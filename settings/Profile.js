@@ -20,9 +20,7 @@ function readProfile() {
   }
 }
 
-function saveProfile(profile) {
-  localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
-}
+function saveProfile(profile) { localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile)); }
 
 function renderProfile() {
   const profile = readProfile();
@@ -46,12 +44,10 @@ function renderProfile() {
         { id: "professional", label: "Профессиональные данные", content: professional }
       ], BookUI.renderButton("Сохранить", "primary", "profile-save"))}
     </form>
-    <div class="profile-work-entry">
-      <button class="ui-folder" type="button" data-action="open-work-profile">
-        <span class="ui-folder-content"><span class="ui-folder-title">Рабочий профиль</span></span>
-        <span class="ui-folder-arrow" aria-hidden="true">›</span>
-      </button>
-    </div>
+    <button class="ui-folder ui-branch-entry" type="button" data-action="open-work-profile">
+      <span class="ui-folder-content"><span class="ui-folder-title">Рабочий профиль</span></span>
+      <span class="ui-folder-arrow" aria-hidden="true">›</span>
+    </button>
     ${BookUI.renderBackButton("Назад", "profile-back")}
   `);
 
@@ -60,21 +56,15 @@ function renderProfile() {
     if (action === "profile-save") {
       const form = app.querySelector("[data-profile-form]");
       if (!form?.reportValidity()) return;
-      const data = Object.fromEntries(new FormData(form).entries());
-      saveProfile(Object.assign({}, readProfile(), data));
+      saveProfile(Object.assign({}, readProfile(), Object.fromEntries(new FormData(form).entries())));
       renderProfile();
       return;
     }
-    if (action === "open-work-profile") {
-      window.Book.openChild("work-profile");
-      return;
-    }
+    if (action === "open-work-profile") window.Book.openChild("work-profile");
     if (action === "profile-back") window.Book.back();
   });
 }
 
-function profileAction(action) {
-  if (action === "open") renderProfile();
-}
-
-window.BookProfile = Object.freeze({ action: profileAction });
+window.BookProfile = Object.freeze({
+  action(action) { if (action === "open") renderProfile(); }
+});
