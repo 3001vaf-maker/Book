@@ -14,16 +14,7 @@ const PROFILE_STORAGE_KEY = "book_profile";
 
 function readProfile() {
   try {
-    return Object.assign({
-      photo: "",
-      name: "",
-      phone: "",
-      about: "",
-      profession: "",
-      experience: "",
-      aboutProfession: "",
-      workplaces: []
-    }, JSON.parse(localStorage.getItem(PROFILE_STORAGE_KEY) || "{}"));
+    return Object.assign({ photo: "", name: "", phone: "", about: "", profession: "", experience: "", aboutProfession: "", workplaces: [] }, JSON.parse(localStorage.getItem(PROFILE_STORAGE_KEY) || "{}"));
   } catch {
     return { photo: "", name: "", phone: "", about: "", profession: "", experience: "", aboutProfession: "", workplaces: [] };
   }
@@ -35,47 +26,41 @@ function saveProfile(profile) {
 
 function renderProfile() {
   const profile = readProfile();
-
   const personal = [
     BookUI.renderField({ label: "Имя", name: "name", value: profile.name, placeholder: "Ваше имя", required: true }),
     BookUI.renderField({ label: "Телефон", name: "phone", value: profile.phone, placeholder: "Номер телефона", type: "tel", required: true }),
     BookUI.renderTextarea({ label: "О себе", name: "about", value: profile.about, placeholder: "Коротко о себе" })
   ].join("");
-
   const professional = [
     BookUI.renderSelect({ label: "Профессия", name: "profession", value: profile.profession, options: PROFILE_PROFESSIONS, placeholder: "Выберите профессию" }),
     BookUI.renderSelect({ label: "Опыт работы", name: "experience", value: profile.experience, options: PROFILE_EXPERIENCE, placeholder: "Выберите стаж" }),
     BookUI.renderTextarea({ label: "О профессии", name: "aboutProfession", value: profile.aboutProfession, placeholder: "Расскажите о своей профессии" })
   ].join("");
 
-  BookUI.renderScreen(
-    document.getElementById("app"),
-    "Профиль",
-    `
-      ${BookUI.renderAvatar()}
-      <form data-profile-form>
-        ${BookUI.renderAccordion([
-          { id: "personal", label: "Личные данные", content: personal },
-          { id: "professional", label: "Профессиональные данные", content: professional }
-        ], BookUI.renderButton("Сохранить", "primary", "profile-save"))}
-      </form>
-      <div class="profile-work-entry">
-        ${BookUI.renderFolderList(document.createElement("div"), [])}
-        <button class="ui-folder" type="button" data-action="open-work-profile">
-          <span class="ui-folder-content"><span class="ui-folder-title">Рабочий профиль</span></span>
-          <span class="ui-folder-arrow" aria-hidden="true">›</span>
-        </button>
-      </div>
-      ${BookUI.renderBackButton("Назад", "profile-back")}
-    `
-  );
+  const app = document.getElementById("app");
+  BookUI.renderScreen(app, "Профиль", `
+    ${BookUI.renderAvatar()}
+    <form data-profile-form>
+      ${BookUI.renderAccordion([
+        { id: "personal", label: "Личные данные", content: personal },
+        { id: "professional", label: "Профессиональные данные", content: professional }
+      ], BookUI.renderButton("Сохранить", "primary", "profile-save"))}
+    </form>
+    <div class="profile-work-entry">
+      <button class="ui-folder" type="button" data-action="open-work-profile">
+        <span class="ui-folder-content"><span class="ui-folder-title">Рабочий профиль</span></span>
+        <span class="ui-folder-arrow" aria-hidden="true">›</span>
+      </button>
+    </div>
+    ${BookUI.renderBackButton("Назад", "profile-back")}
+  `);
 
-  const profileForm = document.querySelector("[data-profile-form]");
-  BookUI.bindAccordion(document.getElementById("app"));
-  BookUI.bindActions(document.getElementById("app"), (action) => {
+  BookUI.bindAccordion(app);
+  BookUI.bindActions(app, (action) => {
     if (action === "profile-save") {
-      if (!profileForm?.reportValidity()) return;
-      const data = Object.fromEntries(new FormData(profileForm).entries());
+      const form = app.querySelector("[data-profile-form]");
+      if (!form?.reportValidity()) return;
+      const data = Object.fromEntries(new FormData(form).entries());
       saveProfile(Object.assign({}, readProfile(), data));
       renderProfile();
       return;
