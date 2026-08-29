@@ -1,7 +1,7 @@
 /* Настройки — владелец только своего первого уровня. */
 
 const SETTINGS_FOLDERS = Object.freeze([
-  { id: "profile", label: "Профиль пользователя" },
+  { id: "profile", label: "Профиль" },
   { id: "service", label: "Сервис" },
   { id: "work-materials", label: "Рабочие материалы" },
   { id: "documents", label: "Документы" },
@@ -15,7 +15,13 @@ function settingsAction(action) {
 
   const app = document.getElementById("app");
   BookUI.renderScreen(app, "Настройки", `<div id="settings-folders"></div>`);
-  BookUI.renderFolderList(document.getElementById("settings-folders"), SETTINGS_FOLDERS);
+  BookUI.renderFolderList(
+    document.getElementById("settings-folders"),
+    SETTINGS_FOLDERS,
+    (folderId) => {
+      if (folderId === "profile") window.Book.openChild("profile");
+    }
+  );
 }
 
 window.BookSettings = Object.freeze({
