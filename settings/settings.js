@@ -14,19 +14,8 @@ function settingsAction(action) {
   if (action !== "open") return;
 
   const app = document.getElementById("app");
-  app.innerHTML = `
-    <section class="screen screen--settings">
-      <h1>Настройки</h1>
-      <div class="folder-list">
-        ${SETTINGS_FOLDERS.map(({ id, label }) => `
-          <button class="folder" type="button" data-settings-folder="${id}">
-            <span>${label}</span>
-            <span aria-hidden="true">›</span>
-          </button>
-        `).join("")}
-      </div>
-    </section>
-  `;
+  BookUI.renderScreen(app, "Настройки", `<div id="settings-folders"></div>`);
+  BookUI.renderFolderList(document.getElementById("settings-folders"), SETTINGS_FOLDERS);
 }
 
 window.BookSettings = Object.freeze({
