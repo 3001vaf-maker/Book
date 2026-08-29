@@ -106,6 +106,91 @@ h1 {
 .ui-folder-arrow { flex: 0 0 auto; color: var(--mocha-light); font-size: 22px; font-weight: 400; line-height: 1; }
 .ui-folder:active { background: var(--cashmere); box-shadow: none; }
 
+/* ACCORDION — единый UI-компонент для раскрываемых секций. */
+.ui-accordion {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-gap);
+  width: 100%;
+  min-width: 0;
+}
+.ui-accordion-item {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--mocha-border);
+  border-radius: var(--ui-folder-radius);
+  background: var(--ui-folder);
+  box-shadow: var(--ui-list-shadow);
+}
+.ui-accordion-trigger {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  min-height: var(--ui-control-h);
+  padding: 14px 16px;
+  border: 0;
+  background: transparent;
+  color: var(--mocha-dark);
+  text-align: left;
+}
+.ui-accordion-trigger:active { background: var(--cashmere); }
+.ui-accordion-title {
+  min-width: 0;
+  font-size: 16px;
+  font-weight: 750;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.ui-accordion-icon {
+  flex: 0 0 auto;
+  color: var(--mocha-medium);
+  font-size: 18px;
+  line-height: 1;
+  transform: rotate(0deg);
+  transition: transform .15s ease;
+}
+.ui-accordion-trigger[aria-expanded="true"] .ui-accordion-icon { transform: rotate(180deg); }
+.ui-accordion-panel {
+  width: 100%;
+  min-width: 0;
+  padding: 0 16px 16px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.ui-accordion-panel[hidden] { display: none; }
+
+/* BUTTON — единый UI-компонент действий. */
+.ui-button,
+.ui-back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  min-height: var(--ui-control-h);
+  padding: 12px 16px;
+  border-radius: var(--ui-radius);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.ui-button { border: 1px solid var(--ui-action); }
+.ui-button-primary { background: var(--ui-action); color: #fff; }
+.ui-button-primary:active { opacity: .9; }
+.ui-back { border: 1px solid var(--mocha-border); background: var(--ui-back); color: var(--mocha-dark); }
+.ui-back:active { background: var(--cashmere); }
+
+/* PROFILE — только компоновка общего UI, без собственной визуальной системы. */
+.profile-content { width: 100%; min-width: 0; }
+.profile-actions { display: flex; flex-direction: column; gap: var(--ui-gap); width: 100%; min-width: 0; margin-top: 18px; }
+
 /* СМАРТФОН — ограничения формы общие для всех экранов. */
 img, svg, video, canvas { display: block; max-width: 100%; }
 img, video, canvas { height: auto; }
@@ -162,6 +247,8 @@ textarea { overflow-wrap: anywhere; resize: vertical; }
 @media (max-width: 360px) {
   .app { padding-left: 12px; padding-right: 12px; }
   .ui-folder { padding-left: 14px; padding-right: 14px; }
+  .ui-accordion-trigger { padding-left: 14px; padding-right: 14px; }
+  .ui-accordion-panel { padding-left: 14px; padding-right: 14px; }
   .nav-item { padding-left: 1px; padding-right: 1px; font-size: 10px; }
 }
 
