@@ -1,11 +1,6 @@
-/*
- * Settings — владелец первого уровня раздела «Настройки».
- *
- * Здесь пока только структура первого уровня.
- * Внутреннее содержимое папок будет добавляться отдельно.
- */
+/* Настройки — владелец первого уровня раздела «Настройки». */
 
-const SETTINGS_FOLDERS = [
+const SETTINGS_FOLDERS = Object.freeze([
   { id: 'profile', label: 'Профиль пользователя' },
   { id: 'service', label: 'Сервис' },
   { id: 'work-materials', label: 'Рабочие материалы' },
@@ -13,8 +8,8 @@ const SETTINGS_FOLDERS = [
   { id: 'loyalty', label: 'Лояльность' },
   { id: 'tags', label: 'Ярлыки' },
   { id: 'wallets', label: 'Кошельки' }
-];
+]);
 
-window.BookSettings = {
+window.BookSettings = Object.freeze({
   folders: SETTINGS_FOLDERS
-};
+});
