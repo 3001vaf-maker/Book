@@ -1,4 +1,7 @@
-/* Book Core — the only navigation/render source for the application shell. */
+/*
+ * Book Core — единый центр управления приложением.
+ * Модули получают доступ к Core, но не становятся его владельцами.
+ */
 (() => {
   const START_ROUTE = "journal";
 
@@ -14,9 +17,22 @@
   const app = document.getElementById("app");
   const navItems = [...document.querySelectorAll(".nav-item")];
 
+  function renderSettings() {
+    const folders = window.BookSettings?.folders ?? [];
+    const items = folders
+      .map(({ id, label }) => `<button class="folder" type="button" data-settings-folder="${id}">${label}</button>`)
+      .join("");
+
+    app.innerHTML = `<section class="screen"><h1>Настройки</h1><div class="folder-list">${items}</div></section>`;
+  }
+
   function render() {
-    const title = ROUTES[state.route];
-    app.innerHTML = `<section class="screen"><h1>${title}</h1></section>`;
+    if (state.route === "settings") {
+      renderSettings();
+    } else {
+      const title = ROUTES[state.route];
+      app.innerHTML = `<section class="screen"><h1>${title}</h1></section>`;
+    }
 
     navItems.forEach((item) => {
       const active = item.dataset.route === state.route;
