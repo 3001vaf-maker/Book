@@ -9,13 +9,17 @@
     settings: "Настройки"
   });
 
-  const state = { route: START_ROUTE };
+  const state = { route: START_ROUTE, child: null };
   const app = document.getElementById("app");
   const navItems = [...document.querySelectorAll(".nav-item")];
 
   function render(route) {
     if (route === "settings") {
-      window.BookSettings.action("open");
+      if (state.child === "profile") {
+        window.BookProfile.action("open");
+      } else {
+        window.BookSettings.action("open");
+      }
     } else {
       BookUI.renderScreen(app, ROUTES[route]);
     }
@@ -31,7 +35,24 @@
   function navigate(route) {
     if (!Object.hasOwn(ROUTES, route)) return;
     state.route = route;
+    state.child = null;
     render(route);
+  }
+
+  function openChild(child) {
+    if (state.route !== "settings" || child !== "profile") return;
+    state.child = child;
+    render("settings");
+  }
+
+  function back() {
+    if (state.route === "settings" && state.child === "profile") {
+      state.child = null;
+      render("settings");
+      return;
+    }
+
+    navigate("settings");
   }
 
   navItems.forEach((item) => {
@@ -40,6 +61,8 @@
 
   window.Book = Object.freeze({
     navigate,
+    openChild,
+    back,
     routes: ROUTES,
     get currentRoute() {
       return state.route;
