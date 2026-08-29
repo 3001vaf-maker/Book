@@ -1,10 +1,6 @@
-/*
- * Book Core — единый центр управления приложением.
- * Модули получают доступ к Core, но не становятся его владельцами.
- */
+/* Book Core — единый центр управления приложением. */
 (() => {
   const START_ROUTE = "journal";
-
   const ROUTES = Object.freeze({
     journal: "Журнал",
     schedule: "График",
@@ -19,20 +15,22 @@
 
   function renderSettings() {
     const folders = window.BookSettings?.folders ?? [];
-    const items = folders
-      .map(({ id, label }) => `<button class="folder" type="button" data-settings-folder="${id}">${label}</button>`)
-      .join("");
-
-    app.innerHTML = `<section class="screen"><h1>Настройки</h1><div class="folder-list">${items}</div></section>`;
+    app.innerHTML = `
+      <section class="screen screen--settings">
+        <h1>Настройки</h1>
+        <div class="folder-list">
+          ${folders.map(({ id, label }) => `
+            <button class="folder" type="button" data-settings-folder="${id}">
+              <span>${label}</span><span aria-hidden="true">›</span>
+            </button>
+          `).join("")}
+        </div>
+      </section>`;
   }
 
   function render() {
-    if (state.route === "settings") {
-      renderSettings();
-    } else {
-      const title = ROUTES[state.route];
-      app.innerHTML = `<section class="screen"><h1>${title}</h1></section>`;
-    }
+    if (state.route === "settings") renderSettings();
+    else app.innerHTML = `<section class="screen"><h1>${ROUTES[state.route]}</h1></section>`;
 
     navItems.forEach((item) => {
       const active = item.dataset.route === state.route;
@@ -47,9 +45,7 @@
     render();
   }
 
-  navItems.forEach((item) => {
-    item.addEventListener("click", () => navigate(item.dataset.route));
-  });
+  navItems.forEach((item) => item.addEventListener("click", () => navigate(item.dataset.route)));
 
   window.Book = Object.freeze({
     navigate,
