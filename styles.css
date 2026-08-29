@@ -1,4 +1,4 @@
-/* Book — one shared design source for the application shell. */
+/* Book — единый источник внешнего вида всего приложения. */
 :root {
   --background: #ffffff;
   --surface: #ffffff;
@@ -43,6 +43,26 @@ button { font: inherit; }
   line-height: 1.2;
 }
 
+.folder-list {
+  display: grid;
+  gap: 0;
+  margin-top: 24px;
+}
+
+.folder {
+  width: 100%;
+  min-height: 52px;
+  padding: 14px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.folder:first-child { border-top: 1px solid var(--border); }
+
 .bottom-nav {
   position: fixed;
   right: max(0px, calc((100vw - var(--app-width)) / 2));
@@ -76,22 +96,14 @@ button { font: inherit; }
   font-weight: 600;
 }
 
-.nav-item:focus-visible {
+.nav-item:focus-visible,
+.folder:focus-visible {
   outline: 2px solid currentColor;
   outline-offset: -4px;
-}
-
-@media (min-width: 700px) {
-  .app {
-    min-height: 100vh;
-  }
 }
 
 @media (max-width: 699px) {
   html, body { background: var(--background); }
   .app { box-shadow: none; }
-  .bottom-nav {
-    left: 0;
-    right: 0;
-  }
+  .bottom-nav { left: 0; right: 0; }
 }
