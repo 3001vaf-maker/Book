@@ -1,4 +1,4 @@
-/* Book Core — единый центр управления приложением. */
+/* Book Core — единый центр навигации и команд приложения. */
 (() => {
   const START_ROUTE = "journal";
   const ROUTES = Object.freeze({
@@ -15,15 +15,16 @@
 
   function render(route) {
     if (route === "settings") {
-      window.BookSettings?.action("open");
+      window.BookSettings.action("open");
     } else {
-      app.innerHTML = `<section class="screen"><h1>${ROUTES[route]}</h1></section>`;
+      BookUI.renderScreen(app, ROUTES[route]);
     }
 
     navItems.forEach((item) => {
       const active = item.dataset.route === route;
       item.classList.toggle("is-active", active);
-      item.setAttribute("aria-current", active ? "page" : "false");
+      if (active) item.setAttribute("aria-current", "page");
+      else item.removeAttribute("aria-current");
     });
   }
 
@@ -40,7 +41,9 @@
   window.Book = Object.freeze({
     navigate,
     routes: ROUTES,
-    get currentRoute() { return state.route; }
+    get currentRoute() {
+      return state.route;
+    }
   });
 
   render(state.route);
