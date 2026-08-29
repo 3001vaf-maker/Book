@@ -10,245 +10,113 @@
   --ui-back: #e7e1db;
   --ui-folder: rgba(255,255,255,.82);
   --ui-action: #3b302b;
-  --ui-tab-active: #e8e1dc;
-  --ui-select: rgba(255,255,255,.72);
   --ui-secondary: var(--cashmere);
-  --ui-danger: #9a6258;
-  --ui-danger-bg: rgba(154,98,88,.10);
   --ui-radius: 14px;
   --ui-folder-radius: 16px;
   --ui-panel-radius: 18px;
   --ui-sheet-radius: 20px;
   --ui-gap: 12px;
   --ui-control-h: 48px;
-  --ui-list-padding: 18px;
-  --ui-list-shadow: 0 1px 6px rgba(59,48,43,.018);
   --ui-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
   --app-width: 430px;
 }
 
 * { box-sizing: border-box; }
-html {
-  width: 100%;
-  min-height: 100%;
-  background: var(--ui-page);
-  overflow-x: hidden;
-}
-body {
-  width: 100%;
-  min-width: 320px;
-  min-height: 100dvh;
-  margin: 0;
-  overflow-x: hidden;
-  background: var(--ui-page);
-  color: var(--mocha-dark);
-  font-family: var(--ui-font);
-  font-size: 14px;
-  line-height: 1.4;
-}
+html { width: 100%; min-height: 100%; background: var(--ui-page); overflow-x: hidden; }
+body { width: 100%; min-width: 320px; min-height: 100dvh; margin: 0; overflow-x: hidden; background: var(--ui-page); color: var(--mocha-dark); font-family: var(--ui-font); font-size: 14px; line-height: 1.4; }
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; color: inherit; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
 button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid rgba(59,48,43,.28); outline-offset: 2px; }
 
-/* APP SHELL — форма приложения рассчитана на ширину смартфона. */
-.app-shell {
-  position: relative;
-  width: 100%;
-  max-width: var(--app-width);
-  min-height: 100dvh;
-  margin: 0 auto;
-  background: var(--ui-bg);
-}
-
-.app {
-  width: 100%;
-  min-width: 0;
-  min-height: 100dvh;
-  padding: 18px 14px calc(96px + env(safe-area-inset-bottom));
-}
-
-.screen { min-width: 0; width: 100%; }
+.app-shell { position: relative; width: 100%; max-width: var(--app-width); min-height: 100dvh; margin: 0 auto; background: var(--ui-bg); }
+.app { width: 100%; min-width: 0; min-height: 100dvh; padding: 18px 14px calc(96px + env(safe-area-inset-bottom)); }
+.screen { width: 100%; min-width: 0; }
 .page-header { min-width: 0; margin: 0 0 18px; }
-h1 {
-  min-width: 0;
-  margin: 0;
-  color: var(--mocha-dark);
-  font-size: 29px;
-  font-weight: 800;
-  letter-spacing: -.8px;
-  line-height: 1.12;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
+h1 { min-width: 0; margin: 0; color: var(--mocha-dark); font-size: 29px; font-weight: 800; letter-spacing: -.8px; line-height: 1.12; overflow-wrap: anywhere; word-break: break-word; }
 
 /* FOLDER — единый UI-компонент. */
 .ui-folder-list { display: flex; flex-direction: column; gap: var(--ui-gap); width: 100%; min-width: 0; }
-.ui-folder {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  min-width: 0;
-  min-height: var(--ui-control-h);
-  padding: 14px 16px;
-  border: 1px solid var(--mocha-border);
-  border-radius: var(--ui-folder-radius);
-  background: var(--ui-folder);
-  box-shadow: var(--ui-list-shadow);
-  color: var(--mocha-dark);
-  text-align: left;
-  overflow: hidden;
-}
+.ui-folder { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 12px; width: 100%; min-width: 0; min-height: var(--ui-control-h); padding: 14px 16px; border: 1px solid var(--mocha-border); border-radius: var(--ui-folder-radius); background: var(--ui-folder); box-shadow: 0 1px 6px rgba(59,48,43,.018); color: var(--mocha-dark); text-align: left; overflow: hidden; }
 .ui-folder-content { min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
 .ui-folder-title { display: block; min-width: 0; font-size: 16px; font-weight: 750; line-height: 1.25; overflow-wrap: anywhere; word-break: break-word; }
 .ui-folder-description { display: block; min-width: 0; margin-top: 3px; color: var(--mocha-medium); font-size: 12px; line-height: 1.3; overflow-wrap: anywhere; word-break: break-word; }
-.ui-folder-arrow { flex: 0 0 auto; color: var(--mocha-light); font-size: 22px; font-weight: 400; line-height: 1; }
+.ui-folder-arrow { flex: 0 0 auto; color: var(--mocha-light); font-size: 22px; line-height: 1; }
 .ui-folder:active { background: var(--cashmere); box-shadow: none; }
+.ui-branch-entry { margin-top: var(--ui-gap); }
 
-/* ACCORDION — единый UI-компонент для раскрываемых секций. */
-.ui-accordion {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-gap);
-  width: 100%;
-  min-width: 0;
-}
-.ui-accordion-item {
-  width: 100%;
-  min-width: 0;
-  overflow: hidden;
-  border: 1px solid var(--mocha-border);
-  border-radius: var(--ui-folder-radius);
-  background: var(--ui-folder);
-  box-shadow: var(--ui-list-shadow);
-}
-.ui-accordion-trigger {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  min-width: 0;
-  min-height: var(--ui-control-h);
-  padding: 14px 16px;
-  border: 0;
-  background: transparent;
-  color: var(--mocha-dark);
-  text-align: left;
-}
+/* ACCORDION — единый UI-компонент. */
+.ui-accordion-block { width: 100%; min-width: 0; overflow: hidden; border: 1px solid var(--mocha-border); border-radius: var(--ui-panel-radius); background: var(--ui-folder); box-shadow: 0 1px 6px rgba(59,48,43,.018); }
+.ui-accordion { display: flex; flex-direction: column; width: 100%; min-width: 0; }
+.ui-accordion-item { width: 100%; min-width: 0; border-bottom: 1px solid var(--mocha-border); }
+.ui-accordion-item:last-child { border-bottom: 0; }
+.ui-accordion-trigger { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 12px; width: 100%; min-width: 0; min-height: var(--ui-control-h); padding: 14px 16px; border: 0; background: transparent; color: var(--mocha-dark); text-align: left; }
 .ui-accordion-trigger:active { background: var(--cashmere); }
-.ui-accordion-title {
-  min-width: 0;
-  font-size: 16px;
-  font-weight: 750;
-  line-height: 1.25;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
-.ui-accordion-icon {
-  flex: 0 0 auto;
-  color: var(--mocha-medium);
-  font-size: 18px;
-  line-height: 1;
-  transform: rotate(0deg);
-  transition: transform .15s ease;
-}
+.ui-accordion-title { min-width: 0; font-size: 16px; font-weight: 750; line-height: 1.25; overflow-wrap: anywhere; word-break: break-word; }
+.ui-accordion-icon { flex: 0 0 auto; color: var(--mocha-medium); font-size: 18px; line-height: 1; transform: rotate(0deg); transition: transform .15s ease; }
 .ui-accordion-trigger[aria-expanded="true"] .ui-accordion-icon { transform: rotate(180deg); }
-.ui-accordion-panel {
-  width: 100%;
-  min-width: 0;
-  padding: 0 16px 16px;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
+.ui-accordion-panel { width: 100%; min-width: 0; padding: 2px 16px 16px; overflow-wrap: anywhere; word-break: break-word; }
 .ui-accordion-panel[hidden] { display: none; }
+.ui-accordion-footer { padding: 16px; border-top: 1px solid var(--mocha-border); }
 
-/* BUTTON — единый UI-компонент действий. */
-.ui-button,
-.ui-back {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  min-width: 0;
-  min-height: var(--ui-control-h);
-  padding: 12px 16px;
-  border-radius: var(--ui-radius);
-  font-size: 14px;
-  font-weight: 700;
-  text-align: center;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
+/* FIELD / SELECT / TEXTAREA — единые формы ввода. */
+.ui-field { display: block; width: 100%; min-width: 0; margin-top: 12px; }
+.ui-field:first-child { margin-top: 0; }
+.ui-field-label { display: block; margin-bottom: 6px; color: var(--mocha-dark); font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }
+.ui-input, .ui-select, .ui-textarea { display: block; width: 100%; max-width: 100%; min-width: 0; border: 1px solid var(--mocha-border); border-radius: var(--ui-radius); background: #fff; color: var(--mocha-dark); }
+.ui-input, .ui-select { min-height: var(--ui-control-h); padding: 11px 13px; }
+.ui-textarea { min-height: 108px; padding: 12px 13px; resize: vertical; }
+.ui-input::placeholder, .ui-textarea::placeholder { color: var(--mocha-light); }
+.ui-select { appearance: auto; }
+
+/* BUTTON / BACK — единые действия. */
+.ui-button, .ui-back { display: flex; align-items: center; justify-content: center; width: 100%; min-width: 0; min-height: var(--ui-control-h); padding: 12px 16px; border-radius: var(--ui-radius); font-size: 14px; font-weight: 700; text-align: center; overflow-wrap: anywhere; word-break: break-word; }
 .ui-button { border: 1px solid var(--ui-action); }
 .ui-button-primary { background: var(--ui-action); color: #fff; }
-.ui-button-primary:active { opacity: .9; }
-.ui-back { border: 1px solid var(--mocha-border); background: var(--ui-back); color: var(--mocha-dark); }
-.ui-back:active { background: var(--cashmere); }
+.ui-button-secondary { border-color: var(--mocha-border); background: var(--ui-secondary); color: var(--mocha-dark); }
+.ui-back { margin-top: 18px; border: 1px solid var(--mocha-border); background: var(--ui-back); color: var(--mocha-dark); }
+.ui-button:active, .ui-back:active { opacity: .9; }
 
-/* PROFILE — только компоновка общего UI, без собственной визуальной системы. */
-.profile-content { width: 100%; min-width: 0; }
-.profile-actions { display: flex; flex-direction: column; gap: var(--ui-gap); width: 100%; min-width: 0; margin-top: 18px; }
+/* AVATAR — универсальный UI-блок фотографии. */
+.ui-avatar-block { display: flex; justify-content: center; width: 100%; margin: 0 0 18px; }
+.ui-avatar { display: flex; align-items: center; justify-content: center; width: 104px; height: 104px; border: 1px solid var(--mocha-border); border-radius: 50%; background: var(--cashmere); color: var(--mocha-medium); font-size: 12px; font-weight: 700; }
 
-/* СМАРТФОН — ограничения формы общие для всех экранов. */
+/* CARD / LIST / EMPTY STATE — единые контейнеры данных. */
+.ui-card-list { display: flex; flex-direction: column; gap: var(--ui-gap); width: 100%; min-width: 0; }
+.ui-card { width: 100%; min-width: 0; padding: 16px; border: 1px solid var(--mocha-border); border-radius: var(--ui-panel-radius); background: #fff; overflow: hidden; }
+.ui-card-title { margin: 0 0 6px; font-size: 17px; line-height: 1.25; overflow-wrap: anywhere; }
+.ui-card-text { margin: 3px 0; color: var(--mocha-medium); overflow-wrap: anywhere; word-break: break-word; }
+.ui-card .ui-button { margin-top: 12px; }
+.ui-empty-state { width: 100%; min-width: 0; padding: 18px; border: 1px dashed var(--mocha-border); border-radius: var(--ui-panel-radius); color: var(--mocha-medium); text-align: center; overflow-wrap: anywhere; }
+
+/* MODAL — единый UI overlay. */
+.ui-modal-layer { position: fixed; inset: 0; z-index: 100; display: flex; align-items: flex-end; justify-content: center; padding: 14px; background: rgba(59,48,43,.22); }
+.ui-modal { width: min(100%, var(--app-width)); max-height: calc(100dvh - 28px); overflow: auto; border-radius: var(--ui-sheet-radius); background: #fff; box-shadow: 0 12px 45px rgba(59,48,43,.16); }
+.ui-modal-header { padding: 18px 18px 10px; }
+.ui-modal-header h2 { margin: 0; font-size: 20px; line-height: 1.2; overflow-wrap: anywhere; }
+.ui-modal-content { padding: 0 18px 6px; }
+.ui-modal-actions { display: flex; flex-direction: column; gap: var(--ui-gap); padding: 12px 18px 18px; }
+
+/* Общая мобильная геометрия. */
 img, svg, video, canvas { display: block; max-width: 100%; }
-img, video, canvas { height: auto; }
-table { width: 100%; max-width: 100%; border-collapse: collapse; table-layout: fixed; }
 input, select, textarea { width: 100%; max-width: 100%; min-width: 0; }
-textarea { overflow-wrap: anywhere; resize: vertical; }
+table { width: 100%; max-width: 100%; border-collapse: collapse; table-layout: fixed; }
 
-/* CALENDAR — семидневная сетка всегда находится внутри ширины приложения. */
-.calendar, .calendar-grid { width: 100%; max-width: 100%; min-width: 0; overflow: hidden; }
-.calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
-.calendar-cell { min-width: 0; max-width: 100%; overflow: hidden; overflow-wrap: anywhere; }
-
-/* BOTTOM NAVIGATION — единая нижняя навигация с safe area смартфона. */
-.bottom-nav {
-  position: fixed;
-  right: 50%;
-  bottom: 0;
-  left: 50%;
-  z-index: 30;
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  width: min(100%, var(--app-width));
-  min-height: 64px;
-  padding: 0 4px env(safe-area-inset-bottom);
-  transform: translateX(-50%);
-  background: rgba(255,255,255,.97);
-  border-top: 1px solid #e8e8e5;
-  backdrop-filter: blur(14px);
-}
-.nav-item {
-  min-width: 0;
-  min-height: 64px;
-  padding: 9px 2px 8px;
-  border: 0;
-  background: transparent;
-  color: var(--mocha-medium);
-  font-size: 11px;
-  line-height: 1.2;
-  text-align: center;
-  white-space: normal;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
+/* BOTTOM NAVIGATION — единая форма смартфона. */
+.bottom-nav { position: fixed; right: 50%; bottom: 0; left: 50%; z-index: 30; display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); width: min(100%,var(--app-width)); min-height: 64px; padding: 0 4px env(safe-area-inset-bottom); transform: translateX(-50%); background: rgba(255,255,255,.97); border-top: 1px solid #e8e8e5; backdrop-filter: blur(14px); }
+.nav-item { min-width: 0; min-height: 64px; padding: 9px 2px 8px; border: 0; background: transparent; color: var(--mocha-medium); font-size: 11px; line-height: 1.2; text-align: center; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
 .nav-item.is-active { color: var(--mocha-dark); font-weight: 800; }
 
-/* DESKTOP / MAC — тот же интерфейс в телефонной форме по центру. */
 @media (min-width: 761px) {
   body { padding: 20px 0; }
   .app-shell { min-height: calc(100dvh - 40px); border-radius: 18px; box-shadow: 0 0 40px rgba(0,0,0,.08); overflow: hidden; }
   .app { min-height: calc(100dvh - 40px); }
 }
 
-/* Узкие смартфоны — уменьшаем только геометрию, не создаём копию UI. */
 @media (max-width: 360px) {
   .app { padding-left: 12px; padding-right: 12px; }
   .ui-folder { padding-left: 14px; padding-right: 14px; }
-  .ui-accordion-trigger { padding-left: 14px; padding-right: 14px; }
-  .ui-accordion-panel { padding-left: 14px; padding-right: 14px; }
+  .ui-accordion-trigger, .ui-accordion-panel { padding-left: 14px; padding-right: 14px; }
+  .ui-modal-content, .ui-modal-actions, .ui-modal-header { padding-left: 14px; padding-right: 14px; }
   .nav-item { padding-left: 1px; padding-right: 1px; font-size: 10px; }
 }
 
