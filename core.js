@@ -13,27 +13,15 @@
   const app = document.getElementById("app");
   const navItems = [...document.querySelectorAll(".nav-item")];
 
-  function renderSettings() {
-    const folders = window.BookSettings?.folders ?? [];
-    app.innerHTML = `
-      <section class="screen screen--settings">
-        <h1>Настройки</h1>
-        <div class="folder-list">
-          ${folders.map(({ id, label }) => `
-            <button class="folder" type="button" data-settings-folder="${id}">
-              <span>${label}</span><span aria-hidden="true">›</span>
-            </button>
-          `).join("")}
-        </div>
-      </section>`;
-  }
-
-  function render() {
-    if (state.route === "settings") renderSettings();
-    else app.innerHTML = `<section class="screen"><h1>${ROUTES[state.route]}</h1></section>`;
+  function render(route) {
+    if (route === "settings") {
+      window.BookSettings?.action("open");
+    } else {
+      app.innerHTML = `<section class="screen"><h1>${ROUTES[route]}</h1></section>`;
+    }
 
     navItems.forEach((item) => {
-      const active = item.dataset.route === state.route;
+      const active = item.dataset.route === route;
       item.classList.toggle("is-active", active);
       item.setAttribute("aria-current", active ? "page" : "false");
     });
@@ -42,10 +30,12 @@
   function navigate(route) {
     if (!Object.hasOwn(ROUTES, route)) return;
     state.route = route;
-    render();
+    render(route);
   }
 
-  navItems.forEach((item) => item.addEventListener("click", () => navigate(item.dataset.route)));
+  navItems.forEach((item) => {
+    item.addEventListener("click", () => navigate(item.dataset.route));
+  });
 
   window.Book = Object.freeze({
     navigate,
@@ -53,5 +43,5 @@
     get currentRoute() { return state.route; }
   });
 
-  render();
+  render(state.route);
 })();
