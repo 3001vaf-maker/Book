@@ -9,23 +9,23 @@
     settings: "Настройки"
   });
 
-  const state = { route: START_ROUTE, child: null };
+  const state = { route: START_ROUTE, stack: [] };
   const app = document.getElementById("app");
   const navItems = [...document.querySelectorAll(".nav-item")];
 
-  function render(route) {
-    if (route === "settings") {
-      if (state.child === "profile") {
-        window.BookProfile.action("open");
-      } else {
-        window.BookSettings.action("open");
-      }
+  function render() {
+    if (state.route === "settings") {
+      const current = state.stack.at(-1);
+      if (current === "profile") window.BookProfile.action("open");
+      else if (current === "work-profile") window.BookWorkProfile.action("open");
+      else if (current === "workplaces") window.BookWorkplaces.action("open");
+      else window.BookSettings.action("open");
     } else {
-      BookUI.renderScreen(app, ROUTES[route]);
+      BookUI.renderScreen(app, ROUTES[state.route]);
     }
 
     navItems.forEach((item) => {
-      const active = item.dataset.route === route;
+      const active = item.dataset.route === state.route;
       item.classList.toggle("is-active", active);
       if (active) item.setAttribute("aria-current", "page");
       else item.removeAttribute("aria-current");
@@ -35,23 +35,24 @@
   function navigate(route) {
     if (!Object.hasOwn(ROUTES, route)) return;
     state.route = route;
-    state.child = null;
-    render(route);
+    state.stack = [];
+    render();
   }
 
   function openChild(child) {
-    if (state.route !== "settings" || child !== "profile") return;
-    state.child = child;
-    render("settings");
+    if (state.route !== "settings") return;
+    const allowed = new Set(["profile", "work-profile", "workplaces"]);
+    if (!allowed.has(child)) return;
+    state.stack.push(child);
+    render();
   }
 
   function back() {
-    if (state.route === "settings" && state.child === "profile") {
-      state.child = null;
-      render("settings");
+    if (state.route === "settings" && state.stack.length) {
+      state.stack.pop();
+      render();
       return;
     }
-
     navigate("settings");
   }
 
@@ -64,10 +65,9 @@
     openChild,
     back,
     routes: ROUTES,
-    get currentRoute() {
-      return state.route;
-    }
+    get currentRoute() { return state.route; },
+    get currentStack() { return [...state.stack]; }
   });
 
-  render(state.route);
+  render();
 })();
