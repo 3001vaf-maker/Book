@@ -1,0 +1,4 @@
+export function accordion(items, { openFirst = false } = {}) {
+  return `<div class="accordion" data-accordion>${items.map((item,index)=>`<section class="accordion-item ${openFirst&&index===0?'is-open':''}"><button type="button" class="accordion-trigger" aria-expanded="${openFirst&&index===0}" data-accordion-trigger><span>${item.title}</span><span class="accordion-value">${item.value||''}</span><span class="accordion-chevron">⌄</span></button><div class="accordion-panel">${item.content}</div></section>`).join('')}</div>`;
+}
+export function initAccordions(root){root.querySelectorAll('[data-accordion]').forEach(a=>a.addEventListener('click',e=>{const t=e.target.closest('[data-accordion-trigger]');if(!t)return;const item=t.closest('.accordion-item'),open=item.classList.toggle('is-open');t.setAttribute('aria-expanded',String(open));}));}

@@ -1,0 +1,2 @@
+const items=[['main','Главная','⌂'],['timetable','График','◷'],['journal','Журнал','▤'],['chat','Чат','◌'],['settings','Настройки','⚙']];
+export function bottomNavigation(active){return `<nav class="bottom-nav" aria-label="Основная навигация">${items.map(([id,label,icon])=>`<button type="button" class="nav-item ${active===id?'is-active':''}" data-nav="${id}"><span class="nav-icon" aria-hidden="true">${icon}</span><span>${label}</span></button>`).join('')}</nav>`}
