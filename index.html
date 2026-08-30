@@ -1,32 +1,14 @@
 <!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#ffffff">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#F5F5F3">
   <title>Book</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <div class="app-shell">
-    <main id="app" class="app" aria-live="polite"></main>
-    <nav class="bottom-nav" aria-label="Основная навигация">
-      <button class="nav-item" data-route="journal" type="button">Журнал</button>
-      <button class="nav-item" data-route="schedule" type="button">График</button>
-      <button class="nav-item" data-route="dashboard" type="button">Дашборд</button>
-      <button class="nav-item" data-route="chat" type="button">Чат</button>
-      <button class="nav-item" data-route="settings" type="button">Настройки</button>
-    </nav>
-  </div>
-  <script src="ui/ui.js"></script>
-  <script src="settings/settings.js"></script>
-  <script src="settings/Profile.js"></script>
-  <script src="settings/WorkProfile.js"></script>
-  <script src="settings/Workplaces.js"></script>
-  <script src="dashboard/Dashboard.js"></script>
-  <script src="clients/Clients.js"></script>
-  <script src="core.js"></script>
+  <div id="app" class="app-shell"></div>
+  <script type="module" src="core.js"></script>
 </body>
 </html>

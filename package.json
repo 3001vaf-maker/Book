@@ -1,0 +1,1 @@
+{"name":"book","private":true,"type":"module","scripts":{"check":"node --check core.js && node --check ui/ui.js && node --check main/main.js && node --check main/clients/clients.js && node --check journal/journal.js && node --check timetable/timetable.js && node --check chat/chat.js && node --check settings/settings.js"}}
