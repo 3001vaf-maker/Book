@@ -2,10 +2,11 @@ import { accordion, initAccordions } from './accordion/accordion.js';
 import { bottomNavigation } from './navigation/navigation.js';
 import { entityCard } from './cards/index.js';
 import { select } from './selectors/index.js';
+import { workLinks, initWorkLinks, collectWorkLinks } from './links/index.js';
 
 const escapeMap = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
-export const escapeHtml = (v = '') => String(v).replace(/[&<>"']/g, (c) => escapeMap[c]);
-export { accordion, initAccordions, bottomNavigation, entityCard, select };
+export const escapeHtml = (v = '') => String(v).replace(/[&<>\"']/g, (c) => escapeMap[c]);
+export { accordion, initAccordions, bottomNavigation, entityCard, select, workLinks, initWorkLinks, collectWorkLinks };
 
 export function pageHeader(title, subtitle = '') {
   return `<header class="page-header"><h1>${escapeHtml(title)}</h1>${subtitle ? `<p>${escapeHtml(subtitle)}</p>` : ''}</header>`;
@@ -43,6 +44,41 @@ export function timeInput({ label, name, value = '' } = {}) {
 export function photoField({ name = 'photo', value = '' } = {}) {
   const preview = value ? `<div class="photo-field__preview" style="background-image:url('${escapeHtml(value)}')" aria-hidden="true"></div>` : '<div class="photo-field__preview photo-field__preview--empty" aria-hidden="true">Фото</div>';
   return `<div class="photo-field" data-photo-field><span class="photo-field__label">Фото</span><label class="photo-field__control">${preview}<span class="photo-field__action">${value ? 'Изменить фото' : 'Добавить фото'}</span><input type="file" accept="image/*" data-photo-input></label>${value ? '<button type="button" class="ui-button ui-button--small photo-field__remove" data-photo-remove>Удалить фото</button>' : ''}<input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(value)}" data-photo-value></div>`;
+}
+
+export function initPhotoField(root) {
+  root.querySelectorAll('[data-photo-field]').forEach((fieldRoot) => {
+    const input = fieldRoot.querySelector('[data-photo-input]');
+    const value = fieldRoot.querySelector('[data-photo-value]');
+    const preview = fieldRoot.querySelector('.photo-field__preview');
+    const action = fieldRoot.querySelector('.photo-field__action');
+    if (!input || !value || !preview || !action) return;
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const src = String(reader.result || '');
+        value.value = src;
+        preview.classList.remove('photo-field__preview--empty');
+        preview.style.backgroundImage = `url('${src.replaceAll("'", '%27')}')`;
+        preview.textContent = '';
+        action.textContent = 'Изменить фото';
+        if (!fieldRoot.querySelector('[data-photo-remove]')) fieldRoot.insertAdjacentHTML('beforeend', '<button type="button" class="ui-button ui-button--small photo-field__remove" data-photo-remove>Удалить фото</button>');
+      };
+      reader.readAsDataURL(file);
+    };
+    fieldRoot.onclick = (event) => {
+      if (!event.target.closest('[data-photo-remove]')) return;
+      value.value = '';
+      input.value = '';
+      preview.style.backgroundImage = '';
+      preview.classList.add('photo-field__preview--empty');
+      preview.textContent = 'Фото';
+      action.textContent = 'Добавить фото';
+      event.target.closest('[data-photo-remove]')?.remove();
+    };
+  });
 }
 
 export function emptyState(title, text = '') {
