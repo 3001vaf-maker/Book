@@ -1,10 +1,11 @@
-import { button, escapeHtml, select } from '../ui.js';
+import { escapeHtml } from '../ui.js';
+import { select } from '../selectors/index.js';
 
 export const WORK_LINK_TYPES = ['Instagram', 'ВКонтакте', 'YouTube', 'Facebook', 'Сайт', 'Другое'];
 
 export function workLinks({ links = [], name = 'links' } = {}) {
   const rows = links.length ? links : [{ type: 'Instagram', url: '' }];
-  return `<div class="work-links" data-work-links="${escapeHtml(name)}">${rows.map(linkRow).join('')}</div>${button('+ Добавить ссылку', { className: 'ui-button--small', data: `data-add-work-link="${escapeHtml(name)}"` })}`;
+  return `<div class="work-links" data-work-links="${escapeHtml(name)}">${rows.map(linkRow).join('')}</div>`;
 }
 
 function linkRow(link = {}) {
@@ -27,9 +28,6 @@ export function initWorkLinks(root) {
 
 export function collectWorkLinks(root, name = 'links') {
   return [...root.querySelectorAll(`[data-work-links="${CSS.escape(name)}"] [data-work-link-row]`)]
-    .map((row) => ({
-      type: row.querySelector('[name="linkType"]')?.value || '',
-      url: row.querySelector('[name="linkUrl"]')?.value.trim() || '',
-    }))
+    .map((row) => ({ type: row.querySelector('[name="linkType"]')?.value || '', url: row.querySelector('[name="linkUrl"]')?.value.trim() || '' }))
     .filter((link) => link.url);
 }
