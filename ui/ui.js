@@ -23,6 +23,23 @@ export function field({ label, name, value = '', type = 'text', placeholder = ''
   return `<label class="field"><span>${escapeHtml(label)}</span><input name="${escapeHtml(name)}" type="${type}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}" ${required ? 'required' : ''} ${readonly ? 'readonly' : ''} ${inputmode ? `inputmode="${inputmode}"` : ''}></label>`;
 }
 
+export function phoneField({ label = 'Телефон', name = 'phone', value = '', required = false } = {}) {
+  return field({ label, name, value, type: 'tel', required, inputmode: 'tel', placeholder: '+7' });
+}
+
+export function searchableSelect({ label, name, value = '', options = [], placeholder = 'Начните вводить', required = false } = {}) {
+  const id = `search-${name}-${Math.random().toString(36).slice(2, 8)}`;
+  const opts = options.map((option) => {
+    const item = typeof option === 'string' ? { value: option, label: option } : option;
+    return `<option value="${escapeHtml(item.value)}">${escapeHtml(item.label)}</option>`;
+  }).join('');
+  return `<label class="field searchable-select"><span>${escapeHtml(label)}</span><input list="${id}" name="${escapeHtml(name)}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}" ${required ? 'required' : ''} autocomplete="off"><datalist id="${id}">${opts}</datalist></label>`;
+}
+
+export function timeInput({ label, name, value = '' } = {}) {
+  return field({ label, name, value, type: 'time' });
+}
+
 export function photoField({ name = 'photo', value = '' } = {}) {
   const preview = value ? `<div class="photo-field__preview" style="background-image:url('${escapeHtml(value)}')" aria-hidden="true"></div>` : '<div class="photo-field__preview photo-field__preview--empty" aria-hidden="true">Фото</div>';
   return `<div class="photo-field" data-photo-field><span class="photo-field__label">Фото</span><label class="photo-field__control">${preview}<span class="photo-field__action">${value ? 'Изменить фото' : 'Добавить фото'}</span><input type="file" accept="image/*" data-photo-input></label>${value ? '<button type="button" class="ui-button ui-button--small photo-field__remove" data-photo-remove>Удалить фото</button>' : ''}<input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(value)}" data-photo-value></div>`;
