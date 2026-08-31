@@ -3,15 +3,18 @@ import { bottomNavigation } from './navigation/navigation.js';
 import { entityCard } from './cards/index.js';
 import { select } from './selectors/index.js';
 import { workLinks, initWorkLinks, collectWorkLinks } from './links/index.js';
+import { costField, initCostFields, collectCost } from './cost/index.js';
+import { durationPicker, initDurationPickers } from './duration/index.js';
+import { workplaceSelector, initWorkplaceSelectors, collectWorkplaceSelections } from './workplaces/index.js';
 
 const escapeMap = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
 export const escapeHtml = (v = '') => String(v).replace(/[&<>\"']/g, (c) => escapeMap[c]);
-export { accordion, initAccordions, bottomNavigation, entityCard, select, workLinks, initWorkLinks, collectWorkLinks };
+export { accordion, initAccordions, bottomNavigation, entityCard, select, workLinks, initWorkLinks, collectWorkLinks, costField, initCostFields, collectCost, durationPicker, initDurationPickers, workplaceSelector, initWorkplaceSelectors, collectWorkplaceSelections };
 
 export function pageHeader(title, subtitle = '') { return `<header class="page-header"><h1>${escapeHtml(title)}</h1>${subtitle ? `<p>${escapeHtml(subtitle)}</p>` : ''}</header>`; }
 export function button(label, { className = '', data = '', type = 'button', aria = '' } = {}) { return `<button type="${type}" class="ui-button ${className}" ${data}${aria ? ` aria-label="${escapeHtml(aria)}"` : ''}>${label}</button>`; }
 export function iconButton(label, { className = '', data = '', aria = label } = {}) { return `<button type="button" class="icon-button ${className}" ${data} aria-label="${escapeHtml(aria)}">${label}</button>`; }
-export function field({ label, name, value = '', type = 'text', placeholder = '', required = false, readonly = false, inputmode = '' }) { return `<label class="field"><span>${escapeHtml(label)}</span><input name="${escapeHtml(name)}" type="${type}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}" ${required ? 'required' : ''} ${readonly ? 'readonly' : ''} ${inputmode ? `inputmode="${inputmode}"` : ''}></label>`; }
+export function field({ label, name, value = '', type = 'text', placeholder = '', required = false, readonly = false, inputmode = '' }) { return `<label class="field"><span>${escapeHtml(label)}</span><input name="${escapeHtml(name)}" type="${type}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}" ${required ? 'required' : ''} ${readonly ? 'readonly' : ''} ${inputmode ? `inputmode="${escapeHtml(inputmode)}"` : ''}></label>`; }
 export function phoneField({ label = 'Телефон', name = 'phone', value = '', required = false } = {}) { return field({ label, name, value, type: 'tel', required, inputmode: 'tel', placeholder: '+7' }); }
 export function searchableSelect({ label, name, value = '', options = [], placeholder = 'Начните вводить', required = false } = {}) { const id = `search-${name}-${Math.random().toString(36).slice(2, 8)}`; const opts = options.map((option) => { const item = typeof option === 'string' ? { value: option, label: option } : option; return `<option value="${escapeHtml(item.value)}">${escapeHtml(item.label)}</option>`; }).join(''); return `<label class="field searchable-select"><span>${escapeHtml(label)}</span><input list="${id}" name="${escapeHtml(name)}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}" ${required ? 'required' : ''} autocomplete="off"><datalist id="${id}">${opts}</datalist></label>`; }
 export function timeInput({ label, name, value = '' } = {}) { return field({ label, name, value, type: 'time' }); }
