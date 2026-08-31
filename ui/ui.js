@@ -1,9 +1,11 @@
 import { accordion, initAccordions } from './accordion/accordion.js';
 import { bottomNavigation } from './navigation/navigation.js';
+import { entityCard } from './cards/index.js';
+import { select } from './selectors/index.js';
 
 const escapeMap = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
 export const escapeHtml = (v = '') => String(v).replace(/[&<>"']/g, (c) => escapeMap[c]);
-export { accordion, initAccordions, bottomNavigation };
+export { accordion, initAccordions, bottomNavigation, entityCard, select };
 
 export function pageHeader(title, subtitle = '') {
   return `<header class="page-header"><h1>${escapeHtml(title)}</h1>${subtitle ? `<p>${escapeHtml(subtitle)}</p>` : ''}</header>`;
@@ -19,6 +21,11 @@ export function iconButton(label, { className = '', data = '', aria = label } = 
 
 export function field({ label, name, value = '', type = 'text', placeholder = '', required = false, readonly = false, inputmode = '' }) {
   return `<label class="field"><span>${escapeHtml(label)}</span><input name="${escapeHtml(name)}" type="${type}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}" ${required ? 'required' : ''} ${readonly ? 'readonly' : ''} ${inputmode ? `inputmode="${inputmode}"` : ''}></label>`;
+}
+
+export function photoField({ name = 'photo', value = '' } = {}) {
+  const preview = value ? `<div class="photo-field__preview" style="background-image:url('${escapeHtml(value)}')" aria-hidden="true"></div>` : '<div class="photo-field__preview photo-field__preview--empty" aria-hidden="true">Фото</div>';
+  return `<div class="photo-field" data-photo-field><span class="photo-field__label">Фото</span><label class="photo-field__control">${preview}<span class="photo-field__action">${value ? 'Изменить фото' : 'Добавить фото'}</span><input type="file" accept="image/*" data-photo-input></label>${value ? '<button type="button" class="ui-button ui-button--small photo-field__remove" data-photo-remove>Удалить фото</button>' : ''}<input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(value)}" data-photo-value></div>`;
 }
 
 export function emptyState(title, text = '') {
