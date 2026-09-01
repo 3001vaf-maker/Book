@@ -47,6 +47,7 @@ E-identifiers are assigned when an entity is actually defined. Numbers are not r
 - E-03 — Workplace / Место работы
 - E-04 — Procedure / Процедура
 - E-05 — Product / Товар
+- E-06 — Wallet / Кошелёк
 
 ## Architectural ownership
 
