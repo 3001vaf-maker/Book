@@ -1,4 +1,5 @@
 import { escapeHtml } from '../utils/escape-html.js';
+import { iconButton } from '../buttons/index.js';
 
 const monthNames = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
 const weekDays = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
@@ -24,7 +25,7 @@ function gridDays(year, month) {
 export function calendar({ year, month, states = {}, selected = [], multiple = true } = {}) {
   const cells = gridDays(year, month);
   const selectedSet = new Set(selected);
-  const header = `<div class="calendar__header"><button type="button" class="icon-button calendar__nav" data-calendar-prev aria-label="Предыдущий месяц">‹</button><strong>${monthNames[month]} ${year}</strong><button type="button" class="icon-button calendar__nav" data-calendar-next aria-label="Следующий месяц">›</button></div>`;
+  const header = `<div class="calendar__header">${iconButton('‹', { className: 'calendar__nav', data: 'data-calendar-prev', aria: 'Предыдущий месяц' })}<strong>${monthNames[month]} ${year}</strong>${iconButton('›', { className: 'calendar__nav', data: 'data-calendar-next', aria: 'Следующий месяц' })}</div>`;
   const weekdays = `<div class="calendar__weekdays">${weekDays.map((day) => `<span>${day}</span>`).join('')}</div>`;
   const days = `<div class="calendar__grid" data-calendar-multiple="${multiple ? 'true' : 'false'}">${cells.map((date) => {
     const key = isoDate(date);
@@ -42,6 +43,17 @@ export function calendar({ year, month, states = {}, selected = [], multiple = t
   }).join('')}</div>`;
 
   return `<section class="calendar" data-calendar data-calendar-year="${year}" data-calendar-month="${month}" data-calendar-multiple="${multiple ? 'true' : 'false'}">${header}${weekdays}${days}</section>`;
+}
+
+export function initCalendarNavigation(root) {
+  const host = root.querySelector('[data-calendar]');
+  if (!host) return;
+  host.querySelector('[data-calendar-prev]')?.addEventListener('click', () => {
+    host.dispatchEvent(new CustomEvent('calendar:navigate', { bubbles: true, detail: { direction: -1 } }));
+  });
+  host.querySelector('[data-calendar-next]')?.addEventListener('click', () => {
+    host.dispatchEvent(new CustomEvent('calendar:navigate', { bubbles: true, detail: { direction: 1 } }));
+  });
 }
 
 export function initCalendarSelection(root) {
