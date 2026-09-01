@@ -1,4 +1,4 @@
-import { button, calendar, initCalendarSelection, pageHeader, timePicker, initTimePickers } from '../ui/ui.js';
+import { button, calendar, initCalendarNavigation, initCalendarSelection, pageHeader, timePicker, initTimePickers } from '../ui/ui.js';
 
 const STORAGE_KEY = 'book.schedule.dates';
 const DEFAULT_START = '10:00';
@@ -86,15 +86,12 @@ function render(root, viewDate, selected) {
 
   root.innerHTML = `${pageHeader('График')}${calendar({ year: viewDate.getFullYear(), month: viewDate.getMonth(), states: dates, selected: keys, multiple: true })}<section class="schedule-controls">${keys.length ? `<div class="schedule-selection">Выбрано дат: <strong>${keys.length}</strong></div>` : ''}${interval}<div class="schedule-actions">${action}</div></section>`;
 
+  initCalendarNavigation(root);
   initCalendarSelection(root);
   initTimePickers(root);
 
-  root.querySelector('[data-calendar-prev]')?.addEventListener('click', () => {
-    viewDate.setMonth(viewDate.getMonth() - 1);
-    render(root, viewDate, selected);
-  });
-  root.querySelector('[data-calendar-next]')?.addEventListener('click', () => {
-    viewDate.setMonth(viewDate.getMonth() + 1);
+  root.querySelector('[data-calendar]')?.addEventListener('calendar:navigate', (event) => {
+    viewDate.setMonth(viewDate.getMonth() + event.detail.direction);
     render(root, viewDate, selected);
   });
 
