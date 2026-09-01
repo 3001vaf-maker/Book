@@ -1,4 +1,4 @@
-import { button, calendar, pageHeader, timePicker, initTimePickers } from '../ui/ui.js';
+import { button, calendar, initCalendarSelection, pageHeader, timePicker, initTimePickers } from '../ui/ui.js';
 
 const STORAGE_KEY = 'book.schedule.dates';
 const DEFAULT_START = '10:00';
@@ -77,15 +77,16 @@ function render(root, viewDate, selected) {
   const keys = [...selected];
   const first = keys.length ? dates[keys[0]] : null;
   const mode = keys.length ? (first?.working ? 'working' : 'off') : null;
-  const interval = mode === 'off' ? `<section class="schedule-interval" aria-label="Рабочий интервал"><h2>Рабочий интервал</h2><div class="schedule-interval__fields">${timePicker({ name: 'scheduleStart', label: 'Начало', value: DEFAULT_START, step: 15 })}${timePicker({ name: 'scheduleEnd', label: 'Окончание', value: DEFAULT_END, step: 15 })}</div></section>` : '';
+  const interval = `<section class="schedule-interval" aria-label="Рабочий интервал"><h2>Рабочий интервал</h2><div class="schedule-interval__fields">${timePicker({ name: 'scheduleStart', label: 'Начало', value: mode === 'working' && first?.start ? first.start : DEFAULT_START, step: 15 })}${timePicker({ name: 'scheduleEnd', label: 'Окончание', value: mode === 'working' && first?.end ? first.end : DEFAULT_END, step: 15 })}</div></section>`;
   const action = mode === 'off'
     ? button('Применить рабочий день', { data: 'data-schedule-working' })
     : mode === 'working'
       ? button('Применить выходной', { className: 'ui-button--secondary', data: 'data-schedule-off' })
-      : '';
+      : button('Применить', { data: 'data-schedule-apply', aria: 'Выберите дату' });
 
-  root.innerHTML = `${pageHeader('График')}${calendar({ year: viewDate.getFullYear(), month: viewDate.getMonth(), states: dates, selected: keys })}${keys.length ? `<section class="schedule-controls"><div class="schedule-selection">Выбрано дат: <strong>${keys.length}</strong></div>${interval}<div class="schedule-actions">${action}</div></section>` : ''}`;
+  root.innerHTML = `${pageHeader('График')}${calendar({ year: viewDate.getFullYear(), month: viewDate.getMonth(), states: dates, selected: keys, multiple: true })}<section class="schedule-controls">${keys.length ? `<div class="schedule-selection">Выбрано дат: <strong>${keys.length}</strong></div>` : ''}${interval}<div class="schedule-actions">${action}</div></section>`;
 
+  initCalendarSelection(root);
   initTimePickers(root);
 
   root.querySelector('[data-calendar-prev]')?.addEventListener('click', () => {
@@ -97,30 +98,29 @@ function render(root, viewDate, selected) {
     render(root, viewDate, selected);
   });
 
-  root.querySelectorAll('[data-calendar-date]').forEach((element) => element.addEventListener('click', () => {
-    const key = element.dataset.calendarDate;
-    const state = dates[key]?.working === true;
+  root.querySelector('[data-calendar]')?.addEventListener('calendar:date-select', (event) => {
+    const { date, working } = event.detail;
     if (!keys.length) {
-      selected.add(key);
+      selected.add(date);
     } else {
       const firstState = dates[keys[0]]?.working === true;
-      if (state !== firstState) return;
-      if (selected.has(key)) selected.delete(key); else selected.add(key);
+      if (working !== firstState) return;
+      if (selected.has(date)) selected.delete(date); else selected.add(date);
     }
     render(root, viewDate, selected);
-  }));
+  });
 
   root.querySelector('[data-schedule-working]')?.addEventListener('click', () => {
-    const form = root.querySelector('.schedule-interval');
-    const start = form?.querySelector('[data-time-value][name="scheduleStart"]')?.value;
-    const end = form?.querySelector('[data-time-value][name="scheduleEnd"]')?.value;
-    if (!validRange(start, end)) return;
+    const start = root.querySelector('[data-time-value][name="scheduleStart"]')?.value;
+    const end = root.querySelector('[data-time-value][name="scheduleEnd"]')?.value;
+    if (!validRange(start, end) || !keys.length) return;
     changeDateState({ dates: keys, state: 'working', start, end });
     selected.clear();
     render(root, viewDate, selected);
   });
 
   root.querySelector('[data-schedule-off]')?.addEventListener('click', () => {
+    if (!keys.length) return;
     changeDateState({ dates: keys, state: 'off' });
     selected.clear();
     render(root, viewDate, selected);
