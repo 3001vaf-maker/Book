@@ -6,10 +6,9 @@ import { workLinks, initWorkLinks, collectWorkLinks } from './links/index.js';
 import { costField, initCostFields, collectCost } from './cost/index.js';
 import { durationPicker, initDurationPickers } from './duration/index.js';
 import { workplaceSelector, initWorkplaceSelectors, collectWorkplaceSelections } from './workplaces/index.js';
+import { escapeHtml } from './utils/escape-html.js';
 
-const escapeMap = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
-export const escapeHtml = (v = '') => String(v).replace(/[&<>\"']/g, (c) => escapeMap[c]);
-export { accordion, initAccordions, bottomNavigation, entityCard, select, workLinks, initWorkLinks, collectWorkLinks, costField, initCostFields, collectCost, durationPicker, initDurationPickers, workplaceSelector, initWorkplaceSelectors, collectWorkplaceSelections };
+export { accordion, initAccordions, bottomNavigation, entityCard, select, workLinks, initWorkLinks, collectWorkLinks, costField, initCostFields, collectCost, durationPicker, initDurationPickers, workplaceSelector, initWorkplaceSelectors, collectWorkplaceSelections, escapeHtml };
 
 export function pageHeader(title, subtitle = '') { return `<header class="page-header"><h1>${escapeHtml(title)}</h1>${subtitle ? `<p>${escapeHtml(subtitle)}</p>` : ''}</header>`; }
 export function button(label, { className = '', data = '', type = 'button', aria = '' } = {}) { return `<button type="${type}" class="ui-button ${className}" ${data}${aria ? ` aria-label="${escapeHtml(aria)}"` : ''}>${label}</button>`; }

@@ -1,4 +1,4 @@
-import { escapeHtml } from '../ui.js';
+import { escapeHtml } from '../utils/escape-html.js';
 
 export function entityCard({
   id = '',
