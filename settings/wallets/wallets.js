@@ -21,11 +21,12 @@ function list() {
   return stored.filter((wallet) => !wallet.deletedAt);
 }
 
-function renderList(root) {
+function renderList(root, navigateBack) {
   const items = list();
-  root.innerHTML = `<div class="entity-page-header">${pageHeader('Кошелёк')}<div class="page-header-action">${iconButton('+', { className: 'icon-button--primary', data: 'data-add-wallet', aria: 'Добавить кошелёк' })}</div></div>${items.length ? `<div class="entity-list">${items.map(renderRow).join('')}</div>` : emptyState('Кошельков пока нет', 'Добавьте первый кошелёк кнопкой «+».')}`;
-  root.querySelector('[data-add-wallet]')?.addEventListener('click', () => openForm(root));
-  root.querySelectorAll('[data-wallet]').forEach((element) => element.addEventListener('click', () => renderCard(root, element.dataset.wallet)));
+  root.innerHTML = `<div class="entity-page-header">${pageHeader('Кошелёк')}<div class="page-header-action">${iconButton('+', { className: 'icon-button--primary', data: 'data-add-wallet', aria: 'Добавить кошелёк' })}</div></div>${items.length ? `<div class="entity-list">${items.map(renderRow).join('')}</div>` : emptyState('Кошельков пока нет', 'Добавьте первый кошелёк кнопкой «+».')}<div class="profile-actions">${button('Назад', { className: 'ui-button--secondary', data: 'data-back-wallets' })}</div>`;
+  root.querySelector('[data-add-wallet]')?.addEventListener('click', () => openForm(root, null, navigateBack));
+  root.querySelectorAll('[data-wallet]').forEach((element) => element.addEventListener('click', () => renderCard(root, element.dataset.wallet, navigateBack)));
+  root.querySelector('[data-back-wallets]')?.addEventListener('click', navigateBack);
 }
 
 function renderRow(wallet) {
@@ -40,18 +41,18 @@ function renderRow(wallet) {
   });
 }
 
-function openForm(root, existing = null) {
+function openForm(root, existing = null, navigateBack) {
   const wallet = existing || { photo: '', name: '' };
   const html = `<form class="compact-form" data-wallet-form><div class="modal-title"><h2>${existing ? 'Изменить кошелёк' : 'Новый кошелёк'}</h2></div>${photoField({ name: 'walletPhoto', value: wallet.photo || '' })}<label class="field"><span>Название кошелька *</span><input name="walletName" required value="${escapeHtml(wallet.name || '')}" placeholder="Название кошелька"></label>${button('Сохранить', { type: 'submit' })}</form>`;
   const m = mountModal(root, modal(html, { title: existing ? 'Изменить кошелёк' : 'Новый кошелёк' }));
   initPhotoField(m);
   m.querySelector('[data-wallet-form]')?.addEventListener('submit', (event) => {
     event.preventDefault();
-    saveWallet(root, m, existing);
+    saveWallet(root, m, existing, navigateBack);
   });
 }
 
-function saveWallet(root, modalRoot, existing) {
+function saveWallet(root, modalRoot, existing, navigateBack) {
   const form = modalRoot.querySelector('[data-wallet-form]');
   const data = new FormData(form);
   const name = String(data.get('walletName') || '').trim();
@@ -67,23 +68,23 @@ function saveWallet(root, modalRoot, existing) {
   const items = list();
   write(KEY, existing ? items.map((wallet) => wallet.id === existing.id ? item : wallet) : [...items, item]);
   modalRoot.remove();
-  renderList(root);
+  renderList(root, navigateBack);
 }
 
-function renderCard(root, id) {
+function renderCard(root, id, navigateBack) {
   const wallet = list().find((item) => item.id === id);
-  if (!wallet) return renderList(root);
+  if (!wallet) return renderList(root, navigateBack);
   root.innerHTML = `${pageHeader(wallet.name)}${entityCard({
     image: wallet.photo || '',
     initial: (wallet.name || '?').slice(0, 1).toUpperCase(),
     className: 'entity-card--hero entity-card--wallet',
     top: `<strong class="entity-card__wallet-name">${escapeHtml(wallet.name)}</strong>`,
-  })}<div class="profile-actions">${button('Работа с кошельком', { data: 'data-wallet-work' })}${button('Назад', { className: 'ui-button--secondary', data: 'data-back-wallets' })}</div>`;
-  root.querySelector('[data-wallet-work]')?.addEventListener('click', () => openPhotoForm(root, wallet));
-  root.querySelector('[data-back-wallets]')?.addEventListener('click', () => renderList(root));
+  })}<div class="profile-actions">${button('Работа с кошельком', { data: 'data-wallet-work' })}${button('Назад', { className: 'ui-button--secondary', data: 'data-back-wallet-card' })}</div>`;
+  root.querySelector('[data-wallet-work]')?.addEventListener('click', () => openPhotoForm(root, wallet, navigateBack));
+  root.querySelector('[data-back-wallet-card]')?.addEventListener('click', () => renderList(root, navigateBack));
 }
 
-function openPhotoForm(root, wallet) {
+function openPhotoForm(root, wallet, navigateBack) {
   const html = `<form class="compact-form" data-wallet-photo-form><div class="modal-title"><h2>Работа с кошельком</h2></div>${photoField({ name: 'walletPhoto', value: wallet.photo || '' })}${button('Сохранить', { type: 'submit' })}</form>`;
   const m = mountModal(root, modal(html, { title: 'Работа с кошельком' }));
   initPhotoField(m);
@@ -94,10 +95,10 @@ function openPhotoForm(root, wallet) {
     const updated = items.map((item) => item.id === wallet.id ? { ...item, photo: String(data.get('walletPhoto') || ''), updatedAt: new Date().toISOString() } : item);
     write(KEY, updated);
     m.remove();
-    renderCard(root, wallet.id);
+    renderCard(root, wallet.id, navigateBack);
   });
 }
 
-export function renderWallets(root) {
-  renderList(root);
+export function renderWallets(root, navigateBack = () => {}) {
+  renderList(root, navigateBack);
 }
