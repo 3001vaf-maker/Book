@@ -1,1 +1,15 @@
-export {};
+import { escapeHtml } from '../utils/escape-html.js';
+
+export function modal(content, { title = '' } = {}) {
+  return `<div class="modal-backdrop" data-modal><div class="modal-sheet" role="dialog" aria-modal="true" ${title ? `aria-label="${escapeHtml(title)}"` : ''}><button type="button" class="modal-close" data-modal-close aria-label="Закрыть">×</button>${content}</div></div>`;
+}
+
+export function mountModal(root, html) {
+  root.insertAdjacentHTML('beforeend', html);
+  const m = root.querySelector('[data-modal]:last-of-type');
+  m?.addEventListener('click', (e) => {
+    if (e.target.matches('[data-modal],[data-modal-close]')) m.remove();
+  });
+  requestAnimationFrame(() => m?.querySelector('input,select,textarea,button:not([data-modal-close])')?.focus());
+  return m;
+}
