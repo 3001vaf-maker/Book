@@ -111,8 +111,9 @@
 | `colorPicker()` | Открывает визуальный выбор цвета из утверждённой палитры | `ui/colors/` | Специализированная | Ярлыки | Цвет ярлыка | ОБЩАЯ ДЛЯ ФУНКЦИИ |
 | `initColorPickers()` | Подключает визуальный выбор цвета и существующее Modal | `ui/colors/` | Инфраструктура UI | Ярлыки | DOM color picker / Modal | ОБЩАЯ ДЛЯ ФУНКЦИИ |
 | `escapeHtml()` | Экранирует HTML-значения | `ui/utils/` | Низкоуровневая утилита | UI-компоненты | Строки | ОБЩАЯ УТИЛИТА |
-| `timePicker()` | Выбор времени суток | `ui/time/` | Специализированная | Предусмотрен для форм времени | Время `HH:MM` | НЕ ПОДКЛЮЧЕНА К ФАСАДУ |
-| `initTimePickers()` | Подключает time picker | `ui/time/` | Инфраструктура UI | Формы с time picker | DOM time picker | НЕ ПОДКЛЮЧЕНА К ФАСАДУ |
+| `timePicker()` | Выбор времени суток | `ui/time/` | Специализированная | График и формы времени | Время `HH:MM` | ОБЩАЯ ДЛЯ ФУНКЦИИ |
+| `initTimePickers()` | Подключает time picker | `ui/time/` | Инфраструктура UI | График и формы времени | DOM time picker | ОБЩАЯ ДЛЯ ФУНКЦИИ |
+| `calendar()` | Общий календарный контрол: месяц, сетка, состояния и выбор дат | `ui/calendar/` | Общая | График и будущие календарные ветки | Календарные даты и переданное бизнес-состояние | КАНОНИЧЕСКАЯ |
 | `pageHeader()` | Заголовок страницы и подзаголовок | `ui/ui.js` | Общая | Профиль, Товары и другие страницы | Заголовок страницы | ТРЕБУЕТ РЕШЕНИЯ О ПЕРЕНОСЕ |
 | `timeInput()` | Простое HTML-поле выбора времени | `ui/ui.js` | Общая | Формы, использующие простой time input | Время | ТРЕБУЕТ РЕШЕНИЯ О ПЕРЕНОСЕ |
 | `photoField()` | Поле добавления/изменения/удаления фотографии | `ui/ui.js` | Общая | Товары, Кошелёк и другие сущности с фото | Фото сущности | ТРЕБУЕТ РЕШЕНИЯ О ПЕРЕНОСЕ |
@@ -127,6 +128,7 @@
 | `ui/accordion/` | Раскрывающиеся секции | `accordion`, `initAccordions` |
 | `ui/buttons/` | Кнопки | `button`, `iconButton` |
 | `ui/cards/` | Карточки сущностей | `entityCard` |
+| `ui/calendar/` | Общий календарный интерфейс | `calendar` |
 | `ui/colors/` | Визуальный выбор цвета | `colorPicker`, `initColorPickers` |
 | `ui/cost/` | Стоимость | `costField`, `initCostFields`, `collectCost` |
 | `ui/duration/` | Длительность | `durationPicker`, `initDurationPickers` |
@@ -152,6 +154,7 @@
 | Товары | `pageHeader`, `entityCard`, `emptyState`, `photoField`, `costField`, `workplaceSelector`, `modal`, `mountModal`, `button`, `iconButton`, поля и селекторы |
 | Кошелёк | `pageHeader`, `entityCard`, `emptyState`, `button`, `iconButton`, `modal`, `mountModal`, `photoField`, `initPhotoField` |
 | Ярлыки | `pageHeader`, `emptyState`, `button`, `iconButton`, `modal`, `mountModal`, `colorPicker`, `initColorPickers` |
+| График | `pageHeader`, `calendar`, `timePicker`, `initTimePickers`, `button` |
 | Навигация приложения | `bottomNavigation` |
 
 ---
