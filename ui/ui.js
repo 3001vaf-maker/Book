@@ -7,13 +7,12 @@ import { costField, initCostFields, collectCost } from './cost/index.js';
 import { durationPicker, initDurationPickers } from './duration/index.js';
 import { workplaceSelector, initWorkplaceSelectors, collectWorkplaceSelections } from './workplaces/index.js';
 import { modal, mountModal } from './modals/index.js';
+import { button, iconButton } from './buttons/index.js';
 import { escapeHtml } from './utils/escape-html.js';
 
-export { accordion, initAccordions, bottomNavigation, entityCard, select, workLinks, initWorkLinks, collectWorkLinks, costField, initCostFields, collectCost, durationPicker, initDurationPickers, workplaceSelector, initWorkplaceSelectors, collectWorkplaceSelections, modal, mountModal, escapeHtml };
+export { accordion, initAccordions, bottomNavigation, entityCard, select, workLinks, initWorkLinks, collectWorkLinks, costField, initCostFields, collectCost, durationPicker, initDurationPickers, workplaceSelector, initWorkplaceSelectors, collectWorkplaceSelections, modal, mountModal, button, iconButton, escapeHtml };
 
 export function pageHeader(title, subtitle = '') { return `<header class="page-header"><h1>${escapeHtml(title)}</h1>${subtitle ? `<p>${escapeHtml(subtitle)}</p>` : ''}</header>`; }
-export function button(label, { className = '', data = '', type = 'button', aria = '' } = {}) { return `<button type="${type}" class="ui-button ${className}" ${data}${aria ? ` aria-label="${escapeHtml(aria)}"` : ''}>${label}</button>`; }
-export function iconButton(label, { className = '', data = '', aria = label } = {}) { return `<button type="button" class="icon-button ${className}" ${data} aria-label="${escapeHtml(aria)}">${label}</button>`; }
 export function field({ label, name, value = '', type = 'text', placeholder = '', required = false, readonly = false, inputmode = '' }) { return `<label class="field"><span>${escapeHtml(label)}</span><input name="${escapeHtml(name)}" type="${type}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}" ${required ? 'required' : ''} ${readonly ? 'readonly' : ''} ${inputmode ? `inputmode="${escapeHtml(inputmode)}"` : ''}></label>`; }
 export function phoneField({ label = 'Телефон', name = 'phone', value = '', required = false } = {}) { return field({ label, name, value, type: 'tel', required, inputmode: 'tel', placeholder: '+7' }); }
 export function searchableSelect({ label, name, value = '', options = [], placeholder = 'Начните вводить', required = false } = {}) { const id = `search-${name}-${Math.random().toString(36).slice(2, 8)}`; const opts = options.map((option) => { const item = typeof option === 'string' ? { value: option, label: option } : option; return `<option value="${escapeHtml(item.value)}">${escapeHtml(item.label)}</option>`; }).join(''); return `<label class="field searchable-select"><span>${escapeHtml(label)}</span><input list="${id}" name="${escapeHtml(name)}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}" ${required ? 'required' : ''} autocomplete="off"><datalist id="${id}">${opts}</datalist></label>`; }
