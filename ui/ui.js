@@ -12,10 +12,10 @@ import { field, phoneField, textareaField } from './inputs/index.js';
 import { emptyState } from './states/index.js';
 import { colorPicker, initColorPickers } from './colors/index.js';
 import { timePicker, initTimePickers } from './time/index.js';
-import { calendar } from './calendar/index.js';
+import { calendar, initCalendarSelection } from './calendar/index.js';
 import { escapeHtml } from './utils/escape-html.js';
 
-export { accordion, initAccordions, bottomNavigation, entityCard, select, searchableSelect, workLinks, initWorkLinks, collectWorkLinks, costField, initCostFields, collectCost, durationPicker, initDurationPickers, workplaceSelector, initWorkplaceSelectors, collectWorkplaceSelections, modal, mountModal, button, iconButton, field, phoneField, textareaField, emptyState, colorPicker, initColorPickers, timePicker, initTimePickers, calendar, escapeHtml };
+export { accordion, initAccordions, bottomNavigation, entityCard, select, searchableSelect, workLinks, initWorkLinks, collectWorkLinks, costField, initCostFields, collectCost, durationPicker, initDurationPickers, workplaceSelector, initWorkplaceSelectors, collectWorkplaceSelections, modal, mountModal, button, iconButton, field, phoneField, textareaField, emptyState, colorPicker, initColorPickers, timePicker, initTimePickers, calendar, initCalendarSelection, escapeHtml };
 
 export function pageHeader(title, subtitle = '') { return `<header class="page-header"><h1>${escapeHtml(title)}</h1>${subtitle ? `<p>${escapeHtml(subtitle)}</p>` : ''}</header>`; }
 export function timeInput({ label, name, value = '' } = {}) { return field({ label, name, value, type: 'time' }); }
