@@ -1,9 +1,7 @@
-import { escapeHtml } from '../ui.js';
-
-export function select({ name = '', label = '', value = '', options = [], aria = '', className = '', data = '' } = {}) {
-  const optionMarkup = options.map(option => {
-    const item = typeof option === 'string' ? { value: option, label: option } : option;
-    return `<option value="${escapeHtml(item.value ?? '')}" ${String(item.value ?? '') === String(value ?? '') ? 'selected' : ''}>${escapeHtml(item.label ?? item.value ?? '')}</option>`;
-  }).join('');
-  return `<label class="field ui-select ${className}">${label ? `<span>${escapeHtml(label)}</span>` : ''}<span class="ui-select__control"><select ${name ? `name="${escapeHtml(name)}"` : ''} ${aria ? `aria-label="${escapeHtml(aria)}"` : ''} ${data}>${optionMarkup}</select></span></label>`;
-}
+const escapeHtml = (v='') => String(v).replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#039;'}[c]));
+const normalize=(option)=>typeof option==='string'?{value:option,label:option}:option||{};
+function optionsMarkup(options,value,multiple=false){return options.map(option=>{const item=normalize(option);const selected=multiple?Array.isArray(value)&&value.map(String).includes(String(item.value??'')):String(item.value??'')===String(value??'');return `<option value="${escapeHtml(item.value??'')}" ${selected?'selected':''}>${escapeHtml(item.label??item.value??'')}</option>`}).join('')}
+export function selector({mode='single',name='',label='',value='',options=[],aria='',className='',data='',multiple=mode==='multiple'}={}){const values=multiple?(Array.isArray(value)?value:[value].filter(v=>v!=='')):value;return `<label class="field ui-select ${className}">${label?`<span>${escapeHtml(label)}</span>`:''}<span class="ui-select__control"><select ${name?`name="${escapeHtml(name)}"`:''} ${aria?`aria-label="${escapeHtml(aria)}"`:''} ${multiple?'multiple':''} ${data}>${optionsMarkup(options,values,multiple)}</select></span></label>`}
+export function select(options={}){return selector({...options,mode:'single',multiple:false})}
+export function singleSelector(options={}){return selector({...options,mode:'single',multiple:false})}
+export function multipleSelector(options={}){return selector({...options,mode:'multiple',multiple:true})}
