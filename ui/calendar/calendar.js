@@ -51,6 +51,10 @@ function buildCalendar({ displayedMonth, selectedDate = '', workingDates = [], r
       key === todayKey ? 'is-today' : '',
       key === selectedDate ? 'is-selected' : '',
     ].filter(Boolean).join(' ');
+    const style = [
+      isCurrentMonth ? 'border:1px solid var(--border);border-radius:8px;background:var(--white)' : '',
+      key === todayKey ? 'border:1px solid #C9A895;background:#DCC4B4' : '',
+    ].filter(Boolean).join(';');
 
     const content = renderDateContent({
       date,
@@ -62,7 +66,7 @@ function buildCalendar({ displayedMonth, selectedDate = '', workingDates = [], r
       isSelected: key === selectedDate,
     });
 
-    cells.push(`<button type="button" class="${classes}" data-calendar-date="${key}" aria-pressed="${key === selectedDate}"><span class="calendar__date-number">${date.getDate()}</span>${content ? `<span class="calendar__date-content">${content}</span>` : '<span class="calendar__date-content" aria-hidden="true"></span>'}</button>`);
+    cells.push(`<button type="button" class="${classes}"${style ? ` style="${style}"` : ''} data-calendar-date="${key}" aria-pressed="${key === selectedDate}"><span class="calendar__date-number">${date.getDate()}</span>${content ? `<span class="calendar__date-content">${content}</span>` : '<span class="calendar__date-content" aria-hidden="true"></span>'}</button>`);
   }
 
   return `<section class="calendar" data-calendar><header class="calendar__header"><button type="button" class="calendar__month-button" data-calendar-prev aria-label="Предыдущий месяц">←</button><div class="calendar__month" aria-live="polite">${monthLabel(displayedMonth)}</div><button type="button" class="calendar__month-button" data-calendar-next aria-label="Следующий месяц">→</button></header><div class="calendar__weekdays" aria-hidden="true">${['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((day) => `<span>${day}</span>`).join('')}</div><div class="calendar__grid">${cells.join('')}</div></section>`;
