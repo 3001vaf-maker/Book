@@ -1,2 +1,10 @@
-import { pageHeader, emptyState } from '../ui/ui.js';
-export function renderTimetable(root) { root.innerHTML = `${pageHeader('График')}${emptyState('График пока пуст','Рабочее время будет добавлено отдельным ТЗ.')}`; }
+import { pageHeader, calendar, initCalendar } from '../ui/ui.js';
+
+export function renderTimetable(root) {
+  root.innerHTML = `${pageHeader('График')}<div data-timetable-calendar></div>`;
+  initCalendar(root.querySelector('[data-timetable-calendar]'), {
+    workingDates: [],
+    renderDateContent: () => '',
+    onDateSelect: () => {},
+  });
+}
