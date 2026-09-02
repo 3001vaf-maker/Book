@@ -1,5 +1,10 @@
-import { emptyState } from '../ui/ui.js';
+import { initCalendar } from '../ui/ui.js';
 
 export function renderJournalMonth(root) {
-  root.innerHTML = emptyState('Месяц', 'Представление Месяца подготовлено для последующей реализации.');
+  root.innerHTML = '<div data-journal-month-calendar></div>';
+  initCalendar(root.querySelector('[data-journal-month-calendar]'), {
+    workingDates: [],
+    renderDateContent: () => '',
+    onDateSelect: () => {},
+  });
 }
