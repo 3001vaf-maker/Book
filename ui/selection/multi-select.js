@@ -13,7 +13,7 @@ export function initMultiSelect(root, { selectedDates = [], onChange = () => {} 
   const toggle = (dateKey) => {
     if (!dateKey) return;
     const button = Array.from(root.querySelectorAll('[data-calendar-date]')).find((item) => item.dataset.calendarDate === dateKey);
-    if (!button || button.dataset.calendarCurrentMonth !== 'true') return;
+    if (!button) return;
 
     if (selection.has(dateKey)) selection.delete(dateKey);
     else selection.add(dateKey);
