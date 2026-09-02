@@ -86,6 +86,10 @@
 | `accordion()` | Раскрывающийся/сворачивающийся блок | `ui/accordion/` | Общая | Профиль и другие экраны с секциями | Секции UI | ОБЩАЯ |
 | `initAccordions()` | Подключает поведение accordion | `ui/accordion/` | Инфраструктура UI | Экраны с accordion | DOM accordion | ОБЩАЯ |
 | `bottomNavigation()` | Нижняя навигация приложения | `ui/navigation/` | Общая | Все основные разделы | Навигация Book | ОБЩАЯ |
+| `viewNavigation()` | Переключатель представлений внутри раздела | `ui/view-navigation/` | Общая | Журнал и другие разделы с несколькими представлениями | Представления раздела | ОБЩАЯ |
+| `initViewNavigation()` | Подключает поведение переключателя представлений | `ui/view-navigation/` | Инфраструктура UI | Журнал и другие разделы с View Navigation | DOM View Navigation | ОБЩАЯ |
+| `calendar()` | Формирует общий календарь с месяцем, неделей, датами и визуальными состояниями | `ui/calendar/` | Общая | График, Журнал → Месяц | Даты и календарная сетка | КАНОНИЧЕСКАЯ |
+| `initCalendar()` | Подключает навигацию по месяцам и выбор дат общего Calendar | `ui/calendar/` | Инфраструктура UI | График, Журнал → Месяц | DOM Calendar | КАНОНИЧЕСКАЯ |
 | `entityCard()` | Единая карточка сущности | `ui/cards/` | Общая | Клиенты, Профиль, Процедуры, Товары, Кошелёк | Сущности приложения | КАНОНИЧЕСКАЯ |
 | `select()` | Выпадающий выбор значения | `ui/selectors/` | Общая | Формы и настройки | Списки вариантов | ОБЩАЯ |
 | `searchableSelect()` | Выбор значения с поиском | `ui/selectors/` | Общая | Формы, где вариантов много | Списки вариантов | ОБЩАЯ |
@@ -126,6 +130,7 @@
 |---|---|---|
 | `ui/accordion/` | Раскрывающиеся секции | `accordion`, `initAccordions` |
 | `ui/buttons/` | Кнопки | `button`, `iconButton` |
+| `ui/calendar/` | Общий календарь: месяц, недельная сетка, даты и независимые визуальные состояния | `calendar`, `initCalendar` |
 | `ui/cards/` | Карточки сущностей | `entityCard` |
 | `ui/colors/` | Визуальный выбор цвета | `colorPicker`, `initColorPickers` |
 | `ui/cost/` | Стоимость | `costField`, `initCostFields`, `collectCost` |
@@ -138,6 +143,7 @@
 | `ui/states/` | UI-состояния | `emptyState` |
 | `ui/time/` | Время суток | `timePicker`, `initTimePickers` |
 | `ui/utils/` | Низкоуровневые UI-утилиты | `escapeHtml` |
+| `ui/view-navigation/` | Переключение представлений | `viewNavigation`, `initViewNavigation` |
 | `ui/workplaces/` | Рабочие места | `workplaceSelector`, `initWorkplaceSelectors`, `collectWorkplaceSelections` |
 
 ---
@@ -152,6 +158,8 @@
 | Товары | `pageHeader`, `entityCard`, `emptyState`, `photoField`, `costField`, `workplaceSelector`, `modal`, `mountModal`, `button`, `iconButton`, поля и селекторы |
 | Кошелёк | `pageHeader`, `entityCard`, `emptyState`, `button`, `iconButton`, `modal`, `mountModal`, `photoField`, `initPhotoField` |
 | Ярлыки | `pageHeader`, `emptyState`, `button`, `iconButton`, `modal`, `mountModal`, `colorPicker`, `initColorPickers` |
+| График | `pageHeader`, `initCalendar` |
+| Журнал → Месяц | `initCalendar` |
 | Навигация приложения | `bottomNavigation` |
 
 ---
@@ -277,5 +285,3 @@
 
 - `ARCHITECTURE_DICTIONARY.md` — общая архитектура Book.
 - `DESIGN_DICTIONARY.md` — единые визуальные правила Book.
-
-Этот документ отвечает именно на вопрос **«какая UI-функция у нас уже есть, что она делает, где лежит и где используется?»**.
