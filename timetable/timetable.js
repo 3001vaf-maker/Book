@@ -12,6 +12,11 @@ export function renderTimetable(root) {
   const startInput = root.querySelector('[name="startTime"]');
   const endInput = root.querySelector('[name="endTime"]');
 
+  root.querySelectorAll('.work-time-row__field .field').forEach((field) => {
+    field.style.gridTemplateColumns = '1fr';
+    field.style.alignItems = 'stretch';
+  });
+
   const selection = initMultiSelect(calendarRoot, {
     onChange: (dates) => {
       const firstDate = dates[0];
