@@ -1,4 +1,4 @@
-import { pageHeader, calendar, initCalendar } from '../ui/ui.js';
+import { pageHeader, initCalendar } from '../ui/ui.js';
 
 export function renderTimetable(root) {
   root.innerHTML = `${pageHeader('График')}<div data-timetable-calendar></div>`;
