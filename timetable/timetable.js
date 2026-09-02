@@ -1,16 +1,16 @@
-import { pageHeader, initCalendar, initMultiSelect } from '../ui/ui.js';
+import { pageHeader, initCalendar, initMultiSelect, timeInput } from '../ui/ui.js';
 
 export function renderTimetable(root) {
   const workingDates = new Set();
   let startTime = '10:00';
   let endTime = '18:00';
 
-  root.innerHTML = `${pageHeader('График')}<div class="work-time-row"><div class="work-time-row__fields"><label class="field"><span>Начало</span><input type="time" value="${startTime}" data-timetable-start></label><label class="field"><span>Окончание</span><input type="time" value="${endTime}" data-timetable-end></label></div></div><div data-timetable-calendar></div><div class="profile-actions"><button type="button" class="ui-button" data-timetable-apply disabled>Применить: рабочий день</button></div>`;
+  root.innerHTML = `${pageHeader('График')}<div class="work-time-row"><div class="work-time-row__fields">${timeInput({ label: 'Начало', name: 'startTime', value: startTime })}${timeInput({ label: 'Окончание', name: 'endTime', value: endTime })}</div></div><div data-timetable-calendar></div><div class="profile-actions"><button type="button" class="ui-button" data-timetable-apply disabled>Применить: рабочий день</button></div>`;
 
   const calendarRoot = root.querySelector('[data-timetable-calendar]');
   const applyButton = root.querySelector('[data-timetable-apply]');
-  const startInput = root.querySelector('[data-timetable-start]');
-  const endInput = root.querySelector('[data-timetable-end]');
+  const startInput = root.querySelector('[name="startTime"]');
+  const endInput = root.querySelector('[name="endTime"]');
 
   const selection = initMultiSelect(calendarRoot, {
     onChange: (dates) => {
