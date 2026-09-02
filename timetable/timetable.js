@@ -71,8 +71,7 @@ export function renderTimetable(root) {
     saveState({ workingDates: [...workingDates], startTime, endTime });
     syncCalendarStatus();
 
-    const nextTargetWorking = !workingDates.has(dates[0]);
-    applyButton.textContent = `Применить: ${nextTargetWorking ? 'рабочий день' : 'выходной'}`;
+    selection.clear();
   });
 
   syncCalendarStatus();
