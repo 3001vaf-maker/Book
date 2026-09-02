@@ -1,5 +1,4 @@
 const MONTH_FORMATTER = new Intl.DateTimeFormat('ru-RU', { month: 'long', year: 'numeric' });
-const WEEKDAY_FORMATTER = new Intl.DateTimeFormat('ru-RU', { weekday: 'short' });
 
 function pad(value) {
   return String(value).padStart(2, '0');
