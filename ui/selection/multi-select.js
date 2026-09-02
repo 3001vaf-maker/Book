@@ -22,13 +22,15 @@ export function initMultiSelect(root, { selectedDates = [], onChange = () => {} 
     onChange([...selection]);
   };
 
-  root.addEventListener('click', (event) => {
+  const handleClick = (event) => {
     const button = event.target.closest('[data-calendar-date]');
     if (!button || !root.contains(button)) return;
     event.preventDefault();
     event.stopPropagation();
     toggle(button.dataset.calendarDate || '');
-  }, true);
+  };
+
+  root.addEventListener('click', handleClick, true);
 
   const observer = new MutationObserver(sync);
   observer.observe(root, { childList: true, subtree: true });
@@ -45,11 +47,9 @@ export function initMultiSelect(root, { selectedDates = [], onChange = () => {} 
       onChange([...selection]);
     },
     toggle,
-    clear: () => {
-      selection.clear();
-      sync();
-      onChange([]);
+    destroy: () => {
+      observer.disconnect();
+      root.removeEventListener('click', handleClick, true);
     },
-    destroy: () => observer.disconnect(),
   };
 }
