@@ -1,4 +1,4 @@
-import { pageHeader, initCalendar, initMultiSelect, timeInput } from '../ui/ui.js';
+import { pageHeader, initCalendar, initMultiSelect, timeInput } from '../ui/ui.js?v=graph-20260902';
 
 export function renderTimetable(root) {
   const workingDates = new Set();
@@ -11,11 +11,6 @@ export function renderTimetable(root) {
   const applyButton = root.querySelector('[data-timetable-apply]');
   const startInput = root.querySelector('[name="startTime"]');
   const endInput = root.querySelector('[name="endTime"]');
-
-  root.querySelectorAll('.work-time-row__field .field').forEach((field) => {
-    field.style.gridTemplateColumns = '1fr';
-    field.style.alignItems = 'stretch';
-  });
 
   const selection = initMultiSelect(calendarRoot, {
     onChange: (dates) => {
