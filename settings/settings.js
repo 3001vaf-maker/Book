@@ -1,7 +1,32 @@
-import { pageHeader, button, escapeHtml } from '../ui/ui.js';
+import { pageHeader, escapeHtml } from '../ui/ui.js';
+import { render as renderProfile } from './profile/profile.js';
+import { renderService } from './service/service.js';
+import { render as renderWarehouse } from './warehouse/warehouse.js';
+import { render as renderDocuments } from './documents/documents.js';
+import { render as renderLoyalty } from './loyalty/loyalty.js';
+import { renderTags } from './tags/tags.js';
+import { renderWallets } from './wallets/wallets.js';
 
-const structure = {profile:{title:'Профиль',children:[['personal','Личные данные'],['workplaces','Места работы']]},service:{title:'Сервис',children:[['procedures','Процедуры'],['products','Товары']]},warehouse:{title:'Склад',children:[['recipes','Рецепты'],['materials','Материалы']]},documents:{title:'Документы',children:[]},loyalty:{title:'Программа лояльности',children:[['deposit','Депозит'],['personal-account','Личный счёт'],['referral-program','Реферальная программа'],['bonus-program','Бонусная программа'],['certificates','Сертификаты'],['subscriptions','Абонементы']]},tags:{title:'Ярлыки',children:[]},wallets:{title:'Кошелёк',children:[]}};
-const topLevel = [['profile','Профиль'],['service','Сервис'],['warehouse','Склад'],['documents','Документы'],['loyalty','Программа лояльности'],['tags','Ярлыки'],['wallets','Кошелёк']];
-function renderRows(items){return `<div class="settings-list">${items.map(([key,label])=>`<button class="settings-row" type="button" data-settings-open="${escapeHtml(key)}"><span>${escapeHtml(label)}</span><span>›</span></button>`).join('')}</div>`}
-function renderFolder(root,key,navigateBack){if(key==='profile'){import('./profile/profile.js').then(({render})=>render(root));return}if(key==='procedures'){import('./service/procedures/procedures.js').then(({renderProcedures})=>renderProcedures(root));return}if(key==='products'){import('./service/products/products.js').then(({renderProducts})=>renderProducts(root));return}if(key==='tags'){import('./tags/tags.js').then(({renderTags})=>renderTags(root,navigateBack));return}if(key==='wallets'){import('./wallets/wallets.js').then(({renderWallets})=>renderWallets(root,navigateBack));return}const node=structure[key];if(!node)return;root.innerHTML=`${pageHeader(node.title)}${renderRows(node.children)}${node.children.length?'':'<div class="empty-state"><strong>Раздел подготовлен</strong><span>Содержимое добавляется отдельным ТЗ.</span></div>'}<div class="profile-actions">${button('Назад',{className:'ui-button--secondary',data:'data-settings-back'})}</div>`;root.querySelectorAll('[data-settings-open]').forEach(el=>el.addEventListener('click',()=>renderFolder(root,el.dataset.settingsOpen,()=>renderSettings(root))));root.querySelector('[data-settings-back]')?.addEventListener('click',navigateBack)}
-export function renderSettings(root){root.innerHTML=`${pageHeader('Настройки')}${renderRows(topLevel)}`;root.querySelectorAll('[data-settings-open]').forEach(el=>el.addEventListener('click',()=>renderFolder(root,el.dataset.settingsOpen,()=>renderSettings(root))))}
+const folders = [
+  ['profile', 'Профиль', renderProfile],
+  ['service', 'Сервис', renderService],
+  ['warehouse', 'Склад', renderWarehouse],
+  ['documents', 'Документы', renderDocuments],
+  ['loyalty', 'Программа лояльности', renderLoyalty],
+  ['tags', 'Ярлыки', renderTags],
+  ['wallets', 'Кошелёк', renderWallets],
+];
+
+function renderRows(root, navigateBack) {
+  root.innerHTML = `${pageHeader('Настройки')}<div class="settings-list">${folders.map(([key, label]) => `<button class="settings-row" type="button" data-settings-open="${escapeHtml(key)}"><span>${escapeHtml(label)}</span><span>›</span></button>`).join('')}</div>`;
+  root.querySelectorAll('[data-settings-open]').forEach((element) => {
+    element.addEventListener('click', () => {
+      const folder = folders.find(([key]) => key === element.dataset.settingsOpen);
+      folder?.[2]?.(root, () => renderRows(root, navigateBack));
+    });
+  });
+}
+
+export function renderSettings(root) {
+  renderRows(root, () => renderSettings(root));
+}
