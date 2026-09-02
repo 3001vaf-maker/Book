@@ -1,4 +1,4 @@
-import { pageHeader, initCalendar, initMultiSelect, timeInput } from '../ui/ui.js?v=graph-20260902';
+import { pageHeader, initCalendar, initMultiSelect, timeInput } from '../ui/ui.js?v=graph-lifecycle-20260903';
 
 const STORAGE_KEY = 'book:timetable-state';
 
@@ -34,20 +34,15 @@ export function renderTimetable(root) {
   const startInput = root.querySelector('[name="startTime"]');
   const endInput = root.querySelector('[name="endTime"]');
 
-  const selection = initMultiSelect(calendarRoot, {
-    onChange: (dates) => {
-      const firstDate = dates[0];
-      const targetWorking = firstDate ? !workingDates.has(firstDate) : true;
-      applyButton.disabled = dates.length === 0;
-      applyButton.textContent = `Применить: ${targetWorking ? 'рабочий день' : 'выходной'}`;
-    },
-  });
+  let calendar;
+  let selection;
 
-  initCalendar(calendarRoot, {
-    workingDates: [...workingDates],
-    renderDateContent: () => '',
-    onDateSelect: () => {},
-  });
+  const syncApplyButton = (dates) => {
+    const firstDate = dates[0];
+    const targetWorking = firstDate ? !workingDates.has(firstDate) : true;
+    applyButton.disabled = dates.length === 0;
+    applyButton.textContent = `Применить: ${targetWorking ? 'рабочий день' : 'выходной'}`;
+  };
 
   const syncCalendarStatus = () => {
     calendarRoot.querySelectorAll('[data-calendar-date]').forEach((button) => {
@@ -55,6 +50,23 @@ export function renderTimetable(root) {
       button.classList.toggle('is-working', workingDates.has(key));
     });
   };
+
+  const startSelectionSession = (month) => {
+    calendar = initCalendar(calendarRoot, {
+      month,
+      workingDates: [...workingDates],
+      renderDateContent: () => '',
+      onDateSelect: () => {},
+    });
+
+    selection = initMultiSelect(calendarRoot, {
+      onChange: syncApplyButton,
+    });
+
+    syncCalendarStatus();
+  };
+
+  startSelectionSession();
 
   applyButton.addEventListener('click', () => {
     const dates = selection.getSelectedDates();
@@ -69,12 +81,11 @@ export function renderTimetable(root) {
     startTime = startInput.value || startTime;
     endTime = endInput.value || endTime;
     saveState({ workingDates: [...workingDates], startTime, endTime });
-    syncCalendarStatus();
 
-    selection.clear();
+    const month = calendar.getDisplayedMonth();
+    selection.destroy();
+    startSelectionSession(month);
   });
 
-  syncCalendarStatus();
-
-  return { selection };
+  return { selection: () => selection };
 }
