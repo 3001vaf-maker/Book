@@ -5,7 +5,7 @@ export function renderTimetable(root) {
   let startTime = '10:00';
   let endTime = '18:00';
 
-  root.innerHTML = `${pageHeader('График')}<div class="work-time-row"><div class="work-time-row__fields">${timeInput({ label: 'Начало', name: 'startTime', value: startTime })}${timeInput({ label: 'Окончание', name: 'endTime', value: endTime })}</div></div><div data-timetable-calendar></div><div class="profile-actions"><button type="button" class="ui-button" data-timetable-apply disabled>Применить: рабочий день</button></div>`;
+  root.innerHTML = `${pageHeader('График')}<div class="work-time-row"><div class="work-time-row__fields"><div class="work-time-row__field">${timeInput({ label: 'Начало', name: 'startTime', value: startTime })}</div><div class="work-time-row__field">${timeInput({ label: 'Окончание', name: 'endTime', value: endTime })}</div></div></div><div data-timetable-calendar></div><div class="profile-actions"><button type="button" class="ui-button" data-timetable-apply disabled>Применить: рабочий день</button></div>`;
 
   const calendarRoot = root.querySelector('[data-timetable-calendar]');
   const applyButton = root.querySelector('[data-timetable-apply]');
