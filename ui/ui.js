@@ -1,8 +1,8 @@
 import { accordion, initAccordions } from './accordion/accordion.js';
 import { bottomNavigation } from './navigation/navigation.js';
 import { viewNavigation, initViewNavigation } from './view-navigation/view-navigation.js';
-import { calendar, initCalendar } from './calendar/index.js?v=graph-20260902';
-import { initMultiSelect } from './selection/index.js?v=graph-20260902';
+import { calendar, initCalendar } from './calendar/index.js?v=graph-lifecycle-20260903';
+import { initMultiSelect } from './selection/index.js?v=graph-lifecycle-20260903';
 import { entityCard } from './cards/index.js';
 import { select, searchableSelect } from './selectors/index.js';
 import { workLinks, initWorkLinks, collectWorkLinks } from './links/index.js';
