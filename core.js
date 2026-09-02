@@ -1,6 +1,6 @@
 import { renderMain } from './main/main.js';
 import { renderJournal } from './journal/journal.js';
-import { renderTimetable } from './timetable/timetable.js';
+import { renderTimetable } from './timetable/timetable.js?v=graph-persist-20260903';
 import { renderChat } from './chat/chat.js';
 import { renderSettings } from './settings/settings.js';
 import { bottomNavigation } from './ui/ui.js';
