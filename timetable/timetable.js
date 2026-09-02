@@ -87,5 +87,9 @@ export function renderTimetable(root) {
     startSelectionSession(month);
   });
 
-  return { selection: () => selection };
+  return {
+    get selection() {
+      return selection;
+    },
+  };
 }
