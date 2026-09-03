@@ -4,7 +4,7 @@ import { getTimeWorks } from '../core/time-work.js?v=journal-worktime-20260903';
 import { getRecordsForDay } from '../core/record.js';
 import { getJournalBreaksForDay, getJournalBreaks } from '../core/journal-breaks.js';
 import { getTimeUsages } from '../core/time-usage.js';
-import { openRecordCreation } from './record.js';
+import { openRecordCreation, openRecordView } from './record.js';
 
 function dateKey(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
 export function renderJournalDay(root, { date = new Date(), workplaceId = '', onChange = () => {} } = {}) {
@@ -20,6 +20,11 @@ export function renderJournalDay(root, { date = new Date(), workplaceId = '', on
   const usages = getTimeUsages({ records, breaks });
   contentRoot.innerHTML = journalDayTimeline({ from: time.from, to: time.to, records, usages });
   initJournalDayTimeline(contentRoot, { usages, onSlotClick: ({ from, to, usage }) => {
+    if (usage?.type === 'record') {
+      const record = records.find((item) => item?.id === usage.id);
+      if (record) openRecordView(record);
+      return;
+    }
     if (usage) return;
     openRecordCreation({ date, workplaceId, from, to, onCreated: () => renderJournalDay(root, { date, workplaceId, onChange }) });
   } });
