@@ -19,12 +19,9 @@ function loadState() {
     if (!raw) return { workingDays: [] };
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed.workingDays)) return { workingDays: parsed.workingDays };
-
-    // Migrate the previous Graph-only day list without assigning it a place of work.
     if (Array.isArray(parsed.workingDates)) {
       return { workingDays: parsed.workingDates.map((date) => ({ date, workplaceId: null })) };
     }
-
     return { workingDays: [] };
   } catch {
     return { workingDays: [] };
@@ -87,7 +84,10 @@ export function renderTimetable(root) {
   let selection;
 
   const selectedWorkplace = () => workplaces.find((workplace) => workplace.key === selectedWorkplaceId) || null;
-  const selectedTime = () => resolveTime(selectedWorkplace()?.from, selectedWorkplace()?.to);
+  const selectedTime = () => {
+    const workplace = selectedWorkplace();
+    return resolveTime(workplace?.from, workplace?.to);
+  };
 
   const renderHeader = (month) => {
     const header = root.querySelector('.page-header');
@@ -98,7 +98,7 @@ export function renderTimetable(root) {
 
   const syncApplyButton = (dates) => {
     applyButton.disabled = !selectedWorkplaceId || dates.length === 0;
-    applyButton.textContent = `Применить: ${dates.length ? 'рабочий день' : 'рабочий день'}`;
+    applyButton.textContent = `Применить: ${dates.length ? 'рабочий день / выходной' : 'рабочий день'}`;
   };
 
   const startSelectionSession = (month) => {
@@ -114,10 +114,7 @@ export function renderTimetable(root) {
       onDateSelect: () => {},
       onMonthChange: renderHeader,
     });
-
-    selection = initMultiSelect(calendarRoot, {
-      onChange: syncApplyButton,
-    });
+    selection = initMultiSelect(calendarRoot, { onChange: syncApplyButton });
   };
 
   if (workplaces.length) {
@@ -140,16 +137,14 @@ export function renderTimetable(root) {
     const dates = selection.getSelectedDates();
     if (!dates.length) return;
 
+    const firstDate = dates[0];
+    const wasWorking = workingDays.some((item) => item?.date === firstDate && item?.workplaceId === selectedWorkplaceId);
     const selected = new Set(dates);
-    const withoutSelectedDates = workingDays.filter((item) => !(item?.workplaceId === selectedWorkplaceId && selected.has(item.date)));
-    const currentDates = new Set(datesForWorkplace(withoutSelectedDates, selectedWorkplaceId));
-    const targetWorking = !currentDates.has(dates[0]);
-
-    const nextWorkingDays = [...withoutSelectedDates];
-    dates.forEach((date) => {
-      const exists = nextWorkingDays.some((item) => item?.date === date && item?.workplaceId === selectedWorkplaceId);
-      if (targetWorking && !exists) nextWorkingDays.push({ date, workplaceId: selectedWorkplaceId });
-    });
+    const nextWorkingDays = wasWorking
+      ? workingDays.filter((item) => !(item?.workplaceId === selectedWorkplaceId && selected.has(item.date)))
+      : [...workingDays, ...dates
+          .filter((date) => !workingDays.some((item) => item?.date === date && item?.workplaceId === selectedWorkplaceId))
+          .map((date) => ({ date, workplaceId: selectedWorkplaceId }))];
 
     saveState({ workingDays: nextWorkingDays });
     workingDays.splice(0, workingDays.length, ...nextWorkingDays);
