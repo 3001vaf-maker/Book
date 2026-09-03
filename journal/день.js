@@ -1,5 +1,9 @@
-import { emptyState } from '../ui/ui.js';
+import { initDateNavigator } from '../ui/ui.js';
 
 export function renderJournalDay(root) {
-  root.innerHTML = emptyState('День', 'Представление Дня подготовлено для последующей реализации.');
+  root.innerHTML = '<div data-journal-day-navigator></div>';
+
+  initDateNavigator(root.querySelector('[data-journal-day-navigator]'), {
+    date: new Date(),
+  });
 }
