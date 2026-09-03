@@ -87,7 +87,7 @@ export function renderTimetable(root) {
 
   const syncApplyButton = (dates) => {
     applyButton.disabled = !selectedWorkplaceId || dates.length === 0;
-    applyButton.textContent = `Применить: ${dates.length ? 'рабочий день / выходной' : 'рабочий день'}`;
+    applyButton.textContent = 'Применить: рабочий день';
   };
 
   const startSelectionSession = (month) => {
