@@ -47,24 +47,14 @@ function workingDayForDate(workingDays, workplaceId, date) {
   return workingDays.find((item) => item?.workplaceId === workplaceId && item?.date === date) || null;
 }
 
-function effectiveWorkplaces(workplaces, workplaceTimeOverrides) {
-  return workplaces.map((workplace) => {
-    const override = workplaceTimeOverrides[workplace.key];
-    return override?.from && override?.to
-      ? { ...workplace, from: override.from, to: override.to }
-      : workplace;
-  });
-}
-
-function monthStats(month, workingDays, workplaceId, workplaces, workplaceTimeOverrides) {
+function monthStats(month, workingDays, workplaceId, workplaces) {
   const year = month.getFullYear();
   const monthIndex = month.getMonth();
   const prefix = `${year}-${String(monthIndex + 1).padStart(2, '0')}-`;
   const days = datesForWorkplace(workingDays, workplaceId).filter((dateKey) => dateKey.startsWith(prefix));
-  const effective = effectiveWorkplaces(workplaces, workplaceTimeOverrides);
   const minutes = days.reduce((total, dateKey) => {
     const workingDay = workingDayForDate(workingDays, workplaceId, dateKey);
-    const time = resolveWorkingDayTime(effective, workingDay);
+    const time = resolveWorkingDayTime(workplaces, workingDay);
     if (!time) return total;
     const [fromHour, fromMinute] = time.from.split(':').map(Number);
     const [toHour, toMinute] = time.to.split(':').map(Number);
@@ -88,11 +78,10 @@ export function renderTimetable(root) {
   const workplaces = getWorkplaces();
   const savedState = loadState(workplaces);
   const workingDays = Array.isArray(savedState.workingDays) ? savedState.workingDays : [];
-  const workplaceTimeOverrides = savedState.workplaceTimeOverrides || {};
   let selectedWorkplaceId = workplaces[0]?.key || '';
 
   const initialMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-  const initialStats = monthStats(initialMonth, workingDays, selectedWorkplaceId, workplaces, workplaceTimeOverrides);
+  const initialStats = monthStats(initialMonth, workingDays, selectedWorkplaceId, workplaces);
   const selectedWorkplace = workplaces.find((workplace) => workplace.key === selectedWorkplaceId) || null;
   const headerControl = workplaceHeaderButton(selectedWorkplace, initialStats);
 
@@ -113,7 +102,7 @@ export function renderTimetable(root) {
     const meta = header.querySelector('.page-header__meta');
     if (!meta) return;
     const workplace = workplaces.find((item) => item.key === selectedWorkplaceId) || null;
-    meta.innerHTML = workplaceHeaderButton(workplace, monthStats(month, workingDays, selectedWorkplaceId, workplaces, workplaceTimeOverrides));
+    meta.innerHTML = workplaceHeaderButton(workplace, monthStats(month, workingDays, selectedWorkplaceId, workplaces));
     meta.querySelector('[data-timetable-workplace-open]')?.addEventListener('click', openWorkplaceModal);
   };
 
@@ -164,7 +153,7 @@ export function renderTimetable(root) {
       renderDateContent: ({ dateKey, isCurrentMonth, isWorking }) => {
         if (!isCurrentMonth || !isWorking) return '';
         const workingDay = workingDayForDate(workingDays, selectedWorkplaceId, dateKey);
-        const time = resolveWorkingDayTime(effectiveWorkplaces(workplaces, workplaceTimeOverrides), workingDay);
+        const time = resolveWorkingDayTime(workplaces, workingDay);
         if (!time) return '';
         return `<span>${time.from}</span><span>${time.to}</span>`;
       },
@@ -193,11 +182,17 @@ export function renderTimetable(root) {
   }
 
   function openWorkplaceTimeModal() {
+    const selectedDates = selection?.getSelectedDates?.() || [];
+    if (selectedDates.length !== 1) return;
+
+    const selectedDate = selectedDates[0];
     const workplace = workplaces.find((item) => item.key === selectedWorkplaceId) || null;
-    if (!workplace) return;
-    const override = workplaceTimeOverrides[selectedWorkplaceId] || {};
-    const from = override.from || workplace.from || '09:00';
-    const to = override.to || workplace.to || '18:00';
+    const workingDay = workingDayForDate(workingDays, selectedWorkplaceId, selectedDate);
+    if (!workplace || !workingDay) return;
+
+    const time = resolveWorkingDayTime(workplaces, workingDay);
+    const from = time?.from || workplace.from || '09:00';
+    const to = time?.to || workplace.to || '18:00';
     const content = `<div class="modal-title"><h2>Время работы</h2></div><div class="timetable-time-fields">${timePicker({ name: 'timetableWorkplaceFrom', label: 'Начало', value: from })}${timePicker({ name: 'timetableWorkplaceTo', label: 'Окончание', value: to })}</div><button type="button" class="ui-button" data-timetable-workplace-time-save>Сохранить</button>`;
     const modalRoot = mountModal(document.body, modal(content, { title: 'Время работы' }));
     if (!modalRoot) return;
@@ -205,8 +200,10 @@ export function renderTimetable(root) {
     modalRoot.querySelector('[data-timetable-workplace-time-save]')?.addEventListener('click', () => {
       const nextFrom = modalRoot.querySelector('[name="timetableWorkplaceFrom"]')?.value || from;
       const nextTo = modalRoot.querySelector('[name="timetableWorkplaceTo"]')?.value || to;
-      workplaceTimeOverrides[selectedWorkplaceId] = { from: nextFrom, to: nextTo };
-      saveState({ workingDays, workplaceTimeOverrides });
+      const target = workingDayForDate(workingDays, selectedWorkplaceId, selectedDate);
+      if (!target) return;
+      target.timeOverride = { from: nextFrom, to: nextTo };
+      saveState({ workingDays, workplaceTimeOverrides: {} });
       const month = calendar?.getDisplayedMonth() || initialMonth;
       selection?.destroy();
       startSelectionSession(month);
@@ -217,14 +214,17 @@ export function renderTimetable(root) {
 
   function openWorkplaceModal() {
     const workplace = workplaces.find((item) => item.key === selectedWorkplaceId) || null;
-    const stats = monthStats(calendar?.getDisplayedMonth() || initialMonth, workingDays, selectedWorkplaceId, workplaces, workplaceTimeOverrides);
-    const content = `<div class="modal-title"><h2>Место работы</h2></div><div class="timetable-workplace-modal-summary"><strong>${workplace?.name || 'Место работы не выбрано'}</strong>${timetableCounter(stats)}</div><div class="timetable-workplace-modal-actions"><button type="button" class="ui-button" data-timetable-open-picker>Выбрать место работы</button><button type="button" class="ui-button" data-timetable-open-time>Скорректировать время</button></div>`;
+    const selectedDates = selection?.getSelectedDates?.() || [];
+    const stats = monthStats(calendar?.getDisplayedMonth() || initialMonth, workingDays, selectedWorkplaceId, workplaces);
+    const timeActionDisabled = selectedDates.length !== 1 || !workingDayForDate(workingDays, selectedWorkplaceId, selectedDates[0]);
+    const content = `<div class="modal-title"><h2>Место работы</h2></div><div class="timetable-workplace-modal-summary"><strong>${workplace?.name || 'Место работы не выбрано'}</strong>${timetableCounter(stats)}</div><div class="timetable-workplace-modal-actions"><button type="button" class="ui-button" data-timetable-open-picker>Выбрать место работы</button><button type="button" class="ui-button" data-timetable-open-time ${timeActionDisabled ? 'disabled' : ''}>Скорректировать время</button></div>`;
     const modalRoot = mountModal(document.body, modal(content, { title: 'Место работы' }));
     modalRoot?.querySelector('[data-timetable-open-picker]')?.addEventListener('click', () => {
       modalRoot.remove();
       openWorkplacePickerModal();
     });
     modalRoot?.querySelector('[data-timetable-open-time]')?.addEventListener('click', () => {
+      if (timeActionDisabled) return;
       modalRoot.remove();
       openWorkplaceTimeModal();
     });
@@ -244,7 +244,7 @@ export function renderTimetable(root) {
     const nextWorkingDays = makeWorking
       ? [...workingDays, ...dates.filter((date) => !workingDays.some((item) => item?.date === date && item?.workplaceId === selectedWorkplaceId)).map((date) => ({ date, workplaceId: selectedWorkplaceId, timeOverride: null }))]
       : workingDays.filter((item) => !(item?.workplaceId === selectedWorkplaceId && selected.has(item.date)));
-    saveState({ workingDays: nextWorkingDays, workplaceTimeOverrides });
+    saveState({ workingDays: nextWorkingDays, workplaceTimeOverrides: {} });
     workingDays.splice(0, workingDays.length, ...nextWorkingDays);
     const month = calendar.getDisplayedMonth();
     selection.destroy();
