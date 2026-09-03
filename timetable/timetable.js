@@ -1,19 +1,17 @@
-import { pageHeader, initCalendar, initMultiSelect, timeInput, initTimePickers } from '../ui/ui.js?v=time-wheel-20260903';
+import { pageHeader, initCalendar, initMultiSelect } from '../ui/ui.js?v=graph-day-domain-20260903';
 
 const STORAGE_KEY = 'book:timetable-state';
 
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { workingDates: [], startTime: '10:00', endTime: '20:00' };
+    if (!raw) return { workingDates: [] };
     const parsed = JSON.parse(raw);
     return {
       workingDates: Array.isArray(parsed.workingDates) ? parsed.workingDates : [],
-      startTime: typeof parsed.startTime === 'string' && parsed.startTime ? parsed.startTime : '10:00',
-      endTime: typeof parsed.endTime === 'string' && parsed.endTime ? parsed.endTime : '20:00',
     };
   } catch {
-    return { workingDates: [], startTime: '10:00', endTime: '20:00' };
+    return { workingDates: [] };
   }
 }
 
@@ -21,57 +19,40 @@ function saveState(state) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
-function minutesBetween(startTime, endTime) {
-  const [startHours, startMinutes] = startTime.split(':').map(Number);
-  const [endHours, endMinutes] = endTime.split(':').map(Number);
-  if (![startHours, startMinutes, endHours, endMinutes].every(Number.isFinite)) return 0;
-  const start = startHours * 60 + startMinutes;
-  const end = endHours * 60 + endMinutes;
-  return end >= start ? end - start : (24 * 60 - start) + end;
-}
-
-function monthStats(month, workingDates, startTime, endTime) {
+function monthStats(month, workingDates) {
   const year = month.getFullYear();
   const monthIndex = month.getMonth();
   const prefix = `${year}-${String(monthIndex + 1).padStart(2, '0')}-`;
-  const days = [...workingDates].filter((dateKey) => dateKey.startsWith(prefix)).length;
-  const totalMinutes = days * minutesBetween(startTime, endTime);
-  return { days, hours: Math.floor(totalMinutes / 60), minutes: totalMinutes % 60 };
+  return {
+    days: [...workingDates].filter((dateKey) => dateKey.startsWith(prefix)).length,
+  };
 }
 
 function timetableHeaderMeta(stats) {
-  return `<div class="page-header__meta-line"><strong>${stats.days}</strong><small>д</small></div><div class="page-header__meta-line"><strong>${stats.hours}</strong><small>ч</small><strong>${stats.minutes}</strong><small>м</small></div>`;
+  return `<div class="page-header__meta-line"><strong>${stats.days}</strong><small>д</small></div>`;
 }
 
 export function renderTimetable(root) {
   const savedState = loadState();
   const workingDates = new Set(savedState.workingDates);
-  let startTime = savedState.startTime;
-  let endTime = savedState.endTime;
 
   const renderHeader = (month) => {
     const header = root.querySelector('.page-header');
     if (!header) return;
-    const stats = monthStats(month, workingDates, startTime, endTime);
     const meta = header.querySelector('.page-header__meta');
-    if (meta) meta.innerHTML = timetableHeaderMeta(stats);
+    if (meta) meta.innerHTML = timetableHeaderMeta(monthStats(month, workingDates));
   };
 
   const initialMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-  const initialStats = monthStats(initialMonth, workingDates, startTime, endTime);
+  const initialStats = monthStats(initialMonth, workingDates);
 
-  root.innerHTML = `<div class="timetable-view">${pageHeader('График', '', timetableHeaderMeta(initialStats))}<div data-timetable-calendar></div><div class="cost-range paired-fields">${timeInput({ label: 'Начало', name: 'startTime', value: startTime })}${timeInput({ label: 'Окончание', name: 'endTime', value: endTime })}</div><div class="profile-actions"><button type="button" class="ui-button" data-timetable-apply disabled>Применить: рабочий день</button></div></div>`;
+  root.innerHTML = `<div class="timetable-view">${pageHeader('График', '', timetableHeaderMeta(initialStats))}<div data-timetable-calendar></div><div class="profile-actions"><button type="button" class="ui-button" data-timetable-apply disabled>Применить: рабочий день</button></div></div>`;
 
   const calendarRoot = root.querySelector('[data-timetable-calendar]');
   const applyButton = root.querySelector('[data-timetable-apply]');
 
   let calendar;
   let selection;
-
-  initTimePickers(root);
-
-  const startInput = root.querySelector('[name="startTime"]');
-  const endInput = root.querySelector('[name="endTime"]');
 
   const syncApplyButton = (dates) => {
     const firstDate = dates[0];
@@ -84,10 +65,7 @@ export function renderTimetable(root) {
     calendar = initCalendar(calendarRoot, {
       month,
       workingDates: [...workingDates],
-      renderDateContent: ({ isCurrentMonth, isWorking }) => {
-        if (!isCurrentMonth || !isWorking) return '';
-        return `<span>${startTime}</span><span>${endTime}</span>`;
-      },
+      renderDateContent: () => '',
       onDateSelect: () => {},
       onMonthChange: renderHeader,
     });
@@ -109,9 +87,7 @@ export function renderTimetable(root) {
       else workingDates.delete(dateKey);
     });
 
-    startTime = startInput.value || startTime;
-    endTime = endInput.value || endTime;
-    saveState({ workingDates: [...workingDates], startTime, endTime });
+    saveState({ workingDates: [...workingDates] });
 
     const month = calendar.getDisplayedMonth();
     selection.destroy();
