@@ -81,15 +81,18 @@ export function initCalendar(root, options = {}) {
   const workingDates = options.workingDates || [];
   const renderDateContent = options.renderDateContent || (() => '');
   const onDateSelect = options.onDateSelect || (() => {});
+  const onMonthChange = options.onMonthChange || (() => {});
   const render = () => {
     root.innerHTML = buildCalendar({ displayedMonth, workingDates, renderDateContent });
     root.querySelector('[data-calendar-prev]')?.addEventListener('click', () => {
       displayedMonth = new Date(displayedMonth.getFullYear(), displayedMonth.getMonth() - 1, 1);
       render();
+      onMonthChange(new Date(displayedMonth));
     });
     root.querySelector('[data-calendar-next]')?.addEventListener('click', () => {
       displayedMonth = new Date(displayedMonth.getFullYear(), displayedMonth.getMonth() + 1, 1);
       render();
+      onMonthChange(new Date(displayedMonth));
     });
     root.querySelectorAll('[data-calendar-date]').forEach((button) => {
       button.addEventListener('click', () => {
