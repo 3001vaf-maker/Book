@@ -29,7 +29,9 @@ export function isTimeRangeAvailable({ from, to, usages = [], excludeId = '' } =
 
 export function getTimeUsages({ records = [], breaks = [] } = {}) {
   return [
-    ...(Array.isArray(records) ? records : []).map((record) => ({ ...record, type: 'record' })),
+    ...(Array.isArray(records) ? records : [])
+      .filter((record) => record?.status !== 'cancelled')
+      .map((record) => ({ ...record, type: 'record' })),
     ...(Array.isArray(breaks) ? breaks : []).map((item) => ({ ...item, type: 'break' })),
   ].filter((item) => item?.from && item?.to);
 }
