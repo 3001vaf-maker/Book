@@ -1,45 +1,49 @@
-export function initMultiSelect(root, { selectedDates = [], onChange = () => {} } = {}) {
-  const selection = new Set(selectedDates);
+export function initMultiSelect(root, { selectedDates = [], selectedValues = [], selector = '[data-calendar-date]', valueAttribute = 'calendarDate', onChange = () => {} } = {}) {
+  const initial = selectedValues.length ? selectedValues : selectedDates;
+  const selection = new Set(initial.filter(Boolean));
+  const valueOf = (element) => element?.dataset?.[valueAttribute] || '';
 
   const sync = () => {
-    root.querySelectorAll('[data-calendar-date]').forEach((button) => {
-      const key = button.dataset.calendarDate || '';
-      const selected = selection.has(key);
-      button.classList.toggle('is-selected', selected);
-      button.setAttribute('aria-pressed', String(selected));
+    root.querySelectorAll(selector).forEach((element) => {
+      const selected = selection.has(valueOf(element));
+      element.classList.toggle('is-selected', selected);
+      element.setAttribute('aria-pressed', String(selected));
+      const checkbox = element.matches('input[type="checkbox"]') ? element : element.querySelector('input[type="checkbox"]');
+      if (checkbox) checkbox.checked = selected;
     });
   };
 
-  const toggle = (dateKey) => {
-    if (!dateKey) return;
-    const button = Array.from(root.querySelectorAll('[data-calendar-date]')).find((item) => item.dataset.calendarDate === dateKey);
-    if (!button) return;
-
-    if (selection.has(dateKey)) selection.delete(dateKey);
-    else selection.add(dateKey);
-
+  const toggle = (value) => {
+    if (!value) return;
+    if (selection.has(value)) selection.delete(value);
+    else selection.add(value);
     sync();
     onChange([...selection]);
   };
 
   const handleClick = (event) => {
-    const button = event.target.closest('[data-calendar-date]');
-    if (!button || !root.contains(button)) return;
+    const element = event.target.closest(selector);
+    if (!element || !root.contains(element)) return;
     event.preventDefault();
     event.stopPropagation();
-    toggle(button.dataset.calendarDate || '');
+    toggle(valueOf(element));
   };
 
   root.addEventListener('click', handleClick, true);
-
   const observer = new MutationObserver(sync);
   observer.observe(root, { childList: true, subtree: true });
-
   sync();
 
   return {
+    getSelectedValues: () => [...selection],
     getSelectedDates: () => [...selection],
-    isSelected: (dateKey) => selection.has(dateKey),
+    isSelected: (value) => selection.has(value),
+    setSelectedValues: (values = []) => {
+      selection.clear();
+      values.filter(Boolean).forEach((value) => selection.add(value));
+      sync();
+      onChange([...selection]);
+    },
     setSelectedDates: (values = []) => {
       selection.clear();
       values.filter(Boolean).forEach((value) => selection.add(value));
