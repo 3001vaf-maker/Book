@@ -1,5 +1,14 @@
 const MONTH_FORMATTER = new Intl.DateTimeFormat('ru-RU', { month: 'long', year: 'numeric' });
 
+export function dateNavigator({ label = '', prevLabel = 'Предыдущий период', nextLabel = 'Следующий период' } = {}) {
+  return `<header class="calendar__header"><button type="button" class="calendar__month-button" data-date-navigator-prev aria-label="${prevLabel}">←</button><div class="calendar__month" aria-live="polite">${label}</div><button type="button" class="calendar__month-button" data-date-navigator-next aria-label="${nextLabel}">→</button></header>`;
+}
+
+export function initDateNavigator(root, { onPrev = () => {}, onNext = () => {} } = {}) {
+  root.querySelector('[data-date-navigator-prev]')?.addEventListener('click', onPrev);
+  root.querySelector('[data-date-navigator-next]')?.addEventListener('click', onNext);
+}
+
 function pad(value) {
   return String(value).padStart(2, '0');
 }
@@ -68,7 +77,7 @@ function buildCalendar({ displayedMonth, workingDates = [], renderDateContent = 
     cells.push(`<button type="button" class="${classes}"${style ? ` style="${style}"` : ''} data-calendar-date="${key}" data-calendar-current-month="${isCurrentMonth}" aria-pressed="false"><span class="calendar__date-number">${date.getDate()}</span>${content ? `<span class="calendar__date-content">${content}</span>` : '<span class="calendar__date-content" aria-hidden="true"></span>'}</button>`);
   }
 
-  return `<section class="calendar" data-calendar><header class="calendar__header"><button type="button" class="calendar__month-button" data-calendar-prev aria-label="Предыдущий месяц">←</button><div class="calendar__month" aria-live="polite">${monthLabel(displayedMonth)}</div><button type="button" class="calendar__month-button" data-calendar-next aria-label="Следующий месяц">→</button></header><div class="calendar__weekdays" aria-hidden="true">${['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((day) => `<span>${day}</span>`).join('')}</div><div class="calendar__grid">${cells.join('')}</div></section>`;
+  return `<section class="calendar" data-calendar>${dateNavigator({ label: monthLabel(displayedMonth), prevLabel: 'Предыдущий месяц', nextLabel: 'Следующий месяц' })}<div class="calendar__weekdays" aria-hidden="true">${['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((day) => `<span>${day}</span>`).join('')}</div><div class="calendar__grid">${cells.join('')}</div></section>`;
 }
 
 export function calendar(options = {}) {
@@ -84,15 +93,17 @@ export function initCalendar(root, options = {}) {
   const onMonthChange = options.onMonthChange || (() => {});
   const render = () => {
     root.innerHTML = buildCalendar({ displayedMonth, workingDates, renderDateContent });
-    root.querySelector('[data-calendar-prev]')?.addEventListener('click', () => {
-      displayedMonth = new Date(displayedMonth.getFullYear(), displayedMonth.getMonth() - 1, 1);
-      render();
-      onMonthChange(new Date(displayedMonth));
-    });
-    root.querySelector('[data-calendar-next]')?.addEventListener('click', () => {
-      displayedMonth = new Date(displayedMonth.getFullYear(), displayedMonth.getMonth() + 1, 1);
-      render();
-      onMonthChange(new Date(displayedMonth));
+    initDateNavigator(root, {
+      onPrev: () => {
+        displayedMonth = new Date(displayedMonth.getFullYear(), displayedMonth.getMonth() - 1, 1);
+        render();
+        onMonthChange(new Date(displayedMonth));
+      },
+      onNext: () => {
+        displayedMonth = new Date(displayedMonth.getFullYear(), displayedMonth.getMonth() + 1, 1);
+        render();
+        onMonthChange(new Date(displayedMonth));
+      },
     });
     root.querySelectorAll('[data-calendar-date]').forEach((button) => {
       button.addEventListener('click', () => {
