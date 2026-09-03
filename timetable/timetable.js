@@ -1,17 +1,7 @@
 import { pageHeader, initCalendar, initMultiSelect, select } from '../ui/ui.js?v=graph-workplace-20260903';
-import { resolveTime } from '../core/time.js';
+import { getWorkplaces, resolveWorkplaceTime } from '../core/workplace-time.js';
 
 const STORAGE_KEY = 'book:timetable-state';
-const WORKPLACES_KEY = 'book.workplaces';
-
-function readWorkplaces() {
-  try {
-    const value = JSON.parse(localStorage.getItem(WORKPLACES_KEY) || '[]');
-    return Array.isArray(value) ? value : [];
-  } catch {
-    return [];
-  }
-}
 
 function loadState(workplaces) {
   try {
@@ -21,9 +11,7 @@ function loadState(workplaces) {
     if (Array.isArray(parsed.workingDays)) return { workingDays: parsed.workingDays };
     if (Array.isArray(parsed.workingDates)) {
       const firstWorkplaceId = workplaces[0]?.key || null;
-      return {
-        workingDays: parsed.workingDates.map((date) => ({ date, workplaceId: firstWorkplaceId })),
-      };
+      return { workingDays: parsed.workingDates.map((date) => ({ date, workplaceId: firstWorkplaceId })) };
     }
     return { workingDays: [] };
   } catch {
@@ -62,7 +50,7 @@ function timetableHeaderMeta(stats) {
 }
 
 export function renderTimetable(root) {
-  const workplaces = readWorkplaces();
+  const workplaces = getWorkplaces();
   const savedState = loadState(workplaces);
   const workingDays = Array.isArray(savedState.workingDays) ? savedState.workingDays : [];
   let selectedWorkplaceId = workplaces[0]?.key || '';
@@ -86,12 +74,6 @@ export function renderTimetable(root) {
   let calendar;
   let selection;
 
-  const selectedWorkplace = () => workplaces.find((workplace) => workplace.key === selectedWorkplaceId) || null;
-  const selectedTime = () => {
-    const workplace = selectedWorkplace();
-    return resolveTime(workplace?.from, workplace?.to);
-  };
-
   const renderHeader = (month) => {
     const header = root.querySelector('.page-header');
     if (!header) return;
@@ -105,13 +87,12 @@ export function renderTimetable(root) {
   };
 
   const startSelectionSession = (month) => {
-    const workplace = selectedWorkplace();
-    const time = selectedTime();
+    const time = resolveWorkplaceTime(workplaces, selectedWorkplaceId);
     calendar = initCalendar(calendarRoot, {
       month,
       workingDates: datesForWorkplace(workingDays, selectedWorkplaceId),
       renderDateContent: ({ isCurrentMonth, isWorking }) => {
-        if (!isCurrentMonth || !isWorking || !workplace) return '';
+        if (!isCurrentMonth || !isWorking || !time) return '';
         return `<span>${time.from}</span><span>${time.to}</span>`;
       },
       onDateSelect: () => {},
