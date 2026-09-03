@@ -13,14 +13,17 @@ function readWorkplaces() {
   }
 }
 
-function loadState() {
+function loadState(workplaces) {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return { workingDays: [] };
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed.workingDays)) return { workingDays: parsed.workingDays };
     if (Array.isArray(parsed.workingDates)) {
-      return { workingDays: parsed.workingDates.map((date) => ({ date, workplaceId: null })) };
+      const firstWorkplaceId = workplaces[0]?.key || null;
+      return {
+        workingDays: parsed.workingDates.map((date) => ({ date, workplaceId: firstWorkplaceId })),
+      };
     }
     return { workingDays: [] };
   } catch {
@@ -59,9 +62,9 @@ function timetableHeaderMeta(stats) {
 }
 
 export function renderTimetable(root) {
-  const savedState = loadState();
-  const workingDays = Array.isArray(savedState.workingDays) ? savedState.workingDays : [];
   const workplaces = readWorkplaces();
+  const savedState = loadState(workplaces);
+  const workingDays = Array.isArray(savedState.workingDays) ? savedState.workingDays : [];
   let selectedWorkplaceId = workplaces[0]?.key || '';
 
   const initialMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
