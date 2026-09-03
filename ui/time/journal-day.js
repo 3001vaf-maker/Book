@@ -20,7 +20,8 @@ export function journalDayTimeline({ from = '09:00', to = '18:00' } = {}) {
   const firstSlot = Math.ceil(start / 30) * 30;
   for (let minutes = firstSlot; minutes < end; minutes += 30) {
     const next = Math.min(minutes + 30, end);
-    slots.push(`<button type="button" class="time-timeline__slot" data-time-slot-from="${formatMinutes(minutes)}" data-time-slot-to="${formatMinutes(next)}" aria-label="${formatMinutes(minutes)}–${formatMinutes(next)}"><span class="time-timeline__hour">${formatMinutes(minutes)}</span><span class="time-timeline__line"><span class="time-timeline__quarter" aria-hidden="true"></span></span></button>`);
+    const label = minutes % 60 === 0 ? formatMinutes(minutes) : '';
+    slots.push(`<button type="button" class="time-timeline__slot" data-time-slot-from="${formatMinutes(minutes)}" data-time-slot-to="${formatMinutes(next)}" aria-label="${formatMinutes(minutes)}–${formatMinutes(next)}"><span class="time-timeline__hour">${label}</span><span class="time-timeline__line"><span class="time-timeline__quarter" aria-hidden="true"></span></span></button>`);
   }
 
   return `<section class="time-timeline" data-time-timeline data-time-from="${from}" data-time-to="${to}">${slots.join('')}</section>`;
