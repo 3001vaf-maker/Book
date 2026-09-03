@@ -1,24 +1,28 @@
-import { pageHeader, initCalendar, initMultiSelect, timeInput } from '../ui/ui.js?v=graph-lifecycle-20260903';
+import { pageHeader, initCalendar, initMultiSelect, timeInput } from '../ui/ui.js?v=graph-time-20260903';
 
 const STORAGE_KEY = 'book:timetable-state';
 
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { workingDates: [], startTime: '10:00', endTime: '18:00' };
+    if (!raw) return { workingDates: [], startTime: '10:00', endTime: '20:00' };
     const parsed = JSON.parse(raw);
     return {
       workingDates: Array.isArray(parsed.workingDates) ? parsed.workingDates : [],
       startTime: typeof parsed.startTime === 'string' && parsed.startTime ? parsed.startTime : '10:00',
-      endTime: typeof parsed.endTime === 'string' && parsed.endTime ? parsed.endTime : '18:00',
+      endTime: typeof parsed.endTime === 'string' && parsed.endTime ? parsed.endTime : '20:00',
     };
   } catch {
-    return { workingDates: [], startTime: '10:00', endTime: '18:00' };
+    return { workingDates: [], startTime: '10:00', endTime: '20:00' };
   }
 }
 
 function saveState(state) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function renderWorkTimeIndicator(startTime, endTime) {
+  return `<span class="calendar__work-time" aria-label="Рабочее время">${startTime}–${endTime}</span>`;
 }
 
 export function renderTimetable(root) {
@@ -48,6 +52,13 @@ export function renderTimetable(root) {
     calendarRoot.querySelectorAll('[data-calendar-date]').forEach((button) => {
       const key = button.dataset.calendarDate || '';
       button.classList.toggle('is-working', workingDates.has(key));
+      const indicator = button.querySelector('[data-calendar-work-time]');
+      if (workingDates.has(key)) {
+        if (!indicator) button.insertAdjacentHTML('beforeend', `<span data-calendar-work-time class="calendar__work-time" aria-hidden="true">${startTime}–${endTime}</span>`);
+        else indicator.textContent = `${startTime}–${endTime}`;
+      } else if (indicator) {
+        indicator.remove();
+      }
     });
   };
 
