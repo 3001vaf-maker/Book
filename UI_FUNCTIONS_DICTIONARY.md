@@ -93,6 +93,7 @@
 | `entityCard()` | Единая карточка сущности | `ui/cards/` | Общая | Клиенты, Профиль, Процедуры, Товары, Кошелёк | Сущности приложения | КАНОНИЧЕСКАЯ |
 | `select()` | Выпадающий выбор значения | `ui/selectors/` | Общая | Формы и настройки | Списки вариантов | ОБЩАЯ |
 | `searchableSelect()` | Выбор значения с поиском | `ui/selectors/` | Общая | Формы, где вариантов много | Списки вариантов | ОБЩАЯ |
+| `initMultiSelect()` | Подключает множественный выбор дат/значений | `ui/selection/` | Инфраструктура UI | График | DOM календаря и выбранные даты | ОБЩАЯ |
 | `workLinks()` | Управление рабочими ссылками | `ui/links/` | Специализированная | Профиль | Ссылки мастера | ОБЩАЯ ДЛЯ ФУНКЦИИ |
 | `initWorkLinks()` | Подключает поведение рабочих ссылок | `ui/links/` | Инфраструктура UI | Профиль | DOM рабочих ссылок | ОБЩАЯ ДЛЯ ФУНКЦИИ |
 | `collectWorkLinks()` | Собирает введённые рабочие ссылки | `ui/links/` | Инфраструктура данных UI | Профиль | Данные рабочих ссылок | ОБЩАЯ ДЛЯ ФУНКЦИИ |
@@ -104,8 +105,8 @@
 | `workplaceSelector()` | Выбор рабочего места | `ui/workplaces/` | Специализированная | Процедуры и профильные настройки | Рабочие места | ОБЩАЯ ДЛЯ ФУНКЦИИ |
 | `initWorkplaceSelectors()` | Подключает выбор рабочих мест | `ui/workplaces/` | Инфраструктура UI | Формы с рабочими местами | DOM workplace selector | ОБЩАЯ ДЛЯ ФУНКЦИИ |
 | `collectWorkplaceSelections()` | Собирает выбранные рабочие места | `ui/workplaces/` | Инфраструктура данных UI | Формы с рабочими местами | Данные рабочих мест | ОБЩАЯ ДЛЯ ФУНКЦИИ |
-| `modal()` | Создаёт HTML модального окна | `ui/modals/` | Общая | Профиль, Клиенты, Процедуры, Товары, Кошелёк, Ярлыки | Overlay / форма | ОБЩАЯ |
-| `mountModal()` | Показывает модальное окно и подключает закрытие/фокус | `ui/modals/` | Инфраструктура UI | Профиль, Клиенты, Процедуры, Товары, Кошелёк, Ярлыки | DOM modal | ОБЩАЯ |
+| `modal()` | Создаёт HTML модального окна | `ui/modals/` | Общая | Профиль, Клиенты, Процедуры, Товары, Кошелёк, Ярлыки, График | Overlay / форма | ОБЩАЯ |
+| `mountModal()` | Показывает модальное окно и подключает закрытие/фокус | `ui/modals/` | Инфраструктура UI | Профиль, Клиенты, Процедуры, Товары, Кошелёк, Ярлыки, График | DOM modal | ОБЩАЯ |
 | `button()` | Обычная кнопка действия | `ui/buttons/` | Общая | Разные экраны | Действия пользователя | ОБЩАЯ |
 | `iconButton()` | Кнопка с иконкой | `ui/buttons/` | Общая | Разные экраны, включая Кошелёк и Ярлыки | Действия пользователя | ОБЩАЯ |
 | `field()` | Однострочное поле ввода текста/значения | `ui/inputs/` | Общая | Формы | Текстовые и типизированные значения | ОБЩАЯ |
@@ -115,10 +116,10 @@
 | `colorPicker()` | Открывает визуальный выбор цвета из утверждённой палитры | `ui/colors/` | Специализированная | Ярлыки | Цвет ярлыка | ОБЩАЯ ДЛЯ ФУНКЦИИ |
 | `initColorPickers()` | Подключает визуальный выбор цвета и существующее Modal | `ui/colors/` | Инфраструктура UI | Ярлыки | DOM color picker / Modal | ОБЩАЯ ДЛЯ ФУНКЦИИ |
 | `escapeHtml()` | Экранирует HTML-значения | `ui/utils/` | Низкоуровневая утилита | UI-компоненты | Строки | ОБЩАЯ УТИЛИТА |
-| `timePicker()` | Выбор времени суток | `ui/time/` | Специализированная | Предусмотрен для форм времени | Время `HH:MM` | НЕ ПОДКЛЮЧЕНА К ФАСАДУ |
-| `initTimePickers()` | Подключает time picker | `ui/time/` | Инфраструктура UI | Формы с time picker | DOM time picker | НЕ ПОДКЛЮЧЕНА К ФАСАДУ |
-| `pageHeader()` | Заголовок страницы и подзаголовок | `ui/ui.js` | Общая | Профиль, Товары и другие страницы | Заголовок страницы | ТРЕБУЕТ РЕШЕНИЯ О ПЕРЕНОСЕ |
-| `timeInput()` | Простое HTML-поле выбора времени | `ui/ui.js` | Общая | Формы, использующие простой time input | Время | ТРЕБУЕТ РЕШЕНИЯ О ПЕРЕНОСЕ |
+| `timePicker()` | Выбор времени суток через единый настраиваемый барабан | `ui/time/` | Специализированная | График, Профиль | Время `HH:MM`; шаг минут 15/1 | КАНОНИЧЕСКАЯ |
+| `initTimePickers()` | Подключает time picker | `ui/time/` | Инфраструктура UI | График, Профиль | DOM time picker | КАНОНИЧЕСКАЯ |
+| `pageHeader()` | Заголовок страницы и подзаголовок | `ui/ui.js` | Общая | Профиль, Товары, График и другие страницы | Заголовок страницы | ТРЕБУЕТ РЕШЕНИЯ О ПЕРЕНОСЕ |
+| `timeInput()` | Фасадный вызов time picker с конфигурацией шага минут | `ui/ui.js` | Фасад UI | График и формы, использующие time picker | `timePicker()` | ОБЩАЯ |
 | `photoField()` | Поле добавления/изменения/удаления фотографии | `ui/ui.js` | Общая | Товары, Кошелёк и другие сущности с фото | Фото сущности | ТРЕБУЕТ РЕШЕНИЯ О ПЕРЕНОСЕ |
 | `initPhotoField()` | Подключает загрузку, предпросмотр и удаление фото | `ui/ui.js` | Инфраструктура UI | Формы с фото | DOM photo field | ТРЕБУЕТ РЕШЕНИЯ О ПЕРЕНОСЕ |
 
@@ -140,8 +141,9 @@
 | `ui/modals/` | Модальные окна | `modal`, `mountModal` |
 | `ui/navigation/` | Навигация | `bottomNavigation` |
 | `ui/selectors/` | Выбор значений | `select`, `searchableSelect` |
+| `ui/selection/` | Множественный выбор | `initMultiSelect` |
 | `ui/states/` | UI-состояния | `emptyState` |
-| `ui/time/` | Время суток | `timePicker`, `initTimePickers` |
+| `ui/time/` | Время суток и единый барабан выбора | `timePicker`, `initTimePickers` |
 | `ui/utils/` | Низкоуровневые UI-утилиты | `escapeHtml` |
 | `ui/view-navigation/` | Переключение представлений | `viewNavigation`, `initViewNavigation` |
 | `ui/workplaces/` | Рабочие места | `workplaceSelector`, `initWorkplaceSelectors`, `collectWorkplaceSelections` |
@@ -152,13 +154,13 @@
 
 | Сущность / раздел | Используемые UI-функции |
 |---|---|
-| Профиль | `pageHeader`, `entityCard`, `field`, `phoneField`, `textareaField`, `select`, `searchableSelect`, `accordion`, `modal`, `mountModal`, `workLinks`, `workplaceSelector` и связанные init/collect-функции |
+| Профиль | `pageHeader`, `entityCard`, `field`, `phoneField`, `textareaField`, `select`, `searchableSelect`, `accordion`, `modal`, `mountModal`, `workLinks`, `workplaceSelector`, `timePicker`, `initTimePickers` и связанные init/collect-функции |
 | Клиенты | `pageHeader`, `entityCard`, `emptyState`, `button`, `iconButton`, `modal`, `mountModal`, поля ввода и селекторы по необходимости |
 | Процедуры | `pageHeader`, `entityCard`, `costField`, `durationPicker`, `workplaceSelector`, `modal`, `mountModal`, `button`, поля и селекторы |
 | Товары | `pageHeader`, `entityCard`, `emptyState`, `photoField`, `costField`, `workplaceSelector`, `modal`, `mountModal`, `button`, `iconButton`, поля и селекторы |
 | Кошелёк | `pageHeader`, `entityCard`, `emptyState`, `button`, `iconButton`, `modal`, `mountModal`, `photoField`, `initPhotoField` |
 | Ярлыки | `pageHeader`, `emptyState`, `button`, `iconButton`, `modal`, `mountModal`, `colorPicker`, `initColorPickers` |
-| График | `pageHeader`, `initCalendar` |
+| График | `pageHeader`, `initCalendar`, `initMultiSelect`, `timePicker`, `initTimePickers`, `timeInput` |
 | Журнал → Месяц | `initCalendar` |
 | Навигация приложения | `bottomNavigation` |
 
@@ -174,6 +176,24 @@
 - `durationPicker()` — **продолжительность**, например `1 ч 30 мин`.
 
 Визуальное объединение в будущем возможно, если будет создан общий механизм, но модели данных и назначения должны оставаться различимыми.
+
+### `timePicker()` и `timeInput()` — не две реализации
+
+`timePicker()` является канонической реализацией UI выбора времени в `ui/time/`.
+
+`timeInput()` в `ui/ui.js` является фасадным вызовом этой реализации и не должен развиваться в отдельный компонент.
+
+Конфигурация `minuteStep` позволяет использовать один и тот же time picker для разных режимов времени без создания отдельных компонентов.
+
+### `timePicker()` и единый барабан
+
+Барабан выбора — один общий UI-механизм внутри `ui/time/`. Разными являются только данные, передаваемые ему:
+
+- часы `00–23` + минуты `00, 15, 30, 45` — выбор времени с шагом 15 минут;
+- часы `00–23` + минуты `00–59` — выбор времени с шагом 1 минута;
+- часы `1–12` + минуты `1–59` — выбор длительности.
+
+Не создавать `TimeWheel15`, `TimeWheel1` или `DurationWheel` как отдельные UI-компоненты.
 
 ### `costField()` — специализированный компонент
 
@@ -276,12 +296,3 @@
 6. Где она используется?
 7. Нужно ли добавить её в `ui/ui.js` как публичный экспорт?
 8. Обновлён ли этот реестр в том же изменении?
-
-Если функция уже существует, создание второй реализации без архитектурного обоснования запрещено.
-
----
-
-## 11. Связанные документы
-
-- `ARCHITECTURE_DICTIONARY.md` — общая архитектура Book.
-- `DESIGN_DICTIONARY.md` — единые визуальные правила Book.
