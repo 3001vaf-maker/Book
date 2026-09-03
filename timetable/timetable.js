@@ -200,7 +200,12 @@ export function renderTimetable(root) {
 
   function openWorkplaceTimeModal() {
     const selectedDates = selection?.getSelectedDates?.() || [];
-    if (selectedDates.length !== 1) return;
+    if (!selectedDates.length) return;
+
+    const selectedWorkingDays = selectedDates
+      .map((date) => workingDayForDate(workingDays, selectedWorkplaceId, date))
+      .filter(Boolean);
+    if (selectedWorkingDays.length !== selectedDates.length) return;
 
     const selectedDate = selectedDates[0];
     const workplace = workplaces.find((item) => item.key === selectedWorkplaceId) || null;
@@ -217,16 +222,21 @@ export function renderTimetable(root) {
     modalRoot.querySelector('[data-timetable-workplace-time-save]')?.addEventListener('click', () => {
       const nextFrom = modalRoot.querySelector('[name="timetableWorkplaceFrom"]')?.value || from;
       const nextTo = modalRoot.querySelector('[name="timetableWorkplaceTo"]')?.value || to;
-      const target = workingDayForDate(workingDays, selectedWorkplaceId, selectedDate);
-      if (!target) return;
       const baseTime = resolveWorkplaceTime(workplaces, selectedWorkplaceId);
-      const timeWork = ensureTimeWork(timeWorks, {
-        workplaceId: selectedWorkplaceId,
-        date: selectedDate,
-        time: baseTime,
-      });
-      if (!timeWork) return;
-      correctTimeWork(timeWork, nextFrom, nextTo, 'timetable');
+      if (!baseTime) return;
+
+      for (const date of selectedDates) {
+        const target = workingDayForDate(workingDays, selectedWorkplaceId, date);
+        if (!target) continue;
+        const timeWork = ensureTimeWork(timeWorks, {
+          workplaceId: selectedWorkplaceId,
+          date,
+          time: baseTime,
+        });
+        if (!timeWork) continue;
+        correctTimeWork(timeWork, nextFrom, nextTo, 'timetable');
+      }
+
       saveTimeWorks(timeWorks);
       const month = calendar?.getDisplayedMonth() || initialMonth;
       selection?.destroy();
@@ -240,7 +250,7 @@ export function renderTimetable(root) {
     const workplace = workplaces.find((item) => item.key === selectedWorkplaceId) || null;
     const selectedDates = selection?.getSelectedDates?.() || [];
     const stats = monthStats(calendar?.getDisplayedMonth() || initialMonth, workingDays, selectedWorkplaceId, workplaces, timeWorks);
-    const timeActionDisabled = selectedDates.length !== 1 || !workingDayForDate(workingDays, selectedWorkplaceId, selectedDates[0]);
+    const timeActionDisabled = !selectedDates.length || selectedDates.some((date) => !workingDayForDate(workingDays, selectedWorkplaceId, date));
     const content = `<div class="modal-title"><h2>Место работы</h2></div><div class="timetable-workplace-modal-summary"><strong>${workplace?.name || 'Место работы не выбрано'}</strong>${timetableCounter(stats)}</div><div class="timetable-workplace-modal-actions"><button type="button" class="ui-button" data-timetable-open-picker>Выбрать место работы</button><button type="button" class="ui-button" data-timetable-open-time ${timeActionDisabled ? 'disabled' : ''}>Скорректировать время</button></div>`;
     const modalRoot = mountModal(document.body, modal(content, { title: 'Место работы' }));
     modalRoot?.querySelector('[data-timetable-open-picker]')?.addEventListener('click', () => {
