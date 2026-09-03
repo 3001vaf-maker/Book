@@ -15,9 +15,19 @@ export function getWorkplace(workplaces, workplaceId) {
   return workplaces.find((workplace) => workplace?.key === workplaceId) || null;
 }
 
-// Domain bridge: resolves the Time belonging to the selected workplace for use by another domain.
+// Domain bridge: resolves the base Time belonging to a workplace.
 export function resolveWorkplaceTime(workplaces, workplaceId) {
   const workplace = getWorkplace(workplaces, workplaceId);
   if (!workplace) return null;
-  return resolveTime(workplace.from, workplace.to);
+  return resolveTime({ from: workplace.from, to: workplace.to });
+}
+
+// Domain bridge: resolves the effective Time for one WorkingDay.
+// A day override, when present, wins over the workplace base time.
+// Without an override the day inherits the selected workplace time.
+export function resolveWorkingDayTime(workplaces, workingDay) {
+  if (!workingDay?.workplaceId) return null;
+  const baseTime = resolveWorkplaceTime(workplaces, workingDay.workplaceId);
+  if (!baseTime) return null;
+  return resolveTime(baseTime, workingDay.timeOverride || null);
 }
