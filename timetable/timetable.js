@@ -86,8 +86,33 @@ export function renderTimetable(root) {
   };
 
   const syncApplyButton = (dates) => {
+    const firstDate = dates[0] || '';
+    const firstIsWorking = firstDate
+      ? datesForWorkplace(workingDays, selectedWorkplaceId).includes(firstDate)
+      : false;
+
     applyButton.disabled = !selectedWorkplaceId || dates.length === 0;
-    applyButton.textContent = 'Применить: рабочий день';
+    applyButton.textContent = firstIsWorking
+      ? 'Применить: выходной'
+      : 'Применить: рабочий день';
+  };
+
+  const normalizeSelectionByFirstDate = (dates) => {
+    if (!dates.length) {
+      syncApplyButton([]);
+      return;
+    }
+
+    const workingDates = new Set(datesForWorkplace(workingDays, selectedWorkplaceId));
+    const firstIsWorking = workingDates.has(dates[0]);
+    const filtered = dates.filter((date) => workingDates.has(date) === firstIsWorking);
+
+    if (filtered.length !== dates.length) {
+      selection.setSelectedDates(filtered);
+      return;
+    }
+
+    syncApplyButton(filtered);
   };
 
   const startSelectionSession = (month) => {
@@ -104,7 +129,7 @@ export function renderTimetable(root) {
       onDateSelect: () => {},
       onMonthChange: renderHeader,
     });
-    selection = initMultiSelect(calendarRoot, { onChange: syncApplyButton });
+    selection = initMultiSelect(calendarRoot, { onChange: normalizeSelectionByFirstDate });
   };
 
   if (workplaces.length) {
