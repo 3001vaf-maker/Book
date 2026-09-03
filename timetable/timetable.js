@@ -21,10 +21,6 @@ function saveState(state) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
-function renderWorkTimeIndicator(startTime, endTime) {
-  return `<span class="calendar__work-time" aria-label="Рабочее время">${startTime}–${endTime}</span>`;
-}
-
 export function renderTimetable(root) {
   const savedState = loadState();
   const workingDates = new Set(savedState.workingDates);
@@ -51,11 +47,16 @@ export function renderTimetable(root) {
   const syncCalendarStatus = () => {
     calendarRoot.querySelectorAll('[data-calendar-date]').forEach((button) => {
       const key = button.dataset.calendarDate || '';
+      const isCurrentMonth = button.dataset.calendarCurrentMonth === 'true';
       button.classList.toggle('is-working', workingDates.has(key));
+
       const indicator = button.querySelector('[data-calendar-work-time]');
-      if (workingDates.has(key)) {
-        if (!indicator) button.insertAdjacentHTML('beforeend', `<span data-calendar-work-time class="calendar__work-time" aria-hidden="true">${startTime}–${endTime}</span>`);
-        else indicator.textContent = `${startTime}–${endTime}`;
+      if (isCurrentMonth && workingDates.has(key)) {
+        if (!indicator) {
+          button.insertAdjacentHTML('beforeend', `<span data-calendar-work-time aria-hidden="true" style="display:block;margin-top:2px;font-size:10px;line-height:1.1;font-weight:600;color:var(--text-secondary)">${startTime}–${endTime}</span>`);
+        } else {
+          indicator.textContent = `${startTime}–${endTime}`;
+        }
       } else if (indicator) {
         indicator.remove();
       }
