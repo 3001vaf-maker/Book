@@ -1,4 +1,4 @@
-import { pageHeader, initCalendar, initMultiSelect, timeInput } from '../ui/ui.js?v=graph-time-20260903';
+import { pageHeader, initCalendar, initMultiSelect, timeInput } from '../ui/ui.js?v=graph-header-meta-20260903';
 
 const STORAGE_KEY = 'book:timetable-state';
 
@@ -48,10 +48,8 @@ export function renderTimetable(root) {
   const workingDates = new Set(savedState.workingDates);
   let startTime = savedState.startTime;
   let endTime = savedState.endTime;
-  let displayedMonth;
 
   const renderHeader = (month) => {
-    displayedMonth = month;
     const header = root.querySelector('.page-header');
     if (!header) return;
     const stats = monthStats(month, workingDates, startTime, endTime);
