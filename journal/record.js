@@ -1,6 +1,7 @@
 import { entityCard, escapeHtml, mountModal, modal, timePicker, initTimePickers, initMultiSelect } from '../ui/ui.js';
 import { createRecord } from '../core/record.js';
 import { isTimeRangeAvailable, getTimeUsages } from '../core/time-usage.js';
+import { getWorkplaces } from '../core/workplace-time.js';
 
 const readList = (key) => { try { const value = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(value) ? value : []; } catch { return []; } };
 const people = () => readList('book.people');
@@ -63,4 +64,43 @@ function openBlockEndModal({ date, workplaceId, from, onCreated }) {
   const m = mountModal(document.body, modal(html, { className: 'record-modal record-modal--full' })); if (!m) return;
   m.querySelectorAll('[data-block-end]').forEach((node) => node.addEventListener('click', () => { const to = node.dataset.blockEnd, breaksNow = readList('book.journalBreaks'); const item = { id: crypto.randomUUID(), workplaceId: String(workplaceId || ''), date: dateKey(date), from: String(from), to: String(to), createdAt: new Date().toISOString() }; breaksNow.push(item); localStorage.setItem('book.journalBreaks', JSON.stringify(breaksNow)); m.remove(); onCreated?.(); }));
 }
+
+function findWorkplaceName(workplaceId) {
+  const workplace = getWorkplaces().find((item) => String(item?.id ?? item?.key ?? '') === String(workplaceId ?? ''));
+  return workplace?.name || workplace?.title || 'Салон красоты';
+}
+
+function formatRecordDate(date) {
+  const value = String(date || '');
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return match ? `${match[3]}.${match[2]}` : value;
+}
+
+function findRecordClient(record) {
+  const client = record?.client || {};
+  return people().find((person) => String(person?.key ?? '') === String(client.key ?? ''))
+    || people().find((person) => String(person?.id ?? '') === String(client.id ?? ''))
+    || client;
+}
+
+export function openRecordView(record, { onClose = () => {} } = {}) {
+  if (!record) return;
+  const client = findRecordClient(record);
+  const name = clientName(client);
+  const phone = client?.phones?.[0] || client?.phone || '';
+  const procedureNames = (record.procedures || []).map((item) => item?.name).filter(Boolean);
+  const workplace = findWorkplaceName(record.workplaceId);
+  const top = `<div class="record-card-topline"><span class="record-card-workplace" data-record-edit-workplace>${escapeHtml(workplace)}</span><strong class="record-card-datetime" data-record-edit-datetime>${escapeHtml(formatRecordDate(record.date))} ${escapeHtml(record.from || '')}</strong></div>`;
+  const clientBlock = `<div class="record-card-client" data-record-edit-client><strong>${record.client?.id ? `${escapeHtml(record.client.id)} ` : ''}${escapeHtml(name)}</strong>${phone ? `<span>${escapeHtml(phone)}</span>` : ''}</div>`;
+  const procedureBlock = procedureNames.length ? `<div class="record-card-procedures" data-record-edit-procedures>${procedureNames.map((item) => `<span>${escapeHtml(item)}</span>`).join('')}</div>` : '';
+  const card = entityCard({ top: `${top}${clientBlock}`, bottom: '', right: procedureBlock, className: 'entity-card--record', data: 'data-record-card' });
+  const content = `<div class="record-view"><div class="record-view-card">${card}</div><div class="record-view-actions"><button type="button" class="ui-button ui-button--secondary" data-record-repeat>Повторить запись</button><button type="button" class="ui-button ui-button--secondary" data-record-cancel>Отменить запись</button></div></div>`;
+  const m = mountModal(document.body, modal(content, { className: 'record-modal record-modal--view' }));
+  if (!m) return;
+  m.querySelector('[data-record-card]')?.addEventListener('click', () => {});
+  m.querySelector('[data-record-repeat]')?.addEventListener('click', () => {});
+  m.querySelector('[data-record-cancel]')?.addEventListener('click', () => {});
+  m.addEventListener('modal:close', () => onClose?.(), { once: true });
+}
+
 export function openRecordCreation(options = {}) { openTimeModal(options); }
