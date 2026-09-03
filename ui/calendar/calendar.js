@@ -1,4 +1,5 @@
 const MONTH_FORMATTER = new Intl.DateTimeFormat('ru-RU', { month: 'long', year: 'numeric' });
+const DATE_FORMATTER = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
 
 function pad(value) {
   return String(value).padStart(2, '0');
@@ -25,6 +26,15 @@ function endOfSundayWeek(date) {
 function monthLabel(date) {
   const label = MONTH_FORMATTER.format(date);
   return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+function dateLabel(date) {
+  const label = DATE_FORMATTER.format(date);
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+function calendarHeader({ label, prevAriaLabel, nextAriaLabel, prevAttribute, nextAttribute }) {
+  return `<header class="calendar__header"><button type="button" class="calendar__month-button" ${prevAttribute} aria-label="${prevAriaLabel}">←</button><div class="calendar__month" aria-live="polite">${label}</div><button type="button" class="calendar__month-button" ${nextAttribute} aria-label="${nextAriaLabel}">→</button></header>`;
 }
 
 function buildCalendar({ displayedMonth, workingDates = [], renderDateContent = () => '' } = {}) {
@@ -68,7 +78,7 @@ function buildCalendar({ displayedMonth, workingDates = [], renderDateContent = 
     cells.push(`<button type="button" class="${classes}"${style ? ` style="${style}"` : ''} data-calendar-date="${key}" data-calendar-current-month="${isCurrentMonth}" aria-pressed="false"><span class="calendar__date-number">${date.getDate()}</span>${content ? `<span class="calendar__date-content">${content}</span>` : '<span class="calendar__date-content" aria-hidden="true"></span>'}</button>`);
   }
 
-  return `<section class="calendar" data-calendar><header class="calendar__header"><button type="button" class="calendar__month-button" data-calendar-prev aria-label="Предыдущий месяц">←</button><div class="calendar__month" aria-live="polite">${monthLabel(displayedMonth)}</div><button type="button" class="calendar__month-button" data-calendar-next aria-label="Следующий месяц">→</button></header><div class="calendar__weekdays" aria-hidden="true">${['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((day) => `<span>${day}</span>`).join('')}</div><div class="calendar__grid">${cells.join('')}</div></section>`;
+  return `<section class="calendar" data-calendar>${calendarHeader({ label: monthLabel(displayedMonth), prevAriaLabel: 'Предыдущий месяц', nextAriaLabel: 'Следующий месяц', prevAttribute: 'data-calendar-prev', nextAttribute: 'data-calendar-next' })}<div class="calendar__weekdays" aria-hidden="true">${['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((day) => `<span>${day}</span>`).join('')}</div><div class="calendar__grid">${cells.join('')}</div></section>`;
 }
 
 export function calendar(options = {}) {
@@ -105,5 +115,39 @@ export function initCalendar(root, options = {}) {
 
   return {
     getDisplayedMonth: () => new Date(displayedMonth),
+  };
+}
+
+export function dateNavigator({ date = new Date() } = {}) {
+  return calendarHeader({
+    label: dateLabel(date),
+    prevAriaLabel: 'Предыдущий день',
+    nextAriaLabel: 'Следующий день',
+    prevAttribute: 'data-date-navigator-prev',
+    nextAttribute: 'data-date-navigator-next',
+  });
+}
+
+export function initDateNavigator(root, { date = new Date(), onChange = () => {} } = {}) {
+  let currentDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+  const render = () => {
+    root.innerHTML = dateNavigator({ date: currentDate });
+    root.querySelector('[data-date-navigator-prev]')?.addEventListener('click', () => {
+      currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate() - 1);
+      render();
+      onChange(new Date(currentDate));
+    });
+    root.querySelector('[data-date-navigator-next]')?.addEventListener('click', () => {
+      currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate() + 1);
+      render();
+      onChange(new Date(currentDate));
+    });
+  };
+
+  render();
+
+  return {
+    getDate: () => new Date(currentDate),
   };
 }
