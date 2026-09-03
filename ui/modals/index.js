@@ -2,8 +2,9 @@ import { escapeHtml } from '../utils/escape-html.js';
 
 let modalLevel = 0;
 
-export function modal(content, { title = '' } = {}) {
-  return `<div class="modal-backdrop" data-modal><div class="modal-sheet" role="dialog" aria-modal="true" ${title ? `aria-label="${escapeHtml(title)}"` : ''}><button type="button" class="modal-close" data-modal-close aria-label="Закрыть">×</button>${content}</div></div>`;
+export function modal(content, { title = '', className = '' } = {}) {
+  const classes = ['modal-sheet', className].filter(Boolean).join(' ');
+  return `<div class="modal-backdrop" data-modal><div class="${classes}" role="dialog" aria-modal="true" ${title ? `aria-label="${escapeHtml(title)}"` : ''}><button type="button" class="modal-close" data-modal-close aria-label="Закрыть">×</button>${content}</div></div>`;
 }
 
 export function mountModal(root, html) {
