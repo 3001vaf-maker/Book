@@ -1,5 +1,5 @@
 import { entityCard, escapeHtml, mountModal, modal, timePicker, initTimePickers, initMultiSelect } from '../ui/ui.js';
-import { createRecord } from '../core/record.js';
+import { createRecord, removeRecord } from '../core/record.js';
 import { isTimeRangeAvailable, getTimeUsages } from '../core/time-usage.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 
@@ -99,7 +99,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
   if (!m) return;
   m.querySelector('[data-record-card]')?.addEventListener('click', () => {});
   m.querySelector('[data-record-repeat]')?.addEventListener('click', () => {});
-  m.querySelector('[data-record-cancel]')?.addEventListener('click', () => {});
+  m.querySelector('[data-record-cancel]')?.addEventListener('click', () => { if (!removeRecord(record.id)) return; m.remove(); onClose?.(); });
   m.addEventListener('modal:close', () => onClose?.(), { once: true });
 }
 
