@@ -13,7 +13,7 @@ export function createRecord({ date, workplaceId, from, to, client, procedures =
   const dayBreaks = readBreaks().filter((item) => item?.date === normalizedDate && item?.workplaceId === normalizedWorkplaceId);
   if (!isTimeRangeAvailable({ from: normalizedFrom, to: normalizedTo, usages: getTimeUsages({ records: dayRecords, breaks: dayBreaks }) })) return null;
   const record = { id: crypto.randomUUID(), status: 'active', date: normalizedDate, workplaceId: normalizedWorkplaceId, from: normalizedFrom, to: normalizedTo, client: client || null, procedures: Array.isArray(procedures) ? procedures : [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
-  const records = read(); records.push(record); write(records); notifyRecordsChanged(); return record;
+  const records = read(); records.push(record); write(records); return record;
 }
 export function updateRecord(id, patch = {}) {
   const records = read(), index = records.findIndex((record) => record.id === id); if (index < 0) return null;
@@ -22,7 +22,7 @@ export function updateRecord(id, patch = {}) {
   const dayRecords = records.filter((record) => record.date === next.date && record.workplaceId === next.workplaceId);
   const dayBreaks = readBreaks().filter((item) => item?.date === next.date && item?.workplaceId === next.workplaceId);
   if (next.status !== 'cancelled' && !isTimeRangeAvailable({ from: next.from, to: next.to, usages: getTimeUsages({ records: dayRecords, breaks: dayBreaks }), excludeId: id })) return null;
-  records[index] = { ...next, updatedAt: new Date().toISOString() }; write(records); notifyRecordsChanged(); return records[index];
+  records[index] = { ...next, updatedAt: new Date().toISOString() }; write(records); return records[index];
 }
 export function cancelRecord(id) {
   const records = read(), index = records.findIndex((record) => record.id === id);
