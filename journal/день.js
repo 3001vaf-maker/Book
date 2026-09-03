@@ -1,6 +1,7 @@
 import { initDateNavigator, journalDayTimeline, initJournalDayTimeline } from '../ui/ui.js?v=journal-day-timeline-20260903';
 import { getWorkplaces, getWorkingDays, getWorkingDay, resolveWorkingDayTime } from '../core/workplace-time.js?v=journal-worktime-20260903';
 import { getTimeWorks } from '../core/time-work.js?v=journal-worktime-20260903';
+import { openRecordCreation } from './record.js';
 
 function dateKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -31,5 +32,7 @@ export function renderJournalDay(root, { date = new Date(), workplaceId = '', on
   }
 
   contentRoot.innerHTML = journalDayTimeline({ from: time.from, to: time.to });
-  initJournalDayTimeline(contentRoot);
+  initJournalDayTimeline(contentRoot, {
+    onSlotClick: ({ from, to }) => openRecordCreation({ date, workplaceId, from, to, onCreated: () => renderJournalDay(root, { date, workplaceId, onChange }) }),
+  });
 }
