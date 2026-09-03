@@ -1,4 +1,4 @@
-import { button, entityCard, field, iconButton, mountModal, modal, timePicker, initTimePickers } from '../ui/ui.js';
+import { entityCard, mountModal, modal, timePicker, initTimePickers } from '../ui/ui.js';
 import { createRecord } from '../core/record.js';
 
 const people = () => {
@@ -16,7 +16,6 @@ const procedures = () => {
 };
 
 const clientName = (person) => [person?.name, person?.surname].filter(Boolean).join(' ') || 'Без имени';
-const money = (value) => value === '' || value == null ? '' : `${Number(value).toLocaleString('ru-RU')} ₽`;
 const durationText = (minutes) => { const m = Number(minutes) || 0; const h = Math.floor(m / 60); const min = m % 60; return h ? `${h} ч${min ? ` ${min} мин` : ''}` : `${min} мин`; };
 
 function dateKey(date) {
@@ -40,7 +39,7 @@ function openTimeModal({ date, workplaceId, from, to, onCreated }) {
   const times = values.map((value) => `<button type="button" class="record-time-option${/:(00|15|30|45)$/.test(value) ? ' is-quarter' : ''}" data-record-time="${value}">${value}</button>`).join('');
   const toggle = `<div class="segment-control segment-control--two" data-record-mode><button type="button" class="is-active" data-record-mode-value="record">Создать запись</button><button type="button" data-record-mode-value="block">Занять время</button></div>`;
   const content = `${toggle}<div class="record-time-list">${times || '<div class="muted">Нет доступного времени</div>'}</div>`;
-  const m = mountModal(document.body, modal(content, { title: 'Создать запись' }));
+  const m = mountModal(document.body, modal(content));
   if (!m) return;
   m.querySelectorAll('[data-record-mode-value]').forEach((buttonNode) => buttonNode.addEventListener('click', () => {
     m.querySelectorAll('[data-record-mode-value]').forEach((item) => item.classList.toggle('is-active', item === buttonNode));
@@ -80,7 +79,7 @@ function openProceduresModal({ date, workplaceId, from, to, onCreated }) {
     m.querySelectorAll('[data-procedure-settings]').forEach((buttonNode) => buttonNode.addEventListener('click', () => openProcedureSettings(m, items.find((item) => item.id === buttonNode.dataset.procedureSettings), selected)));
   };
   const content = `<div class="record-modal-toolbar"><strong>Процедуры</strong><button type="button" class="icon-button icon-button--primary" data-record-add aria-label="Добавить процедуру">+</button></div><div data-record-procedures></div><button type="button" class="ui-button ui-button--secondary record-reset" data-record-reset hidden>Сброс выбора</button><div class="record-modal-next"><button type="button" class="ui-button" data-record-next disabled>Далее →</button></div>`;
-  const m = mountModal(document.body, modal(content, { title: 'Процедуры' }));
+  const m = mountModal(document.body, modal(content));
   if (!m) return;
   m.querySelector('[data-record-add]').addEventListener('click', () => {});
   m.querySelector('[data-record-reset]').addEventListener('click', () => { selected.clear(); render(m); });
@@ -102,8 +101,8 @@ function defaultCost(procedure) {
 function openProcedureSettings(parent, procedure, selected) {
   if (!procedure) return;
   const current = selected.get(procedure.id) || { procedure, cost: defaultCost(procedure), duration: Number(procedure.duration) || 0 };
-  const html = `<div class="record-setting-note">установите необходимые параметры услуги для данной записи</div><div class="record-setting-row"><span>Стоимость</span><input inputmode="decimal" data-record-cost value="${current.cost === '' ? '' : `${current.cost} ₽`}"></div><div class="record-setting-row"><span>Длительность</span>${timePicker({ name: 'recordDuration', label: '', value: `${String(Math.floor(current.duration / 60)).padStart(2, '0')}:${String(current.duration % 60).padStart(2, '0')}`, minuteStep: 5 })}</div><div class="record-setting-actions"><button type="button" class="ui-button ui-button--secondary" data-record-cancel>Отмена</button><button type="button" class="ui-button" data-record-save>Сохранить</button></div>`;
-  const m = mountModal(document.body, modal(`<h2>${procedure.name}</h2>${html}`, { title: procedure.name }));
+  const html = `<h2>${procedure.name}</h2><div class="record-setting-note">установите необходимые параметры услуги для данной записи</div><div class="record-setting-row"><span>Стоимость</span><input inputmode="decimal" data-record-cost value="${current.cost === '' ? '' : `${current.cost} ₽`}"></div><div class="record-setting-row"><span>Длительность</span>${timePicker({ name: 'recordDuration', label: '', value: `${String(Math.floor(current.duration / 60)).padStart(2, '0')}:${String(current.duration % 60).padStart(2, '0')}`, minuteStep: 5 })}</div><div class="record-setting-actions"><button type="button" class="ui-button ui-button--secondary" data-record-cancel>Отмена</button><button type="button" class="ui-button" data-record-save>Сохранить</button></div>`;
+  const m = mountModal(document.body, modal(html));
   if (!m) return;
   initTimePickers(m);
   m.querySelector('[data-record-cancel]').addEventListener('click', () => m.remove());
