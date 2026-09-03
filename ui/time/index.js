@@ -24,7 +24,29 @@ function open(host){
   const modalRoot=mountModal(document.body,modal(content,{title:host.querySelector('.time-picker__label')?.textContent||'Время'}));
   if(!modalRoot)return;
   const center=(type,value)=>{const item=modalRoot.querySelector(`[data-time-wheel-type="${type}"][data-value="${value}"]`);if(item)item.scrollIntoView({block:'center'});};
-  center('hours',initialHour);center('minutes',initialMinute);
-  modalRoot.querySelectorAll('[data-time-wheel-item]').forEach(item=>item.addEventListener('click',()=>{const type=item.dataset.timeWheelType;modalRoot.querySelectorAll(`[data-time-wheel-type="${type}"]`).forEach(node=>node.classList.remove('is-selected'));item.classList.add('is-selected');item.scrollIntoView({block:'center',behavior:'smooth'})}));
-  modalRoot.querySelector('[data-time-save]')?.addEventListener('click',()=>{const hour=modalRoot.querySelector('[data-time-wheel-type="hours"].is-selected')?.dataset.value;const minute=modalRoot.querySelector('[data-time-wheel-type="minutes"].is-selected')?.dataset.value;if(hour==null||minute==null)return;const value=`${String(Number(hour)).padStart(2,'0')}:${String(Number(minute)).padStart(2,'0')}`;hidden.value=value;host.querySelector('[data-time-open]').textContent=value;modalRoot.remove()});
+  const syncColumn=(viewport)=>{
+    const items=[...viewport.querySelectorAll('[data-time-wheel-item]')];
+    if(!items.length)return;
+    const centerY=viewport.getBoundingClientRect().top+viewport.clientHeight/2;
+    let nearest=items[0],distance=Infinity;
+    items.forEach(item=>{const rect=item.getBoundingClientRect();const d=Math.abs(rect.top+rect.height/2-centerY);if(d<distance){distance=d;nearest=item;}});
+    items.forEach(item=>item.classList.toggle('is-selected',item===nearest));
+  };
+  center('hours',initialHour);
+  center('minutes',initialMinute);
+  modalRoot.querySelectorAll('.time-wheel__viewport').forEach(viewport=>{
+    let frame=0;
+    viewport.addEventListener('scroll',()=>{cancelAnimationFrame(frame);frame=requestAnimationFrame(()=>syncColumn(viewport));},{passive:true});
+    syncColumn(viewport);
+  });
+  modalRoot.querySelectorAll('[data-time-wheel-item]').forEach(item=>item.addEventListener('click',()=>{item.scrollIntoView({block:'center',behavior:'smooth'})}));
+  modalRoot.querySelector('[data-time-save]')?.addEventListener('click',()=>{
+    const hour=modalRoot.querySelector('[data-time-wheel-type="hours"].is-selected')?.dataset.value;
+    const minute=modalRoot.querySelector('[data-time-wheel-type="minutes"].is-selected')?.dataset.value;
+    if(hour==null||minute==null)return;
+    const value=`${String(Number(hour)).padStart(2,'0')}:${String(Number(minute)).padStart(2,'0')}`;
+    hidden.value=value;
+    host.querySelector('[data-time-open]').textContent=value;
+    modalRoot.remove();
+  });
 }
