@@ -1,3 +1,5 @@
+import { dateNavigator, initDateNavigator } from '../ui/calendar/calendar.js';
+
 const DAY_FORMATTER = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
 
 function pad(value) {
@@ -13,24 +15,25 @@ function dayLabel(date) {
   return `${label.charAt(0).toUpperCase()}${label.slice(1)} г.`;
 }
 
-function renderNavigator(date) {
-  return `<header class="calendar__header" data-journal-day-navigator><button type="button" class="calendar__month-button" data-journal-day-prev aria-label="Предыдущий день">←</button><div class="calendar__month" aria-live="polite">${dayLabel(date)}</div><button type="button" class="calendar__month-button" data-journal-day-next aria-label="Следующий день">→</button></header>`;
-}
-
 export function renderJournalDay(root, initialDate = new Date()) {
   let selectedDate = new Date(initialDate.getFullYear(), initialDate.getMonth(), initialDate.getDate());
 
   const render = () => {
-    root.innerHTML = renderNavigator(selectedDate);
-
-    root.querySelector('[data-journal-day-prev]')?.addEventListener('click', () => {
-      selectedDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate() - 1);
-      render();
+    root.innerHTML = dateNavigator({
+      label: dayLabel(selectedDate),
+      prevLabel: 'Предыдущий день',
+      nextLabel: 'Следующий день',
     });
 
-    root.querySelector('[data-journal-day-next]')?.addEventListener('click', () => {
-      selectedDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate() + 1);
-      render();
+    initDateNavigator(root, {
+      onPrev: () => {
+        selectedDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate() - 1);
+        render();
+      },
+      onNext: () => {
+        selectedDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate() + 1);
+        render();
+      },
     });
   };
 
