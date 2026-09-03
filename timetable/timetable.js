@@ -81,7 +81,7 @@ function timetableCounter(stats) {
 function workplaceHeaderButton(workplace, stats) {
   const name = workplace?.name || 'Место работы';
   const safeName = escapeHtml(name);
-  return `<button type="button" class="timetable-workplace-button" data-timetable-workplace-open aria-label="Место работы: ${safeName}"><span class="timetable-workplace-button__name">${safeName}</span>${timetableCounter(stats)}<span class="timetable-workplace-button__arrow" aria-hidden="true">⌄</span></button>`;
+  return `<button type="button" class="timetable-workplace-button ui-button--secondary" data-timetable-workplace-open aria-label="Место работы: ${safeName}"><span class="timetable-workplace-button__name">${safeName}</span>${timetableCounter(stats)}<span class="timetable-workplace-button__arrow" aria-hidden="true">⌄</span></button>`;
 }
 
 export function renderTimetable(root) {
@@ -218,8 +218,7 @@ export function renderTimetable(root) {
   function openWorkplaceModal() {
     const workplace = workplaces.find((item) => item.key === selectedWorkplaceId) || null;
     const stats = monthStats(calendar?.getDisplayedMonth() || initialMonth, workingDays, selectedWorkplaceId, workplaces, workplaceTimeOverrides);
-    const name = workplace?.name || 'Место работы не выбрано';
-    const content = `<div class="modal-title"><h2>Место работы</h2></div><div class="timetable-workplace-modal-summary"><strong>${escapeHtml(name)}</strong>${timetableCounter(stats)}</div><div class="timetable-workplace-modal-actions"><button type="button" class="ui-button" data-timetable-open-picker>Выбрать место работы</button><button type="button" class="ui-button" data-timetable-open-time>Скорректировать время</button></div>`;
+    const content = `<div class="modal-title"><h2>Место работы</h2></div><div class="timetable-workplace-modal-summary"><strong>${workplace?.name || 'Место работы не выбрано'}</strong>${timetableCounter(stats)}</div><div class="timetable-workplace-modal-actions"><button type="button" class="ui-button" data-timetable-open-picker>Выбрать место работы</button><button type="button" class="ui-button" data-timetable-open-time>Скорректировать время</button></div>`;
     const modalRoot = mountModal(document.body, modal(content, { title: 'Место работы' }));
     modalRoot?.querySelector('[data-timetable-open-picker]')?.addEventListener('click', () => {
       modalRoot.remove();
