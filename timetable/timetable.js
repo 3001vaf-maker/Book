@@ -27,7 +27,7 @@ export function renderTimetable(root) {
   let startTime = savedState.startTime;
   let endTime = savedState.endTime;
 
-  root.innerHTML = `${pageHeader('График')}<div class="work-time-row"><div class="work-time-row__fields"><div class="work-time-row__field">${timeInput({ label: 'Начало', name: 'startTime', value: startTime })}</div><div class="work-time-row__field">${timeInput({ label: 'Окончание', name: 'endTime', value: endTime })}</div></div></div><div data-timetable-calendar></div><div class="profile-actions"><button type="button" class="ui-button" data-timetable-apply disabled>Применить: рабочий день</button></div>`;
+  root.innerHTML = `${pageHeader('График')}<div data-timetable-calendar></div><div class="cost-range paired-fields">${timeInput({ label: 'Начало', name: 'startTime', value: startTime })}${timeInput({ label: 'Окончание', name: 'endTime', value: endTime })}</div><div class="profile-actions"><button type="button" class="ui-button" data-timetable-apply disabled>Применить: рабочий день</button></div>`;
 
   const calendarRoot = root.querySelector('[data-timetable-calendar]');
   const applyButton = root.querySelector('[data-timetable-apply]');
