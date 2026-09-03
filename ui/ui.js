@@ -1,7 +1,7 @@
 import { accordion, initAccordions } from './accordion/accordion.js';
 import { bottomNavigation } from './navigation/navigation.js';
 import { viewNavigation, initViewNavigation } from './view-navigation/view-navigation.js';
-import { calendar, initCalendar, dateNavigator, initDateNavigator } from './calendar/index.js?v=graph-header-meta-20260903';
+import { calendar, initCalendar, dateNavigator, initDateNavigator } from './calendar/index.js?v=journal-day-20260903';
 import { initMultiSelect } from './selection/index.js?v=graph-lifecycle-20260903';
 import { entityCard } from './cards/index.js';
 import { select, searchableSelect } from './selectors/index.js';
