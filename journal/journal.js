@@ -97,7 +97,10 @@ export function renderJournal(root) {
         onChange: (nextDate) => { selectedDate = nextDate; renderView(); },
       });
     } else if (activeView === 'month') {
-      renderJournalMonth(viewRoot, { workplaceId: selectedWorkplaceId });
+      renderJournalMonth(viewRoot, {
+        workplaceId: selectedWorkplaceId,
+        onDateSelect: (nextDate) => { selectedDate = nextDate; activeView = 'day'; renderView(); },
+      });
     } else {
       renderJournalList(viewRoot);
     }
