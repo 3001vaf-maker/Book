@@ -1,5 +1,5 @@
 import { pageHeader, initCalendar, initMultiSelect, select } from '../ui/ui.js?v=graph-workplace-20260903';
-import { getWorkplaces, resolveWorkplaceTime } from '../core/workplace-time.js';
+import { getWorkplaces, resolveWorkingDayTime } from '../core/workplace-time.js?v=working-day-time-20260903';
 
 const STORAGE_KEY = 'book:timetable-state';
 
@@ -35,6 +35,10 @@ function datesForWorkplace(workingDays, workplaceId) {
     .filter((item) => item?.workplaceId === workplaceId)
     .map((item) => item.date)
     .filter(Boolean);
+}
+
+function workingDayForDate(workingDays, workplaceId, date) {
+  return workingDays.find((item) => item?.workplaceId === workplaceId && item?.date === date) || null;
 }
 
 function monthStats(month, workingDays, workplaceId) {
@@ -87,12 +91,14 @@ export function renderTimetable(root) {
   };
 
   const startSelectionSession = (month) => {
-    const time = resolveWorkplaceTime(workplaces, selectedWorkplaceId);
     calendar = initCalendar(calendarRoot, {
       month,
       workingDates: datesForWorkplace(workingDays, selectedWorkplaceId),
-      renderDateContent: ({ isCurrentMonth, isWorking }) => {
-        if (!isCurrentMonth || !isWorking || !time) return '';
+      renderDateContent: ({ dateKey, isCurrentMonth, isWorking }) => {
+        if (!isCurrentMonth || !isWorking) return '';
+        const workingDay = workingDayForDate(workingDays, selectedWorkplaceId, dateKey);
+        const time = resolveWorkingDayTime(workplaces, workingDay);
+        if (!time) return '';
         return `<span>${time.from}</span><span>${time.to}</span>`;
       },
       onDateSelect: () => {},
@@ -128,7 +134,7 @@ export function renderTimetable(root) {
       ? workingDays.filter((item) => !(item?.workplaceId === selectedWorkplaceId && selected.has(item.date)))
       : [...workingDays, ...dates
           .filter((date) => !workingDays.some((item) => item?.date === date && item?.workplaceId === selectedWorkplaceId))
-          .map((date) => ({ date, workplaceId: selectedWorkplaceId }))];
+          .map((date) => ({ date, workplaceId: selectedWorkplaceId, timeOverride: null }))];
 
     saveState({ workingDays: nextWorkingDays });
     workingDays.splice(0, workingDays.length, ...nextWorkingDays);
