@@ -1,4 +1,4 @@
-import { pageHeader, initCalendar, initMultiSelect, select, modal, mountModal, timePicker, initTimePickers } from '../ui/ui.js?v=graph-workplace-header-20260903';
+import { pageHeader, initCalendar, initMultiSelect, select, modal, mountModal, timePicker, initTimePickers, escapeHtml } from '../ui/ui.js?v=graph-workplace-header-20260903';
 import { getWorkplaces, resolveWorkingDayTime } from '../core/workplace-time.js?v=working-day-time-20260903';
 
 const STORAGE_KEY = 'book:timetable-state';
@@ -80,7 +80,8 @@ function timetableCounter(stats) {
 
 function workplaceHeaderButton(workplace, stats) {
   const name = workplace?.name || 'Место работы';
-  return `<button type="button" class="timetable-workplace-button" data-timetable-workplace-open aria-label="Место работы: ${name}"><span class="timetable-workplace-button__name">${name}</span>${timetableCounter(stats)}<span class="timetable-workplace-button__arrow" aria-hidden="true">⌄</span></button>`;
+  const safeName = escapeHtml(name);
+  return `<button type="button" class="timetable-workplace-button" data-timetable-workplace-open aria-label="Место работы: ${safeName}"><span class="timetable-workplace-button__name">${safeName}</span>${timetableCounter(stats)}<span class="timetable-workplace-button__arrow" aria-hidden="true">⌄</span></button>`;
 }
 
 export function renderTimetable(root) {
@@ -207,6 +208,7 @@ export function renderTimetable(root) {
       workplaceTimeOverrides[selectedWorkplaceId] = { from: nextFrom, to: nextTo };
       saveState({ workingDays, workplaceTimeOverrides });
       const month = calendar?.getDisplayedMonth() || initialMonth;
+      selection?.destroy();
       startSelectionSession(month);
       renderHeader(month);
       modalRoot.remove();
@@ -216,7 +218,8 @@ export function renderTimetable(root) {
   function openWorkplaceModal() {
     const workplace = workplaces.find((item) => item.key === selectedWorkplaceId) || null;
     const stats = monthStats(calendar?.getDisplayedMonth() || initialMonth, workingDays, selectedWorkplaceId, workplaces, workplaceTimeOverrides);
-    const content = `<div class="modal-title"><h2>Место работы</h2></div><div class="timetable-workplace-modal-summary"><strong>${workplace?.name || 'Место работы не выбрано'}</strong>${timetableCounter(stats)}</div><div class="timetable-workplace-modal-actions"><button type="button" class="ui-button" data-timetable-open-picker>Выбрать место работы</button><button type="button" class="ui-button" data-timetable-open-time>Скорректировать время</button></div>`;
+    const name = workplace?.name || 'Место работы не выбрано';
+    const content = `<div class="modal-title"><h2>Место работы</h2></div><div class="timetable-workplace-modal-summary"><strong>${escapeHtml(name)}</strong>${timetableCounter(stats)}</div><div class="timetable-workplace-modal-actions"><button type="button" class="ui-button" data-timetable-open-picker>Выбрать место работы</button><button type="button" class="ui-button" data-timetable-open-time>Скорректировать время</button></div>`;
     const modalRoot = mountModal(document.body, modal(content, { title: 'Место работы' }));
     modalRoot?.querySelector('[data-timetable-open-picker]')?.addEventListener('click', () => {
       modalRoot.remove();
