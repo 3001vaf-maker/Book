@@ -1,15 +1,34 @@
 import { escapeHtml } from '../utils/escape-html.js';
 
+let modalLevel = 0;
+
 export function modal(content, { title = '' } = {}) {
   return `<div class="modal-backdrop" data-modal><div class="modal-sheet" role="dialog" aria-modal="true" ${title ? `aria-label="${escapeHtml(title)}"` : ''}><button type="button" class="modal-close" data-modal-close aria-label="Закрыть">×</button>${content}</div></div>`;
 }
 
 export function mountModal(root, html) {
-  root.insertAdjacentHTML('beforeend', html);
-  const m = root.querySelector('[data-modal]:last-of-type');
-  m?.addEventListener('click', (e) => {
-    if (e.target.matches('[data-modal],[data-modal-close]')) m.remove();
+  const template = document.createElement('template');
+  template.innerHTML = String(html || '').trim();
+  const m = template.content.firstElementChild;
+  if (!m?.matches('[data-modal]')) return null;
+
+  // Keep every modal in one shared document-level stack. A modal opened from
+  // another modal therefore gets its own stacking level and event surface.
+  document.body.appendChild(m);
+  modalLevel += 1;
+  m.dataset.modalLevel = String(modalLevel);
+  m.style.zIndex = String(1000 + modalLevel);
+
+  const close = () => {
+    if (!m.isConnected) return;
+    m.remove();
+    if (!document.querySelector('[data-modal]')) modalLevel = 0;
+  };
+
+  m.addEventListener('click', (e) => {
+    if (e.target === m || e.target.closest('[data-modal-close]')) close();
   });
-  requestAnimationFrame(() => m?.querySelector('input,select,textarea,button:not([data-modal-close])')?.focus());
+
+  requestAnimationFrame(() => m.querySelector('input,select,textarea,button:not([data-modal-close])')?.focus());
   return m;
 }
