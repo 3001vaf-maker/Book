@@ -44,38 +44,20 @@ export function renderTimetable(root) {
     applyButton.textContent = `Применить: ${targetWorking ? 'рабочий день' : 'выходной'}`;
   };
 
-  const syncCalendarStatus = () => {
-    calendarRoot.querySelectorAll('[data-calendar-date]').forEach((button) => {
-      const key = button.dataset.calendarDate || '';
-      const isCurrentMonth = button.dataset.calendarCurrentMonth === 'true';
-      button.classList.toggle('is-working', workingDates.has(key));
-
-      const indicator = button.querySelector('[data-calendar-work-time]');
-      if (isCurrentMonth && workingDates.has(key)) {
-        if (!indicator) {
-          button.insertAdjacentHTML('beforeend', `<span data-calendar-work-time aria-hidden="true" style="display:block;margin-top:2px;font-size:10px;line-height:1.1;font-weight:600;color:var(--text-secondary)">${startTime}–${endTime}</span>`);
-        } else {
-          indicator.textContent = `${startTime}–${endTime}`;
-        }
-      } else if (indicator) {
-        indicator.remove();
-      }
-    });
-  };
-
   const startSelectionSession = (month) => {
     calendar = initCalendar(calendarRoot, {
       month,
       workingDates: [...workingDates],
-      renderDateContent: () => '',
+      renderDateContent: ({ isCurrentMonth, isWorking }) => {
+        if (!isCurrentMonth || !isWorking) return '';
+        return `<span>${startTime}</span><span>${endTime}</span>`;
+      },
       onDateSelect: () => {},
     });
 
     selection = initMultiSelect(calendarRoot, {
       onChange: syncApplyButton,
     });
-
-    syncCalendarStatus();
   };
 
   startSelectionSession();
