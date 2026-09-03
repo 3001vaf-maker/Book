@@ -1,15 +1,16 @@
-import { dateKey } from '../ui/calendar/calendar.js';
-
 const DAY_FORMATTER = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+
+function pad(value) {
+  return String(value).padStart(2, '0');
+}
+
+function dateKey(date) {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
 
 function dayLabel(date) {
   const label = DAY_FORMATTER.format(date);
   return `${label.charAt(0).toUpperCase()}${label.slice(1)} г.`;
-}
-
-function parseDate(value) {
-  const [year, month, day] = String(value).split('-').map(Number);
-  return new Date(year, month - 1, day);
 }
 
 function renderNavigator(date) {
