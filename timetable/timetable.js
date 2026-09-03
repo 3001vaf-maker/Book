@@ -87,13 +87,13 @@ export function renderTimetable(root) {
     data: 'data-timetable-workplace',
   });
 
-  root.innerHTML = `<div class="timetable-view">${pageHeader('График', '', timetableHeaderMeta(initialStats))}${workplaceSelector}<div data-timetable-calendar></div><div class="profile-actions"><button type="button" class="ui-button" data-timetable-apply disabled><span data-timetable-apply-label>Применить: рабочий день</span><span data-timetable-apply-counter>${timetableCounter(initialStats)}</span></button></div></div>`;
+  root.innerHTML = `<div class="timetable-view">${pageHeader('График', '', timetableHeaderMeta(initialStats))}<div class="timetable-workplace"><div class="timetable-workplace__selector">${workplaceSelector}</div><div class="timetable-workplace__meta" data-timetable-workplace-meta>${timetableCounter(initialStats)}</div></div><div data-timetable-calendar></div><div class="profile-actions"><button type="button" class="ui-button" data-timetable-apply disabled><span data-timetable-apply-label>Применить: рабочий день</span></button></div></div>`;
 
   const calendarRoot = root.querySelector('[data-timetable-calendar]');
   const workplaceSelect = root.querySelector('[data-timetable-workplace]');
+  const workplaceMeta = root.querySelector('[data-timetable-workplace-meta]');
   const applyButton = root.querySelector('[data-timetable-apply]');
   const applyLabel = root.querySelector('[data-timetable-apply-label]');
-  const applyCounter = root.querySelector('[data-timetable-apply-counter]');
 
   let calendar;
   let selection;
@@ -106,8 +106,8 @@ export function renderTimetable(root) {
     if (meta) meta.innerHTML = timetableHeaderMeta(monthStats(month, workingDays, selectedWorkplaceId, workplaces));
   };
 
-  const renderApplyCounter = (month) => {
-    if (applyCounter) applyCounter.innerHTML = timetableCounter(monthStats(month, workingDays, selectedWorkplaceId, workplaces));
+  const renderWorkplaceCounter = (month) => {
+    if (workplaceMeta) workplaceMeta.innerHTML = timetableCounter(monthStats(month, workingDays, selectedWorkplaceId, workplaces));
   };
 
   const isWorkingDate = (dateKey) => datesForWorkplace(workingDays, selectedWorkplaceId).includes(dateKey);
@@ -135,25 +135,20 @@ export function renderTimetable(root) {
       syncApplyButton([]);
       return;
     }
-
     syncApplyButton(dates);
   };
 
   const handleSelectionGuard = (event) => {
     const button = event.target.closest('[data-calendar-date]');
     if (!button || !calendarRoot.contains(button)) return;
-
     const dateKey = button.dataset.calendarDate || '';
     if (!dateKey || !selection) return;
-
     const selected = selection.isSelected(dateKey);
     if (selected) return;
-
     if (!selectionMode) {
       selectionMode = isWorkingDate(dateKey) ? 'make-off' : 'make-working';
       return;
     }
-
     const dateMode = isWorkingDate(dateKey) ? 'make-off' : 'make-working';
     if (dateMode !== selectionMode) {
       event.preventDefault();
@@ -185,12 +180,12 @@ export function renderTimetable(root) {
       onMonthChange: (nextMonth) => {
         resetSelectionForCalendarField();
         renderHeader(nextMonth);
-        renderApplyCounter(nextMonth);
+        renderWorkplaceCounter(nextMonth);
       },
     });
     selection = initMultiSelect(calendarRoot, { onChange: normalizeSelectionByFirstDate });
     syncApplyButton([]);
-    renderApplyCounter(month);
+    renderWorkplaceCounter(month);
   };
 
   if (workplaces.length) {
@@ -206,14 +201,13 @@ export function renderTimetable(root) {
     const month = calendar.getDisplayedMonth();
     startSelectionSession(month);
     renderHeader(month);
-    renderApplyCounter(month);
+    renderWorkplaceCounter(month);
   });
 
   applyButton.addEventListener('click', () => {
     if (!selection) return;
     const dates = selection.getSelectedDates();
     if (!dates.length || !selectionMode) return;
-
     const makeWorking = selectionMode === 'make-working';
     const selected = new Set(dates);
     const nextWorkingDays = makeWorking
@@ -221,14 +215,13 @@ export function renderTimetable(root) {
           .filter((date) => !workingDays.some((item) => item?.date === date && item?.workplaceId === selectedWorkplaceId))
           .map((date) => ({ date, workplaceId: selectedWorkplaceId, timeOverride: null }))]
       : workingDays.filter((item) => !(item?.workplaceId === selectedWorkplaceId && selected.has(item.date)));
-
     saveState({ workingDays: nextWorkingDays });
     workingDays.splice(0, workingDays.length, ...nextWorkingDays);
-
     const month = calendar.getDisplayedMonth();
     selection.destroy();
     startSelectionSession(month);
     renderHeader(month);
+    renderWorkplaceCounter(month);
   });
 
   return {
