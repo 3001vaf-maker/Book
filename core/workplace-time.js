@@ -1,4 +1,5 @@
 import { resolveTime } from './time.js';
+import { getTimeWork, resolveTimeWork } from './time-work.js';
 
 const WORKPLACES_KEY = 'book.workplaces';
 
@@ -22,12 +23,12 @@ export function resolveWorkplaceTime(workplaces, workplaceId) {
   return resolveTime({ from: workplace.from, to: workplace.to });
 }
 
-// Domain bridge: resolves the effective Time for one WorkingDay.
-// A day override, when present, wins over the workplace base time.
-// Without an override the day inherits the selected workplace time.
-export function resolveWorkingDayTime(workplaces, workingDay) {
-  if (!workingDay?.workplaceId) return null;
+// Domain bridge: resolves the concrete TimeWork for one WorkingDay.
+// Time remains the workplace-level source; TimeWork owns the day-specific interval.
+export function resolveWorkingDayTime(workplaces, workingDay, timeWorks = []) {
+  if (!workingDay?.workplaceId || !workingDay?.date) return null;
   const baseTime = resolveWorkplaceTime(workplaces, workingDay.workplaceId);
   if (!baseTime) return null;
-  return resolveTime(baseTime, workingDay.timeOverride || null);
+  const timeWork = getTimeWork(timeWorks, workingDay.workplaceId, workingDay.date);
+  return resolveTimeWork(timeWork, baseTime);
 }
