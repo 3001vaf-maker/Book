@@ -86,8 +86,9 @@ export function renderJournal(root) {
   const bindHeaderControl = () => root.querySelector('[data-workplace-header-open]')?.addEventListener('click', openWorkplaceModal);
 
   const renderView = () => {
-    const meta = activeView === 'day' ? renderHeaderControl() : '';
-    root.innerHTML = `${pageHeader('Журнал', '', meta)}${viewNavigation({ views, activeView })}<div data-journal-view></div>`;
+    // Место работы принадлежит всему Журналу, а День/Месяц/Список — его представления.
+    // Поэтому кнопка всегда находится в заголовке Журнала и не зависит от activeView.
+    root.innerHTML = `${pageHeader('Журнал', '', renderHeaderControl())}${viewNavigation({ views, activeView })}<div data-journal-view></div>`;
     const viewRoot = root.querySelector('[data-journal-view]');
     if (activeView === 'day') {
       renderJournalDay(viewRoot, {
@@ -95,12 +96,12 @@ export function renderJournal(root) {
         workplaceId: selectedWorkplaceId,
         onChange: (nextDate) => { selectedDate = nextDate; renderView(); },
       });
-      bindHeaderControl();
     } else if (activeView === 'month') {
       renderJournalMonth(viewRoot, { workplaceId: selectedWorkplaceId });
     } else {
       renderJournalList(viewRoot);
     }
+    bindHeaderControl();
     initViewNavigation(root, {
       views,
       activeView,
