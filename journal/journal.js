@@ -1,8 +1,8 @@
 import { pageHeader, viewNavigation, initViewNavigation, workplaceHeaderButton, select, modal, mountModal, timePicker, initTimePickers } from '../ui/ui.js?v=journal-workplace-header-20260903';
 import { getWorkplaces, resolveWorkplaceTime, resolveWorkingDayTime } from '../core/workplace-time.js?v=journal-workplace-header-20260903';
 import { getTimeWorks, saveTimeWorks, ensureTimeWork, correctTimeWork } from '../core/time-work.js?v=journal-workplace-header-20260903';
-import { renderJournalDay } from './день.js';
-import { renderJournalMonth } from './месяц.js';
+import { renderJournalDay } from './день.js?v=journal-worktime-20260903';
+import { renderJournalMonth } from './месяц.js?v=journal-worktime-20260903';
 import { renderJournalList } from './список.js';
 
 const TIMETABLE_STATE_KEY = 'book:timetable-state';
@@ -34,10 +34,7 @@ export function renderJournal(root) {
   };
 
   const openWorkplacePickerModal = () => {
-    const options = workplaces.map((workplace) => ({
-      value: workplace.key,
-      label: workplace.name || 'Без названия',
-    }));
+    const options = workplaces.map((workplace) => ({ value: workplace.key, label: workplace.name || 'Без названия' }));
     const content = `<div class="modal-title"><h2>Выбрать место работы</h2></div>${select({ name: 'journalWorkplaceModal', label: 'Место работы', value: selectedWorkplaceId, options, data: 'data-journal-workplace-modal' })}<button type="button" class="ui-button" data-journal-workplace-save>Выбрать</button>`;
     const modalRoot = mountModal(document.body, modal(content, { title: 'Выбрать место работы' }));
     modalRoot?.querySelector('[data-journal-workplace-save]')?.addEventListener('click', () => {
@@ -53,7 +50,6 @@ export function renderJournal(root) {
     const workingDay = workingDays.find((item) => item?.workplaceId === selectedWorkplaceId && item?.date === date) || null;
     const workplace = workplaces.find((item) => item.key === selectedWorkplaceId) || null;
     if (!workingDay || !workplace) return;
-
     const timeWorks = getTimeWorks();
     const time = resolveWorkingDayTime(workplaces, workingDay, timeWorks);
     const from = time?.from || workplace.from || '09:00';
@@ -83,20 +79,11 @@ export function renderJournal(root) {
     const workplace = workplaces.find((item) => item.key === selectedWorkplaceId) || null;
     const content = `<div class="modal-title"><h2>Место работы</h2></div><div class="timetable-workplace-modal-summary"><strong>${workplace?.name || 'Место работы не выбрано'}</strong></div><div class="timetable-workplace-modal-actions"><button type="button" class="ui-button" data-journal-open-picker>Выбрать место работы</button><button type="button" class="ui-button" data-journal-open-time ${hasWorkingDay ? '' : 'disabled'}>Скорректировать время</button></div>`;
     const modalRoot = mountModal(document.body, modal(content, { title: 'Место работы' }));
-    modalRoot?.querySelector('[data-journal-open-picker]')?.addEventListener('click', () => {
-      modalRoot.remove();
-      openWorkplacePickerModal();
-    });
-    modalRoot?.querySelector('[data-journal-open-time]')?.addEventListener('click', () => {
-      if (!hasWorkingDay) return;
-      modalRoot.remove();
-      openWorkplaceTimeModal();
-    });
+    modalRoot?.querySelector('[data-journal-open-picker]')?.addEventListener('click', () => { modalRoot.remove(); openWorkplacePickerModal(); });
+    modalRoot?.querySelector('[data-journal-open-time]')?.addEventListener('click', () => { if (!hasWorkingDay) return; modalRoot.remove(); openWorkplaceTimeModal(); });
   };
 
-  const bindHeaderControl = () => {
-    root.querySelector('[data-workplace-header-open]')?.addEventListener('click', openWorkplaceModal);
-  };
+  const bindHeaderControl = () => root.querySelector('[data-workplace-header-open]')?.addEventListener('click', openWorkplaceModal);
 
   const renderView = () => {
     const meta = activeView === 'day' ? renderHeaderControl() : '';
@@ -105,19 +92,19 @@ export function renderJournal(root) {
     if (activeView === 'day') {
       renderJournalDay(viewRoot, {
         date: selectedDate,
-        onChange: (nextDate) => { selectedDate = nextDate; },
+        workplaceId: selectedWorkplaceId,
+        onChange: (nextDate) => { selectedDate = nextDate; renderView(); },
       });
       bindHeaderControl();
+    } else if (activeView === 'month') {
+      renderJournalMonth(viewRoot, { workplaceId: selectedWorkplaceId });
     } else {
-      views.find(({ id }) => id === activeView).render(viewRoot);
+      renderJournalList(viewRoot);
     }
     initViewNavigation(root, {
       views,
       activeView,
-      onChange: (nextView) => {
-        activeView = nextView;
-        renderView();
-      },
+      onChange: (nextView) => { activeView = nextView; renderView(); },
     });
   };
 
