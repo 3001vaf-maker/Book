@@ -77,6 +77,7 @@ export function renderTimetable(root) {
 
   let calendar;
   let selection;
+  let selectionMode = null;
 
   const renderHeader = (month) => {
     const header = root.querySelector('.page-header');
@@ -85,13 +86,19 @@ export function renderTimetable(root) {
     if (meta) meta.innerHTML = timetableHeaderMeta(monthStats(month, workingDays, selectedWorkplaceId));
   };
 
-  const syncApplyButton = (dates) => {
-    const firstDate = dates[0] || '';
-    const firstIsWorking = firstDate
-      ? datesForWorkplace(workingDays, selectedWorkplaceId).includes(firstDate)
-      : false;
+  const isWorkingDate = (dateKey) => datesForWorkplace(workingDays, selectedWorkplaceId).includes(dateKey);
 
-    applyButton.disabled = !selectedWorkplaceId || dates.length === 0;
+  const syncApplyButton = (dates) => {
+    if (!dates.length) {
+      selectionMode = null;
+      applyButton.disabled = true;
+      applyButton.textContent = 'Применить: рабочий день';
+      return;
+    }
+
+    const firstIsWorking = isWorkingDate(dates[0]);
+    selectionMode = firstIsWorking ? 'make-off' : 'make-working';
+    applyButton.disabled = false;
     applyButton.textContent = firstIsWorking
       ? 'Применить: выходной'
       : 'Применить: рабочий день';
@@ -103,16 +110,38 @@ export function renderTimetable(root) {
       return;
     }
 
-    const workingDates = new Set(datesForWorkplace(workingDays, selectedWorkplaceId));
-    const firstIsWorking = workingDates.has(dates[0]);
-    const filtered = dates.filter((date) => workingDates.has(date) === firstIsWorking);
+    syncApplyButton(dates);
+  };
 
-    if (filtered.length !== dates.length) {
-      selection.setSelectedDates(filtered);
+  const handleSelectionGuard = (event) => {
+    const button = event.target.closest('[data-calendar-date]');
+    if (!button || !calendarRoot.contains(button)) return;
+
+    const dateKey = button.dataset.calendarDate || '';
+    if (!dateKey || !selection) return;
+
+    const selected = selection.isSelected(dateKey);
+    if (selected) return;
+
+    if (!selectionMode) {
+      selectionMode = isWorkingDate(dateKey) ? 'make-off' : 'make-working';
       return;
     }
 
-    syncApplyButton(filtered);
+    const dateMode = isWorkingDate(dateKey) ? 'make-off' : 'make-working';
+    if (dateMode !== selectionMode) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  };
+
+  calendarRoot.addEventListener('click', handleSelectionGuard, true);
+
+  const resetSelectionForCalendarField = () => {
+    selectionMode = null;
+    selection?.destroy();
+    selection = initMultiSelect(calendarRoot, { onChange: normalizeSelectionByFirstDate });
+    syncApplyButton([]);
   };
 
   const startSelectionSession = (month) => {
@@ -127,9 +156,13 @@ export function renderTimetable(root) {
         return `<span>${time.from}</span><span>${time.to}</span>`;
       },
       onDateSelect: () => {},
-      onMonthChange: renderHeader,
+      onMonthChange: (nextMonth) => {
+        resetSelectionForCalendarField();
+        renderHeader(nextMonth);
+      },
     });
     selection = initMultiSelect(calendarRoot, { onChange: normalizeSelectionByFirstDate });
+    syncApplyButton([]);
   };
 
   if (workplaces.length) {
@@ -148,18 +181,17 @@ export function renderTimetable(root) {
   });
 
   applyButton.addEventListener('click', () => {
-    if (!selectedWorkplaceId || !selection) return;
+    if (!selection) return;
     const dates = selection.getSelectedDates();
-    if (!dates.length) return;
+    if (!dates.length || !selectionMode) return;
 
-    const firstDate = dates[0];
-    const wasWorking = workingDays.some((item) => item?.date === firstDate && item?.workplaceId === selectedWorkplaceId);
+    const makeWorking = selectionMode === 'make-working';
     const selected = new Set(dates);
-    const nextWorkingDays = wasWorking
-      ? workingDays.filter((item) => !(item?.workplaceId === selectedWorkplaceId && selected.has(item.date)))
-      : [...workingDays, ...dates
+    const nextWorkingDays = makeWorking
+      ? [...workingDays, ...dates
           .filter((date) => !workingDays.some((item) => item?.date === date && item?.workplaceId === selectedWorkplaceId))
-          .map((date) => ({ date, workplaceId: selectedWorkplaceId, timeOverride: null }))];
+          .map((date) => ({ date, workplaceId: selectedWorkplaceId, timeOverride: null }))]
+      : workingDays.filter((item) => !(item?.workplaceId === selectedWorkplaceId && selected.has(item.date)));
 
     saveState({ workingDays: nextWorkingDays });
     workingDays.splice(0, workingDays.length, ...nextWorkingDays);
