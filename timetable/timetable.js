@@ -1,4 +1,4 @@
-import { pageHeader, initCalendar, initMultiSelect, timeInput } from '../ui/ui.js?v=graph-header-meta-20260903';
+import { pageHeader, initCalendar, initMultiSelect, timeInput, initTimePickers } from '../ui/ui.js?v=time-wheel-20260903';
 
 const STORAGE_KEY = 'book:timetable-state';
 
@@ -64,11 +64,14 @@ export function renderTimetable(root) {
 
   const calendarRoot = root.querySelector('[data-timetable-calendar]');
   const applyButton = root.querySelector('[data-timetable-apply]');
-  const startInput = root.querySelector('[name="startTime"]');
-  const endInput = root.querySelector('[name="endTime"]');
 
   let calendar;
   let selection;
+
+  initTimePickers(root);
+
+  const startInput = root.querySelector('[name="startTime"]');
+  const endInput = root.querySelector('[name="endTime"]');
 
   const syncApplyButton = (dates) => {
     const firstDate = dates[0];
