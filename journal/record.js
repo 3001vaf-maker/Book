@@ -1,9 +1,6 @@
 import { entityCard, escapeHtml, mountModal, modal, timePicker, initTimePickers, initMultiSelect } from '../ui/ui.js';
 import { createRecord } from '../core/record.js';
-
-const readList = (key) => {
-  try { const value = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(value) ? value : []; } catch { return []; }
-};
+const readList = (key) => { try { const value = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(value) ? value : []; } catch { return []; } };
 const people = () => readList('book.people');
 const procedures = () => readList('book.procedures').filter((item) => !item.deletedAt);
 const clientName = (person) => [person?.name, person?.surname].filter(Boolean).join(' ') || 'Без имени';
@@ -26,7 +23,7 @@ function openProceduresModal({ date, workplaceId, from, to, onCreated }) {
   const m = mountModal(document.body, modal(content)); if (!m) return;
   const render = () => {
     const host = m.querySelector('[data-record-procedures]');
-    host.innerHTML = items.length ? items.map((procedure) => `<button type="button" class="record-procedure-row${selected.has(procedure.id) ? ' is-selected' : ''}" data-procedure-select="${escapeHtml(procedure.id)}" aria-pressed="${selected.has(procedure.id)}"><span class="record-procedure-check" aria-hidden="true"></span><span class="record-procedure-main"><strong>${escapeHtml(procedure.name)}</strong><small>${durationText(procedure.duration)}</small></span><span class="record-procedure-settings" data-procedure-settings="${escapeHtml(procedure.id)}" role="button" tabindex="0" aria-label="Настройки">⚙</span></button>`).join('') : '<div class="muted">Процедур пока нет.</div>';
+    host.innerHTML = items.length ? items.map((procedure) => `<button type="button" class="record-procedure-row${selected.has(procedure.id) ? ' is-selected' : ''}" data-procedure-select="${escapeHtml(procedure.id)}" aria-pressed="${selected.has(procedure.id)}"><span class="record-procedure-check" aria-hidden="true"></span><span class="record-procedure-main"><strong>${escapeHtml(procedure.name)}</strong><small>${durationText(procedure.duration)}</small></span><span class="record-procedure-settings" data-procedure-settings="${escapeHtml(procedure.id)}" data-selection-action role="button" tabindex="0" aria-label="Настройки">⚙</span></button>`).join('') : '<div class="muted">Процедур пока нет.</div>';
     m.querySelector('[data-record-next]').disabled = selected.size === 0; m.querySelector('[data-record-reset]').hidden = selected.size === 0;
     initMultiSelect(host, { selectedValues: [...selected.keys()], selector: '[data-procedure-select]', valueAttribute: 'procedureSelect', onChange: (values) => { const next = new Map(); values.forEach((id) => { const procedure = items.find((item) => item.id === id); if (procedure) next.set(id, selected.get(id) || { procedure, cost: defaultCost(procedure), duration: Number(procedure.duration) || 0 }); }); selected.clear(); next.forEach((value, id) => selected.set(id, value)); m.querySelector('[data-record-next]').disabled = selected.size === 0; m.querySelector('[data-record-reset]').hidden = selected.size === 0; } });
     m.querySelectorAll('[data-procedure-settings]').forEach((node) => node.addEventListener('click', (event) => { event.preventDefault(); event.stopPropagation(); openProcedureSettings(m, items.find((item) => item.id === node.dataset.procedureSettings), selected); }));
