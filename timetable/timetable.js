@@ -1,17 +1,33 @@
-import { pageHeader, initCalendar, initMultiSelect } from '../ui/ui.js?v=graph-day-domain-20260903';
+import { pageHeader, initCalendar, initMultiSelect, select } from '../ui/ui.js?v=graph-workplace-20260903';
+import { resolveTime } from '../core/time.js';
 
 const STORAGE_KEY = 'book:timetable-state';
+const WORKPLACES_KEY = 'book.workplaces';
+
+function readWorkplaces() {
+  try {
+    const value = JSON.parse(localStorage.getItem(WORKPLACES_KEY) || '[]');
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return [];
+  }
+}
 
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { workingDates: [] };
+    if (!raw) return { workingDays: [] };
     const parsed = JSON.parse(raw);
-    return {
-      workingDates: Array.isArray(parsed.workingDates) ? parsed.workingDates : [],
-    };
+    if (Array.isArray(parsed.workingDays)) return { workingDays: parsed.workingDays };
+
+    // Migrate the previous Graph-only day list without assigning it a place of work.
+    if (Array.isArray(parsed.workingDates)) {
+      return { workingDays: parsed.workingDates.map((date) => ({ date, workplaceId: null })) };
+    }
+
+    return { workingDays: [] };
   } catch {
-    return { workingDates: [] };
+    return { workingDays: [] };
   }
 }
 
@@ -19,13 +35,26 @@ function saveState(state) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
-function monthStats(month, workingDates) {
+function workplaceOptions(workplaces) {
+  return workplaces.map((workplace) => ({
+    value: workplace.key,
+    label: workplace.name || 'Без названия',
+  }));
+}
+
+function datesForWorkplace(workingDays, workplaceId) {
+  return workingDays
+    .filter((item) => item?.workplaceId === workplaceId)
+    .map((item) => item.date)
+    .filter(Boolean);
+}
+
+function monthStats(month, workingDays, workplaceId) {
   const year = month.getFullYear();
   const monthIndex = month.getMonth();
   const prefix = `${year}-${String(monthIndex + 1).padStart(2, '0')}-`;
-  return {
-    days: [...workingDates].filter((dateKey) => dateKey.startsWith(prefix)).length,
-  };
+  const days = datesForWorkplace(workingDays, workplaceId).filter((dateKey) => dateKey.startsWith(prefix)).length;
+  return { days };
 }
 
 function timetableHeaderMeta(stats) {
@@ -34,38 +63,54 @@ function timetableHeaderMeta(stats) {
 
 export function renderTimetable(root) {
   const savedState = loadState();
-  const workingDates = new Set(savedState.workingDates);
-
-  const renderHeader = (month) => {
-    const header = root.querySelector('.page-header');
-    if (!header) return;
-    const meta = header.querySelector('.page-header__meta');
-    if (meta) meta.innerHTML = timetableHeaderMeta(monthStats(month, workingDates));
-  };
+  const workingDays = Array.isArray(savedState.workingDays) ? savedState.workingDays : [];
+  const workplaces = readWorkplaces();
+  let selectedWorkplaceId = workplaces[0]?.key || '';
 
   const initialMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-  const initialStats = monthStats(initialMonth, workingDates);
+  const initialStats = monthStats(initialMonth, workingDays, selectedWorkplaceId);
+  const workplaceSelector = select({
+    label: 'Место работы',
+    name: 'timetableWorkplace',
+    value: selectedWorkplaceId,
+    options: workplaceOptions(workplaces),
+    data: 'data-timetable-workplace',
+  });
 
-  root.innerHTML = `<div class="timetable-view">${pageHeader('График', '', timetableHeaderMeta(initialStats))}<div data-timetable-calendar></div><div class="profile-actions"><button type="button" class="ui-button" data-timetable-apply disabled>Применить: рабочий день</button></div></div>`;
+  root.innerHTML = `<div class="timetable-view">${pageHeader('График', '', timetableHeaderMeta(initialStats))}${workplaceSelector}<div data-timetable-calendar></div><div class="profile-actions"><button type="button" class="ui-button" data-timetable-apply disabled>Применить: рабочий день</button></div></div>`;
 
   const calendarRoot = root.querySelector('[data-timetable-calendar]');
+  const workplaceSelect = root.querySelector('[data-timetable-workplace]');
   const applyButton = root.querySelector('[data-timetable-apply]');
 
   let calendar;
   let selection;
 
+  const selectedWorkplace = () => workplaces.find((workplace) => workplace.key === selectedWorkplaceId) || null;
+  const selectedTime = () => resolveTime(selectedWorkplace()?.from, selectedWorkplace()?.to);
+
+  const renderHeader = (month) => {
+    const header = root.querySelector('.page-header');
+    if (!header) return;
+    const meta = header.querySelector('.page-header__meta');
+    if (meta) meta.innerHTML = timetableHeaderMeta(monthStats(month, workingDays, selectedWorkplaceId));
+  };
+
   const syncApplyButton = (dates) => {
-    const firstDate = dates[0];
-    const targetWorking = firstDate ? !workingDates.has(firstDate) : true;
-    applyButton.disabled = dates.length === 0;
-    applyButton.textContent = `Применить: ${targetWorking ? 'рабочий день' : 'выходной'}`;
+    applyButton.disabled = !selectedWorkplaceId || dates.length === 0;
+    applyButton.textContent = `Применить: ${dates.length ? 'рабочий день' : 'рабочий день'}`;
   };
 
   const startSelectionSession = (month) => {
+    const workplace = selectedWorkplace();
+    const time = selectedTime();
     calendar = initCalendar(calendarRoot, {
       month,
-      workingDates: [...workingDates],
-      renderDateContent: () => '',
+      workingDates: datesForWorkplace(workingDays, selectedWorkplaceId),
+      renderDateContent: ({ isCurrentMonth, isWorking }) => {
+        if (!isCurrentMonth || !isWorking || !workplace) return '';
+        return `<span>${time.from}</span><span>${time.to}</span>`;
+      },
       onDateSelect: () => {},
       onMonthChange: renderHeader,
     });
@@ -75,19 +120,39 @@ export function renderTimetable(root) {
     });
   };
 
-  startSelectionSession(initialMonth);
+  if (workplaces.length) {
+    startSelectionSession(initialMonth);
+  } else {
+    calendar = initCalendar(calendarRoot, { month: initialMonth, workingDates: [] });
+    applyButton.disabled = true;
+  }
+
+  workplaceSelect?.addEventListener('change', () => {
+    selectedWorkplaceId = workplaceSelect.value || '';
+    selection?.destroy();
+    const month = calendar.getDisplayedMonth();
+    startSelectionSession(month);
+    renderHeader(month);
+  });
 
   applyButton.addEventListener('click', () => {
+    if (!selectedWorkplaceId || !selection) return;
     const dates = selection.getSelectedDates();
     if (!dates.length) return;
 
-    const targetWorking = !workingDates.has(dates[0]);
-    dates.forEach((dateKey) => {
-      if (targetWorking) workingDates.add(dateKey);
-      else workingDates.delete(dateKey);
+    const selected = new Set(dates);
+    const withoutSelectedDates = workingDays.filter((item) => !(item?.workplaceId === selectedWorkplaceId && selected.has(item.date)));
+    const currentDates = new Set(datesForWorkplace(withoutSelectedDates, selectedWorkplaceId));
+    const targetWorking = !currentDates.has(dates[0]);
+
+    const nextWorkingDays = [...withoutSelectedDates];
+    dates.forEach((date) => {
+      const exists = nextWorkingDays.some((item) => item?.date === date && item?.workplaceId === selectedWorkplaceId);
+      if (targetWorking && !exists) nextWorkingDays.push({ date, workplaceId: selectedWorkplaceId });
     });
 
-    saveState({ workingDates: [...workingDates] });
+    saveState({ workingDays: nextWorkingDays });
+    workingDays.splice(0, workingDays.length, ...nextWorkingDays);
 
     const month = calendar.getDisplayedMonth();
     selection.destroy();
