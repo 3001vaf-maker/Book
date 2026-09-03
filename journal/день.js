@@ -8,6 +8,9 @@ import { openRecordCreation, openRecordView } from './record.js';
 
 function dateKey(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
 export function renderJournalDay(root, { date = new Date(), workplaceId = '', onChange = () => {} } = {}) {
+  if (root.__bookRecordChangeHandler) window.removeEventListener('book:records-changed', root.__bookRecordChangeHandler);
+  root.__bookRecordChangeHandler = () => renderJournalDay(root, { date, workplaceId, onChange });
+  window.addEventListener('book:records-changed', root.__bookRecordChangeHandler);
   root.innerHTML = '<div data-journal-day-navigator></div><div data-journal-day-content></div>';
   initDateNavigator(root.querySelector('[data-journal-day-navigator]'), { date, onChange });
   const contentRoot = root.querySelector('[data-journal-day-content]'), workplaces = getWorkplaces(), workingDays = getWorkingDays(), workingDay = getWorkingDay(workingDays, workplaceId, dateKey(date));
