@@ -1,7 +1,6 @@
 import { createTimeRange, rangesOverlap, timeToMinutes, minutesToTime, isValidRange } from './time.js';
 
 const TIMETABLE_STATE_KEY = 'book:timetable-state';
-const LEGACY_TIME_WORKS_KEY = 'book.timeWorks';
 
 function readState() {
   try {
@@ -10,12 +9,6 @@ function readState() {
   } catch { return {}; }
 }
 function writeState(state) { localStorage.setItem(TIMETABLE_STATE_KEY, JSON.stringify(state || { workingDays: [] })); }
-function readLegacyTimeWorks() {
-  try {
-    const value = JSON.parse(localStorage.getItem(LEGACY_TIME_WORKS_KEY) || '[]');
-    return Array.isArray(value) ? value : [];
-  } catch { return []; }
-}
 function dateValue(value) { return String(value || '').slice(0, 10); }
 
 export function getDays() { const state = readState(); return Array.isArray(state.workingDays) ? state.workingDays : []; }
@@ -29,10 +22,6 @@ export function getDaysForDate(days, date) { const key = dateValue(date); return
 export function getDayTime(day, workplaces = []) {
   if (!day) return null;
   if (day.from && day.to && isValidRange(day.from, day.to)) return createTimeRange(day.from, day.to);
-  const legacy = readLegacyTimeWorks().find((item) => String(item?.workplaceId || '') === String(day.workplaceId || '') && dateValue(item?.date) === dateValue(day.date));
-  if (legacy?.from && legacy?.to && isValidRange(legacy.from, legacy.to)) {
-    const range = createTimeRange(legacy.from, legacy.to); day.from = range.from; day.to = range.to; return range;
-  }
   const workplace = (Array.isArray(workplaces) ? workplaces : []).find((item) => String(item?.key || '') === String(day.workplaceId || ''));
   if (!workplace?.from || !workplace?.to || !isValidRange(workplace.from, workplace.to)) return null;
   const range = createTimeRange(workplace.from, workplace.to); day.from = range.from; day.to = range.to; return range;
