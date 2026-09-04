@@ -1,6 +1,7 @@
-import { initDateNavigator, journalDayTimeline, initJournalDayTimeline } from '../ui/ui.js?v=journal-day-timeline-20260903';
-import { getWorkplaces, getWorkingDays, getWorkingDay, resolveWorkingDayTime } from '../core/workplace-time.js?v=day-worktime-20260904';
-import { getRecordsForDay } from '../core/record.js';
+import { initDateNavigator, journalDayTimeline, initJournalDayTimeline } from '../ui/ui.js';
+import { getWorkplaces } from '../core/workplace-time.js';
+import { getDays, getDay, getDayTime } from '../core/day.js';
+import { getRecordsForDay } from './record-data.js';
 import { getJournalBreaksForDay, getJournalBreaks } from '../core/journal-breaks.js';
 import { getTimeUsages } from '../core/time-usage.js';
 import { openRecordCreation } from './record.js';
@@ -13,10 +14,9 @@ export function renderJournalDay(root, { date = new Date(), workplaceId = '', on
   initDateNavigator(root.querySelector('[data-journal-day-navigator]'), { date, onChange });
   const contentRoot = root.querySelector('[data-journal-day-content]');
   const workplaces = getWorkplaces();
-  const workingDays = getWorkingDays();
-  const workingDay = getWorkingDay(workingDays, workplaceId, dateKey(date));
+  const workingDay = getDay(getDays(), workplaceId, dateKey(date));
   if (!workingDay) { contentRoot.innerHTML = '<div class="time-day-state" aria-disabled="true">Выходной день</div>'; return; }
-  const time = resolveWorkingDayTime(workplaces, workingDay);
+  const time = getDayTime(workingDay, workplaces);
   if (!time) { contentRoot.innerHTML = '<div class="time-day-state" aria-disabled="true">Не задано рабочее время</div>'; return; }
   const dayDate = dateKey(date);
   const records = getRecordsForDay(dayDate, workplaceId).filter((record) => record?.status !== 'cancelled');
