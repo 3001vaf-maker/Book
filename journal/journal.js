@@ -1,5 +1,5 @@
 import { pageHeader, viewNavigation, initViewNavigation, workplaceHeaderButton, select, modal, mountModal, timePicker, initTimePickers } from '../ui/ui.js';
-import { getWorkplaces } from '../core/workplace-time.js';
+import { getWorkplaces } from '../core/workplace.js';
 import { getDays, saveDays, getDay, getDayTime, updateDayTime, hasScheduleConflict } from '../core/day.js';
 import { renderJournalDay } from './день.js';
 import { renderJournalMonth } from './месяц.js';
