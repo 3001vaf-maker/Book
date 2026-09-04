@@ -1,8 +1,7 @@
-import { resolveTime } from './time.js';
-import { getTimeWork, resolveTimeWork } from './time-work.js';
+import { createTimeRange } from './time.js';
+import { getDays, getDay, getDayTime, getDaysForDate, hasScheduleConflict } from './day.js';
 
 const WORKPLACES_KEY = 'book.workplaces';
-const TIMETABLE_STATE_KEY = 'book:timetable-state';
 
 export function getWorkplaces() {
   try {
@@ -14,40 +13,40 @@ export function getWorkplaces() {
 }
 
 export function getWorkplace(workplaces, workplaceId) {
-  return workplaces.find((workplace) => workplace?.key === workplaceId) || null;
+  return (Array.isArray(workplaces) ? workplaces : []).find((workplace) => String(workplace?.key || '') === String(workplaceId || '')) || null;
 }
 
 export function getWorkingDays() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(TIMETABLE_STATE_KEY) || '{}');
-    return Array.isArray(parsed.workingDays) ? parsed.workingDays : [];
-  } catch {
-    return [];
-  }
+  return getDays();
 }
 
 export function getWorkingDay(workingDays, workplaceId, date) {
-  return workingDays.find((item) => item?.workplaceId === workplaceId && item?.date === date) || null;
+  return getDay(workingDays, workplaceId, date);
 }
 
 export function getWorkingDates(workingDays, workplaceId, month) {
   const prefix = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}-`;
-  return workingDays
-    .filter((item) => item?.workplaceId === workplaceId && item?.date?.startsWith(prefix))
+  return (Array.isArray(workingDays) ? workingDays : [])
+    .filter((item) => String(item?.workplaceId || '') === String(workplaceId || '') && item?.date?.startsWith(prefix))
     .map((item) => item.date)
     .filter(Boolean);
 }
 
 export function resolveWorkplaceTime(workplaces, workplaceId) {
   const workplace = getWorkplace(workplaces, workplaceId);
-  if (!workplace) return null;
-  return resolveTime({ from: workplace.from, to: workplace.to });
+  if (!workplace?.from || !workplace?.to) return null;
+  return createTimeRange(workplace.from, workplace.to);
 }
 
-export function resolveWorkingDayTime(workplaces, workingDay, timeWorks = []) {
+export function resolveWorkingDayTime(workplaces, workingDay) {
   if (!workingDay?.workplaceId || !workingDay?.date) return null;
-  const baseTime = resolveWorkplaceTime(workplaces, workingDay.workplaceId);
-  if (!baseTime) return null;
-  const timeWork = getTimeWork(timeWorks, workingDay.workplaceId, workingDay.date);
-  return resolveTimeWork(timeWork, baseTime);
+  return getDayTime(workingDay, workplaces);
+}
+
+export function canScheduleWork(days, { workplaceId, date, from, to, excludeWorkplaceId = '', excludeDate = '' } = {}) {
+  return !hasScheduleConflict(days, { workplaceId, date, from, to, excludeWorkplaceId, excludeDate });
+}
+
+export function getOtherWorkDays(days, date, workplaceId) {
+  return getDaysForDate(days, date).filter((day) => String(day?.workplaceId || '') !== String(workplaceId || ''));
 }
