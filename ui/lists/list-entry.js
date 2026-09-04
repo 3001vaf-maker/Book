@@ -16,6 +16,9 @@ export function listEntry({
   data = '',
   className = '',
   aria = '',
+  actionData = '',
+  actionAria = '',
+  actionIcon = '⚙',
   deleteData = '',
   deleteAria = 'Удалить'
 } = {}) {
@@ -28,6 +31,9 @@ export function listEntry({
   const right = rightTop || rightBottom
     ? `<span class="list-entry__right">${rightTop ? `<strong>${rightTop}</strong>` : ''}${rightBottom ? `<small>${rightBottom}</small>` : ''}</span>`
     : '';
+  const action = actionData
+    ? `<span class="list-entry__action" ${actionData} ${actionAria ? `aria-label="${escapeHtml(actionAria)}"` : ''} role="button" tabindex="0">${escapeHtml(actionIcon)}</span>`
+    : '';
   const deleteAction = deleteData
     ? `<span class="list-entry__delete" data-delete-action="${escapeHtml(deleteData)}" aria-label="${escapeHtml(deleteAria)}">×</span>`
     : '';
@@ -36,7 +42,7 @@ export function listEntry({
     <span class="list-entry__background" aria-hidden="true">${image ? '' : `<span>${escapeHtml(initial)}</span>`}</span>
     <span class="list-entry__content">
       <span class="list-entry__main"><strong>${escapeHtml(title)}</strong><small>${escapeHtml(secondLine)}</small></span>
-      ${right}${deleteAction}
+      ${right}${action}${deleteAction}
     </span>
   </${tag}>`;
 }
