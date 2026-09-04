@@ -24,6 +24,7 @@ function monthStats(month, days, workplaceId, workplaces) {
   const total = selected.reduce((sum, date) => { const time = getDayTime(workingDayForDate(days, workplaceId, date), workplaces); return sum + (time ? minutesBetween(time.from, time.to) : 0); }, 0);
   return { days: selected.length, hours: Math.floor(total / 60), minutes: total % 60 };
 }
+function timetableCounter(stats) { return `<span class="timetable-workplace__days">${stats.days} дней</span><span class="timetable-workplace__time">${stats.hours} ч ${String(stats.minutes).padStart(2, '0')} м</span>`; }
 
 export function renderTimetable(root) {
   const workplaces = getWorkplaces();
