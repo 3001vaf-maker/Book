@@ -59,13 +59,13 @@ function openClientConfirmation({ date, workplaceId, from, to, selectedClient, s
     title: name,
     subtitle: phone,
     id: clientId,
-    meta: [],
     image: selectedClient?.photo || '',
     initial: name.slice(0, 1).toUpperCase(),
     className: 'entity-card--entry-confirm',
     data: 'data-record-confirm-client',
-    top: `<span class="entry-card__workplace" data-entry-workplace>${escapeHtml(workplace)}</span>`,
-    right: `<span class="entry-card__date">${escapeHtml(formattedDate)}</span><span class="entry-card__time">${escapeHtml(from)} - ${escapeHtml(to || '')}</span>`
+    top: `<div class="entry-card__top"><span class="entry-card__workplace">${escapeHtml(workplace)}</span><span class="entry-card__datetime"><span>${escapeHtml(formattedDate)}</span><span>${escapeHtml(from)} - ${escapeHtml(to || '')}</span></span></div>`,
+    bottom: `<div class="entry-card__client"><strong>${escapeHtml(name)}${clientId ? ` ${escapeHtml(clientId)}` : ''}</strong>${phone ? `<span>${escapeHtml(phone)}</span>` : ''}</div>`,
+    right: ''
   });
   const procedureSummary = selectedProcedures.map(({ procedure }) => `<div class="record-confirm-procedure"><span>${escapeHtml(procedure.name)}</span></div>`).join('');
   const content = `<div class="record-screen record-screen--confirmation"><div class="record-confirm-card">${card}</div><div class="record-confirm-summary">${procedureSummary}</div><div class="record-confirm-actions"><button type="button" class="ui-button ui-button--secondary" data-record-confirm-back>Назад</button><button type="button" class="ui-button" data-record-confirm>Подтвердить запись</button></div></div>`;
