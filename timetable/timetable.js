@@ -1,4 +1,4 @@
-import { pageHeader, initCalendar, initMultiSelect, select, modal, mountModal, timePicker, initTimePickers, escapeHtml } from '../ui/ui.js';
+import { pageHeader, initCalendar, initMultiSelect, select, modal, mountModal, timePicker, initTimePickers, escapeHtml, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js';
 import { getWorkplaces, resolveWorkplaceTime } from '../core/workplace-time.js';
 import { getDays, saveDays, getDay, getDayTime, createDay, updateDayTime, hasScheduleConflict, findSuggestedInterval } from '../core/day.js';
 
@@ -33,8 +33,10 @@ export function renderTimetable(root) {
   const canonicalDays = getDays();
   const workingDays = canonicalDays.length ? canonicalDays : savedState.workingDays;
   if (canonicalDays.length === 0 && savedState.workingDays.length) saveDays(workingDays);
-  let selectedWorkplaceId = workplaces[0]?.key || '';
-  const initialMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const context = getWorkplaceContext(workplaces);
+  let selectedWorkplaceId = context.workplaceId;
+  const initialDate = context.date;
+  const initialMonth = new Date(initialDate.getFullYear(), initialDate.getMonth(), 1);
 
   root.innerHTML = `<div class="timetable-view">${pageHeader('График', '', workplaceHeaderButton(workplaces.find((w) => w.key === selectedWorkplaceId), monthStats(initialMonth, workingDays, selectedWorkplaceId, workplaces)))}<div data-timetable-calendar></div><div class="profile-actions"><button type="button" class="ui-button" data-timetable-apply disabled><span data-timetable-apply-label>Применить: рабочий день</span></button></div></div>`;
   const calendarRoot = root.querySelector('[data-timetable-calendar]');
@@ -50,6 +52,7 @@ export function renderTimetable(root) {
   const isWorkingDate = (date) => datesForWorkplace(workingDays, selectedWorkplaceId).includes(date);
   const syncApplyButton = (dates) => {
     if (!dates.length) { selectionMode = null; applyButton.disabled = true; applyLabel.textContent = 'Применить: рабочий день'; return; }
+    setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: new Date(`${dates[0]}T00:00:00`) });
     selectionMode = isWorkingDate(dates[0]) ? 'make-off' : 'make-working';
     applyButton.disabled = false; applyLabel.textContent = selectionMode === 'make-off' ? 'Применить: выходной' : 'Применить: рабочий день';
   };
@@ -69,8 +72,8 @@ export function renderTimetable(root) {
         const time = getDayTime(workingDayForDate(workingDays, selectedWorkplaceId, dateKey), workplaces);
         return time ? `<span>${time.from}</span><span>${time.to}</span>` : '';
       },
-      onDateSelect: () => {},
-      onMonthChange: (nextMonth) => { selection?.destroy(); selection = initMultiSelect(calendarRoot, { onChange: syncApplyButton }); syncApplyButton([]); renderHeader(nextMonth); },
+      onDateSelect: (date) => { if (date) setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: new Date(`${date}T00:00:00`) }); },
+      onMonthChange: (nextMonth) => { selection?.destroy(); selection = initMultiSelect(calendarRoot, { onChange: syncApplyButton }); syncApplyButton([]); setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: nextMonth }); renderHeader(nextMonth); },
     });
     selection = initMultiSelect(calendarRoot, { onChange: syncApplyButton }); syncApplyButton([]);
   };
@@ -78,7 +81,7 @@ export function renderTimetable(root) {
   function openWorkplacePickerModal() {
     const content = `<div class="modal-title"><h2>Выбрать место работы</h2></div>${select({ name: 'timetableWorkplaceModal', label: 'Место работы', value: selectedWorkplaceId, options: workplaceOptions(workplaces), data: 'data-timetable-workplace-modal' })}<button type="button" class="ui-button" data-timetable-workplace-save>Выбрать</button>`;
     const m = mountModal(document.body, modal(content, { title: 'Выбрать место работы' }));
-    m?.querySelector('[data-timetable-workplace-save]')?.addEventListener('click', () => { selectedWorkplaceId = m.querySelector('[data-timetable-workplace-modal]')?.value || selectedWorkplaceId; const month = calendar?.getDisplayedMonth() || initialMonth; selection?.destroy(); startSelectionSession(month); renderHeader(month); m.remove(); });
+    m?.querySelector('[data-timetable-workplace-save]')?.addEventListener('click', () => { selectedWorkplaceId = m.querySelector('[data-timetable-workplace-modal]')?.value || selectedWorkplaceId; setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: calendar?.getDisplayedMonth() || initialDate }); const month = calendar?.getDisplayedMonth() || initialMonth; selection?.destroy(); startSelectionSession(month); renderHeader(month); m.remove(); });
   }
 
   function openWorkingDayConflictModal(date) {
