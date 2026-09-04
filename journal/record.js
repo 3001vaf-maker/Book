@@ -37,8 +37,15 @@ function procedureForWorkplace(procedure, workplaceId) {
 }
 function defaultCost(procedure, workplaceId) {
   const assignment = workplaceAssignment(procedure, workplaceId);
-  const cost = assignment?.cost ?? procedure?.cost;
+  const assignmentCost = assignment?.cost;
+  const procedureCost = procedure?.cost;
+  const cost = assignmentCost && typeof assignmentCost === 'object' && !assignmentCost.free && (
+    assignmentCost.amount !== '' && assignmentCost.amount != null ||
+    assignmentCost.from !== '' && assignmentCost.from != null ||
+    assignmentCost.to !== '' && assignmentCost.to != null
+  ) ? assignmentCost : procedureCost;
   if (!cost || cost.free) return '';
+  if (typeof cost === 'number' || typeof cost === 'string') return cost;
   return cost.amount ?? cost.from ?? '';
 }
 function openProceduresModal({ date, workplaceId, from, to, onCreated }) {
