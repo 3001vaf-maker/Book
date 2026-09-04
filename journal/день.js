@@ -1,5 +1,5 @@
 import { initDateNavigator, journalDayTimeline, initJournalDayTimeline } from '../ui/ui.js';
-import { getWorkplaces } from '../core/workplace-time.js';
+import { getWorkplaces } from '../core/workplace.js';
 import { getDays, getDay, getDayTime } from '../core/day.js';
 import { getRecordsForDay } from './record-data.js';
 import { getJournalBreaksForDay, getJournalBreaks } from '../core/journal-breaks.js';
