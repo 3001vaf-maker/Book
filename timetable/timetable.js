@@ -1,4 +1,4 @@
-import { pageHeader, initCalendar, initMultiSelect, select, modal, mountModal, timePicker, initTimePickers, escapeHtml, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js';
+import { pageHeader, initCalendar, initMultiSelect, select, modal, mountModal, timePicker, initTimePickers, escapeHtml, workplaceHeaderButton, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js';
 import { getWorkplaces, resolveWorkplaceTime } from '../core/workplace-time.js';
 import { getDays, saveDays, getDay, getDayTime, createDay, updateDayTime, hasScheduleConflict, findSuggestedInterval } from '../core/day.js';
 
@@ -24,8 +24,6 @@ function monthStats(month, days, workplaceId, workplaces) {
   const total = selected.reduce((sum, date) => { const time = getDayTime(workingDayForDate(days, workplaceId, date), workplaces); return sum + (time ? minutesBetween(time.from, time.to) : 0); }, 0);
   return { days: selected.length, hours: Math.floor(total / 60), minutes: total % 60 };
 }
-function timetableCounter(stats) { return `<span class="timetable-workplace__days">${stats.days} дней</span><span class="timetable-workplace__time">${stats.hours} ч ${String(stats.minutes).padStart(2, '0')} м</span>`; }
-function workplaceHeaderButton(workplace, stats) { const name = workplace?.name || 'Место работы'; const safe = escapeHtml(name); return `<button type="button" class="timetable-workplace-button ui-button--secondary" data-timetable-workplace-open aria-label="Место работы: ${safe}"><span class="timetable-workplace-button__name">${safe}</span>${timetableCounter(stats)}<span class="timetable-workplace-button__arrow" aria-hidden="true">⌄</span></button>`; }
 
 export function renderTimetable(root) {
   const workplaces = getWorkplaces();
@@ -38,7 +36,7 @@ export function renderTimetable(root) {
   const initialDate = context.date;
   const initialMonth = new Date(initialDate.getFullYear(), initialDate.getMonth(), 1);
 
-  root.innerHTML = `<div class="timetable-view">${pageHeader('График', '', workplaceHeaderButton(workplaces.find((w) => w.key === selectedWorkplaceId), monthStats(initialMonth, workingDays, selectedWorkplaceId, workplaces)))}<div data-timetable-calendar></div><div class="profile-actions"><button type="button" class="ui-button" data-timetable-apply disabled><span data-timetable-apply-label>Применить: рабочий день</span></button></div></div>`;
+  root.innerHTML = `<div class="timetable-view">${pageHeader('График', '', workplaceHeaderButton({ workplace: workplaces.find((w) => w.key === selectedWorkplaceId), showStats: true, stats: monthStats(initialMonth, workingDays, selectedWorkplaceId, workplaces) }))}<div data-timetable-calendar></div><div class="profile-actions"><button type="button" class="ui-button" data-timetable-apply disabled><span data-timetable-apply-label>Применить: рабочий день</span></button></div></div>`;
   const calendarRoot = root.querySelector('[data-timetable-calendar]');
   const applyButton = root.querySelector('[data-timetable-apply]');
   const applyLabel = root.querySelector('[data-timetable-apply-label]');
@@ -46,8 +44,8 @@ export function renderTimetable(root) {
 
   const renderHeader = (month) => {
     const meta = root.querySelector('.page-header__meta'); if (!meta) return;
-    meta.innerHTML = workplaceHeaderButton(workplaces.find((w) => w.key === selectedWorkplaceId), monthStats(month, workingDays, selectedWorkplaceId, workplaces));
-    meta.querySelector('[data-timetable-workplace-open]')?.addEventListener('click', openWorkplaceModal);
+    meta.innerHTML = workplaceHeaderButton({ workplace: workplaces.find((w) => w.key === selectedWorkplaceId), showStats: true, stats: monthStats(month, workingDays, selectedWorkplaceId, workplaces) });
+    meta.querySelector('[data-workplace-header-open]')?.addEventListener('click', openWorkplaceModal);
   };
   const isWorkingDate = (date) => datesForWorkplace(workingDays, selectedWorkplaceId).includes(date);
   const syncApplyButton = (dates) => {
@@ -121,7 +119,7 @@ export function renderTimetable(root) {
     m?.querySelector('[data-timetable-open-picker]')?.addEventListener('click', () => { m.remove(); openWorkplacePickerModal(); });
     m?.querySelector('[data-timetable-open-time]')?.addEventListener('click', () => { if (!disabled) { m.remove(); openWorkplaceTimeModal(); } });
   }
-  root.querySelector('[data-timetable-workplace-open]')?.addEventListener('click', openWorkplaceModal);
+  root.querySelector('[data-workplace-header-open]')?.addEventListener('click', openWorkplaceModal);
 
   if (workplaces.length) startSelectionSession(initialMonth); else calendar = initCalendar(calendarRoot, { month: initialMonth, workingDates: [] });
 
