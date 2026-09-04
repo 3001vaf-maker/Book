@@ -14,10 +14,10 @@ const durationText = (minutes) => {
   return hours ? `${hours} ч${rest ? ` ${rest} мин` : ''}` : `${rest} мин`;
 };
 
-export function procedureItem({ procedure = {}, cost = procedure.cost, interactive = true, data = '', selected = false, className = '' } = {}) {
+export function procedureItem({ procedure = {}, cost = procedure.cost, interactive = true, data = '', selected = false, action = '', className = '' } = {}) {
   const tag = interactive ? 'button' : 'div';
   const attrs = interactive ? `type="button" ${data} aria-pressed="${selected}"` : data;
-  return `<${tag} class="entity-list-row ${selected ? 'is-selected' : ''} ${className}" ${attrs}><span class="entity-list-row__main"><strong>${escapeHtml(procedure.name || '')}</strong><small>${durationText(procedure.duration)}</small></span><span class="entity-list-row__price">${costText(cost)}</span></${tag}>`;
+  return `<${tag} class="entity-list-row ${selected ? 'is-selected' : ''} ${className}" ${attrs}><span class="entity-list-row__main"><strong>${escapeHtml(procedure.name || '')}</strong><small>${durationText(procedure.duration)}</small></span><span class="entity-list-row__price">${costText(cost)}</span>${action}</${tag}>`;
 }
 
 export { costText as procedureCostText, durationText as procedureDurationText };
