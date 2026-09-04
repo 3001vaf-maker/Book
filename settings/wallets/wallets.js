@@ -1,4 +1,4 @@
-import { button, emptyState, entityCard, escapeHtml, iconButton, initPhotoField, mountModal, modal, pageHeader, photoField } from '../../ui/ui.js';
+import { button, emptyState, entityCard, escapeHtml, iconButton, initPhotoField, listEntry, mountModal, modal, pageHeader, photoField } from '../../ui/ui.js';
 
 const KEY = 'book.wallets';
 const SYSTEM_WALLETS = [
@@ -23,21 +23,21 @@ function list() {
 
 function renderList(root, navigateBack) {
   const items = list();
-  root.innerHTML = `<div class="entity-page-header">${pageHeader('Кошелёк')}<div class="page-header-action">${iconButton('+', { className: 'icon-button--primary', data: 'data-add-wallet', aria: 'Добавить кошелёк' })}</div></div>${items.length ? `<div class="entity-list">${items.map(renderRow).join('')}</div>` : emptyState('Кошельков пока нет', 'Добавьте первый кошелёк кнопкой «+».')}<div class="profile-actions">${button('Назад', { className: 'ui-button--secondary', data: 'data-back-wallets' })}</div>`;
+  root.innerHTML = `<div class="entity-page-header">${pageHeader('Кошелёк')}<div class="page-header-action">${iconButton('+', { className: 'icon-button--primary', data: 'data-add-wallet', aria: 'Добавить кошелёк' })}</div></div>${items.length ? `<div class="people-list">${items.map(renderRow).join('')}</div>` : emptyState('Кошельков пока нет', 'Добавьте первый кошелёк кнопкой «+».')}<div class="profile-actions">${button('Назад', { className: 'ui-button--secondary', data: 'data-back-wallets' })}</div>`;
   root.querySelector('[data-add-wallet]')?.addEventListener('click', () => openForm(root, null, navigateBack));
   root.querySelectorAll('[data-wallet]').forEach((element) => element.addEventListener('click', () => renderCard(root, element.dataset.wallet, navigateBack)));
   root.querySelector('[data-back-wallets]')?.addEventListener('click', navigateBack);
 }
 
 function renderRow(wallet) {
-  return entityCard({
-    id: wallet.id,
+  return listEntry({
     title: wallet.name,
+    subtitle: '',
     image: wallet.photo || '',
     initial: (wallet.name || '?').slice(0, 1).toUpperCase(),
     interactive: true,
     data: `data-wallet="${escapeHtml(wallet.id)}"`,
-    className: 'entity-card--compact entity-card--wallet',
+    aria: `Открыть кошелёк ${wallet.name}`,
   });
 }
 
