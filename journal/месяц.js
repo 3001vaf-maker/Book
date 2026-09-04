@@ -1,5 +1,5 @@
 import { initCalendar } from '../ui/ui.js?v=journal-month-worktime-20260903';
-import { getDays, getWorkingDates } from '../core/day.js';
+import { getDays } from '../core/day.js';
 
 export function renderJournalMonth(root, { workplaceId = '', onDateSelect = () => {} } = {}) {
   const render = (month = new Date(new Date().getFullYear(), new Date().getMonth(), 1)) => {
