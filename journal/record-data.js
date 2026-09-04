@@ -1,6 +1,6 @@
 import { containsRange, isValidRange, rangesOverlap } from '../core/time.js';
 import { getDays, getDay, getDayTime } from '../core/day.js';
-import { getWorkplaces } from '../core/workplace-time.js';
+import { getWorkplaces } from '../core/workplace.js';
 
 const KEY = 'book.records';
 const BREAKS_KEY = 'book.journalBreaks';
