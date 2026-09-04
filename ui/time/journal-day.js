@@ -7,35 +7,47 @@ function toMinutes(value) {
 }
 function formatMinutes(minutes) { return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`; }
 const escape = (value) => String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;');
-function recordMarkup(record) {
-  const client = record?.client || {}, name = [client.name, client.surname].filter(Boolean).join(' ') || 'Без имени';
+function recordMarkup(usage) {
+  const client = usage?.client || {}, name = [client.name, client.surname].filter(Boolean).join(' ') || 'Без имени';
   const id = client.id ? `${escape(client.id)} ` : '';
   const phone = client.phone ? `<span>${escape(client.phone)}</span>` : '';
-  const services = (record.procedures || []).map((item) => `<span>${escape(item.name)}</span>`).join('');
-  return `<span class="journal-record" data-journal-record="${escape(record.id)}"><strong>${id}${escape(name)}</strong>${phone}${services}</span>`;
+  const services = (usage.procedures || []).map((item) => `<span>${escape(item.name)}</span>`).join('');
+  return `<span class="journal-record" data-journal-record="${escape(usage.id)}"><strong>${id}${escape(name)}</strong>${phone}${services}</span>`;
 }
-export function journalDayTimeline({ from = '09:00', to = '18:00', records = [], usages = [] } = {}) {
+export function journalDayTimeline({ from = '09:00', to = '18:00', usages = [] } = {}) {
   const start = toMinutes(from), end = toMinutes(to);
   if (start == null || end == null || end <= start) return '';
-  const slots = [], sortedRecords = [...records].sort((a, b) => (toMinutes(a.from) ?? 0) - (toMinutes(b.from) ?? 0));
+  const slots = [], activeUsages = Array.isArray(usages) ? usages : [];
   const firstSlot = Math.ceil(start / 30) * 30;
   for (let minutes = firstSlot; minutes < end; minutes += 30) {
     const next = Math.min(minutes + 30, end);
-    const slotUsages = (Array.isArray(usages) ? usages : []).filter((usage) => {
-      const usageStart = toMinutes(usage.from), usageEnd = toMinutes(usage.to);
+    const usage = activeUsages.find((item) => {
+      const usageStart = toMinutes(item?.from), usageEnd = toMinutes(item?.to);
       return usageStart != null && usageEnd != null && usageStart < next && usageEnd > minutes;
-    });
-    const firstRecord = sortedRecords.find((record) => {
-      const recordStart = toMinutes(record.from);
-      return recordStart != null && recordStart >= minutes && recordStart < next;
-    });
-    const usage = slotUsages[0] || null;
-    const body = firstRecord ? recordMarkup(firstRecord) : '';
+    }) || null;
+    const body = usage?.type === 'record' ? recordMarkup(usage) : '';
     slots.push(`<button type="button" class="time-timeline__slot${usage ? ' is-occupied' : ''}" data-time-slot-from="${formatMinutes(minutes)}" data-time-slot-to="${formatMinutes(next)}" data-time-slot-usage="${escape(usage?.id || '')}" aria-label="${formatMinutes(minutes)}–${formatMinutes(next)}"><span class="time-timeline__hour">${formatMinutes(minutes)}</span><span class="time-timeline__line">${body}<span class="time-timeline__quarter" aria-hidden="true"></span></span></button>`);
   }
   return `<section class="time-timeline" data-time-timeline data-time-from="${from}" data-time-to="${to}">${slots.join('')}</section>`;
 }
+
+function releaseUsageFromTimeline(root, usageId) {
+  if (!usageId) return;
+  root.querySelectorAll(`[data-time-slot-usage="${CSS.escape(String(usageId))}"]`).forEach((slot) => {
+    slot.classList.remove('is-occupied');
+    slot.dataset.timeSlotUsage = '';
+    slot.querySelector('[data-journal-record]')?.remove();
+  });
+}
+
 export function initJournalDayTimeline(root, { onSlotClick = () => {}, usages = [] } = {}) {
+  if (root.__bookTimeUsageChangeHandler) window.removeEventListener('book:time-usage-changed', root.__bookTimeUsageChangeHandler);
+  root.__bookTimeUsageChangeHandler = (event) => {
+    const detail = event.detail || {};
+    if (detail.action === 'release') releaseUsageFromTimeline(root, detail.usageId);
+  };
+  window.addEventListener('book:time-usage-changed', root.__bookTimeUsageChangeHandler);
+
   root.querySelectorAll('[data-time-slot-from]').forEach((slot) => slot.addEventListener('click', () => {
     const clickedFrom = slot.dataset.timeSlotFrom || '';
     const clickedMinutes = toMinutes(clickedFrom);

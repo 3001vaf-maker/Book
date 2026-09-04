@@ -31,9 +31,13 @@ export function getTimeUsages({ records = [], breaks = [] } = {}) {
   return [
     ...(Array.isArray(records) ? records : [])
       .filter((record) => record?.status !== 'cancelled')
-      .map((record) => ({ ...record, type: 'record' })),
-    ...(Array.isArray(breaks) ? breaks : []).map((item) => ({ ...item, type: 'break' })),
+      .map((record) => ({ ...record, type: 'record', sourceId: record.id })),
+    ...(Array.isArray(breaks) ? breaks : []).map((item) => ({ ...item, type: 'break', sourceId: item.id })),
   ].filter((item) => item?.from && item?.to);
+}
+
+export function notifyTimeUsageChanged(detail = {}) {
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('book:time-usage-changed', { detail }));
 }
 
 export function getUsageAtTime(usages, from) {

@@ -8,9 +8,6 @@ import { openRecordCreation, openRecordView } from './record.js';
 
 function dateKey(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
 export function renderJournalDay(root, { date = new Date(), workplaceId = '', onChange = () => {} } = {}) {
-  if (root.__bookRecordChangeHandler) window.removeEventListener('book:records-changed', root.__bookRecordChangeHandler);
-  root.__bookRecordChangeHandler = () => renderJournalDay(root, { date, workplaceId, onChange });
-  window.addEventListener('book:records-changed', root.__bookRecordChangeHandler);
   root.innerHTML = '<div data-journal-day-navigator></div><div data-journal-day-content></div>';
   initDateNavigator(root.querySelector('[data-journal-day-navigator]'), { date, onChange });
   const contentRoot = root.querySelector('[data-journal-day-content]'), workplaces = getWorkplaces(), workingDays = getWorkingDays(), workingDay = getWorkingDay(workingDays, workplaceId, dateKey(date));
@@ -21,10 +18,10 @@ export function renderJournalDay(root, { date = new Date(), workplaceId = '', on
   const records = getRecordsForDay(dayDate, workplaceId);
   const breaks = getJournalBreaksForDay(getJournalBreaks(), workplaceId, dayDate);
   const usages = getTimeUsages({ records, breaks });
-  contentRoot.innerHTML = journalDayTimeline({ from: time.from, to: time.to, records, usages });
+  contentRoot.innerHTML = journalDayTimeline({ from: time.from, to: time.to, usages });
   initJournalDayTimeline(contentRoot, { usages, onSlotClick: ({ from, to, usage }) => {
     if (usage?.type === 'record') {
-      const record = records.find((item) => item?.id === usage.id);
+      const record = records.find((item) => item?.id === usage.sourceId);
       if (record) openRecordView(record);
       return;
     }
