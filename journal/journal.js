@@ -1,4 +1,4 @@
-import { pageHeader, viewNavigation, initViewNavigation, workplaceHeaderButton, select, modal, mountModal, timePicker, initTimePickers } from '../ui/ui.js';
+import { pageHeader, viewNavigation, initViewNavigation, workplaceHeaderButton, getWorkplaceContext, setWorkplaceContext, select, modal, mountModal, timePicker, initTimePickers } from '../ui/ui.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getDays, saveDays, getDay, getDayTime, updateDayTime, hasScheduleConflict } from '../core/day.js';
 import { renderJournalDay } from './день.js';
@@ -15,8 +15,9 @@ const views = [
 export function renderJournal(root) {
   let activeView = 'day';
   const workplaces = getWorkplaces();
-  let selectedWorkplaceId = workplaces[0]?.key || '';
-  let selectedDate = new Date();
+  const context = getWorkplaceContext(workplaces);
+  let selectedWorkplaceId = context.workplaceId;
+  let selectedDate = context.date;
 
   const renderHeaderControl = () => workplaceHeaderButton({ workplace: workplaces.find((item) => item.key === selectedWorkplaceId) || null });
 
@@ -24,7 +25,7 @@ export function renderJournal(root) {
     const options = workplaces.map((workplace) => ({ value: workplace.key, label: workplace.name || 'Без названия' }));
     const content = `<div class="modal-title"><h2>Выбрать место работы</h2></div>${select({ name: 'journalWorkplaceModal', label: 'Место работы', value: selectedWorkplaceId, options, data: 'data-journal-workplace-modal' })}<button type="button" class="ui-button" data-journal-workplace-save>Выбрать</button>`;
     const m = mountModal(document.body, modal(content, { title: 'Выбрать место работы' }));
-    m?.querySelector('[data-journal-workplace-save]')?.addEventListener('click', () => { selectedWorkplaceId = m.querySelector('[data-journal-workplace-modal]')?.value || selectedWorkplaceId; m.remove(); renderView(); });
+    m?.querySelector('[data-journal-workplace-save]')?.addEventListener('click', () => { selectedWorkplaceId = m.querySelector('[data-journal-workplace-modal]')?.value || selectedWorkplaceId; setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: selectedDate }); m.remove(); renderView(); });
   };
 
   const openWorkplaceTimeModal = () => {
@@ -52,8 +53,8 @@ export function renderJournal(root) {
   const renderView = () => {
     root.innerHTML = `${pageHeader('Журнал', '', renderHeaderControl())}${viewNavigation({ views, activeView })}<div data-journal-view></div>`;
     const viewRoot = root.querySelector('[data-journal-view]');
-    if (activeView === 'day') renderJournalDay(viewRoot, { date: selectedDate, workplaceId: selectedWorkplaceId, onChange: (nextDate) => { selectedDate = nextDate; renderView(); } });
-    else if (activeView === 'month') renderJournalMonth(viewRoot, { workplaceId: selectedWorkplaceId, onDateSelect: (nextDate) => { selectedDate = nextDate; activeView = 'day'; renderView(); } });
+    if (activeView === 'day') renderJournalDay(viewRoot, { date: selectedDate, workplaceId: selectedWorkplaceId, onChange: (nextDate) => { selectedDate = nextDate; setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: selectedDate }); renderView(); } });
+    else if (activeView === 'month') renderJournalMonth(viewRoot, { workplaceId: selectedWorkplaceId, onDateSelect: (nextDate) => { selectedDate = nextDate; setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: selectedDate }); activeView = 'day'; renderView(); } });
     else renderJournalList(viewRoot);
     root.querySelector('[data-workplace-header-open]')?.addEventListener('click', openWorkplaceModal);
     initViewNavigation(root, { views, activeView, onChange: (nextView) => { activeView = nextView; renderView(); } });
