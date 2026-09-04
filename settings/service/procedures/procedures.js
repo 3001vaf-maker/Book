@@ -1,4 +1,4 @@
-import { button, collectCost, collectWorkplaceSelections, costField, durationPicker, emptyState, entityCard, escapeHtml, iconButton, initCostFields, initDurationPickers, initPhotoField, initWorkplaceSelectors, mountModal, modal, pageHeader, photoField, procedureItem, workplaceSelector } from '../../../ui/ui.js';
+import { button, collectCost, collectWorkplaceSelections, costField, durationPicker, emptyState, entityCard, escapeHtml, iconButton, initCostFields, initDurationPickers, initPhotoField, initWorkplaceSelectors, mountModal, modal, pageHeader, photoField, procedureCostText, procedureItem, workplaceSelector } from '../../../ui/ui.js';
 
 const KEY='book.procedures';
 const HISTORY_KEY='book.procedures.history';
