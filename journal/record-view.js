@@ -1,4 +1,4 @@
-import { escapeHtml, mountModal, modal, select, initMultiSelect, initCalendar, entityCard } from '../ui/ui.js';
+import { escapeHtml, mountModal, modal, select, initMultiSelect, initCalendar, entityCard, procedureItem } from '../ui/ui.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getDays, getDay, getDayTime } from '../core/day.js';
 import { timeToMinutes, minutesToTime } from '../core/time.js';
@@ -12,8 +12,6 @@ const dateKey = (value) => { const date = value instanceof Date ? value : new Da
 const formatDate = (value) => { const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); return match ? `${match[3]}.${match[2]}.${match[1].slice(-2)}` : String(value || ''); };
 const workplaceName = (id) => getWorkplaces().find((item) => String(item?.key || '') === String(id || ''))?.name || 'Место работы';
 const findClient = (record) => { const client = record?.client || {}; return people().find((item) => String(item?.key ?? '') === String(client.key ?? '')) || people().find((item) => String(item?.id ?? '') === String(client.id ?? '')) || client; };
-const fmtMoney = (value) => value === '' || value == null ? '' : `${Number(value).toLocaleString('ru-RU')} ₽`;
-const costText = (cost) => { if (!cost || cost.free) return ''; if (cost.mode === 'from-to') return `от ${fmtMoney(cost.from)}<br>до ${fmtMoney(cost.to)}`; if (cost.mode === 'from') return `от ${fmtMoney(cost.from ?? cost.amount)}`; return fmtMoney(cost.amount ?? cost.from); };
 const costValue = (cost) => { if (!cost || cost.free) return null; const value = cost.mode === 'from-to' ? cost.from : cost.mode === 'from' ? (cost.from ?? cost.amount) : (cost.amount ?? cost.from); const number = Number(value); return Number.isFinite(number) && number > 0 ? number : null; };
 function resolveProcedureCost(procedure, workplaceId) {
   const scoped = (procedure?.workplaces || []).filter((item) => String(item?.workplaceId ?? '') === String(workplaceId ?? '')).map((item) => item?.cost).filter((cost) => costValue(cost) != null);
@@ -67,7 +65,7 @@ function openProceduresPicker(state, onDone) {
   const content = `<div class="record-screen record-screen--procedures"><div class="modal-title"><h2>Услуги</h2></div><div data-record-edit-procedures></div><button type="button" class="ui-button" data-record-edit-save>Применить</button></div>`;
   const m = mountModal(document.body, pickerModal(content)); if (!m) return;
   const host = m.querySelector('[data-record-edit-procedures]');
-  host.innerHTML = items.map((item) => `<button type="button" class="record-procedure-row${selected.has(item.id) ? ' is-selected' : ''}" data-record-edit-procedure="${escapeHtml(item.id)}" aria-pressed="${selected.has(item.id)}"><span class="record-procedure-check" aria-hidden="true"></span><span class="record-procedure-main"><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(String(item.duration || 0))} мин</small></span><span class="record-procedure-price">${costText(resolveProcedureCost(item, state.workplaceId))}</span></button>`).join('') || '<div class="muted">Услуг пока нет.</div>';
+  host.innerHTML = items.map((item) => procedureItem({ procedure: item, cost: resolveProcedureCost(item, state.workplaceId), data: `data-record-edit-procedure="${escapeHtml(item.id)}"`, selected: selected.has(item.id) })).join('') || '<div class="muted">Услуг пока нет.</div>';
   initMultiSelect(host, { selectedValues: [...selected.keys()], selector: '[data-record-edit-procedure]', valueAttribute: 'recordEditProcedure', onChange: (values) => { const next = new Map(); values.forEach((id) => { const item = items.find((procedure) => procedure.id === id); if (!item) return; const existing = selected.get(id); next.set(id, existing || { id: item.id, name: item.name, cost: costValue(resolveProcedureCost(item, state.workplaceId)) ?? '', duration: Number(item.duration) || 0 }); }); selected.clear(); next.forEach((value, id) => selected.set(id, value)); } });
   m.querySelector('[data-record-edit-save]')?.addEventListener('click', () => {
     state.procedures = items.filter((item) => selected.has(item.id)).map((item) => { const selectedItem = selected.get(item.id) || {}; return { id: item.id, name: item.name, cost: selectedItem.cost ?? (costValue(resolveProcedureCost(item, state.workplaceId)) ?? ''), duration: Number(selectedItem.duration ?? item.duration) || 0 }; });
