@@ -1,113 +1,84 @@
-import { escapeHtml, mountModal, modal, select, timePicker, initTimePickers } from '../ui/ui.js';
+import { escapeHtml, mountModal, modal, select, timePicker, initTimePickers, initMultiSelect, initCalendar, entityCard } from '../ui/ui.js';
 import { getWorkplaces } from '../core/workplace-time.js';
-import { moveRecord, cancelRecord, deleteRecord, checkRecordTime } from './record-data.js';
+import { getDays, getDay } from '../core/day.js';
+import { updateRecord, deleteRecord, checkRecordTime } from './record-data.js';
 
-const readList = (key) => {
-  try {
-    const value = JSON.parse(localStorage.getItem(key) || '[]');
-    return Array.isArray(value) ? value : [];
-  } catch {
-    return [];
-  }
-};
+const readList = (key) => { try { const value = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(value) ? value : []; } catch { return []; } };
 const people = () => readList('book.people');
+const procedures = () => readList('book.procedures').filter((item) => !item.deletedAt);
 const clientName = (person) => [person?.name, person?.surname].filter(Boolean).join(' ') || 'Без имени';
-const dateKey = (value) => {
-  const date = value instanceof Date ? value : new Date(value);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-};
-const findClient = (record) => {
-  const client = record?.client || {};
-  return people().find((item) => String(item?.key ?? '') === String(client.key ?? ''))
-    || people().find((item) => String(item?.id ?? '') === String(client.id ?? ''))
-    || client;
-};
+const dateKey = (value) => { const date = value instanceof Date ? value : new Date(value); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; };
+const formatDate = (value) => { const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); return match ? `${match[3]}.${match[2]}.${match[1].slice(-2)}` : String(value || ''); };
 const workplaceName = (id) => getWorkplaces().find((item) => String(item?.key || '') === String(id || ''))?.name || 'Место работы';
+const findClient = (record) => { const client = record?.client || {}; return people().find((item) => String(item?.key ?? '') === String(client.key ?? '')) || people().find((item) => String(item?.id ?? '') === String(client.id ?? '')) || client; };
 
-function openMoveModal(record, onChanged) {
+function openWorkplacePicker(state, onDone) {
   const workplaces = getWorkplaces();
   const options = workplaces.map((item) => ({ value: item.key, label: item.name || 'Без названия' }));
-  const content = `<div class="record-screen record-screen--move">
-    <div class="modal-title"><h2>Перенести запись</h2></div>
-    <div class="form-grid">
-      <label class="field"><span class="field__label">Дата</span><input class="field__input" type="date" data-record-move-date value="${escapeHtml(record.date || '')}"></label>
-      ${select({ name: 'recordMoveWorkplace', label: 'Место работы', value: record.workplaceId || '', options, data: 'data-record-move-workplace' })}
-      ${timePicker({ name: 'recordMoveFrom', label: 'Начало', value: record.from || '09:00' })}
-      ${timePicker({ name: 'recordMoveTo', label: 'Окончание', value: record.to || '10:00' })}
-    </div>
-    <div class="form-error" data-record-move-error></div>
-    <div class="record-modal-actions modal-actions"><button type="button" class="ui-button ui-button--secondary" data-record-move-cancel>Отмена</button><button type="button" class="ui-button" data-record-move-save>Перенести</button></div>
-  </div>`;
-  const m = mountModal(document.body, modal(content, { className: 'record-modal record-modal--panel' }));
-  if (!m) return;
-  initTimePickers(m);
-  m.querySelector('[data-record-move-cancel]')?.addEventListener('click', () => m.remove());
-  m.querySelector('[data-record-move-save]')?.addEventListener('click', () => {
-    const nextDate = m.querySelector('[data-record-move-date]')?.value || record.date;
-    const nextWorkplace = m.querySelector('[data-record-move-workplace]')?.value || record.workplaceId;
-    const nextFrom = m.querySelector('[name="recordMoveFrom"]')?.value || record.from;
-    const nextTo = m.querySelector('[name="recordMoveTo"]')?.value || record.to;
-    const check = checkRecordTime({ date: nextDate, workplaceId: nextWorkplace, from: nextFrom, to: nextTo, excludeId: record.id });
-    const error = m.querySelector('[data-record-move-error]');
-    if (!check.ok) {
-      const message = check.reason === 'day-not-working'
-        ? 'Выбранный день не является рабочим. Выберите другой день.'
-        : check.reason === 'occupied'
-          ? 'Это время уже занято. Выберите другое время или другой день.'
-          : check.reason === 'outside-working-time'
-            ? `Время записи должно находиться внутри рабочего времени дня: ${check.time?.from || ''}–${check.time?.to || ''}.`
-            : 'Проверьте дату и время.';
-      if (error) error.textContent = message;
-      return;
-    }
-    const updated = moveRecord(record.id, { date: nextDate, workplaceId: nextWorkplace, from: nextFrom, to: nextTo });
-    if (!updated) {
-      if (error) error.textContent = 'Не удалось перенести запись. Проверьте свободное время.';
-      return;
-    }
-    m.remove();
-    onChanged?.(updated);
-  });
+  const content = `<div class="record-screen record-screen--settings"><div class="modal-title"><h2>Место работы</h2></div>${select({ name: 'recordEditWorkplace', label: 'Место работы', value: state.workplaceId, options, data: 'data-record-edit-workplace-select' })}<button type="button" class="ui-button" data-record-edit-save>Выбрать</button></div>`;
+  const m = mountModal(document.body, modal(content, { className: 'record-modal record-modal--panel' })); if (!m) return;
+  m.querySelector('[data-record-edit-save]')?.addEventListener('click', () => { state.workplaceId = m.querySelector('[data-record-edit-workplace-select]')?.value || state.workplaceId; m.remove(); onDone(); });
 }
 
-function confirmDelete(record, onChanged) {
-  const content = `<div class="record-screen"><div class="modal-title"><h2>Удалить запись?</h2></div><p>Запись будет удалена полностью и больше не будет занимать время.</p><div class="record-modal-actions modal-actions"><button type="button" class="ui-button ui-button--secondary" data-record-delete-cancel>Отмена</button><button type="button" class="ui-button" data-record-delete-confirm>Удалить</button></div></div>`;
-  const m = mountModal(document.body, modal(content, { className: 'record-modal record-modal--panel' }));
-  if (!m) return;
-  m.querySelector('[data-record-delete-cancel]')?.addEventListener('click', () => m.remove());
-  m.querySelector('[data-record-delete-confirm]')?.addEventListener('click', () => {
-    if (!deleteRecord(record.id)) return;
-    m.remove();
-    onChanged?.();
-  });
+function openClientPicker(state, onDone) {
+  const all = people(); let filtered = all;
+  const content = `<div class="record-screen record-screen--clients"><div class="modal-title"><h2>Клиент</h2></div><div class="record-client-toolbar"><input class="record-client-search" data-record-client-search placeholder="🔍 Найти клиента..." autocomplete="off"></div><div class="record-client-list" data-record-client-list></div></div>`;
+  const m = mountModal(document.body, modal(content, { className: 'record-modal record-modal--panel' })); if (!m) return;
+  const render = () => { const host = m.querySelector('[data-record-client-list]'); host.innerHTML = filtered.map((person) => entityCard({ id: person.id, title: clientName(person), subtitle: person.phones?.[0] || '', image: person.photo || '', initial: clientName(person).slice(0, 1).toUpperCase(), interactive: true, data: `data-record-client="${escapeHtml(person.key)}"`, className: 'entity-card--compact', aria: `Выбрать клиента ${clientName(person)}` })).join('') || '<div class="muted">Клиенты не найдены.</div>'; host.querySelectorAll('[data-record-client]').forEach((card) => card.addEventListener('click', () => { const person = all.find((item) => String(item.key) === String(card.dataset.recordClient)); if (!person) return; state.client = { key: person.key, id: person.id || '', name: person.name || '', surname: person.surname || '', phone: person.phones?.[0] || '' }; m.remove(); onDone(); })); };
+  m.querySelector('[data-record-client-search]')?.addEventListener('input', (event) => { const q = event.target.value.trim().toLocaleLowerCase('ru'); filtered = all.filter((person) => clientName(person).toLocaleLowerCase('ru').includes(q) || String(person.phones?.[0] || '').includes(q)); render(); }); render();
+}
+
+function openDatePicker(state, onDone) {
+  const workingDates = getDays().filter((day) => String(day?.workplaceId || '') === String(state.workplaceId || '')).map((day) => day.date).filter(Boolean);
+  const content = `<div class="record-screen"><div class="modal-title"><h2>Дата</h2></div><div data-record-edit-calendar></div></div>`;
+  const m = mountModal(document.body, modal(content, { className: 'record-modal record-modal--panel' })); if (!m) return;
+  initCalendar(m.querySelector('[data-record-edit-calendar]'), { month: new Date(`${state.date}T12:00:00`), workingDates, onDateSelect: (value) => { if (!getDay(getDays(), state.workplaceId, value)) { alert('На выбранную дату нет рабочего дня.'); return; } state.date = value; m.remove(); onDone(); } });
+}
+
+function openTimePicker(state, original, onDone) {
+  const content = `<div class="record-screen"><div class="modal-title"><h2>Время</h2></div><div class="timetable-time-fields">${timePicker({ name: 'recordEditFrom', label: 'Начало', value: state.from, minuteStep: 5 })}${timePicker({ name: 'recordEditTo', label: 'Окончание', value: state.to, minuteStep: 5 })}</div><div class="form-error" data-record-edit-time-error></div><button type="button" class="ui-button" data-record-edit-save>Выбрать</button></div>`;
+  const m = mountModal(document.body, modal(content, { className: 'record-modal record-modal--panel' })); if (!m) return; initTimePickers(m);
+  m.querySelector('[data-record-edit-save]')?.addEventListener('click', () => { const from = m.querySelector('[name="recordEditFrom"]')?.value || state.from; const to = m.querySelector('[name="recordEditTo"]')?.value || state.to; const check = checkRecordTime({ date: state.date, workplaceId: state.workplaceId, from, to, excludeId: original.id }); if (!check.ok) { m.querySelector('[data-record-edit-time-error]').textContent = check.reason === 'occupied' ? 'Это время уже занято. Выберите другое время.' : check.reason === 'day-not-working' ? 'Выбранный день не является рабочим.' : 'Время должно находиться внутри рабочего времени дня.'; return; } state.from = from; state.to = to; m.remove(); onDone(); });
+}
+
+function openProceduresPicker(state, onDone) {
+  const items = procedures(); const selected = new Set((state.procedures || []).map((item) => item?.id).filter(Boolean));
+  const content = `<div class="record-screen record-screen--procedures"><div class="modal-title"><h2>Услуги</h2></div><div data-record-edit-procedures></div><button type="button" class="ui-button" data-record-edit-save>Применить</button></div>`;
+  const m = mountModal(document.body, modal(content, { className: 'record-modal record-modal--panel' })); if (!m) return;
+  const host = m.querySelector('[data-record-edit-procedures]');
+  host.innerHTML = items.map((item) => `<button type="button" class="record-procedure-row${selected.has(item.id) ? ' is-selected' : ''}" data-record-edit-procedure="${escapeHtml(item.id)}" aria-pressed="${selected.has(item.id)}"><span class="record-procedure-check" aria-hidden="true"></span><span class="record-procedure-main"><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(String(item.duration || 0))} мин</small></span></button>`).join('') || '<div class="muted">Услуг пока нет.</div>';
+  initMultiSelect(host, { selectedValues: [...selected], selector: '[data-record-edit-procedure]', valueAttribute: 'recordEditProcedure', onChange: (values) => { selected.clear(); values.forEach((id) => selected.add(id)); } });
+  m.querySelector('[data-record-edit-save]')?.addEventListener('click', () => { state.procedures = items.filter((item) => selected.has(item.id)).map((item) => ({ id: item.id, name: item.name, cost: item.cost ?? '', duration: Number(item.duration) || 0 })); m.remove(); onDone(); });
+}
+
+function confirmDelete(record, onDeleted) {
+  const content = `<div class="record-screen"><div class="modal-title"><h2>Удалить запись?</h2></div><p>Запись будет удалена полностью и освободит это время.</p><div class="record-modal-actions modal-actions"><button type="button" class="ui-button ui-button--secondary" data-record-delete-no>Нет</button><button type="button" class="ui-button" data-record-delete-yes>Удалить</button></div></div>`;
+  const m = mountModal(document.body, modal(content, { className: 'record-modal record-modal--panel' })); if (!m) return;
+  m.querySelector('[data-record-delete-no]')?.addEventListener('click', () => m.remove());
+  m.querySelector('[data-record-delete-yes]')?.addEventListener('click', () => { if (!deleteRecord(record.id)) return; m.remove(); onDeleted?.(); });
 }
 
 export function openRecordView(record, { onClose = () => {} } = {}) {
   if (!record) return;
-  const client = findClient(record);
-  const name = clientName(client);
-  const phone = client?.phones?.[0] || client?.phone || '';
-  const services = (record.procedures || []).map((item) => item?.name).filter(Boolean).join(', ');
-  const content = `<div class="record-view">
-    <div class="record-view-card">
-      <div class="record-card-topline"><span>${escapeHtml(workplaceName(record.workplaceId))}</span><strong>${escapeHtml(record.date || '')} ${escapeHtml(record.from || '')}–${escapeHtml(record.to || '')}</strong></div>
-      <div class="record-card-client"><strong>${record.client?.id ? `${escapeHtml(record.client.id)} ` : ''}${escapeHtml(name)}</strong>${phone ? `<span>${escapeHtml(phone)}</span>` : ''}</div>
-      ${services ? `<div class="record-card-procedures"><span>${escapeHtml(services)}</span></div>` : ''}
-    </div>
-    <div class="record-view-actions">
-      <button type="button" class="ui-button" data-record-move>Перенести</button>
-      <button type="button" class="ui-button ui-button--secondary" data-record-cancel>Отменить запись</button>
-      <button type="button" class="ui-button ui-button--secondary" data-record-delete>Удалить</button>
-    </div>
-  </div>`;
-  const m = mountModal(document.body, modal(content, { className: 'record-modal record-modal--view' }));
-  if (!m) return;
-  const changed = () => { m.remove(); onClose?.(); };
-  m.querySelector('[data-record-move]')?.addEventListener('click', () => { m.remove(); openMoveModal(record, changed); });
-  m.querySelector('[data-record-cancel]')?.addEventListener('click', () => {
-    if (!cancelRecord(record.id)) return;
-    changed();
-  });
-  m.querySelector('[data-record-delete]')?.addEventListener('click', () => confirmDelete(record, changed));
-  m.addEventListener('modal:close', () => onClose?.(), { once: true });
+  const state = { date: record.date, workplaceId: record.workplaceId, from: record.from, to: record.to, client: record.client ? { ...record.client } : null, procedures: Array.isArray(record.procedures) ? record.procedures.map((item) => ({ ...item })) : [] };
+  const original = { ...record };
+  const render = () => {
+    const client = state.client || findClient(record) || {};
+    const phone = client.phone || client.phones?.[0] || '';
+    const procedureNames = state.procedures.map((item) => item?.name).filter(Boolean);
+    const top = `<button type="button" class="record-card-workplace record-editor-field" data-record-edit-workplace>${escapeHtml(workplaceName(state.workplaceId))}</button><button type="button" class="record-card-datetime record-editor-field" data-record-edit-datetime><span>${escapeHtml(formatDate(state.date))}</span><span>${escapeHtml(state.from || '')}–${escapeHtml(state.to || '')}</span></button>`;
+    const clientBlock = `<button type="button" class="record-card-client record-editor-field" data-record-edit-client><strong>${client.id ? `${escapeHtml(client.id)} ` : ''}${escapeHtml(clientName(client))}</strong>${phone ? `<span>${escapeHtml(phone)}</span>` : ''}</button>`;
+    const procedureBlock = `<button type="button" class="record-card-procedures record-editor-field" data-record-edit-procedures>${procedureNames.length ? procedureNames.map((item) => `<span>${escapeHtml(item)}</span>`).join('') : '<span>Добавить услугу</span>'}</button>`;
+    const card = entityCard({ top: `${top}${clientBlock}`, bottom: '', right: procedureBlock, className: 'entity-card--record', data: 'data-record-card' });
+    const content = `<div class="record-view"><div class="record-view-card">${card}</div><div class="record-view-actions"><button type="button" class="ui-button ui-button--small record-delete-button" data-record-delete>Удалить</button><button type="button" class="ui-button record-apply-button" data-record-apply>Применить</button></div></div>`;
+    const m = mountModal(document.body, modal(content, { className: 'record-modal record-modal--view' })); if (!m) return;
+    m.querySelector('[data-record-edit-workplace]')?.addEventListener('click', () => { m.remove(); openWorkplacePicker(state, render); });
+    m.querySelector('[data-record-edit-client]')?.addEventListener('click', () => { m.remove(); openClientPicker(state, render); });
+    m.querySelector('[data-record-edit-datetime]')?.addEventListener('click', () => { m.remove(); openDatePicker(state, () => openTimePicker(state, original, render)); });
+    m.querySelector('[data-record-edit-procedures]')?.addEventListener('click', () => { m.remove(); openProceduresPicker(state, render); });
+    m.querySelector('[data-record-delete]')?.addEventListener('click', () => confirmDelete(record, () => { m.remove(); onClose?.(); }));
+    m.querySelector('[data-record-apply]')?.addEventListener('click', () => { const updated = updateRecord(record.id, { date: dateKey(state.date), workplaceId: String(state.workplaceId || ''), from: state.from, to: state.to, client: state.client, procedures: state.procedures }); if (!updated) { alert('Не удалось сохранить изменения: проверьте рабочий день и свободное время.'); return; } m.remove(); onClose?.(); });
+    m.addEventListener('modal:close', () => onClose?.(), { once: true });
+  };
+  render();
 }
