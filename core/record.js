@@ -1,10 +1,10 @@
-import { getTimeUsages, isTimeRangeAvailable } from './time-usage.js';
+import { getTimeUsages, isTimeRangeAvailable, notifyTimeUsageChanged } from './time-usage.js';
 
 const KEY = 'book.records';
 function read() { try { const value = JSON.parse(localStorage.getItem(KEY) || '[]'); return Array.isArray(value) ? value : []; } catch { return []; } }
 function write(records) { localStorage.setItem(KEY, JSON.stringify(records)); }
+function notifyRecordsChanged(detail = {}) { if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('book:records-changed', { detail })); }
 function readBreaks() { try { const value = JSON.parse(localStorage.getItem('book.journalBreaks') || '[]'); return Array.isArray(value) ? value : []; } catch { return []; } }
-function notifyRecordsChanged() { if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('book:records-changed')); }
 export function getRecords() { return read(); }
 export function getRecordsForDay(date, workplaceId = '') { const key = String(date || ''); return read().filter((record) => record.date === key && (!workplaceId || record.workplaceId === workplaceId)); }
 export function createRecord({ date, workplaceId, from, to, client, procedures = [] } = {}) {
@@ -27,8 +27,12 @@ export function updateRecord(id, patch = {}) {
 export function cancelRecord(id) {
   const records = read(), index = records.findIndex((record) => record.id === id);
   if (index < 0 || records[index].status === 'cancelled') return null;
-  records[index] = { ...records[index], status: 'cancelled', cancelledAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
-  write(records); notifyRecordsChanged(); return records[index];
+  const previous = records[index];
+  records[index] = { ...previous, status: 'cancelled', cancelledAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+  write(records);
+  notifyRecordsChanged({ action: 'cancel', recordId: previous.id });
+  notifyTimeUsageChanged({ action: 'release', usageId: previous.id, sourceId: previous.id, date: previous.date, workplaceId: previous.workplaceId, from: previous.from, to: previous.to });
+  return records[index];
 }
 // Backward-compatible name for existing callers; cancellation never deletes history.
 export function removeRecord(id) { return Boolean(cancelRecord(id)); }
