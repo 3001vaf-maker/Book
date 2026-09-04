@@ -12,6 +12,14 @@ const dateKey = (value) => { const date = value instanceof Date ? value : new Da
 const formatDate = (value) => { const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); return match ? `${match[3]}.${match[2]}.${match[1].slice(-2)}` : String(value || ''); };
 const workplaceName = (id) => getWorkplaces().find((item) => String(item?.key || '') === String(id || ''))?.name || 'Место работы';
 const findClient = (record) => { const client = record?.client || {}; return people().find((item) => String(item?.key ?? '') === String(client.key ?? '')) || people().find((item) => String(item?.id ?? '') === String(client.id ?? '')) || client; };
+const fmtMoney = (value) => value === '' || value == null ? '' : `${Number(value).toLocaleString('ru-RU')} ₽`;
+const costText = (cost) => { if (!cost || cost.free) return ''; if (cost.mode === 'from-to') return `от ${fmtMoney(cost.from)}<br>до ${fmtMoney(cost.to)}`; if (cost.mode === 'from') return `от ${fmtMoney(cost.from ?? cost.amount)}`; return fmtMoney(cost.amount ?? cost.from); };
+const costValue = (cost) => { if (!cost || cost.free) return null; const value = cost.mode === 'from-to' ? cost.from : cost.mode === 'from' ? (cost.from ?? cost.amount) : (cost.amount ?? cost.from); const number = Number(value); return Number.isFinite(number) && number > 0 ? number : null; };
+function resolveProcedureCost(procedure, workplaceId) {
+  const scoped = (procedure?.workplaces || []).filter((item) => String(item?.workplaceId ?? '') === String(workplaceId ?? '')).map((item) => item?.cost).filter((cost) => costValue(cost) != null);
+  if (scoped.length) { const minimum = Math.min(...scoped.map(costValue)); const source = scoped.find((cost) => costValue(cost) === minimum); return source; }
+  return procedure?.cost || {};
+}
 
 function getBookingStep() {
   try { const profile = JSON.parse(localStorage.getItem('book.profile') || '{}'); const value = Number(profile?.bookingStep); return value === 15 || value === 30 ? value : 60; }
@@ -54,13 +62,15 @@ function openTimePicker(state, original, onDone) {
 }
 
 function openProceduresPicker(state, onDone) {
-  const items = procedures(); const selected = new Set((state.procedures || []).map((item) => item?.id).filter(Boolean));
+  const items = procedures();
+  const selected = new Map((state.procedures || []).map((entry) => [entry?.id, { ...entry }]).filter(([id]) => id));
   const content = `<div class="record-screen record-screen--procedures"><div class="modal-title"><h2>Услуги</h2></div><div data-record-edit-procedures></div><button type="button" class="ui-button" data-record-edit-save>Применить</button></div>`;
   const m = mountModal(document.body, pickerModal(content)); if (!m) return;
-  const host = m.querySelector('[data-record-edit-procedures]'); host.innerHTML = items.map((item) => `<button type="button" class="record-procedure-row${selected.has(item.id) ? ' is-selected' : ''}" data-record-edit-procedure="${escapeHtml(item.id)}" aria-pressed="${selected.has(item.id)}"><span class="record-procedure-check" aria-hidden="true"></span><span class="record-procedure-main"><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(String(item.duration || 0))} мин</small></span></button>`).join('') || '<div class="muted">Услуг пока нет.</div>';
-  initMultiSelect(host, { selectedValues: [...selected], selector: '[data-record-edit-procedure]', valueAttribute: 'recordEditProcedure', onChange: (values) => { selected.clear(); values.forEach((id) => selected.add(id)); } });
+  const host = m.querySelector('[data-record-edit-procedures]');
+  host.innerHTML = items.map((item) => `<button type="button" class="record-procedure-row${selected.has(item.id) ? ' is-selected' : ''}" data-record-edit-procedure="${escapeHtml(item.id)}" aria-pressed="${selected.has(item.id)}"><span class="record-procedure-check" aria-hidden="true"></span><span class="record-procedure-main"><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(String(item.duration || 0))} мин</small></span><span class="record-procedure-price">${costText(resolveProcedureCost(item, state.workplaceId))}</span></button>`).join('') || '<div class="muted">Услуг пока нет.</div>';
+  initMultiSelect(host, { selectedValues: [...selected.keys()], selector: '[data-record-edit-procedure]', valueAttribute: 'recordEditProcedure', onChange: (values) => { const next = new Map(); values.forEach((id) => { const item = items.find((procedure) => procedure.id === id); if (!item) return; const existing = selected.get(id); next.set(id, existing || { id: item.id, name: item.name, cost: costValue(resolveProcedureCost(item, state.workplaceId)) ?? '', duration: Number(item.duration) || 0 }); }); selected.clear(); next.forEach((value, id) => selected.set(id, value)); } });
   m.querySelector('[data-record-edit-save]')?.addEventListener('click', () => {
-    state.procedures = items.filter((item) => selected.has(item.id)).map((item) => ({ id: item.id, name: item.name, cost: item.cost ?? '', duration: Number(item.duration) || 0 }));
+    state.procedures = items.filter((item) => selected.has(item.id)).map((item) => { const selectedItem = selected.get(item.id) || {}; return { id: item.id, name: item.name, cost: selectedItem.cost ?? (costValue(resolveProcedureCost(item, state.workplaceId)) ?? ''), duration: Number(selectedItem.duration ?? item.duration) || 0 }; });
     const from = timeToMinutes(state.from);
     const duration = state.procedures.reduce((sum, item) => sum + (Number(item.duration) || 0), 0);
     if (from != null) state.to = minutesToTime(from + duration);
