@@ -1,30 +1,11 @@
-// Unified time-resource layer for Journal-owned consumption inside an existing TimeWork.
-// TimeWork defines the available working interval; this module determines how Journal consumes it.
+// Technical interval helpers for Journal rendering and collision checks.
+// This module does not own working time or Record state.
+import { timeToMinutes, rangesOverlap } from './time.js';
 
-function toMinutes(value) {
-  const match = String(value || '').match(/^(\d{1,2}):(\d{2})$/);
-  if (!match) return null;
-  const hours = Number(match[1]);
-  const minutes = Number(match[2]);
-  if (hours > 23 || minutes > 59) return null;
-  return hours * 60 + minutes;
-}
-
-export function timeToMinutes(value) {
-  return toMinutes(value);
-}
-
-export function rangesOverlap(fromA, toA, fromB, toB) {
-  const a = toMinutes(fromA);
-  const b = toMinutes(toA);
-  const c = toMinutes(fromB);
-  const d = toMinutes(toB);
-  if ([a, b, c, d].some((value) => value == null)) return false;
-  return a < d && c < b;
-}
+export { timeToMinutes, rangesOverlap };
 
 export function isTimeRangeAvailable({ from, to, usages = [], excludeId = '' } = {}) {
-  return !usages.some((usage) => usage?.id !== excludeId && rangesOverlap(from, to, usage.from, usage.to));
+  return !usages.some((usage) => usage?.sourceId !== excludeId && usage?.id !== excludeId && rangesOverlap(from, to, usage?.from, usage?.to));
 }
 
 export function getTimeUsages({ records = [], breaks = [] } = {}) {
@@ -32,7 +13,8 @@ export function getTimeUsages({ records = [], breaks = [] } = {}) {
     ...(Array.isArray(records) ? records : [])
       .filter((record) => record?.status !== 'cancelled')
       .map((record) => ({ ...record, type: 'record', sourceId: record.id })),
-    ...(Array.isArray(breaks) ? breaks : []).map((item) => ({ ...item, type: 'break', sourceId: item.id })),
+    ...(Array.isArray(breaks) ? breaks : [])
+      .map((item) => ({ ...item, type: 'break', sourceId: item.id })),
   ].filter((item) => item?.from && item?.to);
 }
 
@@ -41,11 +23,11 @@ export function notifyTimeUsageChanged(detail = {}) {
 }
 
 export function getUsageAtTime(usages, from) {
-  const point = toMinutes(from);
+  const point = timeToMinutes(from);
   if (point == null) return null;
   return (Array.isArray(usages) ? usages : []).find((usage) => {
-    const start = toMinutes(usage.from);
-    const end = toMinutes(usage.to);
+    const start = timeToMinutes(usage?.from);
+    const end = timeToMinutes(usage?.to);
     return start != null && end != null && point >= start && point < end;
   }) || null;
 }
