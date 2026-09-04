@@ -3,7 +3,8 @@ import { getWorkplaces, getWorkingDays, getWorkingDay, resolveWorkingDayTime } f
 import { getRecordsForDay } from '../core/record.js';
 import { getJournalBreaksForDay, getJournalBreaks } from '../core/journal-breaks.js';
 import { getTimeUsages } from '../core/time-usage.js';
-import { openRecordCreation, openRecordView } from './record.js';
+import { openRecordCreation } from './record.js';
+import { openRecordView } from './record-view.js';
 
 function dateKey(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
 
@@ -15,10 +16,8 @@ export function renderJournalDay(root, { date = new Date(), workplaceId = '', on
   const workingDays = getWorkingDays();
   const workingDay = getWorkingDay(workingDays, workplaceId, dateKey(date));
   if (!workingDay) { contentRoot.innerHTML = '<div class="time-day-state" aria-disabled="true">Выходной день</div>'; return; }
-
   const time = resolveWorkingDayTime(workplaces, workingDay);
   if (!time) { contentRoot.innerHTML = '<div class="time-day-state" aria-disabled="true">Не задано рабочее время</div>'; return; }
-
   const dayDate = dateKey(date);
   const records = getRecordsForDay(dayDate, workplaceId).filter((record) => record?.status !== 'cancelled');
   const breaks = getJournalBreaksForDay(getJournalBreaks(), workplaceId, dayDate);
