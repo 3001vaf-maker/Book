@@ -50,9 +50,13 @@ function openClientModal({ date, workplaceId, from, to, procedures: selectedProc
   m.querySelector('[data-record-client-search]').addEventListener('input', (event) => { const q = event.target.value.trim().toLocaleLowerCase('ru'); filtered = all.filter((person) => clientName(person).toLocaleLowerCase('ru').includes(q) || String(person.phones?.[0] || '').includes(q)); render(); }); m.querySelector('[data-record-add-client]').addEventListener('click', () => {}); render();
 }
 function openClientConfirmation({ date, workplaceId, from, to, selectedClient, selectedProcedures, onCreated }) {
-  const card = entityCard({ id: selectedClient.id, title: clientName(selectedClient), subtitle: selectedClient.phones?.[0] || '', image: selectedClient.photo || '', initial: clientName(selectedClient).slice(0, 1).toUpperCase(), className: 'entity-card--hero', data: 'data-record-confirm-client' });
-  const procedureSummary = selectedProcedures.map(({ procedure, cost, duration }) => `<div class="record-confirm-procedure"><span>${escapeHtml(procedure.name)}</span><strong>${durationText(duration)}${cost === '' ? '' : ` · ${escapeHtml(String(cost))} ₽`}</strong></div>`).join('');
-  const content = `<div class="record-screen record-screen--confirmation"><div class="record-confirm-card">${card}</div><div class="record-confirm-summary"><div><span>Время</span><strong>${escapeHtml(from)}–${escapeHtml(to || '')}</strong></div>${procedureSummary}</div><div class="record-confirm-actions"><button type="button" class="ui-button ui-button--secondary" data-record-confirm-back>Назад</button><button type="button" class="ui-button" data-record-confirm>Подтвердить запись</button></div></div>`;
+  const name = clientName(selectedClient);
+  const phone = selectedClient?.phones?.[0] || selectedClient?.phone || '';
+  const formattedDate = formatConfirmationDate(date);
+  const cardTop = `<div class="entity-card__bottom"><div class="entity-card__bottom-main"><strong class="entity-card__entity-name">${escapeHtml(name)}</strong>${phone ? `<span class="entity-card__subtitle">${escapeHtml(phone)}</span>` : ''}</div><div class="entity-card__bottom-right"><span>${escapeHtml(formattedDate)}</span><span>${escapeHtml(from)}–${escapeHtml(to || '')}</span></div></div>`;
+  const card = entityCard({ image: selectedClient.photo || '', initial: name.slice(0, 1).toUpperCase(), top: cardTop, bottom: '', className: 'entity-card--hero', data: 'data-record-confirm-client' });
+  const procedureSummary = selectedProcedures.map(({ procedure }) => `<div class="record-confirm-procedure"><span>${escapeHtml(procedure.name)}</span></div>`).join('');
+  const content = `<div class="record-screen record-screen--confirmation"><div class="record-confirm-card">${card}</div><div class="record-confirm-summary">${procedureSummary}</div><div class="record-confirm-actions"><button type="button" class="ui-button ui-button--secondary" data-record-confirm-back>Назад</button><button type="button" class="ui-button" data-record-confirm>Подтвердить запись</button></div></div>`;
   const m = mountModal(document.body, modal(content, { className: 'record-modal record-modal--full' })); if (!m) return;
   m.querySelector('[data-record-confirm-back]').addEventListener('click', () => { m.remove(); openClientModal({ date, workplaceId, from, to, procedures: selectedProcedures, onCreated }); });
   m.querySelector('[data-record-confirm]').addEventListener('click', () => { const usages = scopedUsages(date, workplaceId); if (!isTimeRangeAvailable({ from, to, usages })) { alert('Это время уже занято.'); return; } createRecord({ date: dateKey(date), workplaceId, from, to, client: { key: selectedClient.key, id: selectedClient.id || '', name: selectedClient.name || '', surname: selectedClient.surname || '', phone: selectedClient.phones?.[0] || '' }, procedures: selectedProcedures.map(({ procedure, cost, duration: itemDuration }) => ({ id: procedure.id, name: procedure.name, cost, duration: itemDuration })) }); m.remove(); onCreated?.(); });
@@ -75,6 +79,12 @@ function formatRecordDate(date) {
   const value = String(date || '');
   const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   return match ? `${match[3]}.${match[2]}` : value;
+}
+
+function formatConfirmationDate(date) {
+  const value = String(date || '');
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return match ? `${match[3]}.${match[2]}.${match[1].slice(-2)}` : value;
 }
 
 function findRecordClient(record) {
