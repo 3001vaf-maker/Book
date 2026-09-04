@@ -54,21 +54,21 @@ function openClientConfirmation({ date, workplaceId, from, to, selectedClient, s
   const phone = selectedClient?.phones?.[0] || selectedClient?.phone || '';
   const formattedDate = formatConfirmationDate(date);
   const workplace = findWorkplaceName(workplaceId);
-  const clientId = selectedClient?.id || '';
-  const card = entityCard({
-    title: name,
-    subtitle: phone,
-    id: clientId,
-    image: selectedClient?.photo || '',
-    initial: name.slice(0, 1).toUpperCase(),
-    className: 'entity-card--entry-confirm',
-    data: 'data-record-confirm-client',
-    top: `<div class="entry-card__top"><span class="entry-card__workplace">${escapeHtml(workplace)}</span><span class="entry-card__datetime"><span>${escapeHtml(formattedDate)}</span><span>${escapeHtml(from)} - ${escapeHtml(to || '')}</span></span></div>`,
-    bottom: `<div class="entry-card__client"><strong>${escapeHtml(name)}${clientId ? ` ${escapeHtml(clientId)}` : ''}</strong>${phone ? `<span>${escapeHtml(phone)}</span>` : ''}</div>`,
-    right: ''
-  });
-  const procedureSummary = selectedProcedures.map(({ procedure }) => `<div class="record-confirm-procedure"><span>${escapeHtml(procedure.name)}</span></div>`).join('');
-  const content = `<div class="record-screen record-screen--confirmation"><div class="record-confirm-card">${card}</div><div class="record-confirm-summary">${procedureSummary}</div><div class="record-confirm-actions"><button type="button" class="ui-button ui-button--secondary" data-record-confirm-back>Назад</button><button type="button" class="ui-button" data-record-confirm>Подтвердить запись</button></div></div>`;
+  const procedureSummary = selectedProcedures.map(({ procedure }) => `<div class="record-confirm-procedure">${escapeHtml(procedure.name)}</div>`).join('');
+  const content = `<div class="record-screen record-screen--confirmation form-grid">
+    <div>${escapeHtml(workplace)}</div>
+    <div>${escapeHtml(formattedDate)}</div>
+    <div>${escapeHtml(from)} - ${escapeHtml(to || '')}</div>
+    <div aria-hidden="true"></div>
+    <div>${escapeHtml(name)}</div>
+    ${phone ? `<div>${escapeHtml(phone)}</div>` : ''}
+    <div aria-hidden="true"></div>
+    <div class="record-confirm-summary">${procedureSummary}</div>
+    <div aria-hidden="true"></div>
+    <button type="button" class="ui-button ui-button--secondary" data-record-confirm-back>Назад</button>
+    <div aria-hidden="true"></div>
+    <button type="button" class="ui-button" data-record-confirm>Подтвердить запись</button>
+  </div>`;
   const m = mountModal(document.body, modal(content, { className: 'record-modal record-modal--full' })); if (!m) return;
   m.querySelector('[data-record-confirm-back]').addEventListener('click', () => { m.remove(); openClientModal({ date, workplaceId, from, to, procedures: selectedProcedures, onCreated }); });
   m.querySelector('[data-record-confirm]').addEventListener('click', () => { const usages = scopedUsages(date, workplaceId); if (!isTimeRangeAvailable({ from, to, usages })) { alert('Это время уже занято.'); return; } createRecord({ date: dateKey(date), workplaceId, from, to, client: { key: selectedClient.key, id: selectedClient.id || '', name: selectedClient.name || '', surname: selectedClient.surname || '', phone: selectedClient.phones?.[0] || '' }, procedures: selectedProcedures.map(({ procedure, cost, duration: itemDuration }) => ({ id: procedure.id, name: procedure.name, cost, duration: itemDuration })) }); m.remove(); onCreated?.(); });
