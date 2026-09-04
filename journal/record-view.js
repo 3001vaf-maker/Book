@@ -59,7 +59,14 @@ function openProceduresPicker(state, onDone) {
   const m = mountModal(document.body, pickerModal(content)); if (!m) return;
   const host = m.querySelector('[data-record-edit-procedures]'); host.innerHTML = items.map((item) => `<button type="button" class="record-procedure-row${selected.has(item.id) ? ' is-selected' : ''}" data-record-edit-procedure="${escapeHtml(item.id)}" aria-pressed="${selected.has(item.id)}"><span class="record-procedure-check" aria-hidden="true"></span><span class="record-procedure-main"><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(String(item.duration || 0))} мин</small></span></button>`).join('') || '<div class="muted">Услуг пока нет.</div>';
   initMultiSelect(host, { selectedValues: [...selected], selector: '[data-record-edit-procedure]', valueAttribute: 'recordEditProcedure', onChange: (values) => { selected.clear(); values.forEach((id) => selected.add(id)); } });
-  m.querySelector('[data-record-edit-save]')?.addEventListener('click', () => { state.procedures = items.filter((item) => selected.has(item.id)).map((item) => ({ id: item.id, name: item.name, cost: item.cost ?? '', duration: Number(item.duration) || 0 })); m.remove(); onDone(); });
+  m.querySelector('[data-record-edit-save]')?.addEventListener('click', () => {
+    state.procedures = items.filter((item) => selected.has(item.id)).map((item) => ({ id: item.id, name: item.name, cost: item.cost ?? '', duration: Number(item.duration) || 0 }));
+    const from = timeToMinutes(state.from);
+    const duration = state.procedures.reduce((sum, item) => sum + (Number(item.duration) || 0), 0);
+    if (from != null) state.to = minutesToTime(from + duration);
+    m.remove();
+    onDone();
+  });
 }
 
 function confirmDelete(record, onDeleted) {
