@@ -1,5 +1,5 @@
 import { pageHeader, initCalendar, initMultiSelect, select, modal, mountModal, timePicker, initTimePickers, escapeHtml } from '../ui/ui.js';
-import { getWorkplaces, resolveWorkplaceTime } from '../core/workplace-time.js';
+import { getWorkplaces, getWorkplaceTime } from '../core/workplace.js';
 import { getDays, saveDays, getDay, getDayTime, createDay, updateDayTime, hasScheduleConflict, findSuggestedInterval } from '../core/day.js';
 
 const STORAGE_KEY = 'book:timetable-state';
@@ -82,7 +82,7 @@ export function renderTimetable(root) {
   }
 
   function openWorkingDayConflictModal(date) {
-    const workplace = workplaces.find((w) => w.key === selectedWorkplaceId); const base = resolveWorkplaceTime(workplaces, selectedWorkplaceId); if (!workplace || !base) return;
+    const workplace = workplaces.find((w) => w.key === selectedWorkplaceId); const base = getWorkplaceTime(workplaces, selectedWorkplaceId); if (!workplace || !base) return;
     const suggested = findSuggestedInterval(workingDays, { workplaceId: selectedWorkplaceId, date, baseFrom: base.from, baseTo: base.to });
     const suggestionText = suggested ? `${suggested.from}–${suggested.to}` : 'свободного интервала в стандартных часах нет';
     const content = `<div class="modal-title"><h2>Выберите время</h2></div><p>На ${escapeHtml(date)} выбранное место пересекается с другой работой мастера.</p><div class="timetable-workplace-modal-summary"><strong>Можно предложить: ${escapeHtml(suggestionText)}</strong></div><div class="timetable-time-fields">${timePicker({ name: 'timetableConflictFrom', label: 'Начало', value: suggested?.from || base.from })}${timePicker({ name: 'timetableConflictTo', label: 'Окончание', value: suggested?.to || base.to })}</div><div class="form-error" data-timetable-conflict-error></div><button type="button" class="ui-button" data-timetable-conflict-save>Сохранить</button>`;
@@ -128,7 +128,7 @@ export function renderTimetable(root) {
     if (makeWorking) {
       for (const date of dates) {
         if (getDay(workingDays, selectedWorkplaceId, date)) continue;
-        const base = resolveWorkplaceTime(workplaces, selectedWorkplaceId); if (!base) continue;
+        const base = getWorkplaceTime(workplaces, selectedWorkplaceId); if (!base) continue;
         if (hasScheduleConflict(workingDays, { workplaceId: selectedWorkplaceId, date, from: base.from, to: base.to })) {
           if (dates.length === 1) { openWorkingDayConflictModal(date); return; }
           continue;
