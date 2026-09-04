@@ -53,8 +53,20 @@ function openClientConfirmation({ date, workplaceId, from, to, selectedClient, s
   const name = clientName(selectedClient);
   const phone = selectedClient?.phones?.[0] || selectedClient?.phone || '';
   const formattedDate = formatConfirmationDate(date);
-  const cardTop = `<div class="entity-card__bottom"><div class="entity-card__bottom-main"><strong class="entity-card__entity-name">${escapeHtml(name)}</strong>${phone ? `<span class="entity-card__subtitle">${escapeHtml(phone)}</span>` : ''}</div><div class="entity-card__bottom-right"><span>${escapeHtml(formattedDate)}</span><span>${escapeHtml(from)}–${escapeHtml(to || '')}</span></div></div>`;
-  const card = entityCard({ image: selectedClient.photo || '', initial: name.slice(0, 1).toUpperCase(), top: cardTop, bottom: '', className: 'entity-card--hero entity-card--profile', data: 'data-record-confirm-client' });
+  const workplace = findWorkplaceName(workplaceId);
+  const clientId = selectedClient?.id || '';
+  const card = entityCard({
+    title: name,
+    subtitle: phone,
+    id: clientId,
+    meta: [],
+    image: selectedClient?.photo || '',
+    initial: name.slice(0, 1).toUpperCase(),
+    className: 'entity-card--entry-confirm',
+    data: 'data-record-confirm-client',
+    top: `<span class="entry-card__workplace" data-entry-workplace>${escapeHtml(workplace)}</span>`,
+    right: `<span class="entry-card__date">${escapeHtml(formattedDate)}</span><span class="entry-card__time">${escapeHtml(from)} - ${escapeHtml(to || '')}</span>`
+  });
   const procedureSummary = selectedProcedures.map(({ procedure }) => `<div class="record-confirm-procedure"><span>${escapeHtml(procedure.name)}</span></div>`).join('');
   const content = `<div class="record-screen record-screen--confirmation"><div class="record-confirm-card">${card}</div><div class="record-confirm-summary">${procedureSummary}</div><div class="record-confirm-actions"><button type="button" class="ui-button ui-button--secondary" data-record-confirm-back>Назад</button><button type="button" class="ui-button" data-record-confirm>Подтвердить запись</button></div></div>`;
   const m = mountModal(document.body, modal(content, { className: 'record-modal record-modal--full' })); if (!m) return;
