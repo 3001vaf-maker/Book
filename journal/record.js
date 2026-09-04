@@ -54,20 +54,13 @@ function openClientConfirmation({ date, workplaceId, from, to, selectedClient, s
   const phone = selectedClient?.phones?.[0] || selectedClient?.phone || '';
   const formattedDate = formatConfirmationDate(date);
   const workplace = findWorkplaceName(workplaceId);
-  const procedureSummary = selectedProcedures.map(({ procedure }) => `<div class="record-confirm-procedure">${escapeHtml(procedure.name)}</div>`).join('');
+  const procedureRows = selectedProcedures.map(({ procedure }) => `<div class="settings-row">${escapeHtml(procedure.name)}</div>`).join('');
   const content = `<div class="record-screen record-screen--confirmation form-grid">
-    <div>${escapeHtml(workplace)}</div>
-    <div>${escapeHtml(formattedDate)}</div>
-    <div>${escapeHtml(from)} - ${escapeHtml(to || '')}</div>
-    <div aria-hidden="true"></div>
-    <div>${escapeHtml(name)}</div>
-    ${phone ? `<div>${escapeHtml(phone)}</div>` : ''}
-    <div aria-hidden="true"></div>
-    <div class="record-confirm-summary">${procedureSummary}</div>
-    <div aria-hidden="true"></div>
-    <button type="button" class="ui-button ui-button--secondary" data-record-confirm-back>Назад</button>
-    <div aria-hidden="true"></div>
-    <button type="button" class="ui-button" data-record-confirm>Подтвердить запись</button>
+    <div class="settings-list"><div class="settings-row">${escapeHtml(workplace)}</div></div>
+    <div class="settings-list"><div class="settings-row">${escapeHtml(formattedDate)}</div><div class="settings-row">${escapeHtml(from)} - ${escapeHtml(to || '')}</div></div>
+    <div class="settings-list"><div class="settings-row">${escapeHtml(name)}</div>${phone ? `<div class="settings-row">${escapeHtml(phone)}</div>` : ''}</div>
+    <div class="settings-list">${procedureRows || '<div class="settings-row">Процедур пока нет.</div>'}</div>
+    <div class="record-modal-actions modal-actions"><button type="button" class="ui-button ui-button--secondary" data-record-confirm-back>Назад</button><button type="button" class="ui-button" data-record-confirm>Подтвердить запись</button></div>
   </div>`;
   const m = mountModal(document.body, modal(content, { className: 'record-modal record-modal--full' })); if (!m) return;
   m.querySelector('[data-record-confirm-back]').addEventListener('click', () => { m.remove(); openClientModal({ date, workplaceId, from, to, procedures: selectedProcedures, onCreated }); });
