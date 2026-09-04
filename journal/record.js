@@ -1,5 +1,5 @@
 import { entityCard, escapeHtml, mountModal, modal, timePicker, initTimePickers, initMultiSelect } from '../ui/ui.js';
-import { createRecord, cancelRecord } from '../core/record.js';
+import { createRecord, deleteRecord } from '../core/record.js';
 import { isTimeRangeAvailable, getTimeUsages } from '../core/time-usage.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 
@@ -110,12 +110,11 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
   const clientBlock = `<div class="record-card-client" data-record-edit-client><strong>${record.client?.id ? `${escapeHtml(record.client.id)} ` : ''}${escapeHtml(name)}</strong>${phone ? `<span>${escapeHtml(phone)}</span>` : ''}</div>`;
   const procedureBlock = procedureNames.length ? `<div class="record-card-procedures" data-record-edit-procedures>${procedureNames.map((item) => `<span>${escapeHtml(item)}</span>`).join('')}</div>` : '';
   const card = entityCard({ top: `${top}${clientBlock}`, bottom: '', right: procedureBlock, className: 'entity-card--record', data: 'data-record-card' });
-  const content = `<div class="record-view"><div class="record-view-card">${card}</div><div class="record-view-actions"><button type="button" class="ui-button ui-button--secondary" data-record-repeat>Повторить запись</button><button type="button" class="ui-button ui-button--secondary" data-record-cancel>Отменить запись</button></div></div>`;
+  const content = `<div class="record-view"><div class="record-view-card">${card}</div><div class="record-view-actions"><button type="button" class="ui-button ui-button--secondary record-delete-button" data-record-delete>Удалить</button><button type="button" class="ui-button record-apply-button" data-record-apply>Применить</button></div></div>`;
   const m = mountModal(document.body, modal(content, { className: 'record-modal record-modal--view' }));
   if (!m) return;
-  m.querySelector('[data-record-card]')?.addEventListener('click', () => {});
-  m.querySelector('[data-record-repeat]')?.addEventListener('click', () => {});
-  m.querySelector('[data-record-cancel]')?.addEventListener('click', () => { if (!cancelRecord(record.id)) return; m.remove(); onClose?.(); });
+  m.querySelector('[data-record-delete]')?.addEventListener('click', () => { if (!deleteRecord(record.id)) return; m.remove(); onClose?.(); });
+  m.querySelector('[data-record-apply]')?.addEventListener('click', () => { m.remove(); onClose?.(); });
   m.addEventListener('modal:close', () => onClose?.(), { once: true });
 }
 
