@@ -4,6 +4,7 @@ import { viewNavigation, initViewNavigation } from './view-navigation/view-navig
 import { calendar, initCalendar, dateNavigator, initDateNavigator } from './calendar/index.js?v=journal-day-20260903';
 import { initMultiSelect } from './selection/index.js?v=graph-lifecycle-20260903';
 import { entityCard } from './cards/index.js';
+import { procedureItem, procedureCostText, procedureDurationText } from './procedures/index.js';
 import { select, searchableSelect } from './selectors/index.js';
 import { workLinks, initWorkLinks, collectWorkLinks } from './links/index.js';
 import { costField, initCostFields, collectCost } from './cost/index.js';
@@ -18,7 +19,7 @@ import { emptyState } from './states/index.js';
 import { colorPicker, initColorPickers } from './colors/index.js';
 import { escapeHtml } from './utils/escape-html.js';
 
-export { accordion, initAccordions, bottomNavigation, viewNavigation, initViewNavigation, calendar, initCalendar, dateNavigator, initDateNavigator, initMultiSelect, entityCard, select, searchableSelect, workLinks, initWorkLinks, collectWorkLinks, costField, initCostFields, collectCost, durationPicker, initDurationPickers, timePicker, initTimePickers, journalDayTimeline, initJournalDayTimeline, workplaceSelector, initWorkplaceSelectors, collectWorkplaceSelections, workplaceHeaderButton, modal, mountModal, button, iconButton, field, phoneField, textareaField, emptyState, colorPicker, initColorPickers, escapeHtml };
+export { accordion, initAccordions, bottomNavigation, viewNavigation, initViewNavigation, calendar, initCalendar, dateNavigator, initDateNavigator, initMultiSelect, entityCard, procedureItem, procedureCostText, procedureDurationText, select, searchableSelect, workLinks, initWorkLinks, collectWorkLinks, costField, initCostFields, collectCost, durationPicker, initDurationPickers, timePicker, initTimePickers, journalDayTimeline, initJournalDayTimeline, workplaceSelector, initWorkplaceSelectors, collectWorkplaceSelections, workplaceHeaderButton, modal, mountModal, button, iconButton, field, phoneField, textareaField, emptyState, colorPicker, initColorPickers, escapeHtml };
 
 export function pageHeader(title, subtitle = '', meta = '') { return `<header class="page-header"><div class="page-header__main"><h1>${escapeHtml(title)}</h1>${subtitle ? `<p>${escapeHtml(subtitle)}</p>` : ''}</div>${meta ? `<div class="page-header__meta">${meta}</div>` : ''}</header>`; }
 export function timeInput({ label, name, value = '', minuteStep = 15 } = {}) { return timePicker({ label, name, value, minuteStep }); }
