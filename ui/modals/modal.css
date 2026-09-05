@@ -1,1 +1,9 @@
 .modal-sheet{box-sizing:border-box;max-width:calc(100vw - 24px);min-width:0;overflow-x:hidden}.modal-sheet input,.modal-sheet select,.modal-sheet textarea{font-size:16px;max-width:100%;min-width:0}.modal-sheet input:focus,.modal-sheet select:focus,.modal-sheet textarea:focus{font-size:16px}
+
+/* Unified Core Modal variants. Geometry is owned only by Core Modal. */
+.modal-sheet.modal--list,.modal-sheet.modal--large,.modal-sheet.modal--medium,.modal-sheet.modal--compact,.modal-sheet.modal--bottom{background:#fff;box-sizing:border-box}
+.modal-sheet.modal--list{width:min(100% - 24px, 430px);max-height:calc(100dvh - 24px);overflow-y:auto}
+.modal-sheet.modal--large{width:min(100% - 24px, 430px);height:min(calc(100dvh - 24px), 820px);max-height:calc(100dvh - 24px);overflow-y:auto}
+.modal-sheet.modal--medium{width:min(100% - 48px, 390px);max-height:calc(100dvh - 48px);overflow-y:auto}
+.modal-sheet.modal--compact{width:min(100% - 72px, 330px);max-height:calc(100dvh - 72px);overflow-y:auto}
+.modal-sheet.modal--bottom{width:min(100%, 430px);height:76px;max-height:76px;background:#F4F1EA;overflow:hidden}
