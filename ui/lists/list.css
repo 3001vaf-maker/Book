@@ -51,9 +51,9 @@ button.ui-list__item{
   cursor:pointer
 }
 
-button.ui-list__item:hover,
 button.ui-list__item:focus-visible{
-  background:var(--active)
+  outline:2px solid var(--active);
+  outline-offset:-2px
 }
 
 .ui-list__item.is-selected{
