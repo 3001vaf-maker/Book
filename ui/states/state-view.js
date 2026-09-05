@@ -1,19 +1,60 @@
 import { escapeHtml } from '../utils/escape-html.js';
-import { list } from '../lists/list.js';
 
 /**
  * Canonical Core UI StateView.
  *
- * Presents a generic current state as independent, clickable data blocks,
- * separated visually from each other and from the final actions.
- * The component does not know what the state represents.
+ * A StateView is composed of independent state blocks. A block is not a
+ * list() component: it uses the Core List visual principles for its rows,
+ * while retaining its own semantics and optional block-level behavior.
+ *
+ * Supported block shapes:
+ * - rows: independent data rows;
+ * - list: item rows plus an optional summary row.
  */
 export function stateView({ title = '', blocks = [], actions = [], className = '' } = {}) {
   const safeBlocks = Array.isArray(blocks) ? blocks : [];
   const safeActions = Array.isArray(actions) ? actions : [];
 
+  const renderRow = (row = {}, index, total, extraClass = '') => {
+    const classes = [
+      'ui-state-view__row',
+      index === 0 ? 'is-first' : '',
+      index === total - 1 ? 'is-last' : '',
+      extraClass
+    ].filter(Boolean).join(' ');
+    const left = row.title ?? row.left ?? '';
+    const secondary = row.secondary ?? '';
+    const right = row.right ?? '';
+    return `<div class="${classes}">` +
+      `<span class="ui-state-view__row-main"><span class="ui-state-view__row-title">${escapeHtml(left)}</span>` +
+      (secondary !== '' ? `<span class="ui-state-view__row-secondary">${escapeHtml(secondary)}</span>` : '') +
+      `</span>` +
+      (right !== '' ? `<span class="ui-state-view__row-right">${escapeHtml(right)}</span>` : '') +
+      `</div>`;
+  };
+
+  const renderBlockContent = (block = {}) => {
+    if (block.kind === 'list') {
+      const items = Array.isArray(block.items) ? block.items : [];
+      const summary = block.summary || {};
+      const rows = items.map((item = {}, index) => renderRow({
+        title: item.title ?? item.left ?? '',
+        secondary: item.secondary ?? '',
+        right: item.right ?? (Array.isArray(item.secondary) ? item.secondary[item.secondary.length - 1] : '')
+      }, index, items.length));
+      const summaryRow = (summary.left !== undefined || summary.right !== undefined)
+        ? `<div class="ui-state-view__row ui-state-view__summary is-last"><span class="ui-state-view__row-main"><span class="ui-state-view__row-title">${escapeHtml(summary.left ?? '')}</span></span><span class="ui-state-view__row-right">${escapeHtml(summary.right ?? '')}</span></div>`
+        : '';
+      if (!items.length && !summaryRow) return '<div class="ui-state-view__empty">Нет данных</div>';
+      return `<div class="ui-state-view__rows">${rows}${summaryRow}</div>`;
+    }
+
+    const rows = Array.isArray(block.rows) ? block.rows : [];
+    if (!rows.length) return '<div class="ui-state-view__empty">Нет данных</div>';
+    return `<div class="ui-state-view__rows">${rows.map((row, index) => renderRow(row, index, rows.length)).join('')}</div>`;
+  };
+
   const renderedBlocks = safeBlocks.map((block = {}, index) => {
-    const items = Array.isArray(block.items) ? block.items.map((item = {}) => ({ ...item, interactive: false })) : [];
     const blockId = block.id ?? index;
     const clickable = block.interactive !== false;
     const attrs = [
@@ -22,22 +63,24 @@ export function stateView({ title = '', blocks = [], actions = [], className = '
       block.data || '',
       block.aria ? `aria-label="${escapeHtml(block.aria)}"` : ''
     ].filter(Boolean).join(' ');
+    const separator = block.heading
+      ? `<div class="ui-state-view__separator"><span>${escapeHtml(block.heading)}</span></div>`
+      : (index ? '<div class="ui-state-view__separator" aria-hidden="true"></div>' : '');
 
-    return `${block.heading ? `<div class="ui-state-view__separator"><span>${escapeHtml(block.heading)}</span></div>` : (index ? '<div class="ui-state-view__separator" aria-hidden="true"></div>' : '')}` +
-      `<div class="ui-state-view__block${clickable ? ' is-interactive' : ''}" ${attrs}>${list({ items }) || '<div class="ui-state-view__empty">Нет данных</div>'}</div>`;
+    return `${separator}<div class="ui-state-view__block${clickable ? ' is-interactive' : ''}" ${attrs}>${renderBlockContent(block)}</div>`;
   }).join('');
 
   const renderedActions = safeActions.map((action = {}) => {
     const label = escapeHtml(action.label ?? '');
     const type = escapeHtml(action.type ?? 'button');
-    const className = escapeHtml(action.className ?? '');
+    const actionClass = escapeHtml(action.className ?? '');
     const data = action.data ? ` ${action.data}` : '';
     const aria = action.aria ? ` aria-label="${escapeHtml(action.aria)}"` : '';
-    return `<button type="${type}" class="ui-button${className ? ` ${className}` : ''}"${data}${aria}>${label}</button>`;
+    return `<button type="${type}" class="ui-button${actionClass ? ` ${actionClass}` : ''}"${data}${aria}>${label}</button>`;
   }).join('');
 
   return `<section class="ui-state-view${className ? ` ${escapeHtml(className)}` : ''}" data-state-view>` +
-    `<h1 class="ui-state-view__title">${escapeHtml(title)}</h1>` +
+    (title ? `<h1 class="ui-state-view__title">${escapeHtml(title)}</h1>` : '') +
     `<div class="ui-state-view__blocks">${renderedBlocks}</div>` +
     (safeActions.length ? '<div class="ui-state-view__actions-spacer" aria-hidden="true"></div>' : '') +
     (renderedActions ? `<div class="ui-state-view__actions">${renderedActions}</div>` : '') +
