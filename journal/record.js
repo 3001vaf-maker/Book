@@ -111,8 +111,7 @@ function openClientConfirmation({ date, workplaceId, from, to, selectedClient, s
     const view = stateView({
       blocks: [
         { id: 'workplace', rows: [{ title: workplace }], aria: `Изменить салон: ${workplace}` },
-        { id: 'date', rows: [{ title: formattedDate }], aria: `Изменить дату: ${formattedDate}` },
-        { id: 'time', rows: [{ title: `${currentFrom} - ${currentTo || ''}` }], aria: `Изменить время: ${currentFrom} - ${currentTo || ''}` },
+        { id: 'dateTime', rows: [{ title: formattedDate }, { title: `${currentFrom} - ${currentTo || ''}` }], aria: `Изменить дату и время: ${formattedDate} ${currentFrom} - ${currentTo || ''}` },
         { id: 'client', rows: [{ title: name }, ...(phone ? [{ title: phone }] : [])], aria: `Изменить клиента: ${name}` },
         { id: 'procedures', kind: 'list', items: procedureItems, summary: { left: durationText(duration()), right: `${total} ₽` }, aria: 'Изменить процедуры' }
       ],
@@ -123,11 +122,14 @@ function openClientConfirmation({ date, workplaceId, from, to, selectedClient, s
     initStateView(m.querySelector('[data-state-view]'), {
       onBlockSelect: (blockId) => {
         if (blockId === 'workplace') { openConfirmationWorkplaceModal({ workplaceId: currentWorkplaceId, onSelected: (nextWorkplaceId) => chooseDateAfterWorkplace(m, nextWorkplaceId) }); return; }
-        if (blockId === 'date') { chooseDate(m); return; }
-        if (blockId === 'time') { chooseTime(m); return; }
+        if (blockId === 'dateTime') { chooseDate(m); return; }
         if (blockId === 'client') { openClientModal({ date: currentDate, workplaceId: currentWorkplaceId, from: currentFrom, to: currentTo, procedures: selectedProcedures, onCreated, onSelected: (client) => { currentClient = client; render(m); } }); return; }
       },
       onRowSelect: (blockId, rowIndex) => {
+        if (blockId === 'dateTime') {
+          if (rowIndex === 0) { chooseDate(m); return; }
+          if (rowIndex === 1) { chooseTime(m); return; }
+        }
         if (blockId !== 'procedures' || rowIndex === 'summary') return;
         const index = Number(rowIndex);
         const item = selectedProcedures[index];
