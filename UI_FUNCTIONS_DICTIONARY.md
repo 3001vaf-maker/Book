@@ -124,7 +124,7 @@
 | `pageHeader()` | Заголовок страницы и подзаголовок | `ui/ui.js` | Общая | Профиль, Товары, График и другие страницы | Заголовок страницы | ТРЕБУЕТ РЕШЕНИЯ О ПЕРЕНОСЕ |
 | `timeInput()` | Фасадный вызов time picker с конфигурацией шага минут | `ui/ui.js` | Фасад UI | График и формы, использующие time picker | `timePicker()` | ОБЩАЯ |
 | `photoField()` | Поле добавления/изменения/удаления фотографии | `ui/ui.js` | Общая | Товары, Кошелёк и другие сущности с фото | Фото сущности | ТРЕБУЕТ РЕШЕНИЯ О ПЕРЕНОСЕ |
-| `initPhotoField()` | Подключает загрузку, предпросмотр... (truncated) | `ui/ui.js` | Инфраструктура UI | Формы с фото | DOM photo field | ТРЕБУЕТ РЕШЕНИЯ О ПЕРЕНОСЕ |
+| `initPhotoField()` | Подключает загрузку, предпросмотр и удаление фото | `ui/ui.js` | Инфраструктура UI | Формы с фото | DOM photo field | ТРЕБУЕТ РЕШЕНИЯ О ПЕРЕНОСЕ |
 
 ---
 
@@ -146,7 +146,7 @@
 | `ui/navigation/` | Навигация | `bottomNavigation` |
 | `ui/selectors/` | Выбор значений | `select`, `searchableSelect` |
 | `ui/selection/` | Множественный выбор | `initMultiSelect` |
-| `ui/states/` | Универсальные UI-состояния и представления состояния | `emptyState`, `stateView`, `initStateView` |
+| `ui/states/` | UI-состояния | `emptyState`, `stateView`, `initStateView` |
 | `ui/time/` | Время суток и единый барабан выбора | `timePicker`, `initTimePickers` |
 | `ui/utils/` | Низкоуровневые UI-утилиты | `escapeHtml` |
 | `ui/view-navigation/` | Переключение представлений | `viewNavigation`, `initViewNavigation` |
