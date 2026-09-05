@@ -120,24 +120,29 @@ function openClientConfirmation({ date, workplaceId, from, to, selectedClient, s
       className: 'record-state-view'
     });
     m.innerHTML = `<div class="record-screen record-screen--state-view">${view}</div>`;
-    initStateView(m.querySelector('[data-state-view]'), { onBlockSelect: (blockId) => {
-      if (blockId === 'workplace') { openConfirmationWorkplaceModal({ workplaceId: currentWorkplaceId, onSelected: (nextWorkplaceId) => chooseDateAfterWorkplace(m, nextWorkplaceId) }); return; }
-      if (blockId === 'date') { chooseDate(m); return; }
-      if (blockId === 'time') { chooseTime(m); return; }
-      if (blockId === 'client') { openClientModal({ date: currentDate, workplaceId: currentWorkplaceId, from: currentFrom, to: currentTo, procedures: selectedProcedures, onCreated, onSelected: (client) => { currentClient = client; render(m); } }); return; }
-      if (blockId === 'procedures') {
-        selectedProcedures.forEach((item, index) => {
-          item._stateIndex = index;
+    initStateView(m.querySelector('[data-state-view]'), {
+      onBlockSelect: (blockId) => {
+        if (blockId === 'workplace') { openConfirmationWorkplaceModal({ workplaceId: currentWorkplaceId, onSelected: (nextWorkplaceId) => chooseDateAfterWorkplace(m, nextWorkplaceId) }); return; }
+        if (blockId === 'date') { chooseDate(m); return; }
+        if (blockId === 'time') { chooseTime(m); return; }
+        if (blockId === 'client') { openClientModal({ date: currentDate, workplaceId: currentWorkplaceId, from: currentFrom, to: currentTo, procedures: selectedProcedures, onCreated, onSelected: (client) => { currentClient = client; render(m); } }); return; }
+      },
+      onRowSelect: (blockId, rowIndex) => {
+        if (blockId !== 'procedures' || rowIndex === 'summary') return;
+        const index = Number(rowIndex);
+        const item = selectedProcedures[index];
+        if (!item) return;
+        openProcedureSettings({
+          procedure: item.procedure,
+          current: item,
+          onSave: (updated) => {
+            selectedProcedures[index] = updated;
+            currentTo = minutesToTime(timeToMinutes(currentFrom) + duration());
+            render(m);
+          }
         });
-        const editProcedure = (index) => { const item = selectedProcedures[index]; if (!item) return; openProcedureSettings({ procedure: item.procedure, current: item, onSave: (updated) => { selectedProcedures[index] = updated; currentTo = minutesToTime(timeToMinutes(currentFrom) + duration()); render(m); } }); };
-        const procedureHost = document.createElement('div');
-        procedureHost.className = 'record-procedure-edit-host';
-        procedureHost.innerHTML = selectedProcedures.map((item, index) => `<button type="button" class="ui-button ui-button--secondary" data-record-procedure-edit="${index}">${escapeHtml(item.procedure.name)}</button>`).join('');
-        procedureHost.querySelectorAll('[data-record-procedure-edit]').forEach((button) => button.addEventListener('click', () => editProcedure(Number(button.dataset.recordProcedureEdit))));
-        const procedureModal = mountModal(document.body, modal(`<div class="record-screen record-screen--settings"><div class="record-setting-title">Процедуры</div>${procedureHost.outerHTML}</div>`, { className: 'record-modal record-modal--panel' }));
-        if (procedureModal) procedureModal.querySelectorAll('[data-record-procedure-edit]').forEach((button) => button.addEventListener('click', () => { editProcedure(Number(button.dataset.recordProcedureEdit)); procedureModal.remove(); }));
       }
-    } });
+    });
     m.querySelector('[data-record-confirm]')?.addEventListener('click', () => { const usages = scopedUsages(currentDate, currentWorkplaceId); if (!isTimeRangeAvailable({ from: currentFrom, to: currentTo, usages })) { alert('Это время уже занято.'); return; } createRecord({ date: dateKey(currentDate), workplaceId: currentWorkplaceId, from: currentFrom, to: currentTo, client: { key: currentClient.key, id: currentClient.id || '', name: currentClient.name || '', surname: currentClient.surname || '', phone: currentClient.phones?.[0] || '' }, procedures: selectedProcedures.map(({ procedure, cost, duration: itemDuration }) => ({ id: procedure.id, name: procedure.name, cost, duration: itemDuration })) }); m.remove(); onCreated?.(); });
   };
   const m = mountModal(document.body, modal('', { className: 'record-modal record-modal--full' })); if (!m) return;
