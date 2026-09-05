@@ -5,9 +5,11 @@ let modalLevel = 0;
 const MODAL_VARIANTS = new Set(['list', 'large', 'medium', 'compact', 'bottom']);
 
 export function modal(content, { title = '', className = '', variant = '' } = {}) {
+  const isBottom = variant === 'bottom';
   const variantClass = MODAL_VARIANTS.has(variant) ? ` modal--${variant}` : '';
   const classes = ['modal-sheet', className].filter(Boolean).join(' ') + variantClass;
-  return `<div class="modal-backdrop" data-modal><div class="${classes}" role="dialog" aria-modal="true" ${title ? `aria-label="${escapeHtml(title)}"` : ''}><button type="button" class="modal-close" data-modal-close aria-label="Закрыть">×</button>${content}</div></div>`;
+  const closeButton = isBottom ? '' : '<button type="button" class="modal-close" data-modal-close aria-label="Закрыть">×</button>';
+  return `<div class="modal-backdrop" data-modal><div class="${classes}" role="dialog" aria-modal="true" ${title ? `aria-label="${escapeHtml(title)}"` : ''}>${closeButton}${content}</div></div>`;
 }
 
 export function mountModal(root, html) {
@@ -16,8 +18,6 @@ export function mountModal(root, html) {
   const m = template.content.firstElementChild;
   if (!m?.matches('[data-modal]')) return null;
 
-  // Keep every modal in one shared document-level stack. A modal opened from
-  // another modal therefore gets its own stacking level and event surface.
   document.body.appendChild(m);
   modalLevel += 1;
   m.dataset.modalLevel = String(modalLevel);
