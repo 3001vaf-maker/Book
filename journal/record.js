@@ -32,25 +32,14 @@ function workplaceAssignment(procedure, workplaceId) {
   const id = String(workplaceId || '');
   return (procedure?.workplaces || []).find((workplace) => String(workplace?.workplaceId ?? workplace?.id ?? workplace?.key ?? '') === id) || null;
 }
-function procedureForWorkplace(procedure, workplaceId) {
-  return workplaceAssignment(procedure, workplaceId) ? procedure : null;
-}
+function procedureForWorkplace(procedure, workplaceId) { return workplaceAssignment(procedure, workplaceId) ? procedure : null; }
 function defaultCost(procedure, workplaceId) {
-  const assignment = workplaceAssignment(procedure, workplaceId);
-  const assignmentCost = assignment?.cost;
-  const procedureCost = procedure?.cost;
-  const cost = assignmentCost && typeof assignmentCost === 'object' && !assignmentCost.free && (
-    assignmentCost.amount !== '' && assignmentCost.amount != null ||
-    assignmentCost.from !== '' && assignmentCost.from != null ||
-    assignmentCost.to !== '' && assignmentCost.to != null
-  ) ? assignmentCost : procedureCost;
-  if (!cost || cost.free) return '';
-  if (typeof cost === 'number' || typeof cost === 'string') return cost;
-  return cost.amount ?? cost.from ?? '';
+  const assignment = workplaceAssignment(procedure, workplaceId); const assignmentCost = assignment?.cost; const procedureCost = procedure?.cost;
+  const cost = assignmentCost && typeof assignmentCost === 'object' && !assignmentCost.free && (assignmentCost.amount !== '' && assignmentCost.amount != null || assignmentCost.from !== '' && assignmentCost.from != null || assignmentCost.to !== '' && assignmentCost.to != null) ? assignmentCost : procedureCost;
+  if (!cost || cost.free) return ''; if (typeof cost === 'number' || typeof cost === 'string') return cost; return cost.amount ?? cost.from ?? '';
 }
 function openProceduresModal({ date, workplaceId, from, to, onCreated }) {
-  const items = procedures().filter((procedure) => procedureForWorkplace(procedure, workplaceId));
-  const selected = new Map(); let selectionController = null;
+  const items = procedures().filter((procedure) => procedureForWorkplace(procedure, workplaceId)); const selected = new Map(); let selectionController = null;
   const content = `<div class="record-screen record-screen--procedures"><div class="record-modal-toolbar"><strong>Процедуры</strong><button type="button" class="icon-button icon-button--primary" data-record-add aria-label="Добавить процедуру">+</button></div><div data-record-procedures></div><div class="record-modal-actions modal-actions" data-record-actions></div></div>`;
   const m = mountModal(document.body, modal(content, { className: 'record-modal record-modal--full' })); if (!m) return;
   const syncActions = () => { const hasSelection = selected.size > 0; const actions = m.querySelector('[data-record-actions]'); if (!actions) return; actions.innerHTML = hasSelection ? '<button type="button" class="ui-button ui-button--secondary" data-record-reset>Сброс выбора</button><button type="button" class="ui-button" data-record-next>Далее →</button>' : ''; if (hasSelection) actions.querySelector('[data-record-reset]')?.addEventListener('click', () => { selected.clear(); selectionController?.setSelectedValues([]); }); if (hasSelection) actions.querySelector('[data-record-next]')?.addEventListener('click', () => { const duration = [...selected.values()].reduce((sum, item) => sum + (Number(item.duration) || 0), 0), end = minutesToTime(timeToMinutes(from) + duration), usages = scopedUsages(date, workplaceId); if (!isTimeRangeAvailable({ from, to: end, usages })) { alert('Это время уже занято.'); return; } m.remove(); openClientModal({ date, workplaceId, from, to: end, procedures: [...selected.values()], onCreated }); }); };
@@ -70,72 +59,18 @@ function openClientModal({ date, workplaceId, from, to, procedures: selectedProc
   m.querySelector('[data-record-client-search]').addEventListener('input', (event) => { const q = event.target.value.trim().toLocaleLowerCase('ru'); filtered = all.filter((person) => clientName(person).toLocaleLowerCase('ru').includes(q) || String(person.phones?.[0] || '').includes(q)); render(); }); m.querySelector('[data-record-add-client]').addEventListener('click', () => {}); render();
 }
 function openClientConfirmation({ date, workplaceId, from, to, selectedClient, selectedProcedures, onCreated }) {
-  const name = clientName(selectedClient);
-  const phone = selectedClient?.phones?.[0] || selectedClient?.phone || '';
-  const formattedDate = formatConfirmationDate(date);
-  const workplace = findWorkplaceName(workplaceId);
-  const procedureRows = selectedProcedures.map(({ procedure }) => `<div class="settings-row">${escapeHtml(procedure.name)}</div>`).join('');
-  const content = `<div class="record-screen record-screen--confirmation form-grid">
-    <div class="settings-list"><div class="settings-row">${escapeHtml(workplace)}</div></div>
-    <div class="settings-list"><div class="settings-row">${escapeHtml(formattedDate)}</div><div class="settings-row">${escapeHtml(from)} - ${escapeHtml(to || '')}</div></div>
-    <div class="settings-list"><div class="settings-row">${escapeHtml(name)}</div>${phone ? `<div class="settings-row">${escapeHtml(phone)}</div>` : ''}</div>
-    <div class="settings-list">${procedureRows || '<div class="settings-row">Процедур пока нет.</div>'}</div>
-    <div class="record-modal-actions modal-actions"><button type="button" class="ui-button ui-button--secondary" data-record-confirm-back>Назад</button><button type="button" class="ui-button" data-record-confirm>Подтвердить запись</button></div>
-  </div>`;
-  const m = mountModal(document.body, modal(content, { className: 'record-modal record-modal--full' })); if (!m) return;
-  m.querySelector('[data-record-confirm-back]').addEventListener('click', () => { m.remove(); openClientModal({ date, workplaceId, from, to, procedures: selectedProcedures, onCreated }); });
-  m.querySelector('[data-record-confirm]').addEventListener('click', () => { const usages = scopedUsages(date, workplaceId); if (!isTimeRangeAvailable({ from, to, usages })) { alert('Это время уже занято.'); return; } createRecord({ date: dateKey(date), workplaceId, from, to, client: { key: selectedClient.key, id: selectedClient.id || '', name: selectedClient.name || '', surname: selectedClient.surname || '', phone: selectedClient.phones?.[0] || '' }, procedures: selectedProcedures.map(({ procedure, cost, duration: itemDuration }) => ({ id: procedure.id, name: procedure.name, cost, duration: itemDuration })) }); m.remove(); onCreated?.(); });
+  const name = clientName(selectedClient); const phone = selectedClient?.phones?.[0] || selectedClient?.phone || ''; const formattedDate = formatConfirmationDate(date); const workplace = findWorkplaceName(workplaceId); const procedureRows = selectedProcedures.map(({ procedure }) => `<div class="settings-row">${escapeHtml(procedure.name)}</div>`).join('');
+  const content = `<div class="record-screen record-screen--confirmation form-grid"><div class="settings-list"><div class="settings-row">${escapeHtml(workplace)}</div></div><div class="settings-list"><div class="settings-row">${escapeHtml(formattedDate)}</div><div class="settings-row">${escapeHtml(from)} - ${escapeHtml(to || '')}</div></div><div class="settings-list"><div class="settings-row">${escapeHtml(name)}</div>${phone ? `<div class="settings-row">${escapeHtml(phone)}</div>` : ''}</div><div class="settings-list">${procedureRows || '<div class="settings-row">Процедур пока нет.</div>'}</div><div class="record-modal-actions modal-actions"><button type="button" class="ui-button ui-button--secondary" data-record-confirm-back>Назад</button><button type="button" class="ui-button" data-record-confirm>Подтвердить запись</button></div></div>`;
+  const m = mountModal(document.body, modal(content, { className: 'record-modal record-modal--full' })); if (!m) return; m.querySelector('[data-record-confirm-back]').addEventListener('click', () => { m.remove(); openClientModal({ date, workplaceId, from, to, procedures: selectedProcedures, onCreated }); }); m.querySelector('[data-record-confirm]').addEventListener('click', () => { const usages = scopedUsages(date, workplaceId); if (!isTimeRangeAvailable({ from, to, usages })) { alert('Это время уже занято.'); return; } createRecord({ date: dateKey(date), workplaceId, from, to, client: { key: selectedClient.key, id: selectedClient.id || '', name: selectedClient.name || '', surname: selectedClient.surname || '', phone: selectedClient.phones?.[0] || '' }, procedures: selectedProcedures.map(({ procedure, cost, duration: itemDuration }) => ({ id: procedure.id, name: procedure.name, cost, duration: itemDuration })) }); m.remove(); onCreated?.(); });
 }
 function openBlockEndModal({ date, workplaceId, from, onCreated }) {
-  const usages = scopedUsages(date, workplaceId);
-  const start = timeToMinutes(from), endOfDay = start == null ? 0 : 24 * 60;
-  const values = []; for (let value = (start ?? 0) + 5; value <= endOfDay; value += 5) { const end = minutesToTime(value); if (isTimeRangeAvailable({ from, to: end, usages })) values.push(end); }
+  const usages = scopedUsages(date, workplaceId); const start = timeToMinutes(from), endOfDay = start == null ? 0 : 24 * 60; const values = []; for (let value = (start ?? 0) + 5; value <= endOfDay; value += 5) { const end = minutesToTime(value); if (isTimeRangeAvailable({ from, to: end, usages })) values.push(end); }
   const html = `<div class="record-screen record-screen--time"><div class="record-modal-toolbar"><strong>Занять время</strong></div><div class="record-time-list">${values.map((value) => `<button type="button" class="record-time-option" data-block-end="${value}">${value}</button>`).join('')}</div></div>`;
-  const m = mountModal(document.body, modal(html, { className: 'record-modal record-modal--full' })); if (!m) return;
-  m.querySelectorAll('[data-block-end]').forEach((node) => node.addEventListener('click', () => { const to = node.dataset.blockEnd, breaksNow = readList('book.journalBreaks'); const item = { id: crypto.randomUUID(), workplaceId: String(workplaceId || ''), date: dateKey(date), from: String(from), to: String(to), createdAt: new Date().toISOString() }; breaksNow.push(item); localStorage.setItem('book.journalBreaks', JSON.stringify(breaksNow)); m.remove(); onCreated?.(); }));
+  const m = mountModal(document.body, modal(html, { className: 'record-modal record-modal--full' })); if (!m) return; m.querySelectorAll('[data-block-end]').forEach((node) => node.addEventListener('click', () => { const to = node.dataset.blockEnd, breaksNow = readList('book.journalBreaks'); const item = { id: crypto.randomUUID(), workplaceId: String(workplaceId || ''), date: dateKey(date), from: String(from), to: String(to), createdAt: new Date().toISOString() }; breaksNow.push(item); localStorage.setItem('book.journalBreaks', JSON.stringify(breaksNow)); m.remove(); onCreated?.(); }));
 }
-
-function findWorkplaceName(workplaceId) {
-  const workplace = getWorkplaces().find((item) => String(item?.id ?? item?.key ?? '') === String(workplaceId ?? ''));
-  return workplace?.name || workplace?.title || 'Салон красоты';
-}
-
-function formatRecordDate(date) {
-  const value = String(date || '');
-  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  return match ? `${match[3]}.${match[2]}` : value;
-}
-
-function formatConfirmationDate(date) {
-  const value = date instanceof Date ? dateKey(date) : String(date || '');
-  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  return match ? `${match[3]}.${match[2]}.${match[1].slice(-2)}` : value;
-}
-
-function findRecordClient(record) {
-  const client = record?.client || {};
-  return people().find((person) => String(person?.key ?? '') === String(client.key ?? ''))
-    || people().find((person) => String(person?.id ?? '') === String(client.id ?? ''))
-    || client;
-}
-
-export function openRecordView(record, { onClose = () => {} } = {}) {
-  if (!record) return;
-  const client = findRecordClient(record);
-  const name = clientName(client);
-  const phone = client?.phones?.[0] || client?.phone || '';
-  const procedureNames = (record.procedures || []).map((item) => item?.name).filter(Boolean);
-  const workplace = findWorkplaceName(record.workplaceId);
-  const top = `<div class="record-card-topline"><span class="record-card-workplace" data-record-edit-workplace>${escapeHtml(workplace)}</span><strong class="record-card-datetime" data-record-edit-datetime>${escapeHtml(formatRecordDate(record.date))} ${escapeHtml(record.from || '')}</strong></div>`;
-  const clientBlock = `<div class="record-card-client" data-record-edit-client><strong>${record.client?.id ? `${escapeHtml(record.client.id)} ` : ''}${escapeHtml(name)}</strong>${phone ? `<span>${escapeHtml(phone)}</span>` : ''}</div>`;
-  const procedureBlock = procedureNames.length ? `<div class="record-card-procedures" data-record-edit-procedures>${procedureNames.map((item) => `<span>${escapeHtml(item)}</span>`).join('')}</div>` : '';
-  const card = entityCard({ top: `${top}${clientBlock}`, bottom: '', right: procedureBlock, className: 'entity-card--record', data: 'data-record-card' });
-  const content = `<div class="record-view"><div class="record-view-card">${card}</div><div class="record-view-actions"><button type="button" class="ui-button ui-button--secondary record-delete-button" data-record-delete>Удалить</button><button type="button" class="ui-button record-apply-button" data-record-apply>Применить</button></div></div>`;
-  const m = mountModal(document.body, modal(content, { className: 'record-modal record-modal--view' }));
-  if (!m) return;
-  m.querySelector('[data-record-delete]')?.addEventListener('click', () => { if (!deleteRecord(record.id)) return; m.remove(); onClose?.(); });
-  m.querySelector('[data-record-apply]')?.addEventListener('click', () => { m.remove(); onClose?.(); });
-  m.addEventListener('modal:close', () => onClose?.(), { once: true });
-}
-
+function findWorkplaceName(workplaceId) { const workplace = getWorkplaces().find((item) => String(item?.id ?? item?.key ?? '') === String(workplaceId ?? '')); return workplace?.name || workplace?.title || 'Салон красоты'; }
+function formatRecordDate(date) { const value = String(date || ''); const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/); return match ? `${match[3]}.${match[2]}` : value; }
+function formatConfirmationDate(date) { const value = date instanceof Date ? dateKey(date) : String(date || ''); const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/); return match ? `${match[3]}.${match[2]}.${match[1].slice(-2)}` : value; }
+function findRecordClient(record) { const client = record?.client || {}; return people().find((person) => String(person?.key ?? '') === String(client.key ?? '')) || people().find((person) => String(person?.id ?? '') === String(client.id ?? '')) || client; }
+export function openRecordView(record, { onClose = () => {} } = {}) { if (!record) return; const client = findRecordClient(record); const name = clientName(client); const phone = client?.phones?.[0] || client?.phone || ''; const procedureNames = (record.procedures || []).map((item) => item?.name).filter(Boolean); const workplace = findWorkplaceName(record.workplaceId); const top = `<div class="record-card-topline"><span class="record-card-workplace" data-record-edit-workplace>${escapeHtml(workplace)}</span><strong class="record-card-datetime" data-record-edit-datetime>${escapeHtml(formatRecordDate(record.date))} ${escapeHtml(record.from || '')}</strong></div>`; const clientBlock = `<div class="record-card-client" data-record-edit-client><strong>${record.client?.id ? `${escapeHtml(record.client.id)} ` : ''}${escapeHtml(name)}</strong>${phone ? `<span>${escapeHtml(phone)}</span>` : ''}</div>`; const procedureBlock = procedureNames.length ? `<div class="record-card-procedures" data-record-edit-procedures>${procedureNames.map((item) => `<span>${escapeHtml(item)}</span>`).join('')}</div>` : ''; const card = entityCard({ top: `${top}${clientBlock}`, bottom: '', right: procedureBlock, className: 'entity-card--record', data: 'data-record-card' }); const content = `<div class="record-view"><div class="record-view-card">${card}</div><div class="record-view-actions"><button type="button" class="ui-button ui-button--secondary record-delete-button" data-record-delete>Удалить</button><button type="button" class="ui-button record-apply-button" data-record-apply>Применить</button></div></div>`; const m = mountModal(document.body, modal(content, { className: 'record-modal record-modal--view' })); if (!m) return; m.querySelector('[data-record-delete]')?.addEventListener('click', () => { if (!deleteRecord(record.id)) return; m.remove(); onClose?.(); }); m.querySelector('[data-record-apply]')?.addEventListener('click', () => { m.remove(); onClose?.(); }); m.addEventListener('modal:close', () => onClose?.(), { once: true }); }
 export function openRecordCreation(options = {}) { openTimeModal(options); }
