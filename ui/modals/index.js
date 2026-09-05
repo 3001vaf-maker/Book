@@ -2,17 +2,9 @@ import { escapeHtml } from '../utils/escape-html.js';
 
 let modalLevel = 0;
 
-const MODAL_VARIANTS = new Set(['list', 'large', 'medium', 'compact', 'bottom']);
-
-export function modal(content, { title = '', className = '', variant = '' } = {}) {
-  const normalizedVariant = MODAL_VARIANTS.has(String(variant).toLowerCase())
-    ? String(variant).toLowerCase()
-    : '';
-  const classes = ['modal-sheet', normalizedVariant ? `modal-sheet--${normalizedVariant}` : '', className].filter(Boolean).join(' ');
-  const closeButton = normalizedVariant === 'bottom'
-    ? ''
-    : '<button type="button" class="modal-close" data-modal-close aria-label="Закрыть">×</button>';
-  return `<div class="modal-backdrop" data-modal><div class="${classes}" role="dialog" aria-modal="true" ${title ? `aria-label="${escapeHtml(title)}"` : ''}>${closeButton}${content}</div></div>`;
+export function modal(content, { title = '', className = '' } = {}) {
+  const classes = ['modal-sheet', className].filter(Boolean).join(' ');
+  return `<div class="modal-backdrop" data-modal><div class="${classes}" role="dialog" aria-modal="true" ${title ? `aria-label="${escapeHtml(title)}"` : ''}><button type="button" class="modal-close" data-modal-close aria-label="Закрыть">×</button>${content}</div></div>`;
 }
 
 export function mountModal(root, html) {
@@ -21,6 +13,8 @@ export function mountModal(root, html) {
   const m = template.content.firstElementChild;
   if (!m?.matches('[data-modal]')) return null;
 
+  // Keep every modal in one shared document-level stack. A modal opened from
+  // another modal therefore gets its own stacking level and event surface.
   document.body.appendChild(m);
   modalLevel += 1;
   m.dataset.modalLevel = String(modalLevel);
