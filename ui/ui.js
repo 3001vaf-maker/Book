@@ -13,7 +13,7 @@ import { durationPicker, initDurationPickers } from './duration/index.js';
 import { timePicker, initTimePickers } from './time/index.js';
 import { journalDayTimeline, initJournalDayTimeline } from './time/journal-day.js';
 import { workplaceSelector, initWorkplaceSelectors, collectWorkplaceSelections, workplaceHeaderButton, getWorkplaceContext, setWorkplaceContext } from './workplaces/index.js?v=workplace-header-20260903';
-import { modal, mountModal } from './modals/index.js';
+import { modal, mountModal } from './modals/index.js?v=20260905-core-modal';
 import { button, iconButton } from './buttons/index.js';
 import { field, phoneField, textareaField } from './inputs/index.js';
 import { emptyState, stateView, initStateView } from './states/index.js';
