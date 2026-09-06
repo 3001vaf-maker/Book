@@ -25,12 +25,12 @@ import { repeatedField, initRepeatedFields, collectRepeatedField } from './repea
 
 export { accordion, initAccordions, bottomNavigation, viewNavigation, initViewNavigation, calendar, initCalendar, dateNavigator, initDateNavigator, initMultiSelect, entityCard, folderCard, list, listEntry, listEntries, select, searchableSelect, workLinks, initWorkLinks, collectWorkLinks, costField, initCostFields, collectCost, durationPicker, initDurationPickers, timePicker, initTimePickers, journalDayTimeline, initJournalDayTimeline, workplaceSelector, initWorkplaceSelectors, collectWorkplaceSelections, workplaceHeaderButton, getWorkplaceContext, setWorkplaceContext, modal, mountModal, button, iconButton, field, phoneField, textareaField, emptyState, stateView, initStateView, colorPicker, initColorPickers, escapeHtml, page, pageHeader, agreementBlock, actionBlock, repeatedField, initRepeatedFields, collectRepeatedField };
 
-export function pageHeader(title, options = '') {
+export function pageHeader(title, options = '', meta = '') {
   const isOptions = options !== null && typeof options === 'object';
   const subtitle = isOptions ? '' : options;
   const count = isOptions ? options.count : null;
   const hasCount = count !== null && count !== undefined && String(count) !== '';
-  return `<header class="page-header"><div class="page-header__main"><h1>${escapeHtml(title)}</h1>${subtitle ? `<p>${escapeHtml(subtitle)}</p>` : ''}</div>${hasCount ? `<span class="page-header__count">${escapeHtml(count)}</span>` : ''}</header>`;
+  return `<header class="page-header"><div class="page-header__main"><h1>${escapeHtml(title)}</h1>${subtitle ? `<p>${escapeHtml(subtitle)}</p>` : ''}</div>${hasCount ? `<span class="page-header__count">${escapeHtml(count)}</span>` : meta ? `<div class="page-header__meta">${meta}</div>` : ''}</header>`;
 }
 export function timeInput({ label, name, value = '', minuteStep = 15 } = {}) { return timePicker({ label, name, value, minuteStep }); }
 export function photoField({ name = 'photo', value = '' } = {}) { const preview = value ? `<div class="photo-field__preview" style="background-image:url('${escapeHtml(value)}')" aria-hidden="true"></div>` : '<div class="photo-field__preview photo-field__preview--empty" aria-hidden="true">Фото</div>'; return `<div class="photo-field" data-photo-field><span class="photo-field__label">Фото</span><label class="photo-field__control">${preview}<span class="photo-field__action">${value ? 'Изменить фото' : 'Добавить фото'}</span><input type="file" accept="image/*" data-photo-input></label>${value ? '<button type="button" class="ui-button ui-button--small photo-field__remove" data-photo-remove>Удалить фото</button>' : ''}<input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(value)}" data-photo-value></div>`; }
