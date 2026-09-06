@@ -46,3 +46,7 @@ export function listEntry({
     </span>
   </${tag}>`;
 }
+
+export function listEntries(items = []) {
+  return `<div class="list-entries">${(Array.isArray(items) ? items : []).join('')}</div>`;
+}
