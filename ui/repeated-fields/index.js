@@ -24,7 +24,7 @@ export function repeatedField({ label = '', name = '', values = [], type = 'text
 function repeatedRow({ name, type, value = '', source = '', placeholder, label = '' }) {
   const sourceMarkup = source ? ` data-repeated-source="${escapeHtml(source)}"` : '';
   const removeLabel = label ? `Удалить ${label}` : 'Удалить значение';
-  return `<div class="array-row" data-repeated-row${sourceMarkup}><input type="${escapeHtml(type)}" name="${escapeHtml(name)}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}"><button type="button" class="remove-button" data-repeated-remove aria-label="${escapeHtml(removeLabel)}">−</button></div>`;
+  return `<div class="array-row" data-repeated-row${sourceMarkup}><input type="${escapeHtml(type)}" name="${escapeHtml(name)}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}"><button type="button" class="remove-button" data-repeated-remove aria-label="${escapeHtml(removeLabel)}">🗑</button></div>`;
 }
 
 export function initRepeatedFields(root) {
