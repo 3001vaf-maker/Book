@@ -2,6 +2,7 @@ import { accordion, actionBlock, agreementBlock, button, emptyState, entityCard,
 import { applyUEI, detachUEI, getMembers, getOptions, getUEI } from '../../core/uei.js';
 
 const KEY='book.people', SORT='book.people.sort';
+localStorage.removeItem('book.usedIds');
 const read=(k,d)=>JSON.parse(localStorage.getItem(k)||JSON.stringify(d));
 const list=()=>read(KEY,[]).map(({id,...person})=>({...person,uei:getUEI('person',person.key)||''}));
 const save=(v)=>localStorage.setItem(KEY,JSON.stringify(v.map(({id,...person})=>person)));
