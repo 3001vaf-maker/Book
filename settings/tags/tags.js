@@ -9,6 +9,8 @@ const read = (key, fallback) => {
 const write = (key, value) => localStorage.setItem(key, JSON.stringify(value));
 const list = () => read(KEY, []).filter((tag) => !tag.deletedAt);
 
+export const getTags = () => list().map(({ id, name, color }) => ({ id, name, color }));
+
 function renderList(root, navigateBack) {
   const items = list();
   root.innerHTML = `<div class="entity-page-header">${pageHeader('Ярлыки')}<div class="page-header-action">${iconButton('+', { className: 'icon-button--primary', data: 'data-add-tag', aria: 'Добавить ярлык' })}</div></div>${items.length ? `<div class="tag-entity-list">${items.map(renderRow).join('')}</div>` : emptyState('Ярлыков пока нет', 'Добавьте первый ярлык кнопкой «+».')}<div class="profile-actions">${button('Назад', { className: 'ui-button--secondary', data: 'data-back-tags' })}</div>`;
