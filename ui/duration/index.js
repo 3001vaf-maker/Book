@@ -17,7 +17,7 @@ function open(host){
   const initialHour=currentHours>=1?currentHours:1;
   const initialMinute=currentMinutes>=1?currentMinutes:1;
   const content=`<div class="modal-title"><h2>${esc(host.querySelector('.duration-picker__label')?.textContent||'Длительность')}</h2></div><div class="time-wheel" data-duration-wheel><div class="time-wheel__column"><span class="time-wheel__label">Часы</span><div class="time-wheel__viewport">${wheel({values:hours,selected:initialHour,type:'duration-hours',formatter:v=>`${v} ч`})}</div></div><div class="time-wheel__column"><span class="time-wheel__label">Минуты</span><div class="time-wheel__viewport">${wheel({values:minutes,selected:initialMinute,type:'duration-minutes',formatter:v=>`${v} мин`})}</div></div></div><button type="button" class="ui-button" data-duration-save>Сохранить</button>`;
-  const modalRoot=mountModal(document.body,modal(content,{title:host.querySelector('.duration-picker__label')?.textContent||'Длительность'}));
+  const modalRoot=mountModal(document.body,modal(content,{title:host.querySelector('.duration-picker__label')?.textContent||'Длительность',variant:'compact'}));
   if(!modalRoot)return;
   const center=(type,value)=>{const item=modalRoot.querySelector(`[data-time-wheel-type="${type}"][data-value="${value}"]`);if(item)item.scrollIntoView({block:'center'});};
   const syncColumn=(viewport)=>{
