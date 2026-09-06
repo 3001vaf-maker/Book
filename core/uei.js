@@ -16,13 +16,8 @@ function readStore() {
   }
 }
 
-function writeStore(store) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
-}
-
-function relationKey(type, id) {
-  return `${String(type)}:${String(id)}`;
-}
+function writeStore(store) { localStorage.setItem(STORAGE_KEY, JSON.stringify(store)); }
+function relationKey(type, id) { return `${String(type)}:${String(id)}`; }
 
 export function normalizeUEI(value) {
   const source = String(value ?? '').trim();
@@ -38,13 +33,7 @@ export function isValidUEI(value) {
 }
 
 function ensureEntity(store, uei, entityType, entityId) {
-  const entity = store.entities[uei] || {
-    uei,
-    owner: null,
-    members: [],
-    history: [],
-    reserved: true,
-  };
+  const entity = store.entities[uei] || { uei, owner: null, members: [], history: [], reserved: true };
   if (!entity.owner) entity.owner = { type: entityType, id: entityId };
   if (!entity.members.includes(relationKey(entityType, entityId))) entity.members.push(relationKey(entityType, entityId));
   store.entities[uei] = entity;
@@ -65,29 +54,24 @@ function addRevocation(store, entityType, entityId, uei) {
 }
 
 export function listUEIs() {
-  const store = readStore();
-  return Object.values(store.entities)
+  return Object.values(readStore().entities)
     .filter(entity => entity && entity.uei && entity.uei !== EMPTY)
     .sort((a, b) => a.uei.localeCompare(b.uei));
 }
 
 export function getUEI(entityType, entityId) {
-  const store = readStore();
-  return store.relations[relationKey(entityType, entityId)] || '';
+  return readStore().relations[relationKey(entityType, entityId)] || '';
 }
 
 export function getMembers(uei) {
   const normalized = normalizeUEI(uei);
   if (normalized === EMPTY) return [];
-  const store = readStore();
-  return [...(store.entities[normalized]?.members || [])];
+  return [...(readStore().entities[normalized]?.members || [])];
 }
 
 export function getOptions(entityType, entityId) {
   const current = getUEI(entityType, entityId);
-  return listUEIs()
-    .filter(entity => entity.uei !== current)
-    .map(entity => ({ value: entity.uei, label: entity.uei }));
+  return listUEIs().filter(entity => entity.uei !== current).map(entity => ({ value: entity.uei, label: entity.uei }));
 }
 
 export function createUEI({ entityType, entityId, value, identifiers = [] } = {}) {
@@ -96,8 +80,7 @@ export function createUEI({ entityType, entityId, value, identifiers = [] } = {}
   const store = readStore();
   if (store.entities[uei]) throw Error('Этот UEI уже существует.');
   const key = relationKey(entityType, entityId);
-  const current = store.relations[key];
-  if (current) throw Error('Профиль уже связан с UEI.');
+  if (store.relations[key]) throw Error('Профиль уже связан с UEI.');
   const entity = ensureEntity(store, uei, entityType, entityId);
   recordHistory(entity, entityType, entityId, identifiers);
   store.relations[key] = uei;
@@ -113,10 +96,7 @@ export function linkUEI({ entityType, entityId, value, identifiers = [] } = {}) 
   const key = relationKey(entityType, entityId);
   const current = store.relations[key] || '';
   if (current === uei) return uei;
-  if (store.revoked.some(x => x.key === key && x.uei === uei)) throw Error('Эта связь была явно отвязана и не восстанавливается автоматически.');
-  if (current && store.entities[current]) {
-    store.entities[current].members = store.entities[current].members.filter(member => member !== key);
-  }
+  if (current && store.entities[current]) store.entities[current].members = store.entities[current].members.filter(member => member !== key);
   const entity = ensureEntity(store, uei, entityType, entityId);
   recordHistory(entity, entityType, entityId, identifiers);
   store.relations[key] = uei;
@@ -140,14 +120,20 @@ export function detachUEI({ entityType, entityId, uei, explicit = true } = {}) {
   return '';
 }
 
-export function applyUEI({ entityType, entityId, currentUEI = '', value = '', linkValue = '', detachValue = '', identifiers = [] } = {}) {
-  const current = normalizeUEI(currentUEI);
-  if (detachValue) {
-    const member = String(detachValue);
-    const prefix = `${String(entityType)}:`;
-    const targetId = member.startsWith(prefix) ? member.slice(prefix.length) : member;
-    return { uei: current === EMPTY ? '' : current, detached: targetId };
+export function findHistoricalUEI(entityType, identifier) {
+  const needle = String(identifier || '').trim();
+  if (!needle) return '';
+  const store = readStore();
+  for (const entity of Object.values(store.entities)) {
+    if (entity.uei === EMPTY) continue;
+    const match = (entity.history || []).some(item => item.type === entityType && (item.identifiers || []).includes(needle));
+    if (match) return entity.uei;
   }
+  return '';
+}
+
+export function applyUEI({ entityType, entityId, currentUEI = '', value = '', linkValue = '', identifiers = [] } = {}) {
+  const current = normalizeUEI(currentUEI);
   if (linkValue) return { uei: linkUEI({ entityType, entityId, value: linkValue, identifiers }), linked: true };
   if (value && normalizeUEI(value) !== EMPTY) {
     const requested = normalizeUEI(value);
@@ -162,6 +148,4 @@ export function applyUEI({ entityType, entityId, currentUEI = '', value = '', li
   return { uei: '' };
 }
 
-export function clearTestState() {
-  localStorage.removeItem(STORAGE_KEY);
-}
+export function clearTestState() { localStorage.removeItem(STORAGE_KEY); }
