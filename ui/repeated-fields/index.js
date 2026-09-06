@@ -10,15 +10,21 @@ function normalizeItems(values) {
       : { value: String(value), source: '' });
 }
 
-export function repeatedField({ label = '', name = '', values = [], type = 'text', placeholder = 'Добавить значение', addLabel = '+', className = '' } = {}) {
-  const items = normalizeItems(values);
-  const rows = items.length ? items : [{ value: '', source: '' }];
-  return `<div class="array-group ${escapeHtml(className)}" data-repeated-field data-repeated-name="${escapeHtml(name)}"><span class="array-label">${escapeHtml(label)}</span><div data-repeated-list>${rows.map(item => repeatedRow({ name, type, value: item.value, source: item.source, placeholder })).join('')}</div>${button(addLabel, { className: 'ui-button--small', data: `data-repeated-add="${escapeHtml(name)}"` })}</div>`;
+function defaultAddLabel(label) {
+  return label ? `+ Добавить ${label}` : '+ Добавить';
 }
 
-function repeatedRow({ name, type, value = '', source = '', placeholder }) {
+export function repeatedField({ label = '', name = '', values = [], type = 'text', placeholder = 'Добавить значение', addLabel = '', className = '' } = {}) {
+  const items = normalizeItems(values);
+  const rows = items.length ? items : [{ value: '', source: '' }];
+  const resolvedAddLabel = addLabel || defaultAddLabel(label);
+  return `<div class="array-group ${escapeHtml(className)}" data-repeated-field data-repeated-name="${escapeHtml(name)}" data-repeated-label="${escapeHtml(label)}"><span class="array-label">${escapeHtml(label)}</span><div data-repeated-list>${rows.map(item => repeatedRow({ name, type, value: item.value, source: item.source, placeholder, label })).join('')}</div>${button(resolvedAddLabel, { className: 'ui-button--small', data: `data-repeated-add="${escapeHtml(name)}"` })}</div>`;
+}
+
+function repeatedRow({ name, type, value = '', source = '', placeholder, label = '' }) {
   const sourceMarkup = source ? ` data-repeated-source="${escapeHtml(source)}"` : '';
-  return `<div class="array-row" data-repeated-row${sourceMarkup}><input type="${escapeHtml(type)}" name="${escapeHtml(name)}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}"><button type="button" class="remove-button" data-repeated-remove aria-label="Удалить">×</button></div>`;
+  const removeLabel = label ? `Удалить ${label}` : 'Удалить значение';
+  return `<div class="array-row" data-repeated-row${sourceMarkup}><input type="${escapeHtml(type)}" name="${escapeHtml(name)}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}"><button type="button" class="remove-button" data-repeated-remove aria-label="${escapeHtml(removeLabel)}">−</button></div>`;
 }
 
 export function initRepeatedFields(root) {
@@ -36,9 +42,10 @@ export function initRepeatedFields(root) {
       const list = group.querySelector('[data-repeated-list]');
       if (!list) return;
       const name = group.dataset.repeatedName || '';
+      const label = group.dataset.repeatedLabel || '';
       const type = group.querySelector('input')?.type || 'text';
       const placeholder = group.querySelector('input')?.placeholder || 'Добавить значение';
-      list.insertAdjacentHTML('beforeend', repeatedRow({ name, type, placeholder }));
+      list.insertAdjacentHTML('beforeend', repeatedRow({ name, type, placeholder, label }));
     });
   });
 }
