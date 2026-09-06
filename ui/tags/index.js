@@ -8,7 +8,8 @@ function normalizeSelected(values = [], tags = []) {
 }
 
 function tagChip(tag) {
-  return `<span class="tag" data-tag-id="${escapeHtml(tag.id)}"><span class="tag-entity-row__color" style="background:${escapeHtml(tag.color || '#3B302B')}"></span>${escapeHtml(tag.name)}<button type="button" class="remove-button" data-remove-tag aria-label="Снять ярлык ${escapeHtml(tag.name)}">×</button></span>`;
+  const color = escapeHtml(tag.color || '#E8E1DC');
+  return `<span class="tag" data-tag-id="${escapeHtml(tag.id)}" style="background:${color}">${escapeHtml(tag.name)}<button type="button" class="remove-button" data-remove-tag aria-label="Снять ярлык ${escapeHtml(tag.name)}">×</button></span>`;
 }
 
 function syncSelector(host) {
