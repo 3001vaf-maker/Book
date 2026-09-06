@@ -3,16 +3,10 @@ import { escapeHtml } from '../utils/escape-html.js';
 let selectorEventsReady = false;
 
 function normalizeOptions(options = []) {
-  const normalized = options.map(option => {
+  return options.map(option => {
     const item = typeof option === 'string' ? { value: option, label: option } : option || {};
     return { value: String(item.value ?? ''), label: String(item.label ?? item.value ?? '') };
   });
-
-  if (!normalized.some(option => option.value === '')) {
-    normalized.unshift({ value: '', label: 'Не выбрано' });
-  }
-
-  return normalized;
 }
 
 function ensureSelectorEvents() {
@@ -20,32 +14,34 @@ function ensureSelectorEvents() {
   selectorEventsReady = true;
 
   document.addEventListener('click', (event) => {
-    const trigger = event.target.closest('[data-ui-select-trigger]');
+    const trigger = event.target.closest?.('[data-ui-select-trigger]');
     if (!trigger) return;
     event.preventDefault();
     openSelector(trigger);
   });
 
   document.addEventListener('click', (event) => {
-    const option = event.target.closest('[data-ui-select-option]');
+    const option = event.target.closest?.('[data-ui-select-option]');
     if (!option) return;
     const surface = option.closest('[data-ui-selector]');
     if (!surface) return;
 
     const input = document.getElementById(surface.dataset.inputId);
-    if (!input) return;
+    const trigger = input?.closest('.ui-select')?.querySelector('[data-ui-select-trigger]');
+    if (!input || !trigger) return;
 
-    input.value = option.dataset.value ?? '';
+    const value = option.dataset.value ?? '';
+    const label = option.querySelector('span')?.textContent ?? '';
+    input.value = value;
+    trigger.querySelector('.ui-select__value').textContent = label;
     input.dispatchEvent(new Event('change', { bubbles: true }));
     closeSelector(surface);
   });
 
   document.addEventListener('click', (event) => {
-    const surface = event.target.closest('[data-ui-selector]');
-    if (!surface || event.target.closest('[data-ui-select-option]')) return;
-    if (event.target === surface || event.target.closest('[data-ui-selector-dismiss]')) {
-      closeSelector(surface);
-    }
+    const surface = event.target.closest?.('[data-ui-selector]');
+    if (!surface || event.target.closest?.('[data-ui-select-option]')) return;
+    if (event.target === surface || event.target.closest?.('[data-ui-selector-dismiss]')) closeSelector(surface);
   });
 
   document.addEventListener('keydown', (event) => {
@@ -67,7 +63,7 @@ function openSelector(trigger) {
 
   const options = JSON.parse(trigger.dataset.options || '[]');
   const currentValue = String(input.value ?? '');
-  const selectedIndex = Math.max(0, options.findIndex(option => String(option.value ?? '') === currentValue));
+  const selectedIndex = options.findIndex(option => String(option.value ?? '') === currentValue);
   const optionMarkup = options.map((option, index) => `
     <button type="button" class="ui-selector__option${index === selectedIndex ? ' is-current' : ''}" data-ui-select-option data-value="${escapeHtml(option.value)}">
       <span>${escapeHtml(option.label)}</span>
@@ -105,8 +101,8 @@ export function select({ name = '', label = '', value = '', options = [], aria =
   return `<label class="field ui-select ${escapeHtml(className)}">
     ${label ? `<span>${escapeHtml(label)}</span>` : ''}
     <input id="${inputId}" type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(String(value ?? ''))}"${dataAttrs}>
-    <button type="button" class="ui-select__control" data-ui-select-trigger data-input-id="${inputId}" data-options="${optionData}"${aria ? ` aria-label="${escapeHtml(aria)}"` : ''}>
-      <span class="ui-select__value">${escapeHtml(current.label)}</span>
+    <button type="button" class="ui-select__control" data-ui-select-trigger data-input-id="${inputId}" data-options="${optionData}"${aria ? ` aria-label="${escapeHtml(aria)}"` : ''}${dataAttrs}>
+      <span class="ui-select__value">${escapeHtml(current?.label ?? '')}</span>
       <span class="ui-select__chevron" aria-hidden="true">⌄</span>
     </button>
   </label>`;
