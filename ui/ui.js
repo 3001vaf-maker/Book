@@ -4,6 +4,7 @@ import { viewNavigation, initViewNavigation } from './view-navigation/view-navig
 import { calendar, initCalendar, dateNavigator, initDateNavigator } from './calendar/index.js?v=journal-day-20260903';
 import { initMultiSelect } from './selection/index.js?v=graph-lifecycle-20260903';
 import { entityCard } from './cards/index.js';
+import { folderCard } from './cards/folder-card.js';
 import { list } from './lists/list.js';
 import { listEntry } from './lists/list-entry.js';
 import { select, searchableSelect } from './selectors/index.js';
@@ -22,7 +23,7 @@ import { escapeHtml } from './utils/escape-html.js';
 import { page, agreementBlock, actionBlock } from './page/page.js';
 import { repeatedField, initRepeatedFields, collectRepeatedField } from './repeated-fields/index.js';
 
-export { accordion, initAccordions, bottomNavigation, viewNavigation, initViewNavigation, calendar, initCalendar, dateNavigator, initDateNavigator, initMultiSelect, entityCard, list, listEntry, select, searchableSelect, workLinks, initWorkLinks, collectWorkLinks, costField, initCostFields, collectCost, durationPicker, initDurationPickers, timePicker, initTimePickers, journalDayTimeline, initJournalDayTimeline, workplaceSelector, initWorkplaceSelectors, collectWorkplaceSelections, workplaceHeaderButton, getWorkplaceContext, setWorkplaceContext, modal, mountModal, button, iconButton, field, phoneField, textareaField, emptyState, stateView, initStateView, colorPicker, initColorPickers, escapeHtml, page, agreementBlock, actionBlock, repeatedField, initRepeatedFields, collectRepeatedField };
+export { accordion, initAccordions, bottomNavigation, viewNavigation, initViewNavigation, calendar, initCalendar, dateNavigator, initDateNavigator, initMultiSelect, entityCard, folderCard, list, listEntry, select, searchableSelect, workLinks, initWorkLinks, collectWorkLinks, costField, initCostFields, collectCost, durationPicker, initDurationPickers, timePicker, initTimePickers, journalDayTimeline, initJournalDayTimeline, workplaceSelector, initWorkplaceSelectors, collectWorkplaceSelections, workplaceHeaderButton, getWorkplaceContext, setWorkplaceContext, modal, mountModal, button, iconButton, field, phoneField, textareaField, emptyState, stateView, initStateView, colorPicker, initColorPickers, escapeHtml, page, agreementBlock, actionBlock, repeatedField, initRepeatedFields, collectRepeatedField };
 
 export function pageHeader(title, subtitle = '', meta = '') { return `<header class="page-header"><div class="page-header__main"><h1>${escapeHtml(title)}</h1>${subtitle ? `<p>${escapeHtml(subtitle)}</p>` : ''}</div>${meta ? `<div class="page-header__meta">${meta}</div>` : ''}</header>`; }
 export function timeInput({ label, name, value = '', minuteStep = 15 } = {}) { return timePicker({ label, name, value, minuteStep }); }
