@@ -5,12 +5,12 @@ import { select } from '../selectors/index.js';
 export const LINK_TYPES = ['Instagram', 'ВКонтакте', 'YouTube', 'Facebook', 'Сайт', 'Другое'];
 
 function linkRow(link = {}) {
-  return `<div class="array-row link-row" data-link-row>${select({ name:'linkType', value:link.type||'Instagram', options:LINK_TYPES })}<input name="linkUrl" value="${escapeHtml(link.url||'')}" placeholder="URL"><button type="button" class="remove-button" data-remove-link aria-label="Удалить ссылку">🗑</button></div>`;
+  return `<div class="array-group link-row" data-link-row>${select({ name:'linkType', value:link.type||'Instagram', options:LINK_TYPES })}<div class="array-row"><input name="linkUrl" value="${escapeHtml(link.url||'')}" placeholder="URL"><button type="button" class="remove-button" data-remove-link aria-label="Удалить ссылку">🗑</button></div></div>`;
 }
 
 export function links({ links: values = [], name = 'links' } = {}) {
   const rows = values.length ? values : [{ type: 'Instagram', url: '' }];
-  return `<div class="ui-links" data-links="${escapeHtml(name)}"><div data-links-list>${rows.map(linkRow).join('')}</div>${button('+ Добавить ссылку',{className:'ui-button--small',data:`data-add-link="${escapeHtml(name)}"`})}</div>`;
+  return `<div class="ui-links array-group" data-links="${escapeHtml(name)}"><div data-links-list>${rows.map(linkRow).join('')}</div>${button('+ Добавить ссылку',{className:'ui-button--small',data:`data-add-link="${escapeHtml(name)}"`})}</div>`;
 }
 
 export function initLinks(root) {
