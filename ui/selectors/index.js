@@ -104,8 +104,8 @@ export function select({ name = '', label = '', value = '', options = [], aria =
 
   return `<label class="field ui-select ${escapeHtml(className)}">
     ${label ? `<span>${escapeHtml(label)}</span>` : ''}
-    <input id="${inputId}" type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(String(value ?? ''))}">
-    <button type="button" class="ui-select__control" data-ui-select-trigger data-input-id="${inputId}" data-options="${optionData}"${aria ? ` aria-label="${escapeHtml(aria)}"` : ''}${dataAttrs}>
+    <input id="${inputId}" type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(String(value ?? ''))}"${dataAttrs}>
+    <button type="button" class="ui-select__control" data-ui-select-trigger data-input-id="${inputId}" data-options="${optionData}"${aria ? ` aria-label="${escapeHtml(aria)}"` : ''}>
       <span class="ui-select__value">${escapeHtml(current.label)}</span>
       <span class="ui-select__chevron" aria-hidden="true">⌄</span>
     </button>
