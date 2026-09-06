@@ -76,7 +76,7 @@ export function createUEI({ entityType, entityId, value, identifiers = [] } = {}
   const uei = normalizeUEI(value);
   if (uei === EMPTY) throw Error('0000 не является действительным UEI.');
   const store = readStore();
-  if (store.entities[uei]) throw Error('Этот UEI уже существует.');
+  if (store.entities[uei]) throw Error('Этот UEI уже существует. Для связи с существующим UEI используйте поле «Связать».');
   const key = relationKey(entityType, entityId);
   if (store.relations[key]) throw Error('Профиль уже связан с UEI.');
   const entity = ensureEntity(store, uei, entityType, entityId);
@@ -140,17 +140,24 @@ export function findHistoricalUEI(entityType, identifier) {
 
 export function applyUEI({ entityType, entityId, currentUEI = '', value = '', linkValue = '', identifiers = [] } = {}) {
   const current = normalizeUEI(currentUEI);
-  if (linkValue) return { uei: linkUEI({ entityType, entityId, value: linkValue, identifiers }), linked: true };
+
+  // The two UI fields have two different meanings:
+  // UEI input creates a NEW UEI only; the existing-UEI selector links to an existing UEI.
+  if (linkValue) {
+    return { uei: linkUEI({ entityType, entityId, value: linkValue, identifiers }), linked: true };
+  }
+
   if (value && normalizeUEI(value) !== EMPTY) {
     const requested = normalizeUEI(value);
     if (current === requested) return { uei: requested };
     if (current !== EMPTY) detachUEI({ entityType, entityId, uei: current, explicit: false });
-    const result = listUEIs().some(entity => entity.uei === requested)
-      ? linkUEI({ entityType, entityId, value: requested, identifiers })
-      : createUEI({ entityType, entityId, value: requested, identifiers });
-    return { uei: result };
+    return { uei: createUEI({ entityType, entityId, value: requested, identifiers }), created: true };
   }
-  if (current !== EMPTY) return { uei: detachUEI({ entityType, entityId, uei: current, explicit: true }) };
+
+  if (current !== EMPTY) {
+    return { uei: detachUEI({ entityType, entityId, uei: current, explicit: true }) };
+  }
+
   return { uei: '' };
 }
 
