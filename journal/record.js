@@ -147,7 +147,7 @@ function openClientConfirmation({ date, workplaceId, from, to, selectedClient, s
     });
     m.querySelector('[data-record-confirm]')?.addEventListener('click', () => { const usages = scopedUsages(currentDate, currentWorkplaceId); if (!isTimeRangeAvailable({ from: currentFrom, to: currentTo, usages })) { alert('Это время уже занято.'); return; } createRecord({ date: dateKey(currentDate), workplaceId: currentWorkplaceId, from: currentFrom, to: currentTo, client: { key: currentClient.key, id: currentClient.id || '', name: currentClient.name || '', surname: currentClient.surname || '', phone: currentClient.phones?.[0] || '' }, procedures: selectedProcedures.map(({ procedure, cost, duration: itemDuration }) => ({ id: procedure.id, name: procedure.name, cost, duration: itemDuration })) }); m.remove(); onCreated?.(); });
   };
-  const m = mountModal(document.body, modal('', { className: 'record-modal record-modal--full' })); if (!m) return;
+  const m = mountModal(document.body, modal('', { className: 'record-modal', variant: 'large' })); if (!m) return;
   render(m);
 }
 function openBlockEndModal({ date, workplaceId, from, onCreated }) {
