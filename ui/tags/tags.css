@@ -1,0 +1,1 @@
+.ui-tags{display:grid;gap:14px}.ui-tags .tag-list{padding-top:5px}.ui-tags .tag{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:7px 10px 7px 12px;border-radius:999px;color:var(--text);font-size:13px}.ui-tags .tag .remove-button{width:28px;height:28px;flex:0 0 28px;background:transparent;color:var(--danger);font-size:20px}
