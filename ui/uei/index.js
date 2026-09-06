@@ -12,8 +12,12 @@ function withEmptyChoice(options = []) {
 }
 
 export function uei({ value = '', existing = [], detachable = [], linkValue = '', detachValue = '', memberCount = 0, showApply = true } = {}) {
+  const hasUEI = String(value || '').trim().length > 0;
   const linkOptions = withEmptyChoice(existing);
   const detachOptions = withEmptyChoice(detachable);
+  const linkMarkup = hasUEI
+    ? ''
+    : select({ label: 'Связать', name: 'ueiLink', value: linkValue, options: linkOptions });
   const detachMarkup = detachable.length > 1
     ? select({ label: 'Отвязать', name: 'ueiDetach', value: detachValue, options: detachOptions })
     : '';
@@ -24,7 +28,7 @@ export function uei({ value = '', existing = [], detachable = [], linkValue = ''
       <span>UEI</span>
       <span class="ui-uei__value-row"><input name="uei" value="${escapeHtml(value)}" maxlength="4" pattern="${UEI_PATTERN}" inputmode="text" autocomplete="off" data-uei-field="uei" aria-label="UEI">${countMarkup}</span>
     </label>
-    ${select({ label: 'Связать', name: 'ueiLink', value: linkValue, options: linkOptions })}
+    ${linkMarkup}
     ${detachMarkup}
     ${applyMarkup}
   </section>`;
