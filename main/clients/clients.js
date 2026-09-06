@@ -4,7 +4,7 @@ import { applyUEI, detachUEI, getMembers, getOptions, getUEI } from '../../core/
 const KEY='book.people', SORT='book.people.sort';
 localStorage.removeItem('book.usedIds');
 const read=(k,d)=>JSON.parse(localStorage.getItem(k)||JSON.stringify(d));
-const list=()=>read(KEY,[]).map(({id,...person})=>({...person,uei:getUEI('person',person.key)||''}));
+const list=()=>{const people=read(KEY,[]).map(({id,...person})=>({...person,uei:getUEI('person',person.key)||''}));const linked=new Set();for(const person of people){if(!person.uei)continue;const members=getMembers(person.uei);members.slice(1).forEach(member=>{const id=member.startsWith('person:')?member.slice(7):member;linked.add(id)})}return people.filter(person=>!linked.has(person.key));};
 const save=(v)=>localStorage.setItem(KEY,JSON.stringify(v.map(({id,...person})=>person)));
 const name=p=>[p.name,p.surname].filter(Boolean).join(' '), money=v=>new Intl.NumberFormat('ru-RU').format(Number(v||0))+' ₽';
 function newPerson(nameValue,surname,phone){return{key:crypto.randomUUID(),uei:'',name:nameValue,surname,photo:'',gender:'',birthDate:'',phones:[phone],telegrams:[],emails:[],links:[],tags:[],loyalty:{discount:0,programs:[]},agreements:{personalData:false,mailings:false},visits:0,totalSpent:0,lastVisit:'',createdAt:new Date().toISOString()}}
