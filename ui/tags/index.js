@@ -11,12 +11,26 @@ function tagChip(tag) {
   return `<span class="tag" data-tag-id="${escapeHtml(tag.id)}"><span class="tag-entity-row__color" style="background:${escapeHtml(tag.color || '#3B302B')}"></span>${escapeHtml(tag.name)}<button type="button" class="remove-button" data-remove-tag aria-label="Снять ярлык ${escapeHtml(tag.name)}">×</button></span>`;
 }
 
+function syncSelector(host) {
+  const input = host.querySelector('[data-tag-add]');
+  const trigger = host.querySelector('[data-ui-select-trigger][data-tag-add]');
+  if (!input || !trigger) return;
+  const catalog = JSON.parse(host.dataset.tagCatalog || '[]');
+  const selected = new Set([...host.querySelectorAll('[data-tag-id]')].map((element) => element.dataset.tagId));
+  const options = [{ value: '', label: 'Добавить ярлык' }, ...catalog.filter((tag) => !selected.has(tag.id)).map((tag) => ({ value: tag.id, label: tag.name }))];
+  input.value = '';
+  trigger.dataset.options = JSON.stringify(options);
+  const value = trigger.querySelector('.ui-select__value');
+  if (value) value.textContent = 'Добавить ярлык';
+}
+
 export function tags({ tags: available = [], selected = [], name = 'tags' } = {}) {
   const selectedIds = normalizeSelected(selected, available);
   const selectedSet = new Set(selectedIds);
   const selectedTags = selectedIds.map((id) => available.find((tag) => tag.id === id)).filter(Boolean);
   const options = [{ value: '', label: 'Добавить ярлык' }, ...available.filter((tag) => !selectedSet.has(tag.id)).map((tag) => ({ value: tag.id, label: tag.name }))];
-  return `<div class="ui-tags" data-tags="${escapeHtml(name)}"><div class="tag-list" data-tag-list>${selectedTags.map(tagChip).join('')}</div>${available.length ? select({ name: `${name}-add`, value: '', options, aria: 'Добавить ярлык', data: 'data-tag-add' }) : '<span class="muted">Сначала создайте ярлыки в Настройках.</span>'}</div>`;
+  const catalog = escapeHtml(JSON.stringify(available.map(({ id, name: tagName, color }) => ({ id, name: tagName, color }))));
+  return `<div class="ui-tags" data-tags="${escapeHtml(name)}" data-tag-catalog="${catalog}"><div class="tag-list" data-tag-list>${selectedTags.map(tagChip).join('')}</div>${available.length ? select({ name: `${name}-add`, value: '', options, aria: 'Добавить ярлык', data: 'data-tag-add' }) : '<span class="muted">Сначала создайте ярлыки в Настройках.</span>'}</div>`;
 }
 
 export function initTags(root) {
@@ -27,16 +41,17 @@ export function initTags(root) {
       const remove = event.target.closest('[data-remove-tag]');
       if (!remove) return;
       remove.closest('[data-tag-id]')?.remove();
+      syncSelector(host);
       host.dispatchEvent(new Event('change', { bubbles: true }));
     });
     host.querySelector('[data-tag-add]')?.addEventListener('change', (event) => {
       const id = event.target.value;
       if (!id || host.querySelector(`[data-tag-id="${CSS.escape(id)}"]`)) return;
-      const option = event.target.selectedOptions?.[0];
-      const tag = { id, name: option?.textContent || '', color: '' };
+      const catalog = JSON.parse(host.dataset.tagCatalog || '[]');
+      const tag = catalog.find((item) => item.id === id);
+      if (!tag) return;
       host.querySelector('[data-tag-list]')?.insertAdjacentHTML('beforeend', tagChip(tag));
-      event.target.querySelector(`option[value="${CSS.escape(id)}"]`)?.remove();
-      event.target.value = '';
+      syncSelector(host);
       host.dispatchEvent(new Event('change', { bubbles: true }));
     });
   });
