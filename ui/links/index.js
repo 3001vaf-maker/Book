@@ -39,15 +39,3 @@ export function collectLinks(root, name = 'links') {
     }))
     .filter((link) => link.url);
 }
-
-// Compatibility aliases: old consumers use the same shared Links UI, never a parallel selector.
-export const WORK_LINK_TYPES = LINK_TYPES;
-export function workLinks({ links: values = [], name = 'links' } = {}) { return links({ links: values, name }); }
-export function initWorkLinks(root) {
-  root.querySelectorAll('[data-add-work-link]').forEach((add) => {
-    add.dataset.addLink = add.dataset.addWorkLink;
-    add.setAttribute('data-add-link', '');
-  });
-  initLinks(root);
-}
-export function collectWorkLinks(root, name = 'links') { return collectLinks(root, name); }
