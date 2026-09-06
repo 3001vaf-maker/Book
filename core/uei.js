@@ -59,9 +59,7 @@ export function listUEIs() {
     .sort((a, b) => a.uei.localeCompare(b.uei));
 }
 
-export function getUEI(entityType, entityId) {
-  return readStore().relations[relationKey(entityType, entityId)] || '';
-}
+export function getUEI(entityType, entityId) { return readStore().relations[relationKey(entityType, entityId)] || ''; }
 
 export function getMembers(uei) {
   const normalized = normalizeUEI(uei);
@@ -110,9 +108,17 @@ export function detachUEI({ entityType, entityId, uei, explicit = true } = {}) {
   const store = readStore();
   const key = relationKey(entityType, entityId);
   if (store.relations[key] !== normalized) return store.relations[key] || '';
-  if (store.entities[normalized]) {
-    store.entities[normalized].members = store.entities[normalized].members.filter(member => member !== key);
-    recordHistory(store.entities[normalized], entityType, entityId, []);
+  const entity = store.entities[normalized];
+  if (entity) {
+    entity.members = entity.members.filter(member => member !== key);
+    recordHistory(entity, entityType, entityId, []);
+    if (entity.owner?.type === entityType && entity.owner?.id === entityId) {
+      const nextOwner = entity.members[0] || null;
+      if (nextOwner) {
+        const separator = nextOwner.indexOf(':');
+        entity.owner = { type: nextOwner.slice(0, separator), id: nextOwner.slice(separator + 1) };
+      }
+    }
   }
   delete store.relations[key];
   if (explicit) addRevocation(store, entityType, entityId, normalized);
