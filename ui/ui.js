@@ -9,7 +9,7 @@ import { list } from './lists/list.js';
 import { listEntry, listEntries } from './lists/list-entry.js';
 import { select, searchableSelect } from './selectors/index.js';
 import { links, initLinks, collectLinks } from './links/index.js';
-import { tags, initTags, collectTags } from './tags/index.js';
+import { tags, initTags, collectTags } from './tags/index.js?v=tag-chip-color-20260907';
 import { costField, initCostFields, collectCost } from './cost/index.js';
 import { durationPicker, initDurationPickers } from './duration/index.js';
 import { timePicker, initTimePickers } from './time/index.js';
@@ -21,7 +21,7 @@ import { field, phoneField, textareaField } from './inputs/index.js';
 import { emptyState, stateView, initStateView } from './states/index.js';
 import { colorPicker, initColorPickers } from './colors/index.js';
 import { escapeHtml } from './utils/escape-html.js';
-import { page, agreementBlock, actionBlock } from './page/page.js';
+import { page, agreementBlock, actionBlock } from './page/page.js?v=agreement-checkbox-20260907';
 import { repeatedField, initRepeatedFields, collectRepeatedField, collectRepeatedEntries } from './repeated-fields/index.js';
 import { uei, initUEI } from './uei/index.js';
 
