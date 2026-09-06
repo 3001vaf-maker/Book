@@ -25,7 +25,7 @@ function open(host){
   const initialHour=hours.includes(current.h)?current.h:hours[0];
   const initialMinute=minutes.includes(current.min)?current.min:minutes[0];
   const content=`<div class="modal-title"><h2>${esc(host.querySelector('.time-picker__label')?.textContent||'Время')}</h2></div><div class="time-wheel" data-time-wheel><div class="time-wheel__column" data-time-wheel-column="hours"><span class="time-wheel__label">Часы</span><div class="time-wheel__viewport">${wheel({values:hours,selected:initialHour,type:'hours'})}</div></div><div class="time-wheel__column" data-time-wheel-column="minutes"><span class="time-wheel__label">Минуты</span><div class="time-wheel__viewport">${wheel({values:minutes,selected:initialMinute,type:'minutes'})}</div></div></div><button type="button" class="ui-button" data-time-save>Сохранить</button>`;
-  const modalRoot=mountModal(document.body,modal(content,{title:host.querySelector('.time-picker__label')?.textContent||'Время'}));
+  const modalRoot=mountModal(document.body,modal(content,{title:host.querySelector('.time-picker__label')?.textContent||'Время',variant:'compact'}));
   if(!modalRoot)return;
   const center=(type,value)=>{const item=modalRoot.querySelector(`[data-time-wheel-type="${type}"][data-value="${value}"]`);if(item)item.scrollIntoView({block:'center'});};
   const syncColumn=(viewport)=>{
