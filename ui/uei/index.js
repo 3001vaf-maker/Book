@@ -17,13 +17,14 @@ function selectField({ label, name, value = '', options = [], placeholder = '' }
   return `<label class="field ui-select"><span>${escapeHtml(label)}</span><span class="ui-select__control"><select name="${escapeHtml(name)}" data-uei-field="${escapeHtml(name)}">${placeholderMarkup}${optionMarkup(options, value)}</select></span></label>`;
 }
 
-export function uei({ value = '', existing = [], detachable = [], linkValue = '', detachValue = '', showApply = true } = {}) {
+export function uei({ value = '', existing = [], detachable = [], linkValue = '', detachValue = '', memberCount = 0, showApply = true } = {}) {
   const detachMarkup = detachable.length > 1 ? selectField({ label: 'Отвязать', name: 'ueiDetach', value: detachValue, options: detachable, placeholder: 'Выберите сущность' }) : '';
+  const countMarkup = memberCount > 1 ? `<span class="ui-uei__count" aria-label="Количество профилей">${escapeHtml(memberCount)}</span>` : '';
   const applyMarkup = showApply ? button('Применить', { data: 'data-uei-apply' }) : '';
   return `<section class="ui-uei" data-uei>
     <label class="field ui-uei__value">
       <span>UEI</span>
-      <input name="uei" value="${escapeHtml(value)}" maxlength="4" pattern="${UEI_PATTERN}" inputmode="text" autocomplete="off" data-uei-field="uei" aria-label="UEI">
+      <span class="ui-uei__value-row"><input name="uei" value="${escapeHtml(value)}" maxlength="4" pattern="${UEI_PATTERN}" inputmode="text" autocomplete="off" data-uei-field="uei" aria-label="UEI">${countMarkup}</span>
     </label>
     ${selectField({ label: 'Связать', name: 'ueiLink', value: linkValue, options: existing, placeholder: 'Выберите UEI' })}
     ${detachMarkup}
