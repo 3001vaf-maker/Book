@@ -4,7 +4,7 @@ import { deleteProduct as deleteProductData, getProducts, pushProductHistory, sa
 
 function renderList(root,navigateBack){
   const items=getProducts();
-  root.innerHTML=`<div class="entity-page-header">${pageHeader('Товары')}<div class="page-header-action">${iconButton('+',{data:'data-add-product',aria:'Добавить товар'})}</div></div>${items.length?listEntries(items.map(renderRow)):emptyState('Товаров пока нет','Добавьте первый товар кнопкой «+».')}${actionBlock(button('Назад',{className:'ui-button--secondary',data:'data-back-products'}))}`;
+  root.innerHTML=`<div class="entity-page-header">${pageHeader('Товары')}<div class="page-header-action">${iconButton('+',{className:'icon-button--primary',data:'data-add-product',aria:'Добавить товар'})}</div></div>${items.length?listEntries(items.map(renderRow)):emptyState('Товаров пока нет','Добавьте первый товар кнопкой «+».')}${actionBlock(button('Назад',{className:'ui-button--secondary',data:'data-back-products'}))}`;
   root.querySelector('[data-add-product]')?.addEventListener('click',()=>openForm(root,null,navigateBack));
   root.querySelectorAll('[data-product]').forEach(el=>el.addEventListener('click',()=>renderCard(root,el.dataset.product,navigateBack)));
   root.querySelectorAll('[data-delete-action]').forEach(el=>el.addEventListener('click',e=>{e.stopPropagation();confirmDelete(root,el.dataset.deleteAction,navigateBack,()=>renderList(root,navigateBack))}));

@@ -6,7 +6,7 @@ const durationText=m=>{m=Number(m)||0;const h=Math.floor(m/60),min=m%60;return h
 
 function renderList(root,navigateBack){
   const items=getProcedures();
-  root.innerHTML=`<div class="entity-page-header">${pageHeader('Процедуры')}<div class="page-header-action">${iconButton('+',{data:'data-add-procedure',aria:'Добавить процедуру'})}</div></div>${items.length?listEntries(items.map(renderRow)):emptyState('Процедур пока нет','Добавьте первую процедуру кнопкой «+».')}${actionBlock(button('Назад',{className:'ui-button--secondary',data:'data-back-procedures'}))}`;
+  root.innerHTML=`<div class="entity-page-header">${pageHeader('Процедуры')}<div class="page-header-action">${iconButton('+',{className:'icon-button--primary',data:'data-add-procedure',aria:'Добавить процедуру'})}</div></div>${items.length?listEntries(items.map(renderRow)):emptyState('Процедур пока нет','Добавьте первую процедуру кнопкой «+».')}${actionBlock(button('Назад',{className:'ui-button--secondary',data:'data-back-procedures'}))}`;
   root.querySelector('[data-add-procedure]')?.addEventListener('click',()=>openForm(root,null,navigateBack));
   root.querySelectorAll('[data-procedure]').forEach(el=>el.addEventListener('click',()=>renderCard(root,el.dataset.procedure,navigateBack)));
   root.querySelectorAll('[data-delete-action]').forEach(el=>el.addEventListener('click',e=>{e.stopPropagation();confirmDelete(root,el.dataset.deleteAction,navigateBack,()=>renderList(root,navigateBack))}));
