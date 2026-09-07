@@ -1,4 +1,4 @@
-import { pageHeader, viewNavigation, initViewNavigation, workplaceHeaderButton, getWorkplaceContext, setWorkplaceContext, select, modal, mountModal, timePicker, initTimePickers } from '../ui/ui.js';
+import { button, pageHeader, viewNavigation, initViewNavigation, workplaceHeaderButton, getWorkplaceContext, setWorkplaceContext, select, modal, mountModal, timePicker, initTimePickers, escapeHtml } from '../ui/ui.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getDays, saveDays, getDay, getDayTime, updateDayTime, hasScheduleConflict } from '../core/day.js';
 import { renderJournalDay } from './день.js';
@@ -23,7 +23,7 @@ export function renderJournal(root) {
 
   const openWorkplacePickerModal = () => {
     const options = workplaces.map((workplace) => ({ value: workplace.key, label: workplace.name || 'Без названия' }));
-    const content = `<div class="modal-title"><h2>Выбрать место работы</h2></div>${select({ name: 'journalWorkplaceModal', label: 'Место работы', value: selectedWorkplaceId, options, data: 'data-journal-workplace-modal' })}<button type="button" class="ui-button" data-journal-workplace-save>Выбрать</button>`;
+    const content = `<div class="modal-title"><h2>Выбрать место работы</h2></div>${select({ name: 'journalWorkplaceModal', label: 'Место работы', value: selectedWorkplaceId, options, data: 'data-journal-workplace-modal' })}${button('Выбрать', { data: 'data-journal-workplace-save' })}`;
     const m = mountModal(document.body, modal(content, { title: 'Выбрать место работы' }));
     m?.querySelector('[data-journal-workplace-save]')?.addEventListener('click', () => { selectedWorkplaceId = m.querySelector('[data-journal-workplace-modal]')?.value || selectedWorkplaceId; setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: selectedDate }); m.remove(); renderView(); });
   };
@@ -32,7 +32,7 @@ export function renderJournal(root) {
     const days = getDays(); const date = dateKey(selectedDate); const day = getDay(days, selectedWorkplaceId, date); const workplace = workplaces.find((item) => item.key === selectedWorkplaceId) || null;
     if (!day || !workplace) return;
     const current = getDayTime(day, workplaces); const from = current?.from || workplace.from || '09:00'; const to = current?.to || workplace.to || '18:00';
-    const content = `<div class="modal-title"><h2>Время работы</h2></div><div class="timetable-time-fields">${timePicker({ name: 'journalWorkplaceFrom', label: 'Начало', value: from })}${timePicker({ name: 'journalWorkplaceTo', label: 'Окончание', value: to })}</div><div class="form-error" data-journal-workplace-time-error></div><button type="button" class="ui-button" data-journal-workplace-time-save>Сохранить</button>`;
+    const content = `<div class="modal-title"><h2>Время работы</h2></div><div class="timetable-time-fields">${timePicker({ name: 'journalWorkplaceFrom', label: 'Начало', value: from })}${timePicker({ name: 'journalWorkplaceTo', label: 'Окончание', value: to })}</div><div class="form-error" data-journal-workplace-time-error></div>${button('Сохранить', { data: 'data-journal-workplace-time-save' })}`;
     const m = mountModal(document.body, modal(content, { title: 'Время работы' })); if (!m) return; initTimePickers(m);
     m.querySelector('[data-journal-workplace-time-save]')?.addEventListener('click', () => {
       const fromNext = m.querySelector('[name="journalWorkplaceFrom"]')?.value || from; const toNext = m.querySelector('[name="journalWorkplaceTo"]')?.value || to;
@@ -44,7 +44,7 @@ export function renderJournal(root) {
 
   const openWorkplaceModal = () => {
     const days = getDays(); const date = dateKey(selectedDate); const hasWorkingDay = Boolean(getDay(days, selectedWorkplaceId, date)); const workplace = workplaces.find((item) => item.key === selectedWorkplaceId) || null;
-    const content = `<div class="modal-title"><h2>Место работы</h2></div><div class="timetable-workplace-modal-summary"><strong>${workplace?.name || 'Место работы не выбрано'}</strong></div><div class="timetable-workplace-modal-actions"><button type="button" class="ui-button" data-journal-open-picker>Выбрать место работы</button><button type="button" class="ui-button" data-journal-open-time ${hasWorkingDay ? '' : 'disabled'}>Скорректировать время</button></div>`;
+    const content = `<div class="modal-title"><h2>Место работы</h2></div><div class="timetable-workplace-modal-summary"><strong>${escapeHtml(workplace?.name || 'Место работы не выбрано')}</strong></div><div class="timetable-workplace-modal-actions">${button('Выбрать место работы', { data: 'data-journal-open-picker' })}${button('Скорректировать время', { data: `data-journal-open-time${hasWorkingDay ? '' : ' disabled'}` })}</div>`;
     const m = mountModal(document.body, modal(content, { title: 'Место работы' }));
     m?.querySelector('[data-journal-open-picker]')?.addEventListener('click', () => { m.remove(); openWorkplacePickerModal(); });
     m?.querySelector('[data-journal-open-time]')?.addEventListener('click', () => { if (hasWorkingDay) { m.remove(); openWorkplaceTimeModal(); } });

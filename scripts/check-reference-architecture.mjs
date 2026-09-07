@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 const root = process.cwd();
@@ -25,10 +25,12 @@ function report(file, rule) {
 
 const mainFiles = walk(join(root, 'main'));
 const settingsFiles = walk(join(root, 'settings'));
-const referenceFiles = [...mainFiles, ...settingsFiles];
+const timetableController = join(root, 'timetable/timetable.js');
+const journalController = join(root, 'journal/journal.js');
+const referenceFiles = [...mainFiles, ...settingsFiles, timetableController];
 const uiFiles = walk(join(root, 'ui'));
 const coreFiles = walk(join(root, 'core'));
-const allFiles = [...walk(join(root, 'main')), ...walk(join(root, 'settings')), ...uiFiles, ...coreFiles, join(root, 'core.js')];
+const allFiles = [...walk(join(root, 'main')), ...walk(join(root, 'settings')), ...walk(join(root, 'timetable')), ...walk(join(root, 'journal')), ...uiFiles, ...coreFiles, join(root, 'core.js')];
 
 for (const file of referenceFiles) {
   const source = text(file);
@@ -56,6 +58,17 @@ for (const file of allFiles) {
 
 const clientsUi = join(root, 'main/clients/clients.js');
 if (/\blocalStorage\b/.test(text(clientsUi))) report(clientsUi, 'Clients screen must use data/view-state owners instead of direct localStorage');
+
+for (const controller of [timetableController, journalController]) {
+  const source = text(controller);
+  if (/\blocalStorage\b/.test(source)) report(controller, 'Graph/Journal controller must use the canonical data owner instead of direct localStorage');
+  if (/<button\b[^>]*class=["'][^"']*\bui-button\b/i.test(source)) report(controller, 'Graph/Journal controller must use shared button() instead of recreating ui-button markup');
+}
+
+const legacyTimetableCss = join(root, 'timetable/timetable.css');
+if (existsSync(legacyTimetableCss)) {
+  report(legacyTimetableCss, 'Graph must not own a parallel functional CSS file; shared presentation belongs to common UI');
+}
 
 const settingsControllers = [
   'settings/profile/profile.js',

@@ -20,6 +20,17 @@ function dateValue(value) { return String(value || '').slice(0, 10); }
 
 export function getDays() { const state = readState(); return Array.isArray(state.workingDays) ? state.workingDays : []; }
 export function saveDays(days) { writeState({ workingDays: Array.isArray(days) ? days : [] }); }
+export function migrateLegacyWorkingDates(defaultWorkplaceId = '') {
+  const state = readState();
+  if (Array.isArray(state.workingDays) && state.workingDays.length) return state.workingDays;
+  const workplaceId = String(defaultWorkplaceId || '');
+  if (!workplaceId || !Array.isArray(state.workingDates) || !state.workingDates.length) return [];
+  const days = state.workingDates
+    .map((date) => ({ date: dateValue(date), workplaceId }))
+    .filter((day) => day.date);
+  saveDays(days);
+  return days;
+}
 export function getDay(days, workplaceId, date) {
   const key = dateValue(date);
   return (Array.isArray(days) ? days : []).find((item) => String(item?.workplaceId || '') === String(workplaceId || '') && dateValue(item?.date) === key) || null;
