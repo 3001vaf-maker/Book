@@ -3,7 +3,11 @@ import { renderJournal } from './journal/journal.js';
 import { renderTimetable } from './timetable/timetable.js?v=graph-lifecycle-20260903';
 import { renderChat } from './chat/chat.js';
 import { renderSettings } from './settings/settings.js';
+import { getWorkplaces as getWorkplaceEntities } from './settings/profile/workplaces/data.js';
+import { configureWorkplaceSource } from './core/workplace-time.js';
 import { bottomNavigation } from './ui/ui.js';
+
+configureWorkplaceSource(getWorkplaceEntities);
 
 const routes = {
   main: renderMain,
