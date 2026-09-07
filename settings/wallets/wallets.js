@@ -1,28 +1,8 @@
 import { button, emptyState, entityCard, escapeHtml, iconButton, initPhotoField, listEntry, mountModal, modal, pageHeader, photoField } from '../../ui/ui.js';
-
-const KEY = 'book.wallets';
-const SYSTEM_WALLETS = [
-  { id: 'cash', name: 'Наличные', photo: '', system: true },
-  { id: 'cashless', name: 'Безналичные', photo: '', system: true },
-];
-
-const read = (key, fallback) => {
-  try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); }
-  catch { return fallback; }
-};
-const write = (key, value) => localStorage.setItem(key, JSON.stringify(value));
-
-function list() {
-  const stored = read(KEY, null);
-  if (!Array.isArray(stored)) {
-    write(KEY, SYSTEM_WALLETS);
-    return [...SYSTEM_WALLETS];
-  }
-  return stored.filter((wallet) => !wallet.deletedAt);
-}
+import { getWallets, saveWallet as saveWalletData, updateWallet } from './data.js';
 
 function renderList(root, navigateBack) {
-  const items = list();
+  const items = getWallets();
   root.innerHTML = `<div class="entity-page-header">${pageHeader('Кошелёк')}<div class="page-header-action">${iconButton('+', { className: 'icon-button--primary', data: 'data-add-wallet', aria: 'Добавить кошелёк' })}</div></div>${items.length ? `<div class="people-list">${items.map(renderRow).join('')}</div>` : emptyState('Кошельков пока нет', 'Добавьте первый кошелёк кнопкой «+».')}<div class="profile-actions">${button('Назад', { className: 'ui-button--secondary', data: 'data-back-wallets' })}</div>`;
   root.querySelector('[data-add-wallet]')?.addEventListener('click', () => openForm(root, null, navigateBack));
   root.querySelectorAll('[data-wallet]').forEach((element) => element.addEventListener('click', () => renderCard(root, element.dataset.wallet, navigateBack)));
@@ -65,14 +45,13 @@ function saveWallet(root, modalRoot, existing, navigateBack) {
     createdAt: existing?.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
-  const items = list();
-  write(KEY, existing ? items.map((wallet) => wallet.id === existing.id ? item : wallet) : [...items, item]);
+  saveWalletData(item);
   modalRoot.remove();
   renderList(root, navigateBack);
 }
 
 function renderCard(root, id, navigateBack) {
-  const wallet = list().find((item) => item.id === id);
+  const wallet = getWallets().find((item) => item.id === id);
   if (!wallet) return renderList(root, navigateBack);
   root.innerHTML = `${pageHeader(wallet.name)}${entityCard({
     image: wallet.photo || '',
@@ -91,9 +70,7 @@ function openPhotoForm(root, wallet, navigateBack) {
   m.querySelector('[data-wallet-photo-form]')?.addEventListener('submit', (event) => {
     event.preventDefault();
     const data = new FormData(m.querySelector('[data-wallet-photo-form]'));
-    const items = list();
-    const updated = items.map((item) => item.id === wallet.id ? { ...item, photo: String(data.get('walletPhoto') || ''), updatedAt: new Date().toISOString() } : item);
-    write(KEY, updated);
+    updateWallet(wallet.id, { photo: String(data.get('walletPhoto') || '') });
     m.remove();
     renderCard(root, wallet.id, navigateBack);
   });
