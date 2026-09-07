@@ -1,9 +1,9 @@
-import { actionBlock, button, colorPicker, emptyState, escapeHtml, field, iconButton, initColorPickers, mountModal, modal, pageHeader } from '../../ui/ui.js?v=tag-manager-list-20260908';
+import { actionBlock, button, colorPicker, emptyState, escapeHtml, field, iconButton, initColorPickers, mountModal, modal, pageHeader, tagManagerList } from '../../ui/ui.js?v=tag-manager-ui-20260908';
 import { createTag, getTags, saveTags } from './data.js';
 
 function renderList(root, navigateBack) {
   const items = getTags();
-  root.innerHTML = `<div class="entity-page-header">${pageHeader('Ярлыки')}<div class="page-header-action">${iconButton('+', { className: 'icon-button--primary', data: 'data-add-tag', aria: 'Добавить ярлык' })}</div></div>${items.length ? renderTagList(items) : emptyState('Ярлыков пока нет', 'Добавьте первый ярлык кнопкой «+».')}${actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-back-tags' }))}`;
+  root.innerHTML = `<div class="entity-page-header">${pageHeader('Ярлыки')}<div class="page-header-action">${iconButton('+', { className: 'icon-button--primary', data: 'data-add-tag', aria: 'Добавить ярлык' })}</div></div>${items.length ? tagManagerList(items) : emptyState('Ярлыков пока нет', 'Добавьте первый ярлык кнопкой «+».')}${actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-back-tags' }))}`;
   root.querySelector('[data-add-tag]')?.addEventListener('click', () => openForm(root, navigateBack));
   root.querySelectorAll('[data-edit-tag]').forEach((element) => {
     element.addEventListener('click', () => {
@@ -21,18 +21,6 @@ function renderList(root, navigateBack) {
     confirmDelete(root, element.dataset.deleteTag, navigateBack);
   }));
   root.querySelector('[data-back-tags]')?.addEventListener('click', navigateBack);
-}
-
-function renderTagList(items) {
-  return `<div class="tag-manager-list">${items.map(renderRow).join('')}</div>`;
-}
-
-function renderRow(tag) {
-  return `<div class="tag-manager-list__item" data-edit-tag="${escapeHtml(tag.id)}" role="button" tabindex="0" aria-label="Изменить ярлык ${escapeHtml(tag.name)}">
-    <span class="tag-manager-list__swatch" style="--tag-manager-color:${escapeHtml(tag.color)}" aria-hidden="true"></span>
-    <strong class="tag-manager-list__name">${escapeHtml(tag.name)}</strong>
-    <button type="button" class="remove-button tag-manager-list__delete" data-delete-tag="${escapeHtml(tag.id)}" aria-label="Удалить ярлык ${escapeHtml(tag.name)}">×</button>
-  </div>`;
 }
 
 function openForm(root, navigateBack, existing = null) {

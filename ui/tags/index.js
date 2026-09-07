@@ -12,6 +12,18 @@ function tagChip(tag) {
   return `<span class="tag" data-tag-id="${escapeHtml(tag.id)}" style="background:${color}">${escapeHtml(tag.name)}<button type="button" class="remove-button" data-remove-tag aria-label="Снять ярлык ${escapeHtml(tag.name)}">×</button></span>`;
 }
 
+function tagManagerRow(tag) {
+  return `<div class="tag-manager-list__item" data-edit-tag="${escapeHtml(tag.id)}" role="button" tabindex="0" aria-label="Изменить ярлык ${escapeHtml(tag.name)}">
+    <span class="tag-manager-list__swatch" style="--tag-manager-color:${escapeHtml(tag.color)}" aria-hidden="true"></span>
+    <strong class="tag-manager-list__name">${escapeHtml(tag.name)}</strong>
+    <button type="button" class="remove-button tag-manager-list__delete" data-delete-tag="${escapeHtml(tag.id)}" aria-label="Удалить ярлык ${escapeHtml(tag.name)}">×</button>
+  </div>`;
+}
+
+export function tagManagerList(items = []) {
+  return `<div class="tag-manager-list">${items.map(tagManagerRow).join('')}</div>`;
+}
+
 function syncSelector(host) {
   const input = host.querySelector('[data-tag-add]');
   const trigger = host.querySelector('[data-ui-select-trigger][data-tag-add]');

@@ -6,7 +6,7 @@ const folders = [
   ['warehouse', 'Склад', '◫', () => import('./warehouse/warehouse.js')],
   ['documents', 'Документы', '◫', () => import('./documents/documents.js')],
   ['loyalty', 'Программа лояльности', '◫', () => import('./loyalty/loyalty.js')],
-  ['tags', 'Ярлыки', '◫', () => import('./tags/tags.js?v=tag-edit-20260908')],
+  ['tags', 'Ярлыки', '◫', () => import('./tags/tags.js?v=tag-manager-ui-20260908')],
   ['wallets', 'Кошелёк', '◫', () => import('./wallets/wallets.js?v=custom-wallet-delete-20260908')],
 ];
 
