@@ -3,7 +3,6 @@ import { getWorkplaces } from '../../profile/workplaces/data.js';
 import { deleteProcedure as deleteProcedureData, getProcedures, pushProcedureHistory, saveProcedure as saveProcedureData } from './data.js';
 
 const durationText=m=>{m=Number(m)||0;const h=Math.floor(m/60),min=m%60;return h?`${h} ч${min?` ${min} мин`:''}`:`${min} мин`};
-const salonCountText=count=>{const n=Math.max(0,Number(count)||0),m10=n%10,m100=n%100;const word=m10===1&&m100!==11?'салон':m10>=2&&m10<=4&&(m100<12||m100>14)?'салона':'салонов';return `${n} ${word}`};
 const fmt=v=>v===''||v==null?'':`${Number(v).toLocaleString('ru-RU')} ₽`;
 const costParts=cost=>{if(!cost||cost.free)return{rightTop:'Бесплатно'};if(cost.mode==='from-to')return{rightTop:`от ${fmt(cost.from)}`,rightBottom:`до ${fmt(cost.to)}`};if(cost.mode==='from')return{rightTop:`от ${fmt(cost.from??cost.amount)}`};return{rightTop:fmt(cost.amount??cost.from)}};
 const cardCostMeta=cost=>{
@@ -23,8 +22,8 @@ function renderList(root,navigateBack){
 }
 
 function renderRow(p){
-  const price=costParts(p.cost),salons=(p.workplaces||[]).length;
-  return listEntry({title:p.name||'',subtitle:`${durationText(p.duration)} — ${salonCountText(salons)}`,image:p.photo||'',initial:(p.name||'?').slice(0,1).toUpperCase(),rightTop:price.rightTop||'',rightBottom:price.rightBottom||'',interactive:true,data:`data-procedure="${escapeHtml(p.id)}"`,aria:`Открыть процедуру ${p.name||''}`,deleteData:p.id,deleteAria:`Удалить процедуру ${p.name||''}`});
+  const price=costParts(p.cost),workplaceCount=(p.workplaces||[]).length;
+  return listEntry({title:p.name||'',subtitle:`${durationText(p.duration)} — ${workplaceCount}`,image:p.photo||'',initial:(p.name||'?').slice(0,1).toUpperCase(),rightTop:price.rightTop||'',rightBottom:price.rightBottom||'',interactive:true,data:`data-procedure="${escapeHtml(p.id)}"`,aria:`Открыть процедуру ${p.name||''}`,deleteData:p.id,deleteAria:`Удалить процедуру ${p.name||''}`});
 }
 
 function openForm(root,existing=null,navigateBack=()=>{}){
@@ -49,7 +48,7 @@ function renderCard(root,id,navigateBack){
     subtitle:durationText(p.duration),
     image:p.photo||'',
     initial:(p.name||'?').slice(0,1).toUpperCase(),
-    topMeta:[{value:salonCountText(workplaceNames.length)}],
+    topMeta:[{value:String(workplaceNames.length)}],
     topRightMeta:cardCostMeta(p.cost),
     meta:workplaceNames.map(name=>({value:name})),
     metricsLayout:'vertical',
