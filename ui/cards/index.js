@@ -10,7 +10,7 @@ function metricMarkup(items = []) {
 }
 
 function topMetaMarkup(items = [], side = 'left') {
-  return items.map(({ value = '—', label = '' }) => `<span class="entity-card__top-meta entity-card__top-meta--${escapeHtml(side)}"><strong>${escapeHtml(value)}</strong>${label ? `<small>${escapeHtml(label)}</small>` : ''}</span>`).join('');
+  return items.map(({ value = '—', label = '', weight = 'strong' }) => `<span class="entity-card__top-meta entity-card__top-meta--${escapeHtml(side)} entity-card__top-meta--${weight === 'regular' ? 'regular' : 'strong'}"><strong>${escapeHtml(value)}</strong>${label ? `<small>${escapeHtml(label)}</small>` : ''}</span>`).join('');
 }
 
 export function entityCard({
