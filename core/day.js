@@ -26,7 +26,6 @@ export function getDayTime(day, workplaces = []) {
   if (!workplace?.from || !workplace?.to || !isValidRange(workplace.from, workplace.to)) return null;
   return createTimeRange(workplace.from, workplace.to);
 }
-export function normalizeDay(day, workplaces = []) { if (!day) return null; const time = getDayTime(day, workplaces); return time ? { ...day, from: time.from, to: time.to } : { ...day }; }
 export function createDay({ date, workplaceId, from, to } = {}) {
   if (!date || !workplaceId || !isValidRange(from, to)) return null;
   const range = createTimeRange(from, to);
@@ -70,17 +69,4 @@ export function findSuggestedInterval(days, { workplaceId, date, baseFrom, baseT
   }
   if (cursor + duration <= baseEnd) return createTimeRange(minutesToTime(cursor), minutesToTime(cursor + duration));
   return null;
-}
-export function migrateDaysToCanonical(workplaces = []) {
-  const days = getDays(); let changed = false;
-  for (let index = 0; index < days.length; index += 1) {
-    const normalized = normalizeDay(days[index], workplaces);
-    if (!normalized) continue;
-    if (normalized.from !== days[index]?.from || normalized.to !== days[index]?.to) {
-      days[index] = normalized;
-      changed = true;
-    }
-  }
-  if (changed) saveDays(days);
-  return days;
 }
