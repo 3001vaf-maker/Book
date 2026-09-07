@@ -1,5 +1,6 @@
 import { accordion, actionBlock, button, entityCard, field, iconButton, initAccordions, initPhotoField, page, phoneField, photoField, select, textareaField } from '../../ui/ui.js';
 import { addCustomProfession, getCustomProfessions, getProfile, saveProfile as saveProfileData } from './data.js';
+import { getWorkplaces } from './workplaces/data.js';
 import { openWorkplaceModal, renderWorkplace, workplaceList } from './workplaces/workplaces.js';
 
 const PROFESSIONS=['Парикмахер','Колорист','Барбер','Визажист','Стилист','Мастер маникюра','Мастер педикюра','Бровист','Лэшмейкер','Косметолог','Массажист','Мастер по наращиванию волос','Мастер перманентного макияжа','Другая'];
@@ -11,17 +12,21 @@ const professionOptions=()=>[...new Set([...PROFESSIONS.filter(p=>p!=='Друг�
 export function render(root,navigateBack=()=>{}){renderProfile(root,navigateBack)}
 
 function profileCard(p){
+  const workplaceCount=getWorkplaces().length;
   return entityCard({
     title:fullName(p),
     subtitle:p.phone||'',
     image:p.photo||'',
     initial:initial(p),
-    meta:[
-      {value:p.profession||'—',label:'профессия'},
-      {value:p.experience||'—',label:'опыт'}
+    topMeta:[
+      {value:p.profession||'—'},
+      {value:p.experience||'—'}
     ],
-    metricsLayout:'grid',
-    className:'entity-card--hero'
+    meta:[
+      {value:String(workplaceCount),label:'мест работы'}
+    ],
+    metricsLayout:'end',
+    className:'entity-card--hero entity-card--top-light'
   });
 }
 
