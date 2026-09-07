@@ -1,9 +1,9 @@
-import { actionBlock, button, folderCard, pageHeader } from '../../ui/ui.js';
+import { actionBlock, button, folderList, pageHeader } from '../../ui/ui.js';
 
 const children = [['recipes', 'Рецепты', '◫'], ['materials', 'Материалы', '◫']];
 
 function renderWarehouseFolders(root, navigateBack) {
-  root.innerHTML = `${pageHeader('Склад')}<div class="ui-folder-grid">${children.map(([key, label, icon]) => folderCard({ title: label, icon, data: `data-warehouse-open="${key}"` })).join('')}</div>${actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-warehouse-back' }))}`;
+  root.innerHTML = `${pageHeader('Склад')}${folderList(children.map(([key, label]) => ({ title: label, data: `data-warehouse-open="${key}"` })))}${actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-warehouse-back' }))}`;
   root.querySelectorAll('[data-warehouse-open]').forEach((element) => element.addEventListener('click', async () => {
     const key = element.dataset.warehouseOpen;
     if (key === 'recipes') {
