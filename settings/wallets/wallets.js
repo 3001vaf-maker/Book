@@ -1,9 +1,9 @@
-import { button, emptyState, entityCard, escapeHtml, iconButton, initPhotoField, listEntry, mountModal, modal, pageHeader, photoField } from '../../ui/ui.js';
+import { actionBlock, button, emptyState, entityCard, escapeHtml, iconButton, initPhotoField, listEntries, listEntry, mountModal, modal, page, pageHeader, photoField } from '../../ui/ui.js';
 import { getWallets, saveWallet as saveWalletData, updateWallet } from './data.js';
 
 function renderList(root, navigateBack) {
   const items = getWallets();
-  root.innerHTML = `<div class="entity-page-header">${pageHeader('Кошелёк')}<div class="page-header-action">${iconButton('+', { className: 'icon-button--primary', data: 'data-add-wallet', aria: 'Добавить кошелёк' })}</div></div>${items.length ? `<div class="people-list">${items.map(renderRow).join('')}</div>` : emptyState('Кошельков пока нет', 'Добавьте первый кошелёк кнопкой «+».')}<div class="profile-actions">${button('Назад', { className: 'ui-button--secondary', data: 'data-back-wallets' })}</div>`;
+  root.innerHTML = `<div class="entity-page-header">${pageHeader('Кошелёк')}<div class="page-header-action">${iconButton('+', { className: 'icon-button--primary', data: 'data-add-wallet', aria: 'Добавить кошелёк' })}</div></div>${items.length ? listEntries(items.map(renderRow)) : emptyState('Кошельков пока нет', 'Добавьте первый кошелёк кнопкой «+».')}${actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-back-wallets' }))}`;
   root.querySelector('[data-add-wallet]')?.addEventListener('click', () => openForm(root, null, navigateBack));
   root.querySelectorAll('[data-wallet]').forEach((element) => element.addEventListener('click', () => renderCard(root, element.dataset.wallet, navigateBack)));
   root.querySelector('[data-back-wallets]')?.addEventListener('click', navigateBack);
@@ -12,7 +12,7 @@ function renderList(root, navigateBack) {
 function renderRow(wallet) {
   return listEntry({
     title: wallet.name,
-    subtitle: '',
+    subtitle: wallet.system ? 'Системный кошелёк' : '',
     image: wallet.photo || '',
     initial: (wallet.name || '?').slice(0, 1).toUpperCase(),
     interactive: true,
@@ -53,12 +53,14 @@ function saveWallet(root, modalRoot, existing, navigateBack) {
 function renderCard(root, id, navigateBack) {
   const wallet = getWallets().find((item) => item.id === id);
   if (!wallet) return renderList(root, navigateBack);
-  root.innerHTML = `${pageHeader(wallet.name)}${entityCard({
-    image: wallet.photo || '',
-    initial: (wallet.name || '?').slice(0, 1).toUpperCase(),
-    className: 'entity-card--hero entity-card--wallet',
-    top: `<strong class="entity-card__wallet-name">${escapeHtml(wallet.name)}</strong>`,
-  })}<div class="profile-actions">${button('Работа с кошельком', { data: 'data-wallet-work' })}${button('Назад', { className: 'ui-button--secondary', data: 'data-back-wallet-card' })}</div>`;
+  const card=entityCard({
+    title:wallet.name||'',
+    subtitle:wallet.system?'Системный кошелёк':'',
+    image:wallet.photo||'',
+    initial:(wallet.name||'?').slice(0,1).toUpperCase(),
+    className:'entity-card--hero'
+  });
+  root.innerHTML=page([card,actionBlock(`${button('Работа с кошельком',{data:'data-wallet-work'})}${button('Назад',{className:'ui-button--secondary',data:'data-back-wallet-card'})}`)]);
   root.querySelector('[data-wallet-work]')?.addEventListener('click', () => openPhotoForm(root, wallet, navigateBack));
   root.querySelector('[data-back-wallet-card]')?.addEventListener('click', () => renderList(root, navigateBack));
 }
