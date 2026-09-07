@@ -14,12 +14,12 @@ function workplaceOptions(workplaces = []) {
 function row(name, value, options, selected = {}, withCost = false) {
   const cost = selected?.cost || {};
   return `<div class="workplace-select-row" data-workplace-row>${select({
-    label: 'Место работы',
+    label: 'Рабочее место',
     name,
     value,
-    options: [{ value: '', label: 'Выбор места работы' }, ...options],
+    options: [{ value: '', label: 'Выбор рабочего места' }, ...options],
     data: 'data-workplace-value',
-  })}${withCost ? costField({ name: `${name}-cost-${Math.random().toString(36).slice(2, 8)}`, value: cost }) : ''}<button type="button" class="remove-button" data-remove-workplace aria-label="Удалить место работы">×</button></div>`;
+  })}${withCost ? costField({ name: `${name}-cost-${Math.random().toString(36).slice(2, 8)}`, value: cost }) : ''}<button type="button" class="remove-button" data-remove-workplace aria-label="Удалить рабочее место">×</button></div>`;
 }
 
 export function workplaceSelector({ name = 'workplaces', selected = [], allowMultiple = true, costPerWorkplace = false, workplaces = [] } = {}) {
@@ -27,7 +27,7 @@ export function workplaceSelector({ name = 'workplaces', selected = [], allowMul
   const selections = Array.isArray(selected) ? selected : [];
   const first = String(selections[0]?.workplaceId || selections[0]?.id || selections[0]?.key || '');
   const catalog = escapeHtml(JSON.stringify(options));
-  return `<div class="workplace-selector" data-workplace-selector="${escapeHtml(name)}" data-cost-per-workplace="${costPerWorkplace ? 'true' : 'false'}" data-workplace-options="${catalog}"><div data-workplace-rows>${row(name, first, options, selections[0], costPerWorkplace)}</div>${allowMultiple ? '<button type="button" class="ui-button ui-button--small" data-add-workplace>+ Добавить место работы</button>' : ''}</div>`;
+  return `<div class="workplace-selector" data-workplace-selector="${escapeHtml(name)}" data-cost-per-workplace="${costPerWorkplace ? 'true' : 'false'}" data-workplace-options="${catalog}"><div data-workplace-rows>${row(name, first, options, selections[0], costPerWorkplace)}</div>${allowMultiple ? '<button type="button" class="ui-button ui-button--small" data-add-workplace>+ Добавить рабочее место</button>' : ''}</div>`;
 }
 
 export function initWorkplaceSelectors(root) {
@@ -66,10 +66,10 @@ export function collectWorkplaceSelections(root, name = 'workplaces') {
 }
 
 export function workplaceHeaderButton({ workplace = null, showStats = false, stats = null } = {}) {
-  const name = workplace?.name || 'Место работы';
+  const name = workplace?.name || 'Рабочее место';
   const safeName = escapeHtml(name);
   const counter = showStats && stats
     ? `<span class="timetable-workplace__days">${stats.days} дней</span><span class="timetable-workplace__time">${stats.hours} ч ${String(stats.minutes).padStart(2, '0')} м</span>`
     : '';
-  return `<button type="button" class="timetable-workplace-button ui-button--secondary" data-workplace-header-open aria-label="Место работы: ${safeName}"><span class="timetable-workplace-button__name">${safeName}</span>${counter}<span class="timetable-workplace-button__arrow" aria-hidden="true">⌄</span></button>`;
+  return `<button type="button" class="timetable-workplace-button ui-button--secondary" data-workplace-header-open aria-label="Рабочее место: ${safeName}"><span class="timetable-workplace-button__name">${safeName}</span>${counter}<span class="timetable-workplace-button__arrow" aria-hidden="true">⌄</span></button>`;
 }
