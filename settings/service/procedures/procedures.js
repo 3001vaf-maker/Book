@@ -1,4 +1,5 @@
 import { actionBlock, button, collectCost, collectWorkplaceSelections, costField, durationPicker, emptyState, entityCard, escapeHtml, iconButton, initCostFields, initDurationPickers, initPhotoField, initWorkplaceSelectors, listEntries, listEntry, mountModal, modal, page, pageHeader, photoField, workplaceSelector } from '../../../ui/ui.js';
+import { getWorkplaces } from '../../profile/workplaces/data.js';
 import { deleteProcedure as deleteProcedureData, getProcedures, pushProcedureHistory, saveProcedure as saveProcedureData } from './data.js';
 
 const durationText=m=>{m=Number(m)||0;const h=Math.floor(m/60),min=m%60;return h?`${h} ч${min?` ${min} мин`:''}`:`${min} мин`};
@@ -22,7 +23,7 @@ function renderRow(p){
 
 function openForm(root,existing=null,navigateBack=()=>{}){
   const p=existing||{photo:'',name:'',duration:0,breakDuration:0,cost:{mode:'amount',amount:'',free:false},workplaces:[]};
-  const html=`<form class="compact-form" data-procedure-form><div class="modal-title"><h2>${existing?'Изменить процедуру':'Процедура'}</h2></div>${photoField({name:'procedurePhoto',value:p.photo||''})}<label class="field"><span>Название *</span><input name="procedureName" required value="${escapeHtml(p.name||'')}" placeholder="Название процедуры"></label>${costField({value:p.cost||{},name:'procedureCost'})}${durationPicker({label:'Длительность',name:'procedureDuration',value:p.duration||0})}${durationPicker({label:'Перерыв',name:'procedureBreak',value:p.breakDuration||0})}<div class="array-group"><span class="array-label">Рабочие места</span>${workplaceSelector({name:'procedureWorkplaces',selected:p.workplaces||[],allowMultiple:true})}</div>${button('Сохранить',{type:'submit'})}</form>`;
+  const html=`<form class="compact-form" data-procedure-form><div class="modal-title"><h2>${existing?'Изменить процедуру':'Процедура'}</h2></div>${photoField({name:'procedurePhoto',value:p.photo||''})}<label class="field"><span>Название *</span><input name="procedureName" required value="${escapeHtml(p.name||'')}" placeholder="Название процедуры"></label>${costField({value:p.cost||{},name:'procedureCost'})}${durationPicker({label:'Длительность',name:'procedureDuration',value:p.duration||0})}${durationPicker({label:'Перерыв',name:'procedureBreak',value:p.breakDuration||0})}<div class="array-group"><span class="array-label">Рабочие места</span>${workplaceSelector({name:'procedureWorkplaces',selected:p.workplaces||[],allowMultiple:true,workplaces:getWorkplaces()})}</div>${button('Сохранить',{type:'submit'})}</form>`;
   const m=mountModal(root,modal(html));
   initPhotoField(m);initCostFields(m);initDurationPickers(m);initWorkplaceSelectors(m);
   m.querySelector('[data-procedure-form]')?.addEventListener('submit',e=>{e.preventDefault();saveProcedure(root,m,existing,navigateBack)});
