@@ -1,4 +1,4 @@
-import { actionBlock, button, folderCard, pageHeader } from '../../ui/ui.js';
+import { actionBlock, button, folderList, pageHeader } from '../../ui/ui.js';
 
 const children = [
   ['procedures', 'Процедуры', '◫'],
@@ -6,7 +6,7 @@ const children = [
 ];
 
 export function renderService(root, navigateBack = () => {}) {
-  root.innerHTML = `${pageHeader('Сервис')}<div class="ui-folder-grid">${children.map(([key, label, icon]) => folderCard({ title: label, icon, data: `data-service-open="${key}"` })).join('')}</div>${actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-service-back' }))}`;
+  root.innerHTML = `${pageHeader('Сервис')}${folderList(children.map(([key, label]) => ({ title: label, data: `data-service-open="${key}"` })))}${actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-service-back' }))}`;
   root.querySelectorAll('[data-service-open]').forEach((element) => {
     element.addEventListener('click', async () => {
       if (element.dataset.serviceOpen === 'procedures') {
