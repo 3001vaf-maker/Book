@@ -1,4 +1,5 @@
 import { actionBlock, button, collectCost, collectWorkplaceSelections, costField, emptyState, entityCard, escapeHtml, iconButton, initCostFields, initPhotoField, initWorkplaceSelectors, listEntries, listEntry, mountModal, modal, page, pageHeader, photoField, workplaceSelector } from '../../../ui/ui.js';
+import { getWorkplaces } from '../../profile/workplaces/data.js';
 import { deleteProduct as deleteProductData, getProducts, pushProductHistory, saveProduct as saveProductData } from './data.js';
 
 const fmtMoney=v=>v===''||v==null?'':`${Number(v).toLocaleString('ru-RU')} ₽`;
@@ -19,7 +20,7 @@ function renderRow(p){
 
 function openForm(root,existing=null,navigateBack=()=>{}){
   const p=existing||{photo:'',name:'',cost:{amount:'',free:false},about:'',workplaces:[]};
-  const html=`<form class="compact-form" data-product-form><div class="modal-title"><h2>${existing?'Изменить товар':'Товар'}</h2></div>${photoField({name:'productPhoto',value:p.photo||''})}<label class="field"><span>Название *</span><input name="productName" required value="${escapeHtml(p.name||'')}" placeholder="Название товара"></label>${costField({value:p.cost||{},name:'productCost',modes:['amount'],free:true})}<div class="array-group"><span class="array-label">Описание</span><label class="field"><textarea name="productAbout" rows="7" maxlength="5000" placeholder="Описание товара">${escapeHtml(p.about||'')}</textarea></label></div><div class="array-group"><span class="array-label">Рабочие места</span>${workplaceSelector({name:'productWorkplaces',selected:p.workplaces||[],allowMultiple:true})}</div>${button('Сохранить',{type:'submit'})}</form>`;
+  const html=`<form class="compact-form" data-product-form><div class="modal-title"><h2>${existing?'Изменить товар':'Товар'}</h2></div>${photoField({name:'productPhoto',value:p.photo||''})}<label class="field"><span>Название *</span><input name="productName" required value="${escapeHtml(p.name||'')}" placeholder="Название товара"></label>${costField({value:p.cost||{},name:'productCost',modes:['amount'],free:true})}<div class="array-group"><span class="array-label">Описание</span><label class="field"><textarea name="productAbout" rows="7" maxlength="5000" placeholder="Описание товара">${escapeHtml(p.about||'')}</textarea></label></div><div class="array-group"><span class="array-label">Рабочие места</span>${workplaceSelector({name:'productWorkplaces',selected:p.workplaces||[],allowMultiple:true,workplaces:getWorkplaces()})}</div>${button('Сохранить',{type:'submit'})}</form>`;
   const m=mountModal(root,modal(html));
   initPhotoField(m);initCostFields(m);initWorkplaceSelectors(m);
   m.querySelector('[data-product-form]')?.addEventListener('submit',e=>{e.preventDefault();saveProduct(root,m,existing,navigateBack)});
