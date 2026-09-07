@@ -1,11 +1,16 @@
-import { actionBlock, button, collectCost, collectWorkplaceSelections, costField, details, durationPicker, emptyState, entityCard, escapeHtml, field, iconButton, initCostFields, initDurationPickers, initPhotoField, initWorkplaceSelectors, listEntries, listEntry, mountModal, modal, page, pageHeader, photoField, workplaceSelector } from '../../../ui/ui.js';
+import { actionBlock, button, collectCost, collectWorkplaceSelections, costField, durationPicker, emptyState, entityCard, escapeHtml, field, iconButton, initCostFields, initDurationPickers, initPhotoField, initWorkplaceSelectors, listEntries, listEntry, mountModal, modal, page, pageHeader, photoField, workplaceSelector } from '../../../ui/ui.js';
 import { getWorkplaces } from '../../profile/workplaces/data.js';
 import { deleteProcedure as deleteProcedureData, getProcedures, pushProcedureHistory, saveProcedure as saveProcedureData } from './data.js';
 
 const durationText=m=>{m=Number(m)||0;const h=Math.floor(m/60),min=m%60;return h?`${h} ч${min?` ${min} мин`:''}`:`${min} мин`};
 const fmt=v=>v===''||v==null?'':`${Number(v).toLocaleString('ru-RU')} ₽`;
-const costValue=cost=>{if(!cost||cost.free)return 'Бесплатно';if(cost.mode==='from-to')return `${fmt(cost.from)}–${fmt(cost.to)}`;if(cost.mode==='from')return `от ${fmt(cost.from??cost.amount)}`;return fmt(cost.amount??cost.from)||'—'};
 const costParts=cost=>{if(!cost||cost.free)return{rightTop:'Бесплатно'};if(cost.mode==='from-to')return{rightTop:`от ${fmt(cost.from)}`,rightBottom:`до ${fmt(cost.to)}`};if(cost.mode==='from')return{rightTop:`от ${fmt(cost.from??cost.amount)}`};return{rightTop:fmt(cost.amount??cost.from)}};
+const cardCostMeta=cost=>{
+  if(!cost||cost.free)return[{value:'Бесплатно',label:'стоимость'}];
+  if(cost.mode==='from-to')return[{value:`от ${fmt(cost.from)}`},{value:`до ${fmt(cost.to)}`}];
+  if(cost.mode==='from')return[{value:''},{value:`от ${fmt(cost.from??cost.amount)}`}];
+  return[{value:fmt(cost.amount??cost.from)||'—'},{value:'стоимость'}];
+};
 
 function renderList(root,navigateBack){
   const items=getProcedures();
@@ -37,9 +42,19 @@ function saveProcedure(root,m,existing,navigateBack){
 
 function renderCard(root,id,navigateBack){
   const p=getProcedures().find(x=>x.id===id);if(!p)return renderList(root,navigateBack);
-  const card=entityCard({title:p.name||'',subtitle:p.workplaces?.[0]?.name||'',image:p.photo||'',initial:(p.name||'?').slice(0,1).toUpperCase(),meta:[{value:durationText(p.duration),label:'длительность'},{value:costValue(p.cost),label:'стоимость'},{value:durationText(p.breakDuration),label:'перерыв'}],className:'entity-card--hero'});
-  const info=p.workplaces?.length?details([{label:'Места работы',value:p.workplaces.map(w=>w.name||w.workplaceId).join(', ')}]):'';
-  root.innerHTML=page([card,info,actionBlock(`${button('Редактировать процедуру',{data:'data-edit-procedure'})}${button('Назад',{className:'ui-button--secondary',data:'data-back-procedures-card'})}${button('Удалить',{variant:'danger',data:'data-delete-card'})}`)]);
+  const workplaceNames=(p.workplaces||[]).map(w=>w.name||w.workplaceId).filter(Boolean);
+  const card=entityCard({
+    title:p.name||'',
+    subtitle:durationText(p.duration),
+    image:p.photo||'',
+    initial:(p.name||'?').slice(0,1).toUpperCase(),
+    topMeta:workplaceNames.length?[{value:workplaceNames[0]}]:[],
+    topRightMeta:cardCostMeta(p.cost),
+    meta:workplaceNames.map(name=>({value:name,label:'место работы'})),
+    metricsLayout:'vertical',
+    className:'entity-card--hero entity-card--top-light'
+  });
+  root.innerHTML=page([card,actionBlock(`${button('Редактировать процедуру',{data:'data-edit-procedure'})}${button('Назад',{className:'ui-button--secondary',data:'data-back-procedures-card'})}${button('Удалить',{variant:'danger',data:'data-delete-card'})}`)]);
   root.querySelector('[data-edit-procedure]').onclick=()=>openForm(root,p,navigateBack);
   root.querySelector('[data-delete-card]').onclick=()=>confirmDelete(root,id,navigateBack,()=>renderList(root,navigateBack));
   root.querySelector('[data-back-procedures-card]').onclick=()=>renderList(root,navigateBack);
