@@ -1,4 +1,4 @@
-import { actionBlock, button, collectCost, collectWorkplaceSelections, costField, emptyState, entityCard, escapeHtml, iconButton, initCostFields, initPhotoField, initWorkplaceSelectors, listEntries, listEntry, mountModal, modal, page, pageHeader, photoField, workplaceSelector } from '../../../ui/ui.js';
+import { actionBlock, button, collectCost, collectWorkplaceSelections, costField, details, emptyState, entityCard, escapeHtml, field, iconButton, initCostFields, initPhotoField, initWorkplaceSelectors, listEntries, listEntry, mountModal, modal, page, pageHeader, photoField, textareaField, workplaceSelector } from '../../../ui/ui.js';
 import { getWorkplaces } from '../../profile/workplaces/data.js';
 import { deleteProduct as deleteProductData, getProducts, pushProductHistory, saveProduct as saveProductData } from './data.js';
 
@@ -20,7 +20,7 @@ function renderRow(p){
 
 function openForm(root,existing=null,navigateBack=()=>{}){
   const p=existing||{photo:'',name:'',cost:{amount:'',free:false},about:'',workplaces:[]};
-  const html=`<form class="compact-form" data-product-form><div class="modal-title"><h2>${existing?'Изменить товар':'Товар'}</h2></div>${photoField({name:'productPhoto',value:p.photo||''})}<label class="field"><span>Название *</span><input name="productName" required value="${escapeHtml(p.name||'')}" placeholder="Название товара"></label>${costField({value:p.cost||{},name:'productCost',modes:['amount'],free:true})}<div class="array-group"><span class="array-label">Описание</span><label class="field"><textarea name="productAbout" rows="7" maxlength="5000" placeholder="Описание товара">${escapeHtml(p.about||'')}</textarea></label></div><div class="array-group"><span class="array-label">Рабочие места</span>${workplaceSelector({name:'productWorkplaces',selected:p.workplaces||[],allowMultiple:true,workplaces:getWorkplaces()})}</div>${button('Сохранить',{type:'submit'})}</form>`;
+  const html=`<form class="compact-form" data-product-form><div class="modal-title"><h2>${existing?'Изменить товар':'Товар'}</h2></div>${photoField({name:'productPhoto',value:p.photo||''})}${field({label:'Название',name:'productName',value:p.name||'',placeholder:'Название товара',required:true})}${costField({value:p.cost||{},name:'productCost',modes:['amount'],free:true})}${textareaField({label:'Описание',name:'productAbout',value:p.about||'',rows:7,maxlength:5000,placeholder:'Описание товара'})}<div class="array-group"><span class="array-label">Рабочие места</span>${workplaceSelector({name:'productWorkplaces',selected:p.workplaces||[],allowMultiple:true,workplaces:getWorkplaces()})}</div>${button('Сохранить',{type:'submit'})}</form>`;
   const m=mountModal(root,modal(html));
   initPhotoField(m);initCostFields(m);initWorkplaceSelectors(m);
   m.querySelector('[data-product-form]')?.addEventListener('submit',e=>{e.preventDefault();saveProduct(root,m,existing,navigateBack)});
@@ -35,9 +35,11 @@ function saveProduct(root,m,existing,navigateBack){
 function renderCard(root,id,navigateBack){
   const p=getProducts().find(x=>x.id===id);if(!p)return renderList(root,navigateBack);
   const card=entityCard({title:p.name||'',subtitle:p.workplaces?.[0]?.name||'',image:p.photo||'',initial:(p.name||'?').slice(0,1).toUpperCase(),meta:[{value:costText(p.cost),label:'стоимость'},{value:String(p.workplaces?.length||0),label:'мест работы'}],metricsLayout:'grid',className:'entity-card--hero'});
-  const about=p.about?`<div class="entity-details"><div><span>Описание</span><strong>${escapeHtml(p.about)}</strong></div></div>`:'';
-  const workplaces=p.workplaces?.length?`<div class="entity-details"><div><span>Места работы</span><strong>${escapeHtml(p.workplaces.map(w=>w.name||w.workplaceId).join(', '))}</strong></div></div>`:'';
-  root.innerHTML=page([card,about,workplaces,actionBlock(`${button('Редактировать товар',{data:'data-edit-product'})}${button('Назад',{className:'ui-button--secondary',data:'data-back-products-card'})}${button('Удалить',{variant:'danger',data:'data-delete-card'})}`)]);
+  const info=details([
+    p.about?{label:'Описание',value:p.about}:null,
+    p.workplaces?.length?{label:'Места работы',value:p.workplaces.map(w=>w.name||w.workplaceId).join(', ')}:null
+  ]);
+  root.innerHTML=page([card,info,actionBlock(`${button('Редактировать товар',{data:'data-edit-product'})}${button('Назад',{className:'ui-button--secondary',data:'data-back-products-card'})}${button('Удалить',{variant:'danger',data:'data-delete-card'})}`)]);
   root.querySelector('[data-edit-product]').onclick=()=>openForm(root,p,navigateBack);
   root.querySelector('[data-delete-card]').onclick=()=>confirmDelete(root,id,navigateBack,()=>renderList(root,navigateBack));
   root.querySelector('[data-back-products-card]').onclick=()=>renderList(root,navigateBack);
