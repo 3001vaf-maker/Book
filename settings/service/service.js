@@ -1,21 +1,18 @@
 import { actionBlock, button, folderList, pageHeader } from '../../ui/ui.js';
 
 const children = [
-  ['procedures', 'Процедуры', '◫'],
-  ['products', 'Товары', '◫'],
+  ['procedures', 'Процедуры', () => import('./procedures/procedures.js?v=description-workplace-wording-20260907')],
+  ['products', 'Товары', () => import('./products/products.js')],
 ];
 
 export function renderService(root, navigateBack = () => {}) {
   root.innerHTML = `${pageHeader('Сервис')}${folderList(children.map(([key, label]) => ({ title: label, data: `data-service-open="${key}"` })))}${actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-service-back' }))}`;
   root.querySelectorAll('[data-service-open]').forEach((element) => {
     element.addEventListener('click', async () => {
-      if (element.dataset.serviceOpen === 'procedures') {
-        const { renderProcedures } = await import('./procedures/procedures.js?v=description-workplace-wording-20260907');
-        renderProcedures(root, () => renderService(root, navigateBack));
-      } else if (element.dataset.serviceOpen === 'products') {
-        const { renderProducts } = await import('./products/products.js');
-        renderProducts(root, () => renderService(root, navigateBack));
-      }
+      const folder = children.find(([key]) => key === element.dataset.serviceOpen);
+      if (!folder) return;
+      const { render } = await folder[2]();
+      render(root, () => renderService(root, navigateBack));
     });
   });
   root.querySelector('[data-service-back]')?.addEventListener('click', navigateBack);

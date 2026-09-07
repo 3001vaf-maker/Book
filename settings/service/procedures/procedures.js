@@ -1,8 +1,6 @@
-import { actionBlock, button, collectCost, collectWorkplaceSelections, costCardMeta, costField, costListParts, durationPicker, emptyState, entityCard, escapeHtml, field, iconButton, initCostFields, initDurationPickers, initPhotoField, initWorkplaceSelectors, listEntries, listEntry, mountModal, modal, page, pageHeader, photoField, textareaField, workplaceCountText, workplaceSelector } from '../../../ui/ui.js';
+import { actionBlock, button, collectCost, collectWorkplaceSelections, costCardMeta, costField, costListParts, durationPicker, durationText, emptyState, entityCard, escapeHtml, field, iconButton, initCostFields, initDurationPickers, initPhotoField, initWorkplaceSelectors, listEntries, listEntry, mountModal, modal, page, pageHeader, photoField, textareaField, workplaceCountText, workplaceSelector } from '../../../ui/ui.js';
 import { getWorkplaces } from '../../profile/workplaces/data.js';
 import { deleteProcedure as deleteProcedureData, getProcedures, pushProcedureHistory, saveProcedure as saveProcedureData } from './data.js';
-
-const durationText=m=>{m=Number(m)||0;const h=Math.floor(m/60),min=m%60;return h?`${h} ч${min?` ${min} мин`:''}`:`${min} мин`};
 
 function renderList(root,navigateBack){
   const items=getProcedures();
@@ -61,3 +59,4 @@ function confirmDelete(root,id,navigateBack,onDeleted){
 }
 
 export function renderProcedures(root,navigateBack=()=>{}){renderList(root,navigateBack)}
+export { renderProcedures as render };

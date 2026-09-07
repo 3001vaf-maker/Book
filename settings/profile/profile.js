@@ -74,7 +74,7 @@ function renderProfile(root,navigateBack){
   initRepeatedFields(root);
   initAccordions(root,{onDirty:()=>root.querySelector('[data-save-profile]')?.classList.add('is-visible')});
   initWorkplaceListDeletion(root,()=>renderProfile(root,navigateBack));
-  root.addEventListener('change',e=>{if(e.target.matches?.('[name="profession"]')&&e.target.value==='Другая')openCustomProfessionModal(root)});
+  root.querySelector('[name="profession"]')?.addEventListener('change',e=>{if(e.target.value==='Другая')openCustomProfessionModal(root)});
   root.querySelector('[data-save-profile]')?.addEventListener('click',()=>saveProfile(root,navigateBack));
   root.querySelector('[data-profile-back]')?.addEventListener('click',navigateBack);
   root.querySelector('[data-add-workplace]')?.addEventListener('click',()=>openWorkplaceModal(root,null,()=>renderProfile(root,navigateBack)));

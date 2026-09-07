@@ -62,3 +62,4 @@ function confirmDelete(root,id,navigateBack,onDeleted){
 }
 
 export function renderProducts(root,navigateBack=()=>{}){renderList(root,navigateBack)}
+export { renderProducts as render };

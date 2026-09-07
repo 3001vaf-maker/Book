@@ -53,3 +53,5 @@ function confirmDelete(root,id,navigateBack){
 export function renderTags(root, navigateBack = () => {}) {
   renderList(root, navigateBack);
 }
+
+export { renderTags as render };

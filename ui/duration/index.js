@@ -1,11 +1,11 @@
 import { modal, mountModal } from '../modals/index.js';
 import { wheel } from '../time/index.js';
+import { escapeHtml } from '../utils/escape-html.js';
 
-const esc=(v='')=>String(v).replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#039;'}[c]));
-const text=m=>{m=Math.max(0,Number(m)||0);const h=Math.floor(m/60),min=m%60;return h?`${h} ч${min?` ${min} мин`:''}`:`${min} мин`};
+export function durationText(minutes=0){const m=Math.max(0,Number(minutes)||0),h=Math.floor(m/60),min=m%60;return h?`${h} ч${min?` ${min} мин`:''}`:`${min} мин`}
 const MIDDLE_CYCLE=2;
 
-export function durationPicker({name='duration',label='Длительность',value=0}={}){return `<div class="duration-picker" data-duration-picker="${esc(name)}"><span class="duration-picker__label">${esc(label)}</span><button type="button" class="duration-picker__button" data-duration-open>${text(value)}</button><input type="hidden" name="${esc(name)}" value="${Number(value)||0}" data-duration-value></div>`}
+export function durationPicker({name='duration',label='Длительность',value=0}={}){return `<div class="duration-picker" data-duration-picker="${escapeHtml(name)}"><span class="duration-picker__label">${escapeHtml(label)}</span><button type="button" class="duration-picker__button" data-duration-open>${durationText(value)}</button><input type="hidden" name="${escapeHtml(name)}" value="${Number(value)||0}" data-duration-value></div>`}
 export function initDurationPickers(root){root.querySelectorAll('[data-duration-picker]').forEach(host=>host.querySelector('[data-duration-open]')?.addEventListener('click',()=>open(host)))}
 
 function open(host){
@@ -17,7 +17,7 @@ function open(host){
   const minutes=Array.from({length:60},(_,i)=>i);
   const initialHour=hours.includes(currentHours)?currentHours:0;
   const initialMinute=minutes.includes(currentMinutes)?currentMinutes:0;
-  const content=`<div class="modal-title"><h2>${esc(host.querySelector('.duration-picker__label')?.textContent||'Длительность')}</h2></div><div class="time-wheel" data-duration-wheel><div class="time-wheel__column"><span class="time-wheel__label">Часы</span><div class="time-wheel__viewport">${wheel({values:hours,selected:initialHour,type:'duration-hours',formatter:v=>`${v} ч`})}</div></div><div class="time-wheel__column"><span class="time-wheel__label">Минуты</span><div class="time-wheel__viewport">${wheel({values:minutes,selected:initialMinute,type:'duration-minutes',formatter:v=>`${v} мин`})}</div></div></div><button type="button" class="ui-button" data-duration-save>Сохранить</button>`;
+  const content=`<div class="modal-title"><h2>${escapeHtml(host.querySelector('.duration-picker__label')?.textContent||'Длительность')}</h2></div><div class="time-wheel" data-duration-wheel><div class="time-wheel__column"><span class="time-wheel__label">Часы</span><div class="time-wheel__viewport">${wheel({values:hours,selected:initialHour,type:'duration-hours',formatter:v=>`${v} ч`})}</div></div><div class="time-wheel__column"><span class="time-wheel__label">Минуты</span><div class="time-wheel__viewport">${wheel({values:minutes,selected:initialMinute,type:'duration-minutes',formatter:v=>`${v} мин`})}</div></div></div><button type="button" class="ui-button" data-duration-save>Сохранить</button>`;
   const modalRoot=mountModal(document.body,modal(content,{title:host.querySelector('.duration-picker__label')?.textContent||'Длительность',variant:'compact'}));
   if(!modalRoot)return;
 
@@ -83,6 +83,6 @@ function open(host){
     const hours=Number(modalRoot.querySelector('[data-time-wheel-type="duration-hours"].is-selected')?.dataset.value)||0;
     const minutes=Number(modalRoot.querySelector('[data-time-wheel-type="duration-minutes"].is-selected')?.dataset.value)||0;
     const total=hours*60+minutes;
-    hidden.value=String(total);host.querySelector('[data-duration-open]').textContent=text(total);modalRoot.remove();
+    hidden.value=String(total);host.querySelector('[data-duration-open]').textContent=durationText(total);modalRoot.remove();
   });
 }

@@ -81,3 +81,5 @@ function openPhotoForm(root, wallet, navigateBack) {
 export function renderWallets(root, navigateBack = () => {}) {
   renderList(root, navigateBack);
 }
+
+export { renderWallets as render };

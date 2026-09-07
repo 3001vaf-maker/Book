@@ -16,9 +16,8 @@ function renderRows(root) {
     element.addEventListener('click', async () => {
       const folder = folders.find(([key]) => key === element.dataset.settingsOpen);
       if (!folder) return;
-      const module = await folder[3]();
-      const render = module.render || module.renderSettings || module.renderService || module.renderTags || module.renderWallets;
-      render?.(root, () => renderRows(root));
+      const { render } = await folder[3]();
+      render(root, () => renderRows(root));
     });
   });
 }

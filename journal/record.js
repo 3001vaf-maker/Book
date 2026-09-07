@@ -1,4 +1,4 @@
-import { entityCard, escapeHtml, list, listEntry, stateView, initStateView, initCalendar, mountModal, modal, timePicker, initTimePickers, initMultiSelect } from '../ui/ui.js';
+import { durationText, entityCard, escapeHtml, list, listEntry, stateView, initStateView, initCalendar, mountModal, modal, timePicker, initTimePickers, initMultiSelect } from '../ui/ui.js';
 import { createRecord, deleteRecord } from '../core/record.js';
 import { isTimeRangeAvailable, getTimeUsages } from '../core/time-usage.js';
 import { getWorkplaces } from '../core/workplace-time.js';
@@ -8,7 +8,6 @@ const readList = (key) => { try { const value = JSON.parse(localStorage.getItem(
 const people = () => readList('book.people');
 const procedures = () => readList('book.procedures').filter((item) => !item.deletedAt);
 const clientName = (person) => [person?.name, person?.surname].filter(Boolean).join(' ') || 'Без имени';
-const durationText = (minutes) => { const m = Number(minutes) || 0; const h = Math.floor(m / 60); const min = m % 60; return h ? `${h} ч${min ? ` ${min} мин` : ''}` : `${min} мин`; };
 const timeToMinutes = (value) => { const match = String(value || '').match(/^(\d{1,2}):(\d{2})$/); return match ? Number(match[1]) * 60 + Number(match[2]) : null; };
 const minutesToTime = (value) => `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`;
 function dateKey(date) { const d = date instanceof Date ? date : new Date(date); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
