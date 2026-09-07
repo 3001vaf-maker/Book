@@ -122,13 +122,13 @@ export function renderTimetable(root) {
     if (makeWorking) {
       const base = resolveWorkplaceTime(workplaces, selectedWorkplaceId); if (!base) return;
       const conflictingDates = dates.filter((date) => !getDay(workingDays, selectedWorkplaceId, date) && hasScheduleConflict(workingDays, { workplaceId: selectedWorkplaceId, date, from: base.from, to: base.to }));
-      if (conflictingDates.length) {
+      if (conflictingDates.length === dates.length) {
         if (dates.length === 1) openWorkingDayConflictModal(conflictingDates[0]);
         else openWorkingDaysConflictModal();
         return;
       }
       for (const date of dates) {
-        if (getDay(workingDays, selectedWorkplaceId, date)) continue;
+        if (getDay(workingDays, selectedWorkplaceId, date) || conflictingDates.includes(date)) continue;
         const day = createDay({ date, workplaceId: selectedWorkplaceId, from: base.from, to: base.to }); if (day) workingDays.push(day);
       }
     } else {
