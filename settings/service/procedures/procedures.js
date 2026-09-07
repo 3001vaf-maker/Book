@@ -1,9 +1,9 @@
-import { actionBlock, button, collectCost, collectWorkplaceSelections, costField, durationPicker, emptyState, entityCard, escapeHtml, field, iconButton, initCostFields, initDurationPickers, initPhotoField, initWorkplaceSelectors, listEntries, listEntry, mountModal, modal, page, pageHeader, photoField, workplaceSelector } from '../../../ui/ui.js';
+import { actionBlock, button, collectCost, collectWorkplaceSelections, costField, durationPicker, emptyState, entityCard, escapeHtml, field, iconButton, initCostFields, initDurationPickers, initPhotoField, initWorkplaceSelectors, listEntries, listEntry, mountModal, modal, page, pageHeader, photoField, textareaField, workplaceSelector } from '../../../ui/ui.js';
 import { getWorkplaces } from '../../profile/workplaces/data.js';
 import { deleteProcedure as deleteProcedureData, getProcedures, pushProcedureHistory, saveProcedure as saveProcedureData } from './data.js';
 
 const durationText=m=>{m=Number(m)||0;const h=Math.floor(m/60),min=m%60;return h?`${h} ч${min?` ${min} мин`:''}`:`${min} мин`};
-const workplaceCountText=count=>`${Math.max(0,Number(count)||0)} м/р`;
+const workplaceCountText=count=>`${Math.max(0,Number(count)||0)} р.м.`;
 const fmt=v=>v===''||v==null?'':`${Number(v).toLocaleString('ru-RU')} ₽`;
 const costParts=cost=>{if(!cost||cost.free)return{rightTop:'Бесплатно'};if(cost.mode==='from-to')return{rightTop:`от ${fmt(cost.from)}`,rightBottom:`до ${fmt(cost.to)}`};if(cost.mode==='from')return{rightTop:`от ${fmt(cost.from??cost.amount)}`};return{rightTop:fmt(cost.amount??cost.from)}};
 const cardCostMeta=cost=>{
@@ -28,8 +28,8 @@ function renderRow(p){
 }
 
 function openForm(root,existing=null,navigateBack=()=>{}){
-  const p=existing||{photo:'',name:'',duration:0,breakDuration:0,cost:{mode:'amount',amount:'',free:false},workplaces:[]};
-  const html=`<form class="compact-form" data-procedure-form><div class="modal-title"><h2>${existing?'Изменить процедуру':'Процедура'}</h2></div>${photoField({name:'procedurePhoto',value:p.photo||''})}${field({label:'Название',name:'procedureName',value:p.name||'',placeholder:'Название процедуры',required:true})}${costField({value:p.cost||{},name:'procedureCost'})}<div class="work-time-row__fields">${durationPicker({label:'Длительность',name:'procedureDuration',value:p.duration||0})}${durationPicker({label:'Перерыв',name:'procedureBreak',value:p.breakDuration||0})}</div><div class="array-group"><span class="array-label">Рабочие места</span>${workplaceSelector({name:'procedureWorkplaces',selected:p.workplaces||[],allowMultiple:true,workplaces:getWorkplaces()})}</div>${button('Сохранить',{type:'submit'})}</form>`;
+  const p=existing||{photo:'',name:'',description:'',duration:0,breakDuration:0,cost:{mode:'amount',amount:'',free:false},workplaces:[]};
+  const html=`<form class="compact-form" data-procedure-form><div class="modal-title"><h2>${existing?'Изменить процедуру':'Процедура'}</h2></div>${photoField({name:'procedurePhoto',value:p.photo||''})}${field({label:'Название',name:'procedureName',value:p.name||'',placeholder:'Название процедуры',required:true})}${textareaField({label:'Описание',name:'procedureDescription',value:p.description||'',placeholder:'Описание процедуры'})}${costField({value:p.cost||{},name:'procedureCost'})}<div class="work-time-row__fields">${durationPicker({label:'Длительность',name:'procedureDuration',value:p.duration||0})}${durationPicker({label:'Перерыв',name:'procedureBreak',value:p.breakDuration||0})}</div><div class="array-group"><span class="array-label">Рабочие места</span>${workplaceSelector({name:'procedureWorkplaces',selected:p.workplaces||[],allowMultiple:true,workplaces:getWorkplaces()})}</div>${button('Сохранить',{type:'submit'})}</form>`;
   const m=mountModal(root,modal(html));
   initPhotoField(m);initCostFields(m);initDurationPickers(m);initWorkplaceSelectors(m);
   m.querySelector('[data-procedure-form]')?.addEventListener('submit',e=>{e.preventDefault();saveProcedure(root,m,existing,navigateBack)});
@@ -37,7 +37,7 @@ function openForm(root,existing=null,navigateBack=()=>{}){
 
 function saveProcedure(root,m,existing,navigateBack){
   const data=new FormData(m.querySelector('[data-procedure-form]'));const name=String(data.get('procedureName')||'').trim();if(!name)return;
-  const item={id:existing?.id||crypto.randomUUID(),photo:String(data.get('procedurePhoto')||''),name,duration:Number(data.get('procedureDuration')||0),breakDuration:Number(data.get('procedureBreak')||0),cost:collectCost(m,'procedureCost'),workplaces:collectWorkplaceSelections(m,'procedureWorkplaces'),createdAt:existing?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()};
+  const item={id:existing?.id||crypto.randomUUID(),photo:String(data.get('procedurePhoto')||''),name,description:String(data.get('procedureDescription')||'').trim(),duration:Number(data.get('procedureDuration')||0),breakDuration:Number(data.get('procedureBreak')||0),cost:collectCost(m,'procedureCost'),workplaces:collectWorkplaceSelections(m,'procedureWorkplaces'),createdAt:existing?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()};
   if(existing)pushProcedureHistory(existing,'updated');saveProcedureData(item);m.remove();renderList(root,navigateBack);
 }
 
