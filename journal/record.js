@@ -1,4 +1,4 @@
-import { durationText, entityCard, escapeHtml, list, listEntry, stateView, initStateView, initCalendar, mountModal, modal, timePicker, initTimePickers, initMultiSelect } from '../ui/ui.js';
+import { durationText, entityCard, escapeHtml, list, listEntry, stateView, initStateView, initCalendar, mountModal, modal, timePicker, initTimePickers, initMultiSelect } from '../ui/ui.js?v=settings-architecture-20260907';
 import { createRecord, deleteRecord } from '../core/record.js';
 import { isTimeRangeAvailable, getTimeUsages } from '../core/time-usage.js';
 import { getWorkplaces } from '../core/workplace-time.js';

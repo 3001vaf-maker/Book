@@ -1,8 +1,8 @@
 import { actionBlock, button, folderList, pageHeader } from '../../ui/ui.js';
 
 const children = [
-  ['procedures', 'Процедуры', () => import('./procedures/procedures.js?v=description-workplace-wording-20260907')],
-  ['products', 'Товары', () => import('./products/products.js')],
+  ['procedures', 'Процедуры', () => import('./procedures/procedures.js?v=shared-duration-text-20260907')],
+  ['products', 'Товары', () => import('./products/products.js?v=shared-render-contract-20260907')],
 ];
 
 export function renderService(root, navigateBack = () => {}) {

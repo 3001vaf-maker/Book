@@ -1,13 +1,13 @@
 import { folderList, pageHeader } from '../ui/ui.js';
 
 const folders = [
-  ['profile', 'Профиль', '◫', () => import('./profile/profile.js')],
-  ['service', 'Сервис', '◫', () => import('./service/service.js')],
+  ['profile', 'Профиль', '◫', () => import('./profile/profile.js?v=shared-workplace-add-20260907')],
+  ['service', 'Сервис', '◫', () => import('./service/service.js?v=shared-render-contract-20260907')],
   ['warehouse', 'Склад', '◫', () => import('./warehouse/warehouse.js')],
   ['documents', 'Документы', '◫', () => import('./documents/documents.js')],
   ['loyalty', 'Программа лояльности', '◫', () => import('./loyalty/loyalty.js')],
-  ['tags', 'Ярлыки', '◫', () => import('./tags/tags.js')],
-  ['wallets', 'Кошелёк', '◫', () => import('./wallets/wallets.js')],
+  ['tags', 'Ярлыки', '◫', () => import('./tags/tags.js?v=shared-render-contract-20260907')],
+  ['wallets', 'Кошелёк', '◫', () => import('./wallets/wallets.js?v=shared-render-contract-20260907')],
 ];
 
 function renderRows(root) {

@@ -1,11 +1,11 @@
 import { renderMain } from './main/main.js';
-import { renderJournal } from './journal/journal.js';
+import { renderJournal } from './journal/journal.js?v=shared-duration-text-20260907';
 import { renderTimetable } from './timetable/timetable.js?v=graph-lifecycle-20260903';
 import { renderChat } from './chat/chat.js';
-import { renderSettings } from './settings/settings.js';
+import { renderSettings } from './settings/settings.js?v=shared-render-contract-20260907';
 import { getWorkplaces as getWorkplaceEntities } from './settings/profile/workplaces/data.js';
 import { configureWorkplaceSource } from './core/workplace-time.js';
-import { bottomNavigation } from './ui/ui.js';
+import { bottomNavigation } from './ui/ui.js?v=settings-architecture-20260907';
 
 configureWorkplaceSource(getWorkplaceEntities);
 
