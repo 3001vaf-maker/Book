@@ -9,6 +9,10 @@ function metricMarkup(items = []) {
   return items.map(({ value = '—', label = '' }) => `<span class="entity-card__metric"><strong>${escapeHtml(value)}</strong>${label ? `<small>${escapeHtml(label)}</small>` : ''}</span>`).join('');
 }
 
+function topMetaMarkup(items = []) {
+  return items.map(({ value = '—', label = '' }) => `<span class="entity-card__top-meta"><strong>${escapeHtml(value)}</strong>${label ? `<small>${escapeHtml(label)}</small>` : ''}</span>`).join('');
+}
+
 export function entityCard({
   id = '',
   title = '',
@@ -16,6 +20,7 @@ export function entityCard({
   image = '',
   initial = '?',
   meta = [],
+  topMeta = [],
   interactive = false,
   data = '',
   className = '',
@@ -35,10 +40,11 @@ export function entityCard({
   if (canonical) {
     const identity = `${id ? `<span class="entity-card__id">${escapeHtml(id)}</span>` : '<span class="entity-card__id" aria-hidden="true"></span>'}<strong class="entity-card__title"${titleStyle(title)}>${escapeHtml(title)}</strong>${subtitle ? `<span class="entity-card__subtitle">${escapeHtml(subtitle)}</span>` : '<span class="entity-card__subtitle" aria-hidden="true"></span>'}`;
     const metrics = meta.length ? `<div class="entity-card__metrics entity-card__metrics--${escapeHtml(metricsLayout)}">${metricMarkup(meta)}</div>` : '';
+    const topContent = topMeta.length ? `<div class="entity-card__top-meta-list">${topMetaMarkup(topMeta)}</div>` : '';
     return `<${tag} class="entity-card entity-card--canonical ${image ? 'has-image' : ''} ${className}"${attrs}${style}>
       <div class="entity-card__background" aria-hidden="true"></div>
       <div class="entity-card__content">
-        <div class="entity-card__zone entity-card__zone--top"></div>
+        <div class="entity-card__zone entity-card__zone--top">${topContent}</div>
         <div class="entity-card__zone entity-card__zone--media"></div>
         <div class="entity-card__zone entity-card__zone--identity">${identity}</div>
         ${metrics}
