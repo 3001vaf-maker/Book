@@ -1,6 +1,8 @@
 name: Check Book
 
 on:
+  push:
+    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -18,7 +20,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Syntax check
+      - name: Syntax and architecture checks
         run: npm run check
       - name: Domain regression tests
         run: npm test
