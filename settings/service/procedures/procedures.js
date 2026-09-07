@@ -3,13 +3,14 @@ import { getWorkplaces } from '../../profile/workplaces/data.js';
 import { deleteProcedure as deleteProcedureData, getProcedures, pushProcedureHistory, saveProcedure as saveProcedureData } from './data.js';
 
 const durationText=m=>{m=Number(m)||0;const h=Math.floor(m/60),min=m%60;return h?`${h} ч${min?` ${min} мин`:''}`:`${min} мин`};
+const workplaceCountText=count=>`${Math.max(0,Number(count)||0)} м/р`;
 const fmt=v=>v===''||v==null?'':`${Number(v).toLocaleString('ru-RU')} ₽`;
 const costParts=cost=>{if(!cost||cost.free)return{rightTop:'Бесплатно'};if(cost.mode==='from-to')return{rightTop:`от ${fmt(cost.from)}`,rightBottom:`до ${fmt(cost.to)}`};if(cost.mode==='from')return{rightTop:`от ${fmt(cost.from??cost.amount)}`};return{rightTop:fmt(cost.amount??cost.from)}};
 const cardCostMeta=cost=>{
-  if(!cost||cost.free)return[{value:'стоимость',weight:'regular'},{value:'Бесплатно'}];
-  if(cost.mode==='from-to')return[{value:`от ${fmt(cost.from)}`,weight:'regular'},{value:`до ${fmt(cost.to)}`,weight:'regular'}];
-  if(cost.mode==='from')return[{value:'от',weight:'regular'},{value:fmt(cost.from??cost.amount)}];
-  return[{value:'стоимость',weight:'regular'},{value:fmt(cost.amount??cost.from)||'—'}];
+  if(!cost||cost.free)return[{value:'стоимость'},{value:'Бесплатно'}];
+  if(cost.mode==='from-to')return[{value:`от ${fmt(cost.from)}`},{value:`до ${fmt(cost.to)}`}];
+  if(cost.mode==='from')return[{value:'от'},{value:fmt(cost.from??cost.amount)}];
+  return[{value:'стоимость'},{value:fmt(cost.amount??cost.from)||'—'}];
 };
 
 function renderList(root,navigateBack){
@@ -23,7 +24,7 @@ function renderList(root,navigateBack){
 
 function renderRow(p){
   const price=costParts(p.cost),workplaceCount=(p.workplaces||[]).length;
-  return listEntry({title:p.name||'',subtitle:`${durationText(p.duration)} — ${workplaceCount}`,image:p.photo||'',initial:(p.name||'?').slice(0,1).toUpperCase(),rightTop:price.rightTop||'',rightBottom:price.rightBottom||'',interactive:true,data:`data-procedure="${escapeHtml(p.id)}"`,aria:`Открыть процедуру ${p.name||''}`,deleteData:p.id,deleteAria:`Удалить процедуру ${p.name||''}`});
+  return listEntry({title:p.name||'',subtitle:`${durationText(p.duration)} — ${workplaceCountText(workplaceCount)}`,image:p.photo||'',initial:(p.name||'?').slice(0,1).toUpperCase(),rightTop:price.rightTop||'',rightBottom:price.rightBottom||'',interactive:true,data:`data-procedure="${escapeHtml(p.id)}"`,aria:`Открыть процедуру ${p.name||''}`,deleteData:p.id,deleteAria:`Удалить процедуру ${p.name||''}`});
 }
 
 function openForm(root,existing=null,navigateBack=()=>{}){
@@ -48,7 +49,7 @@ function renderCard(root,id,navigateBack){
     subtitle:durationText(p.duration),
     image:p.photo||'',
     initial:(p.name||'?').slice(0,1).toUpperCase(),
-    topMeta:[{value:String(workplaceNames.length)}],
+    topMeta:[{value:workplaceCountText(workplaceNames.length)}],
     topRightMeta:cardCostMeta(p.cost),
     meta:workplaceNames.map(name=>({value:name})),
     metricsLayout:'vertical',
