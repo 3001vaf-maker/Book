@@ -21,11 +21,6 @@ function open(host){
   const modalRoot=mountModal(document.body,modal(content,{title:host.querySelector('.duration-picker__label')?.textContent||'Длительность',variant:'compact'}));
   if(!modalRoot)return;
 
-  const center=(type,value)=>{
-    const item=modalRoot.querySelector(`[data-time-wheel-type="${type}"][data-value="${value}"][data-cycle="${MIDDLE_CYCLE}"]`);
-    if(item)item.scrollIntoView({block:'center'});
-  };
-
   const nearestItem=(viewport)=>{
     const items=[...viewport.querySelectorAll('[data-time-wheel-item]')];
     if(!items.length)return null;
@@ -35,10 +30,20 @@ function open(host){
     return nearest;
   };
 
+  const selectOnly=(viewport,item)=>viewport.querySelectorAll('[data-time-wheel-item]').forEach(other=>other.classList.toggle('is-selected',other===item));
+
+  const center=(type,value)=>{
+    const item=modalRoot.querySelector(`[data-time-wheel-type="${type}"][data-value="${CSS.escape(String(value))}"][data-cycle="${MIDDLE_CYCLE}"]`);
+    const viewport=item?.closest('.time-wheel__viewport');
+    if(!item||!viewport)return;
+    viewport.scrollTop=item.offsetTop-(viewport.clientHeight-item.offsetHeight)/2;
+    selectOnly(viewport,item);
+  };
+
   const syncColumn=(viewport,{recenter=true}={})=>{
     const nearest=nearestItem(viewport);
     if(!nearest)return;
-    viewport.querySelectorAll('[data-time-wheel-item]').forEach(item=>item.classList.toggle('is-selected',item===nearest));
+    selectOnly(viewport,nearest);
     if(!recenter)return;
     const cycle=Number(nearest.dataset.cycle);
     if(cycle===MIDDLE_CYCLE)return;
@@ -47,10 +52,9 @@ function open(host){
     const twin=modalRoot.querySelector(`[data-time-wheel-type="${type}"][data-value="${CSS.escape(value)}"][data-cycle="${MIDDLE_CYCLE}"]`);
     if(!twin)return;
     viewport.scrollTop+=twin.offsetTop-nearest.offsetTop;
-    viewport.querySelectorAll('[data-time-wheel-item]').forEach(item=>item.classList.toggle('is-selected',item===twin));
+    selectOnly(viewport,twin);
   };
 
-  center('duration-hours',initialHour);center('duration-minutes',initialMinute);
   modalRoot.querySelectorAll('.time-wheel__viewport').forEach(viewport=>{
     let frame=0;
     let settle=0;
@@ -60,14 +64,18 @@ function open(host){
       frame=requestAnimationFrame(()=>syncColumn(viewport,{recenter:false}));
       settle=setTimeout(()=>syncColumn(viewport,{recenter:true}),90);
     },{passive:true});
-    syncColumn(viewport,{recenter:false});
   });
+
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    center('duration-hours',initialHour);
+    center('duration-minutes',initialMinute);
+  }));
 
   modalRoot.querySelectorAll('[data-time-wheel-item]').forEach(item=>item.addEventListener('click',()=>{
     const viewport=item.closest('.time-wheel__viewport');
-    viewport?.querySelectorAll('[data-time-wheel-item]').forEach(other=>other.classList.remove('is-selected'));
-    item.classList.add('is-selected');
-    item.scrollIntoView({block:'center',behavior:'smooth'});
+    if(!viewport)return;
+    selectOnly(viewport,item);
+    viewport.scrollTo({top:item.offsetTop-(viewport.clientHeight-item.offsetHeight)/2,behavior:'smooth'});
   }));
 
   modalRoot.querySelector('[data-duration-save]')?.addEventListener('click',()=>{
