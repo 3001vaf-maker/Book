@@ -1,2 +1,2 @@
-import { button, emptyState, pageHeader } from '../../../ui/ui.js';
-export function render(root,navigateBack=()=>{}){root.innerHTML=`${pageHeader('Бонусная программа')}${emptyState('Раздел подготовлен','Содержимое добавляется отдельным ТЗ.')}<div class="profile-actions">${button('Назад',{className:'ui-button--secondary',data:'data-loyalty-child-back'})}</div>`;root.querySelector('[data-loyalty-child-back]')?.addEventListener('click',navigateBack)}
+import { actionBlock, button, emptyState, pageHeader } from '../../../ui/ui.js';
+export function render(root,navigateBack=()=>{}){root.innerHTML=`${pageHeader('Бонусная программа')}${emptyState('Раздел подготовлен','Содержимое добавляется отдельным ТЗ.')}${actionBlock(button('Назад',{className:'ui-button--secondary',data:'data-loyalty-child-back'}))}`;root.querySelector('[data-loyalty-child-back]')?.addEventListener('click',navigateBack)}
