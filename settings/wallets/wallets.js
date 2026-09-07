@@ -12,7 +12,7 @@ function renderList(root, navigateBack) {
 function renderRow(wallet) {
   return listEntry({
     title: wallet.name,
-    subtitle: wallet.system ? 'Системный кошелёк' : '',
+    subtitle: '',
     image: wallet.photo || '',
     initial: (wallet.name || '?').slice(0, 1).toUpperCase(),
     interactive: true,
@@ -55,7 +55,7 @@ function renderCard(root, id, navigateBack) {
   if (!wallet) return renderList(root, navigateBack);
   const card=entityCard({
     title:wallet.name||'',
-    subtitle:wallet.system?'Системный кошелёк':'',
+    subtitle:'',
     image:wallet.photo||'',
     initial:(wallet.name||'?').slice(0,1).toUpperCase(),
     className:'entity-card--hero'

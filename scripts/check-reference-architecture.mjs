@@ -99,6 +99,11 @@ if (/iconButton\('\+'[^)]*data-add-workplace/.test(text(profileController))) {
   report(profileController, 'Profile must not recreate the workplace add button locally');
 }
 
+const walletsController = join(root, 'settings/wallets/wallets.js');
+if (/Системный кошелёк/.test(text(walletsController))) {
+  report(walletsController, 'The internal system-wallet flag must not be exposed as a visible label');
+}
+
 if (errors.length) {
   console.error('reference architecture check: FAILED');
   for (const error of errors) console.error(`- ${error}`);
