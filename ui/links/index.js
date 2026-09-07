@@ -5,7 +5,7 @@ import { select } from '../selectors/index.js';
 export const LINK_TYPES = ['Instagram', 'ВКонтакте', 'YouTube', 'Facebook', 'Сайт', 'Другое'];
 
 function linkRow(link = {}) {
-  return `<div class="array-group link-row" data-link-row>${select({ name:'linkType', value:link.type||'Instagram', options:LINK_TYPES })}<div class="array-row"><input name="linkUrl" value="${escapeHtml(link.url||'')}" placeholder="URL"><button type="button" class="remove-button" data-remove-link aria-label="Удалить ссылку">🗑</button></div></div>`;
+  return `<div class="array-group link-row" data-link-row>${select({ name:'linkType', value:link.type||'Instagram', options:LINK_TYPES })}<div class="array-row"><input name="linkUrl" value="${escapeHtml(link.url||'')}" placeholder="URL"><button type="button" class="remove-button" data-remove-link aria-label="Удалить ссылку">×</button></div></div>`;
 }
 
 export function links({ links: values = [], name = 'links' } = {}) {
