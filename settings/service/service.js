@@ -10,7 +10,7 @@ export function renderService(root, navigateBack = () => {}) {
   root.querySelectorAll('[data-service-open]').forEach((element) => {
     element.addEventListener('click', async () => {
       if (element.dataset.serviceOpen === 'procedures') {
-        const { renderProcedures } = await import('./procedures/procedures.js');
+        const { renderProcedures } = await import('./procedures/procedures.js?v=description-workplace-wording-20260907');
         renderProcedures(root, () => renderService(root, navigateBack));
       } else if (element.dataset.serviceOpen === 'products') {
         const { renderProducts } = await import('./products/products.js');
