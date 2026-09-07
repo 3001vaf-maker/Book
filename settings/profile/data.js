@@ -10,12 +10,22 @@ function write(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
+function normalizeList(values) {
+  return (Array.isArray(values) ? values : [])
+    .map((value) => String(value || '').trim())
+    .filter(Boolean);
+}
+
 function normalizeProfile(profile = {}) {
+  const phones = normalizeList(profile.phones?.length ? profile.phones : [profile.phone]);
   return {
     key: 'profile',
     name: String(profile.name || ''),
     surname: String(profile.surname || ''),
-    phone: String(profile.phone || ''),
+    phone: phones[0] || '',
+    phones,
+    telegrams: normalizeList(profile.telegrams),
+    emails: normalizeList(profile.emails),
     about: String(profile.about || ''),
     photo: String(profile.photo || ''),
     profession: String(profile.profession || ''),
