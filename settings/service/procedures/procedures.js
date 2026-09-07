@@ -6,10 +6,10 @@ const durationText=m=>{m=Number(m)||0;const h=Math.floor(m/60),min=m%60;return h
 const fmt=v=>v===''||v==null?'':`${Number(v).toLocaleString('ru-RU')} ₽`;
 const costParts=cost=>{if(!cost||cost.free)return{rightTop:'Бесплатно'};if(cost.mode==='from-to')return{rightTop:`от ${fmt(cost.from)}`,rightBottom:`до ${fmt(cost.to)}`};if(cost.mode==='from')return{rightTop:`от ${fmt(cost.from??cost.amount)}`};return{rightTop:fmt(cost.amount??cost.from)}};
 const cardCostMeta=cost=>{
-  if(!cost||cost.free)return[{value:'Бесплатно',label:'стоимость'}];
-  if(cost.mode==='from-to')return[{value:`от ${fmt(cost.from)}`},{value:`до ${fmt(cost.to)}`}];
-  if(cost.mode==='from')return[{value:''},{value:`от ${fmt(cost.from??cost.amount)}`}];
-  return[{value:fmt(cost.amount??cost.from)||'—'},{value:'стоимость'}];
+  if(!cost||cost.free)return[{value:'стоимость',weight:'regular'},{value:'Бесплатно'}];
+  if(cost.mode==='from-to')return[{value:`от ${fmt(cost.from)}`,weight:'regular'},{value:`до ${fmt(cost.to)}`,weight:'regular'}];
+  if(cost.mode==='from')return[{value:'от',weight:'regular'},{value:fmt(cost.from??cost.amount)}];
+  return[{value:'стоимость',weight:'regular'},{value:fmt(cost.amount??cost.from)||'—'}];
 };
 
 function renderList(root,navigateBack){
@@ -50,9 +50,9 @@ function renderCard(root,id,navigateBack){
     initial:(p.name||'?').slice(0,1).toUpperCase(),
     topMeta:workplaceNames.length?[{value:workplaceNames[0]}]:[],
     topRightMeta:cardCostMeta(p.cost),
-    meta:workplaceNames.map(name=>({value:name,label:'место работы'})),
+    meta:workplaceNames.map(name=>({value:name})),
     metricsLayout:'vertical',
-    className:'entity-card--hero entity-card--top-light'
+    className:'entity-card--hero entity-card--top-dark'
   });
   root.innerHTML=page([card,actionBlock(`${button('Редактировать процедуру',{data:'data-edit-procedure'})}${button('Назад',{className:'ui-button--secondary',data:'data-back-procedures-card'})}${button('Удалить',{variant:'danger',data:'data-delete-card'})}`)]);
   root.querySelector('[data-edit-procedure]').onclick=()=>openForm(root,p,navigateBack);
