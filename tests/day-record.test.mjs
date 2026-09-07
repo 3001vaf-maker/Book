@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createDay, hasScheduleConflict } from '../core/day.js';
+import { createDay, getScheduleConflicts, hasScheduleConflict } from '../core/day.js';
 import { createRecord, moveRecord, cancelRecord, deleteRecord, getRecords } from '../journal/record-data.js';
 
 const store = new Map();
@@ -15,6 +15,11 @@ store.set('book:timetable-state', JSON.stringify({ workingDays: days }));
 
 assert.equal(hasScheduleConflict(days, { workplaceId: 'charodeyka', date: '2026-09-15', from: '16:00', to: '20:00' }), false);
 assert.equal(hasScheduleConflict(days, { workplaceId: 'charodeyka', date: '2026-09-15', from: '15:00', to: '18:00' }), true);
+const conflicts = getScheduleConflicts(days, { workplaceId: 'charodeyka', date: '2026-09-15', from: '15:00', to: '18:00' });
+assert.equal(conflicts.length, 1);
+assert.equal(conflicts[0].workplaceId, 'romashka');
+assert.equal(conflicts[0].from, '12:00');
+assert.equal(conflicts[0].to, '16:00');
 
 const record = createRecord({ date: '2026-09-15', workplaceId: 'romashka', from: '12:00', to: '13:00', client: { name: 'Тест' } });
 assert.ok(record);

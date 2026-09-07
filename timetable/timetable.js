@@ -1,11 +1,12 @@
 import { actionBlock, button, pageHeader, initCalendar, initMultiSelect, select, modal, mountModal, timePicker, initTimePickers, escapeHtml, workplaceHeaderButton, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js';
 import { getWorkplaces, resolveWorkplaceTime } from '../core/workplace-time.js';
-import { getDays, saveDays, getDay, getDayTime, createDay, updateDayTime, hasScheduleConflict, findSuggestedInterval, migrateLegacyWorkingDates } from '../core/day.js';
+import { getDays, saveDays, getDay, getDayTime, createDay, updateDayTime, getScheduleConflicts, hasScheduleConflict, findSuggestedInterval, migrateLegacyWorkingDates } from '../core/day.js';
 
 function workplaceOptions(workplaces) { return workplaces.map((workplace) => ({ value: workplace.key, label: workplace.name || 'Без названия' })); }
 function datesForWorkplace(days, workplaceId) { return days.filter((item) => item?.workplaceId === workplaceId).map((item) => item.date).filter(Boolean); }
 function workingDayForDate(days, workplaceId, date) { return getDay(days, workplaceId, date); }
 function minutesBetween(from, to) { const [fh, fm] = from.split(':').map(Number); const [th, tm] = to.split(':').map(Number); return Math.max(0, th * 60 + tm - fh * 60 - fm); }
+function formatDateLabel(value) { const [year, month, day] = String(value || '').split('-'); return year && month && day ? `${day}.${month}.${year}` : String(value || ''); }
 function monthStats(month, days, workplaceId, workplaces) {
   const prefix = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}-`;
   const selected = datesForWorkplace(days, workplaceId).filter((date) => date.startsWith(prefix));
@@ -69,24 +70,50 @@ export function renderTimetable(root) {
     m?.querySelector('[data-timetable-workplace-save]')?.addEventListener('click', () => { selectedWorkplaceId = m.querySelector('[data-timetable-workplace-modal]')?.value || selectedWorkplaceId; setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: calendar?.getDisplayedMonth() || initialDate }); const month = calendar?.getDisplayedMonth() || initialMonth; selection?.destroy(); startSelectionSession(month); renderHeader(month); m.remove(); });
   }
 
-  function openWorkingDayConflictModal(date) {
-    const workplace = workplaces.find((w) => w.key === selectedWorkplaceId); const base = resolveWorkplaceTime(workplaces, selectedWorkplaceId); if (!workplace || !base) return;
-    const suggested = findSuggestedInterval(workingDays, { workplaceId: selectedWorkplaceId, date, baseFrom: base.from, baseTo: base.to });
-    const suggestionText = suggested ? `${suggested.from}–${suggested.to}` : 'свободного интервала в стандартных часах нет';
-    const content = `<div class="modal-title"><h2>Выберите время</h2></div><p>На ${escapeHtml(date)} выбранное место пересекается с другой работой мастера.</p><div class="timetable-workplace-modal-summary"><strong>Можно предложить: ${escapeHtml(suggestionText)}</strong></div><div class="timetable-time-fields">${timePicker({ name: 'timetableConflictFrom', label: 'Начало', value: suggested?.from || base.from })}${timePicker({ name: 'timetableConflictTo', label: 'Окончание', value: suggested?.to || base.to })}</div><div class="form-error" data-timetable-conflict-error></div>${button('Сохранить', { data: 'data-timetable-conflict-save' })}`;
-    const m = mountModal(document.body, modal(content, { title: 'Выберите время' })); if (!m) return; initTimePickers(m);
-    m.querySelector('[data-timetable-conflict-save]')?.addEventListener('click', () => {
-      const from = m.querySelector('[name="timetableConflictFrom"]')?.value || base.from; const to = m.querySelector('[name="timetableConflictTo"]')?.value || base.to;
-      if (hasScheduleConflict(workingDays, { workplaceId: selectedWorkplaceId, date, from, to })) { m.querySelector('[data-timetable-conflict-error]').textContent = 'Это время пересекается с другой работой. Выберите другое время или другой день.'; return; }
-      const day = createDay({ date, workplaceId: selectedWorkplaceId, from, to }); if (!day) return;
-      workingDays.push(day); saveDays(workingDays); m.remove(); const month = calendar?.getDisplayedMonth() || initialMonth; selection?.destroy(); startSelectionSession(month); renderHeader(month);
-    });
+  function conflictWorkplaceLabel(day) {
+    return workplaces.find((item) => String(item?.key || '') === String(day?.workplaceId || ''))?.name || 'Другое место работы';
   }
 
-  function openWorkingDaysConflictModal() {
-    const content = `<div class="modal-title"><h2>Выберите другие даты</h2><p>Эти даты заняты другим салоном.</p></div>${button('Понятно', { data: 'data-timetable-multi-conflict-close' })}`;
-    const m = mountModal(document.body, modal(content, { title: 'Выберите другие даты', variant: 'compact' }));
-    m?.querySelector('[data-timetable-multi-conflict-close]')?.addEventListener('click', () => m.remove());
+  function buildConflictEntry(date, base) {
+    const conflicts = getScheduleConflicts(workingDays, { workplaceId: selectedWorkplaceId, date, from: base.from, to: base.to });
+    if (!conflicts.length) return null;
+    const suggested = findSuggestedInterval(workingDays, { workplaceId: selectedWorkplaceId, date, baseFrom: base.from, baseTo: base.to });
+    return { date, conflicts, suggested };
+  }
+
+  function openWorkingDaysConflictModal(entries, base) {
+    const rows = entries.map((entry, index) => {
+      const occupied = entry.conflicts.map((day) => `<div><span>Занято в другом месте</span><strong>${escapeHtml(conflictWorkplaceLabel(day))} · ${escapeHtml(day.from)}–${escapeHtml(day.to)}</strong></div>`).join('');
+      const initialFrom = entry.suggested?.from || base.from;
+      const initialTo = entry.suggested?.to || base.to;
+      return `<div class="compact-form" data-timetable-conflict-row="${index}"><div class="entity-details"><div><span>Дата</span><strong>${escapeHtml(formatDateLabel(entry.date))}</strong></div>${occupied}</div><div class="timetable-time-fields">${timePicker({ name: `timetableConflictFrom${index}`, label: 'Начало', value: initialFrom })}${timePicker({ name: `timetableConflictTo${index}`, label: 'Окончание', value: initialTo })}</div><div class="form-error" data-timetable-conflict-error="${index}"></div></div>`;
+    }).join('');
+    const content = `<div class="modal-title"><h2>Конфликт времени</h2><p>На этих датах вы уже работаете в другом месте. Скорректируйте время для выбранного места.</p></div>${rows}${button('Сохранить', { data: 'data-timetable-conflicts-save' })}`;
+    const m = mountModal(document.body, modal(content, { title: 'Конфликт времени' })); if (!m) return; initTimePickers(m);
+    m.querySelector('[data-timetable-conflicts-save]')?.addEventListener('click', () => {
+      const updates = [];
+      let hasError = false;
+      entries.forEach((entry, index) => {
+        const from = m.querySelector(`[name="timetableConflictFrom${index}"]`)?.value || base.from;
+        const to = m.querySelector(`[name="timetableConflictTo${index}"]`)?.value || base.to;
+        const error = m.querySelector(`[data-timetable-conflict-error="${index}"]`);
+        if (hasScheduleConflict(workingDays, { workplaceId: selectedWorkplaceId, date: entry.date, from, to })) {
+          if (error) error.textContent = 'Это время всё ещё пересекается с другой работой.';
+          hasError = true;
+          return;
+        }
+        if (error) error.textContent = '';
+        updates.push({ date: entry.date, from, to });
+      });
+      if (hasError) return;
+      for (const item of updates) {
+        if (getDay(workingDays, selectedWorkplaceId, item.date)) updateDayTime(workingDays, selectedWorkplaceId, item.date, item.from, item.to);
+        else { const day = createDay({ date: item.date, workplaceId: selectedWorkplaceId, from: item.from, to: item.to }); if (day) workingDays.push(day); }
+      }
+      saveDays(workingDays);
+      const month = calendar?.getDisplayedMonth() || initialMonth;
+      selection?.destroy(); startSelectionSession(month); renderHeader(month); m.remove();
+    });
   }
 
   function openWorkplaceTimeModal() {
@@ -121,15 +148,19 @@ export function renderTimetable(root) {
     const makeWorking = selectionMode === 'make-working';
     if (makeWorking) {
       const base = resolveWorkplaceTime(workplaces, selectedWorkplaceId); if (!base) return;
-      const conflictingDates = dates.filter((date) => !getDay(workingDays, selectedWorkplaceId, date) && hasScheduleConflict(workingDays, { workplaceId: selectedWorkplaceId, date, from: base.from, to: base.to }));
-      if (conflictingDates.length === dates.length) {
-        if (dates.length === 1) openWorkingDayConflictModal(conflictingDates[0]);
-        else openWorkingDaysConflictModal();
-        return;
-      }
-      for (const date of dates) {
-        if (getDay(workingDays, selectedWorkplaceId, date) || conflictingDates.includes(date)) continue;
+      const candidates = dates.filter((date) => !getDay(workingDays, selectedWorkplaceId, date));
+      const conflictEntries = candidates.map((date) => buildConflictEntry(date, base)).filter(Boolean);
+      const conflictDates = new Set(conflictEntries.map((entry) => entry.date));
+      const freeDates = candidates.filter((date) => !conflictDates.has(date));
+      for (const date of freeDates) {
         const day = createDay({ date, workplaceId: selectedWorkplaceId, from: base.from, to: base.to }); if (day) workingDays.push(day);
+      }
+      if (freeDates.length) saveDays(workingDays);
+      if (conflictEntries.length) {
+        const month = calendar?.getDisplayedMonth() || initialMonth;
+        if (freeDates.length) { selection?.destroy(); startSelectionSession(month); renderHeader(month); }
+        openWorkingDaysConflictModal(conflictEntries, base);
+        return;
       }
     } else {
       for (let i = workingDays.length - 1; i >= 0; i -= 1) if (workingDays[i]?.workplaceId === selectedWorkplaceId && dates.includes(workingDays[i].date)) workingDays.splice(i, 1);

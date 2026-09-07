@@ -65,14 +65,15 @@ export function removeDay(days, workplaceId, date) {
   for (let index = days.length - 1; index >= 0; index -= 1) if (String(days[index]?.workplaceId || '') === String(workplaceId || '') && dateValue(days[index]?.date) === key) days.splice(index, 1);
   return days.length !== before;
 }
-export function hasScheduleConflict(days, { workplaceId, date, from, to, excludeWorkplaceId = '', excludeDate = '' } = {}) {
-  if (!isValidRange(from, to)) return true;
-  return getDaysForDate(days, date).some((day) => {
+export function getScheduleConflicts(days, { workplaceId, date, from, to, excludeWorkplaceId = '', excludeDate = '' } = {}) {
+  if (!isValidRange(from, to)) return [];
+  return getDaysForDate(days, date).filter((day) => {
     if (String(day?.workplaceId || '') === String(workplaceId || '')) return false;
     if (excludeWorkplaceId && String(day?.workplaceId || '') === String(excludeWorkplaceId) && dateValue(day?.date) === dateValue(excludeDate || date)) return false;
     return day?.from && day?.to && rangesOverlap(from, to, day.from, day.to);
   });
 }
+export function hasScheduleConflict(days, options = {}) { return getScheduleConflicts(days, options).length > 0; }
 export function findSuggestedInterval(days, { workplaceId, date, baseFrom, baseTo } = {}) {
   if (!isValidRange(baseFrom, baseTo)) return null;
   const baseStart = timeToMinutes(baseFrom), baseEnd = timeToMinutes(baseTo), duration = baseEnd - baseStart;
