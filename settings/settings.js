@@ -1,4 +1,4 @@
-import { folderCard, pageHeader } from '../ui/ui.js';
+import { folderList, pageHeader } from '../ui/ui.js';
 
 const folders = [
   ['profile', 'Профиль', '◫', () => import('./profile/profile.js')],
@@ -11,7 +11,7 @@ const folders = [
 ];
 
 function renderRows(root) {
-  root.innerHTML = `${pageHeader('Настройки')}<div class="ui-folder-grid">${folders.map(([key, label, icon]) => folderCard({ title: label, icon, data: `data-settings-open="${key}"` })).join('')}</div>`;
+  root.innerHTML = `${pageHeader('Настройки')}${folderList(folders.map(([key, label]) => ({ title: label, data: `data-settings-open="${key}"` })))}`;
   root.querySelectorAll('[data-settings-open]').forEach((element) => {
     element.addEventListener('click', async () => {
       const folder = folders.find(([key]) => key === element.dataset.settingsOpen);
