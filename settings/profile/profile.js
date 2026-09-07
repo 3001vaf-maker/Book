@@ -30,12 +30,21 @@ function profileCard(p){
   });
 }
 
+function setCustomProfessionVisibility(root,value){
+  const box=root.querySelector('[data-profession-custom]');
+  if(!box)return;
+  const visible=value==='Другая';
+  box.hidden=!visible;
+  box.style.display=visible?'grid':'none';
+  if(visible)root.querySelector('[name="customProfession"]')?.focus();
+}
+
 function renderProfile(root,navigateBack){
   const p=getProfile(),profession=p.profession||'',custom=profession&&!PROFESSIONS.includes(profession)?profession:'';
   const items=[
     {title:'Личные данные',content:`<div class="form-grid">${photoField({name:'profilePhoto',value:p.photo||''})}${field({label:'Имя',name:'profileName',value:p.name,placeholder:'Ваше имя',required:true})}${field({label:'Фамилия',name:'profileSurname',value:p.surname,placeholder:'Ваша фамилия'})}${textareaField({label:'О себе',name:'profileAbout',value:p.about||'',placeholder:'Коротко о себе'})}</div>`},
     {title:'Контактные данные',content:repeatedField({label:'Телефон',name:'profilePhones',values:p.phones?.length?p.phones:[p.phone||''],type:'tel'})+repeatedField({label:'Telegram',name:'profileTelegrams',values:p.telegrams||[]})+repeatedField({label:'Email',name:'profileEmails',values:p.emails||[],type:'email'})},
-    {title:'Профессиональные данные',content:`<div class="form-grid">${select({label:'Профессия',name:'profession',value:custom?'Другая':profession,options:professionOptions()})}<div data-profession-custom style="display:${custom?'grid':'none'}">${field({label:'Своя профессия',name:'customProfession',value:custom,placeholder:'Введите профессию'})}</div>${select({label:'Опыт работы',name:'experience',value:p.experience||'',options:[{value:'',label:'Не указан'},...EXPERIENCES.map(v=>({value:v,label:v}))]})}${textareaField({label:'О профессии',name:'professionAbout',value:p.professionAbout||'',placeholder:'Расскажите о своей профессии'})}</div>`}
+    {title:'Профессиональные данные',content:`<div class="form-grid">${select({label:'Профессия',name:'profession',value:custom?'Другая':profession,options:professionOptions()})}<div data-profession-custom${custom?'':' hidden'} style="display:${custom?'grid':'none'}">${field({label:'Своя профессия',name:'customProfession',value:custom,placeholder:'Введите профессию'})}</div>${select({label:'Опыт работы',name:'experience',value:p.experience||'',options:[{value:'',label:'Не указан'},...EXPERIENCES.map(v=>({value:v,label:v}))]})}${textareaField({label:'О профессии',name:'professionAbout',value:p.professionAbout||'',placeholder:'Расскажите о своей профессии'})}</div>`}
   ];
   const workplaces=`<section class="workplaces-section"><div class="section-heading"><h2>Места работы</h2>${iconButton('+',{className:'icon-button--primary',data:'data-add-workplace',aria:'Добавить место работы'})}</div>${workplaceList()}</section>`;
   root.innerHTML=page([
@@ -47,7 +56,7 @@ function renderProfile(root,navigateBack){
   initPhotoField(root);
   initRepeatedFields(root);
   initAccordions(root,{onDirty:()=>root.querySelector('[data-save-profile]')?.classList.add('is-visible')});
-  root.querySelector('[name="profession"]')?.addEventListener('change',e=>{const box=root.querySelector('[data-profession-custom]');if(box)box.style.display=e.target.value==='Другая'?'grid':'none'});
+  root.addEventListener('change',e=>{if(e.target.matches?.('[name="profession"]'))setCustomProfessionVisibility(root,e.target.value)});
   root.querySelector('[data-save-profile]')?.addEventListener('click',()=>saveProfile(root,navigateBack));
   root.querySelector('[data-profile-back]')?.addEventListener('click',navigateBack);
   root.querySelector('[data-add-workplace]')?.addEventListener('click',()=>openWorkplaceModal(root,null,()=>renderProfile(root,navigateBack)));
@@ -61,6 +70,7 @@ function saveProfile(root,navigateBack){
   const telegrams=collectRepeatedField(root,'profileTelegrams');
   const emails=collectRepeatedField(root,'profileEmails');
   if(!name||!phones.length)return;
+  if(selected==='Другая'&&!custom)return;
   if(custom)addCustomProfession(custom);
   saveProfileData({...current,key:'profile',name,surname:root.querySelector('[name="profileSurname"]')?.value.trim()||'',phone:phones[0]||'',phones,telegrams,emails,about:root.querySelector('[name="profileAbout"]')?.value.trim()||'',photo:root.querySelector('[data-photo-value]')?.value||'',profession,experience:root.querySelector('[name="experience"]')?.value||'',professionAbout:root.querySelector('[name="professionAbout"]')?.value.trim()||''});
   renderProfile(root,navigateBack);
