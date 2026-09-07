@@ -1,9 +1,15 @@
 import { createTimeRange } from './time.js';
 import { getDays, getDay, getDayTime, getDaysForDate, hasScheduleConflict } from './day.js';
-import { getWorkplaces as getWorkplaceEntities } from '../settings/profile/workplaces/data.js';
+
+let workplaceSource = () => [];
+
+export function configureWorkplaceSource(source) {
+  workplaceSource = typeof source === 'function' ? source : () => [];
+}
 
 export function getWorkplaces() {
-  return getWorkplaceEntities();
+  const values = workplaceSource();
+  return Array.isArray(values) ? values : [];
 }
 
 export function getWorkplace(workplaces, workplaceId) {
