@@ -1,4 +1,4 @@
-import { actionBlock, button, collectCost, collectWorkplaceSelections, costField, durationPicker, emptyState, entityCard, escapeHtml, iconButton, initCostFields, initDurationPickers, initPhotoField, initWorkplaceSelectors, listEntries, listEntry, mountModal, modal, page, pageHeader, photoField, workplaceSelector } from '../../../ui/ui.js';
+import { actionBlock, button, collectCost, collectWorkplaceSelections, costField, details, durationPicker, emptyState, entityCard, escapeHtml, field, iconButton, initCostFields, initDurationPickers, initPhotoField, initWorkplaceSelectors, listEntries, listEntry, mountModal, modal, page, pageHeader, photoField, workplaceSelector } from '../../../ui/ui.js';
 import { getWorkplaces } from '../../profile/workplaces/data.js';
 import { deleteProcedure as deleteProcedureData, getProcedures, pushProcedureHistory, saveProcedure as saveProcedureData } from './data.js';
 
@@ -23,7 +23,7 @@ function renderRow(p){
 
 function openForm(root,existing=null,navigateBack=()=>{}){
   const p=existing||{photo:'',name:'',duration:0,breakDuration:0,cost:{mode:'amount',amount:'',free:false},workplaces:[]};
-  const html=`<form class="compact-form" data-procedure-form><div class="modal-title"><h2>${existing?'Изменить процедуру':'Процедура'}</h2></div>${photoField({name:'procedurePhoto',value:p.photo||''})}<label class="field"><span>Название *</span><input name="procedureName" required value="${escapeHtml(p.name||'')}" placeholder="Название процедуры"></label>${costField({value:p.cost||{},name:'procedureCost'})}${durationPicker({label:'Длительность',name:'procedureDuration',value:p.duration||0})}${durationPicker({label:'Перерыв',name:'procedureBreak',value:p.breakDuration||0})}<div class="array-group"><span class="array-label">Рабочие места</span>${workplaceSelector({name:'procedureWorkplaces',selected:p.workplaces||[],allowMultiple:true,workplaces:getWorkplaces()})}</div>${button('Сохранить',{type:'submit'})}</form>`;
+  const html=`<form class="compact-form" data-procedure-form><div class="modal-title"><h2>${existing?'Изменить процедуру':'Процедура'}</h2></div>${photoField({name:'procedurePhoto',value:p.photo||''})}${field({label:'Название',name:'procedureName',value:p.name||'',placeholder:'Название процедуры',required:true})}${costField({value:p.cost||{},name:'procedureCost'})}${durationPicker({label:'Длительность',name:'procedureDuration',value:p.duration||0})}${durationPicker({label:'Перерыв',name:'procedureBreak',value:p.breakDuration||0})}<div class="array-group"><span class="array-label">Рабочие места</span>${workplaceSelector({name:'procedureWorkplaces',selected:p.workplaces||[],allowMultiple:true,workplaces:getWorkplaces()})}</div>${button('Сохранить',{type:'submit'})}</form>`;
   const m=mountModal(root,modal(html));
   initPhotoField(m);initCostFields(m);initDurationPickers(m);initWorkplaceSelectors(m);
   m.querySelector('[data-procedure-form]')?.addEventListener('submit',e=>{e.preventDefault();saveProcedure(root,m,existing,navigateBack)});
@@ -38,8 +38,8 @@ function saveProcedure(root,m,existing,navigateBack){
 function renderCard(root,id,navigateBack){
   const p=getProcedures().find(x=>x.id===id);if(!p)return renderList(root,navigateBack);
   const card=entityCard({title:p.name||'',subtitle:p.workplaces?.[0]?.name||'',image:p.photo||'',initial:(p.name||'?').slice(0,1).toUpperCase(),meta:[{value:durationText(p.duration),label:'длительность'},{value:costValue(p.cost),label:'стоимость'},{value:durationText(p.breakDuration),label:'перерыв'}],className:'entity-card--hero'});
-  const details=p.workplaces?.length?`<div class="entity-details"><div><span>Места работы</span><strong>${escapeHtml(p.workplaces.map(w=>w.name||w.workplaceId).join(', '))}</strong></div></div>`:'';
-  root.innerHTML=page([card,details,actionBlock(`${button('Редактировать процедуру',{data:'data-edit-procedure'})}${button('Назад',{className:'ui-button--secondary',data:'data-back-procedures-card'})}${button('Удалить',{variant:'danger',data:'data-delete-card'})}`)]);
+  const info=p.workplaces?.length?details([{label:'Места работы',value:p.workplaces.map(w=>w.name||w.workplaceId).join(', ')}]):'';
+  root.innerHTML=page([card,info,actionBlock(`${button('Редактировать процедуру',{data:'data-edit-procedure'})}${button('Назад',{className:'ui-button--secondary',data:'data-back-procedures-card'})}${button('Удалить',{variant:'danger',data:'data-delete-card'})}`)]);
   root.querySelector('[data-edit-procedure]').onclick=()=>openForm(root,p,navigateBack);
   root.querySelector('[data-delete-card]').onclick=()=>confirmDelete(root,id,navigateBack,()=>renderList(root,navigateBack));
   root.querySelector('[data-back-procedures-card]').onclick=()=>renderList(root,navigateBack);
