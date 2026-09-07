@@ -47,3 +47,13 @@ export function upsertWorkplace(workplace) {
     : [...values, item];
   return saveWorkplaces(next);
 }
+
+export function deleteWorkplace(key) {
+  const target = String(key || '');
+  if (!target) return false;
+  const values = getWorkplaces();
+  const next = values.filter((value) => value.key !== target);
+  if (next.length === values.length) return false;
+  saveWorkplaces(next);
+  return true;
+}
