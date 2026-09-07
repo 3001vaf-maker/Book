@@ -1,4 +1,5 @@
 import { getMembers, getUEI } from '../../core/uei.js';
+import { getTags } from '../../settings/tags/data.js';
 
 const STORAGE_KEY = 'book.people';
 
@@ -9,6 +10,15 @@ function readStoredClients() {
   } catch {
     return [];
   }
+}
+
+function normalizeTagAssignments(values = []) {
+  const catalog = getTags();
+  const ids = new Set(catalog.map((tag) => tag.id));
+  const byName = new Map(catalog.map((tag) => [tag.name, tag.id]));
+  return [...new Set((Array.isArray(values) ? values : [])
+    .map((value) => ids.has(value) ? value : byName.get(value))
+    .filter(Boolean))];
 }
 
 function normalizeClient(person = {}) {
@@ -23,7 +33,7 @@ function normalizeClient(person = {}) {
     telegrams: Array.isArray(person.telegrams) ? person.telegrams : [],
     emails: Array.isArray(person.emails) ? person.emails : [],
     links: Array.isArray(person.links) ? person.links : [],
-    tags: Array.isArray(person.tags) ? person.tags : [],
+    tags: normalizeTagAssignments(person.tags),
     agreements: {
       personalData: Boolean(person.agreements?.personalData),
       mailings: Boolean(person.agreements?.mailings),
