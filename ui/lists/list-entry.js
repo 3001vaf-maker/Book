@@ -12,6 +12,7 @@ export function listEntry({
   rightBottom = '',
   image = '',
   initial = '?',
+  leadingSwatch = '',
   interactive = true,
   data = '',
   className = '',
@@ -28,6 +29,7 @@ export function listEntry({
     : '';
   const style = image ? ` style="--list-entry-image:url('${escapeHtml(image)}')"` : '';
   const secondLine = subtitle || '\u00a0';
+  const swatch = leadingSwatch ? `<span class="list-entry__swatch" style="--list-entry-swatch:${escapeHtml(leadingSwatch)}" aria-hidden="true"></span>` : '';
   const right = rightTop || rightBottom
     ? `<span class="list-entry__right">${rightTop ? `<strong>${rightTop}</strong>` : ''}${rightBottom ? `<small>${rightBottom}</small>` : ''}</span>`
     : '';
@@ -41,7 +43,7 @@ export function listEntry({
   return `<${tag} class="list-entry ${image ? 'has-image' : ''} ${className}"${attrs}${style}>
     <span class="list-entry__background" aria-hidden="true">${image ? '' : `<span>${escapeHtml(initial)}</span>`}</span>
     <span class="list-entry__content">
-      <span class="list-entry__main"><strong>${escapeHtml(title)}</strong><small>${escapeHtml(secondLine)}</small></span>
+      <span class="list-entry__main${swatch ? ' has-swatch' : ''}">${swatch}<span class="list-entry__text"><strong>${escapeHtml(title)}</strong><small>${escapeHtml(secondLine)}</small></span></span>
       ${right}${action}${deleteAction}
     </span>
   </${tag}>`;
