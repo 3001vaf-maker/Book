@@ -8,7 +8,7 @@ import { folderCard, folderList } from './cards/folder-card.js';
 import { list } from './lists/list.js';
 import { listEntry, listEntries } from './lists/list-entry.js';
 import { select, searchableSelect } from './selectors/index.js';
-import { links, initLinks, collectLinks } from './links/index.js';
+import { links, initLinks, collectLinks } from './links/index.js?v=remove-cross-20260907';
 import { tags, initTags, collectTags } from './tags/index.js?v=tag-chip-color-20260907';
 import { costField, initCostFields, collectCost } from './cost/index.js';
 import { durationPicker, initDurationPickers } from './duration/index.js';
@@ -22,7 +22,7 @@ import { emptyState, stateView, initStateView } from './states/index.js';
 import { colorPicker, initColorPickers } from './colors/index.js';
 import { escapeHtml } from './utils/escape-html.js';
 import { page, pageHeader, details, agreementBlock, actionBlock } from './page/page.js?v=reference-page-20260907';
-import { repeatedField, initRepeatedFields, collectRepeatedField, collectRepeatedEntries } from './repeated-fields/index.js';
+import { repeatedField, initRepeatedFields, collectRepeatedField, collectRepeatedEntries } from './repeated-fields/index.js?v=remove-cross-20260907';
 import { uei, initUEI } from './uei/index.js';
 
 export { accordion, initAccordions, bottomNavigation, viewNavigation, initViewNavigation, calendar, initCalendar, monthDayPicker, initMonthDayPickers, dateNavigator, initDateNavigator, initMultiSelect, entityCard, folderCard, folderList, list, listEntry, listEntries, select, searchableSelect, links, initLinks, collectLinks, tags, initTags, collectTags, costField, initCostFields, collectCost, durationPicker, initDurationPickers, timePicker, initTimePickers, journalDayTimeline, initJournalDayTimeline, workplaceSelector, initWorkplaceSelectors, collectWorkplaceSelections, workplaceHeaderButton, getWorkplaceContext, setWorkplaceContext, modal, mountModal, button, iconButton, field, phoneField, textareaField, photoField, initPhotoField, emptyState, stateView, initStateView, colorPicker, initColorPickers, escapeHtml, page, pageHeader, details, agreementBlock, actionBlock, repeatedField, initRepeatedFields, collectRepeatedField, collectRepeatedEntries, uei, initUEI };
