@@ -1,4 +1,4 @@
-import { actionBlock, button, folderCard, pageHeader } from '../../ui/ui.js';
+import { actionBlock, button, folderList, pageHeader } from '../../ui/ui.js';
 
 const children = [
   ['deposit', 'Депозит', '◫'],
@@ -19,7 +19,7 @@ const loaders = {
 };
 
 function renderLoyaltyFolders(root, navigateBack) {
-  root.innerHTML = `${pageHeader('Программа лояльности')}<div class="ui-folder-grid">${children.map(([key, label, icon]) => folderCard({ title: label, icon, data: `data-loyalty-open="${key}"` })).join('')}</div>${actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-loyalty-back' }))}`;
+  root.innerHTML = `${pageHeader('Программа лояльности')}${folderList(children.map(([key, label]) => ({ title: label, data: `data-loyalty-open="${key}"` })))}${actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-loyalty-back' }))}`;
   root.querySelectorAll('[data-loyalty-open]').forEach((element) => element.addEventListener('click', async () => {
     const loader = loaders[element.dataset.loyaltyOpen];
     if (!loader) return;
