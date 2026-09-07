@@ -4,7 +4,7 @@ import { viewNavigation, initViewNavigation } from './view-navigation/view-navig
 import { calendar, initCalendar, monthDayPicker, initMonthDayPickers, dateNavigator, initDateNavigator } from './calendar/index.js?v=month-day-20260906';
 import { initMultiSelect } from './selection/index.js?v=graph-lifecycle-20260903';
 import { entityCard } from './cards/index.js';
-import { folderCard } from './cards/folder-card.js';
+import { folderCard, folderList } from './cards/folder-card.js';
 import { list } from './lists/list.js';
 import { listEntry, listEntries } from './lists/list-entry.js';
 import { select, searchableSelect } from './selectors/index.js';
@@ -25,7 +25,7 @@ import { page, agreementBlock, actionBlock } from './page/page.js?v=agreement-ch
 import { repeatedField, initRepeatedFields, collectRepeatedField, collectRepeatedEntries } from './repeated-fields/index.js';
 import { uei, initUEI } from './uei/index.js';
 
-export { accordion, initAccordions, bottomNavigation, viewNavigation, initViewNavigation, calendar, initCalendar, monthDayPicker, initMonthDayPickers, dateNavigator, initDateNavigator, initMultiSelect, entityCard, folderCard, list, listEntry, listEntries, select, searchableSelect, links, initLinks, collectLinks, tags, initTags, collectTags, costField, initCostFields, collectCost, durationPicker, initDurationPickers, timePicker, initTimePickers, journalDayTimeline, initJournalDayTimeline, workplaceSelector, initWorkplaceSelectors, collectWorkplaceSelections, workplaceHeaderButton, getWorkplaceContext, setWorkplaceContext, modal, mountModal, button, iconButton, field, phoneField, textareaField, emptyState, stateView, initStateView, colorPicker, initColorPickers, escapeHtml, page, agreementBlock, actionBlock, repeatedField, initRepeatedFields, collectRepeatedField, collectRepeatedEntries, uei, initUEI };
+export { accordion, initAccordions, bottomNavigation, viewNavigation, initViewNavigation, calendar, initCalendar, monthDayPicker, initMonthDayPickers, dateNavigator, initDateNavigator, initMultiSelect, entityCard, folderCard, folderList, list, listEntry, listEntries, select, searchableSelect, links, initLinks, collectLinks, tags, initTags, collectTags, costField, initCostFields, collectCost, durationPicker, initDurationPickers, timePicker, initTimePickers, journalDayTimeline, initJournalDayTimeline, workplaceSelector, initWorkplaceSelectors, collectWorkplaceSelections, workplaceHeaderButton, getWorkplaceContext, setWorkplaceContext, modal, mountModal, button, iconButton, field, phoneField, textareaField, emptyState, stateView, initStateView, colorPicker, initColorPickers, escapeHtml, page, agreementBlock, actionBlock, repeatedField, initRepeatedFields, collectRepeatedField, collectRepeatedEntries, uei, initUEI };
 
 export function pageHeader(title, subtitle = '', meta = '') { return `<header class="page-header"><div class="page-header__main"><h1>${escapeHtml(title)}</h1>${subtitle ? `<p>${escapeHtml(subtitle)}</p>` : ''}</div>${meta ? `<div class="page-header__meta">${meta}</div>` : ''}</header>`; }
 export function timeInput({ label, name, value = '', minuteStep = 15 } = {}) { return timePicker({ label, name, value, minuteStep }); }
