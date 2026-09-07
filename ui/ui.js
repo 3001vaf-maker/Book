@@ -12,7 +12,7 @@ import { links, initLinks, collectLinks } from './links/index.js?v=remove-cross-
 import { tags, initTags, collectTags } from './tags/index.js?v=tag-chip-color-20260907';
 import { costField, initCostFields, collectCost } from './cost/index.js';
 import { durationPicker, initDurationPickers } from './duration/index.js';
-import { timePicker, initTimePickers } from './time/index.js?v=cyclic-wheel-20260907';
+import { timePicker, initTimePickers } from './time/index.js?v=center-current-20260907';
 import { journalDayTimeline, initJournalDayTimeline } from './time/journal-day.js';
 import { workplaceSelector, initWorkplaceSelectors, collectWorkplaceSelections, workplaceHeaderButton, getWorkplaceContext, setWorkplaceContext } from './workplaces/index.js?v=workplace-canonical-selector-20260907';
 import { modal, mountModal } from './modals/index.js';
