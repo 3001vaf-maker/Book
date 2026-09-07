@@ -12,7 +12,8 @@ export function workplaceList() {
     subtitle:w.city||'',
     image:w.photo||'',
     initial:(w.name||'?').slice(0,1).toUpperCase(),
-    rightTop:`${w.from||'—'}–${w.to||'—'}`,
+    rightTop:`с ${w.from||'—'}`,
+    rightBottom:`до ${w.to||'—'}`,
     interactive:true,
     data:`data-workplace="${escapeHtml(w.key)}"`,
     aria:`Открыть место работы ${w.name||''}`
