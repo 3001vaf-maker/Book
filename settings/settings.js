@@ -1,8 +1,8 @@
 import { folderList, pageHeader } from '../ui/ui.js';
 
 const folders = [
-  ['profile', 'Профиль', '◫', () => import('./profile/profile.js?v=shared-workplace-add-20260907')],
-  ['service', 'Сервис', '◫', () => import('./service/service.js?v=shared-render-contract-20260907')],
+  ['profile', 'Профиль', '◫', () => import('./profile/profile.js?v=shared-secondary-button-20260908')],
+  ['service', 'Сервис', '◫', () => import('./service/service.js?v=shared-secondary-button-20260908')],
   ['warehouse', 'Склад', '◫', () => import('./warehouse/warehouse.js')],
   ['documents', 'Документы', '◫', () => import('./documents/documents.js')],
   ['loyalty', 'Программа лояльности', '◫', () => import('./loyalty/loyalty.js')],

@@ -14,7 +14,7 @@ import { costField, initCostFields, collectCost, costListParts, costCardMeta } f
 import { durationPicker, durationText, initDurationPickers } from './duration/index.js?v=shared-duration-text-20260907';
 import { timePicker, initTimePickers } from './time/index.js?v=centered-current-time-20260907';
 import { journalDayTimeline, initJournalDayTimeline } from './time/journal-day.js';
-import { workplaceSelector, initWorkplaceSelectors, collectWorkplaceSelections, workplaceAddButton, workplaceHeaderButton, workplaceCountText, getWorkplaceContext, setWorkplaceContext } from './workplaces/index.js?v=shared-workplace-add-20260907';
+import { workplaceSelector, initWorkplaceSelectors, collectWorkplaceSelections, workplaceAddButton, workplaceHeaderButton, workplaceCountText, getWorkplaceContext, setWorkplaceContext } from './workplaces/index.js?v=shared-secondary-button-20260908';
 import { modal, mountModal } from './modals/index.js';
 import { button, iconButton } from './buttons/index.js';
 import { field, phoneField, textareaField, photoField, initPhotoField } from './inputs/index.js';
