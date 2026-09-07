@@ -1,21 +1,12 @@
-import { actionBlock, button, collectCost, collectWorkplaceSelections, costField, durationPicker, emptyState, entityCard, escapeHtml, field, iconButton, initCostFields, initDurationPickers, initPhotoField, initWorkplaceSelectors, listEntries, listEntry, mountModal, modal, page, pageHeader, photoField, textareaField, workplaceSelector } from '../../../ui/ui.js';
+import { actionBlock, button, collectCost, collectWorkplaceSelections, costCardMeta, costField, costListParts, durationPicker, emptyState, entityCard, escapeHtml, field, iconButton, initCostFields, initDurationPickers, initPhotoField, initWorkplaceSelectors, listEntries, listEntry, mountModal, modal, page, pageHeader, photoField, textareaField, workplaceCountText, workplaceSelector } from '../../../ui/ui.js';
 import { getWorkplaces } from '../../profile/workplaces/data.js';
 import { deleteProcedure as deleteProcedureData, getProcedures, pushProcedureHistory, saveProcedure as saveProcedureData } from './data.js';
 
 const durationText=m=>{m=Number(m)||0;const h=Math.floor(m/60),min=m%60;return h?`${h} ч${min?` ${min} мин`:''}`:`${min} мин`};
-const workplaceCountText=count=>`${Math.max(0,Number(count)||0)} р.м.`;
-const fmt=v=>v===''||v==null?'':`${Number(v).toLocaleString('ru-RU')} ₽`;
-const costParts=cost=>{if(!cost||cost.free)return{rightTop:'Бесплатно'};if(cost.mode==='from-to')return{rightTop:`от ${fmt(cost.from)}`,rightBottom:`до ${fmt(cost.to)}`};if(cost.mode==='from')return{rightTop:`от ${fmt(cost.from??cost.amount)}`};return{rightTop:fmt(cost.amount??cost.from)}};
-const cardCostMeta=cost=>{
-  if(!cost||cost.free)return[{value:'стоимость'},{value:'Бесплатно'}];
-  if(cost.mode==='from-to')return[{value:`от ${fmt(cost.from)}`},{value:`до ${fmt(cost.to)}`}];
-  if(cost.mode==='from')return[{value:'от'},{value:fmt(cost.from??cost.amount)}];
-  return[{value:'стоимость'},{value:fmt(cost.amount??cost.from)||'—'}];
-};
 
 function renderList(root,navigateBack){
   const items=getProcedures();
-  root.innerHTML=`<div class="entity-page-header">${pageHeader('Процедуры')}<div class="page-header-action">${iconButton('+',{className:'icon-button--primary',data:'data-add-procedure',aria:'Добавить процедуру'})}</div></div>${items.length?listEntries(items.map(renderRow)):emptyState('Процедур пока нет','Добавьте первую процедуру кнопкой «+».')}${actionBlock(button('Назад',{className:'ui-button--secondary',data:'data-back-procedures'}))}`;
+  root.innerHTML=`<div class="entity-page-header">${pageHeader('Процедуры')}<div class="page-header-action">${iconButton('+',{data:'data-add-procedure',aria:'Добавить процедуру'})}</div></div>${items.length?listEntries(items.map(renderRow)):emptyState('Процедур пока нет','Добавьте первую процедуру кнопкой «+».')}${actionBlock(button('Назад',{className:'ui-button--secondary',data:'data-back-procedures'}))}`;
   root.querySelector('[data-add-procedure]')?.addEventListener('click',()=>openForm(root,null,navigateBack));
   root.querySelectorAll('[data-procedure]').forEach(el=>el.addEventListener('click',()=>renderCard(root,el.dataset.procedure,navigateBack)));
   root.querySelectorAll('[data-delete-action]').forEach(el=>el.addEventListener('click',e=>{e.stopPropagation();confirmDelete(root,el.dataset.deleteAction,navigateBack,()=>renderList(root,navigateBack))}));
@@ -23,7 +14,7 @@ function renderList(root,navigateBack){
 }
 
 function renderRow(p){
-  const price=costParts(p.cost),workplaceCount=(p.workplaces||[]).length;
+  const price=costListParts(p.cost),workplaceCount=(p.workplaces||[]).length;
   return listEntry({title:p.name||'',subtitle:`${durationText(p.duration)} — ${workplaceCountText(workplaceCount)}`,image:p.photo||'',initial:(p.name||'?').slice(0,1).toUpperCase(),rightTop:price.rightTop||'',rightBottom:price.rightBottom||'',interactive:true,data:`data-procedure="${escapeHtml(p.id)}"`,aria:`Открыть процедуру ${p.name||''}`,deleteData:p.id,deleteAria:`Удалить процедуру ${p.name||''}`});
 }
 
@@ -50,7 +41,7 @@ function renderCard(root,id,navigateBack){
     image:p.photo||'',
     initial:(p.name||'?').slice(0,1).toUpperCase(),
     topMeta:[{value:workplaceCountText(workplaceNames.length)}],
-    topRightMeta:cardCostMeta(p.cost),
+    topRightMeta:costCardMeta(p.cost),
     meta:workplaceNames.map(name=>({value:name})),
     metricsLayout:'vertical',
     className:'entity-card--hero entity-card--top-dark'
