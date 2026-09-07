@@ -9,13 +9,22 @@ const children = [
   ['subscriptions', 'Абонементы'],
 ];
 
+const loaders = {
+  'deposit': () => import('./deposit/deposit.js'),
+  'personal-account': () => import('./personal-account/personal-account.js'),
+  'referral-program': () => import('./referral-program/referral-program.js'),
+  'bonus-program': () => import('./bonus-program/bonus-program.js'),
+  'certificates': () => import('./certificates/certificates.js'),
+  'subscriptions': () => import('./subscriptions/subscriptions.js'),
+};
+
 function renderLoyaltyFolders(root, navigateBack) {
   root.innerHTML = `${pageHeader('Программа лояльности')}<div class="settings-list">${children.map(([key, label]) => `<button class="settings-row" type="button" data-loyalty-open="${escapeHtml(key)}"><span>${escapeHtml(label)}</span><span>›</span></button>`).join('')}</div><div class="profile-actions">${button('Назад', { className: 'ui-button--secondary', data: 'data-loyalty-back' })}</div>`;
-  root.querySelectorAll('[data-loyalty-open]').forEach((element) => element.addEventListener('click', () => {
-    const label = children.find(([key]) => key === element.dataset.loyaltyOpen)?.[1];
-    if (!label) return;
-    root.innerHTML = `${pageHeader(label)}<div class="empty-state"><strong>Раздел подготовлен</strong><span>Содержимое добавляется отдельным ТЗ.</span></div><div class="profile-actions">${button('Назад', { className: 'ui-button--secondary', data: 'data-loyalty-child-back' })}</div>`;
-    root.querySelector('[data-loyalty-child-back]')?.addEventListener('click', () => renderLoyaltyFolders(root, navigateBack));
+  root.querySelectorAll('[data-loyalty-open]').forEach((element) => element.addEventListener('click', async () => {
+    const loader = loaders[element.dataset.loyaltyOpen];
+    if (!loader) return;
+    const { render } = await loader();
+    render(root, () => renderLoyaltyFolders(root, navigateBack));
   }));
   root.querySelector('[data-loyalty-back]')?.addEventListener('click', navigateBack);
 }
