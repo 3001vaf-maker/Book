@@ -19,7 +19,7 @@ import { modal, mountModal } from './modals/index.js';
 import { button, iconButton } from './buttons/index.js';
 import { field, phoneField, textareaField, photoField, initPhotoField } from './inputs/index.js';
 import { emptyState, stateView, initStateView } from './states/index.js';
-import { colorPicker, initColorPickers } from './colors/index.js';
+import { colorPicker, initColorPickers } from './colors/index.js?v=expanded-palette-20260908';
 import { escapeHtml } from './utils/escape-html.js';
 import { page, pageHeader, details, agreementBlock, actionBlock } from './page/page.js?v=reference-page-20260907';
 import { repeatedField, initRepeatedFields, collectRepeatedField, collectRepeatedEntries } from './repeated-fields/index.js?v=remove-cross-20260907';

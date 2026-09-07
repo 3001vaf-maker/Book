@@ -1,7 +1,17 @@
 import { escapeHtml } from '../utils/escape-html.js';
 import { modal, mountModal } from '../modals/index.js';
 
-const DEFAULT_COLORS = ['#3B302B', '#7A6F69', '#B8AEA8', '#E5DED9', '#F4F1EA', '#E8E1DC', '#9A6258', '#B84A4A', '#FFFFFF'];
+const DEFAULT_COLORS = [
+  '#F6D32D', '#F2C94C', '#F2994A', '#F08C46', '#E76F51',
+  '#E63946', '#D62828', '#B42318', '#9B1C31', '#7F1D1D',
+  '#FF6B9D', '#E64980', '#C2255C', '#A61E4D', '#7A284B',
+  '#C77DFF', '#9D4EDD', '#7B2CBF', '#5A189A', '#3C096C',
+  '#74C0FC', '#339AF0', '#1C7ED6', '#1864AB', '#0B3C5D',
+  '#63E6BE', '#20C997', '#12B886', '#0F766E', '#0B7285',
+  '#8CE99A', '#51CF66', '#37B24D', '#2B8A3E', '#1B5E20',
+  '#DDB892', '#BC8A5F', '#9C6644', '#7F5539', '#5B4636',
+  '#FFFFFF', '#E9ECEF', '#ADB5BD', '#6C757D', '#212529'
+];
 
 export function colorPicker({ name = 'color', value = DEFAULT_COLORS[0], colors = DEFAULT_COLORS } = {}) {
   const selected = colors.includes(value) ? value : colors[0];
