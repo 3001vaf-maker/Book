@@ -116,6 +116,7 @@
 | `phoneField()` | Поле ввода телефона | `ui/inputs/` | Общая | Формы профиля и сущностей | Телефон | ОБЩАЯ |
 | `textareaField()` | Многострочное поле ввода текста | `ui/inputs/` | Общая | Формы | Длинный текст | ОБЩАЯ |
 | `emptyState()` | Показывает экран/блок при отсутствии данных | `ui/states/` | Общая | Пустые списки, например Товары, Клиенты, Ярлыки | Состояние пустого списка | ОБЩАЯ |
+| `tagManagerList()` | Формирует специализированный список управления ярлыками: крупный цветовой маркер, название, редактирование строки и удаление | `ui/tags/` | Специализированная | Настройки → Ярлыки | Сущность Ярлык | ОБЩАЯ ДЛЯ ФУНКЦИИ |
 | `colorPicker()` | Открывает визуальный выбор цвета из утверждённой палитры | `ui/colors/` | Специализированная | Ярлыки | Цвет ярлыка | ОБЩАЯ ДЛЯ ФУНКЦИИ |
 | `initColorPickers()` | Подключает визуальный выбор цвета и существующее Modal | `ui/colors/` | Инфраструктура UI | Ярлыки | DOM color picker / Modal | ОБЩАЯ ДЛЯ ФУНКЦИИ |
 | `escapeHtml()` | Экранирует HTML-значения | `ui/utils/` | Низкоуровневая утилита | UI-компоненты | Строки | ОБЩАЯ УТИЛИТА |
@@ -147,6 +148,7 @@
 | `ui/selectors/` | Выбор значений | `select`, `searchableSelect` |
 | `ui/selection/` | Множественный выбор | `initMultiSelect` |
 | `ui/states/` | UI-состояния и StateView | `emptyState`, `stateView`, `initStateView` |
+| `ui/tags/` | Отображение назначенных ярлыков и специализированный список управления ярлыками | `tags`, `initTags`, `collectTags`, `tagManagerList` |
 | `ui/time/` | Время суток и единый барабан выбора | `timePicker`, `initTimePickers` |
 | `ui/utils/` | Низкоуровневые UI-утилиты | `escapeHtml` |
 | `ui/view-navigation/` | Переключение представлений | `viewNavigation`, `initViewNavigation` |
@@ -163,7 +165,7 @@
 | Процедуры | `pageHeader`, `entityCard`, `costField`, `durationPicker`, `workplaceSelector`, `modal`, `mountModal`, `button`, поля и селекторы |
 | Товары | `pageHeader`, `entityCard`, `emptyState`, `photoField`, `costField`, `workplaceSelector`, `modal`, `mountModal`, `button`, `iconButton`, поля и селекторы |
 | Кошелёк | `pageHeader`, `entityCard`, `emptyState`, `button`, `iconButton`, `modal`, `mountModal`, `photoField`, `initPhotoField` |
-| Ярлыки | `pageHeader`, `emptyState`, `button`, `iconButton`, `modal`, `mountModal`, `colorPicker`, `initColorPickers` |
+| Ярлыки | `pageHeader`, `tagManagerList`, `emptyState`, `button`, `iconButton`, `modal`, `mountModal`, `colorPicker`, `initColorPickers` |
 | График | `pageHeader`, `initCalendar`, `initMultiSelect`, `timePicker`, `initTimePickers`, `timeInput` |
 | Журнал → Месяц | `initCalendar` |
 | Навигация приложения | `bottomNavigation` |
@@ -269,6 +271,12 @@
 `listEntry()` — существующий компонент записи внутри специализированных/entity-листов. Он сохраняется отдельно и не должен использоваться как подмена Core UI List.
 
 Для `list()` не создаются отдельные CSS-правила под Клиентов, Процедуры, Журнал или другие сущности.
+
+### `tagManagerList()` и `list()` — не считать дубликатами
+
+`tagManagerList()` — специализированный UI управления сущностью Ярлык. Его строка функционально отличается от Core UI List: содержит крупный цветовой маркер, открывает редактирование существующего ярлыка и имеет отдельное действие удаления.
+
+`list()` остаётся неизменным каноническим перечнем простых значений. Нельзя добавлять в `list()` логику Ярлыков и нельзя локально собирать `tagManagerList()` внутри `settings/tags/`.
 
 ---
 
