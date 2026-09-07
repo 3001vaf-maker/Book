@@ -1,4 +1,4 @@
-import { accordion, actionBlock, button, entityCard, escapeHtml, iconButton, initAccordions, initPhotoField, page, phoneField, photoField, select, textareaField } from '../../ui/ui.js';
+import { accordion, actionBlock, button, entityCard, field, iconButton, initAccordions, initPhotoField, page, phoneField, photoField, select, textareaField } from '../../ui/ui.js';
 import { addCustomProfession, getCustomProfessions, getProfile, saveProfile as saveProfileData } from './data.js';
 import { openWorkplaceModal, renderWorkplace, workplaceList } from './workplaces/workplaces.js';
 
@@ -28,8 +28,8 @@ function profileCard(p){
 function renderProfile(root,navigateBack){
   const p=getProfile(),profession=p.profession||'',custom=profession&&!PROFESSIONS.includes(profession)?profession:'';
   const items=[
-    {title:'Личные данные',content:`<div class="form-grid">${photoField({name:'profilePhoto',value:p.photo||''})}${fieldRequired('Имя','profileName',p.name,'Ваше имя')}${fieldOptional('Фамилия','profileSurname',p.surname,'Ваша фамилия')}${phoneField({label:'Телефон',name:'profilePhone',value:p.phone||'',required:true})}${textareaField({label:'О себе',name:'profileAbout',value:p.about||'',placeholder:'Коротко о себе'})}</div>`},
-    {title:'Профессиональные данные',content:`<div class="form-grid">${select({label:'Профессия',name:'profession',value:custom?'Другая':profession,options:professionOptions()})}<div data-profession-custom style="display:${custom?'grid':'none'}">${fieldOptional('Своя профессия','customProfession',custom,'Введите профессию')}</div>${select({label:'Опыт работы',name:'experience',value:p.experience||'',options:[{value:'',label:'Не указан'},...EXPERIENCES.map(v=>({value:v,label:v}))]})}${textareaField({label:'О профессии',name:'professionAbout',value:p.professionAbout||'',placeholder:'Расскажите о своей профессии'})}</div>`}
+    {title:'Личные данные',content:`<div class="form-grid">${photoField({name:'profilePhoto',value:p.photo||''})}${field({label:'Имя',name:'profileName',value:p.name,placeholder:'Ваше имя',required:true})}${field({label:'Фамилия',name:'profileSurname',value:p.surname,placeholder:'Ваша фамилия'})}${phoneField({label:'Телефон',name:'profilePhone',value:p.phone||'',required:true})}${textareaField({label:'О себе',name:'profileAbout',value:p.about||'',placeholder:'Коротко о себе'})}</div>`},
+    {title:'Профессиональные данные',content:`<div class="form-grid">${select({label:'Профессия',name:'profession',value:custom?'Другая':profession,options:professionOptions()})}<div data-profession-custom style="display:${custom?'grid':'none'}">${field({label:'Своя профессия',name:'customProfession',value:custom,placeholder:'Введите профессию'})}</div>${select({label:'Опыт работы',name:'experience',value:p.experience||'',options:[{value:'',label:'Не указан'},...EXPERIENCES.map(v=>({value:v,label:v}))]})}${textareaField({label:'О профессии',name:'professionAbout',value:p.professionAbout||'',placeholder:'Расскажите о своей профессии'})}</div>`}
   ];
   const workplaces=`<section class="workplaces-section"><div class="section-heading"><h2>Места работы</h2>${iconButton('+',{className:'icon-button--primary',data:'data-add-workplace',aria:'Добавить место работы'})}</div>${workplaceList()}</section>`;
   root.innerHTML=page([
@@ -55,6 +55,3 @@ function saveProfile(root,navigateBack){
   saveProfileData({...current,key:'profile',name,surname:root.querySelector('[name="profileSurname"]')?.value.trim()||'',phone,about:root.querySelector('[name="profileAbout"]')?.value.trim()||'',photo:root.querySelector('[data-photo-value]')?.value||'',profession,experience:root.querySelector('[name="experience"]')?.value||'',professionAbout:root.querySelector('[name="professionAbout"]')?.value.trim()||''});
   renderProfile(root,navigateBack);
 }
-
-function fieldRequired(label,name,value,placeholder){return `<label class="field"><span>${escapeHtml(label)} *</span><input name="${escapeHtml(name)}" required value="${escapeHtml(value||'')}" placeholder="${escapeHtml(placeholder||'')}"></label>`}
-function fieldOptional(label,name,value,placeholder){return `<label class="field"><span>${escapeHtml(label)}</span><input name="${escapeHtml(name)}" value="${escapeHtml(value||'')}" placeholder="${escapeHtml(placeholder||'')}"></label>`}
