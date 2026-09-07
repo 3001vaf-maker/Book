@@ -36,7 +36,7 @@ function openForm(root,existing=null,navigateBack=()=>{}){
 }
 
 function saveProcedure(root,m,existing,navigateBack){
-  const data=new FormData(m.querySelector('[data-workplace-form]')||m.querySelector('[data-procedure-form]'));const name=String(data.get('procedureName')||'').trim();if(!name)return;
+  const data=new FormData(m.querySelector('[data-procedure-form]'));const name=String(data.get('procedureName')||'').trim();if(!name)return;
   const item={id:existing?.id||crypto.randomUUID(),photo:String(data.get('procedurePhoto')||''),name,duration:Number(data.get('procedureDuration')||0),breakDuration:Number(data.get('procedureBreak')||0),cost:collectCost(m,'procedureCost'),workplaces:collectWorkplaceSelections(m,'procedureWorkplaces'),createdAt:existing?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()};
   if(existing)pushProcedureHistory(existing,'updated');saveProcedureData(item);m.remove();renderList(root,navigateBack);
 }
