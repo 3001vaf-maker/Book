@@ -63,7 +63,7 @@ function renderProfile(root,navigateBack){
     {title:'Контактные данные',content:repeatedField({label:'Телефон',name:'profilePhones',values:p.phones?.length?p.phones:[p.phone||''],type:'tel'})+repeatedField({label:'Telegram',name:'profileTelegrams',values:p.telegrams||[]})+repeatedField({label:'Email',name:'profileEmails',values:p.emails||[],type:'email'})},
     {title:'Профессиональные данные',content:`<div class="form-grid">${select({label:'Профессия',name:'profession',value:profession,options:professionOptions()})}${select({label:'Опыт работы',name:'experience',value:p.experience||'',options:[{value:'',label:'Не указан'},...EXPERIENCES.map(v=>({value:v,label:v}))]})}${textareaField({label:'О профессии',name:'professionAbout',value:p.professionAbout||'',placeholder:'Расскажите о своей профессии'})}</div>`}
   ];
-  const workplaces=`<section class="workplaces-section"><div class="section-heading"><h2>Рабочие места</h2></div>${workplaceAddButton()}${workplaceList()}</section>`;
+  const workplaces=`<section class="workplaces-section"><div class="section-heading"><h2>Рабочие места</h2></div>${actionBlock(`${workplaceAddButton()}${workplaceList()}`)}</section>`;
   root.innerHTML=page([
     profileCard(p),
     accordion(items),

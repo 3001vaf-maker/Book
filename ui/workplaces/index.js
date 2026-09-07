@@ -11,7 +11,7 @@ export function workplaceCountText(count = 0) {
 
 export function workplaceAddButton({ data = 'data-add-workplace' } = {}) {
   return button('+ Добавить рабочее место', {
-    className: 'ui-button--secondary workplace-add-button',
+    className: 'ui-button--secondary ui-button--full',
     data,
     aria: 'Добавить рабочее место',
   });
