@@ -37,3 +37,12 @@ export function updateWallet(id, patch) {
   write(values.map((item) => item.id === id ? updated : item));
   return updated;
 }
+
+export function deleteWallet(id) {
+  const values = getWallets();
+  const current = values.find((item) => item.id === id);
+  if (!current || current.system) return false;
+  const deletedAt = new Date().toISOString();
+  write(values.map((item) => item.id === id ? { ...item, deletedAt, updatedAt: deletedAt } : item));
+  return true;
+}

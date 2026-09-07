@@ -1,5 +1,5 @@
 import { actionBlock, button, emptyState, entityCard, escapeHtml, field, iconButton, initPhotoField, listEntries, listEntry, mountModal, modal, page, pageHeader, photoField } from '../../ui/ui.js';
-import { getWallets, saveWallet as saveWalletData, updateWallet } from './data.js';
+import { deleteWallet as deleteWalletData, getWallets, saveWallet as saveWalletData, updateWallet } from './data.js?v=custom-wallet-delete-20260908';
 
 function renderList(root, navigateBack) {
   const items = getWallets();
@@ -60,9 +60,24 @@ function renderCard(root, id, navigateBack) {
     initial:(wallet.name||'?').slice(0,1).toUpperCase(),
     className:'entity-card--hero'
   });
-  root.innerHTML=page([card,actionBlock(`${button('Работа с кошельком',{data:'data-wallet-work'})}${button('Назад',{className:'ui-button--secondary',data:'data-back-wallet-card'})}`)]);
+  const deleteButton=wallet.system?'':button('Удалить',{variant:'danger',data:'data-delete-wallet-card'});
+  root.innerHTML=page([card,actionBlock(`${button('Работа с кошельком',{data:'data-wallet-work'})}${button('Назад',{className:'ui-button--secondary',data:'data-back-wallet-card'})}${deleteButton}`)]);
   root.querySelector('[data-wallet-work]')?.addEventListener('click', () => openPhotoForm(root, wallet, navigateBack));
   root.querySelector('[data-back-wallet-card]')?.addEventListener('click', () => renderList(root, navigateBack));
+  root.querySelector('[data-delete-wallet-card]')?.addEventListener('click', () => confirmDeleteWallet(root, wallet, navigateBack));
+}
+
+function confirmDeleteWallet(root, wallet, navigateBack) {
+  if (wallet.system) return;
+  const html=`<div class="modal-title"><h2>Удалить кошелёк?</h2><p>${escapeHtml(wallet.name)} будет удалён.</p></div><div class="modal-actions">${button('Удалить',{variant:'danger',data:'data-confirm-delete-wallet'})}${button('Отмена',{className:'ui-button--secondary',data:'data-cancel-delete-wallet'})}</div>`;
+  const m=mountModal(root,modal(html,{variant:'compact'}));
+  if(!m)return;
+  m.querySelector('[data-cancel-delete-wallet]')?.addEventListener('click',()=>m.remove());
+  m.querySelector('[data-confirm-delete-wallet]')?.addEventListener('click',()=>{
+    if(!deleteWalletData(wallet.id))return;
+    m.remove();
+    renderList(root,navigateBack);
+  });
 }
 
 function openPhotoForm(root, wallet, navigateBack) {

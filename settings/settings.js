@@ -7,7 +7,7 @@ const folders = [
   ['documents', 'Документы', '◫', () => import('./documents/documents.js')],
   ['loyalty', 'Программа лояльности', '◫', () => import('./loyalty/loyalty.js')],
   ['tags', 'Ярлыки', '◫', () => import('./tags/tags.js?v=shared-render-contract-20260907')],
-  ['wallets', 'Кошелёк', '◫', () => import('./wallets/wallets.js?v=wallet-label-20260908')],
+  ['wallets', 'Кошелёк', '◫', () => import('./wallets/wallets.js?v=custom-wallet-delete-20260908')],
 ];
 
 function renderRows(root) {
