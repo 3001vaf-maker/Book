@@ -1,20 +1,10 @@
-import { actionBlock, button, collectCost, collectWorkplaceSelections, costField, details, emptyState, entityCard, escapeHtml, field, iconButton, initCostFields, initPhotoField, initWorkplaceSelectors, listEntries, listEntry, mountModal, modal, page, pageHeader, photoField, textareaField, workplaceSelector } from '../../../ui/ui.js';
+import { actionBlock, button, collectCost, collectWorkplaceSelections, costCardMeta, costField, costListParts, details, emptyState, entityCard, escapeHtml, field, iconButton, initCostFields, initPhotoField, initWorkplaceSelectors, listEntries, listEntry, mountModal, modal, page, pageHeader, photoField, textareaField, workplaceCountText, workplaceSelector } from '../../../ui/ui.js';
 import { getWorkplaces } from '../../profile/workplaces/data.js';
 import { deleteProduct as deleteProductData, getProducts, pushProductHistory, saveProduct as saveProductData } from './data.js';
 
-const fmt=v=>v===''||v==null?'':`${Number(v).toLocaleString('ru-RU')} ₽`;
-const workplaceCountText=count=>`${Math.max(0,Number(count)||0)} р.м.`;
-const costParts=cost=>{if(!cost||cost.free)return{rightTop:'Бесплатно'};if(cost.mode==='from-to')return{rightTop:`от ${fmt(cost.from)}`,rightBottom:`до ${fmt(cost.to)}`};if(cost.mode==='from')return{rightTop:`от ${fmt(cost.from??cost.amount)}`};return{rightTop:fmt(cost.amount??cost.from)}};
-const cardCostMeta=cost=>{
-  if(!cost||cost.free)return[{value:'стоимость'},{value:'Бесплатно'}];
-  if(cost.mode==='from-to')return[{value:`от ${fmt(cost.from)}`},{value:`до ${fmt(cost.to)}`}];
-  if(cost.mode==='from')return[{value:'от'},{value:fmt(cost.from??cost.amount)}];
-  return[{value:'стоимость'},{value:fmt(cost.amount??cost.from)||'—'}];
-};
-
 function renderList(root,navigateBack){
   const items=getProducts();
-  root.innerHTML=`<div class="entity-page-header">${pageHeader('Товары')}<div class="page-header-action">${iconButton('+',{className:'icon-button--primary',data:'data-add-product',aria:'Добавить товар'})}</div></div>${items.length?listEntries(items.map(renderRow)):emptyState('Товаров пока нет','Добавьте первый товар кнопкой «+».')}${actionBlock(button('Назад',{className:'ui-button--secondary',data:'data-back-products'}))}`;
+  root.innerHTML=`<div class="entity-page-header">${pageHeader('Товары')}<div class="page-header-action">${iconButton('+',{data:'data-add-product',aria:'Добавить товар'})}</div></div>${items.length?listEntries(items.map(renderRow)):emptyState('Товаров пока нет','Добавьте первый товар кнопкой «+».')}${actionBlock(button('Назад',{className:'ui-button--secondary',data:'data-back-products'}))}`;
   root.querySelector('[data-add-product]')?.addEventListener('click',()=>openForm(root,null,navigateBack));
   root.querySelectorAll('[data-product]').forEach(el=>el.addEventListener('click',()=>renderCard(root,el.dataset.product,navigateBack)));
   root.querySelectorAll('[data-delete-action]').forEach(el=>el.addEventListener('click',e=>{e.stopPropagation();confirmDelete(root,el.dataset.deleteAction,navigateBack,()=>renderList(root,navigateBack))}));
@@ -22,7 +12,7 @@ function renderList(root,navigateBack){
 }
 
 function renderRow(p){
-  const price=costParts(p.cost),workplaceCount=(p.workplaces||[]).length;
+  const price=costListParts(p.cost),workplaceCount=(p.workplaces||[]).length;
   return listEntry({title:p.name||'',subtitle:workplaceCountText(workplaceCount),image:p.photo||'',initial:(p.name||'?').slice(0,1).toUpperCase(),rightTop:price.rightTop||'',rightBottom:price.rightBottom||'',interactive:true,data:`data-product="${escapeHtml(p.id)}"`,aria:`Открыть товар ${p.name||''}`,deleteData:p.id,deleteAria:`Удалить товар ${p.name||''}`});
 }
 
@@ -48,14 +38,14 @@ function renderCard(root,id,navigateBack){
     image:p.photo||'',
     initial:(p.name||'?').slice(0,1).toUpperCase(),
     topMeta:[{value:workplaceCountText(workplaceNames.length)}],
-    topRightMeta:cardCostMeta(p.cost),
+    topRightMeta:costCardMeta(p.cost),
     meta:workplaceNames.map(name=>({value:name})),
     metricsLayout:'vertical',
     className:'entity-card--hero entity-card--top-dark'
   });
   const info=details([
     p.about?{label:'Описание',value:p.about}:null,
-    workplaceNames.length?{label:'Рабочее место',value:workplaceNames.join(', ')}:null
+    workplaceNames.length?{label:'Рабочие места',value:workplaceNames.join(', ')}:null
   ]);
   root.innerHTML=page([card,info,actionBlock(`${button('Редактировать товар',{data:'data-edit-product'})}${button('Назад',{className:'ui-button--secondary',data:'data-back-products-card'})}${button('Удалить',{variant:'danger',data:'data-delete-card'})}`)]);
   root.querySelector('[data-edit-product]').onclick=()=>openForm(root,p,navigateBack);
