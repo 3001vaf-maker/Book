@@ -91,6 +91,14 @@ for (const file of allFiles) {
 const uiFacade = join(root, 'ui/ui.js');
 if (/export\s+function\b/.test(text(uiFacade))) report(uiFacade, 'ui/ui.js must remain a pure import/re-export facade');
 
+const profileController = join(root, 'settings/profile/profile.js');
+if (!/\bworkplaceAddButton\(\)/.test(text(profileController))) {
+  report(profileController, 'Profile must use the shared workplace add button from ui/workplaces');
+}
+if (/iconButton\('\+'[^)]*data-add-workplace/.test(text(profileController))) {
+  report(profileController, 'Profile must not recreate the workplace add button locally');
+}
+
 if (errors.length) {
   console.error('reference architecture check: FAILED');
   for (const error of errors) console.error(`- ${error}`);
