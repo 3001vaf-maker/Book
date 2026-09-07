@@ -14,7 +14,7 @@ import { costField, initCostFields, collectCost } from './cost/index.js';
 import { durationPicker, initDurationPickers } from './duration/index.js?v=centered-current-duration-20260907';
 import { timePicker, initTimePickers } from './time/index.js?v=centered-current-time-20260907';
 import { journalDayTimeline, initJournalDayTimeline } from './time/journal-day.js';
-import { workplaceSelector, initWorkplaceSelectors, collectWorkplaceSelections, workplaceHeaderButton, getWorkplaceContext, setWorkplaceContext } from './workplaces/index.js?v=workplace-wording-20260907';
+import { workplaceSelector, initWorkplaceSelectors, collectWorkplaceSelections, workplaceHeaderButton, getWorkplaceContext, setWorkplaceContext } from './workplaces/index.js?v=workplace-full-action-20260907';
 import { modal, mountModal } from './modals/index.js';
 import { button, iconButton } from './buttons/index.js';
 import { field, phoneField, textareaField, photoField, initPhotoField } from './inputs/index.js';
