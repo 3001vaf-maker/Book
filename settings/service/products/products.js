@@ -2,8 +2,15 @@ import { actionBlock, button, collectCost, collectWorkplaceSelections, costField
 import { getWorkplaces } from '../../profile/workplaces/data.js';
 import { deleteProduct as deleteProductData, getProducts, pushProductHistory, saveProduct as saveProductData } from './data.js';
 
-const fmtMoney=v=>v===''||v==null?'':`${Number(v).toLocaleString('ru-RU')} ₽`;
-const costText=c=>c?.free?'Бесплатно':fmtMoney(c?.amount)||'—';
+const fmt=v=>v===''||v==null?'':`${Number(v).toLocaleString('ru-RU')} ₽`;
+const workplaceCountText=count=>`${Math.max(0,Number(count)||0)} р.м.`;
+const costParts=cost=>{if(!cost||cost.free)return{rightTop:'Бесплатно'};if(cost.mode==='from-to')return{rightTop:`от ${fmt(cost.from)}`,rightBottom:`до ${fmt(cost.to)}`};if(cost.mode==='from')return{rightTop:`от ${fmt(cost.from??cost.amount)}`};return{rightTop:fmt(cost.amount??cost.from)}};
+const cardCostMeta=cost=>{
+  if(!cost||cost.free)return[{value:'стоимость'},{value:'Бесплатно'}];
+  if(cost.mode==='from-to')return[{value:`от ${fmt(cost.from)}`},{value:`до ${fmt(cost.to)}`}];
+  if(cost.mode==='from')return[{value:'от'},{value:fmt(cost.from??cost.amount)}];
+  return[{value:'стоимость'},{value:fmt(cost.amount??cost.from)||'—'}];
+};
 
 function renderList(root,navigateBack){
   const items=getProducts();
@@ -15,12 +22,13 @@ function renderList(root,navigateBack){
 }
 
 function renderRow(p){
-  return listEntry({title:p.name||'',subtitle:p.workplaces?.[0]?.name||'',image:p.photo||'',initial:(p.name||'?').slice(0,1).toUpperCase(),rightTop:costText(p.cost),interactive:true,data:`data-product="${escapeHtml(p.id)}"`,aria:`Открыть товар ${p.name||''}`,deleteData:p.id,deleteAria:`Удалить товар ${p.name||''}`});
+  const price=costParts(p.cost),workplaceCount=(p.workplaces||[]).length;
+  return listEntry({title:p.name||'',subtitle:workplaceCountText(workplaceCount),image:p.photo||'',initial:(p.name||'?').slice(0,1).toUpperCase(),rightTop:price.rightTop||'',rightBottom:price.rightBottom||'',interactive:true,data:`data-product="${escapeHtml(p.id)}"`,aria:`Открыть товар ${p.name||''}`,deleteData:p.id,deleteAria:`Удалить товар ${p.name||''}`});
 }
 
 function openForm(root,existing=null,navigateBack=()=>{}){
-  const p=existing||{photo:'',name:'',cost:{amount:'',free:false},about:'',workplaces:[]};
-  const html=`<form class="compact-form" data-product-form><div class="modal-title"><h2>${existing?'Изменить товар':'Товар'}</h2></div>${photoField({name:'productPhoto',value:p.photo||''})}${field({label:'Название',name:'productName',value:p.name||'',placeholder:'Название товара',required:true})}${costField({value:p.cost||{},name:'productCost',modes:['amount'],free:true})}${textareaField({label:'Описание',name:'productAbout',value:p.about||'',rows:7,maxlength:5000,placeholder:'Описание товара'})}<div class="array-group"><span class="array-label">Рабочие места</span>${workplaceSelector({name:'productWorkplaces',selected:p.workplaces||[],allowMultiple:true,workplaces:getWorkplaces()})}</div>${button('Сохранить',{type:'submit'})}</form>`;
+  const p=existing||{photo:'',name:'',cost:{mode:'amount',amount:'',free:false},about:'',workplaces:[]};
+  const html=`<form class="compact-form" data-product-form><div class="modal-title"><h2>${existing?'Изменить товар':'Товар'}</h2></div>${photoField({name:'productPhoto',value:p.photo||''})}${field({label:'Название',name:'productName',value:p.name||'',placeholder:'Название товара',required:true})}${costField({value:p.cost||{},name:'productCost'})}${workplaceSelector({name:'productWorkplaces',selected:p.workplaces||[],allowMultiple:true,workplaces:getWorkplaces()})}${textareaField({label:'Описание',name:'productAbout',value:p.about||'',rows:7,maxlength:5000,placeholder:'Описание товара'})}${button('Сохранить',{type:'submit'})}</form>`;
   const m=mountModal(root,modal(html));
   initPhotoField(m);initCostFields(m);initWorkplaceSelectors(m);
   m.querySelector('[data-product-form]')?.addEventListener('submit',e=>{e.preventDefault();saveProduct(root,m,existing,navigateBack)});
@@ -34,10 +42,20 @@ function saveProduct(root,m,existing,navigateBack){
 
 function renderCard(root,id,navigateBack){
   const p=getProducts().find(x=>x.id===id);if(!p)return renderList(root,navigateBack);
-  const card=entityCard({title:p.name||'',subtitle:p.workplaces?.[0]?.name||'',image:p.photo||'',initial:(p.name||'?').slice(0,1).toUpperCase(),meta:[{value:costText(p.cost),label:'стоимость'},{value:String(p.workplaces?.length||0),label:'мест работы'}],metricsLayout:'grid',className:'entity-card--hero'});
+  const workplaceNames=(p.workplaces||[]).map(w=>w.name||w.workplaceId).filter(Boolean);
+  const card=entityCard({
+    title:p.name||'',
+    image:p.photo||'',
+    initial:(p.name||'?').slice(0,1).toUpperCase(),
+    topMeta:[{value:workplaceCountText(workplaceNames.length)}],
+    topRightMeta:cardCostMeta(p.cost),
+    meta:workplaceNames.map(name=>({value:name})),
+    metricsLayout:'vertical',
+    className:'entity-card--hero entity-card--top-dark'
+  });
   const info=details([
     p.about?{label:'Описание',value:p.about}:null,
-    p.workplaces?.length?{label:'Места работы',value:p.workplaces.map(w=>w.name||w.workplaceId).join(', ')}:null
+    workplaceNames.length?{label:'Рабочее место',value:workplaceNames.join(', ')}:null
   ]);
   root.innerHTML=page([card,info,actionBlock(`${button('Редактировать товар',{data:'data-edit-product'})}${button('Назад',{className:'ui-button--secondary',data:'data-back-products-card'})}${button('Удалить',{variant:'danger',data:'data-delete-card'})}`)]);
   root.querySelector('[data-edit-product]').onclick=()=>openForm(root,p,navigateBack);
