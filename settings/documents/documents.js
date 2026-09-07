@@ -1,6 +1,6 @@
-import { button, pageHeader } from '../../ui/ui.js';
+import { actionBlock, button, emptyState, pageHeader } from '../../ui/ui.js';
 
 export function render(root, navigateBack = () => {}) {
-  root.innerHTML = `${pageHeader('Документы')}<div class="empty-state"><strong>Раздел подготовлен</strong><span>Содержимое добавляется отдельным ТЗ.</span></div><div class="profile-actions">${button('Назад', { className: 'ui-button--secondary', data: 'data-documents-back' })}</div>`;
+  root.innerHTML = `${pageHeader('Документы')}${emptyState('Раздел подготовлен','Содержимое добавляется отдельным ТЗ.')}${actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-documents-back' }))}`;
   root.querySelector('[data-documents-back]')?.addEventListener('click', navigateBack);
 }
