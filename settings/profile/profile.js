@@ -1,7 +1,7 @@
 import { accordion, actionBlock, button, collectRepeatedField, entityCard, field, iconButton, initAccordions, initPhotoField, initRepeatedFields, modal, mountModal, page, photoField, repeatedField, select, textareaField } from '../../ui/ui.js';
 import { addCustomProfession, getCustomProfessions, getProfile, saveProfile as saveProfileData } from './data.js';
 import { getWorkplaces } from './workplaces/data.js';
-import { openWorkplaceModal, renderWorkplace, workplaceList } from './workplaces/workplaces.js';
+import { initWorkplaceListDeletion, openWorkplaceModal, renderWorkplace, workplaceList } from './workplaces/workplaces.js';
 
 const PROFESSIONS=['Парикмахер','Колорист','Барбер','Визажист','Стилист','Мастер маникюра','Мастер педикюра','Бровист','Лэшмейкер','Косметолог','Массажист','Мастер по наращиванию волос','Мастер перманентного макияжа','Другая'];
 const EXPERIENCES=['Без опыта','До 1 года','1–3 года','3–5 лет','5–10 лет','10–15 лет','15–20 лет','Более 20 лет'];
@@ -73,6 +73,7 @@ function renderProfile(root,navigateBack){
   initPhotoField(root);
   initRepeatedFields(root);
   initAccordions(root,{onDirty:()=>root.querySelector('[data-save-profile]')?.classList.add('is-visible')});
+  initWorkplaceListDeletion(root,()=>renderProfile(root,navigateBack));
   root.addEventListener('change',e=>{if(e.target.matches?.('[name="profession"]')&&e.target.value==='Другая')openCustomProfessionModal(root)});
   root.querySelector('[data-save-profile]')?.addEventListener('click',()=>saveProfile(root,navigateBack));
   root.querySelector('[data-profile-back]')?.addEventListener('click',navigateBack);
