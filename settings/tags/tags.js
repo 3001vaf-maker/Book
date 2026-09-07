@@ -5,7 +5,19 @@ function renderList(root, navigateBack) {
   const items = getTags();
   root.innerHTML = `<div class="entity-page-header">${pageHeader('Ярлыки')}<div class="page-header-action">${iconButton('+', { className: 'icon-button--primary', data: 'data-add-tag', aria: 'Добавить ярлык' })}</div></div>${items.length ? renderTagList(items) : emptyState('Ярлыков пока нет', 'Добавьте первый ярлык кнопкой «+».')}${actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-back-tags' }))}`;
   root.querySelector('[data-add-tag]')?.addEventListener('click', () => openForm(root, navigateBack));
-  root.querySelectorAll('[data-delete-tag]').forEach((element) => element.addEventListener('click', () => {
+  root.querySelectorAll('[data-edit-tag]').forEach((element) => {
+    element.addEventListener('click', () => {
+      const tag = getTags().find((item) => item.id === element.dataset.editTag);
+      if (tag) openForm(root, navigateBack, tag);
+    });
+    element.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      element.click();
+    });
+  });
+  root.querySelectorAll('[data-delete-tag]').forEach((element) => element.addEventListener('click', (event) => {
+    event.stopPropagation();
     confirmDelete(root, element.dataset.deleteTag, navigateBack);
   }));
   root.querySelector('[data-back-tags]')?.addEventListener('click', navigateBack);
@@ -16,29 +28,43 @@ function renderTagList(items) {
 }
 
 function renderRow(tag) {
-  return `<div class="tag-manager-list__item">
+  return `<div class="tag-manager-list__item" data-edit-tag="${escapeHtml(tag.id)}" role="button" tabindex="0" aria-label="Изменить ярлык ${escapeHtml(tag.name)}">
     <span class="tag-manager-list__swatch" style="--tag-manager-color:${escapeHtml(tag.color)}" aria-hidden="true"></span>
     <strong class="tag-manager-list__name">${escapeHtml(tag.name)}</strong>
     <button type="button" class="remove-button tag-manager-list__delete" data-delete-tag="${escapeHtml(tag.id)}" aria-label="Удалить ярлык ${escapeHtml(tag.name)}">×</button>
   </div>`;
 }
 
-function openForm(root, navigateBack) {
-  const html = `<form class="compact-form" data-tag-form><div class="modal-title"><h2>Новый ярлык</h2></div>${colorPicker({ name: 'tagColor' })}${field({ label: 'Название ярлыка', name: 'tagName', placeholder: 'Название ярлыка', required: true })}${button('Сохранить', { type: 'submit' })}</form>`;
-  const m = mountModal(root, modal(html, { title: 'Новый ярлык' }));
+function openForm(root, navigateBack, existing = null) {
+  const title = existing ? 'Изменить ярлык' : 'Новый ярлык';
+  const html = `<form class="compact-form" data-tag-form><div class="modal-title"><h2>${title}</h2></div>${colorPicker({ name: 'tagColor', value: existing?.color || '#F6D32D' })}${field({ label: 'Название ярлыка', name: 'tagName', value: existing?.name || '', placeholder: 'Название ярлыка', required: true })}${button('Сохранить', { type: 'submit' })}</form>`;
+  const m = mountModal(root, modal(html, { title }));
   initColorPickers(m);
   m.querySelector('[data-tag-form]')?.addEventListener('submit', (event) => {
     event.preventDefault();
-    saveTag(root, m, navigateBack);
+    saveTag(root, m, navigateBack, existing);
   });
 }
 
-function saveTag(root, modalRoot, navigateBack) {
+function saveTag(root, modalRoot, navigateBack, existing = null) {
   const data = new FormData(modalRoot.querySelector('[data-tag-form]'));
   const name = String(data.get('tagName') || '').trim();
   if (!name) return;
-  const tag = createTag({ name, color: String(data.get('tagColor') || '#F6D32D') });
-  saveTags([...getTags(), tag]);
+  const color = String(data.get('tagColor') || '#F6D32D');
+
+  if (existing) {
+    const updated = {
+      ...existing,
+      name,
+      color,
+      updatedAt: new Date().toISOString(),
+    };
+    saveTags(getTags().map((item) => item.id === existing.id ? updated : item));
+  } else {
+    const tag = createTag({ name, color });
+    saveTags([...getTags(), tag]);
+  }
+
   modalRoot.remove();
   renderList(root, navigateBack);
 }
