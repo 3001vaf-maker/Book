@@ -3,7 +3,7 @@ import { bottomNavigation } from './navigation/navigation.js';
 import { viewNavigation, initViewNavigation } from './view-navigation/view-navigation.js';
 import { calendar, initCalendar, monthDayPicker, initMonthDayPickers, dateNavigator, initDateNavigator } from './calendar/index.js?v=month-day-20260906';
 import { initMultiSelect } from './selection/index.js?v=graph-lifecycle-20260903';
-import { entityCard } from './cards/index.js?v=profile-card-top-20260907';
+import { entityCard } from './cards/index.js?v=procedure-card-layout-20260907';
 import { folderCard, folderList } from './cards/folder-card.js';
 import { list } from './lists/list.js';
 import { listEntry, listEntries } from './lists/list-entry.js';
