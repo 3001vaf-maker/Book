@@ -75,9 +75,7 @@ if (existsSync(legacyTimeWorkBridge)) {
   report(legacyTimeWorkBridge, 'legacy TimeWork compatibility bridge is forbidden; Day is the canonical working-time owner');
 }
 
-const scheduleMigration = 'core/migrations/schedule-v1.js';
 for (const file of allFiles) {
-  const path = relative(root, file).replaceAll('\\', '/');
   const source = text(file);
 
   if (/from\s+['"][^'"]*time-work\.js['"]/.test(source)) {
@@ -89,11 +87,11 @@ for (const file of allFiles) {
   }
 
   if (/\bmigrateLegacyWorkingDates\b/.test(source)) {
-    report(file, 'legacy workingDates migration must not live in runtime controllers or Day');
+    report(file, 'legacy workingDates migration is forbidden');
   }
 
-  if (source.includes('book.timeWorks') && path !== scheduleMigration) {
-    report(file, 'book.timeWorks may only be read by the isolated one-time schedule migration');
+  if (source.includes('book.timeWorks')) {
+    report(file, 'legacy book.timeWorks storage is forbidden');
   }
 }
 

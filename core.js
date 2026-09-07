@@ -5,11 +5,9 @@ import { renderChat } from './chat/chat.js';
 import { renderSettings } from './settings/settings.js?v=tag-manager-ui-20260908';
 import { getWorkplaces as getWorkplaceEntities } from './settings/profile/workplaces/data.js';
 import { configureWorkplaceSource } from './core/workplace-time.js';
-import { migrateScheduleV1 } from './core/migrations/schedule-v1.js?v=day-core-clean-20260908';
 import { bottomNavigation } from './ui/ui.js?v=shared-secondary-button-20260908';
 
 configureWorkplaceSource(getWorkplaceEntities);
-migrateScheduleV1(getWorkplaceEntities());
 
 const routes = {
   main: renderMain,
