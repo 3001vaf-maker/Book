@@ -1,17 +1,69 @@
 import { costField, collectCost, initCostFields } from '../cost/index.js';
+import { select } from '../selectors/index.js';
 import { escapeHtml } from '../utils/escape-html.js';
 
-const CONTEXT_KEY='book:workplace-context';
-function readContext(){try{const value=JSON.parse(localStorage.getItem(CONTEXT_KEY)||'{}');return value&&typeof value==='object'?value:{}}catch{return {}}}
-function writeContext(next){localStorage.setItem(CONTEXT_KEY,JSON.stringify(next));}
+export { getWorkplaceContext, setWorkplaceContext } from '../../core/workplace-context.js';
 
-export function getWorkplaceContext(workplaces=[]){const items=Array.isArray(workplaces)?workplaces:[];const context=readContext();const first=items[0]?.key||'';const workplaceId=items.some((item)=>item.key===context.workplaceId)?context.workplaceId:first;const parsedDate=typeof context.date==='string'?new Date(`${context.date}T00:00:00`):null;const date=parsedDate&&!Number.isNaN(parsedDate.getTime())?parsedDate:new Date();return {workplaceId,date};}
-export function setWorkplaceContext({workplaceId,date}={}){const current=readContext();const next={...current};if(workplaceId!==undefined)next.workplaceId=workplaceId||'';if(date instanceof Date&&!Number.isNaN(date.getTime()))next.date=`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;writeContext(next);return next;}
+function workplaceOptions(workplaces = []) {
+  return (Array.isArray(workplaces) ? workplaces : []).map((workplace) => ({
+    value: String(workplace?.key || ''),
+    label: String(workplace?.name || 'Без названия'),
+  })).filter((option) => option.value);
+}
 
-export function workplaceSelector({name='workplaces',selected=[],allowMultiple=true,costPerWorkplace=false,workplaces=[]}={}){const items=Array.isArray(workplaces)?workplaces:[],options=items.map(w=>`<option value="${escapeHtml(w.key)}">${escapeHtml(w.name||'Без названия')}</option>`).join(''),first=selected.map(x=>x.workplaceId||x.id||x.key)[0]||'';return `<div class="workplace-selector" data-workplace-selector="${escapeHtml(name)}" data-cost-per-workplace="${costPerWorkplace?'true':'false'}"><div data-workplace-rows>${row(name,first,options,selected[0],costPerWorkplace)}</div>${allowMultiple?`<button type="button" class="ui-button ui-button--small" data-add-workplace>+ Добавить место работы</button>`:''}</div>`}
-function row(name,value,options,selected={},withCost=false){const cost=selected?.cost||{},selectedOptions=options.replace(new RegExp(`value="${escapeHtml(value)}"`,'g'),`value="${escapeHtml(value)}" selected`);return `<div class="workplace-select-row" data-workplace-row><label class="field"><span>Место работы</span><select data-workplace-value name="${escapeHtml(name)}"><option value="">Выбор места работы</option>${selectedOptions}</select></label>${withCost?costField({name:`${name}-cost-${Math.random().toString(36).slice(2,8)}`,value:cost}):''}<button type="button" class="remove-button" data-remove-workplace aria-label="Удалить место работы">×</button></div>`}
-export function initWorkplaceSelectors(root){root.querySelectorAll('[data-workplace-selector]').forEach(host=>{initCostFields(host);host.querySelector('[data-add-workplace]')?.addEventListener('click',()=>{const rows=host.querySelector('[data-workplace-rows]'),select=rows.querySelector('select'),withCost=host.dataset.costPerWorkplace==='true';if(!rows||!select)return;rows.insertAdjacentHTML('beforeend',row(host.dataset.workplaceSelector,'',[...select.options].map(o=>o.outerHTML).join(''),{},withCost));const added=rows.lastElementChild;if(withCost)initCostFields(added)});host.addEventListener('click',e=>{if(e.target.closest('[data-remove-workplace]'))e.target.closest('[data-workplace-row]')?.remove()})})}
-export function collectWorkplaceSelections(root,name='workplaces'){const host=root.querySelector(`[data-workplace-selector="${CSS.escape(name)}"]`);if(!host)return [];return [...host.querySelectorAll('[data-workplace-row]')].map(r=>{const select=r.querySelector('[data-workplace-value]'),id=select?.value||'',label=select?.selectedOptions?.[0]?.textContent?.trim()||'',costHost=r.querySelector('[data-cost-field]');return id?{workplaceId:id,name:label,cost:costHost?collectCost(r,costHost.dataset.costField):{}}:null}).filter(Boolean)}
+function row(name, value, options, selected = {}, withCost = false) {
+  const cost = selected?.cost || {};
+  return `<div class="workplace-select-row" data-workplace-row>${select({
+    label: 'Место работы',
+    name,
+    value,
+    options: [{ value: '', label: 'Выбор места работы' }, ...options],
+    data: 'data-workplace-value',
+  })}${withCost ? costField({ name: `${name}-cost-${Math.random().toString(36).slice(2, 8)}`, value: cost }) : ''}<button type="button" class="remove-button" data-remove-workplace aria-label="Удалить место работы">×</button></div>`;
+}
+
+export function workplaceSelector({ name = 'workplaces', selected = [], allowMultiple = true, costPerWorkplace = false, workplaces = [] } = {}) {
+  const options = workplaceOptions(workplaces);
+  const selections = Array.isArray(selected) ? selected : [];
+  const first = String(selections[0]?.workplaceId || selections[0]?.id || selections[0]?.key || '');
+  const catalog = escapeHtml(JSON.stringify(options));
+  return `<div class="workplace-selector" data-workplace-selector="${escapeHtml(name)}" data-cost-per-workplace="${costPerWorkplace ? 'true' : 'false'}" data-workplace-options="${catalog}"><div data-workplace-rows>${row(name, first, options, selections[0], costPerWorkplace)}</div>${allowMultiple ? '<button type="button" class="ui-button ui-button--small" data-add-workplace>+ Добавить место работы</button>' : ''}</div>`;
+}
+
+export function initWorkplaceSelectors(root) {
+  root.querySelectorAll('[data-workplace-selector]').forEach((host) => {
+    if (host.dataset.workplaceSelectorReady === 'true') return;
+    host.dataset.workplaceSelectorReady = 'true';
+    initCostFields(host);
+    host.querySelector('[data-add-workplace]')?.addEventListener('click', () => {
+      const rows = host.querySelector('[data-workplace-rows]');
+      if (!rows) return;
+      const options = JSON.parse(host.dataset.workplaceOptions || '[]');
+      const withCost = host.dataset.costPerWorkplace === 'true';
+      rows.insertAdjacentHTML('beforeend', row(host.dataset.workplaceSelector, '', options, {}, withCost));
+      const added = rows.lastElementChild;
+      if (withCost && added) initCostFields(added);
+    });
+    host.addEventListener('click', (event) => {
+      const remove = event.target.closest('[data-remove-workplace]');
+      if (remove) remove.closest('[data-workplace-row]')?.remove();
+    });
+  });
+}
+
+export function collectWorkplaceSelections(root, name = 'workplaces') {
+  const host = root.querySelector(`[data-workplace-selector="${CSS.escape(name)}"]`);
+  if (!host) return [];
+  const options = JSON.parse(host.dataset.workplaceOptions || '[]');
+  return [...host.querySelectorAll('[data-workplace-row]')].map((item) => {
+    const input = item.querySelector('input[type="hidden"][data-workplace-value]');
+    const workplaceId = String(input?.value || '');
+    if (!workplaceId) return null;
+    const label = options.find((option) => option.value === workplaceId)?.label || '';
+    const costHost = item.querySelector('[data-cost-field]');
+    return { workplaceId, name: label, cost: costHost ? collectCost(item, costHost.dataset.costField) : {} };
+  }).filter(Boolean);
+}
 
 export function workplaceHeaderButton({ workplace = null, showStats = false, stats = null } = {}) {
   const name = workplace?.name || 'Место работы';
