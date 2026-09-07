@@ -1,15 +1,9 @@
 import { createTimeRange } from './time.js';
 import { getDays, getDay, getDayTime, getDaysForDate, hasScheduleConflict } from './day.js';
-
-const WORKPLACES_KEY = 'book.workplaces';
+import { getWorkplaces as getWorkplaceEntities } from '../settings/profile/workplaces/data.js';
 
 export function getWorkplaces() {
-  try {
-    const value = JSON.parse(localStorage.getItem(WORKPLACES_KEY) || '[]');
-    return Array.isArray(value) ? value : [];
-  } catch {
-    return [];
-  }
+  return getWorkplaceEntities();
 }
 
 export function getWorkplace(workplaces, workplaceId) {
