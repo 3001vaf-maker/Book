@@ -1,5 +1,4 @@
-import { actionBlock, button, emptyState, escapeHtml, field, iconButton, listEntries, listEntry, mountModal, modal, pageHeader } from '../../ui/ui.js';
-import { colorPicker, initColorPickers } from '../../ui/colors/index.js';
+import { actionBlock, button, colorPicker, emptyState, escapeHtml, field, iconButton, initColorPickers, listEntries, listEntry, mountModal, modal, pageHeader } from '../../ui/ui.js';
 import { createTag, getTags, saveTags } from './data.js';
 
 function renderList(root, navigateBack) {
