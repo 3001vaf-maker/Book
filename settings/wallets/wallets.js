@@ -1,4 +1,4 @@
-import { actionBlock, button, emptyState, entityCard, escapeHtml, iconButton, initPhotoField, listEntries, listEntry, mountModal, modal, page, pageHeader, photoField } from '../../ui/ui.js';
+import { actionBlock, button, emptyState, entityCard, escapeHtml, field, iconButton, initPhotoField, listEntries, listEntry, mountModal, modal, page, pageHeader, photoField } from '../../ui/ui.js';
 import { getWallets, saveWallet as saveWalletData, updateWallet } from './data.js';
 
 function renderList(root, navigateBack) {
@@ -23,7 +23,7 @@ function renderRow(wallet) {
 
 function openForm(root, existing = null, navigateBack) {
   const wallet = existing || { photo: '', name: '' };
-  const html = `<form class="compact-form" data-wallet-form><div class="modal-title"><h2>${existing ? 'Изменить кошелёк' : 'Новый кошелёк'}</h2></div>${photoField({ name: 'walletPhoto', value: wallet.photo || '' })}<label class="field"><span>Название кошелька *</span><input name="walletName" required value="${escapeHtml(wallet.name || '')}" placeholder="Название кошелька"></label>${button('Сохранить', { type: 'submit' })}</form>`;
+  const html = `<form class="compact-form" data-wallet-form><div class="modal-title"><h2>${existing ? 'Изменить кошелёк' : 'Новый кошелёк'}</h2></div>${photoField({ name: 'walletPhoto', value: wallet.photo || '' })}${field({ label: 'Название кошелька', name: 'walletName', value: wallet.name || '', placeholder: 'Название кошелька', required: true })}${button('Сохранить', { type: 'submit' })}</form>`;
   const m = mountModal(root, modal(html, { title: existing ? 'Изменить кошелёк' : 'Новый кошелёк' }));
   initPhotoField(m);
   m.querySelector('[data-wallet-form]')?.addEventListener('submit', (event) => {
