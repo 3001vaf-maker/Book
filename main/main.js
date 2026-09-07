@@ -1,5 +1,5 @@
 import { folderCard, pageHeader } from '../ui/ui.js';
-import { getClientCount } from './clients/clients.js';
+import { getClientCount } from './clients/data.js';
 
 export function renderMain(root) {
   const count = getClientCount();
