@@ -83,6 +83,12 @@ export function renderTimetable(root) {
     });
   }
 
+  function openWorkingDaysConflictModal() {
+    const content = `<div class="modal-title"><h2>Выберите другие даты</h2><p>Эти даты заняты другим салоном.</p></div>${button('Понятно', { data: 'data-timetable-multi-conflict-close' })}`;
+    const m = mountModal(document.body, modal(content, { title: 'Выберите другие даты', variant: 'compact' }));
+    m?.querySelector('[data-timetable-multi-conflict-close]')?.addEventListener('click', () => m.remove());
+  }
+
   function openWorkplaceTimeModal() {
     const dates = selection?.getSelectedDates?.() || []; if (!dates.length) return;
     const firstDay = workingDayForDate(workingDays, selectedWorkplaceId, dates[0]); if (!firstDay) return;
@@ -114,13 +120,15 @@ export function renderTimetable(root) {
     const dates = selection?.getSelectedDates?.() || []; if (!dates.length || !selectionMode) return;
     const makeWorking = selectionMode === 'make-working';
     if (makeWorking) {
+      const base = resolveWorkplaceTime(workplaces, selectedWorkplaceId); if (!base) return;
+      const conflictingDates = dates.filter((date) => !getDay(workingDays, selectedWorkplaceId, date) && hasScheduleConflict(workingDays, { workplaceId: selectedWorkplaceId, date, from: base.from, to: base.to }));
+      if (conflictingDates.length) {
+        if (dates.length === 1) openWorkingDayConflictModal(conflictingDates[0]);
+        else openWorkingDaysConflictModal();
+        return;
+      }
       for (const date of dates) {
         if (getDay(workingDays, selectedWorkplaceId, date)) continue;
-        const base = resolveWorkplaceTime(workplaces, selectedWorkplaceId); if (!base) continue;
-        if (hasScheduleConflict(workingDays, { workplaceId: selectedWorkplaceId, date, from: base.from, to: base.to })) {
-          if (dates.length === 1) { openWorkingDayConflictModal(date); return; }
-          continue;
-        }
         const day = createDay({ date, workplaceId: selectedWorkplaceId, from: base.from, to: base.to }); if (day) workingDays.push(day);
       }
     } else {
