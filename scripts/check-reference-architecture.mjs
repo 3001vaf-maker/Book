@@ -70,6 +70,38 @@ if (existsSync(legacyTimetableCss)) {
   report(legacyTimetableCss, 'Graph must not own a parallel functional CSS file; shared presentation belongs to common UI');
 }
 
+const legacyTimeWorkBridge = join(root, 'core/time-work.js');
+if (existsSync(legacyTimeWorkBridge)) {
+  report(legacyTimeWorkBridge, 'legacy TimeWork compatibility bridge is forbidden; Day is the canonical working-time owner');
+}
+
+const scheduleMigration = 'core/migrations/schedule-v1.js';
+for (const file of allFiles) {
+  const path = relative(root, file).replaceAll('\\', '/');
+  const source = text(file);
+
+  if (/from\s+['"][^'"]*time-work\.js['"]/.test(source)) {
+    report(file, 'runtime code must not import the removed TimeWork compatibility bridge');
+  }
+
+  if (/\b(?:getTimeWorks|saveTimeWorks|getTimeWork|ensureTimeWork|correctTimeWork|resolveTimeWork|createTimeWork)\b/.test(source)) {
+    report(file, 'legacy TimeWork compatibility API is forbidden');
+  }
+
+  if (/\bmigrateLegacyWorkingDates\b/.test(source)) {
+    report(file, 'legacy workingDates migration must not live in runtime controllers or Day');
+  }
+
+  if (source.includes('book.timeWorks') && path !== scheduleMigration) {
+    report(file, 'book.timeWorks may only be read by the isolated one-time schedule migration');
+  }
+}
+
+const dayOwner = join(root, 'core/day.js');
+if (/\bworkingDates\b/.test(text(dayOwner)) || text(dayOwner).includes('book.timeWorks')) {
+  report(dayOwner, 'Day must contain only the canonical workingDays model and no legacy schedule storage');
+}
+
 const settingsControllers = [
   'settings/profile/profile.js',
   'settings/service/service.js',

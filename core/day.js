@@ -1,7 +1,6 @@
 import { createTimeRange, rangesOverlap, timeToMinutes, minutesToTime, isValidRange } from './time.js';
 
 const TIMETABLE_STATE_KEY = 'book:timetable-state';
-const LEGACY_TIME_WORKS_KEY = 'book.timeWorks';
 
 function readState() {
   try {
@@ -10,27 +9,10 @@ function readState() {
   } catch { return {}; }
 }
 function writeState(state) { localStorage.setItem(TIMETABLE_STATE_KEY, JSON.stringify(state || { workingDays: [] })); }
-function readLegacyTimeWorks() {
-  try {
-    const value = JSON.parse(localStorage.getItem(LEGACY_TIME_WORKS_KEY) || '[]');
-    return Array.isArray(value) ? value : [];
-  } catch { return []; }
-}
 function dateValue(value) { return String(value || '').slice(0, 10); }
 
 export function getDays() { const state = readState(); return Array.isArray(state.workingDays) ? state.workingDays : []; }
 export function saveDays(days) { writeState({ workingDays: Array.isArray(days) ? days : [] }); }
-export function migrateLegacyWorkingDates(defaultWorkplaceId = '') {
-  const state = readState();
-  if (Array.isArray(state.workingDays) && state.workingDays.length) return state.workingDays;
-  const workplaceId = String(defaultWorkplaceId || '');
-  if (!workplaceId || !Array.isArray(state.workingDates) || !state.workingDates.length) return [];
-  const days = state.workingDates
-    .map((date) => ({ date: dateValue(date), workplaceId }))
-    .filter((day) => day.date);
-  saveDays(days);
-  return days;
-}
 export function getDay(days, workplaceId, date) {
   const key = dateValue(date);
   return (Array.isArray(days) ? days : []).find((item) => String(item?.workplaceId || '') === String(workplaceId || '') && dateValue(item?.date) === key) || null;
@@ -40,13 +22,9 @@ export function getDaysForDate(days, date) { const key = dateValue(date); return
 export function getDayTime(day, workplaces = []) {
   if (!day) return null;
   if (day.from && day.to && isValidRange(day.from, day.to)) return createTimeRange(day.from, day.to);
-  const legacy = readLegacyTimeWorks().find((item) => String(item?.workplaceId || '') === String(day.workplaceId || '') && dateValue(item?.date) === dateValue(day.date));
-  if (legacy?.from && legacy?.to && isValidRange(legacy.from, legacy.to)) {
-    const range = createTimeRange(legacy.from, legacy.to); day.from = range.from; day.to = range.to; return range;
-  }
   const workplace = (Array.isArray(workplaces) ? workplaces : []).find((item) => String(item?.key || '') === String(day.workplaceId || ''));
   if (!workplace?.from || !workplace?.to || !isValidRange(workplace.from, workplace.to)) return null;
-  const range = createTimeRange(workplace.from, workplace.to); day.from = range.from; day.to = range.to; return range;
+  return createTimeRange(workplace.from, workplace.to);
 }
 export function normalizeDay(day, workplaces = []) { if (!day) return null; const time = getDayTime(day, workplaces); return time ? { ...day, from: time.from, to: time.to } : { ...day }; }
 export function createDay({ date, workplaceId, from, to } = {}) {
@@ -95,7 +73,14 @@ export function findSuggestedInterval(days, { workplaceId, date, baseFrom, baseT
 }
 export function migrateDaysToCanonical(workplaces = []) {
   const days = getDays(); let changed = false;
-  for (const day of days) { const beforeFrom = day?.from, beforeTo = day?.to; normalizeDay(day, workplaces); if (day?.from !== beforeFrom || day?.to !== beforeTo) changed = true; }
+  for (let index = 0; index < days.length; index += 1) {
+    const normalized = normalizeDay(days[index], workplaces);
+    if (!normalized) continue;
+    if (normalized.from !== days[index]?.from || normalized.to !== days[index]?.to) {
+      days[index] = normalized;
+      changed = true;
+    }
+  }
   if (changed) saveDays(days);
   return days;
 }

@@ -1,6 +1,6 @@
 import { actionBlock, button, pageHeader, initCalendar, initMultiSelect, select, modal, mountModal, timePicker, initTimePickers, escapeHtml, workplaceHeaderButton, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js';
 import { getWorkplaces, resolveWorkplaceTime } from '../core/workplace-time.js';
-import { getDays, saveDays, getDay, getDayTime, createDay, updateDayTime, getScheduleConflicts, hasScheduleConflict, findSuggestedInterval, migrateLegacyWorkingDates } from '../core/day.js';
+import { getDays, saveDays, getDay, getDayTime, createDay, updateDayTime, getScheduleConflicts, hasScheduleConflict, findSuggestedInterval } from '../core/day.js';
 
 function workplaceOptions(workplaces) { return workplaces.map((workplace) => ({ value: workplace.key, label: workplace.name || 'Без названия' })); }
 function datesForWorkplace(days, workplaceId) { return days.filter((item) => item?.workplaceId === workplaceId).map((item) => item.date).filter(Boolean); }
@@ -17,8 +17,7 @@ function timetableCounter(stats) { return `<span class="timetable-workplace__day
 
 export function renderTimetable(root) {
   const workplaces = getWorkplaces();
-  let workingDays = getDays();
-  if (!workingDays.length) workingDays = migrateLegacyWorkingDates(workplaces[0]?.key);
+  const workingDays = getDays();
   const context = getWorkplaceContext(workplaces);
   let selectedWorkplaceId = context.workplaceId;
   const initialDate = context.date;
