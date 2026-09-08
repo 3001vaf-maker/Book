@@ -24,6 +24,7 @@ function normalizeTagAssignments(values = []) {
 function normalizeClient(person = {}) {
   return {
     key: String(person.key || ''),
+    id: String(person.id || ''),
     name: String(person.name || ''),
     surname: String(person.surname || ''),
     photo: String(person.photo || ''),
