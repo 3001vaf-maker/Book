@@ -1,11 +1,10 @@
 import { pageHeader, viewNavigation, initViewNavigation, headerControl, workplaceContent, openWorkplaceControl, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js?v=header-title-context-20260908';
 import { getWorkplaces, getWorkplaceMonthStatsMap } from '../core/workplace-time.js?v=schedule-indicators-20260908';
-import { getDays, saveDays, getDay, getDayTime, updateDayTime, hasScheduleConflict } from '../core/day.js';
+import { getDays } from '../core/day.js';
 import { renderJournalDay } from './день.js?v=journal-architecture-20260908';
 import { renderJournalMonth } from './месяц.js?v=schedule-indicators-20260908';
 import { renderJournalList } from './список.js';
 
-function dateKey(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
 const views = [
   { id: 'day', label: 'День', render: renderJournalDay },
   { id: 'month', label: 'Месяц', render: renderJournalMonth },
@@ -29,11 +28,6 @@ export function renderJournal(root) {
 
   const openWorkplace = () => {
     const days = getDays();
-    const date = dateKey(selectedDate);
-    const day = getDay(days, selectedWorkplaceId, date);
-    const workplace = workplaces.find((item) => item.key === selectedWorkplaceId) || null;
-    const current = day ? getDayTime(day, workplaces) : null;
-    const time = day && workplace ? { from: current?.from || workplace.from || '09:00', to: current?.to || workplace.to || '18:00' } : null;
     const month = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
     const workplaceStats = getWorkplaceMonthStatsMap(days, workplaces, month);
 
@@ -43,23 +37,10 @@ export function renderJournal(root) {
       title: '',
       stats: workplaceStats[selectedWorkplaceId],
       workplaceStats,
-      canCorrectTime: Boolean(day && workplace),
-      time,
       onSelect: (nextId) => {
         selectedWorkplaceId = nextId || selectedWorkplaceId;
         setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: selectedDate });
         renderView();
-      },
-      onSaveTime: ({ from, to }) => {
-        if (hasScheduleConflict(days, { workplaceId: selectedWorkplaceId, date, from, to })) {
-          return { ok: false, message: 'Это время пересекается с другой работой мастера. Выберите другое время.' };
-        }
-        if (!updateDayTime(days, selectedWorkplaceId, date, from, to)) {
-          return { ok: false, message: 'Проверьте рабочее время.' };
-        }
-        saveDays(days);
-        renderView();
-        return { ok: true };
       },
     });
   };
