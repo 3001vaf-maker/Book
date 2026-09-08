@@ -30,18 +30,24 @@ function text(file) {
   return readFileSync(file, 'utf8');
 }
 
+function rel(file) {
+  return relative(root, file).replaceAll('\\', '/');
+}
+
 function report(file, rule) {
   errors.push(`${relative(root, file)}: ${rule}`);
 }
 
 const mainFiles = walk(join(root, 'main'));
 const settingsFiles = walk(join(root, 'settings'));
+const timetableFiles = walk(join(root, 'timetable'));
+const journalFiles = walk(join(root, 'journal'));
 const timetableController = join(root, 'timetable/timetable.js');
 const journalController = join(root, 'journal/journal.js');
-const referenceFiles = [...mainFiles, ...settingsFiles, timetableController];
+const referenceFiles = [...mainFiles, ...settingsFiles, ...timetableFiles, ...journalFiles];
 const uiFiles = walk(join(root, 'ui'));
 const coreFiles = walk(join(root, 'core'));
-const allFiles = [...walk(join(root, 'main')), ...walk(join(root, 'settings')), ...walk(join(root, 'timetable')), ...walk(join(root, 'journal')), ...uiFiles, ...coreFiles, join(root, 'core.js')];
+const allFiles = [...mainFiles, ...settingsFiles, ...timetableFiles, ...journalFiles, ...uiFiles, ...coreFiles, join(root, 'core.js')];
 const cssFiles = [...walkCss(join(root, 'css')), ...walkCss(join(root, 'ui'))];
 
 for (const file of referenceFiles) {
@@ -58,7 +64,7 @@ for (const file of uiFiles) {
 
 for (const file of coreFiles) {
   const source = text(file);
-  if (/from\s+['"][^'"]*(?:settings|main)\//.test(source)) report(file, 'core domain module must not import feature/entity folders');
+  if (/from\s+['"][^'"]*(?:settings|main|journal)\//.test(source)) report(file, 'core domain module must not import feature/entity folders');
 }
 
 const buttonSizeClass = /\bui-button--(?:full|small|compact)\b/;
@@ -78,14 +84,14 @@ for (const file of cssFiles) {
   for (const match of source.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
     const selector = match[1] || '';
     const body = match[2] || '';
-    if (selector.includes('.ui-button') && buttonGeometryProperty.test(body)) {
+    if (/\.ui-button(?![-\w])/.test(selector) && buttonGeometryProperty.test(body)) {
       report(file, 'ordinary button geometry belongs only to ui/buttons/buttons.css');
       break;
     }
   }
 }
 const buttonOwner = join(root, 'ui/buttons/index.js');
-const manualOrdinaryButton = /<button\b[^>]*class=["'][^"']*\bui-button\b/i;
+const manualOrdinaryButton = /<button\b[^>]*class=["'][^"']*(?:^|\s)ui-button(?:\s|["'])/i;
 for (const file of allFiles) {
   if (file === buttonOwner) continue;
   if (manualOrdinaryButton.test(text(file))) report(file, 'ordinary action buttons must be rendered by shared button() from ui/buttons');
@@ -95,15 +101,40 @@ const workplaceOwner = 'settings/profile/workplaces/data.js';
 for (const file of allFiles) {
   const source = text(file);
   if (!source.includes('book.workplaces')) continue;
-  if (relative(root, file).replaceAll('\\', '/') !== workplaceOwner) report(file, 'book.workplaces may only be accessed by the Workplace data owner');
+  if (rel(file) !== workplaceOwner) report(file, 'book.workplaces may only be accessed by the Workplace data owner');
 }
 
 const clientsUi = join(root, 'main/clients/clients.js');
 if (/\blocalStorage\b/.test(text(clientsUi))) report(clientsUi, 'Clients screen must use data/view-state owners instead of direct localStorage');
 
-for (const controller of [timetableController, journalController]) {
-  const source = text(controller);
-  if (/\blocalStorage\b/.test(source)) report(controller, 'Graph/Journal controller must use the canonical data owner instead of direct localStorage');
+if (/\blocalStorage\b/.test(text(timetableController))) {
+  report(timetableController, 'Graph controller must use the canonical data owner instead of direct localStorage');
+}
+
+const journalDataOwners = new Set(['journal/record-data.js', 'journal/break-data.js']);
+for (const file of journalFiles) {
+  if (/\blocalStorage\b/.test(text(file)) && !journalDataOwners.has(rel(file))) {
+    report(file, 'Journal runtime must use entity data owners instead of direct localStorage');
+  }
+}
+
+const storageOwners = new Map([
+  ['book.records', 'journal/record-data.js'],
+  ['book.journalBreaks', 'journal/break-data.js'],
+]);
+for (const file of allFiles) {
+  const source = text(file);
+  for (const [key, owner] of storageOwners) {
+    if (source.includes(key) && rel(file) !== owner) report(file, `${key} may only be accessed by ${owner}`);
+  }
+}
+
+const journalCreation = join(root, 'journal/record.js');
+if (/export\s+function\s+openRecordView\b/.test(text(journalCreation))) {
+  report(journalCreation, 'Record creation must not contain a duplicate Record View; journal/record-view.js is the single view implementation');
+}
+if (/from\s+['"][^'"]*core\/record\.js['"]/.test(text(journalCreation))) {
+  report(journalCreation, 'Record creation must use the Journal Record data owner directly, not a Core compatibility bridge');
 }
 
 const legacyTimetableCss = join(root, 'timetable/timetable.css');
@@ -115,12 +146,26 @@ const legacyTimeWorkBridge = join(root, 'core/time-work.js');
 if (existsSync(legacyTimeWorkBridge)) {
   report(legacyTimeWorkBridge, 'legacy TimeWork compatibility bridge is forbidden; Day is the canonical working-time owner');
 }
+const legacyRecordBridge = join(root, 'core/record.js');
+if (existsSync(legacyRecordBridge)) {
+  report(legacyRecordBridge, 'legacy Record compatibility bridge is forbidden; journal/record-data.js is the canonical Record owner');
+}
+const misplacedJournalBreaks = join(root, 'core/journal-breaks.js');
+if (existsSync(misplacedJournalBreaks)) {
+  report(misplacedJournalBreaks, 'Journal Break is Journal-owned and must not have a parallel Core owner');
+}
 
 for (const file of allFiles) {
   const source = text(file);
 
   if (/from\s+['"][^'"]*time-work\.js['"]/.test(source)) {
     report(file, 'runtime code must not import the removed TimeWork compatibility bridge');
+  }
+  if (/from\s+['"][^'"]*core\/record\.js['"]/.test(source)) {
+    report(file, 'runtime code must not import the removed Record compatibility bridge');
+  }
+  if (/from\s+['"][^'"]*core\/journal-breaks\.js['"]/.test(source)) {
+    report(file, 'runtime code must not import the removed Core Journal Break owner');
   }
 
   if (/\b(?:getTimeWorks|saveTimeWorks|getTimeWork|ensureTimeWork|correctTimeWork|resolveTimeWork|createTimeWork)\b/.test(source)) {
@@ -166,7 +211,7 @@ if (/module\.render\s*\|\|/.test(text(settingsRoot))) {
 }
 
 for (const file of allFiles) {
-  if (relative(root, file).replaceAll('\\', '/') === 'ui/duration/index.js') continue;
+  if (rel(file) === 'ui/duration/index.js') continue;
   if (/\b(?:const|let|var|function)\s+durationText\b/.test(text(file))) {
     report(file, 'durationText() belongs only to ui/duration and must be imported through ui/ui.js');
   }
