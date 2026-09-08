@@ -1,4 +1,4 @@
-import { openHeaderControl, list, escapeHtml, ALL_WORKPLACES_ID } from '../ui/ui.js?v=journal-header-split-20260908';
+import { openHeaderControl, list, button, openDayWorkplaceControl, escapeHtml, ALL_WORKPLACES_ID } from '../ui/ui.js?v=journal-header-split-20260908';
 
 const WORKPLACE_FALLBACK_COLOR = '#212529';
 
@@ -15,7 +15,9 @@ export function openJournalWorkplaceControl({
   workplaces = [],
   workplaceId = '',
   recordCounts = {},
+  available = [],
   onSelect = () => {},
+  onAdd = () => {},
 } = {}) {
   const items = [{
     title: 'Все записи',
@@ -40,7 +42,10 @@ export function openJournalWorkplaceControl({
     });
   }
 
-  const content = `<div class="workplace-control-list">${list({ items })}</div>`;
+  const addAction = Array.isArray(available) && available.length
+    ? `<div class="workplace-control-actions">${button('+ Добавить рабочее место', { variant: 'secondary', data: 'data-journal-workplace-add' })}</div>`
+    : '';
+  const content = `<div class="workplace-control-list">${list({ items })}</div>${addAction}`;
   const main = openHeaderControl(content, { title: '' });
   main?.querySelectorAll('[data-journal-workplace-select]').forEach((row) => row.addEventListener('click', () => {
     const nextId = String(row.dataset.journalWorkplaceSelect || '');
@@ -48,5 +53,14 @@ export function openJournalWorkplaceControl({
     main.remove();
     onSelect(nextId);
   }));
+  main?.querySelector('[data-journal-workplace-add]')?.addEventListener('click', () => {
+    main.remove();
+    openDayWorkplaceControl({
+      active: [],
+      available,
+      catalogTitle: 'Добавить рабочее место',
+      onAdd,
+    });
+  });
   return main;
 }
