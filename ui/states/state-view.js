@@ -1,3 +1,4 @@
+import { button } from '../buttons/index.js';
 import { escapeHtml } from '../utils/escape-html.js';
 
 /**
@@ -73,14 +74,12 @@ export function stateView({ title = '', blocks = [], actions = [], className = '
     return `${separator}<div class="ui-state-view__block${clickable ? ' is-interactive' : ''}" ${attrs}>${renderBlockContent(block)}</div>`;
   }).join('');
 
-  const renderedActions = safeActions.map((action = {}) => {
-    const label = escapeHtml(action.label ?? '');
-    const type = escapeHtml(action.type ?? 'button');
-    const actionClass = escapeHtml(action.className ?? '');
-    const data = action.data ? ` ${action.data}` : '';
-    const aria = action.aria ? ` aria-label="${escapeHtml(action.aria)}"` : '';
-    return `<button type="${type}" class="ui-button${actionClass ? ` ${actionClass}` : ''}"${data}${aria}>${label}</button>`;
-  }).join('');
+  const renderedActions = safeActions.map((action = {}) => button(escapeHtml(action.label ?? ''), {
+    type: escapeHtml(action.type ?? 'button'),
+    className: escapeHtml(action.className ?? ''),
+    data: action.data || '',
+    aria: action.aria ?? '',
+  })).join('');
 
   return `<section class="ui-state-view${className ? ` ${escapeHtml(className)}` : ''}" data-state-view>` +
     (title ? `<h1 class="ui-state-view__title">${escapeHtml(title)}</h1>` : '') +
