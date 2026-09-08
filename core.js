@@ -1,6 +1,6 @@
 import { renderMain } from './main/main.js';
 import { renderJournal } from './journal/journal.js?v=graph-architecture-20260908';
-import { renderTimetable } from './timetable/timetable.js?v=workplace-modal-ui-20260908';
+import { renderTimetable } from './timetable/timetable.js?v=time-correction-action-20260908';
 import { renderChat } from './chat/chat.js';
 import { renderSettings } from './settings/settings.js?v=tag-manager-ui-20260908';
 import { getWorkplaces as getWorkplaceEntities } from './settings/profile/workplaces/data.js';
