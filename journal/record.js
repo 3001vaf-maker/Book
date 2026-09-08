@@ -4,6 +4,7 @@ import { getJournalBreaks, createJournalBreak } from './break-data.js';
 import { getAllClients } from '../main/clients/data.js';
 import { getProcedures } from '../settings/service/procedures/data.js';
 import { isTimeRangeAvailable, getTimeUsages } from '../core/time-usage.js';
+import { timeToMinutes, minutesToTime } from '../core/time.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getDays, getDay, getDayTime } from '../core/day.js';
 
@@ -14,8 +15,6 @@ const RECORD_MODES = [
 const people = () => getAllClients();
 const procedures = () => getProcedures();
 const clientName = (person) => [person?.name, person?.surname].filter(Boolean).join(' ') || 'Без имени';
-const timeToMinutes = (value) => { const match = String(value || '').match(/^(\d{1,2}):(\d{2})$/); return match ? Number(match[1]) * 60 + Number(match[2]) : null; };
-const minutesToTime = (value) => `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`;
 function dateKey(date) { const d = date instanceof Date ? date : new Date(date); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
 function scopedUsages(date, workplaceId) {
   const day = dateKey(date);
