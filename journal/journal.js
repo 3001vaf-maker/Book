@@ -1,4 +1,4 @@
-import { pageHeader, viewNavigation, initViewNavigation, headerControl, workplaceContent, ALL_WORKPLACES_ID, dayWorkplaceContent, openDayWorkplaceControl, openDayWorkplaceTime } from '../ui/ui.js?v=day-workplaces-20260908';
+import { pageHeader, viewNavigation, initViewNavigation, headerControl, workplaceContent, ALL_WORKPLACES_ID, dayWorkplaceContent, openDayWorkplaceControl, openDayWorkplaceTime } from '../ui/ui.js?v=day-workplaces-records-20260908';
 import { getWorkplaceContext, setWorkplaceContext } from '../core/workplace-context.js?v=section-workplace-context-20260908';
 import { getWorkplaces } from '../core/workplace-time.js?v=schedule-indicators-20260908';
 import { getActiveDayWorkplaces, getAvailableDayWorkplaces, getDayWorkplaceDraft, saveDayWorkplaceTime } from '../core/day-workplaces.js?v=day-workplaces-20260908';
@@ -75,7 +75,11 @@ export function renderJournal(root) {
   };
 
   const openDayWorkplaces = () => {
-    const active = activeDayWorkplaces();
+    const day = dateKey(selectedDate);
+    const active = activeDayWorkplaces().map((item) => ({
+      ...item,
+      right: [`${getActiveRecordCountForDay(day, item.workplaceId)} з`],
+    }));
     const available = getAvailableDayWorkplaces(selectedDate, workplaces);
     openDayWorkplaceControl({
       active,
