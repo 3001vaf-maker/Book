@@ -1,7 +1,7 @@
 import { containsRange, isValidRange, rangesOverlap } from '../core/time.js';
 import { getDays, getDay, getDayTime } from '../core/day.js';
 import { getWorkplaces } from '../core/workplace-time.js';
-import { getJournalBreaks } from './break-data.js';
+import { getJournalBreaks } from './break-data.js?v=journal-architecture-20260908';
 
 const KEY = 'book.records';
 
