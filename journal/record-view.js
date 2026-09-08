@@ -1,4 +1,4 @@
-import { button, costListParts, escapeHtml, list, mountModal, modal, select, initMultiSelect, initCalendar, entityCard } from '../ui/ui.js?v=journal-architecture-20260908';
+import { button, costListParts, escapeHtml, list, mountModal, modal, select, initMultiSelect, initCalendar, entityCard } from '../ui/ui.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getDays, getDay, getDayTime } from '../core/day.js';
 import { timeToMinutes, minutesToTime } from '../core/time.js';
