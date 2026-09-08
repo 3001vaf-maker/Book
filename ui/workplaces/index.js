@@ -1,5 +1,6 @@
 import { costField, collectCost, initCostFields } from '../cost/index.js';
 import { button } from '../buttons/index.js';
+import { openHeaderControl } from '../header/index.js';
 import { select } from '../selectors/index.js';
 import { modal, mountModal } from '../modals/index.js';
 import { timePicker, initTimePickers } from '../time/index.js';
@@ -81,15 +82,16 @@ export function collectWorkplaceSelections(root, name = 'workplaces') {
 }
 
 /**
- * Workplace-specific content for a generic Header Control.
- * This function never creates the clickable header shell itself.
+ * Neutral Workplace UI content.
+ * It does not know whether it is placed inside Header Control, List or any
+ * other shared UI container.
  */
-export function workplaceHeaderContent({ workplace = null, showStats = false, stats = null } = {}) {
+export function workplaceContent({ workplace = null, showStats = false, stats = null } = {}) {
   const name = workplace?.name || 'Рабочее место';
   const counter = showStats && stats
-    ? `<span class="workplace-header-content__primary">${Math.max(0, Number(stats.days) || 0)} дней</span><span class="workplace-header-content__secondary">${Math.max(0, Number(stats.hours) || 0)} ч ${String(Math.max(0, Number(stats.minutes) || 0)).padStart(2, '0')} м</span>`
+    ? `<span class="workplace-content__primary">${Math.max(0, Number(stats.days) || 0)} дней</span><span class="workplace-content__secondary">${Math.max(0, Number(stats.hours) || 0)} ч ${String(Math.max(0, Number(stats.minutes) || 0)).padStart(2, '0')} м</span>`
     : '';
-  return `<span class="workplace-header-content"><span class="workplace-header-content__name">${escapeHtml(name)}</span>${counter}</span>`;
+  return `<span class="workplace-content"><span class="workplace-content__name">${escapeHtml(name)}</span>${counter}</span>`;
 }
 
 function workplaceSummary(stats) {
@@ -102,8 +104,9 @@ function workplaceSummary(stats) {
 
 /**
  * Canonical Workplace manifestation used from any section.
- * The section provides only current data and callbacks; modal composition,
- * labels, spacing, selector, TimePicker and action buttons are owned here.
+ * The section provides only current data and callbacks. The first-level
+ * manifestation always uses the shared Header Control medium modal; nested
+ * Workplace actions compose existing shared UI.
  */
 export function openWorkplaceControl({
   workplaces = [],
@@ -159,7 +162,7 @@ export function openWorkplaceControl({
     ? button('Корректировка времени', { data: 'data-workplace-control-open-time', variant: 'secondary' })
     : '';
   const content = `<div class="modal-title"><h2>${escapeHtml(workplaceName)}</h2></div>${workplaceSummary(stats)}<div class="workplace-control-actions">${button('Рабочее место', { data: 'data-workplace-control-open-picker' })}${correction}</div>`;
-  const main = mountModal(document.body, modal(content, { title: workplaceName, variant: 'medium' }));
+  const main = openHeaderControl(content, { title: workplaceName });
   main?.querySelector('[data-workplace-control-open-picker]')?.addEventListener('click', () => { main.remove(); openPicker(); });
   main?.querySelector('[data-workplace-control-open-time]')?.addEventListener('click', () => { main.remove(); openTime(); });
   return main;

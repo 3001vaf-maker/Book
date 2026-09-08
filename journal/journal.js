@@ -1,4 +1,4 @@
-import { pageHeader, viewNavigation, initViewNavigation, headerControl, workplaceHeaderContent, openWorkplaceControl, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js?v=header-control-20260908';
+import { pageHeader, viewNavigation, initViewNavigation, headerControl, workplaceContent, openWorkplaceControl, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js?v=header-control-v2-20260908';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getDays, saveDays, getDay, getDayTime, updateDayTime, hasScheduleConflict } from '../core/day.js';
 import { renderJournalDay } from './день.js?v=journal-architecture-20260908';
@@ -21,7 +21,7 @@ export function renderJournal(root) {
 
   const renderHeaderControl = () => {
     const workplace = workplaces.find((item) => item.key === selectedWorkplaceId) || null;
-    return headerControl(workplaceHeaderContent({ workplace }), {
+    return headerControl(workplaceContent({ workplace }), {
       data: 'data-workplace-header-open',
       aria: `Рабочее место: ${workplace?.name || 'не выбрано'}`,
     });

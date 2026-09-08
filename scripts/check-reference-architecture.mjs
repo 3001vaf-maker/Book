@@ -99,26 +99,43 @@ for (const file of allFiles) {
 
 const headerControlOwner = join(root, 'ui/header/index.js');
 const headerControlCss = join(root, 'ui/header/header.css');
+const workplaceUi = join(root, 'ui/workplaces/index.js');
+const workplaceCss = join(root, 'ui/workplaces/workplaces.css');
 for (const file of allFiles) {
   const source = text(file);
   if (file !== headerControlOwner && /<button\b[^>]*class=["'][^"']*\bheader-control\b/i.test(source)) {
     report(file, 'Header Control shell belongs only to ui/header/index.js');
   }
   if (/\bworkplaceHeaderButton\b/.test(source)) {
-    report(file, 'workplaceHeaderButton is forbidden; use generic headerControl() with workplaceHeaderContent()');
+    report(file, 'workplaceHeaderButton is forbidden; use generic headerControl() with workplaceContent()');
+  }
+  if (/\bworkplaceHeaderContent\b/.test(source)) {
+    report(file, 'Workplace content must be container-neutral; use workplaceContent()');
   }
 }
 for (const file of cssFiles) {
-  if (file === headerControlCss) continue;
-  if (/\.header-control\b/.test(text(file))) report(file, 'Header Control presentation belongs only to ui/header/header.css');
+  const source = text(file);
+  if (file !== headerControlCss && /\.header-control\b/.test(source)) report(file, 'Header Control presentation belongs only to ui/header/header.css');
+  if (/\.workplace-header-content\b/.test(source)) report(file, 'Workplace content must not be coupled to Header; use .workplace-content');
+}
+const headerSource = text(headerControlOwner);
+if (!/export\s+function\s+openHeaderControl\b/.test(headerSource) || !/variant:\s*['"]medium['"]/.test(headerSource)) {
+  report(headerControlOwner, 'Header Control must own one canonical medium modal manifestation through openHeaderControl()');
+}
+const workplaceSource = text(workplaceUi);
+if (!/\bopenHeaderControl\s*\(/.test(workplaceSource)) {
+  report(workplaceUi, 'Workplace main manifestation must use the shared openHeaderControl() shell');
+}
+if (/variant:\s*['"]medium['"]/.test(workplaceSource)) {
+  report(workplaceUi, 'Workplace must not choose Header Control modal size; medium belongs to ui/header');
 }
 for (const controller of [timetableController, journalController]) {
   const source = text(controller);
   if (/\bopenWorkplace(?:Picker|Time)?Modal\b/.test(source)) {
     report(controller, 'sections must not own Workplace modal manifestations; use shared openWorkplaceControl()');
   }
-  if (!/\bheaderControl\s*\(/.test(source) || !/\bworkplaceHeaderContent\s*\(/.test(source)) {
-    report(controller, 'Graph and Journal must compose Workplace content inside the shared Header Control');
+  if (!/\bheaderControl\s*\(/.test(source) || !/\bworkplaceContent\s*\(/.test(source)) {
+    report(controller, 'Graph and Journal must compose neutral Workplace content inside the shared Header Control');
   }
   if (!/\bopenWorkplaceControl\s*\(/.test(source)) {
     report(controller, 'Graph and Journal must use the shared Workplace manifestation');

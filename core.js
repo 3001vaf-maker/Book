@@ -1,11 +1,11 @@
 import { renderMain } from './main/main.js';
-import { renderJournal } from './journal/journal.js?v=header-control-20260908';
-import { renderTimetable } from './timetable/timetable.js?v=header-control-20260908';
+import { renderJournal } from './journal/journal.js?v=header-control-v2-20260908';
+import { renderTimetable } from './timetable/timetable.js?v=header-control-v2-20260908';
 import { renderChat } from './chat/chat.js';
 import { renderSettings } from './settings/settings.js?v=tag-manager-ui-20260908';
 import { getWorkplaces as getWorkplaceEntities } from './settings/profile/workplaces/data.js';
 import { configureWorkplaceSource } from './core/workplace-time.js';
-import { bottomNavigation } from './ui/ui.js?v=header-control-20260908';
+import { bottomNavigation } from './ui/ui.js?v=header-control-v2-20260908';
 
 configureWorkplaceSource(getWorkplaceEntities);
 

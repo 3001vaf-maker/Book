@@ -1,4 +1,4 @@
-import { actionBlock, button, pageHeader, initCalendar, initMultiSelect, modal, mountModal, timePicker, initTimePickers, escapeHtml, headerControl, workplaceHeaderContent, openWorkplaceControl, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js?v=header-control-20260908';
+import { actionBlock, button, pageHeader, initCalendar, initMultiSelect, modal, mountModal, timePicker, initTimePickers, escapeHtml, headerControl, workplaceContent, openWorkplaceControl, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js?v=header-control-v2-20260908';
 import { getWorkplaces, resolveWorkplaceTime } from '../core/workplace-time.js';
 import { getDays, saveDays, getDay, getDayTime, createDay, updateDayTime, getScheduleConflicts, hasScheduleConflict, findSuggestedInterval } from '../core/day.js';
 import { minutesBetween } from '../core/time.js';
@@ -23,7 +23,7 @@ export function renderTimetable(root) {
 
   const headerMarkup = (month) => {
     const workplace = workplaces.find((item) => item.key === selectedWorkplaceId) || null;
-    return headerControl(workplaceHeaderContent({ workplace, showStats: true, stats: monthStats(month, workingDays, selectedWorkplaceId, workplaces) }), {
+    return headerControl(workplaceContent({ workplace, showStats: true, stats: monthStats(month, workingDays, selectedWorkplaceId, workplaces) }), {
       data: 'data-workplace-header-open',
       aria: `Рабочее место: ${workplace?.name || 'не выбрано'}`,
     });

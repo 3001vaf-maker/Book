@@ -88,6 +88,7 @@
 | `bottomNavigation()` | Нижняя навигация приложения | `ui/navigation/` | Общая | Все основные разделы | Навигация Book | ОБЩАЯ |
 | `pageHeader()` | Канонический заголовок страницы с основной частью и слотом для готового Header UI | `ui/header/` | Общая | Все страницы с заголовком | Заголовок страницы и Header UI | КАНОНИЧЕСКАЯ |
 | `headerControl()` | Универсальная нажимаемая оболочка в заголовке; не знает, какой UI помещён внутрь | `ui/header/` | Общая | График, Журнал и любые будущие страницы с интерактивным блоком в заголовке | Любой готовый UI-контент заголовка | КАНОНИЧЕСКАЯ |
+| `openHeaderControl()` | Единое проявление Header Control: открывает стандартный `medium` Modal и принимает любой готовый UI-контент | `ui/header/` | Инфраструктура UI | Все Header Control | Header Control + Modal | КАНОНИЧЕСКАЯ |
 | `viewNavigation()` | Переключатель представлений внутри раздела | `ui/view-navigation/` | Общая | Журнал и другие разделы с несколькими представлениями | Представления раздела | ОБЩАЯ |
 | `initViewNavigation()` | Подключает поведение переключателя представлений | `ui/view-navigation/` | Инфраструктура UI | Журнал и другие разделы с View Navigation | DOM View Navigation | ОБЩАЯ |
 | `calendar()` | Формирует общий календарь с месяцем, неделей, датами и визуальными состояниями | `ui/calendar/` | Общая | График, Журнал → Месяц | Даты и календарная сетка | КАНОНИЧЕСКАЯ |
@@ -110,8 +111,8 @@
 | `workplaceSelector()` | Выбор рабочего места | `ui/workplaces/` | Специализированная | Процедуры и профильные настройки | Рабочие места | ОБЩАЯ ДЛЯ ФУНКЦИИ |
 | `initWorkplaceSelectors()` | Подключает выбор рабочих мест | `ui/workplaces/` | Инфраструктура UI | Формы с рабочими местами | DOM workplace selector | ОБЩАЯ ДЛЯ ФУНКЦИИ |
 | `collectWorkplaceSelections()` | Собирает выбранные рабочие места | `ui/workplaces/` | Инфраструктура данных UI | Формы с рабочими местами | Данные рабочих мест | ОБЩАЯ ДЛЯ ФУНКЦИИ |
-| `workplaceHeaderContent()` | Формирует только содержимое рабочего места для помещения в общий Header Control; не создаёт нажимаемую оболочку | `ui/workplaces/` | Специализированная | График, Журнал и будущие представления рабочего места | Название рабочего места и переданная статистика | КАНОНИЧЕСКАЯ |
-| `openWorkplaceControl()` | Единое проявление рабочего места: главное окно, выбор рабочего места и корректировка рабочего времени; разделы передают только данные и callbacks | `ui/workplaces/` | Специализированная композиция UI | График, Журнал и будущие представления рабочего места | Workplace + Modal + Select + TimePicker + Button | КАНОНИЧЕСКАЯ |
+| `workplaceContent()` | Нейтральный UI-контент рабочего места; не знает, в Header Control, List или другой контейнер он будет помещён | `ui/workplaces/` | Специализированная | Любые представления рабочего места | Название рабочего места и переданная статистика | КАНОНИЧЕСКАЯ |
+| `openWorkplaceControl()` | Единое Workplace-проявление: первый уровень использует `openHeaderControl()`, а выбор места и рабочего времени собирается из общего Select, TimePicker, Modal и Button | `ui/workplaces/` | Специализированная композиция UI | График, Журнал и будущие представления рабочего места | Workplace + Header Control + Select + TimePicker + Button | КАНОНИЧЕСКАЯ |
 | `modal()` | Создаёт HTML модального окна | `ui/modals/` | Общая | Профиль, Клиенты, Процедуры, Товары, Кошелёк, Ярлыки, График, Журнал | Overlay / форма | ОБЩАЯ |
 | `mountModal()` | Показывает модальное окно и подключает закрытие/фокус | `ui/modals/` | Инфраструктура UI | Профиль, Клиенты, Процедуры, Товары, Кошелёк, Ярлыки, График, Журнал | DOM modal | ОБЩАЯ |
 | `button()` | Единственная обычная кнопка действия: одна геометрия, `100%` доступной ширины, минимальная высота `48px`; `secondary`/`danger` меняют только визуальную роль, размерных вариантов нет | `ui/buttons/` | Общая | Разные экраны | Действия пользователя | КАНОНИЧЕСКАЯ |
@@ -143,7 +144,7 @@
 | `ui/colors/` | Визуальный выбор цвета | `colorPicker`, `initColorPickers` |
 | `ui/cost/` | Стоимость | `costField`, `initCostFields`, `collectCost` |
 | `ui/duration/` | Длительность | `durationPicker`, `initDurationPickers` |
-| `ui/header/` | Заголовок страницы и универсальная интерактивная оболочка внутри заголовка; не знает сущностей, помещённых внутрь | `pageHeader`, `headerControl` |
+| `ui/header/` | Заголовок страницы, универсальная интерактивная оболочка и единый `medium` Modal её проявления; не знает сущностей внутри | `pageHeader`, `headerControl`, `openHeaderControl` |
 | `ui/inputs/` | Ввод значений | `field`, `phoneField`, `textareaField` |
 | `ui/links/` | Рабочие ссылки | `workLinks`, `initWorkLinks`, `collectWorkLinks` |
 | `ui/lists/` | Универсальные простые перечни без знания сущностей | `list` |
@@ -156,7 +157,7 @@
 | `ui/time/` | Время суток и единый барабан выбора | `timePicker`, `initTimePickers` |
 | `ui/utils/` | Низкоуровневые UI-утилиты | `escapeHtml` |
 | `ui/view-navigation/` | Переключение представлений | `viewNavigation`, `initViewNavigation` |
-| `ui/workplaces/` | UI рабочего места как содержимое/проявление; не владеет Header Control | `workplaceSelector`, `initWorkplaceSelectors`, `collectWorkplaceSelections`, `workplaceHeaderContent`, `openWorkplaceControl` |
+| `ui/workplaces/` | Нейтральный UI рабочего места и Workplace-проявления; не владеет оболочкой Header Control или её размером | `workplaceSelector`, `initWorkplaceSelectors`, `collectWorkplaceSelections`, `workplaceContent`, `openWorkplaceControl` |
 
 ---
 
@@ -170,8 +171,8 @@
 | Товары | `pageHeader`, `entityCard`, `emptyState`, `photoField`, `costField`, `workplaceSelector`, `modal`, `mountModal`, `button`, `iconButton`, поля и селекторы |
 | Кошелёк | `pageHeader`, `entityCard`, `emptyState`, `button`, `iconButton`, `modal`, `mountModal`, `photoField`, `initPhotoField` |
 | Ярлыки | `pageHeader`, `tagManagerList`, `emptyState`, `button`, `iconButton`, `modal`, `mountModal`, `colorPicker`, `initColorPickers` |
-| График | `pageHeader`, `headerControl`, `workplaceHeaderContent`, `openWorkplaceControl`, `initCalendar`, `initMultiSelect`, `timePicker`, `initTimePickers` |
-| Журнал | `pageHeader`, `headerControl`, `workplaceHeaderContent`, `openWorkplaceControl`, `viewNavigation`, `initViewNavigation` и UI его представлений |
+| График | `pageHeader`, `headerControl`, `workplaceContent`, `openWorkplaceControl`, `initCalendar`, `initMultiSelect`, `timePicker`, `initTimePickers` |
+| Журнал | `pageHeader`, `headerControl`, `workplaceContent`, `openWorkplaceControl`, `viewNavigation`, `initViewNavigation` и UI его представлений |
 | Журнал → Месяц | `initCalendar` |
 | Навигация приложения | `bottomNavigation` |
 
@@ -183,17 +184,27 @@
 
 `headerControl()` принадлежит только категории Header. Он является универсальной нажимаемой оболочкой в заголовке страницы и не знает, какие данные или какой UI помещены внутрь.
 
-Внутрь `headerControl()` можно передать `workplaceHeaderContent()`, Time UI, статистику записей, финансовые данные или любой другой готовый UI-блок.
+Внутрь `headerControl()` можно передать `workplaceContent()`, Time UI, статистику записей, финансовые данные или любой другой готовый UI-блок.
 
-Изменение визуала, геометрии или поведения самой оболочки `headerControl()` выполняется один раз в `ui/header/` и автоматически применяется во всех местах, где этот компонент представлен. Разделы `График`, `Журнал`, `Клиенты` и другие не создают свои копии Header Control и не переопределяют его визуал локально.
+Изменение визуала, геометрии или положения самой оболочки `headerControl()` выполняется один раз в `ui/header/` и автоматически применяется во всех местах, где этот компонент представлен. Разделы `График`, `Журнал`, `Клиенты` и другие не создают свои копии Header Control и не переопределяют его визуал локально.
 
-`workplaceHeaderContent()` не является кнопкой и не создаёт `<button>`. Он формирует только содержимое рабочего места, которое можно поместить в `headerControl()`.
+`workplaceContent()` не является кнопкой и не создаёт `<button>`. Это нейтральный Workplace UI, поэтому его можно поместить не только в Header Control, но и в другой общий контейнер без переименования или второй реализации.
 
-### `openWorkplaceControl()` — одно проявление Workplace
+### `openHeaderControl()` — единое проявление Header Control
 
-Главное окно рабочего места, окно выбора рабочего места и окно корректировки рабочего времени имеют одну реализацию `openWorkplaceControl()` в `ui/workplaces/`.
+Нажатие на Header Control проявляет его через единый `openHeaderControl()` из `ui/header/`. На текущем этапе это всегда стандартный `medium` Modal.
 
-График, Журнал или другой раздел не собирают эти модальные окна самостоятельно. Они передают в общий Workplace UI только текущие данные и callbacks бизнес-операций. Поэтому изменение текста, состава UI, размеров/варианта Modal, отступов, Select, TimePicker или Button в этом проявлении выполняется в одном месте и проявляется у всех потребителей.
+Размер этого первого модального окна не выбирается Графиком, Журналом, Workplace или другим содержимым. Если в будущем изменится размер или общий способ проявления Header Control, изменение выполняется один раз в `ui/header/`.
+
+Содержимое `medium` Modal может быть любым: Workplace UI, Time UI, данные записей, деньги, Dashboard или другая композиция общих UI-компонентов.
+
+### `openWorkplaceControl()` — одно Workplace-проявление
+
+`openWorkplaceControl()` формирует содержимое рабочего места и использует `openHeaderControl()` для первого окна. Поэтому Workplace не владеет геометрией или размером Header Control Modal.
+
+Вложенные действия рабочего места — выбор рабочего места и корректировка рабочего времени — остаются Workplace UI и собираются из уже существующих общих `Select`, `TimePicker`, `Modal` и `Button`.
+
+График, Журнал или другой раздел не собирают эти проявления самостоятельно. Они передают только текущие данные и callbacks бизнес-операций.
 
 ### `button()` — одна геометрия
 
