@@ -41,6 +41,16 @@ assert.match(workplaceSource, /Общий график/);
 assert.match(workplaceSource, /WORKPLACE_FALLBACK_COLOR\s*=\s*'#212529'/);
 assert.doesNotMatch(workplaceSource, /function\s+openPicker\b/);
 assert.doesNotMatch(workplaceSource, /data-workplace-control-save/);
+assert.doesNotMatch(workplaceSource, /<h2>Рабочий график<\/h2>/);
+assert.match(workplaceSource, /title\s*=\s*''/);
+assert.match(workplaceSource, /subtitle\s*=\s*''/);
+assert.match(workplaceSource, /openHeaderControl\(content,\s*\{\s*title:\s*visibleTitle\s*\|\|\s*visibleSubtitle\s*\}\)/);
+
+const graphSource = readFileSync(new URL('../timetable/timetable.js', import.meta.url), 'utf8');
+assert.match(graphSource, /title:\s*'Рабочий график'/);
+
+const journalSource = readFileSync(new URL('../journal/journal.js', import.meta.url), 'utf8');
+assert.match(journalSource, /title:\s*''/);
 
 const workplaceDataSource = readFileSync(new URL('../settings/profile/workplaces/data.js', import.meta.url), 'utf8');
 assert.match(workplaceDataSource, /color:\s*String\(workplace\.color/);
