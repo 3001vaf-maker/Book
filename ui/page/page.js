@@ -1,9 +1,5 @@
 import { escapeHtml } from '../utils/escape-html.js';
 
-export function pageHeader(title, subtitle = '', meta = '') {
-  return `<header class="page-header"><div class="page-header__main"><h1>${escapeHtml(title)}</h1>${subtitle ? `<p>${escapeHtml(subtitle)}</p>` : ''}</div>${meta ? `<div class="page-header__meta">${meta}</div>` : ''}</header>`;
-}
-
 export function page(blocks = []) {
   return `<div class="ui-page">${blocks.filter(Boolean).join('')}</div>`;
 }
