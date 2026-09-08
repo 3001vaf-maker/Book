@@ -120,8 +120,8 @@ export function renderTimetable(root) {
     const firstDay = workingDayForDate(workingDays, selectedWorkplaceId, dates[0]); if (!firstDay) return;
     const workplace = workplaces.find((w) => w.key === selectedWorkplaceId); const current = getDayTime(firstDay, workplaces);
     const from = current?.from || workplace?.from || '09:00'; const to = current?.to || workplace?.to || '18:00';
-    const content = `<div class="modal-title"><h2>Время работы</h2></div><div class="timetable-time-fields">${timePicker({ name: 'timetableWorkplaceFrom', label: 'Начало', value: from })}${timePicker({ name: 'timetableWorkplaceTo', label: 'Окончание', value: to })}</div><div class="form-error" data-timetable-time-error></div>${button('Сохранить', { data: 'data-timetable-workplace-time-save' })}`;
-    const m = mountModal(document.body, modal(content, { title: 'Время работы' })); if (!m) return; initTimePickers(m);
+    const content = `<div class="modal-title"><h2>Рабочее время</h2></div><div class="timetable-time-fields">${timePicker({ name: 'timetableWorkplaceFrom', label: 'Начало', value: from })}${timePicker({ name: 'timetableWorkplaceTo', label: 'Окончание', value: to })}</div><div class="form-error" data-timetable-time-error></div>${button('Сохранить', { data: 'data-timetable-workplace-time-save', variant: 'full' })}`;
+    const m = mountModal(document.body, modal(content, { title: 'Рабочее время' })); if (!m) return; initTimePickers(m);
     m.querySelector('[data-timetable-workplace-time-save]')?.addEventListener('click', () => {
       const nextFrom = m.querySelector('[name="timetableWorkplaceFrom"]')?.value || from; const nextTo = m.querySelector('[name="timetableWorkplaceTo"]')?.value || to;
       for (const date of dates) if (hasScheduleConflict(workingDays, { workplaceId: selectedWorkplaceId, date, from: nextFrom, to: nextTo })) { m.querySelector('[data-timetable-time-error]').textContent = `В ${date} это время пересекается с другой работой мастера.`; return; }
