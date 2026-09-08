@@ -1,4 +1,4 @@
-import { initDateNavigator, journalDayTimeline, initJournalDayTimeline, ALL_WORKPLACES_ID } from '../ui/ui.js?v=journal-work-fields-20260908';
+import { initDateNavigator, journalDayTimeline, initJournalDayTimeline, ALL_WORKPLACES_ID } from '../ui/ui.js?v=journal-all-workplaces-20260908';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getDays, getDay, getDayTime, getDaysForDate } from '../core/day.js';
 import { rangesOverlap } from '../core/time.js';
@@ -27,12 +27,12 @@ export function renderJournalDay(root, { date = new Date(), workplaceId = '', on
       const currentId = String(day?.workplaceId || '');
       const workplace = workplaces.find((item) => String(item?.key || '') === currentId) || null;
       const time = getDayTime(day, workplaces);
-      if (!currentId || !workplace || !time) return null;
+      if (!currentId || !time) return null;
       const columnRecords = records.filter((record) => String(record?.workplaceId || '') === currentId);
       const columnBreaks = getJournalBreaksForDay(breaks, currentId, dayDate);
       return {
         workplaceId: currentId,
-        name: workplace.name || 'Без названия',
+        name: workplace?.name || 'Рабочее место',
         from: time.from,
         to: time.to,
         usages: getTimeUsages({ records: columnRecords, breaks: columnBreaks }),
