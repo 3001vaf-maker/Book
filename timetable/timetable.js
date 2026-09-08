@@ -115,8 +115,8 @@ export function renderTimetable(root) {
     });
   }
 
-  function openWorkplaceTimeModal() {
-    const dates = selection?.getSelectedDates?.() || []; if (!dates.length) return;
+  function openWorkplaceTimeModal(dates = selection?.getSelectedDates?.() || []) {
+    if (!dates.length) return;
     const firstDay = workingDayForDate(workingDays, selectedWorkplaceId, dates[0]); if (!firstDay) return;
     const workplace = workplaces.find((w) => w.key === selectedWorkplaceId); const current = getDayTime(firstDay, workplaces);
     const from = current?.from || workplace?.from || '09:00'; const to = current?.to || workplace?.to || '18:00';
@@ -130,14 +130,24 @@ export function renderTimetable(root) {
     });
   }
 
+  function openCorrectionSelectionNotice() {
+    const content = `<div class="compact-form"><div class="modal-title"><h2>Корректировка времени</h2><p>Выберите в календаре одну или несколько рабочих дат этого рабочего места.</p></div>${button('Понятно', { data: 'data-timetable-correction-notice-close' })}</div>`;
+    const m = mountModal(document.body, modal(content, { title: 'Корректировка времени', variant: 'compact' }));
+    m?.querySelector('[data-timetable-correction-notice-close]')?.addEventListener('click', () => m.remove());
+  }
+
   function openWorkplaceModal() {
     const workplace = workplaces.find((w) => w.key === selectedWorkplaceId); const dates = selection?.getSelectedDates?.() || []; const stats = monthStats(calendar?.getDisplayedMonth() || initialMonth, workingDays, selectedWorkplaceId, workplaces);
-    const disabled = !dates.length || dates.some((date) => !workingDayForDate(workingDays, selectedWorkplaceId, date));
+    const canCorrect = dates.length > 0 && dates.every((date) => workingDayForDate(workingDays, selectedWorkplaceId, date));
     const workplaceName = workplace?.name || 'Рабочее место';
-    const content = `<div class="modal-title"><h2>${escapeHtml(workplaceName)}</h2></div><div class="timetable-workplace-modal-summary">${timetableCounter(stats)}</div><div class="timetable-workplace-modal-actions">${button('Рабочее место', { data: 'data-timetable-open-picker' })}${button('Корректировка времени', { data: `data-timetable-open-time${disabled ? ' disabled' : ''}`, variant: 'secondary' })}</div>`;
+    const content = `<div class="modal-title"><h2>${escapeHtml(workplaceName)}</h2></div><div class="timetable-workplace-modal-summary">${timetableCounter(stats)}</div><div class="timetable-workplace-modal-actions">${button('Рабочее место', { data: 'data-timetable-open-picker' })}${button('Корректировка времени', { data: 'data-timetable-open-time', variant: 'secondary' })}</div>`;
     const m = mountModal(document.body, modal(content, { title: workplaceName, variant: 'medium' }));
     m?.querySelector('[data-timetable-open-picker]')?.addEventListener('click', () => { m.remove(); openWorkplacePickerModal(); });
-    m?.querySelector('[data-timetable-open-time]')?.addEventListener('click', () => { if (!disabled) { m.remove(); openWorkplaceTimeModal(); } });
+    m?.querySelector('[data-timetable-open-time]')?.addEventListener('click', () => {
+      m.remove();
+      if (!canCorrect) { openCorrectionSelectionNotice(); return; }
+      openWorkplaceTimeModal(dates);
+    });
   }
   root.querySelector('[data-workplace-header-open]')?.addEventListener('click', openWorkplaceModal);
 
