@@ -17,5 +17,3 @@ export function renderService(root, navigateBack = () => {}) {
   });
   root.querySelector('[data-service-back]')?.addEventListener('click', navigateBack);
 }
-
-export { renderService as render };
