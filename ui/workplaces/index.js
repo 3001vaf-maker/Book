@@ -102,9 +102,9 @@ export function workplaceContent({ workplace = null, title = '', showStats = fal
 }
 
 /**
- * Canonical Workplace manifestation. The first level is a generic List
- * inside the shared Header Control modal. The caller owns the optional
- * visible title/subtitle and the meaning/name of an optional aggregate row.
+ * Graph-owned Workplace manifestation.
+ * It composes the shared Header Control + List for the Graph scenario only.
+ * Journal has its own manifestation and must not call this function.
  */
 export function openWorkplaceControl({
   workplaces = [],
@@ -115,24 +115,21 @@ export function openWorkplaceControl({
   workplaceStats = {},
   aggregateStats = null,
   includeAggregate = false,
-  aggregateLabel = 'Общий график',
-  aggregateAria = '',
   onSelect = () => {},
 } = {}) {
   const catalog = Array.isArray(workplaces) ? workplaces : [];
   const visibleTitle = String(title || '').trim();
   const visibleSubtitle = String(subtitle || '').trim();
-  const aggregateTitle = String(aggregateLabel || 'Общий график').trim() || 'Общий график';
   const listItems = [];
 
   if (includeAggregate) {
     listItems.push({
-      title: aggregateTitle,
+      title: 'Общий график',
       right: statsRows(aggregateStats),
       interactive: true,
       selected: workplaceId === ALL_WORKPLACES_ID,
       data: `data-workplace-control-select="${ALL_WORKPLACES_ID}"`,
-      aria: String(aggregateAria || `Показать ${aggregateTitle.toLowerCase()}`),
+      aria: 'Показать общий график всех рабочих мест',
     });
   }
 
