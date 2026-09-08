@@ -1,4 +1,4 @@
-import { button, durationText, escapeHtml, iconButton, list, listEntry, stateView, initStateView, initCalendar, mountModal, modal, timePicker, initTimePickers, initMultiSelect, viewNavigation, initViewNavigation } from '../ui/ui.js?v=journal-architecture-20260908';
+import { button, durationText, escapeHtml, iconButton, list, listEntry, stateView, initStateView, initCalendar, mountModal, modal, timePicker, initTimePickers, initMultiSelect, viewNavigation, initViewNavigation } from '../ui/ui.js';
 import { createRecord, getRecords } from './record-data.js';
 import { getJournalBreaks, createJournalBreak } from './break-data.js';
 import { getAllClients } from '../main/clients/data.js';
