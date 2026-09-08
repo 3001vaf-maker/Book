@@ -1,5 +1,5 @@
 import { renderMain } from './main/main.js';
-import { renderJournal } from './journal/journal.js?v=journal-confirmation-modal-20260909';
+import { renderJournal } from './journal/journal.js';
 import { renderTimetable } from './timetable/timetable.js';
 import { renderChat } from './chat/chat.js';
 import { renderSettings } from './settings/settings.js';
