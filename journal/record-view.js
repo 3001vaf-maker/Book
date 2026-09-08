@@ -1,4 +1,4 @@
-import { escapeHtml, mountModal, modal, select, initMultiSelect, initCalendar, entityCard } from '../ui/ui.js';
+import { button, escapeHtml, mountModal, modal, select, initMultiSelect, initCalendar, entityCard } from '../ui/ui.js?v=single-button-20260908';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getDays, getDay, getDayTime } from '../core/day.js';
 import { timeToMinutes, minutesToTime } from '../core/time.js';
@@ -30,7 +30,7 @@ const pickerModal = (content) => modal(content, { className: 'record-modal recor
 function openWorkplacePicker(state, onDone) {
   const workplaces = getWorkplaces();
   const options = workplaces.map((item) => ({ value: item.key, label: item.name || 'Без названия' }));
-  const content = `<div class="record-screen record-screen--settings"><div class="modal-title"><h2>Место работы</h2></div>${select({ name: 'recordEditWorkplace', label: 'Место работы', value: state.workplaceId, options, data: 'data-record-edit-workplace-select' })}<button type="button" class="ui-button" data-record-edit-save>Выбрать</button></div>`;
+  const content = `<div class="record-screen record-screen--settings"><div class="modal-title"><h2>Место работы</h2></div>${select({ name: 'recordEditWorkplace', label: 'Место работы', value: state.workplaceId, options, data: 'data-record-edit-workplace-select' })}${button('Выбрать', { data: 'data-record-edit-save' })}</div>`;
   const m = mountModal(document.body, pickerModal(content)); if (!m) return;
   m.querySelector('[data-record-edit-save]')?.addEventListener('click', () => { state.workplaceId = m.querySelector('[data-record-edit-workplace-select]')?.value || state.workplaceId; m.remove(); onDone(); });
 }
@@ -63,7 +63,7 @@ function openTimePicker(state, original, onDone) {
 function openProceduresPicker(state, onDone) {
   const items = procedures();
   const selected = new Map((state.procedures || []).map((entry) => [entry?.id, { ...entry }]).filter(([id]) => id));
-  const content = `<div class="record-screen record-screen--procedures"><div class="modal-title"><h2>Услуги</h2></div><div class="entity-list" data-record-edit-procedures></div><button type="button" class="ui-button" data-record-edit-save>Применить</button></div>`;
+  const content = `<div class="record-screen record-screen--procedures"><div class="modal-title"><h2>Услуги</h2></div><div class="entity-list" data-record-edit-procedures></div>${button('Применить', { data: 'data-record-edit-save' })}</div>`;
   const m = mountModal(document.body, pickerModal(content)); if (!m) return;
   const host = m.querySelector('[data-record-edit-procedures]');
   host.innerHTML = items.map((item) => `<button type="button" class="entity-list-row${selected.has(item.id) ? ' is-selected' : ''}" data-record-edit-procedure="${escapeHtml(item.id)}" aria-pressed="${selected.has(item.id)}"><span class="entity-list-row__main"><strong>${escapeHtml(item.name || '')}</strong><small>${Number(item.duration) || 0} мин</small></span><span class="entity-list-row__price">${costText(resolveProcedureCost(item, state.workplaceId))}</span></button>`).join('') || '<div class="muted">Услуг пока нет.</div>';
@@ -79,7 +79,7 @@ function openProceduresPicker(state, onDone) {
 }
 
 function confirmDelete(record, onDeleted) {
-  const content = `<div class="record-screen"><div class="modal-title"><h2>Удалить запись?</h2></div><p>Запись будет удалена полностью и освободит это время.</p><div class="record-modal-actions modal-actions"><button type="button" class="ui-button ui-button--secondary" data-record-delete-no>Нет</button><button type="button" class="ui-button" data-record-delete-yes>Удалить</button></div></div>`;
+  const content = `<div class="record-screen"><div class="modal-title"><h2>Удалить запись?</h2></div><p>Запись будет удалена полностью и освободит это время.</p><div class="record-modal-actions modal-actions">${button('Нет', { data: 'data-record-delete-no', variant: 'secondary' })}${button('Удалить', { data: 'data-record-delete-yes' })}</div></div>`;
   const m = mountModal(document.body, pickerModal(content)); if (!m) return;
   m.querySelector('[data-record-delete-no]')?.addEventListener('click', () => m.remove()); m.querySelector('[data-record-delete-yes]')?.addEventListener('click', () => { if (!deleteRecord(record.id)) return; m.remove(); onDeleted?.(); });
 }
@@ -94,7 +94,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     const clientBlock = `<button type="button" class="record-card-client record-editor-field" data-record-edit-client><strong>${client.id ? `${escapeHtml(client.id)} ` : ''}${escapeHtml(clientName(client))}</strong>${phone ? `<span>${escapeHtml(phone)}</span>` : ''}</button>`;
     const card = entityCard({ top: `${top}${clientBlock}`, bottom: '', right: '', className: 'entity-card--record', data: 'data-record-card' });
     const services = `<button type="button" class="record-record-services record-editor-field" data-record-edit-procedures>${procedureNames.length ? procedureNames.map((item) => `<span>${escapeHtml(item)}</span>`).join('') : '<span>Добавить услугу</span>'}</button>`;
-    const content = `<div class="record-view"><div class="record-view-card">${card}</div><div class="record-view-services">${services}</div><div class="record-view-actions"><button type="button" class="ui-button ui-button--small record-delete-button" data-record-delete>Удалить</button><button type="button" class="ui-button record-apply-button" data-record-apply>Применить</button></div></div>`;
+    const content = `<div class="record-view"><div class="record-view-card">${card}</div><div class="record-view-services">${services}</div><div class="record-view-actions">${button('Удалить', { className: 'record-delete-button', data: 'data-record-delete', variant: 'secondary' })}${button('Применить', { className: 'record-apply-button', data: 'data-record-apply' })}</div></div>`;
     const m = mountModal(document.body, modal(content, { className: 'record-modal record-modal--view' })); if (!m) return;
     m.querySelector('[data-record-edit-workplace]')?.addEventListener('click', () => { m.remove(); openWorkplacePicker(state, render); }); m.querySelector('[data-record-edit-client]')?.addEventListener('click', () => { m.remove(); openClientPicker(state, render); }); m.querySelector('[data-record-edit-datetime]')?.addEventListener('click', () => { m.remove(); openDatePicker(state, () => openTimePicker(state, original, render)); }); m.querySelector('[data-record-edit-procedures]')?.addEventListener('click', () => { m.remove(); openProceduresPicker(state, render); });
     m.querySelector('[data-record-delete]')?.addEventListener('click', () => confirmDelete(record, () => { m.remove(); onClose?.(); })); m.querySelector('[data-record-apply]')?.addEventListener('click', () => { const updated = updateRecord(record.id, { date: dateKey(state.date), workplaceId: String(state.workplaceId || ''), from: state.from, to: state.to, client: state.client, procedures: state.procedures }); if (!updated) { alert('Не удалось сохранить изменения: проверьте рабочий день и свободное время.'); return; } m.remove(); onClose?.(); }); m.addEventListener('modal:close', () => onClose?.(), { once: true });
