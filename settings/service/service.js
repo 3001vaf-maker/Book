@@ -9,7 +9,7 @@ export function renderService(root, navigateBack = () => {}) {
   root.innerHTML = `${pageHeader('Сервис')}${folderList(children.map(([key, label]) => ({ title: label, data: `data-service-open="${key}"` })))}${actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-service-back' }))}`;
   root.querySelectorAll('[data-service-open]').forEach((element) => {
     element.addEventListener('click', async () => {
-      const folder = children.find(([key]) => key === element.dataset.settingsOpen);
+      const folder = children.find(([key]) => key === element.dataset.serviceOpen);
       if (!folder) return;
       const { render } = await folder[2]();
       render(root, () => renderService(root, navigateBack));
