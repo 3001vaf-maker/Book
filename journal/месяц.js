@@ -1,5 +1,5 @@
-import { initCalendar, ALL_WORKPLACES_ID } from '../ui/ui.js?v=journal-all-workplaces-20260908';
-import { getWorkplaces, getWorkingDays, getWorkingDates, getAllWorkingDates, getWorkingDayIndicators } from '../core/workplace-time.js?v=schedule-indicators-20260908';
+import { initCalendar, ALL_WORKPLACES_ID } from '../ui/ui.js';
+import { getWorkplaces, getWorkingDays, getWorkingDates, getAllWorkingDates, getWorkingDayIndicators } from '../core/workplace-time.js';
 
 export function renderJournalMonth(root, { workplaceId = '', onDateSelect = () => {} } = {}) {
   const render = (month = new Date(new Date().getFullYear(), new Date().getMonth(), 1)) => {
