@@ -14,7 +14,7 @@ import { costField, initCostFields, collectCost, costListParts, costCardMeta } f
 import { durationPicker, durationText, initDurationPickers } from './duration/index.js?v=shared-duration-text-20260907';
 import { timePicker, initTimePickers } from './time/index.js?v=aggregate-day-editor-20260908';
 import { journalDayTimeline, initJournalDayTimeline } from './time/journal-day.js?v=journal-all-workplaces-20260908';
-import { workplaceSelector, initWorkplaceSelectors, collectWorkplaceSelections, workplaceAddButton, workplaceContent, openWorkplaceControl, workplaceCountText, ALL_WORKPLACES_ID, getWorkplaceContext, setWorkplaceContext, dayWorkplaceContent, openDayWorkplaceControl, openDayWorkplaceTime } from './workplaces/index.js?v=day-workplaces-20260908';
+import { workplaceSelector, initWorkplaceSelectors, collectWorkplaceSelections, workplaceAddButton, workplaceContent, openWorkplaceControl, workplaceCountText, ALL_WORKPLACES_ID, getWorkplaceContext, setWorkplaceContext, dayWorkplaceContent, openDayWorkplaceControl, openDayWorkplaceTime } from './workplaces/index.js?v=journal-record-metadata-20260908';
 import { pageHeader, headerControl, openHeaderControl } from './header/index.js?v=header-control-v2-20260908';
 import { modal, mountModal } from './modals/index.js';
 import { button, iconButton } from './buttons/index.js?v=single-button-20260908';
