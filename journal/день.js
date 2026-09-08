@@ -2,7 +2,7 @@ import { initDateNavigator, journalDayTimeline, initJournalDayTimeline } from '.
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getDays, getDay, getDayTime } from '../core/day.js';
 import { getRecordsForDay } from './record-data.js';
-import { getJournalBreaksForDay, getJournalBreaks } from '../core/journal-breaks.js';
+import { getJournalBreaksForDay, getJournalBreaks } from './break-data.js';
 import { getTimeUsages } from '../core/time-usage.js';
 import { openRecordCreation } from './record.js';
 import { openRecordView } from './record-view.js';
