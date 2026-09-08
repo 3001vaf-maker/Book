@@ -41,6 +41,8 @@ assert.match(workplaceSource, /Общий график/);
 assert.match(workplaceSource, /WORKPLACE_FALLBACK_COLOR\s*=\s*'#212529'/);
 assert.doesNotMatch(workplaceSource, /function\s+openPicker\b/);
 assert.doesNotMatch(workplaceSource, /data-workplace-control-save/);
+assert.doesNotMatch(workplaceSource, /Корректировка времени/);
+assert.doesNotMatch(workplaceSource, /workplaceControlFrom|workplaceControlTo/);
 assert.doesNotMatch(workplaceSource, /<h2>Рабочий график<\/h2>/);
 assert.match(workplaceSource, /title\s*=\s*''/);
 assert.match(workplaceSource, /subtitle\s*=\s*''/);
@@ -48,9 +50,33 @@ assert.match(workplaceSource, /openHeaderControl\(content,\s*\{\s*title:\s*visib
 
 const graphSource = readFileSync(new URL('../timetable/timetable.js', import.meta.url), 'utf8');
 assert.match(graphSource, /title:\s*'Рабочий график'/);
+assert.match(graphSource, /openAggregateDayEditor/);
+assert.match(graphSource, /variant:\s*'medium'/);
+assert.match(graphSource, /time-range-fields/);
+assert.match(graphSource, /getWorkingTimeUsageConflicts/);
+assert.match(graphSource, /actionsRoot\.hidden\s*=\s*allMode/);
+assert.match(graphSource, /Пересечение с/);
+assert.match(graphSource, /Запись \$\{conflict\.from\}–\$\{conflict\.to\} выходит за рабочее время/);
+assert.doesNotMatch(graphSource, /journal\/record-data\.js/);
+assert.doesNotMatch(graphSource, /canCorrectTime|onSaveTime/);
 
 const journalSource = readFileSync(new URL('../journal/journal.js', import.meta.url), 'utf8');
 assert.match(journalSource, /title:\s*''/);
+assert.doesNotMatch(journalSource, /canCorrectTime|onSaveTime|updateDayTime|hasScheduleConflict/);
+
+const recordDataSource = readFileSync(new URL('../journal/record-data.js', import.meta.url), 'utf8');
+assert.match(recordDataSource, /export function getWorkingTimeRecordConflicts/);
+assert.match(recordDataSource, /!containsRange\(from, to, record\.from, record\.to\)/);
+
+const timeUsageSource = readFileSync(new URL('../core/time-usage.js', import.meta.url), 'utf8');
+assert.match(timeUsageSource, /configureWorkingTimeConflictSource/);
+assert.match(timeUsageSource, /getWorkingTimeUsageConflicts/);
+
+const coreSource = readFileSync(new URL('../core.js', import.meta.url), 'utf8');
+assert.match(coreSource, /configureWorkingTimeConflictSource\(getWorkingTimeRecordConflicts\)/);
+
+const timeSource = readFileSync(new URL('../ui/time/index.js', import.meta.url), 'utf8');
+assert.match(timeSource, /dispatchEvent\(new Event\('change',\{bubbles:true\}\)\)/);
 
 const workplaceDataSource = readFileSync(new URL('../settings/profile/workplaces/data.js', import.meta.url), 'utf8');
 assert.match(workplaceDataSource, /color:\s*String\(workplace\.color/);
