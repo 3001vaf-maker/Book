@@ -1,17 +1,18 @@
-import { initCalendar } from '../ui/ui.js?v=schedule-indicators-20260908';
-import { getWorkplaces, getWorkingDays, getWorkingDates, getWorkingDayIndicators } from '../core/workplace-time.js?v=schedule-indicators-20260908';
+import { initCalendar, ALL_WORKPLACES_ID } from '../ui/ui.js?v=journal-all-workplaces-20260908';
+import { getWorkplaces, getWorkingDays, getWorkingDates, getAllWorkingDates, getWorkingDayIndicators } from '../core/workplace-time.js?v=schedule-indicators-20260908';
 
 export function renderJournalMonth(root, { workplaceId = '', onDateSelect = () => {} } = {}) {
   const render = (month = new Date(new Date().getFullYear(), new Date().getMonth(), 1)) => {
     root.innerHTML = '<div data-journal-month-calendar></div>';
     const workingDays = getWorkingDays();
     const workplaces = getWorkplaces();
+    const allMode = workplaceId === ALL_WORKPLACES_ID;
     initCalendar(root.querySelector('[data-journal-month-calendar]'), {
       month,
-      workingDates: getWorkingDates(workingDays, workplaceId, month),
+      workingDates: allMode ? getAllWorkingDates(workingDays, month) : getWorkingDates(workingDays, workplaceId, month),
       renderDateContent: () => '',
       resolveDateIndicators: ({ dateKey, isCurrentMonth }) => isCurrentMonth
-        ? getWorkingDayIndicators(workingDays, workplaces, dateKey, { excludeWorkplaceId: workplaceId })
+        ? getWorkingDayIndicators(workingDays, workplaces, dateKey, { excludeWorkplaceId: allMode ? '' : workplaceId })
         : [],
       onDateSelect: (dateKey) => {
         const [year, monthNumber, day] = String(dateKey).split('-').map(Number);

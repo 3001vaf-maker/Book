@@ -1,8 +1,8 @@
-import { pageHeader, viewNavigation, initViewNavigation, headerControl, workplaceContent, openWorkplaceControl, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js?v=header-title-context-20260908';
+import { pageHeader, viewNavigation, initViewNavigation, headerControl, workplaceContent, openWorkplaceControl, ALL_WORKPLACES_ID, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js?v=journal-all-workplaces-20260908';
 import { getWorkplaces, getWorkplaceMonthStatsMap } from '../core/workplace-time.js?v=schedule-indicators-20260908';
 import { getDays } from '../core/day.js';
-import { renderJournalDay } from './день.js?v=journal-architecture-20260908';
-import { renderJournalMonth } from './месяц.js?v=schedule-indicators-20260908';
+import { renderJournalDay } from './день.js?v=journal-all-workplaces-20260908';
+import { renderJournalMonth } from './месяц.js?v=journal-all-workplaces-20260908';
 import { renderJournalList } from './список.js';
 
 const views = [
@@ -19,10 +19,11 @@ export function renderJournal(root) {
   let selectedDate = context.date;
 
   const renderHeaderControl = () => {
-    const workplace = workplaces.find((item) => item.key === selectedWorkplaceId) || null;
-    return headerControl(workplaceContent({ workplace }), {
+    const allMode = selectedWorkplaceId === ALL_WORKPLACES_ID;
+    const workplace = allMode ? null : workplaces.find((item) => item.key === selectedWorkplaceId) || null;
+    return headerControl(workplaceContent({ workplace, title: allMode ? 'Все записи' : '' }), {
       data: 'data-workplace-header-open',
-      aria: `Рабочее место: ${workplace?.name || 'не выбрано'}`,
+      aria: allMode ? 'Все записи по рабочим местам' : `Рабочее место: ${workplace?.name || 'не выбрано'}`,
     });
   };
 
@@ -35,8 +36,11 @@ export function renderJournal(root) {
       workplaces,
       workplaceId: selectedWorkplaceId,
       title: '',
-      stats: workplaceStats[selectedWorkplaceId],
+      stats: selectedWorkplaceId === ALL_WORKPLACES_ID ? null : workplaceStats[selectedWorkplaceId],
       workplaceStats,
+      includeAggregate: true,
+      aggregateLabel: 'Все записи',
+      aggregateAria: 'Показать записи всех рабочих мест',
       onSelect: (nextId) => {
         selectedWorkplaceId = nextId || selectedWorkplaceId;
         setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: selectedDate });
