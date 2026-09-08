@@ -1,4 +1,4 @@
-import { actionBlock, button, pageHeader, initCalendar, initMultiSelect, modal, mountModal, timePicker, initTimePickers, escapeHtml, headerControl, workplaceContent, openWorkplaceControl, ALL_WORKPLACES_ID, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js?v=schedule-indicators-20260908';
+import { actionBlock, button, pageHeader, initCalendar, initMultiSelect, modal, mountModal, timePicker, initTimePickers, escapeHtml, headerControl, workplaceContent, openWorkplaceControl, ALL_WORKPLACES_ID, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js?v=header-title-context-20260908';
 import { getWorkplaces, resolveWorkplaceTime, getWorkingDayIndicators, getWorkingDayTotalMinutes, getWorkplaceMonthStats, getAllWorkplacesMonthStats, getWorkplaceMonthStatsMap } from '../core/workplace-time.js?v=schedule-indicators-20260908';
 import { getDays, saveDays, getDay, getDayTime, createDay, updateDayTime, getScheduleConflicts, hasScheduleConflict, findSuggestedInterval } from '../core/day.js';
 
@@ -169,6 +169,7 @@ export function renderTimetable(root) {
     openWorkplaceControl({
       workplaces,
       workplaceId: selectedWorkplaceId,
+      title: 'Рабочий график',
       stats: allMode ? monthStats.aggregate : monthStats.byWorkplace[selectedWorkplaceId],
       workplaceStats: monthStats.byWorkplace,
       aggregateStats: monthStats.aggregate,
