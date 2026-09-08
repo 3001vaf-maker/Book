@@ -44,6 +44,7 @@ const timetableFiles = walk(join(root, 'timetable'));
 const journalFiles = walk(join(root, 'journal'));
 const timetableController = join(root, 'timetable/timetable.js');
 const journalController = join(root, 'journal/journal.js');
+const journalWorkplaceControl = join(root, 'journal/workplace-control.js');
 const referenceFiles = [...mainFiles, ...settingsFiles, ...timetableFiles, ...journalFiles];
 const uiFiles = walk(join(root, 'ui'));
 const coreFiles = walk(join(root, 'core'));
@@ -124,22 +125,39 @@ if (!/export\s+function\s+openHeaderControl\b/.test(headerSource) || !/variant:\
 }
 const workplaceSource = text(workplaceUi);
 if (!/\bopenHeaderControl\s*\(/.test(workplaceSource)) {
-  report(workplaceUi, 'Workplace main manifestation must use the shared openHeaderControl() shell');
+  report(workplaceUi, 'Graph Workplace manifestation must use the shared openHeaderControl() shell');
 }
 if (/variant:\s*['"]medium['"]/.test(workplaceSource)) {
   report(workplaceUi, 'Workplace must not choose Header Control modal size; medium belongs to ui/header');
 }
-for (const controller of [timetableController, journalController]) {
-  const source = text(controller);
-  if (/\bopenWorkplace(?:Picker|Time)?Modal\b/.test(source)) {
-    report(controller, 'sections must not own Workplace modal manifestations; use shared openWorkplaceControl()');
-  }
-  if (!/\bheaderControl\s*\(/.test(source) || !/\bworkplaceContent\s*\(/.test(source)) {
-    report(controller, 'Graph and Journal must compose neutral Workplace content inside the shared Header Control');
-  }
-  if (!/\bopenWorkplaceControl\s*\(/.test(source)) {
-    report(controller, 'Graph and Journal must use the shared Workplace manifestation');
-  }
+
+const graphSource = text(timetableController);
+if (/\bopenWorkplace(?:Picker|Time)?Modal\b/.test(graphSource)) {
+  report(timetableController, 'Graph must not create a parallel Workplace modal; use its canonical Workplace control');
+}
+if (!/\bheaderControl\s*\(/.test(graphSource) || !/\bworkplaceContent\s*\(/.test(graphSource)) {
+  report(timetableController, 'Graph must compose neutral Workplace content inside the shared Header Control');
+}
+if (!/\bopenWorkplaceControl\s*\(/.test(graphSource)) {
+  report(timetableController, 'Graph must use its canonical Workplace manifestation');
+}
+
+const journalSource = text(journalController);
+if (/\bopenWorkplace(?:Picker|Time)?Modal\b/.test(journalSource)) {
+  report(journalController, 'Journal must not create a parallel raw Workplace modal; use its Journal-owned Header manifestation');
+}
+if (!/\bheaderControl\s*\(/.test(journalSource) || !/\bworkplaceContent\s*\(/.test(journalSource)) {
+  report(journalController, 'Journal must compose neutral Workplace content inside the shared Header Control');
+}
+if (/\bopenWorkplaceControl\s*\(/.test(journalSource)) {
+  report(journalController, 'Journal must not use the Graph Workplace manifestation');
+}
+if (!/\bopenJournalWorkplaceControl\s*\(/.test(journalSource)) {
+  report(journalController, 'Journal must use its own Header manifestation');
+}
+const journalWorkplaceSource = text(journalWorkplaceControl);
+if (!/\bopenHeaderControl\s*\(/.test(journalWorkplaceSource) || !/\blist\s*\(/.test(journalWorkplaceSource)) {
+  report(journalWorkplaceControl, 'Journal Header manifestation must reuse shared Header Control and List');
 }
 
 const workplaceOwner = 'settings/profile/workplaces/data.js';
