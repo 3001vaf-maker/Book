@@ -1,5 +1,5 @@
 import { renderMain } from './main/main.js';
-import { renderJournal } from './journal/journal.js?v=day-workplaces-records-20260908';
+import { renderJournal } from './journal/journal.js?v=journal-day-active-workplaces-20260908';
 import { renderTimetable } from './timetable/timetable.js?v=aggregate-day-editor-20260908';
 import { renderChat } from './chat/chat.js';
 import { renderSettings } from './settings/settings.js?v=schedule-indicators-20260908';
