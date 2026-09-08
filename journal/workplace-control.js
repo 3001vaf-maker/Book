@@ -2,12 +2,8 @@ import { openHeaderControl, list, escapeHtml, ALL_WORKPLACES_ID } from '../ui/ui
 
 const WORKPLACE_FALLBACK_COLOR = '#212529';
 
-function statsRows(stats) {
-  if (!stats) return [];
-  const days = Math.max(0, Number(stats.days) || 0);
-  const hours = Math.max(0, Number(stats.hours) || 0);
-  const minutes = String(Math.max(0, Number(stats.minutes) || 0)).padStart(2, '0');
-  return [`${days} дней`, `${hours} ч ${minutes} м`];
+function recordCountText(count = 0) {
+  return `${Math.max(0, Number(count) || 0)} з`;
 }
 
 /**
@@ -18,7 +14,7 @@ function statsRows(stats) {
 export function openJournalWorkplaceControl({
   workplaces = [],
   workplaceId = '',
-  workplaceStats = {},
+  recordCounts = {},
   onSelect = () => {},
 } = {}) {
   const items = [{
@@ -34,7 +30,7 @@ export function openJournalWorkplaceControl({
     if (!key) continue;
     items.push({
       title: workplace?.name || 'Без названия',
-      right: statsRows(workplaceStats?.[key]),
+      right: [recordCountText(recordCounts?.[key])],
       indicatorColor: workplace?.indicatorColor || workplace?.color || WORKPLACE_FALLBACK_COLOR,
       indicatorLabel: workplace?.name || 'Рабочее место',
       interactive: true,
