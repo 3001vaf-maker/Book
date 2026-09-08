@@ -104,6 +104,8 @@ function openClientConfirmation({ date, workplaceId, from, to, selectedClient, s
   const chooseDate = (m) => openConfirmationDateModal({ workplaceId: currentWorkplaceId, date: currentDate, onSelected: (nextDate) => { currentDate = nextDate; openConfirmationTimeModal({ date: currentDate, workplaceId: currentWorkplaceId, from: currentFrom, duration: duration(), onSelected: (nextFrom) => { currentFrom = nextFrom; currentTo = minutesToTime(timeToMinutes(currentFrom) + duration()); render(m); } }); } });
   const chooseTime = (m) => openConfirmationTimeModal({ date: currentDate, workplaceId: currentWorkplaceId, from: currentFrom, duration: duration(), onSelected: (nextFrom) => { currentFrom = nextFrom; currentTo = minutesToTime(timeToMinutes(currentFrom) + duration()); render(m); } });
   const render = (m) => {
+    const host = m.querySelector('[data-record-confirm-host]');
+    if (!host) return;
     const name = clientName(currentClient);
     const phone = currentClient?.phones?.[0] || currentClient?.phone || '';
     const workplace = findWorkplaceName(currentWorkplaceId);
@@ -123,8 +125,8 @@ function openClientConfirmation({ date, workplaceId, from, to, selectedClient, s
       actions: [{ label: 'Подтвердить запись', data: 'data-record-confirm' }],
       className: 'record-state-view'
     });
-    m.innerHTML = `<div class="record-screen record-screen--state-view">${view}</div>`;
-    initStateView(m.querySelector('[data-state-view]'), {
+    host.innerHTML = `<div class="record-screen record-screen--state-view">${view}</div>`;
+    initStateView(host.querySelector('[data-state-view]'), {
       onBlockSelect: (blockId) => {
         if (blockId === 'workplace') { openConfirmationWorkplaceModal({ workplaceId: currentWorkplaceId, onSelected: (nextWorkplaceId) => chooseDateAfterWorkplace(m, nextWorkplaceId) }); return; }
         if (blockId === 'dateTime') { chooseDate(m); return; }
@@ -150,9 +152,9 @@ function openClientConfirmation({ date, workplaceId, from, to, selectedClient, s
         });
       }
     });
-    m.querySelector('[data-record-confirm]')?.addEventListener('click', () => { const usages = scopedUsages(currentDate, currentWorkplaceId); if (!isTimeRangeAvailable({ from: currentFrom, to: currentTo, usages })) { alert('Это время уже занято.'); return; } createRecord({ date: dateKey(currentDate), workplaceId: currentWorkplaceId, from: currentFrom, to: currentTo, client: { key: currentClient.key, id: currentClient.id || '', name: currentClient.name || '', surname: currentClient.surname || '', phone: currentClient.phones?.[0] || '' }, procedures: selectedProcedures.map(({ procedure, cost, duration: itemDuration }) => ({ id: procedure.id, name: procedure.name, cost, duration: itemDuration })) }); m.remove(); onCreated?.(); });
+    host.querySelector('[data-record-confirm]')?.addEventListener('click', () => { const usages = scopedUsages(currentDate, currentWorkplaceId); if (!isTimeRangeAvailable({ from: currentFrom, to: currentTo, usages })) { alert('Это время уже занято.'); return; } createRecord({ date: dateKey(currentDate), workplaceId: currentWorkplaceId, from: currentFrom, to: currentTo, client: { key: currentClient.key, id: currentClient.id || '', name: currentClient.name || '', surname: currentClient.surname || '', phone: currentClient.phones?.[0] || '' }, procedures: selectedProcedures.map(({ procedure, cost, duration: itemDuration }) => ({ id: procedure.id, name: procedure.name, cost, duration: itemDuration })) }); m.remove(); onCreated?.(); });
   };
-  const m = mountModal(document.body, modal('', { className: 'record-modal', variant: 'large' })); if (!m) return;
+  const m = mountModal(document.body, modal('<div data-record-confirm-host></div>', { className: 'record-modal', variant: 'large' })); if (!m) return;
   render(m);
 }
 function openBlockEndModal({ date, workplaceId, from, onCreated }) {
