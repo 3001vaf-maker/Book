@@ -1,6 +1,6 @@
-import { actionBlock, button, collectLinks, colorPicker, details, emptyState, entityCard, escapeHtml, field, initColorPickers, initLinks, initPhotoField, initTimePickers, links, listEntries, listEntry, mountModal, modal, page, phoneField, photoField, searchableSelect, select, textareaField, timePicker } from '../../../ui/ui.js?v=schedule-indicators-20260908';
+import { actionBlock, button, collectLinks, colorPicker, details, emptyState, entityCard, escapeHtml, field, initColorPickers, initLinks, initPhotoField, initTimePickers, links, listEntries, listEntry, mountModal, modal, page, phoneField, photoField, searchableSelect, select, textareaField, timePicker } from '../../../ui/ui.js';
 import { getProfile } from '../data.js';
-import { deleteWorkplace as deleteWorkplaceData, getWorkplaces, upsertWorkplace } from './data.js?v=schedule-indicators-20260908';
+import { deleteWorkplace as deleteWorkplaceData, getWorkplaces, upsertWorkplace } from './data.js';
 
 const CITIES=['Москва','Санкт-Петербург','Казань','Нижний Новгород','Екатеринбург','Новосибирск','Самара','Ростов-на-Дону','Краснодар','Сочи','Уфа','Воронеж','Пермь','Волгоград','Омск','Тула','Калининград'];
 
