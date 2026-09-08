@@ -130,24 +130,15 @@ export function renderTimetable(root) {
     });
   }
 
-  function openCorrectionSelectionNotice() {
-    const content = `<div class="compact-form"><div class="modal-title"><h2>Корректировка времени</h2><p>Выберите в календаре одну или несколько рабочих дат этого рабочего места.</p></div>${button('Понятно', { data: 'data-timetable-correction-notice-close' })}</div>`;
-    const m = mountModal(document.body, modal(content, { title: 'Корректировка времени', variant: 'compact' }));
-    m?.querySelector('[data-timetable-correction-notice-close]')?.addEventListener('click', () => m.remove());
-  }
-
   function openWorkplaceModal() {
     const workplace = workplaces.find((w) => w.key === selectedWorkplaceId); const dates = selection?.getSelectedDates?.() || []; const stats = monthStats(calendar?.getDisplayedMonth() || initialMonth, workingDays, selectedWorkplaceId, workplaces);
     const canCorrect = dates.length > 0 && dates.every((date) => workingDayForDate(workingDays, selectedWorkplaceId, date));
     const workplaceName = workplace?.name || 'Рабочее место';
-    const content = `<div class="modal-title"><h2>${escapeHtml(workplaceName)}</h2></div><div class="timetable-workplace-modal-summary">${timetableCounter(stats)}</div><div class="timetable-workplace-modal-actions">${button('Рабочее место', { data: 'data-timetable-open-picker' })}${button('Корректировка времени', { data: 'data-timetable-open-time', variant: 'secondary' })}</div>`;
+    const correctionAction = canCorrect ? button('Корректировка времени', { data: 'data-timetable-open-time', variant: 'secondary' }) : '';
+    const content = `<div class="modal-title"><h2>${escapeHtml(workplaceName)}</h2></div><div class="timetable-workplace-modal-summary">${timetableCounter(stats)}</div><div class="timetable-workplace-modal-actions">${button('Рабочее место', { data: 'data-timetable-open-picker' })}${correctionAction}</div>`;
     const m = mountModal(document.body, modal(content, { title: workplaceName, variant: 'medium' }));
     m?.querySelector('[data-timetable-open-picker]')?.addEventListener('click', () => { m.remove(); openWorkplacePickerModal(); });
-    m?.querySelector('[data-timetable-open-time]')?.addEventListener('click', () => {
-      m.remove();
-      if (!canCorrect) { openCorrectionSelectionNotice(); return; }
-      openWorkplaceTimeModal(dates);
-    });
+    m?.querySelector('[data-timetable-open-time]')?.addEventListener('click', () => { m.remove(); openWorkplaceTimeModal(dates); });
   }
   root.querySelector('[data-workplace-header-open]')?.addEventListener('click', openWorkplaceModal);
 
