@@ -3,10 +3,12 @@ import { escapeHtml } from '../utils/escape-html.js';
 let modalLevel = 0;
 
 const MODAL_VARIANTS = new Set(['list', 'large', 'medium', 'compact', 'bottom']);
+const MODAL_SURFACES = new Set(['app']);
 
-export function modal(content, { title = '', className = '', variant = '' } = {}) {
+export function modal(content, { title = '', className = '', variant = '', surface = '' } = {}) {
   const variantClass = MODAL_VARIANTS.has(variant) ? ` modal--${variant}` : '';
-  const classes = ['modal-sheet', className].filter(Boolean).join(' ') + variantClass;
+  const surfaceClass = MODAL_SURFACES.has(surface) ? ` modal--surface-${surface}` : '';
+  const classes = ['modal-sheet', className].filter(Boolean).join(' ') + variantClass + surfaceClass;
   const closeButton = variant === 'bottom'
     ? ''
     : '<button type="button" class="modal-close" data-modal-close aria-label="Закрыть">×</button>';
