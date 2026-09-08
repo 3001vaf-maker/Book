@@ -1,4 +1,4 @@
-import { actionBlock, button, pageHeader, initCalendar, initMultiSelect, select, modal, mountModal, timePicker, initTimePickers, escapeHtml, workplaceHeaderButton, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js';
+import { actionBlock, button, pageHeader, initCalendar, initMultiSelect, select, modal, mountModal, timePicker, initTimePickers, escapeHtml, workplaceHeaderButton, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js?v=single-button-20260908';
 import { getWorkplaces, resolveWorkplaceTime } from '../core/workplace-time.js';
 import { getDays, saveDays, getDay, getDayTime, createDay, updateDayTime, getScheduleConflicts, hasScheduleConflict, findSuggestedInterval } from '../core/day.js';
 
@@ -120,7 +120,7 @@ export function renderTimetable(root) {
     const firstDay = workingDayForDate(workingDays, selectedWorkplaceId, dates[0]); if (!firstDay) return;
     const workplace = workplaces.find((w) => w.key === selectedWorkplaceId); const current = getDayTime(firstDay, workplaces);
     const from = current?.from || workplace?.from || '09:00'; const to = current?.to || workplace?.to || '18:00';
-    const content = `<div class="modal-title"><h2>Рабочее время</h2></div><div class="timetable-time-fields">${timePicker({ name: 'timetableWorkplaceFrom', label: 'Начало', value: from })}${timePicker({ name: 'timetableWorkplaceTo', label: 'Окончание', value: to })}</div><div class="form-error" data-timetable-time-error></div>${button('Сохранить', { data: 'data-timetable-workplace-time-save', variant: 'full' })}`;
+    const content = `<div class="modal-title"><h2>Рабочее время</h2></div><div class="timetable-time-fields">${timePicker({ name: 'timetableWorkplaceFrom', label: 'Начало', value: from })}${timePicker({ name: 'timetableWorkplaceTo', label: 'Окончание', value: to })}</div><div class="form-error" data-timetable-time-error></div>${button('Сохранить', { data: 'data-timetable-workplace-time-save' })}`;
     const m = mountModal(document.body, modal(content, { title: 'Рабочее время' })); if (!m) return; initTimePickers(m);
     m.querySelector('[data-timetable-workplace-time-save]')?.addEventListener('click', () => {
       const nextFrom = m.querySelector('[name="timetableWorkplaceFrom"]')?.value || from; const nextTo = m.querySelector('[name="timetableWorkplaceTo"]')?.value || to;

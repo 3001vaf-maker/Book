@@ -1,4 +1,5 @@
 import { modal, mountModal } from '../modals/index.js';
+import { button } from '../buttons/index.js';
 
 const esc=(v='')=>String(v).replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#039;'}[c]));
 const normalize=v=>{const m=String(v||'').match(/^(\d{1,2}):(\d{2})$/);if(!m)return {h:0,min:0};return {h:Math.min(23,Number(m[1])),min:Number(m[2])<60?Number(m[2]):0}};
@@ -27,7 +28,7 @@ function open(host){
   const minutes=Array.from({length:Math.floor(59/step)+1},(_,i)=>i*step).filter(m=>m<=59);
   const initialHour=hours.includes(current.h)?current.h:hours[0];
   const initialMinute=minutes.includes(current.min)?current.min:minutes[0];
-  const content=`<div class="modal-title"><h2>${esc(host.querySelector('.time-picker__label')?.textContent||'Время')}</h2></div><div class="time-wheel" data-time-wheel><div class="time-wheel__column" data-time-wheel-column="hours"><span class="time-wheel__label">Часы</span><div class="time-wheel__viewport">${wheel({values:hours,selected:initialHour,type:'hours'})}</div></div><div class="time-wheel__column" data-time-wheel-column="minutes"><span class="time-wheel__label">Минуты</span><div class="time-wheel__viewport">${wheel({values:minutes,selected:initialMinute,type:'minutes'})}</div></div></div><button type="button" class="ui-button" data-time-save>Сохранить</button>`;
+  const content=`<div class="modal-title"><h2>${esc(host.querySelector('.time-picker__label')?.textContent||'Время')}</h2></div><div class="time-wheel" data-time-wheel><div class="time-wheel__column" data-time-wheel-column="hours"><span class="time-wheel__label">Часы</span><div class="time-wheel__viewport">${wheel({values:hours,selected:initialHour,type:'hours'})}</div></div><div class="time-wheel__column" data-time-wheel-column="minutes"><span class="time-wheel__label">Минуты</span><div class="time-wheel__viewport">${wheel({values:minutes,selected:initialMinute,type:'minutes'})}</div></div></div>${button('Сохранить',{data:'data-time-save'})}`;
   const modalRoot=mountModal(document.body,modal(content,{title:host.querySelector('.time-picker__label')?.textContent||'Время',variant:'compact'}));
   if(!modalRoot)return;
 

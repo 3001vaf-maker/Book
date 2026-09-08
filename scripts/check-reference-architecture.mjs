@@ -49,6 +49,19 @@ for (const file of coreFiles) {
   if (/from\s+['"][^'"]*(?:settings|main)\//.test(source)) report(file, 'core domain module must not import feature/entity folders');
 }
 
+const buttonSizeVariant = /\bui-button--(?:full|small|compact)\b|variant\s*:\s*['"](?:full|small|compact)['"]/;
+for (const file of allFiles) {
+  if (buttonSizeVariant.test(text(file))) report(file, 'ordinary button() has one geometry; size variants full/small/compact are forbidden');
+}
+const buttonsCss = join(root, 'ui/buttons/buttons.css');
+if (/\bui-button--(?:full|small|compact)\b/.test(text(buttonsCss))) {
+  report(buttonsCss, 'ordinary button has one geometry; size modifier classes are forbidden');
+}
+const timePickerUi = join(root, 'ui/time/index.js');
+if (/<button\b[^>]*class=["'][^"']*\bui-button\b/i.test(text(timePickerUi))) {
+  report(timePickerUi, 'TimePicker must use shared button() for ordinary actions instead of recreating ui-button markup');
+}
+
 const workplaceOwner = 'settings/profile/workplaces/data.js';
 for (const file of allFiles) {
   const source = text(file);
