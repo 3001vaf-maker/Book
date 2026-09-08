@@ -3,7 +3,7 @@ import { getWorkplaceContext, setWorkplaceContext } from '../core/workplace-cont
 import { getWorkplaces } from '../core/workplace-time.js?v=schedule-indicators-20260908';
 import { getActiveRecordCountForDay } from './record-data.js?v=journal-record-counts-20260908';
 import { openJournalWorkplaceControl } from './workplace-control.js?v=journal-record-counts-20260908';
-import { renderJournalDay } from './день.js?v=journal-all-workplaces-20260908';
+import { renderJournalDay } from './день.js?v=journal-work-fields-20260908';
 import { renderJournalMonth } from './месяц.js?v=journal-all-workplaces-20260908';
 import { renderJournalList } from './список.js';
 
