@@ -40,6 +40,18 @@ export function getRecordsForDay(date, workplaceId = '') {
   const day = normalizeDate(date), workplace = normalizeId(workplaceId);
   return getRecords().filter((record) => record?.date === day && (!workplace || normalizeId(record?.workplaceId) === workplace));
 }
+
+/**
+ * Record owns the appointment data. Consumers receive only the records that
+ * would fall outside a proposed working interval, never the whole day list.
+ */
+export function getWorkingTimeRecordConflicts({ date, workplaceId, from, to } = {}) {
+  if (!isValidRange(from, to)) return [];
+  return getRecordsForDay(date, workplaceId)
+    .filter((record) => record?.status !== 'cancelled' && isValidRange(record?.from, record?.to) && !containsRange(from, to, record.from, record.to))
+    .map((record) => ({ type: 'record', from: String(record.from), to: String(record.to) }));
+}
+
 export function checkRecordTime({ date, workplaceId, from, to, excludeId = '' } = {}) {
   if (!isValidRange(from, to)) return { ok: false, reason: 'invalid-time' };
   const day = dayAllows({ date, workplaceId, from, to });
