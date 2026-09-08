@@ -38,6 +38,7 @@ assert.match(headerSource, /variant:\s*'medium'/);
 const workplaceSource = readFileSync(new URL('../ui/workplaces/index.js', import.meta.url), 'utf8');
 assert.match(workplaceSource, /list\(\{\s*items:\s*listItems\s*\}\)/);
 assert.match(workplaceSource, /Общий график/);
+assert.doesNotMatch(workplaceSource, /Все записи|aggregateLabel|aggregateAria/);
 assert.match(workplaceSource, /WORKPLACE_FALLBACK_COLOR\s*=\s*'#212529'/);
 assert.doesNotMatch(workplaceSource, /function\s+openPicker\b/);
 assert.doesNotMatch(workplaceSource, /data-workplace-control-save/);
@@ -49,6 +50,7 @@ assert.match(workplaceSource, /subtitle\s*=\s*''/);
 assert.match(workplaceSource, /openHeaderControl\(content,\s*\{\s*title:\s*visibleTitle\s*\|\|\s*visibleSubtitle\s*\}\)/);
 
 const graphSource = readFileSync(new URL('../timetable/timetable.js', import.meta.url), 'utf8');
+assert.match(graphSource, /openWorkplaceControl/);
 assert.match(graphSource, /title:\s*'Рабочий график'/);
 assert.match(graphSource, /openAggregateDayEditor/);
 assert.match(graphSource, /variant:\s*'medium'/);
@@ -61,8 +63,17 @@ assert.doesNotMatch(graphSource, /journal\/record-data\.js/);
 assert.doesNotMatch(graphSource, /canCorrectTime|onSaveTime/);
 
 const journalSource = readFileSync(new URL('../journal/journal.js', import.meta.url), 'utf8');
-assert.match(journalSource, /title:\s*''/);
+assert.match(journalSource, /openJournalWorkplaceControl/);
+assert.doesNotMatch(journalSource, /openWorkplaceControl/);
 assert.doesNotMatch(journalSource, /canCorrectTime|onSaveTime|updateDayTime|hasScheduleConflict/);
+
+const journalControlSource = readFileSync(new URL('../journal/workplace-control.js', import.meta.url), 'utf8');
+assert.match(journalControlSource, /export function openJournalWorkplaceControl/);
+assert.match(journalControlSource, /Все записи/);
+assert.match(journalControlSource, /data-journal-workplace-select/);
+assert.match(journalControlSource, /openHeaderControl/);
+assert.match(journalControlSource, /list\(\{\s*items\s*\}\)/);
+assert.doesNotMatch(journalControlSource, /Общий график|data-workplace-control-select/);
 
 const recordDataSource = readFileSync(new URL('../journal/record-data.js', import.meta.url), 'utf8');
 assert.match(recordDataSource, /export function getWorkingTimeRecordConflicts/);
