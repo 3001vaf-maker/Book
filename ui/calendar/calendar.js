@@ -1,4 +1,5 @@
 import { modal, mountModal } from '../modals/index.js';
+import { button } from '../buttons/index.js';
 import { escapeHtml } from '../utils/escape-html.js';
 
 const MONTH_FORMATTER = new Intl.DateTimeFormat('ru-RU', { month: 'long', year: 'numeric' });
@@ -189,7 +190,7 @@ function openMonthDayPicker(host) {
   const hidden = host.querySelector('[data-month-day-value]');
   if (!hidden) return;
   const current = parseMonthDay(hidden.value);
-  const content = `<div class="modal-title"><h2>${escapeHtml(host.querySelector(':scope > span')?.textContent || 'Дата')}</h2></div><div data-month-day-calendar></div>${hidden.value ? '<div class="modal-actions"><button type="button" class="ui-button ui-button--secondary" data-month-day-clear>Очистить</button></div>' : ''}`;
+  const content = `<div class="modal-title"><h2>${escapeHtml(host.querySelector(':scope > span')?.textContent || 'Дата')}</h2></div><div data-month-day-calendar></div>${hidden.value ? `<div class="modal-actions">${button('Очистить', { data: 'data-month-day-clear', variant: 'secondary' })}</div>` : ''}`;
   const modalRoot = mountModal(document.body, modal(content, { variant: 'medium' }));
   if (!modalRoot) return;
   const calendarRoot = modalRoot.querySelector('[data-month-day-calendar]');
