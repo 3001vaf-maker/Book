@@ -84,5 +84,5 @@ export function workplaceHeaderButton({ workplace = null, showStats = false, sta
   const counter = showStats && stats
     ? `<span class="timetable-workplace__days">${stats.days} дней</span><span class="timetable-workplace__time">${stats.hours} ч ${String(stats.minutes).padStart(2, '0')} м</span>`
     : '';
-  return `<button type="button" class="timetable-workplace-button ui-button--secondary" data-workplace-header-open aria-label="Рабочее место: ${safeName}"><span class="timetable-workplace-button__name">${safeName}</span>${counter}<span class="timetable-workplace-button__arrow" aria-hidden="true">⌄</span></button>`;
+  return `<button type="button" class="timetable-workplace-button" data-workplace-header-open aria-label="Рабочее место: ${safeName}"><span class="timetable-workplace-button__name">${safeName}</span>${counter}<span class="timetable-workplace-button__arrow" aria-hidden="true">⌄</span></button>`;
 }
