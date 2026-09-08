@@ -24,6 +24,7 @@ const calendarUi = read('ui/calendar/calendar.js');
 const calendarCss = read('ui/calendar/calendar.css');
 const listUi = read('ui/lists/list.js');
 const graph = read('timetable/timetable.js');
+const journal = read('journal/journal.js');
 const journalMonth = read('journal/месяц.js');
 const allCss = [...walkCss('ui'), ...walkCss('css')];
 
@@ -49,10 +50,15 @@ for (const path of allCss) {
 if (!/list\(\{\s*items:\s*listItems\s*\}\)/.test(workplaceUi)) fail('ui/workplaces/index.js', 'Workplace Header manifestation must use shared list()');
 if (/function\s+openPicker\b|name:\s*['"]workplaceControlSelect['"]|data-workplace-control-save/.test(workplaceUi)) fail('ui/workplaces/index.js', 'Workplace Header manifestation must not recreate Select + Choose flow');
 if (!/ALL_WORKPLACES_ID/.test(workplaceUi) || !/Общий график/.test(workplaceUi)) fail('ui/workplaces/index.js', 'Workplace List must support the aggregate graph row');
+if (/<h2>Рабочий график<\/h2>/.test(workplaceUi)) fail('ui/workplaces/index.js', 'Workplace must not own the visible Header Control title');
+if (!/title\s*=\s*['"]['"]/.test(workplaceUi) || !/subtitle\s*=\s*['"]['"]/.test(workplaceUi)) fail('ui/workplaces/index.js', 'Workplace manifestation must accept caller-owned optional title/subtitle');
+if (!/openHeaderControl\(content,\s*\{\s*title:\s*visibleTitle\s*\|\|\s*visibleSubtitle\s*\}\)/.test(workplaceUi)) fail('ui/workplaces/index.js', 'Workplace must pass the caller-owned heading to Header Control without inventing its own title');
 
 if (!/ALL_WORKPLACES_ID/.test(graph) || !/includeAggregate:\s*true/.test(graph)) fail('timetable/timetable.js', 'Graph must expose the aggregate workplace schedule through the shared Workplace List');
 if (!/getWorkingDayTotalMinutes/.test(graph)) fail('timetable/timetable.js', 'aggregate Graph dates must show summed duration instead of a false continuous interval');
 if (!/resolveDateIndicators/.test(graph) || /calendar__date-indicator/.test(graph)) fail('timetable/timetable.js', 'Graph must pass indicator data to Calendar instead of drawing indicators locally');
+if (!/openWorkplaceControl\s*\(\s*\{[\s\S]*?title:\s*['"]Рабочий график['"]/.test(graph)) fail('timetable/timetable.js', 'Graph must own and pass its visible Header Control title');
+if (!/openWorkplaceControl\s*\(\s*\{[\s\S]*?title:\s*['"]['"]/.test(journal)) fail('journal/journal.js', 'Journal must own its Header Control title independently and may leave it empty');
 if (!/getWorkingDayIndicators/.test(journalMonth) || !/resolveDateIndicators/.test(journalMonth) || /calendar__date-indicator/.test(journalMonth)) fail('journal/месяц.js', 'Journal Month must use the same Calendar indicator channel and must not draw its own indicators');
 
 if (errors.length) {
