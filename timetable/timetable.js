@@ -1,11 +1,10 @@
-import { actionBlock, button, pageHeader, initCalendar, initMultiSelect, select, modal, mountModal, timePicker, initTimePickers, escapeHtml, workplaceHeaderButton, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js?v=single-button-20260908';
+import { actionBlock, button, pageHeader, initCalendar, initMultiSelect, modal, mountModal, timePicker, initTimePickers, escapeHtml, headerControl, workplaceHeaderContent, openWorkplaceControl, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js?v=header-control-20260908';
 import { getWorkplaces, resolveWorkplaceTime } from '../core/workplace-time.js';
 import { getDays, saveDays, getDay, getDayTime, createDay, updateDayTime, getScheduleConflicts, hasScheduleConflict, findSuggestedInterval } from '../core/day.js';
+import { minutesBetween } from '../core/time.js';
 
-function workplaceOptions(workplaces) { return workplaces.map((workplace) => ({ value: workplace.key, label: workplace.name || 'Без названия' })); }
 function datesForWorkplace(days, workplaceId) { return days.filter((item) => item?.workplaceId === workplaceId).map((item) => item.date).filter(Boolean); }
 function workingDayForDate(days, workplaceId, date) { return getDay(days, workplaceId, date); }
-function minutesBetween(from, to) { const [fh, fm] = from.split(':').map(Number); const [th, tm] = to.split(':').map(Number); return Math.max(0, th * 60 + tm - fh * 60 - fm); }
 function formatDateLabel(value) { const [year, month, day] = String(value || '').split('-'); return year && month && day ? `${day}.${month}.${year}` : String(value || ''); }
 function monthStats(month, days, workplaceId, workplaces) {
   const prefix = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}-`;
@@ -13,7 +12,6 @@ function monthStats(month, days, workplaceId, workplaces) {
   const total = selected.reduce((sum, date) => { const time = getDayTime(workingDayForDate(days, workplaceId, date), workplaces); return sum + (time ? minutesBetween(time.from, time.to) : 0); }, 0);
   return { days: selected.length, hours: Math.floor(total / 60), minutes: total % 60 };
 }
-function timetableCounter(stats) { return `<span class="timetable-workplace__days">${stats.days} дней</span><span class="timetable-workplace__time">${stats.hours} ч ${String(stats.minutes).padStart(2, '0')} м</span>`; }
 
 export function renderTimetable(root) {
   const workplaces = getWorkplaces();
@@ -23,7 +21,15 @@ export function renderTimetable(root) {
   const initialDate = context.date;
   const initialMonth = new Date(initialDate.getFullYear(), initialDate.getMonth(), 1);
 
-  root.innerHTML = `<div class="calendar-workspace">${pageHeader('График', '', workplaceHeaderButton({ workplace: workplaces.find((w) => w.key === selectedWorkplaceId), showStats: true, stats: monthStats(initialMonth, workingDays, selectedWorkplaceId, workplaces) }))}<div data-timetable-calendar data-calendar-workspace-host></div>${actionBlock(button('<span data-timetable-apply-label>Применить: рабочий день</span>', { data: 'data-timetable-apply disabled' }), { className: 'calendar-workspace__actions' })}</div>`;
+  const headerMarkup = (month) => {
+    const workplace = workplaces.find((item) => item.key === selectedWorkplaceId) || null;
+    return headerControl(workplaceHeaderContent({ workplace, showStats: true, stats: monthStats(month, workingDays, selectedWorkplaceId, workplaces) }), {
+      data: 'data-workplace-header-open',
+      aria: `Рабочее место: ${workplace?.name || 'не выбрано'}`,
+    });
+  };
+
+  root.innerHTML = `<div class="calendar-workspace">${pageHeader('График', '', headerMarkup(initialMonth))}<div data-timetable-calendar data-calendar-workspace-host></div>${actionBlock(button('<span data-timetable-apply-label>Применить: рабочий день</span>', { data: 'data-timetable-apply disabled' }), { className: 'calendar-workspace__actions' })}</div>`;
   const calendarRoot = root.querySelector('[data-timetable-calendar]');
   const applyButton = root.querySelector('[data-timetable-apply]');
   const applyLabel = root.querySelector('[data-timetable-apply-label]');
@@ -31,8 +37,8 @@ export function renderTimetable(root) {
 
   const renderHeader = (month) => {
     const meta = root.querySelector('.page-header__meta'); if (!meta) return;
-    meta.innerHTML = workplaceHeaderButton({ workplace: workplaces.find((w) => w.key === selectedWorkplaceId), showStats: true, stats: monthStats(month, workingDays, selectedWorkplaceId, workplaces) });
-    meta.querySelector('[data-workplace-header-open]')?.addEventListener('click', openWorkplaceModal);
+    meta.innerHTML = headerMarkup(month);
+    meta.querySelector('[data-workplace-header-open]')?.addEventListener('click', openWorkplace);
   };
   const isWorkingDate = (date) => datesForWorkplace(workingDays, selectedWorkplaceId).includes(date);
   const syncApplyButton = (dates) => {
@@ -63,12 +69,6 @@ export function renderTimetable(root) {
     selection = initMultiSelect(calendarRoot, { onChange: syncApplyButton }); syncApplyButton([]);
   };
 
-  function openWorkplacePickerModal() {
-    const content = `<div class="compact-form"><div class="modal-title"><h2>Рабочее место</h2></div>${select({ name: 'timetableWorkplaceModal', value: selectedWorkplaceId, options: workplaceOptions(workplaces), data: 'data-timetable-workplace-modal', aria: 'Рабочее место' })}<div class="modal-actions">${button('Выбрать', { data: 'data-timetable-workplace-save' })}</div></div>`;
-    const m = mountModal(document.body, modal(content, { title: 'Рабочее место', variant: 'compact' }));
-    m?.querySelector('[data-timetable-workplace-save]')?.addEventListener('click', () => { selectedWorkplaceId = m.querySelector('[data-timetable-workplace-modal]')?.value || selectedWorkplaceId; setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: calendar?.getDisplayedMonth() || initialDate }); const month = calendar?.getDisplayedMonth() || initialMonth; selection?.destroy(); startSelectionSession(month); renderHeader(month); m.remove(); });
-  }
-
   function conflictWorkplaceLabel(day) {
     return workplaces.find((item) => String(item?.key || '') === String(day?.workplaceId || ''))?.name || 'Другое место работы';
   }
@@ -85,7 +85,7 @@ export function renderTimetable(root) {
       const occupied = entry.conflicts.map((day) => `<div><span>Занято в другом месте</span><strong>${escapeHtml(conflictWorkplaceLabel(day))} · ${escapeHtml(day.from)}–${escapeHtml(day.to)}</strong></div>`).join('');
       const initialFrom = entry.suggested?.from || base.from;
       const initialTo = entry.suggested?.to || base.to;
-      return `<div class="compact-form" data-timetable-conflict-row="${index}"><div class="entity-details"><div><span>Дата</span><strong>${escapeHtml(formatDateLabel(entry.date))}</strong></div>${occupied}</div><div class="timetable-time-fields">${timePicker({ name: `timetableConflictFrom${index}`, label: 'Начало', value: initialFrom })}${timePicker({ name: `timetableConflictTo${index}`, label: 'Окончание', value: initialTo })}</div><div class="form-error" data-timetable-conflict-error="${index}"></div></div>`;
+      return `<div class="compact-form" data-timetable-conflict-row="${index}"><div class="entity-details"><div><span>Дата</span><strong>${escapeHtml(formatDateLabel(entry.date))}</strong></div>${occupied}</div><div class="compact-form">${timePicker({ name: `timetableConflictFrom${index}`, label: 'Начало', value: initialFrom })}${timePicker({ name: `timetableConflictTo${index}`, label: 'Окончание', value: initialTo })}</div><div class="form-error" data-timetable-conflict-error="${index}"></div></div>`;
     }).join('');
     const content = `<div class="modal-title"><h2>Конфликт времени</h2><p>На этих датах вы уже работаете в другом месте. Скорректируйте время для выбранного места.</p></div>${rows}${button('Сохранить', { data: 'data-timetable-conflicts-save' })}`;
     const m = mountModal(document.body, modal(content, { title: 'Конфликт времени' })); if (!m) return; initTimePickers(m);
@@ -115,32 +115,40 @@ export function renderTimetable(root) {
     });
   }
 
-  function openWorkplaceTimeModal(dates = selection?.getSelectedDates?.() || []) {
-    if (!dates.length) return;
-    const firstDay = workingDayForDate(workingDays, selectedWorkplaceId, dates[0]); if (!firstDay) return;
-    const workplace = workplaces.find((w) => w.key === selectedWorkplaceId); const current = getDayTime(firstDay, workplaces);
-    const from = current?.from || workplace?.from || '09:00'; const to = current?.to || workplace?.to || '18:00';
-    const content = `<div class="modal-title"><h2>Рабочее время</h2></div><div class="timetable-time-fields">${timePicker({ name: 'timetableWorkplaceFrom', label: 'Начало', value: from })}${timePicker({ name: 'timetableWorkplaceTo', label: 'Окончание', value: to })}</div><div class="form-error" data-timetable-time-error></div>${button('Сохранить', { data: 'data-timetable-workplace-time-save' })}`;
-    const m = mountModal(document.body, modal(content, { title: 'Рабочее время' })); if (!m) return; initTimePickers(m);
-    m.querySelector('[data-timetable-workplace-time-save]')?.addEventListener('click', () => {
-      const nextFrom = m.querySelector('[name="timetableWorkplaceFrom"]')?.value || from; const nextTo = m.querySelector('[name="timetableWorkplaceTo"]')?.value || to;
-      for (const date of dates) if (hasScheduleConflict(workingDays, { workplaceId: selectedWorkplaceId, date, from: nextFrom, to: nextTo })) { m.querySelector('[data-timetable-time-error]').textContent = `В ${date} это время пересекается с другой работой мастера.`; return; }
-      for (const date of dates) updateDayTime(workingDays, selectedWorkplaceId, date, nextFrom, nextTo);
-      saveDays(workingDays); const month = calendar?.getDisplayedMonth() || initialMonth; selection?.destroy(); startSelectionSession(month); renderHeader(month); m.remove();
+  function openWorkplace() {
+    const dates = selection?.getSelectedDates?.() || [];
+    const canCorrectTime = dates.length > 0 && dates.every((date) => workingDayForDate(workingDays, selectedWorkplaceId, date));
+    const workplace = workplaces.find((item) => item.key === selectedWorkplaceId) || null;
+    const firstDay = canCorrectTime ? workingDayForDate(workingDays, selectedWorkplaceId, dates[0]) : null;
+    const current = firstDay ? getDayTime(firstDay, workplaces) : null;
+    const time = canCorrectTime ? { from: current?.from || workplace?.from || '09:00', to: current?.to || workplace?.to || '18:00' } : null;
+    const month = calendar?.getDisplayedMonth() || initialMonth;
+
+    openWorkplaceControl({
+      workplaces,
+      workplaceId: selectedWorkplaceId,
+      stats: monthStats(month, workingDays, selectedWorkplaceId, workplaces),
+      canCorrectTime,
+      time,
+      onSelect: (nextId) => {
+        selectedWorkplaceId = nextId || selectedWorkplaceId;
+        setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: month });
+        selection?.destroy(); startSelectionSession(month); renderHeader(month);
+      },
+      onSaveTime: ({ from, to }) => {
+        for (const date of dates) {
+          if (hasScheduleConflict(workingDays, { workplaceId: selectedWorkplaceId, date, from, to })) {
+            return { ok: false, message: `В ${date} это время пересекается с другой работой мастера.` };
+          }
+        }
+        for (const date of dates) updateDayTime(workingDays, selectedWorkplaceId, date, from, to);
+        saveDays(workingDays);
+        selection?.destroy(); startSelectionSession(month); renderHeader(month);
+        return { ok: true };
+      },
     });
   }
-
-  function openWorkplaceModal() {
-    const workplace = workplaces.find((w) => w.key === selectedWorkplaceId); const dates = selection?.getSelectedDates?.() || []; const stats = monthStats(calendar?.getDisplayedMonth() || initialMonth, workingDays, selectedWorkplaceId, workplaces);
-    const canCorrect = dates.length > 0 && dates.every((date) => workingDayForDate(workingDays, selectedWorkplaceId, date));
-    const workplaceName = workplace?.name || 'Рабочее место';
-    const correctionAction = canCorrect ? button('Корректировка времени', { data: 'data-timetable-open-time', variant: 'secondary' }) : '';
-    const content = `<div class="modal-title"><h2>${escapeHtml(workplaceName)}</h2></div><div class="timetable-workplace-modal-summary">${timetableCounter(stats)}</div><div class="timetable-workplace-modal-actions">${button('Рабочее место', { data: 'data-timetable-open-picker' })}${correctionAction}</div>`;
-    const m = mountModal(document.body, modal(content, { title: workplaceName, variant: 'medium' }));
-    m?.querySelector('[data-timetable-open-picker]')?.addEventListener('click', () => { m.remove(); openWorkplacePickerModal(); });
-    m?.querySelector('[data-timetable-open-time]')?.addEventListener('click', () => { m.remove(); openWorkplaceTimeModal(dates); });
-  }
-  root.querySelector('[data-workplace-header-open]')?.addEventListener('click', openWorkplaceModal);
+  root.querySelector('[data-workplace-header-open]')?.addEventListener('click', openWorkplace);
 
   if (workplaces.length) startSelectionSession(initialMonth); else calendar = initCalendar(calendarRoot, { month: initialMonth, workingDates: [] });
 

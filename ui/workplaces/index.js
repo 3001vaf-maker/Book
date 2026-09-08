@@ -1,6 +1,8 @@
 import { costField, collectCost, initCostFields } from '../cost/index.js';
 import { button } from '../buttons/index.js';
 import { select } from '../selectors/index.js';
+import { modal, mountModal } from '../modals/index.js';
+import { timePicker, initTimePickers } from '../time/index.js';
 import { escapeHtml } from '../utils/escape-html.js';
 
 export { getWorkplaceContext, setWorkplaceContext } from '../../core/workplace-context.js';
@@ -78,11 +80,87 @@ export function collectWorkplaceSelections(root, name = 'workplaces') {
   }).filter(Boolean);
 }
 
-export function workplaceHeaderButton({ workplace = null, showStats = false, stats = null } = {}) {
+/**
+ * Workplace-specific content for a generic Header Control.
+ * This function never creates the clickable header shell itself.
+ */
+export function workplaceHeaderContent({ workplace = null, showStats = false, stats = null } = {}) {
   const name = workplace?.name || 'Рабочее место';
-  const safeName = escapeHtml(name);
   const counter = showStats && stats
-    ? `<span class="timetable-workplace__days">${stats.days} дней</span><span class="timetable-workplace__time">${stats.hours} ч ${String(stats.minutes).padStart(2, '0')} м</span>`
+    ? `<span class="workplace-header-content__primary">${Math.max(0, Number(stats.days) || 0)} дней</span><span class="workplace-header-content__secondary">${Math.max(0, Number(stats.hours) || 0)} ч ${String(Math.max(0, Number(stats.minutes) || 0)).padStart(2, '0')} м</span>`
     : '';
-  return `<button type="button" class="timetable-workplace-button" data-workplace-header-open aria-label="Рабочее место: ${safeName}"><span class="timetable-workplace-button__name">${safeName}</span>${counter}<span class="timetable-workplace-button__arrow" aria-hidden="true">⌄</span></button>`;
+  return `<span class="workplace-header-content"><span class="workplace-header-content__name">${escapeHtml(name)}</span>${counter}</span>`;
+}
+
+function workplaceSummary(stats) {
+  if (!stats) return '';
+  const days = Math.max(0, Number(stats.days) || 0);
+  const hours = Math.max(0, Number(stats.hours) || 0);
+  const minutes = String(Math.max(0, Number(stats.minutes) || 0)).padStart(2, '0');
+  return `<div class="workplace-control-summary"><strong>${days} дней</strong><span>${hours} ч ${minutes} м</span></div>`;
+}
+
+/**
+ * Canonical Workplace manifestation used from any section.
+ * The section provides only current data and callbacks; modal composition,
+ * labels, spacing, selector, TimePicker and action buttons are owned here.
+ */
+export function openWorkplaceControl({
+  workplaces = [],
+  workplaceId = '',
+  stats = null,
+  canCorrectTime = false,
+  time = null,
+  onSelect = () => {},
+  onSaveTime = () => ({ ok: true }),
+} = {}) {
+  const catalog = Array.isArray(workplaces) ? workplaces : [];
+  const current = catalog.find((item) => String(item?.key || '') === String(workplaceId || '')) || null;
+  const workplaceName = current?.name || 'Рабочее место';
+
+  const openPicker = () => {
+    const content = `<div class="compact-form"><div class="modal-title"><h2>Рабочее место</h2></div>${select({
+      name: 'workplaceControlSelect',
+      value: workplaceId,
+      options: workplaceOptions(catalog),
+      data: 'data-workplace-control-select',
+      aria: 'Рабочее место',
+    })}<div class="modal-actions">${button('Выбрать', { data: 'data-workplace-control-save' })}</div></div>`;
+    const picker = mountModal(document.body, modal(content, { title: 'Рабочее место', variant: 'compact' }));
+    picker?.querySelector('[data-workplace-control-save]')?.addEventListener('click', () => {
+      const nextId = picker.querySelector('input[data-workplace-control-select]')?.value || workplaceId;
+      onSelect(String(nextId || ''));
+      picker.remove();
+    });
+  };
+
+  const openTime = () => {
+    if (!canCorrectTime || !time) return;
+    const from = String(time.from || '09:00');
+    const to = String(time.to || '18:00');
+    const content = `<div class="compact-form"><div class="modal-title"><h2>Рабочее время</h2></div><div class="workplace-control-time">${timePicker({ name: 'workplaceControlFrom', label: 'Начало', value: from })}${timePicker({ name: 'workplaceControlTo', label: 'Окончание', value: to })}</div><div class="form-error" data-workplace-control-time-error></div>${button('Сохранить', { data: 'data-workplace-control-time-save' })}</div>`;
+    const timeModal = mountModal(document.body, modal(content, { title: 'Рабочее время' }));
+    if (!timeModal) return;
+    initTimePickers(timeModal);
+    timeModal.querySelector('[data-workplace-control-time-save]')?.addEventListener('click', () => {
+      const nextFrom = timeModal.querySelector('[name="workplaceControlFrom"]')?.value || from;
+      const nextTo = timeModal.querySelector('[name="workplaceControlTo"]')?.value || to;
+      const result = onSaveTime({ from: nextFrom, to: nextTo });
+      if (result === false || result?.ok === false) {
+        const error = timeModal.querySelector('[data-workplace-control-time-error]');
+        if (error) error.textContent = result?.message || 'Проверьте рабочее время.';
+        return;
+      }
+      timeModal.remove();
+    });
+  };
+
+  const correction = canCorrectTime && time
+    ? button('Корректировка времени', { data: 'data-workplace-control-open-time', variant: 'secondary' })
+    : '';
+  const content = `<div class="modal-title"><h2>${escapeHtml(workplaceName)}</h2></div>${workplaceSummary(stats)}<div class="workplace-control-actions">${button('Рабочее место', { data: 'data-workplace-control-open-picker' })}${correction}</div>`;
+  const main = mountModal(document.body, modal(content, { title: workplaceName, variant: 'medium' }));
+  main?.querySelector('[data-workplace-control-open-picker]')?.addEventListener('click', () => { main.remove(); openPicker(); });
+  main?.querySelector('[data-workplace-control-open-time]')?.addEventListener('click', () => { main.remove(); openTime(); });
+  return main;
 }

@@ -1,4 +1,4 @@
-import { button, pageHeader, viewNavigation, initViewNavigation, workplaceHeaderButton, getWorkplaceContext, setWorkplaceContext, select, modal, mountModal, timePicker, initTimePickers, escapeHtml } from '../ui/ui.js?v=journal-architecture-20260908';
+import { pageHeader, viewNavigation, initViewNavigation, headerControl, workplaceHeaderContent, openWorkplaceControl, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js?v=header-control-20260908';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getDays, saveDays, getDay, getDayTime, updateDayTime, hasScheduleConflict } from '../core/day.js';
 import { renderJournalDay } from './день.js?v=journal-architecture-20260908';
@@ -19,35 +19,44 @@ export function renderJournal(root) {
   let selectedWorkplaceId = context.workplaceId;
   let selectedDate = context.date;
 
-  const renderHeaderControl = () => workplaceHeaderButton({ workplace: workplaces.find((item) => item.key === selectedWorkplaceId) || null });
-
-  const openWorkplacePickerModal = () => {
-    const options = workplaces.map((workplace) => ({ value: workplace.key, label: workplace.name || 'Без названия' }));
-    const content = `<div class="modal-title"><h2>Выбрать место работы</h2></div>${select({ name: 'journalWorkplaceModal', label: 'Место работы', value: selectedWorkplaceId, options, data: 'data-journal-workplace-modal' })}${button('Выбрать', { data: 'data-journal-workplace-save' })}`;
-    const m = mountModal(document.body, modal(content, { title: 'Выбрать место работы' }));
-    m?.querySelector('[data-journal-workplace-save]')?.addEventListener('click', () => { selectedWorkplaceId = m.querySelector('[data-journal-workplace-modal]')?.value || selectedWorkplaceId; setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: selectedDate }); m.remove(); renderView(); });
-  };
-
-  const openWorkplaceTimeModal = () => {
-    const days = getDays(); const date = dateKey(selectedDate); const day = getDay(days, selectedWorkplaceId, date); const workplace = workplaces.find((item) => item.key === selectedWorkplaceId) || null;
-    if (!day || !workplace) return;
-    const current = getDayTime(day, workplaces); const from = current?.from || workplace.from || '09:00'; const to = current?.to || workplace.to || '18:00';
-    const content = `<div class="modal-title"><h2>Время работы</h2></div><div class="timetable-time-fields">${timePicker({ name: 'journalWorkplaceFrom', label: 'Начало', value: from })}${timePicker({ name: 'journalWorkplaceTo', label: 'Окончание', value: to })}</div><div class="form-error" data-journal-workplace-time-error></div>${button('Сохранить', { data: 'data-journal-workplace-time-save' })}`;
-    const m = mountModal(document.body, modal(content, { title: 'Время работы' })); if (!m) return; initTimePickers(m);
-    m.querySelector('[data-journal-workplace-time-save]')?.addEventListener('click', () => {
-      const fromNext = m.querySelector('[name="journalWorkplaceFrom"]')?.value || from; const toNext = m.querySelector('[name="journalWorkplaceTo"]')?.value || to;
-      if (hasScheduleConflict(days, { workplaceId: selectedWorkplaceId, date, from: fromNext, to: toNext })) { m.querySelector('[data-journal-workplace-time-error]').textContent = 'Это время пересекается с другой работой мастера. Выберите другое время.'; return; }
-      if (!updateDayTime(days, selectedWorkplaceId, date, fromNext, toNext)) { m.querySelector('[data-journal-workplace-time-error]').textContent = 'Проверьте рабочее время.'; return; }
-      saveDays(days); m.remove(); renderView();
+  const renderHeaderControl = () => {
+    const workplace = workplaces.find((item) => item.key === selectedWorkplaceId) || null;
+    return headerControl(workplaceHeaderContent({ workplace }), {
+      data: 'data-workplace-header-open',
+      aria: `Рабочее место: ${workplace?.name || 'не выбрано'}`,
     });
   };
 
-  const openWorkplaceModal = () => {
-    const days = getDays(); const date = dateKey(selectedDate); const hasWorkingDay = Boolean(getDay(days, selectedWorkplaceId, date)); const workplace = workplaces.find((item) => item.key === selectedWorkplaceId) || null;
-    const content = `<div class="modal-title"><h2>Место работы</h2></div><div class="timetable-workplace-modal-summary"><strong>${escapeHtml(workplace?.name || 'Место работы не выбрано')}</strong></div><div class="timetable-workplace-modal-actions">${button('Выбрать место работы', { data: 'data-journal-open-picker' })}${button('Скорректировать время', { data: `data-journal-open-time${hasWorkingDay ? '' : ' disabled'}` })}</div>`;
-    const m = mountModal(document.body, modal(content, { title: 'Место работы' }));
-    m?.querySelector('[data-journal-open-picker]')?.addEventListener('click', () => { m.remove(); openWorkplacePickerModal(); });
-    m?.querySelector('[data-journal-open-time]')?.addEventListener('click', () => { if (hasWorkingDay) { m.remove(); openWorkplaceTimeModal(); } });
+  const openWorkplace = () => {
+    const days = getDays();
+    const date = dateKey(selectedDate);
+    const day = getDay(days, selectedWorkplaceId, date);
+    const workplace = workplaces.find((item) => item.key === selectedWorkplaceId) || null;
+    const current = day ? getDayTime(day, workplaces) : null;
+    const time = day && workplace ? { from: current?.from || workplace.from || '09:00', to: current?.to || workplace.to || '18:00' } : null;
+
+    openWorkplaceControl({
+      workplaces,
+      workplaceId: selectedWorkplaceId,
+      canCorrectTime: Boolean(day && workplace),
+      time,
+      onSelect: (nextId) => {
+        selectedWorkplaceId = nextId || selectedWorkplaceId;
+        setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: selectedDate });
+        renderView();
+      },
+      onSaveTime: ({ from, to }) => {
+        if (hasScheduleConflict(days, { workplaceId: selectedWorkplaceId, date, from, to })) {
+          return { ok: false, message: 'Это время пересекается с другой работой мастера. Выберите другое время.' };
+        }
+        if (!updateDayTime(days, selectedWorkplaceId, date, from, to)) {
+          return { ok: false, message: 'Проверьте рабочее время.' };
+        }
+        saveDays(days);
+        renderView();
+        return { ok: true };
+      },
+    });
   };
 
   const renderView = () => {
@@ -56,7 +65,7 @@ export function renderJournal(root) {
     if (activeView === 'day') renderJournalDay(viewRoot, { date: selectedDate, workplaceId: selectedWorkplaceId, onChange: (nextDate) => { selectedDate = nextDate; setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: selectedDate }); renderView(); } });
     else if (activeView === 'month') renderJournalMonth(viewRoot, { workplaceId: selectedWorkplaceId, onDateSelect: (nextDate) => { selectedDate = nextDate; setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: selectedDate }); activeView = 'day'; renderView(); } });
     else renderJournalList(viewRoot);
-    root.querySelector('[data-workplace-header-open]')?.addEventListener('click', openWorkplaceModal);
+    root.querySelector('[data-workplace-header-open]')?.addEventListener('click', openWorkplace);
     initViewNavigation(root, { views, activeView, onChange: (nextView) => { activeView = nextView; renderView(); } });
   };
   renderView();

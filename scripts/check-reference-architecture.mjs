@@ -97,6 +97,34 @@ for (const file of allFiles) {
   if (manualOrdinaryButton.test(text(file))) report(file, 'ordinary action buttons must be rendered by shared button() from ui/buttons');
 }
 
+const headerControlOwner = join(root, 'ui/header/index.js');
+const headerControlCss = join(root, 'ui/header/header.css');
+for (const file of allFiles) {
+  const source = text(file);
+  if (file !== headerControlOwner && /<button\b[^>]*class=["'][^"']*\bheader-control\b/i.test(source)) {
+    report(file, 'Header Control shell belongs only to ui/header/index.js');
+  }
+  if (/\bworkplaceHeaderButton\b/.test(source)) {
+    report(file, 'workplaceHeaderButton is forbidden; use generic headerControl() with workplaceHeaderContent()');
+  }
+}
+for (const file of cssFiles) {
+  if (file === headerControlCss) continue;
+  if (/\.header-control\b/.test(text(file))) report(file, 'Header Control presentation belongs only to ui/header/header.css');
+}
+for (const controller of [timetableController, journalController]) {
+  const source = text(controller);
+  if (/\bopenWorkplace(?:Picker|Time)?Modal\b/.test(source)) {
+    report(controller, 'sections must not own Workplace modal manifestations; use shared openWorkplaceControl()');
+  }
+  if (!/\bheaderControl\s*\(/.test(source) || !/\bworkplaceHeaderContent\s*\(/.test(source)) {
+    report(controller, 'Graph and Journal must compose Workplace content inside the shared Header Control');
+  }
+  if (!/\bopenWorkplaceControl\s*\(/.test(source)) {
+    report(controller, 'Graph and Journal must use the shared Workplace manifestation');
+  }
+}
+
 const workplaceOwner = 'settings/profile/workplaces/data.js';
 for (const file of allFiles) {
   const source = text(file);
