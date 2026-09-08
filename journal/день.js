@@ -5,7 +5,7 @@ import { rangesOverlap } from '../core/time.js';
 import { getRecordsForDay } from './record-data.js';
 import { getJournalBreaksForDay, getJournalBreaks } from './break-data.js';
 import { getTimeUsages } from '../core/time-usage.js';
-import { openRecordCreation } from './record.js';
+import { openRecordCreation } from './record.js?v=journal-confirmation-modal-20260909';
 import { openRecordView } from './record-view.js';
 
 function dateKey(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
