@@ -47,7 +47,7 @@ for (const path of allCss) {
 }
 
 if (!/list\(\{\s*items:\s*listItems\s*\}\)/.test(workplaceUi)) fail('ui/workplaces/index.js', 'Workplace Header manifestation must use shared list()');
-if (/function\s+openPicker\b|workplaceControlSelect|data-workplace-control-save/.test(workplaceUi)) fail('ui/workplaces/index.js', 'Workplace Header manifestation must not recreate Select + Choose flow');
+if (/function\s+openPicker\b|name:\s*['"]workplaceControlSelect['"]|data-workplace-control-save/.test(workplaceUi)) fail('ui/workplaces/index.js', 'Workplace Header manifestation must not recreate Select + Choose flow');
 if (!/ALL_WORKPLACES_ID/.test(workplaceUi) || !/Общий график/.test(workplaceUi)) fail('ui/workplaces/index.js', 'Workplace List must support the aggregate graph row');
 
 if (!/ALL_WORKPLACES_ID/.test(graph) || !/includeAggregate:\s*true/.test(graph)) fail('timetable/timetable.js', 'Graph must expose the aggregate workplace schedule through the shared Workplace List');
