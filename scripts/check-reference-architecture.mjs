@@ -84,9 +84,11 @@ for (const file of cssFiles) {
     }
   }
 }
-const timePickerUi = join(root, 'ui/time/index.js');
-if (/<button\b[^>]*class=["'][^"']*\bui-button\b/i.test(text(timePickerUi))) {
-  report(timePickerUi, 'TimePicker must use shared button() for ordinary actions instead of recreating ui-button markup');
+const buttonOwner = join(root, 'ui/buttons/index.js');
+const manualOrdinaryButton = /<button\b[^>]*class=["'][^"']*\bui-button\b/i;
+for (const file of allFiles) {
+  if (file === buttonOwner) continue;
+  if (manualOrdinaryButton.test(text(file))) report(file, 'ordinary action buttons must be rendered by shared button() from ui/buttons');
 }
 
 const workplaceOwner = 'settings/profile/workplaces/data.js';
@@ -102,7 +104,6 @@ if (/\blocalStorage\b/.test(text(clientsUi))) report(clientsUi, 'Clients screen 
 for (const controller of [timetableController, journalController]) {
   const source = text(controller);
   if (/\blocalStorage\b/.test(source)) report(controller, 'Graph/Journal controller must use the canonical data owner instead of direct localStorage');
-  if (/<button\b[^>]*class=["'][^"']*\bui-button\b/i.test(source)) report(controller, 'Graph/Journal controller must use shared button() instead of recreating ui-button markup');
 }
 
 const legacyTimetableCss = join(root, 'timetable/timetable.css');
