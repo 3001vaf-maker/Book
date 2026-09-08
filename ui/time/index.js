@@ -95,6 +95,9 @@ function open(host){
     const minute=modalRoot.querySelector('[data-time-wheel-type="minutes"].is-selected')?.dataset.value;
     if(hour==null||minute==null)return;
     const value=`${String(Number(hour)).padStart(2,'0')}:${String(Number(minute)).padStart(2,'0')}`;
-    hidden.value=value;host.querySelector('[data-time-open]').textContent=value;modalRoot.remove();
+    hidden.value=value;
+    host.querySelector('[data-time-open]').textContent=value;
+    hidden.dispatchEvent(new Event('change',{bubbles:true}));
+    modalRoot.remove();
   });
 }
