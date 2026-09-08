@@ -1,12 +1,16 @@
 import { costField, collectCost, initCostFields } from '../cost/index.js';
 import { button } from '../buttons/index.js';
 import { openHeaderControl } from '../header/index.js';
+import { list } from '../lists/list.js';
 import { select } from '../selectors/index.js';
 import { modal, mountModal } from '../modals/index.js';
 import { timePicker, initTimePickers } from '../time/index.js';
 import { escapeHtml } from '../utils/escape-html.js';
 
 export { getWorkplaceContext, setWorkplaceContext } from '../../core/workplace-context.js';
+
+export const ALL_WORKPLACES_ID = '__all__';
+const WORKPLACE_FALLBACK_COLOR = '#212529';
 
 export function workplaceCountText(count = 0) {
   return `${Math.max(0, Number(count) || 0)} р.м.`;
@@ -81,37 +85,36 @@ export function collectWorkplaceSelections(root, name = 'workplaces') {
   }).filter(Boolean);
 }
 
-/**
- * Neutral Workplace UI content.
- * It does not know whether it is placed inside Header Control, List or any
- * other shared UI container.
- */
-export function workplaceContent({ workplace = null, showStats = false, stats = null } = {}) {
-  const name = workplace?.name || 'Рабочее место';
-  const counter = showStats && stats
-    ? `<span class="workplace-content__primary">${Math.max(0, Number(stats.days) || 0)} дней</span><span class="workplace-content__secondary">${Math.max(0, Number(stats.hours) || 0)} ч ${String(Math.max(0, Number(stats.minutes) || 0)).padStart(2, '0')} м</span>`
+function statsRows(stats) {
+  if (!stats) return [];
+  const days = Math.max(0, Number(stats.days) || 0);
+  const hours = Math.max(0, Number(stats.hours) || 0);
+  const minutes = String(Math.max(0, Number(stats.minutes) || 0)).padStart(2, '0');
+  return [`${days} дней`, `${hours} ч ${minutes} м`];
+}
+
+/** Neutral Workplace content that can be placed in Header Control or elsewhere. */
+export function workplaceContent({ workplace = null, title = '', showStats = false, stats = null } = {}) {
+  const name = String(title || workplace?.name || 'Рабочее место');
+  const rows = statsRows(stats);
+  const counter = showStats && rows.length
+    ? `<span class="workplace-content__primary">${escapeHtml(rows[0])}</span><span class="workplace-content__secondary">${escapeHtml(rows[1])}</span>`
     : '';
   return `<span class="workplace-content"><span class="workplace-content__name">${escapeHtml(name)}</span>${counter}</span>`;
 }
 
-function workplaceSummary(stats) {
-  if (!stats) return '';
-  const days = Math.max(0, Number(stats.days) || 0);
-  const hours = Math.max(0, Number(stats.hours) || 0);
-  const minutes = String(Math.max(0, Number(stats.minutes) || 0)).padStart(2, '0');
-  return `<div class="workplace-control-summary"><strong>${days} дней</strong><span>${hours} ч ${minutes} м</span></div>`;
-}
-
 /**
- * Canonical Workplace manifestation used from any section.
- * The section provides only current data and callbacks. The first-level
- * manifestation always uses the shared Header Control medium modal; nested
- * Workplace actions compose existing shared UI.
+ * Canonical Workplace manifestation. The first level is a generic List
+ * inside the shared Header Control modal. Workplace never owns the Header
+ * shell or its modal size.
  */
 export function openWorkplaceControl({
   workplaces = [],
   workplaceId = '',
   stats = null,
+  workplaceStats = {},
+  aggregateStats = null,
+  includeAggregate = false,
   canCorrectTime = false,
   time = null,
   onSelect = () => {},
@@ -119,26 +122,10 @@ export function openWorkplaceControl({
 } = {}) {
   const catalog = Array.isArray(workplaces) ? workplaces : [];
   const current = catalog.find((item) => String(item?.key || '') === String(workplaceId || '')) || null;
-  const workplaceName = current?.name || 'Рабочее место';
-
-  const openPicker = () => {
-    const content = `<div class="compact-form"><div class="modal-title"><h2>Рабочее место</h2></div>${select({
-      name: 'workplaceControlSelect',
-      value: workplaceId,
-      options: workplaceOptions(catalog),
-      data: 'data-workplace-control-select',
-      aria: 'Рабочее место',
-    })}<div class="modal-actions">${button('Выбрать', { data: 'data-workplace-control-save' })}</div></div>`;
-    const picker = mountModal(document.body, modal(content, { title: 'Рабочее место', variant: 'compact' }));
-    picker?.querySelector('[data-workplace-control-save]')?.addEventListener('click', () => {
-      const nextId = picker.querySelector('input[data-workplace-control-select]')?.value || workplaceId;
-      onSelect(String(nextId || ''));
-      picker.remove();
-    });
-  };
+  const currentTitle = workplaceId === ALL_WORKPLACES_ID ? 'Общий график' : (current?.name || 'Рабочий график');
 
   const openTime = () => {
-    if (!canCorrectTime || !time) return;
+    if (!canCorrectTime || !time || workplaceId === ALL_WORKPLACES_ID) return;
     const from = String(time.from || '09:00');
     const to = String(time.to || '18:00');
     const content = `<div class="compact-form"><div class="modal-title"><h2>Рабочее время</h2></div><div class="workplace-control-time">${timePicker({ name: 'workplaceControlFrom', label: 'Начало', value: from })}${timePicker({ name: 'workplaceControlTo', label: 'Окончание', value: to })}</div><div class="form-error" data-workplace-control-time-error></div>${button('Сохранить', { data: 'data-workplace-control-time-save' })}</div>`;
@@ -158,12 +145,44 @@ export function openWorkplaceControl({
     });
   };
 
-  const correction = canCorrectTime && time
-    ? button('Корректировка времени', { data: 'data-workplace-control-open-time', variant: 'secondary' })
+  const listItems = [];
+  if (includeAggregate) {
+    listItems.push({
+      title: 'Общий график',
+      right: statsRows(aggregateStats),
+      interactive: true,
+      selected: workplaceId === ALL_WORKPLACES_ID,
+      data: `data-workplace-control-select="${ALL_WORKPLACES_ID}"`,
+      aria: 'Показать общий график всех рабочих мест',
+    });
+  }
+  for (const workplace of catalog) {
+    const key = String(workplace?.key || '');
+    if (!key) continue;
+    const rowStats = workplaceStats?.[key] || (key === String(workplaceId || '') ? stats : null);
+    listItems.push({
+      title: workplace?.name || 'Без названия',
+      right: statsRows(rowStats),
+      indicatorColor: workplace?.indicatorColor || workplace?.color || WORKPLACE_FALLBACK_COLOR,
+      indicatorLabel: workplace?.name || 'Рабочее место',
+      interactive: true,
+      selected: key === String(workplaceId || ''),
+      data: `data-workplace-control-select="${escapeHtml(key)}"`,
+      aria: `Выбрать рабочее место ${workplace?.name || ''}`,
+    });
+  }
+
+  const correction = canCorrectTime && time && workplaceId !== ALL_WORKPLACES_ID
+    ? `<div class="workplace-control-actions">${button('Корректировка времени', { data: 'data-workplace-control-open-time', variant: 'secondary' })}</div>`
     : '';
-  const content = `<div class="modal-title"><h2>${escapeHtml(workplaceName)}</h2></div>${workplaceSummary(stats)}<div class="workplace-control-actions">${button('Рабочее место', { data: 'data-workplace-control-open-picker' })}${correction}</div>`;
-  const main = openHeaderControl(content, { title: workplaceName });
-  main?.querySelector('[data-workplace-control-open-picker]')?.addEventListener('click', () => { main.remove(); openPicker(); });
+  const content = `<div class="modal-title"><h2>Рабочий график</h2></div><div class="workplace-control-list">${list({ items: listItems })}</div>${correction}`;
+  const main = openHeaderControl(content, { title: currentTitle });
+  main?.querySelectorAll('[data-workplace-control-select]').forEach((row) => row.addEventListener('click', () => {
+    const nextId = String(row.dataset.workplaceControlSelect || '');
+    if (!nextId) return;
+    main.remove();
+    onSelect(nextId);
+  }));
   main?.querySelector('[data-workplace-control-open-time]')?.addEventListener('click', () => { main.remove(); openTime(); });
   return main;
 }

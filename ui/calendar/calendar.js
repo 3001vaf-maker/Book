@@ -69,7 +69,22 @@ function calendarHeader({ label, prevAriaLabel, nextAriaLabel, prevAttribute, ne
   return `<header class="calendar__header"><button type="button" class="calendar__month-button" ${prevAttribute} aria-label="${prevAriaLabel}">←</button><div class="calendar__month" aria-live="polite">${label}</div><button type="button" class="calendar__month-button" ${nextAttribute} aria-label="${nextAriaLabel}">→</button></header>`;
 }
 
-function buildCalendar({ displayedMonth, workingDates = [], renderDateContent = () => '', mode = 'date', selectedValue = '' } = {}) {
+function normalizeDateIndicators(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => {
+    if (typeof item === 'string') return { color: item, label: '' };
+    if (!item || typeof item !== 'object') return null;
+    return { color: String(item.color || ''), label: String(item.label || '') };
+  }).filter((item) => item?.color);
+}
+
+function dateIndicatorsMarkup(indicators) {
+  const values = normalizeDateIndicators(indicators);
+  if (!values.length) return '';
+  return `<span class="calendar__date-indicators">${values.map((item) => `<span class="calendar__date-indicator" style="--calendar-indicator:${escapeHtml(item.color)}"${item.label ? ` role="img" aria-label="${escapeHtml(item.label)}" title="${escapeHtml(item.label)}"` : ' aria-hidden="true"'}></span>`).join('')}</span>`;
+}
+
+function buildCalendar({ displayedMonth, workingDates = [], renderDateContent = () => '', resolveDateIndicators = () => [], mode = 'date', selectedValue = '' } = {}) {
   const year = displayedMonth.getFullYear();
   const month = displayedMonth.getMonth();
   const firstDay = new Date(year, month, 1);
@@ -89,11 +104,12 @@ function buildCalendar({ displayedMonth, workingDates = [], renderDateContent = 
     const isWeekend = date.getDay() === 0 || date.getDay() === 6;
     const isToday = mode === 'date' && fullKey === todayKey;
     const isSelected = String(selectedValue || '') === key;
+    const isWorking = working.has(fullKey);
     const classes = [
       'calendar__date',
       isCurrentMonth ? '' : 'is-neighbor',
       isWeekend ? 'is-weekend' : '',
-      working.has(fullKey) ? 'is-working' : '',
+      isWorking ? 'is-working' : '',
       isToday ? 'is-today' : '',
       isSelected ? 'is-selected' : '',
     ].filter(Boolean).join(' ');
@@ -102,18 +118,11 @@ function buildCalendar({ displayedMonth, workingDates = [], renderDateContent = 
       isToday ? 'border:1px solid #C9A895;background:#DCC4B4' : '',
       isSelected ? 'outline:2px solid var(--text);outline-offset:-2px' : '',
     ].filter(Boolean).join(';');
+    const dateMeta = { date, dateKey: key, isCurrentMonth, isWeekend, isWorking, isToday, isSelected };
+    const content = renderDateContent(dateMeta);
+    const indicators = mode === 'date' ? dateIndicatorsMarkup(resolveDateIndicators(dateMeta)) : '';
 
-    const content = renderDateContent({
-      date,
-      dateKey: key,
-      isCurrentMonth,
-      isWeekend,
-      isWorking: working.has(fullKey),
-      isToday,
-      isSelected,
-    });
-
-    cells.push(`<button type="button" class="${classes}"${style ? ` style="${style}"` : ''} data-calendar-date="${key}" data-calendar-current-month="${isCurrentMonth}" aria-pressed="${isSelected ? 'true' : 'false'}"><span class="calendar__date-number">${date.getDate()}</span>${content ? `<span class="calendar__date-content">${content}</span>` : '<span class="calendar__date-content" aria-hidden="true"></span>'}</button>`);
+    cells.push(`<button type="button" class="${classes}"${style ? ` style="${style}"` : ''} data-calendar-date="${key}" data-calendar-current-month="${isCurrentMonth}" aria-pressed="${isSelected ? 'true' : 'false'}"><span class="calendar__date-number">${date.getDate()}</span>${content ? `<span class="calendar__date-content">${content}</span>` : '<span class="calendar__date-content" aria-hidden="true"></span>'}${indicators}</button>`);
   }
 
   return `<section class="calendar" data-calendar data-calendar-mode="${mode}">${calendarHeader({ label: monthLabel(displayedMonth, mode), prevAriaLabel: 'Предыдущий месяц', nextAriaLabel: 'Следующий месяц', prevAttribute: 'data-calendar-prev', nextAttribute: 'data-calendar-next' })}<div class="calendar__weekdays" aria-hidden="true">${['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((day) => `<span>${day}</span>`).join('')}</div><div class="calendar__grid">${cells.join('')}</div></section>`;
@@ -139,11 +148,12 @@ export function initCalendar(root, options = {}) {
   const mode = options.mode || 'date';
   const workingDates = options.workingDates || [];
   const renderDateContent = options.renderDateContent || (() => '');
+  const resolveDateIndicators = options.resolveDateIndicators || (() => []);
   const onDateSelect = options.onDateSelect || (() => {});
   const onMonthChange = options.onMonthChange || (() => {});
   let selectedValue = mode === 'month-day' ? (parseMonthDay(options.selectedValue) ? monthDayKey(parseMonthDay(options.selectedValue)) : '') : String(options.selectedValue || '');
   const render = () => {
-    root.innerHTML = buildCalendar({ displayedMonth, workingDates, renderDateContent, mode, selectedValue });
+    root.innerHTML = buildCalendar({ displayedMonth, workingDates, renderDateContent, resolveDateIndicators, mode, selectedValue });
     root.querySelector('[data-calendar-prev]')?.addEventListener('click', () => {
       displayedMonth = new Date(displayedMonth.getFullYear(), displayedMonth.getMonth() - 1, 1);
       render();

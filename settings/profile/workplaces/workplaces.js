@@ -1,6 +1,6 @@
-import { actionBlock, button, collectLinks, details, emptyState, entityCard, escapeHtml, field, initLinks, initPhotoField, initTimePickers, links, listEntries, listEntry, mountModal, modal, page, phoneField, photoField, searchableSelect, select, textareaField, timePicker } from '../../../ui/ui.js';
+import { actionBlock, button, collectLinks, colorPicker, details, emptyState, entityCard, escapeHtml, field, initColorPickers, initLinks, initPhotoField, initTimePickers, links, listEntries, listEntry, mountModal, modal, page, phoneField, photoField, searchableSelect, select, textareaField, timePicker } from '../../../ui/ui.js?v=schedule-indicators-20260908';
 import { getProfile } from '../data.js';
-import { deleteWorkplace as deleteWorkplaceData, getWorkplaces, upsertWorkplace } from './data.js';
+import { deleteWorkplace as deleteWorkplaceData, getWorkplaces, upsertWorkplace } from './data.js?v=schedule-indicators-20260908';
 
 const CITIES=['Москва','Санкт-Петербург','Казань','Нижний Новгород','Екатеринбург','Новосибирск','Самара','Ростов-на-Дону','Краснодар','Сочи','Уфа','Воронеж','Пермь','Волгоград','Омск','Тула','Калининград'];
 
@@ -32,20 +32,20 @@ export function initWorkplaceListDeletion(root,onDeleted=()=>{}) {
 }
 
 export function openWorkplaceModal(root, existing = null, onDone = () => {}) {
-  const w=existing||{photo:'',name:'',city:'',address:'',phone:'',currency:'RUB',from:'09:00',to:'18:00',links:[],about:''};
+  const w=existing||{photo:'',name:'',color:'',city:'',address:'',phone:'',currency:'RUB',from:'09:00',to:'18:00',links:[],about:''};
   const deleteButton=existing?button('Удалить',{variant:'danger',data:'data-delete-workplace-form'}):'';
-  const html=`<form class="compact-form" data-workplace-form><div class="modal-title"><h2>${existing?'Изменить рабочее место':'Новое рабочее место'}</h2></div>${photoField({name:'workplacePhoto',value:w.photo||''})}${field({label:'Название',name:'workplaceName',value:w.name,placeholder:'Название рабочего места',required:true})}${searchableSelect({label:'Город',name:'workplaceCity',value:w.city||'',options:CITIES,placeholder:'Начните вводить',required:true})}${field({label:'Адрес',name:'workplaceAddress',value:w.address,placeholder:'Адрес'})}${phoneField({label:'Рабочий телефон',name:'workplacePhone',value:w.phone||''})}${select({label:'Валюта',name:'workplaceCurrency',value:w.currency||'RUB',options:[{value:'RUB',label:'RUB — ₽'},{value:'EUR',label:'EUR — €'},{value:'USD',label:'USD — $'},{value:'GBP',label:'GBP — £'}]})}<div class="work-time-row"><span class="work-time-row__label">График работы</span><div class="work-time-row__fields">${timePicker({label:'с',name:'workplaceFrom',value:w.from||'09:00'})}${timePicker({label:'до',name:'workplaceTo',value:w.to||'18:00'})}</div></div><div class="array-group"><span class="array-label">Рабочие ссылки</span>${links({links:w.links||[],name:'workplace-links'})}</div>${textareaField({label:'О рабочем пространстве',name:'workplaceAbout',value:w.about||'',placeholder:'Коротко о рабочем месте'})}<div class="form-error" data-workplace-error></div>${button('Сохранить',{type:'submit'})}${deleteButton}</form>`;
+  const html=`<form class="compact-form" data-workplace-form><div class="modal-title"><h2>${existing?'Изменить рабочее место':'Новое рабочее место'}</h2></div>${photoField({name:'workplacePhoto',value:w.photo||''})}${field({label:'Название',name:'workplaceName',value:w.name,placeholder:'Название рабочего места',required:true})}${colorPicker({name:'workplaceColor',value:w.color||'',required:true})}${searchableSelect({label:'Город',name:'workplaceCity',value:w.city||'',options:CITIES,placeholder:'Начните вводить',required:true})}${field({label:'Адрес',name:'workplaceAddress',value:w.address,placeholder:'Адрес'})}${phoneField({label:'Рабочий телефон',name:'workplacePhone',value:w.phone||''})}${select({label:'Валюта',name:'workplaceCurrency',value:w.currency||'RUB',options:[{value:'RUB',label:'RUB — ₽'},{value:'EUR',label:'EUR — €'},{value:'USD',label:'USD — $'},{value:'GBP',label:'GBP — £'}]})}<div class="work-time-row"><span class="work-time-row__label">График работы</span><div class="work-time-row__fields">${timePicker({label:'с',name:'workplaceFrom',value:w.from||'09:00'})}${timePicker({label:'до',name:'workplaceTo',value:w.to||'18:00'})}</div></div><div class="array-group"><span class="array-label">Рабочие ссылки</span>${links({links:w.links||[],name:'workplace-links'})}</div>${textareaField({label:'О рабочем пространстве',name:'workplaceAbout',value:w.about||'',placeholder:'Коротко о рабочем месте'})}<div class="form-error" data-workplace-error></div>${button('Сохранить',{type:'submit'})}${deleteButton}</form>`;
   const m=mountModal(root,modal(html));
-  initPhotoField(m);initTimePickers(m);initLinks(m);
+  initPhotoField(m);initColorPickers(m);initTimePickers(m);initLinks(m);
   m.querySelector('[data-workplace-form]')?.addEventListener('submit',e=>{e.preventDefault();saveWorkplace(m,existing,onDone)});
   m.querySelector('[data-delete-workplace-form]')?.addEventListener('click',e=>{e.preventDefault();confirmDeleteWorkplace(root,existing?.key,()=>{m.remove();onDone();})});
 }
 
 function saveWorkplace(m,existing,onDone){
-  const data=new FormData(m.querySelector('[data-workplace-form]')),name=String(data.get('workplaceName')||'').trim(),city=String(data.get('workplaceCity')||'').trim();
-  if(!name||!city){m.querySelector('[data-workplace-error]').textContent='Название и город обязательны.';return}
+  const data=new FormData(m.querySelector('[data-workplace-form]')),name=String(data.get('workplaceName')||'').trim(),city=String(data.get('workplaceCity')||'').trim(),color=String(data.get('workplaceColor')||'').trim();
+  if(!name||!city||!color){m.querySelector('[data-workplace-error]').textContent='Название, город и цвет обязательны.';return}
   const profile=getProfile();
-  const item={key:existing?.key||crypto.randomUUID(),profileId:profile.key,photo:String(data.get('workplacePhoto')||''),name,city,address:String(data.get('workplaceAddress')||'').trim(),phone:String(data.get('workplacePhone')||'').trim(),currency:String(data.get('workplaceCurrency')||'RUB'),from:String(data.get('workplaceFrom')||''),to:String(data.get('workplaceTo')||''),links:collectLinks(m,'workplace-links'),about:String(data.get('workplaceAbout')||'').trim(),createdAt:existing?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()};
+  const item={key:existing?.key||crypto.randomUUID(),profileId:profile.key,photo:String(data.get('workplacePhoto')||''),name,color,city,address:String(data.get('workplaceAddress')||'').trim(),phone:String(data.get('workplacePhone')||'').trim(),currency:String(data.get('workplaceCurrency')||'RUB'),from:String(data.get('workplaceFrom')||''),to:String(data.get('workplaceTo')||''),links:collectLinks(m,'workplace-links'),about:String(data.get('workplaceAbout')||'').trim(),createdAt:existing?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()};
   upsertWorkplace(item);m.remove();onDone();
 }
 

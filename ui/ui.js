@@ -1,11 +1,11 @@
 import { accordion, initAccordions } from './accordion/accordion.js';
 import { bottomNavigation } from './navigation/navigation.js';
 import { viewNavigation, initViewNavigation } from './view-navigation/view-navigation.js?v=journal-architecture-20260908';
-import { calendar, initCalendar, monthDayPicker, initMonthDayPickers, dateNavigator, initDateNavigator } from './calendar/index.js?v=month-day-20260906';
+import { calendar, initCalendar, monthDayPicker, initMonthDayPickers, dateNavigator, initDateNavigator } from './calendar/index.js?v=schedule-indicators-20260908';
 import { initMultiSelect } from './selection/index.js?v=graph-lifecycle-20260903';
 import { entityCard } from './cards/index.js?v=procedure-card-metadata-20260907';
 import { folderCard, folderList } from './cards/folder-card.js';
-import { list } from './lists/list.js';
+import { list } from './lists/list.js?v=schedule-indicators-20260908';
 import { listEntry, listEntries } from './lists/list-entry.js';
 import { select, searchableSelect } from './selectors/index.js';
 import { links, initLinks, collectLinks } from './links/index.js?v=remove-cross-20260907';
@@ -14,16 +14,16 @@ import { costField, initCostFields, collectCost, costListParts, costCardMeta } f
 import { durationPicker, durationText, initDurationPickers } from './duration/index.js?v=shared-duration-text-20260907';
 import { timePicker, initTimePickers } from './time/index.js?v=single-button-20260908';
 import { journalDayTimeline, initJournalDayTimeline } from './time/journal-day.js';
-import { workplaceSelector, initWorkplaceSelectors, collectWorkplaceSelections, workplaceAddButton, workplaceContent, openWorkplaceControl, workplaceCountText, getWorkplaceContext, setWorkplaceContext } from './workplaces/index.js?v=header-control-v2-20260908';
+import { workplaceSelector, initWorkplaceSelectors, collectWorkplaceSelections, workplaceAddButton, workplaceContent, openWorkplaceControl, workplaceCountText, ALL_WORKPLACES_ID, getWorkplaceContext, setWorkplaceContext } from './workplaces/index.js?v=schedule-indicators-20260908';
 import { pageHeader, headerControl, openHeaderControl } from './header/index.js?v=header-control-v2-20260908';
 import { modal, mountModal } from './modals/index.js';
 import { button, iconButton } from './buttons/index.js?v=single-button-20260908';
 import { field, phoneField, textareaField, photoField, initPhotoField } from './inputs/index.js';
 import { emptyState, stateView, initStateView } from './states/index.js';
-import { colorPicker, initColorPickers } from './colors/index.js?v=expanded-palette-20260908';
+import { colorPicker, initColorPickers } from './colors/index.js?v=schedule-indicators-20260908';
 import { escapeHtml } from './utils/escape-html.js';
 import { page, details, agreementBlock, actionBlock } from './page/page.js?v=reference-page-20260907';
 import { repeatedField, initRepeatedFields, collectRepeatedField, collectRepeatedEntries } from './repeated-fields/index.js?v=remove-cross-20260907';
 import { uei, initUEI } from './uei/index.js';
 
-export { accordion, initAccordions, bottomNavigation, viewNavigation, initViewNavigation, calendar, initCalendar, monthDayPicker, initMonthDayPickers, dateNavigator, initDateNavigator, initMultiSelect, entityCard, folderCard, folderList, list, listEntry, listEntries, select, searchableSelect, links, initLinks, collectLinks, tags, tagManagerList, initTags, collectTags, costField, initCostFields, collectCost, costListParts, costCardMeta, durationPicker, durationText, initDurationPickers, timePicker, initTimePickers, journalDayTimeline, initJournalDayTimeline, workplaceSelector, initWorkplaceSelectors, collectWorkplaceSelections, workplaceAddButton, workplaceContent, openWorkplaceControl, workplaceCountText, getWorkplaceContext, setWorkplaceContext, pageHeader, headerControl, openHeaderControl, modal, mountModal, button, iconButton, field, phoneField, textareaField, photoField, initPhotoField, emptyState, stateView, initStateView, colorPicker, initColorPickers, escapeHtml, page, details, agreementBlock, actionBlock, repeatedField, initRepeatedFields, collectRepeatedField, collectRepeatedEntries, uei, initUEI };
+export { accordion, initAccordions, bottomNavigation, viewNavigation, initViewNavigation, calendar, initCalendar, monthDayPicker, initMonthDayPickers, dateNavigator, initDateNavigator, initMultiSelect, entityCard, folderCard, folderList, list, listEntry, listEntries, select, searchableSelect, links, initLinks, collectLinks, tags, tagManagerList, initTags, collectTags, costField, initCostFields, collectCost, costListParts, costCardMeta, durationPicker, durationText, initDurationPickers, timePicker, initTimePickers, journalDayTimeline, initJournalDayTimeline, workplaceSelector, initWorkplaceSelectors, collectWorkplaceSelections, workplaceAddButton, workplaceContent, openWorkplaceControl, workplaceCountText, ALL_WORKPLACES_ID, getWorkplaceContext, setWorkplaceContext, pageHeader, headerControl, openHeaderControl, modal, mountModal, button, iconButton, field, phoneField, textareaField, photoField, initPhotoField, emptyState, stateView, initStateView, colorPicker, initColorPickers, escapeHtml, page, details, agreementBlock, actionBlock, repeatedField, initRepeatedFields, collectRepeatedField, collectRepeatedEntries, uei, initUEI };

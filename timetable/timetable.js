@@ -1,16 +1,18 @@
-import { actionBlock, button, pageHeader, initCalendar, initMultiSelect, modal, mountModal, timePicker, initTimePickers, escapeHtml, headerControl, workplaceContent, openWorkplaceControl, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js?v=header-control-v2-20260908';
-import { getWorkplaces, resolveWorkplaceTime } from '../core/workplace-time.js';
+import { actionBlock, button, pageHeader, initCalendar, initMultiSelect, modal, mountModal, timePicker, initTimePickers, escapeHtml, headerControl, workplaceContent, openWorkplaceControl, ALL_WORKPLACES_ID, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js?v=schedule-indicators-20260908';
+import { getWorkplaces, resolveWorkplaceTime, getWorkingDayIndicators, getWorkingDayTotalMinutes, getWorkplaceMonthStats, getAllWorkplacesMonthStats, getWorkplaceMonthStatsMap } from '../core/workplace-time.js?v=schedule-indicators-20260908';
 import { getDays, saveDays, getDay, getDayTime, createDay, updateDayTime, getScheduleConflicts, hasScheduleConflict, findSuggestedInterval } from '../core/day.js';
-import { minutesBetween } from '../core/time.js';
 
 function datesForWorkplace(days, workplaceId) { return days.filter((item) => item?.workplaceId === workplaceId).map((item) => item.date).filter(Boolean); }
+function datesForAllWorkplaces(days) { return [...new Set(days.map((item) => item?.date).filter(Boolean))]; }
 function workingDayForDate(days, workplaceId, date) { return getDay(days, workplaceId, date); }
 function formatDateLabel(value) { const [year, month, day] = String(value || '').split('-'); return year && month && day ? `${day}.${month}.${year}` : String(value || ''); }
-function monthStats(month, days, workplaceId, workplaces) {
-  const prefix = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}-`;
-  const selected = datesForWorkplace(days, workplaceId).filter((date) => date.startsWith(prefix));
-  const total = selected.reduce((sum, date) => { const time = getDayTime(workingDayForDate(days, workplaceId, date), workplaces); return sum + (time ? minutesBetween(time.from, time.to) : 0); }, 0);
-  return { days: selected.length, hours: Math.floor(total / 60), minutes: total % 60 };
+function formatDuration(totalMinutes) {
+  const total = Math.max(0, Number(totalMinutes) || 0);
+  const hours = Math.floor(total / 60);
+  const minutes = total % 60;
+  if (!minutes) return `${hours} ч`;
+  if (!hours) return `${minutes} м`;
+  return `${hours} ч ${minutes} м`;
 }
 
 export function renderTimetable(root) {
@@ -21,11 +23,25 @@ export function renderTimetable(root) {
   const initialDate = context.date;
   const initialMonth = new Date(initialDate.getFullYear(), initialDate.getMonth(), 1);
 
+  const statsForMonth = (month) => ({
+    aggregate: getAllWorkplacesMonthStats(workingDays, workplaces, month),
+    byWorkplace: getWorkplaceMonthStatsMap(workingDays, workplaces, month),
+  });
+
   const headerMarkup = (month) => {
+    const allMode = selectedWorkplaceId === ALL_WORKPLACES_ID;
     const workplace = workplaces.find((item) => item.key === selectedWorkplaceId) || null;
-    return headerControl(workplaceContent({ workplace, showStats: true, stats: monthStats(month, workingDays, selectedWorkplaceId, workplaces) }), {
+    const stats = allMode
+      ? getAllWorkplacesMonthStats(workingDays, workplaces, month)
+      : getWorkplaceMonthStats(workingDays, workplaces, selectedWorkplaceId, month);
+    return headerControl(workplaceContent({
+      workplace,
+      title: allMode ? 'Общий график' : '',
+      showStats: true,
+      stats,
+    }), {
       data: 'data-workplace-header-open',
-      aria: `Рабочее место: ${workplace?.name || 'не выбрано'}`,
+      aria: allMode ? 'Общий график рабочих мест' : `Рабочее место: ${workplace?.name || 'не выбрано'}`,
     });
   };
 
@@ -40,33 +56,57 @@ export function renderTimetable(root) {
     meta.innerHTML = headerMarkup(month);
     meta.querySelector('[data-workplace-header-open]')?.addEventListener('click', openWorkplace);
   };
-  const isWorkingDate = (date) => datesForWorkplace(workingDays, selectedWorkplaceId).includes(date);
+  const isAllMode = () => selectedWorkplaceId === ALL_WORKPLACES_ID;
+  const isWorkingDate = (date) => !isAllMode() && datesForWorkplace(workingDays, selectedWorkplaceId).includes(date);
   const syncApplyButton = (dates) => {
+    if (isAllMode()) { selectionMode = null; applyButton.disabled = true; applyLabel.textContent = 'Выберите рабочее место'; return; }
     if (!dates.length) { selectionMode = null; applyButton.disabled = true; applyLabel.textContent = 'Применить: рабочий день'; return; }
     setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: new Date(`${dates[0]}T00:00:00`) });
     selectionMode = isWorkingDate(dates[0]) ? 'make-off' : 'make-working';
     applyButton.disabled = false; applyLabel.textContent = selectionMode === 'make-off' ? 'Применить: выходной' : 'Применить: рабочий день';
   };
   const guard = (event) => {
-    const calendarButton = event.target.closest('[data-calendar-date]'); if (!calendarButton || !selection) return;
+    const calendarButton = event.target.closest('[data-calendar-date]'); if (!calendarButton || !selection || isAllMode()) return;
     const date = calendarButton.dataset.calendarDate || ''; if (!date || selection.isSelected(date)) return;
     const mode = isWorkingDate(date) ? 'make-off' : 'make-working';
     if (!selectionMode) selectionMode = mode; else if (mode !== selectionMode) { event.preventDefault(); event.stopImmediatePropagation(); }
   };
   calendarRoot.addEventListener('click', guard, true);
 
+  const bindSelection = () => {
+    selection?.destroy();
+    selection = isAllMode() ? null : initMultiSelect(calendarRoot, { onChange: syncApplyButton });
+    syncApplyButton([]);
+  };
+
   const startSelectionSession = (month) => {
+    const allMode = isAllMode();
     calendar = initCalendar(calendarRoot, {
-      month, workingDates: datesForWorkplace(workingDays, selectedWorkplaceId),
+      month,
+      workingDates: allMode ? datesForAllWorkplaces(workingDays) : datesForWorkplace(workingDays, selectedWorkplaceId),
       renderDateContent: ({ dateKey, isCurrentMonth, isWorking }) => {
         if (!isCurrentMonth || !isWorking) return '';
+        if (allMode) return `<span>${escapeHtml(formatDuration(getWorkingDayTotalMinutes(workingDays, workplaces, dateKey)))}</span>`;
         const time = getDayTime(workingDayForDate(workingDays, selectedWorkplaceId, dateKey), workplaces);
         return time ? `<span>${time.from}</span><span>${time.to}</span>` : '';
       },
-      onDateSelect: (date) => { if (date) setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: new Date(`${date}T00:00:00`) }); },
-      onMonthChange: (nextMonth) => { selection?.destroy(); selection = initMultiSelect(calendarRoot, { onChange: syncApplyButton }); syncApplyButton([]); setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: nextMonth }); renderHeader(nextMonth); },
+      resolveDateIndicators: ({ dateKey, isCurrentMonth }) => isCurrentMonth
+        ? getWorkingDayIndicators(workingDays, workplaces, dateKey, { excludeWorkplaceId: allMode ? '' : selectedWorkplaceId })
+        : [],
+      onDateSelect: (date) => {
+        if (!date) return;
+        const nextDate = new Date(`${date}T00:00:00`);
+        if (allMode) setWorkplaceContext({ date: nextDate });
+        else setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: nextDate });
+      },
+      onMonthChange: (nextMonth) => {
+        bindSelection();
+        if (allMode) setWorkplaceContext({ date: nextMonth });
+        else setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: nextMonth });
+        renderHeader(nextMonth);
+      },
     });
-    selection = initMultiSelect(calendarRoot, { onChange: syncApplyButton }); syncApplyButton([]);
+    bindSelection();
   };
 
   function conflictWorkplaceLabel(day) {
@@ -111,29 +151,35 @@ export function renderTimetable(root) {
       }
       saveDays(workingDays);
       const month = calendar?.getDisplayedMonth() || initialMonth;
-      selection?.destroy(); startSelectionSession(month); renderHeader(month); m.remove();
+      startSelectionSession(month); renderHeader(month); m.remove();
     });
   }
 
   function openWorkplace() {
     const dates = selection?.getSelectedDates?.() || [];
-    const canCorrectTime = dates.length > 0 && dates.every((date) => workingDayForDate(workingDays, selectedWorkplaceId, date));
-    const workplace = workplaces.find((item) => item.key === selectedWorkplaceId) || null;
+    const allMode = isAllMode();
+    const canCorrectTime = !allMode && dates.length > 0 && dates.every((date) => workingDayForDate(workingDays, selectedWorkplaceId, date));
+    const workplace = allMode ? null : workplaces.find((item) => item.key === selectedWorkplaceId) || null;
     const firstDay = canCorrectTime ? workingDayForDate(workingDays, selectedWorkplaceId, dates[0]) : null;
     const current = firstDay ? getDayTime(firstDay, workplaces) : null;
     const time = canCorrectTime ? { from: current?.from || workplace?.from || '09:00', to: current?.to || workplace?.to || '18:00' } : null;
     const month = calendar?.getDisplayedMonth() || initialMonth;
+    const monthStats = statsForMonth(month);
 
     openWorkplaceControl({
       workplaces,
       workplaceId: selectedWorkplaceId,
-      stats: monthStats(month, workingDays, selectedWorkplaceId, workplaces),
+      stats: allMode ? monthStats.aggregate : monthStats.byWorkplace[selectedWorkplaceId],
+      workplaceStats: monthStats.byWorkplace,
+      aggregateStats: monthStats.aggregate,
+      includeAggregate: true,
       canCorrectTime,
       time,
       onSelect: (nextId) => {
         selectedWorkplaceId = nextId || selectedWorkplaceId;
-        setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: month });
-        selection?.destroy(); startSelectionSession(month); renderHeader(month);
+        if (selectedWorkplaceId === ALL_WORKPLACES_ID) setWorkplaceContext({ date: month });
+        else setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: month });
+        startSelectionSession(month); renderHeader(month);
       },
       onSaveTime: ({ from, to }) => {
         for (const date of dates) {
@@ -143,7 +189,7 @@ export function renderTimetable(root) {
         }
         for (const date of dates) updateDayTime(workingDays, selectedWorkplaceId, date, from, to);
         saveDays(workingDays);
-        selection?.destroy(); startSelectionSession(month); renderHeader(month);
+        startSelectionSession(month); renderHeader(month);
         return { ok: true };
       },
     });
@@ -153,6 +199,7 @@ export function renderTimetable(root) {
   if (workplaces.length) startSelectionSession(initialMonth); else calendar = initCalendar(calendarRoot, { month: initialMonth, workingDates: [] });
 
   applyButton.addEventListener('click', () => {
+    if (isAllMode()) return;
     const dates = selection?.getSelectedDates?.() || []; if (!dates.length || !selectionMode) return;
     const makeWorking = selectionMode === 'make-working';
     if (makeWorking) {
@@ -167,14 +214,14 @@ export function renderTimetable(root) {
       if (freeDates.length) saveDays(workingDays);
       if (conflictEntries.length) {
         const month = calendar?.getDisplayedMonth() || initialMonth;
-        if (freeDates.length) { selection?.destroy(); startSelectionSession(month); renderHeader(month); }
+        if (freeDates.length) { startSelectionSession(month); renderHeader(month); }
         openWorkingDaysConflictModal(conflictEntries, base);
         return;
       }
     } else {
       for (let i = workingDays.length - 1; i >= 0; i -= 1) if (workingDays[i]?.workplaceId === selectedWorkplaceId && dates.includes(workingDays[i].date)) workingDays.splice(i, 1);
     }
-    saveDays(workingDays); const month = calendar.getDisplayedMonth(); selection?.destroy(); startSelectionSession(month); renderHeader(month);
+    saveDays(workingDays); const month = calendar.getDisplayedMonth(); startSelectionSession(month); renderHeader(month);
   });
 
   return { get selection() { return selection; } };

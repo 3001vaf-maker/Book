@@ -1,8 +1,8 @@
-import { pageHeader, viewNavigation, initViewNavigation, headerControl, workplaceContent, openWorkplaceControl, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js?v=header-control-v2-20260908';
-import { getWorkplaces } from '../core/workplace-time.js';
+import { pageHeader, viewNavigation, initViewNavigation, headerControl, workplaceContent, openWorkplaceControl, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js?v=schedule-indicators-20260908';
+import { getWorkplaces, getWorkplaceMonthStatsMap } from '../core/workplace-time.js?v=schedule-indicators-20260908';
 import { getDays, saveDays, getDay, getDayTime, updateDayTime, hasScheduleConflict } from '../core/day.js';
 import { renderJournalDay } from './день.js?v=journal-architecture-20260908';
-import { renderJournalMonth } from './месяц.js';
+import { renderJournalMonth } from './месяц.js?v=schedule-indicators-20260908';
 import { renderJournalList } from './список.js';
 
 function dateKey(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
@@ -34,10 +34,14 @@ export function renderJournal(root) {
     const workplace = workplaces.find((item) => item.key === selectedWorkplaceId) || null;
     const current = day ? getDayTime(day, workplaces) : null;
     const time = day && workplace ? { from: current?.from || workplace.from || '09:00', to: current?.to || workplace.to || '18:00' } : null;
+    const month = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+    const workplaceStats = getWorkplaceMonthStatsMap(days, workplaces, month);
 
     openWorkplaceControl({
       workplaces,
       workplaceId: selectedWorkplaceId,
+      stats: workplaceStats[selectedWorkplaceId],
+      workplaceStats,
       canCorrectTime: Boolean(day && workplace),
       time,
       onSelect: (nextId) => {

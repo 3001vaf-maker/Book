@@ -1,7 +1,7 @@
-import { folderList, pageHeader } from '../ui/ui.js';
+import { folderList, pageHeader } from '../ui/ui.js?v=schedule-indicators-20260908';
 
 const folders = [
-  ['profile', 'Профиль', '◫', () => import('./profile/profile.js?v=shared-secondary-button-20260908')],
+  ['profile', 'Профиль', '◫', () => import('./profile/profile.js?v=schedule-indicators-20260908')],
   ['service', 'Сервис', '◫', () => import('./service/service.js?v=shared-secondary-button-20260908')],
   ['warehouse', 'Склад', '◫', () => import('./warehouse/warehouse.js')],
   ['documents', 'Документы', '◫', () => import('./documents/documents.js')],
