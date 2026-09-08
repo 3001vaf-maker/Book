@@ -45,13 +45,17 @@ export function getActiveRecordCountForDay(date, workplaceId = '') {
 }
 
 /**
- * Record owns the appointment data. Consumers receive only the records that
- * would fall outside a proposed working interval, never the whole day list.
+ * Record owns appointment data. Core asks only whether Records block a
+ * proposed working-time change or complete Day removal.
  */
-export function getWorkingTimeRecordConflicts({ date, workplaceId, from, to } = {}) {
+export function getWorkingTimeRecordConflicts({ date, workplaceId, from, to, operation = 'resize' } = {}) {
+  const activeRecords = getRecordsForDay(date, workplaceId).filter((record) => record?.status !== 'cancelled');
+  if (operation === 'remove') {
+    return activeRecords.map((record) => ({ type: 'record', from: String(record?.from || ''), to: String(record?.to || '') }));
+  }
   if (!isValidRange(from, to)) return [];
-  return getRecordsForDay(date, workplaceId)
-    .filter((record) => record?.status !== 'cancelled' && isValidRange(record?.from, record?.to) && !containsRange(from, to, record.from, record.to))
+  return activeRecords
+    .filter((record) => isValidRange(record?.from, record?.to) && !containsRange(from, to, record.from, record.to))
     .map((record) => ({ type: 'record', from: String(record.from), to: String(record.to) }));
 }
 
