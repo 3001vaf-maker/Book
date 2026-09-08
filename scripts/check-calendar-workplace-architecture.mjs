@@ -27,6 +27,7 @@ const timeCss = read('ui/time/time.css');
 const listUi = read('ui/lists/list.js');
 const graph = read('timetable/timetable.js');
 const journal = read('journal/journal.js');
+const journalWorkplaceControl = read('journal/workplace-control.js');
 const journalMonth = read('journal/месяц.js');
 const recordData = read('journal/record-data.js');
 const timeUsage = read('core/time-usage.js');
@@ -52,15 +53,16 @@ for (const path of allCss) {
   if (/\.ui-list__indicator\b/.test(read(path))) fail(path, 'List indicator CSS belongs only to ui/lists/list.css');
 }
 
-if (!/list\(\{\s*items:\s*listItems\s*\}\)/.test(workplaceUi)) fail('ui/workplaces/index.js', 'Workplace Header manifestation must use shared list()');
-if (/function\s+openPicker\b|name:\s*['"]workplaceControlSelect['"]|data-workplace-control-save/.test(workplaceUi)) fail('ui/workplaces/index.js', 'Workplace Header manifestation must not recreate Select + Choose flow');
-if (!/ALL_WORKPLACES_ID/.test(workplaceUi) || !/Общий график/.test(workplaceUi)) fail('ui/workplaces/index.js', 'Workplace List must support the aggregate graph row');
+if (!/list\(\{\s*items:\s*listItems\s*\}\)/.test(workplaceUi)) fail('ui/workplaces/index.js', 'Graph Workplace manifestation must use shared list()');
+if (/function\s+openPicker\b|name:\s*['"]workplaceControlSelect['"]|data-workplace-control-save/.test(workplaceUi)) fail('ui/workplaces/index.js', 'Graph Workplace manifestation must not recreate Select + Choose flow');
+if (!/ALL_WORKPLACES_ID/.test(workplaceUi) || !/Общий график/.test(workplaceUi)) fail('ui/workplaces/index.js', 'Graph Workplace List must own the aggregate graph row');
+if (/Все записи|aggregateLabel|aggregateAria/.test(workplaceUi)) fail('ui/workplaces/index.js', 'Graph Workplace control must not contain Journal aggregate semantics');
 if (/<h2>Рабочий график<\/h2>/.test(workplaceUi)) fail('ui/workplaces/index.js', 'Workplace must not own the visible Header Control title');
-if (!/title\s*=\s*['"]['"]/.test(workplaceUi) || !/subtitle\s*=\s*['"]['"]/.test(workplaceUi)) fail('ui/workplaces/index.js', 'Workplace manifestation must accept caller-owned optional title/subtitle');
-if (!/openHeaderControl\(content,\s*\{\s*title:\s*visibleTitle\s*\|\|\s*visibleSubtitle\s*\}\)/.test(workplaceUi)) fail('ui/workplaces/index.js', 'Workplace must pass the caller-owned heading to Header Control without inventing its own title');
-if (/Корректировка времени|data-workplace-control-open-time|workplaceControlFrom|workplaceControlTo/.test(workplaceUi)) fail('ui/workplaces/index.js', 'Workplace Header content must not own working-time correction');
+if (!/title\s*=\s*['"]['"]/.test(workplaceUi) || !/subtitle\s*=\s*['"]['"]/.test(workplaceUi)) fail('ui/workplaces/index.js', 'Graph Workplace manifestation must accept caller-owned optional title/subtitle');
+if (!/openHeaderControl\(content,\s*\{\s*title:\s*visibleTitle\s*\|\|\s*visibleSubtitle\s*\}\)/.test(workplaceUi)) fail('ui/workplaces/index.js', 'Graph Workplace manifestation must pass the caller-owned heading to Header Control');
+if (/Корректировка времени|data-workplace-control-open-time|workplaceControlFrom|workplaceControlTo/.test(workplaceUi)) fail('ui/workplaces/index.js', 'Graph Header Workplace List must not own working-time correction');
 
-if (!/ALL_WORKPLACES_ID/.test(graph) || !/includeAggregate:\s*true/.test(graph)) fail('timetable/timetable.js', 'Graph must expose the aggregate workplace schedule through the shared Workplace List');
+if (!/ALL_WORKPLACES_ID/.test(graph) || !/includeAggregate:\s*true/.test(graph)) fail('timetable/timetable.js', 'Graph must expose the aggregate workplace schedule through its Workplace control');
 if (!/getWorkingDayTotalMinutes/.test(graph)) fail('timetable/timetable.js', 'aggregate Graph dates must show summed duration instead of a false continuous interval');
 if (!/resolveDateIndicators/.test(graph) || /calendar__date-indicator/.test(graph)) fail('timetable/timetable.js', 'Graph must pass indicator data to Calendar instead of drawing indicators locally');
 if (!/openWorkplaceControl\s*\(\s*\{[\s\S]*?title:\s*['"]Рабочий график['"]/.test(graph)) fail('timetable/timetable.js', 'Graph must own and pass its visible Header Control title');
@@ -70,10 +72,15 @@ if (!/time-range-fields/.test(graph) || !/timePicker\(\{\s*name:\s*`aggregateFro
 if (!/getWorkingTimeUsageConflicts/.test(graph)) fail('timetable/timetable.js', 'aggregate date editor must ask Core for occupied-time conflicts');
 if (/journal\/record-data\.js/.test(graph)) fail('timetable/timetable.js', 'Graph must not import or own Record data directly');
 if (!/Пересечение с/.test(graph) || !/Запись \$\{conflict\.from\}–\$\{conflict\.to\} выходит за рабочее время/.test(graph)) fail('timetable/timetable.js', 'aggregate date editor must show only actual schedule/record conflicts');
-if (/canCorrectTime|onSaveTime/.test(graph)) fail('timetable/timetable.js', 'Header Workplace List must not receive time-correction callbacks');
+if (/canCorrectTime|onSaveTime/.test(graph)) fail('timetable/timetable.js', 'Graph Header Workplace List must not receive time-correction callbacks');
 
-if (!/openWorkplaceControl\s*\(\s*\{[\s\S]*?title:\s*['"]['"]/.test(journal)) fail('journal/journal.js', 'Journal must own its Header Control title independently and may leave it empty');
-if (/canCorrectTime|onSaveTime|updateDayTime|hasScheduleConflict/.test(journal)) fail('journal/journal.js', 'Journal Header Workplace List must not own time correction');
+if (/openWorkplaceControl/.test(journal)) fail('journal/journal.js', 'Journal must not call the Graph Workplace control');
+if (!/openJournalWorkplaceControl/.test(journal)) fail('journal/journal.js', 'Journal must use its own Header manifestation');
+if (/canCorrectTime|onSaveTime|updateDayTime|hasScheduleConflict/.test(journal)) fail('journal/journal.js', 'Journal Header manifestation must not own time correction');
+if (!/export function openJournalWorkplaceControl/.test(journalWorkplaceControl)) fail('journal/workplace-control.js', 'Journal must own a separate Workplace selection manifestation');
+if (!/openHeaderControl/.test(journalWorkplaceControl) || !/list\(\{\s*items\s*\}\)/.test(journalWorkplaceControl)) fail('journal/workplace-control.js', 'Journal manifestation must reuse shared Header Control and List');
+if (!/Все записи/.test(journalWorkplaceControl) || /Общий график/.test(journalWorkplaceControl)) fail('journal/workplace-control.js', 'Journal manifestation must own only Journal aggregate semantics');
+if (!/data-journal-workplace-select/.test(journalWorkplaceControl) || /data-workplace-control-select/.test(journalWorkplaceControl)) fail('journal/workplace-control.js', 'Journal and Graph controls must have separate interaction channels');
 if (!/getWorkingDayIndicators/.test(journalMonth) || !/resolveDateIndicators/.test(journalMonth) || /calendar__date-indicator/.test(journalMonth)) fail('journal/месяц.js', 'Journal Month must use the same Calendar indicator channel and must not draw its own indicators');
 
 if (!/export function getWorkingTimeRecordConflicts/.test(recordData)) fail('journal/record-data.js', 'Record owner must expose only conflicts against a proposed working interval');
