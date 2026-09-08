@@ -105,12 +105,15 @@ export function workplaceContent({ workplace = null, title = '', showStats = fal
 
 /**
  * Canonical Workplace manifestation. The first level is a generic List
- * inside the shared Header Control modal. Workplace never owns the Header
- * shell or its modal size.
+ * inside the shared Header Control modal. The caller owns the optional
+ * visible title/subtitle; Workplace owns neither the Header shell nor
+ * the heading or modal size.
  */
 export function openWorkplaceControl({
   workplaces = [],
   workplaceId = '',
+  title = '',
+  subtitle = '',
   stats = null,
   workplaceStats = {},
   aggregateStats = null,
@@ -121,8 +124,8 @@ export function openWorkplaceControl({
   onSaveTime = () => ({ ok: true }),
 } = {}) {
   const catalog = Array.isArray(workplaces) ? workplaces : [];
-  const current = catalog.find((item) => String(item?.key || '') === String(workplaceId || '')) || null;
-  const currentTitle = workplaceId === ALL_WORKPLACES_ID ? 'Общий график' : (current?.name || 'Рабочий график');
+  const visibleTitle = String(title || '').trim();
+  const visibleSubtitle = String(subtitle || '').trim();
 
   const openTime = () => {
     if (!canCorrectTime || !time || workplaceId === ALL_WORKPLACES_ID) return;
@@ -175,8 +178,11 @@ export function openWorkplaceControl({
   const correction = canCorrectTime && time && workplaceId !== ALL_WORKPLACES_ID
     ? `<div class="workplace-control-actions">${button('Корректировка времени', { data: 'data-workplace-control-open-time', variant: 'secondary' })}</div>`
     : '';
-  const content = `<div class="modal-title"><h2>Рабочий график</h2></div><div class="workplace-control-list">${list({ items: listItems })}</div>${correction}`;
-  const main = openHeaderControl(content, { title: currentTitle });
+  const heading = visibleTitle || visibleSubtitle
+    ? `<div class="modal-title">${visibleTitle ? `<h2>${escapeHtml(visibleTitle)}</h2>` : ''}${visibleSubtitle ? `<p>${escapeHtml(visibleSubtitle)}</p>` : ''}</div>`
+    : '';
+  const content = `${heading}<div class="workplace-control-list">${list({ items: listItems })}</div>${correction}`;
+  const main = openHeaderControl(content, { title: visibleTitle || visibleSubtitle });
   main?.querySelectorAll('[data-workplace-control-select]').forEach((row) => row.addEventListener('click', () => {
     const nextId = String(row.dataset.workplaceControlSelect || '');
     if (!nextId) return;
