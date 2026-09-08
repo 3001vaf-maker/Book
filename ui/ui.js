@@ -13,7 +13,7 @@ import { tags, tagManagerList, initTags, collectTags } from './tags/index.js?v=t
 import { costField, initCostFields, collectCost, costListParts, costCardMeta } from './cost/index.js?v=shared-cost-presentation-20260907';
 import { durationPicker, durationText, initDurationPickers } from './duration/index.js?v=shared-duration-text-20260907';
 import { timePicker, initTimePickers } from './time/index.js?v=aggregate-day-editor-20260908';
-import { journalDayTimeline, initJournalDayTimeline } from './time/journal-day.js?v=journal-work-fields-20260908';
+import { journalDayTimeline, initJournalDayTimeline } from './time/journal-day.js?v=journal-all-workplaces-20260908';
 import { workplaceSelector, initWorkplaceSelectors, collectWorkplaceSelections, workplaceAddButton, workplaceContent, openWorkplaceControl, workplaceCountText, ALL_WORKPLACES_ID, getWorkplaceContext, setWorkplaceContext } from './workplaces/index.js?v=journal-all-workplaces-20260908';
 import { pageHeader, headerControl, openHeaderControl } from './header/index.js?v=header-control-v2-20260908';
 import { modal, mountModal } from './modals/index.js';
