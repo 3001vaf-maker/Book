@@ -1,11 +1,11 @@
 import { renderMain } from './main/main.js';
-import { renderJournal } from './journal/journal.js?v=schedule-indicators-20260908';
-import { renderTimetable } from './timetable/timetable.js?v=schedule-indicators-20260908';
+import { renderJournal } from './journal/journal.js?v=header-title-context-20260908';
+import { renderTimetable } from './timetable/timetable.js?v=header-title-context-20260908';
 import { renderChat } from './chat/chat.js';
 import { renderSettings } from './settings/settings.js?v=schedule-indicators-20260908';
 import { getWorkplaces as getWorkplaceEntities } from './settings/profile/workplaces/data.js?v=schedule-indicators-20260908';
 import { configureWorkplaceSource } from './core/workplace-time.js?v=schedule-indicators-20260908';
-import { bottomNavigation } from './ui/ui.js?v=schedule-indicators-20260908';
+import { bottomNavigation } from './ui/ui.js?v=header-title-context-20260908';
 
 configureWorkplaceSource(getWorkplaceEntities);
 
