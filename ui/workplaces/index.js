@@ -3,8 +3,6 @@ import { button } from '../buttons/index.js';
 import { openHeaderControl } from '../header/index.js';
 import { list } from '../lists/list.js';
 import { select } from '../selectors/index.js';
-import { modal, mountModal } from '../modals/index.js';
-import { timePicker, initTimePickers } from '../time/index.js';
 import { escapeHtml } from '../utils/escape-html.js';
 
 export { getWorkplaceContext, setWorkplaceContext } from '../../core/workplace-context.js';
@@ -107,7 +105,7 @@ export function workplaceContent({ workplace = null, title = '', showStats = fal
  * Canonical Workplace manifestation. The first level is a generic List
  * inside the shared Header Control modal. The caller owns the optional
  * visible title/subtitle; Workplace owns neither the Header shell nor
- * the heading or modal size.
+ * the heading, modal size or time correction.
  */
 export function openWorkplaceControl({
   workplaces = [],
@@ -118,37 +116,13 @@ export function openWorkplaceControl({
   workplaceStats = {},
   aggregateStats = null,
   includeAggregate = false,
-  canCorrectTime = false,
-  time = null,
   onSelect = () => {},
-  onSaveTime = () => ({ ok: true }),
 } = {}) {
   const catalog = Array.isArray(workplaces) ? workplaces : [];
   const visibleTitle = String(title || '').trim();
   const visibleSubtitle = String(subtitle || '').trim();
-
-  const openTime = () => {
-    if (!canCorrectTime || !time || workplaceId === ALL_WORKPLACES_ID) return;
-    const from = String(time.from || '09:00');
-    const to = String(time.to || '18:00');
-    const content = `<div class="compact-form"><div class="modal-title"><h2>Рабочее время</h2></div><div class="workplace-control-time">${timePicker({ name: 'workplaceControlFrom', label: 'Начало', value: from })}${timePicker({ name: 'workplaceControlTo', label: 'Окончание', value: to })}</div><div class="form-error" data-workplace-control-time-error></div>${button('Сохранить', { data: 'data-workplace-control-time-save' })}</div>`;
-    const timeModal = mountModal(document.body, modal(content, { title: 'Рабочее время' }));
-    if (!timeModal) return;
-    initTimePickers(timeModal);
-    timeModal.querySelector('[data-workplace-control-time-save]')?.addEventListener('click', () => {
-      const nextFrom = timeModal.querySelector('[name="workplaceControlFrom"]')?.value || from;
-      const nextTo = timeModal.querySelector('[name="workplaceControlTo"]')?.value || to;
-      const result = onSaveTime({ from: nextFrom, to: nextTo });
-      if (result === false || result?.ok === false) {
-        const error = timeModal.querySelector('[data-workplace-control-time-error]');
-        if (error) error.textContent = result?.message || 'Проверьте рабочее время.';
-        return;
-      }
-      timeModal.remove();
-    });
-  };
-
   const listItems = [];
+
   if (includeAggregate) {
     listItems.push({
       title: 'Общий график',
@@ -159,6 +133,7 @@ export function openWorkplaceControl({
       aria: 'Показать общий график всех рабочих мест',
     });
   }
+
   for (const workplace of catalog) {
     const key = String(workplace?.key || '');
     if (!key) continue;
@@ -175,13 +150,10 @@ export function openWorkplaceControl({
     });
   }
 
-  const correction = canCorrectTime && time && workplaceId !== ALL_WORKPLACES_ID
-    ? `<div class="workplace-control-actions">${button('Корректировка времени', { data: 'data-workplace-control-open-time', variant: 'secondary' })}</div>`
-    : '';
   const heading = visibleTitle || visibleSubtitle
     ? `<div class="modal-title">${visibleTitle ? `<h2>${escapeHtml(visibleTitle)}</h2>` : ''}${visibleSubtitle ? `<p>${escapeHtml(visibleSubtitle)}</p>` : ''}</div>`
     : '';
-  const content = `${heading}<div class="workplace-control-list">${list({ items: listItems })}</div>${correction}`;
+  const content = `${heading}<div class="workplace-control-list">${list({ items: listItems })}</div>`;
   const main = openHeaderControl(content, { title: visibleTitle || visibleSubtitle });
   main?.querySelectorAll('[data-workplace-control-select]').forEach((row) => row.addEventListener('click', () => {
     const nextId = String(row.dataset.workplaceControlSelect || '');
@@ -189,6 +161,5 @@ export function openWorkplaceControl({
     main.remove();
     onSelect(nextId);
   }));
-  main?.querySelector('[data-workplace-control-open-time]')?.addEventListener('click', () => { main.remove(); openTime(); });
   return main;
 }
