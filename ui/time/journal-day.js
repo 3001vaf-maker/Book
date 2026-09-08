@@ -30,6 +30,17 @@ function slotsMarkup(start, end, { interactive = true } = {}) {
   return slots.join('');
 }
 
+function workFieldLines(start, end) {
+  const duration = end - start;
+  if (duration <= 0) return '';
+  const lines = [];
+  for (let minutes = Math.ceil(start / 30) * 30; minutes < end; minutes += 30) {
+    const top = ((minutes - start) / duration) * 100;
+    lines.push(`<span class="journal-work-field__line" style="top:${top}%" aria-hidden="true"></span>`);
+  }
+  return lines.join('');
+}
+
 function aggregateTimeline(columns = []) {
   const prepared = (Array.isArray(columns) ? columns : []).map((column) => {
     const start = timeToMinutes(column?.from);
@@ -43,12 +54,13 @@ function aggregateTimeline(columns = []) {
   const end = Math.max(...prepared.map((column) => column.end));
   const total = end - start;
   const minWidth = 56 + prepared.length * 104;
-  const headings = prepared.map((column) => `<strong class="journal-day-columns__heading">${escape(column?.name || 'Рабочее место')}</strong>`).join('');
+  const headings = prepared.map((column) => `<strong class="journal-day-columns__heading">${escape(column?.name || 'Без названия')}</strong>`).join('');
 
   const fields = prepared.map((column) => {
     const top = ((column.start - start) / total) * 100;
     const height = ((column.end - column.start) / total) * 100;
     const fieldDuration = column.end - column.start;
+    const lines = workFieldLines(column.start, column.end);
     const usages = column.usages.map((usage) => {
       const usageStart = timeToMinutes(usage?.from);
       const usageEnd = timeToMinutes(usage?.to);
@@ -59,7 +71,7 @@ function aggregateTimeline(columns = []) {
       const usageHeight = ((clippedEnd - clippedStart) / fieldDuration) * 100;
       return `<div class="journal-work-field__usage" style="top:${usageTop}%;height:${usageHeight}%" data-time-usage="${escape(usage.id)}">${usageMarkup(usage)}</div>`;
     }).join('');
-    return `<div class="journal-work-column"><div class="journal-work-field${column?.conflict ? ' is-conflict' : ''}" style="top:${top}%;height:${height}%" data-journal-work-field="${escape(column?.workplaceId || '')}">${usages}</div></div>`;
+    return `<div class="journal-work-column"><div class="journal-work-field${column?.conflict ? ' is-conflict' : ''}" style="top:${top}%;height:${height}%" data-journal-work-field="${escape(column?.workplaceId || '')}">${lines}${usages}</div></div>`;
   }).join('');
 
   return `<div class="journal-day-columns" data-journal-day-columns><div class="journal-day-columns__inner" style="min-width:${minWidth}px;--journal-column-count:${prepared.length}"><div class="journal-day-columns__headings"><span aria-hidden="true"></span>${headings}</div><section class="time-timeline time-timeline--columns" data-time-timeline data-time-from="${escape(minutesToTime(start))}" data-time-to="${escape(minutesToTime(end))}" style="--time-total-minutes:${total}">${slotsMarkup(start, end, { interactive: false })}<div class="journal-work-columns">${fields}</div></section></div></div>`;
