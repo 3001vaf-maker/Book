@@ -4,6 +4,17 @@ import { timeToMinutes, rangesOverlap } from './time.js';
 
 export { timeToMinutes, rangesOverlap };
 
+let workingTimeConflictSource = () => [];
+
+export function configureWorkingTimeConflictSource(source) {
+  workingTimeConflictSource = typeof source === 'function' ? source : () => [];
+}
+
+export function getWorkingTimeUsageConflicts(options = {}) {
+  const conflicts = workingTimeConflictSource(options);
+  return Array.isArray(conflicts) ? conflicts : [];
+}
+
 export function isTimeRangeAvailable({ from, to, usages = [], excludeId = '' } = {}) {
   return !usages.some((usage) => usage?.sourceId !== excludeId && usage?.id !== excludeId && rangesOverlap(from, to, usage?.from, usage?.to));
 }
