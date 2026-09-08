@@ -1,4 +1,4 @@
-import { openHeaderControl, list, button, openDayWorkplaceControl, escapeHtml, ALL_WORKPLACES_ID } from '../ui/ui.js?v=journal-header-split-20260908';
+import { openHeaderControl, list, button, openDayWorkplaceControl, escapeHtml, ALL_WORKPLACES_ID } from '../ui/ui.js';
 
 const WORKPLACE_FALLBACK_COLOR = '#212529';
 
