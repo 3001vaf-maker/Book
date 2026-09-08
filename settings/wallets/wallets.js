@@ -1,5 +1,5 @@
 import { actionBlock, button, emptyState, entityCard, escapeHtml, field, iconButton, initPhotoField, listEntries, listEntry, mountModal, modal, page, pageHeader, photoField } from '../../ui/ui.js';
-import { deleteWallet as deleteWalletData, getWallets, saveWallet as saveWalletData, updateWallet } from './data.js?v=custom-wallet-delete-20260908';
+import { deleteWallet as deleteWalletData, getWallets, saveWallet as saveWalletData, updateWallet } from './data.js';
 
 function renderList(root, navigateBack) {
   const items = getWallets();
