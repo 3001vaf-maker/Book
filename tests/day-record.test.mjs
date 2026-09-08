@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
-import { createDay, getScheduleConflicts, hasScheduleConflict } from '../core/day.js';
-import { createRecord, moveRecord, cancelRecord, deleteRecord, getRecords } from '../journal/record-data.js';
+import { createDay, getDays, getScheduleConflicts, hasScheduleConflict, removeDay, saveDays } from '../core/day.js';
+import { configureWorkingTimeConflictSource } from '../core/time-usage.js';
+import { createRecord, moveRecord, cancelRecord, deleteRecord, getRecords, getWorkingTimeRecordConflicts } from '../journal/record-data.js';
 
 const store = new Map();
 globalThis.localStorage = {
@@ -9,6 +10,8 @@ globalThis.localStorage = {
   removeItem: (key) => store.delete(key),
 };
 globalThis.window = { dispatchEvent() {} };
+
+configureWorkingTimeConflictSource(getWorkingTimeRecordConflicts);
 
 const days = [createDay({ date: '2026-09-15', workplaceId: 'romashka', from: '12:00', to: '16:00' })];
 store.set('book:timetable-state', JSON.stringify({ workingDays: days }));
@@ -30,11 +33,28 @@ const moved = moveRecord(record.id, { date: '2026-09-15', workplaceId: 'romashka
 assert.equal(moved.from, '13:00');
 assert.equal(moved.to, '14:00');
 
+const guardedDays = getDays();
+assert.equal(removeDay(guardedDays, 'romashka', '2026-09-15'), false);
+assert.equal(guardedDays.length, 1);
+
+const bypassedDays = getDays();
+bypassedDays.splice(0, 1);
+const blockedSave = saveDays(bypassedDays);
+assert.equal(blockedSave.ok, false);
+assert.equal(blockedSave.reason, 'usage-conflict');
+assert.equal(bypassedDays.length, 1);
+assert.equal(getDays().length, 1);
+
 assert.ok(cancelRecord(record.id));
 assert.equal(createRecord({ date: '2026-09-15', workplaceId: 'romashka', from: '13:00', to: '14:00' })?.id !== undefined, true);
 const active = getRecords().filter((item) => item.status !== 'cancelled');
 assert.equal(active.length, 1);
 assert.equal(deleteRecord(active[0].id), true);
 assert.equal(getRecords().filter((item) => item.status !== 'cancelled').length, 0);
+
+const removableDays = getDays();
+assert.equal(removeDay(removableDays, 'romashka', '2026-09-15'), true);
+assert.equal(saveDays(removableDays).ok, true);
+assert.equal(getDays().length, 0);
 
 console.log('day-record tests: OK');
