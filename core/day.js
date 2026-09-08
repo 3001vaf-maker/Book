@@ -1,4 +1,5 @@
 import { createTimeRange, rangesOverlap, timeToMinutes, minutesToTime, isValidRange } from './time.js';
+import { getWorkingTimeUsageConflicts } from './time-usage.js';
 
 const TIMETABLE_STATE_KEY = 'book:timetable-state';
 
@@ -10,9 +11,32 @@ function readState() {
 }
 function writeState(state) { localStorage.setItem(TIMETABLE_STATE_KEY, JSON.stringify(state || { workingDays: [] })); }
 function dateValue(value) { return String(value || '').slice(0, 10); }
+function dayIdentity(day) { return `${String(day?.workplaceId || '')}::${dateValue(day?.date)}`; }
 
 export function getDays() { const state = readState(); return Array.isArray(state.workingDays) ? state.workingDays : []; }
-export function saveDays(days) { writeState({ workingDays: Array.isArray(days) ? days : [] }); }
+export function getDayRemovalConflicts(workplaceId, date) {
+  const key = dateValue(date), targetId = String(workplaceId || '');
+  if (!key || !targetId) return [];
+  return getWorkingTimeUsageConflicts({ operation: 'remove', date: key, workplaceId: targetId });
+}
+export function saveDays(days) {
+  const requested = Array.isArray(days) ? days : [];
+  const current = getDays();
+  const requestedIds = new Set(requested.map(dayIdentity));
+  const blocked = current
+    .filter((day) => !requestedIds.has(dayIdentity(day)))
+    .map((day) => ({ day, conflicts: getDayRemovalConflicts(day?.workplaceId, day?.date) }))
+    .filter((entry) => entry.conflicts.length > 0);
+
+  const next = [...requested];
+  for (const entry of blocked) if (!next.some((day) => dayIdentity(day) === dayIdentity(entry.day))) next.push(entry.day);
+
+  if (Array.isArray(days) && blocked.length) days.splice(0, days.length, ...next);
+  writeState({ workingDays: next });
+  return blocked.length
+    ? { ok: false, reason: 'usage-conflict', blocked }
+    : { ok: true, reason: '', blocked: [] };
+}
 export function getDay(days, workplaceId, date) {
   const key = dateValue(date);
   return (Array.isArray(days) ? days : []).find((item) => String(item?.workplaceId || '') === String(workplaceId || '') && dateValue(item?.date) === key) || null;
@@ -37,7 +61,7 @@ export function updateDayTime(days, workplaceId, date, from, to) {
   const range = createTimeRange(from, to); day.from = range.from; day.to = range.to; return day;
 }
 export function removeDay(days, workplaceId, date) {
-  if (!Array.isArray(days)) return false;
+  if (!Array.isArray(days) || getDayRemovalConflicts(workplaceId, date).length) return false;
   const key = dateValue(date), before = days.length;
   for (let index = days.length - 1; index >= 0; index -= 1) if (String(days[index]?.workplaceId || '') === String(workplaceId || '') && dateValue(days[index]?.date) === key) days.splice(index, 1);
   return days.length !== before;
