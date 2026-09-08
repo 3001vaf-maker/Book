@@ -1,8 +1,8 @@
 import { pageHeader, viewNavigation, initViewNavigation, headerControl, workplaceContent, ALL_WORKPLACES_ID } from '../ui/ui.js?v=journal-header-split-20260908';
 import { getWorkplaceContext, setWorkplaceContext } from '../core/workplace-context.js?v=section-workplace-context-20260908';
-import { getWorkplaces, getWorkplaceMonthStatsMap } from '../core/workplace-time.js?v=schedule-indicators-20260908';
-import { getDays } from '../core/day.js';
-import { openJournalWorkplaceControl } from './workplace-control.js?v=journal-header-split-20260908';
+import { getWorkplaces } from '../core/workplace-time.js?v=schedule-indicators-20260908';
+import { getActiveRecordCountForDay } from './record-data.js?v=journal-record-counts-20260908';
+import { openJournalWorkplaceControl } from './workplace-control.js?v=journal-record-counts-20260908';
 import { renderJournalDay } from './день.js?v=journal-all-workplaces-20260908';
 import { renderJournalMonth } from './месяц.js?v=journal-all-workplaces-20260908';
 import { renderJournalList } from './список.js';
@@ -14,6 +14,11 @@ const views = [
   { id: 'month', label: 'Месяц', render: renderJournalMonth },
   { id: 'list', label: 'Список', render: renderJournalList },
 ];
+
+function dateKey(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
 
 export function renderJournal(root) {
   let activeView = 'day';
@@ -32,14 +37,16 @@ export function renderJournal(root) {
   };
 
   const openWorkplace = () => {
-    const days = getDays();
-    const month = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
-    const workplaceStats = getWorkplaceMonthStatsMap(days, workplaces, month);
+    const day = dateKey(selectedDate);
+    const recordCounts = Object.fromEntries(workplaces.map((workplace) => {
+      const key = String(workplace?.key || '');
+      return [key, key ? getActiveRecordCountForDay(day, key) : 0];
+    }));
 
     openJournalWorkplaceControl({
       workplaces,
       workplaceId: selectedWorkplaceId,
-      workplaceStats,
+      recordCounts,
       onSelect: (nextId) => {
         selectedWorkplaceId = nextId || selectedWorkplaceId;
         setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: selectedDate, scope: JOURNAL_CONTEXT_SCOPE });
