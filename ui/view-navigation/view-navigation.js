@@ -1,5 +1,7 @@
-export function viewNavigation({ views, activeView }) {
-  return `<div class="segment-control" role="tablist" aria-label="Представление" data-view-navigation>${views.map(({ id, label }) => `<button type="button" role="tab" aria-selected="${id === activeView}" class="${id === activeView ? 'is-active' : ''}" data-view="${id}">${label}</button>`).join('')}</div>`;
+import { escapeHtml } from '../utils/escape-html.js';
+
+export function viewNavigation({ views = [], activeView = '', className = '', ariaLabel = 'Представление' } = {}) {
+  return `<div class="segment-control${className ? ` ${escapeHtml(className)}` : ''}" role="tablist" aria-label="${escapeHtml(ariaLabel)}" data-view-navigation>${views.map(({ id, label }) => `<button type="button" role="tab" aria-selected="${id === activeView}" class="${id === activeView ? 'is-active' : ''}" data-view="${escapeHtml(id)}">${escapeHtml(label)}</button>`).join('')}</div>`;
 }
 
 export function initViewNavigation(root, { views, activeView, onChange }) {
