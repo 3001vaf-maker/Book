@@ -1,9 +1,9 @@
-import { pageHeader, viewNavigation, initViewNavigation, headerControl, workplaceContent, ALL_WORKPLACES_ID, dayWorkplaceContent, openDayWorkplaceControl, openDayWorkplaceTime } from '../ui/ui.js?v=day-workplaces-records-20260908';
+import { pageHeader, viewNavigation, initViewNavigation, headerControl, workplaceContent, ALL_WORKPLACES_ID, openDayWorkplaceTime } from '../ui/ui.js?v=day-workplaces-records-20260908';
 import { getWorkplaceContext, setWorkplaceContext } from '../core/workplace-context.js?v=section-workplace-context-20260908';
 import { getWorkplaces } from '../core/workplace-time.js?v=schedule-indicators-20260908';
 import { getActiveDayWorkplaces, getAvailableDayWorkplaces, getDayWorkplaceDraft, saveDayWorkplaceTime } from '../core/day-workplaces.js?v=day-workplaces-20260908';
 import { getActiveRecordCountForDay } from './record-data.js?v=journal-record-counts-20260908';
-import { openJournalWorkplaceControl } from './workplace-control.js?v=journal-record-counts-20260908';
+import { openJournalWorkplaceControl } from './workplace-control.js?v=journal-day-active-workplaces-20260908';
 import { renderJournalDay } from './день.js?v=journal-all-workplaces-20260908';
 import { renderJournalMonth } from './месяц.js?v=journal-all-workplaces-20260908';
 import { renderJournalList } from './список.js';
@@ -21,12 +21,6 @@ function dateKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
-function dayRenderWorkplaceId(items = []) {
-  const active = Array.isArray(items) ? items : [];
-  if (active.length > 1) return ALL_WORKPLACES_ID;
-  return active[0]?.workplaceId || '';
-}
-
 export function renderJournal(root) {
   let activeView = 'day';
   const workplaces = getWorkplaces();
@@ -37,15 +31,6 @@ export function renderJournal(root) {
   const activeDayWorkplaces = () => getActiveDayWorkplaces(selectedDate, workplaces);
 
   const renderHeaderControl = () => {
-    if (activeView === 'day') {
-      const items = activeDayWorkplaces();
-      const names = items.map((item) => item.name).filter(Boolean).join(', ');
-      return headerControl(dayWorkplaceContent({ items }), {
-        data: 'data-day-workplaces-open',
-        aria: names ? `Рабочие места дня: ${names}` : 'Добавить рабочее место',
-      });
-    }
-
     const allMode = selectedWorkplaceId === ALL_WORKPLACES_ID;
     const workplace = allMode ? null : workplaces.find((item) => item.key === selectedWorkplaceId) || null;
     return headerControl(workplaceContent({ workplace, title: allMode ? 'Все записи' : '' }), {
@@ -74,19 +59,35 @@ export function renderJournal(root) {
     });
   };
 
+  const selectWorkplace = (nextId) => {
+    selectedWorkplaceId = nextId || selectedWorkplaceId;
+    setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: selectedDate, scope: JOURNAL_CONTEXT_SCOPE });
+    renderView();
+  };
+
   const openDayWorkplaces = () => {
     const day = dateKey(selectedDate);
-    const active = activeDayWorkplaces().map((item) => ({
-      ...item,
-      right: [`${getActiveRecordCountForDay(day, item.workplaceId)} з`],
+    const active = activeDayWorkplaces().map((item) => {
+      const workplace = workplaces.find((entry) => String(entry?.key || '') === String(item.workplaceId || '')) || null;
+      return {
+        ...(workplace || {}),
+        key: item.workplaceId,
+        name: item.name,
+        indicatorColor: item.indicatorColor,
+      };
+    });
+    const recordCounts = Object.fromEntries(active.map((workplace) => {
+      const key = String(workplace?.key || '');
+      return [key, key ? getActiveRecordCountForDay(day, key) : 0];
     }));
     const available = getAvailableDayWorkplaces(selectedDate, workplaces);
-    openDayWorkplaceControl({
-      active,
+
+    openJournalWorkplaceControl({
+      workplaces: active,
+      workplaceId: selectedWorkplaceId,
+      recordCounts,
       available,
-      title: 'Рабочие места дня',
-      catalogTitle: 'Добавить рабочее место',
-      onEdit: openDayTime,
+      onSelect: selectWorkplace,
       onAdd: openDayTime,
     });
   };
@@ -102,11 +103,7 @@ export function renderJournal(root) {
       workplaces,
       workplaceId: selectedWorkplaceId,
       recordCounts,
-      onSelect: (nextId) => {
-        selectedWorkplaceId = nextId || selectedWorkplaceId;
-        setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: selectedDate, scope: JOURNAL_CONTEXT_SCOPE });
-        renderView();
-      },
+      onSelect: selectWorkplace,
     });
   };
 
@@ -114,13 +111,12 @@ export function renderJournal(root) {
     root.innerHTML = `${pageHeader('Журнал', '', renderHeaderControl())}${viewNavigation({ views, activeView })}<div data-journal-view></div>`;
     const viewRoot = root.querySelector('[data-journal-view]');
     if (activeView === 'day') {
-      const dayWorkplaceId = dayRenderWorkplaceId(activeDayWorkplaces());
       renderJournalDay(viewRoot, {
         date: selectedDate,
-        workplaceId: dayWorkplaceId,
+        workplaceId: selectedWorkplaceId,
         onChange: (nextDate) => {
           selectedDate = nextDate;
-          setWorkplaceContext({ date: selectedDate, scope: JOURNAL_CONTEXT_SCOPE });
+          setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: selectedDate, scope: JOURNAL_CONTEXT_SCOPE });
           renderView();
         },
       });
@@ -136,8 +132,7 @@ export function renderJournal(root) {
       });
     } else renderJournalList(viewRoot);
 
-    root.querySelector('[data-day-workplaces-open]')?.addEventListener('click', openDayWorkplaces);
-    root.querySelector('[data-workplace-header-open]')?.addEventListener('click', openWorkplace);
+    root.querySelector('[data-workplace-header-open]')?.addEventListener('click', activeView === 'day' ? openDayWorkplaces : openWorkplace);
     initViewNavigation(root, { views, activeView, onChange: (nextView) => { activeView = nextView; renderView(); } });
   };
   renderView();
