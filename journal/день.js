@@ -1,11 +1,11 @@
-import { initDateNavigator, journalDayTimeline, initJournalDayTimeline } from '../ui/ui.js';
+import { initDateNavigator, journalDayTimeline, initJournalDayTimeline } from '../ui/ui.js?v=journal-architecture-20260908';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getDays, getDay, getDayTime } from '../core/day.js';
-import { getRecordsForDay } from './record-data.js';
-import { getJournalBreaksForDay, getJournalBreaks } from './break-data.js';
+import { getRecordsForDay } from './record-data.js?v=journal-architecture-20260908';
+import { getJournalBreaksForDay, getJournalBreaks } from './break-data.js?v=journal-architecture-20260908';
 import { getTimeUsages } from '../core/time-usage.js';
-import { openRecordCreation } from './record.js';
-import { openRecordView } from './record-view.js';
+import { openRecordCreation } from './record.js?v=journal-architecture-20260908';
+import { openRecordView } from './record-view.js?v=journal-architecture-20260908';
 
 function dateKey(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
 
