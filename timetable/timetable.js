@@ -1,6 +1,6 @@
 import { actionBlock, button, pageHeader, initCalendar, initMultiSelect, modal, mountModal, timePicker, initTimePickers, escapeHtml, headerControl, workplaceContent, openWorkplaceControl, ALL_WORKPLACES_ID, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js';
 import { getWorkplaces, resolveWorkplaceTime, getWorkingDayIndicators, getWorkingDayTotalMinutes, getWorkplaceMonthStats, getAllWorkplacesMonthStats, getWorkplaceMonthStatsMap } from '../core/workplace-time.js';
-import { getDays, saveDays, getDay, getDayTime, getDaysForDate, createDay, updateDayTime, removeDay, getScheduleConflicts, hasScheduleConflict, findSuggestedInterval } from '../core/day.js';
+import { getDays, saveDays, getDay, getDayTime, getDaysForDate, createDay, updateDayTime, removeDay, getDayRemovalConflicts, getScheduleConflicts, hasScheduleConflict, findSuggestedInterval } from '../core/day.js';
 import { getWorkingTimeUsageConflicts } from '../core/time-usage.js';
 import { isValidRange, rangesOverlap } from '../core/time.js';
 
@@ -259,6 +259,29 @@ export function renderTimetable(root) {
     });
   }
 
+  function openRemovalBlockedModal(entries = []) {
+    const blocked = (Array.isArray(entries) ? entries : []).filter((entry) => Array.isArray(entry?.conflicts) && entry.conflicts.length);
+    if (!blocked.length) return;
+    const workplace = workplaces.find((item) => String(item?.key || '') === String(selectedWorkplaceId || '')) || null;
+    const workplaceName = workplace?.name || 'Рабочее место';
+    const multiple = blocked.length > 1;
+    const title = multiple ? 'Не все дни можно сделать выходными' : 'День нельзя сделать выходным';
+    const description = multiple
+      ? `${workplaceName}: на этих датах есть записи. Рабочие дни сохранены.`
+      : `${workplaceName}: на этой дате есть запись. Рабочий день сохранён.`;
+    const rows = blocked.map((entry) => {
+      const times = entry.conflicts
+        .filter((conflict) => conflict?.type === 'record' && conflict?.from && conflict?.to)
+        .map((conflict) => `${conflict.from}–${conflict.to}`)
+        .join(', ');
+      return `<div><span>${escapeHtml(formatDateLabel(entry.date))}</span><strong>${escapeHtml(times ? `Запись ${times}` : 'Есть запись')}</strong></div>`;
+    }).join('');
+    const content = `<div class="modal-title"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(description)}</p></div><div class="entity-details">${rows}</div>${button('Понятно', { data: 'data-removal-blocked-close' })}`;
+    const m = mountModal(document.body, modal(content, { title, variant: 'compact' }));
+    if (!m) return;
+    m.querySelector('[data-removal-blocked-close]')?.addEventListener('click', () => m.remove());
+  }
+
   function openWorkplace() {
     const allMode = isAllMode();
     const month = calendar?.getDisplayedMonth() || initialMonth;
@@ -288,6 +311,7 @@ export function renderTimetable(root) {
     if (isAllMode()) return;
     const dates = selection?.getSelectedDates?.() || []; if (!dates.length || !selectionMode) return;
     const makeWorking = selectionMode === 'make-working';
+    const blockedRemoval = [];
     if (makeWorking) {
       const base = resolveWorkplaceTime(workplaces, selectedWorkplaceId); if (!base) return;
       const candidates = dates.filter((date) => !getDay(workingDays, selectedWorkplaceId, date));
@@ -305,9 +329,14 @@ export function renderTimetable(root) {
         return;
       }
     } else {
-      for (const date of dates) removeDay(workingDays, selectedWorkplaceId, date);
+      for (const date of dates) {
+        if (removeDay(workingDays, selectedWorkplaceId, date)) continue;
+        const conflicts = getDayRemovalConflicts(selectedWorkplaceId, date);
+        if (conflicts.length) blockedRemoval.push({ date, conflicts });
+      }
     }
     saveDays(workingDays); const month = calendar.getDisplayedMonth(); startSelectionSession(month); renderHeader(month);
+    if (blockedRemoval.length) openRemovalBlockedModal(blockedRemoval);
   });
 
   return { get selection() { return selection; } };
