@@ -1,6 +1,6 @@
 import { accordion, initAccordions } from './accordion/accordion.js';
 import { bottomNavigation } from './navigation/navigation.js';
-import { viewNavigation, initViewNavigation } from './view-navigation/view-navigation.js';
+import { viewNavigation, initViewNavigation } from './view-navigation/view-navigation.js?v=journal-architecture-20260908';
 import { calendar, initCalendar, monthDayPicker, initMonthDayPickers, dateNavigator, initDateNavigator } from './calendar/index.js?v=month-day-20260906';
 import { initMultiSelect } from './selection/index.js?v=graph-lifecycle-20260903';
 import { entityCard } from './cards/index.js?v=procedure-card-metadata-20260907';
@@ -14,7 +14,7 @@ import { costField, initCostFields, collectCost, costListParts, costCardMeta } f
 import { durationPicker, durationText, initDurationPickers } from './duration/index.js?v=shared-duration-text-20260907';
 import { timePicker, initTimePickers } from './time/index.js?v=single-button-20260908';
 import { journalDayTimeline, initJournalDayTimeline } from './time/journal-day.js';
-import { workplaceSelector, initWorkplaceSelectors, collectWorkplaceSelections, workplaceAddButton, workplaceHeaderButton, workplaceCountText, getWorkplaceContext, setWorkplaceContext } from './workplaces/index.js?v=shared-secondary-button-20260908';
+import { workplaceSelector, initWorkplaceSelectors, collectWorkplaceSelections, workplaceAddButton, workplaceHeaderButton, workplaceCountText, getWorkplaceContext, setWorkplaceContext } from './workplaces/index.js?v=journal-architecture-20260908';
 import { modal, mountModal } from './modals/index.js';
 import { button, iconButton } from './buttons/index.js?v=single-button-20260908';
 import { field, phoneField, textareaField, photoField, initPhotoField } from './inputs/index.js';
