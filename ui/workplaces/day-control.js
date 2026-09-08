@@ -59,12 +59,12 @@ export function openDayWorkplaceControl({
 
   const items = activeItems.map((item) => ({
     title: item?.name || 'Рабочее место',
-    right: item?.from && item?.to ? [`${item.from}–${item.to}`] : [],
+    right: item?.right ?? [],
     indicatorColor: item?.indicatorColor || WORKPLACE_FALLBACK_COLOR,
     indicatorLabel: item?.name || 'Рабочее место',
     interactive: true,
     data: `data-day-workplace-edit="${escapeHtml(item.workplaceId)}"`,
-    aria: `Рабочее время ${item?.name || 'рабочего места'}`,
+    aria: `Рабочее место ${item?.name || ''}`,
   }));
 
   const addAction = (Array.isArray(available) && available.length)
