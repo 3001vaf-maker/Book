@@ -1,9 +1,9 @@
 import { containsRange, isValidRange, rangesOverlap } from '../core/time.js';
 import { getDays, getDay, getDayTime } from '../core/day.js';
 import { getWorkplaces } from '../core/workplace-time.js';
+import { getJournalBreaks } from './break-data.js';
 
 const KEY = 'book.records';
-const BREAKS_KEY = 'book.journalBreaks';
 
 function readList(key) {
   try {
@@ -17,7 +17,7 @@ function writeList(key, value) { localStorage.setItem(key, JSON.stringify(Array.
 function notify(name, detail = {}) { if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(name, { detail })); }
 function normalizeDate(value) { return String(value || '').slice(0, 10); }
 function normalizeId(value) { return String(value || ''); }
-function usagesForDay(date, workplaceId, records = readList(KEY), breaks = readList(BREAKS_KEY)) {
+function usagesForDay(date, workplaceId, records = readList(KEY), breaks = getJournalBreaks()) {
   const day = normalizeDate(date), workplace = normalizeId(workplaceId);
   return [
     ...records.filter((item) => item?.date === day && normalizeId(item?.workplaceId) === workplace && item?.status !== 'cancelled').map((item) => ({ ...item, type: 'record', sourceId: item.id })),
