@@ -1,4 +1,4 @@
-import { pageHeader, viewNavigation, initViewNavigation, headerControl, workplaceContent, openWorkplaceControl, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js?v=schedule-indicators-20260908';
+import { pageHeader, viewNavigation, initViewNavigation, headerControl, workplaceContent, openWorkplaceControl, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js?v=header-title-context-20260908';
 import { getWorkplaces, getWorkplaceMonthStatsMap } from '../core/workplace-time.js?v=schedule-indicators-20260908';
 import { getDays, saveDays, getDay, getDayTime, updateDayTime, hasScheduleConflict } from '../core/day.js';
 import { renderJournalDay } from './день.js?v=journal-architecture-20260908';
@@ -40,6 +40,7 @@ export function renderJournal(root) {
     openWorkplaceControl({
       workplaces,
       workplaceId: selectedWorkplaceId,
+      title: '',
       stats: workplaceStats[selectedWorkplaceId],
       workplaceStats,
       canCorrectTime: Boolean(day && workplace),
