@@ -64,8 +64,8 @@ export function renderTimetable(root) {
   };
 
   function openWorkplacePickerModal() {
-    const content = `<div class="modal-title"><h2>Выбрать место работы</h2></div>${select({ name: 'timetableWorkplaceModal', label: 'Место работы', value: selectedWorkplaceId, options: workplaceOptions(workplaces), data: 'data-timetable-workplace-modal' })}${button('Выбрать', { data: 'data-timetable-workplace-save' })}`;
-    const m = mountModal(document.body, modal(content, { title: 'Выбрать место работы' }));
+    const content = `<div class="compact-form"><div class="modal-title"><h2>Рабочее место</h2></div>${select({ name: 'timetableWorkplaceModal', value: selectedWorkplaceId, options: workplaceOptions(workplaces), data: 'data-timetable-workplace-modal', aria: 'Рабочее место' })}<div class="modal-actions">${button('Выбрать', { data: 'data-timetable-workplace-save' })}</div></div>`;
+    const m = mountModal(document.body, modal(content, { title: 'Рабочее место', variant: 'compact' }));
     m?.querySelector('[data-timetable-workplace-save]')?.addEventListener('click', () => { selectedWorkplaceId = m.querySelector('[data-timetable-workplace-modal]')?.value || selectedWorkplaceId; setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: calendar?.getDisplayedMonth() || initialDate }); const month = calendar?.getDisplayedMonth() || initialMonth; selection?.destroy(); startSelectionSession(month); renderHeader(month); m.remove(); });
   }
 
@@ -133,8 +133,9 @@ export function renderTimetable(root) {
   function openWorkplaceModal() {
     const workplace = workplaces.find((w) => w.key === selectedWorkplaceId); const dates = selection?.getSelectedDates?.() || []; const stats = monthStats(calendar?.getDisplayedMonth() || initialMonth, workingDays, selectedWorkplaceId, workplaces);
     const disabled = !dates.length || dates.some((date) => !workingDayForDate(workingDays, selectedWorkplaceId, date));
-    const content = `<div class="modal-title"><h2>Место работы</h2></div><div class="timetable-workplace-modal-summary"><strong>${escapeHtml(workplace?.name || 'Место работы не выбрано')}</strong>${timetableCounter(stats)}</div><div class="timetable-workplace-modal-actions">${button('Выбрать место работы', { data: 'data-timetable-open-picker' })}${button('Скорректировать время', { data: `data-timetable-open-time${disabled ? ' disabled' : ''}` })}</div>`;
-    const m = mountModal(document.body, modal(content, { title: 'Место работы' }));
+    const workplaceName = workplace?.name || 'Рабочее место';
+    const content = `<div class="modal-title"><h2>${escapeHtml(workplaceName)}</h2></div><div class="timetable-workplace-modal-summary">${timetableCounter(stats)}</div><div class="timetable-workplace-modal-actions">${button('Рабочее место', { data: 'data-timetable-open-picker' })}${button('Корректировка времени', { data: `data-timetable-open-time${disabled ? ' disabled' : ''}`, variant: 'secondary' })}</div>`;
+    const m = mountModal(document.body, modal(content, { title: workplaceName, variant: 'medium' }));
     m?.querySelector('[data-timetable-open-picker]')?.addEventListener('click', () => { m.remove(); openWorkplacePickerModal(); });
     m?.querySelector('[data-timetable-open-time]')?.addEventListener('click', () => { if (!disabled) { m.remove(); openWorkplaceTimeModal(); } });
   }
