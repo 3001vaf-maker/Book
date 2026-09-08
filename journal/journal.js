@@ -4,7 +4,7 @@ import { getWorkplaces } from '../core/workplace-time.js';
 import { getActiveDayWorkplaces, getAvailableDayWorkplaces, getDayWorkplaceDraft, saveDayWorkplaceTime } from '../core/day-workplaces.js';
 import { getActiveRecordCountForDay } from './record-data.js';
 import { openJournalWorkplaceControl } from './workplace-control.js';
-import { renderJournalDay } from './день.js?v=journal-confirmation-modal-20260909';
+import { renderJournalDay } from './день.js';
 import { renderJournalMonth } from './месяц.js';
 import { renderJournalList } from './список.js';
 
