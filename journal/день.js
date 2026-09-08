@@ -1,8 +1,8 @@
 import { initDateNavigator, journalDayTimeline, initJournalDayTimeline } from '../ui/ui.js?v=journal-architecture-20260908';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getDays, getDay, getDayTime } from '../core/day.js';
-import { getRecordsForDay } from './record-data.js?v=journal-architecture-20260908';
-import { getJournalBreaksForDay, getJournalBreaks } from './break-data.js?v=journal-architecture-20260908';
+import { getRecordsForDay } from './record-data.js';
+import { getJournalBreaksForDay, getJournalBreaks } from './break-data.js';
 import { getTimeUsages } from '../core/time-usage.js';
 import { openRecordCreation } from './record.js?v=journal-architecture-20260908';
 import { openRecordView } from './record-view.js?v=journal-architecture-20260908';
