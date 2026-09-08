@@ -1,6 +1,6 @@
 import { actionBlock, button, pageHeader, initCalendar, initMultiSelect, modal, mountModal, timePicker, initTimePickers, escapeHtml, headerControl, workplaceContent, openWorkplaceControl, ALL_WORKPLACES_ID, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js';
 import { getWorkplaces, resolveWorkplaceTime, getWorkingDayIndicators, getWorkingDayTotalMinutes, getWorkplaceMonthStats, getAllWorkplacesMonthStats, getWorkplaceMonthStatsMap } from '../core/workplace-time.js';
-import { getDays, saveDays, getDay, getDayTime, getDaysForDate, createDay, updateDayTime, getScheduleConflicts, hasScheduleConflict, findSuggestedInterval } from '../core/day.js';
+import { getDays, saveDays, getDay, getDayTime, getDaysForDate, createDay, updateDayTime, removeDay, getScheduleConflicts, hasScheduleConflict, findSuggestedInterval } from '../core/day.js';
 import { getWorkingTimeUsageConflicts } from '../core/time-usage.js';
 import { isValidRange, rangesOverlap } from '../core/time.js';
 
@@ -305,7 +305,7 @@ export function renderTimetable(root) {
         return;
       }
     } else {
-      for (let i = workingDays.length - 1; i >= 0; i -= 1) if (workingDays[i]?.workplaceId === selectedWorkplaceId && dates.includes(workingDays[i].date)) workingDays.splice(i, 1);
+      for (const date of dates) removeDay(workingDays, selectedWorkplaceId, date);
     }
     saveDays(workingDays); const month = calendar.getDisplayedMonth(); startSelectionSession(month); renderHeader(month);
   });
