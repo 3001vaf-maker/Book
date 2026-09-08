@@ -1,13 +1,13 @@
 import { renderMain } from './main/main.js';
-import { renderJournal } from './journal/journal.js?v=journal-workplace-source-20260908';
-import { renderTimetable } from './timetable/timetable.js?v=aggregate-day-editor-20260908';
+import { renderJournal } from './journal/journal.js';
+import { renderTimetable } from './timetable/timetable.js';
 import { renderChat } from './chat/chat.js';
-import { renderSettings } from './settings/settings.js?v=schedule-indicators-20260908';
-import { getWorkplaces as getWorkplaceEntities } from './settings/profile/workplaces/data.js?v=schedule-indicators-20260908';
-import { getWorkingTimeRecordConflicts } from './journal/record-data.js?v=aggregate-day-editor-20260908';
-import { configureWorkplaceSource } from './core/workplace-time.js?v=schedule-indicators-20260908';
-import { configureWorkingTimeConflictSource } from './core/time-usage.js?v=aggregate-day-editor-20260908';
-import { bottomNavigation } from './ui/ui.js?v=aggregate-day-editor-20260908';
+import { renderSettings } from './settings/settings.js';
+import { getWorkplaces as getWorkplaceEntities } from './settings/profile/workplaces/data.js';
+import { getWorkingTimeRecordConflicts } from './journal/record-data.js';
+import { configureWorkplaceSource } from './core/workplace-time.js';
+import { configureWorkingTimeConflictSource } from './core/time-usage.js';
+import { bottomNavigation } from './ui/ui.js';
 
 configureWorkplaceSource(getWorkplaceEntities);
 configureWorkingTimeConflictSource(getWorkingTimeRecordConflicts);

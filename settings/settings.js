@@ -1,13 +1,13 @@
-import { folderList, pageHeader } from '../ui/ui.js?v=schedule-indicators-20260908';
+import { folderList, pageHeader } from '../ui/ui.js';
 
 const folders = [
-  ['profile', 'Профиль', '◫', () => import('./profile/profile.js?v=schedule-indicators-20260908')],
-  ['service', 'Сервис', '◫', () => import('./service/service.js?v=shared-secondary-button-20260908')],
+  ['profile', 'Профиль', '◫', () => import('./profile/profile.js')],
+  ['service', 'Сервис', '◫', () => import('./service/service.js')],
   ['warehouse', 'Склад', '◫', () => import('./warehouse/warehouse.js')],
   ['documents', 'Документы', '◫', () => import('./documents/documents.js')],
   ['loyalty', 'Программа лояльности', '◫', () => import('./loyalty/loyalty.js')],
-  ['tags', 'Ярлыки', '◫', () => import('./tags/tags.js?v=tag-manager-ui-20260908')],
-  ['wallets', 'Кошелёк', '◫', () => import('./wallets/wallets.js?v=custom-wallet-delete-20260908')],
+  ['tags', 'Ярлыки', '◫', () => import('./tags/tags.js')],
+  ['wallets', 'Кошелёк', '◫', () => import('./wallets/wallets.js')],
 ];
 
 function renderRows(root) {

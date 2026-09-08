@@ -1,4 +1,4 @@
-import { actionBlock, button, colorPicker, emptyState, escapeHtml, field, iconButton, initColorPickers, mountModal, modal, pageHeader, tagManagerList } from '../../ui/ui.js?v=tag-manager-ui-20260908';
+import { actionBlock, button, colorPicker, emptyState, escapeHtml, field, iconButton, initColorPickers, mountModal, modal, pageHeader, tagManagerList } from '../../ui/ui.js';
 import { createTag, getTags, saveTags } from './data.js';
 
 function renderList(root, navigateBack) {

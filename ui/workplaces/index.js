@@ -6,7 +6,7 @@ import { select } from '../selectors/index.js';
 import { escapeHtml } from '../utils/escape-html.js';
 
 export { getWorkplaceContext, setWorkplaceContext } from '../../core/workplace-context.js';
-export { dayWorkplaceContent, openDayWorkplaceControl, openDayWorkplaceTime } from './day-control.js?v=journal-record-metadata-20260908';
+export { dayWorkplaceContent, openDayWorkplaceControl, openDayWorkplaceTime } from './day-control.js';
 
 export const ALL_WORKPLACES_ID = '__all__';
 const WORKPLACE_FALLBACK_COLOR = '#212529';

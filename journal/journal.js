@@ -1,11 +1,11 @@
-import { pageHeader, viewNavigation, initViewNavigation, headerControl, workplaceContent, ALL_WORKPLACES_ID, openDayWorkplaceTime } from '../ui/ui.js?v=day-workplaces-records-20260908';
-import { getWorkplaceContext, setWorkplaceContext } from '../core/workplace-context.js?v=section-workplace-context-20260908';
-import { getWorkplaces } from '../core/workplace-time.js?v=schedule-indicators-20260908';
-import { getActiveDayWorkplaces, getAvailableDayWorkplaces, getDayWorkplaceDraft, saveDayWorkplaceTime } from '../core/day-workplaces.js?v=day-workplaces-20260908';
-import { getActiveRecordCountForDay } from './record-data.js?v=journal-record-counts-20260908';
-import { openJournalWorkplaceControl } from './workplace-control.js?v=journal-day-active-workplaces-20260908';
-import { renderJournalDay } from './день.js?v=journal-workplace-source-20260908';
-import { renderJournalMonth } from './месяц.js?v=journal-all-workplaces-20260908';
+import { pageHeader, viewNavigation, initViewNavigation, headerControl, workplaceContent, ALL_WORKPLACES_ID, openDayWorkplaceTime } from '../ui/ui.js';
+import { getWorkplaceContext, setWorkplaceContext } from '../core/workplace-context.js';
+import { getWorkplaces } from '../core/workplace-time.js';
+import { getActiveDayWorkplaces, getAvailableDayWorkplaces, getDayWorkplaceDraft, saveDayWorkplaceTime } from '../core/day-workplaces.js';
+import { getActiveRecordCountForDay } from './record-data.js';
+import { openJournalWorkplaceControl } from './workplace-control.js';
+import { renderJournalDay } from './день.js';
+import { renderJournalMonth } from './месяц.js';
 import { renderJournalList } from './список.js';
 
 const JOURNAL_CONTEXT_SCOPE = 'journal';
