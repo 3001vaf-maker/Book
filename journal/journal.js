@@ -1,7 +1,7 @@
-import { button, pageHeader, viewNavigation, initViewNavigation, workplaceHeaderButton, getWorkplaceContext, setWorkplaceContext, select, modal, mountModal, timePicker, initTimePickers, escapeHtml } from '../ui/ui.js';
+import { button, pageHeader, viewNavigation, initViewNavigation, workplaceHeaderButton, getWorkplaceContext, setWorkplaceContext, select, modal, mountModal, timePicker, initTimePickers, escapeHtml } from '../ui/ui.js?v=journal-architecture-20260908';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getDays, saveDays, getDay, getDayTime, updateDayTime, hasScheduleConflict } from '../core/day.js';
-import { renderJournalDay } from './день.js';
+import { renderJournalDay } from './день.js?v=journal-architecture-20260908';
 import { renderJournalMonth } from './месяц.js';
 import { renderJournalList } from './список.js';
 
