@@ -1,28 +1,24 @@
-import { button, escapeHtml, mountModal, modal, select, initMultiSelect, initCalendar, entityCard } from '../ui/ui.js?v=single-button-20260908';
+import { button, costListParts, escapeHtml, list, mountModal, modal, select, initMultiSelect, initCalendar, entityCard } from '../ui/ui.js?v=journal-architecture-20260908';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getDays, getDay, getDayTime } from '../core/day.js';
 import { timeToMinutes, minutesToTime } from '../core/time.js';
+import { getAllClients } from '../main/clients/data.js';
+import { getProcedures } from '../settings/service/procedures/data.js';
 import { updateRecord, deleteRecord, checkRecordTime } from './record-data.js';
 
-const readList = (key) => { try { const value = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(value) ? value : []; } catch { return []; } };
-const people = () => readList('book.people');
-const procedures = () => readList('book.procedures').filter((item) => !item.deletedAt);
+const RECORD_TIME_STEP_MINUTES = 5;
+const people = () => getAllClients();
+const procedures = () => getProcedures();
 const clientName = (person) => [person?.name, person?.surname].filter(Boolean).join(' ') || 'Без имени';
 const dateKey = (value) => { const date = value instanceof Date ? value : new Date(value); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; };
 const formatDate = (value) => { const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); return match ? `${match[3]}.${match[2]}.${match[1].slice(-2)}` : String(value || ''); };
 const workplaceName = (id) => getWorkplaces().find((item) => String(item?.key || '') === String(id || ''))?.name || 'Место работы';
-const findClient = (record) => { const client = record?.client || {}; return people().find((item) => String(item?.key ?? '') === String(client.key ?? '')) || people().find((item) => String(item?.id ?? '') === String(client.id ?? '')) || client; };
+const findClient = (record) => { const client = record?.client || {}; return people().find((item) => String(item.key ?? '') === String(client.key ?? '')) || people().find((item) => String(item.id ?? '') === String(client.id ?? '')) || client; };
 const costValue = (cost) => { if (!cost || cost.free) return null; const value = cost.mode === 'from-to' ? cost.from : cost.mode === 'from' ? (cost.from ?? cost.amount) : (cost.amount ?? cost.from); const number = Number(value); return Number.isFinite(number) && number > 0 ? number : null; };
-const costText = (cost) => { if (!cost || cost.free) return ''; const fmt = (value) => value === '' || value == null ? '' : `${Number(value).toLocaleString('ru-RU')} ₽`; if (cost.mode === 'from-to') return `от ${fmt(cost.from)}<br>до ${fmt(cost.to)}`; if (cost.mode === 'from') return `от ${fmt(cost.from ?? cost.amount)}`; return fmt(cost.amount ?? cost.from); };
 function resolveProcedureCost(procedure, workplaceId) {
   const scoped = (procedure?.workplaces || []).filter((item) => String(item?.workplaceId ?? '') === String(workplaceId ?? '')).map((item) => item?.cost).filter((cost) => costValue(cost) != null);
   if (scoped.length) { const minimum = Math.min(...scoped.map(costValue)); const source = scoped.find((cost) => costValue(cost) === minimum); return source; }
   return procedure?.cost || {};
-}
-
-function getBookingStep() {
-  try { const profile = JSON.parse(localStorage.getItem('book.profile') || '{}'); const value = Number(profile?.bookingStep); return value === 15 || value === 30 ? value : 60; }
-  catch { return 60; }
 }
 
 const pickerModal = (content) => modal(content, { className: 'record-modal record-modal--picker' });
@@ -37,9 +33,19 @@ function openWorkplacePicker(state, onDone) {
 
 function openClientPicker(state, onDone) {
   const all = people(); let filtered = all;
-  const content = `<div class="record-screen record-screen--clients"><div class="modal-title"><h2>Клиент</h2></div><div class="record-client-toolbar"><input class="record-client-search" data-record-client-search placeholder="🔍 Найти клиента..." autocomplete="off"></div><div class="entity-list" data-record-client-list></div></div>`;
+  const content = `<div class="record-screen record-screen--clients"><div class="modal-title"><h2>Клиент</h2></div><div class="record-client-toolbar"><input class="record-client-search" data-record-client-search placeholder="🔍 Найти клиента..." autocomplete="off"></div><div data-record-client-list></div></div>`;
   const m = mountModal(document.body, pickerModal(content)); if (!m) return;
-  const render = () => { const host = m.querySelector('[data-record-client-list]'); host.innerHTML = filtered.map((person) => `<button type="button" class="entity-list-row" data-record-client="${escapeHtml(person.key)}"><span class="entity-list-row__main"><strong>${escapeHtml(person.id ? `${person.id} ${clientName(person)}` : clientName(person))}</strong><small>${escapeHtml(person.phones?.[0] || '')}</small></span></button>`).join('') || '<div class="muted">Клиенты не найдены.</div>'; host.querySelectorAll('[data-record-client]').forEach((card) => card.addEventListener('click', () => { const person = all.find((item) => String(item.key) === String(card.dataset.recordClient)); if (!person) return; state.client = { key: person.key, id: person.id || '', name: person.name || '', surname: person.surname || '', phone: person.phones?.[0] || '' }; m.remove(); onDone(); })); };
+  const render = () => {
+    const host = m.querySelector('[data-record-client-list]');
+    host.innerHTML = list({ items: filtered.map((person) => ({
+      title: person.id ? `${person.id} ${clientName(person)}` : clientName(person),
+      secondary: person.phones?.[0] || '',
+      interactive: true,
+      data: `data-record-client="${escapeHtml(person.key)}"`,
+      aria: `Выбрать клиента ${clientName(person)}`,
+    })) }) || '<div class="muted">Клиенты не найдены.</div>';
+    host.querySelectorAll('[data-record-client]').forEach((card) => card.addEventListener('click', () => { const person = all.find((item) => String(item.key) === String(card.dataset.recordClient)); if (!person) return; state.client = { key: person.key, id: person.id || '', name: person.name || '', surname: person.surname || '', phone: person.phones?.[0] || '' }; m.remove(); onDone(); }));
+  };
   m.querySelector('[data-record-client-search]')?.addEventListener('input', (event) => { const q = event.target.value.trim().toLocaleLowerCase('ru'); filtered = all.filter((person) => clientName(person).toLocaleLowerCase('ru').includes(q) || String(person.phones?.[0] || '').includes(q)); render(); }); render();
 }
 
@@ -53,9 +59,9 @@ function openDatePicker(state, onDone) {
 function openTimePicker(state, original, onDone) {
   const day = getDay(getDays(), state.workplaceId, state.date); const dayTime = getDayTime(day, getWorkplaces()); if (!dayTime) return;
   const currentFrom = timeToMinutes(state.from); const currentTo = timeToMinutes(state.to); const duration = currentFrom != null && currentTo != null && currentTo > currentFrom ? currentTo - currentFrom : 60;
-  const step = getBookingStep(); const start = timeToMinutes(dayTime.from); const end = timeToMinutes(dayTime.to); const slots = [];
-  if (start != null && end != null) for (let minutes = start; minutes + duration <= end; minutes += step) { const from = minutesToTime(minutes); const to = minutesToTime(minutes + duration); const check = checkRecordTime({ date: state.date, workplaceId: state.workplaceId, from, to, excludeId: original.id }); if (check.ok) slots.push({ from, to }); }
-  const content = `<div class="record-screen record-screen--time"><div class="modal-title"><h2>Время</h2></div><div class="entity-list" data-record-time-slots>${slots.map((slot) => `<button type="button" class="entity-list-row${slot.from === state.from ? ' is-selected' : ''}" data-record-time-from="${slot.from}" data-record-time-to="${slot.to}" aria-pressed="${slot.from === state.from}"><span class="entity-list-row__main"><strong>${slot.from}</strong><small>до ${slot.to}</small></span></button>`).join('') || '<div class="muted">Свободного времени нет.</div>'}</div></div>`;
+  const start = timeToMinutes(dayTime.from); const end = timeToMinutes(dayTime.to); const slots = [];
+  if (start != null && end != null) for (let minutes = start; minutes + duration <= end; minutes += RECORD_TIME_STEP_MINUTES) { const from = minutesToTime(minutes); const to = minutesToTime(minutes + duration); const check = checkRecordTime({ date: state.date, workplaceId: state.workplaceId, from, to, excludeId: original.id }); if (check.ok) slots.push({ from, to }); }
+  const content = `<div class="record-screen record-screen--time"><div class="modal-title"><h2>Время</h2></div><div data-record-time-slots>${list({ items: slots.map((slot) => ({ title: slot.from, secondary: `до ${slot.to}`, interactive: true, selected: slot.from === state.from, data: `data-record-time-from="${slot.from}" data-record-time-to="${slot.to}"`, aria: `Выбрать время ${slot.from}–${slot.to}` })) }) || '<div class="muted">Свободного времени нет.</div>'}</div></div>`;
   const m = mountModal(document.body, pickerModal(content)); if (!m) return;
   m.querySelectorAll('[data-record-time-from]').forEach((slot) => slot.addEventListener('click', () => { state.from = slot.dataset.recordTimeFrom || state.from; state.to = slot.dataset.recordTimeTo || state.to; m.remove(); onDone(); }));
 }
@@ -63,10 +69,20 @@ function openTimePicker(state, original, onDone) {
 function openProceduresPicker(state, onDone) {
   const items = procedures();
   const selected = new Map((state.procedures || []).map((entry) => [entry?.id, { ...entry }]).filter(([id]) => id));
-  const content = `<div class="record-screen record-screen--procedures"><div class="modal-title"><h2>Услуги</h2></div><div class="entity-list" data-record-edit-procedures></div>${button('Применить', { data: 'data-record-edit-save' })}</div>`;
+  const content = `<div class="record-screen record-screen--procedures"><div class="modal-title"><h2>Услуги</h2></div><div data-record-edit-procedures></div>${button('Применить', { data: 'data-record-edit-save' })}</div>`;
   const m = mountModal(document.body, pickerModal(content)); if (!m) return;
   const host = m.querySelector('[data-record-edit-procedures]');
-  host.innerHTML = items.map((item) => `<button type="button" class="entity-list-row${selected.has(item.id) ? ' is-selected' : ''}" data-record-edit-procedure="${escapeHtml(item.id)}" aria-pressed="${selected.has(item.id)}"><span class="entity-list-row__main"><strong>${escapeHtml(item.name || '')}</strong><small>${Number(item.duration) || 0} мин</small></span><span class="entity-list-row__price">${costText(resolveProcedureCost(item, state.workplaceId))}</span></button>`).join('') || '<div class="muted">Услуг пока нет.</div>';
+  host.innerHTML = list({ items: items.map((item) => {
+    const cost = costListParts(resolveProcedureCost(item, state.workplaceId));
+    return {
+      title: item.name || '',
+      secondary: [`${Number(item.duration) || 0} мин`, cost.rightTop, cost.rightBottom].filter(Boolean),
+      interactive: true,
+      selected: selected.has(item.id),
+      data: `data-record-edit-procedure="${escapeHtml(item.id)}"`,
+      aria: `Выбрать услугу ${item.name || ''}`,
+    };
+  }) }) || '<div class="muted">Услуг пока нет.</div>';
   initMultiSelect(host, { selectedValues: [...selected.keys()], selector: '[data-record-edit-procedure]', valueAttribute: 'recordEditProcedure', onChange: (values) => { const next = new Map(); values.forEach((id) => { const item = items.find((procedure) => procedure.id === id); if (!item) return; const existing = selected.get(id); next.set(id, existing || { id: item.id, name: item.name, cost: costValue(resolveProcedureCost(item, state.workplaceId)) ?? '', duration: Number(item.duration) || 0 }); }); selected.clear(); next.forEach((value, id) => selected.set(id, value)); } });
   m.querySelector('[data-record-edit-save]')?.addEventListener('click', () => {
     state.procedures = items.filter((item) => selected.has(item.id)).map((item) => { const selectedItem = selected.get(item.id) || {}; return { id: item.id, name: item.name, cost: selectedItem.cost ?? (costValue(resolveProcedureCost(item, state.workplaceId)) ?? ''), duration: Number(selectedItem.duration ?? item.duration) || 0 }; });
