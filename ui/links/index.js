@@ -10,7 +10,7 @@ function linkRow(link = {}) {
 
 export function links({ links: values = [], name = 'links' } = {}) {
   const rows = values.length ? values : [{ type: 'Instagram', url: '' }];
-  return `<div class="ui-links array-group" data-links="${escapeHtml(name)}"><div data-links-list>${rows.map(linkRow).join('')}</div>${button('+ Добавить ссылку',{className:'ui-button--small',data:`data-add-link="${escapeHtml(name)}"`})}</div>`;
+  return `<div class="ui-links array-group" data-links="${escapeHtml(name)}"><div data-links-list>${rows.map(linkRow).join('')}</div>${button('+ Добавить ссылку',{variant:'secondary',data:`data-add-link="${escapeHtml(name)}"`})}</div>`;
 }
 
 export function initLinks(root) {

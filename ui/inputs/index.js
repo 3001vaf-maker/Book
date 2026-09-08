@@ -1,4 +1,5 @@
 import { escapeHtml } from '../utils/escape-html.js';
+import { button } from '../buttons/index.js';
 
 function labelText(label, required) {
   const value = String(label || '');
@@ -21,7 +22,7 @@ export function photoField({ name = 'photo', value = '' } = {}) {
   const preview = value
     ? `<div class="photo-field__preview" style="background-image:url('${escapeHtml(value)}')" aria-hidden="true"></div>`
     : '<div class="photo-field__preview photo-field__preview--empty" aria-hidden="true">Фото</div>';
-  return `<div class="photo-field" data-photo-field><span class="photo-field__label">Фото</span><label class="photo-field__control">${preview}<span class="photo-field__action">${value ? 'Изменить фото' : 'Добавить фото'}</span><input type="file" accept="image/*" data-photo-input></label>${value ? '<button type="button" class="ui-button ui-button--small photo-field__remove" data-photo-remove>Удалить фото</button>' : ''}<input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(value)}" data-photo-value></div>`;
+  return `<div class="photo-field" data-photo-field><span class="photo-field__label">Фото</span><label class="photo-field__control">${preview}<span class="photo-field__action">${value ? 'Изменить фото' : 'Добавить фото'}</span><input type="file" accept="image/*" data-photo-input></label>${value ? button('Удалить фото', { className: 'photo-field__remove', data: 'data-photo-remove', variant: 'secondary' }) : ''}<input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(value)}" data-photo-value></div>`;
 }
 
 export function initPhotoField(root) {
@@ -43,7 +44,7 @@ export function initPhotoField(root) {
         preview.style.backgroundImage = `url('${src.replaceAll("'", '%27')}')`;
         preview.textContent = '';
         action.textContent = 'Изменить фото';
-        if (!fieldRoot.querySelector('[data-photo-remove]')) fieldRoot.insertAdjacentHTML('beforeend', '<button type="button" class="ui-button ui-button--small photo-field__remove" data-photo-remove>Удалить фото</button>');
+        if (!fieldRoot.querySelector('[data-photo-remove]')) fieldRoot.insertAdjacentHTML('beforeend', button('Удалить фото', { className: 'photo-field__remove', data: 'data-photo-remove', variant: 'secondary' }));
         value.dispatchEvent(new Event('change', { bubbles: true }));
       });
       reader.readAsDataURL(file);

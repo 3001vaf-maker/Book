@@ -15,6 +15,17 @@ function walk(dir) {
   return result;
 }
 
+function walkCss(dir) {
+  const result = [];
+  for (const name of readdirSync(dir)) {
+    const path = join(dir, name);
+    const stat = statSync(path);
+    if (stat.isDirectory()) result.push(...walkCss(path));
+    else if (/\.css$/.test(name)) result.push(path);
+  }
+  return result;
+}
+
 function text(file) {
   return readFileSync(file, 'utf8');
 }
@@ -31,6 +42,7 @@ const referenceFiles = [...mainFiles, ...settingsFiles, timetableController];
 const uiFiles = walk(join(root, 'ui'));
 const coreFiles = walk(join(root, 'core'));
 const allFiles = [...walk(join(root, 'main')), ...walk(join(root, 'settings')), ...walk(join(root, 'timetable')), ...walk(join(root, 'journal')), ...uiFiles, ...coreFiles, join(root, 'core.js')];
+const cssFiles = [...walkCss(join(root, 'css')), ...walkCss(join(root, 'ui'))];
 
 for (const file of referenceFiles) {
   const source = text(file);
@@ -58,6 +70,19 @@ for (const file of allFiles) {
 const buttonsCss = join(root, 'ui/buttons/buttons.css');
 if (buttonSizeClass.test(text(buttonsCss))) {
   report(buttonsCss, 'ordinary button has one geometry; size modifier classes are forbidden');
+}
+const buttonGeometryProperty = /\b(?:width|min-width|max-width|height|min-height|max-height|padding|padding-top|padding-right|padding-bottom|padding-left)\s*:/;
+for (const file of cssFiles) {
+  if (file === buttonsCss) continue;
+  const source = text(file);
+  for (const match of source.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const selector = match[1] || '';
+    const body = match[2] || '';
+    if (selector.includes('.ui-button') && buttonGeometryProperty.test(body)) {
+      report(file, 'ordinary button geometry belongs only to ui/buttons/buttons.css');
+      break;
+    }
+  }
 }
 const timePickerUi = join(root, 'ui/time/index.js');
 if (/<button\b[^>]*class=["'][^"']*\bui-button\b/i.test(text(timePickerUi))) {
