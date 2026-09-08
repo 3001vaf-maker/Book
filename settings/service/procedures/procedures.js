@@ -1,4 +1,4 @@
-import { actionBlock, button, collectCost, collectWorkplaceSelections, costCardMeta, costField, costListParts, durationPicker, durationText, emptyState, entityCard, escapeHtml, field, iconButton, initCostFields, initDurationPickers, initPhotoField, initWorkplaceSelectors, listEntries, listEntry, mountModal, modal, page, pageHeader, photoField, textareaField, workplaceCountText, workplaceSelector } from '../../../ui/ui.js?v=shared-secondary-button-20260908';
+import { actionBlock, button, collectCost, collectWorkplaceSelections, costCardMeta, costField, costListParts, durationPicker, durationText, emptyState, entityCard, escapeHtml, field, iconButton, initCostFields, initDurationPickers, initPhotoField, initWorkplaceSelectors, listEntries, listEntry, mountModal, modal, page, pageHeader, photoField, textareaField, workplaceCountText, workplaceSelector } from '../../../ui/ui.js';
 import { getWorkplaces } from '../../profile/workplaces/data.js';
 import { deleteProcedure as deleteProcedureData, getProcedures, pushProcedureHistory, saveProcedure as saveProcedureData } from './data.js';
 
