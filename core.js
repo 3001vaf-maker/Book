@@ -1,5 +1,5 @@
 import { renderMain } from './main/main.js';
-import { renderJournal } from './journal/journal.js?v=journal-all-workplaces-20260908';
+import { renderJournal } from './journal/journal.js?v=journal-header-split-20260908';
 import { renderTimetable } from './timetable/timetable.js?v=aggregate-day-editor-20260908';
 import { renderChat } from './chat/chat.js';
 import { renderSettings } from './settings/settings.js?v=schedule-indicators-20260908';
@@ -7,7 +7,7 @@ import { getWorkplaces as getWorkplaceEntities } from './settings/profile/workpl
 import { getWorkingTimeRecordConflicts } from './journal/record-data.js?v=aggregate-day-editor-20260908';
 import { configureWorkplaceSource } from './core/workplace-time.js?v=schedule-indicators-20260908';
 import { configureWorkingTimeConflictSource } from './core/time-usage.js?v=aggregate-day-editor-20260908';
-import { bottomNavigation } from './ui/ui.js?v=journal-all-workplaces-20260908';
+import { bottomNavigation } from './ui/ui.js?v=aggregate-day-editor-20260908';
 
 configureWorkplaceSource(getWorkplaceEntities);
 configureWorkingTimeConflictSource(getWorkingTimeRecordConflicts);
