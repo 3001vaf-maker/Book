@@ -1,6 +1,7 @@
-import { pageHeader, viewNavigation, initViewNavigation, headerControl, workplaceContent, openWorkplaceControl, ALL_WORKPLACES_ID, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js?v=journal-all-workplaces-20260908';
+import { pageHeader, viewNavigation, initViewNavigation, headerControl, workplaceContent, ALL_WORKPLACES_ID, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js?v=journal-header-split-20260908';
 import { getWorkplaces, getWorkplaceMonthStatsMap } from '../core/workplace-time.js?v=schedule-indicators-20260908';
 import { getDays } from '../core/day.js';
+import { openJournalWorkplaceControl } from './workplace-control.js?v=journal-header-split-20260908';
 import { renderJournalDay } from './день.js?v=journal-all-workplaces-20260908';
 import { renderJournalMonth } from './месяц.js?v=journal-all-workplaces-20260908';
 import { renderJournalList } from './список.js';
@@ -32,15 +33,10 @@ export function renderJournal(root) {
     const month = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
     const workplaceStats = getWorkplaceMonthStatsMap(days, workplaces, month);
 
-    openWorkplaceControl({
+    openJournalWorkplaceControl({
       workplaces,
       workplaceId: selectedWorkplaceId,
-      title: '',
-      stats: selectedWorkplaceId === ALL_WORKPLACES_ID ? null : workplaceStats[selectedWorkplaceId],
       workplaceStats,
-      includeAggregate: true,
-      aggregateLabel: 'Все записи',
-      aggregateAria: 'Показать записи всех рабочих мест',
       onSelect: (nextId) => {
         selectedWorkplaceId = nextId || selectedWorkplaceId;
         setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: selectedDate });
