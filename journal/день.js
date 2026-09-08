@@ -1,5 +1,5 @@
 import { initDateNavigator, journalDayTimeline, initJournalDayTimeline, ALL_WORKPLACES_ID } from '../ui/ui.js?v=journal-all-workplaces-20260908';
-import { getWorkplaces } from '../core/workplace-time.js';
+import { getWorkplaces } from '../core/workplace-time.js?v=schedule-indicators-20260908';
 import { getDays, getDay, getDayTime, getDaysForDate } from '../core/day.js';
 import { rangesOverlap } from '../core/time.js';
 import { getRecordsForDay } from './record-data.js';
