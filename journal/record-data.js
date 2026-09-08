@@ -40,6 +40,9 @@ export function getRecordsForDay(date, workplaceId = '') {
   const day = normalizeDate(date), workplace = normalizeId(workplaceId);
   return getRecords().filter((record) => record?.date === day && (!workplace || normalizeId(record?.workplaceId) === workplace));
 }
+export function getActiveRecordCountForDay(date, workplaceId = '') {
+  return getRecordsForDay(date, workplaceId).filter((record) => record?.status !== 'cancelled').length;
+}
 
 /**
  * Record owns the appointment data. Consumers receive only the records that
