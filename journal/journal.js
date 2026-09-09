@@ -1,4 +1,4 @@
-import { pageHeader, viewNavigation, initViewNavigation, headerControl, headerToggle, headerControlGroup, workplaceContent, ALL_WORKPLACES_ID, openDayWorkplaceTime } from '../ui/ui.js';
+import { pageHeader, viewNavigation, initViewNavigation, headerControl, workplaceContent, ALL_WORKPLACES_ID, openDayWorkplaceTime } from '../ui/ui.js';
 import { getWorkplaceContext, setWorkplaceContext } from '../core/workplace-context.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getActiveDayWorkplaces, getAvailableDayWorkplaces, getDayWorkplaceDraft, saveDayWorkplaceTime } from '../core/day-workplaces.js';
@@ -70,15 +70,6 @@ export function renderJournal(root) {
     });
   };
 
-  const renderHeaderMeta = () => {
-    const workplaceControl = renderHeaderControl();
-    if (activeView !== 'list') return workplaceControl;
-    return headerControlGroup([
-      headerToggle({ items: listModes, activeId: listMode, data: 'data-journal-list-mode' }),
-      workplaceControl,
-    ]);
-  };
-
   const openDayTime = (workplaceId) => {
     const workplace = workplaces.find((item) => String(item?.key || '') === String(workplaceId || '')) || null;
     const draft = getDayWorkplaceDraft(selectedDate, workplaceId, workplaces);
@@ -148,7 +139,10 @@ export function renderJournal(root) {
   };
 
   const renderView = () => {
-    root.innerHTML = `${pageHeader('Журнал', '', renderHeaderMeta())}${viewNavigation({ views, activeView })}<div data-journal-view></div>`;
+    const listModeNavigation = activeView === 'list'
+      ? `<div data-journal-list-mode-navigation>${viewNavigation({ views: listModes, activeView: listMode, ariaLabel: 'Режим списка' })}</div>`
+      : '';
+    root.innerHTML = `${pageHeader('Журнал', '', renderHeaderControl())}${viewNavigation({ views, activeView })}${listModeNavigation}<div data-journal-view></div>`;
     const viewRoot = root.querySelector('[data-journal-view]');
     if (activeView === 'day') {
       renderJournalDay(viewRoot, {
@@ -173,12 +167,17 @@ export function renderJournal(root) {
     } else renderJournalList(viewRoot, { mode: listMode });
 
     root.querySelector('[data-workplace-header-open]')?.addEventListener('click', activeView === 'day' ? openDayWorkplaces : openWorkplace);
-    root.querySelectorAll('[data-journal-list-mode]').forEach((node) => node.addEventListener('click', () => {
-      const nextMode = node.dataset.journalListMode;
-      if (!listModes.some((item) => item.id === nextMode) || nextMode === listMode) return;
-      listMode = nextMode;
-      renderView();
-    }));
+    const listModeRoot = root.querySelector('[data-journal-list-mode-navigation]');
+    if (listModeRoot) {
+      initViewNavigation(listModeRoot, {
+        views: listModes,
+        activeView: listMode,
+        onChange: (nextMode) => {
+          listMode = nextMode;
+          renderView();
+        },
+      });
+    }
     initViewNavigation(root, { views, activeView, onChange: (nextView) => { activeView = nextView; renderView(); } });
   };
 
