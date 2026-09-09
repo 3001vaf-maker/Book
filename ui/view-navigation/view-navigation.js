@@ -7,11 +7,18 @@ export function viewNavigation({ views = [], activeView = '', className = '', ar
 export function initViewNavigation(root, { views, activeView, onChange }) {
   const navigation = root.querySelector('[data-view-navigation]');
   if (!navigation) return;
+  let currentView = activeView;
 
   navigation.querySelectorAll('[data-view]').forEach((button) => {
     button.addEventListener('click', () => {
       const nextView = button.dataset.view;
-      if (!views.some(({ id }) => id === nextView) || nextView === activeView) return;
+      if (!views.some(({ id }) => id === nextView) || nextView === currentView) return;
+      currentView = nextView;
+      navigation.querySelectorAll('[data-view]').forEach((item) => {
+        const isActive = item.dataset.view === currentView;
+        item.classList.toggle('is-active', isActive);
+        item.setAttribute('aria-selected', String(isActive));
+      });
       onChange(nextView);
     });
   });
