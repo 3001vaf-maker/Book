@@ -2,6 +2,8 @@ import { actionBlock, button, emptyState, entityCard, escapeHtml, field, iconBut
 import { getPaymentsForWallet } from '../../core/payment.js';
 import { deleteWallet as deleteWalletData, getWallets, saveWallet as saveWalletData, updateWallet } from './data.js';
 
+const formatMoney = (value) => `${Math.max(0, Number(value) || 0).toLocaleString('ru-RU')} ₽`;
+
 function renderList(root, navigateBack) {
   const items = getWallets();
   root.innerHTML = `<div class="entity-page-header">${pageHeader('Кошелёк')}<div class="page-header-action">${iconButton('+', { className: 'icon-button--primary', data: 'data-add-wallet', aria: 'Добавить кошелёк' })}</div></div>${items.length ? listEntries(items.map(renderRow)) : emptyState('Кошельков пока нет', 'Добавьте первый кошелёк кнопкой «+».')}${actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-back-wallets' }))}`;
@@ -11,14 +13,19 @@ function renderList(root, navigateBack) {
 }
 
 function renderRow(wallet) {
+  const total = getPaymentsForWallet(wallet.id).reduce((sum, payment) => {
+    const value = Number(payment?.total);
+    return Number.isFinite(value) ? sum + value : sum;
+  }, 0);
   return listEntry({
     title: wallet.name,
     subtitle: '',
+    rightTop: formatMoney(total),
     image: wallet.photo || '',
     initial: (wallet.name || '?').slice(0, 1).toUpperCase(),
     interactive: true,
     data: `data-wallet="${escapeHtml(wallet.id)}"`,
-    aria: `Открыть кошелёк ${wallet.name}`,
+    aria: `Открыть кошелёк ${wallet.name}, ${formatMoney(total)}`,
   });
 }
 
