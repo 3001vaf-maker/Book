@@ -1,19 +1,14 @@
 import { initPaymentForm, initPaymentMethods, modal, mountModal, paymentForm, paymentMethods } from '../ui/ui.js';
+import { createPaymentDraft, paymentTotal } from '../core/payment.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getAllClients } from '../main/clients/data.js';
 import { clientDisplay } from '../main/clients/presentation.js';
 import { getWallets } from '../settings/wallets/data.js';
 import { getRecords } from './record-data.js';
 
-function recordTotal(record) {
-  return (Array.isArray(record?.procedures) ? record.procedures : []).reduce((sum, item) => {
-    const value = Number(item?.cost);
-    return Number.isFinite(value) ? sum + value : sum;
-  }, 0);
-}
-
 function paymentEntryContent(record) {
-  return `<button type="button" class="modal-bottom-action" data-record-payment-open aria-label="Открыть оплату, к оплате ${recordTotal(record)} рублей"><span>К оплате</span><strong>${recordTotal(record)} ₽</strong></button>`;
+  const total = paymentTotal(record?.procedures || []);
+  return `<button type="button" class="modal-bottom-action" data-record-payment-open aria-label="Открыть оплату, к оплате ${total} рублей"><span>К оплате</span><strong>${total} ₽</strong></button>`;
 }
 
 function workplaceName(id) {
@@ -31,12 +26,13 @@ function recordClient(record) {
   return { uei: display.uei || '', name: display.name || '' };
 }
 
-function paymentMoment() {
-  const now = new Date();
-  return {
-    date: `${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getFullYear()).slice(-2)}`,
-    time: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
-  };
+function paymentFromRecord(record) {
+  return createPaymentDraft({
+    source: { type: 'record', id: record?.id || '' },
+    workplace: workplaceName(record?.workplaceId),
+    client: recordClient(record),
+    items: record?.procedures || [],
+  });
 }
 
 function openPaymentMethodsModal() {
@@ -48,14 +44,14 @@ function openPaymentMethodsModal() {
 
 function openPaymentModal(record) {
   const current = getRecords().find((item) => String(item?.id || '') === String(record?.id || '')) || record;
-  const moment = paymentMoment();
+  const payment = paymentFromRecord(current);
   const content = `<div class="modal-title"><h2>Оплата</h2></div>${paymentForm({
-    workplace: workplaceName(current.workplaceId),
-    date: moment.date,
-    time: moment.time,
-    client: recordClient(current),
-    procedures: current.procedures || [],
-    total: recordTotal(current),
+    workplace: payment.workplace,
+    date: payment.date,
+    time: payment.time,
+    client: payment.client || {},
+    procedures: payment.items.map((item) => ({ id: item.sourceId, name: item.name, cost: item.price })),
+    total: payment.total,
   })}`;
   const m = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
   if (!m) return;
@@ -71,7 +67,7 @@ export function openRecordPaymentEntry(record) {
     const current = getRecords().find((item) => String(item?.id || '') === String(record.id));
     const action = bottom.querySelector('[data-record-payment-open]');
     if (!current || !action) return;
-    const amount = recordTotal(current);
+    const amount = paymentTotal(current.procedures || []);
     action.innerHTML = `<span>К оплате</span><strong>${amount} ₽</strong>`;
     action.setAttribute('aria-label', `Открыть оплату, к оплате ${amount} рублей`);
   };
