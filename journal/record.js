@@ -1,4 +1,4 @@
-import { button, durationText, entityCard, escapeHtml, iconButton, list, listEntry, stateView, initStateView, initCalendar, mountModal, modal, timePicker, initTimePickers, initMultiSelect, viewNavigation, initViewNavigation } from '../ui/ui.js';
+import { button, durationText, entityCard, escapeHtml, field, iconButton, list, listEntry, stateView, initStateView, initCalendar, mountModal, modal, timePicker, initTimePickers, initMultiSelect, viewNavigation, initViewNavigation } from '../ui/ui.js';
 import { createRecord, getRecords } from './record-data.js';
 import { getJournalBreaks, createJournalBreak } from './break-data.js';
 import { getAllClients } from '../main/clients/data.js';
@@ -213,16 +213,17 @@ function renderProceduresStep(modalRoot, { date, workplaceId, from, to, onCreate
 function openProcedureSettings({ procedure, current, onSave, onAdd }) {
   if (!procedure) return;
   const value = current || { procedure, cost: defaultCost(procedure, ''), duration: Number(procedure.duration) || 0 };
-  const addAction = onAdd ? button('Добавить процедуру', { data: 'data-record-add-procedure', variant: 'secondary' }) : '';
-  const html = `<div class="record-setting-title">${escapeHtml(procedure.name)}</div><div class="record-setting-note">установите необходимые параметры услуги для данной записи</div><div class="record-setting-row"><span>Стоимость</span><input inputmode="decimal" data-record-cost value="${value.cost === '' ? '' : `${value.cost} ₽`}"></div><div class="record-setting-row"><span>Длительность</span>${timePicker({ name: 'recordDuration', label: '', value: `${String(Math.floor(value.duration / 60)).padStart(2, '0')}:${String(value.duration % 60).padStart(2, '0')}`, minuteStep: 5 })}</div><div class="record-setting-actions">${addAction}${button('Отмена', { data: 'data-record-cancel', variant: 'secondary' })}${button('Сохранить', { data: 'data-record-save' })}</div>`;
-  const m = mountModal(document.body, modal(`<div class="record-screen record-screen--settings">${html}</div>`, { className: 'record-modal record-modal--panel' }));
+  const addAction = onAdd ? button('+ Добавить процедуру', { data: 'data-record-add-procedure', variant: 'secondary' }) : '';
+  const costField = field({ label: 'Стоимость', name: 'recordCost', value: value.cost === '' ? '' : value.cost, inputmode: 'decimal', data: 'data-record-cost' });
+  const durationField = timePicker({ name: 'recordDuration', label: 'Время', value: `${String(Math.floor(value.duration / 60)).padStart(2, '0')}:${String(value.duration % 60).padStart(2, '0')}`, minuteStep: 5 });
+  const html = `<div class="modal-title"><h2>${escapeHtml(procedure.name)}</h2><p>Установите параметры процедуры для этой записи.</p></div><div class="compact-form">${costField}${durationField}<div class="modal-actions">${button('Сохранить', { data: 'data-record-save' })}${addAction}</div></div>`;
+  const m = mountModal(document.body, modal(html, { variant: 'medium', surface: 'app' }));
   if (!m) return;
   initTimePickers(m);
   m.querySelector('[data-record-add-procedure]')?.addEventListener('click', () => {
     m.remove();
     onAdd?.();
   });
-  m.querySelector('[data-record-cancel]')?.addEventListener('click', () => m.remove());
   m.querySelector('[data-record-save]')?.addEventListener('click', () => {
     const rawCost = String(m.querySelector('[data-record-cost]')?.value || '').replace(/[^0-9.,-]/g, '').replace(',', '.');
     const timeValue = m.querySelector('[data-time-value]')?.value || '';
@@ -316,8 +317,15 @@ function workingDatesForWorkplace(workplaceId) {
 
 function openConfirmationWorkplaceModal({ workplaceId, onSelected }) {
   const workplaces = getWorkplaces();
-  const content = `<div class="record-screen record-screen--workplaces"><div class="record-modal-toolbar"><strong>Выбрать салон</strong></div><div data-record-workplaces>${workplaces.map((workplace) => listEntry({ title: workplace.name || workplace.title || 'Без названия', interactive: true, data: `data-record-workplace="${escapeHtml(workplace.key || workplace.id || '')}"`, aria: `Выбрать салон ${workplace.name || workplace.title || ''}`, className: String(workplace.key || workplace.id || '') === String(workplaceId || '') ? 'is-selected' : '' })).join('') || '<div class="muted">Салоны не найдены.</div>'}</div></div>`;
-  const m = mountModal(document.body, modal(content, { className: 'record-modal record-modal--full' }));
+  const items = workplaces.map((workplace) => ({
+    title: workplace.name || workplace.title || 'Без названия',
+    interactive: true,
+    data: `data-record-workplace="${escapeHtml(workplace.key || workplace.id || '')}"`,
+    selected: String(workplace.key || workplace.id || '') === String(workplaceId || ''),
+    aria: `Выбрать рабочее пространство ${workplace.name || workplace.title || ''}`,
+  }));
+  const content = `<div class="modal-title"><h2>Рабочее пространство</h2></div>${list({ items }) || '<div class="muted">Рабочие пространства не найдены.</div>'}`;
+  const m = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
   if (!m) return;
   m.querySelectorAll('[data-record-workplace]').forEach((row) => row.addEventListener('click', () => {
     const selectedId = row.dataset.recordWorkplace || workplaceId;
@@ -329,7 +337,8 @@ function openConfirmationWorkplaceModal({ workplaceId, onSelected }) {
 function openConfirmationDateModal({ workplaceId, date, onSelected }) {
   const workingDates = workingDatesForWorkplace(workplaceId);
   const current = date instanceof Date ? date : new Date(`${String(date || workingDates[0] || dateKey(new Date()))}T00:00:00`);
-  const m = mountModal(document.body, modal(`<div class="record-screen record-screen--date"><div class="record-modal-toolbar"><strong>Выбор даты</strong></div><div data-record-confirm-calendar></div></div>`, { className: 'record-modal record-modal--full' }));
+  const content = `<div class="modal-title"><h2>Выбор даты</h2></div><div data-record-confirm-calendar></div>`;
+  const m = mountModal(document.body, modal(content, { variant: 'large', surface: 'app' }));
   if (!m) return;
   const calendarRoot = m.querySelector('[data-record-confirm-calendar]');
   initCalendar(calendarRoot, {
@@ -351,9 +360,9 @@ function availableConfirmationTimes({ date, workplaceId, duration }) {
   const end = timeToMinutes(workTime.to);
   if (start == null || end == null) return [];
   const appointmentDuration = Math.max(1, Number(duration) || 0);
-  const first = Math.ceil(start / 30) * 30;
+  const first = Math.ceil(start / 15) * 15;
   const result = [];
-  for (let value = first; value + appointmentDuration <= end; value += 30) {
+  for (let value = first; value + appointmentDuration <= end; value += 15) {
     const from = minutesToTime(value);
     const to = minutesToTime(value + appointmentDuration);
     if (isTimeRangeAvailable({ from, to, usages: scopedUsages(date, workplaceId) })) result.push({ from, to });
@@ -363,8 +372,9 @@ function availableConfirmationTimes({ date, workplaceId, duration }) {
 
 function openConfirmationTimeModal({ date, workplaceId, from, duration, onSelected }) {
   const options = availableConfirmationTimes({ date, workplaceId, duration });
-  const content = `<div class="record-screen record-screen--time"><div class="record-modal-toolbar"><strong>Выбор времени</strong></div><div class="record-time-list">${options.map((item) => `<button type="button" class="record-time-option" data-record-confirm-time-option="${item.from}">${item.from}</button>`).join('') || '<div class="muted">Свободного времени нет.</div>'}</div></div>`;
-  const m = mountModal(document.body, modal(content, { className: 'record-modal record-modal--full' }));
+  const slots = options.map((item) => `<button type="button" class="record-time-option" data-record-confirm-time-option="${item.from}">${item.from}</button>`).join('') || '<div class="muted">Свободного времени нет.</div>';
+  const content = `<div class="modal-title"><h2>Выбор времени</h2></div><div class="record-time-list">${slots}</div>`;
+  const m = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
   if (!m) return;
   m.querySelectorAll('[data-record-confirm-time-option]').forEach((node) => node.addEventListener('click', () => {
     const selectedFrom = node.dataset.recordConfirmTimeOption || from;
@@ -405,7 +415,7 @@ function openConfirmationProcedurePicker({ workplaceId, selectedProcedures, onSe
       aria: `Добавить процедуру ${procedure.name || ''}`,
     })),
   }) || '<div class="muted">Других процедур для этого рабочего места нет.</div>';
-  const m = mountModal(document.body, modal(`<div class="record-screen record-screen--procedures"><div class="record-modal-toolbar"><strong>Добавить процедуру</strong></div>${content}</div>`, { className: 'record-modal record-modal--full' }));
+  const m = mountModal(document.body, modal(`<div class="modal-title"><h2>Добавить процедуру</h2></div>${content}`, { variant: 'medium', surface: 'app' }));
   if (!m) return;
   m.querySelectorAll('[data-record-confirm-add-procedure]').forEach((node) => node.addEventListener('click', () => {
     const procedure = available.find((item) => String(item.id) === String(node.dataset.recordConfirmAddProcedure));
@@ -687,7 +697,7 @@ function renderBreakConfirmationStep(modalRoot, { date, workplaceId, from, to, o
 
 function findWorkplaceName(workplaceId) {
   const workplace = getWorkplaces().find((item) => String(item?.id ?? item?.key ?? '') === String(workplaceId ?? ''));
-  return workplace?.name || workplace?.title || 'Салон красоты';
+  return workplace?.name || workplace?.title || 'Рабочее пространство';
 }
 
 function formatConfirmationDate(date) {
