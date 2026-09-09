@@ -1,7 +1,22 @@
+const STORAGE_KEY = 'book.payments';
+
 const numberValue = (value) => {
   const number = Number(String(value ?? '').replace(',', '.'));
   return Number.isFinite(number) ? number : 0;
 };
+
+function readPayments() {
+  try {
+    const value = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return [];
+  }
+}
+
+function writePayments(items) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.isArray(items) ? items : []));
+}
 
 export function paymentMoment(now = new Date()) {
   return {
@@ -41,4 +56,35 @@ export function createPaymentDraft({ source = null, workplace = '', client = nul
     items: preparedItems,
     total: paymentTotal(preparedItems),
   };
+}
+
+export function completePayment(draft, { walletId = '', walletName = '', items = [], total = 0 } = {}) {
+  if (!draft?.id || !walletId) return null;
+  const preparedItems = (Array.isArray(items) ? items : []).map((item) => ({
+    sourceId: item?.sourceId || '',
+    name: item?.name || '',
+    price: Math.max(0, numberValue(item?.price)),
+    discountPercent: Math.max(0, numberValue(item?.discountPercent)),
+    discountMoney: Math.max(0, numberValue(item?.discountMoney)),
+  }));
+  const payment = {
+    ...draft,
+    status: 'completed',
+    walletId: String(walletId),
+    walletName: String(walletName || ''),
+    items: preparedItems,
+    total: Math.max(0, numberValue(total)),
+    paidAt: new Date().toISOString(),
+  };
+  writePayments([...readPayments(), payment]);
+  window.dispatchEvent(new CustomEvent('book:payments-changed', { detail: { paymentId: payment.id, walletId: payment.walletId } }));
+  return payment;
+}
+
+export function getPayments() {
+  return readPayments();
+}
+
+export function getPaymentsForWallet(walletId) {
+  return readPayments().filter((payment) => payment?.status === 'completed' && String(payment?.walletId || '') === String(walletId || ''));
 }
