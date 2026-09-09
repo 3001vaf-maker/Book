@@ -1,15 +1,21 @@
 import { timeToMinutes, minutesToTime } from '../../core/time.js';
 
 const escape = (value) => String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;');
+const recordTotal = (usage) => (usage?.procedures || []).reduce((sum, item) => {
+  const value = Number(item?.cost);
+  return Number.isFinite(value) ? sum + value : sum;
+}, 0);
+const moneyText = (value) => `${Math.max(0, Number(value) || 0).toLocaleString('ru-RU')} ₽`;
 
 function recordMarkup(usage) {
   const client = usage?.client || {};
   const name = [client.name, client.surname].filter(Boolean).join(' ') || 'Без имени';
   const id = String(client.uei || client.id || '').trim();
   const identity = id ? `${escape(id)} - ${escape(name)}` : escape(name);
+  const total = moneyText(recordTotal(usage));
   const phone = client.phone ? `<span class="journal-record__phone">${escape(client.phone)}</span>` : '';
   const services = (usage.procedures || []).map((item) => `<span class="journal-record__service">${escape(item.name)}</span>`).join('');
-  return `<button type="button" class="journal-record" data-journal-record="${escape(usage.id)}"><strong class="journal-record__identity">${identity}</strong>${phone}${services}</button>`;
+  return `<button type="button" class="journal-record" data-journal-record="${escape(usage.id)}"><span class="journal-record__head"><strong class="journal-record__identity">${identity}</strong><strong class="journal-record__total">${escape(total)}</strong></span>${phone}${services}</button>`;
 }
 
 function usageMarkup(usage) {
