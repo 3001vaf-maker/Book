@@ -37,10 +37,13 @@ export function list({ items = [], className = '' } = {}) {
     const indicator = indicatorColor
       ? `<span class="ui-list__indicator" style="--ui-list-indicator:${escapeHtml(indicatorColor)}"${indicatorLabel ? ` role="img" aria-label="${escapeHtml(indicatorLabel)}" title="${escapeHtml(indicatorLabel)}"` : ' aria-hidden="true"'}></span>`
       : '';
+    const overline = item.overline
+      ? `<span class="ui-list__title">${escapeHtml(item.overline)}</span>`
+      : '';
 
     return `<${tag} class="${classes}"${interactive ? ` type="button"` : ''}${attrs}>` +
       indicator +
-      `<span class="ui-list__main"><span class="ui-list__title">${escapeHtml(item.title ?? '')}</span>` +
+      `<span class="ui-list__main">${overline}<span class="ui-list__title">${escapeHtml(item.title ?? '')}</span>` +
       (primarySecondary ? `<span class="ui-list__secondary">${escapeHtml(primarySecondary)}</span>` : '') +
       `</span>` +
       (rightSecondary.length ? `<span class="ui-list__right-secondary">${rightSecondary.map((value) => `<span>${escapeHtml(value)}</span>`).join('')}</span>` : '') +
