@@ -1,3 +1,4 @@
+import { button } from '../buttons/index.js';
 import { select } from '../selectors/index.js';
 import { escapeHtml } from '../utils/escape-html.js';
 
@@ -48,6 +49,27 @@ export function paymentForm({ workplace = '', date = '', time = '', client = {},
     <div class="payment-readonly-block payment-readonly-block--client">${uei}<strong>${name}</strong></div>
     <div class="payment-procedures">${procedureBlocks}</div>
     <label class="payment-total"><span>Итого</span><input type="number" inputmode="decimal" value="${escapeHtml(moneyText(total))}" data-payment-total readonly></label>
+    <div class="payment-submit">${button('Оплатить', { data: 'data-payment-submit' })}</div>
+  </div>`;
+}
+
+export function paymentMethods({ wallets = [] } = {}) {
+  const walletButtons = (Array.isArray(wallets) ? wallets : []).map((wallet) => button(
+    escapeHtml(wallet?.name || 'Кошелёк'),
+    {
+      data: `data-payment-wallet="${escapeHtml(wallet?.id || '')}"`,
+      variant: 'secondary',
+      aria: `Оплатить через ${wallet?.name || 'кошелёк'}`,
+    },
+  )).join('');
+
+  return `<div class="payment-methods" data-payment-methods>
+    <div class="segment-control segment-control--two-equal" role="group" aria-label="Режим оплаты">
+      <button type="button" class="is-active" aria-pressed="true" data-payment-mode="single">Оплата</button>
+      <button type="button" aria-pressed="false" data-payment-mode="split">Разделить оплату</button>
+    </div>
+    <div class="payment-methods__wallets" data-payment-wallets>${walletButtons}</div>
+    <div class="payment-methods__split" data-payment-split hidden></div>
   </div>`;
 }
 
@@ -82,7 +104,7 @@ function recalculateTotal(root) {
   if (totalInput) totalInput.value = moneyText(total);
 }
 
-export function initPaymentForm(root) {
+export function initPaymentForm(root, { onPay = () => {} } = {}) {
   if (!root) return;
 
   root.querySelectorAll('[data-payment-procedure]').forEach((row) => {
@@ -117,5 +139,26 @@ export function initPaymentForm(root) {
     });
   });
 
+  root.querySelector('[data-payment-submit]')?.addEventListener('click', () => {
+    const total = numberValue(root.querySelector('[data-payment-total]')?.value);
+    onPay?.({ total });
+  });
+
   recalculateTotal(root);
+}
+
+export function initPaymentMethods(root) {
+  if (!root) return;
+  const wallets = root.querySelector('[data-payment-wallets]');
+  const split = root.querySelector('[data-payment-split]');
+  root.querySelectorAll('[data-payment-mode]').forEach((buttonNode) => buttonNode.addEventListener('click', () => {
+    const mode = buttonNode.dataset.paymentMode === 'split' ? 'split' : 'single';
+    root.querySelectorAll('[data-payment-mode]').forEach((node) => {
+      const active = node.dataset.paymentMode === mode;
+      node.classList.toggle('is-active', active);
+      node.setAttribute('aria-pressed', String(active));
+    });
+    if (wallets) wallets.hidden = mode !== 'single';
+    if (split) split.hidden = mode !== 'split';
+  }));
 }
