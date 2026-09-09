@@ -1,4 +1,5 @@
 import { actionBlock, button, emptyState, entityCard, escapeHtml, field, iconButton, initPhotoField, listEntries, listEntry, mountModal, modal, page, pageHeader, photoField } from '../../ui/ui.js';
+import { getPaymentsForWallet } from '../../core/payment.js';
 import { deleteWallet as deleteWalletData, getWallets, saveWallet as saveWalletData, updateWallet } from './data.js';
 
 function renderList(root, navigateBack) {
@@ -18,6 +19,16 @@ function renderRow(wallet) {
     interactive: true,
     data: `data-wallet="${escapeHtml(wallet.id)}"`,
     aria: `Открыть кошелёк ${wallet.name}`,
+  });
+}
+
+function renderPaymentRow(payment) {
+  return listEntry({
+    title: 'Услуга',
+    subtitle: `${payment?.date || ''} ${payment?.time || ''}`.trim(),
+    rightTop: `${Number(payment?.total || 0)} ₽`,
+    initial: '₽',
+    interactive: false,
   });
 }
 
@@ -53,6 +64,7 @@ function saveWallet(root, modalRoot, existing, navigateBack) {
 function renderCard(root, id, navigateBack) {
   const wallet = getWallets().find((item) => item.id === id);
   if (!wallet) return renderList(root, navigateBack);
+  const payments = getPaymentsForWallet(wallet.id);
   const card=entityCard({
     title:wallet.name||'',
     subtitle:'',
@@ -60,8 +72,9 @@ function renderCard(root, id, navigateBack) {
     initial:(wallet.name||'?').slice(0,1).toUpperCase(),
     className:'entity-card--hero'
   });
+  const paymentList = payments.length ? listEntries(payments.map(renderPaymentRow)) : emptyState('Оплат пока нет', 'После оплаты через этот кошелёк операции появятся здесь.');
   const deleteButton=wallet.system?'':button('Удалить',{variant:'danger',data:'data-delete-wallet-card'});
-  root.innerHTML=page([card,actionBlock(`${button('Работа с кошельком',{data:'data-wallet-work'})}${button('Назад',{className:'ui-button--secondary',data:'data-back-wallet-card'})}${deleteButton}`)]);
+  root.innerHTML=page([card,paymentList,actionBlock(`${button('Работа с кошельком',{data:'data-wallet-work'})}${button('Назад',{className:'ui-button--secondary',data:'data-back-wallet-card'})}${deleteButton}`)]);
   root.querySelector('[data-wallet-work]')?.addEventListener('click', () => openPhotoForm(root, wallet, navigateBack));
   root.querySelector('[data-back-wallet-card]')?.addEventListener('click', () => renderList(root, navigateBack));
   root.querySelector('[data-delete-wallet-card]')?.addEventListener('click', () => confirmDeleteWallet(root, wallet, navigateBack));
