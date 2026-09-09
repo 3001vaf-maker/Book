@@ -24,6 +24,25 @@ export function headerControl(content = '', { data = '', aria = '', className = 
 }
 
 /**
+ * Canonical compact two-or-more option toggle for page headers.
+ */
+export function headerToggle({ items = [], activeId = '', data = 'data-header-toggle' } = {}) {
+  const buttons = (Array.isArray(items) ? items : []).map((item) => {
+    const id = String(item?.id || '');
+    const active = id === String(activeId || '');
+    return `<button type="button" class="header-toggle__item${active ? ' is-active' : ''}" ${data}="${escapeHtml(id)}" aria-pressed="${active}">${escapeHtml(item?.label || id)}</button>`;
+  }).join('');
+  return `<div class="header-toggle" role="group">${buttons}</div>`;
+}
+
+/**
+ * Canonical grouping for more than one header control block.
+ */
+export function headerControlGroup(items = []) {
+  return `<div class="header-control-group">${(Array.isArray(items) ? items : []).filter(Boolean).join('')}</div>`;
+}
+
+/**
  * Canonical manifestation of Header Control.
  * Every Header Control opens the same medium modal shell; the caller only
  * supplies the UI content placed inside that shell.
