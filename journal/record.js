@@ -4,6 +4,7 @@ import { getJournalBreaks, createJournalBreak } from './break-data.js';
 import { getAllClients } from '../main/clients/data.js';
 import { clientDisplay } from '../main/clients/presentation.js';
 import { openClientCreate } from '../main/clients/create.js';
+import { openClientProfile } from '../main/clients/clients.js';
 import { getProcedures } from '../settings/service/procedures/data.js';
 import { openProcedureForm } from '../settings/service/procedures/form.js';
 import { isTimeRangeAvailable, getTimeUsages } from '../core/time-usage.js';
@@ -209,13 +210,18 @@ function renderProceduresStep(modalRoot, { date, workplaceId, from, to, onCreate
   render();
 }
 
-function openProcedureSettings({ procedure, current, onSave }) {
+function openProcedureSettings({ procedure, current, onSave, onAdd }) {
   if (!procedure) return;
   const value = current || { procedure, cost: defaultCost(procedure, ''), duration: Number(procedure.duration) || 0 };
-  const html = `<div class="record-setting-title">${escapeHtml(procedure.name)}</div><div class="record-setting-note">установите необходимые параметры услуги для данной записи</div><div class="record-setting-row"><span>Стоимость</span><input inputmode="decimal" data-record-cost value="${value.cost === '' ? '' : `${value.cost} ₽`}"></div><div class="record-setting-row"><span>Длительность</span>${timePicker({ name: 'recordDuration', label: '', value: `${String(Math.floor(value.duration / 60)).padStart(2, '0')}:${String(value.duration % 60).padStart(2, '0')}`, minuteStep: 5 })}</div><div class="record-setting-actions">${button('Отмена', { data: 'data-record-cancel', variant: 'secondary' })}${button('Сохранить', { data: 'data-record-save' })}</div>`;
+  const addAction = onAdd ? button('Добавить процедуру', { data: 'data-record-add-procedure', variant: 'secondary' }) : '';
+  const html = `<div class="record-setting-title">${escapeHtml(procedure.name)}</div><div class="record-setting-note">установите необходимые параметры услуги для данной записи</div><div class="record-setting-row"><span>Стоимость</span><input inputmode="decimal" data-record-cost value="${value.cost === '' ? '' : `${value.cost} ₽`}"></div><div class="record-setting-row"><span>Длительность</span>${timePicker({ name: 'recordDuration', label: '', value: `${String(Math.floor(value.duration / 60)).padStart(2, '0')}:${String(value.duration % 60).padStart(2, '0')}`, minuteStep: 5 })}</div><div class="record-setting-actions">${addAction}${button('Отмена', { data: 'data-record-cancel', variant: 'secondary' })}${button('Сохранить', { data: 'data-record-save' })}</div>`;
   const m = mountModal(document.body, modal(`<div class="record-screen record-screen--settings">${html}</div>`, { className: 'record-modal record-modal--panel' }));
   if (!m) return;
   initTimePickers(m);
+  m.querySelector('[data-record-add-procedure]')?.addEventListener('click', () => {
+    m.remove();
+    onAdd?.();
+  });
   m.querySelector('[data-record-cancel]')?.addEventListener('click', () => m.remove());
   m.querySelector('[data-record-save]')?.addEventListener('click', () => {
     const rawCost = String(m.querySelector('[data-record-cost]')?.value || '').replace(/[^0-9.,-]/g, '').replace(',', '.');
@@ -367,6 +373,52 @@ function openConfirmationTimeModal({ date, workplaceId, from, duration, onSelect
   }));
 }
 
+function openPhoneActions(phone) {
+  const value = String(phone || '').trim();
+  if (!value) return;
+  const content = list({
+    items: [
+      { title: 'Позвонить', interactive: true, data: 'data-record-phone-call', aria: `Позвонить ${value}` },
+      { title: 'Написать', interactive: true, data: 'data-record-phone-write', aria: `Написать ${value}` },
+    ],
+  });
+  const m = mountModal(document.body, modal(content, { variant: 'compact' }));
+  if (!m) return;
+  m.querySelector('[data-record-phone-call]')?.addEventListener('click', () => {
+    window.location.href = `tel:${value.replace(/[^\d+]/g, '')}`;
+  });
+  m.querySelector('[data-record-phone-write]')?.addEventListener('click', () => {
+    m.remove();
+    mountModal(document.body, modal('<div class="muted">Чат в разработке</div>', { variant: 'compact' }));
+  });
+}
+
+function openConfirmationProcedurePicker({ workplaceId, selectedProcedures, onSelected }) {
+  const selectedIds = new Set(selectedProcedures.map((item) => String(item?.procedure?.id || '')));
+  const available = procedures().filter((procedure) => procedureForWorkplace(procedure, workplaceId) && !selectedIds.has(String(procedure.id || '')));
+  const content = list({
+    items: available.map((procedure) => ({
+      title: procedure.name || '',
+      secondary: [durationText(procedure.duration), defaultCost(procedure, workplaceId) !== '' ? `${defaultCost(procedure, workplaceId)} ₽` : ''],
+      interactive: true,
+      data: `data-record-confirm-add-procedure="${escapeHtml(procedure.id)}"`,
+      aria: `Добавить процедуру ${procedure.name || ''}`,
+    })),
+  }) || '<div class="muted">Других процедур для этого рабочего места нет.</div>';
+  const m = mountModal(document.body, modal(`<div class="record-screen record-screen--procedures"><div class="record-modal-toolbar"><strong>Добавить процедуру</strong></div>${content}</div>`, { className: 'record-modal record-modal--full' }));
+  if (!m) return;
+  m.querySelectorAll('[data-record-confirm-add-procedure]').forEach((node) => node.addEventListener('click', () => {
+    const procedure = available.find((item) => String(item.id) === String(node.dataset.recordConfirmAddProcedure));
+    if (!procedure) return;
+    m.remove();
+    onSelected?.({
+      procedure,
+      cost: defaultCost(procedure, workplaceId),
+      duration: Number(procedure.duration) || 0,
+    });
+  }));
+}
+
 function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, selectedClient, selectedProcedures, onCreated }) {
   let currentDate = dateKey(date);
   let currentWorkplaceId = workplaceId;
@@ -379,6 +431,11 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
     const value = Number(entry.cost);
     return Number.isFinite(value) ? sum + value : sum;
   }, 0);
+  const calculatedTo = () => minutesToTime(timeToMinutes(currentFrom) + duration());
+  const fitsCurrentSlot = (nextDuration = duration()) => {
+    const end = minutesToTime(timeToMinutes(currentFrom) + nextDuration);
+    return isTimeRangeAvailable({ from: currentFrom, to: end, usages: scopedUsages(currentDate, currentWorkplaceId) });
+  };
 
   const chooseDateAfterWorkplace = (nextWorkplaceId) => {
     currentWorkplaceId = nextWorkplaceId;
@@ -394,7 +451,7 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
           duration: duration(),
           onSelected: (nextFrom) => {
             currentFrom = nextFrom;
-            currentTo = minutesToTime(timeToMinutes(currentFrom) + duration());
+            currentTo = calculatedTo();
             render();
           },
         });
@@ -414,7 +471,7 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
         duration: duration(),
         onSelected: (nextFrom) => {
           currentFrom = nextFrom;
-          currentTo = minutesToTime(timeToMinutes(currentFrom) + duration());
+          currentTo = calculatedTo();
           render();
         },
       });
@@ -428,10 +485,39 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
     duration: duration(),
     onSelected: (nextFrom) => {
       currentFrom = nextFrom;
-      currentTo = minutesToTime(timeToMinutes(currentFrom) + duration());
+      currentTo = calculatedTo();
       render();
     },
   });
+
+  const addProcedure = () => openConfirmationProcedurePicker({
+    workplaceId: currentWorkplaceId,
+    selectedProcedures,
+    onSelected: (item) => {
+      const nextDuration = duration() + (Number(item.duration) || 0);
+      if (!fitsCurrentSlot(nextDuration)) {
+        alert('Эта процедура не помещается в свободный интервал. Выберите другое время.');
+        return;
+      }
+      selectedProcedures.push(item);
+      currentTo = calculatedTo();
+      render();
+    },
+  });
+
+  const openClient = () => {
+    const key = currentClient?.key;
+    if (!key) return;
+    openClientProfile({
+      root: document.body,
+      key,
+      onClose: () => {
+        const updated = people().find((person) => person.key === key);
+        if (updated) currentClient = updated;
+        render();
+      },
+    });
+  };
 
   const render = () => {
     const host = flowHost(modalRoot);
@@ -442,25 +528,62 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
     const total = totalCost();
     const detailRows = [
       { left: durationText(duration()), right: `${total} ₽`, weight: 'strong' },
-      ...selectedProcedures.map((item) => ({
+      ...selectedProcedures.map((item, index) => ({
         left: item.procedure.name || '',
         right: item.cost === '' || item.cost === null || item.cost === undefined ? '' : `${item.cost} ₽`,
+        data: `data-record-confirm-procedure="${index}"`,
+        aria: `Изменить процедуру ${item.procedure.name || ''}`,
       })),
     ];
     const card = entityCard({
       id: client.uei,
       title: client.name,
       subtitle: client.phone,
-      topMeta: [{ value: workplace, row: 1 }],
+      idData: client.uei ? 'data-record-confirm-client-profile' : '',
+      idAria: client.uei ? `Открыть профиль клиента ${client.name}` : '',
+      titleData: 'data-record-confirm-client-profile',
+      titleAria: `Открыть профиль клиента ${client.name}`,
+      subtitleData: client.phone ? 'data-record-confirm-phone' : '',
+      subtitleAria: client.phone ? `Действия с телефоном ${client.phone}` : '',
+      topMeta: [{ value: workplace, row: 1, data: 'data-record-confirm-workplace', aria: `Изменить рабочее пространство ${workplace}` }],
       topRightMeta: [
-        { value: formattedDate, row: 2 },
-        { value: `${currentFrom} - ${currentTo || ''}`, row: 3 },
+        { value: formattedDate, row: 2, data: 'data-record-confirm-date', aria: `Изменить дату ${formattedDate}` },
+        { value: `${currentFrom} - ${currentTo || ''}`, row: 3, data: 'data-record-confirm-time', aria: `Изменить время ${currentFrom} - ${currentTo || ''}` },
       ],
       detailRows,
       className: 'entity-card--hero entity-card--top-dark',
     });
 
     host.innerHTML = `<div class="record-screen record-screen--state-view">${card}<div class="record-modal-actions modal-actions">${button('Подтвердить запись', { data: 'data-record-confirm' })}</div></div>`;
+
+    host.querySelector('[data-record-confirm-workplace]')?.addEventListener('click', () => {
+      openConfirmationWorkplaceModal({ workplaceId: currentWorkplaceId, onSelected: chooseDateAfterWorkplace });
+    });
+    host.querySelector('[data-record-confirm-date]')?.addEventListener('click', chooseDate);
+    host.querySelector('[data-record-confirm-time]')?.addEventListener('click', chooseTime);
+    host.querySelectorAll('[data-record-confirm-client-profile]').forEach((node) => node.addEventListener('click', openClient));
+    host.querySelector('[data-record-confirm-phone]')?.addEventListener('click', () => openPhoneActions(client.phone));
+    host.querySelectorAll('[data-record-confirm-procedure]').forEach((node) => node.addEventListener('click', () => {
+      const index = Number(node.dataset.recordConfirmProcedure);
+      const item = selectedProcedures[index];
+      if (!item) return;
+      openProcedureSettings({
+        procedure: item.procedure,
+        current: item,
+        onAdd: addProcedure,
+        onSave: (updated) => {
+          const previous = selectedProcedures[index];
+          selectedProcedures[index] = updated;
+          if (!fitsCurrentSlot()) {
+            selectedProcedures[index] = previous;
+            alert('Новая длительность не помещается в свободный интервал. Выберите другое время.');
+            return;
+          }
+          currentTo = calculatedTo();
+          render();
+        },
+      });
+    }));
 
     host.querySelector('[data-record-confirm]')?.addEventListener('click', () => {
       const usages = scopedUsages(currentDate, currentWorkplaceId);
