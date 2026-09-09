@@ -6,7 +6,7 @@ import { getRecordsForDay } from './record-data.js';
 
 const RECORD_COLOR = '#EFFFBB';
 const PAID_COLOR = '#DDE8D7';
-const CANCELLED_COLOR = '#F1DADA';
+const NO_SHOW_COLOR = '#F1DADA';
 
 function paidRecordIds() {
   return new Set(getPayments()
@@ -27,14 +27,15 @@ function dayCapacityMinutes(workingDays, workplaces, workplaceId, dateKey, allMo
 }
 
 function dayRecordData({ dateKey, workplaceId, allMode, workingDays, workplaces, paidIds }) {
-  const records = getRecordsForDay(dateKey, allMode ? '' : workplaceId);
+  const records = getRecordsForDay(dateKey, allMode ? '' : workplaceId)
+    .filter((record) => record?.status !== 'cancelled');
   const capacity = dayCapacityMinutes(workingDays, workplaces, workplaceId, dateKey, allMode);
-  const minutes = { paid: 0, active: 0, cancelled: 0 };
+  const minutes = { paid: 0, active: 0, noShow: 0 };
 
   records.forEach((record) => {
     const duration = recordMinutes(record);
-    if (record?.status === 'cancelled') minutes.cancelled += duration;
-    else if (paidIds.has(String(record?.id || ''))) minutes.paid += duration;
+    if (paidIds.has(String(record?.id || ''))) minutes.paid += duration;
+    else if (record?.attendance === 'no-show') minutes.noShow += duration;
     else minutes.active += duration;
   });
 
@@ -46,7 +47,7 @@ function usageGradient({ capacity, minutes }) {
   const values = [
     { color: PAID_COLOR, minutes: minutes.paid },
     { color: RECORD_COLOR, minutes: minutes.active },
-    { color: CANCELLED_COLOR, minutes: minutes.cancelled },
+    { color: NO_SHOW_COLOR, minutes: minutes.noShow },
   ];
   let cursor = 0;
   const stops = [];
