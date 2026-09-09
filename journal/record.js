@@ -1,4 +1,4 @@
-import { button, durationText, escapeHtml, iconButton, list, listEntry, stateView, initStateView, initCalendar, mountModal, modal, timePicker, initTimePickers, initMultiSelect, viewNavigation, initViewNavigation } from '../ui/ui.js';
+import { button, durationText, entityCard, escapeHtml, iconButton, list, listEntry, stateView, initStateView, initCalendar, mountModal, modal, timePicker, initTimePickers, initMultiSelect, viewNavigation, initViewNavigation } from '../ui/ui.js';
 import { createRecord, getRecords } from './record-data.js';
 import { getJournalBreaks, createJournalBreak } from './break-data.js';
 import { getAllClients } from '../main/clients/data.js';
@@ -439,74 +439,28 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
     const client = clientDisplay(currentClient);
     const workplace = findWorkplaceName(currentWorkplaceId);
     const formattedDate = formatConfirmationDate(currentDate);
-    const procedureItems = selectedProcedures.map((item) => ({
-      title: item.procedure.name || '',
-      right: item.cost === '' || item.cost === null || item.cost === undefined ? '' : `${item.cost} ₽`,
-    }));
     const total = totalCost();
-    const view = stateView({
-      blocks: [
-        { id: 'workplace', rows: [{ title: workplace }], aria: `Изменить салон: ${workplace}` },
-        { id: 'dateTime', rows: [{ title: formattedDate }, { title: `${currentFrom} - ${currentTo || ''}` }], aria: `Изменить дату и время: ${formattedDate} ${currentFrom} - ${currentTo || ''}` },
-        { id: 'client', rows: [...(client.uei ? [{ title: client.uei }] : []), { title: client.name }, { title: client.phone }], aria: `Изменить клиента: ${client.name}` },
-        { id: 'procedures', kind: 'list', items: procedureItems, summary: { left: durationText(duration()), right: `${total} ₽` }, aria: 'Изменить процедуры' },
+    const detailRows = [
+      { left: durationText(duration()), right: `${total} ₽`, weight: 'strong' },
+      ...selectedProcedures.map((item) => ({
+        left: item.procedure.name || '',
+        right: item.cost === '' || item.cost === null || item.cost === undefined ? '' : `${item.cost} ₽`,
+      })),
+    ];
+    const card = entityCard({
+      id: client.uei,
+      title: client.name,
+      subtitle: client.phone,
+      topMeta: [{ value: workplace }],
+      topRightMeta: [
+        { value: formattedDate },
+        { value: `${currentFrom} - ${currentTo || ''}` },
       ],
-      actions: [{ label: 'Подтвердить запись', data: 'data-record-confirm' }],
-      className: 'record-state-view',
+      detailRows,
+      className: 'entity-card--hero entity-card--top-dark',
     });
 
-    host.innerHTML = `<div class="record-screen record-screen--state-view">${view}</div>`;
-    initStateView(host.querySelector('[data-state-view]'), {
-      onBlockSelect: (blockId) => {
-        if (blockId === 'workplace') {
-          openConfirmationWorkplaceModal({ workplaceId: currentWorkplaceId, onSelected: chooseDateAfterWorkplace });
-          return;
-        }
-        if (blockId === 'dateTime') {
-          chooseDate();
-          return;
-        }
-        if (blockId === 'client') {
-          renderClientStep(modalRoot, {
-            date: currentDate,
-            workplaceId: currentWorkplaceId,
-            from: currentFrom,
-            to: currentTo,
-            procedures: selectedProcedures,
-            onCreated,
-            onSelected: (client) => {
-              currentClient = client;
-              render();
-            },
-          });
-        }
-      },
-      onRowSelect: (blockId, rowIndex) => {
-        if (blockId === 'dateTime') {
-          if (rowIndex === 0) {
-            chooseDate();
-            return;
-          }
-          if (rowIndex === 1) {
-            chooseTime();
-            return;
-          }
-        }
-        if (blockId !== 'procedures' || rowIndex === 'summary') return;
-        const index = Number(rowIndex);
-        const item = selectedProcedures[index];
-        if (!item) return;
-        openProcedureSettings({
-          procedure: item.procedure,
-          current: item,
-          onSave: (updated) => {
-            selectedProcedures[index] = updated;
-            currentTo = minutesToTime(timeToMinutes(currentFrom) + duration());
-            render();
-          },
-        });
-      },
-    });
+    host.innerHTML = `<div class="record-screen record-screen--state-view">${card}<div class="record-modal-actions modal-actions">${button('Подтвердить запись', { data: 'data-record-confirm' })}</div></div>`;
 
     host.querySelector('[data-record-confirm]')?.addEventListener('click', () => {
       const usages = scopedUsages(currentDate, currentWorkplaceId);
