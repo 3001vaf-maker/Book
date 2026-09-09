@@ -55,6 +55,13 @@ function renderFlow(modalRoot, content) {
   return host;
 }
 
+function openRecordTimeNotice(message) {
+  const content = `<div class="modal-title"><h2>Недостаточно времени</h2><p>${escapeHtml(message)}</p></div><div class="modal-actions">${button('ОК', { data: 'data-record-time-notice-close' })}</div>`;
+  const m = mountModal(document.body, modal(content, { variant: 'compact', surface: 'app' }));
+  if (!m) return;
+  m.querySelector('[data-record-time-notice-close]')?.addEventListener('click', () => m.remove());
+}
+
 function renderTimeStep(modalRoot, { date, workplaceId, from, to, onCreated }) {
   let activeMode = 'record';
   const usages = scopedUsages(date, workplaceId);
@@ -135,7 +142,7 @@ function renderProceduresStep(modalRoot, { date, workplaceId, from, to, onCreate
       const end = minutesToTime(timeToMinutes(from) + duration);
       const usages = scopedUsages(date, workplaceId);
       if (!isTimeRangeAvailable({ from, to: end, usages })) {
-        alert('Это время уже занято.');
+        openRecordTimeNotice('Запись не может быть создана: выбранным процедурам не хватает свободного времени. Скорректируйте время записи.');
         return;
       }
       renderClientStep(modalRoot, {
@@ -506,7 +513,7 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
     onSelected: (item) => {
       const nextDuration = duration() + (Number(item.duration) || 0);
       if (!fitsCurrentSlot(nextDuration)) {
-        alert('Эта процедура не помещается в свободный интервал. Выберите другое время.');
+        openRecordTimeNotice('Эта процедура не помещается в свободный интервал. Скорректируйте время записи.');
         return;
       }
       selectedProcedures.push(item);
@@ -586,7 +593,7 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
           selectedProcedures[index] = updated;
           if (!fitsCurrentSlot()) {
             selectedProcedures[index] = previous;
-            alert('Новая длительность не помещается в свободный интервал. Выберите другое время.');
+            openRecordTimeNotice('Новая длительность процедуры не помещается в свободный интервал. Скорректируйте время записи.');
             return;
           }
           currentTo = calculatedTo();
@@ -598,7 +605,7 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
     host.querySelector('[data-record-confirm]')?.addEventListener('click', () => {
       const usages = scopedUsages(currentDate, currentWorkplaceId);
       if (!isTimeRangeAvailable({ from: currentFrom, to: currentTo, usages })) {
-        alert('Это время уже занято.');
+        openRecordTimeNotice('Запись не может быть создана: выбранное время уже занято. Скорректируйте время записи.');
         return;
       }
       createRecord({
