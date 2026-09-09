@@ -44,6 +44,14 @@ const procedureTotalCost = (items = []) => items.reduce((sum, item) => {
   return Number.isFinite(value) ? sum + value : sum;
 }, 0);
 const procedureTotalDuration = (items = []) => items.reduce((sum, item) => sum + (Number(item?.duration) || 0), 0);
+const stateSnapshot = (state) => JSON.stringify({
+  date: dateKey(state.date),
+  workplaceId: String(state.workplaceId || ''),
+  from: String(state.from || ''),
+  to: String(state.to || ''),
+  client: state.client || null,
+  procedures: Array.isArray(state.procedures) ? state.procedures : [],
+});
 
 function openWorkplacePicker(state, onSelected) {
   const items = getWorkplaces().map((workplace) => ({
@@ -211,19 +219,24 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     procedures: Array.isArray(record.procedures) ? record.procedures.map((item) => ({ ...item })) : [],
   };
   const original = { ...record };
+  let baseline = stateSnapshot(state);
   const m = mountModal(document.body, modal('<div data-record-view-host></div>', { variant: 'large', surface: 'app' }));
   if (!m) return;
   const root = m.querySelector('[data-record-view-host]');
 
-  const persist = (patch) => {
-    const next = { ...state, ...patch };
+  const applyPatch = (patch) => {
+    state = { ...state, ...patch };
+    render();
+  };
+
+  const persistChanges = () => {
     const updated = updateRecord(record.id, {
-      date: dateKey(next.date),
-      workplaceId: String(next.workplaceId || ''),
-      from: next.from,
-      to: next.to,
-      client: next.client,
-      procedures: next.procedures,
+      date: dateKey(state.date),
+      workplaceId: String(state.workplaceId || ''),
+      from: state.from,
+      to: state.to,
+      client: state.client,
+      procedures: state.procedures,
     });
     if (!updated) {
       alert('Не удалось сохранить изменения: проверьте рабочий день и свободное время.');
@@ -237,6 +250,8 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       client: updated.client ? { ...updated.client } : null,
       procedures: Array.isArray(updated.procedures) ? updated.procedures.map((item) => ({ ...item })) : [],
     };
+    baseline = stateSnapshot(state);
+    render();
     return true;
   };
 
@@ -255,7 +270,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
         left: item.name || '',
         right: item.cost === '' || item.cost == null ? '' : `${item.cost} ₽`,
         data: 'data-record-view-procedures-edit',
-        aria: `Изменить процедуры записи`,
+        aria: 'Изменить процедуры записи',
       })),
     ];
     const card = entityCard({
@@ -291,23 +306,22 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       detailRows,
       className: 'entity-card--hero entity-card--top-dark',
     });
+    const dirty = stateSnapshot(state) !== baseline;
+    const confirmAction = dirty
+      ? `<div class="record-modal-actions modal-actions">${button('Подтвердить изменения', { data: 'data-record-view-confirm' })}</div>`
+      : '';
+    const deleteAction = `<div class="record-modal-actions modal-actions">${button('Удалить запись', { data: 'data-record-view-delete', variant: 'danger' })}</div>`;
 
-    root.innerHTML = `<div class="record-screen record-screen--state-view">${card}<div class="record-modal-actions modal-actions">${button('Удалить запись', { data: 'data-record-view-delete', variant: 'danger' })}</div></div>`;
+    root.innerHTML = `<div class="record-screen record-screen--state-view">${card}${confirmAction}${deleteAction}</div>`;
 
     root.querySelector('[data-record-view-workplace-edit]')?.addEventListener('click', () => {
-      openWorkplacePicker(state, (workplaceId) => {
-        if (persist({ workplaceId })) render();
-      });
+      openWorkplacePicker(state, (workplaceId) => applyPatch({ workplaceId }));
     });
     root.querySelector('[data-record-view-date-edit]')?.addEventListener('click', () => {
-      openDatePicker(state, (date) => {
-        if (persist({ date })) render();
-      });
+      openDatePicker(state, (date) => applyPatch({ date }));
     });
     root.querySelector('[data-record-view-time-edit]')?.addEventListener('click', () => {
-      openTimePicker(state, original, ({ from, to }) => {
-        if (persist({ from, to })) render();
-      });
+      openTimePicker(state, original, ({ from, to }) => applyPatch({ from, to }));
     });
     root.querySelectorAll('[data-record-view-client-profile]').forEach((node) => node.addEventListener('click', () => {
       if (!currentPerson?.key) return;
@@ -319,9 +333,10 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
         const start = timeToMinutes(state.from);
         const duration = procedureTotalDuration(nextProcedures);
         const to = start == null ? state.to : minutesToTime(start + duration);
-        if (persist({ procedures: nextProcedures, to })) render();
+        applyPatch({ procedures: nextProcedures, to });
       });
     }));
+    root.querySelector('[data-record-view-confirm]')?.addEventListener('click', persistChanges);
     root.querySelector('[data-record-view-delete]')?.addEventListener('click', () => {
       confirmDelete(record, () => {
         m.remove();
