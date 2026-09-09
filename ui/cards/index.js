@@ -5,6 +5,11 @@ function titleStyle(value = '') {
   return ` style="--entity-card-title-chars:${chars}"`;
 }
 
+function topMetaStyle(value = '') {
+  const chars = Math.min(String(value).trim().length, 72);
+  return ` style="--entity-card-top-meta-chars:${chars}"`;
+}
+
 function metricMarkup(items = []) {
   return items.map(({ value = '—', label = '' }) => `<span class="entity-card__metric"><strong>${escapeHtml(value)}</strong>${label ? `<small>${escapeHtml(label)}</small>` : ''}</span>`).join('');
 }
@@ -12,7 +17,7 @@ function metricMarkup(items = []) {
 function topMetaMarkup(items = [], side = 'left') {
   return items.map(({ value = '—', label = '', weight = 'strong', row = '' }) => {
     const rowClass = [1, 2, 3].includes(Number(row)) ? ` entity-card__top-meta--row-${Number(row)}` : '';
-    return `<span class="entity-card__top-meta entity-card__top-meta--${escapeHtml(side)} entity-card__top-meta--${weight === 'regular' ? 'regular' : 'strong'}${rowClass}"><strong>${escapeHtml(value)}</strong>${label ? `<small>${escapeHtml(label)}</small>` : ''}</span>`;
+    return `<span class="entity-card__top-meta entity-card__top-meta--${escapeHtml(side)} entity-card__top-meta--${weight === 'regular' ? 'regular' : 'strong'}${rowClass}"><strong${topMetaStyle(value)}>${escapeHtml(value)}</strong>${label ? `<small>${escapeHtml(label)}</small>` : ''}</span>`;
   }).join('');
 }
 
