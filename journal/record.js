@@ -54,6 +54,7 @@ function renderFlow(modalRoot, content) {
 }
 
 function renderTimeStep(modalRoot, { date, workplaceId, from, to, onCreated }) {
+  let activeMode = 'record';
   const usages = scopedUsages(date, workplaceId);
   const values = nextFiveMinutes(from).filter((value) => isTimeRangeAvailable({
     from: value,
@@ -61,21 +62,25 @@ function renderTimeStep(modalRoot, { date, workplaceId, from, to, onCreated }) {
     usages,
   }));
   const times = values.map((value) => `<button type="button" class="record-time-option${/:(00|15|30|45)$/.test(value) ? ' is-quarter' : ''}" data-record-time="${value}">${value}</button>`).join('');
-  const toggle = viewNavigation({ views: RECORD_MODES, activeView: 'record', className: 'segment-control--two', ariaLabel: 'Режим записи' });
+  const toggle = viewNavigation({ views: RECORD_MODES, activeView: activeMode, className: 'segment-control--two', ariaLabel: 'Режим записи' });
   const host = renderFlow(modalRoot, `<div class="record-screen record-screen--time">${toggle}<div class="record-time-list">${times || '<div class="muted">Нет свободного времени</div>'}</div></div>`);
   if (!host) return;
 
   host.querySelectorAll('[data-record-time]').forEach((node) => node.addEventListener('click', () => {
     const selected = node.dataset.recordTime;
+    if (activeMode === 'block') {
+      renderBlockEndStep(modalRoot, { date, workplaceId, from: selected, onCreated });
+      return;
+    }
     renderProceduresStep(modalRoot, { date, workplaceId, from: selected, to, onCreated });
   }));
 
   initViewNavigation(host, {
     views: RECORD_MODES,
-    activeView: 'record',
+    activeView: activeMode,
     onChange: (nextMode) => {
-      if (nextMode !== 'block') return;
-      renderBlockEndStep(modalRoot, { date, workplaceId, from, onCreated });
+      if (!RECORD_MODES.some((item) => item.id === nextMode)) return;
+      activeMode = nextMode;
     },
   });
 }
@@ -529,23 +534,71 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
   render();
 }
 
-function renderBlockEndStep(modalRoot, { date, workplaceId, from, onCreated }) {
-  const usages = scopedUsages(date, workplaceId);
+function blockEndValues({ date, workplaceId, from }) {
   const start = timeToMinutes(from);
-  const endOfDay = start == null ? 0 : 24 * 60;
+  if (start == null) return [];
+  const day = getDay(getDays(), workplaceId, date);
+  const workTime = getDayTime(day, getWorkplaces());
+  const workEnd = timeToMinutes(workTime?.to);
+  if (workEnd == null || workEnd <= start) return [];
+
+  const usages = scopedUsages(date, workplaceId);
+  const nextUsageStart = usages
+    .map((usage) => timeToMinutes(usage?.from))
+    .filter((value) => value != null && value > start)
+    .reduce((nearest, value) => nearest == null || value < nearest ? value : nearest, null);
+  const limit = Math.min(workEnd, nextUsageStart ?? workEnd);
   const values = [];
-  for (let value = (start ?? 0) + 5; value <= endOfDay; value += 5) {
+  for (let value = start + 5; value <= limit; value += 5) {
     const end = minutesToTime(value);
     if (isTimeRangeAvailable({ from, to: end, usages })) values.push(end);
   }
-  const host = renderFlow(modalRoot, `<div class="record-screen record-screen--time"><div class="record-modal-toolbar"><strong>Занять время</strong></div><div class="record-time-list">${values.map((value) => `<button type="button" class="record-time-option" data-block-end="${value}">${value}</button>`).join('')}</div></div>`);
+  return values;
+}
+
+function renderBlockEndStep(modalRoot, { date, workplaceId, from, onCreated }) {
+  const values = blockEndValues({ date, workplaceId, from });
+  const host = renderFlow(modalRoot, `<div class="record-screen record-screen--time"><div class="record-modal-toolbar"><strong>До скольки занять</strong></div><div class="record-time-list">${values.map((value) => `<button type="button" class="record-time-option" data-block-end="${value}">${value}</button>`).join('') || '<div class="muted">Свободного времени нет.</div>'}</div></div>`);
   if (!host) return;
   host.querySelectorAll('[data-block-end]').forEach((node) => node.addEventListener('click', () => {
     const to = node.dataset.blockEnd;
+    renderBreakConfirmationStep(modalRoot, { date, workplaceId, from, to, onCreated });
+  }));
+}
+
+function renderBreakConfirmationStep(modalRoot, { date, workplaceId, from, to, onCreated }) {
+  const host = flowHost(modalRoot);
+  if (!host) return;
+  const workplace = findWorkplaceName(workplaceId);
+  const formattedDate = formatConfirmationDate(date);
+  const view = stateView({
+    blocks: [
+      { id: 'workplace', rows: [{ title: workplace }] },
+      { id: 'dateTime', rows: [{ title: formattedDate }, { title: `${from} - ${to}` }] },
+    ],
+    actions: [{ label: 'Подтвердить перерыв', data: 'data-break-confirm' }],
+    className: 'record-state-view',
+  });
+  host.innerHTML = `<div class="record-screen record-screen--state-view">${view}</div>`;
+  host.querySelector('[data-break-confirm]')?.addEventListener('click', () => {
+    const day = getDay(getDays(), workplaceId, date);
+    const workTime = getDayTime(day, getWorkplaces());
+    const start = timeToMinutes(from);
+    const end = timeToMinutes(to);
+    const workStart = timeToMinutes(workTime?.from);
+    const workEnd = timeToMinutes(workTime?.to);
+    if (start == null || end == null || workStart == null || workEnd == null || start < workStart || end > workEnd || end <= start) {
+      alert('Это время находится вне рабочего периода.');
+      return;
+    }
+    if (!isTimeRangeAvailable({ from, to, usages: scopedUsages(date, workplaceId) })) {
+      alert('Это время уже занято.');
+      return;
+    }
     if (!createJournalBreak({ workplaceId: String(workplaceId || ''), date: dateKey(date), from: String(from), to: String(to) })) return;
     modalRoot.remove();
     onCreated?.();
-  }));
+  });
 }
 
 function findWorkplaceName(workplaceId) {
