@@ -1,4 +1,4 @@
-import { pageHeader, viewNavigation, initViewNavigation, headerControl, workplaceContent, ALL_WORKPLACES_ID, openDayWorkplaceTime } from '../ui/ui.js';
+import { pageHeader, viewNavigation, initViewNavigation, headerControl, headerToggle, headerControlGroup, workplaceContent, ALL_WORKPLACES_ID, openDayWorkplaceTime } from '../ui/ui.js';
 import { getWorkplaceContext, setWorkplaceContext } from '../core/workplace-context.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getActiveDayWorkplaces, getAvailableDayWorkplaces, getDayWorkplaceDraft, saveDayWorkplaceTime } from '../core/day-workplaces.js';
@@ -17,6 +17,11 @@ const views = [
   { id: 'list', label: 'Список', render: renderJournalList },
 ];
 
+const listModes = [
+  { id: 'flow', label: 'Поток' },
+  { id: 'time', label: 'По времени' },
+];
+
 function dateKey(date) {
   if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -29,6 +34,7 @@ function formatRubles(value = 0) {
 
 export function renderJournal(root) {
   let activeView = 'day';
+  let listMode = 'flow';
   const workplaces = getWorkplaces();
   const context = getWorkplaceContext(workplaces, { scope: JOURNAL_CONTEXT_SCOPE });
   let selectedWorkplaceId = context.workplaceId;
@@ -62,6 +68,15 @@ export function renderJournal(root) {
       data: 'data-workplace-header-open',
       aria: allMode ? 'Все записи по рабочим местам' : `Рабочее место: ${workplace?.name || 'не выбрано'}`,
     });
+  };
+
+  const renderHeaderMeta = () => {
+    const workplaceControl = renderHeaderControl();
+    if (activeView !== 'list') return workplaceControl;
+    return headerControlGroup([
+      headerToggle({ items: listModes, activeId: listMode, data: 'data-journal-list-mode' }),
+      workplaceControl,
+    ]);
   };
 
   const openDayTime = (workplaceId) => {
@@ -133,7 +148,7 @@ export function renderJournal(root) {
   };
 
   const renderView = () => {
-    root.innerHTML = `${pageHeader('Журнал', '', renderHeaderControl())}${viewNavigation({ views, activeView })}<div data-journal-view></div>`;
+    root.innerHTML = `${pageHeader('Журнал', '', renderHeaderMeta())}${viewNavigation({ views, activeView })}<div data-journal-view></div>`;
     const viewRoot = root.querySelector('[data-journal-view]');
     if (activeView === 'day') {
       renderJournalDay(viewRoot, {
@@ -155,17 +170,29 @@ export function renderJournal(root) {
           renderView();
         },
       });
-    } else renderJournalList(viewRoot);
+    } else renderJournalList(viewRoot, { mode: listMode });
 
     root.querySelector('[data-workplace-header-open]')?.addEventListener('click', activeView === 'day' ? openDayWorkplaces : openWorkplace);
+    root.querySelectorAll('[data-journal-list-mode]').forEach((node) => node.addEventListener('click', () => {
+      const nextMode = node.dataset.journalListMode;
+      if (!listModes.some((item) => item.id === nextMode) || nextMode === listMode) return;
+      listMode = nextMode;
+      renderView();
+    }));
     initViewNavigation(root, { views, activeView, onChange: (nextView) => { activeView = nextView; renderView(); } });
   };
 
   if (root.__bookJournalRecordsChangedHandler) window.removeEventListener('book:records-changed', root.__bookJournalRecordsChangedHandler);
   root.__bookJournalRecordsChangedHandler = () => {
-    if (activeView === 'day') renderView();
+    if (activeView === 'day' || activeView === 'list') renderView();
   };
   window.addEventListener('book:records-changed', root.__bookJournalRecordsChangedHandler);
+
+  if (root.__bookJournalPaymentsChangedHandler) window.removeEventListener('book:payments-changed', root.__bookJournalPaymentsChangedHandler);
+  root.__bookJournalPaymentsChangedHandler = () => {
+    if (activeView === 'list') renderView();
+  };
+  window.addEventListener('book:payments-changed', root.__bookJournalPaymentsChangedHandler);
 
   renderView();
 }
