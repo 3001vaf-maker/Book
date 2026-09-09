@@ -1,5 +1,5 @@
 import { initPaymentForm, initPaymentMethods, modal, mountModal, paymentForm, paymentMethods } from '../ui/ui.js';
-import { createPaymentDraft, paymentTotal } from '../core/payment.js';
+import { completePayment, createPaymentDraft, paymentTotal } from '../core/payment.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getAllClients } from '../main/clients/data.js';
 import { clientDisplay } from '../main/clients/presentation.js';
@@ -35,11 +35,23 @@ function paymentFromRecord(record) {
   });
 }
 
-function openPaymentMethodsModal() {
+function openPaymentMethodsModal(payment, values, paymentModal) {
   const content = `<div class="modal-title"><h2>Способы оплаты</h2></div>${paymentMethods({ wallets: getWallets() })}`;
   const methodsModal = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
   if (!methodsModal) return;
-  initPaymentMethods(methodsModal.querySelector('[data-payment-methods]'));
+  initPaymentMethods(methodsModal.querySelector('[data-payment-methods]'), {
+    onWallet: (wallet) => {
+      const completed = completePayment(payment, {
+        walletId: wallet.id,
+        walletName: wallet.name,
+        items: values.items,
+        total: values.total,
+      });
+      if (!completed) return;
+      methodsModal.remove();
+      paymentModal?.remove();
+    },
+  });
 }
 
 function openPaymentModal(record) {
@@ -55,7 +67,9 @@ function openPaymentModal(record) {
   })}`;
   const m = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
   if (!m) return;
-  initPaymentForm(m.querySelector('[data-payment-ui]'), { onPay: openPaymentMethodsModal });
+  initPaymentForm(m.querySelector('[data-payment-ui]'), {
+    onPay: (values) => openPaymentMethodsModal(payment, values, m),
+  });
 }
 
 export function openRecordPaymentEntry(record) {
