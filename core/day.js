@@ -10,7 +10,12 @@ function readState() {
   } catch { return {}; }
 }
 function writeState(state) { localStorage.setItem(TIMETABLE_STATE_KEY, JSON.stringify(state || { workingDays: [] })); }
-function dateValue(value) { return String(value || '').slice(0, 10); }
+function dateValue(value) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+  }
+  return String(value || '').slice(0, 10);
+}
 function dayIdentity(day) { return `${String(day?.workplaceId || '')}::${dateValue(day?.date)}`; }
 
 export function getDays() { const state = readState(); return Array.isArray(state.workingDays) ? state.workingDays : []; }
