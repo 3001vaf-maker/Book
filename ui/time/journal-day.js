@@ -5,10 +5,11 @@ const escape = (value) => String(value ?? '').replaceAll('&', '&amp;').replaceAl
 function recordMarkup(usage) {
   const client = usage?.client || {};
   const name = [client.name, client.surname].filter(Boolean).join(' ') || 'Без имени';
-  const id = client.id ? `${escape(client.id)} ` : '';
-  const phone = client.phone ? `<span>${escape(client.phone)}</span>` : '';
-  const services = (usage.procedures || []).map((item) => `<span>${escape(item.name)}</span>`).join('');
-  return `<button type="button" class="journal-record" data-journal-record="${escape(usage.id)}"><strong>${id}${escape(name)}</strong>${phone}${services}</button>`;
+  const id = String(client.uei || client.id || '').trim();
+  const identity = id ? `${escape(id)} - ${escape(name)}` : escape(name);
+  const phone = client.phone ? `<span class="journal-record__phone">${escape(client.phone)}</span>` : '';
+  const services = (usage.procedures || []).map((item) => `<span class="journal-record__service">${escape(item.name)}</span>`).join('');
+  return `<button type="button" class="journal-record" data-journal-record="${escape(usage.id)}"><strong class="journal-record__identity">${identity}</strong>${phone}${services}</button>`;
 }
 
 function usageMarkup(usage) {
