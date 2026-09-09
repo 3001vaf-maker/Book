@@ -1,6 +1,23 @@
 import { actionBlock, button, costCardMeta, costListParts, durationText, emptyState, entityCard, escapeHtml, iconButton, listEntries, listEntry, mountModal, modal, page, pageHeader, workplaceCountText } from '../../../ui/ui.js';
+import { getPayments, paymentTotal } from '../../../core/payment.js';
+import { getRecords } from '../../../journal/record-data.js';
 import { deleteProcedure as deleteProcedureData, getProcedures } from './data.js';
 import { openProcedureForm } from './form.js';
+
+const money = (value) => `${new Intl.NumberFormat('ru-RU').format(Number(value || 0))} ₽`;
+
+function procedureMetrics(procedureId) {
+  const id = String(procedureId || '');
+  const records = getRecords().filter((record) => record?.status !== 'cancelled'
+    && (record?.procedures || []).some((item) => String(item?.id || '') === id));
+  const revenue = getPayments()
+    .filter((payment) => payment?.status === 'completed')
+    .reduce((sum, payment) => {
+      const items = (payment?.items || []).filter((item) => String(item?.sourceId || '') === id);
+      return sum + paymentTotal(items);
+    }, 0);
+  return { records: records.length, revenue };
+}
 
 function renderList(root, navigateBack) {
   const items = getProcedures();
@@ -35,6 +52,7 @@ function renderRow(procedure) {
 function renderCard(root, id, navigateBack) {
   const procedure = getProcedures().find((item) => item.id === id);
   if (!procedure) return renderList(root, navigateBack);
+  const metrics = procedureMetrics(procedure.id);
   const workplaceNames = (procedure.workplaces || []).map((workplace) => workplace.name || workplace.workplaceId).filter(Boolean);
   const card = entityCard({
     title: procedure.name || '',
@@ -43,7 +61,11 @@ function renderCard(root, id, navigateBack) {
     initial: (procedure.name || '?').slice(0, 1).toUpperCase(),
     topMeta: [{ value: workplaceCountText(workplaceNames.length) }],
     topRightMeta: costCardMeta(procedure.cost),
-    meta: workplaceNames.map((name) => ({ value: name })),
+    meta: [
+      { value: metrics.records, label: 'записей' },
+      { value: money(metrics.revenue), label: 'сумма' },
+      ...workplaceNames.map((name) => ({ value: name })),
+    ],
     metricsLayout: 'vertical',
     className: 'entity-card--hero entity-card--top-dark',
   });
