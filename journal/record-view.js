@@ -10,6 +10,7 @@ import {
   mountModal,
   timeSlots,
 } from '../ui/ui.js';
+import { getCompletedPaymentForSource } from '../core/payment.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getDays, getDay, getDayTime } from '../core/day.js';
 import { timeToMinutes, minutesToTime } from '../core/time.js';
@@ -17,7 +18,7 @@ import { getAllClients } from '../main/clients/data.js';
 import { clientDisplay } from '../main/clients/presentation.js';
 import { openClientProfile } from '../main/clients/clients.js';
 import { getProcedures } from '../settings/service/procedures/data.js';
-import { updateRecord, deleteRecord, checkRecordTime } from './record-data.js';
+import { getRecords, updateRecord, deleteRecord, checkRecordTime } from './record-data.js';
 
 const people = () => getAllClients();
 const procedures = () => getProcedures();
@@ -65,6 +66,16 @@ const stateSnapshot = (state) => JSON.stringify({
   procedures: Array.isArray(state.procedures) ? state.procedures : [],
   confirmed: Boolean(state.confirmed),
   attendance: normalizedAttendance(state.attendance),
+});
+const stateFromRecord = (record, { paid = false } = {}) => ({
+  date: record.date,
+  workplaceId: record.workplaceId,
+  from: record.from,
+  to: record.to,
+  client: record.client ? { ...record.client } : null,
+  procedures: Array.isArray(record.procedures) ? record.procedures.map((item) => ({ ...item })) : [],
+  confirmed: Boolean(record.confirmed),
+  attendance: paid ? 'arrived' : normalizedAttendance(record.attendance),
 });
 
 function openWorkplacePicker(state, onSelected) {
@@ -224,16 +235,8 @@ function confirmCancel(record, onCancelled) {
 
 export function openRecordView(record, { onClose = () => {} } = {}) {
   if (!record?.id) return;
-  let state = {
-    date: record.date,
-    workplaceId: record.workplaceId,
-    from: record.from,
-    to: record.to,
-    client: record.client ? { ...record.client } : null,
-    procedures: Array.isArray(record.procedures) ? record.procedures.map((item) => ({ ...item })) : [],
-    confirmed: Boolean(record.confirmed),
-    attendance: normalizedAttendance(record.attendance),
-  };
+  const isPaid = () => Boolean(getCompletedPaymentForSource('record', record.id));
+  let state = stateFromRecord(record, { paid: isPaid() });
   const original = { ...record };
   let baseline = stateSnapshot(state);
   let startTimer = null;
@@ -242,6 +245,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
   const root = m.querySelector('[data-record-view-host]');
 
   const applyPatch = (patch) => {
+    if (isPaid()) return;
     const movesAppointment = Object.prototype.hasOwnProperty.call(patch, 'date')
       || Object.prototype.hasOwnProperty.call(patch, 'workplaceId')
       || Object.prototype.hasOwnProperty.call(patch, 'from')
@@ -251,6 +255,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
   };
 
   const persistChanges = () => {
+    if (isPaid()) return false;
     const updated = updateRecord(record.id, {
       date: dateKey(state.date),
       workplaceId: String(state.workplaceId || ''),
@@ -265,16 +270,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       alert('Не удалось сохранить изменения: проверьте рабочий день и свободное время.');
       return false;
     }
-    state = {
-      date: updated.date,
-      workplaceId: updated.workplaceId,
-      from: updated.from,
-      to: updated.to,
-      client: updated.client ? { ...updated.client } : null,
-      procedures: Array.isArray(updated.procedures) ? updated.procedures.map((item) => ({ ...item })) : [],
-      confirmed: Boolean(updated.confirmed),
-      attendance: normalizedAttendance(updated.attendance),
-    };
+    state = stateFromRecord(updated);
     baseline = stateSnapshot(state);
     render();
     return true;
@@ -283,6 +279,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
   const scheduleStartRender = () => {
     if (startTimer) clearTimeout(startTimer);
     startTimer = null;
+    if (isPaid()) return;
     const start = appointmentStart(state);
     if (!start) return;
     const delay = start.getTime() - Date.now();
@@ -292,6 +289,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
 
   const render = () => {
     scheduleStartRender();
+    const paid = isPaid();
     const clientSource = state.client || findClient(record) || {};
     const currentPerson = clientSource?.key
       ? people().find((person) => String(person.key) === String(clientSource.key)) || clientSource
@@ -305,8 +303,8 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       ...state.procedures.map((item) => ({
         left: item.name || '',
         right: item.cost === '' || item.cost == null ? '' : `${item.cost} ₽`,
-        data: 'data-record-view-procedures-edit',
-        aria: 'Изменить процедуры записи',
+        data: paid ? '' : 'data-record-view-procedures-edit',
+        aria: paid ? '' : 'Изменить процедуры записи',
       })),
     ];
     const card = entityCard({
@@ -322,21 +320,21 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       topMeta: [{
         value: workplace,
         row: 1,
-        data: 'data-record-view-workplace-edit',
-        aria: `Изменить рабочее пространство ${workplace}`,
+        data: paid ? '' : 'data-record-view-workplace-edit',
+        aria: paid ? '' : `Изменить рабочее пространство ${workplace}`,
       }],
       topRightMeta: [
         {
           value: formatDate(state.date),
           row: 2,
-          data: 'data-record-view-date-edit',
-          aria: `Изменить дату ${formatDate(state.date)}`,
+          data: paid ? '' : 'data-record-view-date-edit',
+          aria: paid ? '' : `Изменить дату ${formatDate(state.date)}`,
         },
         {
           value: `${state.from} - ${state.to}`,
           row: 3,
-          data: 'data-record-view-time-edit',
-          aria: `Изменить время ${state.from} - ${state.to}`,
+          data: paid ? '' : 'data-record-view-time-edit',
+          aria: paid ? '' : `Изменить время ${state.from} - ${state.to}`,
         },
       ],
       detailRows,
@@ -344,31 +342,34 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     });
 
     const started = hasAppointmentStarted(state);
-    const effectiveAttendance = started ? (normalizedAttendance(state.attendance) || 'arrived') : '';
+    const effectiveAttendance = paid ? 'arrived' : (started ? (normalizedAttendance(state.attendance) || 'arrived') : '');
     const statusControl = `<div class="record-status-controls">
       <div class="segment-control segment-control--one" role="group" aria-label="Подтверждение записи">
-        <button type="button" class="${state.confirmed ? 'is-active' : ''}" aria-pressed="${state.confirmed}" data-record-view-confirmed>Подтвердил</button>
+        <button type="button" class="${state.confirmed ? 'is-active' : ''}" aria-pressed="${state.confirmed}" data-record-view-confirmed${paid ? ' disabled' : ''}>Подтвердил</button>
       </div>
       <div class="segment-control segment-control--two-equal" role="group" aria-label="Посещение записи">
-        <button type="button" class="${effectiveAttendance === 'arrived' ? 'is-active' : ''}" aria-pressed="${effectiveAttendance === 'arrived'}" data-record-view-attendance="arrived"${started ? '' : ' disabled'}>Пришел</button>
-        <button type="button" class="${effectiveAttendance === 'no-show' ? 'is-active' : ''}" aria-pressed="${effectiveAttendance === 'no-show'}" data-record-view-attendance="no-show"${started ? '' : ' disabled'}>Не пришел</button>
+        <button type="button" class="${effectiveAttendance === 'arrived' ? 'is-active' : ''}" aria-pressed="${effectiveAttendance === 'arrived'}" data-record-view-attendance="arrived"${paid || !started ? ' disabled' : ''}>Пришел</button>
+        <button type="button" class="${effectiveAttendance === 'no-show' ? 'is-active' : ''}" aria-pressed="${effectiveAttendance === 'no-show'}" data-record-view-attendance="no-show"${paid || !started ? ' disabled' : ''}>Не пришел</button>
       </div>
     </div>`;
     const dirty = stateSnapshot(state) !== baseline;
-    const confirmAction = dirty
+    const confirmAction = !paid && dirty
       ? `<div class="record-modal-actions modal-actions">${button('Подтвердить изменения', { data: 'data-record-view-confirm' })}</div>`
       : '';
-    const cancelAction = `<div class="record-modal-actions modal-actions">${button('Отменить запись', { data: 'data-record-view-cancel', variant: 'danger' })}</div>`;
+    const cancelAction = paid ? '' : `<div class="record-modal-actions modal-actions">${button('Отменить запись', { data: 'data-record-view-cancel', variant: 'danger' })}</div>`;
 
     root.innerHTML = `<div class="record-screen record-screen--state-view">${card}${statusControl}${confirmAction}${cancelAction}</div>`;
 
     root.querySelector('[data-record-view-workplace-edit]')?.addEventListener('click', () => {
+      if (isPaid()) return;
       openWorkplacePicker(state, (workplaceId) => applyPatch({ workplaceId }));
     });
     root.querySelector('[data-record-view-date-edit]')?.addEventListener('click', () => {
+      if (isPaid()) return;
       openDatePicker(state, (date) => applyPatch({ date }));
     });
     root.querySelector('[data-record-view-time-edit]')?.addEventListener('click', () => {
+      if (isPaid()) return;
       openTimePicker(state, original, ({ from, to }) => applyPatch({ from, to }));
     });
     root.querySelectorAll('[data-record-view-client-profile]').forEach((node) => node.addEventListener('click', () => {
@@ -377,6 +378,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     }));
     root.querySelector('[data-record-view-phone]')?.addEventListener('click', () => openPhoneActions(client.phone));
     root.querySelectorAll('[data-record-view-procedures-edit]').forEach((node) => node.addEventListener('click', () => {
+      if (isPaid()) return;
       openProceduresPicker(state, (nextProcedures) => {
         const start = timeToMinutes(state.from);
         const duration = procedureTotalDuration(nextProcedures);
@@ -385,10 +387,11 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       });
     }));
     root.querySelector('[data-record-view-confirmed]')?.addEventListener('click', () => {
+      if (isPaid()) return;
       applyPatch({ confirmed: !state.confirmed });
     });
     root.querySelectorAll('[data-record-view-attendance]').forEach((node) => node.addEventListener('click', () => {
-      if (!hasAppointmentStarted(state)) return;
+      if (isPaid() || !hasAppointmentStarted(state)) return;
       const next = normalizedAttendance(node.dataset.recordViewAttendance);
       const current = normalizedAttendance(state.attendance) || 'arrived';
       if (!next || next === current) return;
@@ -396,6 +399,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     }));
     root.querySelector('[data-record-view-confirm]')?.addEventListener('click', persistChanges);
     root.querySelector('[data-record-view-cancel]')?.addEventListener('click', () => {
+      if (isPaid()) return;
       confirmCancel(record, () => {
         m.remove();
         onClose?.();
@@ -403,9 +407,20 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     });
   };
 
+  const onPaymentsChanged = (event) => {
+    const source = event?.detail?.source;
+    if (String(source?.type || '') !== 'record' || String(source?.id || '') !== String(record.id)) return;
+    const current = getRecords().find((item) => String(item?.id || '') === String(record.id)) || record;
+    state = stateFromRecord(current, { paid: true });
+    baseline = stateSnapshot(state);
+    render();
+  };
+  window.addEventListener('book:payments-changed', onPaymentsChanged);
+
   m.addEventListener('click', (event) => {
     if (event.target === m || event.target.closest('[data-modal-close]')) {
       if (startTimer) clearTimeout(startTimer);
+      window.removeEventListener('book:payments-changed', onPaymentsChanged);
       queueMicrotask(() => onClose?.());
     }
   });
