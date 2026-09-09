@@ -2,6 +2,7 @@ import { initDateNavigator, journalDayTimeline, initJournalDayTimeline, ALL_WORK
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getDays, getDay, getDayTime, getDaysForDate } from '../core/day.js';
 import { rangesOverlap } from '../core/time.js';
+import { getCompletedPaymentForSource } from '../core/payment.js';
 import { getRecordsForDay } from './record-data.js';
 import { getJournalBreaksForDay, getJournalBreaks } from './break-data.js';
 import { getTimeUsages } from '../core/time-usage.js';
@@ -11,6 +12,12 @@ import { openRecordPaymentEntry } from './record-payment.js';
 import { openBreakView } from './break-view.js';
 
 function dateKey(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
+function withPaymentStatus(records = []) {
+  return (Array.isArray(records) ? records : []).map((record) => ({
+    ...record,
+    paid: Boolean(record?.id && getCompletedPaymentForSource('record', record.id)),
+  }));
+}
 
 function openExistingRecord(record, onClose) {
   let closePayment = () => {};
@@ -34,7 +41,7 @@ export function renderJournalDay(root, { date = new Date(), workplaceId = '', on
   if (allMode) {
     const days = getDaysForDate(getDays(), dayDate);
     if (!days.length) { contentRoot.innerHTML = '<div class="time-day-state" aria-disabled="true">Выходной день</div>'; return; }
-    const records = getRecordsForDay(dayDate).filter((record) => record?.status !== 'cancelled');
+    const records = withPaymentStatus(getRecordsForDay(dayDate).filter((record) => record?.status !== 'cancelled'));
     const breaks = getJournalBreaks();
     const columns = days.map((day) => {
       const currentId = String(day?.workplaceId || '');
@@ -81,7 +88,7 @@ export function renderJournalDay(root, { date = new Date(), workplaceId = '', on
   if (!workingDay) { contentRoot.innerHTML = '<div class="time-day-state" aria-disabled="true">Выходной день</div>'; return; }
   const time = getDayTime(workingDay, workplaces);
   if (!time) { contentRoot.innerHTML = '<div class="time-day-state" aria-disabled="true">Не задано рабочее время</div>'; return; }
-  const records = getRecordsForDay(dayDate, workplaceId).filter((record) => record?.status !== 'cancelled');
+  const records = withPaymentStatus(getRecordsForDay(dayDate, workplaceId).filter((record) => record?.status !== 'cancelled'));
   const breaks = getJournalBreaksForDay(getJournalBreaks(), workplaceId, dayDate);
   const usages = getTimeUsages({ records, breaks });
   contentRoot.innerHTML = journalDayTimeline({ from: time.from, to: time.to, usages });
