@@ -345,10 +345,14 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
 
     const started = hasAppointmentStarted(state);
     const effectiveAttendance = started ? (normalizedAttendance(state.attendance) || 'arrived') : '';
-    const statusControl = `<div class="segment-control" role="group" aria-label="Статус записи">
-      <button type="button" class="${state.confirmed ? 'is-active' : ''}" aria-pressed="${state.confirmed}" data-record-view-confirmed>Подтвердил</button>
-      <button type="button" class="${effectiveAttendance === 'arrived' ? 'is-active' : ''}" aria-pressed="${effectiveAttendance === 'arrived'}" data-record-view-attendance="arrived"${started ? '' : ' disabled'}>Пришел</button>
-      <button type="button" class="${effectiveAttendance === 'no-show' ? 'is-active' : ''}" aria-pressed="${effectiveAttendance === 'no-show'}" data-record-view-attendance="no-show"${started ? '' : ' disabled'}>Не пришел</button>
+    const statusControl = `<div class="record-status-controls">
+      <div class="segment-control segment-control--one" role="group" aria-label="Подтверждение записи">
+        <button type="button" class="${state.confirmed ? 'is-active' : ''}" aria-pressed="${state.confirmed}" data-record-view-confirmed>Подтвердил</button>
+      </div>
+      <div class="segment-control segment-control--two-equal" role="group" aria-label="Посещение записи">
+        <button type="button" class="${effectiveAttendance === 'arrived' ? 'is-active' : ''}" aria-pressed="${effectiveAttendance === 'arrived'}" data-record-view-attendance="arrived"${started ? '' : ' disabled'}>Пришел</button>
+        <button type="button" class="${effectiveAttendance === 'no-show' ? 'is-active' : ''}" aria-pressed="${effectiveAttendance === 'no-show'}" data-record-view-attendance="no-show"${started ? '' : ' disabled'}>Не пришел</button>
+      </div>
     </div>`;
     const dirty = stateSnapshot(state) !== baseline;
     const confirmAction = dirty
@@ -381,7 +385,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       });
     }));
     root.querySelector('[data-record-view-confirmed]')?.addEventListener('click', () => {
-      if (!state.confirmed) applyPatch({ confirmed: true });
+      applyPatch({ confirmed: !state.confirmed });
     });
     root.querySelectorAll('[data-record-view-attendance]').forEach((node) => node.addEventListener('click', () => {
       if (!hasAppointmentStarted(state)) return;
