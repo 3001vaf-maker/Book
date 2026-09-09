@@ -7,9 +7,21 @@ import { getJournalBreaksForDay, getJournalBreaks } from './break-data.js';
 import { getTimeUsages } from '../core/time-usage.js';
 import { openRecordCreation } from './record.js';
 import { openRecordView } from './record-view.js';
+import { openRecordPaymentEntry } from './record-payment.js';
 import { openBreakView } from './break-view.js';
 
 function dateKey(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
+
+function openExistingRecord(record, onClose) {
+  let closePayment = () => {};
+  openRecordView(record, {
+    onClose: () => {
+      closePayment();
+      onClose?.();
+    },
+  });
+  closePayment = openRecordPaymentEntry(record);
+}
 
 export function renderJournalDay(root, { date = new Date(), workplaceId = '', onChange = () => {} } = {}) {
   root.innerHTML = '<div data-journal-day-navigator></div><div data-journal-day-content></div>';
@@ -53,7 +65,7 @@ export function renderJournalDay(root, { date = new Date(), workplaceId = '', on
       onSlotClick: ({ usage }) => {
         if (usage?.type === 'record') {
           const record = records.find((item) => item?.id === usage.sourceId);
-          if (record) openRecordView(record, { onClose: () => renderJournalDay(root, { date, workplaceId, onChange }) });
+          if (record) openExistingRecord(record, () => renderJournalDay(root, { date, workplaceId, onChange }));
           return;
         }
         if (usage?.type === 'break') {
@@ -78,7 +90,7 @@ export function renderJournalDay(root, { date = new Date(), workplaceId = '', on
     onSlotClick: ({ from, to, usage }) => {
       if (usage?.type === 'record') {
         const record = records.find((item) => item?.id === usage.sourceId);
-        if (record) openRecordView(record, { onClose: () => renderJournalDay(root, { date, workplaceId, onChange }) });
+        if (record) openExistingRecord(record, () => renderJournalDay(root, { date, workplaceId, onChange }));
         return;
       }
       if (usage?.type === 'break') {
