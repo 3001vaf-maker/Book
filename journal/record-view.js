@@ -3,11 +3,13 @@ import {
   durationText,
   entityCard,
   escapeHtml,
+  field,
   initCalendar,
-  initMultiSelect,
+  initTimePickers,
   list,
   modal,
   mountModal,
+  timePicker,
   timeSlots,
 } from '../ui/ui.js';
 import { getCompletedPaymentForSource } from '../core/payment.js';
@@ -77,6 +79,25 @@ const stateFromRecord = (record, { paid = false } = {}) => ({
   confirmed: Boolean(record.confirmed),
   attendance: paid ? 'arrived' : normalizedAttendance(record.attendance),
 });
+
+function workplaceAssignment(procedure, workplaceId) {
+  const id = String(workplaceId || '');
+  return (procedure?.workplaces || []).find((workplace) => String(workplace?.workplaceId ?? workplace?.id ?? workplace?.key ?? '') === id) || null;
+}
+
+function defaultCost(procedure, workplaceId) {
+  const assignment = workplaceAssignment(procedure, workplaceId);
+  const assignmentCost = assignment?.cost;
+  const procedureCost = procedure?.cost;
+  const cost = assignmentCost && typeof assignmentCost === 'object' && !assignmentCost.free && (
+    assignmentCost.amount !== '' && assignmentCost.amount != null
+    || assignmentCost.from !== '' && assignmentCost.from != null
+    || assignmentCost.to !== '' && assignmentCost.to != null
+  ) ? assignmentCost : procedureCost;
+  if (!cost || cost.free) return '';
+  if (typeof cost === 'number' || typeof cost === 'string') return cost;
+  return cost.amount ?? cost.from ?? '';
+}
 
 function openWorkplacePicker(state, onSelected) {
   const items = getWorkplaces().map((workplace) => ({
@@ -157,47 +178,68 @@ function openTimePicker(state, original, onSelected) {
   }));
 }
 
-function openProceduresPicker(state, onSelected) {
-  const all = procedures();
-  const selected = new Map((state.procedures || []).map((item) => [String(item?.id || ''), { ...item }]).filter(([id]) => id));
-  const content = `<div class="modal-title"><h2>Процедуры</h2></div><div data-record-view-procedures></div><div class="modal-actions">${button('Сохранить', { data: 'data-record-view-procedures-save' })}</div>`;
-  const m = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
-  if (!m) return;
-  const host = m.querySelector('[data-record-view-procedures]');
-  host.innerHTML = list({
-    items: all.map((procedure) => ({
+function openAddProcedurePicker(state, onSelected) {
+  const selectedIds = new Set((state.procedures || []).map((item) => String(item?.id || '')));
+  const available = procedures().filter((procedure) => workplaceAssignment(procedure, state.workplaceId) && !selectedIds.has(String(procedure.id || '')));
+  const content = list({
+    items: available.map((procedure) => ({
       title: procedure.name || '',
-      secondary: durationText(procedure.duration),
+      secondary: [durationText(procedure.duration), defaultCost(procedure, state.workplaceId) !== '' ? `${defaultCost(procedure, state.workplaceId)} ₽` : ''],
       interactive: true,
-      selected: selected.has(String(procedure.id || '')),
-      data: `data-record-view-procedure="${escapeHtml(procedure.id || '')}"`,
-      aria: `Выбрать процедуру ${procedure.name || ''}`,
+      data: `data-record-view-add-procedure="${escapeHtml(procedure.id || '')}"`,
+      aria: `Добавить процедуру ${procedure.name || ''}`,
     })),
-  }) || '<div class="muted">Процедур пока нет.</div>';
-  initMultiSelect(host, {
-    selectedValues: [...selected.keys()],
-    selector: '[data-record-view-procedure]',
-    valueAttribute: 'recordViewProcedure',
-    onChange: (values) => {
-      const next = new Map();
-      values.forEach((id) => {
-        const procedure = all.find((item) => String(item.id) === String(id));
-        if (!procedure) return;
-        const current = selected.get(String(id));
-        next.set(String(id), current || {
-          id: procedure.id,
-          name: procedure.name,
-          cost: '',
-          duration: Number(procedure.duration) || 0,
-        });
-      });
-      selected.clear();
-      next.forEach((value, id) => selected.set(id, value));
-    },
-  });
-  m.querySelector('[data-record-view-procedures-save]')?.addEventListener('click', () => {
+  }) || '<div class="muted">Других процедур для этого рабочего места нет.</div>';
+  const m = mountModal(document.body, modal(`<div class="modal-title"><h2>Добавить процедуру</h2></div>${content}`, { variant: 'medium', surface: 'app' }));
+  if (!m) return;
+  m.querySelectorAll('[data-record-view-add-procedure]').forEach((node) => node.addEventListener('click', () => {
+    const procedure = available.find((item) => String(item.id) === String(node.dataset.recordViewAddProcedure));
+    if (!procedure) return;
     m.remove();
-    onSelected?.([...selected.values()]);
+    onSelected?.({
+      id: procedure.id,
+      name: procedure.name,
+      cost: defaultCost(procedure, state.workplaceId),
+      duration: Number(procedure.duration) || 0,
+    });
+  }));
+}
+
+function openProcedureCorrection(state, index, { onSave, onAdd } = {}) {
+  const item = state.procedures?.[index];
+  if (!item) return;
+  const costField = field({
+    label: 'Стоимость',
+    name: 'recordCost',
+    value: item.cost === '' || item.cost == null ? '' : item.cost,
+    inputmode: 'decimal',
+    data: 'data-record-view-cost',
+  });
+  const duration = Math.max(0, Number(item.duration) || 0);
+  const durationField = timePicker({
+    name: 'recordDuration',
+    label: 'Время',
+    value: `${String(Math.floor(duration / 60)).padStart(2, '0')}:${String(duration % 60).padStart(2, '0')}`,
+    minuteStep: 5,
+  });
+  const html = `<div class="modal-title"><h2>${escapeHtml(item.name || 'Процедура')}</h2><p>Установите параметры процедуры для этой записи.</p></div><div class="compact-form">${costField}${durationField}<div class="modal-actions">${button('Сохранить', { data: 'data-record-view-procedure-save' })}${button('+ Добавить процедуру', { data: 'data-record-view-procedure-add', variant: 'secondary' })}</div></div>`;
+  const m = mountModal(document.body, modal(html, { variant: 'medium', surface: 'app' }));
+  if (!m) return;
+  initTimePickers(m);
+  m.querySelector('[data-record-view-procedure-add]')?.addEventListener('click', () => {
+    m.remove();
+    onAdd?.();
+  });
+  m.querySelector('[data-record-view-procedure-save]')?.addEventListener('click', () => {
+    const rawCost = String(m.querySelector('[data-record-view-cost]')?.value || '').replace(/[^0-9.,-]/g, '').replace(',', '.');
+    const timeValue = m.querySelector('[data-time-value]')?.value || '';
+    const match = timeValue.match(/^(\d{1,2}):(\d{2})$/);
+    onSave?.({
+      ...item,
+      cost: rawCost === '' ? '' : Number(rawCost),
+      duration: match ? Number(match[1]) * 60 + Number(match[2]) : duration,
+    });
+    m.remove();
   });
 }
 
@@ -254,6 +296,27 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     render();
   };
 
+  const applyProcedures = (nextProcedures) => {
+    if (isPaid()) return;
+    const start = timeToMinutes(state.from);
+    const duration = procedureTotalDuration(nextProcedures);
+    const nextTo = start == null ? state.to : minutesToTime(start + duration);
+    const check = checkRecordTime({
+      date: state.date,
+      workplaceId: state.workplaceId,
+      from: state.from,
+      to: nextTo,
+      excludeId: original.id,
+    });
+    if (!check.ok) {
+      alert('Новая длительность не помещается в свободный интервал. Выберите другое время.');
+      return;
+    }
+    const patch = { procedures: nextProcedures };
+    if (nextTo !== state.to) patch.to = nextTo;
+    applyPatch(patch);
+  };
+
   const persistChanges = () => {
     if (isPaid()) return false;
     const updated = updateRecord(record.id, {
@@ -300,11 +363,11 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     const totalCost = procedureTotalCost(state.procedures);
     const detailRows = [
       { left: durationText(totalDuration), right: `${totalCost} ₽`, weight: 'strong' },
-      ...state.procedures.map((item) => ({
+      ...state.procedures.map((item, index) => ({
         left: item.name || '',
         right: item.cost === '' || item.cost == null ? '' : `${item.cost} ₽`,
-        data: paid ? '' : 'data-record-view-procedures-edit',
-        aria: paid ? '' : 'Изменить процедуры записи',
+        data: paid ? '' : `data-record-view-procedure-edit="${index}"`,
+        aria: paid ? '' : `Изменить процедуру ${item.name || ''}`,
       })),
     ];
     const card = entityCard({
@@ -377,13 +440,18 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       openClientProfile({ root: document.body, key: currentPerson.key, onClose: render });
     }));
     root.querySelector('[data-record-view-phone]')?.addEventListener('click', () => openPhoneActions(client.phone));
-    root.querySelectorAll('[data-record-view-procedures-edit]').forEach((node) => node.addEventListener('click', () => {
+    root.querySelectorAll('[data-record-view-procedure-edit]').forEach((node) => node.addEventListener('click', () => {
       if (isPaid()) return;
-      openProceduresPicker(state, (nextProcedures) => {
-        const start = timeToMinutes(state.from);
-        const duration = procedureTotalDuration(nextProcedures);
-        const to = start == null ? state.to : minutesToTime(start + duration);
-        applyPatch({ procedures: nextProcedures, to });
+      const index = Number(node.dataset.recordViewProcedureEdit);
+      if (!Number.isInteger(index) || !state.procedures[index]) return;
+      openProcedureCorrection(state, index, {
+        onSave: (updated) => {
+          const nextProcedures = state.procedures.map((item, itemIndex) => itemIndex === index ? updated : { ...item });
+          applyProcedures(nextProcedures);
+        },
+        onAdd: () => openAddProcedurePicker(state, (added) => {
+          applyProcedures([...state.procedures.map((item) => ({ ...item })), added]);
+        }),
       });
     }));
     root.querySelector('[data-record-view-confirmed]')?.addEventListener('click', () => {
