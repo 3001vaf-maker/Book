@@ -93,11 +93,13 @@ function statsRows(stats) {
 }
 
 /** Neutral Workplace content that can be placed in Header Control or elsewhere. */
-export function workplaceContent({ workplace = null, title = '', showStats = false, stats = null } = {}) {
+export function workplaceContent({ workplace = null, title = '', showStats = false, stats = null, primaryText = '', secondaryText = '' } = {}) {
   const name = String(title || workplace?.name || 'Рабочее место');
   const rows = statsRows(stats);
-  const counter = showStats && rows.length
-    ? `<span class="workplace-content__primary">${escapeHtml(rows[0])}</span><span class="workplace-content__secondary">${escapeHtml(rows[1])}</span>`
+  const primary = String(primaryText || (showStats && rows.length ? rows[0] : ''));
+  const secondary = String(secondaryText || (showStats && rows.length ? rows[1] : ''));
+  const counter = primary || secondary
+    ? `${primary ? `<span class="workplace-content__primary">${escapeHtml(primary)}</span>` : ''}${secondary ? `<span class="workplace-content__secondary">${escapeHtml(secondary)}</span>` : ''}`
     : '';
   return `<span class="workplace-content"><span class="workplace-content__name">${escapeHtml(name)}</span>${counter}</span>`;
 }
