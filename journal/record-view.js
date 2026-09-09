@@ -44,6 +44,18 @@ const procedureTotalCost = (items = []) => items.reduce((sum, item) => {
   return Number.isFinite(value) ? sum + value : sum;
 }, 0);
 const procedureTotalDuration = (items = []) => items.reduce((sum, item) => sum + (Number(item?.duration) || 0), 0);
+const normalizedAttendance = (value) => value === 'arrived' || value === 'no-show' ? value : '';
+const appointmentStart = (state) => {
+  const date = dateKey(state.date);
+  const time = String(state.from || '');
+  if (!/^\d{2}:\d{2}$/.test(time)) return null;
+  const value = new Date(`${date}T${time}:00`);
+  return Number.isNaN(value.getTime()) ? null : value;
+};
+const hasAppointmentStarted = (state) => {
+  const start = appointmentStart(state);
+  return Boolean(start && Date.now() >= start.getTime());
+};
 const stateSnapshot = (state) => JSON.stringify({
   date: dateKey(state.date),
   workplaceId: String(state.workplaceId || ''),
@@ -51,6 +63,8 @@ const stateSnapshot = (state) => JSON.stringify({
   to: String(state.to || ''),
   client: state.client || null,
   procedures: Array.isArray(state.procedures) ? state.procedures : [],
+  confirmed: Boolean(state.confirmed),
+  attendance: normalizedAttendance(state.attendance),
 });
 
 function openWorkplacePicker(state, onSelected) {
@@ -196,15 +210,15 @@ function openPhoneActions(phone) {
   });
 }
 
-function confirmDelete(record, onDeleted) {
-  const content = `<div class="modal-title"><h2>Удалить запись?</h2><p>Запись будет удалена полностью и освободит это время.</p></div><div class="modal-actions">${button('Нет', { data: 'data-record-delete-no', variant: 'secondary' })}${button('Удалить запись', { data: 'data-record-delete-yes', variant: 'danger' })}</div>`;
+function confirmCancel(record, onCancelled) {
+  const content = `<div class="modal-title"><h2>Отменить запись?</h2><p>Запись будет удалена полностью и освободит это время.</p></div><div class="modal-actions">${button('Нет', { data: 'data-record-cancel-no', variant: 'secondary' })}${button('Отменить запись', { data: 'data-record-cancel-yes', variant: 'danger' })}</div>`;
   const m = mountModal(document.body, modal(content, { variant: 'compact', surface: 'app' }));
   if (!m) return;
-  m.querySelector('[data-record-delete-no]')?.addEventListener('click', () => m.remove());
-  m.querySelector('[data-record-delete-yes]')?.addEventListener('click', () => {
+  m.querySelector('[data-record-cancel-no]')?.addEventListener('click', () => m.remove());
+  m.querySelector('[data-record-cancel-yes]')?.addEventListener('click', () => {
     if (!deleteRecord(record.id)) return;
     m.remove();
-    onDeleted?.();
+    onCancelled?.();
   });
 }
 
@@ -217,15 +231,22 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     to: record.to,
     client: record.client ? { ...record.client } : null,
     procedures: Array.isArray(record.procedures) ? record.procedures.map((item) => ({ ...item })) : [],
+    confirmed: Boolean(record.confirmed),
+    attendance: normalizedAttendance(record.attendance),
   };
   const original = { ...record };
   let baseline = stateSnapshot(state);
+  let startTimer = null;
   const m = mountModal(document.body, modal('<div data-record-view-host></div>', { variant: 'large', surface: 'app' }));
   if (!m) return;
   const root = m.querySelector('[data-record-view-host]');
 
   const applyPatch = (patch) => {
-    state = { ...state, ...patch };
+    const movesAppointment = Object.prototype.hasOwnProperty.call(patch, 'date')
+      || Object.prototype.hasOwnProperty.call(patch, 'workplaceId')
+      || Object.prototype.hasOwnProperty.call(patch, 'from')
+      || Object.prototype.hasOwnProperty.call(patch, 'to');
+    state = { ...state, ...patch, ...(movesAppointment ? { attendance: '' } : {}) };
     render();
   };
 
@@ -237,6 +258,8 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       to: state.to,
       client: state.client,
       procedures: state.procedures,
+      confirmed: Boolean(state.confirmed),
+      attendance: normalizedAttendance(state.attendance),
     });
     if (!updated) {
       alert('Не удалось сохранить изменения: проверьте рабочий день и свободное время.');
@@ -249,13 +272,26 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       to: updated.to,
       client: updated.client ? { ...updated.client } : null,
       procedures: Array.isArray(updated.procedures) ? updated.procedures.map((item) => ({ ...item })) : [],
+      confirmed: Boolean(updated.confirmed),
+      attendance: normalizedAttendance(updated.attendance),
     };
     baseline = stateSnapshot(state);
     render();
     return true;
   };
 
+  const scheduleStartRender = () => {
+    if (startTimer) clearTimeout(startTimer);
+    startTimer = null;
+    const start = appointmentStart(state);
+    if (!start) return;
+    const delay = start.getTime() - Date.now();
+    if (delay <= 0) return;
+    startTimer = setTimeout(() => render(), Math.min(delay + 50, 2147483647));
+  };
+
   const render = () => {
+    scheduleStartRender();
     const clientSource = state.client || findClient(record) || {};
     const currentPerson = clientSource?.key
       ? people().find((person) => String(person.key) === String(clientSource.key)) || clientSource
@@ -306,13 +342,21 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       detailRows,
       className: 'entity-card--hero entity-card--top-dark',
     });
+
+    const started = hasAppointmentStarted(state);
+    const effectiveAttendance = started ? (normalizedAttendance(state.attendance) || 'arrived') : '';
+    const statusControl = `<div class="segment-control" role="group" aria-label="Статус записи">
+      <button type="button" class="${state.confirmed ? 'is-active' : ''}" aria-pressed="${state.confirmed}" data-record-view-confirmed>Подтвердил</button>
+      <button type="button" class="${effectiveAttendance === 'arrived' ? 'is-active' : ''}" aria-pressed="${effectiveAttendance === 'arrived'}" data-record-view-attendance="arrived"${started ? '' : ' disabled'}>Пришел</button>
+      <button type="button" class="${effectiveAttendance === 'no-show' ? 'is-active' : ''}" aria-pressed="${effectiveAttendance === 'no-show'}" data-record-view-attendance="no-show"${started ? '' : ' disabled'}>Не пришел</button>
+    </div>`;
     const dirty = stateSnapshot(state) !== baseline;
     const confirmAction = dirty
       ? `<div class="record-modal-actions modal-actions">${button('Подтвердить изменения', { data: 'data-record-view-confirm' })}</div>`
       : '';
-    const deleteAction = `<div class="record-modal-actions modal-actions">${button('Удалить запись', { data: 'data-record-view-delete', variant: 'danger' })}</div>`;
+    const cancelAction = `<div class="record-modal-actions modal-actions">${button('Отменить запись', { data: 'data-record-view-cancel', variant: 'danger' })}</div>`;
 
-    root.innerHTML = `<div class="record-screen record-screen--state-view">${card}${confirmAction}${deleteAction}</div>`;
+    root.innerHTML = `<div class="record-screen record-screen--state-view">${card}${statusControl}${confirmAction}${cancelAction}</div>`;
 
     root.querySelector('[data-record-view-workplace-edit]')?.addEventListener('click', () => {
       openWorkplacePicker(state, (workplaceId) => applyPatch({ workplaceId }));
@@ -336,9 +380,19 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
         applyPatch({ procedures: nextProcedures, to });
       });
     }));
+    root.querySelector('[data-record-view-confirmed]')?.addEventListener('click', () => {
+      if (!state.confirmed) applyPatch({ confirmed: true });
+    });
+    root.querySelectorAll('[data-record-view-attendance]').forEach((node) => node.addEventListener('click', () => {
+      if (!hasAppointmentStarted(state)) return;
+      const next = normalizedAttendance(node.dataset.recordViewAttendance);
+      const current = normalizedAttendance(state.attendance) || 'arrived';
+      if (!next || next === current) return;
+      applyPatch({ attendance: next });
+    }));
     root.querySelector('[data-record-view-confirm]')?.addEventListener('click', persistChanges);
-    root.querySelector('[data-record-view-delete]')?.addEventListener('click', () => {
-      confirmDelete(record, () => {
+    root.querySelector('[data-record-view-cancel]')?.addEventListener('click', () => {
+      confirmCancel(record, () => {
         m.remove();
         onClose?.();
       });
@@ -346,7 +400,10 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
   };
 
   m.addEventListener('click', (event) => {
-    if (event.target === m || event.target.closest('[data-modal-close]')) queueMicrotask(() => onClose?.());
+    if (event.target === m || event.target.closest('[data-modal-close]')) {
+      if (startTimer) clearTimeout(startTimer);
+      queueMicrotask(() => onClose?.());
+    }
   });
 
   render();
