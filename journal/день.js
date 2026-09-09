@@ -7,6 +7,7 @@ import { getJournalBreaksForDay, getJournalBreaks } from './break-data.js';
 import { getTimeUsages } from '../core/time-usage.js';
 import { openRecordCreation } from './record.js';
 import { openRecordView } from './record-view.js';
+import { openBreakView } from './break-view.js';
 
 function dateKey(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
 
@@ -50,9 +51,15 @@ export function renderJournalDay(root, { date = new Date(), workplaceId = '', on
     initJournalDayTimeline(contentRoot, {
       usages,
       onSlotClick: ({ usage }) => {
-        if (usage?.type !== 'record') return;
-        const record = records.find((item) => item?.id === usage.sourceId);
-        if (record) openRecordView(record, { onClose: () => renderJournalDay(root, { date, workplaceId, onChange }) });
+        if (usage?.type === 'record') {
+          const record = records.find((item) => item?.id === usage.sourceId);
+          if (record) openRecordView(record, { onClose: () => renderJournalDay(root, { date, workplaceId, onChange }) });
+          return;
+        }
+        if (usage?.type === 'break') {
+          const item = breaks.find((entry) => entry?.id === usage.sourceId);
+          if (item) openBreakView(item, { onClose: () => renderJournalDay(root, { date, workplaceId, onChange }) });
+        }
       },
     });
     return;
@@ -72,6 +79,11 @@ export function renderJournalDay(root, { date = new Date(), workplaceId = '', on
       if (usage?.type === 'record') {
         const record = records.find((item) => item?.id === usage.sourceId);
         if (record) openRecordView(record, { onClose: () => renderJournalDay(root, { date, workplaceId, onChange }) });
+        return;
+      }
+      if (usage?.type === 'break') {
+        const item = breaks.find((entry) => entry?.id === usage.sourceId);
+        if (item) openBreakView(item, { onClose: () => renderJournalDay(root, { date, workplaceId, onChange }) });
         return;
       }
       if (usage) return;
