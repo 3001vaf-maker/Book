@@ -14,7 +14,7 @@ function recordMarkup(usage) {
 function usageMarkup(usage) {
   return usage?.type === 'record'
     ? recordMarkup(usage)
-    : `<button type="button" class="journal-record journal-record--break" data-journal-break="${escape(usage.id)}"><strong>Занято</strong></button>`;
+    : `<button type="button" class="journal-record journal-record--break" data-journal-break="${escape(usage.id)}"><strong>Перерыв</strong></button>`;
 }
 
 function slotsMarkup(start, end, { interactive = true } = {}) {
@@ -98,9 +98,10 @@ export function initJournalDayTimeline(root, { onSlotClick = () => {}, usages = 
     onSlotClick({ from, to, usage });
   }));
 
-  root.querySelectorAll('[data-journal-record]').forEach((node) => node.addEventListener('click', (event) => {
+  root.querySelectorAll('[data-journal-record],[data-journal-break]').forEach((node) => node.addEventListener('click', (event) => {
     event.stopPropagation();
-    const usage = (Array.isArray(usages) ? usages : []).find((item) => String(item?.id) === String(node.dataset.journalRecord));
+    const usageId = node.dataset.journalRecord || node.dataset.journalBreak || '';
+    const usage = (Array.isArray(usages) ? usages : []).find((item) => String(item?.id) === String(usageId));
     if (usage) onSlotClick({ from: usage.from, to: usage.to, usage });
   }));
 }
