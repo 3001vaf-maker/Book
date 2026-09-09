@@ -22,38 +22,100 @@ function workplaceName(workplaces, workplaceId) {
   return workplace?.name || 'Рабочее место';
 }
 
-function sortRecords(records) {
-  return [...records].sort((a, b) => {
-    const left = `${a?.date || ''} ${a?.from || ''}`;
-    const right = `${b?.date || ''} ${b?.from || ''}`;
-    return right.localeCompare(left);
-  });
+function appointmentTime(record, field = 'from') {
+  const date = String(record?.date || '').slice(0, 10);
+  const time = String(record?.[field] || '');
+  const value = Date.parse(`${date}T${time}:00`);
+  return Number.isFinite(value) ? value : 0;
 }
 
-function recordStatusClass(record) {
+function paymentFor(record) {
+  return getCompletedPaymentForSource('record', record?.id);
+}
+
+function activityTime(record, payment = null) {
+  const paidAt = Date.parse(String(payment?.paidAt || payment?.createdAt || ''));
+  if (Number.isFinite(paidAt)) return paidAt;
+  const updatedAt = Date.parse(String(record?.updatedAt || record?.createdAt || ''));
+  if (Number.isFinite(updatedAt)) return updatedAt;
+  return appointmentTime(record, 'to') || appointmentTime(record, 'from');
+}
+
+function isCompletedSide(record, payment, now) {
+  return record?.status === 'cancelled'
+    || record?.attendance === 'no-show'
+    || Boolean(payment)
+    || appointmentTime(record, 'to') <= now;
+}
+
+function recordStatusClass(record, payment = null) {
   if (record?.status === 'cancelled') return 'journal-list-record--deleted';
-  if (getCompletedPaymentForSource('record', record?.id)) return 'journal-list-record--paid';
+  if (payment) return 'journal-list-record--paid';
   if (record?.attendance === 'no-show') return 'journal-list-record--no-show';
   return 'journal-list-record--active';
 }
 
-export function renderJournalList(root) {
-  const workplaces = getWorkplaces();
-  const records = sortRecords(getRecords());
-
-  if (!records.length) {
-    root.innerHTML = emptyState('Список', 'Записей пока нет.');
-    return;
-  }
-
-  root.innerHTML = listEntries(records.map((record) => listEntry({
+function recordEntry(record, workplaces, { focus = false, payment = null } = {}) {
+  const classes = [recordStatusClass(record, payment), focus ? 'journal-list-focus' : ''].filter(Boolean).join(' ');
+  return listEntry({
     overline: workplaceName(workplaces, record?.workplaceId),
     title: clientName(record?.client),
     subtitle: record?.client?.phone || '',
     rightTop: [formatDate(record?.date), String(record?.from || '')].filter(Boolean).join(' · '),
     rightBottom: formatMoney(paymentTotal(record?.procedures || [])),
     interactive: false,
-    className: recordStatusClass(record),
+    className: classes,
     initial: (clientName(record?.client) || '?').slice(0, 1).toUpperCase(),
-  })));
+  });
+}
+
+function scrollToFocus(root, selector) {
+  requestAnimationFrame(() => root.querySelector(selector)?.scrollIntoView({ block: 'center', behavior: 'auto' }));
+}
+
+function renderTimeMode(root, records, workplaces) {
+  const now = Date.now();
+  const ordered = [...records].sort((a, b) => appointmentTime(a, 'from') - appointmentTime(b, 'from'));
+  let focus = ordered.find((record) => appointmentTime(record, 'from') <= now && appointmentTime(record, 'to') > now)
+    || ordered.find((record) => appointmentTime(record, 'from') >= now)
+    || ordered[ordered.length - 1]
+    || null;
+
+  root.innerHTML = listEntries(ordered.map((record) => {
+    const payment = paymentFor(record);
+    return recordEntry(record, workplaces, { focus: record === focus, payment });
+  }));
+  scrollToFocus(root, '.journal-list-focus');
+}
+
+function renderFlowMode(root, records, workplaces) {
+  const now = Date.now();
+  const prepared = records.map((record) => ({ record, payment: paymentFor(record) }));
+  const completed = prepared
+    .filter(({ record, payment }) => isCompletedSide(record, payment, now))
+    .sort((a, b) => activityTime(a.record, a.payment) - activityTime(b.record, b.payment));
+  const pending = prepared
+    .filter(({ record, payment }) => !isCompletedSide(record, payment, now))
+    .sort((a, b) => activityTime(b.record, b.payment) - activityTime(a.record, a.payment));
+
+  const entries = [
+    ...completed.map(({ record, payment }) => recordEntry(record, workplaces, { payment })),
+    '<div class="journal-list-flow-anchor" data-journal-list-flow-anchor aria-hidden="true"></div>',
+    ...pending.map(({ record, payment }) => recordEntry(record, workplaces, { payment })),
+  ];
+  root.innerHTML = listEntries(entries);
+  scrollToFocus(root, '[data-journal-list-flow-anchor]');
+}
+
+export function renderJournalList(root, { mode = 'flow' } = {}) {
+  const workplaces = getWorkplaces();
+  const records = getRecords();
+
+  if (!records.length) {
+    root.innerHTML = emptyState('Список', 'Записей пока нет.');
+    return;
+  }
+
+  if (mode === 'time') renderTimeMode(root, records, workplaces);
+  else renderFlowMode(root, records, workplaces);
 }
