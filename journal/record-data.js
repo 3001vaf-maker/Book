@@ -70,7 +70,20 @@ export function createRecord({ date, workplaceId, from, to, client, procedures =
   const normalizedDate = normalizeDate(date), normalizedWorkplaceId = normalizeId(workplaceId);
   if (!checkRecordTime({ date: normalizedDate, workplaceId: normalizedWorkplaceId, from, to }).ok) return null;
   const now = new Date().toISOString();
-  const record = { id: crypto.randomUUID(), status: 'active', date: normalizedDate, workplaceId: normalizedWorkplaceId, from: String(from), to: String(to), client: client || null, procedures: Array.isArray(procedures) ? procedures : [], createdAt: now, updatedAt: now };
+  const record = {
+    id: crypto.randomUUID(),
+    status: 'active',
+    confirmed: false,
+    attendance: '',
+    date: normalizedDate,
+    workplaceId: normalizedWorkplaceId,
+    from: String(from),
+    to: String(to),
+    client: client || null,
+    procedures: Array.isArray(procedures) ? procedures : [],
+    createdAt: now,
+    updatedAt: now,
+  };
   const records = getRecords(); records.push(record); writeList(KEY, records);
   notify('book:records-changed', { action: 'create', recordId: record.id });
   notify('book:time-usage-changed', { action: 'occupy', usageId: record.id, sourceId: record.id, date: record.date, workplaceId: record.workplaceId, from: record.from, to: record.to });
