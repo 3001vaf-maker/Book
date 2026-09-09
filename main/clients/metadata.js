@@ -20,14 +20,14 @@ export function getClientMetadata(key) {
       const value = Number(payment?.total);
       return sum + (Number.isFinite(value) ? value : 0);
     }, 0);
-  const arrived = records
-    .filter((record) => record?.attendance === 'arrived' && record?.date)
+  const dated = records
+    .filter((record) => record?.date)
     .sort((a, b) => String(b.date).localeCompare(String(a.date)));
 
   return {
     recordCount: records.length,
     paidTotal,
-    lastVisit: arrived[0]?.date || '',
+    lastVisit: dated[0]?.date || '',
   };
 }
 
