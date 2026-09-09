@@ -1,16 +1,90 @@
 import { initCalendar, ALL_WORKPLACES_ID } from '../ui/ui.js';
-import { getWorkplaces, getWorkingDays, getWorkingDates, getAllWorkingDates, getWorkingDayIndicators } from '../core/workplace-time.js';
+import { getPayments } from '../core/payment.js';
+import { minutesBetween } from '../core/time.js';
+import { getWorkplaces, getWorkingDays, getWorkingDates, getAllWorkingDates, getWorkingDayIndicators, getWorkingDay, getWorkingDayTotalMinutes, resolveWorkingDayTime } from '../core/workplace-time.js';
+import { getRecordsForDay } from './record-data.js';
+
+const RECORD_COLOR = '#EFFFBB';
+const PAID_COLOR = '#DDE8D7';
+const CANCELLED_COLOR = '#F1DADA';
+
+function paidRecordIds() {
+  return new Set(getPayments()
+    .filter((payment) => payment?.status === 'completed' && payment?.source?.type === 'record')
+    .map((payment) => String(payment?.source?.id || ''))
+    .filter(Boolean));
+}
+
+function recordMinutes(record) {
+  return Math.max(0, minutesBetween(String(record?.from || ''), String(record?.to || '')) || 0);
+}
+
+function dayCapacityMinutes(workingDays, workplaces, workplaceId, dateKey, allMode) {
+  if (allMode) return Math.max(0, getWorkingDayTotalMinutes(workingDays, workplaces, dateKey));
+  const workingDay = getWorkingDay(workingDays, workplaceId, dateKey);
+  const time = resolveWorkingDayTime(workplaces, workingDay);
+  return time ? Math.max(0, minutesBetween(time.from, time.to)) : 0;
+}
+
+function dayRecordData({ dateKey, workplaceId, allMode, workingDays, workplaces, paidIds }) {
+  const records = getRecordsForDay(dateKey, allMode ? '' : workplaceId);
+  const capacity = dayCapacityMinutes(workingDays, workplaces, workplaceId, dateKey, allMode);
+  const minutes = { paid: 0, active: 0, cancelled: 0 };
+
+  records.forEach((record) => {
+    const duration = recordMinutes(record);
+    if (record?.status === 'cancelled') minutes.cancelled += duration;
+    else if (paidIds.has(String(record?.id || ''))) minutes.paid += duration;
+    else minutes.active += duration;
+  });
+
+  return { count: records.length, capacity, minutes };
+}
+
+function usageGradient({ capacity, minutes }) {
+  if (!(capacity > 0)) return '';
+  const values = [
+    { color: PAID_COLOR, minutes: minutes.paid },
+    { color: RECORD_COLOR, minutes: minutes.active },
+    { color: CANCELLED_COLOR, minutes: minutes.cancelled },
+  ];
+  let cursor = 0;
+  const stops = [];
+
+  values.forEach((item) => {
+    if (!(item.minutes > 0) || cursor >= 100) return;
+    const width = Math.min(100 - cursor, (item.minutes / capacity) * 100);
+    const end = cursor + width;
+    stops.push(`${item.color} ${cursor.toFixed(2)}%`, `${item.color} ${end.toFixed(2)}%`);
+    cursor = end;
+  });
+
+  if (!stops.length) return '';
+  stops.push(`transparent ${cursor.toFixed(2)}%`, 'transparent 100%');
+  return `linear-gradient(90deg,${stops.join(',')})`;
+}
+
+function dateContent(data) {
+  const gradient = usageGradient(data);
+  const fill = gradient ? `<span class="calendar__date-fill" style="--calendar-date-fill:${gradient}" aria-hidden="true"></span>` : '';
+  const count = data.count ? `<span class="calendar__date-count">${data.count} зап.</span>` : '';
+  return `${fill}${count}`;
+}
 
 export function renderJournalMonth(root, { workplaceId = '', onDateSelect = () => {} } = {}) {
   const render = (month = new Date(new Date().getFullYear(), new Date().getMonth(), 1)) => {
     root.innerHTML = '<div data-journal-month-calendar></div>';
     const workingDays = getWorkingDays();
     const workplaces = getWorkplaces();
+    const paidIds = paidRecordIds();
     const allMode = workplaceId === ALL_WORKPLACES_ID;
     initCalendar(root.querySelector('[data-journal-month-calendar]'), {
       month,
       workingDates: allMode ? getAllWorkingDates(workingDays, month) : getWorkingDates(workingDays, workplaceId, month),
-      renderDateContent: () => '',
+      renderDateContent: ({ dateKey, isCurrentMonth }) => {
+        if (!isCurrentMonth) return '';
+        return dateContent(dayRecordData({ dateKey, workplaceId, allMode, workingDays, workplaces, paidIds }));
+      },
       resolveDateIndicators: ({ dateKey, isCurrentMonth }) => isCurrentMonth
         ? getWorkingDayIndicators(workingDays, workplaces, dateKey, { excludeWorkplaceId: allMode ? '' : workplaceId })
         : [],
