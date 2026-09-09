@@ -64,9 +64,8 @@ function renderCard(root, id, navigateBack) {
     meta: [
       { value: metrics.records, label: 'записей' },
       { value: money(metrics.revenue), label: 'сумма' },
-      ...workplaceNames.map((name) => ({ value: name })),
     ],
-    metricsLayout: 'vertical',
+    detailRows: workplaceNames.map((name) => ({ left: name })),
     className: 'entity-card--hero entity-card--top-dark',
   });
   root.innerHTML = page([
