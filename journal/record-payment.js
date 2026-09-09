@@ -1,4 +1,4 @@
-import { modal, mountModal, paymentForm } from '../ui/ui.js';
+import { initPaymentForm, modal, mountModal, paymentForm } from '../ui/ui.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getAllClients } from '../main/clients/data.js';
 import { clientDisplay } from '../main/clients/presentation.js';
@@ -13,11 +13,6 @@ function recordTotal(record) {
 
 function paymentEntryContent(record) {
   return `<button type="button" class="modal-bottom-action" data-record-payment-open aria-label="Открыть оплату, к оплате ${recordTotal(record)} рублей"><span>К оплате</span><strong>${recordTotal(record)} ₽</strong></button>`;
-}
-
-function formatDate(value) {
-  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  return match ? `${match[3]}.${match[2]}.${match[1].slice(-2)}` : String(value || '');
 }
 
 function workplaceName(id) {
@@ -35,17 +30,28 @@ function recordClient(record) {
   return { uei: display.uei || '', name: display.name || '' };
 }
 
+function paymentMoment() {
+  const now = new Date();
+  return {
+    date: `${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getFullYear()).slice(-2)}`,
+    time: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
+  };
+}
+
 function openPaymentModal(record) {
   const current = getRecords().find((item) => String(item?.id || '') === String(record?.id || '')) || record;
+  const moment = paymentMoment();
   const content = `<div class="modal-title"><h2>Оплата</h2></div>${paymentForm({
     workplace: workplaceName(current.workplaceId),
-    date: formatDate(current.date),
-    time: `${current.from || ''} - ${current.to || ''}`,
+    date: moment.date,
+    time: moment.time,
     client: recordClient(current),
     procedures: current.procedures || [],
     total: recordTotal(current),
   })}`;
-  mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
+  const m = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
+  if (!m) return;
+  initPaymentForm(m.querySelector('[data-payment-ui]'));
 }
 
 export function openRecordPaymentEntry(record) {
