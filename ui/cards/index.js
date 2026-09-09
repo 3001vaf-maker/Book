@@ -13,6 +13,13 @@ function topMetaMarkup(items = [], side = 'left') {
   return items.map(({ value = '—', label = '', weight = 'strong' }) => `<span class="entity-card__top-meta entity-card__top-meta--${escapeHtml(side)} entity-card__top-meta--${weight === 'regular' ? 'regular' : 'strong'}"><strong>${escapeHtml(value)}</strong>${label ? `<small>${escapeHtml(label)}</small>` : ''}</span>`).join('');
 }
 
+function detailRowsMarkup(items = []) {
+  return items.map(({ left = '', right = '', weight = 'regular', data = '', aria = '' }) => {
+    const attrs = `${data ? ` ${data}` : ''}${aria ? ` aria-label="${escapeHtml(aria)}"` : ''}`;
+    return `<div class="entity-card__detail-row entity-card__detail-row--${weight === 'strong' ? 'strong' : 'regular'}"${attrs}><span>${escapeHtml(left)}</span><span>${escapeHtml(right)}</span></div>`;
+  }).join('');
+}
+
 export function entityCard({
   id = '',
   title = '',
@@ -22,6 +29,7 @@ export function entityCard({
   meta = [],
   topMeta = [],
   topRightMeta = [],
+  detailRows = [],
   interactive = false,
   data = '',
   className = '',
@@ -41,6 +49,7 @@ export function entityCard({
   if (canonical) {
     const identity = `${id ? `<span class="entity-card__id">${escapeHtml(id)}</span>` : '<span class="entity-card__id" aria-hidden="true"></span>'}<strong class="entity-card__title"${titleStyle(title)}>${escapeHtml(title)}</strong>${subtitle ? `<span class="entity-card__subtitle">${escapeHtml(subtitle)}</span>` : '<span class="entity-card__subtitle" aria-hidden="true"></span>'}`;
     const metrics = meta.length ? `<div class="entity-card__metrics entity-card__metrics--${escapeHtml(metricsLayout)}">${metricMarkup(meta)}</div>` : '';
+    const details = detailRows.length ? `<div class="entity-card__details">${detailRowsMarkup(detailRows)}</div>` : '';
     const topLeft = topMeta.length ? `<div class="entity-card__top-meta-list entity-card__top-meta-list--left">${topMetaMarkup(topMeta,'left')}</div>` : '';
     const topRight = topRightMeta.length ? `<div class="entity-card__top-meta-list entity-card__top-meta-list--right">${topMetaMarkup(topRightMeta,'right')}</div>` : '';
     return `<${tag} class="entity-card entity-card--canonical ${image ? 'has-image' : ''} ${className}"${attrs}${style}>
@@ -49,7 +58,7 @@ export function entityCard({
         <div class="entity-card__zone entity-card__zone--top">${topLeft}${topRight}</div>
         <div class="entity-card__zone entity-card__zone--media"></div>
         <div class="entity-card__zone entity-card__zone--identity">${identity}</div>
-        ${metrics}
+        ${metrics}${details}
       </div>
     </${tag}>`;
   }
