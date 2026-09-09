@@ -2,6 +2,7 @@ import { button, durationText, escapeHtml, iconButton, list, listEntry, stateVie
 import { createRecord, getRecords } from './record-data.js';
 import { getJournalBreaks, createJournalBreak } from './break-data.js';
 import { getAllClients } from '../main/clients/data.js';
+import { clientDisplay } from '../main/clients/presentation.js';
 import { openClientCreate } from '../main/clients/create.js';
 import { getProcedures } from '../settings/service/procedures/data.js';
 import { openProcedureForm } from '../settings/service/procedures/form.js';
@@ -17,7 +18,7 @@ const RECORD_MODES = [
 
 const people = () => getAllClients();
 const procedures = () => getProcedures();
-const clientName = (person) => [person?.name, person?.surname].filter(Boolean).join(' ') || 'Без имени';
+const clientName = (person) => clientDisplay(person).name;
 
 function dateKey(date) {
   const d = date instanceof Date ? date : new Date(date);
@@ -258,14 +259,18 @@ function renderClientStep(modalRoot, { date, workplaceId, from, to, procedures: 
     const listHost = host.querySelector('[data-record-client-list]');
     if (!listHost) return;
     listHost.innerHTML = list({
-      items: filtered.map((person) => ({
-        title: clientName(person),
-        secondary: person.phones?.[0] || '',
-        interactive: true,
-        data: `data-record-client="${escapeHtml(person.key)}"`,
-        selected: selectedClient?.key === person.key,
-        aria: `Выбрать клиента ${clientName(person)}`,
-      })),
+      items: filtered.map((person) => {
+        const display = clientDisplay(person);
+        return {
+          overline: display.uei,
+          title: display.name,
+          secondary: display.phone,
+          interactive: true,
+          data: `data-record-client="${escapeHtml(person.key)}"`,
+          selected: selectedClient?.key === person.key,
+          aria: `Выбрать клиента ${display.name}`,
+        };
+      }),
     }) || '<div class="muted">Клиенты не найдены.</div>';
 
     listHost.querySelectorAll('[data-record-client]').forEach((row) => row.addEventListener('click', () => {
@@ -275,7 +280,10 @@ function renderClientStep(modalRoot, { date, workplaceId, from, to, procedures: 
 
   host.querySelector('[data-record-client-search]')?.addEventListener('input', (event) => {
     const q = event.target.value.trim().toLocaleLowerCase('ru');
-    filtered = all.filter((person) => clientName(person).toLocaleLowerCase('ru').includes(q) || String(person.phones?.[0] || '').includes(q));
+    filtered = all.filter((person) => {
+      const display = clientDisplay(person);
+      return display.name.toLocaleLowerCase('ru').includes(q) || display.phone.includes(q) || display.uei.toLocaleLowerCase('ru').includes(q);
+    });
     render();
   });
   host.querySelector('[data-record-add-client]')?.addEventListener('click', () => {
