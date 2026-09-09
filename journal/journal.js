@@ -140,9 +140,10 @@ export function renderJournal(root) {
 
   const renderView = () => {
     const listModeNavigation = activeView === 'list'
-      ? `<div data-journal-list-mode-navigation>${viewNavigation({ views: listModes, activeView: listMode, ariaLabel: 'Режим списка' })}</div>`
+      ? `<div class="journal-list-mode-navigation" data-journal-list-mode-navigation>${viewNavigation({ views: listModes, activeView: listMode, className: 'segment-control--two-equal', ariaLabel: 'Режим списка' })}</div>`
       : '';
-    root.innerHTML = `${pageHeader('Журнал', '', renderHeaderControl())}${viewNavigation({ views, activeView })}${listModeNavigation}<div data-journal-view></div>`;
+    const viewClass = activeView === 'list' ? ' class="journal-list-viewport"' : '';
+    root.innerHTML = `${pageHeader('Журнал', '', renderHeaderControl())}${viewNavigation({ views, activeView })}${listModeNavigation}<div data-journal-view${viewClass}></div>`;
     const viewRoot = root.querySelector('[data-journal-view]');
     if (activeView === 'day') {
       renderJournalDay(viewRoot, {
