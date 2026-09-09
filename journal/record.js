@@ -665,15 +665,16 @@ function renderBreakConfirmationStep(modalRoot, { date, workplaceId, from, to, o
   if (!host) return;
   const workplace = findWorkplaceName(workplaceId);
   const formattedDate = formatConfirmationDate(date);
-  const view = stateView({
-    blocks: [
-      { id: 'workplace', rows: [{ title: workplace }] },
-      { id: 'dateTime', rows: [{ title: formattedDate }, { title: `${from} - ${to}` }] },
+  const card = entityCard({
+    title: 'Перерыв',
+    topMeta: [{ value: workplace, row: 1 }],
+    topRightMeta: [
+      { value: formattedDate, row: 2, weight: 'regular' },
+      { value: `${from} - ${to}`, row: 3, weight: 'regular' },
     ],
-    actions: [{ label: 'Подтвердить перерыв', data: 'data-break-confirm' }],
-    className: 'record-state-view',
+    className: 'entity-card--hero entity-card--top-dark',
   });
-  host.innerHTML = `<div class="record-screen record-screen--state-view">${view}</div>`;
+  host.innerHTML = `<div class="record-screen record-screen--state-view">${card}<div class="record-modal-actions modal-actions">${button('Подтвердить перерыв', { data: 'data-break-confirm' })}</div></div>`;
   host.querySelector('[data-break-confirm]')?.addEventListener('click', () => {
     const day = getDay(getDays(), workplaceId, date);
     const workTime = getDayTime(day, getWorkplaces());
