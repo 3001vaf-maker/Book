@@ -25,7 +25,7 @@ const discountOptions = [
 
 export function paymentForm({ workplace = '', date = '', time = '', client = {}, procedures = [], total = 0 } = {}) {
   const procedureBlocks = (Array.isArray(procedures) ? procedures : []).map((procedure, index) => `
-    <section class="payment-procedure" data-payment-procedure="${index}">
+    <section class="payment-procedure" data-payment-procedure="${index}" data-payment-source-id="${escapeHtml(procedure?.id || '')}" data-payment-name="${escapeHtml(procedure?.name || '')}">
       <strong class="payment-procedure__name">${escapeHtml(procedure?.name || '')}</strong>
       <div class="payment-fields payment-fields--three">
         <label><span>Цена</span><input type="number" inputmode="decimal" step="0.01" min="0" value="${escapeHtml(moneyText(procedure?.cost))}" data-payment-price></label>
@@ -57,7 +57,7 @@ export function paymentMethods({ wallets = [] } = {}) {
   const walletButtons = (Array.isArray(wallets) ? wallets : []).map((wallet) => button(
     escapeHtml(wallet?.name || 'Кошелёк'),
     {
-      data: `data-payment-wallet="${escapeHtml(wallet?.id || '')}"`,
+      data: `data-payment-wallet="${escapeHtml(wallet?.id || '')}" data-payment-wallet-name="${escapeHtml(wallet?.name || '')}"`,
       variant: 'secondary',
       aria: `Оплатить через ${wallet?.name || 'кошелёк'}`,
     },
@@ -104,6 +104,19 @@ function recalculateTotal(root) {
   if (totalInput) totalInput.value = moneyText(total);
 }
 
+function collectPaymentItems(root) {
+  return [...root.querySelectorAll('[data-payment-procedure]')].map((row) => {
+    const values = rowValues(row);
+    return {
+      sourceId: row.dataset.paymentSourceId || '',
+      name: row.dataset.paymentName || '',
+      price: values.price,
+      discountPercent: values.percent,
+      discountMoney: Math.min(values.money, values.price),
+    };
+  });
+}
+
 export function initPaymentForm(root, { onPay = () => {} } = {}) {
   if (!root) return;
 
@@ -141,13 +154,13 @@ export function initPaymentForm(root, { onPay = () => {} } = {}) {
 
   root.querySelector('[data-payment-submit]')?.addEventListener('click', () => {
     const total = numberValue(root.querySelector('[data-payment-total]')?.value);
-    onPay?.({ total });
+    onPay?.({ total, items: collectPaymentItems(root) });
   });
 
   recalculateTotal(root);
 }
 
-export function initPaymentMethods(root) {
+export function initPaymentMethods(root, { onWallet = () => {} } = {}) {
   if (!root) return;
   const wallets = root.querySelector('[data-payment-wallets]');
   const split = root.querySelector('[data-payment-split]');
@@ -160,5 +173,8 @@ export function initPaymentMethods(root) {
     });
     if (wallets) wallets.hidden = mode !== 'single';
     if (split) split.hidden = mode !== 'split';
+  }));
+  root.querySelectorAll('[data-payment-wallet]').forEach((buttonNode) => buttonNode.addEventListener('click', () => {
+    onWallet?.({ id: buttonNode.dataset.paymentWallet || '', name: buttonNode.dataset.paymentWalletName || '' });
   }));
 }
