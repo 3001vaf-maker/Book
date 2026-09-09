@@ -2,7 +2,9 @@ import { button, durationText, escapeHtml, iconButton, list, listEntry, stateVie
 import { createRecord, getRecords } from './record-data.js';
 import { getJournalBreaks, createJournalBreak } from './break-data.js';
 import { getAllClients } from '../main/clients/data.js';
+import { openClientCreate } from '../main/clients/create.js';
 import { getProcedures } from '../settings/service/procedures/data.js';
+import { openProcedureForm } from '../settings/service/procedures/form.js';
 import { isTimeRangeAvailable, getTimeUsages } from '../core/time-usage.js';
 import { timeToMinutes, minutesToTime } from '../core/time.js';
 import { getWorkplaces } from '../core/workplace-time.js';
@@ -102,7 +104,7 @@ function defaultCost(procedure, workplaceId) {
 }
 
 function renderProceduresStep(modalRoot, { date, workplaceId, from, to, onCreated }) {
-  const items = procedures().filter((procedure) => procedureForWorkplace(procedure, workplaceId));
+  let items = procedures().filter((procedure) => procedureForWorkplace(procedure, workplaceId));
   const selected = new Map();
   let selectionController = null;
   const host = renderFlow(modalRoot, `<div class="record-screen record-screen--procedures"><div class="record-modal-toolbar"><strong>Процедуры</strong>${iconButton('+', { className: 'icon-button--primary', data: 'data-record-add', aria: 'Добавить процедуру' })}</div><div data-record-procedures></div><div class="record-modal-actions modal-actions" data-record-actions></div></div>`);
@@ -179,7 +181,25 @@ function renderProceduresStep(modalRoot, { date, workplaceId, from, to, onCreate
     });
   };
 
-  host.querySelector('[data-record-add]')?.addEventListener('click', () => {});
+  host.querySelector('[data-record-add]')?.addEventListener('click', () => {
+    openProcedureForm({
+      root: document.body,
+      defaultWorkplaceId: workplaceId,
+      variant: 'large',
+      surface: 'app',
+      onSaved: (procedure) => {
+        items = procedures().filter((item) => procedureForWorkplace(item, workplaceId));
+        if (procedureForWorkplace(procedure, workplaceId)) {
+          selected.set(procedure.id, {
+            procedure,
+            cost: defaultCost(procedure, workplaceId),
+            duration: Number(procedure.duration) || 0,
+          });
+        }
+        render();
+      },
+    });
+  });
   render();
 }
 
@@ -205,11 +225,29 @@ function openProcedureSettings({ procedure, current, onSave }) {
 }
 
 function renderClientStep(modalRoot, { date, workplaceId, from, to, procedures: selectedProcedures, onCreated, onSelected }) {
-  const all = people();
+  let all = people();
   let filtered = all;
   let selectedClient = null;
   const host = renderFlow(modalRoot, `<div class="record-screen record-screen--clients"><div class="record-client-toolbar"><input class="record-client-search" data-record-client-search placeholder="🔍 Найти клиента..." autocomplete="off">${iconButton('+', { className: 'icon-button--primary', data: 'data-record-add-client', aria: 'Добавить клиента' })}</div><div class="record-client-list" data-record-client-list></div></div>`);
   if (!host) return;
+
+  const openSelectedClient = (person) => {
+    selectedClient = person;
+    if (!selectedClient) return;
+    if (onSelected) {
+      onSelected(selectedClient);
+      return;
+    }
+    renderConfirmationStep(modalRoot, {
+      date,
+      workplaceId,
+      from,
+      to,
+      selectedClient,
+      selectedProcedures,
+      onCreated,
+    });
+  };
 
   const render = () => {
     const listHost = host.querySelector('[data-record-client-list]');
@@ -226,21 +264,7 @@ function renderClientStep(modalRoot, { date, workplaceId, from, to, procedures: 
     }) || '<div class="muted">Клиенты не найдены.</div>';
 
     listHost.querySelectorAll('[data-record-client]').forEach((row) => row.addEventListener('click', () => {
-      selectedClient = all.find((person) => person.key === row.dataset.recordClient) || null;
-      if (!selectedClient) return;
-      if (onSelected) {
-        onSelected(selectedClient);
-        return;
-      }
-      renderConfirmationStep(modalRoot, {
-        date,
-        workplaceId,
-        from,
-        to,
-        selectedClient,
-        selectedProcedures,
-        onCreated,
-      });
+      openSelectedClient(all.find((person) => person.key === row.dataset.recordClient) || null);
     }));
   };
 
@@ -249,7 +273,18 @@ function renderClientStep(modalRoot, { date, workplaceId, from, to, procedures: 
     filtered = all.filter((person) => clientName(person).toLocaleLowerCase('ru').includes(q) || String(person.phones?.[0] || '').includes(q));
     render();
   });
-  host.querySelector('[data-record-add-client]')?.addEventListener('click', () => {});
+  host.querySelector('[data-record-add-client]')?.addEventListener('click', () => {
+    openClientCreate({
+      root: document.body,
+      variant: 'large',
+      surface: 'app',
+      onCreated: (person) => {
+        all = people();
+        filtered = all;
+        openSelectedClient(all.find((item) => item.key === person.key) || person);
+      },
+    });
+  });
   render();
 }
 
