@@ -451,10 +451,10 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
       id: client.uei,
       title: client.name,
       subtitle: client.phone,
-      topMeta: [{ value: workplace }],
+      topMeta: [{ value: workplace, row: 1 }],
       topRightMeta: [
-        { value: formattedDate },
-        { value: `${currentFrom} - ${currentTo || ''}` },
+        { value: formattedDate, row: 2 },
+        { value: `${currentFrom} - ${currentTo || ''}`, row: 3 },
       ],
       detailRows,
       className: 'entity-card--hero entity-card--top-dark',
