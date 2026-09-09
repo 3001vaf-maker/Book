@@ -2,7 +2,8 @@ import { pageHeader, viewNavigation, initViewNavigation, headerControl, workplac
 import { getWorkplaceContext, setWorkplaceContext } from '../core/workplace-context.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getActiveDayWorkplaces, getAvailableDayWorkplaces, getDayWorkplaceDraft, saveDayWorkplaceTime } from '../core/day-workplaces.js';
-import { getActiveRecordCountForDay } from './record-data.js';
+import { paymentTotal } from '../core/payment.js';
+import { getActiveRecordCountForDay, getRecordsForDay } from './record-data.js';
 import { openJournalWorkplaceControl } from './workplace-control.js';
 import { renderJournalDay } from './день.js';
 import { renderJournalMonth } from './месяц.js';
@@ -21,6 +22,11 @@ function dateKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
+function formatRubles(value = 0) {
+  const amount = Math.max(0, Math.round(Number(value) || 0));
+  return `${amount.toLocaleString('ru-RU').replaceAll('\u00a0', ' ')} р.`;
+}
+
 export function renderJournal(root) {
   let activeView = 'day';
   const workplaces = getWorkplaces();
@@ -30,10 +36,29 @@ export function renderJournal(root) {
 
   const activeDayWorkplaces = () => getActiveDayWorkplaces(selectedDate, workplaces);
 
+  const dayHeaderSummary = () => {
+    const day = dateKey(selectedDate);
+    const allMode = selectedWorkplaceId === ALL_WORKPLACES_ID;
+    const records = getRecordsForDay(day, allMode ? '' : selectedWorkplaceId)
+      .filter((record) => record?.status !== 'cancelled');
+    const recordCount = records.length;
+    const procedureCount = records.reduce((sum, record) => sum + (Array.isArray(record?.procedures) ? record.procedures.length : 0), 0);
+    const total = records.reduce((sum, record) => sum + paymentTotal(record?.procedures || []), 0);
+    return {
+      primaryText: `${recordCount} зап. - ${procedureCount}пр.`,
+      secondaryText: formatRubles(total),
+    };
+  };
+
   const renderHeaderControl = () => {
     const allMode = selectedWorkplaceId === ALL_WORKPLACES_ID;
     const workplace = allMode ? null : workplaces.find((item) => item.key === selectedWorkplaceId) || null;
-    return headerControl(workplaceContent({ workplace, title: allMode ? 'Все записи' : '' }), {
+    const summary = activeView === 'day' ? dayHeaderSummary() : {};
+    return headerControl(workplaceContent({
+      workplace,
+      title: allMode ? 'Все записи' : '',
+      ...summary,
+    }), {
       data: 'data-workplace-header-open',
       aria: allMode ? 'Все записи по рабочим местам' : `Рабочее место: ${workplace?.name || 'не выбрано'}`,
     });
@@ -135,5 +160,12 @@ export function renderJournal(root) {
     root.querySelector('[data-workplace-header-open]')?.addEventListener('click', activeView === 'day' ? openDayWorkplaces : openWorkplace);
     initViewNavigation(root, { views, activeView, onChange: (nextView) => { activeView = nextView; renderView(); } });
   };
+
+  if (root.__bookJournalRecordsChangedHandler) window.removeEventListener('book:records-changed', root.__bookJournalRecordsChangedHandler);
+  root.__bookJournalRecordsChangedHandler = () => {
+    if (activeView === 'day') renderView();
+  };
+  window.addEventListener('book:records-changed', root.__bookJournalRecordsChangedHandler);
+
   renderView();
 }
