@@ -6,6 +6,7 @@ import { escapeHtml } from '../utils/escape-html.js';
  * item inside a list; entityCard() renders the opened entity.
  */
 export function listEntry({
+  overline = '',
   title = '',
   subtitle = '',
   rightTop = '',
@@ -39,11 +40,12 @@ export function listEntry({
   const deleteAction = deleteData
     ? `<span class="list-entry__delete" data-delete-action="${escapeHtml(deleteData)}" aria-label="${escapeHtml(deleteAria)}">×</span>`
     : '';
+  const firstLine = overline ? `<strong>${escapeHtml(overline)}</strong>` : '';
 
   return `<${tag} class="list-entry ${image ? 'has-image' : ''} ${className}"${attrs}${style}>
     <span class="list-entry__background" aria-hidden="true">${image ? '' : `<span>${escapeHtml(initial)}</span>`}</span>
     <span class="list-entry__content">
-      <span class="list-entry__main${swatch ? ' has-swatch' : ''}">${swatch}<span class="list-entry__text"><strong>${escapeHtml(title)}</strong><small>${escapeHtml(secondLine)}</small></span></span>
+      <span class="list-entry__main${swatch ? ' has-swatch' : ''}">${swatch}<span class="list-entry__text">${firstLine}<strong>${escapeHtml(title)}</strong><small>${escapeHtml(secondLine)}</small></span></span>
       ${right}${action}${deleteAction}
     </span>
   </${tag}>`;
