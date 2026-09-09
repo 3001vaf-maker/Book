@@ -1,4 +1,7 @@
-import { modal, mountModal } from '../ui/ui.js';
+import { modal, mountModal, paymentForm } from '../ui/ui.js';
+import { getWorkplaces } from '../core/workplace-time.js';
+import { getAllClients } from '../main/clients/data.js';
+import { clientDisplay } from '../main/clients/presentation.js';
 import { getRecords } from './record-data.js';
 
 function recordTotal(record) {
@@ -12,8 +15,37 @@ function paymentEntryContent(record) {
   return `<button type="button" class="modal-bottom-action" data-record-payment-open aria-label="Открыть оплату, к оплате ${recordTotal(record)} рублей"><span>К оплате</span><strong>${recordTotal(record)} ₽</strong></button>`;
 }
 
-function openPaymentModal() {
-  mountModal(document.body, modal('<div class="modal-title"><h2>Оплата</h2></div>', { variant: 'medium', surface: 'app' }));
+function formatDate(value) {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return match ? `${match[3]}.${match[2]}.${match[1].slice(-2)}` : String(value || '');
+}
+
+function workplaceName(id) {
+  const workplace = getWorkplaces().find((item) => String(item?.key ?? item?.id ?? '') === String(id || ''));
+  return workplace?.name || workplace?.title || 'Рабочее пространство';
+}
+
+function recordClient(record) {
+  const source = record?.client || {};
+  const people = getAllClients();
+  const current = people.find((item) => String(item?.key ?? '') === String(source?.key ?? ''))
+    || people.find((item) => String(item?.id ?? '') === String(source?.id ?? ''))
+    || source;
+  const display = clientDisplay(current);
+  return { uei: display.uei || '', name: display.name || '' };
+}
+
+function openPaymentModal(record) {
+  const current = getRecords().find((item) => String(item?.id || '') === String(record?.id || '')) || record;
+  const content = `<div class="modal-title"><h2>Оплата</h2></div>${paymentForm({
+    workplace: workplaceName(current.workplaceId),
+    date: formatDate(current.date),
+    time: `${current.from || ''} - ${current.to || ''}`,
+    client: recordClient(current),
+    procedures: current.procedures || [],
+    total: recordTotal(current),
+  })}`;
+  mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
 }
 
 export function openRecordPaymentEntry(record) {
@@ -34,7 +66,7 @@ export function openRecordPaymentEntry(record) {
     if (String(event?.detail?.recordId || '') === String(record.id)) renderAmount();
   };
 
-  bottom.querySelector('[data-record-payment-open]')?.addEventListener('click', openPaymentModal);
+  bottom.querySelector('[data-record-payment-open]')?.addEventListener('click', () => openPaymentModal(record));
   window.addEventListener('book:records-changed', onRecordsChanged);
 
   return () => {
