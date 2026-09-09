@@ -69,6 +69,10 @@ function recordEntry(record, workplaces, { focus = false, payment = null } = {})
   });
 }
 
+function anchorEntry() {
+  return '<div class="journal-list-anchor" data-journal-list-anchor aria-hidden="true"></div>';
+}
+
 function scrollToFocus(root, selector) {
   requestAnimationFrame(() => {
     const node = root.querySelector(selector);
@@ -82,16 +86,17 @@ function scrollToFocus(root, selector) {
 function renderTimeMode(root, records, workplaces) {
   const now = Date.now();
   const ordered = [...records].sort((a, b) => appointmentTime(a, 'from') - appointmentTime(b, 'from'));
-  const focus = ordered.find((record) => appointmentTime(record, 'from') <= now && appointmentTime(record, 'to') > now)
-    || ordered.find((record) => appointmentTime(record, 'from') >= now)
-    || ordered[ordered.length - 1]
-    || null;
-
-  root.innerHTML = listEntries(ordered.map((record) => {
+  const focusIndex = ordered.findIndex((record) => appointmentTime(record, 'to') > now);
+  const splitIndex = focusIndex >= 0 ? focusIndex : ordered.length;
+  const entries = ordered.flatMap((record, index) => {
     const payment = paymentFor(record);
-    return recordEntry(record, workplaces, { focus: record === focus, payment });
-  }));
-  scrollToFocus(root, '.journal-list-focus');
+    const row = recordEntry(record, workplaces, { focus: index === splitIndex, payment });
+    return index === splitIndex ? [anchorEntry(), row] : [row];
+  });
+  if (splitIndex === ordered.length) entries.push(anchorEntry());
+
+  root.innerHTML = listEntries(entries);
+  scrollToFocus(root, '[data-journal-list-anchor]');
 }
 
 function renderFlowMode(root, records, workplaces) {
@@ -106,11 +111,11 @@ function renderFlowMode(root, records, workplaces) {
 
   const entries = [
     ...completed.map(({ record, payment }) => recordEntry(record, workplaces, { payment })),
-    '<div class="journal-list-flow-anchor" data-journal-list-flow-anchor aria-hidden="true"></div>',
+    anchorEntry(),
     ...pending.map(({ record, payment }) => recordEntry(record, workplaces, { payment })),
   ];
   root.innerHTML = listEntries(entries);
-  scrollToFocus(root, '[data-journal-list-flow-anchor]');
+  scrollToFocus(root, '[data-journal-list-anchor]');
 }
 
 export function renderJournalList(root, { mode = 'flow' } = {}) {
