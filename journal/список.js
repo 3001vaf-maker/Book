@@ -31,8 +31,9 @@ function sortRecords(records) {
 }
 
 function recordStatusClass(record) {
-  if (record?.status === 'cancelled') return 'journal-list-record--cancelled';
+  if (record?.status === 'cancelled') return 'journal-list-record--deleted';
   if (getCompletedPaymentForSource('record', record?.id)) return 'journal-list-record--paid';
+  if (record?.attendance === 'no-show') return 'journal-list-record--no-show';
   return 'journal-list-record--active';
 }
 
