@@ -1,7 +1,8 @@
-import { initPaymentForm, modal, mountModal, paymentForm } from '../ui/ui.js';
+import { initPaymentForm, initPaymentMethods, modal, mountModal, paymentForm, paymentMethods } from '../ui/ui.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getAllClients } from '../main/clients/data.js';
 import { clientDisplay } from '../main/clients/presentation.js';
+import { getWallets } from '../settings/wallets/data.js';
 import { getRecords } from './record-data.js';
 
 function recordTotal(record) {
@@ -38,6 +39,13 @@ function paymentMoment() {
   };
 }
 
+function openPaymentMethodsModal() {
+  const content = `<div class="modal-title"><h2>Способы оплаты</h2></div>${paymentMethods({ wallets: getWallets() })}`;
+  const methodsModal = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
+  if (!methodsModal) return;
+  initPaymentMethods(methodsModal.querySelector('[data-payment-methods]'));
+}
+
 function openPaymentModal(record) {
   const current = getRecords().find((item) => String(item?.id || '') === String(record?.id || '')) || record;
   const moment = paymentMoment();
@@ -51,7 +59,7 @@ function openPaymentModal(record) {
   })}`;
   const m = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
   if (!m) return;
-  initPaymentForm(m.querySelector('[data-payment-ui]'));
+  initPaymentForm(m.querySelector('[data-payment-ui]'), { onPay: openPaymentMethodsModal });
 }
 
 export function openRecordPaymentEntry(record) {
