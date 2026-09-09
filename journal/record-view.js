@@ -205,7 +205,7 @@ function openAddProcedurePicker(state, onSelected) {
   }));
 }
 
-function openProcedureCorrection(state, index, { onSave, onAdd } = {}) {
+function openProcedureCorrection(state, index, { onSave, onAdd, onDelete } = {}) {
   const item = state.procedures?.[index];
   if (!item) return;
   const costField = field({
@@ -222,13 +222,17 @@ function openProcedureCorrection(state, index, { onSave, onAdd } = {}) {
     value: `${String(Math.floor(duration / 60)).padStart(2, '0')}:${String(duration % 60).padStart(2, '0')}`,
     minuteStep: 5,
   });
-  const html = `<div class="modal-title"><h2>${escapeHtml(item.name || 'Процедура')}</h2><p>Установите параметры процедуры для этой записи.</p></div><div class="compact-form">${costField}${durationField}<div class="modal-actions">${button('Сохранить', { data: 'data-record-view-procedure-save' })}${button('+ Добавить процедуру', { data: 'data-record-view-procedure-add', variant: 'secondary' })}</div></div>`;
+  const html = `<div class="modal-title"><h2>${escapeHtml(item.name || 'Процедура')}</h2><p>Установите параметры процедуры для этой записи.</p></div><div class="compact-form">${costField}${durationField}<div class="modal-actions">${button('Сохранить', { data: 'data-record-view-procedure-save' })}${button('+ Добавить процедуру', { data: 'data-record-view-procedure-add', variant: 'secondary' })}${button('Удалить процедуру', { data: 'data-record-view-procedure-delete', variant: 'danger' })}</div></div>`;
   const m = mountModal(document.body, modal(html, { variant: 'medium', surface: 'app' }));
   if (!m) return;
   initTimePickers(m);
   m.querySelector('[data-record-view-procedure-add]')?.addEventListener('click', () => {
     m.remove();
     onAdd?.();
+  });
+  m.querySelector('[data-record-view-procedure-delete]')?.addEventListener('click', () => {
+    m.remove();
+    onDelete?.();
   });
   m.querySelector('[data-record-view-procedure-save]')?.addEventListener('click', () => {
     const rawCost = String(m.querySelector('[data-record-view-cost]')?.value || '').replace(/[^0-9.,-]/g, '').replace(',', '.');
@@ -299,7 +303,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
   const applyProcedures = (nextProcedures) => {
     if (isPaid()) return;
     const start = timeToMinutes(state.from);
-    const duration = procedureTotalDuration(nextProcedures);
+    const duration = nextProcedures.length ? procedureTotalDuration(nextProcedures) : 30;
     const nextTo = start == null ? state.to : minutesToTime(start + duration);
     const check = checkRecordTime({
       date: state.date,
@@ -359,7 +363,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       : clientSource;
     const client = clientDisplay(currentPerson);
     const workplace = workplaceName(state.workplaceId);
-    const totalDuration = procedureTotalDuration(state.procedures);
+    const totalDuration = state.procedures.length ? procedureTotalDuration(state.procedures) : 30;
     const totalCost = procedureTotalCost(state.procedures);
     const detailRows = [
       { left: durationText(totalDuration), right: `${totalCost} ₽`, weight: 'strong' },
@@ -452,6 +456,10 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
         onAdd: () => openAddProcedurePicker(state, (added) => {
           applyProcedures([...state.procedures.map((item) => ({ ...item })), added]);
         }),
+        onDelete: () => {
+          const nextProcedures = state.procedures.filter((_, itemIndex) => itemIndex !== index).map((item) => ({ ...item }));
+          applyProcedures(nextProcedures);
+        },
       });
     }));
     root.querySelector('[data-record-view-confirmed]')?.addEventListener('click', () => {
