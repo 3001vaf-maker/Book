@@ -1,12 +1,16 @@
 import { initPaymentForm, initPaymentMethods, modal, mountModal, paymentForm, paymentMethods } from '../ui/ui.js';
-import { completePayment, createPaymentDraft, paymentTotal } from '../core/payment.js';
+import { completePayment, createPaymentDraft, getCompletedPaymentForSource, paymentTotal } from '../core/payment.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getAllClients } from '../main/clients/data.js';
 import { clientDisplay } from '../main/clients/presentation.js';
 import { getWallets } from '../settings/wallets/data.js';
-import { getRecords } from './record-data.js';
+import { getRecords, updateRecord } from './record-data.js';
 
 function paymentEntryContent(record) {
+  const completed = getCompletedPaymentForSource('record', record?.id);
+  if (completed) {
+    return `<div class="modal-bottom-action modal-bottom-action--paid" aria-label="Оплачено ${completed.total} рублей"><strong>Оплачено</strong><strong>${completed.total} ₽</strong></div>`;
+  }
   const total = paymentTotal(record?.procedures || []);
   return `<button type="button" class="modal-bottom-action" data-record-payment-open aria-label="Открыть оплату, к оплате ${total} рублей"><span>К оплате</span><strong>${total} ₽</strong></button>`;
 }
@@ -48,6 +52,9 @@ function openPaymentMethodsModal(payment, values, paymentModal) {
         total: values.total,
       });
       if (!completed) return;
+      if (completed?.source?.type === 'record' && completed?.source?.id) {
+        updateRecord(completed.source.id, { attendance: 'arrived' });
+      }
       methodsModal.remove();
       paymentModal?.remove();
     },
@@ -55,6 +62,7 @@ function openPaymentMethodsModal(payment, values, paymentModal) {
 }
 
 function openPaymentModal(record) {
+  if (getCompletedPaymentForSource('record', record?.id)) return;
   const current = getRecords().find((item) => String(item?.id || '') === String(record?.id || '')) || record;
   const payment = paymentFromRecord(current);
   const content = `<div class="modal-title"><h2>Оплата</h2></div>${paymentForm({
@@ -77,24 +85,29 @@ export function openRecordPaymentEntry(record) {
   const bottom = mountModal(document.body, modal(paymentEntryContent(record), { variant: 'bottom' }));
   if (!bottom) return () => {};
 
-  const renderAmount = () => {
-    const current = getRecords().find((item) => String(item?.id || '') === String(record.id));
-    const action = bottom.querySelector('[data-record-payment-open]');
-    if (!current || !action) return;
-    const amount = paymentTotal(current.procedures || []);
-    action.innerHTML = `<span>К оплате</span><strong>${amount} ₽</strong>`;
-    action.setAttribute('aria-label', `Открыть оплату, к оплате ${amount} рублей`);
+  const renderPaymentState = () => {
+    const current = getRecords().find((item) => String(item?.id || '') === String(record.id)) || record;
+    const sheet = bottom.querySelector('.modal-sheet');
+    if (!sheet) return;
+    sheet.innerHTML = paymentEntryContent(current);
+    sheet.querySelector('[data-record-payment-open]')?.addEventListener('click', () => openPaymentModal(current));
   };
 
   const onRecordsChanged = (event) => {
-    if (String(event?.detail?.recordId || '') === String(record.id)) renderAmount();
+    if (String(event?.detail?.recordId || '') === String(record.id)) renderPaymentState();
+  };
+  const onPaymentsChanged = (event) => {
+    const source = event?.detail?.source;
+    if (String(source?.type || '') === 'record' && String(source?.id || '') === String(record.id)) renderPaymentState();
   };
 
   bottom.querySelector('[data-record-payment-open]')?.addEventListener('click', () => openPaymentModal(record));
   window.addEventListener('book:records-changed', onRecordsChanged);
+  window.addEventListener('book:payments-changed', onPaymentsChanged);
 
   return () => {
     window.removeEventListener('book:records-changed', onRecordsChanged);
+    window.removeEventListener('book:payments-changed', onPaymentsChanged);
     bottom.remove();
   };
 }
