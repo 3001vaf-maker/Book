@@ -70,13 +70,19 @@ function recordEntry(record, workplaces, { focus = false, payment = null } = {})
 }
 
 function scrollToFocus(root, selector) {
-  requestAnimationFrame(() => root.querySelector(selector)?.scrollIntoView({ block: 'center', behavior: 'auto' }));
+  requestAnimationFrame(() => {
+    const node = root.querySelector(selector);
+    if (!node) return;
+    const rootTop = root.getBoundingClientRect().top;
+    const nodeTop = node.getBoundingClientRect().top;
+    root.scrollTop += nodeTop - rootTop;
+  });
 }
 
 function renderTimeMode(root, records, workplaces) {
   const now = Date.now();
   const ordered = [...records].sort((a, b) => appointmentTime(a, 'from') - appointmentTime(b, 'from'));
-  let focus = ordered.find((record) => appointmentTime(record, 'from') <= now && appointmentTime(record, 'to') > now)
+  const focus = ordered.find((record) => appointmentTime(record, 'from') <= now && appointmentTime(record, 'to') > now)
     || ordered.find((record) => appointmentTime(record, 'from') >= now)
     || ordered[ordered.length - 1]
     || null;
