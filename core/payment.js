@@ -77,7 +77,14 @@ export function completePayment(draft, { walletId = '', walletName = '', items =
     paidAt: new Date().toISOString(),
   };
   writePayments([...readPayments(), payment]);
-  window.dispatchEvent(new CustomEvent('book:payments-changed', { detail: { paymentId: payment.id, walletId: payment.walletId } }));
+  window.dispatchEvent(new CustomEvent('book:payments-changed', {
+    detail: {
+      paymentId: payment.id,
+      walletId: payment.walletId,
+      total: payment.total,
+      source: payment.source || null,
+    },
+  }));
   return payment;
 }
 
@@ -87,4 +94,14 @@ export function getPayments() {
 
 export function getPaymentsForWallet(walletId) {
   return readPayments().filter((payment) => payment?.status === 'completed' && String(payment?.walletId || '') === String(walletId || ''));
+}
+
+export function getCompletedPaymentForSource(type, id) {
+  const sourceType = String(type || '');
+  const sourceId = String(id || '');
+  if (!sourceType || !sourceId) return null;
+  const matches = readPayments().filter((payment) => payment?.status === 'completed'
+    && String(payment?.source?.type || '') === sourceType
+    && String(payment?.source?.id || '') === sourceId);
+  return matches.length ? matches[matches.length - 1] : null;
 }
