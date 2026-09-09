@@ -50,6 +50,23 @@ export function createJournalBreak({ workplaceId, date, from, to } = {}) {
   return item;
 }
 
+export function moveJournalBreak(id, { from, to } = {}) {
+  const breakId = String(id || '');
+  const start = normalizeTime(from, '');
+  const end = normalizeTime(to, '');
+  if (!breakId || !isValidRange(start, end)) return null;
+  const breaks = getJournalBreaks();
+  const index = breaks.findIndex((item) => String(item?.id || '') === breakId);
+  if (index < 0) return null;
+  const previous = breaks[index];
+  const updated = { ...previous, from: start, to: end };
+  breaks[index] = updated;
+  writeBreaks(breaks);
+  notifyTimeUsageChanged({ action: 'release', usageId: breakId, sourceId: breakId, date: previous.date, workplaceId: previous.workplaceId, from: previous.from, to: previous.to });
+  notifyTimeUsageChanged({ action: 'occupy', usageId: breakId, sourceId: breakId, date: updated.date, workplaceId: updated.workplaceId, from: updated.from, to: updated.to });
+  return updated;
+}
+
 export function removeJournalBreak(id) {
   const breakId = String(id || '');
   if (!breakId) return false;
