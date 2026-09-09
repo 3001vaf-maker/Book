@@ -7,6 +7,11 @@ const text=v=>{const {h,min}=normalize(v);return `${String(h).padStart(2,'0')}:$
 const CYCLES=5;
 const MIDDLE_CYCLE=Math.floor(CYCLES/2);
 
+export function timeSlots({values=[],selected='',data='data-time-slot',ariaLabel='Выбрать время'}={}){
+  const items=Array.isArray(values)?values:[];
+  return `<div class="time-slots" role="group" aria-label="${esc(ariaLabel)}">${items.map(value=>{const slot=typeof value==='object'?value:{value,label:value};const raw=slot.value??slot.from??slot.label??'';const label=slot.label??raw;const isSelected=String(raw)===String(selected);return `<button type="button" class="time-slot${isSelected?' is-selected':''}" ${data}="${esc(raw)}" aria-pressed="${isSelected?'true':'false'}">${esc(label)}</button>`;}).join('')}</div>`;
+}
+
 export function wheel({values,selected,type,formatter=(v)=>String(v).padStart(2,'0')}={}){
   const base=Array.isArray(values)?values:[];
   return Array.from({length:CYCLES},(_,cycle)=>base.map((value,index)=>`<button type="button" class="time-wheel__item${cycle===MIDDLE_CYCLE&&String(value)===String(selected)?' is-selected':''}" data-time-wheel-item data-time-wheel-type="${esc(type)}" data-value="${esc(value)}" data-cycle="${cycle}" data-index="${index}">${esc(formatter(value))}</button>`).join('')).join('');
