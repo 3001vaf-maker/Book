@@ -1,6 +1,6 @@
 import { emptyState, listEntries, listEntry } from '../ui/ui.js';
 import { getWorkplaces } from '../core/workplace-time.js';
-import { paymentTotal } from '../core/payment.js';
+import { getCompletedPaymentForSource, paymentTotal } from '../core/payment.js';
 import { getRecords } from './record-data.js';
 
 function formatDate(value = '') {
@@ -30,6 +30,12 @@ function sortRecords(records) {
   });
 }
 
+function recordStatusClass(record) {
+  if (record?.status === 'cancelled') return 'journal-list-record--cancelled';
+  if (getCompletedPaymentForSource('record', record?.id)) return 'journal-list-record--paid';
+  return 'journal-list-record--active';
+}
+
 export function renderJournalList(root) {
   const workplaces = getWorkplaces();
   const records = sortRecords(getRecords());
@@ -46,6 +52,7 @@ export function renderJournalList(root) {
     rightTop: [formatDate(record?.date), String(record?.from || '')].filter(Boolean).join(' · '),
     rightBottom: formatMoney(paymentTotal(record?.procedures || [])),
     interactive: false,
+    className: recordStatusClass(record),
     initial: (clientName(record?.client) || '?').slice(0, 1).toUpperCase(),
   })));
 }
