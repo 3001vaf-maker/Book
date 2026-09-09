@@ -15,7 +15,8 @@ function recordMarkup(usage) {
   const total = moneyText(recordTotal(usage));
   const phone = client.phone ? `<span class="journal-record__phone">${escape(client.phone)}</span>` : '';
   const services = (usage.procedures || []).map((item) => `<span class="journal-record__service">${escape(item.name)}</span>`).join('');
-  return `<button type="button" class="journal-record" data-journal-record="${escape(usage.id)}"><span class="journal-record__head"><strong class="journal-record__identity">${identity}</strong><strong class="journal-record__total">${escape(total)}</strong></span>${phone}${services}</button>`;
+  const statusClass = usage?.paid ? ' journal-record--paid' : usage?.attendance === 'no-show' ? ' journal-record--no-show' : '';
+  return `<button type="button" class="journal-record${statusClass}" data-journal-record="${escape(usage.id)}"><span class="journal-record__head"><strong class="journal-record__identity">${identity}</strong><strong class="journal-record__total">${escape(total)}</strong></span>${phone}${services}</button>`;
 }
 
 function usageMarkup(usage) {
