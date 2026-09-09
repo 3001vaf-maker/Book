@@ -436,8 +436,7 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
   const render = () => {
     const host = flowHost(modalRoot);
     if (!host) return;
-    const name = clientName(currentClient);
-    const phone = currentClient?.phones?.[0] || currentClient?.phone || '';
+    const client = clientDisplay(currentClient);
     const workplace = findWorkplaceName(currentWorkplaceId);
     const formattedDate = formatConfirmationDate(currentDate);
     const procedureItems = selectedProcedures.map((item) => ({
@@ -449,7 +448,7 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
       blocks: [
         { id: 'workplace', rows: [{ title: workplace }], aria: `Изменить салон: ${workplace}` },
         { id: 'dateTime', rows: [{ title: formattedDate }, { title: `${currentFrom} - ${currentTo || ''}` }], aria: `Изменить дату и время: ${formattedDate} ${currentFrom} - ${currentTo || ''}` },
-        { id: 'client', rows: [{ title: name }, ...(phone ? [{ title: phone }] : [])], aria: `Изменить клиента: ${name}` },
+        { id: 'client', rows: [...(client.uei ? [{ title: client.uei }] : []), { title: client.name }, { title: client.phone }], aria: `Изменить клиента: ${client.name}` },
         { id: 'procedures', kind: 'list', items: procedureItems, summary: { left: durationText(duration()), right: `${total} ₽` }, aria: 'Изменить процедуры' },
       ],
       actions: [{ label: 'Подтвердить запись', data: 'data-record-confirm' }],
