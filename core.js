@@ -22,6 +22,7 @@ const routes = {
 
 const state = { activeSection: 'main' };
 const app = document.querySelector('#app');
+let disposeView = () => {};
 
 function syncViewport() {
   const vv = window.visualViewport;
@@ -40,9 +41,12 @@ function navigate(section) {
 }
 
 function render() {
+  disposeView();
+  disposeView = () => {};
   const view = routes[state.activeSection];
   app.innerHTML = `<main class="app-content" id="app-content"></main>${bottomNavigation(state.activeSection)}`;
-  view(document.querySelector('#app-content'), { navigate });
+  const nextDispose = view(document.querySelector('#app-content'), { navigate });
+  if (typeof nextDispose === 'function') disposeView = nextDispose;
   app.querySelectorAll('[data-nav]').forEach((button) => {
     button.addEventListener('click', () => navigate(button.dataset.nav));
   });
