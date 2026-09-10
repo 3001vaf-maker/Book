@@ -14,22 +14,24 @@ enum MembershipRole {
 }
 
 model Tenant {
-  id          String       @id @default(cuid())
-  name        String
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  memberships Membership[]
+  id              String           @id @default(cuid())
+  name            String
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  memberships     Membership[]
+  workspaceStates WorkspaceState[]
 }
 
 model User {
-  id                String       @id @default(cuid())
-  email             String       @unique
+  id                String           @id @default(cuid())
+  email             String           @unique
   passwordHash      String
-  onboardingStep    Int          @default(0)
-  workspaceUnlocked Boolean      @default(false)
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
+  onboardingStep    Int              @default(0)
+  workspaceUnlocked Boolean          @default(false)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
   memberships       Membership[]
+  workspaceStates   WorkspaceState[]
 }
 
 model Membership {
@@ -43,5 +45,22 @@ model Membership {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, userId])
+  @@index([userId])
+}
+
+model WorkspaceState {
+  id        String   @id @default(cuid())
+  tenantId  String
+  userId    String
+  data      Json
+  revision  Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId])
+  @@index([tenantId])
   @@index([userId])
 }
