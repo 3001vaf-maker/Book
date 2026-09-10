@@ -1,4 +1,4 @@
-import { button, durationText, entityCard, escapeHtml, field, iconButton, list, listEntry, stateView, initStateView, initCalendar, mountModal, modal, timePicker, initTimePickers, initMultiSelect, viewNavigation, initViewNavigation } from '../ui/ui.js';
+import { button, durationText, entityCard, escapeHtml, field, iconButton, list, listEntry, stateView, initStateView, initCalendar, mountModal, modal, openNotice, timePicker, initTimePickers, initMultiSelect, viewNavigation, initViewNavigation } from '../ui/ui.js';
 import { createRecord, getRecords } from './record-data.js';
 import { getJournalBreaks, createJournalBreak } from './break-data.js';
 import { getAllClients } from '../main/clients/data.js';
@@ -56,10 +56,7 @@ function renderFlow(modalRoot, content) {
 }
 
 function openRecordTimeNotice(message) {
-  const content = `<div class="modal-title"><h2>Недостаточно времени</h2><p>${escapeHtml(message)}</p></div><div class="modal-actions">${button('ОК', { data: 'data-record-time-notice-close' })}</div>`;
-  const m = mountModal(document.body, modal(content, { variant: 'compact', surface: 'app' }));
-  if (!m) return;
-  m.querySelector('[data-record-time-notice-close]')?.addEventListener('click', () => m.remove());
+  openNotice({ title: 'Недостаточно времени', message });
 }
 
 function renderTimeStep(modalRoot, { date, workplaceId, from, to, onCreated }) {
@@ -690,11 +687,11 @@ function renderBreakConfirmationStep(modalRoot, { date, workplaceId, from, to, o
     const workStart = timeToMinutes(workTime?.from);
     const workEnd = timeToMinutes(workTime?.to);
     if (start == null || end == null || workStart == null || workEnd == null || start < workStart || end > workEnd || end <= start) {
-      alert('Это время находится вне рабочего периода.');
+      openNotice({ title: 'Перерыв', message: 'Это время находится вне рабочего периода.' });
       return;
     }
     if (!isTimeRangeAvailable({ from, to, usages: scopedUsages(date, workplaceId) })) {
-      alert('Это время уже занято.');
+      openNotice({ title: 'Перерыв', message: 'Это время уже занято.' });
       return;
     }
     if (!createJournalBreak({ workplaceId: String(workplaceId || ''), date: dateKey(date), from: String(from), to: String(to) })) return;
