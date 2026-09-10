@@ -1,13 +1,13 @@
 import { renderMain } from './main/main.js';
 import { renderJournal } from './journal/journal.js';
 import { renderTimetable } from './timetable/timetable.js';
-import { renderChat } from './chat/chat.js';
 import { renderSettings } from './settings/settings.js';
 import { getWorkplaces as getWorkplaceEntities } from './settings/profile/workplaces/data.js';
 import { getWorkingTimeRecordConflicts } from './journal/record-data.js';
 import { configureWorkplaceSource } from './core/workplace-time.js';
 import { configureWorkingTimeConflictSource } from './core/time-usage.js';
 import { getCurrentUser, login, prepareProductionWorkspace } from './core/auth.js';
+import { isOnboardingComplete, renderOnboarding } from './onboarding/onboarding.js';
 import { bottomNavigation } from './ui/ui.js';
 
 configureWorkplaceSource(getWorkplaceEntities);
@@ -17,13 +17,13 @@ const routes = {
   main: renderMain,
   timetable: renderTimetable,
   journal: renderJournal,
-  chat: renderChat,
   settings: renderSettings,
 };
 
-const state = { activeSection: 'main' };
+const state = { activeSection: 'journal' };
 const app = document.querySelector('#app');
 let disposeView = () => {};
+let workspaceReady = false;
 
 function syncViewport() {
   const vv = window.visualViewport;
@@ -35,13 +35,14 @@ function syncViewport() {
 }
 
 function navigate(section) {
-  if (!routes[section]) return;
+  if (!workspaceReady || !routes[section]) return;
   state.activeSection = section;
-  render();
+  renderWorkspace();
   history.replaceState({}, '', `#${section}`);
 }
 
-function render() {
+function renderWorkspace() {
+  workspaceReady = true;
   disposeView();
   disposeView = () => {};
   const view = routes[state.activeSection];
@@ -54,7 +55,28 @@ function render() {
   syncViewport();
 }
 
+async function renderAuthenticated() {
+  if (!isOnboardingComplete()) {
+    workspaceReady = false;
+    history.replaceState({}, '', location.pathname);
+    await renderOnboarding(app, {
+      onComplete: () => {
+        state.activeSection = 'journal';
+        history.replaceState({}, '', '#journal');
+        renderWorkspace();
+      },
+    });
+    syncViewport();
+    return;
+  }
+
+  state.activeSection = 'journal';
+  history.replaceState({}, '', '#journal');
+  renderWorkspace();
+}
+
 function renderLogin(message = '') {
+  workspaceReady = false;
   disposeView();
   disposeView = () => {};
   app.innerHTML = `
@@ -93,7 +115,7 @@ function renderLogin(message = '') {
     try {
       await login(data.get('email'), data.get('password'));
       prepareProductionWorkspace();
-      render();
+      await renderAuthenticated();
     } catch (loginError) {
       error.textContent = loginError instanceof Error ? loginError.message : 'Не удалось войти';
       button.disabled = false;
@@ -105,10 +127,11 @@ function renderLogin(message = '') {
 }
 
 window.addEventListener('hashchange', () => {
+  if (!workspaceReady) return;
   const section = location.hash.slice(1);
   if (routes[section]) {
     state.activeSection = section;
-    render();
+    renderWorkspace();
   }
 });
 window.addEventListener('resize', syncViewport, { passive: true });
@@ -122,15 +145,13 @@ document.addEventListener('focusin', (event) => {
   window.setTimeout(() => target.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' }), 120);
 }, { passive: true });
 
-const initialSection = location.hash.slice(1);
-if (routes[initialSection]) state.activeSection = initialSection;
 syncViewport();
 
 try {
   const currentUser = await getCurrentUser();
   if (currentUser) {
     prepareProductionWorkspace();
-    render();
+    await renderAuthenticated();
   } else {
     renderLogin();
   }
