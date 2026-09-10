@@ -164,7 +164,7 @@ function openTimePicker(state, record, onSelected) {
 }
 
 function openClientPicker(state, onSelected) {
-  const content = `<div class="record-editor-screen record-screen--clients"><div class="record-client-toolbar"><input class="record-client-search" type="search" placeholder="Поиск клиента" data-record-view-client-search></div><div class="record-client-list" data-record-view-client-list></div></div>`;
+  const content = `<div class="record-editor-screen record-editor-screen--clients"><div class="record-client-toolbar"><input class="record-client-search" type="search" placeholder="Поиск клиента" data-record-view-client-search></div><div class="record-client-list" data-record-view-client-list></div></div>`;
   const m = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app', className: 'record-editor-modal' }));
   if (!m) return;
   const render = (query = '') => {
