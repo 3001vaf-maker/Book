@@ -29,6 +29,13 @@ function proceduresFromFinance(record, finance) {
   });
 }
 
+function saveFinancialCorrection(record, finance) {
+  return updateRecord(record.id, {
+    procedures: proceduresFromFinance(record, finance),
+    finance,
+  });
+}
+
 function paymentEntryContent(record) {
   const completed = getActivePaymentForSource('record', record?.id);
   if (completed) return `<button type="button" class="modal-bottom-action modal-bottom-action--paid" data-record-payment-paid aria-label="Открыть оплату ${completed.total} рублей"><strong>Оплачено</strong><strong>${money(completed.total)}</strong></button>`;
@@ -150,11 +157,13 @@ function openPaymentModal(record) {
   if (!m) return;
   initPaymentForm(m.querySelector('[data-payment-ui]'), {
     calculate: (items) => calculateFinancialPlan(items),
+    onSave: ({ finance: updatedFinance }) => {
+      const updated = saveFinancialCorrection(current, updatedFinance);
+      if (!updated) return;
+      m.remove();
+    },
     onPay: ({ finance: updatedFinance }) => {
-      const updated = updateRecord(current.id, {
-        procedures: proceduresFromFinance(current, updatedFinance),
-        finance: updatedFinance,
-      });
+      const updated = saveFinancialCorrection(current, updatedFinance);
       if (!updated) return;
       openPaymentMethodsModal({ ...paymentFromRecord(updated), finance: updated.finance }, m);
     },
