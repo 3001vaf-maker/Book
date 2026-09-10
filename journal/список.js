@@ -2,6 +2,7 @@ import { emptyState, listEntries, listEntry } from '../ui/ui.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getCompletedPaymentForSource, paymentTotal } from '../core/payment.js';
 import { getRecords } from './record-data.js';
+import { isRecordCompletedSide, recordActivityTime, recordAppointmentTime, recordVisualState } from './record-state.js';
 
 function formatDate(value = '') {
   const [year, month, day] = String(value || '').slice(0, 10).split('-');
@@ -22,37 +23,12 @@ function workplaceName(workplaces, workplaceId) {
   return workplace?.name || 'Рабочее место';
 }
 
-function appointmentTime(record, field = 'from') {
-  const date = String(record?.date || '').slice(0, 10);
-  const time = String(record?.[field] || '');
-  const value = Date.parse(`${date}T${time}:00`);
-  return Number.isFinite(value) ? value : 0;
-}
-
 function paymentFor(record) {
   return getCompletedPaymentForSource('record', record?.id);
 }
 
-function activityTime(record, payment = null) {
-  const paidAt = Date.parse(String(payment?.paidAt || payment?.createdAt || ''));
-  if (Number.isFinite(paidAt)) return paidAt;
-  const updatedAt = Date.parse(String(record?.updatedAt || record?.createdAt || ''));
-  if (Number.isFinite(updatedAt)) return updatedAt;
-  return appointmentTime(record, 'to') || appointmentTime(record, 'from');
-}
-
-function isCompletedSide(record, payment, now) {
-  return record?.status === 'cancelled'
-    || record?.attendance === 'no-show'
-    || Boolean(payment)
-    || appointmentTime(record, 'to') <= now;
-}
-
 function recordStatusClass(record, payment = null) {
-  if (record?.status === 'cancelled') return 'journal-list-record--deleted';
-  if (payment) return 'journal-list-record--paid';
-  if (record?.attendance === 'no-show') return 'journal-list-record--no-show';
-  return 'journal-list-record--active';
+  return `journal-list-record--${recordVisualState(record, { paid: Boolean(payment) })}`;
 }
 
 function recordEntry(record, workplaces, { focus = false, payment = null } = {}) {
@@ -85,8 +61,8 @@ function scrollToFocus(root, selector) {
 
 function renderTimeMode(root, records, workplaces) {
   const now = Date.now();
-  const ordered = [...records].sort((a, b) => appointmentTime(a, 'from') - appointmentTime(b, 'from'));
-  const focusIndex = ordered.findIndex((record) => appointmentTime(record, 'to') > now);
+  const ordered = [...records].sort((a, b) => recordAppointmentTime(a, 'from') - recordAppointmentTime(b, 'from'));
+  const focusIndex = ordered.findIndex((record) => recordAppointmentTime(record, 'to') > now);
   const splitIndex = focusIndex >= 0 ? focusIndex : ordered.length;
   const entries = ordered.flatMap((record, index) => {
     const payment = paymentFor(record);
@@ -101,13 +77,17 @@ function renderTimeMode(root, records, workplaces) {
 
 function renderFlowMode(root, records, workplaces) {
   const now = Date.now();
-  const prepared = records.map((record) => ({ record, payment: paymentFor(record) }));
+  const prepared = records.map((record) => {
+    const payment = paymentFor(record);
+    const completed = isRecordCompletedSide(record, { paid: Boolean(payment), now });
+    return { record, payment, completed };
+  });
   const completed = prepared
-    .filter(({ record, payment }) => isCompletedSide(record, payment, now))
-    .sort((a, b) => activityTime(a.record, a.payment) - activityTime(b.record, b.payment));
+    .filter((item) => item.completed)
+    .sort((a, b) => recordActivityTime(a.record, a.payment, { completed: true }) - recordActivityTime(b.record, b.payment, { completed: true }));
   const pending = prepared
-    .filter(({ record, payment }) => !isCompletedSide(record, payment, now))
-    .sort((a, b) => activityTime(b.record, b.payment) - activityTime(a.record, a.payment));
+    .filter((item) => !item.completed)
+    .sort((a, b) => recordActivityTime(b.record, b.payment) - recordActivityTime(a.record, a.payment));
 
   const entries = [
     ...completed.map(({ record, payment }) => recordEntry(record, workplaces, { payment })),
