@@ -1,5 +1,5 @@
 import { actionBlock, button, collectCost, collectWorkplaceSelections, costCardMeta, costField, costListParts, details, emptyState, entityCard, escapeHtml, field, iconButton, initCostFields, initPhotoField, initWorkplaceSelectors, listEntries, listEntry, mountModal, modal, page, pageHeader, photoField, textareaField, workplaceCountText, workplaceSelector } from '../../../ui/ui.js';
-import { getBusinessItemFact } from '../../../core/business-model.js';
+import { getFinancialItemFact } from '../../../core/financial-model.js';
 import { getWorkplaces } from '../../profile/workplaces/data.js';
 import { deleteProduct as deleteProductData, getProducts, pushProductHistory, saveProduct as saveProductData } from './data.js';
 
@@ -36,7 +36,7 @@ function saveProduct(root,m,existing,navigateBack){
 function renderCard(root,id,navigateBack){
   const p=getProducts().find(x=>x.id===id);if(!p)return renderList(root,navigateBack);
   const workplaceNames=(p.workplaces||[]).map(w=>w.name||w.workplaceId).filter(Boolean);
-  const fact=getBusinessItemFact('product',p.id);
+  const fact=getFinancialItemFact('product',p.id);
   const card=entityCard({
     title:p.name||'',
     image:p.photo||'',
@@ -59,7 +59,7 @@ function renderCard(root,id,navigateBack){
 
 function confirmDelete(root,id,navigateBack,onDeleted){
   const p=getProducts().find(x=>x.id===id);if(!p)return;
-  const m=mountModal(root,modal(`<div class="modal-title"><h2>Удалить?</h2><p>${escapeHtml(p.name||'Товар')} будет удалён.</p></div><div class="modal-actions">${button('Удалить',{variant:'danger',data:'data-confirm-delete'})}${button('Отмена',{className:'ui-button--secondary',data:'data-cancel-delete'})}</div>`,{variant:'compact'}));
+  const m=mountModal(root,modal(`<div class="modal-title"><h2>Удалить?</h2><p>${escapeHtml(p.name||'Товар')} будет удалён.</p></div><div class="modal-actions">${button('Удалить',{variant:'danger',data:'data-confirm-delete' })}${button('Отмена',{className:'ui-button--secondary',data:'data-cancel-delete'})}</div>`,{variant:'compact'}));
   if(!m)return;
   m.querySelector('[data-cancel-delete]').onclick=()=>m.remove();
   m.querySelector('[data-confirm-delete]').onclick=()=>{if(deleteProductData(id)){m.remove();onDeleted?.()}else m.remove()};
