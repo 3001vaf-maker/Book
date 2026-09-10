@@ -49,14 +49,20 @@ export function paymentForm({ workplace = '', date = '', time = '', client = {},
   </div>`;
 }
 
-export function paymentMethods({ wallets = [], total = 0 } = {}) {
+export function paymentMethods({ wallets = [], total = 0, initialMode = 'single', initialAllocations = [] } = {}) {
   const walletData = escapeHtml(JSON.stringify(Array.isArray(wallets) ? wallets.map((wallet) => ({ id: String(wallet?.id || ''), name: String(wallet?.name || '') })) : []));
-  return `<div class="payment-methods" data-payment-methods data-payment-total="${escapeHtml(moneyText(total))}" data-payment-wallets="${walletData}">
+  const allocationData = escapeHtml(JSON.stringify(Array.isArray(initialAllocations) ? initialAllocations : []));
+  const splitMode = initialMode === 'split';
+  const firstAllocation = Array.isArray(initialAllocations) ? initialAllocations[0] || {} : {};
+  const initialMarkup = splitMode
+    ? splitPaymentMarkup({ wallets, total, initialAllocations })
+    : singlePaymentMarkup({ wallets, total, initialWalletId: firstAllocation.walletId || '' });
+  return `<div class="payment-methods" data-payment-methods data-payment-total="${escapeHtml(moneyText(total))}" data-payment-wallets="${walletData}" data-payment-initial-mode="${splitMode ? 'split' : 'single'}" data-payment-initial-allocations="${allocationData}">
     <div class="segment-control segment-control--two-equal" role="group" aria-label="Режим оплаты">
-      <button type="button" class="is-active" aria-pressed="true" data-payment-mode="single">Оплата</button>
-      <button type="button" aria-pressed="false" data-payment-mode="split">Разделить</button>
+      <button type="button" class="${splitMode ? '' : 'is-active'}" aria-pressed="${splitMode ? 'false' : 'true'}" data-payment-mode="single">Оплата</button>
+      <button type="button" class="${splitMode ? 'is-active' : ''}" aria-pressed="${splitMode ? 'true' : 'false'}" data-payment-mode="split">Разделить</button>
     </div>
-    <div data-payment-mode-host>${singlePaymentMarkup({ wallets, total })}</div>
+    <div data-payment-mode-host>${initialMarkup}</div>
   </div>`;
 }
 
@@ -127,9 +133,11 @@ export function initPaymentMethods(root, { onWallet = () => {}, onSplit = () => 
   const host = root.querySelector('[data-payment-mode-host]');
   const total = Math.max(0, numberValue(root.dataset.paymentTotal));
   let wallets = [];
+  let initialAllocations = [];
   try { wallets = JSON.parse(root.dataset.paymentWallets || '[]'); } catch { wallets = []; }
+  try { initialAllocations = JSON.parse(root.dataset.paymentInitialAllocations || '[]'); } catch { initialAllocations = []; }
 
-  const renderMode = (mode) => {
+  const renderMode = (mode, preserveInitial = false) => {
     if (!host) return;
     const splitMode = mode === 'split';
     root.querySelectorAll('[data-payment-mode]').forEach((node) => {
@@ -137,11 +145,16 @@ export function initPaymentMethods(root, { onWallet = () => {}, onSplit = () => 
       node.classList.toggle('is-active', active);
       node.setAttribute('aria-pressed', String(active));
     });
-    host.innerHTML = splitMode ? splitPaymentMarkup({ wallets, total }) : singlePaymentMarkup({ wallets, total });
+    const allocations = preserveInitial ? initialAllocations : [];
+    host.innerHTML = splitMode
+      ? splitPaymentMarkup({ wallets, total, initialAllocations: allocations })
+      : singlePaymentMarkup({ wallets, total, initialWalletId: allocations[0]?.walletId || '' });
     if (splitMode) initSplitPayment(host, { wallets, total, onPay: onSplit });
     else initSinglePayment(host, { wallets, onPay: onWallet });
   };
 
   root.querySelectorAll('[data-payment-mode]').forEach((node) => node.addEventListener('click', () => renderMode(node.dataset.paymentMode === 'split' ? 'split' : 'single')));
-  initSinglePayment(host, { wallets, onPay: onWallet });
+  const initialMode = root.dataset.paymentInitialMode === 'split' ? 'split' : 'single';
+  if (initialMode === 'split') initSplitPayment(host, { wallets, total, onPay: onSplit });
+  else initSinglePayment(host, { wallets, onPay: onWallet });
 }
