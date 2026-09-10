@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { calculateFinancialPlan, getFinancialItemFact } from '../core/financial-model.js';
 import { createDay } from '../core/day.js';
 import { recordPaymentIncome, recordRefundExpense } from '../core/dds.js';
@@ -181,5 +182,15 @@ assert.equal(restoredHistory.finance.discountPercent, 20);
 assert.equal(restoredHistory.finance.discountTotal, 1600);
 assert.equal(restoredHistory.finance.planTotal, 6400);
 assert.equal(restoredHistory.finance.factTotal, 6400);
+
+// Record card shows expense / service value / discount metadata. Amount due belongs only to payment bottom sheet.
+const recordViewSource = readFileSync(new URL('../journal/record-view.js', import.meta.url), 'utf8');
+const recordPaymentSource = readFileSync(new URL('../journal/record-payment.js', import.meta.url), 'utf8');
+assert.match(recordViewSource, /label:\s*'расход'/);
+assert.match(recordViewSource, /label:\s*'стоимость'/);
+assert.match(recordViewSource, /скидка/);
+assert.doesNotMatch(recordViewSource, /procedureTotalCost/);
+assert.doesNotMatch(recordViewSource, /К оплате/);
+assert.match(recordPaymentSource, /К оплате/);
 
 console.log('critical record flow tests: OK');
