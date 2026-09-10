@@ -1,26 +1,30 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
 
 const root = process.cwd();
-const files = [
-  'journal/record.js',
-  'journal/record-view.js',
-];
-const nativeDialog = /\b(?:window\.)?(?:alert|confirm)\s*\(\s*(['"])(.*?)\1\s*\)/g;
-const known = new Set([
-  'journal/record.js::Это время находится вне рабочего периода.',
-  'journal/record.js::Это время уже занято.',
-  'journal/record-view.js::Новая длительность не помещается в свободный интервал. Выберите другое время.',
-  'journal/record-view.js::Не удалось сохранить изменения: проверьте рабочий день и свободное время.',
-]);
+const runtimeRoots = ['main', 'settings', 'timetable', 'journal', 'ui', 'core', 'chat'];
+const forbidden = /\b(?:window\.)?(?:alert|confirm)\s*\(/;
 const errors = [];
 
-for (const relative of files) {
-  const source = readFileSync(join(root, relative), 'utf8');
-  for (const match of source.matchAll(nativeDialog)) {
-    const key = `${relative}::${match[2]}`;
-    if (!known.has(key)) errors.push(`${relative}: new native alert/confirm is forbidden; use shared Book modal UI`);
+function walk(dir) {
+  const result = [];
+  for (const name of readdirSync(dir)) {
+    const path = join(dir, name);
+    const stat = statSync(path);
+    if (stat.isDirectory()) result.push(...walk(path));
+    else if (/\.js$/.test(name)) result.push(path);
   }
+  return result;
+}
+
+const files = [
+  join(root, 'core.js'),
+  ...runtimeRoots.flatMap((dir) => walk(join(root, dir))),
+];
+
+for (const file of files) {
+  if (!forbidden.test(readFileSync(file, 'utf8'))) continue;
+  errors.push(`${relative(root, file)}: native alert/confirm is forbidden; use shared Book modal UI`);
 }
 
 if (errors.length) {
@@ -29,4 +33,4 @@ if (errors.length) {
   process.exit(1);
 }
 
-console.log('native dialog check: OK (4 known journal dialogs remain to migrate)');
+console.log(`native dialog check: OK (${files.length} runtime files)`);
