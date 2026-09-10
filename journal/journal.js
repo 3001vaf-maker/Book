@@ -2,7 +2,7 @@ import { pageHeader, viewNavigation, initViewNavigation, headerControl, workplac
 import { getWorkplaceContext, setWorkplaceContext } from '../core/workplace-context.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getActiveDayWorkplaces, getAvailableDayWorkplaces, getDayWorkplaceDraft, saveDayWorkplaceTime } from '../core/day-workplaces.js';
-import { recordPlanTotal } from '../core/business-model.js';
+import { recordPlanTotal } from '../core/financial-model.js';
 import { getActiveRecordCountForDay, getRecordsForDay } from './record-data.js';
 import { openJournalWorkplaceControl } from './workplace-control.js';
 import { renderJournalDay } from './день.js';
