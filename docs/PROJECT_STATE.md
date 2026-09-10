@@ -1,10 +1,10 @@
 # Book — Project State
 
-This file is the authoritative continuity anchor for Book. Read it before making architecture or product changes. Older repository documents may be obsolete and must not override this file or current code.
+This file is the authoritative continuity anchor for Book. Read it before architecture or product changes. Current `main` and current regression checks override older repository notes.
 
 ## Product essence
 
-Book is a modular SaaS / anti-CRM for beauty professionals, starting from an independent master and expanding later to studios, salons and chains.
+Book is a modular SaaS / anti-CRM for beauty professionals, starting with an independent master and expanding later to studios, salons and chains.
 
 Architecture rule:
 
@@ -14,283 +14,219 @@ Core
 → shared UI
 → manifestation
 
-One entity / one UI / one implementation. No local workaround when a rule belongs in Core/shared UI.
+One entity / one UI / one implementation. No local workaround when a rule belongs in Core/shared UI. UI/CSS may display state but must never become the owner of business logic.
 
-Book is the current technical tool name, not necessarily the future umbrella brand.
+## Production and infrastructure
 
-## Current launch mode
+`main` is production and contains real user data. Never clear, reset or silently replace production facts.
 
-The current priority is to make the existing production Book a complete, usable daily work instrument before starting broader modules.
+Frontend: GitHub Pages.
+Backend: NestJS + PostgreSQL + Prisma on Amvera.
+Authentication and tenant identity are server-backed.
 
-`main` is the production Book currently used with real data. Do not clear, reset or replace existing production browser data as part of feature work. All changes must preserve data already entered by Alexander.
+Profile + Workplaces have already completed their server-owner migration. Other launch-critical domains still contain browser-local transitional ownership and must be migrated safely later. Browser storage is migration debt, not the target architecture.
 
-A `develop` branch exists for future broader development, but the immediate launch-critical finishing work is being completed against the production product in small verified release blocks. Use a feature branch for the block, run CI, then merge once to `main` to minimize Amvera rebuild interruptions.
+Final rule: server + database own business/application data; browser is only the interface and may hold temporary cache. Same account + same tenant must show the same data on Safari, Yandex Browser, iPhone or another computer.
 
-Do not spend launch time cleaning old repository documentation. `docs/PROJECT_STATE.md` is the authority.
+## Production data migration rule
 
-## Current infrastructure
+For every remaining domain migration:
+1. Preserve existing production browser facts.
+2. Add tenant-scoped PostgreSQL/API ownership.
+3. Import legacy facts without deleting the legacy copy during verification.
+4. Verify counts, IDs, links and critical fields exactly.
+5. Switch canonical ownership only after verification.
+6. Verify same-account cross-device data.
+7. Remove ongoing browser ownership only after the server owner is proven.
 
-Frontend: existing Book application on GitHub Pages.
-Backend: NestJS + PostgreSQL + Prisma modular monolith in `server/`.
+Remaining broad dependency order:
+Procedures → Documents + Consents → Wallets + DDS movements → Timetable → Clients → Records / Breaks / Journal → Online Booking facts.
 
-Multi-tenant foundation:
+Do not resume this migration while a domain's business rules are still unstable.
 
-Tenant / Business
-→ Users
-→ Membership / Role
-→ Profile
-→ Workplaces
-→ Clients / Procedures / Records / Payments / Documents / ...
+## Canonical finance architecture — current
 
-Every business entity must be isolated by `tenantId` on the server.
+Detailed contract: `docs/FINANCE_ARCHITECTURE.md`.
 
-Production infrastructure:
-- `book-api` on Amvera, Moscow-0
-- `book-db` PostgreSQL on Amvera, Moscow-0
-- frontend on GitHub Pages
-- real OWNER authentication works against production API/PostgreSQL
+There is deliberately no financial owner called Payment and no payment-editing/correction model. `core/payment.js` has been removed.
 
-`book-api` must normally remain running. The Amvera website/browser tab does not need to stay open.
+### Service / Procedure / Product
 
-## Production data rule — critical
+Owns the source price fact. This is not a financial instrument.
 
-Production Book now contains real data entered by Alexander. Some major business domains still use browser localStorage while authentication/tenant identity is server-backed.
+For a range price such as 7,000–10,000, the minimum 7,000 initially flows into a new Record. The master may then set the real procedure price for that appointment, for example 8,000.
 
-Therefore:
-- never run another production clean-start reset;
-- never delete or silently replace current localStorage facts;
-- any move from localStorage to PostgreSQL must first preserve and migrate the existing production facts;
-- verify counts and critical fields before switching the source of truth;
-- after migration there must be one canonical owner, not parallel local/server truth.
+### Record
 
-Current browser-owned domains include profile, clients, workplaces, procedures/history, timetable, records, wallets/payments and the initial Documents templates.
+Record owns the appointment and stores the complete financial snapshot for that appointment. Record does not calculate finance and does not move money.
 
-### IMMEDIATE NEXT BLOCK — server ownership and cross-device sync
+The stored chain must preserve:
+- source item;
+- source/master-set price;
+- applied discount mode;
+- discount percent;
+- discount rubles;
+- plan / amount due;
+- hydrated actual fact totals for history/export.
 
-This is now the highest-priority launch blocker and must be done before online booking.
+Record is a recorder/transmitter of these facts.
 
-Observed production problem: the same authenticated OWNER account sees populated Book data on Mac but a clean/empty profile on iPhone. This is expected from the current architecture because authentication is server-backed but business data is still largely browser-local. The same user must see the same tenant data on every device.
+### Business Model
 
-Do not solve this with CSS, copying localStorage, browser tricks, or a second parallel store. The fix is canonical server ownership.
+`core/business-model.js` owns plan/fact calculation.
 
-Required migration discipline:
-1. Read current production localStorage facts on the already-populated Mac without clearing anything.
-2. Add tenant-scoped PostgreSQL models/API in dependency order.
-3. Perform controlled one-time import of existing production facts into the authenticated tenant.
-4. Verify counts, IDs/links, prices, discounts, payments/refunds, records and other critical relationships.
-5. Switch each domain to server source of truth only after its migration verifies.
-6. iPhone and Mac must then load the same facts after login.
-7. Keep temporary migration safeguards only as long as needed; do not leave permanent dual ownership.
+Plan rule:
 
-Migration order remains:
-Profile + Workplaces → Procedures → Documents + Consents → Wallets + Payments/Refunds → Timetable → Clients → Records/Breaks/Journal → Online Booking facts.
+`price - applied discount = planTotal / amount due`.
 
-No new production clean-start/reset may be introduced. Existing real browser data are the source to preserve during the first migration.
+The client's profile discount is the default discount source for a new Record. If the master changes the discount at payment stage, Business Model recalculates the specific Record first. That corrected Record snapshot is saved before DDS receives the payment movement. A payment-stage correction does not automatically change the client's permanent profile discount.
 
-## Launch-critical sequence
+Business Model also derives actual fact from DDS and is the route used by Client / Procedure / Product analytics.
 
-Finish in this order:
+### DDS — Движение денежных средств
 
-1. Onboarding, including Documents between Procedures and Wallets.
-2. Documents / agreements as a real working domain.
-3. Client agreement history linked to real client profiles.
-4. Finish the daily work contour: Profile, Procedures, Wallets/Payments, Timetable, Clients, Journal.
-5. Finish payment editing, split payments, later payments and refunds/reversals.
-6. **Move launch-critical business facts safely to the server and make the same account consistent across devices. This is the immediate next block.**
-7. Add public online booking and minimum client self-service/history.
-8. Connect Telegram for booking notifications and add notification-template settings.
-9. Fix bugs found in real daily use.
+`core/dds.js` is the sole owner of actual money movements.
 
-Warehouse, Loyalty and other larger expansion modules remain parked until this sequence is operational.
+Current movements:
+- income: payment;
+- expense: refund.
 
-## Production onboarding
+Later DDS expands with purchases, material spending and other income/expense movement types. DDS does not own plan calculations.
 
-The first login is onboarding, not the working application.
+Each movement preserves enough source/business context for historical attribution. Existing legacy `book.payments` facts are read non-destructively and migrated into the DDS representation; they are not cleared.
 
-Before mandatory onboarding is complete:
-- no bottom navigation;
-- no general Main/Journal/Chat navigation;
-- only the current onboarding workspace is visible.
+### Wallet
 
-Mandatory order:
-1. Profile + Workplaces
-2. Procedures
-3. Documents / agreements
-4. Wallet
-5. Timetable / working days
-6. Clients
-7. Journal
+Wallet owns its own metadata/settings and final cash/balance. Its history and balance are a projection of DDS movements for that wallet.
 
-Products are not a mandatory onboarding step.
+Money path is never `Record → Wallet`.
 
-After onboarding, every ordinary opening starts on Journal. Bottom navigation contains only: Main / Timetable / Journal / Settings.
+Canonical path:
 
-## Documents / agreements
+`Record/payment action → DDS → Wallet`.
 
-Documents is a general product document domain, not a folder only for consents and not repository documentation.
+### Client / Procedure / Product financial facts
 
-Current structure:
-- Documents → Templates
-- Documents → History
-- History can switch between document history and signing/consent facts.
+Client must show how much that client actually brought.
+Procedure/Product must show how much that item actually brought.
 
-Templates hold versioned/editable document content. History holds document lifecycle/manipulation facts. Consent/signing is a canonical fact linked to client + document/version, and the Client card is only another manifestation of the same fact.
+These manifestations do not calculate DDS independently. They read Business Model fact, which derives actuals from DDS. Refunds reduce the corresponding actual fact.
 
-Initial system document set:
-- Agreement / information document for personal-data processing;
-- Consent to personal-data processing — required client consent in the booking/client flow;
-- Consent to informational messages — optional client consent.
+Products already have the same metric route, but actual product-sale movements are not yet implemented, so the value remains zero until such DDS movements exist.
 
-Documents screen has `+` to create containers for additional future documents/contracts/other document types. The module must remain general enough for future contracts, certificates, medical-book-related metadata or other document categories once business logic is defined.
+## Canonical pricing example
 
-Book may provide editable starter templates, but they are deliberately general and must not be presented as guaranteed legally sufficient documents for every master. Legal explanatory text should not clutter the main screen; show it in informational modals where context requires it.
+Price set by master: 8,000 ₽.
+Applied client discount: 20%.
+Discount amount: 1,600 ₽.
+Plan / amount due: 6,400 ₽.
 
-Do not state categorically that consent is the only legal basis in every case. The product should be conservative: before Book collects client personal data in its ordinary booking flow, it must obtain/record the required configured consent unless a separately designed lawful basis applies.
+Record stores the full chain: `8,000 / 20% / 1,600 / 6,400`.
 
-Client Profile agreements block shows status and opens the same consent fact. It must not own duplicate consent data.
+Journal card/day total use 6,400, not 8,000.
+Payment opens with 6,400.
+DDS records +6,400 only when the money is actually paid.
+Wallet receives +6,400 from DDS.
+Client and Procedure actual contribution become 6,400 through Business Model fact.
 
-## Daily work contour
+If the profile discount was 0 and the master applies 20% only during payment, Business Model recalculates the same chain and updates Record first; only then DDS records +6,400.
+
+## Payment and refund rules
+
+Only two historical financial actions exist: Payment and Refund.
+
+Wrong payment:
+`refund → new payment`.
+
+There is no Edit Payment / Correct Payment historical mutation. Payment/refund facts are immutable.
+
+Split payment is a normal payment mode with multiple wallet allocations. A full refund makes the Record payable/editable again; a partial refund leaves the remaining active payment balance.
+
+The payment UI is input/display only. It may let the master enter a percent or ruble discount, but calculation belongs to Business Model and actual movement belongs to DDS.
+
+## Journal financial rule
+
+Journal does not invent financial arithmetic.
+
+Record card, Journal list and day header use Business Model `planTotal` — the amount after the applied client/payment-stage discount.
+
+Example: service 5,000 with 20% discount → Journal/day amount is 4,000, not 5,000.
+
+Paid/unpaid visual state comes from DDS actual payment state, not from plan calculation.
+
+## Current daily-work contour
 
 Production-visible structure:
 - Main → Clients → Client Profile
 - Timetable → Calendar
 - Journal → Day / Month / List
-- Settings → Profile / Service / Documents / Wallet / Tags / booking-notification settings later
+- Settings → Profile / Service / Documents / Wallet / Tags
 
-Hidden until ready:
+Hidden or parked until ready:
 - Chat
 - Warehouse
-- Loyalty program
+- Loyalty expansion
+- broader reports/marketing/notifications surfaces
 
-Do not delete hidden modules; omit them from production manifestation/navigation until activated.
+Do not delete parked modules merely because they are not currently shown.
 
-## Payments / finance — current implementation and requirements
+## Documents / agreements
 
-Existing payment facts must not be deleted to represent edits or refunds.
+Documents is a general product document domain, not only consents.
 
-Current implemented behavior:
-- payment modes are separated by owners: `ui/payment/single.js` and `ui/payment/split.js`; `ui/payment/index.js` switches/mounts one UI, not both;
-- mode switch is 50/50;
-- normal payment: amount → wallet select → confirm payment;
-- split payment: two wallet+amount rows initially; third row exists only if a remainder remains;
-- edit payment opens the previous payment fact, including previous wallet allocation(s), rather than a blank new payment;
-- refund opens the original payment fact and supports full or partial refund;
-- refund is a separate immutable financial fact;
-- client-level discount is stored separately and automatically prefills/recalculates payment;
-- payment must not destroy base procedure price by replacing it with the discounted price;
-- full refund must make the record unpaid/editable again immediately;
-- partial refund leaves the remaining paid balance active;
-- client financial totals must reflect refunds.
+Current structure includes Templates and History. Consent/signing facts must remain canonical and linked to client + document/version. Client Profile is only another manifestation of the same consent fact.
 
-UI requirement for payment-management facts: keep it compact and non-duplicated. For paid/refund state show date+time as one block and amount+wallet allocation as the next fact. Do not repeat the same amount/wallet in a third block. Leave visible spacing between the original payment fact and the refund editor so headings are readable.
+## Online booking — later launch block
 
-Required behavior remains:
-- after a record is paid, the red unpaid state disappears;
-- tapping the paid bottom modal/state opens payment management;
-- actions: Edit payment and Refund payment;
-- Edit payment reopens the payment editor with the existing payment as initial state; exiting without save leaves the previous payment unchanged;
-- Refund records how money was returned, to which wallet/method, full or partial amount;
-- split payment supports at least two payment parts by default and adds another part only when a remainder remains;
-- each part has amount + wallet; remainder recalculates automatically;
-- later payment is supported in the future: part may be paid now and the remaining balance later;
-- refunds/reversals are immutable financial facts linked to the original payment, not deletion of history.
+Do not start broad online-booking work until the current daily-work contour and required server ownership are reliable.
 
-Architecture rule reinforced after payment regressions: do not fix owner/render/state problems by CSS. First fix entity → owner → UI component → render. CSS is only presentation after the correct component exists.
-
-## Online booking — minimum launch scope
-
-Do not start the public online-booking implementation until cross-device/server ownership of launch-critical data is working reliably.
-
-Profile automatically exposes a general public booking link.
-
-`+` allows creation of a link scoped to a specific Workplace.
-
-Public/client flow:
-0.1 introduction: explain where the client arrived + Continue;
-0.2 agreements: allow opening each document; required personal-data consent + optional communications consent;
-0.3 minimal client form using the same client entity contract as Book; submitted data creates/links the client profile;
-1. Workplace selection with descriptions;
-2. Procedure multi-select;
-3. Date selection using the shared calendar manifestation but without internal business-only UI;
-4. Free slot selection — slots, not the duration/time wheel picker;
-5. Confirmation.
+Minimum future flow remains:
+introduction → agreements → client identity → workplace → procedures → date → free slot → confirmation.
 
 Server must prevent double booking transactionally.
 
-When the client accepts required/optional documents during online booking, the created Consent/signing fact must automatically appear everywhere from the same canonical source: Client card + Documents/History/signings.
+## Warehouse — later
 
-A client returning through their personal link/session should be able to see at least their appointment history. Future Beauty Journal/community content, articles and photo publishing are later enhancement work and not part of minimum launch.
+Warehouse remains a major future autonomous module. It will later provide purchases, material consumption, inventory, recipes, expiry, equipment/amortization and other expense inputs that feed the DDS expense side where appropriate.
 
-## Telegram / notifications — minimum launch scope
-
-Telegram bot is required initially for a minimal set of appointment notifications. It may later become the fifth bottom-navigation area, but do not expose that navigation item until the feature actually works.
-
-Settings must gain a dedicated notifications/booking-messages folder for configuring the minimum appointment notification templates/rules. Messaging consent and channel rules must be centralized rather than creating separate business models for Telegram/WhatsApp/SMS.
-
-## Account/profile identity rules
-
-Authentication target:
-- email or phone + password in one identifier field;
-- email/phone uniqueness as required by server identity model;
-- authenticated account email prefilled into first clean Profile;
-- Profile provides `Изменить пароль` leading to current password → new password → repeat new password;
-- only `passwordHash` server-side, never plaintext in Profile.
-
-Same authenticated user + same tenant must receive the same server-owned business data on Mac, iPhone and any other device. Browser localStorage must not remain the canonical owner for launch-critical business facts.
-
-## Server migration order
-
-When converting production facts from localStorage to PostgreSQL, preserve current real data and move in dependency order:
-1. Profile + Workplaces
-2. Procedures
-3. Documents + consent facts
-4. Wallets + payments/refunds
-5. Timetable
-6. Clients
-7. Records / Breaks / Journal facts
-8. Online-booking facts
-9. Remove remaining production localStorage ownership only after validation
-
-## Client history
-
-Client history must be canonical chronological history derived from existing facts: Records, attendance/no-show, procedures, payments, refunds/reversals, consent/revocation facts and relevant notes/events. Do not invent parallel history models when existing facts can produce the history.
-
-## Warehouse
-
-Warehouse remains a major future module and should stay modular/autonomous enough to integrate with Book or another CRM. It is not launch-critical right now.
+Do not pull Warehouse scope into current payment/finance visual cleanup.
 
 ## UX / architecture constraints
 
 - One shared modal system.
 - One shared selector mechanism.
-- One shared date/time picker; duration uses the shared duration picker.
+- One shared date/time system; duration uses shared duration UI.
 - Shared Core/UI/CSS rather than local duplicates.
-- `+` manifestation follows the established canonical entity pattern for that screen; do not invent a new local plus-button layout.
-- Segment controls divide evenly: 2 options = 50/50; 3 options = equal thirds.
-- Do not use CSS to repair business-state/render ownership mistakes.
-- Do not rename sections without an explicit reason.
-- Do not delete implemented entities.
-- Do not rollback more than necessary.
-- Client identity: UEI if present, name/surname and phone where required; never display literal `UEI` prefix.
-- Product behaves as an assistant, not a traditional CRM: guide creative users when a step or control is not self-evident.
+- Do not repair owner/render/state mistakes with CSS.
+- Do not rename sections without explicit product reason.
+- Do not delete implemented entities or production facts.
+- Client identity uses existing UEI/name/phone rules.
+- Controllers should converge on one coherent render lifecycle rather than stacked local renders.
 
-## Validation rule
+## Current validation rule
 
-For each production release block:
-1. work on a feature branch from current `main` where practical for a coherent block;
-2. run Check Book on the exact feature HEAD;
-3. merge once into `main` only after the block is coherent;
-4. verify exact `main` HEAD with Check Book and Deploy Book to GitHub Pages;
-5. if backend files changed, wait for Amvera to return to `Запущено` and verify affected API/health before calling the release finished.
+For every production release block:
+1. Start from current `main`.
+2. Work on a feature branch for a coherent block.
+3. Run Check Book on exact feature HEAD.
+4. Merge only after success.
+5. Verify exact merged `main` with Check Book and GitHub Pages.
+6. If backend files changed, also verify the deployed backend/API before calling the block complete.
 
-Never report a change as finished before the required checks pass.
+## Latest finance foundation release
 
-## Latest verified payment release before server-sync work
+PR #26 `Establish DDS and business finance ownership` established the canonical finance separation:
+- Business Model for plan/fact;
+- DDS for actual movements;
+- Wallet for wallet cash/history projection;
+- Record for the stored appointment financial snapshot;
+- Client / Procedure / Product actual contribution paths;
+- payment-stage discount persistence;
+- removal of obsolete `core/payment.js`;
+- architecture regression guard preventing those responsibilities from being mixed again.
 
-Latest payment/discount/refund correction block before this continuity update reached main at commit `22ea2ec6df43e218b1164989ca70fd5ad2fcb014` (`Cover full refund reopening and discounted totals`). Its exact main checks passed: Check Book #478 and Deploy Book #1024.
+No server/backend migration was included in this finance-foundation release.
 
-## Working rule for future chats
+## Immediate next product work
 
-Before continuing Book work, read this file and current `main`. Use it as the continuity authority so work does not depend on chat memory alone.
-
-Immediate instruction for the next chat: **do not resume cosmetic payment tweaking or online booking first. Start by inspecting current server/auth/localStorage ownership and implement the safe server migration beginning with Profile + Workplaces, preserving all existing production data. The success criterion is that Alexander logs into the same account on Mac and iPhone and sees the same server-owned data.**
+Return to payment/Record visual behavior only after this financial foundation is stable. Visual work must consume the established owners rather than recreate financial formulas locally.
