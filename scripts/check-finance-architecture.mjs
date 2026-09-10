@@ -75,6 +75,21 @@ if (!/getWalletDDSMovements/.test(walletData) || !/export function getWalletBala
   errors.push('Wallet data owner must derive history/balance from DDS movements');
 }
 
+const recordView = source('journal/record-view.js');
+if (/recordViewProcedureCost|data-record-view-procedure-cost/.test(recordView)) {
+  errors.push('Created Record card must not correct procedure price; it may correct procedure time only');
+}
+
+const recordCreation = source('journal/record.js');
+if (!/data-record-cost/.test(recordCreation)) {
+  errors.push('Procedure price correction must remain in the record creation/confirmation flow');
+}
+
+const paymentUI = source('ui/payment/index.js');
+if (!/data-payment-price readonly/.test(paymentUI)) {
+  errors.push('Payment price is display-only; price correction must not be duplicated in payment UI');
+}
+
 if (errors.length) {
   console.error('finance architecture check: FAILED');
   errors.forEach((error) => console.error(`- ${error}`));
