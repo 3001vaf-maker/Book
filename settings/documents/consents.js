@@ -1,5 +1,3 @@
-import { getAllClients } from '../../main/clients/data.js';
-
 const STORAGE_KEY = 'book.documents.consents.v1';
 const MIGRATION_KEY = 'book.documents.consents.legacy-migrated.v1';
 
@@ -32,18 +30,20 @@ function write(items) {
   return normalized;
 }
 
-function migrateLegacyOnce() {
+export function migrateLegacyConsents(clients = []) {
   if (localStorage.getItem(MIGRATION_KEY) === '1') return;
   const existing = read();
   const keys = new Set(existing.map((item) => `${item.clientId}:${item.documentId}`));
   const next = [...existing];
 
-  for (const client of getAllClients()) {
+  for (const client of Array.isArray(clients) ? clients : []) {
     if (client.agreements?.personalData && !keys.has(`${client.key}:pdn-consent`)) {
       next.push(normalize({ clientId: client.key, documentId: 'pdn-consent', status: 'accepted', source: 'legacy', acceptedAt: '' }));
+      keys.add(`${client.key}:pdn-consent`);
     }
     if (client.agreements?.mailings && !keys.has(`${client.key}:messages-consent`)) {
       next.push(normalize({ clientId: client.key, documentId: 'messages-consent', status: 'accepted', source: 'legacy', acceptedAt: '' }));
+      keys.add(`${client.key}:messages-consent`);
     }
   }
 
@@ -52,7 +52,6 @@ function migrateLegacyOnce() {
 }
 
 export function getConsents() {
-  migrateLegacyOnce();
   return read();
 }
 
