@@ -12,8 +12,8 @@ function normalizeOrigin(value: string) {
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: false });
-  app.use(json({ limit: '5mb' }));
-  app.use(urlencoded({ extended: true, limit: '5mb' }));
+  app.use(json({ limit: '50mb' }));
+  app.use(urlencoded({ extended: true, limit: '50mb' }));
   const frontendOrigin = normalizeOrigin(
     String(process.env.FRONTEND_ORIGIN || 'http://localhost:8080').trim(),
   );

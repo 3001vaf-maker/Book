@@ -20,6 +20,7 @@ model Tenant {
   updatedAt       DateTime         @updatedAt
   memberships     Membership[]
   workspaceStates WorkspaceState[]
+  profiles        Profile[]
 }
 
 model User {
@@ -32,6 +33,7 @@ model User {
   updatedAt         DateTime         @updatedAt
   memberships       Membership[]
   workspaceStates   WorkspaceState[]
+  profiles          Profile[]
 }
 
 model Membership {
@@ -63,4 +65,64 @@ model WorkspaceState {
   @@unique([tenantId, userId])
   @@index([tenantId])
   @@index([userId])
+}
+
+model Profile {
+  id                  String      @id @default(cuid())
+  tenantId            String
+  userId              String
+  key                 String      @default("profile")
+  name                String      @default("")
+  surname             String      @default("")
+  phone               String      @default("")
+  phones              Json
+  telegrams           Json
+  emails              Json
+  about               String      @default("")
+  photo               String      @default("")
+  profession          String      @default("")
+  experience          String      @default("")
+  professionAbout     String      @default("")
+  customProfessions   Json
+  migrationVerifiedAt DateTime?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workplaces Workplace[]
+
+  @@unique([tenantId, userId])
+  @@unique([id, tenantId])
+  @@index([tenantId])
+  @@index([userId])
+}
+
+model Workplace {
+  id              String   @id @default(cuid())
+  tenantId        String
+  profileId       String
+  key             String
+  position        Int      @default(0)
+  photo           String   @default("")
+  name            String   @default("")
+  color           String   @default("")
+  city            String   @default("")
+  address         String   @default("")
+  phone           String   @default("")
+  currency        String   @default("RUB")
+  from            String   @default("09:00")
+  to              String   @default("18:00")
+  links           Json
+  about           String   @default("")
+  sourceCreatedAt String   @default("")
+  sourceUpdatedAt String   @default("")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  profile Profile @relation(fields: [profileId, tenantId], references: [id, tenantId], onDelete: Cascade)
+
+  @@unique([tenantId, key])
+  @@index([tenantId])
+  @@index([profileId])
 }
