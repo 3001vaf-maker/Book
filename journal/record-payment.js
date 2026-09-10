@@ -21,6 +21,14 @@ function financeForRecord(record) {
   return record?.finance || calculateFinancialPlan(record?.procedures || []);
 }
 
+function proceduresFromFinance(record, finance) {
+  const items = Array.isArray(finance?.items) ? finance.items : [];
+  return (Array.isArray(record?.procedures) ? record.procedures : []).map((procedure, index) => {
+    const financialItem = items.find((item) => String(item?.sourceId || '') === String(procedure?.id || '')) || items[index];
+    return financialItem ? { ...procedure, cost: financialItem.price } : { ...procedure };
+  });
+}
+
 function paymentEntryContent(record) {
   const completed = getActivePaymentForSource('record', record?.id);
   if (completed) return `<button type="button" class="modal-bottom-action modal-bottom-action--paid" data-record-payment-paid aria-label="Открыть оплату ${completed.total} рублей"><strong>Оплачено</strong><strong>${money(completed.total)}</strong></button>`;
@@ -143,7 +151,10 @@ function openPaymentModal(record) {
   initPaymentForm(m.querySelector('[data-payment-ui]'), {
     calculate: (items) => calculateFinancialPlan(items),
     onPay: ({ finance: updatedFinance }) => {
-      const updated = updateRecord(current.id, { finance: updatedFinance });
+      const updated = updateRecord(current.id, {
+        procedures: proceduresFromFinance(current, updatedFinance),
+        finance: updatedFinance,
+      });
       if (!updated) return;
       openPaymentMethodsModal({ ...paymentFromRecord(updated), finance: updated.finance }, m);
     },
