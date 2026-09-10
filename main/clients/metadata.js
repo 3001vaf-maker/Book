@@ -1,4 +1,4 @@
-import { getPayments } from '../../core/payment.js';
+import { getPayments } from '../../core/dds.js';
 import { getRecords } from '../../journal/record-data.js';
 
 const clientKey = (value) => String(value || '');
