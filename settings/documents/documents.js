@@ -108,8 +108,7 @@ function templatesMarkup() {
   });
 
   return page([
-    pageHeader('Шаблоны'),
-    `<div class="ui-list-toolbar"><div></div><div class="ui-list-toolbar__actions">${iconButton('+', { className: 'icon-button--primary', data: 'data-add-document', aria: 'Добавить шаблон' })}</div></div>`,
+    `<div class="entity-page-header">${pageHeader('Шаблоны')}<div class="page-header-action">${iconButton('+', { className: 'icon-button--primary', data: 'data-add-document', aria: 'Добавить шаблон' })}</div></div>`,
     rows,
     actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-documents-root' }))
   ]);
