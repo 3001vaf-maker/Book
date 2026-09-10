@@ -1,10 +1,6 @@
 import { timeToMinutes, minutesToTime } from '../../core/time.js';
 
 const escape = (value) => String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;');
-const recordTotal = (usage) => (usage?.procedures || []).reduce((sum, item) => {
-  const value = Number(item?.cost);
-  return Number.isFinite(value) ? sum + value : sum;
-}, 0);
 const moneyText = (value) => `${Math.max(0, Number(value) || 0).toLocaleString('ru-RU')} ₽`;
 
 function recordMarkup(usage) {
@@ -12,7 +8,7 @@ function recordMarkup(usage) {
   const name = [client.name, client.surname].filter(Boolean).join(' ') || 'Без имени';
   const id = String(client.uei || client.id || '').trim();
   const identity = id ? `${escape(id)} - ${escape(name)}` : escape(name);
-  const total = moneyText(recordTotal(usage));
+  const total = moneyText(usage?.financialTotal ?? usage?.finance?.dueTotal ?? 0);
   const phone = client.phone ? `<span class="journal-record__phone">${escape(client.phone)}</span>` : '';
   const services = (usage.procedures || []).map((item) => `<span class="journal-record__service">${escape(item.name)}</span>`).join('');
   const statusClass = usage?.paid ? ' journal-record--paid' : usage?.attendance === 'no-show' ? ' journal-record--no-show' : '';
