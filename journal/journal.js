@@ -2,7 +2,7 @@ import { pageHeader, viewNavigation, initViewNavigation, headerControl, workplac
 import { getWorkplaceContext, setWorkplaceContext } from '../core/workplace-context.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getActiveDayWorkplaces, getAvailableDayWorkplaces, getDayWorkplaceDraft, saveDayWorkplaceTime } from '../core/day-workplaces.js';
-import { paymentTotal } from '../core/payment.js';
+import { recordPlanTotal } from '../core/business-model.js';
 import { getActiveRecordCountForDay, getRecordsForDay } from './record-data.js';
 import { openJournalWorkplaceControl } from './workplace-control.js';
 import { renderJournalDay } from './день.js';
@@ -49,7 +49,7 @@ export function renderJournal(root) {
       .filter((record) => record?.status !== 'cancelled');
     const recordCount = records.length;
     const procedureCount = records.reduce((sum, record) => sum + (Array.isArray(record?.procedures) ? record.procedures.length : 0), 0);
-    const total = records.reduce((sum, record) => sum + paymentTotal(record?.procedures || []), 0);
+    const total = records.reduce((sum, record) => sum + recordPlanTotal(record), 0);
     return {
       primaryText: `${recordCount} зап. - ${procedureCount}пр.`,
       secondaryText: formatRubles(total),
@@ -186,16 +186,16 @@ export function renderJournal(root) {
   const recordsChangedHandler = () => {
     if (activeView === 'day' || activeView === 'list') renderView();
   };
-  const paymentsChangedHandler = () => {
-    if (activeView === 'list') renderView();
+  const ddsChangedHandler = () => {
+    if (activeView === 'list' || activeView === 'month') renderView();
   };
 
   window.addEventListener('book:records-changed', recordsChangedHandler);
-  window.addEventListener('book:payments-changed', paymentsChangedHandler);
+  window.addEventListener('book:dds-changed', ddsChangedHandler);
   renderView();
 
   return () => {
     window.removeEventListener('book:records-changed', recordsChangedHandler);
-    window.removeEventListener('book:payments-changed', paymentsChangedHandler);
+    window.removeEventListener('book:dds-changed', ddsChangedHandler);
   };
 }
