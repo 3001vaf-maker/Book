@@ -45,6 +45,37 @@ export function calculateBusinessPlan(items = [], { discountPercent = 0 } = {}) 
   };
 }
 
+function isStoredPlan(value = null) {
+  return Boolean(value && typeof value === 'object'
+    && Array.isArray(value.items)
+    && Number.isFinite(Number(value.planTotal ?? value.dueTotal)));
+}
+
+function normalizeStoredPlan(value = null) {
+  if (!isStoredPlan(value)) return null;
+  return calculateBusinessPlan(value.items, { discountPercent: value.discountPercent ?? 0 });
+}
+
+function latestHistoricalPlanForSource(type, id) {
+  const movements = getDDSMovementsForSource(type, id)
+    .filter((movement) => movement?.business && isStoredPlan(movement.business))
+    .sort((a, b) => String(a?.createdAt || '').localeCompare(String(b?.createdAt || '')));
+  if (!movements.length) return null;
+  return normalizeStoredPlan(movements[movements.length - 1].business);
+}
+
+export function resolveRecordBusinessPlan(record = null, { discountPercent = 0 } = {}) {
+  const stored = normalizeStoredPlan(record?.finance);
+  if (stored) return stored;
+
+  if (record?.id) {
+    const historical = latestHistoricalPlanForSource('record', record.id);
+    if (historical) return historical;
+  }
+
+  return calculateBusinessPlan(record?.procedures || [], { discountPercent });
+}
+
 export function calculateBusinessFact(plan = null, movements = []) {
   const income = (Array.isArray(movements) ? movements : [])
     .filter((item) => item?.movementType === 'income')
@@ -60,9 +91,9 @@ export function calculateBusinessFact(plan = null, movements = []) {
   };
 }
 
-export function getRecordBusinessPlanFact(record = null) {
-  if (!record?.id) return calculateBusinessFact(record?.finance || calculateBusinessPlan(record?.procedures || [], { discountPercent: record?.finance?.discountPercent || 0 }), []);
-  const plan = record?.finance || calculateBusinessPlan(record?.procedures || [], { discountPercent: record?.finance?.discountPercent || 0 });
+export function getRecordBusinessPlanFact(record = null, { discountPercent = 0 } = {}) {
+  const plan = resolveRecordBusinessPlan(record, { discountPercent });
+  if (!record?.id) return calculateBusinessFact(plan, []);
   return calculateBusinessFact(plan, getDDSMovementsForSource('record', record.id));
 }
 
@@ -112,6 +143,5 @@ export function getBusinessItemFact(sourceType, sourceId) {
 }
 
 export function recordPlanTotal(record = null) {
-  if (record?.finance && Number.isFinite(Number(record.finance.planTotal))) return Math.max(0, Number(record.finance.planTotal));
-  return calculateBusinessPlan(record?.procedures || [], { discountPercent: record?.finance?.discountPercent || 0 }).planTotal;
+  return resolveRecordBusinessPlan(record).planTotal;
 }
