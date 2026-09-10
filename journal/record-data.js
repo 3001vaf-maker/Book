@@ -1,7 +1,7 @@
 import { containsRange, isValidRange, rangesOverlap } from '../core/time.js';
 import { getDays, getDay, getDayTime } from '../core/day.js';
 import { getWorkplaces } from '../core/workplace-time.js';
-import { calculateFinancialPlan, getRecordFinancialPlanFact, resolveRecordFinancialPlan } from '../core/financial-model.js';
+import { calculateFinancialPlan, getRecordFinancialPlanFact, repriceFinancialPlan, resolveRecordFinancialPlan } from '../core/financial-model.js';
 import { getAllClients } from '../main/clients/data.js';
 import { getJournalBreaks } from './break-data.js';
 
@@ -75,28 +75,6 @@ function hydrateRecord(record) {
   const { clientDiscountPercent: _legacyDiscount, ...cleanRecord } = record;
   const finance = getRecordFinancialPlanFact({ ...cleanRecord, finance: storedRecordFinance(record) }, { discountPercent: legacyDiscount });
   return { ...cleanRecord, finance: normalizeFinance(finance) };
-}
-
-function repriceFinancialPlan(procedures = [], currentFinance = null) {
-  const priorItems = Array.isArray(currentFinance?.items) ? currentFinance.items : [];
-  const bySource = new Map(priorItems.map((item) => [String(item?.sourceId || ''), item]));
-  const defaultDiscount = currentFinance?.discountPercent == null ? 0 : percent(currentFinance.discountPercent);
-  const items = (Array.isArray(procedures) ? procedures : []).map((procedure, index) => {
-    const prior = bySource.get(String(procedure?.id || '')) || priorItems[index] || null;
-    const base = {
-      sourceType: 'procedure',
-      sourceId: String(procedure?.id || ''),
-      name: String(procedure?.name || ''),
-      price: Math.max(0, numberValue(procedure?.cost)),
-    };
-    if (!prior) return { ...base, discountMode: defaultDiscount > 0 ? 'percent' : 'none', discountPercent: defaultDiscount };
-    if (prior.discountMode === 'money') return { ...base, discountMode: 'money', discountMoney: prior.discountMoney };
-    if (prior.discountMode === 'percent' || numberValue(prior.discountPercent) > 0) {
-      return { ...base, discountMode: 'percent', discountPercent: prior.discountPercent };
-    }
-    return { ...base, discountMode: 'none' };
-  });
-  return calculateFinancialPlan(items, { discountPercent: defaultDiscount });
 }
 
 export function getRecords() {
