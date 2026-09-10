@@ -7,11 +7,42 @@ import { getWallets } from '../settings/wallets/data.js';
 import { getRecords, updateRecord } from './record-data.js';
 
 const money = (value) => `${new Intl.NumberFormat('ru-RU').format(Number(value || 0))} ₽`;
+const percent = (value) => Math.max(0, Math.min(100, Number(value || 0) || 0));
+
+function clientForRecord(record) {
+  const source = record?.client || {};
+  const people = getAllClients();
+  return people.find((item) => String(item?.key ?? '') === String(source?.key ?? ''))
+    || people.find((item) => String(item?.id ?? '') === String(source?.id ?? ''))
+    || source;
+}
+
+function recordDiscount(record) {
+  const client = clientForRecord(record);
+  return percent(record?.clientDiscountPercent ?? client?.discountPercent ?? 0);
+}
+
+function recordPaymentItems(record) {
+  const discountPercent = recordDiscount(record);
+  return (record?.procedures || []).map((item) => {
+    const price = Math.max(0, Number(item?.cost || 0) || 0);
+    return {
+      ...item,
+      price,
+      discountPercent,
+      discountMoney: discountPercent ? price * discountPercent / 100 : 0,
+    };
+  });
+}
+
+function recordAmount(record) {
+  return paymentTotal(recordPaymentItems(record));
+}
 
 function paymentEntryContent(record) {
   const completed = getCompletedPaymentForSource('record', record?.id);
   if (completed) return `<button type="button" class="modal-bottom-action modal-bottom-action--paid" data-record-payment-paid aria-label="Открыть оплату ${completed.total} рублей"><strong>Оплачено</strong><strong>${money(completed.total)}</strong></button>`;
-  const total = paymentTotal(record?.procedures || []);
+  const total = recordAmount(record);
   return `<button type="button" class="modal-bottom-action" data-record-payment-open aria-label="Открыть оплату, к оплате ${total} рублей"><span>К оплате</span><strong>${money(total)}</strong></button>`;
 }
 
@@ -21,13 +52,9 @@ function workplaceName(id) {
 }
 
 function recordClient(record) {
-  const source = record?.client || {};
-  const people = getAllClients();
-  const current = people.find((item) => String(item?.key ?? '') === String(source?.key ?? ''))
-    || people.find((item) => String(item?.id ?? '') === String(source?.id ?? ''))
-    || source;
+  const current = clientForRecord(record);
   const display = clientDisplay(current);
-  return { uei: display.uei || '', name: display.name || '' };
+  return { uei: display.uei || '', name: display.name || '', discountPercent: percent(current?.discountPercent) };
 }
 
 function paymentFromRecord(record) {
@@ -35,18 +62,7 @@ function paymentFromRecord(record) {
     source: { type: 'record', id: record?.id || '' },
     workplace: workplaceName(record?.workplaceId),
     client: recordClient(record),
-    items: record?.procedures || [],
-  });
-}
-
-function paidProcedures(record, payment) {
-  const items = new Map((payment?.items || []).map((item) => [String(item?.sourceId || ''), item]));
-  return (record?.procedures || []).map((procedure) => {
-    const item = items.get(String(procedure?.id || ''));
-    if (!item) return { ...procedure };
-    const price = Number(item.price || 0);
-    const discount = Math.max(0, Math.min(price, Number(item.discountMoney || 0)));
-    return { ...procedure, cost: Math.max(0, price - discount) };
+    items: recordPaymentItems(record),
   });
 }
 
@@ -57,19 +73,27 @@ function paymentAllocations(payment) {
 }
 
 function paymentDateTime(payment) {
-  const value = payment?.paidAt || payment?.createdAt;
-  if (!value) return '';
+  const value = payment?.refundedAt || payment?.paidAt || payment?.createdAt;
+  if (!value) return { date: '', time: '' };
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  return `${date.toLocaleDateString('ru-RU')} в ${date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
+  if (Number.isNaN(date.getTime())) return { date: '', time: '' };
+  return {
+    date: date.toLocaleDateString('ru-RU'),
+    time: date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+  };
+}
+
+function walletSummary(payment) {
+  const allocations = paymentAllocations(payment);
+  if (!allocations.length) return payment?.walletName || '—';
+  return allocations.map((item) => item.walletName || 'Кошелёк').join(' · ');
 }
 
 function paymentFactMarkup(payment) {
   const when = paymentDateTime(payment);
   return `<div class="entity-details">
-    ${when ? `<div><span>Оплачено</span><strong>${escapeHtml(when)}</strong></div>` : ''}
-    <div><span>Сумма</span><strong>${escapeHtml(money(payment?.total))}</strong></div>
-    ${allocationMarkup(payment)}
+    <div><span>Дата</span><strong>${escapeHtml([when.date, when.time].filter(Boolean).join(' · ') || '—')}</strong></div>
+    <div><span>Сумма</span><strong>${escapeHtml(money(payment?.total))} · ${escapeHtml(walletSummary(payment))}</strong></div>
   </div>`;
 }
 
@@ -81,13 +105,7 @@ function openPaymentMethodsModal(payment, values, paymentModal, replacesPaymentI
   if (!methodsModal) return;
   const finish = (completed) => {
     if (!completed) return;
-    if (completed?.source?.type === 'record' && completed?.source?.id) {
-      const currentRecord = getRecords().find((item) => String(item?.id || '') === String(completed.source.id));
-      updateRecord(completed.source.id, {
-        attendance: 'arrived',
-        ...(currentRecord ? { procedures: paidProcedures(currentRecord, completed) } : {}),
-      });
-    }
+    if (completed?.source?.type === 'record' && completed?.source?.id) updateRecord(completed.source.id, { attendance: 'arrived' });
     methodsModal.remove();
     paymentModal?.remove();
   };
@@ -108,7 +126,7 @@ function openPaymentModal(record) {
     date: payment.date,
     time: payment.time,
     client: payment.client || {},
-    procedures: payment.items.map((item) => ({ id: item.sourceId, name: item.name, cost: item.price })),
+    procedures: payment.items.map((item) => ({ id: item.sourceId, name: item.name, cost: item.price, discountPercent: item.discountPercent, discountMoney: item.discountMoney })),
     total: payment.total,
   })}`;
   const m = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
@@ -125,9 +143,12 @@ function openPaymentEditor(record, previousPayment) {
   openPaymentMethodsModal(draft, values, null, previousPayment.id, previousPayment);
 }
 
-function allocationMarkup(payment) {
-  const allocations = paymentAllocations(payment);
-  return allocations.map((item) => `<div><span>${escapeHtml(item.walletName || 'Кошелёк')}</span><strong>${escapeHtml(money(item.amount))}</strong></div>`).join('');
+function refundHistoryMarkup(refunds) {
+  if (!refunds.length) return '';
+  return `<div class="entity-details">${refunds.map((item) => {
+    const when = paymentDateTime(item);
+    return `<div><span>${escapeHtml([when.date, when.time].filter(Boolean).join(' · ') || 'Возврат')}</span><strong>${escapeHtml(money(item.total))} · ${escapeHtml(item.walletName || 'Кошелёк')}</strong></div>`;
+  }).join('')}</div>`;
 }
 
 function openRefundModal(payment) {
@@ -135,17 +156,17 @@ function openRefundModal(payment) {
   const refunded = refunds.reduce((sum, item) => sum + Number(item?.total || 0), 0);
   const remaining = Math.max(0, Number(payment.total || 0) - refunded);
   if (!remaining) {
-    mountModal(document.body, modal(`<div class="modal-title"><h2>Возврат выполнен</h2><p>По этой оплате возвращена вся сумма.</p></div>${paymentFactMarkup(payment)}`, { variant: 'compact', surface: 'app' }));
+    mountModal(document.body, modal(`<div class="modal-title"><h2>Возврат выполнен</h2></div>${paymentFactMarkup(payment)}${refundHistoryMarkup(refunds)}`, { variant: 'compact', surface: 'app' }));
     return;
   }
   const wallets = getWallets();
   const allocations = paymentAllocations(payment);
   const defaultWalletId = allocations.length === 1 ? String(allocations[0]?.walletId || '') : '';
   const options = [{ value: '', label: 'Кошелёк возврата' }, ...wallets.map((wallet) => ({ value: wallet.id, label: wallet.name }))];
-  const refundHistory = refunds.length ? `<div class="entity-details">${refunds.map((item) => `<div><span>Возврат ${escapeHtml(paymentDateTime(item))}</span><strong>${escapeHtml(money(item.total))} · ${escapeHtml(item.walletName || 'Кошелёк')}</strong></div>`).join('')}</div>` : '';
   const html = `<div class="modal-title"><h2>Возврат оплаты</h2></div>
     ${paymentFactMarkup(payment)}
-    ${refundHistory}
+    ${refundHistoryMarkup(refunds)}
+    <div class="modal-title"><h3>Возврат</h3></div>
     <div class="payment-refund-form">
       <label class="payment-refund-amount"><span>Сумма возврата</span><input type="number" min="0" max="${remaining}" step="0.01" inputmode="decimal" value="${remaining}" data-refund-amount></label>
       ${select({ value: defaultWalletId, options, data: 'data-refund-wallet', aria: 'Кошелёк возврата' })}
@@ -179,8 +200,7 @@ function openPaidState(record) {
   const payment = getCompletedPaymentForSource('record', record?.id);
   if (!payment) return;
   const refunds = getRefundsForPayment(payment.id);
-  const refunded = refunds.reduce((sum, item) => sum + Number(item?.total || 0), 0);
-  const html = `<div class="modal-title"><h2>Оплачено</h2></div>${paymentFactMarkup(payment)}${refunded > 0 ? `<div class="entity-details"><div><span>Возвращено</span><strong>${escapeHtml(money(refunded))}</strong></div></div>` : ''}<div class="modal-actions">${button('Редактировать оплату', { data: 'data-edit-payment' })}${button('Возврат оплаты', { variant: 'secondary', data: 'data-refund-payment' })}</div>`;
+  const html = `<div class="modal-title"><h2>Оплачено</h2></div>${paymentFactMarkup(payment)}${refundHistoryMarkup(refunds)}<div class="modal-actions">${button('Редактировать оплату', { data: 'data-edit-payment' })}${button('Возврат оплаты', { variant: 'secondary', data: 'data-refund-payment' })}</div>`;
   const m = mountModal(document.body, modal(html, { variant: 'medium', surface: 'app' }));
   if (!m) return;
   m.querySelector('[data-edit-payment]')?.addEventListener('click', () => {
