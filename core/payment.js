@@ -23,6 +23,12 @@ function notifyPaymentsChanged(detail = {}) {
   window.dispatchEvent(new CustomEvent('book:payments-changed', { detail }));
 }
 
+function refundsTotal(payments, paymentId) {
+  return payments
+    .filter((payment) => payment?.status === 'refund' && String(payment?.originalPaymentId || '') === String(paymentId || ''))
+    .reduce((sum, payment) => sum + Math.max(0, numberValue(payment?.total)), 0);
+}
+
 export function paymentMoment(now = new Date()) {
   return {
     date: `${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getFullYear()).slice(-2)}`,
@@ -44,7 +50,7 @@ function preparedItems(items = []) {
     sourceId: item?.sourceId || item?.id || '',
     name: item?.name || '',
     price: Math.max(0, numberValue(item?.price ?? item?.cost)),
-    discountPercent: Math.max(0, numberValue(item?.discountPercent)),
+    discountPercent: Math.max(0, Math.min(100, numberValue(item?.discountPercent))),
     discountMoney: Math.max(0, numberValue(item?.discountMoney)),
   }));
 }
@@ -116,7 +122,7 @@ export function refundPayment(paymentId, { reason = '', amount = null, walletId 
   const payments = readPayments();
   const original = payments.find((payment) => String(payment?.id || '') === id && payment?.status === 'completed');
   if (!original) return null;
-  const alreadyRefunded = payments.filter((payment) => payment?.status === 'refund' && String(payment?.originalPaymentId || '') === id).reduce((sum, payment) => sum + Number(payment?.total || 0), 0);
+  const alreadyRefunded = refundsTotal(payments, id);
   const remaining = Math.max(0, Number(original.total || 0) - alreadyRefunded);
   const refundAmount = Math.min(remaining, Math.max(0, amount == null ? remaining : numberValue(amount)));
   if (!refundAmount) return null;
@@ -137,12 +143,25 @@ export function refundPayment(paymentId, { reason = '', amount = null, walletId 
   };
   payments.push(refund);
   writePayments(payments);
-  notifyPaymentsChanged({ action: 'refund', paymentId: refund.id, originalPaymentId: original.id, total: refund.total, source: refund.source || null });
+  notifyPaymentsChanged({
+    action: refundAmount >= remaining - 0.009 ? 'refund-full' : 'refund-partial',
+    paymentId: refund.id,
+    originalPaymentId: original.id,
+    total: refund.total,
+    source: refund.source || null,
+  });
   return refund;
 }
 
 export function getPayments() {
   return readPayments();
+}
+
+export function getPaymentRemaining(paymentId) {
+  const payments = readPayments();
+  const payment = payments.find((item) => String(item?.id || '') === String(paymentId || '') && item?.status === 'completed');
+  if (!payment) return 0;
+  return Math.max(0, numberValue(payment.total) - refundsTotal(payments, payment.id));
 }
 
 export function getPaymentsForWallet(walletId) {
@@ -172,8 +191,10 @@ export function getCompletedPaymentForSource(type, id) {
   const sourceType = String(type || '');
   const sourceId = String(id || '');
   if (!sourceType || !sourceId) return null;
-  const matches = readPayments().filter((payment) => payment?.status === 'completed'
+  const payments = readPayments();
+  const matches = payments.filter((payment) => payment?.status === 'completed'
     && String(payment?.source?.type || '') === sourceType
-    && String(payment?.source?.id || '') === sourceId);
+    && String(payment?.source?.id || '') === sourceId
+    && Math.max(0, numberValue(payment.total) - refundsTotal(payments, payment.id)) > 0.009);
   return matches.length ? matches[matches.length - 1] : null;
 }
