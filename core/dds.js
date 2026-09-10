@@ -33,9 +33,14 @@ function normalizeFinancialSnapshot(value = null) {
   };
 }
 
+function legacyFinancialSnapshot(item = {}) {
+  return item?.['business'] || null;
+}
+
 function normalizeIncome(item = {}) {
-  const { business: legacyBusiness, finance: currentFinance, ...rest } = item;
-  const finance = normalizeFinancialSnapshot(currentFinance || legacyBusiness);
+  const { finance: currentFinance, ...rest } = item;
+  delete rest['business'];
+  const finance = normalizeFinancialSnapshot(currentFinance || legacyFinancialSnapshot(item));
   return {
     ...rest,
     status: 'completed',
@@ -49,7 +54,8 @@ function normalizeIncome(item = {}) {
 }
 
 function normalizeExpense(item = {}) {
-  const { business: legacyBusiness, finance: currentFinance, ...rest } = item;
+  const { finance: currentFinance, ...rest } = item;
+  delete rest['business'];
   return {
     ...rest,
     status: item.status === 'refund' ? 'refund' : (item.status || 'expense'),
@@ -57,7 +63,7 @@ function normalizeExpense(item = {}) {
     expenseType: item.expenseType || (item.status === 'refund' ? 'refund' : 'other'),
     source: item.source || null,
     total: Math.max(0, numberValue(item.total)),
-    finance: normalizeFinancialSnapshot(currentFinance || legacyBusiness),
+    finance: normalizeFinancialSnapshot(currentFinance || legacyFinancialSnapshot(item)),
   };
 }
 
@@ -95,8 +101,8 @@ function readState() {
     const storedRaw = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
     const stored = normalizedState(storedRaw);
     if (stored) {
-      const hasLegacyBusiness = [...(storedRaw?.income || []), ...(storedRaw?.expense || [])].some((item) => item?.business);
-      if (storedRaw?.version !== VERSION || Array.isArray(storedRaw?.operational) || hasLegacyBusiness) writeState(stored);
+      const hasLegacySnapshot = [...(storedRaw?.income || []), ...(storedRaw?.expense || [])].some((item) => item?.['business']);
+      if (storedRaw?.version !== VERSION || Array.isArray(storedRaw?.operational) || hasLegacySnapshot) writeState(stored);
       return stored;
     }
   } catch {}
