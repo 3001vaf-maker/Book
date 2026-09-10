@@ -107,7 +107,7 @@ function financialInputs(root) {
   });
 }
 
-function applyBusinessPlan(root, plan = null) {
+function applyFinancialPlan(root, plan = null) {
   const items = Array.isArray(plan?.items) ? plan.items : [];
   [...root.querySelectorAll('[data-payment-procedure]')].forEach((row, index) => {
     const item = items[index];
@@ -124,7 +124,7 @@ function applyBusinessPlan(root, plan = null) {
 function recalculate(root, calculate) {
   if (typeof calculate !== 'function') return null;
   const plan = calculate(financialInputs(root));
-  applyBusinessPlan(root, plan);
+  applyFinancialPlan(root, plan);
   return plan;
 }
 
@@ -144,7 +144,7 @@ export function initPaymentForm(root, { calculate = null, onPay = () => {} } = {
   root.querySelector('[data-payment-submit]')?.addEventListener('click', () => {
     const plan = recalculate(root, calculate);
     if (!plan) return;
-    onPay?.({ business: plan, items: plan.items, total: plan.planTotal });
+    onPay?.({ finance: plan, items: plan.items, total: plan.planTotal });
   });
   recalculate(root, calculate);
 }
