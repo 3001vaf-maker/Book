@@ -135,7 +135,7 @@ function openPaymentModal(record) {
     date: payment.date,
     time: payment.time,
     client: payment.client || {},
-    procedures: (finance?.items || []).map((item) => ({ id: item.sourceId, name: item.name, cost: item.price, discountPercent: item.discountPercent, discountMoney: item.discountMoney })),
+    procedures: (finance?.items || []).map((item) => ({ sourceType: item.sourceType || 'procedure', id: item.sourceId, name: item.name, cost: item.price, discountMode: item.discountMode, discountPercent: item.discountPercent, discountMoney: item.discountMoney })),
     total: finance?.planTotal || 0,
   })}`;
   const m = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
