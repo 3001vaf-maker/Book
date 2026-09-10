@@ -2,7 +2,8 @@ import { initDateNavigator, journalDayTimeline, initJournalDayTimeline, ALL_WORK
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getDays, getDay, getDayTime, getDaysForDate } from '../core/day.js';
 import { rangesOverlap } from '../core/time.js';
-import { getCompletedPaymentForSource, recordDueTotal } from '../core/dds.js';
+import { getActivePaymentForSource } from '../core/dds.js';
+import { recordPlanTotal } from '../core/business-model.js';
 import { getRecordsForDay } from './record-data.js';
 import { getJournalBreaksForDay, getJournalBreaks } from './break-data.js';
 import { getTimeUsages } from '../core/time-usage.js';
@@ -15,8 +16,8 @@ function dateKey(date) { return `${date.getFullYear()}-${String(date.getMonth() 
 function withFinancialState(records = []) {
   return (Array.isArray(records) ? records : []).map((record) => ({
     ...record,
-    paid: Boolean(record?.id && getCompletedPaymentForSource('record', record.id)),
-    financialTotal: recordDueTotal(record),
+    paid: Boolean(record?.id && getActivePaymentForSource('record', record.id)),
+    financialTotal: recordPlanTotal(record),
   }));
 }
 
