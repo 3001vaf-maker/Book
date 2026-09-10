@@ -2,6 +2,7 @@ import { apiRequest } from './auth.js';
 
 const CLEAN_START_KEY = 'book.production.clean.v2';
 const SYNC_INTERVAL_MS = 4000;
+const STRONG_DATA_KEYS = ['book.people', 'book.workplaces', 'book.procedures', 'book.records', 'book.payments'];
 let lastSerialized = '';
 let syncing = false;
 let timer = null;
@@ -23,8 +24,21 @@ function serialized(data) {
   return JSON.stringify(data || {});
 }
 
+function listLength(raw) {
+  try {
+    const value = JSON.parse(raw || '[]');
+    return Array.isArray(value) ? value.length : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function workspaceStrength(data) {
+  return STRONG_DATA_KEYS.reduce((sum, key) => sum + listLength(data?.[key]), 0);
+}
+
 function hasWorkspaceData(data) {
-  return Object.keys(data || {}).length > 0;
+  return workspaceStrength(data) > 0;
 }
 
 function applySnapshot(data) {
@@ -60,9 +74,15 @@ async function push(data) {
 export async function syncWorkspaceBeforeRender() {
   const local = snapshot();
   const remote = await fetchRemote();
+  const remoteData = remote?.data && typeof remote.data === 'object' && !Array.isArray(remote.data) ? remote.data : null;
 
-  if (remote?.data && typeof remote.data === 'object' && !Array.isArray(remote.data)) {
-    applySnapshot(remote.data);
+  if (remoteData) {
+    const firstServerRevision = Number(remote.revision || 0) <= 1;
+    if (firstServerRevision && workspaceStrength(local) > workspaceStrength(remoteData)) {
+      const saved = await push(local);
+      return { source: 'local-bootstrap-replaced-empty-server', revision: saved?.revision || 2 };
+    }
+    applySnapshot(remoteData);
     return { source: 'server', revision: remote.revision || 0 };
   }
 
