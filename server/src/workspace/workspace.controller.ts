@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Put, Req, UseGuards } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { WorkspaceService } from './workspace.service';
@@ -18,6 +19,6 @@ export class WorkspaceController {
   @Put('state')
   saveState(@Req() request: AuthenticatedRequest, @Body() body: { data?: unknown }) {
     const data = body?.data && typeof body.data === 'object' && !Array.isArray(body.data) ? body.data : {};
-    return this.workspace.save(request.auth!.tenantId, request.auth!.userId, data as Record<string, unknown>);
+    return this.workspace.save(request.auth!.tenantId, request.auth!.userId, data as Prisma.InputJsonValue);
   }
 }
