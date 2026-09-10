@@ -1,7 +1,7 @@
 import { containsRange, isValidRange, rangesOverlap } from '../core/time.js';
 import { getDays, getDay, getDayTime } from '../core/day.js';
 import { getWorkplaces } from '../core/workplace-time.js';
-import { getFinanceForSource, getOperationalFinanceForSource, setOperationalFinanceStatus, syncOperationalFinance } from '../core/dds.js';
+import { calculateBusinessPlan, getRecordBusinessPlanFact } from '../core/business-model.js';
 import { getAllClients } from '../main/clients/data.js';
 import { getJournalBreaks } from './break-data.js';
 
@@ -50,48 +50,39 @@ function clientDiscount(client = null) {
   return percent(person?.discountPercent ?? client?.discountPercent ?? 0);
 }
 
-function financeSnapshot(finance = null) {
-  if (!finance) return null;
+function normalizeFinance(value = null) {
+  if (!value || typeof value !== 'object') return null;
   return {
-    items: Array.isArray(finance.items) ? finance.items.map((item) => ({ ...item })) : [],
-    serviceTotal: Math.max(0, numberValue(finance.serviceTotal)),
-    discountPercent: finance.discountPercent == null ? null : percent(finance.discountPercent),
-    discountTotal: Math.max(0, numberValue(finance.discountTotal)),
-    dueTotal: Math.max(0, numberValue(finance.dueTotal)),
-    paidTotal: Math.max(0, numberValue(finance.paidTotal)),
-    refundedTotal: Math.max(0, numberValue(finance.refundedTotal)),
-    netPaidTotal: Math.max(0, numberValue(finance.netPaidTotal)),
+    items: Array.isArray(value.items) ? value.items.map((item) => ({ ...item })) : [],
+    serviceTotal: Math.max(0, numberValue(value.serviceTotal)),
+    discountPercent: value.discountPercent == null ? null : percent(value.discountPercent),
+    discountTotal: Math.max(0, numberValue(value.discountTotal)),
+    planTotal: Math.max(0, numberValue(value.planTotal ?? value.dueTotal)),
+    factIncome: Math.max(0, numberValue(value.factIncome ?? value.paidTotal)),
+    factExpense: Math.max(0, numberValue(value.factExpense ?? value.refundedTotal)),
+    factTotal: numberValue(value.factTotal ?? value.netPaidTotal),
   };
 }
 
-function syncRecordFinance(record, { recalculate = false } = {}) {
+function storedRecordFinance(record) {
+  const existing = normalizeFinance(record?.finance);
+  if (existing && Number.isFinite(Number(existing.planTotal))) return existing;
+  const legacyDiscount = record?.clientDiscountPercent == null ? clientDiscount(record?.client) : percent(record.clientDiscountPercent);
+  return calculateBusinessPlan(record?.procedures || [], { discountPercent: legacyDiscount });
+}
+
+function hydrateRecord(record) {
   if (!record?.id) return record;
-  let operational = getOperationalFinanceForSource('record', record.id);
-  let clientDiscountPercent = record.clientDiscountPercent == null
-    ? clientDiscount(record.client)
-    : percent(record.clientDiscountPercent);
-
-  if (recalculate || !operational) {
-    operational = syncOperationalFinance({
-      source: { type: 'record', id: record.id },
-      workplace: record.workplaceId,
-      client: record.client,
-      items: record.procedures,
-      discountPercent: clientDiscountPercent,
-      status: record.status || 'active',
-    });
-  }
-
-  const finance = financeSnapshot(getFinanceForSource('record', record.id));
-  if (finance?.discountPercent != null) clientDiscountPercent = finance.discountPercent;
-  return { ...record, clientDiscountPercent, finance };
+  const { clientDiscountPercent: _legacyDiscount, ...cleanRecord } = record;
+  const finance = getRecordBusinessPlanFact({ ...cleanRecord, finance: storedRecordFinance(record) });
+  return { ...cleanRecord, finance: normalizeFinance(finance) };
 }
 
 export function getRecords() {
   const stored = readList(KEY);
   let changed = false;
   const records = stored.map((record) => {
-    const next = syncRecordFinance(record);
+    const next = hydrateRecord(record);
     if (JSON.stringify(next) !== JSON.stringify(record)) changed = true;
     return next;
   });
@@ -106,10 +97,6 @@ export function getActiveRecordCountForDay(date, workplaceId = '') {
   return getRecordsForDay(date, workplaceId).filter((record) => record?.status !== 'cancelled').length;
 }
 
-/**
- * Record owns appointment data. Core asks only whether Records block a
- * proposed working-time change or complete Day removal.
- */
 export function getWorkingTimeRecordConflicts({ date, workplaceId, from, to, operation = 'resize' } = {}) {
   const activeRecords = getRecordsForDay(date, workplaceId).filter((record) => record?.status !== 'cancelled');
   if (operation === 'remove') {
@@ -128,11 +115,13 @@ export function checkRecordTime({ date, workplaceId, from, to, excludeId = '' } 
   if (hasUsageConflict({ date, workplaceId, from, to, excludeId })) return { ok: false, reason: 'occupied', day: day.day, time: day.time };
   return day;
 }
-export function createRecord({ date, workplaceId, from, to, client, procedures = [], clientDiscountPercent = null } = {}) {
+
+export function createRecord({ date, workplaceId, from, to, client, procedures = [] } = {}) {
   const normalizedDate = normalizeDate(date), normalizedWorkplaceId = normalizeId(workplaceId);
   if (!checkRecordTime({ date: normalizedDate, workplaceId: normalizedWorkplaceId, from, to }).ok) return null;
   const now = new Date().toISOString();
-  const record = syncRecordFinance({
+  const finance = calculateBusinessPlan(procedures, { discountPercent: clientDiscount(client) });
+  const record = hydrateRecord({
     id: crypto.randomUUID(),
     status: 'active',
     confirmed: false,
@@ -142,51 +131,59 @@ export function createRecord({ date, workplaceId, from, to, client, procedures =
     from: String(from),
     to: String(to),
     client: client || null,
-    clientDiscountPercent: clientDiscountPercent == null ? clientDiscount(client) : percent(clientDiscountPercent),
     procedures: Array.isArray(procedures) ? procedures : [],
+    finance,
     createdAt: now,
     updatedAt: now,
-  }, { recalculate: true });
+  });
   const records = getRecords(); records.push(record); writeList(KEY, records);
   notify('book:records-changed', { action: 'create', recordId: record.id });
   notify('book:time-usage-changed', { action: 'occupy', usageId: record.id, sourceId: record.id, date: record.date, workplaceId: record.workplaceId, from: record.from, to: record.to });
   return record;
 }
+
 export function updateRecord(id, patch = {}) {
   const records = getRecords(), index = records.findIndex((record) => record?.id === id);
   if (index < 0) return null;
   const current = records[index];
   if (current.status === 'cancelled' && patch.status !== 'active') return null;
-  const financialInputsChanged = Object.prototype.hasOwnProperty.call(patch, 'procedures')
-    || Object.prototype.hasOwnProperty.call(patch, 'client')
-    || Object.prototype.hasOwnProperty.call(patch, 'clientDiscountPercent');
-  const nextDiscount = Object.prototype.hasOwnProperty.call(patch, 'clientDiscountPercent')
-    ? percent(patch.clientDiscountPercent)
-    : Object.prototype.hasOwnProperty.call(patch, 'client')
-      ? clientDiscount(patch.client)
-      : percent(current.clientDiscountPercent);
-  const next = { ...current, ...patch, clientDiscountPercent: nextDiscount };
+  const next = { ...current, ...patch };
   if (next.status !== 'cancelled' && !checkRecordTime({ date: next.date, workplaceId: next.workplaceId, from: next.from, to: next.to, excludeId: id }).ok) return null;
-  records[index] = syncRecordFinance({ ...next, updatedAt: new Date().toISOString() }, { recalculate: financialInputsChanged }); writeList(KEY, records);
+
+  const hasExplicitFinance = Object.prototype.hasOwnProperty.call(patch, 'finance');
+  const serviceChanged = Object.prototype.hasOwnProperty.call(patch, 'procedures');
+  const clientChanged = Object.prototype.hasOwnProperty.call(patch, 'client');
+  if (hasExplicitFinance) {
+    next.finance = normalizeFinance(patch.finance);
+  } else if (serviceChanged || clientChanged) {
+    const discount = clientChanged ? clientDiscount(next.client) : (current.finance?.discountPercent ?? 0);
+    next.finance = calculateBusinessPlan(next.procedures || [], { discountPercent: discount });
+  } else {
+    next.finance = current.finance;
+  }
+
+  records[index] = hydrateRecord({ ...next, updatedAt: new Date().toISOString() });
+  writeList(KEY, records);
   notify('book:records-changed', { action: 'update', recordId: id });
   notify('book:time-usage-changed', { action: 'change', usageId: id, sourceId: id, date: records[index].date, workplaceId: records[index].workplaceId, from: records[index].from, to: records[index].to });
   return records[index];
 }
+
 export function cancelRecord(id) {
   const records = getRecords(), index = records.findIndex((record) => record?.id === id);
   if (index < 0 || records[index].status === 'cancelled') return null;
   const previous = records[index];
-  setOperationalFinanceStatus('record', id, 'cancelled');
-  records[index] = syncRecordFinance({ ...previous, status: 'cancelled', cancelledAt: new Date().toISOString(), updatedAt: new Date().toISOString() }); writeList(KEY, records);
+  records[index] = hydrateRecord({ ...previous, status: 'cancelled', cancelledAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+  writeList(KEY, records);
   notify('book:records-changed', { action: 'cancel', recordId: id });
   notify('book:time-usage-changed', { action: 'release', usageId: id, sourceId: id, date: previous.date, workplaceId: previous.workplaceId, from: previous.from, to: previous.to });
   return records[index];
 }
+
 export function deleteRecord(id) {
   const records = getRecords(), index = records.findIndex((record) => record?.id === id);
   if (index < 0) return false;
   const removed = records[index];
-  setOperationalFinanceStatus('record', id, 'deleted');
   records.splice(index, 1); writeList(KEY, records);
   notify('book:records-changed', { action: 'delete', recordId: id });
   notify('book:time-usage-changed', { action: 'release', usageId: id, sourceId: id, date: removed.date, workplaceId: removed.workplaceId, from: removed.from, to: removed.to });
