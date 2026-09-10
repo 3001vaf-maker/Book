@@ -6,7 +6,7 @@ const ignored = new Set(['.git', 'node_modules', '_site']);
 const errors = [];
 const thisCheck = 'scripts/check-finance-architecture.mjs';
 const obsoletePaymentModule = ['core', 'payment.js'].join('/');
-const reservedBusinessModelModule = ['core', 'business-model.js'].join('/');
+const reservedFutureModelModule = ['core', 'business-model.js'].join('/');
 
 function walk(dir) {
   const files = [];
@@ -31,8 +31,8 @@ function source(path) {
 if (existsSync(join(root, obsoletePaymentModule))) {
   errors.push(`${obsoletePaymentModule} must not exist: DDS owns money movement; Financial Model owns plan/fact`);
 }
-if (existsSync(join(root, reservedBusinessModelModule))) {
-  errors.push(`${reservedBusinessModelModule} is reserved for future Analytics Business Model and must not own finance`);
+if (existsSync(join(root, reservedFutureModelModule))) {
+  errors.push(`${reservedFutureModelModule} is reserved for a separate future instrument and must not own finance`);
 }
 
 for (const file of walk(root)) {
@@ -40,7 +40,7 @@ for (const file of walk(root)) {
   if (path === thisCheck) continue;
   const text = readFileSync(file, 'utf8');
   if (text.includes(obsoletePaymentModule)) errors.push(`${path}: obsolete ${obsoletePaymentModule} dependency`);
-  if (text.includes(reservedBusinessModelModule)) errors.push(`${path}: finance must use core/financial-model.js, not reserved Business Model`);
+  if (text.includes(reservedFutureModelModule)) errors.push(`${path}: finance must use core/financial-model.js`);
 }
 
 const ownershipRules = [
