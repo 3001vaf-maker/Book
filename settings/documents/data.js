@@ -1,3 +1,5 @@
+import { recordDocumentHistory } from './history.js';
+
 const STORAGE_KEY = 'book.documents.templates.v1';
 
 const DEFAULT_DOCUMENTS = [
@@ -68,6 +70,7 @@ export function saveDocument(document) {
   const items = getDocuments();
   const previous = items.find((item) => item.id === document?.id);
   const changedText = previous && String(previous.text || '') !== String(document?.text || '');
+  const changedTitle = previous && String(previous.title || '') !== String(document?.title || '');
   const next = normalize({
     ...document,
     version: changedText ? Number(previous.version || 1) + 1 : Number(document?.version || previous?.version || 1),
@@ -76,6 +79,13 @@ export function saveDocument(document) {
   if (index >= 0) items[index] = next;
   else items.push(next);
   saveDocuments(items);
+
+  if (!previous) {
+    recordDocumentHistory({ documentId: next.id, documentTitle: next.title, documentVersion: next.version, action: 'created' });
+  } else if (changedText || changedTitle) {
+    recordDocumentHistory({ documentId: next.id, documentTitle: next.title, documentVersion: next.version, action: changedText ? 'version-created' : 'renamed' });
+  }
+
   return next;
 }
 
