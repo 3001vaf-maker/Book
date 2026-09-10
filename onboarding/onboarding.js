@@ -142,7 +142,7 @@ export async function renderOnboarding(root, { onComplete = () => {}, accountEma
 
   nextButton?.addEventListener('click', async () => {
     if (!stage.ready?.(module, content)) return;
-    if (stage.beforeNext && !stage.beforeNext(module, content)) return;
+    if (stage.beforeNext && !(await stage.beforeNext(module, content))) return;
 
     observer.disconnect();
     const wasComplete = localStorage.getItem(COMPLETE_KEY) === '1';

@@ -3,11 +3,11 @@ import { renderJournal } from './journal/journal.js';
 import { renderTimetable } from './timetable/timetable.js';
 import { renderSettings } from './settings/settings.js';
 import { getWorkplaces as getWorkplaceEntities } from './settings/profile/workplaces/data.js';
+import { initializeProfileWorkplaces } from './settings/profile/migration.js';
 import { getWorkingTimeRecordConflicts } from './journal/record-data.js';
 import { configureWorkplaceSource } from './core/workplace-time.js';
 import { configureWorkingTimeConflictSource } from './core/time-usage.js';
-import { getCurrentUser, login, prepareProductionWorkspace } from './core/auth.js';
-import { startWorkspaceSync, syncWorkspaceBeforeRender } from './core/workspace-sync.js';
+import { getCurrentUser, login } from './core/auth.js';
 import { isOnboardingComplete, renderOnboarding } from './onboarding/onboarding.js';
 import { bottomNavigation } from './ui/ui.js';
 
@@ -24,7 +24,6 @@ const routes = {
 const state = { activeSection: 'journal' };
 const app = document.querySelector('#app');
 let disposeView = () => {};
-let disposeWorkspaceSync = () => {};
 let workspaceReady = false;
 let authenticatedAccount = null;
 
@@ -58,13 +57,32 @@ function renderWorkspace() {
   syncViewport();
 }
 
+function renderMigrationPending() {
+  workspaceReady = false;
+  disposeView();
+  disposeView = () => {};
+  app.innerHTML = `
+    <main class="auth-view">
+      <section class="auth-card">
+        <div class="auth-card__heading">
+          <h1>Book</h1>
+          <p>Сервер ожидает безопасный перенос данных из основного браузера. Текущие данные не изменены.</p>
+        </div>
+      </section>
+    </main>`;
+  syncViewport();
+}
+
 async function renderAuthenticated(account = authenticatedAccount) {
   authenticatedAccount = account || authenticatedAccount;
-  await syncWorkspaceBeforeRender();
-  disposeWorkspaceSync();
-  disposeWorkspaceSync = startWorkspaceSync();
+  const migration = await initializeProfileWorkplaces(authenticatedAccount);
+  if (!migration.verified) {
+    renderMigrationPending();
+    return;
+  }
 
-  if (!isOnboardingComplete()) {
+  const serverWorkspaceUnlocked = Boolean(authenticatedAccount?.user?.workspaceUnlocked);
+  if (!serverWorkspaceUnlocked && !isOnboardingComplete()) {
     workspaceReady = false;
     history.replaceState({}, '', location.pathname);
     await renderOnboarding(app, {
@@ -88,8 +106,6 @@ function renderLogin(message = '') {
   workspaceReady = false;
   disposeView();
   disposeView = () => {};
-  disposeWorkspaceSync();
-  disposeWorkspaceSync = () => {};
   app.innerHTML = `
     <main class="auth-view">
       <section class="auth-card" aria-labelledby="auth-title">
@@ -126,7 +142,6 @@ function renderLogin(message = '') {
     try {
       const account = await login(data.get('email'), data.get('password'));
       authenticatedAccount = account;
-      prepareProductionWorkspace();
       await renderAuthenticated(account);
     } catch (loginError) {
       error.textContent = loginError instanceof Error ? loginError.message : 'Не удалось войти';
@@ -163,7 +178,6 @@ try {
   const currentUser = await getCurrentUser();
   if (currentUser) {
     authenticatedAccount = currentUser;
-    prepareProductionWorkspace();
     await renderAuthenticated(currentUser);
   } else {
     renderLogin();

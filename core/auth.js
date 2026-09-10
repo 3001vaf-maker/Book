@@ -1,6 +1,5 @@
 const API_BASE = 'https://book-api-volokovykh.amvera.io';
 const TOKEN_KEY = 'book.auth.token';
-const CLEAN_START_KEY = 'book.production.clean.v2';
 
 export function getAuthToken() {
   return sessionStorage.getItem(TOKEN_KEY) || '';
@@ -16,17 +15,6 @@ export async function apiRequest(path, options = {}) {
   if (token) headers.set('Authorization', `Bearer ${token}`);
   if (options.body != null && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   return fetch(`${API_BASE}${path}`, { ...options, headers });
-}
-
-export function prepareProductionWorkspace() {
-  if (localStorage.getItem(CLEAN_START_KEY) === '1') return false;
-
-  Object.keys(localStorage)
-    .filter((key) => key.startsWith('book.') || key.startsWith('book:'))
-    .forEach((key) => localStorage.removeItem(key));
-
-  localStorage.setItem(CLEAN_START_KEY, '1');
-  return true;
 }
 
 export async function login(email, password) {
