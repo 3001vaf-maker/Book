@@ -3,7 +3,6 @@ import {
   durationText,
   entityCard,
   escapeHtml,
-  field,
   initCalendar,
   initTimePickers,
   list,
@@ -165,7 +164,7 @@ function openTimePicker(state, record, onSelected) {
 }
 
 function openClientPicker(state, onSelected) {
-  const content = `<div class="record-editor-screen record-editor-screen--clients"><div class="record-client-toolbar"><input class="record-client-search" type="search" placeholder="Поиск клиента" data-record-view-client-search></div><div class="record-client-list" data-record-view-client-list></div></div>`;
+  const content = `<div class="record-editor-screen record-screen--clients"><div class="record-client-toolbar"><input class="record-client-search" type="search" placeholder="Поиск клиента" data-record-view-client-search></div><div class="record-client-list" data-record-view-client-list></div></div>`;
   const m = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app', className: 'record-editor-modal' }));
   if (!m) return;
   const render = (query = '') => {
@@ -219,9 +218,8 @@ function openProcedureCorrection(state, index, { onSave, onAdd, onDelete } = {})
   const item = state.procedures[index];
   if (!item) return;
   const duration = Number(item.duration) || 0;
-  const costField = field({ label: 'Стоимость', name: 'recordViewProcedureCost', value: item.cost ?? '', type: 'number', inputmode: 'decimal' });
   const durationField = timePicker({ name: 'recordViewProcedureDuration', label: 'Время', value: duration });
-  const html = `<div class="modal-title"><h2>${escapeHtml(item.name || 'Процедура')}</h2><p>Установите параметры процедуры для этой записи.</p></div><div class="compact-form">${costField}${durationField}<div class="modal-actions">${button('Сохранить', { data: 'data-record-view-procedure-save' })}${button('+ Добавить процедуру', { data: 'data-record-view-procedure-add', variant: 'secondary' })}${button('Удалить процедуру', { data: 'data-record-view-procedure-delete', variant: 'danger' })}</div></div>`;
+  const html = `<div class="modal-title"><h2>${escapeHtml(item.name || 'Процедура')}</h2><p>Скорректируйте время процедуры для этой записи.</p></div><div class="compact-form">${durationField}<div class="modal-actions">${button('Сохранить', { data: 'data-record-view-procedure-save' })}${button('+ Добавить процедуру', { data: 'data-record-view-procedure-add', variant: 'secondary' })}${button('Удалить процедуру', { data: 'data-record-view-procedure-delete', variant: 'danger' })}</div></div>`;
   const m = mountModal(document.body, modal(html, { variant: 'medium', surface: 'app' }));
   if (!m) return;
   initTimePickers(m);
@@ -234,13 +232,11 @@ function openProcedureCorrection(state, index, { onSave, onAdd, onDelete } = {})
     onDelete?.();
   });
   m.querySelector('[data-record-view-procedure-save]')?.addEventListener('click', () => {
-    const rawCost = m.querySelector('[name="recordViewProcedureCost"]')?.value ?? '';
     const rawDuration = m.querySelector('[name="recordViewProcedureDuration"]')?.value ?? '';
     const timeValue = String(rawDuration || '').trim();
     const match = timeValue.match(/^(\d{1,2}):(\d{2})$/);
     onSave?.({
       ...item,
-      cost: rawCost === '' ? '' : Number(rawCost),
       duration: match ? Number(match[1]) * 60 + Number(match[2]) : duration,
     });
     m.remove();
@@ -379,7 +375,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       left: item.name || '',
       right: item.cost === '' || item.cost == null ? '' : `${item.cost} ₽`,
       data: paid ? '' : `data-record-view-procedure-edit="${index}"`,
-      aria: paid ? '' : `Изменить процедуру ${item.name || ''}`,
+      aria: paid ? '' : `Изменить время процедуры ${item.name || ''}`,
     }));
     const card = entityCard({
       id: client.uei,
