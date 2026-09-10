@@ -38,7 +38,7 @@ export function paymentForm({ workplace = '', date = '', time = '', client = {},
     <section class="payment-procedure" data-payment-procedure="${index}" data-payment-source-type="${escapeHtml(procedure?.sourceType || 'procedure')}" data-payment-source-id="${escapeHtml(procedure?.id || '')}" data-payment-name="${escapeHtml(procedure?.name || '')}" data-payment-discount-mode="${mode}">
       <strong class="payment-procedure__name">${escapeHtml(procedure?.name || '')}</strong>
       <div class="payment-fields payment-fields--three">
-        <label><span>Цена</span><input type="number" inputmode="decimal" step="0.01" min="0" value="${escapeHtml(moneyText(price))}" data-payment-price readonly></label>
+        <label><span>Цена</span><input type="number" inputmode="decimal" step="0.01" min="0" value="${escapeHtml(moneyText(price))}" data-payment-price></label>
         <div class="payment-discount-percent">${select({ label: 'Скидка %', value: percent ? percentText(percent) : '', options: discountOptions, data: 'data-payment-discount-percent', aria: 'Скидка в процентах' })}</div>
         <label><span>Скидка ₽</span><input type="number" inputmode="decimal" step="0.01" min="0" value="${money ? escapeHtml(moneyText(money)) : ''}" data-payment-discount-money></label>
       </div>
@@ -113,7 +113,8 @@ function applyFinancialPlan(root, plan = null) {
     const item = items[index];
     if (!item) return;
     row.dataset.paymentDiscountMode = item.discountMode || 'none';
-    const { percentInput, moneyInput } = rowValues(row);
+    const { priceInput, percentInput, moneyInput } = rowValues(row);
+    if (priceInput) priceInput.value = moneyText(item.price);
     setPercentDisplay(percentInput, item.discountPercent || 0);
     if (moneyInput) moneyInput.value = item.discountMoney ? moneyText(item.discountMoney) : '';
   });
@@ -131,7 +132,8 @@ function recalculate(root, calculate) {
 export function initPaymentForm(root, { calculate = null, onPay = () => {} } = {}) {
   if (!root) return;
   root.querySelectorAll('[data-payment-procedure]').forEach((row) => {
-    const { percentInput, moneyInput } = rowValues(row);
+    const { priceInput, percentInput, moneyInput } = rowValues(row);
+    priceInput?.addEventListener('input', () => recalculate(root, calculate));
     percentInput?.addEventListener('change', () => {
       row.dataset.paymentDiscountMode = percentInput.value ? 'percent' : 'none';
       recalculate(root, calculate);
