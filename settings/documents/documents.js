@@ -91,6 +91,7 @@ function rootMarkup() {
       { title: 'Шаблоны', data: 'data-documents-section="templates"', aria: 'Открыть шаблоны документов' },
       { title: 'История', data: 'data-documents-section="history"', aria: 'Открыть историю документов' },
     ]),
+    actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-documents-back' }))
   ]);
 }
 
@@ -151,6 +152,10 @@ function historyMarkup() {
 }
 
 function bind(root, navigateBack) {
+  root.querySelector('[data-documents-back]')?.addEventListener('click', () => {
+    currentSection = 'root';
+    navigateBack();
+  });
   root.querySelectorAll('[data-documents-section]').forEach((item) => item.addEventListener('click', () => {
     currentSection = item.dataset.documentsSection;
     render(root, navigateBack);
