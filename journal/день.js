@@ -19,14 +19,9 @@ function withPaymentStatus(records = []) {
   }));
 }
 
-function openExistingRecord(record, onClose) {
+function openExistingRecord(record) {
   let closePayment = () => {};
-  openRecordView(record, {
-    onClose: () => {
-      closePayment();
-      onClose?.();
-    },
-  });
+  openRecordView(record, { onClose: () => closePayment() });
   closePayment = openRecordPaymentEntry(record);
 }
 
@@ -72,7 +67,7 @@ export function renderJournalDay(root, { date = new Date(), workplaceId = '', on
       onSlotClick: ({ usage }) => {
         if (usage?.type === 'record') {
           const record = records.find((item) => item?.id === usage.sourceId);
-          if (record) openExistingRecord(record, () => renderJournalDay(root, { date, workplaceId, onChange }));
+          if (record) openExistingRecord(record);
           return;
         }
         if (usage?.type === 'break') {
@@ -97,7 +92,7 @@ export function renderJournalDay(root, { date = new Date(), workplaceId = '', on
     onSlotClick: ({ from, to, usage }) => {
       if (usage?.type === 'record') {
         const record = records.find((item) => item?.id === usage.sourceId);
-        if (record) openExistingRecord(record, () => renderJournalDay(root, { date, workplaceId, onChange }));
+        if (record) openExistingRecord(record);
         return;
       }
       if (usage?.type === 'break') {
