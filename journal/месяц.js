@@ -3,6 +3,7 @@ import { getPayments } from '../core/payment.js';
 import { minutesBetween } from '../core/time.js';
 import { getWorkplaces, getWorkingDays, getWorkingDates, getAllWorkingDates, getWorkingDayIndicators, getWorkingDay, getWorkingDayTotalMinutes, resolveWorkingDayTime } from '../core/workplace-time.js';
 import { getRecordsForDay } from './record-data.js';
+import { recordVisualState } from './record-state.js';
 
 const RECORD_COLOR = '#EFFFBB';
 const PAID_COLOR = '#DDE8D7';
@@ -34,8 +35,9 @@ function dayRecordData({ dateKey, workplaceId, allMode, workingDays, workplaces,
 
   records.forEach((record) => {
     const duration = recordMinutes(record);
-    if (paidIds.has(String(record?.id || ''))) minutes.paid += duration;
-    else if (record?.attendance === 'no-show') minutes.noShow += duration;
+    const state = recordVisualState(record, { paid: paidIds.has(String(record?.id || '')) });
+    if (state === 'paid') minutes.paid += duration;
+    else if (state === 'no-show') minutes.noShow += duration;
     else minutes.active += duration;
   });
 
