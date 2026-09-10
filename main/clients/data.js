@@ -1,5 +1,6 @@
 import { getMembers, getUEI } from '../../core/uei.js';
 import { getTags } from '../../settings/tags/data.js';
+import { getLatestClientConsent, migrateLegacyConsents } from '../../settings/documents/consents.js';
 
 const STORAGE_KEY = 'book.people';
 
@@ -46,11 +47,21 @@ function normalizeClient(person = {}) {
   };
 }
 
+function accepted(fact) {
+  return Boolean(fact && fact.status === 'accepted');
+}
+
 export function getAllClients() {
-  return readStoredClients()
-    .map(normalizeClient)
-    .filter((person) => person.key)
-    .map((person) => ({ ...person, uei: getUEI('person', person.key) || '' }));
+  const stored = readStoredClients().map(normalizeClient).filter((person) => person.key);
+  migrateLegacyConsents(stored);
+  return stored.map((person) => ({
+    ...person,
+    agreements: {
+      personalData: accepted(getLatestClientConsent(person.key, 'pdn-consent')),
+      mailings: accepted(getLatestClientConsent(person.key, 'messages-consent')),
+    },
+    uei: getUEI('person', person.key) || '',
+  }));
 }
 
 export function getClients() {
