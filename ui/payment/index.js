@@ -107,25 +107,25 @@ function financialInputs(root) {
   });
 }
 
-function applyFinancialPlan(root, plan = null) {
+function applyFinancialPlan(root, plan = null, { preserve = null } = {}) {
   const items = Array.isArray(plan?.items) ? plan.items : [];
   [...root.querySelectorAll('[data-payment-procedure]')].forEach((row, index) => {
     const item = items[index];
     if (!item) return;
     row.dataset.paymentDiscountMode = item.discountMode || 'none';
     const { priceInput, percentInput, moneyInput } = rowValues(row);
-    if (priceInput) priceInput.value = moneyText(item.price);
-    setPercentDisplay(percentInput, item.discountPercent || 0);
-    if (moneyInput) moneyInput.value = item.discountMoney ? moneyText(item.discountMoney) : '';
+    if (priceInput && priceInput !== preserve) priceInput.value = moneyText(item.price);
+    if (percentInput !== preserve) setPercentDisplay(percentInput, item.discountPercent || 0);
+    if (moneyInput && moneyInput !== preserve) moneyInput.value = item.discountMoney ? moneyText(item.discountMoney) : '';
   });
   const totalInput = root.querySelector('[data-payment-total]');
   if (totalInput) totalInput.value = moneyText(plan?.planTotal || 0);
 }
 
-function recalculate(root, calculate) {
+function recalculate(root, calculate, { preserve = null } = {}) {
   if (typeof calculate !== 'function') return null;
   const plan = calculate(financialInputs(root));
-  applyFinancialPlan(root, plan);
+  applyFinancialPlan(root, plan, { preserve });
   return plan;
 }
 
@@ -133,14 +133,14 @@ export function initPaymentForm(root, { calculate = null, onSave = () => {}, onP
   if (!root) return;
   root.querySelectorAll('[data-payment-procedure]').forEach((row) => {
     const { priceInput, percentInput, moneyInput } = rowValues(row);
-    priceInput?.addEventListener('input', () => recalculate(root, calculate));
+    priceInput?.addEventListener('input', () => recalculate(root, calculate, { preserve: priceInput }));
     percentInput?.addEventListener('change', () => {
       row.dataset.paymentDiscountMode = percentInput.value ? 'percent' : 'none';
-      recalculate(root, calculate);
+      recalculate(root, calculate, { preserve: percentInput });
     });
     moneyInput?.addEventListener('input', () => {
       row.dataset.paymentDiscountMode = moneyInput.value ? 'money' : 'none';
-      recalculate(root, calculate);
+      recalculate(root, calculate, { preserve: moneyInput });
     });
   });
   root.querySelector('[data-payment-save]')?.addEventListener('click', () => {
