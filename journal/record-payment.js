@@ -1,4 +1,4 @@
-import { button, escapeHtml, initPaymentForm, initPaymentMethods, modal, mountModal, paymentForm, paymentMethods } from '../ui/ui.js';
+import { button, escapeHtml, initPaymentForm, initPaymentMethods, modal, mountModal, paymentForm, paymentMethods, select } from '../ui/ui.js';
 import { completePayment, completeSplitPayment, createPaymentDraft, getCompletedPaymentForSource, getRefundsForPayment, paymentTotal, refundPayment } from '../core/payment.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getAllClients } from '../main/clients/data.js';
@@ -10,9 +10,7 @@ const money = (value) => `${new Intl.NumberFormat('ru-RU').format(Number(value |
 
 function paymentEntryContent(record) {
   const completed = getCompletedPaymentForSource('record', record?.id);
-  if (completed) {
-    return `<button type="button" class="modal-bottom-action modal-bottom-action--paid" data-record-payment-paid aria-label="Открыть оплату ${completed.total} рублей"><strong>Оплачено</strong><strong>${money(completed.total)}</strong></button>`;
-  }
+  if (completed) return `<button type="button" class="modal-bottom-action modal-bottom-action--paid" data-record-payment-paid aria-label="Открыть оплату ${completed.total} рублей"><strong>Оплачено</strong><strong>${money(completed.total)}</strong></button>`;
   const total = paymentTotal(record?.procedures || []);
   return `<button type="button" class="modal-bottom-action" data-record-payment-open aria-label="Открыть оплату, к оплате ${total} рублей"><span>К оплате</span><strong>${money(total)}</strong></button>`;
 }
@@ -41,13 +39,30 @@ function paymentFromRecord(record) {
   });
 }
 
+function paidProcedures(record, payment) {
+  const items = new Map((payment?.items || []).map((item) => [String(item?.sourceId || ''), item]));
+  return (record?.procedures || []).map((procedure) => {
+    const item = items.get(String(procedure?.id || ''));
+    if (!item) return { ...procedure };
+    const price = Number(item.price || 0);
+    const discount = Math.max(0, Math.min(price, Number(item.discountMoney || 0)));
+    return { ...procedure, cost: Math.max(0, price - discount) };
+  });
+}
+
 function openPaymentMethodsModal(payment, values, paymentModal, replacesPaymentId = '') {
   const content = `<div class="modal-title"><h2>Способ оплаты</h2></div>${paymentMethods({ wallets: getWallets(), total: values.total })}`;
   const methodsModal = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
   if (!methodsModal) return;
   const finish = (completed) => {
     if (!completed) return;
-    if (completed?.source?.type === 'record' && completed?.source?.id) updateRecord(completed.source.id, { attendance: 'arrived' });
+    if (completed?.source?.type === 'record' && completed?.source?.id) {
+      const currentRecord = getRecords().find((item) => String(item?.id || '') === String(completed.source.id));
+      updateRecord(completed.source.id, {
+        attendance: 'arrived',
+        ...(currentRecord ? { procedures: paidProcedures(currentRecord, completed) } : {}),
+      });
+    }
     methodsModal.remove();
     paymentModal?.remove();
   };
@@ -92,16 +107,27 @@ function openRefundModal(payment) {
     return;
   }
   const wallets = getWallets();
-  const walletButtons = wallets.map((wallet) => button(wallet.name, { variant: 'secondary', data: `data-refund-wallet="${escapeHtml(wallet.id)}" data-refund-wallet-name="${escapeHtml(wallet.name)}"` })).join('');
-  const html = `<div class="modal-title"><h2>Возврат оплаты</h2><p>Полный или частичный возврат.</p></div><label class="payment-refund-amount"><span>Сумма возврата</span><input type="number" min="0" max="${remaining}" step="0.01" inputmode="decimal" value="${remaining}" data-refund-amount></label><div class="payment-refund-wallets">${walletButtons}</div>`;
+  const options = [{ value: '', label: 'Кошелёк' }, ...wallets.map((wallet) => ({ value: wallet.id, label: wallet.name }))];
+  const html = `<div class="modal-title"><h2>Возврат оплаты</h2></div><div class="payment-refund-form"><label class="payment-refund-amount"><span>Сумма возврата</span><input type="number" min="0" max="${remaining}" step="0.01" inputmode="decimal" value="${remaining}" data-refund-amount></label>${select({ value: '', options, data: 'data-refund-wallet', aria: 'Кошелёк возврата' })}${button('Подтвердить возврат', { data: 'data-refund-submit disabled' })}</div>`;
   const m = mountModal(document.body, modal(html, { variant: 'medium', surface: 'app' }));
   if (!m) return;
-  m.querySelectorAll('[data-refund-wallet]').forEach((node) => node.addEventListener('click', () => {
-    const amount = Math.max(0, Math.min(remaining, Number(String(m.querySelector('[data-refund-amount]')?.value || '0').replace(',', '.')) || 0));
-    if (!amount) return;
-    const refund = refundPayment(payment.id, { amount, walletId: node.dataset.refundWallet || '', walletName: node.dataset.refundWalletName || '' });
+  const walletInput = m.querySelector('input[data-refund-wallet]');
+  const amountInput = m.querySelector('[data-refund-amount]');
+  const submit = m.querySelector('[data-refund-submit]');
+  const sync = () => {
+    const amount = Math.max(0, Math.min(remaining, Number(String(amountInput?.value || '0').replace(',', '.')) || 0));
+    if (submit) submit.disabled = !walletInput?.value || !amount;
+  };
+  walletInput?.addEventListener('change', sync);
+  amountInput?.addEventListener('input', sync);
+  submit?.addEventListener('click', () => {
+    const amount = Math.max(0, Math.min(remaining, Number(String(amountInput?.value || '0').replace(',', '.')) || 0));
+    const wallet = wallets.find((item) => String(item.id || '') === String(walletInput?.value || ''));
+    if (!amount || !wallet) return;
+    const refund = refundPayment(payment.id, { amount, walletId: wallet.id, walletName: wallet.name });
     if (refund) m.remove();
-  }));
+  });
+  sync();
 }
 
 function openPaidState(record) {
