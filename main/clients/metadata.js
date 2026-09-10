@@ -12,10 +12,17 @@ function clientRecords(key) {
 export function getClientMetadata(key) {
   const records = clientRecords(key);
   const recordIds = new Set(records.map((record) => String(record?.id || '')).filter(Boolean));
-  const paidTotal = getPayments()
-    .filter((payment) => payment?.status === 'completed'
-      && payment?.source?.type === 'record'
-      && recordIds.has(String(payment?.source?.id || '')))
+  const payments = getPayments();
+  const completed = payments.filter((payment) => payment?.status === 'completed'
+    && payment?.source?.type === 'record'
+    && recordIds.has(String(payment?.source?.id || '')));
+  const completedIds = new Set(completed.map((payment) => String(payment.id || '')));
+  const paid = completed.reduce((sum, payment) => {
+    const value = Number(payment?.total);
+    return sum + (Number.isFinite(value) ? value : 0);
+  }, 0);
+  const refunded = payments
+    .filter((payment) => payment?.status === 'refund' && completedIds.has(String(payment?.originalPaymentId || '')))
     .reduce((sum, payment) => {
       const value = Number(payment?.total);
       return sum + (Number.isFinite(value) ? value : 0);
@@ -26,7 +33,7 @@ export function getClientMetadata(key) {
 
   return {
     recordCount: records.length,
-    paidTotal,
+    paidTotal: Math.max(0, paid - refunded),
     lastVisit: dated[0]?.date || '',
   };
 }
