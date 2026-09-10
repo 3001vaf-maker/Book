@@ -29,12 +29,13 @@ export function paymentForm({ workplace = '', date = '', time = '', client = {},
   const procedureBlocks = (Array.isArray(procedures) ? procedures : []).map((procedure, index) => {
     const price = Math.max(0, numberValue(procedure?.cost));
     const percent = Math.max(0, Math.min(100, numberValue(procedure?.discountPercent)));
-    const money = Math.max(0, Math.min(price, numberValue(procedure?.discountMoney ?? (percent ? price * percent / 100 : 0))));
+    const money = Math.max(0, numberValue(procedure?.discountMoney));
+    const discountMode = percent ? 'percent' : money ? 'money' : 'none';
     return `
-    <section class="payment-procedure" data-payment-procedure="${index}" data-payment-source-id="${escapeHtml(procedure?.id || '')}" data-payment-name="${escapeHtml(procedure?.name || '')}">
+    <section class="payment-procedure" data-payment-procedure="${index}" data-payment-source-id="${escapeHtml(procedure?.id || '')}" data-payment-name="${escapeHtml(procedure?.name || '')}" data-payment-discount-mode="${discountMode}">
       <strong class="payment-procedure__name">${escapeHtml(procedure?.name || '')}</strong>
       <div class="payment-fields payment-fields--three">
-        <label><span>Цена</span><input type="number" inputmode="decimal" step="0.01" min="0" value="${escapeHtml(moneyText(price))}" data-payment-price></label>
+        <label><span>Цена</span><input type="number" inputmode="decimal" step="0.01" min="0" value="${escapeHtml(moneyText(price))}" data-payment-price readonly></label>
         <div class="payment-discount-percent">${select({ label: 'Скидка %', value: percent ? percentText(percent) : '', options: discountOptions, data: 'data-payment-discount-percent', aria: 'Скидка в процентах' })}</div>
         <label><span>Скидка ₽</span><input type="number" inputmode="decimal" step="0.01" min="0" value="${money ? escapeHtml(moneyText(money)) : ''}" data-payment-discount-money></label>
       </div>
@@ -69,7 +70,14 @@ function rowValues(row) {
   const priceInput = row.querySelector('[data-payment-price]');
   const percentInput = row.querySelector('input[data-payment-discount-percent]');
   const moneyInput = row.querySelector('[data-payment-discount-money]');
-  return { priceInput, percentInput, moneyInput, price: Math.max(0, numberValue(priceInput?.value)), percent: Math.max(0, numberValue(percentInput?.value)), money: Math.max(0, numberValue(moneyInput?.value)) };
+  return {
+    priceInput,
+    percentInput,
+    moneyInput,
+    price: Math.max(0, numberValue(priceInput?.value)),
+    percent: Math.max(0, numberValue(percentInput?.value)),
+    money: Math.max(0, numberValue(moneyInput?.value)),
+  };
 }
 
 function setPercentDisplay(input, value) {
@@ -80,51 +88,59 @@ function setPercentDisplay(input, value) {
   if (trigger) trigger.textContent = percent ? `${percent}%` : '—';
 }
 
-function recalculateTotal(root) {
-  const total = [...root.querySelectorAll('[data-payment-procedure]')].reduce((sum, row) => {
-    const { price, money } = rowValues(row);
-    return sum + Math.max(0, price - Math.min(money, price));
-  }, 0);
-  const totalInput = root.querySelector('[data-payment-total]');
-  if (totalInput) totalInput.value = moneyText(total);
-}
-
-function collectPaymentItems(root) {
+function financialInputs(root) {
   return [...root.querySelectorAll('[data-payment-procedure]')].map((row) => {
     const values = rowValues(row);
-    return { sourceId: row.dataset.paymentSourceId || '', name: row.dataset.paymentName || '', price: values.price, discountPercent: values.percent, discountMoney: Math.min(values.money, values.price) };
+    const mode = row.dataset.paymentDiscountMode || 'none';
+    return {
+      sourceId: row.dataset.paymentSourceId || '',
+      name: row.dataset.paymentName || '',
+      price: values.price,
+      discountPercent: mode === 'percent' ? values.percent : '',
+      discountMoney: mode === 'money' ? values.money : '',
+    };
   });
 }
 
-export function initPaymentForm(root, { onPay = () => {} } = {}) {
+function applyBusinessPlan(root, plan = null) {
+  const items = Array.isArray(plan?.items) ? plan.items : [];
+  [...root.querySelectorAll('[data-payment-procedure]')].forEach((row, index) => {
+    const item = items[index];
+    if (!item) return;
+    const { percentInput, moneyInput } = rowValues(row);
+    setPercentDisplay(percentInput, item.discountPercent || 0);
+    if (moneyInput) moneyInput.value = item.discountMoney ? moneyText(item.discountMoney) : '';
+  });
+  const totalInput = root.querySelector('[data-payment-total]');
+  if (totalInput) totalInput.value = moneyText(plan?.planTotal || 0);
+}
+
+function recalculate(root, calculate) {
+  if (typeof calculate !== 'function') return null;
+  const plan = calculate(financialInputs(root));
+  applyBusinessPlan(root, plan);
+  return plan;
+}
+
+export function initPaymentForm(root, { calculate = null, onPay = () => {} } = {}) {
   if (!root) return;
   root.querySelectorAll('[data-payment-procedure]').forEach((row) => {
-    const { priceInput, percentInput, moneyInput } = rowValues(row);
-    priceInput?.addEventListener('input', () => {
-      const values = rowValues(row);
-      if (values.percent > 0) {
-        const discount = Math.min(values.price, values.price * Math.min(values.percent, 100) / 100);
-        if (moneyInput) moneyInput.value = moneyText(discount);
-      } else if (values.money > values.price && moneyInput) moneyInput.value = moneyText(values.price);
-      recalculateTotal(root);
-    });
+    const { percentInput, moneyInput } = rowValues(row);
     percentInput?.addEventListener('change', () => {
-      const values = rowValues(row);
-      const percent = Math.min(values.percent, 100);
-      const discount = values.price * percent / 100;
-      if (moneyInput) moneyInput.value = percent ? moneyText(discount) : '';
-      recalculateTotal(root);
+      row.dataset.paymentDiscountMode = percentInput.value ? 'percent' : 'none';
+      recalculate(root, calculate);
     });
     moneyInput?.addEventListener('input', () => {
-      const values = rowValues(row);
-      const discount = Math.min(values.money, values.price);
-      if (values.money !== discount) moneyInput.value = moneyText(discount);
-      setPercentDisplay(percentInput, values.price > 0 ? discount / values.price * 100 : 0);
-      recalculateTotal(root);
+      row.dataset.paymentDiscountMode = moneyInput.value ? 'money' : 'none';
+      recalculate(root, calculate);
     });
   });
-  root.querySelector('[data-payment-submit]')?.addEventListener('click', () => onPay?.({ total: numberValue(root.querySelector('[data-payment-total]')?.value), items: collectPaymentItems(root) }));
-  recalculateTotal(root);
+  root.querySelector('[data-payment-submit]')?.addEventListener('click', () => {
+    const plan = recalculate(root, calculate);
+    if (!plan) return;
+    onPay?.({ business: plan, items: plan.items, total: plan.planTotal });
+  });
+  recalculate(root, calculate);
 }
 
 export function initPaymentMethods(root, { onWallet = () => {}, onSplit = () => {} } = {}) {
