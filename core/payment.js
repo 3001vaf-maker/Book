@@ -68,11 +68,7 @@ export function createPaymentDraft({ source = null, workplace = '', client = nul
 
 export function completePayment(draft, { walletId = '', walletName = '', items = [], total = 0 } = {}) {
   if (!draft?.id || !walletId) return null;
-  return completeSplitPayment(draft, {
-    allocations: [{ walletId, walletName, amount: total }],
-    items,
-    total,
-  });
+  return completeSplitPayment(draft, { allocations: [{ walletId, walletName, amount: total }], items, total });
 }
 
 export function completeSplitPayment(draft, { allocations = [], items = [], total = 0, replacesPaymentId = '' } = {}) {
@@ -93,11 +89,7 @@ export function completeSplitPayment(draft, { allocations = [], items = [], tota
   if (replacesPaymentId) {
     const previousIndex = payments.findIndex((item) => String(item?.id || '') === String(replacesPaymentId));
     if (previousIndex >= 0 && payments[previousIndex]?.status === 'completed') {
-      payments[previousIndex] = {
-        ...payments[previousIndex],
-        status: 'corrected',
-        correctedAt: new Date().toISOString(),
-      };
+      payments[previousIndex] = { ...payments[previousIndex], status: 'corrected', correctedAt: new Date().toISOString() };
     }
   }
 
@@ -155,11 +147,16 @@ export function getPayments() {
 
 export function getPaymentsForWallet(walletId) {
   const id = String(walletId || '');
-  return readPayments().filter((payment) => payment?.status === 'completed').flatMap((payment) => {
+  const payments = readPayments();
+  return payments.filter((payment) => payment?.status === 'completed').flatMap((payment) => {
     const allocations = Array.isArray(payment.allocations) && payment.allocations.length
       ? payment.allocations
       : [{ walletId: payment.walletId || '', walletName: payment.walletName || '', amount: payment.total || 0 }];
-    return allocations.filter((item) => String(item.walletId || '') === id).map((item) => ({ ...payment, walletId: item.walletId, walletName: item.walletName, total: item.amount }));
+    const refunds = payments.filter((item) => item?.status === 'refund' && String(item?.originalPaymentId || '') === String(payment.id));
+    return allocations.filter((item) => String(item.walletId || '') === id).map((item) => {
+      const refunded = refunds.filter((refund) => String(refund.walletId || '') === id).reduce((sum, refund) => sum + Number(refund.total || 0), 0);
+      return { ...payment, walletId: item.walletId, walletName: item.walletName, total: Math.max(0, Number(item.amount || 0) - refunded) };
+    }).filter((item) => item.total > 0);
   });
 }
 
