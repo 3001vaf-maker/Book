@@ -14,6 +14,7 @@ import {
   timeSlots,
 } from '../ui/ui.js';
 import { getActivePaymentForSource } from '../core/dds.js';
+import { repriceFinancialPlan } from '../core/financial-model.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getDays, getDay, getDayTime } from '../core/day.js';
 import { timeToMinutes, minutesToTime } from '../core/time.js';
@@ -33,6 +34,8 @@ const formatDate = (value) => {
   const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
   return match ? `${match[3]}.${match[2]}.${match[1].slice(-2)}` : String(value || '');
 };
+const formatMoney = (value) => `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(Number(value) || 0)} ₽`;
+const formatPercent = (value) => new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(Number(value) || 0);
 const workplaceName = (id) => {
   const workplace = getWorkplaces().find((item) => String(item?.key ?? item?.id ?? '') === String(id || ''));
   return workplace?.name || workplace?.title || 'Рабочее пространство';
@@ -43,10 +46,6 @@ const findClient = (record) => {
     || people().find((item) => String(item.id ?? '') === String(client.id ?? ''))
     || client;
 };
-const procedureTotalCost = (items = []) => items.reduce((sum, item) => {
-  const value = Number(item?.cost);
-  return Number.isFinite(value) ? sum + value : sum;
-}, 0);
 const procedureTotalDuration = (items = []) => items.reduce((sum, item) => sum + (Number(item?.duration) || 0), 0);
 const normalizedAttendance = (value) => value === 'arrived' || value === 'no-show' ? value : '';
 const appointmentStart = (state) => {
@@ -77,6 +76,10 @@ const stateFromRecord = (record, { paid = false } = {}) => ({
   to: record.to,
   client: record.client ? { ...record.client } : null,
   procedures: Array.isArray(record.procedures) ? record.procedures.map((item) => ({ ...item })) : [],
+  finance: record.finance ? {
+    ...record.finance,
+    items: Array.isArray(record.finance.items) ? record.finance.items.map((item) => ({ ...item })) : [],
+  } : null,
   confirmed: Boolean(record.confirmed),
   attendance: paid ? 'arrived' : normalizedAttendance(record.attendance),
 });
@@ -361,16 +364,23 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     const client = clientDisplay(currentPerson);
     const workplace = workplaceName(state.workplaceId);
     const totalDuration = state.procedures.length ? procedureTotalDuration(state.procedures) : 30;
-    const totalCost = procedureTotalCost(state.procedures);
-    const detailRows = [
-      { left: durationText(totalDuration), right: `${totalCost} ₽`, weight: 'strong' },
-      ...state.procedures.map((item, index) => ({
-        left: item.name || '',
-        right: item.cost === '' || item.cost == null ? '' : `${item.cost} ₽`,
-        data: paid ? '' : `data-record-view-procedure-edit="${index}"`,
-        aria: paid ? '' : `Изменить процедуру ${item.name || ''}`,
-      })),
+    const finance = repriceFinancialPlan(state.procedures, state.finance);
+    const discountTotal = Math.max(0, Number(finance?.discountTotal) || 0);
+    const discountPercent = finance?.discountPercent;
+    const meta = [
+      { value: durationText(totalDuration), label: 'расход' },
+      { value: formatMoney(finance?.serviceTotal), label: 'стоимость' },
+      ...(discountTotal > 0 ? [{
+        value: `−${formatMoney(discountTotal)}`,
+        label: discountPercent == null ? 'скидка' : `скидка ${formatPercent(discountPercent)}%`,
+      }] : []),
     ];
+    const detailRows = state.procedures.map((item, index) => ({
+      left: item.name || '',
+      right: item.cost === '' || item.cost == null ? '' : `${item.cost} ₽`,
+      data: paid ? '' : `data-record-view-procedure-edit="${index}"`,
+      aria: paid ? '' : `Изменить процедуру ${item.name || ''}`,
+    }));
     const card = entityCard({
       id: client.uei,
       title: client.name,
@@ -401,6 +411,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
           aria: paid ? '' : `Изменить время ${state.from} - ${state.to}`,
         },
       ],
+      meta,
       detailRows,
       className: 'entity-card--hero entity-card--top-dark',
     });
