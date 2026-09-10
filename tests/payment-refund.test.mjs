@@ -24,6 +24,37 @@ const forbiddenEditPayment = /replacesPaymentId|status:\s*['"]corrected['"]|data
 assert.doesNotMatch(ddsSource, forbiddenEditPayment);
 assert.doesNotMatch(paymentUiSource, forbiddenEditPayment);
 
+// Existing DDS v2 entries keep their full financial snapshot when renamed to `finance`.
+storage.set('book.dds', JSON.stringify({
+  version: 2,
+  income: [{
+    id: 'legacy-income',
+    status: 'completed',
+    source: { type: 'record', id: 'legacy-record' },
+    total: 6400,
+    allocations: [{ walletId: 'cash', walletName: 'Наличные', amount: 6400 }],
+    business: {
+      items: [{ sourceType: 'procedure', sourceId: 'legacy-procedure', name: 'Стрижка', price: 8000, discountMode: 'percent', discountPercent: 20, discountMoney: 1600, planAmount: 6400 }],
+      serviceTotal: 8000,
+      discountPercent: 20,
+      discountTotal: 1600,
+      planTotal: 6400,
+    },
+  }],
+  expense: [],
+}));
+const migratedLegacy = getDDSIncome();
+assert.equal(migratedLegacy.length, 1);
+assert.equal(migratedLegacy[0].finance.serviceTotal, 8000);
+assert.equal(migratedLegacy[0].finance.discountTotal, 1600);
+assert.equal(migratedLegacy[0].finance.planTotal, 6400);
+assert.equal(migratedLegacy[0].business, undefined);
+const storedMigrated = JSON.parse(storage.get('book.dds') || '{}');
+assert.equal(storedMigrated.version, 3);
+assert.equal(storedMigrated.income[0].finance.planTotal, 6400);
+assert.equal(storedMigrated.income[0].business, undefined);
+storage.clear();
+
 const discounted = calculateFinancialPlan([{ sourceId: 'procedure-discount', name: 'Стрижка', price: 8000, discountPercent: 10 }]);
 assert.equal(discounted.serviceTotal, 8000);
 assert.equal(discounted.discountTotal, 800);
