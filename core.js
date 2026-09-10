@@ -7,7 +7,7 @@ import { getWorkplaces as getWorkplaceEntities } from './settings/profile/workpl
 import { getWorkingTimeRecordConflicts } from './journal/record-data.js';
 import { configureWorkplaceSource } from './core/workplace-time.js';
 import { configureWorkingTimeConflictSource } from './core/time-usage.js';
-import { getCurrentUser, login } from './core/auth.js';
+import { getCurrentUser, login, prepareProductionWorkspace } from './core/auth.js';
 import { bottomNavigation } from './ui/ui.js';
 
 configureWorkplaceSource(getWorkplaceEntities);
@@ -92,6 +92,7 @@ function renderLogin(message = '') {
 
     try {
       await login(data.get('email'), data.get('password'));
+      prepareProductionWorkspace();
       render();
     } catch (loginError) {
       error.textContent = loginError instanceof Error ? loginError.message : 'Не удалось войти';
@@ -127,8 +128,12 @@ syncViewport();
 
 try {
   const currentUser = await getCurrentUser();
-  if (currentUser) render();
-  else renderLogin();
+  if (currentUser) {
+    prepareProductionWorkspace();
+    render();
+  } else {
+    renderLogin();
+  }
 } catch {
   renderLogin('Сервер временно недоступен');
 }
