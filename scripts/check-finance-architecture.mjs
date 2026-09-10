@@ -81,13 +81,18 @@ if (/recordViewProcedureCost|data-record-view-procedure-cost/.test(recordView)) 
 }
 
 const recordCreation = source('journal/record.js');
-if (!/data-record-cost/.test(recordCreation)) {
-  errors.push('Procedure price correction must remain in the record creation/confirmation flow');
+if (/data-record-cost|name=['"]recordCost['"]/.test(recordCreation)) {
+  errors.push('Record creation must not correct procedure price; price comes from Price and is corrected only at payment');
 }
 
 const paymentUI = source('ui/payment/index.js');
-if (!/data-payment-price readonly/.test(paymentUI)) {
-  errors.push('Payment price is display-only; price correction must not be duplicated in payment UI');
+if (!/data-payment-price/.test(paymentUI) || /data-payment-price\s+readonly/.test(paymentUI)) {
+  errors.push('Payment must be the single editable procedure price correction point');
+}
+
+const recordPayment = source('journal/record-payment.js');
+if (!/proceduresFromFinance/.test(recordPayment) || !/procedures:\s*proceduresFromFinance/.test(recordPayment)) {
+  errors.push('Payment-stage price correction must be persisted back into Record procedures');
 }
 
 if (errors.length) {
