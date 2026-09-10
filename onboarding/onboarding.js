@@ -5,7 +5,9 @@ import { getClientCount } from '../main/clients/data.js';
 import { actionBlock, button, escapeHtml, modal, mountModal } from '../ui/ui.js';
 
 const COMPLETE_KEY = 'book.onboarding.complete.v2';
-const STEP_KEY = 'book.onboarding.step.v2';
+const LEGACY_STEP_KEY = 'book.onboarding.step.v2';
+const STEP_KEY = 'book.onboarding.step.v3';
+const DOCUMENTS_ACK_KEY = 'book.onboarding.documents.v1';
 
 function infoModal(title, message, variant = 'compact') {
   return mountModal(document.body, modal(`<div class="modal-title"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(message)}</p></div>`, { title, variant, surface: 'app' }));
@@ -27,6 +29,23 @@ const stages = [
       if (!getProcedures().length) queueMicrotask(() => root.querySelector('[data-add-procedure]')?.click());
     },
     ready: () => getProcedures().some((procedure) => Array.isArray(procedure.workplaces) && procedure.workplaces.length > 0),
+  },
+  {
+    id: 'documents',
+    load: () => import('../settings/documents/documents.js'),
+    render(module, root) {
+      module.render(root, () => {});
+      queueMicrotask(() => infoModal(
+        'Документы и персональные данные',
+        'Для обработки персональных данных необходимо законное основание. Book предлагает общие редактируемые шаблоны согласий, но они не заменяют юридическую проверку и могут не учитывать особенности вашей работы. Рекомендуем адаптировать документы и при необходимости обратиться к юристу.',
+        'medium',
+      ));
+    },
+    ready: () => true,
+    beforeNext: () => {
+      localStorage.setItem(DOCUMENTS_ACK_KEY, '1');
+      return true;
+    },
   },
   {
     id: 'wallets',
@@ -58,8 +77,21 @@ const stages = [
 ];
 
 function readStep() {
-  const value = Number(localStorage.getItem(STEP_KEY));
-  return Number.isInteger(value) && value >= 0 && value < stages.length ? value : 0;
+  if (localStorage.getItem(COMPLETE_KEY) === '1' && localStorage.getItem(DOCUMENTS_ACK_KEY) !== '1') {
+    return stages.findIndex((stage) => stage.id === 'documents');
+  }
+
+  const current = Number(localStorage.getItem(STEP_KEY));
+  if (Number.isInteger(current) && current >= 0 && current < stages.length) return current;
+
+  const legacy = Number(localStorage.getItem(LEGACY_STEP_KEY));
+  if (Number.isInteger(legacy) && legacy >= 0 && legacy <= 4) {
+    const migrated = legacy >= 2 ? legacy + 1 : legacy;
+    localStorage.setItem(STEP_KEY, String(migrated));
+    return migrated;
+  }
+
+  return 0;
 }
 
 function writeStep(index) {
@@ -67,7 +99,7 @@ function writeStep(index) {
 }
 
 export function isOnboardingComplete() {
-  return localStorage.getItem(COMPLETE_KEY) === '1';
+  return localStorage.getItem(COMPLETE_KEY) === '1' && localStorage.getItem(DOCUMENTS_ACK_KEY) === '1';
 }
 
 export async function renderOnboarding(root, { onComplete = () => {}, accountEmail = '' } = {}) {
@@ -113,6 +145,14 @@ export async function renderOnboarding(root, { onComplete = () => {}, accountEma
     if (stage.beforeNext && !stage.beforeNext(module, content)) return;
 
     observer.disconnect();
+    const wasComplete = localStorage.getItem(COMPLETE_KEY) === '1';
+    if (wasComplete && stage.id === 'documents') {
+      localStorage.removeItem(STEP_KEY);
+      localStorage.removeItem(LEGACY_STEP_KEY);
+      onComplete();
+      return;
+    }
+
     const nextIndex = stepIndex + 1;
     if (nextIndex < stages.length) {
       writeStep(nextIndex);
@@ -121,7 +161,9 @@ export async function renderOnboarding(root, { onComplete = () => {}, accountEma
     }
 
     localStorage.setItem(COMPLETE_KEY, '1');
+    localStorage.setItem(DOCUMENTS_ACK_KEY, '1');
     localStorage.removeItem(STEP_KEY);
+    localStorage.removeItem(LEGACY_STEP_KEY);
     onComplete();
   });
 }
