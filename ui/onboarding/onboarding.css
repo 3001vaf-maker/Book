@@ -4,5 +4,6 @@
 .onboarding-content [data-profile-back],
 .onboarding-content [data-save-profile],
 .onboarding-content [data-back-procedures],
+.onboarding-content [data-documents-back],
 .onboarding-content [data-back-wallets]{display:none!important}
 .onboarding-actions .ui-button[disabled]{opacity:.45;cursor:not-allowed}

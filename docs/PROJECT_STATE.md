@@ -1,10 +1,10 @@
 # Book — Project State
 
-This file is the continuity anchor for Book. Read it before making architecture or product changes.
+This file is the authoritative continuity anchor for Book. Read it before making architecture or product changes. Older repository documents may be obsolete and must not override this file or current code.
 
 ## Product essence
 
-Book is a modular SaaS for beauty professionals, starting from an independent master and expanding to studios, salons and chains.
+Book is a modular SaaS / anti-CRM for beauty professionals, starting from an independent master and expanding later to studios, salons and chains.
 
 Architecture rule:
 
@@ -16,12 +16,22 @@ Core
 
 One entity / one UI / one implementation. No local workaround when a rule belongs in Core/shared UI.
 
-Book is the current technical tool name, not necessarily the umbrella brand. The larger product vision is a beauty-industry community/ecosystem in which Book is one anti-CRM tool.
+Book is the current technical tool name, not necessarily the future umbrella brand.
 
-## Current production direction
+## Current launch mode
 
-Frontend remains the existing Book application.
-Backend lives in `server/` and is being built as a modular monolith with NestJS + PostgreSQL + Prisma.
+The current priority is to make the existing production Book a complete, usable daily work instrument before starting broader modules.
+
+`main` is the production Book currently used with real data. Do not clear, reset or replace existing production browser data as part of feature work. All changes must preserve data already entered by Alexander.
+
+A `develop` branch exists for future broader development, but the immediate launch-critical finishing work is being completed against the production product in small verified release blocks. Use a feature branch for the block, run CI, then merge once to `main` to minimize Amvera rebuild interruptions.
+
+Do not spend launch time cleaning old repository documentation. `docs/PROJECT_STATE.md` is the authority.
+
+## Current infrastructure
+
+Frontend: existing Book application on GitHub Pages.
+Backend: NestJS + PostgreSQL + Prisma modular monolith in `server/`.
 
 Multi-tenant foundation:
 
@@ -30,169 +40,195 @@ Tenant / Business
 → Membership / Role
 → Profile
 → Workplaces
-→ Clients / Procedures / Records / Payments / ...
+→ Clients / Procedures / Records / Payments / Documents / ...
 
 Every business entity must be isolated by `tenantId` on the server.
 
-Target production hosting is a Russian infrastructure provider/region so personal-data storage can be localized in Russia. Do not move client personal data or backups to foreign infrastructure by default.
-
-Production and development must be isolated:
-- development/staging uses a non-main branch, a separate preview URL and test data;
-- production uses `main`, the production URL and production database;
-- test data must never be copied into production;
-- future real messaging integrations must not send from the development/staging environment.
-
-## Current technical checkpoint
-
-Current backend already includes:
-- NestJS server
-- Prisma/PostgreSQL foundation
-- Tenant, User, Membership
-- roles OWNER / ADMIN / MASTER
-- JWT authentication
-- `/auth/login`
-- protected `/auth/me`
-- owner bootstrap/seed flow
-- health endpoint
-- production Dockerfile
-- production CORS via `FRONTEND_ORIGIN`
-- server build inside Check Book CI
-
-Current production infrastructure:
+Production infrastructure:
 - `book-api` on Amvera, Moscow-0
 - `book-db` PostgreSQL on Amvera, Moscow-0
 - frontend on GitHub Pages
-- real OWNER login works against production API/PostgreSQL
+- real OWNER authentication works against production API/PostgreSQL
 
-## Clean-start data decision
+`book-api` must normally remain running. The Amvera website/browser tab does not need to stay open.
 
-Current browser data is test data and does NOT need to be migrated into production.
+## Production data rule — critical
 
-Production Book starts with a clean server database. Alexander goes through the real product flow from zero and creates real data directly in the server-backed application.
+Production Book now contains real data entered by Alexander. Some major business domains still use browser localStorage while authentication/tenant identity is server-backed.
 
 Therefore:
-- do not build a one-off migration for current test localStorage data;
-- do not spend time preserving current test records, clients, payments or other test entities in production;
-- migration work is about replacing localStorage ownership with server API ownership, not copying the current test dataset;
-- use the clean start to validate the complete first-user journey from OWNER creation through daily work.
+- never run another production clean-start reset;
+- never delete or silently replace current localStorage facts;
+- any move from localStorage to PostgreSQL must first preserve and migrate the existing production facts;
+- verify counts and critical fields before switching the source of truth;
+- after migration there must be one canonical owner, not parallel local/server truth.
 
-## Production onboarding gate
+Current browser-owned domains include profile, clients, workplaces, procedures/history, timetable, records, wallets/payments and the initial Documents templates.
+
+## Launch-critical sequence
+
+Finish in this order:
+
+1. Onboarding, including Documents between Procedures and Wallets.
+2. Documents / agreements as a real working domain.
+3. Client agreement history linked to real client profiles.
+4. Finish the daily work contour: Profile, Procedures, Wallets/Payments, Timetable, Clients, Journal.
+5. Finish payment editing, split payments, later payments and refunds/reversals.
+6. Move launch-critical business facts safely to the server without losing current real data.
+7. Add public online booking and minimum client self-service/history.
+8. Connect Telegram for booking notifications and add notification-template settings.
+9. Fix bugs found in real daily use.
+
+Warehouse, Loyalty and other larger expansion modules remain parked until this sequence is operational.
+
+## Production onboarding
 
 The first login is onboarding, not the working application.
 
-Before all mandatory onboarding steps are completed:
-- do not show bottom navigation;
-- do not show Main, Journal, Chat or unfinished modules as general navigation;
-- render only the current onboarding workspace.
+Before mandatory onboarding is complete:
+- no bottom navigation;
+- no general Main/Journal/Chat navigation;
+- only the current onboarding workspace is visible.
 
 Mandatory order:
-1. Profile
-2. Workplaces
-3. Procedures
+1. Profile + Workplaces
+2. Procedures
+3. Documents / agreements
 4. Wallet
 5. Timetable / working days
 6. Clients
 7. Journal
 
-Profile and workplace configuration may be presented together on the Profile screen because Workplaces are owned under Profile.
+Products are not a mandatory onboarding step.
 
-After mandatory onboarding is completed:
-- the working application becomes available;
-- every normal app opening starts on Journal;
-- bottom navigation contains only: Main / Timetable / Journal / Settings.
+After onboarding, every ordinary opening starts on Journal. Bottom navigation contains only: Main / Timetable / Journal / Settings.
+
+## Documents / agreements
+
+Documents is a real product module, not repository documentation.
+
+Initial system document set:
+- Agreement / information document for personal-data processing;
+- Consent to personal-data processing — required client consent in the booking/client flow;
+- Consent to informational messages — optional client consent.
+
+Documents screen must also have `+` to create containers for additional future documents.
+
+Book may provide editable starter templates, but they are deliberately general and must not be presented as guaranteed legally sufficient documents for every master. The product must warn that lawful personal-data processing requires a legal basis and that the template may need adaptation; recommend legal review for the exact business situation.
+
+Do not state categorically that consent is the only legal basis in every case. The product should be conservative: before Book collects client personal data in its ordinary booking flow, it must obtain/record the required configured consent unless a separately designed lawful basis applies.
+
+Client Profile agreements block must stop being decorative. It must eventually show real immutable consent facts: document/version, status, timestamp, source/channel and revocation where applicable.
+
+## Daily work contour
 
 Production-visible structure:
 - Main → Clients → Client Profile
 - Timetable → Calendar
 - Journal → Day / Month / List
-- Settings → Profile / Service / Documents / Wallet / Tags
+- Settings → Profile / Service / Documents / Wallet / Tags / booking-notification settings later
 
 Hidden until ready:
 - Chat
 - Warehouse
 - Loyalty program
 
-Do not delete hidden modules; remove them from production manifestation/navigation until activated.
+Do not delete hidden modules; omit them from production manifestation/navigation until activated.
 
-Documents must become a working production folder and contain the previously intended agreement form. The exact agreement text/spec is not currently present in the repository continuity source; do not invent legal text without recovering or re-specifying it.
+## Payments / finance — launch requirements
 
-## Account/profile identity rules to retain
+Existing payment facts must not be deleted to represent edits or refunds.
 
-Future authentication must support at minimum:
-- email + password;
-- phone + password.
+Required behavior:
+- after a record is paid, the red unpaid state disappears;
+- tapping the paid bottom modal/state opens payment management;
+- actions: Edit payment and Refund payment;
+- Edit payment reopens the payment flow; if the user exits without saving, the previous payment remains unchanged;
+- Refund records how money was returned, to which wallet/method, full or partial amount;
+- split payment supports at least two payment parts by default and adds another part only when a remainder remains;
+- each part has amount + wallet; remainder recalculates automatically;
+- later payment is supported: part may be paid now and the remaining balance later;
+- refunds/reversals are immutable financial facts linked to the original payment, not deletion of history.
 
-The login identifier can therefore be email or phone. Email/phone used for authentication are account identity fields and must be unique as required by the server model.
+## Online booking — minimum launch scope
 
-On first Profile creation, the authenticated account email should be prefilled into the clean Profile rather than entered twice.
+Profile automatically exposes a general public booking link.
 
-Profile must later provide an `Изменить пароль` action that opens a dedicated password-change flow. Plain passwords are never stored in Profile; only server-side password hashes belong to account authentication.
+`+` allows creation of a link scoped to a specific Workplace.
 
-## Current frontend source-of-truth that still needs replacement
+Public/client flow:
+0.1 introduction: explain where the client arrived + Continue;
+0.2 agreements: allow opening each document; required personal-data consent + optional communications consent;
+0.3 minimal client form using the same client entity contract as Book; submitted data creates/links the client profile;
+1. Workplace selection with descriptions;
+2. Procedure multi-select;
+3. Date selection using the shared calendar manifestation but without internal business-only UI;
+4. Free slot selection — slots, not the duration/time wheel picker;
+5. Confirmation.
 
-Browser localStorage currently owns major data domains:
-- profile
-- clients
-- workplaces
-- procedures/history
-- working days / timetable
-- records
-- wallets/payments
-
-Replace these progressively with server API-backed owners. Keep existing frontend contracts where useful and avoid parallel local/server truth.
-
-Production replacement order follows the mandatory first-user journey:
-1. Profile + Workplaces
-2. Procedures
-3. Wallets
-4. Working days / timetable
-5. Clients
-6. Records / Breaks / Journal facts
-7. Remove remaining production dependence on localStorage
-
-## Known unfinished product areas — do not forget
-
-These are not discarded. They are parked while the server foundation is built.
-
-### Client history
-Client card/history is still incomplete. It must eventually show a canonical chronological history derived from real facts such as Records, attendance/no-show, procedures, payments, refunds/reversals and relevant notes/events. Do not invent a second history data model if existing domain facts can produce it.
-
-### Finance block
-Finance is not finished. Existing Wallet and Payment facts are only the base. The future finance owner must include transactions, refunds/reversals as immutable financial facts, reporting and proper tenant isolation. Do not delete payment history to represent a refund.
-
-### Modular entry / onboarding
-Onboarding must interpret user input into canonical Book entities rather than becoming an independent CRM/data model. It is a manifestation/controller over Profile, Workplaces, Procedures, Wallets, Timetable and Clients.
-
-### Warehouse
-Warehouse is a major future module and must stay modular/autonomous enough to integrate with Book or another CRM. It includes suppliers, items/materials, batches/lots, stock movements, recipes/consumption, historical cost, inventory, depreciation and replenishment analytics.
-
-### Online booking
-Future public route concept: `/booking/:publicProfileId`.
-Flow: master/workplace → procedure → date → time → name/phone → confirm.
 Server must prevent double booking transactionally.
 
-### Communications / marketing
-Messaging channels and consent must be modeled centrally. Telegram/WhatsApp/SMS are channels, not separate business models. Do not force the master to become a blogger or use discount marketing.
+A client returning through their personal link/session should be able to see at least their appointment history. Future Beauty Journal/community content, articles and photo publishing are later enhancement work and not part of minimum launch.
 
-## UX / architecture constraints that remain active
+## Telegram / notifications — minimum launch scope
+
+Telegram bot is required initially for a minimal set of appointment notifications. It may later become the fifth bottom-navigation area, but do not expose that navigation item until the feature actually works.
+
+Settings must gain a dedicated notifications/booking-messages folder for configuring the minimum appointment notification templates/rules. Messaging consent and channel rules must be centralized rather than creating separate business models for Telegram/WhatsApp/SMS.
+
+## Account/profile identity rules
+
+Authentication target:
+- email or phone + password in one identifier field;
+- email/phone uniqueness as required by server identity model;
+- authenticated account email prefilled into first clean Profile;
+- Profile provides `Изменить пароль` leading to current password → new password → repeat new password;
+- only `passwordHash` server-side, never plaintext in Profile.
+
+## Server migration order
+
+When converting production facts from localStorage to PostgreSQL, preserve current real data and move in dependency order:
+1. Profile + Workplaces
+2. Procedures
+3. Documents + consent facts
+4. Wallets + payments/refunds
+5. Timetable
+6. Clients
+7. Records / Breaks / Journal facts
+8. Online-booking facts
+9. Remove remaining production localStorage ownership only after validation
+
+## Client history
+
+Client history must be canonical chronological history derived from existing facts: Records, attendance/no-show, procedures, payments, refunds/reversals, consent/revocation facts and relevant notes/events. Do not invent parallel history models when existing facts can produce the history.
+
+## Warehouse
+
+Warehouse remains a major future module and should stay modular/autonomous enough to integrate with Book or another CRM. It is not launch-critical right now.
+
+## UX / architecture constraints
 
 - One shared modal system.
 - One shared selector mechanism.
-- One shared date/time picker.
-- Shared core/UI/CSS instead of local copies.
+- One shared date/time picker; duration uses the shared duration picker.
+- Shared Core/UI/CSS rather than local duplicates.
 - Do not rename sections without an explicit reason.
-- Do not delete existing implemented entities.
+- Do not delete implemented entities.
 - Do not rollback more than necessary.
 - Client identity: UEI if present, name/surname and phone where required; never display literal `UEI` prefix.
+- Product behaves as an assistant, not a traditional CRM: guide creative users when a step or control is not self-evident.
 
 ## Validation rule
 
-After repository changes, verify the exact latest commit with:
-- Check Book
-- Deploy Book to GitHub Pages
+For each production release block:
+1. work on a feature branch from current `main`;
+2. run Check Book on the exact feature HEAD;
+3. merge once into `main` only after the block is coherent;
+4. verify exact `main` HEAD with Check Book and Deploy Book to GitHub Pages;
+5. if backend files changed, wait for Amvera to return to `Запущено` and verify affected API/health before calling the release finished.
 
-Do not report a change as finished until both succeed for the exact latest HEAD.
+Never report a change as finished before the required checks pass.
 
 ## Working rule for future chats
 
-Before continuing Book work, read this file and current `main`. Use this file as the project continuity anchor so the work does not depend on chat memory alone.
+Before continuing Book work, read this file and current `main`. Use it as the continuity authority so work does not depend on chat memory alone.
