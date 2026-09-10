@@ -1,4 +1,4 @@
-import { button, durationText, entityCard, escapeHtml, field, iconButton, list, listEntry, stateView, initStateView, initCalendar, mountModal, modal, openNotice, timePicker, initTimePickers, initMultiSelect, viewNavigation, initViewNavigation } from '../ui/ui.js';
+import { button, durationPicker, durationText, entityCard, escapeHtml, field, iconButton, list, listEntry, stateView, initStateView, initCalendar, mountModal, modal, openNotice, initDurationPickers, initMultiSelect, viewNavigation, initViewNavigation } from '../ui/ui.js';
 import { createRecord, getRecords } from './record-data.js';
 import { getJournalBreaks, createJournalBreak } from './break-data.js';
 import { getAllClients } from '../main/clients/data.js';
@@ -219,23 +219,22 @@ function openProcedureSettings({ procedure, current, onSave, onAdd }) {
   const value = current || { procedure, cost: defaultCost(procedure, ''), duration: Number(procedure.duration) || 0 };
   const addAction = onAdd ? button('+ Добавить процедуру', { data: 'data-record-add-procedure', variant: 'secondary' }) : '';
   const costField = field({ label: 'Стоимость', name: 'recordCost', value: value.cost === '' ? '' : value.cost, inputmode: 'decimal', data: 'data-record-cost' });
-  const durationField = timePicker({ name: 'recordDuration', label: 'Время', value: `${String(Math.floor(value.duration / 60)).padStart(2, '0')}:${String(value.duration % 60).padStart(2, '0')}`, minuteStep: 5 });
+  const durationField = durationPicker({ name: 'recordDuration', label: 'Время', value: Number(value.duration) || 0 });
   const html = `<div class="modal-title"><h2>${escapeHtml(procedure.name)}</h2><p>Установите параметры процедуры для этой записи.</p></div><div class="compact-form">${costField}${durationField}<div class="modal-actions">${button('Сохранить', { data: 'data-record-save' })}${addAction}</div></div>`;
   const m = mountModal(document.body, modal(html, { variant: 'medium', surface: 'app' }));
   if (!m) return;
-  initTimePickers(m);
+  initDurationPickers(m);
   m.querySelector('[data-record-add-procedure]')?.addEventListener('click', () => {
     m.remove();
     onAdd?.();
   });
   m.querySelector('[data-record-save]')?.addEventListener('click', () => {
     const rawCost = String(m.querySelector('[data-record-cost]')?.value || '').replace(/[^0-9.,-]/g, '').replace(',', '.');
-    const timeValue = m.querySelector('[data-time-value]')?.value || '';
-    const match = timeValue.match(/^(\d{1,2}):(\d{2})$/);
+    const durationValue = Number(m.querySelector('[data-duration-value]')?.value);
     onSave?.({
       procedure,
       cost: rawCost === '' ? '' : Number(rawCost),
-      duration: match ? Number(match[1]) * 60 + Number(match[2]) : value.duration,
+      duration: Number.isFinite(durationValue) ? durationValue : value.duration,
     });
     m.remove();
   });
