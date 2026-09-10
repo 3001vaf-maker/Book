@@ -1,5 +1,5 @@
 import { button, escapeHtml, initPaymentForm, initPaymentMethods, modal, mountModal, paymentForm, paymentMethods, select } from '../ui/ui.js';
-import { completePayment, completeSplitPayment, createPaymentDraft, getCompletedPaymentForSource, getRefundsForPayment, paymentTotal, refundPayment } from '../core/payment.js';
+import { completePayment, completeSplitPayment, createPaymentDraft, getCompletedPaymentForSource, getFinanceForSource, getRefundsForPayment, refundPayment } from '../core/dds.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getAllClients } from '../main/clients/data.js';
 import { clientDisplay } from '../main/clients/presentation.js';
@@ -17,32 +17,20 @@ function clientForRecord(record) {
     || source;
 }
 
-function recordDiscount(record) {
-  const client = clientForRecord(record);
-  return percent(record?.clientDiscountPercent ?? client?.discountPercent ?? 0);
-}
-
-function recordPaymentItems(record) {
-  const discountPercent = recordDiscount(record);
-  return (record?.procedures || []).map((item) => {
-    const price = Math.max(0, Number(item?.cost || 0) || 0);
-    return {
-      ...item,
-      price,
-      discountPercent,
-      discountMoney: discountPercent ? price * discountPercent / 100 : 0,
-    };
-  });
-}
-
-function recordAmount(record) {
-  return paymentTotal(recordPaymentItems(record));
+function financeForRecord(record) {
+  return getFinanceForSource('record', record?.id) || record?.finance || {
+    items: [],
+    serviceTotal: 0,
+    discountPercent: 0,
+    discountTotal: 0,
+    dueTotal: 0,
+  };
 }
 
 function paymentEntryContent(record) {
   const completed = getCompletedPaymentForSource('record', record?.id);
   if (completed) return `<button type="button" class="modal-bottom-action modal-bottom-action--paid" data-record-payment-paid aria-label="Открыть оплату ${completed.total} рублей"><strong>Оплачено</strong><strong>${money(completed.total)}</strong></button>`;
-  const total = recordAmount(record);
+  const total = Number(financeForRecord(record)?.dueTotal || 0);
   return `<button type="button" class="modal-bottom-action" data-record-payment-open aria-label="Открыть оплату, к оплате ${total} рублей"><span>К оплате</span><strong>${money(total)}</strong></button>`;
 }
 
@@ -54,15 +42,21 @@ function workplaceName(id) {
 function recordClient(record) {
   const current = clientForRecord(record);
   const display = clientDisplay(current);
-  return { uei: display.uei || '', name: display.name || '', discountPercent: percent(current?.discountPercent) };
+  const finance = financeForRecord(record);
+  return {
+    uei: display.uei || '',
+    name: display.name || '',
+    discountPercent: finance?.discountPercent == null ? percent(record?.clientDiscountPercent ?? current?.discountPercent) : percent(finance.discountPercent),
+  };
 }
 
 function paymentFromRecord(record) {
+  const finance = financeForRecord(record);
   return createPaymentDraft({
     source: { type: 'record', id: record?.id || '' },
     workplace: workplaceName(record?.workplaceId),
     client: recordClient(record),
-    items: recordPaymentItems(record),
+    items: finance?.items || [],
   });
 }
 
@@ -103,7 +97,9 @@ function openPaymentMethodsModal(payment, values, paymentModal) {
   if (!methodsModal) return;
   const finish = (completed) => {
     if (!completed) return;
-    if (completed?.source?.type === 'record' && completed?.source?.id) updateRecord(completed.source.id, { attendance: 'arrived' });
+    if (completed?.source?.type === 'record' && completed?.source?.id) {
+      updateRecord(completed.source.id, { attendance: 'arrived' });
+    }
     methodsModal.remove();
     paymentModal?.remove();
   };
@@ -177,7 +173,9 @@ function openRefundModal(payment) {
     const wallet = wallets.find((item) => String(item.id || '') === String(walletInput?.value || ''));
     if (!amount || !wallet) return;
     const refund = refundPayment(payment.id, { amount, walletId: wallet.id, walletName: wallet.name });
-    if (refund) m.remove();
+    if (!refund) return;
+    if (refund?.source?.type === 'record' && refund?.source?.id) updateRecord(refund.source.id, {});
+    m.remove();
   });
   sync();
 }
@@ -214,17 +212,17 @@ export function openRecordPaymentEntry(record) {
   const onRecordsChanged = (event) => {
     if (String(event?.detail?.recordId || '') === String(record.id)) renderPaymentState();
   };
-  const onPaymentsChanged = (event) => {
+  const onDDSChanged = (event) => {
     const source = event?.detail?.source;
     if (String(source?.type || '') === 'record' && String(source?.id || '') === String(record.id)) renderPaymentState();
   };
 
   bindEntry(record);
   window.addEventListener('book:records-changed', onRecordsChanged);
-  window.addEventListener('book:payments-changed', onPaymentsChanged);
+  window.addEventListener('book:dds-changed', onDDSChanged);
   return () => {
     window.removeEventListener('book:records-changed', onRecordsChanged);
-    window.removeEventListener('book:payments-changed', onPaymentsChanged);
+    window.removeEventListener('book:dds-changed', onDDSChanged);
     bottom.remove();
   };
 }
