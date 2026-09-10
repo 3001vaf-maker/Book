@@ -8,7 +8,7 @@ function recordMarkup(usage) {
   const name = [client.name, client.surname].filter(Boolean).join(' ') || 'Без имени';
   const id = String(client.uei || client.id || '').trim();
   const identity = id ? `${escape(id)} - ${escape(name)}` : escape(name);
-  const total = moneyText(usage?.financialTotal ?? usage?.finance?.dueTotal ?? 0);
+  const total = moneyText(usage?.financialTotal ?? usage?.finance?.planTotal ?? usage?.finance?.dueTotal ?? 0);
   const phone = client.phone ? `<span class="journal-record__phone">${escape(client.phone)}</span>` : '';
   const services = (usage.procedures || []).map((item) => `<span class="journal-record__service">${escape(item.name)}</span>`).join('');
   const statusClass = usage?.paid ? ' journal-record--paid' : usage?.attendance === 'no-show' ? ' journal-record--no-show' : '';
