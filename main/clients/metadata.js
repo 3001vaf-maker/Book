@@ -1,4 +1,4 @@
-import { getBusinessFactForRecords } from '../../core/business-model.js';
+import { getFinancialFactForRecords } from '../../core/financial-model.js';
 import { getRecords } from '../../journal/record-data.js';
 
 const clientKey = (value) => String(value || '');
@@ -11,7 +11,7 @@ function clientRecords(key) {
 
 export function getClientMetadata(key) {
   const records = clientRecords(key);
-  const fact = getBusinessFactForRecords(records.map((record) => record?.id));
+  const fact = getFinancialFactForRecords(records.map((record) => record?.id));
   const dated = records
     .filter((record) => record?.date)
     .sort((a, b) => String(b.date).localeCompare(String(a.date)));
