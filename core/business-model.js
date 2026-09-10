@@ -1,4 +1,4 @@
-import { getDDSMovementsForSource } from './dds.js';
+import { getDDSMovements, getDDSMovementsForSource } from './dds.js';
 
 const numberValue = (value) => {
   const number = Number(String(value ?? '').replace(',', '.'));
@@ -21,6 +21,7 @@ export function calculateBusinessPlan(items = [], { discountPercent = 0 } = {}) 
       ? (hasMoney ? discountMoney / price * 100 : selectedPercent)
       : 0;
     return {
+      sourceType: String(item?.sourceType || 'procedure'),
       sourceId: String(item?.sourceId || item?.id || ''),
       name: String(item?.name || ''),
       price,
@@ -63,6 +64,51 @@ export function getRecordBusinessPlanFact(record = null) {
   if (!record?.id) return calculateBusinessFact(record?.finance || calculateBusinessPlan(record?.procedures || [], { discountPercent: record?.finance?.discountPercent || 0 }), []);
   const plan = record?.finance || calculateBusinessPlan(record?.procedures || [], { discountPercent: record?.finance?.discountPercent || 0 });
   return calculateBusinessFact(plan, getDDSMovementsForSource('record', record.id));
+}
+
+export function getBusinessFactForRecords(recordIds = []) {
+  const ids = new Set((Array.isArray(recordIds) ? recordIds : []).map((id) => String(id || '')).filter(Boolean));
+  const movements = getDDSMovements().filter((movement) => movement?.source?.type === 'record' && ids.has(String(movement?.source?.id || '')));
+  return calculateBusinessFact(null, movements);
+}
+
+function itemPlanAmount(item = null) {
+  if (!item) return 0;
+  if (Number.isFinite(Number(item.planAmount))) return Math.max(0, numberValue(item.planAmount));
+  const price = Math.max(0, numberValue(item.price));
+  return Math.max(0, price - Math.max(0, numberValue(item.discountMoney)));
+}
+
+function movementItemAmount(movement = null, sourceType = '', sourceId = '') {
+  const business = movement?.business;
+  const items = Array.isArray(business?.items) ? business.items : [];
+  const id = String(sourceId || '');
+  const type = String(sourceType || '');
+  if (!id || !items.length) return 0;
+  const totalPlan = Math.max(0, numberValue(business?.planTotal ?? business?.dueTotal));
+  if (!totalPlan) return 0;
+  const itemPlan = items
+    .filter((item) => String(item?.sourceId || '') === id
+      && (!type || !item?.sourceType || String(item.sourceType) === type))
+    .reduce((sum, item) => sum + itemPlanAmount(item), 0);
+  if (!itemPlan) return 0;
+  return Math.max(0, numberValue(movement?.total)) * (itemPlan / totalPlan);
+}
+
+export function getBusinessItemFact(sourceType, sourceId) {
+  let factIncome = 0;
+  let factExpense = 0;
+  getDDSMovements().forEach((movement) => {
+    const allocated = movementItemAmount(movement, sourceType, sourceId);
+    if (!allocated) return;
+    if (movement?.movementType === 'income') factIncome += allocated;
+    else if (movement?.movementType === 'expense') factExpense += allocated;
+  });
+  return {
+    factIncome,
+    factExpense,
+    factTotal: factIncome - factExpense,
+  };
 }
 
 export function recordPlanTotal(record = null) {
