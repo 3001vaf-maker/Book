@@ -106,7 +106,7 @@ export function renderJournalDay(root, { date = new Date(), workplaceId = '', on
         return;
       }
       if (usage) return;
-      openRecordCreation({ date, workplaceId, from, to, onCreated: () => renderJournalDay(root, { date, workplaceId, onChange }) });
+      openRecordCreation({ date, workplaceId, from, to });
     },
   });
 }
