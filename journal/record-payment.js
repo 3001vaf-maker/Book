@@ -153,7 +153,7 @@ function openPaymentModal(record) {
     procedures: (finance?.items || []).map((item) => ({ sourceType: item.sourceType || 'procedure', id: item.sourceId, name: item.name, cost: item.price, discountMode: item.discountMode, discountPercent: item.discountPercent, discountMoney: item.discountMoney })),
     total: finance?.planTotal || 0,
   })}`;
-  const m = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
+  const m = mountModal(document.body, modal(content, { variant: 'large', surface: 'app' }));
   if (!m) return;
   initPaymentForm(m.querySelector('[data-payment-ui]'), {
     calculate: (items) => calculateFinancialPlan(items),
