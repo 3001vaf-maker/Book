@@ -1,5 +1,6 @@
 import { containsRange, isValidRange, rangesOverlap } from '../core/time.js';
 import { getDays, getDay, getDayTime } from '../core/day.js';
+import { getCompletedPaymentForSource } from '../core/payment.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getJournalBreaks } from './break-data.js';
 
@@ -34,8 +35,23 @@ function dayAllows({ date, workplaceId, from, to }) {
 function hasUsageConflict({ date, workplaceId, from, to, excludeId = '' }) {
   return usagesForDay(date, workplaceId).some((usage) => usage?.sourceId !== excludeId && rangesOverlap(from, to, usage.from, usage.to));
 }
+function paidRecord(record) {
+  const payment = getCompletedPaymentForSource('record', record?.id);
+  if (!payment) return record;
+  const items = new Map((payment.items || []).map((item) => [String(item?.sourceId || ''), item]));
+  return {
+    ...record,
+    procedures: (record.procedures || []).map((procedure) => {
+      const item = items.get(String(procedure?.id || ''));
+      if (!item) return procedure;
+      const price = Math.max(0, Number(item.price || 0));
+      const discount = Math.max(0, Math.min(price, Number(item.discountMoney || 0)));
+      return { ...procedure, cost: Math.max(0, price - discount) };
+    }),
+  };
+}
 
-export function getRecords() { return readList(KEY); }
+export function getRecords() { return readList(KEY).map(paidRecord); }
 export function getRecordsForDay(date, workplaceId = '') {
   const day = normalizeDate(date), workplace = normalizeId(workplaceId);
   return getRecords().filter((record) => record?.date === day && (!workplace || normalizeId(record?.workplaceId) === workplace));
