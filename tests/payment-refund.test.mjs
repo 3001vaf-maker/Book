@@ -11,12 +11,16 @@ const {
   completePayment,
   completeSplitPayment,
   refundPayment,
+  paymentTotal,
   getPayments,
   getPaymentsForWallet,
   getRefundedPayments,
   getCompletedPaymentForSource,
   getRefundsForPayment,
+  getPaymentRemaining,
 } = await import('../core/payment.js');
+
+assert.equal(paymentTotal([{ price: 8000, discountMoney: 800 }]), 7200);
 
 const draft = createPaymentDraft({
   source: { type: 'record', id: 'record-1' },
@@ -35,6 +39,7 @@ const completed = completePayment(draft, {
 assert.equal(completed.status, 'completed');
 assert.equal(getPaymentsForWallet('cash').length, 1);
 assert.equal(getCompletedPaymentForSource('record', 'record-1')?.id, completed.id);
+assert.equal(getPaymentRemaining(completed.id), 5000);
 
 const refundAt = new Date('2026-09-10T10:00:00.000Z');
 const refunded = refundPayment(completed.id, { reason: 'Возврат клиенту', now: refundAt });
@@ -46,7 +51,8 @@ assert.equal(getPayments().length, 2);
 assert.equal(getPaymentsForWallet('cash').length, 0);
 assert.equal(getRefundedPayments().length, 1);
 assert.equal(getRefundsForPayment(completed.id).length, 1);
-assert.equal(getCompletedPaymentForSource('record', 'record-1')?.id, completed.id);
+assert.equal(getPaymentRemaining(completed.id), 0);
+assert.equal(getCompletedPaymentForSource('record', 'record-1'), null);
 assert.equal(refundPayment(completed.id), null);
 
 const splitDraft = createPaymentDraft({
@@ -67,5 +73,10 @@ assert.equal(split.status, 'completed');
 assert.equal(split.allocations.length, 2);
 assert.equal(getPaymentsForWallet('cash').at(-1)?.total, 2000);
 assert.equal(getPaymentsForWallet('card').at(-1)?.total, 4000);
+
+const partial = refundPayment(split.id, { amount: 1000, walletId: 'card', walletName: 'Карта' });
+assert.equal(partial.total, 1000);
+assert.equal(getPaymentRemaining(split.id), 5000);
+assert.equal(getCompletedPaymentForSource('record', 'record-2')?.id, split.id);
 
 console.log('payment refund tests: OK');
