@@ -68,7 +68,8 @@ export function render(root, navigateBack = () => {}) {
   });
 
   root.innerHTML = page([
-    `<div class="entity-page-header">${pageHeader('Документы', 'Шаблоны требуют адаптации под вашу работу и юридической проверки.')}<div class="page-header-action">${iconButton('+', { className: 'icon-button--primary', data: 'data-add-document', aria: 'Добавить документ' })}</div></div>`,
+    pageHeader('Документы', 'Шаблоны требуют адаптации под вашу работу и юридической проверки.'),
+    `<div class="ui-list-toolbar"><div></div><div class="ui-list-toolbar__actions">${iconButton('+', { className: 'icon-button--primary', data: 'data-add-document', aria: 'Добавить документ' })}</div></div>`,
     `<section class="ui-page-section"><p class="muted">Для обработки персональных данных необходимо законное основание. Book даёт общий шаблон, но не гарантирует его соответствие именно вашей ситуации. Перед использованием рекомендуется обратиться к юристу.</p>${rows}</section>`,
     actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-documents-back' }))
   ]);
