@@ -1,3 +1,5 @@
+import { getWalletDDSMovements } from '../../core/dds.js';
+
 const KEY = 'book.wallets';
 const SYSTEM_WALLETS = [
   { id: 'cash', name: 'Наличные', photo: '', system: true },
@@ -20,6 +22,17 @@ export function getWallets() {
     return SYSTEM_WALLETS.map((wallet) => ({ ...wallet }));
   }
   return stored.filter((wallet) => !wallet.deletedAt);
+}
+
+export function getWalletHistory(id) {
+  return getWalletDDSMovements(id);
+}
+
+export function getWalletBalance(id) {
+  return getWalletHistory(id).reduce((sum, movement) => {
+    const value = Number(movement?.total);
+    return sum + (Number.isFinite(value) ? value : 0);
+  }, 0);
 }
 
 export function saveWallet(wallet) {
