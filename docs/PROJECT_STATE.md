@@ -44,11 +44,9 @@ Procedures → Documents + Consents → Wallets + DDS movements → Timetable �
 
 Do not resume this migration while a domain's business rules are still unstable.
 
-## Terminology boundary
+## Current finance terminology
 
-Current finance uses **Financial Model / Финансовая модель**.
-
-The term **Business Model / Бизнес-модель** is reserved for a future advanced instrument under Analytics for growth/potential design. Do not use Business Model, Analytics or Analysis terminology as names for current finance-core responsibilities.
+Current finance calculation owner: **Financial Model / Финансовая модель**.
 
 ## Canonical finance architecture — current
 
@@ -231,7 +229,7 @@ PR #26 established the canonical finance separation:
 - removal of obsolete `core/payment.js`;
 - architecture regression guard preventing those responsibilities from being mixed again.
 
-The follow-up terminology correction renames the finance calculation owner from the accidental Business Model wording to Financial Model and reserves Business Model for the future Analytics instrument.
+The follow-up terminology correction keeps the current finance calculation owner named Financial Model throughout code, tests and documentation.
 
 No server/backend migration was included in this finance-foundation release.
 
