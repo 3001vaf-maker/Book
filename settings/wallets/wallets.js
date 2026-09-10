@@ -1,5 +1,5 @@
 import { actionBlock, button, emptyState, entityCard, escapeHtml, field, iconButton, initPhotoField, listEntries, listEntry, mountModal, modal, page, pageHeader, photoField } from '../../ui/ui.js';
-import { getPaymentsForWallet } from '../../core/payment.js';
+import { getPaymentsForWallet } from '../../core/dds.js';
 import { deleteWallet as deleteWalletData, getWallets, saveWallet as saveWalletData, updateWallet } from './data.js';
 
 const formatMoney = (value) => `${(Number(value) || 0).toLocaleString('ru-RU')} ₽`;
