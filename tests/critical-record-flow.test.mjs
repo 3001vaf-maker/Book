@@ -48,16 +48,20 @@ const draft = createPaymentDraft({
 const payment = completePayment(draft, {
   walletId: 'cash',
   walletName: 'Наличные',
-  items: draft.items,
-  total: 5000,
+  items: [{ sourceId: 'procedure-1', name: 'Стрижка', price: 5000, discountPercent: 10, discountMoney: 500 }],
+  total: 4500,
 });
 assert.ok(payment);
 assert.equal(getCompletedPaymentForSource('record', record.id)?.id, payment.id);
 assert.equal(recordVisualState(noShow, { paid: true }), 'paid');
 
+const attended = updateRecord(record.id, { attendance: 'arrived' });
+assert.equal(attended?.procedures?.[0]?.cost, 5000);
+assert.equal(getRecords()[0]?.procedures?.[0]?.cost, 5000);
+
 const metadata = getClientMetadata('client-1');
 assert.equal(metadata.recordCount, 1);
-assert.equal(metadata.paidTotal, 5000);
+assert.equal(metadata.paidTotal, 4500);
 assert.equal(metadata.lastVisit, '2026-09-11');
 
 const listRoot = {

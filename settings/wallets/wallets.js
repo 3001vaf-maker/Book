@@ -2,7 +2,14 @@ import { actionBlock, button, emptyState, entityCard, escapeHtml, field, iconBut
 import { getPaymentsForWallet } from '../../core/payment.js';
 import { deleteWallet as deleteWalletData, getWallets, saveWallet as saveWalletData, updateWallet } from './data.js';
 
-const formatMoney = (value) => `${Math.max(0, Number(value) || 0).toLocaleString('ru-RU')} ₽`;
+const formatMoney = (value) => `${(Number(value) || 0).toLocaleString('ru-RU')} ₽`;
+
+function operationMoment(payment) {
+  const raw = payment?.refundedAt || payment?.paidAt || payment?.createdAt || '';
+  const date = new Date(raw);
+  if (!raw || Number.isNaN(date.getTime())) return `${payment?.date || ''} ${payment?.time || ''}`.trim();
+  return `${date.toLocaleDateString('ru-RU')} ${date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
+}
 
 function renderList(root, navigateBack) {
   const items = getWallets();
@@ -30,10 +37,11 @@ function renderRow(wallet) {
 }
 
 function renderPaymentRow(payment) {
+  const isRefund = payment?.ledgerType === 'refund' || payment?.status === 'refund';
   return listEntry({
-    title: 'Услуга',
-    subtitle: `${payment?.date || ''} ${payment?.time || ''}`.trim(),
-    rightTop: `${Number(payment?.total || 0)} ₽`,
+    title: isRefund ? 'Возврат' : 'Оплата',
+    subtitle: operationMoment(payment),
+    rightTop: formatMoney(payment?.total),
     initial: '₽',
     interactive: false,
   });
