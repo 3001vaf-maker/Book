@@ -1,4 +1,4 @@
-import { getDDSMovements } from '../../core/dds.js';
+import { getBusinessFactForRecords } from '../../core/business-model.js';
 import { getRecords } from '../../journal/record-data.js';
 
 const clientKey = (value) => String(value || '');
@@ -11,31 +11,14 @@ function clientRecords(key) {
 
 export function getClientMetadata(key) {
   const records = clientRecords(key);
-  const recordIds = new Set(records.map((record) => String(record?.id || '')).filter(Boolean));
-  const movements = getDDSMovements();
-  const completed = movements.filter((movement) => movement?.movementType === 'income'
-    && movement?.source?.type === 'record'
-    && recordIds.has(String(movement?.source?.id || '')));
-  const completedIds = new Set(completed.map((movement) => String(movement.id || '')));
-  const paid = completed.reduce((sum, movement) => {
-    const value = Number(movement?.total);
-    return sum + (Number.isFinite(value) ? value : 0);
-  }, 0);
-  const refunded = movements
-    .filter((movement) => movement?.movementType === 'expense'
-      && movement?.expenseType === 'refund'
-      && completedIds.has(String(movement?.originalPaymentId || '')))
-    .reduce((sum, movement) => {
-      const value = Number(movement?.total);
-      return sum + (Number.isFinite(value) ? value : 0);
-    }, 0);
+  const fact = getBusinessFactForRecords(records.map((record) => record?.id));
   const dated = records
     .filter((record) => record?.date)
     .sort((a, b) => String(b.date).localeCompare(String(a.date)));
 
   return {
     recordCount: records.length,
-    paidTotal: Math.max(0, paid - refunded),
+    paidTotal: Math.max(0, Number(fact.factTotal) || 0),
     lastVisit: dated[0]?.date || '',
   };
 }
