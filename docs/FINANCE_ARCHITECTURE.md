@@ -2,7 +2,7 @@
 
 This file fixes the canonical responsibility boundaries for finance. Do not reintroduce parallel calculations or a Payment financial owner.
 
-Terminology rule: the current finance core uses **Financial Model / Финансовая модель**. The term **Business Model / Бизнес-модель** is reserved for a future advanced Analytics instrument for growth/potential design and must not be used for current finance logic.
+Current finance calculation owner: **Financial Model / Финансовая модель**.
 
 ## Ownership
 
