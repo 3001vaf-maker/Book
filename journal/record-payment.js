@@ -97,10 +97,8 @@ function paymentFactMarkup(payment) {
   </div>`;
 }
 
-function openPaymentMethodsModal(payment, values, paymentModal, replacesPaymentId = '', previousPayment = null) {
-  const initialAllocations = previousPayment ? paymentAllocations(previousPayment) : [];
-  const initialMode = initialAllocations.length > 1 ? 'split' : 'single';
-  const content = `<div class="modal-title"><h2>${replacesPaymentId ? 'Редактировать оплату' : 'Способ оплаты'}</h2></div>${replacesPaymentId && previousPayment ? paymentFactMarkup(previousPayment) : ''}${paymentMethods({ wallets: getWallets(), total: values.total, initialMode, initialAllocations })}`;
+function openPaymentMethodsModal(payment, values, paymentModal) {
+  const content = `<div class="modal-title"><h2>Способ оплаты</h2></div>${paymentMethods({ wallets: getWallets(), total: values.total })}`;
   const methodsModal = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
   if (!methodsModal) return;
   const finish = (completed) => {
@@ -110,10 +108,8 @@ function openPaymentMethodsModal(payment, values, paymentModal, replacesPaymentI
     paymentModal?.remove();
   };
   initPaymentMethods(methodsModal.querySelector('[data-payment-methods]'), {
-    onWallet: (wallet) => finish(replacesPaymentId
-      ? completeSplitPayment(payment, { allocations: [{ walletId: wallet.id, walletName: wallet.name, amount: values.total }], items: values.items, total: values.total, replacesPaymentId })
-      : completePayment(payment, { walletId: wallet.id, walletName: wallet.name, items: values.items, total: values.total })),
-    onSplit: (allocations) => finish(completeSplitPayment(payment, { allocations, items: values.items, total: values.total, replacesPaymentId })),
+    onWallet: (wallet) => finish(completePayment(payment, { walletId: wallet.id, walletName: wallet.name, items: values.items, total: values.total })),
+    onSplit: (allocations) => finish(completeSplitPayment(payment, { allocations, items: values.items, total: values.total })),
   });
 }
 
@@ -132,15 +128,6 @@ function openPaymentModal(record) {
   const m = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
   if (!m) return;
   initPaymentForm(m.querySelector('[data-payment-ui]'), { onPay: (values) => openPaymentMethodsModal(payment, values, m) });
-}
-
-function openPaymentEditor(record, previousPayment) {
-  if (!previousPayment?.id) return;
-  const current = getRecords().find((item) => String(item?.id || '') === String(record?.id || '')) || record;
-  const draft = paymentFromRecord(current);
-  const items = Array.isArray(previousPayment.items) ? previousPayment.items.map((item) => ({ ...item })) : [];
-  const values = { total: Number(previousPayment.total || 0), items };
-  openPaymentMethodsModal(draft, values, null, previousPayment.id, previousPayment);
 }
 
 function refundHistoryMarkup(refunds) {
@@ -166,7 +153,6 @@ function openRefundModal(payment) {
   const html = `<div class="modal-title"><h2>Возврат оплаты</h2></div>
     ${paymentFactMarkup(payment)}
     ${refundHistoryMarkup(refunds)}
-    <div class="modal-title"><h3>Возврат</h3></div>
     <div class="payment-refund-form">
       <label class="payment-refund-amount"><span>Сумма возврата</span><input type="number" min="0" max="${remaining}" step="0.01" inputmode="decimal" value="${remaining}" data-refund-amount></label>
       ${select({ value: defaultWalletId, options, data: 'data-refund-wallet', aria: 'Кошелёк возврата' })}
@@ -200,14 +186,13 @@ function openPaidState(record) {
   const payment = getCompletedPaymentForSource('record', record?.id);
   if (!payment) return;
   const refunds = getRefundsForPayment(payment.id);
-  const html = `<div class="modal-title"><h2>Оплачено</h2></div>${paymentFactMarkup(payment)}${refundHistoryMarkup(refunds)}<div class="modal-actions">${button('Редактировать оплату', { data: 'data-edit-payment' })}${button('Возврат оплаты', { variant: 'secondary', data: 'data-refund-payment' })}</div>`;
+  const html = `<div class="modal-title"><h2>Оплачено</h2></div>${paymentFactMarkup(payment)}${refundHistoryMarkup(refunds)}<div class="modal-actions">${button('Возврат оплаты', { variant: 'secondary', data: 'data-refund-payment' })}</div>`;
   const m = mountModal(document.body, modal(html, { variant: 'medium', surface: 'app' }));
   if (!m) return;
-  m.querySelector('[data-edit-payment]')?.addEventListener('click', () => {
+  m.querySelector('[data-refund-payment]')?.addEventListener('click', () => {
     m.remove();
-    openPaymentEditor(record, payment);
+    openRefundModal(payment);
   });
-  m.querySelector('[data-refund-payment]')?.addEventListener('click', () => openRefundModal(payment));
 }
 
 export function openRecordPaymentEntry(record) {
