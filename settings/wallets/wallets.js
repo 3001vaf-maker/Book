@@ -1,6 +1,5 @@
 import { actionBlock, button, emptyState, entityCard, escapeHtml, field, iconButton, initPhotoField, listEntries, listEntry, mountModal, modal, page, pageHeader, photoField } from '../../ui/ui.js';
-import { getPaymentsForWallet } from '../../core/dds.js';
-import { deleteWallet as deleteWalletData, getWallets, saveWallet as saveWalletData, updateWallet } from './data.js';
+import { deleteWallet as deleteWalletData, getWalletBalance, getWalletHistory, getWallets, saveWallet as saveWalletData, updateWallet } from './data.js';
 
 const formatMoney = (value) => `${(Number(value) || 0).toLocaleString('ru-RU')} ₽`;
 
@@ -20,10 +19,7 @@ function renderList(root, navigateBack) {
 }
 
 function renderRow(wallet) {
-  const total = getPaymentsForWallet(wallet.id).reduce((sum, payment) => {
-    const value = Number(payment?.total);
-    return Number.isFinite(value) ? sum + value : sum;
-  }, 0);
+  const total = getWalletBalance(wallet.id);
   return listEntry({
     title: wallet.name,
     subtitle: '',
@@ -37,7 +33,7 @@ function renderRow(wallet) {
 }
 
 function renderPaymentRow(payment) {
-  const isRefund = payment?.ledgerType === 'refund' || payment?.status === 'refund';
+  const isRefund = payment?.ledgerType === 'refund' || payment?.expenseType === 'refund';
   return listEntry({
     title: isRefund ? 'Возврат' : 'Оплата',
     subtitle: operationMoment(payment),
@@ -79,7 +75,7 @@ function saveWallet(root, modalRoot, existing, navigateBack) {
 function renderCard(root, id, navigateBack) {
   const wallet = getWallets().find((item) => item.id === id);
   if (!wallet) return renderList(root, navigateBack);
-  const payments = getPaymentsForWallet(wallet.id);
+  const payments = getWalletHistory(wallet.id);
   const card=entityCard({
     title:wallet.name||'',
     subtitle:'',
