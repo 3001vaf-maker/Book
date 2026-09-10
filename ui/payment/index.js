@@ -30,9 +30,12 @@ export function paymentForm({ workplace = '', date = '', time = '', client = {},
     const price = Math.max(0, numberValue(procedure?.cost));
     const percent = Math.max(0, Math.min(100, numberValue(procedure?.discountPercent)));
     const money = Math.max(0, numberValue(procedure?.discountMoney));
-    const discountMode = percent ? 'percent' : money ? 'money' : 'none';
+    const explicitMode = procedure?.discountMode;
+    const mode = explicitMode === 'percent' || explicitMode === 'money' || explicitMode === 'none'
+      ? explicitMode
+      : percent ? 'percent' : money ? 'money' : 'none';
     return `
-    <section class="payment-procedure" data-payment-procedure="${index}" data-payment-source-id="${escapeHtml(procedure?.id || '')}" data-payment-name="${escapeHtml(procedure?.name || '')}" data-payment-discount-mode="${discountMode}">
+    <section class="payment-procedure" data-payment-procedure="${index}" data-payment-source-type="${escapeHtml(procedure?.sourceType || 'procedure')}" data-payment-source-id="${escapeHtml(procedure?.id || '')}" data-payment-name="${escapeHtml(procedure?.name || '')}" data-payment-discount-mode="${mode}">
       <strong class="payment-procedure__name">${escapeHtml(procedure?.name || '')}</strong>
       <div class="payment-fields payment-fields--three">
         <label><span>Цена</span><input type="number" inputmode="decimal" step="0.01" min="0" value="${escapeHtml(moneyText(price))}" data-payment-price readonly></label>
@@ -93,9 +96,11 @@ function financialInputs(root) {
     const values = rowValues(row);
     const mode = row.dataset.paymentDiscountMode || 'none';
     return {
+      sourceType: row.dataset.paymentSourceType || 'procedure',
       sourceId: row.dataset.paymentSourceId || '',
       name: row.dataset.paymentName || '',
       price: values.price,
+      discountMode: mode,
       discountPercent: mode === 'percent' ? values.percent : '',
       discountMoney: mode === 'money' ? values.money : '',
     };
@@ -107,6 +112,7 @@ function applyBusinessPlan(root, plan = null) {
   [...root.querySelectorAll('[data-payment-procedure]')].forEach((row, index) => {
     const item = items[index];
     if (!item) return;
+    row.dataset.paymentDiscountMode = item.discountMode || 'none';
     const { percentInput, moneyInput } = rowValues(row);
     setPercentDisplay(percentInput, item.discountPercent || 0);
     if (moneyInput) moneyInput.value = item.discountMoney ? moneyText(item.discountMoney) : '';
