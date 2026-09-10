@@ -9,6 +9,7 @@ import {
   list,
   modal,
   mountModal,
+  openNotice,
   timePicker,
   timeSlots,
 } from '../ui/ui.js';
@@ -309,7 +310,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       excludeId: original.id,
     });
     if (!check.ok) {
-      alert('Новая длительность не помещается в свободный интервал. Выберите другое время.');
+      openNotice({ title: 'Недостаточно времени', message: 'Новая длительность не помещается в свободный интервал. Выберите другое время.' });
       return;
     }
     const patch = { procedures: nextProcedures };
@@ -330,7 +331,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       attendance: normalizedAttendance(state.attendance),
     });
     if (!updated) {
-      alert('Не удалось сохранить изменения: проверьте рабочий день и свободное время.');
+      openNotice({ title: 'Не удалось сохранить', message: 'Проверьте рабочий день и свободное время.' });
       return false;
     }
     state = stateFromRecord(updated);
@@ -473,8 +474,8 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     root.querySelector('[data-record-view-cancel]')?.addEventListener('click', () => {
       if (isPaid()) return;
       confirmCancel(record, () => {
+        finishClose();
         m.remove();
-        onClose?.();
       });
     });
   };
@@ -489,12 +490,18 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
   };
   window.addEventListener('book:payments-changed', onPaymentsChanged);
 
+  let closed = false;
+  const finishClose = () => {
+    if (closed) return;
+    closed = true;
+    if (startTimer) clearTimeout(startTimer);
+    startTimer = null;
+    window.removeEventListener('book:payments-changed', onPaymentsChanged);
+    queueMicrotask(() => onClose?.());
+  };
+
   m.addEventListener('click', (event) => {
-    if (event.target === m || event.target.closest('[data-modal-close]')) {
-      if (startTimer) clearTimeout(startTimer);
-      window.removeEventListener('book:payments-changed', onPaymentsChanged);
-      queueMicrotask(() => onClose?.());
-    }
+    if (event.target === m || event.target.closest('[data-modal-close]')) finishClose();
   });
 
   render();
