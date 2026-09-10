@@ -1,28 +1,28 @@
 import { actionBlock, button, escapeHtml, field, headerControl, list, modal, mountModal, page, pageHeader, textareaField } from '../../ui/ui.js';
 import { createDocument, getDocuments, saveDocument } from './data.js';
 
-function statusText(document) {
-  if (!document.clientConsent) return 'Документ';
-  return document.required ? 'Обязательное согласие' : 'Необязательное согласие';
+function statusText(item) {
+  if (!item.clientConsent) return 'Документ';
+  return item.required ? 'Обязательное согласие' : 'Необязательное согласие';
 }
 
-function openDocumentEditor(document, onSaved) {
+function openDocumentEditor(item, onSaved) {
   const html = `<form data-document-form>
-    <div class="modal-title"><h2>${escapeHtml(document.title)}</h2><p>${escapeHtml(statusText(document))}</p></div>
+    <div class="modal-title"><h2>${escapeHtml(item.title)}</h2><p>${escapeHtml(statusText(item))}</p></div>
     <div class="compact-form">
-      ${field({ label: 'Название', name: 'documentTitle', value: document.title, required: true })}
-      ${textareaField({ label: 'Текст документа', name: 'documentText', value: document.text || '', placeholder: 'Введите текст документа' })}
+      ${field({ label: 'Название', name: 'documentTitle', value: item.title, required: true })}
+      ${textareaField({ label: 'Текст документа', name: 'documentText', value: item.text || '', placeholder: 'Введите текст документа' })}
       <div class="modal-actions">${button('Сохранить', { type: 'submit' })}</div>
     </div>
   </form>`;
-  const m = mountModal(document.body, modal(html, { title: document.title, variant: 'large', surface: 'app' }));
+  const m = mountModal(document.body, modal(html, { title: item.title, variant: 'large', surface: 'app' }));
   if (!m) return;
   m.querySelector('[data-document-form]')?.addEventListener('submit', (event) => {
     event.preventDefault();
     const title = m.querySelector('[name="documentTitle"]')?.value.trim() || '';
     if (!title) return;
     saveDocument({
-      ...document,
+      ...item,
       title,
       text: m.querySelector('[name="documentText"]')?.value.trim() || ''
     });
@@ -58,12 +58,12 @@ function openCreateDocument(onCreated) {
 export function render(root, navigateBack = () => {}) {
   const documents = getDocuments();
   const rows = list({
-    items: documents.map((document) => ({
-      title: document.title,
-      secondary: statusText(document),
+    items: documents.map((item) => ({
+      title: item.title,
+      secondary: statusText(item),
       interactive: true,
-      data: `data-document-id="${escapeHtml(document.id)}"`,
-      aria: `Открыть документ ${document.title}`
+      data: `data-document-id="${escapeHtml(item.id)}"`,
+      aria: `Открыть документ ${item.title}`
     }))
   });
 
@@ -80,7 +80,7 @@ export function render(root, navigateBack = () => {}) {
   root.querySelector('[data-documents-back]')?.addEventListener('click', navigateBack);
   root.querySelector('[data-add-document]')?.addEventListener('click', () => openCreateDocument(() => render(root, navigateBack)));
   root.querySelectorAll('[data-document-id]').forEach((row) => row.addEventListener('click', () => {
-    const document = getDocuments().find((item) => item.id === row.dataset.documentId);
-    if (document) openDocumentEditor(document, () => render(root, navigateBack));
+    const item = getDocuments().find((document) => document.id === row.dataset.documentId);
+    if (item) openDocumentEditor(item, () => render(root, navigateBack));
   }));
 }
