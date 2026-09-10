@@ -75,6 +75,26 @@ if (!/getWalletDDSMovements/.test(walletData) || !/export function getWalletBala
   errors.push('Wallet data owner must derive history/balance from DDS movements');
 }
 
+const recordView = source('journal/record-view.js');
+if (/recordViewProcedureCost|data-record-view-procedure-cost/.test(recordView)) {
+  errors.push('Created Record card must not correct procedure price; it may correct procedure time only');
+}
+
+const recordCreation = source('journal/record.js');
+if (/data-record-cost|name=['"]recordCost['"]/.test(recordCreation)) {
+  errors.push('Record creation must not correct procedure price; price comes from Price and is corrected only at payment');
+}
+
+const paymentUI = source('ui/payment/index.js');
+if (!/data-payment-price/.test(paymentUI) || /data-payment-price\s+readonly/.test(paymentUI)) {
+  errors.push('Payment must be the single editable procedure price correction point');
+}
+
+const recordPayment = source('journal/record-payment.js');
+if (!/proceduresFromFinance/.test(recordPayment) || !/procedures:\s*proceduresFromFinance/.test(recordPayment)) {
+  errors.push('Payment-stage price correction must be persisted back into Record procedures');
+}
+
 if (errors.length) {
   console.error('finance architecture check: FAILED');
   errors.forEach((error) => console.error(`- ${error}`));
