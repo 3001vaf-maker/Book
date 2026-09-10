@@ -1,14 +1,9 @@
-import { emptyState, listEntries, listEntry } from '../ui/ui.js';
+import { emptyState, listEntries, listEntry, shortDate } from '../ui/ui.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getActivePaymentForSource } from '../core/dds.js';
 import { recordPlanTotal } from '../core/financial-model.js';
 import { getRecords } from './record-data.js';
 import { isRecordCompletedSide, recordActivityTime, recordAppointmentTime, recordVisualState } from './record-state.js';
-
-function formatDate(value = '') {
-  const [year, month, day] = String(value || '').slice(0, 10).split('-');
-  return year && month && day ? `${day}.${month}.${year}` : '';
-}
 
 function formatMoney(value = 0) {
   const amount = Math.max(0, Math.round(Number(value) || 0));
@@ -38,7 +33,7 @@ function recordEntry(record, workplaces, { focus = false, payment = null } = {})
     overline: workplaceName(workplaces, record?.workplaceId),
     title: clientName(record?.client),
     subtitle: record?.client?.phone || '',
-    rightTop: [formatDate(record?.date), String(record?.from || '')].filter(Boolean).join(' · '),
+    rightTop: [shortDate(record?.date), String(record?.from || '')].filter(Boolean).join(' · '),
     rightBottom: formatMoney(recordPlanTotal(record)),
     interactive: false,
     className: classes,
