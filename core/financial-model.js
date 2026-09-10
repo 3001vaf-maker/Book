@@ -64,16 +64,12 @@ function normalizeStoredPlan(value = null) {
   return calculateFinancialPlan(value.items, { discountPercent: value.discountPercent ?? 0 });
 }
 
-function movementFinance(movement = null) {
-  return movement?.finance || movement?.business || null;
-}
-
 function latestHistoricalPlanForSource(type, id) {
   const movements = getDDSMovementsForSource(type, id)
-    .filter((movement) => movementFinance(movement) && isStoredPlan(movementFinance(movement)))
+    .filter((movement) => movement?.finance && isStoredPlan(movement.finance))
     .sort((a, b) => String(a?.createdAt || '').localeCompare(String(b?.createdAt || '')));
   if (!movements.length) return null;
-  return normalizeStoredPlan(movementFinance(movements[movements.length - 1]));
+  return normalizeStoredPlan(movements[movements.length - 1].finance);
 }
 
 export function resolveRecordFinancialPlan(record = null, { discountPercent = 0 } = {}) {
@@ -123,7 +119,7 @@ function itemPlanAmount(item = null) {
 }
 
 function movementItemAmount(movement = null, sourceType = '', sourceId = '') {
-  const finance = movementFinance(movement);
+  const finance = movement?.finance;
   const items = Array.isArray(finance?.items) ? finance.items : [];
   const id = String(sourceId || '');
   const type = String(sourceType || '');
