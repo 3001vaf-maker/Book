@@ -6,8 +6,6 @@ globalThis.localStorage = {
   setItem: (key, value) => storage.set(key, String(value)),
 };
 
-globalThis.crypto = { randomUUID: () => 'payment-1' };
-
 const {
   createPaymentDraft,
   completePayment,
@@ -34,10 +32,10 @@ const completed = completePayment(draft, {
 
 assert.equal(completed.status, 'completed');
 assert.equal(getPaymentsForWallet('cash').length, 1);
-assert.equal(getCompletedPaymentForSource('record', 'record-1')?.id, 'payment-1');
+assert.equal(getCompletedPaymentForSource('record', 'record-1')?.id, completed.id);
 
 const refundAt = new Date('2026-09-10T10:00:00.000Z');
-const refunded = refundPayment('payment-1', { reason: 'Возврат клиенту', now: refundAt });
+const refunded = refundPayment(completed.id, { reason: 'Возврат клиенту', now: refundAt });
 
 assert.equal(refunded.status, 'refunded');
 assert.equal(refunded.refundedAt, refundAt.toISOString());
@@ -46,6 +44,6 @@ assert.equal(getPayments().length, 1);
 assert.equal(getPaymentsForWallet('cash').length, 0);
 assert.equal(getRefundedPayments().length, 1);
 assert.equal(getCompletedPaymentForSource('record', 'record-1'), null);
-assert.equal(refundPayment('payment-1'), null);
+assert.equal(refundPayment(completed.id), null);
 
 console.log('payment refund tests: OK');
