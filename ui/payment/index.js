@@ -47,35 +47,30 @@ export function paymentForm({ workplace = '', date = '', time = '', client = {},
   </div>`;
 }
 
-function walletOptions(wallets = []) {
-  return [{ value: '', label: 'Кошелёк' }, ...(Array.isArray(wallets) ? wallets : []).map((wallet) => ({ value: wallet?.id || '', label: wallet?.name || 'Кошелёк' }))];
-}
-
-function splitRow(index, wallets, amount = '') {
-  return `<div class="payment-split-row" data-payment-split-row="${index}">
-    <label><span>Сумма</span><input type="number" min="0" step="0.01" inputmode="decimal" value="${escapeHtml(moneyText(amount))}" data-payment-split-amount></label>
-    ${select({ label: 'Кошелёк', name: `paymentSplitWallet${index}`, value: '', options: walletOptions(wallets), data: 'data-payment-split-wallet', aria: `Кошелёк части ${index + 1}` })}
-  </div>`;
+function walletButtons(wallets = [], dataName = 'data-payment-wallet') {
+  return (Array.isArray(wallets) ? wallets : []).map((wallet) => button(
+    escapeHtml(wallet?.name || 'Кошелёк'),
+    {
+      data: `${dataName}="${escapeHtml(wallet?.id || '')}" data-payment-wallet-name="${escapeHtml(wallet?.name || '')}"`,
+      variant: 'secondary',
+      aria: `Выбрать кошелёк ${wallet?.name || ''}`,
+    },
+  )).join('');
 }
 
 export function paymentMethods({ wallets = [], total = 0 } = {}) {
-  const walletButtons = (Array.isArray(wallets) ? wallets : []).map((wallet) => button(
-    escapeHtml(wallet?.name || 'Кошелёк'),
-    { data: `data-payment-wallet="${escapeHtml(wallet?.id || '')}" data-payment-wallet-name="${escapeHtml(wallet?.name || '')}"`, variant: 'secondary', aria: `Оплатить через ${wallet?.name || 'кошелёк'}` },
-  )).join('');
-
   return `<div class="payment-methods" data-payment-methods data-payment-total="${escapeHtml(moneyText(total))}">
     <div class="segment-control segment-control--two-equal" role="group" aria-label="Режим оплаты">
       <button type="button" class="is-active" aria-pressed="true" data-payment-mode="single">Полностью</button>
       <button type="button" aria-pressed="false" data-payment-mode="split">Разделить</button>
     </div>
-    <div class="payment-methods__wallets" data-payment-wallets>${walletButtons}</div>
+    <div class="payment-methods__single" data-payment-single>
+      <div class="payment-methods__wallets" data-payment-wallets>${walletButtons(wallets)}</div>
+      <div class="payment-methods__confirm">${button('Оплатить', { data: 'data-payment-single-submit' })}</div>
+    </div>
     <div class="payment-methods__split" data-payment-split hidden>
-      ${splitRow(0, wallets, '')}
-      ${splitRow(1, wallets, total)}
-      <div data-payment-split-extra></div>
-      <div class="payment-split-remaining" data-payment-split-remaining></div>
-      ${button('Подтвердить оплату', { data: 'data-payment-split-submit' })}
+      <div data-payment-split-history></div>
+      <div data-payment-split-current></div>
     </div>
   </div>`;
 }
@@ -142,31 +137,61 @@ export function initPaymentForm(root, { onPay = () => {} } = {}) {
   recalculateTotal(root);
 }
 
-function walletNameById(root, id) {
-  const input = root.querySelector(`input[data-payment-split-wallet][value="${CSS.escape(String(id || ''))}"]`);
-  const selectRoot = input?.closest('.ui-select');
-  return selectRoot?.querySelector('[data-ui-select-trigger] .ui-select__value')?.textContent || '';
+function setSelectedWallet(container, selector, selectedId) {
+  container?.querySelectorAll(selector).forEach((node) => {
+    const active = String(node.getAttribute(selector.slice(1, -1)) || '') === String(selectedId || '');
+    node.classList.toggle('is-selected', active);
+    node.setAttribute('aria-pressed', String(active));
+  });
 }
 
 export function initPaymentMethods(root, { onWallet = () => {}, onSplit = () => {} } = {}) {
   if (!root) return;
-  const wallets = root.querySelector('[data-payment-wallets]');
+  const single = root.querySelector('[data-payment-single]');
   const split = root.querySelector('[data-payment-split]');
   const total = Math.max(0, numberValue(root.dataset.paymentTotal));
+  const wallets = [...root.querySelectorAll('[data-payment-wallet]')].map((node) => ({ id: node.dataset.paymentWallet || '', name: node.dataset.paymentWalletName || '' }));
+  let selectedSingle = null;
+  const allocations = [];
 
-  const recalcSplit = () => {
-    const rows = [...root.querySelectorAll('[data-payment-split-row]')];
-    const amounts = rows.map((row) => Math.max(0, numberValue(row.querySelector('[data-payment-split-amount]')?.value)));
-    if (rows[0] && rows[1]) {
-      const first = Math.min(total, amounts[0]);
-      const secondInput = rows[1].querySelector('[data-payment-split-amount]');
-      const second = Math.max(0, total - first);
-      if (secondInput && document.activeElement !== secondInput) secondInput.value = moneyText(second);
-    }
-    const used = [...root.querySelectorAll('[data-payment-split-row]')].reduce((sum, row) => sum + Math.max(0, numberValue(row.querySelector('[data-payment-split-amount]')?.value)), 0);
+  const renderSplitHistory = () => {
+    const host = root.querySelector('[data-payment-split-history]');
+    if (!host) return;
+    host.innerHTML = allocations.length ? `<div class="payment-split-history">${allocations.map((item) => `<div><span>${escapeHtml(item.walletName)}</span><strong>${escapeHtml(moneyText(item.amount))} ₽</strong></div>`).join('')}</div>` : '';
+  };
+
+  const renderSplitStep = () => {
+    const host = root.querySelector('[data-payment-split-current]');
+    if (!host) return;
+    const used = allocations.reduce((sum, item) => sum + Number(item.amount || 0), 0);
     const remaining = Math.max(0, total - used);
-    const remainingNode = root.querySelector('[data-payment-split-remaining]');
-    if (remainingNode) remainingNode.textContent = remaining > 0 ? `Осталось ${moneyText(remaining)} ₽` : '';
+    if (!remaining) {
+      onSplit?.([...allocations]);
+      return;
+    }
+    host.innerHTML = `<div class="payment-split-step">
+      <label class="payment-split-amount"><span>Сумма</span><input type="number" min="0.01" max="${escapeHtml(moneyText(remaining))}" step="0.01" inputmode="decimal" value="${escapeHtml(moneyText(remaining))}" data-payment-split-amount></label>
+      <div class="payment-methods__wallets" data-payment-split-wallets>${walletButtons(wallets, 'data-payment-split-wallet')}</div>
+      <div class="payment-methods__confirm">${button('Оплатить', { data: 'data-payment-split-submit' })}</div>
+    </div>`;
+    let selectedSplit = null;
+    host.querySelectorAll('[data-payment-split-wallet]').forEach((node) => node.addEventListener('click', () => {
+      selectedSplit = { id: node.dataset.paymentSplitWallet || '', name: node.dataset.paymentWalletName || '' };
+      host.querySelectorAll('[data-payment-split-wallet]').forEach((item) => {
+        const active = item === node;
+        item.classList.toggle('is-selected', active);
+        item.setAttribute('aria-pressed', String(active));
+      });
+    }));
+    host.querySelector('[data-payment-split-submit]')?.addEventListener('click', () => {
+      if (!selectedSplit?.id) return;
+      const input = host.querySelector('[data-payment-split-amount]');
+      const amount = Math.max(0, numberValue(input?.value));
+      if (!amount || amount > remaining + 0.009) return;
+      allocations.push({ walletId: selectedSplit.id, walletName: selectedSplit.name, amount });
+      renderSplitHistory();
+      renderSplitStep();
+    });
   };
 
   root.querySelectorAll('[data-payment-mode]').forEach((buttonNode) => buttonNode.addEventListener('click', () => {
@@ -176,21 +201,24 @@ export function initPaymentMethods(root, { onWallet = () => {}, onSplit = () => 
       node.classList.toggle('is-active', active);
       node.setAttribute('aria-pressed', String(active));
     });
-    if (wallets) wallets.hidden = mode !== 'single';
+    if (single) single.hidden = mode !== 'single';
     if (split) split.hidden = mode !== 'split';
-    if (mode === 'split') recalcSplit();
+    if (mode === 'split') {
+      allocations.length = 0;
+      renderSplitHistory();
+      renderSplitStep();
+    }
   }));
 
-  root.querySelectorAll('[data-payment-wallet]').forEach((buttonNode) => buttonNode.addEventListener('click', () => onWallet?.({ id: buttonNode.dataset.paymentWallet || '', name: buttonNode.dataset.paymentWalletName || '' })));
-  root.querySelectorAll('[data-payment-split-amount]').forEach((input) => input.addEventListener('input', recalcSplit));
-  root.querySelector('[data-payment-split-submit]')?.addEventListener('click', () => {
-    const allocations = [...root.querySelectorAll('[data-payment-split-row]')].map((row) => {
-      const walletInput = row.querySelector('input[data-payment-split-wallet]');
-      const walletId = walletInput?.value || '';
-      return { walletId, walletName: walletNameById(root, walletId), amount: Math.max(0, numberValue(row.querySelector('[data-payment-split-amount]')?.value)) };
-    }).filter((item) => item.walletId && item.amount > 0);
-    const sum = allocations.reduce((value, item) => value + item.amount, 0);
-    if (Math.abs(sum - total) > 0.009) return;
-    onSplit?.(allocations);
+  root.querySelectorAll('[data-payment-wallet]').forEach((node) => node.addEventListener('click', () => {
+    selectedSingle = { id: node.dataset.paymentWallet || '', name: node.dataset.paymentWalletName || '' };
+    root.querySelectorAll('[data-payment-wallet]').forEach((item) => {
+      const active = item === node;
+      item.classList.toggle('is-selected', active);
+      item.setAttribute('aria-pressed', String(active));
+    });
+  }));
+  root.querySelector('[data-payment-single-submit]')?.addEventListener('click', () => {
+    if (selectedSingle?.id) onWallet?.(selectedSingle);
   });
 }
