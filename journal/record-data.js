@@ -1,7 +1,7 @@
 import { containsRange, isValidRange, rangesOverlap } from '../core/time.js';
 import { getDays, getDay, getDayTime } from '../core/day.js';
 import { getWorkplaces } from '../core/workplace-time.js';
-import { getFinanceForSource, setOperationalFinanceStatus, syncOperationalFinance } from '../core/dds.js';
+import { getFinanceForSource, getOperationalFinanceForSource, setOperationalFinanceStatus, syncOperationalFinance } from '../core/dds.js';
 import { getAllClients } from '../main/clients/data.js';
 import { getJournalBreaks } from './break-data.js';
 
@@ -64,20 +64,26 @@ function financeSnapshot(finance = null) {
   };
 }
 
-function syncRecordFinance(record) {
+function syncRecordFinance(record, { recalculate = false } = {}) {
   if (!record?.id) return record;
-  const clientDiscountPercent = record.clientDiscountPercent == null
+  let operational = getOperationalFinanceForSource('record', record.id);
+  let clientDiscountPercent = record.clientDiscountPercent == null
     ? clientDiscount(record.client)
     : percent(record.clientDiscountPercent);
-  syncOperationalFinance({
-    source: { type: 'record', id: record.id },
-    workplace: record.workplaceId,
-    client: record.client,
-    items: record.procedures,
-    discountPercent: clientDiscountPercent,
-    status: record.status || 'active',
-  });
+
+  if (recalculate || !operational) {
+    operational = syncOperationalFinance({
+      source: { type: 'record', id: record.id },
+      workplace: record.workplaceId,
+      client: record.client,
+      items: record.procedures,
+      discountPercent: clientDiscountPercent,
+      status: record.status || 'active',
+    });
+  }
+
   const finance = financeSnapshot(getFinanceForSource('record', record.id));
+  if (finance?.discountPercent != null) clientDiscountPercent = finance.discountPercent;
   return { ...record, clientDiscountPercent, finance };
 }
 
@@ -140,7 +146,7 @@ export function createRecord({ date, workplaceId, from, to, client, procedures =
     procedures: Array.isArray(procedures) ? procedures : [],
     createdAt: now,
     updatedAt: now,
-  });
+  }, { recalculate: true });
   const records = getRecords(); records.push(record); writeList(KEY, records);
   notify('book:records-changed', { action: 'create', recordId: record.id });
   notify('book:time-usage-changed', { action: 'occupy', usageId: record.id, sourceId: record.id, date: record.date, workplaceId: record.workplaceId, from: record.from, to: record.to });
@@ -151,6 +157,9 @@ export function updateRecord(id, patch = {}) {
   if (index < 0) return null;
   const current = records[index];
   if (current.status === 'cancelled' && patch.status !== 'active') return null;
+  const financialInputsChanged = Object.prototype.hasOwnProperty.call(patch, 'procedures')
+    || Object.prototype.hasOwnProperty.call(patch, 'client')
+    || Object.prototype.hasOwnProperty.call(patch, 'clientDiscountPercent');
   const nextDiscount = Object.prototype.hasOwnProperty.call(patch, 'clientDiscountPercent')
     ? percent(patch.clientDiscountPercent)
     : Object.prototype.hasOwnProperty.call(patch, 'client')
@@ -158,7 +167,7 @@ export function updateRecord(id, patch = {}) {
       : percent(current.clientDiscountPercent);
   const next = { ...current, ...patch, clientDiscountPercent: nextDiscount };
   if (next.status !== 'cancelled' && !checkRecordTime({ date: next.date, workplaceId: next.workplaceId, from: next.from, to: next.to, excludeId: id }).ok) return null;
-  records[index] = syncRecordFinance({ ...next, updatedAt: new Date().toISOString() }); writeList(KEY, records);
+  records[index] = syncRecordFinance({ ...next, updatedAt: new Date().toISOString() }, { recalculate: financialInputsChanged }); writeList(KEY, records);
   notify('book:records-changed', { action: 'update', recordId: id });
   notify('book:time-usage-changed', { action: 'change', usageId: id, sourceId: id, date: records[index].date, workplaceId: records[index].workplaceId, from: records[index].from, to: records[index].to });
   return records[index];
