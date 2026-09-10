@@ -16,21 +16,21 @@ function walletOptions(wallets = []) {
   }))];
 }
 
-function splitPart(index, wallets) {
+function splitPart(index, wallets, initial = {}) {
   return `<div class="payment-split-part" data-payment-split-part="${index}">
-    ${select({ value: '', options: walletOptions(wallets), data: `data-payment-split-wallet="${index}"`, aria: `Кошелёк части ${index + 1}` })}
-    <input class="payment-split-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Сумма" data-payment-split-amount="${index}">
+    ${select({ value: String(initial?.walletId || ''), options: walletOptions(wallets), data: `data-payment-split-wallet="${index}"`, aria: `Кошелёк части ${index + 1}` })}
+    <input class="payment-split-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Сумма" value="${escapeHtml(initial?.amount == null ? '' : moneyText(initial.amount))}" data-payment-split-amount="${index}">
   </div>`;
 }
 
-export function splitPaymentMarkup({ wallets = [], total = 0 } = {}) {
+export function splitPaymentMarkup({ wallets = [], total = 0, initialAllocations = [] } = {}) {
+  const allocations = Array.isArray(initialAllocations) ? initialAllocations : [];
+  const count = Math.max(2, Math.min(3, allocations.length || 2));
+  const parts = Array.from({ length: count }, (_, index) => splitPart(index, wallets, allocations[index] || {})).join('');
   return `<div class="payment-methods__split" data-payment-split-owner>
     <div class="payment-methods__amount" data-payment-split-remaining><span>Сумма</span><strong>${escapeHtml(moneyText(total))} ₽</strong></div>
-    <div data-payment-split-parts>
-      ${splitPart(0, wallets)}
-      ${splitPart(1, wallets)}
-    </div>
-    ${button('Подтвердить оплату', { data: 'data-payment-split-submit disabled' })}
+    <div data-payment-split-parts>${parts}</div>
+    ${button('Подтвердить оплату', { data: 'data-payment-split-submit' })}
   </div>`;
 }
 
