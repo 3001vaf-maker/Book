@@ -1,5 +1,5 @@
 import { button, escapeHtml, initPaymentForm, initPaymentMethods, modal, mountModal, paymentForm, paymentMethods, select } from '../ui/ui.js';
-import { calculateBusinessPlan } from '../core/business-model.js';
+import { calculateFinancialPlan } from '../core/financial-model.js';
 import { getActivePaymentForSource, getRefundsForPayment, recordPaymentIncome, recordRefundExpense } from '../core/dds.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getAllClients } from '../main/clients/data.js';
@@ -18,7 +18,7 @@ function clientForRecord(record) {
 }
 
 function financeForRecord(record) {
-  return record?.finance || calculateBusinessPlan(record?.procedures || []);
+  return record?.finance || calculateFinancialPlan(record?.procedures || []);
 }
 
 function paymentEntryContent(record) {
@@ -57,7 +57,7 @@ function paymentFromRecord(record) {
     client: recordClient(record),
     date: moment.date,
     time: moment.time,
-    business: financeForRecord(record),
+    finance: financeForRecord(record),
   };
 }
 
@@ -93,7 +93,7 @@ function paymentFactMarkup(payment) {
 }
 
 function openPaymentMethodsModal(payment, paymentModal) {
-  const total = Number(payment?.business?.planTotal || 0);
+  const total = Number(payment?.finance?.planTotal || 0);
   const content = `<div class="modal-title"><h2>Способ оплаты</h2></div>${paymentMethods({ wallets: getWallets(), total })}`;
   const methodsModal = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
   if (!methodsModal) return;
@@ -112,14 +112,14 @@ function openPaymentMethodsModal(payment, paymentModal) {
       source: payment.source,
       workplace: payment.workplace,
       client: payment.client,
-      business: payment.business,
+      finance: payment.finance,
       allocations: [{ walletId: wallet.id, walletName: wallet.name, amount: total }],
     })),
     onSplit: (allocations) => finish(recordPaymentIncome({
       source: payment.source,
       workplace: payment.workplace,
       client: payment.client,
-      business: payment.business,
+      finance: payment.finance,
       allocations,
     })),
   });
@@ -129,7 +129,7 @@ function openPaymentModal(record) {
   if (getActivePaymentForSource('record', record?.id)) return;
   const current = getRecords().find((item) => String(item?.id || '') === String(record?.id || '')) || record;
   const payment = paymentFromRecord(current);
-  const finance = payment.business;
+  const finance = payment.finance;
   const content = `<div class="modal-title"><h2>Оплата</h2></div>${paymentForm({
     workplace: payment.workplace,
     date: payment.date,
@@ -141,11 +141,11 @@ function openPaymentModal(record) {
   const m = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
   if (!m) return;
   initPaymentForm(m.querySelector('[data-payment-ui]'), {
-    calculate: (items) => calculateBusinessPlan(items),
-    onPay: ({ business }) => {
-      const updated = updateRecord(current.id, { finance: business });
+    calculate: (items) => calculateFinancialPlan(items),
+    onPay: ({ finance: updatedFinance }) => {
+      const updated = updateRecord(current.id, { finance: updatedFinance });
       if (!updated) return;
-      openPaymentMethodsModal({ ...paymentFromRecord(updated), business: updated.finance }, m);
+      openPaymentMethodsModal({ ...paymentFromRecord(updated), finance: updated.finance }, m);
     },
   });
 }

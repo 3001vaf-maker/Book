@@ -1,7 +1,7 @@
 import { containsRange, isValidRange, rangesOverlap } from '../core/time.js';
 import { getDays, getDay, getDayTime } from '../core/day.js';
 import { getWorkplaces } from '../core/workplace-time.js';
-import { calculateBusinessPlan, getRecordBusinessPlanFact, resolveRecordBusinessPlan } from '../core/business-model.js';
+import { calculateFinancialPlan, getRecordFinancialPlanFact, resolveRecordFinancialPlan } from '../core/financial-model.js';
 import { getAllClients } from '../main/clients/data.js';
 import { getJournalBreaks } from './break-data.js';
 
@@ -66,18 +66,18 @@ function normalizeFinance(value = null) {
 
 function storedRecordFinance(record) {
   const legacyDiscount = record?.clientDiscountPercent == null ? clientDiscount(record?.client) : percent(record.clientDiscountPercent);
-  return resolveRecordBusinessPlan(record, { discountPercent: legacyDiscount });
+  return resolveRecordFinancialPlan(record, { discountPercent: legacyDiscount });
 }
 
 function hydrateRecord(record) {
   if (!record?.id) return record;
   const legacyDiscount = record?.clientDiscountPercent == null ? clientDiscount(record?.client) : percent(record.clientDiscountPercent);
   const { clientDiscountPercent: _legacyDiscount, ...cleanRecord } = record;
-  const finance = getRecordBusinessPlanFact({ ...cleanRecord, finance: storedRecordFinance(record) }, { discountPercent: legacyDiscount });
+  const finance = getRecordFinancialPlanFact({ ...cleanRecord, finance: storedRecordFinance(record) }, { discountPercent: legacyDiscount });
   return { ...cleanRecord, finance: normalizeFinance(finance) };
 }
 
-function repriceBusinessPlan(procedures = [], currentFinance = null) {
+function repriceFinancialPlan(procedures = [], currentFinance = null) {
   const priorItems = Array.isArray(currentFinance?.items) ? currentFinance.items : [];
   const bySource = new Map(priorItems.map((item) => [String(item?.sourceId || ''), item]));
   const defaultDiscount = currentFinance?.discountPercent == null ? 0 : percent(currentFinance.discountPercent);
@@ -96,7 +96,7 @@ function repriceBusinessPlan(procedures = [], currentFinance = null) {
     }
     return { ...base, discountMode: 'none' };
   });
-  return calculateBusinessPlan(items, { discountPercent: defaultDiscount });
+  return calculateFinancialPlan(items, { discountPercent: defaultDiscount });
 }
 
 export function getRecords() {
@@ -141,7 +141,7 @@ export function createRecord({ date, workplaceId, from, to, client, procedures =
   const normalizedDate = normalizeDate(date), normalizedWorkplaceId = normalizeId(workplaceId);
   if (!checkRecordTime({ date: normalizedDate, workplaceId: normalizedWorkplaceId, from, to }).ok) return null;
   const now = new Date().toISOString();
-  const finance = calculateBusinessPlan(procedures, { discountPercent: clientDiscount(client) });
+  const finance = calculateFinancialPlan(procedures, { discountPercent: clientDiscount(client) });
   const record = hydrateRecord({
     id: crypto.randomUUID(),
     status: 'active',
@@ -177,9 +177,9 @@ export function updateRecord(id, patch = {}) {
   if (hasExplicitFinance) {
     next.finance = normalizeFinance(patch.finance);
   } else if (clientChanged) {
-    next.finance = calculateBusinessPlan(next.procedures || [], { discountPercent: clientDiscount(next.client) });
+    next.finance = calculateFinancialPlan(next.procedures || [], { discountPercent: clientDiscount(next.client) });
   } else if (serviceChanged) {
-    next.finance = repriceBusinessPlan(next.procedures || [], current.finance);
+    next.finance = repriceFinancialPlan(next.procedures || [], current.finance);
   } else {
     next.finance = current.finance;
   }

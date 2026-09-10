@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { calculateBusinessPlan } from '../core/business-model.js';
+import { calculateFinancialPlan } from '../core/financial-model.js';
 import {
   getActivePaymentForSource,
   getDDSExpenses,
@@ -24,30 +24,61 @@ const forbiddenEditPayment = /replacesPaymentId|status:\s*['"]corrected['"]|data
 assert.doesNotMatch(ddsSource, forbiddenEditPayment);
 assert.doesNotMatch(paymentUiSource, forbiddenEditPayment);
 
-const discounted = calculateBusinessPlan([{ sourceId: 'procedure-discount', name: 'Стрижка', price: 8000, discountPercent: 10 }]);
+// Existing DDS v2 entries keep their full financial snapshot when renamed to `finance`.
+storage.set('book.dds', JSON.stringify({
+  version: 2,
+  income: [{
+    id: 'legacy-income',
+    status: 'completed',
+    source: { type: 'record', id: 'legacy-record' },
+    total: 6400,
+    allocations: [{ walletId: 'cash', walletName: 'Наличные', amount: 6400 }],
+    business: {
+      items: [{ sourceType: 'procedure', sourceId: 'legacy-procedure', name: 'Стрижка', price: 8000, discountMode: 'percent', discountPercent: 20, discountMoney: 1600, planAmount: 6400 }],
+      serviceTotal: 8000,
+      discountPercent: 20,
+      discountTotal: 1600,
+      planTotal: 6400,
+    },
+  }],
+  expense: [],
+}));
+const migratedLegacy = getDDSIncome();
+assert.equal(migratedLegacy.length, 1);
+assert.equal(migratedLegacy[0].finance.serviceTotal, 8000);
+assert.equal(migratedLegacy[0].finance.discountTotal, 1600);
+assert.equal(migratedLegacy[0].finance.planTotal, 6400);
+assert.equal(migratedLegacy[0].business, undefined);
+const storedMigrated = JSON.parse(storage.get('book.dds') || '{}');
+assert.equal(storedMigrated.version, 3);
+assert.equal(storedMigrated.income[0].finance.planTotal, 6400);
+assert.equal(storedMigrated.income[0].business, undefined);
+storage.clear();
+
+const discounted = calculateFinancialPlan([{ sourceId: 'procedure-discount', name: 'Стрижка', price: 8000, discountPercent: 10 }]);
 assert.equal(discounted.serviceTotal, 8000);
 assert.equal(discounted.discountTotal, 800);
 assert.equal(discounted.planTotal, 7200);
 
-const business = calculateBusinessPlan([{ sourceId: 'procedure-1', name: 'Стрижка', price: 5000 }]);
+const finance = calculateFinancialPlan([{ sourceId: 'procedure-1', name: 'Стрижка', price: 5000 }]);
 const completed = recordPaymentIncome({
   source: { type: 'record', id: 'record-1' },
   workplace: 'workplace-1',
   client: { key: 'client-1' },
-  business,
+  finance,
   allocations: [{ walletId: 'cash', walletName: 'Наличные', amount: 5000 }],
 });
 
 assert.equal(completed.status, 'completed');
 assert.equal(completed.movementType, 'income');
-assert.equal(completed.business.serviceTotal, 5000);
+assert.equal(completed.finance.serviceTotal, 5000);
 assert.equal(getWalletDDSMovements('cash').length, 1);
 assert.equal(getActivePaymentForSource('record', 'record-1')?.id, completed.id);
 assert.equal(getPaymentRemaining(completed.id), 5000);
 
 assert.equal(recordPaymentIncome({
   source: { type: 'record', id: 'record-1' },
-  business,
+  finance,
   allocations: [{ walletId: 'cash', walletName: 'Наличные', amount: 5000 }],
 }), null);
 assert.equal(getDDSIncome().length, 1);
@@ -68,25 +99,25 @@ assert.equal(recordRefundExpense(completed.id), null);
 
 const repaid = recordPaymentIncome({
   source: { type: 'record', id: 'record-1' },
-  business,
+  finance,
   allocations: [{ walletId: 'cash', walletName: 'Наличные', amount: 5000 }],
 });
 assert.ok(repaid);
 assert.equal(getActivePaymentForSource('record', 'record-1')?.id, repaid.id);
 
-const invalidBusiness = calculateBusinessPlan([{ sourceId: 'procedure-invalid', name: 'Услуга', price: 1000 }]);
+const invalidFinance = calculateFinancialPlan([{ sourceId: 'procedure-invalid', name: 'Услуга', price: 1000 }]);
 assert.equal(recordPaymentIncome({
   source: { type: 'record', id: 'record-invalid' },
-  business: invalidBusiness,
+  finance: invalidFinance,
   allocations: [{ walletId: 'cash', walletName: 'Наличные', amount: 900 }],
 }), null);
 
-const splitBusiness = calculateBusinessPlan([{ sourceId: 'procedure-2', name: 'Окрашивание', price: 6000 }]);
+const splitFinance = calculateFinancialPlan([{ sourceId: 'procedure-2', name: 'Окрашивание', price: 6000 }]);
 const split = recordPaymentIncome({
   source: { type: 'record', id: 'record-2' },
   workplace: 'workplace-1',
   client: { key: 'client-2' },
-  business: splitBusiness,
+  finance: splitFinance,
   allocations: [
     { walletId: 'split-cash', walletName: 'Наличные', amount: 2000 },
     { walletId: 'split-card', walletName: 'Карта', amount: 4000 },

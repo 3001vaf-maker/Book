@@ -44,6 +44,10 @@ Procedures → Documents + Consents → Wallets + DDS movements → Timetable �
 
 Do not resume this migration while a domain's business rules are still unstable.
 
+## Current finance terminology
+
+Current finance calculation owner: **Financial Model / Финансовая модель**.
+
 ## Canonical finance architecture — current
 
 Detailed contract: `docs/FINANCE_ARCHITECTURE.md`.
@@ -71,17 +75,17 @@ The stored chain must preserve:
 
 Record is a recorder/transmitter of these facts.
 
-### Business Model
+### Financial Model
 
-`core/business-model.js` owns plan/fact calculation.
+`core/financial-model.js` owns financial plan/fact calculation.
 
 Plan rule:
 
 `price - applied discount = planTotal / amount due`.
 
-The client's profile discount is the default discount source for a new Record. If the master changes the discount at payment stage, Business Model recalculates the specific Record first. That corrected Record snapshot is saved before DDS receives the payment movement. A payment-stage correction does not automatically change the client's permanent profile discount.
+The client's profile discount is the default discount source for a new Record. If the master changes the discount at payment stage, Financial Model recalculates the specific Record first. That corrected Record snapshot is saved before DDS receives the payment movement. A payment-stage correction does not automatically change the client's permanent profile discount.
 
-Business Model also derives actual fact from DDS and is the route used by Client / Procedure / Product analytics.
+Financial Model also derives actual financial fact from DDS and is the route used by Client / Procedure / Product financial facts.
 
 ### DDS — Движение денежных средств
 
@@ -93,7 +97,7 @@ Current movements:
 
 Later DDS expands with purchases, material spending and other income/expense movement types. DDS does not own plan calculations.
 
-Each movement preserves enough source/business context for historical attribution. Existing legacy `book.payments` facts are read non-destructively and migrated into the DDS representation; they are not cleared.
+Each movement preserves enough source/finance context for historical attribution. Existing legacy `book.payments` facts are read non-destructively and migrated into the DDS representation; they are not cleared.
 
 ### Wallet
 
@@ -110,7 +114,7 @@ Canonical path:
 Client must show how much that client actually brought.
 Procedure/Product must show how much that item actually brought.
 
-These manifestations do not calculate DDS independently. They read Business Model fact, which derives actuals from DDS. Refunds reduce the corresponding actual fact.
+These manifestations do not calculate DDS independently. They read Financial Model fact, which derives actuals from DDS. Refunds reduce the corresponding actual fact.
 
 Products already have the same metric route, but actual product-sale movements are not yet implemented, so the value remains zero until such DDS movements exist.
 
@@ -127,9 +131,9 @@ Journal card/day total use 6,400, not 8,000.
 Payment opens with 6,400.
 DDS records +6,400 only when the money is actually paid.
 Wallet receives +6,400 from DDS.
-Client and Procedure actual contribution become 6,400 through Business Model fact.
+Client and Procedure actual contribution become 6,400 through Financial Model fact.
 
-If the profile discount was 0 and the master applies 20% only during payment, Business Model recalculates the same chain and updates Record first; only then DDS records +6,400.
+If the profile discount was 0 and the master applies 20% only during payment, Financial Model recalculates the same chain and updates Record first; only then DDS records +6,400.
 
 ## Payment and refund rules
 
@@ -142,13 +146,13 @@ There is no Edit Payment / Correct Payment historical mutation. Payment/refund f
 
 Split payment is a normal payment mode with multiple wallet allocations. A full refund makes the Record payable/editable again; a partial refund leaves the remaining active payment balance.
 
-The payment UI is input/display only. It may let the master enter a percent or ruble discount, but calculation belongs to Business Model and actual movement belongs to DDS.
+The payment UI is input/display only. It may let the master enter a percent or ruble discount, but calculation belongs to Financial Model and actual movement belongs to DDS.
 
 ## Journal financial rule
 
 Journal does not invent financial arithmetic.
 
-Record card, Journal list and day header use Business Model `planTotal` — the amount after the applied client/payment-stage discount.
+Record card, Journal list and day header use Financial Model `planTotal` — the amount after the applied client/payment-stage discount.
 
 Example: service 5,000 with 20% discount → Journal/day amount is 4,000, not 5,000.
 
@@ -215,8 +219,8 @@ For every production release block:
 
 ## Latest finance foundation release
 
-PR #26 `Establish DDS and business finance ownership` established the canonical finance separation:
-- Business Model for plan/fact;
+PR #26 established the canonical finance separation:
+- Financial Model for financial plan/fact;
 - DDS for actual movements;
 - Wallet for wallet cash/history projection;
 - Record for the stored appointment financial snapshot;
@@ -224,6 +228,8 @@ PR #26 `Establish DDS and business finance ownership` established the canonical 
 - payment-stage discount persistence;
 - removal of obsolete `core/payment.js`;
 - architecture regression guard preventing those responsibilities from being mixed again.
+
+The follow-up terminology correction keeps the current finance calculation owner named Financial Model throughout code, tests and documentation.
 
 No server/backend migration was included in this finance-foundation release.
 

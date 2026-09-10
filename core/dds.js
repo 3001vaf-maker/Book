@@ -1,6 +1,6 @@
 const STORAGE_KEY = 'book.dds';
 const LEGACY_PAYMENT_KEY = 'book.payments';
-const VERSION = 2;
+const VERSION = 3;
 
 const numberValue = (value) => {
   const number = Number(String(value ?? '').replace(',', '.'));
@@ -22,7 +22,7 @@ function readLegacyPayments() {
   }
 }
 
-function normalizeBusinessSnapshot(value = null) {
+function normalizeFinancialSnapshot(value = null) {
   if (!value || typeof value !== 'object') return null;
   return {
     items: Array.isArray(value.items) ? value.items.map((item) => ({ ...item })) : [],
@@ -33,28 +33,37 @@ function normalizeBusinessSnapshot(value = null) {
   };
 }
 
+function legacyFinancialSnapshot(item = {}) {
+  return item?.['business'] || null;
+}
+
 function normalizeIncome(item = {}) {
-  const business = normalizeBusinessSnapshot(item.business || item.finance);
+  const { finance: currentFinance, ...rest } = item;
+  delete rest['business'];
+  const finance = normalizeFinancialSnapshot(currentFinance || legacyFinancialSnapshot(item));
   return {
-    ...item,
+    ...rest,
     status: 'completed',
     movementType: 'income',
     incomeType: item.incomeType || 'payment',
     source: item.source || null,
     total: Math.max(0, numberValue(item.total)),
     allocations: Array.isArray(item.allocations) ? item.allocations.map((entry) => ({ ...entry })) : [],
-    business,
+    finance,
   };
 }
 
 function normalizeExpense(item = {}) {
+  const { finance: currentFinance, ...rest } = item;
+  delete rest['business'];
   return {
-    ...item,
+    ...rest,
     status: item.status === 'refund' ? 'refund' : (item.status || 'expense'),
     movementType: 'expense',
     expenseType: item.expenseType || (item.status === 'refund' ? 'refund' : 'other'),
     source: item.source || null,
     total: Math.max(0, numberValue(item.total)),
+    finance: normalizeFinancialSnapshot(currentFinance || legacyFinancialSnapshot(item)),
   };
 }
 
@@ -75,9 +84,9 @@ function normalizedState(value) {
   if (legacyOperational.length) {
     const bySource = new Map(legacyOperational.map((entry) => [sourceKey(entry?.source), entry]));
     income.forEach((entry) => {
-      if (entry.business) return;
+      if (entry.finance) return;
       const legacy = bySource.get(sourceKey(entry?.source));
-      if (legacy) entry.business = normalizeBusinessSnapshot(legacy);
+      if (legacy) entry.finance = normalizeFinancialSnapshot(legacy);
     });
   }
   return { version: VERSION, income, expense };
@@ -92,7 +101,8 @@ function readState() {
     const storedRaw = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
     const stored = normalizedState(storedRaw);
     if (stored) {
-      if (storedRaw?.version !== VERSION || Array.isArray(storedRaw?.operational)) writeState(stored);
+      const hasLegacySnapshot = [...(storedRaw?.income || []), ...(storedRaw?.expense || [])].some((item) => item?.['business']);
+      if (storedRaw?.version !== VERSION || Array.isArray(storedRaw?.operational) || hasLegacySnapshot) writeState(stored);
       return stored;
     }
   } catch {}
@@ -136,9 +146,9 @@ function activePaymentForSource(state, source = null) {
   return matches.length ? matches[matches.length - 1] : null;
 }
 
-export function recordPaymentIncome({ source = null, workplace = '', client = null, business = null, allocations = [], now = new Date() } = {}) {
+export function recordPaymentIncome({ source = null, workplace = '', client = null, finance = null, allocations = [], now = new Date() } = {}) {
   if (!source?.type || !source?.id) return null;
-  const snapshot = normalizeBusinessSnapshot(business);
+  const snapshot = normalizeFinancialSnapshot(finance);
   if (!snapshot) return null;
   const total = snapshot.planTotal;
   const state = readState();
@@ -164,7 +174,7 @@ export function recordPaymentIncome({ source = null, workplace = '', client = nu
     walletId: preparedAllocations.length === 1 ? preparedAllocations[0].walletId : '',
     walletName: preparedAllocations.length === 1 ? preparedAllocations[0].walletName : '',
     total,
-    business: snapshot,
+    finance: snapshot,
     createdAt: now.toISOString(),
     paidAt: now.toISOString(),
   });
@@ -202,7 +212,7 @@ export function recordRefundExpense(paymentId, { reason = '', amount = null, wal
     walletName: resolvedWalletName,
     total: refundAmount,
     reason: String(reason || ''),
-    business: original.business || null,
+    finance: original.finance || null,
     createdAt: now.toISOString(),
     refundedAt: now.toISOString(),
   });

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { calculateBusinessPlan, getBusinessItemFact } from '../core/business-model.js';
+import { calculateFinancialPlan, getFinancialItemFact } from '../core/financial-model.js';
 import { createDay } from '../core/day.js';
 import { recordPaymentIncome, recordRefundExpense } from '../core/dds.js';
 import { createRecord, getRecords, moveRecord, updateRecord } from '../journal/record-data.js';
@@ -62,12 +62,12 @@ const payment = recordPaymentIncome({
   source: { type: 'record', id: record.id },
   workplace: 'Студия',
   client: { key: 'client-1', name: 'Анна Тест' },
-  business: noShow.finance,
+  finance: noShow.finance,
   allocations: [{ walletId: 'cash', walletName: 'Наличные', amount: 6400 }],
 });
 assert.ok(payment);
-assert.equal(payment.business.serviceTotal, 8000);
-assert.equal(payment.business.discountTotal, 1600);
+assert.equal(payment.finance.serviceTotal, 8000);
+assert.equal(payment.finance.discountTotal, 1600);
 assert.equal(payment.total, 6400);
 assert.equal(recordVisualState(noShow, { paid: true }), 'paid');
 
@@ -107,7 +107,7 @@ assert.equal(paymentStageRecord.finance.serviceTotal, 8000);
 assert.equal(paymentStageRecord.finance.discountTotal, 0);
 assert.equal(paymentStageRecord.finance.planTotal, 8000);
 
-const paymentStagePlan = calculateBusinessPlan(paymentStageRecord.finance.items.map((item) => ({
+const paymentStagePlan = calculateFinancialPlan(paymentStageRecord.finance.items.map((item) => ({
   ...item,
   discountMode: 'percent',
   discountPercent: 20,
@@ -125,29 +125,29 @@ const paymentStageIncome = recordPaymentIncome({
   source: { type: 'record', id: paymentStageRecord.id },
   workplace: 'Студия',
   client: { key: 'client-2', name: 'Ирина БезСкидки' },
-  business: paymentStageUpdated.finance,
+  finance: paymentStageUpdated.finance,
   allocations: [{ walletId: 'cash', walletName: 'Наличные', amount: 6400 }],
 });
 assert.ok(paymentStageIncome);
 assert.equal(paymentStageIncome.total, 6400);
-assert.equal(paymentStageIncome.business.serviceTotal, 8000);
-assert.equal(paymentStageIncome.business.discountTotal, 1600);
+assert.equal(paymentStageIncome.finance.serviceTotal, 8000);
+assert.equal(paymentStageIncome.finance.discountTotal, 1600);
 
 const paymentStageAttended = updateRecord(paymentStageRecord.id, { attendance: 'arrived' });
 assert.equal(paymentStageAttended.finance.factTotal, 6400);
 assert.equal(getClientMetadata('client-2').paidTotal, 6400);
-assert.equal(getBusinessItemFact('procedure', 'procedure-2').factTotal, 6400);
+assert.equal(getFinancialItemFact('procedure', 'procedure-2').factTotal, 6400);
 assert.equal(getWalletBalance('cash'), 12800);
 
 const returned = recordRefundExpense(paymentStageIncome.id, { reason: 'Возврат клиенту' });
 assert.ok(returned);
 updateRecord(paymentStageRecord.id, {});
 assert.equal(getClientMetadata('client-2').paidTotal, 0);
-assert.equal(getBusinessItemFact('procedure', 'procedure-2').factTotal, 0);
+assert.equal(getFinancialItemFact('procedure', 'procedure-2').factTotal, 0);
 assert.equal(getWalletBalance('cash'), 6400);
 
 // Legacy paid records with a payment-stage discount recover the exact financial snapshot.
-const historicalPlan = calculateBusinessPlan([{
+const historicalPlan = calculateFinancialPlan([{
   sourceType: 'procedure',
   sourceId: 'procedure-history',
   name: 'Историческая услуга',
@@ -159,7 +159,7 @@ const historicalIncome = recordPaymentIncome({
   source: { type: 'record', id: 'record-history' },
   workplace: 'Студия',
   client: { key: 'client-history', name: 'История' },
-  business: historicalPlan,
+  finance: historicalPlan,
   allocations: [{ walletId: 'cashless', walletName: 'Безналичные', amount: 6400 }],
 });
 assert.ok(historicalIncome);
