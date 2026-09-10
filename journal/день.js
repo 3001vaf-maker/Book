@@ -3,7 +3,7 @@ import { getWorkplaces } from '../core/workplace-time.js';
 import { getDays, getDay, getDayTime, getDaysForDate } from '../core/day.js';
 import { rangesOverlap } from '../core/time.js';
 import { getActivePaymentForSource } from '../core/dds.js';
-import { recordPlanTotal } from '../core/business-model.js';
+import { recordPlanTotal } from '../core/financial-model.js';
 import { getRecordsForDay } from './record-data.js';
 import { getJournalBreaksForDay, getJournalBreaks } from './break-data.js';
 import { getTimeUsages } from '../core/time-usage.js';
