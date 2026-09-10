@@ -280,6 +280,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
   const original = { ...record };
   let baseline = stateSnapshot(state);
   let startTimer = null;
+  let updatingFromView = false;
   const m = mountModal(document.body, modal('<div data-record-view-host></div>', { variant: 'large', surface: 'app' }));
   if (!m) return;
   const root = m.querySelector('[data-record-view-host]');
@@ -317,6 +318,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
 
   const persistChanges = () => {
     if (isPaid()) return false;
+    updatingFromView = true;
     const updated = updateRecord(record.id, {
       date: dateKey(state.date),
       workplaceId: String(state.workplaceId || ''),
@@ -327,6 +329,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       confirmed: Boolean(state.confirmed),
       attendance: normalizedAttendance(state.attendance),
     });
+    updatingFromView = false;
     if (!updated) {
       openNotice({ title: 'Не удалось сохранить', message: 'Проверьте рабочий день и свободное время.' });
       return false;
@@ -364,10 +367,10 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     const meta = [
       { value: durationText(totalDuration), label: 'расход' },
       { value: formatMoney(finance?.serviceTotal), label: 'стоимость' },
-      ...(discountTotal > 0 ? [{
-        value: `−${formatMoney(discountTotal)}`,
-        label: discountPercent == null ? 'скидка' : `скидка ${formatPercent(discountPercent)}%`,
-      }] : []),
+      {
+        value: discountTotal > 0 ? `−${formatMoney(discountTotal)}` : formatMoney(0),
+        label: Number(discountPercent) > 0 ? `скидка ${formatPercent(discountPercent)}%` : 'скидка',
+      },
     ];
     const detailRows = state.procedures.map((item, index) => ({
       left: item.name || '',
@@ -485,14 +488,24 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     });
   };
 
-  const onDDSChanged = (event) => {
-    const source = event?.detail?.source;
-    if (String(source?.type || '') !== 'record' || String(source?.id || '') !== String(record.id)) return;
-    const current = getRecords().find((item) => String(item?.id || '') === String(record.id)) || record;
-    state = stateFromRecord(current, { paid: true });
+  const syncFromStoredRecord = ({ paid = isPaid() } = {}) => {
+    const current = getRecords().find((item) => String(item?.id || '') === String(record.id));
+    if (!current) return;
+    state = stateFromRecord(current, { paid });
     baseline = stateSnapshot(state);
     render();
   };
+
+  const onRecordsChanged = (event) => {
+    if (updatingFromView || String(event?.detail?.recordId || '') !== String(record.id)) return;
+    syncFromStoredRecord();
+  };
+  const onDDSChanged = (event) => {
+    const source = event?.detail?.source;
+    if (String(source?.type || '') !== 'record' || String(source?.id || '') !== String(record.id)) return;
+    syncFromStoredRecord({ paid: true });
+  };
+  window.addEventListener('book:records-changed', onRecordsChanged);
   window.addEventListener('book:dds-changed', onDDSChanged);
 
   let closed = false;
@@ -501,6 +514,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     closed = true;
     if (startTimer) clearTimeout(startTimer);
     startTimer = null;
+    window.removeEventListener('book:records-changed', onRecordsChanged);
     window.removeEventListener('book:dds-changed', onDDSChanged);
     queueMicrotask(() => onClose?.());
   };

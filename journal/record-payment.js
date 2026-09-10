@@ -29,6 +29,13 @@ function proceduresFromFinance(record, finance) {
   });
 }
 
+function saveFinancialCorrection(record, finance) {
+  return updateRecord(record.id, {
+    procedures: proceduresFromFinance(record, finance),
+    finance,
+  });
+}
+
 function paymentEntryContent(record) {
   const completed = getActivePaymentForSource('record', record?.id);
   if (completed) return `<button type="button" class="modal-bottom-action modal-bottom-action--paid" data-record-payment-paid aria-label="Открыть оплату ${completed.total} рублей"><strong>Оплачено</strong><strong>${money(completed.total)}</strong></button>`;
@@ -146,15 +153,17 @@ function openPaymentModal(record) {
     procedures: (finance?.items || []).map((item) => ({ sourceType: item.sourceType || 'procedure', id: item.sourceId, name: item.name, cost: item.price, discountMode: item.discountMode, discountPercent: item.discountPercent, discountMoney: item.discountMoney })),
     total: finance?.planTotal || 0,
   })}`;
-  const m = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
+  const m = mountModal(document.body, modal(content, { variant: 'large', surface: 'app' }));
   if (!m) return;
   initPaymentForm(m.querySelector('[data-payment-ui]'), {
     calculate: (items) => calculateFinancialPlan(items),
+    onSave: ({ finance: updatedFinance }) => {
+      const updated = saveFinancialCorrection(current, updatedFinance);
+      if (!updated) return;
+      m.remove();
+    },
     onPay: ({ finance: updatedFinance }) => {
-      const updated = updateRecord(current.id, {
-        procedures: proceduresFromFinance(current, updatedFinance),
-        finance: updatedFinance,
-      });
+      const updated = saveFinancialCorrection(current, updatedFinance);
       if (!updated) return;
       openPaymentMethodsModal({ ...paymentFromRecord(updated), finance: updated.finance }, m);
     },

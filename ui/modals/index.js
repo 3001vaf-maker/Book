@@ -13,7 +13,7 @@ export function modal(content, { title = '', className = '', variant = '', surfa
   const closeButton = variant === 'bottom'
     ? ''
     : '<button type="button" class="modal-close" data-modal-close aria-label="Закрыть">×</button>';
-  return `<div class="modal-backdrop" data-modal><div class="${classes}" role="dialog" aria-modal="true" ${title ? `aria-label="${escapeHtml(title)}"` : ''}>${closeButton}${content}</div></div>`;
+  return `<div class="modal-backdrop" data-modal><div class="${classes}" role="dialog" aria-modal="true" tabindex="-1" ${title ? `aria-label="${escapeHtml(title)}"` : ''}>${closeButton}${content}</div></div>`;
 }
 
 export function mountModal(root, html) {
@@ -37,7 +37,11 @@ export function mountModal(root, html) {
     if (e.target === m || e.target.closest('[data-modal-close]')) close();
   });
 
-  requestAnimationFrame(() => m.querySelector('input,select,textarea,button:not([data-modal-close])')?.focus());
+  requestAnimationFrame(() => {
+    const explicit = m.querySelector('[data-modal-autofocus]');
+    const target = explicit || m.querySelector('.modal-sheet');
+    target?.focus?.({ preventScroll: true });
+  });
   return m;
 }
 
