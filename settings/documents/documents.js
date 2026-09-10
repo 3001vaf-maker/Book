@@ -1,4 +1,4 @@
-import { actionBlock, button, escapeHtml, field, folderList, iconButton, initViewNavigation, list, modal, mountModal, page, pageHeader, textareaField, viewNavigation } from '../../ui/ui.js';
+import { actionBlock, button, escapeHtml, field, folderList, iconButton, initViewNavigation, list, modal, mountModal, page, pageHeader, shortDateTime, textareaField, viewNavigation } from '../../ui/ui.js';
 import { getAllClients } from '../../main/clients/data.js';
 import { createDocument, getDocuments, saveDocument } from './data.js';
 import { getConsents } from './consents.js';
@@ -31,10 +31,7 @@ function consentStateText(status) {
 }
 
 function formatMoment(value) {
-  if (!value) return 'Дата не зафиксирована';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Дата не зафиксирована';
-  return new Intl.DateTimeFormat('ru-RU', { dateStyle: 'short', timeStyle: 'short' }).format(date);
+  return shortDateTime(value, 'Дата не зафиксирована');
 }
 
 function legalNotice() {

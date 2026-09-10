@@ -4,9 +4,12 @@ export function page(blocks = []) {
   return `<div class="ui-page">${blocks.filter(Boolean).join('')}</div>`;
 }
 
-export function details(items = []) {
+export function details(items = [], { variant = '' } = {}) {
   const values = (Array.isArray(items) ? items : []).filter(Boolean);
   if (!values.length) return '';
+  if (variant === 'split') {
+    return `<div class="entity-details entity-details--split">${values.map(({ left = '—', right = '—' }) => `<div><strong>${escapeHtml(left === '' || left == null ? '—' : left)}</strong><strong>${escapeHtml(right === '' || right == null ? '—' : right)}</strong></div>`).join('')}</div>`;
+  }
   return `<div class="entity-details">${values.map(({ label = '', value = '—' }) => `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value === '' || value == null ? '—' : value)}</strong></div>`).join('')}</div>`;
 }
 

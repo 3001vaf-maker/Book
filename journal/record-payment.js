@@ -1,4 +1,4 @@
-import { button, escapeHtml, initPaymentForm, initPaymentMethods, modal, mountModal, paymentForm, paymentMethods, select } from '../ui/ui.js';
+import { button, details, escapeHtml, initPaymentForm, initPaymentMethods, modal, mountModal, paymentForm, paymentMethods, select, shortDate, shortDateTimeParts, shortTime } from '../ui/ui.js';
 import { calculateFinancialPlan } from '../core/financial-model.js';
 import { getActivePaymentForSource, getRefundsForPayment, recordPaymentIncome, recordRefundExpense } from '../core/dds.js';
 import { getWorkplaces } from '../core/workplace-time.js';
@@ -59,8 +59,8 @@ function recordClient(record) {
 
 function paymentMoment(now = new Date()) {
   return {
-    date: `${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getFullYear()).slice(-2)}`,
-    time: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
+    date: shortDate(now),
+    time: shortTime(now),
   };
 }
 
@@ -84,27 +84,28 @@ function paymentAllocations(payment) {
 
 function paymentDateTime(payment) {
   const value = payment?.refundedAt || payment?.paidAt || payment?.createdAt;
-  if (!value) return { date: '', time: '' };
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return { date: '', time: '' };
+  if (value) {
+    const parts = shortDateTimeParts(value);
+    if (parts.date) return parts;
+  }
   return {
-    date: date.toLocaleDateString('ru-RU'),
-    time: date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+    date: String(payment?.date || ''),
+    time: String(payment?.time || ''),
   };
 }
 
 function walletSummary(payment) {
   const allocations = paymentAllocations(payment);
   if (!allocations.length) return payment?.walletName || '—';
-  return allocations.map((item) => item.walletName || 'Кошелёк').join(' · ');
+  return allocations.map((item) => item.walletName || 'Кошелёк').join(' + ');
 }
 
 function paymentFactMarkup(payment) {
   const when = paymentDateTime(payment);
-  return `<div class="entity-details">
-    <div><span>Дата</span><strong>${escapeHtml([when.date, when.time].filter(Boolean).join(' · ') || '—')}</strong></div>
-    <div><span>Сумма</span><strong>${escapeHtml(money(payment?.total))} · ${escapeHtml(walletSummary(payment))}</strong></div>
-  </div>`;
+  return details([
+    { left: when.date || '—', right: when.time || '—' },
+    { left: money(payment?.total), right: walletSummary(payment) },
+  ], { variant: 'split' });
 }
 
 function openPaymentMethodsModal(payment, paymentModal) {
@@ -172,9 +173,12 @@ function openPaymentModal(record) {
 
 function refundHistoryMarkup(refunds) {
   if (!refunds.length) return '';
-  return `<div class="entity-details">${refunds.map((item) => {
+  return `<div class="payment-refund-history">${refunds.map((item) => {
     const when = paymentDateTime(item);
-    return `<div><span>${escapeHtml([when.date, when.time].filter(Boolean).join(' · ') || 'Возврат')}</span><strong>${escapeHtml(money(item.total))} · ${escapeHtml(item.walletName || 'Кошелёк')}</strong></div>`;
+    return `<div class="payment-refund-history__item"><strong class="payment-refund-history__label">Возврат</strong>${details([
+      { left: when.date || '—', right: when.time || '—' },
+      { left: money(item.total), right: item.walletName || 'Кошелёк' },
+    ], { variant: 'split' })}</div>`;
   }).join('')}</div>`;
 }
 
@@ -196,7 +200,7 @@ function openRefundModal(payment) {
     <div class="payment-refund-form">
       <label class="payment-refund-amount"><span>Сумма возврата</span><input type="number" min="0" max="${remaining}" step="0.01" inputmode="decimal" value="${remaining}" data-refund-amount></label>
       ${select({ value: defaultWalletId, options, data: 'data-refund-wallet', aria: 'Кошелёк возврата' })}
-      ${button(remaining === Number(payment.total || 0) ? 'Вернуть полностью' : 'Подтвердить возврат', { data: 'data-refund-submit' })}
+      ${button(remaining === Number(payment.total || 0) ? 'Вернуть полностью' : 'Подтвердить возврат', { variant: 'danger', data: 'data-refund-submit' })}
     </div>`;
   const m = mountModal(document.body, modal(html, { variant: 'medium', surface: 'app' }));
   if (!m) return;
@@ -228,7 +232,7 @@ function openPaidState(record) {
   const payment = getActivePaymentForSource('record', record?.id);
   if (!payment) return;
   const refunds = getRefundsForPayment(payment.id);
-  const html = `<div class="modal-title"><h2>Оплачено</h2></div>${paymentFactMarkup(payment)}${refundHistoryMarkup(refunds)}<div class="modal-actions">${button('Возврат оплаты', { variant: 'secondary', data: 'data-refund-payment' })}</div>`;
+  const html = `<div class="modal-title"><h2>Оплачено</h2></div>${paymentFactMarkup(payment)}${refundHistoryMarkup(refunds)}<div class="modal-actions">${button('Возврат оплаты', { variant: 'danger', data: 'data-refund-payment' })}</div>`;
   const m = mountModal(document.body, modal(html, { variant: 'medium', surface: 'app' }));
   if (!m) return;
   m.querySelector('[data-refund-payment]')?.addEventListener('click', () => {

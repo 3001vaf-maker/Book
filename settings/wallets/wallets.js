@@ -1,13 +1,12 @@
-import { actionBlock, button, emptyState, entityCard, escapeHtml, field, iconButton, initPhotoField, listEntries, listEntry, mountModal, modal, page, pageHeader, photoField } from '../../ui/ui.js';
+import { actionBlock, button, emptyState, entityCard, escapeHtml, field, iconButton, initPhotoField, listEntries, listEntry, mountModal, modal, page, pageHeader, photoField, shortDateTime } from '../../ui/ui.js';
 import { deleteWallet as deleteWalletData, getWalletBalance, getWalletHistory, getWallets, saveWallet as saveWalletData, updateWallet } from './data.js';
 
 const formatMoney = (value) => `${(Number(value) || 0).toLocaleString('ru-RU')} ₽`;
 
 function operationMoment(payment) {
   const raw = payment?.refundedAt || payment?.paidAt || payment?.createdAt || '';
-  const date = new Date(raw);
-  if (!raw || Number.isNaN(date.getTime())) return `${payment?.date || ''} ${payment?.time || ''}`.trim();
-  return `${date.toLocaleDateString('ru-RU')} ${date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
+  const fallback = `${payment?.date || ''} ${payment?.time || ''}`.trim();
+  return shortDateTime(raw, fallback);
 }
 
 function renderList(root, navigateBack) {
