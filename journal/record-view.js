@@ -13,7 +13,7 @@ import {
   timePicker,
   timeSlots,
 } from '../ui/ui.js';
-import { getCompletedPaymentForSource } from '../core/payment.js';
+import { getActivePaymentForSource } from '../core/dds.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getDays, getDay, getDayTime } from '../core/day.js';
 import { timeToMinutes, minutesToTime } from '../core/time.js';
@@ -278,7 +278,7 @@ function confirmCancel(record, onCancelled) {
 
 export function openRecordView(record, { onClose = () => {} } = {}) {
   if (!record?.id) return;
-  const isPaid = () => Boolean(getCompletedPaymentForSource('record', record.id));
+  const isPaid = () => Boolean(getActivePaymentForSource('record', record.id));
   let state = stateFromRecord(record, { paid: isPaid() });
   const original = { ...record };
   let baseline = stateSnapshot(state);
@@ -480,7 +480,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     });
   };
 
-  const onPaymentsChanged = (event) => {
+  const onDDSChanged = (event) => {
     const source = event?.detail?.source;
     if (String(source?.type || '') !== 'record' || String(source?.id || '') !== String(record.id)) return;
     const current = getRecords().find((item) => String(item?.id || '') === String(record.id)) || record;
@@ -488,7 +488,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     baseline = stateSnapshot(state);
     render();
   };
-  window.addEventListener('book:payments-changed', onPaymentsChanged);
+  window.addEventListener('book:dds-changed', onDDSChanged);
 
   let closed = false;
   const finishClose = () => {
@@ -496,7 +496,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     closed = true;
     if (startTimer) clearTimeout(startTimer);
     startTimer = null;
-    window.removeEventListener('book:payments-changed', onPaymentsChanged);
+    window.removeEventListener('book:dds-changed', onDDSChanged);
     queueMicrotask(() => onClose?.());
   };
 
