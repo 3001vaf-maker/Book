@@ -16,11 +16,11 @@ function walletOptions(wallets = []) {
   }))];
 }
 
-export function singlePaymentMarkup({ wallets = [], total = 0 } = {}) {
+export function singlePaymentMarkup({ wallets = [], total = 0, initialWalletId = '' } = {}) {
   return `<div class="payment-methods__single" data-payment-single-owner>
     <div class="payment-methods__amount"><span>Сумма</span><strong>${escapeHtml(moneyText(total))} ₽</strong></div>
-    ${select({ value: '', options: walletOptions(wallets), data: 'data-payment-single-wallet', aria: 'Кошелёк оплаты' })}
-    ${button('Подтвердить оплату', { data: 'data-payment-single-submit disabled' })}
+    ${select({ value: String(initialWalletId || ''), options: walletOptions(wallets), data: 'data-payment-single-wallet', aria: 'Кошелёк оплаты' })}
+    ${button('Подтвердить оплату', { data: 'data-payment-single-submit' })}
   </div>`;
 }
 
