@@ -2,7 +2,6 @@ import { apiRequest } from './auth.js';
 
 const CLEAN_START_KEY = 'book.production.clean.v2';
 const SYNC_INTERVAL_MS = 4000;
-const STRONG_DATA_KEYS = ['book.people', 'book.workplaces', 'book.procedures', 'book.records', 'book.payments'];
 let lastSerialized = '';
 let syncing = false;
 let timer = null;
@@ -24,17 +23,20 @@ function serialized(data) {
   return JSON.stringify(data || {});
 }
 
-function listLength(raw) {
+function storedValueWeight(raw) {
+  if (typeof raw !== 'string' || !raw) return 0;
   try {
-    const value = JSON.parse(raw || '[]');
-    return Array.isArray(value) ? value.length : 0;
+    const value = JSON.parse(raw);
+    if (Array.isArray(value)) return value.length;
+    if (value && typeof value === 'object') return Math.max(1, Object.keys(value).length);
+    return value ? 1 : 0;
   } catch {
-    return 0;
+    return raw.trim() ? 1 : 0;
   }
 }
 
 function workspaceStrength(data) {
-  return STRONG_DATA_KEYS.reduce((sum, key) => sum + listLength(data?.[key]), 0);
+  return Object.values(data || {}).reduce((sum, raw) => sum + storedValueWeight(raw), 0);
 }
 
 function hasWorkspaceData(data) {
