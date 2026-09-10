@@ -139,6 +139,7 @@ export function renderJournal(root) {
   };
 
   const renderView = () => {
+    if (!root.isConnected) return;
     const listModeNavigation = activeView === 'list'
       ? `<div class="journal-list-mode-navigation" data-journal-list-mode-navigation>${viewNavigation({ views: listModes, activeView: listMode, className: 'segment-control--two-equal', ariaLabel: 'Режим списка' })}</div>`
       : '';
@@ -182,17 +183,19 @@ export function renderJournal(root) {
     initViewNavigation(root, { views, activeView, onChange: (nextView) => { activeView = nextView; renderView(); } });
   };
 
-  if (root.__bookJournalRecordsChangedHandler) window.removeEventListener('book:records-changed', root.__bookJournalRecordsChangedHandler);
-  root.__bookJournalRecordsChangedHandler = () => {
+  const recordsChangedHandler = () => {
     if (activeView === 'day' || activeView === 'list') renderView();
   };
-  window.addEventListener('book:records-changed', root.__bookJournalRecordsChangedHandler);
-
-  if (root.__bookJournalPaymentsChangedHandler) window.removeEventListener('book:payments-changed', root.__bookJournalPaymentsChangedHandler);
-  root.__bookJournalPaymentsChangedHandler = () => {
+  const paymentsChangedHandler = () => {
     if (activeView === 'list') renderView();
   };
-  window.addEventListener('book:payments-changed', root.__bookJournalPaymentsChangedHandler);
 
+  window.addEventListener('book:records-changed', recordsChangedHandler);
+  window.addEventListener('book:payments-changed', paymentsChangedHandler);
   renderView();
+
+  return () => {
+    window.removeEventListener('book:records-changed', recordsChangedHandler);
+    window.removeEventListener('book:payments-changed', paymentsChangedHandler);
+  };
 }
