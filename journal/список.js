@@ -1,6 +1,6 @@
 import { emptyState, listEntries, listEntry } from '../ui/ui.js';
 import { getWorkplaces } from '../core/workplace-time.js';
-import { getCompletedPaymentForSource, paymentTotal } from '../core/payment.js';
+import { getCompletedPaymentForSource, recordDueTotal } from '../core/dds.js';
 import { getRecords } from './record-data.js';
 import { isRecordCompletedSide, recordActivityTime, recordAppointmentTime, recordVisualState } from './record-state.js';
 
@@ -38,7 +38,7 @@ function recordEntry(record, workplaces, { focus = false, payment = null } = {})
     title: clientName(record?.client),
     subtitle: record?.client?.phone || '',
     rightTop: [formatDate(record?.date), String(record?.from || '')].filter(Boolean).join(' · '),
-    rightBottom: formatMoney(paymentTotal(record?.procedures || [])),
+    rightBottom: formatMoney(recordDueTotal(record)),
     interactive: false,
     className: classes,
     initial: (clientName(record?.client) || '?').slice(0, 1).toUpperCase(),
