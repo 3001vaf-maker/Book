@@ -58,7 +58,19 @@ Current deployment transition:
 - deploy backend
 - create real OWNER/Tenant in production database
 
-## Current frontend source-of-truth that still needs migration
+## Clean-start data decision
+
+Current browser data is test data and does NOT need to be migrated into production.
+
+Production Book will start with a clean server database. Alexander will go through the real product flow from zero and create real data directly in the server-backed application.
+
+Therefore:
+- do not build a one-off migration for current test localStorage data;
+- do not spend time preserving current test records, clients, payments or other test entities;
+- migration work is about replacing localStorage ownership with server API ownership, not copying the current test dataset;
+- use the clean start to validate the complete first-user journey from OWNER creation through daily work.
+
+## Current frontend source-of-truth that still needs replacement
 
 Browser localStorage currently owns major data domains:
 - clients
@@ -68,16 +80,16 @@ Browser localStorage currently owns major data domains:
 - records
 - payments
 
-Migration must be progressive. Keep existing frontend contracts and replace storage underneath them with API calls. Avoid parallel local/server truth.
+Replace these progressively with server API-backed owners. Keep existing frontend contracts where useful and avoid parallel local/server truth.
 
-Recommended migration order:
+Recommended replacement order:
 1. Profile + Workplaces
 2. Clients
 3. Procedures
 4. Working days / timetable
 5. Records / Breaks
 6. Wallets / Payments
-7. Final localStorage migration and server-only truth
+7. Remove remaining production dependence on localStorage
 
 ## Known unfinished product areas — do not forget
 
