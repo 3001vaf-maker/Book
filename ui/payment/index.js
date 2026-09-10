@@ -26,15 +26,20 @@ const discountOptions = [
 ];
 
 export function paymentForm({ workplace = '', date = '', time = '', client = {}, procedures = [], total = 0 } = {}) {
-  const procedureBlocks = (Array.isArray(procedures) ? procedures : []).map((procedure, index) => `
+  const procedureBlocks = (Array.isArray(procedures) ? procedures : []).map((procedure, index) => {
+    const price = Math.max(0, numberValue(procedure?.cost));
+    const percent = Math.max(0, Math.min(100, numberValue(procedure?.discountPercent)));
+    const money = Math.max(0, Math.min(price, numberValue(procedure?.discountMoney ?? (percent ? price * percent / 100 : 0))));
+    return `
     <section class="payment-procedure" data-payment-procedure="${index}" data-payment-source-id="${escapeHtml(procedure?.id || '')}" data-payment-name="${escapeHtml(procedure?.name || '')}">
       <strong class="payment-procedure__name">${escapeHtml(procedure?.name || '')}</strong>
       <div class="payment-fields payment-fields--three">
-        <label><span>Цена</span><input type="number" inputmode="decimal" step="0.01" min="0" value="${escapeHtml(moneyText(procedure?.cost))}" data-payment-price></label>
-        <div class="payment-discount-percent">${select({ label: 'Скидка %', value: '', options: discountOptions, data: 'data-payment-discount-percent', aria: 'Скидка в процентах' })}</div>
-        <label><span>Скидка ₽</span><input type="number" inputmode="decimal" step="0.01" min="0" value="" data-payment-discount-money></label>
+        <label><span>Цена</span><input type="number" inputmode="decimal" step="0.01" min="0" value="${escapeHtml(moneyText(price))}" data-payment-price></label>
+        <div class="payment-discount-percent">${select({ label: 'Скидка %', value: percent ? percentText(percent) : '', options: discountOptions, data: 'data-payment-discount-percent', aria: 'Скидка в процентах' })}</div>
+        <label><span>Скидка ₽</span><input type="number" inputmode="decimal" step="0.01" min="0" value="${money ? escapeHtml(moneyText(money)) : ''}" data-payment-discount-money></label>
       </div>
-    </section>`).join('');
+    </section>`;
+  }).join('');
 
   const uei = client?.uei ? `<span>${escapeHtml(client.uei)}</span>` : '';
   const name = escapeHtml(client?.name || '');
