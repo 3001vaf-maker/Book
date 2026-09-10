@@ -1,5 +1,5 @@
 import { initCalendar, ALL_WORKPLACES_ID } from '../ui/ui.js';
-import { getPayments } from '../core/payment.js';
+import { getActivePaymentForSource } from '../core/dds.js';
 import { minutesBetween } from '../core/time.js';
 import { getWorkplaces, getWorkingDays, getWorkingDates, getAllWorkingDates, getWorkingDayIndicators, getWorkingDay, getWorkingDayTotalMinutes, resolveWorkingDayTime } from '../core/workplace-time.js';
 import { getRecordsForDay } from './record-data.js';
@@ -8,13 +8,6 @@ import { recordVisualState } from './record-state.js';
 const RECORD_COLOR = '#EFFFBB';
 const PAID_COLOR = '#DDE8D7';
 const NO_SHOW_COLOR = '#F1DADA';
-
-function paidRecordIds() {
-  return new Set(getPayments()
-    .filter((payment) => payment?.status === 'completed' && payment?.source?.type === 'record')
-    .map((payment) => String(payment?.source?.id || ''))
-    .filter(Boolean));
-}
 
 function recordMinutes(record) {
   return Math.max(0, minutesBetween(String(record?.from || ''), String(record?.to || '')) || 0);
@@ -27,7 +20,7 @@ function dayCapacityMinutes(workingDays, workplaces, workplaceId, dateKey, allMo
   return time ? Math.max(0, minutesBetween(time.from, time.to)) : 0;
 }
 
-function dayRecordData({ dateKey, workplaceId, allMode, workingDays, workplaces, paidIds }) {
+function dayRecordData({ dateKey, workplaceId, allMode, workingDays, workplaces }) {
   const records = getRecordsForDay(dateKey, allMode ? '' : workplaceId)
     .filter((record) => record?.status !== 'cancelled');
   const capacity = dayCapacityMinutes(workingDays, workplaces, workplaceId, dateKey, allMode);
@@ -35,7 +28,8 @@ function dayRecordData({ dateKey, workplaceId, allMode, workingDays, workplaces,
 
   records.forEach((record) => {
     const duration = recordMinutes(record);
-    const state = recordVisualState(record, { paid: paidIds.has(String(record?.id || '')) });
+    const paid = Boolean(record?.id && getActivePaymentForSource('record', record.id));
+    const state = recordVisualState(record, { paid });
     if (state === 'paid') minutes.paid += duration;
     else if (state === 'no-show') minutes.noShow += duration;
     else minutes.active += duration;
@@ -79,14 +73,13 @@ export function renderJournalMonth(root, { workplaceId = '', onDateSelect = () =
     root.innerHTML = '<div data-journal-month-calendar></div>';
     const workingDays = getWorkingDays();
     const workplaces = getWorkplaces();
-    const paidIds = paidRecordIds();
     const allMode = workplaceId === ALL_WORKPLACES_ID;
     initCalendar(root.querySelector('[data-journal-month-calendar]'), {
       month,
       workingDates: allMode ? getAllWorkingDates(workingDays, month) : getWorkingDates(workingDays, workplaceId, month),
       renderDateContent: ({ dateKey, isCurrentMonth }) => {
         if (!isCurrentMonth) return '';
-        return dateContent(dayRecordData({ dateKey, workplaceId, allMode, workingDays, workplaces, paidIds }));
+        return dateContent(dayRecordData({ dateKey, workplaceId, allMode, workingDays, workplaces }));
       },
       resolveDateIndicators: ({ dateKey, isCurrentMonth }) => isCurrentMonth
         ? getWorkingDayIndicators(workingDays, workplaces, dateKey, { excludeWorkplaceId: allMode ? '' : workplaceId })

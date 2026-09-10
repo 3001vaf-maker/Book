@@ -1,6 +1,9 @@
 import { actionBlock, button, collectCost, collectWorkplaceSelections, costCardMeta, costField, costListParts, details, emptyState, entityCard, escapeHtml, field, iconButton, initCostFields, initPhotoField, initWorkplaceSelectors, listEntries, listEntry, mountModal, modal, page, pageHeader, photoField, textareaField, workplaceCountText, workplaceSelector } from '../../../ui/ui.js';
+import { getBusinessItemFact } from '../../../core/business-model.js';
 import { getWorkplaces } from '../../profile/workplaces/data.js';
 import { deleteProduct as deleteProductData, getProducts, pushProductHistory, saveProduct as saveProductData } from './data.js';
+
+const money=(value)=>`${new Intl.NumberFormat('ru-RU').format(Number(value||0))} ₽`;
 
 function renderList(root,navigateBack){
   const items=getProducts();
@@ -33,13 +36,14 @@ function saveProduct(root,m,existing,navigateBack){
 function renderCard(root,id,navigateBack){
   const p=getProducts().find(x=>x.id===id);if(!p)return renderList(root,navigateBack);
   const workplaceNames=(p.workplaces||[]).map(w=>w.name||w.workplaceId).filter(Boolean);
+  const fact=getBusinessItemFact('product',p.id);
   const card=entityCard({
     title:p.name||'',
     image:p.photo||'',
     initial:(p.name||'?').slice(0,1).toUpperCase(),
     topMeta:[{value:workplaceCountText(workplaceNames.length)}],
     topRightMeta:costCardMeta(p.cost),
-    meta:workplaceNames.map(name=>({value:name})),
+    meta:[{value:money(fact.factTotal),label:'сумма'}],
     metricsLayout:'vertical',
     className:'entity-card--hero entity-card--top-dark'
   });

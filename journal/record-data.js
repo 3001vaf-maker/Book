@@ -1,6 +1,8 @@
 import { containsRange, isValidRange, rangesOverlap } from '../core/time.js';
 import { getDays, getDay, getDayTime } from '../core/day.js';
 import { getWorkplaces } from '../core/workplace-time.js';
+import { calculateBusinessPlan, getRecordBusinessPlanFact, resolveRecordBusinessPlan } from '../core/business-model.js';
+import { getAllClients } from '../main/clients/data.js';
 import { getJournalBreaks } from './break-data.js';
 
 const KEY = 'book.records';
@@ -17,6 +19,11 @@ function writeList(key, value) { localStorage.setItem(key, JSON.stringify(Array.
 function notify(name, detail = {}) { if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(name, { detail })); }
 function normalizeDate(value) { return String(value || '').slice(0, 10); }
 function normalizeId(value) { return String(value || ''); }
+function numberValue(value) {
+  const number = Number(String(value ?? '').replace(',', '.'));
+  return Number.isFinite(number) ? number : 0;
+}
+function percent(value) { return Math.max(0, Math.min(100, numberValue(value))); }
 function usagesForDay(date, workplaceId, records = readList(KEY), breaks = getJournalBreaks()) {
   const day = normalizeDate(date), workplace = normalizeId(workplaceId);
   return [
@@ -35,7 +42,74 @@ function hasUsageConflict({ date, workplaceId, from, to, excludeId = '' }) {
   return usagesForDay(date, workplaceId).some((usage) => usage?.sourceId !== excludeId && rangesOverlap(from, to, usage.from, usage.to));
 }
 
-export function getRecords() { return readList(KEY); }
+function clientDiscount(client = null) {
+  if (!client) return 0;
+  const people = getAllClients();
+  const person = people.find((item) => String(item?.key || '') === String(client?.key || ''))
+    || people.find((item) => String(item?.id || '') === String(client?.id || ''));
+  return percent(person?.discountPercent ?? client?.discountPercent ?? 0);
+}
+
+function normalizeFinance(value = null) {
+  if (!value || typeof value !== 'object') return null;
+  return {
+    items: Array.isArray(value.items) ? value.items.map((item) => ({ ...item })) : [],
+    serviceTotal: Math.max(0, numberValue(value.serviceTotal)),
+    discountPercent: value.discountPercent == null ? null : percent(value.discountPercent),
+    discountTotal: Math.max(0, numberValue(value.discountTotal)),
+    planTotal: Math.max(0, numberValue(value.planTotal ?? value.dueTotal)),
+    factIncome: Math.max(0, numberValue(value.factIncome ?? value.paidTotal)),
+    factExpense: Math.max(0, numberValue(value.factExpense ?? value.refundedTotal)),
+    factTotal: numberValue(value.factTotal ?? value.netPaidTotal),
+  };
+}
+
+function storedRecordFinance(record) {
+  const legacyDiscount = record?.clientDiscountPercent == null ? clientDiscount(record?.client) : percent(record.clientDiscountPercent);
+  return resolveRecordBusinessPlan(record, { discountPercent: legacyDiscount });
+}
+
+function hydrateRecord(record) {
+  if (!record?.id) return record;
+  const legacyDiscount = record?.clientDiscountPercent == null ? clientDiscount(record?.client) : percent(record.clientDiscountPercent);
+  const { clientDiscountPercent: _legacyDiscount, ...cleanRecord } = record;
+  const finance = getRecordBusinessPlanFact({ ...cleanRecord, finance: storedRecordFinance(record) }, { discountPercent: legacyDiscount });
+  return { ...cleanRecord, finance: normalizeFinance(finance) };
+}
+
+function repriceBusinessPlan(procedures = [], currentFinance = null) {
+  const priorItems = Array.isArray(currentFinance?.items) ? currentFinance.items : [];
+  const bySource = new Map(priorItems.map((item) => [String(item?.sourceId || ''), item]));
+  const defaultDiscount = currentFinance?.discountPercent == null ? 0 : percent(currentFinance.discountPercent);
+  const items = (Array.isArray(procedures) ? procedures : []).map((procedure, index) => {
+    const prior = bySource.get(String(procedure?.id || '')) || priorItems[index] || null;
+    const base = {
+      sourceType: 'procedure',
+      sourceId: String(procedure?.id || ''),
+      name: String(procedure?.name || ''),
+      price: Math.max(0, numberValue(procedure?.cost)),
+    };
+    if (!prior) return { ...base, discountMode: defaultDiscount > 0 ? 'percent' : 'none', discountPercent: defaultDiscount };
+    if (prior.discountMode === 'money') return { ...base, discountMode: 'money', discountMoney: prior.discountMoney };
+    if (prior.discountMode === 'percent' || numberValue(prior.discountPercent) > 0) {
+      return { ...base, discountMode: 'percent', discountPercent: prior.discountPercent };
+    }
+    return { ...base, discountMode: 'none' };
+  });
+  return calculateBusinessPlan(items, { discountPercent: defaultDiscount });
+}
+
+export function getRecords() {
+  const stored = readList(KEY);
+  let changed = false;
+  const records = stored.map((record) => {
+    const next = hydrateRecord(record);
+    if (JSON.stringify(next) !== JSON.stringify(record)) changed = true;
+    return next;
+  });
+  if (changed) writeList(KEY, records);
+  return records;
+}
 export function getRecordsForDay(date, workplaceId = '') {
   const day = normalizeDate(date), workplace = normalizeId(workplaceId);
   return getRecords().filter((record) => record?.date === day && (!workplace || normalizeId(record?.workplaceId) === workplace));
@@ -44,10 +118,6 @@ export function getActiveRecordCountForDay(date, workplaceId = '') {
   return getRecordsForDay(date, workplaceId).filter((record) => record?.status !== 'cancelled').length;
 }
 
-/**
- * Record owns appointment data. Core asks only whether Records block a
- * proposed working-time change or complete Day removal.
- */
 export function getWorkingTimeRecordConflicts({ date, workplaceId, from, to, operation = 'resize' } = {}) {
   const activeRecords = getRecordsForDay(date, workplaceId).filter((record) => record?.status !== 'cancelled');
   if (operation === 'remove') {
@@ -66,11 +136,13 @@ export function checkRecordTime({ date, workplaceId, from, to, excludeId = '' } 
   if (hasUsageConflict({ date, workplaceId, from, to, excludeId })) return { ok: false, reason: 'occupied', day: day.day, time: day.time };
   return day;
 }
+
 export function createRecord({ date, workplaceId, from, to, client, procedures = [] } = {}) {
   const normalizedDate = normalizeDate(date), normalizedWorkplaceId = normalizeId(workplaceId);
   if (!checkRecordTime({ date: normalizedDate, workplaceId: normalizedWorkplaceId, from, to }).ok) return null;
   const now = new Date().toISOString();
-  const record = {
+  const finance = calculateBusinessPlan(procedures, { discountPercent: clientDiscount(client) });
+  const record = hydrateRecord({
     id: crypto.randomUUID(),
     status: 'active',
     confirmed: false,
@@ -81,14 +153,16 @@ export function createRecord({ date, workplaceId, from, to, client, procedures =
     to: String(to),
     client: client || null,
     procedures: Array.isArray(procedures) ? procedures : [],
+    finance,
     createdAt: now,
     updatedAt: now,
-  };
+  });
   const records = getRecords(); records.push(record); writeList(KEY, records);
   notify('book:records-changed', { action: 'create', recordId: record.id });
   notify('book:time-usage-changed', { action: 'occupy', usageId: record.id, sourceId: record.id, date: record.date, workplaceId: record.workplaceId, from: record.from, to: record.to });
   return record;
 }
+
 export function updateRecord(id, patch = {}) {
   const records = getRecords(), index = records.findIndex((record) => record?.id === id);
   if (index < 0) return null;
@@ -96,23 +170,43 @@ export function updateRecord(id, patch = {}) {
   if (current.status === 'cancelled' && patch.status !== 'active') return null;
   const next = { ...current, ...patch };
   if (next.status !== 'cancelled' && !checkRecordTime({ date: next.date, workplaceId: next.workplaceId, from: next.from, to: next.to, excludeId: id }).ok) return null;
-  records[index] = { ...next, updatedAt: new Date().toISOString() }; writeList(KEY, records);
+
+  const hasExplicitFinance = Object.prototype.hasOwnProperty.call(patch, 'finance');
+  const serviceChanged = Object.prototype.hasOwnProperty.call(patch, 'procedures');
+  const clientChanged = Object.prototype.hasOwnProperty.call(patch, 'client');
+  if (hasExplicitFinance) {
+    next.finance = normalizeFinance(patch.finance);
+  } else if (clientChanged) {
+    next.finance = calculateBusinessPlan(next.procedures || [], { discountPercent: clientDiscount(next.client) });
+  } else if (serviceChanged) {
+    next.finance = repriceBusinessPlan(next.procedures || [], current.finance);
+  } else {
+    next.finance = current.finance;
+  }
+
+  records[index] = hydrateRecord({ ...next, updatedAt: new Date().toISOString() });
+  writeList(KEY, records);
   notify('book:records-changed', { action: 'update', recordId: id });
   notify('book:time-usage-changed', { action: 'change', usageId: id, sourceId: id, date: records[index].date, workplaceId: records[index].workplaceId, from: records[index].from, to: records[index].to });
   return records[index];
 }
+
 export function cancelRecord(id) {
   const records = getRecords(), index = records.findIndex((record) => record?.id === id);
   if (index < 0 || records[index].status === 'cancelled') return null;
-  const previous = records[index]; records[index] = { ...previous, status: 'cancelled', cancelledAt: new Date().toISOString(), updatedAt: new Date().toISOString() }; writeList(KEY, records);
+  const previous = records[index];
+  records[index] = hydrateRecord({ ...previous, status: 'cancelled', cancelledAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+  writeList(KEY, records);
   notify('book:records-changed', { action: 'cancel', recordId: id });
   notify('book:time-usage-changed', { action: 'release', usageId: id, sourceId: id, date: previous.date, workplaceId: previous.workplaceId, from: previous.from, to: previous.to });
   return records[index];
 }
+
 export function deleteRecord(id) {
   const records = getRecords(), index = records.findIndex((record) => record?.id === id);
   if (index < 0) return false;
-  const removed = records[index]; records.splice(index, 1); writeList(KEY, records);
+  const removed = records[index];
+  records.splice(index, 1); writeList(KEY, records);
   notify('book:records-changed', { action: 'delete', recordId: id });
   notify('book:time-usage-changed', { action: 'release', usageId: id, sourceId: id, date: removed.date, workplaceId: removed.workplaceId, from: removed.from, to: removed.to });
   return true;

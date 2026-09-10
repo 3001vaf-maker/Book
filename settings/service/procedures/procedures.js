@@ -1,5 +1,5 @@
 import { actionBlock, button, costCardMeta, costListParts, durationText, emptyState, entityCard, escapeHtml, iconButton, listEntries, listEntry, mountModal, modal, page, pageHeader, workplaceCountText } from '../../../ui/ui.js';
-import { getPayments, paymentTotal } from '../../../core/payment.js';
+import { getBusinessItemFact } from '../../../core/business-model.js';
 import { getRecords } from '../../../journal/record-data.js';
 import { deleteProcedure as deleteProcedureData, getProcedures } from './data.js';
 import { openProcedureForm } from './form.js';
@@ -10,13 +10,8 @@ function procedureMetrics(procedureId) {
   const id = String(procedureId || '');
   const records = getRecords().filter((record) => record?.status !== 'cancelled'
     && (record?.procedures || []).some((item) => String(item?.id || '') === id));
-  const revenue = getPayments()
-    .filter((payment) => payment?.status === 'completed')
-    .reduce((sum, payment) => {
-      const items = (payment?.items || []).filter((item) => String(item?.sourceId || '') === id);
-      return sum + paymentTotal(items);
-    }, 0);
-  return { records: records.length, revenue };
+  const fact = getBusinessItemFact('procedure', id);
+  return { records: records.length, revenue: fact.factTotal };
 }
 
 function renderList(root, navigateBack) {

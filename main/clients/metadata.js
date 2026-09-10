@@ -1,4 +1,4 @@
-import { getPayments } from '../../core/payment.js';
+import { getBusinessFactForRecords } from '../../core/business-model.js';
 import { getRecords } from '../../journal/record-data.js';
 
 const clientKey = (value) => String(value || '');
@@ -11,29 +11,14 @@ function clientRecords(key) {
 
 export function getClientMetadata(key) {
   const records = clientRecords(key);
-  const recordIds = new Set(records.map((record) => String(record?.id || '')).filter(Boolean));
-  const payments = getPayments();
-  const completed = payments.filter((payment) => payment?.status === 'completed'
-    && payment?.source?.type === 'record'
-    && recordIds.has(String(payment?.source?.id || '')));
-  const completedIds = new Set(completed.map((payment) => String(payment.id || '')));
-  const paid = completed.reduce((sum, payment) => {
-    const value = Number(payment?.total);
-    return sum + (Number.isFinite(value) ? value : 0);
-  }, 0);
-  const refunded = payments
-    .filter((payment) => payment?.status === 'refund' && completedIds.has(String(payment?.originalPaymentId || '')))
-    .reduce((sum, payment) => {
-      const value = Number(payment?.total);
-      return sum + (Number.isFinite(value) ? value : 0);
-    }, 0);
+  const fact = getBusinessFactForRecords(records.map((record) => record?.id));
   const dated = records
     .filter((record) => record?.date)
     .sort((a, b) => String(b.date).localeCompare(String(a.date)));
 
   return {
     recordCount: records.length,
-    paidTotal: Math.max(0, paid - refunded),
+    paidTotal: Math.max(0, Number(fact.factTotal) || 0),
     lastVisit: dated[0]?.date || '',
   };
 }
