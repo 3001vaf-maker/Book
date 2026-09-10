@@ -22,6 +22,12 @@ function normalizeTagAssignments(values = []) {
     .filter(Boolean))];
 }
 
+function normalizeDiscount(person = {}) {
+  const raw = person.discountPercent ?? person.discount ?? 0;
+  const value = Number(String(raw ?? '').replace(',', '.'));
+  return Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
+}
+
 function normalizeClient(person = {}) {
   return {
     key: String(person.key || ''),
@@ -36,6 +42,7 @@ function normalizeClient(person = {}) {
     emails: Array.isArray(person.emails) ? person.emails : [],
     links: Array.isArray(person.links) ? person.links : [],
     tags: normalizeTagAssignments(person.tags),
+    discountPercent: normalizeDiscount(person),
     agreements: {
       personalData: Boolean(person.agreements?.personalData),
       mailings: Boolean(person.agreements?.mailings),
