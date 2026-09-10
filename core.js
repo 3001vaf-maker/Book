@@ -7,6 +7,7 @@ import { getWorkingTimeRecordConflicts } from './journal/record-data.js';
 import { configureWorkplaceSource } from './core/workplace-time.js';
 import { configureWorkingTimeConflictSource } from './core/time-usage.js';
 import { getCurrentUser, login, prepareProductionWorkspace } from './core/auth.js';
+import { startWorkspaceSync, syncWorkspaceBeforeRender } from './core/workspace-sync.js';
 import { isOnboardingComplete, renderOnboarding } from './onboarding/onboarding.js';
 import { bottomNavigation } from './ui/ui.js';
 
@@ -23,6 +24,7 @@ const routes = {
 const state = { activeSection: 'journal' };
 const app = document.querySelector('#app');
 let disposeView = () => {};
+let disposeWorkspaceSync = () => {};
 let workspaceReady = false;
 let authenticatedAccount = null;
 
@@ -58,6 +60,10 @@ function renderWorkspace() {
 
 async function renderAuthenticated(account = authenticatedAccount) {
   authenticatedAccount = account || authenticatedAccount;
+  await syncWorkspaceBeforeRender();
+  disposeWorkspaceSync();
+  disposeWorkspaceSync = startWorkspaceSync();
+
   if (!isOnboardingComplete()) {
     workspaceReady = false;
     history.replaceState({}, '', location.pathname);
@@ -82,6 +88,8 @@ function renderLogin(message = '') {
   workspaceReady = false;
   disposeView();
   disposeView = () => {};
+  disposeWorkspaceSync();
+  disposeWorkspaceSync = () => {};
   app.innerHTML = `
     <main class="auth-view">
       <section class="auth-card" aria-labelledby="auth-title">
