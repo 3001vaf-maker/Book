@@ -4,6 +4,8 @@ import { join, relative } from 'node:path';
 const root = process.cwd();
 const ignored = new Set(['.git', 'node_modules', '_site']);
 const errors = [];
+const thisCheck = 'scripts/check-finance-architecture.mjs';
+const obsoletePaymentModule = ['core', 'payment.js'].join('/');
 
 function walk(dir) {
   const files = [];
@@ -25,14 +27,15 @@ function source(path) {
   return readFileSync(join(root, path), 'utf8');
 }
 
-if (existsSync(join(root, 'core/payment.js'))) {
-  errors.push('core/payment.js must not exist: DDS owns money movement; Business Model owns plan/fact');
+if (existsSync(join(root, obsoletePaymentModule))) {
+  errors.push(`${obsoletePaymentModule} must not exist: DDS owns money movement; Business Model owns plan/fact`);
 }
 
 for (const file of walk(root)) {
   const path = rel(file);
+  if (path === thisCheck) continue;
   const text = readFileSync(file, 'utf8');
-  if (/core\/payment\.js/.test(text)) errors.push(`${path}: obsolete core/payment.js dependency`);
+  if (text.includes(obsoletePaymentModule)) errors.push(`${path}: obsolete ${obsoletePaymentModule} dependency`);
 }
 
 const ownershipRules = [
