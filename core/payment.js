@@ -18,6 +18,11 @@ function writePayments(items) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.isArray(items) ? items : []));
 }
 
+function notifyPaymentsChanged(detail = {}) {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('book:payments-changed', { detail }));
+}
+
 export function paymentMoment(now = new Date()) {
   return {
     date: `${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getFullYear()).slice(-2)}`,
@@ -77,15 +82,41 @@ export function completePayment(draft, { walletId = '', walletName = '', items =
     paidAt: new Date().toISOString(),
   };
   writePayments([...readPayments(), payment]);
-  window.dispatchEvent(new CustomEvent('book:payments-changed', {
-    detail: {
-      paymentId: payment.id,
-      walletId: payment.walletId,
-      total: payment.total,
-      source: payment.source || null,
-    },
-  }));
+  notifyPaymentsChanged({
+    action: 'complete',
+    paymentId: payment.id,
+    walletId: payment.walletId,
+    total: payment.total,
+    source: payment.source || null,
+  });
   return payment;
+}
+
+export function refundPayment(paymentId, { reason = '', now = new Date() } = {}) {
+  const id = String(paymentId || '');
+  if (!id) return null;
+  const payments = readPayments();
+  const index = payments.findIndex((payment) => String(payment?.id || '') === id);
+  if (index < 0 || payments[index]?.status !== 'completed') return null;
+
+  const current = payments[index];
+  const refunded = {
+    ...current,
+    status: 'refunded',
+    refundedAt: now.toISOString(),
+    refundReason: String(reason || ''),
+  };
+  payments[index] = refunded;
+  writePayments(payments);
+  notifyPaymentsChanged({
+    action: 'refund',
+    paymentId: refunded.id,
+    walletId: refunded.walletId || '',
+    total: refunded.total,
+    source: refunded.source || null,
+    refundedAt: refunded.refundedAt,
+  });
+  return refunded;
 }
 
 export function getPayments() {
@@ -94,6 +125,10 @@ export function getPayments() {
 
 export function getPaymentsForWallet(walletId) {
   return readPayments().filter((payment) => payment?.status === 'completed' && String(payment?.walletId || '') === String(walletId || ''));
+}
+
+export function getRefundedPayments() {
+  return readPayments().filter((payment) => payment?.status === 'refunded');
 }
 
 export function getCompletedPaymentForSource(type, id) {
