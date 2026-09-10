@@ -10,6 +10,14 @@ export function clearAuthToken() {
   sessionStorage.removeItem(TOKEN_KEY);
 }
 
+export async function apiRequest(path, options = {}) {
+  const token = getAuthToken();
+  const headers = new Headers(options.headers || {});
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+  if (options.body != null && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+  return fetch(`${API_BASE}${path}`, { ...options, headers });
+}
+
 export function prepareProductionWorkspace() {
   if (localStorage.getItem(CLEAN_START_KEY) === '1') return false;
 
@@ -41,9 +49,7 @@ export async function getCurrentUser() {
   const token = getAuthToken();
   if (!token) return null;
 
-  const response = await fetch(`${API_BASE}/auth/me`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const response = await apiRequest('/auth/me');
 
   if (response.status === 401) {
     clearAuthToken();
