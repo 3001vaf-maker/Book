@@ -7,24 +7,32 @@ const numberValue = (value) => {
 
 const clampPercent = (value) => Math.max(0, Math.min(100, numberValue(value)));
 
+function discountMode(item = {}, defaultPercent = 0) {
+  if (item?.discountMode === 'percent' || item?.discountMode === 'money' || item?.discountMode === 'none') return item.discountMode;
+  if (item?.discountPercent !== '' && item?.discountPercent != null && clampPercent(item.discountPercent) > 0) return 'percent';
+  if (item?.discountMoney !== '' && item?.discountMoney != null && numberValue(item.discountMoney) > 0) return 'money';
+  return defaultPercent > 0 ? 'percent' : 'none';
+}
+
 export function calculateBusinessPlan(items = [], { discountPercent = 0 } = {}) {
   const defaultPercent = clampPercent(discountPercent);
   const prepared = (Array.isArray(items) ? items : []).map((item) => {
     const price = Math.max(0, numberValue(item?.price ?? item?.cost));
-    const hasPercent = item?.discountPercent !== '' && item?.discountPercent != null;
-    const hasMoney = item?.discountMoney !== '' && item?.discountMoney != null;
-    const selectedPercent = hasPercent ? clampPercent(item.discountPercent) : defaultPercent;
-    const discountMoney = Math.max(0, Math.min(price, hasMoney
-      ? numberValue(item.discountMoney)
-      : price * selectedPercent / 100));
+    const mode = discountMode(item, defaultPercent);
+    const selectedPercent = mode === 'percent'
+      ? clampPercent(item?.discountPercent === '' || item?.discountPercent == null ? defaultPercent : item.discountPercent)
+      : 0;
+    const discountMoney = Math.max(0, Math.min(price,
+      mode === 'money' ? numberValue(item?.discountMoney) : price * selectedPercent / 100));
     const resolvedPercent = price > 0
-      ? (hasMoney ? discountMoney / price * 100 : selectedPercent)
+      ? (mode === 'money' ? discountMoney / price * 100 : selectedPercent)
       : 0;
     return {
       sourceType: String(item?.sourceType || 'procedure'),
       sourceId: String(item?.sourceId || item?.id || ''),
       name: String(item?.name || ''),
       price,
+      discountMode: mode,
       discountPercent: clampPercent(resolvedPercent),
       discountMoney,
       planAmount: Math.max(0, price - discountMoney),
