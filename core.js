@@ -24,6 +24,7 @@ const state = { activeSection: 'journal' };
 const app = document.querySelector('#app');
 let disposeView = () => {};
 let workspaceReady = false;
+let authenticatedAccount = null;
 
 function syncViewport() {
   const vv = window.visualViewport;
@@ -55,11 +56,13 @@ function renderWorkspace() {
   syncViewport();
 }
 
-async function renderAuthenticated() {
+async function renderAuthenticated(account = authenticatedAccount) {
+  authenticatedAccount = account || authenticatedAccount;
   if (!isOnboardingComplete()) {
     workspaceReady = false;
     history.replaceState({}, '', location.pathname);
     await renderOnboarding(app, {
+      accountEmail: authenticatedAccount?.user?.email || '',
       onComplete: () => {
         state.activeSection = 'journal';
         history.replaceState({}, '', '#journal');
@@ -113,9 +116,10 @@ function renderLogin(message = '') {
     const data = new FormData(form);
 
     try {
-      await login(data.get('email'), data.get('password'));
+      const account = await login(data.get('email'), data.get('password'));
+      authenticatedAccount = account;
       prepareProductionWorkspace();
-      await renderAuthenticated();
+      await renderAuthenticated(account);
     } catch (loginError) {
       error.textContent = loginError instanceof Error ? loginError.message : 'Не удалось войти';
       button.disabled = false;
@@ -150,8 +154,9 @@ syncViewport();
 try {
   const currentUser = await getCurrentUser();
   if (currentUser) {
+    authenticatedAccount = currentUser;
     prepareProductionWorkspace();
-    await renderAuthenticated();
+    await renderAuthenticated(currentUser);
   } else {
     renderLogin();
   }
