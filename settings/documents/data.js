@@ -8,6 +8,7 @@ const DEFAULT_DOCUMENTS = [
     title: 'Соглашение об обработке персональных данных',
     clientConsent: false,
     required: false,
+    version: 1,
     text: 'Шаблон для адаптации под вашу работу. Укажите сведения об операторе, цели и правила обработки персональных данных, категории данных, сроки хранения, порядок отзыва и контакты для обращений. Перед использованием рекомендуется проверить документ с юристом.'
   },
   {
@@ -17,6 +18,7 @@ const DEFAULT_DOCUMENTS = [
     title: 'Согласие на обработку персональных данных',
     clientConsent: true,
     required: true,
+    version: 1,
     text: 'Я даю согласие на обработку персональных данных, необходимых для записи и оказания услуг, связи со мной и ведения истории записей. Состав данных, цели, действия с данными, срок действия согласия и способ его отзыва должны быть уточнены оператором перед использованием этого шаблона.'
   },
   {
@@ -26,6 +28,7 @@ const DEFAULT_DOCUMENTS = [
     title: 'Согласие на информационные сообщения',
     clientConsent: true,
     required: false,
+    version: 1,
     text: 'Я согласен(на) получать информационные сообщения, связанные с записью, изменением или отменой визита, а также иные сообщения, на которые я отдельно согласился(ась). Это согласие является необязательным и может быть отозвано.'
   }
 ];
@@ -42,6 +45,7 @@ function normalize(item = {}) {
     title: String(item.title || 'Документ'),
     clientConsent: Boolean(item.clientConsent),
     required: Boolean(item.required),
+    version: Math.max(1, Number(item.version || 1)),
     text: String(item.text || '')
   };
 }
@@ -51,7 +55,7 @@ export function getDocuments() {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
     if (Array.isArray(saved) && saved.length) return saved.map(normalize);
   } catch {}
-  return clone(DEFAULT_DOCUMENTS);
+  return clone(DEFAULT_DOCUMENTS).map(normalize);
 }
 
 export function saveDocuments(items = []) {
@@ -62,7 +66,12 @@ export function saveDocuments(items = []) {
 
 export function saveDocument(document) {
   const items = getDocuments();
-  const next = normalize(document);
+  const previous = items.find((item) => item.id === document?.id);
+  const changedText = previous && String(previous.text || '') !== String(document?.text || '');
+  const next = normalize({
+    ...document,
+    version: changedText ? Number(previous.version || 1) + 1 : Number(document?.version || previous?.version || 1),
+  });
   const index = items.findIndex((item) => item.id === next.id);
   if (index >= 0) items[index] = next;
   else items.push(next);
@@ -78,6 +87,7 @@ export function createDocument({ title = 'Новый документ', text = '
     title,
     clientConsent: false,
     required: false,
+    version: 1,
     text
   });
 }
