@@ -61,7 +61,7 @@ function normalizeLinks(value: unknown): LinkInput[] {
 
 function normalizeProfile(value: unknown): ProfileInput {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
-  const phones = stringList(source.phones?.valueOf?.() ?? source.phones);
+  const phones = stringList(source.phones);
   const fallbackPhone = stringValue(source.phone).trim();
   const normalizedPhones = phones.length ? phones : fallbackPhone ? [fallbackPhone] : [];
   return {
@@ -269,10 +269,11 @@ export class ProfileService {
     return this.bundle(tenantId, userId);
   }
 
-  async bootstrap(tenantId: string, userId: string, accountEmail = '') {
+  async bootstrap(tenantId: string, userId: string) {
     const existing = await this.prisma.profile.findUnique({ where: { tenantId_userId: { tenantId, userId } } });
     if (!existing) {
-      const empty = normalizeProfile({ emails: accountEmail ? [accountEmail] : [] });
+      const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+      const empty = normalizeProfile({ emails: user?.email ? [user.email] : [] });
       await this.prisma.profile.create({
         data: {
           tenantId,
