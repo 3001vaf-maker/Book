@@ -39,16 +39,19 @@ export function paymentTotal(items = []) {
   }, 0);
 }
 
-export function createPaymentDraft({ source = null, workplace = '', client = null, items = [], now = new Date() } = {}) {
-  const moment = paymentMoment(now);
-  const preparedItems = (Array.isArray(items) ? items : []).map((item) => ({
-    sourceId: item?.id || '',
+function preparedItems(items = []) {
+  return (Array.isArray(items) ? items : []).map((item) => ({
+    sourceId: item?.sourceId || item?.id || '',
     name: item?.name || '',
     price: Math.max(0, numberValue(item?.price ?? item?.cost)),
-    discountPercent: 0,
-    discountMoney: 0,
+    discountPercent: Math.max(0, numberValue(item?.discountPercent)),
+    discountMoney: Math.max(0, numberValue(item?.discountMoney)),
   }));
+}
 
+export function createPaymentDraft({ source = null, workplace = '', client = null, items = [], now = new Date() } = {}) {
+  const moment = paymentMoment(now);
+  const itemsPrepared = preparedItems(items);
   return {
     id: globalThis.crypto?.randomUUID?.() || `payment-${Date.now()}`,
     status: 'draft',
@@ -58,65 +61,92 @@ export function createPaymentDraft({ source = null, workplace = '', client = nul
     date: moment.date,
     time: moment.time,
     createdAt: moment.createdAt,
-    items: preparedItems,
-    total: paymentTotal(preparedItems),
+    items: itemsPrepared,
+    total: paymentTotal(itemsPrepared),
   };
 }
 
 export function completePayment(draft, { walletId = '', walletName = '', items = [], total = 0 } = {}) {
   if (!draft?.id || !walletId) return null;
-  const preparedItems = (Array.isArray(items) ? items : []).map((item) => ({
-    sourceId: item?.sourceId || '',
-    name: item?.name || '',
-    price: Math.max(0, numberValue(item?.price)),
-    discountPercent: Math.max(0, numberValue(item?.discountPercent)),
-    discountMoney: Math.max(0, numberValue(item?.discountMoney)),
-  }));
+  return completeSplitPayment(draft, {
+    allocations: [{ walletId, walletName, amount: total }],
+    items,
+    total,
+  });
+}
+
+export function completeSplitPayment(draft, { allocations = [], items = [], total = 0, replacesPaymentId = '' } = {}) {
+  if (!draft?.id) return null;
+  const preparedAllocations = (Array.isArray(allocations) ? allocations : [])
+    .map((item) => ({
+      id: globalThis.crypto?.randomUUID?.() || `allocation-${Date.now()}-${Math.random()}`,
+      walletId: String(item?.walletId || ''),
+      walletName: String(item?.walletName || ''),
+      amount: Math.max(0, numberValue(item?.amount)),
+    }))
+    .filter((item) => item.walletId && item.amount > 0);
+  const expected = Math.max(0, numberValue(total));
+  const allocated = preparedAllocations.reduce((sum, item) => sum + item.amount, 0);
+  if (!preparedAllocations.length || Math.abs(allocated - expected) > 0.009) return null;
+
+  const payments = readPayments();
+  if (replacesPaymentId) {
+    const previousIndex = payments.findIndex((item) => String(item?.id || '') === String(replacesPaymentId));
+    if (previousIndex >= 0 && payments[previousIndex]?.status === 'completed') {
+      payments[previousIndex] = {
+        ...payments[previousIndex],
+        status: 'corrected',
+        correctedAt: new Date().toISOString(),
+      };
+    }
+  }
+
   const payment = {
     ...draft,
+    id: globalThis.crypto?.randomUUID?.() || `payment-${Date.now()}`,
     status: 'completed',
-    walletId: String(walletId),
-    walletName: String(walletName || ''),
-    items: preparedItems,
-    total: Math.max(0, numberValue(total)),
+    allocations: preparedAllocations,
+    walletId: preparedAllocations.length === 1 ? preparedAllocations[0].walletId : '',
+    walletName: preparedAllocations.length === 1 ? preparedAllocations[0].walletName : '',
+    items: preparedItems(items),
+    total: expected,
     paidAt: new Date().toISOString(),
+    replacesPaymentId: String(replacesPaymentId || ''),
   };
-  writePayments([...readPayments(), payment]);
-  notifyPaymentsChanged({
-    action: 'complete',
-    paymentId: payment.id,
-    walletId: payment.walletId,
-    total: payment.total,
-    source: payment.source || null,
-  });
+  payments.push(payment);
+  writePayments(payments);
+  notifyPaymentsChanged({ action: replacesPaymentId ? 'correct' : 'complete', paymentId: payment.id, total: payment.total, source: payment.source || null });
   return payment;
 }
 
-export function refundPayment(paymentId, { reason = '', now = new Date() } = {}) {
+export function refundPayment(paymentId, { reason = '', amount = null, walletId = '', walletName = '', now = new Date() } = {}) {
   const id = String(paymentId || '');
-  if (!id) return null;
   const payments = readPayments();
-  const index = payments.findIndex((payment) => String(payment?.id || '') === id);
-  if (index < 0 || payments[index]?.status !== 'completed') return null;
-
-  const current = payments[index];
-  const refunded = {
-    ...current,
-    status: 'refunded',
+  const original = payments.find((payment) => String(payment?.id || '') === id && payment?.status === 'completed');
+  if (!original) return null;
+  const alreadyRefunded = payments.filter((payment) => payment?.status === 'refund' && String(payment?.originalPaymentId || '') === id).reduce((sum, payment) => sum + Number(payment?.total || 0), 0);
+  const remaining = Math.max(0, Number(original.total || 0) - alreadyRefunded);
+  const refundAmount = Math.min(remaining, Math.max(0, amount == null ? remaining : numberValue(amount)));
+  if (!refundAmount) return null;
+  const fallbackAllocation = original.allocations?.[0] || null;
+  const refund = {
+    id: globalThis.crypto?.randomUUID?.() || `refund-${Date.now()}`,
+    status: 'refund',
+    originalPaymentId: original.id,
+    source: original.source || null,
+    workplace: original.workplace || '',
+    client: original.client || null,
+    walletId: String(walletId || fallbackAllocation?.walletId || original.walletId || ''),
+    walletName: String(walletName || fallbackAllocation?.walletName || original.walletName || ''),
+    total: refundAmount,
+    reason: String(reason || ''),
+    createdAt: now.toISOString(),
     refundedAt: now.toISOString(),
-    refundReason: String(reason || ''),
   };
-  payments[index] = refunded;
+  payments.push(refund);
   writePayments(payments);
-  notifyPaymentsChanged({
-    action: 'refund',
-    paymentId: refunded.id,
-    walletId: refunded.walletId || '',
-    total: refunded.total,
-    source: refunded.source || null,
-    refundedAt: refunded.refundedAt,
-  });
-  return refunded;
+  notifyPaymentsChanged({ action: 'refund', paymentId: refund.id, originalPaymentId: original.id, total: refund.total, source: refund.source || null });
+  return refund;
 }
 
 export function getPayments() {
@@ -124,11 +154,21 @@ export function getPayments() {
 }
 
 export function getPaymentsForWallet(walletId) {
-  return readPayments().filter((payment) => payment?.status === 'completed' && String(payment?.walletId || '') === String(walletId || ''));
+  const id = String(walletId || '');
+  return readPayments().filter((payment) => payment?.status === 'completed').flatMap((payment) => {
+    const allocations = Array.isArray(payment.allocations) && payment.allocations.length
+      ? payment.allocations
+      : [{ walletId: payment.walletId || '', walletName: payment.walletName || '', amount: payment.total || 0 }];
+    return allocations.filter((item) => String(item.walletId || '') === id).map((item) => ({ ...payment, walletId: item.walletId, walletName: item.walletName, total: item.amount }));
+  });
 }
 
 export function getRefundedPayments() {
-  return readPayments().filter((payment) => payment?.status === 'refunded');
+  return readPayments().filter((payment) => payment?.status === 'refund' || payment?.status === 'refunded');
+}
+
+export function getRefundsForPayment(paymentId) {
+  return readPayments().filter((payment) => payment?.status === 'refund' && String(payment?.originalPaymentId || '') === String(paymentId || ''));
 }
 
 export function getCompletedPaymentForSource(type, id) {
