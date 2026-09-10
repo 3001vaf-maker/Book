@@ -7,7 +7,7 @@ import { getWorkingTimeRecordConflicts } from './journal/record-data.js';
 import { configureWorkplaceSource } from './core/workplace-time.js';
 import { configureWorkingTimeConflictSource } from './core/time-usage.js';
 import { getCurrentUser, login, prepareProductionWorkspace } from './core/auth.js';
-import { isOnboardingComplete, renderOnboarding } from './core/onboarding.js';
+import { isOnboardingComplete, renderOnboarding } from './onboarding/onboarding.js';
 import { bottomNavigation } from './ui/ui.js';
 
 configureWorkplaceSource(getWorkplaceEntities);
