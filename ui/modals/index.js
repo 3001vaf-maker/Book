@@ -1,4 +1,5 @@
 import { escapeHtml } from '../utils/escape-html.js';
+import { button } from '../buttons/index.js';
 
 let modalLevel = 0;
 
@@ -37,5 +38,13 @@ export function mountModal(root, html) {
   });
 
   requestAnimationFrame(() => m.querySelector('input,select,textarea,button:not([data-modal-close])')?.focus());
+  return m;
+}
+
+export function openNotice({ title = 'Внимание', message = '', action = 'ОК', variant = 'compact', surface = 'app' } = {}) {
+  const content = `<div class="modal-title"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(message)}</p></div><div class="modal-actions">${button(escapeHtml(action), { data: 'data-notice-close' })}</div>`;
+  const m = mountModal(document.body, modal(content, { variant, surface, title }));
+  if (!m) return null;
+  m.querySelector('[data-notice-close]')?.addEventListener('click', () => m.remove());
   return m;
 }
