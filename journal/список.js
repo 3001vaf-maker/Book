@@ -1,7 +1,7 @@
 import { emptyState, listEntries, listEntry } from '../ui/ui.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getActivePaymentForSource } from '../core/dds.js';
-import { recordPlanTotal } from '../core/business-model.js';
+import { recordPlanTotal } from '../core/financial-model.js';
 import { getRecords } from './record-data.js';
 import { isRecordCompletedSide, recordActivityTime, recordAppointmentTime, recordVisualState } from './record-state.js';
 
