@@ -106,13 +106,23 @@ export function resolveRecordFinancialPlan(record = null, { discountPercent = 0 
   return calculateFinancialPlan(record?.procedures || [], { discountPercent });
 }
 
+function movementServiceAmount(item = null) {
+  if (!item) return 0;
+  if (item?.movementType === 'income') {
+    const total = Math.max(0, numberValue(item?.total));
+    const tips = Math.max(0, numberValue(item?.tips));
+    return Math.max(0, numberValue(item?.serviceAmount ?? (total - tips)));
+  }
+  return Math.max(0, numberValue(item?.serviceAmount ?? item?.total));
+}
+
 export function calculateFinancialFact(plan = null, movements = []) {
   const income = (Array.isArray(movements) ? movements : [])
     .filter((item) => item?.movementType === 'income')
-    .reduce((sum, item) => sum + Math.max(0, numberValue(item?.total)), 0);
+    .reduce((sum, item) => sum + movementServiceAmount(item), 0);
   const expense = (Array.isArray(movements) ? movements : [])
     .filter((item) => item?.movementType === 'expense')
-    .reduce((sum, item) => sum + Math.max(0, numberValue(item?.total)), 0);
+    .reduce((sum, item) => sum + movementServiceAmount(item), 0);
   return {
     ...(plan || {}),
     factIncome: income,
@@ -142,6 +152,9 @@ export function getRecordPaymentState(record = null, { discountPercent = 0 } = {
   const fact = calculateFinancialFact(plan, movements);
   const paidTotal = Math.max(0, numberValue(fact.factTotal));
   const remaining = Math.max(0, numberValue(plan?.planTotal) - paidTotal);
+  const tipsTotal = movements
+    .filter((item) => item?.movementType === 'income')
+    .reduce((sum, item) => sum + Math.max(0, numberValue(item?.tips)), 0);
   const payments = movements
     .filter((item) => item?.movementType === 'income' && paymentNet(item, movements) > 0.009)
     .sort((a, b) => String(a?.createdAt || '').localeCompare(String(b?.createdAt || '')));
@@ -150,6 +163,7 @@ export function getRecordPaymentState(record = null, { discountPercent = 0 } = {
     ...fact,
     paidTotal,
     remaining,
+    tipsTotal,
     fullyPaid,
     partiallyPaid: paidTotal > 0.009 && !fullyPaid,
     hasPayments: payments.length > 0,
@@ -184,7 +198,7 @@ function movementItemAmount(movement = null, sourceType = '', sourceId = '') {
       && (!type || !item?.sourceType || String(item.sourceType) === type))
     .reduce((sum, item) => sum + itemPlanAmount(item), 0);
   if (!itemPlan) return 0;
-  return Math.max(0, numberValue(movement?.total)) * (itemPlan / totalPlan);
+  return movementServiceAmount(movement) * (itemPlan / totalPlan);
 }
 
 export function getFinancialItemFact(sourceType, sourceId) {
