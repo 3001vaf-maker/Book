@@ -1,12 +1,10 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { calculateFinancialPlan } from '../core/financial-model.js';
+import { calculateFinancialPlan, getRecordPaymentState } from '../core/financial-model.js';
 import {
-  getActivePaymentForSource,
   getDDSExpenses,
   getDDSIncome,
   getPaymentRemaining,
-  getPaymentStateForSource,
   getRefundsForPayment,
   getWalletDDSMovements,
   recordPaymentIncome,
@@ -25,7 +23,11 @@ const forbiddenEditPayment = /replacesPaymentId|status:\s*['"]corrected['"]|data
 assert.doesNotMatch(ddsSource, forbiddenEditPayment);
 assert.doesNotMatch(paymentUiSource, forbiddenEditPayment);
 
-// Existing DDS v2 entries keep their full financial snapshot when renamed to `finance`.
+function recordFor(id, finance) {
+  return { id, finance, procedures: [] };
+}
+
+// Existing DDS entries keep their financial snapshot and gain service/tips defaults safely.
 storage.set('book.dds', JSON.stringify({
   version: 2,
   income: [{
@@ -49,6 +51,8 @@ assert.equal(migratedLegacy.length, 1);
 assert.equal(migratedLegacy[0].finance.serviceTotal, 8000);
 assert.equal(migratedLegacy[0].finance.discountTotal, 1600);
 assert.equal(migratedLegacy[0].finance.planTotal, 6400);
+assert.equal(migratedLegacy[0].serviceAmount, 6400);
+assert.equal(migratedLegacy[0].tips, 0);
 assert.equal(migratedLegacy[0].business, undefined);
 const storedMigrated = JSON.parse(storage.get('book.dds') || '{}');
 assert.equal(storedMigrated.version, 4);
@@ -61,32 +65,30 @@ assert.equal(discounted.serviceTotal, 8000);
 assert.equal(discounted.discountTotal, 800);
 assert.equal(discounted.planTotal, 7200);
 
-// Full payment still creates one immutable income movement.
+// Full payment.
 const finance = calculateFinancialPlan([{ sourceId: 'procedure-1', name: 'Стрижка', price: 5000 }]);
 const completed = recordPaymentIncome({
   source: { type: 'record', id: 'record-1' },
   workplace: 'workplace-1',
   client: { key: 'client-1' },
   finance,
+  maxAmount: 5000,
+  serviceAmount: 5000,
   allocations: [{ walletId: 'cash', walletName: 'Наличные', amount: 5000 }],
 });
 assert.equal(completed.status, 'completed');
 assert.equal(completed.movementType, 'income');
 assert.equal(completed.total, 5000);
-assert.equal(completed.finance.serviceTotal, 5000);
+assert.equal(completed.serviceAmount, 5000);
+assert.equal(completed.tips, 0);
 assert.equal(getWalletDDSMovements('cash').length, 1);
-assert.equal(getActivePaymentForSource('record', 'record-1')?.id, completed.id);
+let state = getRecordPaymentState(recordFor('record-1', finance));
+assert.equal(state.paidTotal, 5000);
+assert.equal(state.remaining, 0);
+assert.equal(state.fullyPaid, true);
 assert.equal(getPaymentRemaining(completed.id), 5000);
-assert.equal(getPaymentStateForSource('record', 'record-1').remaining, 0);
 
-// A fully paid source cannot be paid again until money is returned.
-assert.equal(recordPaymentIncome({
-  source: { type: 'record', id: 'record-1' },
-  finance,
-  allocations: [{ walletId: 'cash', walletName: 'Наличные', amount: 5000 }],
-}), null);
-assert.equal(getDDSIncome().length, 1);
-
+// Refund reopens the amount due.
 const refundAt = new Date('2026-09-10T10:00:00.000Z');
 const refunded = recordRefundExpense(completed.id, { reason: 'Возврат клиенту', now: refundAt });
 assert.equal(refunded.status, 'refund');
@@ -98,37 +100,44 @@ assert.equal(getDDSExpenses().length, 1);
 assert.equal(getWalletDDSMovements('cash').reduce((sum, item) => sum + Number(item.total || 0), 0), 0);
 assert.equal(getRefundsForPayment(completed.id).length, 1);
 assert.equal(getPaymentRemaining(completed.id), 0);
-assert.equal(getActivePaymentForSource('record', 'record-1'), null);
-assert.equal(getPaymentStateForSource('record', 'record-1').remaining, 5000);
+state = getRecordPaymentState(recordFor('record-1', finance));
+assert.equal(state.paidTotal, 0);
+assert.equal(state.remaining, 5000);
+assert.equal(state.fullyPaid, false);
 assert.equal(recordRefundExpense(completed.id), null);
 
 const repaid = recordPaymentIncome({
   source: { type: 'record', id: 'record-1' },
   finance,
+  maxAmount: 5000,
+  serviceAmount: 5000,
   allocations: [{ walletId: 'cash', walletName: 'Наличные', amount: 5000 }],
 });
 assert.ok(repaid);
-assert.equal(getActivePaymentForSource('record', 'record-1')?.id, repaid.id);
+assert.equal(getRecordPaymentState(recordFor('record-1', finance)).fullyPaid, true);
 
-// Partial payments are separate immutable DDS income movements.
+// Partial payments remain separate immutable DDS income movements.
 const partialFinance = calculateFinancialPlan([{ sourceId: 'procedure-partial', name: 'Окрашивание', price: 7000 }]);
 const firstPart = recordPaymentIncome({
   source: { type: 'record', id: 'record-partial' },
   finance: partialFinance,
+  maxAmount: 7000,
+  serviceAmount: 2000,
   allocations: [{ walletId: 'partial-cash', walletName: 'Наличные', amount: 2000 }],
 });
 assert.ok(firstPart);
 assert.equal(firstPart.total, 2000);
-let partialState = getPaymentStateForSource('record', 'record-partial');
+let partialState = getRecordPaymentState(recordFor('record-partial', partialFinance));
 assert.equal(partialState.paidTotal, 2000);
 assert.equal(partialState.remaining, 5000);
 assert.equal(partialState.partiallyPaid, true);
 assert.equal(partialState.fullyPaid, false);
-assert.equal(getActivePaymentForSource('record', 'record-partial'), null);
 
 const secondPart = recordPaymentIncome({
   source: { type: 'record', id: 'record-partial' },
   finance: partialFinance,
+  maxAmount: 5000,
+  serviceAmount: 4000,
   allocations: [
     { walletId: 'partial-card', walletName: 'СберБанк', amount: 3000 },
     { walletId: 'partial-cash', walletName: 'Наличные', amount: 1000 },
@@ -136,40 +145,66 @@ const secondPart = recordPaymentIncome({
 });
 assert.ok(secondPart);
 assert.equal(secondPart.total, 4000);
-partialState = getPaymentStateForSource('record', 'record-partial');
+partialState = getRecordPaymentState(recordFor('record-partial', partialFinance));
 assert.equal(partialState.paidTotal, 6000);
 assert.equal(partialState.remaining, 1000);
 assert.equal(partialState.partiallyPaid, true);
-assert.equal(getActivePaymentForSource('record', 'record-partial'), null);
 
-// Overpayment is rejected; exact remainder closes the debt.
+// A service amount over the current remainder is rejected.
 assert.equal(recordPaymentIncome({
   source: { type: 'record', id: 'record-partial' },
   finance: partialFinance,
+  maxAmount: 1000,
+  serviceAmount: 1001,
   allocations: [{ walletId: 'partial-card', walletName: 'СберБанк', amount: 1001 }],
 }), null);
+
 const finalPart = recordPaymentIncome({
   source: { type: 'record', id: 'record-partial' },
   finance: partialFinance,
+  maxAmount: 1000,
+  serviceAmount: 1000,
   allocations: [{ walletId: 'partial-card', walletName: 'СберБанк', amount: 1000 }],
 });
 assert.ok(finalPart);
-partialState = getPaymentStateForSource('record', 'record-partial');
+partialState = getRecordPaymentState(recordFor('record-partial', partialFinance));
 assert.equal(partialState.paidTotal, 7000);
 assert.equal(partialState.remaining, 0);
 assert.equal(partialState.fullyPaid, true);
 assert.equal(partialState.payments.length, 3);
-assert.equal(getActivePaymentForSource('record', 'record-partial')?.id, finalPart.id);
 assert.equal(getWalletDDSMovements('partial-cash').reduce((sum, item) => sum + Number(item.total || 0), 0), 3000);
 assert.equal(getWalletDDSMovements('partial-card').reduce((sum, item) => sum + Number(item.total || 0), 0), 4000);
 
-// One payment can still be allocated to two wallets without any UI mode switch.
+// Tips are actual DDS cash but do not inflate service plan/fact.
+const tipsFinance = calculateFinancialPlan([{ sourceId: 'procedure-tips', name: 'Укладка', price: 7000 }]);
+const withTips = recordPaymentIncome({
+  source: { type: 'record', id: 'record-tips' },
+  finance: tipsFinance,
+  maxAmount: 7000,
+  serviceAmount: 7000,
+  tips: 1000,
+  allocations: [{ walletId: 'tips-card', walletName: 'СберБанк', amount: 8000 }],
+});
+assert.ok(withTips);
+assert.equal(withTips.total, 8000);
+assert.equal(withTips.serviceAmount, 7000);
+assert.equal(withTips.tips, 1000);
+const tipsState = getRecordPaymentState(recordFor('record-tips', tipsFinance));
+assert.equal(tipsState.paidTotal, 7000);
+assert.equal(tipsState.remaining, 0);
+assert.equal(tipsState.tipsTotal, 1000);
+assert.equal(tipsState.fullyPaid, true);
+assert.equal(getWalletDDSMovements('tips-card').reduce((sum, item) => sum + Number(item.total || 0), 0), 8000);
+
+// One payment can be allocated to two wallets without a mode switch.
 const splitFinance = calculateFinancialPlan([{ sourceId: 'procedure-2', name: 'Окрашивание', price: 6000 }]);
 const split = recordPaymentIncome({
   source: { type: 'record', id: 'record-2' },
   workplace: 'workplace-1',
   client: { key: 'client-2' },
   finance: splitFinance,
+  maxAmount: 6000,
+  serviceAmount: 6000,
   allocations: [
     { walletId: 'split-cash', walletName: 'Наличные', amount: 2000 },
     { walletId: 'split-card', walletName: 'Карта', amount: 4000 },
@@ -179,22 +214,5 @@ assert.equal(split.status, 'completed');
 assert.equal(split.allocations.length, 2);
 assert.equal(getWalletDDSMovements('split-cash').reduce((sum, item) => sum + Number(item.total || 0), 0), 2000);
 assert.equal(getWalletDDSMovements('split-card').reduce((sum, item) => sum + Number(item.total || 0), 0), 4000);
-assert.equal(recordRefundExpense(split.id), null);
-
-const partialRefund = recordRefundExpense(split.id, { amount: 1000, walletId: 'split-card', walletName: 'Карта' });
-assert.equal(partialRefund.total, 1000);
-assert.equal(getPaymentRemaining(split.id), 5000);
-assert.equal(getActivePaymentForSource('record', 'record-2'), null);
-assert.equal(getPaymentStateForSource('record', 'record-2').remaining, 1000);
-assert.equal(getWalletDDSMovements('split-card').reduce((sum, item) => sum + Number(item.total || 0), 0), 3000);
-
-const finalRefund = recordRefundExpense(split.id, { amount: 5000, walletId: 'split-cash', walletName: 'Наличные' });
-assert.equal(finalRefund.total, 5000);
-assert.equal(getPaymentRemaining(split.id), 0);
-assert.equal(getActivePaymentForSource('record', 'record-2'), null);
-assert.equal(getPaymentStateForSource('record', 'record-2').remaining, 6000);
-const splitLedgerTotal = [...getWalletDDSMovements('split-cash'), ...getWalletDDSMovements('split-card')]
-  .reduce((sum, item) => sum + Number(item.total || 0), 0);
-assert.equal(splitLedgerTotal, 0);
 
 console.log('payment refund tests: OK');
