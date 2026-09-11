@@ -62,6 +62,7 @@ function normalizeClient(person = {}) {
     visits: Number(person.visits || 0),
     totalSpent: Number(person.totalSpent || 0),
     lastVisit: String(person.lastVisit || ''),
+    programs: Array.isArray(person.programs) ? person.programs : [],
     createdAt: String(person.createdAt || ''),
   };
 }
@@ -138,15 +139,21 @@ export function upsertPersonFromBookingAccount(account = {}) {
   const phone = normalizePhoneForStorage(account.phone);
   const telegramId = String(account.telegramId || '').trim();
   const email = String(account.email || '').trim().toLowerCase();
+  const profileData = account.profileData && typeof account.profileData === 'object' ? account.profileData : {};
+  const incomingGender = String(profileData.gender || '').trim();
+  const incomingBirthDate = String(profileData.birthDate || '').trim();
   const person = normalizeClient({
     ...(previous || {}),
     key: previous?.key || `account-${accountId}`,
     name: String(account.name || previous?.name || ''),
     surname: String(account.surname || previous?.surname || ''),
+    gender: incomingGender || previous?.gender || '',
+    birthDate: incomingBirthDate || previous?.birthDate || '',
     phones: phone ? [...(previous?.phones || []), phone] : previous?.phones || [],
     telegrams: telegramId ? [...(previous?.telegrams || []), telegramId] : previous?.telegrams || [],
     emails: email ? [...(previous?.emails || []), email] : previous?.emails || [],
     accounts: [...(previous?.accounts || []), accountId],
+    programs: previous?.programs || [],
     createdAt: previous?.createdAt || new Date().toISOString(),
   });
   if (existingIndex >= 0) people[existingIndex] = person;
