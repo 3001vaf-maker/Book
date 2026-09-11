@@ -1,5 +1,5 @@
 import { button, details, initPaymentForm, initPaymentMethods, modal, mountModal, paymentForm, paymentMethods, select, shortDate, shortDateTimeParts, shortTime } from '../ui/ui.js';
-import { calculateFinancialPlan, getRecordPaymentState } from '../core/financial-model.js';
+import { calculateFinancialPlan, getRecordPaymentState, recordFinancialItems } from '../core/financial-model.js';
 import { getRefundsForPayment, recordPaymentIncome, recordRefundExpense } from '../core/dds.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getAllClients } from '../main/clients/data.js';
@@ -18,24 +18,26 @@ function clientForRecord(record) {
 }
 
 function financeForRecord(record) {
-  return record?.finance || calculateFinancialPlan(record?.procedures || []);
+  return record?.finance || calculateFinancialPlan(recordFinancialItems(record));
 }
 
 function paymentStateForRecord(record) {
   return getRecordPaymentState(record);
 }
 
-function proceduresFromFinance(record, finance) {
+function sourcesFromFinance(sources, finance, type) {
   const items = Array.isArray(finance?.items) ? finance.items : [];
-  return (Array.isArray(record?.procedures) ? record.procedures : []).map((procedure, index) => {
-    const financialItem = items.find((item) => String(item?.sourceId || '') === String(procedure?.id || '')) || items[index];
-    return financialItem ? { ...procedure, cost: financialItem.price } : { ...procedure };
+  return (Array.isArray(sources) ? sources : []).map((source) => {
+    const financialItem = items.find((item) => String(item?.sourceType || 'procedure') === type
+      && String(item?.sourceId || '') === String(source?.id || ''));
+    return financialItem ? { ...source, cost: financialItem.price } : { ...source };
   });
 }
 
 function saveFinancialCorrection(record, finance) {
   return updateRecord(record.id, {
-    procedures: proceduresFromFinance(record, finance),
+    procedures: sourcesFromFinance(record?.procedures, finance, 'procedure'),
+    products: sourcesFromFinance(record?.products, finance, 'product'),
     finance,
   });
 }

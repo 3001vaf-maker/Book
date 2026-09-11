@@ -69,6 +69,9 @@ const financialModel = source('core/financial-model.js');
 if (!/export function calculateFinancialPlan/.test(financialModel) || !/export function calculateFinancialFact/.test(financialModel)) {
   errors.push('core/financial-model.js must own financial plan/fact calculations');
 }
+if (!/export function recordFinancialItems/.test(financialModel) || !/sourceType:\s*'product'/.test(financialModel)) {
+  errors.push('Financial Model must assemble both procedure and product Record sources');
+}
 
 const walletData = source('settings/wallets/data.js');
 if (!/getWalletDDSMovements/.test(walletData) || !/export function getWalletBalance/.test(walletData)) {
@@ -87,12 +90,12 @@ if (/data-record-cost|name=['"]recordCost['"]/.test(recordCreation)) {
 
 const paymentUI = source('ui/payment/index.js');
 if (!/data-payment-price/.test(paymentUI) || /data-payment-price\s+readonly/.test(paymentUI)) {
-  errors.push('Payment must be the single editable procedure price correction point');
+  errors.push('Payment must be the single editable procedure/product price correction point');
 }
 
 const recordPayment = source('journal/record-payment.js');
-if (!/proceduresFromFinance/.test(recordPayment) || !/procedures:\s*proceduresFromFinance/.test(recordPayment)) {
-  errors.push('Payment-stage price correction must be persisted back into Record procedures');
+if (!/procedures:\s*sourcesFromFinance/.test(recordPayment) || !/products:\s*sourcesFromFinance/.test(recordPayment)) {
+  errors.push('Payment-stage price correction must be persisted back into Record procedures and products');
 }
 
 if (errors.length) {

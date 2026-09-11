@@ -6,12 +6,24 @@ const numberValue = (value) => {
 };
 
 const clampPercent = (value) => Math.max(0, Math.min(100, numberValue(value)));
+const sourceType = (item = null) => String(item?.sourceType || 'procedure');
+const sourceId = (item = null) => String(item?.sourceId || item?.id || '');
+const sourceKey = (item = null) => `${sourceType(item)}:${sourceId(item)}`;
 
 function discountMode(item = {}, defaultPercent = 0) {
   if (item?.discountMode === 'percent' || item?.discountMode === 'money' || item?.discountMode === 'none') return item.discountMode;
   if (item?.discountPercent !== '' && item?.discountPercent != null && clampPercent(item.discountPercent) > 0) return 'percent';
   if (item?.discountMoney !== '' && item?.discountMoney != null && numberValue(item.discountMoney) > 0) return 'money';
   return defaultPercent > 0 ? 'percent' : 'none';
+}
+
+export function recordFinancialItems(record = null) {
+  const procedures = Array.isArray(record?.procedures) ? record.procedures : [];
+  const products = Array.isArray(record?.products) ? record.products : [];
+  return [
+    ...procedures.map((item) => ({ ...item, sourceType: 'procedure', sourceId: String(item?.id || '') })),
+    ...products.map((item) => ({ ...item, sourceType: 'product', sourceId: String(item?.id || '') })),
+  ];
 }
 
 export function calculateFinancialPlan(items = [], { discountPercent = 0 } = {}) {
@@ -28,8 +40,8 @@ export function calculateFinancialPlan(items = [], { discountPercent = 0 } = {})
       ? (mode === 'money' ? discountMoney / price * 100 : selectedPercent)
       : 0;
     return {
-      sourceType: String(item?.sourceType || 'procedure'),
-      sourceId: String(item?.sourceId || item?.id || ''),
+      sourceType: sourceType(item),
+      sourceId: sourceId(item),
       name: String(item?.name || ''),
       price,
       discountMode: mode,
@@ -53,17 +65,21 @@ export function calculateFinancialPlan(items = [], { discountPercent = 0 } = {})
   };
 }
 
-export function repriceFinancialPlan(procedures = [], currentFinance = null) {
+export function repriceFinancialPlan(sources = [], currentFinance = null) {
   const priorItems = Array.isArray(currentFinance?.items) ? currentFinance.items : [];
-  const bySource = new Map(priorItems.map((item) => [String(item?.sourceId || ''), item]));
+  const bySource = new Map(priorItems.map((item) => [sourceKey(item), item]));
   const defaultDiscount = currentFinance?.discountPercent == null ? 0 : clampPercent(currentFinance.discountPercent);
-  const items = (Array.isArray(procedures) ? procedures : []).map((procedure, index) => {
-    const prior = bySource.get(String(procedure?.id || '')) || priorItems[index] || null;
+  const items = (Array.isArray(sources) ? sources : []).map((source, index) => {
+    const type = sourceType(source);
+    const id = sourceId(source);
+    const prior = bySource.get(`${type}:${id}`)
+      || (id ? priorItems.find((item) => String(item?.sourceId || '') === id && (!item?.sourceType || sourceType(item) === type)) : priorItems[index])
+      || null;
     const base = {
-      sourceType: 'procedure',
-      sourceId: String(procedure?.id || ''),
-      name: String(procedure?.name || ''),
-      price: Math.max(0, numberValue(procedure?.cost)),
+      sourceType: type,
+      sourceId: id,
+      name: String(source?.name || ''),
+      price: Math.max(0, numberValue(source?.cost ?? source?.price)),
     };
     if (!prior) return { ...base, discountMode: defaultDiscount > 0 ? 'percent' : 'none', discountPercent: defaultDiscount };
     if (prior.discountMode === 'money') return { ...base, discountMode: 'money', discountMoney: prior.discountMoney };
@@ -103,7 +119,7 @@ export function resolveRecordFinancialPlan(record = null, { discountPercent = 0 
     if (historical) return historical;
   }
 
-  return calculateFinancialPlan(record?.procedures || [], { discountPercent });
+  return calculateFinancialPlan(recordFinancialItems(record), { discountPercent });
 }
 
 function movementServiceAmount(item = null) {
@@ -189,11 +205,11 @@ function itemPlanAmount(item = null) {
   return Math.max(0, price - Math.max(0, numberValue(item.discountMoney)));
 }
 
-function movementItemAmount(movement = null, sourceType = '', sourceId = '') {
+function movementItemAmount(movement = null, sourceTypeValue = '', sourceIdValue = '') {
   const finance = movement?.finance;
   const items = Array.isArray(finance?.items) ? finance.items : [];
-  const id = String(sourceId || '');
-  const type = String(sourceType || '');
+  const id = String(sourceIdValue || '');
+  const type = String(sourceTypeValue || '');
   if (!id || !items.length) return 0;
   const totalPlan = Math.max(0, numberValue(finance?.planTotal ?? finance?.dueTotal));
   if (!totalPlan) return 0;
@@ -205,11 +221,11 @@ function movementItemAmount(movement = null, sourceType = '', sourceId = '') {
   return movementServiceAmount(movement) * (itemPlan / totalPlan);
 }
 
-export function getFinancialItemFact(sourceType, sourceId) {
+export function getFinancialItemFact(sourceTypeValue, sourceIdValue) {
   let factIncome = 0;
   let factExpense = 0;
   getDDSMovements().forEach((movement) => {
-    const allocated = movementItemAmount(movement, sourceType, sourceId);
+    const allocated = movementItemAmount(movement, sourceTypeValue, sourceIdValue);
     if (!allocated) return;
     if (movement?.movementType === 'income') factIncome += allocated;
     else if (movement?.movementType === 'expense') factExpense += allocated;

@@ -1,7 +1,7 @@
 import { containsRange, isValidRange, rangesOverlap } from '../core/time.js';
 import { getDays, getDay, getDayTime } from '../core/day.js';
 import { getWorkplaces } from '../core/workplace-time.js';
-import { calculateFinancialPlan, getRecordFinancialPlanFact, repriceFinancialPlan, resolveRecordFinancialPlan } from '../core/financial-model.js';
+import { calculateFinancialPlan, getRecordFinancialPlanFact, recordFinancialItems, repriceFinancialPlan, resolveRecordFinancialPlan } from '../core/financial-model.js';
 import { getAllClients } from '../main/clients/data.js';
 import { getJournalBreaks } from './break-data.js';
 
@@ -73,8 +73,13 @@ function hydrateRecord(record) {
   if (!record?.id) return record;
   const legacyDiscount = record?.clientDiscountPercent == null ? clientDiscount(record?.client) : percent(record.clientDiscountPercent);
   const { clientDiscountPercent: _legacyDiscount, ...cleanRecord } = record;
-  const finance = getRecordFinancialPlanFact({ ...cleanRecord, finance: storedRecordFinance(record) }, { discountPercent: legacyDiscount });
-  return { ...cleanRecord, finance: normalizeFinance(finance) };
+  const normalizedRecord = {
+    ...cleanRecord,
+    procedures: Array.isArray(cleanRecord.procedures) ? cleanRecord.procedures : [],
+    products: Array.isArray(cleanRecord.products) ? cleanRecord.products : [],
+  };
+  const finance = getRecordFinancialPlanFact({ ...normalizedRecord, finance: storedRecordFinance(normalizedRecord) }, { discountPercent: legacyDiscount });
+  return { ...normalizedRecord, finance: normalizeFinance(finance) };
 }
 
 export function getRecords() {
@@ -115,11 +120,15 @@ export function checkRecordTime({ date, workplaceId, from, to, excludeId = '' } 
   return day;
 }
 
-export function createRecord({ date, workplaceId, from, to, client, procedures = [] } = {}) {
+export function createRecord({ date, workplaceId, from, to, client, procedures = [], products = [] } = {}) {
   const normalizedDate = normalizeDate(date), normalizedWorkplaceId = normalizeId(workplaceId);
   if (!checkRecordTime({ date: normalizedDate, workplaceId: normalizedWorkplaceId, from, to }).ok) return null;
   const now = new Date().toISOString();
-  const finance = calculateFinancialPlan(procedures, { discountPercent: clientDiscount(client) });
+  const sourceRecord = {
+    procedures: Array.isArray(procedures) ? procedures : [],
+    products: Array.isArray(products) ? products : [],
+  };
+  const finance = calculateFinancialPlan(recordFinancialItems(sourceRecord), { discountPercent: clientDiscount(client) });
   const record = hydrateRecord({
     id: crypto.randomUUID(),
     status: 'active',
@@ -130,7 +139,8 @@ export function createRecord({ date, workplaceId, from, to, client, procedures =
     from: String(from),
     to: String(to),
     client: client || null,
-    procedures: Array.isArray(procedures) ? procedures : [],
+    procedures: sourceRecord.procedures,
+    products: sourceRecord.products,
     finance,
     createdAt: now,
     updatedAt: now,
@@ -151,13 +161,14 @@ export function updateRecord(id, patch = {}) {
 
   const hasExplicitFinance = Object.prototype.hasOwnProperty.call(patch, 'finance');
   const serviceChanged = Object.prototype.hasOwnProperty.call(patch, 'procedures');
+  const productChanged = Object.prototype.hasOwnProperty.call(patch, 'products');
   const clientChanged = Object.prototype.hasOwnProperty.call(patch, 'client');
   if (hasExplicitFinance) {
     next.finance = normalizeFinance(patch.finance);
   } else if (clientChanged) {
-    next.finance = calculateFinancialPlan(next.procedures || [], { discountPercent: clientDiscount(next.client) });
-  } else if (serviceChanged) {
-    next.finance = repriceFinancialPlan(next.procedures || [], current.finance);
+    next.finance = calculateFinancialPlan(recordFinancialItems(next), { discountPercent: clientDiscount(next.client) });
+  } else if (serviceChanged || productChanged) {
+    next.finance = repriceFinancialPlan(recordFinancialItems(next), current.finance);
   } else {
     next.finance = current.finance;
   }
