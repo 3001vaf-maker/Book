@@ -27,17 +27,18 @@ function paymentStateForRecord(record) {
 
 function sourcesFromFinance(sources, finance, type) {
   const items = Array.isArray(finance?.items) ? finance.items : [];
-  return (Array.isArray(sources) ? sources : []).map((source) => {
+  return (Array.isArray(sources) ? sources : []).flatMap((source) => {
     const financialItem = items.find((item) => String(item?.sourceType || 'procedure') === type
       && String(item?.sourceId || '') === String(source?.id || ''));
-    return financialItem ? { ...source, cost: financialItem.price } : { ...source };
+    return financialItem ? [{ ...source, cost: financialItem.price }] : [];
   });
 }
 
 function saveFinancialCorrection(record, finance) {
-  return updateRecord(record.id, {
-    procedures: sourcesFromFinance(record?.procedures, finance, 'procedure'),
-    products: sourcesFromFinance(record?.products, finance, 'product'),
+  const current = getRecords().find((item) => String(item?.id || '') === String(record?.id || '')) || record;
+  return updateRecord(current.id, {
+    procedures: sourcesFromFinance(current?.procedures, finance, 'procedure'),
+    products: sourcesFromFinance(current?.products, finance, 'product'),
     finance,
   });
 }
@@ -185,6 +186,9 @@ function openPaymentModal(record) {
   if (!m) return;
   initPaymentForm(m.querySelector('[data-payment-ui]'), {
     calculate: (items) => calculateFinancialPlan(items),
+    onRemove: ({ finance: updatedFinance }) => {
+      saveFinancialCorrection(current, updatedFinance);
+    },
     onSave: ({ finance: updatedFinance }) => {
       const updated = saveFinancialCorrection(current, updatedFinance);
       if (!updated) return;
