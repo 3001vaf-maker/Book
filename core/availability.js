@@ -1,6 +1,6 @@
 // Canonical availability queries over WorkPlan + neutral TimeGrid + occupancy sources.
 // UI and business entities ask this module; they do not rebuild time availability themselves.
-import { getDay, getDayTime, getDays } from './day-read.js';
+import { getDay, getDayTime, getDays } from './day/index.js';
 import { getWorkplaces } from './workplace-time.js';
 import { getTimeUsagesForScope } from './time-usage.js';
 import {
