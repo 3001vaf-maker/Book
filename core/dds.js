@@ -1,6 +1,6 @@
 const STORAGE_KEY = 'book.dds';
 const LEGACY_PAYMENT_KEY = 'book.payments';
-const VERSION = 3;
+const VERSION = 4;
 
 const numberValue = (value) => {
   const number = Number(String(value ?? '').replace(',', '.'));
@@ -138,21 +138,45 @@ function refundTotal(state, paymentId) {
     .reduce((sum, item) => sum + Math.max(0, numberValue(item?.total)), 0);
 }
 
-function activePaymentForSource(state, source = null) {
+function paymentsForSource(state, source = null) {
   const key = sourceKey(source);
-  if (key === ':') return null;
-  const matches = state.income.filter((payment) => sourceKey(payment?.source) === key
-    && Math.max(0, numberValue(payment.total) - refundTotal(state, payment.id)) > 0.009);
-  return matches.length ? matches[matches.length - 1] : null;
+  if (key === ':') return [];
+  return state.income.filter((payment) => sourceKey(payment?.source) === key);
+}
+
+function paymentNet(state, payment) {
+  return Math.max(0, numberValue(payment?.total) - refundTotal(state, payment?.id));
+}
+
+function paymentStateForSource(state, source = null, planTotalOverride = null) {
+  const payments = paymentsForSource(state, source);
+  const latestFinance = [...payments].reverse().find((payment) => payment?.finance)?.finance || null;
+  const override = planTotalOverride == null ? null : Math.max(0, numberValue(planTotalOverride));
+  const planTotal = override == null ? Math.max(0, numberValue(latestFinance?.planTotal)) : override;
+  const paidTotal = payments.reduce((sum, payment) => sum + paymentNet(state, payment), 0);
+  const remaining = Math.max(0, planTotal - paidTotal);
+  const fullyPaid = planTotal > 0 && remaining <= 0.009;
+  const partiallyPaid = paidTotal > 0.009 && !fullyPaid;
+  const activePayments = payments.filter((payment) => paymentNet(state, payment) > 0.009);
+  return {
+    planTotal,
+    paidTotal,
+    remaining,
+    fullyPaid,
+    partiallyPaid,
+    hasPayments: activePayments.length > 0,
+    payments: activePayments,
+    latestPayment: activePayments.length ? activePayments[activePayments.length - 1] : null,
+  };
 }
 
 export function recordPaymentIncome({ source = null, workplace = '', client = null, finance = null, allocations = [], now = new Date() } = {}) {
   if (!source?.type || !source?.id) return null;
   const snapshot = normalizeFinancialSnapshot(finance);
   if (!snapshot) return null;
-  const total = snapshot.planTotal;
   const state = readState();
-  if (activePaymentForSource(state, source)) return null;
+  const before = paymentStateForSource(state, source, snapshot.planTotal);
+  if (before.remaining <= 0.009) return null;
 
   const preparedAllocations = (Array.isArray(allocations) ? allocations : [])
     .map((item) => ({
@@ -163,7 +187,7 @@ export function recordPaymentIncome({ source = null, workplace = '', client = nu
     }))
     .filter((item) => item.walletId && item.amount > 0);
   const allocated = preparedAllocations.reduce((sum, item) => sum + item.amount, 0);
-  if (!preparedAllocations.length || Math.abs(allocated - total) > 0.009) return null;
+  if (!preparedAllocations.length || allocated <= 0 || allocated > before.remaining + 0.009) return null;
 
   const payment = normalizeIncome({
     id: globalThis.crypto?.randomUUID?.() || `payment-${Date.now()}`,
@@ -173,14 +197,21 @@ export function recordPaymentIncome({ source = null, workplace = '', client = nu
     allocations: preparedAllocations,
     walletId: preparedAllocations.length === 1 ? preparedAllocations[0].walletId : '',
     walletName: preparedAllocations.length === 1 ? preparedAllocations[0].walletName : '',
-    total,
+    total: allocated,
     finance: snapshot,
     createdAt: now.toISOString(),
     paidAt: now.toISOString(),
   });
   state.income.push(payment);
   writeState(state);
-  notifyDDSChanged({ action: 'income', paymentId: payment.id, total: payment.total, source: payment.source });
+  const after = paymentStateForSource(state, source, snapshot.planTotal);
+  notifyDDSChanged({
+    action: after.fullyPaid ? 'income-full' : 'income-partial',
+    paymentId: payment.id,
+    total: payment.total,
+    remaining: after.remaining,
+    source: payment.source,
+  });
   return payment;
 }
 
@@ -276,10 +307,29 @@ export function getWalletDDSMovements(walletId) {
   return entries.sort((a, b) => String(a?.createdAt || '').localeCompare(String(b?.createdAt || '')));
 }
 
-export function getActivePaymentForSource(type, id) {
+export function getPaymentStateForSource(type, id, planTotal = null) {
   const source = { type: String(type || ''), id: String(id || '') };
-  if (!source.type || !source.id) return null;
-  return activePaymentForSource(readState(), source);
+  if (!source.type || !source.id) return {
+    planTotal: Math.max(0, numberValue(planTotal)),
+    paidTotal: 0,
+    remaining: Math.max(0, numberValue(planTotal)),
+    fullyPaid: false,
+    partiallyPaid: false,
+    hasPayments: false,
+    payments: [],
+    latestPayment: null,
+  };
+  const value = paymentStateForSource(readState(), source, planTotal);
+  return {
+    ...value,
+    payments: value.payments.map((item) => ({ ...item })),
+    latestPayment: value.latestPayment ? { ...value.latestPayment } : null,
+  };
+}
+
+export function getActivePaymentForSource(type, id) {
+  const state = getPaymentStateForSource(type, id);
+  return state.fullyPaid ? state.latestPayment : null;
 }
 
 export function getRefundsForPayment(paymentId) {
