@@ -174,7 +174,7 @@ if (/\blocalStorage\b/.test(text(timetableController))) {
   report(timetableController, 'Graph controller must use the canonical data owner instead of direct localStorage');
 }
 
-const journalDataOwners = new Set(['journal/record-data.js', 'journal/break-data.js']);
+const journalDataOwners = new Set(['journal/break-data.js']);
 for (const file of journalFiles) {
   if (/\blocalStorage\b/.test(text(file)) && !journalDataOwners.has(rel(file))) {
     report(file, 'Journal runtime must use entity data owners instead of direct localStorage');
@@ -182,7 +182,7 @@ for (const file of journalFiles) {
 }
 
 const storageOwners = new Map([
-  ['book.records', 'journal/record-data.js'],
+  ['book.records', 'core/record/data.js'],
   ['book.journalBreaks', 'journal/break-data.js'],
 ]);
 for (const file of allFiles) {
@@ -211,7 +211,7 @@ if (existsSync(legacyTimeWorkBridge)) {
 }
 const legacyRecordBridge = join(root, 'core/record.js');
 if (existsSync(legacyRecordBridge)) {
-  report(legacyRecordBridge, 'legacy Record compatibility bridge is forbidden; journal/record-data.js is the canonical Record owner');
+  report(legacyRecordBridge, 'legacy Record compatibility bridge is forbidden; core/record/ is the canonical Record owner');
 }
 const misplacedJournalBreaks = join(root, 'core/journal-breaks.js');
 if (existsSync(misplacedJournalBreaks)) {
@@ -244,7 +244,7 @@ for (const file of allFiles) {
   }
 }
 
-const dayOwner = join(root, 'core/day.js');
+const dayOwner = join(root, 'core/day/data.js');
 if (/\bworkingDates\b/.test(text(dayOwner)) || text(dayOwner).includes('book.timeWorks')) {
   report(dayOwner, 'Day must contain only the canonical workingDays model and no legacy schedule storage');
 }

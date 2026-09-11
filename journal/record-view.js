@@ -13,17 +13,17 @@ import {
   openNotice,
   timeSlots,
 } from '../ui/ui.js';
-import { getRecordPaymentState, recordFinancialItems, repriceFinancialPlan } from '../core/financial-model.js';
-import { listAvailableStartTimes } from '../core/availability.js';
+import { getRecordPaymentState, recordFinancialItems, repriceFinancialPlan } from '../core/finance/index.js';
+import { listAvailableStartTimes } from '../core/time/index.js';
 import { getWorkplaces, getWorkplaceWorkingDates } from '../core/workplace-time.js';
-import { timeToMinutes, minutesToTime } from '../core/time.js';
+import { timeToMinutes, minutesToTime } from '../core/time/index.js';
 import { getAllClients } from '../main/clients/data.js';
 import { clientDisplay } from '../main/clients/presentation.js';
 import { openClientProfile } from '../main/clients/clients.js';
 import { getProcedures } from '../settings/service/procedures/data.js';
 import { getProducts } from '../settings/service/products/data.js';
-import { getRecords } from './record-read.js';
-import { updateRecord, cancelRecord, checkRecordTime } from './record-service.js';
+import { getRecords } from '../core/record/index.js';
+import { updateRecord, cancelRecord, checkRecordTime } from '../core/record/index.js';
 
 const people = () => getAllClients();
 const procedures = () => getProcedures();

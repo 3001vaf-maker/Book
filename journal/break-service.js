@@ -1,6 +1,6 @@
-import { checkTimeAvailability } from '../core/availability.js';
-import { isValidRange, normalizeTime } from '../core/time.js';
-import { notifyTimeUsageChanged } from '../core/time-usage.js';
+import { checkTimeAvailability } from '../core/time/index.js';
+import { isValidRange, normalizeTime } from '../core/time/index.js';
+import { notifyTimeUsageChanged } from '../core/time/index.js';
 import { deleteBreakRow, deleteBreakRowsForDay, getBreakRow, insertBreakRow, patchBreakRow } from './break-data.js';
 
 function normalizeDate(value) {

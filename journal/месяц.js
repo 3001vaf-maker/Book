@@ -1,9 +1,9 @@
 import { initCalendar, ALL_WORKPLACES_ID } from '../ui/ui.js';
-import { getRecordPaymentState } from '../core/financial-model.js';
-import { minutesBetween } from '../core/time.js';
+import { getRecordPaymentState } from '../core/finance/index.js';
+import { minutesBetween } from '../core/time/index.js';
 import { getWorkplaces, getWorkingDays, getWorkingDates, getAllWorkingDates, getWorkingDayIndicators, getWorkingDay, getWorkingDayTotalMinutes, resolveWorkingDayTime } from '../core/workplace-time.js';
-import { getRecordsForDay } from './record-read.js';
-import { recordVisualState } from './record-state.js';
+import { getRecordsForDay } from '../core/record/index.js';
+import { recordVisualState } from '../core/record/index.js';
 
 const RECORD_COLOR = '#EFFFBB';
 const PAID_COLOR = '#DDE8D7';

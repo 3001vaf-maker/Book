@@ -6,7 +6,7 @@ const recordView = readFileSync(new URL('../journal/record-view.js', import.meta
 const breakView = readFileSync(new URL('../journal/break-view.js', import.meta.url), 'utf8');
 const journalDay = readFileSync(new URL('../journal/день.js', import.meta.url), 'utf8');
 const timeline = readFileSync(new URL('../ui/time/journal-day.js', import.meta.url), 'utf8');
-const timeUsage = readFileSync(new URL('../core/time-usage.js', import.meta.url), 'utf8');
+const timeUsage = readFileSync(new URL('../core/time/usage.js', import.meta.url), 'utf8');
 const dayEditor = readFileSync(new URL('../timetable/day-editor.js', import.meta.url), 'utf8');
 
 assert.match(recordFlow, /checkTimeAvailability/);

@@ -12,13 +12,13 @@ const breakRead = read('journal/break-read.js');
 const breakService = read('journal/break-service.js');
 const journalDay = read('journal/день.js');
 const timeline = read('ui/time/journal-day.js');
-const timeUsage = read('core/time-usage.js');
-const timeGrid = read('core/time-grid.js');
-const availability = read('core/availability.js');
+const timeUsage = read('core/time/usage.js');
+const timeGrid = read('core/time/grid.js');
+const availability = read('core/time/availability.js');
 const dayEditor = read('timetable/day-editor.js');
 const architecture = read('ARCHITECTURE_DICTIONARY.md');
 
-if (!/from ['"]\.\.\/core\/availability\.js['"]/.test(recordFlow)) fail('journal/record.js', 'Record creation must ask Core Availability');
+if (!/from ['"]\.\.\/core\/time\/index\.js['"]/.test(recordFlow)) fail('journal/record.js', 'Record creation must ask Core Availability');
 if (!/checkTimeAvailability/.test(recordFlow) || !/listAvailableStartTimes/.test(recordFlow) || !/listAvailableEndTimes/.test(recordFlow)) fail('journal/record.js', 'Record creation must use canonical Availability queries');
 if (!/getWorkplaceWorkingDates/.test(recordFlow)) fail('journal/record.js', 'Record creation must use the canonical WorkPlan date query');
 if (/from ['"]\.\.\/core\/day\.js['"]|isTimeRangeAvailable|getTimeUsages|getJournalBreaks|getRecords\(|getDayTime|getDay\(/.test(recordFlow)) fail('journal/record.js', 'Record creation must not rebuild occupancy or WorkPlan availability');
@@ -35,13 +35,13 @@ if (!/chooseTimeForDraft\(datedDraft/.test(recordView)) fail('journal/record-vie
 if (/openWorkplacePicker\(state,\s*\(workplaceId\)\s*=>\s*applyPatch/.test(recordView)) fail('journal/record-view.js', 'Workplace selection must not apply a partial scheduling tuple');
 if (/openDatePicker\(state,\s*\(date\)\s*=>\s*applyPatch/.test(recordView)) fail('journal/record-view.js', 'Date selection must not apply stale time');
 
-if (!/from ['"]\.\.\/core\/availability\.js['"]/.test(breakView)) fail('journal/break-view.js', 'Break view must ask Core Availability');
+if (!/from ['"]\.\.\/core\/time\/index\.js['"]/.test(breakView)) fail('journal/break-view.js', 'Break view must ask Core Availability');
 if (!/listAvailableStartTimes/.test(breakView) || !/listAvailableEndTimes/.test(breakView)) fail('journal/break-view.js', 'Break view must use canonical Availability choices');
-if (/from ['"]\.\.\/core\/(?:day|time-usage|time-grid)\.js['"]|from ['"]\.\/break-data\.js['"]|getRecordsForDay|getJournalBreaks|isTimeRangeAvailable|getTimeUsages/.test(breakView)) fail('journal/break-view.js', 'Break view must not calculate occupancy or use persistence directly');
+if (/from ['"]\.\.\/core\/(?:day|time)\/(?!index\.js)[^'"]+['"]|from ['"]\.\/break-data\.js['"]|getRecordsForDay|getJournalBreaks|isTimeRangeAvailable|getTimeUsages/.test(breakView)) fail('journal/break-view.js', 'Break view must not calculate occupancy or use persistence directly');
 
 if (/^import /m.test(breakData) || /notifyTimeUsageChanged|checkTimeAvailability|isValidRange|normalizeTime/.test(breakData)) fail('journal/break-data.js', 'Break data must remain persistence-only');
 if (!/from ['"]\.\/break-data\.js['"]/.test(breakRead) || /checkTimeAvailability|notifyTimeUsageChanged/.test(breakRead)) fail('journal/break-read.js', 'Break read model must only compose persisted facts');
-if (!/from ['"]\.\.\/core\/availability\.js['"]/.test(breakService) || !/from ['"]\.\/break-data\.js['"]/.test(breakService)) fail('journal/break-service.js', 'Break service must own commands and validate through Availability');
+if (!/from ['"]\.\.\/core\/time\/index\.js['"]/.test(breakService) || !/from ['"]\.\/break-data\.js['"]/.test(breakService)) fail('journal/break-service.js', 'Break service must own commands and validate through Availability');
 
 if (!/getTimeUsagesForScope/.test(journalDay) || !/getTimeAvailabilityAt/.test(journalDay)) fail('journal/день.js', 'Journal Day must consume Core occupancy and minute state');
 if (/getRecordsForDay|getJournalBreaks|getTimeUsages\(|rangesOverlap|time-grid/.test(journalDay)) fail('journal/день.js', 'Journal Day must not assemble or calculate time ownership locally');

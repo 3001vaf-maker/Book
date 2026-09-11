@@ -1,6 +1,6 @@
 import { getJournalBreaks, getJournalBreaksForDay } from './break-read.js';
 import { removeJournalBreaksForDay } from './break-service.js';
-import { getRecordsForDay } from './record-read.js';
+import { getRecordsForDay } from '../core/record/index.js';
 
 export function getJournalTimeUsages({ date, workplaceId } = {}) {
   const day = String(date || '').slice(0, 10);

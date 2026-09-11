@@ -1,10 +1,9 @@
 import assert from 'node:assert/strict';
-import { createDay } from '../core/day.js';
-import { configureTimeUsageSource } from '../core/time-usage.js';
-import { getRecordRow } from '../journal/record-data.js';
-import { getRecordEvents, RECORD_EVENT_TYPES } from '../journal/record-events.js';
-import { getRecord } from '../journal/record-read.js';
-import { cancelRecord, createRecord, moveRecord, setRecordAttendance, setRecordConfirmed } from '../journal/record-service.js';
+import { createDay } from '../core/day/index.js';
+import { configureTimeUsageSource } from '../core/time/index.js';
+import { getRecordEvents, RECORD_EVENT_TYPES } from '../core/record/index.js';
+import { getRecord } from '../core/record/index.js';
+import { cancelRecord, createRecord, moveRecord, setRecordAttendance, setRecordConfirmed } from '../core/record/index.js';
 import { getJournalTimeUsages } from '../journal/time-usage-source.js';
 
 const store = new Map();
@@ -32,7 +31,7 @@ const record = createRecord({
 });
 assert.ok(record);
 
-const stored = getRecordRow(record.id);
+const stored = JSON.parse(localStorage.getItem('book.records') || '[]').find((item) => item?.id === record.id);
 assert.equal(Object.hasOwn(stored, 'status'), false);
 assert.equal(Object.hasOwn(stored, 'confirmed'), false);
 assert.equal(Object.hasOwn(stored, 'attendance'), false);

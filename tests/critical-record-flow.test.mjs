@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { calculateFinancialPlan, getFinancialItemFact } from '../core/financial-model.js';
-import { createDay } from '../core/day.js';
-import { recordPaymentIncome, recordRefundExpense } from '../core/dds.js';
-import { getRecords } from '../journal/record-read.js';
-import { createRecord, moveRecord, updateRecord } from '../journal/record-service.js';
-import { recordVisualState } from '../journal/record-state.js';
+import { calculateFinancialPlan, getFinancialItemFact } from '../core/finance/index.js';
+import { createDay } from '../core/day/index.js';
+import { recordPaymentIncome, recordRefundExpense } from '../core/finance/index.js';
+import { getRecords } from '../core/record/index.js';
+import { createRecord, moveRecord, updateRecord } from '../core/record/index.js';
+import { recordVisualState } from '../core/record/index.js';
 import { renderJournalList } from '../journal/список.js';
 import { getClientMetadata } from '../main/clients/metadata.js';
 import { getWalletBalance } from '../settings/wallets/data.js';

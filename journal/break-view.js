@@ -1,5 +1,5 @@
 import { button, entityCard, modal, mountModal, timeSlots } from '../ui/ui.js';
-import { listAvailableEndTimes, listAvailableStartTimes } from '../core/availability.js';
+import { listAvailableEndTimes, listAvailableStartTimes } from '../core/time/index.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { moveJournalBreak, removeJournalBreak } from './break-service.js';
 

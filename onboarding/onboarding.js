@@ -1,6 +1,6 @@
 import { getWorkplaces } from '../settings/profile/workplaces/data.js';
 import { getProcedures } from '../settings/service/procedures/data.js';
-import { getDays } from '../core/day.js';
+import { getDays } from '../core/day/index.js';
 import { getClientCount } from '../main/clients/data.js';
 import { actionBlock, button, escapeHtml, modal, mountModal } from '../ui/ui.js';
 

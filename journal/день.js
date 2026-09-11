@@ -1,9 +1,9 @@
 import { initDateNavigator, journalDayTimeline, initJournalDayTimeline, ALL_WORKPLACES_ID } from '../ui/ui.js';
 import { getWorkplaces } from '../core/workplace-time.js';
-import { getDays, getDay, getDayTime, getDaysForDate, getScheduleConflicts } from '../core/day.js';
-import { getTimeUsagesForScope } from '../core/time-usage.js';
-import { getTimeAvailabilityAt } from '../core/availability.js';
-import { getRecordPaymentState, recordPlanTotal } from '../core/financial-model.js';
+import { getDays, getDay, getDayTime, getDaysForDate, getScheduleConflicts } from '../core/day/index.js';
+import { getTimeUsagesForScope } from '../core/time/index.js';
+import { getTimeAvailabilityAt } from '../core/time/index.js';
+import { getRecordPaymentState, recordPlanTotal } from '../core/finance/index.js';
 import { openRecordCreation } from './record.js';
 import { openRecordView } from './record-view.js';
 import { openRecordPaymentEntry } from './record-payment.js';

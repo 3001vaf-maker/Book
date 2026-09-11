@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { isRecordCompletedSide, recordActivityTime, recordAppointmentTime, recordVisualState } from '../journal/record-state.js';
+import { isRecordCompletedSide, recordActivityTime, recordAppointmentTime, recordVisualState } from '../core/record/index.js';
 
 const record = {
   id: 'record-1',

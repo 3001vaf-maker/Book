@@ -71,6 +71,10 @@ for (const file of walk(root)) {
   for (const specifier of imports(source)) {
     if (!specifier.startsWith('.')) continue;
     const resolved = rel(resolve(dirname(file), specifier));
+    if (legacyFiles.includes(resolved)) {
+      errors.push(`${path}: imports removed legacy domain owner ${resolved}`);
+      continue;
+    }
     const targetMatch = resolved.match(/^core\/(day|time|record|finance)\/(.+)$/);
     if (!targetMatch) continue;
     const targetDomain = targetMatch[1];
