@@ -55,7 +55,7 @@ assert.equal(migratedLegacy[0].serviceAmount, 6400);
 assert.equal(migratedLegacy[0].tips, 0);
 assert.equal(migratedLegacy[0].business, undefined);
 const storedMigrated = JSON.parse(storage.get('book.dds') || '{}');
-assert.equal(storedMigrated.version, 4);
+assert.equal(storedMigrated.version, 5);
 assert.equal(storedMigrated.income[0].finance.planTotal, 6400);
 assert.equal(storedMigrated.income[0].business, undefined);
 storage.clear();
@@ -94,6 +94,8 @@ const refunded = recordRefundExpense(completed.id, { reason: 'Возврат к�
 assert.equal(refunded.status, 'refund');
 assert.equal(refunded.movementType, 'expense');
 assert.equal(refunded.expenseType, 'refund');
+assert.equal(refunded.serviceAmount, 5000);
+assert.equal(refunded.tips, 0);
 assert.equal(refunded.refundedAt, refundAt.toISOString());
 assert.equal(refunded.reason, 'Возврат клиенту');
 assert.equal(getDDSExpenses().length, 1);
@@ -175,26 +177,70 @@ assert.equal(partialState.payments.length, 3);
 assert.equal(getWalletDDSMovements('partial-cash').reduce((sum, item) => sum + Number(item.total || 0), 0), 3000);
 assert.equal(getWalletDDSMovements('partial-card').reduce((sum, item) => sum + Number(item.total || 0), 0), 4000);
 
-// Tips are actual DDS cash but do not inflate service plan/fact.
+// Required Tips example: 7,000 due, 10,000 received -> 3,000 Tips.
 const tipsFinance = calculateFinancialPlan([{ sourceId: 'procedure-tips', name: 'Укладка', price: 7000 }]);
 const withTips = recordPaymentIncome({
   source: { type: 'record', id: 'record-tips' },
   finance: tipsFinance,
   maxAmount: 7000,
   serviceAmount: 7000,
-  tips: 1000,
-  allocations: [{ walletId: 'tips-card', walletName: 'СберБанк', amount: 8000 }],
+  tips: 3000,
+  allocations: [{ walletId: 'tips-cash', walletName: 'Наличные', amount: 10000 }],
 });
 assert.ok(withTips);
-assert.equal(withTips.total, 8000);
+assert.equal(withTips.total, 10000);
 assert.equal(withTips.serviceAmount, 7000);
-assert.equal(withTips.tips, 1000);
-const tipsState = getRecordPaymentState(recordFor('record-tips', tipsFinance));
+assert.equal(withTips.tips, 3000);
+let tipsState = getRecordPaymentState(recordFor('record-tips', tipsFinance));
 assert.equal(tipsState.paidTotal, 7000);
 assert.equal(tipsState.remaining, 0);
-assert.equal(tipsState.tipsTotal, 1000);
+assert.equal(tipsState.tipsTotal, 3000);
 assert.equal(tipsState.fullyPaid, true);
-assert.equal(getWalletDDSMovements('tips-card').reduce((sum, item) => sum + Number(item.total || 0), 0), 8000);
+assert.equal(getWalletDDSMovements('tips-cash').reduce((sum, item) => sum + Number(item.total || 0), 0), 10000);
+
+// Required discount example: 7,000 price - 1,400 discount = 5,600 service, 6,000 received -> 400 Tips.
+const discountTipsFinance = calculateFinancialPlan([{ sourceId: 'procedure-discount-tips', name: 'Стрижка', price: 7000, discountPercent: 20 }]);
+assert.equal(discountTipsFinance.discountTotal, 1400);
+assert.equal(discountTipsFinance.planTotal, 5600);
+const discountTips = recordPaymentIncome({
+  source: { type: 'record', id: 'record-discount-tips' },
+  finance: discountTipsFinance,
+  maxAmount: 5600,
+  serviceAmount: 5600,
+  tips: 400,
+  allocations: [{ walletId: 'discount-cash', walletName: 'Наличные', amount: 6000 }],
+});
+assert.ok(discountTips);
+assert.equal(discountTips.total, 6000);
+assert.equal(discountTips.serviceAmount, 5600);
+assert.equal(discountTips.tips, 400);
+let discountTipsState = getRecordPaymentState(recordFor('record-discount-tips', discountTipsFinance));
+assert.equal(discountTipsState.paidTotal, 5600);
+assert.equal(discountTipsState.remaining, 0);
+assert.equal(discountTipsState.tipsTotal, 400);
+assert.equal(discountTipsState.fullyPaid, true);
+
+// Refund Tips first: returning the 400 Tips must not reopen service debt.
+const tipsRefund = recordRefundExpense(discountTips.id, { amount: 400 });
+assert.ok(tipsRefund);
+assert.equal(tipsRefund.total, 400);
+assert.equal(tipsRefund.tips, 400);
+assert.equal(tipsRefund.serviceAmount, 0);
+discountTipsState = getRecordPaymentState(recordFor('record-discount-tips', discountTipsFinance));
+assert.equal(discountTipsState.paidTotal, 5600);
+assert.equal(discountTipsState.remaining, 0);
+assert.equal(discountTipsState.tipsTotal, 0);
+assert.equal(discountTipsState.fullyPaid, true);
+
+// Once Tips are exhausted, further refund reduces service and reopens the debt.
+const serviceRefund = recordRefundExpense(discountTips.id, { amount: 1000 });
+assert.ok(serviceRefund);
+assert.equal(serviceRefund.tips, 0);
+assert.equal(serviceRefund.serviceAmount, 1000);
+discountTipsState = getRecordPaymentState(recordFor('record-discount-tips', discountTipsFinance));
+assert.equal(discountTipsState.paidTotal, 4600);
+assert.equal(discountTipsState.remaining, 1000);
+assert.equal(discountTipsState.fullyPaid, false);
 
 // One payment can be allocated to two wallets without a mode switch.
 const splitFinance = calculateFinancialPlan([{ sourceId: 'procedure-2', name: 'Окрашивание', price: 6000 }]);
