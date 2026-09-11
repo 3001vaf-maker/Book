@@ -14,9 +14,13 @@ export function details(items = [], { variant = '' } = {}) {
 }
 
 export function agreementBlock(items = []) {
-  return `<section class="agreements-summary">${items.map(({ label, value, checked, data = '', aria = '', interactive = false }) => {
+  return `<section class="agreements-summary">${items.map(({ label, value, checked, data = '', aria = '', interactive = false, openData = '', toggleData = '', openAria = '', toggleAria = '' }) => {
     const isChecked = typeof checked === 'boolean' ? checked : value === true || value === 'Дано';
-    const content = `<span>${escapeHtml(label)}</span><strong class="agreement-status" aria-label="${isChecked ? 'Дано' : 'Не дано'}">${isChecked ? '☑' : '□'}</strong>`;
+    const status = `<strong class="agreement-status" aria-label="${isChecked ? 'Дано' : 'Не дано'}">${isChecked ? '☑' : '□'}</strong>`;
+    if (openData || toggleData) {
+      return `<div class="agreement-choice"><button type="button" class="agreement-choice__document"${openData ? ` ${openData}` : ''}${openAria ? ` aria-label="${escapeHtml(openAria)}"` : ''}><span>${escapeHtml(label)}</span></button><button type="button" class="agreement-choice__toggle"${toggleData ? ` ${toggleData}` : ''}${toggleAria ? ` aria-label="${escapeHtml(toggleAria)}"` : ''}>${status}</button></div>`;
+    }
+    const content = `<span>${escapeHtml(label)}</span>${status}`;
     if (interactive || data) return `<button type="button"${data ? ` ${data}` : ''}${aria ? ` aria-label="${escapeHtml(aria)}"` : ''}>${content}</button>`;
     return `<div>${content}</div>`;
   }).join('')}</section>`;

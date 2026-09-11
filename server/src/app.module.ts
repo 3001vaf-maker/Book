@@ -4,9 +4,10 @@ import { PrismaService } from './prisma.service';
 import { AuthModule } from './auth/auth.module';
 import { WorkspaceModule } from './workspace/workspace.module';
 import { ProfileModule } from './profile/profile.module';
+import { OnlineBookingModule } from './online-booking/online-booking.module';
 
 @Module({
-  imports: [AuthModule, WorkspaceModule, ProfileModule],
+  imports: [AuthModule, WorkspaceModule, ProfileModule, OnlineBookingModule],
   controllers: [HealthController],
   providers: [PrismaService],
 })

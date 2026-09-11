@@ -35,6 +35,10 @@ function normalizePhones(values = []) {
     .filter(Boolean))];
 }
 
+function normalizeStrings(values = []) {
+  return [...new Set((Array.isArray(values) ? values : []).map((value) => String(value || '').trim()).filter(Boolean))];
+}
+
 function normalizeClient(person = {}) {
   return {
     key: String(person.key || ''),
@@ -46,7 +50,8 @@ function normalizeClient(person = {}) {
     birthDate: String(person.birthDate || ''),
     phones: normalizePhones(person.phones),
     telegrams: Array.isArray(person.telegrams) ? person.telegrams : [],
-    emails: Array.isArray(person.emails) ? person.emails : [],
+    emails: normalizeStrings(person.emails),
+    accounts: normalizeStrings(person.accounts),
     links: Array.isArray(person.links) ? person.links : [],
     tags: normalizeTagAssignments(person.tags),
     discountPercent: normalizeDiscount(person),
@@ -99,6 +104,12 @@ export function findPeopleByPhone(phone) {
   return getAllClients().filter((person) => (person.phones || []).some((value) => phonesMatch(value, target)));
 }
 
+export function findPersonByAccountId(accountId) {
+  const id = String(accountId || '').trim();
+  if (!id) return null;
+  return getAllClients().find((person) => (person.accounts || []).includes(id)) || null;
+}
+
 export function getClientCount() {
   return getClients().length;
 }
@@ -116,4 +127,30 @@ export function createClient(name, surname, phone = '') {
     phones: normalizedPhone ? [normalizedPhone] : [],
     createdAt: new Date().toISOString(),
   });
+}
+
+export function upsertPersonFromBookingAccount(account = {}) {
+  const accountId = String(account.id || '').trim();
+  if (!accountId) return null;
+  const people = getAllClients();
+  const existingIndex = people.findIndex((person) => (person.accounts || []).includes(accountId));
+  const previous = existingIndex >= 0 ? people[existingIndex] : null;
+  const phone = normalizePhoneForStorage(account.phone);
+  const telegramId = String(account.telegramId || '').trim();
+  const email = String(account.email || '').trim().toLowerCase();
+  const person = normalizeClient({
+    ...(previous || {}),
+    key: previous?.key || `account-${accountId}`,
+    name: String(account.name || previous?.name || ''),
+    surname: String(account.surname || previous?.surname || ''),
+    phones: phone ? [...(previous?.phones || []), phone] : previous?.phones || [],
+    telegrams: telegramId ? [...(previous?.telegrams || []), telegramId] : previous?.telegrams || [],
+    emails: email ? [...(previous?.emails || []), email] : previous?.emails || [],
+    accounts: [...(previous?.accounts || []), accountId],
+    createdAt: previous?.createdAt || new Date().toISOString(),
+  });
+  if (existingIndex >= 0) people[existingIndex] = person;
+  else people.push(person);
+  saveClients(people);
+  return getAllClients().find((item) => item.key === person.key) || person;
 }

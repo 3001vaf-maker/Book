@@ -1,4 +1,4 @@
-const API_BASE = 'https://book-api-volokovykh.amvera.io';
+export const API_BASE = 'https://book-api-volokovykh.amvera.io';
 const TOKEN_KEY = 'book.auth.token';
 
 export function getAuthToken() {

@@ -64,7 +64,17 @@ export function checkRecordTime({ date, workplaceId, from, to, excludeId = '' } 
   return { ok: result.ok, reason: result.reason, conflicts: result.conflicts || [] };
 }
 
-export function createRecord({ date, workplaceId, from, to, client, procedures = [], products = [] } = {}) {
+export function createRecord({
+  date,
+  workplaceId,
+  from,
+  to,
+  client,
+  procedures = [],
+  products = [],
+  source = 'manual',
+  sourceRequestId = '',
+} = {}) {
   const normalizedDate = normalizeDate(date);
   const normalizedWorkplaceId = normalizeId(workplaceId);
   if (!checkRecordTime({ date: normalizedDate, workplaceId: normalizedWorkplaceId, from, to }).ok) return null;
@@ -86,6 +96,8 @@ export function createRecord({ date, workplaceId, from, to, client, procedures =
     client: client || null,
     procedures: sourceRecord.procedures,
     products: sourceRecord.products,
+    source: String(source || 'manual'),
+    sourceRequestId: String(sourceRequestId || ''),
     finance,
     createdAt: now,
     updatedAt: now,
