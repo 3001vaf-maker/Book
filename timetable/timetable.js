@@ -1,4 +1,4 @@
-import { actionBlock, button, pageHeader, initCalendar, initMultiSelect, modal, mountModal, timePicker, initTimePickers, escapeHtml, headerControl, workplaceContent, openWorkplaceControl, ALL_WORKPLACES_ID, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js';
+import { actionBlock, button, pageHeader, initCalendar, initMultiSelect, modal, mountModal, timePicker, initTimePickers, escapeHtml, headerControl, workplaceContent, openWorkplaceControl, openDayWorkplaceControl, ALL_WORKPLACES_ID, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js';
 import { getWorkplaces, resolveWorkplaceTime, getWorkingDayIndicators, getWorkingDayTotalMinutes, getWorkplaceMonthStats, getAllWorkplacesMonthStats, getWorkplaceMonthStatsMap } from '../core/workplace-time.js';
 import { getDays, saveDays, getDay, getDayTime, getDaysForDate, createDay, updateDayTime, removeDay, getDayRemovalConflicts, getScheduleConflicts, hasScheduleConflict, findSuggestedInterval } from '../core/day.js';
 import { getWorkingTimeUsageConflicts } from '../core/time-usage.js';
@@ -113,13 +113,24 @@ export function renderTimetable(root) {
   function openAggregateDayEditor(date) {
     const entries = aggregateDayEntries(date);
     if (!entries.length) return;
-    const rows = entries.map((entry, index) => `<div class="compact-form" data-aggregate-workplace="${escapeHtml(entry.workplaceId)}"><strong>${escapeHtml(entry.name)}</strong><div class="time-range-fields">${timePicker({ name: `aggregateFrom${index}`, label: 'Начало', value: entry.from })}${timePicker({ name: `aggregateTo${index}`, label: 'Окончание', value: entry.to })}</div><div class="form-error" data-aggregate-error="${index}" aria-live="polite"></div></div>`).join('');
+    const rowMarkup = (entry, index) => `<div class="compact-form" data-aggregate-workplace="${escapeHtml(entry.workplaceId)}"><strong>${escapeHtml(entry.name)}</strong><div class="time-range-fields">${timePicker({ name: `aggregateFrom${index}`, label: 'Начало', value: entry.from })}${timePicker({ name: `aggregateTo${index}`, label: 'Окончание', value: entry.to })}</div><div class="form-error" data-aggregate-error="${index}" aria-live="polite"></div></div>`;
     const dateTitle = formatModalDate(date);
-    const content = `<div class="compact-form"><div class="modal-title"><h2>${escapeHtml(dateTitle)}</h2></div>${rows}${button('Применить', { data: 'data-aggregate-day-apply' })}</div>`;
+    const content = `<div class="compact-form"><div class="modal-title"><h2>${escapeHtml(dateTitle)}</h2></div><div data-aggregate-day-rows>${entries.map(rowMarkup).join('')}</div>${button('+ Добавить рабочее пространство', { variant: 'secondary', data: 'data-aggregate-day-add' })}${button('Применить', { data: 'data-aggregate-day-apply' })}</div>`;
     const m = mountModal(document.body, modal(content, { title: dateTitle, variant: 'medium' }));
     if (!m) return;
     initTimePickers(m);
+    const rowsRoot = m.querySelector('[data-aggregate-day-rows]');
+    const add = m.querySelector('[data-aggregate-day-add]');
     const save = m.querySelector('[data-aggregate-day-apply]');
+
+    const availableWorkplaces = () => {
+      const active = new Set(entries.map((entry) => String(entry.workplaceId || '')));
+      return workplaces.filter((workplace) => {
+        const key = String(workplace?.key || '');
+        return key && !active.has(key);
+      });
+    };
+    const syncAdd = () => { if (add) add.hidden = availableWorkplaces().length === 0; };
 
     const readValues = () => entries.map((entry, index) => ({
       ...entry,
@@ -164,15 +175,56 @@ export function renderTimetable(root) {
       return { ok: !hasErrors, values };
     };
 
+    const appendWorkplace = (workplaceId) => {
+      const workplace = workplaces.find((item) => String(item?.key || '') === String(workplaceId || '')) || null;
+      const base = resolveWorkplaceTime(workplaces, workplaceId);
+      if (!workplace || !base) return;
+      const suggested = findSuggestedInterval(workingDays, { workplaceId, date, baseFrom: base.from, baseTo: base.to }) || base;
+      const entry = {
+        workplaceId: String(workplaceId),
+        name: workplace.name || 'Рабочее пространство',
+        from: suggested.from,
+        to: suggested.to,
+      };
+      entries.push(entry);
+      const shell = document.createElement('div');
+      shell.innerHTML = rowMarkup(entry, entries.length - 1);
+      const row = shell.firstElementChild;
+      if (row && rowsRoot) {
+        rowsRoot.append(row);
+        initTimePickers(row);
+      }
+      syncAdd();
+      validate();
+    };
+
+    add?.addEventListener('click', () => {
+      const available = availableWorkplaces();
+      if (!available.length) return;
+      openDayWorkplaceControl({
+        active: [],
+        available,
+        catalogTitle: 'Добавить рабочее пространство',
+        onAdd: appendWorkplace,
+      });
+    });
     m.addEventListener('change', (event) => {
       if (event.target?.matches?.('[data-time-value]')) validate();
     });
+    syncAdd();
     validate();
 
     save?.addEventListener('click', () => {
       const result = validate();
       if (!result.ok) return;
-      result.values.forEach((value) => updateDayTime(workingDays, value.workplaceId, date, value.from, value.to));
+      result.values.forEach((value) => {
+        const existing = getDay(workingDays, value.workplaceId, date);
+        if (existing) updateDayTime(workingDays, value.workplaceId, date, value.from, value.to);
+        else {
+          const day = createDay({ date, workplaceId: value.workplaceId, from: value.from, to: value.to });
+          if (day) workingDays.push(day);
+        }
+      });
       saveDays(workingDays);
       const month = calendar?.getDisplayedMonth() || initialMonth;
       startSelectionSession(month);
