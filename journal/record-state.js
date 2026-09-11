@@ -31,6 +31,9 @@ export function projectRecordLifecycle(record = {}, events = []) {
     } else if (event.type === RECORD_EVENT_TYPES.NO_SHOW) {
       attendance = 'no-show';
       attendanceAt = at;
+    } else if (event.type === RECORD_EVENT_TYPES.ATTENDANCE_CLEARED) {
+      attendance = '';
+      attendanceAt = at;
     } else if (event.type === RECORD_EVENT_TYPES.CANCELLED) {
       status = 'cancelled';
       cancelledAt = at;
