@@ -1,4 +1,4 @@
-import { createTimeRange, minutesBetween } from './time.js';
+import { createTimeRange, minutesBetween } from './time/index.js';
 import { getDay, getDayTime, getDays, getDaysForDate, hasScheduleConflict } from './day/index.js';
 
 const WORKPLACE_FALLBACK_COLOR = '#212529';
