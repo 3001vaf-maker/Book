@@ -53,7 +53,7 @@ function normalizeIncome(item = {}) {
   const serviceAmount = Math.max(0, Math.min(total, numberValue(item.serviceAmount ?? (total - tips))));
   return {
     ...rest,
-    status: 'completed',
+    status: item.status === 'cancelled' ? 'cancelled' : 'completed',
     movementType: 'income',
     incomeType: item.incomeType || 'payment',
     source: item.source || null,
@@ -73,7 +73,7 @@ function normalizeExpense(item = {}) {
   const serviceAmount = Math.max(0, Math.min(total, numberValue(item.serviceAmount ?? (total - tips))));
   return {
     ...rest,
-    status: item.status === 'refund' ? 'refund' : (item.status || 'expense'),
+    status: item.status === 'cancelled' ? 'cancelled' : (item.status === 'refund' ? 'refund' : (item.status || 'expense')),
     movementType: 'expense',
     expenseType: item.expenseType || (item.status === 'refund' ? 'refund' : 'other'),
     source: item.source || null,

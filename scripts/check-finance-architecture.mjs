@@ -63,8 +63,13 @@ const financeData = source('core/finance/data.js');
 if (!/const STORAGE_KEY = ['"]book\.dds['"]/.test(financeData)) errors.push('core/finance/data.js must own DDS movement persistence');
 
 const financeService = source('core/finance/service.js');
-if (!/export function recordPaymentIncome/.test(financeService) || !/export function recordRefundExpense/.test(financeService)) {
-  errors.push('core/finance/service.js must own payment income and refund expense commands');
+if (!/export function recordPaymentIncome/.test(financeService) || !/export function recordRefundExpense/.test(financeService) || !/export function cancelPaymentOperation/.test(financeService)) {
+  errors.push('core/finance/service.js must own payment income, refund expense and operation cancellation commands');
+}
+
+const financeRead = source('core/finance/read.js');
+if (!/export function getActiveDDSMovements/.test(financeRead) || !/status\s*!==\s*['"]cancelled['"]/.test(financeRead)) {
+  errors.push('core/finance/read.js must keep cancelled history separate from active financial projections');
 }
 
 const financeRules = source('core/finance/rules.js');
@@ -76,7 +81,7 @@ if (!/export function recordFinancialItems/.test(financeRules) || !/sourceType:\
 }
 
 const financeIndex = source('core/finance/index.js');
-if (!/recordPaymentIncome/.test(financeIndex) || !/calculateFinancialPlan/.test(financeIndex) || !/getRecordPaymentState/.test(financeIndex)) {
+if (!/recordPaymentIncome/.test(financeIndex) || !/cancelPaymentOperation/.test(financeIndex) || !/calculateFinancialPlan/.test(financeIndex) || !/getRecordPaymentState/.test(financeIndex)) {
   errors.push('core/finance/index.js must expose the complete public Finance contract');
 }
 
@@ -103,6 +108,9 @@ if (!/data-payment-price/.test(paymentUI) || /data-payment-price\s+readonly/.tes
 const recordPayment = source('journal/record-payment.js');
 if (!/procedures:\s*sourcesFromFinance/.test(recordPayment) || !/products:\s*sourcesFromFinance/.test(recordPayment)) {
   errors.push('Payment-stage price correction must be persisted back into Record procedures and products');
+}
+if (!/cancelPaymentOperation/.test(recordPayment) || !/data-payment-actions/.test(recordPayment)) {
+  errors.push('Paid Record UI must route cancellation through Finance Core and keep it distinct from refund');
 }
 
 if (errors.length) {

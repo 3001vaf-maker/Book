@@ -1,6 +1,6 @@
 // Financial Model builds plan/fact projections from source facts and pure rules.
 // Low-level arithmetic lives in rules.js; money persistence lives in data/service.
-import { getDDSMovements, getDDSMovementsForSource } from './read.js';
+import { getActiveDDSMovements, getActiveDDSMovementsForSource } from './read.js';
 import {
   calculateFinancialFact,
   calculateFinancialItemFact,
@@ -14,7 +14,7 @@ import {
 } from './rules.js';
 
 function latestHistoricalPlanForSource(type, id) {
-  const movements = getDDSMovementsForSource(type, id)
+  const movements = getActiveDDSMovementsForSource(type, id)
     .filter((movement) => movement?.finance && isStoredFinancialPlan(movement.finance))
     .sort((a, b) => String(a?.createdAt || '').localeCompare(String(b?.createdAt || '')));
   if (!movements.length) return null;
@@ -34,23 +34,23 @@ export function resolveRecordFinancialPlan(record = null, { discountPercent = 0 
 export function getRecordFinancialPlanFact(record = null, { discountPercent = 0 } = {}) {
   const plan = resolveRecordFinancialPlan(record, { discountPercent });
   if (!record?.id) return calculateFinancialFact(plan, []);
-  return calculateFinancialFact(plan, getDDSMovementsForSource('record', record.id));
+  return calculateFinancialFact(plan, getActiveDDSMovementsForSource('record', record.id));
 }
 
 export function getRecordPaymentState(record = null, { discountPercent = 0 } = {}) {
   const plan = resolveRecordFinancialPlan(record, { discountPercent });
-  const movements = record?.id ? getDDSMovementsForSource('record', record.id) : [];
+  const movements = record?.id ? getActiveDDSMovementsForSource('record', record.id) : [];
   return calculateRecordPaymentState(plan, movements);
 }
 
 export function getFinancialFactForRecords(recordIds = []) {
   const ids = new Set((Array.isArray(recordIds) ? recordIds : []).map((id) => String(id || '')).filter(Boolean));
-  const movements = getDDSMovements().filter((movement) => movement?.source?.type === 'record' && ids.has(String(movement?.source?.id || '')));
+  const movements = getActiveDDSMovements().filter((movement) => movement?.source?.type === 'record' && ids.has(String(movement?.source?.id || '')));
   return calculateFinancialFact(null, movements);
 }
 
 export function getFinancialItemFact(sourceTypeValue, sourceIdValue) {
-  return calculateFinancialItemFact(getDDSMovements(), sourceTypeValue, sourceIdValue);
+  return calculateFinancialItemFact(getActiveDDSMovements(), sourceTypeValue, sourceIdValue);
 }
 
 export function recordPlanTotal(record = null) {

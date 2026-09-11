@@ -1,6 +1,6 @@
 import { button, details, initPaymentForm, initPaymentMethods, modal, mountModal, paymentForm, paymentMethods, paymentReceipt, select, shortDate, shortDateTimeParts, shortTime } from '../ui/ui.js';
 import { calculateFinancialPlan, getRecordPaymentState, recordFinancialItems } from '../core/finance/index.js';
-import { getRefundsForPayment, recordPaymentIncome, recordRefundExpense } from '../core/finance/index.js';
+import { cancelPaymentOperation, getRefundsForPayment, recordPaymentIncome, recordRefundExpense } from '../core/finance/index.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getAllClients } from '../main/clients/data.js';
 import { clientDisplay } from '../main/clients/presentation.js';
@@ -265,17 +265,50 @@ function openRefundModal(payment) {
   sync();
 }
 
+function openCancelPaymentModal(payment) {
+  const html = `<div class="modal-title"><h2>Отменить операцию?</h2></div>
+    ${paymentFactMarkup(payment)}
+    <p>Неверный ввод останется в финансовой истории с пометкой «Отменена», но не будет участвовать в кошельках и расчётах.</p>
+    <div class="modal-actions">${button('Подтвердить отмену', { variant: 'secondary', data: 'data-cancel-payment-confirm' })}</div>`;
+  const m = mountModal(document.body, modal(html, { variant: 'medium', surface: 'app' }));
+  if (!m) return;
+  m.querySelector('[data-cancel-payment-confirm]')?.addEventListener('click', () => {
+    const cancelled = cancelPaymentOperation(payment.id, { reason: 'incorrect-entry' });
+    if (!cancelled) return;
+    m.remove();
+  });
+}
+
+function openPaymentActions(payment) {
+  const html = `<div class="modal-title"><h2>Действия с оплатой</h2></div>
+    ${paymentFactMarkup(payment)}
+    <div class="modal-actions">
+      ${button('Отменить операцию', { variant: 'secondary', data: 'data-cancel-payment' })}
+      ${button('Возврат', { variant: 'danger', data: 'data-refund-payment' })}
+    </div>`;
+  const m = mountModal(document.body, modal(html, { variant: 'medium', surface: 'app' }));
+  if (!m) return;
+  m.querySelector('[data-cancel-payment]')?.addEventListener('click', () => {
+    m.remove();
+    openCancelPaymentModal(payment);
+  });
+  m.querySelector('[data-refund-payment]')?.addEventListener('click', () => {
+    m.remove();
+    openRefundModal(payment);
+  });
+}
+
 function openPaidState(record) {
   const state = paymentStateForRecord(record);
   if (!state.fullyPaid || !state.latestPayment) return;
   const payment = state.latestPayment;
   const refunds = getRefundsForPayment(payment.id);
-  const html = `<div class="modal-title"><h2>Оплачено</h2></div>${sourcePaymentFactMarkup(state)}${refundHistoryMarkup(refunds)}<div class="modal-actions">${button('Возврат оплаты', { variant: 'danger', data: 'data-refund-payment' })}</div>`;
+  const html = `<div class="modal-title"><h2>Оплачено</h2></div>${sourcePaymentFactMarkup(state)}${refundHistoryMarkup(refunds)}<div class="modal-actions">${button('Действия с оплатой', { variant: 'secondary', data: 'data-payment-actions' })}</div>`;
   const m = mountModal(document.body, modal(html, { variant: 'medium', surface: 'app' }));
   if (!m) return;
-  m.querySelector('[data-refund-payment]')?.addEventListener('click', () => {
+  m.querySelector('[data-payment-actions]')?.addEventListener('click', () => {
     m.remove();
-    openRefundModal(payment);
+    openPaymentActions(payment);
   });
 }
 
