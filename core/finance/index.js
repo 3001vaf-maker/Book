@@ -25,4 +25,4 @@ export {
   recordPlanTotal,
   resolveRecordFinancialPlan,
 } from './model.js';
-export { recordPaymentIncome, recordRefundExpense } from './service.js';
+export { cancelPaymentOperation, recordPaymentIncome, recordRefundExpense } from './service.js';
