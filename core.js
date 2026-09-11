@@ -4,7 +4,7 @@ import { renderTimetable } from './timetable/timetable.js';
 import { renderSettings } from './settings/settings.js';
 import { getWorkplaces as getWorkplaceEntities } from './settings/profile/workplaces/data.js';
 import { initializeProfileWorkplaces } from './settings/profile/migration.js';
-import { getWorkingTimeRecordConflicts } from './journal/record-data.js';
+import { getJournalWorkingTimeConflicts } from './journal/time-usage-source.js';
 import { configureWorkplaceSource } from './core/workplace-time.js';
 import { configureWorkingTimeConflictSource } from './core/time-usage.js';
 import { getCurrentUser, login } from './core/auth.js';
@@ -12,7 +12,7 @@ import { isOnboardingComplete, renderOnboarding } from './onboarding/onboarding.
 import { bottomNavigation } from './ui/ui.js';
 
 configureWorkplaceSource(getWorkplaceEntities);
-configureWorkingTimeConflictSource(getWorkingTimeRecordConflicts);
+configureWorkingTimeConflictSource(getJournalWorkingTimeConflicts);
 
 const routes = {
   main: renderMain,
@@ -110,7 +110,7 @@ function renderLogin(message = '') {
     <main class="auth-view">
       <section class="auth-card" aria-labelledby="auth-title">
         <div class="auth-card__heading">
-          <h1 id="auth-title">Book</h1>
+          <h1>Book</h1>
           <p>Вход в рабочее пространство</p>
         </div>
         <form class="auth-form" id="auth-form">
