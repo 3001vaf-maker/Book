@@ -138,42 +138,78 @@ export function renderTimetable(root) {
   }
 
   function openWorkingDaysConflictModal(entries, base) {
-    const rows = entries.map((entry, index) => {
-      const occupied = entry.conflicts.map((day) => `<div><span>Занято в другом месте</span><strong>${escapeHtml(conflictWorkplaceLabel(day))} · ${escapeHtml(day.from)}–${escapeHtml(day.to)}</strong></div>`).join('');
-      const initialFrom = entry.suggested?.from || base.from;
-      const initialTo = entry.suggested?.to || base.to;
+    const targetWorkplace = workplaces.find((item) => String(item?.key || '') === String(selectedWorkplaceId || '')) || null;
+    const targetWorkplaceName = targetWorkplace?.name || 'Рабочее пространство';
+    let activeEntries = entries.map((entry) => ({
+      ...entry,
+      draftFrom: entry.suggested?.from || base.from,
+      draftTo: entry.suggested?.to || base.to,
+      error: '',
+    }));
+
+    const rowMarkup = (entry, index) => {
+      const occupied = entry.conflicts.map((day) => `<div><span>Конфликтует</span><strong>${escapeHtml(conflictWorkplaceLabel(day))} · ${escapeHtml(day.from)}–${escapeHtml(day.to)}</strong></div>`).join('');
       const timeFields = twoColumnLayout(
-        timePicker({ name: `timetableConflictFrom${index}`, label: 'Начало', value: initialFrom }),
-        timePicker({ name: `timetableConflictTo${index}`, label: 'Окончание', value: initialTo }),
+        timePicker({ name: `timetableConflictFrom${index}`, label: 'Начало', value: entry.draftFrom }),
+        timePicker({ name: `timetableConflictTo${index}`, label: 'Окончание', value: entry.draftTo }),
         { ariaLabel: 'Интервал рабочего времени' },
       );
-      return `<div class="compact-form" data-timetable-conflict-row="${index}"><div class="entity-details"><div><span>Дата</span><strong>${escapeHtml(formatDateLabel(entry.date))}</strong></div>${occupied}</div>${timeFields}<div class="form-error" data-timetable-conflict-error="${index}"></div></div>`;
-    }).join('');
-    const content = `<div class="modal-title"><h2>Конфликт времени</h2><p>На этих датах вы уже работаете в другом месте. Скорректируйте время для выбранного места.</p></div>${rows}${button('Сохранить', { data: 'data-timetable-conflicts-save' })}`;
-    const m = mountModal(document.body, modal(content, { title: 'Конфликт времени' })); if (!m) return; initTimePickers(m);
+      return `<div class="compact-form" data-timetable-conflict-row="${index}"><div class="entity-details"><div><span>Дата</span><strong>${escapeHtml(formatDateLabel(entry.date))}</strong></div><div><span>Корректируем</span><strong>${escapeHtml(targetWorkplaceName)}</strong></div></div>${timeFields}<div class="entity-details">${occupied}</div><div class="form-error" data-timetable-conflict-error="${index}">${escapeHtml(entry.error || '')}</div></div>`;
+    };
+
+    const content = `<div class="modal-title"><h2>Конфликт времени</h2><p>Исправленные даты применяются сразу. Даты, где конфликт остаётся, останутся здесь для дальнейшей корректировки.</p></div><div data-timetable-conflict-rows></div>${button('Сохранить', { data: 'data-timetable-conflicts-save' })}`;
+    const m = mountModal(document.body, modal(content, { title: 'Конфликт времени' }));
+    if (!m) return;
+    const rowsRoot = m.querySelector('[data-timetable-conflict-rows]');
+
+    const renderRows = () => {
+      if (!rowsRoot) return;
+      rowsRoot.innerHTML = activeEntries.map(rowMarkup).join('');
+      initTimePickers(rowsRoot);
+    };
+
+    renderRows();
     m.querySelector('[data-timetable-conflicts-save]')?.addEventListener('click', () => {
-      const updates = [];
-      let hasError = false;
-      entries.forEach((entry, index) => {
-        const from = m.querySelector(`[name="timetableConflictFrom${index}"]`)?.value || base.from;
-        const to = m.querySelector(`[name="timetableConflictTo${index}"]`)?.value || base.to;
-        const error = m.querySelector(`[data-timetable-conflict-error="${index}"]`);
-        if (hasScheduleConflict(workingDays, { workplaceId: selectedWorkplaceId, date: entry.date, from, to })) {
-          if (error) error.textContent = 'Это время всё ещё пересекается с другой работой.';
-          hasError = true;
+      const remaining = [];
+      let applied = 0;
+
+      activeEntries.forEach((entry, index) => {
+        const from = m.querySelector(`[name="timetableConflictFrom${index}"]`)?.value || entry.draftFrom;
+        const to = m.querySelector(`[name="timetableConflictTo${index}"]`)?.value || entry.draftTo;
+        if (!isValidRange(from, to)) {
+          remaining.push({ ...entry, draftFrom: from, draftTo: to, error: 'Окончание должно быть позже начала.' });
           return;
         }
-        if (error) error.textContent = '';
-        updates.push({ date: entry.date, from, to });
+
+        const conflicts = getScheduleConflicts(workingDays, { workplaceId: selectedWorkplaceId, date: entry.date, from, to });
+        if (conflicts.length) {
+          remaining.push({ ...entry, conflicts, draftFrom: from, draftTo: to, error: 'Это время всё ещё пересекается с другой работой.' });
+          return;
+        }
+
+        const existing = getDay(workingDays, selectedWorkplaceId, entry.date);
+        if (existing) updateDayTime(workingDays, selectedWorkplaceId, entry.date, from, to);
+        else {
+          const day = createDay({ date: entry.date, workplaceId: selectedWorkplaceId, from, to });
+          if (day) workingDays.push(day);
+        }
+        applied += 1;
       });
-      if (hasError) return;
-      for (const item of updates) {
-        if (getDay(workingDays, selectedWorkplaceId, item.date)) updateDayTime(workingDays, selectedWorkplaceId, item.date, item.from, item.to);
-        else { const day = createDay({ date: item.date, workplaceId: selectedWorkplaceId, from: item.from, to: item.to }); if (day) workingDays.push(day); }
+
+      if (applied) {
+        saveDays(workingDays);
+        const month = calendar?.getDisplayedMonth() || initialMonth;
+        startSelectionSession(month);
+        renderHeader(month);
       }
-      saveDays(workingDays);
-      const month = calendar?.getDisplayedMonth() || initialMonth;
-      startSelectionSession(month); renderHeader(month); m.remove();
+
+      if (!remaining.length) {
+        m.remove();
+        return;
+      }
+
+      activeEntries = remaining;
+      renderRows();
     });
   }
 

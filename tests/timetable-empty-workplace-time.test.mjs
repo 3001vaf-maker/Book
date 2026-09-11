@@ -28,4 +28,15 @@ assert.match(source, /applyWorkingDays\(dates, \{ from, to \}\)/);
 assert.match(source, /Постоянное расписание рабочего места не изменится/);
 assert.doesNotMatch(source, /workplace\.(?:from|to)\s*=/);
 
+assert.match(source, /const targetWorkplace = workplaces\.find\([\s\S]*?selectedWorkplaceId/);
+assert.match(source, /const targetWorkplaceName = targetWorkplace\?\.name \|\| 'Рабочее пространство'/);
+assert.match(source, /<span>Корректируем<\/span><strong>\$\{escapeHtml\(targetWorkplaceName\)\}<\/strong>/);
+assert.match(source, /<span>Конфликтует<\/span>/);
+assert.match(source, /let activeEntries = entries\.map/);
+assert.match(source, /const remaining = \[\]/);
+assert.match(source, /const conflicts = getScheduleConflicts\(workingDays,/);
+assert.match(source, /if \(applied\) \{\s*saveDays\(workingDays\);/s);
+assert.match(source, /activeEntries = remaining;\s*renderRows\(\);/s);
+assert.doesNotMatch(source, /if \(hasError\) return;/);
+
 console.log('timetable empty workplace time tests: OK');
