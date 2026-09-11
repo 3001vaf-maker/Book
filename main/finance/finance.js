@@ -59,13 +59,39 @@ function movementListItem(item) {
   };
 }
 
+function csvCell(value) {
+  return `"${String(value ?? '').replaceAll('"', '""')}"`;
+}
+
+function downloadDDS(movements) {
+  const headers = ['Дата и время', 'Операция', 'Клиент', 'Рабочее место', 'Кошелёк', 'Сумма', 'Статус', 'Чаевые'];
+  const rows = movements.map((item) => [
+    operationMoment(item),
+    operationName(item).replace(' · Отменена', ''),
+    clientText(item),
+    item?.workplace || '',
+    walletText(item),
+    operationAmount(item),
+    item?.status === 'cancelled' ? 'Отменена' : 'Активна',
+    Number(item?.tips || 0),
+  ]);
+  const text = '\uFEFF' + [headers, ...rows].map((row) => row.map(csvCell).join(';')).join('\r\n');
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = 'Book-ДДС.csv';
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
 function renderDDS(root) {
   const movements = [...getDDSMovements()].reverse();
   const operations = movements.length
     ? list({ items: movements.map(movementListItem) })
     : emptyState('Все операции', 'Финансовых операций пока нет.');
 
-  root.innerHTML = `${pageHeader('ДДС', 'Все операции')}${operations}${actionBlock(button('Назад', { variant: 'secondary', data: 'data-finance-dds-back' }))}`;
+  root.innerHTML = `${pageHeader('ДДС', 'Все операции')}<div class="ui-list-toolbar"><div></div><div class="ui-list-toolbar__actions">${button('Excel', { className: 'ui-button--secondary', data: 'data-finance-dds-excel' })}</div></div>${operations}${actionBlock(button('Назад', { variant: 'secondary', data: 'data-finance-dds-back' }))}`;
+  root.querySelector('[data-finance-dds-excel]')?.addEventListener('click', () => downloadDDS(movements));
   root.querySelector('[data-finance-dds-back]')?.addEventListener('click', () => renderFinance(root));
 }
 
