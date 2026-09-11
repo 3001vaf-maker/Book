@@ -152,9 +152,13 @@ export function getRecordPaymentState(record = null, { discountPercent = 0 } = {
   const fact = calculateFinancialFact(plan, movements);
   const paidTotal = Math.max(0, numberValue(fact.factTotal));
   const remaining = Math.max(0, numberValue(plan?.planTotal) - paidTotal);
-  const tipsTotal = movements
+  const tipsIncome = movements
     .filter((item) => item?.movementType === 'income')
     .reduce((sum, item) => sum + Math.max(0, numberValue(item?.tips)), 0);
+  const tipsExpense = movements
+    .filter((item) => item?.movementType === 'expense')
+    .reduce((sum, item) => sum + Math.max(0, numberValue(item?.tips)), 0);
+  const tipsTotal = Math.max(0, tipsIncome - tipsExpense);
   const payments = movements
     .filter((item) => item?.movementType === 'income' && paymentNet(item, movements) > 0.009)
     .sort((a, b) => String(a?.createdAt || '').localeCompare(String(b?.createdAt || '')));
