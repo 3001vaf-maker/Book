@@ -3,7 +3,7 @@ import { timeToMinutes, minutesToTime } from '../../core/time.js';
 const escape = (value) => String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;');
 const moneyText = (value) => `${Math.max(0, Number(value) || 0).toLocaleString('ru-RU')} ₽`;
 
-function recordMarkup(usage) {
+function recordMarkup(usage, { interactive = true } = {}) {
   const client = usage?.client || {};
   const name = [client.name, client.surname].filter(Boolean).join(' ') || 'Без имени';
   const id = String(client.uei || client.id || '').trim();
@@ -12,13 +12,17 @@ function recordMarkup(usage) {
   const phone = client.phone ? `<span class="journal-record__phone">${escape(client.phone)}</span>` : '';
   const services = (usage.procedures || []).map((item) => `<span class="journal-record__service">${escape(item.name)}</span>`).join('');
   const statusClass = usage?.paid ? ' journal-record--paid' : usage?.attendance === 'no-show' ? ' journal-record--no-show' : '';
-  return `<button type="button" class="journal-record${statusClass}" data-journal-record="${escape(usage.id)}"><span class="journal-record__head"><strong class="journal-record__identity">${identity}</strong><strong class="journal-record__total">${escape(total)}</strong></span>${phone}${services}</button>`;
+  const content = `<span class="journal-record__head"><strong class="journal-record__identity">${identity}</strong><strong class="journal-record__total">${escape(total)}</strong></span>${phone}${services}`;
+  return interactive
+    ? `<button type="button" class="journal-record${statusClass}" data-journal-record="${escape(usage.id)}">${content}</button>`
+    : `<div class="journal-record${statusClass}" aria-disabled="true">${content}</div>`;
 }
 
-function usageMarkup(usage) {
-  return usage?.type === 'record'
-    ? recordMarkup(usage)
-    : `<button type="button" class="journal-record journal-record--break" data-journal-break="${escape(usage.id)}"><strong>Перерыв</strong></button>`;
+function usageMarkup(usage, { interactive = true } = {}) {
+  if (usage?.type === 'record') return recordMarkup(usage, { interactive });
+  return interactive
+    ? `<button type="button" class="journal-record journal-record--break" data-journal-break="${escape(usage.id)}"><strong>Перерыв</strong></button>`
+    : '<div class="journal-record journal-record--break" aria-disabled="true"><strong>Перерыв</strong></div>';
 }
 
 function slotsMarkup(start, end, { interactive = true } = {}) {
@@ -61,9 +65,9 @@ function aggregateTimeline(columns = []) {
       const clippedEnd = Math.min(column.end, usageEnd);
       const usageTop = ((clippedStart - column.start) / fieldDuration) * 100;
       const usageHeight = ((clippedEnd - clippedStart) / fieldDuration) * 100;
-      return `<div class="journal-work-field__usage" style="top:${usageTop}%;height:${usageHeight}%" data-time-usage="${escape(usage.id)}">${usageMarkup(usage)}</div>`;
+      return `<div class="journal-work-field__usage" style="top:${usageTop}%;height:${usageHeight}%" data-time-usage="${escape(usage.id)}">${usageMarkup(usage, { interactive: false })}</div>`;
     }).join('');
-    return `<div class="journal-work-column"><div class="journal-work-field${column?.conflict ? ' is-conflict' : ''}" style="top:${top}%;height:${height}%" data-journal-work-field="${escape(column?.workplaceId || '')}">${usages}</div></div>`;
+    return `<div class="journal-work-column"><div class="journal-work-field${column?.conflict ? ' is-conflict' : ''}" role="button" tabindex="0" aria-label="Изменить рабочее пространство ${escape(column?.name || '')}" style="top:${top}%;height:${height}%" data-journal-work-field="${escape(column?.workplaceId || '')}">${usages}</div></div>`;
   }).join('');
 
   return `<div class="journal-day-columns" data-journal-day-columns><div class="journal-day-columns__inner" style="min-width:${minWidth}px;--journal-column-count:${prepared.length}"><div class="journal-day-columns__headings"><span aria-hidden="true"></span>${headings}</div><section class="time-timeline time-timeline--columns" data-time-timeline data-time-from="${escape(minutesToTime(start))}" data-time-to="${escape(minutesToTime(end))}" style="--time-total-minutes:${total}">${slotsMarkup(start, end, { interactive: false })}<div class="journal-work-columns">${fields}</div></section></div></div>`;
@@ -86,10 +90,23 @@ export function journalDayTimeline({ from = '09:00', to = '18:00', usages = [], 
   return `<section class="time-timeline" data-time-timeline data-time-from="${escape(from)}" data-time-to="${escape(to)}" style="--time-total-minutes:${total}">${slotsMarkup(start, end)}<div class="time-timeline__usages">${overlays}</div></section>`;
 }
 
-export function initJournalDayTimeline(root, { onSlotClick = () => {}, usages = [] } = {}) {
+export function initJournalDayTimeline(root, { onSlotClick = () => {}, onWorkFieldClick = () => {}, usages = [] } = {}) {
   if (root.__bookTimeUsageChangeHandler) window.removeEventListener('book:time-usage-changed', root.__bookTimeUsageChangeHandler);
   root.__bookTimeUsageChangeHandler = () => {};
   window.addEventListener('book:time-usage-changed', root.__bookTimeUsageChangeHandler);
+
+  root.querySelectorAll('[data-journal-work-field]').forEach((field) => {
+    const open = () => {
+      const workplaceId = String(field.dataset.journalWorkField || '');
+      if (workplaceId) onWorkFieldClick({ workplaceId });
+    };
+    field.addEventListener('click', open);
+    field.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      open();
+    });
+  });
 
   root.querySelectorAll('[data-time-slot-from]').forEach((slot) => slot.addEventListener('click', () => {
     const from = slot.dataset.timeSlotFrom || '';

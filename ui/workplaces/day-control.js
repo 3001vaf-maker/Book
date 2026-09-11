@@ -29,13 +29,13 @@ function openCatalog({ workplaces = [], title = '', onSelect = () => {} } = {}) 
       indicatorLabel: workplace?.name || 'Рабочее место',
       interactive: true,
       data: `data-day-workplace-pick="${escapeHtml(key)}"`,
-      aria: `Добавить рабочее место ${workplace?.name || ''}`,
+      aria: `Добавить рабочее пространство ${workplace?.name || ''}`,
     };
   }).filter(Boolean);
 
   const content = items.length
     ? `<div class="workplace-control-list">${list({ items })}</div>`
-    : '<div class="time-day-state" aria-disabled="true">Нет доступных рабочих мест</div>';
+    : '<div class="time-day-state" aria-disabled="true">Нет доступных рабочих пространств</div>';
   const main = openHeaderControl(content, { title });
   main?.querySelectorAll('[data-day-workplace-pick]').forEach((row) => row.addEventListener('click', () => {
     const workplaceId = String(row.dataset.dayWorkplacePick || '');
@@ -68,7 +68,7 @@ export function openDayWorkplaceControl({
   }));
 
   const addAction = (Array.isArray(available) && available.length)
-    ? `<div class="workplace-control-actions">${button('+ Добавить рабочее место', { variant: 'secondary', data: 'data-day-workplace-add' })}</div>`
+    ? `<div class="workplace-control-actions">${button('+ Добавить рабочее пространство', { variant: 'secondary', data: 'data-day-workplace-add' })}</div>`
     : '';
   const content = `<div class="workplace-control-list">${list({ items })}</div>${addAction}`;
   const main = openHeaderControl(content, { title });
@@ -90,7 +90,10 @@ export function openDayWorkplaceTime({
   from = '',
   to = '',
   occupied = [],
+  available = [],
+  catalogTitle = 'Добавить рабочее пространство',
   onSave = () => ({ ok: true }),
+  onAdd = () => {},
 } = {}) {
   const occupiedItems = normalizedItems(occupied).map((item) => ({
     title: item?.name || 'Рабочее место',
@@ -101,10 +104,17 @@ export function openDayWorkplaceTime({
   const occupiedMarkup = occupiedItems.length
     ? `<div class="workplace-control-list">${list({ items: occupiedItems })}</div>`
     : '';
-  const content = `<div class="compact-form"><div class="modal-title"><h2>${escapeHtml(title || 'Рабочее время')}</h2></div>${occupiedMarkup}<div class="time-range-fields">${timePicker({ name: 'dayWorkplaceFrom', label: 'Начало', value: from })}${timePicker({ name: 'dayWorkplaceTo', label: 'Окончание', value: to })}</div><div class="form-error" data-day-workplace-time-error aria-live="polite"></div>${button('Сохранить', { data: 'data-day-workplace-time-save' })}</div>`;
+  const addAction = Array.isArray(available) && available.length
+    ? button('+ Добавить рабочее пространство', { variant: 'secondary', data: 'data-day-workplace-time-add' })
+    : '';
+  const content = `<div class="compact-form"><div class="modal-title"><h2>${escapeHtml(title || 'Рабочее время')}</h2></div>${occupiedMarkup}<div class="time-range-fields">${timePicker({ name: 'dayWorkplaceFrom', label: 'Начало', value: from })}${timePicker({ name: 'dayWorkplaceTo', label: 'Окончание', value: to })}</div><div class="form-error" data-day-workplace-time-error aria-live="polite"></div>${addAction}${button('Сохранить', { data: 'data-day-workplace-time-save' })}</div>`;
   const main = mountModal(document.body, modal(content, { title: title || 'Рабочее время', variant: 'medium' }));
   if (!main) return null;
   initTimePickers(main);
+  main.querySelector('[data-day-workplace-time-add]')?.addEventListener('click', () => {
+    main.remove();
+    openCatalog({ workplaces: available, title: catalogTitle, onSelect: onAdd });
+  });
   main.querySelector('[data-day-workplace-time-save]')?.addEventListener('click', () => {
     const nextFrom = main.querySelector('[name="dayWorkplaceFrom"]')?.value || '';
     const nextTo = main.querySelector('[name="dayWorkplaceTo"]')?.value || '';

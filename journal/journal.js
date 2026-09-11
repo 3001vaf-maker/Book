@@ -74,12 +74,16 @@ export function renderJournal(root) {
     const workplace = workplaces.find((item) => String(item?.key || '') === String(workplaceId || '')) || null;
     const draft = getDayWorkplaceDraft(selectedDate, workplaceId, workplaces);
     if (!draft) return;
+    const available = getAvailableDayWorkplaces(selectedDate, workplaces);
 
     openDayWorkplaceTime({
-      title: workplace?.name || 'Рабочее место',
+      title: workplace?.name || 'Рабочее пространство',
       from: draft.from,
       to: draft.to,
       occupied: draft.occupied,
+      available,
+      catalogTitle: 'Добавить рабочее пространство',
+      onAdd: openDayTime,
       onSave: ({ from, to }) => {
         const result = saveDayWorkplaceTime({ date: selectedDate, workplaceId, from, to }, workplaces);
         if (!result.ok) return result;
@@ -150,6 +154,7 @@ export function renderJournal(root) {
       renderJournalDay(viewRoot, {
         date: selectedDate,
         workplaceId: selectedWorkplaceId,
+        onWorkplaceFieldClick: openDayTime,
         onChange: (nextDate) => {
           selectedDate = nextDate;
           setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: selectedDate, scope: JOURNAL_CONTEXT_SCOPE });
