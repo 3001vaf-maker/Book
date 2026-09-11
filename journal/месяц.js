@@ -2,7 +2,7 @@ import { initCalendar, ALL_WORKPLACES_ID } from '../ui/ui.js';
 import { getRecordPaymentState } from '../core/financial-model.js';
 import { minutesBetween } from '../core/time.js';
 import { getWorkplaces, getWorkingDays, getWorkingDates, getAllWorkingDates, getWorkingDayIndicators, getWorkingDay, getWorkingDayTotalMinutes, resolveWorkingDayTime } from '../core/workplace-time.js';
-import { getRecordsForDay } from './record-data.js';
+import { getRecordsForDay } from './record-read.js';
 import { recordVisualState } from './record-state.js';
 
 const RECORD_COLOR = '#EFFFBB';
