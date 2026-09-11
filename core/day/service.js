@@ -3,8 +3,7 @@
 import { replaceDayRows } from './data.js';
 import { getDay, getDays } from './read.js';
 import { createDayValue, dayDate, dayIdentity } from './rules.js';
-import { getWorkingTimeUsageConflicts, releaseWorkingTimeSoftUsages } from '../time-usage.js';
-import { createTimeRange, isValidRange } from '../time.js';
+import { createTimeRange, getWorkingTimeUsageConflicts, isValidRange, releaseWorkingTimeSoftUsages } from '../time/index.js';
 
 export function getDayRemovalConflicts(workplaceId, date) {
   const key = dayDate(date);
