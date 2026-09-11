@@ -13,14 +13,24 @@ enum MembershipRole {
   MASTER
 }
 
+enum BookingRequestStatus {
+  PENDING
+  IMPORTED
+  REJECTED
+  CANCELLED
+}
+
 model Tenant {
-  id              String           @id @default(cuid())
-  name            String
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  memberships     Membership[]
-  workspaceStates WorkspaceState[]
-  profiles        Profile[]
+  id                 String              @id @default(cuid())
+  name               String
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  memberships        Membership[]
+  workspaceStates    WorkspaceState[]
+  profiles           Profile[]
+  bookingPublication BookingPublication?
+  bookingAccounts    BookingAccount[]
+  bookingRequests    BookingRequest[]
 }
 
 model User {
@@ -125,4 +135,58 @@ model Workplace {
   @@unique([tenantId, key])
   @@index([tenantId])
   @@index([profileId])
+}
+
+model BookingPublication {
+  id        String   @id @default(cuid())
+  tenantId  String   @unique
+  data      Json
+  revision  Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model BookingAccount {
+  id           String   @id @default(cuid())
+  tenantId     String
+  email        String
+  passwordHash String
+  name         String   @default("")
+  surname      String   @default("")
+  phone        String   @default("")
+  telegramId   String   @default("")
+  consents     Json
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  requests BookingRequest[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@index([tenantId, phone])
+}
+
+model BookingRequest {
+  id               String               @id @default(cuid())
+  tenantId         String
+  accountId        String
+  workplaceKey     String
+  date             String
+  from             String
+  to               String
+  procedures       Json
+  status           BookingRequestStatus @default(PENDING)
+  importedRecordId String               @default("")
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  tenant  Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  account BookingAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@index([tenantId, workplaceKey, date])
+  @@index([accountId])
 }
