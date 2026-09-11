@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   check:
@@ -16,10 +16,25 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 24
+      - name: Complete domain handoff
+        if: github.event_name == 'pull_request'
+        run: node scripts/finish-domain-handoff.mjs
+      - name: Commit domain handoff
+        if: github.event_name == 'pull_request'
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "Finish canonical domain handoff"
+            git push origin HEAD:${{ github.head_ref }}
+          fi
       - name: Syntax and architecture checks
         run: npm run check
       - name: Domain regression tests
