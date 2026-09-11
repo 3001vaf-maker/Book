@@ -3,7 +3,7 @@ import { getWorkplaces } from '../core/workplace-time.js';
 import { getDays, getDay, getDayTime } from '../core/day.js';
 import { getTimeUsages, isTimeRangeAvailable } from '../core/time-usage.js';
 import { minutesToTime, timeToMinutes } from '../core/time.js';
-import { getRecordsForDay } from './record-data.js';
+import { getRecordsForDay } from './record-read.js';
 import { getJournalBreaks, moveJournalBreak, removeJournalBreak } from './break-data.js';
 
 function formatDate(value) {
