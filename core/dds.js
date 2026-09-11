@@ -1,6 +1,6 @@
 const STORAGE_KEY = 'book.dds';
 const LEGACY_PAYMENT_KEY = 'book.payments';
-const VERSION = 4;
+const VERSION = 5;
 
 const numberValue = (value) => {
   const number = Number(String(value ?? '').replace(',', '.'));
@@ -61,13 +61,18 @@ function normalizeIncome(item = {}) {
 function normalizeExpense(item = {}) {
   const { finance: currentFinance, ...rest } = item;
   delete rest['business'];
+  const total = Math.max(0, numberValue(item.total));
+  const tips = Math.max(0, Math.min(total, numberValue(item.tips)));
+  const serviceAmount = Math.max(0, Math.min(total, numberValue(item.serviceAmount ?? (total - tips))));
   return {
     ...rest,
     status: item.status === 'refund' ? 'refund' : (item.status || 'expense'),
     movementType: 'expense',
     expenseType: item.expenseType || (item.status === 'refund' ? 'refund' : 'other'),
     source: item.source || null,
-    total: Math.max(0, numberValue(item.total)),
+    total,
+    serviceAmount,
+    tips,
     finance: normalizeFinancialSnapshot(currentFinance || legacyFinancialSnapshot(item)),
   };
 }
@@ -137,9 +142,13 @@ function normalizedAllocations(payment) {
   }];
 }
 
+function refundsForPayment(state, paymentId) {
+  return state.expense.filter((item) => item?.expenseType === 'refund'
+    && String(item?.originalPaymentId || '') === String(paymentId || ''));
+}
+
 function refundTotal(state, paymentId) {
-  return state.expense
-    .filter((item) => item?.expenseType === 'refund' && String(item?.originalPaymentId || '') === String(paymentId || ''))
+  return refundsForPayment(state, paymentId)
     .reduce((sum, item) => sum + Math.max(0, numberValue(item?.total)), 0);
 }
 
@@ -191,10 +200,19 @@ export function recordRefundExpense(paymentId, { reason = '', amount = null, wal
   const state = readState();
   const original = state.income.find((payment) => String(payment?.id || '') === id);
   if (!original) return null;
-  const alreadyRefunded = refundTotal(state, id);
+  const refunds = refundsForPayment(state, id);
+  const alreadyRefunded = refunds.reduce((sum, item) => sum + Math.max(0, numberValue(item?.total)), 0);
+  const alreadyTipsRefunded = refunds.reduce((sum, item) => sum + Math.max(0, numberValue(item?.tips)), 0);
+  const alreadyServiceRefunded = refunds.reduce((sum, item) => sum + Math.max(0, numberValue(item?.serviceAmount)), 0);
   const remaining = Math.max(0, numberValue(original.total) - alreadyRefunded);
   const refundAmount = Math.min(remaining, Math.max(0, amount == null ? remaining : numberValue(amount)));
   if (!refundAmount) return null;
+
+  const tipsRemaining = Math.max(0, numberValue(original.tips) - alreadyTipsRefunded);
+  const serviceRemaining = Math.max(0, numberValue(original.serviceAmount) - alreadyServiceRefunded);
+  const tipsRefund = Math.min(refundAmount, tipsRemaining);
+  const serviceRefund = Math.min(Math.max(0, refundAmount - tipsRefund), serviceRemaining);
+  if (tipsRefund + serviceRefund <= 0) return null;
 
   const allocations = normalizedAllocations(original);
   const fallbackAllocation = allocations.length === 1 ? allocations[0] : null;
@@ -212,7 +230,9 @@ export function recordRefundExpense(paymentId, { reason = '', amount = null, wal
     client: original.client || null,
     walletId: resolvedWalletId,
     walletName: resolvedWalletName,
-    total: refundAmount,
+    total: tipsRefund + serviceRefund,
+    serviceAmount: serviceRefund,
+    tips: tipsRefund,
     reason: String(reason || ''),
     finance: original.finance || null,
     createdAt: now.toISOString(),
@@ -221,10 +241,12 @@ export function recordRefundExpense(paymentId, { reason = '', amount = null, wal
   state.expense.push(refund);
   writeState(state);
   notifyDDSChanged({
-    action: refundAmount >= remaining - 0.009 ? 'refund-full' : 'refund-partial',
+    action: refund.total >= remaining - 0.009 ? 'refund-full' : 'refund-partial',
     paymentId: refund.id,
     originalPaymentId: original.id,
     total: refund.total,
+    serviceAmount: refund.serviceAmount,
+    tips: refund.tips,
     source: refund.source || null,
   });
   return refund;
@@ -279,7 +301,7 @@ export function getWalletDDSMovements(walletId) {
 }
 
 export function getRefundsForPayment(paymentId) {
-  return readState().expense.filter((item) => item?.expenseType === 'refund' && String(item?.originalPaymentId || '') === String(paymentId || ''));
+  return refundsForPayment(readState(), paymentId).map((item) => ({ ...item }));
 }
 
 export function getPaymentRemaining(paymentId) {
