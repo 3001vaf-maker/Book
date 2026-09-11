@@ -1,7 +1,6 @@
 import { emptyState, listEntries, listEntry, shortDate } from '../ui/ui.js';
 import { getWorkplaces } from '../core/workplace-time.js';
-import { getActivePaymentForSource } from '../core/dds.js';
-import { recordPlanTotal } from '../core/financial-model.js';
+import { getRecordPaymentState, recordPlanTotal } from '../core/financial-model.js';
 import { getRecords } from './record-data.js';
 import { isRecordCompletedSide, recordActivityTime, recordAppointmentTime, recordVisualState } from './record-state.js';
 
@@ -20,7 +19,8 @@ function workplaceName(workplaces, workplaceId) {
 }
 
 function paymentFor(record) {
-  return getActivePaymentForSource('record', record?.id);
+  const state = getRecordPaymentState(record);
+  return state.fullyPaid ? state.latestPayment : null;
 }
 
 function recordStatusClass(record, payment = null) {
