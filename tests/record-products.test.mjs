@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs';
 import { createDay } from '../core/day.js';
 import { calculateFinancialPlan, getFinancialItemFact } from '../core/financial-model.js';
 import { recordPaymentIncome } from '../core/dds.js';
-import { createRecord, getRecords, updateRecord } from '../journal/record-data.js';
+import { getRecords } from '../journal/record-read.js';
+import { createRecord, updateRecord } from '../journal/record-service.js';
 
 const storage = new Map();
 globalThis.localStorage = {
