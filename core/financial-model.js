@@ -127,6 +127,37 @@ export function getRecordFinancialPlanFact(record = null, { discountPercent = 0 
   return calculateFinancialFact(plan, getDDSMovementsForSource('record', record.id));
 }
 
+function paymentNet(payment, movements = []) {
+  const refunded = (Array.isArray(movements) ? movements : [])
+    .filter((item) => item?.movementType === 'expense'
+      && item?.expenseType === 'refund'
+      && String(item?.originalPaymentId || '') === String(payment?.id || ''))
+    .reduce((sum, item) => sum + Math.max(0, numberValue(item?.total)), 0);
+  return Math.max(0, numberValue(payment?.total) - refunded);
+}
+
+export function getRecordPaymentState(record = null, { discountPercent = 0 } = {}) {
+  const plan = resolveRecordFinancialPlan(record, { discountPercent });
+  const movements = record?.id ? getDDSMovementsForSource('record', record.id) : [];
+  const fact = calculateFinancialFact(plan, movements);
+  const paidTotal = Math.max(0, numberValue(fact.factTotal));
+  const remaining = Math.max(0, numberValue(plan?.planTotal) - paidTotal);
+  const payments = movements
+    .filter((item) => item?.movementType === 'income' && paymentNet(item, movements) > 0.009)
+    .sort((a, b) => String(a?.createdAt || '').localeCompare(String(b?.createdAt || '')));
+  const fullyPaid = numberValue(plan?.planTotal) > 0 && remaining <= 0.009;
+  return {
+    ...fact,
+    paidTotal,
+    remaining,
+    fullyPaid,
+    partiallyPaid: paidTotal > 0.009 && !fullyPaid,
+    hasPayments: payments.length > 0,
+    payments,
+    latestPayment: payments.length ? payments[payments.length - 1] : null,
+  };
+}
+
 export function getFinancialFactForRecords(recordIds = []) {
   const ids = new Set((Array.isArray(recordIds) ? recordIds : []).map((id) => String(id || '')).filter(Boolean));
   const movements = getDDSMovements().filter((movement) => movement?.source?.type === 'record' && ids.has(String(movement?.source?.id || '')));
