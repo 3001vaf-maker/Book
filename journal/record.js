@@ -7,6 +7,7 @@ import { openClientCreate } from '../main/clients/create.js';
 import { openClientProfile } from '../main/clients/clients.js';
 import { getProcedures } from '../settings/service/procedures/data.js';
 import { openProcedureForm } from '../settings/service/procedures/form.js';
+import { assignProceduresToWorkplace } from '../settings/service/procedures/service.js';
 import { checkTimeAvailability, listAvailableEndTimes, listAvailableStartTimes } from '../core/time/index.js';
 import { timeToMinutes, minutesToTime } from '../core/time/index.js';
 import { getWorkplaces, getWorkplaceWorkingDates } from '../core/workplace-time.js';
@@ -106,11 +107,65 @@ function defaultCost(procedure, workplaceId) {
   return cost.amount ?? cost.from ?? '';
 }
 
+function openPriceProcedurePicker({ workplaceId, onAssigned }) {
+  const all = procedures();
+  if (!all.length) {
+    openNotice({ title: 'Прайс', message: 'В прайсе пока нет процедур. Новую процедуру можно создать через «+».' });
+    return;
+  }
+
+  const available = all.filter((procedure) => !procedureForWorkplace(procedure, workplaceId));
+  if (!available.length) {
+    openNotice({ title: 'Прайс', message: 'Все процедуры из прайса уже доступны в этом рабочем месте.' });
+    return;
+  }
+
+  const selectedIds = new Set();
+  const content = list({
+    items: available.map((procedure) => {
+      const cost = defaultCost(procedure, '');
+      return {
+        title: procedure.name || '',
+        secondary: [durationText(procedure.duration), cost !== '' ? `${cost} ₽` : ''],
+        interactive: true,
+        data: `data-record-price-procedure="${escapeHtml(procedure.id)}"`,
+        aria: `Подключить процедуру ${procedure.name || ''} к рабочему месту`,
+      };
+    }),
+  });
+  const m = mountModal(document.body, modal(`<div class="modal-title"><h2>Из прайса</h2><p>Отметьте процедуры, которые выполняются в этом рабочем месте.</p></div><div data-record-price-list>${content}</div><div class="modal-actions">${button('Добавить', { data: 'data-record-price-save' })}</div>`, { variant: 'medium', surface: 'app' }));
+  if (!m) return;
+
+  const listRoot = m.querySelector('[data-record-price-list]');
+  const controller = initMultiSelect(listRoot, {
+    selectedValues: [],
+    selector: '[data-record-price-procedure]',
+    valueAttribute: 'recordPriceProcedure',
+    onChange: (values) => {
+      selectedIds.clear();
+      values.forEach((id) => selectedIds.add(String(id)));
+    },
+  });
+
+  m.querySelector('[data-record-price-save]')?.addEventListener('click', () => {
+    if (!selectedIds.size) return;
+    const workplace = getWorkplaces().find((item) => String(item?.id ?? item?.key ?? '') === String(workplaceId || '')) || null;
+    const assigned = assignProceduresToWorkplace({
+      procedureIds: [...selectedIds],
+      workplaceId,
+      workplaceName: workplace?.name || workplace?.title || '',
+    });
+    controller?.destroy();
+    m.remove();
+    onAssigned?.(assigned);
+  });
+}
+
 function renderProceduresStep(modalRoot, { date, workplaceId, from, to, onCreated }) {
   let items = procedures().filter((procedure) => procedureForWorkplace(procedure, workplaceId));
   const selected = new Map();
   let selectionController = null;
-  const host = renderFlow(modalRoot, `<div class="record-screen record-screen--procedures"><div class="record-modal-toolbar"><strong>Процедуры</strong>${iconButton('+', { className: 'icon-button--primary', data: 'data-record-add', aria: 'Добавить процедуру' })}</div><div data-record-procedures></div><div class="record-modal-actions modal-actions" data-record-actions></div></div>`);
+  const host = renderFlow(modalRoot, `<div class="record-screen record-screen--procedures"><div class="record-modal-toolbar"><strong>Процедуры</strong>${button('Из прайса', { data: 'data-record-from-price', variant: 'secondary' })}${iconButton('+', { className: 'icon-button--primary', data: 'data-record-add', aria: 'Добавить процедуру' })}</div><div data-record-procedures></div><div class="record-modal-actions modal-actions" data-record-actions></div></div>`);
   if (!host) return;
 
   const syncActions = () => {
@@ -182,6 +237,16 @@ function renderProceduresStep(modalRoot, { date, workplaceId, from, to, onCreate
       },
     });
   };
+
+  host.querySelector('[data-record-from-price]')?.addEventListener('click', () => {
+    openPriceProcedurePicker({
+      workplaceId,
+      onAssigned: () => {
+        items = procedures().filter((item) => procedureForWorkplace(item, workplaceId));
+        render();
+      },
+    });
+  });
 
   host.querySelector('[data-record-add]')?.addEventListener('click', () => {
     openProcedureForm({
