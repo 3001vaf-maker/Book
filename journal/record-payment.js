@@ -1,12 +1,12 @@
 import { button, details, initPaymentForm, initPaymentMethods, modal, mountModal, paymentForm, paymentMethods, paymentReceipt, select, shortDate, shortDateTimeParts, shortTime } from '../ui/ui.js';
-import { calculateFinancialPlan, getRecordPaymentState, recordFinancialItems } from '../core/financial-model.js';
-import { getRefundsForPayment, recordPaymentIncome, recordRefundExpense } from '../core/dds.js';
+import { calculateFinancialPlan, getRecordPaymentState, recordFinancialItems } from '../core/finance/index.js';
+import { getRefundsForPayment, recordPaymentIncome, recordRefundExpense } from '../core/finance/index.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getAllClients } from '../main/clients/data.js';
 import { clientDisplay } from '../main/clients/presentation.js';
 import { getWallets } from '../settings/wallets/data.js';
-import { getRecord } from './record-read.js';
-import { setRecordAttendance, updateRecord } from './record-service.js';
+import { getRecord } from '../core/record/index.js';
+import { setRecordAttendance, updateRecord } from '../core/record/index.js';
 
 const money = (value) => `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(Number(value || 0)).replaceAll('\u00a0', ' ')} ₽`;
 

@@ -1,6 +1,6 @@
 // Neutral minute-resolution time grid.
 // Owns no business entities and stores no application state.
-import { containsRange, isValidRange, rangesOverlap, timeToMinutes, minutesToTime } from './time.js';
+import { containsRange, isValidRange, rangesOverlap, timeToMinutes, minutesToTime } from './math.js';
 
 const RIGIDITY_WEIGHT = Object.freeze({ soft: 1, hard: 2 });
 

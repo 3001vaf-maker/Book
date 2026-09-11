@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { calculateFinancialPlan, getFinancialItemFact } from '../core/financial-model.js';
-import { createDay } from '../core/day.js';
-import { recordPaymentIncome, recordRefundExpense } from '../core/dds.js';
-import { getRecords } from '../journal/record-read.js';
-import { createRecord, moveRecord, updateRecord } from '../journal/record-service.js';
-import { recordVisualState } from '../journal/record-state.js';
+import { calculateFinancialPlan, getFinancialItemFact } from '../core/finance/index.js';
+import { createDay } from '../core/day/index.js';
+import { recordPaymentIncome, recordRefundExpense } from '../core/finance/index.js';
+import { getRecords } from '../core/record/index.js';
+import { createRecord, moveRecord, updateRecord } from '../core/record/index.js';
+import { recordVisualState } from '../core/record/index.js';
 import { renderJournalList } from '../journal/список.js';
 import { getClientMetadata } from '../main/clients/metadata.js';
 import { getWalletBalance } from '../settings/wallets/data.js';
@@ -33,7 +33,7 @@ const record = createRecord({
   workplaceId: 'studio',
   from: '10:00',
   to: '11:00',
-  client: { key: 'client-1', name: 'Анна', surname: 'Тест', phone: '+70000000000' },
+  client: { key: 'client-1', name: 'Анна', surname: 'Тест', phone: '+70000000000', discountPercent: 20 },
   procedures: [{ id: 'procedure-1', name: 'Стрижка', cost: 5000, duration: 60 }],
 });
 assert.ok(record);

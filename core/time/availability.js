@@ -1,15 +1,15 @@
 // Canonical availability queries over WorkPlan + neutral TimeGrid + occupancy sources.
 // UI and business entities ask this module; they do not rebuild time availability themselves.
-import { getDay, getDayTime, getDays } from './day.js';
-import { getWorkplaces } from './workplace-time.js';
-import { getTimeUsagesForScope } from './time-usage.js';
+import { getDay, getDayTime, getDays } from '../day/index.js';
+import { getWorkplaces } from '../workplace-time.js';
+import { getTimeUsagesForScope } from './usage.js';
 import {
   createTimeGrid,
   getTimeGridMinuteState,
   getTimeGridRangeState,
   listTimeGridAvailableEnds,
   listTimeGridAvailableStarts,
-} from './time-grid.js';
+} from './grid.js';
 
 function dateKey(value) {
   return String(value || '').slice(0, 10);

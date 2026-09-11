@@ -1,5 +1,5 @@
 // Technical helpers for clock-time intervals.
-// Time is not a business entity and does not own any application state.
+// Time math owns no business entities and stores no application state.
 
 export function normalizeTime(value, fallback = '00:00') {
   const match = String(value ?? '').match(/^(\d{1,2}):(\d{2})$/);

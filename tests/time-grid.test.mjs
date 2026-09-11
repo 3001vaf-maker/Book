@@ -5,7 +5,7 @@ import {
   getTimeGridRangeState,
   listTimeGridAvailableEnds,
   listTimeGridAvailableStarts,
-} from '../core/time-grid.js';
+} from '../core/time/index.js';
 
 const grid = createTimeGrid({
   date: '2026-09-15',

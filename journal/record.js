@@ -1,5 +1,5 @@
 import { button, durationPicker, durationText, entityCard, escapeHtml, iconButton, list, listEntry, stateView, initStateView, initCalendar, mountModal, modal, openNotice, initDurationPickers, initMultiSelect, viewNavigation, initViewNavigation } from '../ui/ui.js';
-import { createRecord } from './record-service.js';
+import { createRecord } from '../core/record/index.js';
 import { createJournalBreak } from './break-service.js';
 import { getAllClients } from '../main/clients/data.js';
 import { clientDisplay } from '../main/clients/presentation.js';
@@ -7,8 +7,8 @@ import { openClientCreate } from '../main/clients/create.js';
 import { openClientProfile } from '../main/clients/clients.js';
 import { getProcedures } from '../settings/service/procedures/data.js';
 import { openProcedureForm } from '../settings/service/procedures/form.js';
-import { checkTimeAvailability, listAvailableEndTimes, listAvailableStartTimes } from '../core/availability.js';
-import { timeToMinutes, minutesToTime } from '../core/time.js';
+import { checkTimeAvailability, listAvailableEndTimes, listAvailableStartTimes } from '../core/time/index.js';
+import { timeToMinutes, minutesToTime } from '../core/time/index.js';
 import { getWorkplaces, getWorkplaceWorkingDates } from '../core/workplace-time.js';
 
 const RECORD_MODES = [
@@ -597,6 +597,7 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
           name: currentClient.name || '',
           surname: currentClient.surname || '',
           phone: currentClient.phones?.[0] || '',
+          discountPercent: Number(currentClient.discountPercent) || 0,
         },
         procedures: selectedProcedures.map(({ procedure, cost, duration: itemDuration }) => ({
           id: procedure.id,

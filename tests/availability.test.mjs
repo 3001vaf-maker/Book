@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { configureWorkplaceSource } from '../core/workplace-time.js';
-import { configureTimeUsageSource } from '../core/time-usage.js';
-import { checkTimeAvailability, getTimeAvailabilityAt, listAvailableStartTimes } from '../core/availability.js';
+import { configureTimeUsageSource } from '../core/time/index.js';
+import { checkTimeAvailability, getTimeAvailabilityAt, listAvailableStartTimes } from '../core/time/index.js';
 
 const store = new Map();
 globalThis.localStorage = {

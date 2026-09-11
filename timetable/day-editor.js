@@ -1,7 +1,7 @@
 import { button, escapeHtml, initTimePickers, modal, mountModal, openDayWorkplaceControl, timePicker } from '../ui/ui.js';
-import { createDay, findSuggestedInterval, getDay, getDayDraftScheduleConflicts, getDayTime, getDays, getDaysForDate, saveDays, updateDayTime } from '../core/day.js';
-import { getWorkingTimeUsageConflicts } from '../core/time-usage.js';
-import { isValidRange } from '../core/time.js';
+import { createDay, findSuggestedInterval, getDay, getDayDraftScheduleConflicts, getDayTime, getDays, getDaysForDate, saveDays, updateDayTime } from '../core/day/index.js';
+import { getWorkingTimeUsageConflicts } from '../core/time/index.js';
+import { isValidRange } from '../core/time/index.js';
 import { getWorkplaces, resolveWorkplaceTime } from '../core/workplace-time.js';
 
 function dateKey(value) {

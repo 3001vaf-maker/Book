@@ -40,12 +40,12 @@ for (const file of walk(root)) {
   if (path === thisCheck) continue;
   const text = readFileSync(file, 'utf8');
   if (text.includes(obsoletePaymentModule)) errors.push(`${path}: obsolete ${obsoletePaymentModule} dependency`);
-  if (text.includes(reservedFutureModelModule)) errors.push(`${path}: finance must use core/financial-model.js`);
+  if (text.includes(reservedFutureModelModule)) errors.push(`${path}: finance must use core/finance/index.js`);
 }
 
 const ownershipRules = [
-  ['core/dds.js', /from\s+['"][^'"]*(?:financial-model|wallet|record|client|ui)[^'"]*['"]/, 'DDS must not depend on Financial Model, Wallet, Record, Client or UI'],
-  ['core/financial-model.js', /from\s+['"][^'"]*(?:wallet|journal|record-data|client|ui)[^'"]*['"]/, 'Financial Model must not depend on manifestations/data owners'],
+  ['core/finance/data.js', /from\s+['"][^'"]*(?:financial-model|wallet|record|client|ui)[^'"]*['"]/, 'DDS must not depend on Financial Model, Wallet, Record, Client or UI'],
+  ['core/finance/rules.js', /from\s+['"][^'"]*(?:wallet|journal|record-data|client|ui)[^'"]*['"]/, 'Financial Model must not depend on manifestations/data owners'],
   ['journal/record-data.js', /core\/dds\.js/, 'Record data must not own/read money movements directly; fact comes through Financial Model'],
   ['main/clients/metadata.js', /core\/dds\.js/, 'Client metrics must read financial fact through Financial Model'],
   ['settings/service/procedures/procedures.js', /core\/dds\.js/, 'Procedure metrics must read financial fact through Financial Model'],
@@ -59,18 +59,25 @@ for (const [path, pattern, message] of ownershipRules) {
   if (pattern.test(source(path))) errors.push(`${path}: ${message}`);
 }
 
-const dds = source('core/dds.js');
-if (!/const STORAGE_KEY = ['"]book\.dds['"]/.test(dds)) errors.push('core/dds.js must remain the only DDS movement store owner');
-if (!/export function recordPaymentIncome/.test(dds) || !/export function recordRefundExpense/.test(dds)) {
-  errors.push('core/dds.js must own payment income and refund expense movements');
+const financeData = source('core/finance/data.js');
+if (!/const STORAGE_KEY = ['"]book\.dds['"]/.test(financeData)) errors.push('core/finance/data.js must own DDS movement persistence');
+
+const financeService = source('core/finance/service.js');
+if (!/export function recordPaymentIncome/.test(financeService) || !/export function recordRefundExpense/.test(financeService)) {
+  errors.push('core/finance/service.js must own payment income and refund expense commands');
 }
 
-const financialModel = source('core/financial-model.js');
-if (!/export function calculateFinancialPlan/.test(financialModel) || !/export function calculateFinancialFact/.test(financialModel)) {
-  errors.push('core/financial-model.js must own financial plan/fact calculations');
+const financeRules = source('core/finance/rules.js');
+if (!/export function calculateFinancialPlan/.test(financeRules) || !/export function calculateFinancialFact/.test(financeRules)) {
+  errors.push('core/finance/rules.js must own financial plan/fact calculations');
 }
-if (!/export function recordFinancialItems/.test(financialModel) || !/sourceType:\s*'product'/.test(financialModel)) {
-  errors.push('Financial Model must assemble both procedure and product Record sources');
+if (!/export function recordFinancialItems/.test(financeRules) || !/sourceType:\s*'product'/.test(financeRules)) {
+  errors.push('Finance rules must assemble both procedure and product Record sources');
+}
+
+const financeIndex = source('core/finance/index.js');
+if (!/recordPaymentIncome/.test(financeIndex) || !/calculateFinancialPlan/.test(financeIndex) || !/getRecordPaymentState/.test(financeIndex)) {
+  errors.push('core/finance/index.js must expose the complete public Finance contract');
 }
 
 const walletData = source('settings/wallets/data.js');

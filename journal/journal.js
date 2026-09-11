@@ -1,10 +1,10 @@
 import { pageHeader, viewNavigation, initViewNavigation, headerControl, workplaceContent, ALL_WORKPLACES_ID } from '../ui/ui.js';
 import { getWorkplaceContext, setWorkplaceContext } from '../core/workplace-context.js';
 import { getWorkplaces } from '../core/workplace-time.js';
-import { getActiveDayWorkplaces, getAvailableDayWorkplaces } from '../core/day-workplaces.js';
-import { recordPlanTotal } from '../core/financial-model.js';
+import { getActiveDayWorkplaces, getAvailableDayWorkplaces } from '../core/day/index.js';
+import { recordPlanTotal } from '../core/finance/index.js';
 import { openTimetableDayEditor } from '../timetable/day-editor.js';
-import { getActiveRecordCountForDay, getRecordsForDay } from './record-read.js';
+import { getActiveRecordCountForDay, getRecordsForDay } from '../core/record/index.js';
 import { openJournalWorkplaceControl } from './workplace-control.js';
 import { renderJournalDay } from './день.js';
 import { renderJournalMonth } from './месяц.js';

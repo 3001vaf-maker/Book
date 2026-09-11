@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { calculateFinancialPlan, getRecordPaymentState } from '../core/financial-model.js';
+import { calculateFinancialPlan, getRecordPaymentState } from '../core/finance/index.js';
 import {
   getDDSExpenses,
   getDDSIncome,
@@ -9,7 +9,7 @@ import {
   getWalletDDSMovements,
   recordPaymentIncome,
   recordRefundExpense,
-} from '../core/dds.js';
+} from '../core/finance/index.js';
 
 const storage = new Map();
 globalThis.localStorage = {
@@ -17,7 +17,7 @@ globalThis.localStorage = {
   setItem: (key, value) => storage.set(key, String(value)),
 };
 
-const ddsSource = readFileSync(new URL('../core/dds.js', import.meta.url), 'utf8');
+const ddsSource = readFileSync(new URL('../core/finance/service.js', import.meta.url), 'utf8');
 const paymentUiSource = readFileSync(new URL('../ui/payment/index.js', import.meta.url), 'utf8');
 const forbiddenEditPayment = /replacesPaymentId|status:\s*['"]corrected['"]|data-edit-payment|openPaymentEditor|Редактировать оплату/;
 assert.doesNotMatch(ddsSource, forbiddenEditPayment);

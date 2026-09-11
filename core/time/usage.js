@@ -1,6 +1,6 @@
 // Neutral occupancy contract between business owners and Core time mechanisms.
 // This module does not own WorkPlan, Record, Break, Availability, or UI state.
-import { containsRange, isValidRange } from './time.js';
+import { containsRange, isValidRange } from './math.js';
 
 let timeUsageSource = () => [];
 let softTimeUsageReleaseSource = () => 0;
@@ -33,7 +33,7 @@ export function getTimeUsagesForScope(options = {}) {
 }
 
 // WorkPlan asks whether existing usages still fit inside a changed working interval.
-// This is not appointment availability: that belongs only to core/availability.js.
+// This is not appointment availability: that belongs to availability.js.
 export function getWorkingTimeUsageConflicts({ operation = 'resize', from, to, ...scope } = {}) {
   const usages = getTimeUsagesForScope(scope);
   if (operation === 'remove') return usages.filter((usage) => usage.rigidity === 'hard');

@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createDay } from '../core/day.js';
-import { calculateFinancialPlan, getFinancialItemFact } from '../core/financial-model.js';
-import { recordPaymentIncome } from '../core/dds.js';
-import { getRecords } from '../journal/record-read.js';
-import { createRecord, updateRecord } from '../journal/record-service.js';
+import { createDay } from '../core/day/index.js';
+import { calculateFinancialPlan, getFinancialItemFact } from '../core/finance/index.js';
+import { recordPaymentIncome } from '../core/finance/index.js';
+import { getRecords } from '../core/record/index.js';
+import { createRecord, updateRecord } from '../core/record/index.js';
 
 const storage = new Map();
 globalThis.localStorage = {

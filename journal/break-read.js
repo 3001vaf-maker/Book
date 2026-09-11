@@ -1,4 +1,4 @@
-import { minutesBetween, timeToMinutes } from '../core/time.js';
+import { minutesBetween, timeToMinutes } from '../core/time/index.js';
 import { getBreakRows } from './break-data.js';
 
 export function getJournalBreaks() {

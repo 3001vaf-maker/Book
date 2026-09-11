@@ -1,6 +1,6 @@
 // Append-only lifecycle facts for Record.
-// This module owns lifecycle event meaning; record-data.js owns physical persistence only.
-import { deleteRecordEventRows, getRecordEventRows, insertRecordEventRow } from './record-data.js';
+// Event meaning lives here; data.js owns physical persistence only.
+import { deleteRecordEventRows, getRecordEventRows, insertRecordEventRow } from './data.js';
 
 function normalizeRecordId(value) {
   return String(value || '');
@@ -64,21 +64,11 @@ export function ensureLegacyRecordEvents(record = {}) {
   const types = new Set(existing.map((event) => event.type));
   const createdAt = record?.createdAt || record?.updatedAt || '';
 
-  if (!types.has(RECORD_EVENT_TYPES.CREATED)) {
-    appendRecordEvent(recordId, RECORD_EVENT_TYPES.CREATED, { at: createdAt });
-  }
-  if (record?.confirmed && !types.has(RECORD_EVENT_TYPES.CONFIRMED)) {
-    appendRecordEvent(recordId, RECORD_EVENT_TYPES.CONFIRMED, { at: record?.updatedAt || createdAt });
-  }
-  if (record?.attendance === 'arrived' && !types.has(RECORD_EVENT_TYPES.ARRIVED)) {
-    appendRecordEvent(recordId, RECORD_EVENT_TYPES.ARRIVED, { at: record?.updatedAt || createdAt });
-  }
-  if (record?.attendance === 'no-show' && !types.has(RECORD_EVENT_TYPES.NO_SHOW)) {
-    appendRecordEvent(recordId, RECORD_EVENT_TYPES.NO_SHOW, { at: record?.updatedAt || createdAt });
-  }
-  if (record?.status === 'cancelled' && !types.has(RECORD_EVENT_TYPES.CANCELLED)) {
-    appendRecordEvent(recordId, RECORD_EVENT_TYPES.CANCELLED, { at: record?.cancelledAt || record?.updatedAt || createdAt });
-  }
+  if (!types.has(RECORD_EVENT_TYPES.CREATED)) appendRecordEvent(recordId, RECORD_EVENT_TYPES.CREATED, { at: createdAt });
+  if (record?.confirmed && !types.has(RECORD_EVENT_TYPES.CONFIRMED)) appendRecordEvent(recordId, RECORD_EVENT_TYPES.CONFIRMED, { at: record?.updatedAt || createdAt });
+  if (record?.attendance === 'arrived' && !types.has(RECORD_EVENT_TYPES.ARRIVED)) appendRecordEvent(recordId, RECORD_EVENT_TYPES.ARRIVED, { at: record?.updatedAt || createdAt });
+  if (record?.attendance === 'no-show' && !types.has(RECORD_EVENT_TYPES.NO_SHOW)) appendRecordEvent(recordId, RECORD_EVENT_TYPES.NO_SHOW, { at: record?.updatedAt || createdAt });
+  if (record?.status === 'cancelled' && !types.has(RECORD_EVENT_TYPES.CANCELLED)) appendRecordEvent(recordId, RECORD_EVENT_TYPES.CANCELLED, { at: record?.cancelledAt || record?.updatedAt || createdAt });
   return getRecordEvents(recordId);
 }
 

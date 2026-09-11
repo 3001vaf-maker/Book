@@ -1,4 +1,4 @@
-import { timeToMinutes, minutesToTime } from '../../core/time.js';
+import { timeToMinutes, minutesToTime } from '../../core/time/index.js';
 
 const escape = (value) => String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;');
 const moneyText = (value) => `${Math.max(0, Number(value) || 0).toLocaleString('ru-RU')} ₽`;

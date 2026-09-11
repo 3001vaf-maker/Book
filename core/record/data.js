@@ -1,5 +1,5 @@
 // Persistence gateway for Record facts.
-// No scheduling, finance, lifecycle meaning, UI, or workflow decisions belong here.
+// Storage only: no scheduling, finance, lifecycle meaning, UI, or workflow decisions belong here.
 const RECORDS_KEY = 'book.records';
 const EVENTS_KEY = 'book.recordEvents';
 

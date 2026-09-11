@@ -1,9 +1,14 @@
-import { checkTimeAvailability } from '../core/availability.js';
-import { calculateFinancialPlan, recordFinancialItems, repriceFinancialPlan } from '../core/financial-model.js';
-import { deleteRecordRow, insertRecordRow, patchRecordRow } from './record-data.js';
-import { appendRecordEvent, deleteRecordEvents, RECORD_EVENT_TYPES } from './record-events.js';
-import { normalizeRecordFinance, recordClientDiscount } from './record-finance.js';
-import { getRecord } from './record-read.js';
+import { checkTimeAvailability } from '../time/index.js';
+import {
+  calculateFinancialPlan,
+  normalizeRecordFinance,
+  recordClientDiscount,
+  recordFinancialItems,
+  repriceFinancialPlan,
+} from '../finance/index.js';
+import { deleteRecordRow, insertRecordRow, patchRecordRow } from './data.js';
+import { appendRecordEvent, deleteRecordEvents, RECORD_EVENT_TYPES } from './events.js';
+import { getRecord } from './read.js';
 
 function notify(name, detail = {}) {
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(name, { detail }));
@@ -41,19 +46,13 @@ function scheduleChanged(patch = {}) {
 function appendLifecyclePatch(record, patch = {}) {
   if (!record?.id) return;
   if (hasOwn(patch, 'confirmed') && Boolean(patch.confirmed) !== Boolean(record.confirmed)) {
-    appendRecordEvent(
-      record.id,
-      patch.confirmed ? RECORD_EVENT_TYPES.CONFIRMED : RECORD_EVENT_TYPES.UNCONFIRMED,
-    );
+    appendRecordEvent(record.id, patch.confirmed ? RECORD_EVENT_TYPES.CONFIRMED : RECORD_EVENT_TYPES.UNCONFIRMED);
   }
 
   if (hasOwn(patch, 'attendance')) {
     const next = patch.attendance === 'arrived' || patch.attendance === 'no-show' ? patch.attendance : '';
     if (next && next !== record.attendance) {
-      appendRecordEvent(
-        record.id,
-        next === 'arrived' ? RECORD_EVENT_TYPES.ARRIVED : RECORD_EVENT_TYPES.NO_SHOW,
-      );
+      appendRecordEvent(record.id, next === 'arrived' ? RECORD_EVENT_TYPES.ARRIVED : RECORD_EVENT_TYPES.NO_SHOW);
     } else if (!next && record.attendance) {
       appendRecordEvent(record.id, RECORD_EVENT_TYPES.ATTENDANCE_CLEARED);
     }
@@ -68,12 +67,7 @@ export function checkRecordTime({ date, workplaceId, from, to, excludeId = '' } 
 export function createRecord({ date, workplaceId, from, to, client, procedures = [], products = [] } = {}) {
   const normalizedDate = normalizeDate(date);
   const normalizedWorkplaceId = normalizeId(workplaceId);
-  if (!checkRecordTime({
-    date: normalizedDate,
-    workplaceId: normalizedWorkplaceId,
-    from,
-    to,
-  }).ok) return null;
+  if (!checkRecordTime({ date: normalizedDate, workplaceId: normalizedWorkplaceId, from, to }).ok) return null;
 
   const now = new Date().toISOString();
   const sourceRecord = {
@@ -160,13 +154,9 @@ export function updateRecord(id, patch = {}) {
   notify('book:records-changed', { action: 'update', recordId: id });
   if (scheduleChanged(nextDataPatch)) {
     notify('book:time-usage-changed', {
-      action: 'change',
-      usageId: id,
-      sourceId: id,
-      date: updated?.date,
-      workplaceId: updated?.workplaceId,
-      from: updated?.from,
-      to: updated?.to,
+      action: 'change', usageId: id, sourceId: id,
+      date: updated?.date, workplaceId: updated?.workplaceId,
+      from: updated?.from, to: updated?.to,
     });
   }
   return updated;
@@ -188,13 +178,9 @@ export function cancelRecord(id) {
   const cancelled = getRecord(id);
   notify('book:records-changed', { action: 'cancel', recordId: id });
   notify('book:time-usage-changed', {
-    action: 'release',
-    usageId: id,
-    sourceId: id,
-    date: current.date,
-    workplaceId: current.workplaceId,
-    from: current.from,
-    to: current.to,
+    action: 'release', usageId: id, sourceId: id,
+    date: current.date, workplaceId: current.workplaceId,
+    from: current.from, to: current.to,
   });
   return cancelled;
 }
@@ -207,13 +193,9 @@ export function deleteRecord(id) {
   notify('book:records-changed', { action: 'delete', recordId: id });
   if (current.status !== 'cancelled') {
     notify('book:time-usage-changed', {
-      action: 'release',
-      usageId: id,
-      sourceId: id,
-      date: current.date,
-      workplaceId: current.workplaceId,
-      from: current.from,
-      to: current.to,
+      action: 'release', usageId: id, sourceId: id,
+      date: current.date, workplaceId: current.workplaceId,
+      from: current.from, to: current.to,
     });
   }
   return true;

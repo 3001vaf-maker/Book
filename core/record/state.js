@@ -1,4 +1,4 @@
-import { RECORD_EVENT_TYPES } from './record-events.js';
+import { RECORD_EVENT_TYPES } from './events.js';
 
 function orderedEvents(events = []) {
   return (Array.isArray(events) ? events : [])
@@ -41,16 +41,7 @@ export function projectRecordLifecycle(record = {}, events = []) {
     if (at) lifecycleUpdatedAt = at;
   }
 
-  return {
-    ...record,
-    status,
-    confirmed,
-    attendance,
-    confirmedAt,
-    attendanceAt,
-    cancelledAt,
-    lifecycleUpdatedAt,
-  };
+  return { ...record, status, confirmed, attendance, confirmedAt, attendanceAt, cancelledAt, lifecycleUpdatedAt };
 }
 
 export function recordAppointmentTime(record, field = 'from') {

@@ -6,7 +6,7 @@ import { getWorkplaces as getWorkplaceEntities } from './settings/profile/workpl
 import { initializeProfileWorkplaces } from './settings/profile/migration.js';
 import { getJournalTimeUsages, releaseJournalSoftTimeUsages } from './journal/time-usage-source.js';
 import { configureWorkplaceSource } from './core/workplace-time.js';
-import { configureTimeUsageSource, configureSoftTimeUsageReleaseSource } from './core/time-usage.js';
+import { configureTimeUsageSource, configureSoftTimeUsageReleaseSource } from './core/time/index.js';
 import { getCurrentUser, login } from './core/auth.js';
 import { isOnboardingComplete, renderOnboarding } from './onboarding/onboarding.js';
 import { bottomNavigation } from './ui/ui.js';

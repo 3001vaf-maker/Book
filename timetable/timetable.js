@@ -1,6 +1,6 @@
 import { actionBlock, button, pageHeader, initCalendar, initMultiSelect, modal, mountModal, timePicker, initTimePickers, escapeHtml, headerControl, workplaceContent, openWorkplaceControl, ALL_WORKPLACES_ID, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js';
 import { getWorkplaces, resolveWorkplaceTime, getWorkingDayIndicators, getWorkingDayTotalMinutes, getWorkplaceMonthStats, getAllWorkplacesMonthStats, getWorkplaceMonthStatsMap } from '../core/workplace-time.js';
-import { getDays, saveDays, getDay, getDayTime, createDay, updateDayTime, removeDay, getDayRemovalConflicts, getScheduleConflicts, hasScheduleConflict, findSuggestedInterval } from '../core/day.js';
+import { getDays, saveDays, getDay, getDayTime, createDay, updateDayTime, removeDay, getDayRemovalConflicts, getScheduleConflicts, hasScheduleConflict, findSuggestedInterval } from '../core/day/index.js';
 import { openTimetableDayEditor } from './day-editor.js';
 
 function datesForWorkplace(days, workplaceId) { return days.filter((item) => item?.workplaceId === workplaceId).map((item) => item.date).filter(Boolean); }

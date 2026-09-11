@@ -1,8 +1,8 @@
 import { emptyState, listEntries, listEntry, shortDate } from '../ui/ui.js';
 import { getWorkplaces } from '../core/workplace-time.js';
-import { getRecordPaymentState, recordPlanTotal } from '../core/financial-model.js';
-import { getRecords } from './record-read.js';
-import { isRecordCompletedSide, recordActivityTime, recordAppointmentTime, recordVisualState } from './record-state.js';
+import { getRecordPaymentState, recordPlanTotal } from '../core/finance/index.js';
+import { getRecords } from '../core/record/index.js';
+import { isRecordCompletedSide, recordActivityTime, recordAppointmentTime, recordVisualState } from '../core/record/index.js';
 
 function formatMoney(value = 0) {
   const amount = Math.max(0, Math.round(Number(value) || 0));

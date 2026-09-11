@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { saveDays } from '../core/day.js';
-import { getActiveDayWorkplaces, getAvailableDayWorkplaces } from '../core/day-workplaces.js';
+import { saveDays } from '../core/day/index.js';
+import { getActiveDayWorkplaces, getAvailableDayWorkplaces } from '../core/day/index.js';
 import { getWorkplaceWorkingDates } from '../core/workplace-time.js';
 
 const storage = new Map();

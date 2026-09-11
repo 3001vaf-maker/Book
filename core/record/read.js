@@ -1,7 +1,7 @@
-import { getRecordRow, getRecordRows } from './record-data.js';
-import { getRecordEvents } from './record-events.js';
-import { hydrateRecordFinance } from './record-finance.js';
-import { projectRecordLifecycle } from './record-state.js';
+import { hydrateRecordFinance } from '../finance/index.js';
+import { getRecordRow, getRecordRows } from './data.js';
+import { getRecordEvents } from './events.js';
+import { projectRecordLifecycle } from './state.js';
 
 function normalizeDate(value) {
   return String(value || '').slice(0, 10);

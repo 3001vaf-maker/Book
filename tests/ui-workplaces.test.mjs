@@ -103,13 +103,13 @@ assert.match(journalControlSource, /openHeaderControl/);
 assert.match(journalControlSource, /list\(\{\s*items\s*\}\)/);
 assert.doesNotMatch(journalControlSource, /Общий график|data-workplace-control-select/);
 
-const timeGridSource = readFileSync(new URL('../core/time-grid.js', import.meta.url), 'utf8');
+const timeGridSource = readFileSync(new URL('../core/time/grid.js', import.meta.url), 'utf8');
 assert.match(timeGridSource, /export function createTimeGrid/);
 assert.match(timeGridSource, /getTimeGridMinuteState/);
 assert.match(timeGridSource, /getTimeGridRangeState/);
 assert.doesNotMatch(timeGridSource, /journal\/|timetable\/|ui\//);
 
-const availabilitySource = readFileSync(new URL('../core/availability.js', import.meta.url), 'utf8');
+const availabilitySource = readFileSync(new URL('../core/time/availability.js', import.meta.url), 'utf8');
 assert.match(availabilitySource, /getAvailabilityGrid/);
 assert.match(availabilitySource, /checkTimeAvailability/);
 assert.match(availabilitySource, /listAvailableStartTimes/);
@@ -129,7 +129,7 @@ assert.match(journalTimeUsageSource, /getRecordsForDay/);
 assert.match(journalTimeUsageSource, /getJournalBreaksForDay/);
 assert.doesNotMatch(journalTimeUsageSource, /containsRange|rangesOverlap|isValidRange/);
 
-const timeUsageSource = readFileSync(new URL('../core/time-usage.js', import.meta.url), 'utf8');
+const timeUsageSource = readFileSync(new URL('../core/time/usage.js', import.meta.url), 'utf8');
 assert.match(timeUsageSource, /configureTimeUsageSource/);
 assert.match(timeUsageSource, /getTimeUsagesForScope/);
 assert.match(timeUsageSource, /getWorkingTimeUsageConflicts/);
@@ -142,13 +142,13 @@ assert.match(coreSource, /configureTimeUsageSource\(getJournalTimeUsages\)/);
 assert.match(coreSource, /configureSoftTimeUsageReleaseSource\(releaseJournalSoftTimeUsages\)/);
 assert.doesNotMatch(coreSource, /configureWorkingTimeConflictSource/);
 
-const recordDataSource = readFileSync(new URL('../journal/record-data.js', import.meta.url), 'utf8');
-const recordServiceSource = readFileSync(new URL('../journal/record-service.js', import.meta.url), 'utf8');
+const recordDataSource = readFileSync(new URL('../core/record/data.js', import.meta.url), 'utf8');
+const recordServiceSource = readFileSync(new URL('../core/record/service.js', import.meta.url), 'utf8');
 assert.match(recordServiceSource, /checkTimeAvailability/);
 assert.doesNotMatch(recordServiceSource, /getDays|getDayTime|getWorkplaces|getJournalBreaks|rangesOverlap|containsRange/);
 assert.doesNotMatch(recordDataSource, /checkTimeAvailability|getDays|getDayTime|getWorkplaces|getJournalBreaks|rangesOverlap|containsRange/);
 
-const daySource = readFileSync(new URL('../core/day.js', import.meta.url), 'utf8');
+const daySource = readFileSync(new URL('../core/day/service.js', import.meta.url), 'utf8');
 assert.match(daySource, /releaseWorkingTimeSoftUsages/);
 assert.match(daySource, /operation:\s*'remove'/);
 assert.doesNotMatch(daySource, /journal\//);

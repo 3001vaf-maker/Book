@@ -1,5 +1,5 @@
-import { getDayTime, getDays, getDaysForDate } from './day.js';
-import { getWorkplaces } from './workplace-time.js';
+import { getDayTime, getDays, getDaysForDate } from './read.js';
+import { getWorkplaces } from '../workplace-time.js';
 
 const WORKPLACE_FALLBACK_COLOR = '#212529';
 

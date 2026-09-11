@@ -1,4 +1,4 @@
-import { getWalletDDSMovements } from '../../core/dds.js';
+import { getWalletDDSMovements } from '../../core/finance/index.js';
 
 const KEY = 'book.wallets';
 const SYSTEM_WALLETS = [
