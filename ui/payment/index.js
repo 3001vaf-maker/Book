@@ -1,4 +1,4 @@
-import { button } from '../buttons/index.js';
+import { button, iconButton } from '../buttons/index.js';
 import { select } from '../selectors/index.js';
 import { escapeHtml } from '../utils/escape-html.js';
 import { paymentMethodsMarkup, initPaymentMethodsAllocation } from './methods.js';
@@ -40,7 +40,7 @@ export function paymentForm({ workplace = '', date = '', time = '', client = {},
     <section class="payment-procedure" data-payment-procedure="${index}" data-payment-source-type="${escapeHtml(procedure?.sourceType || 'procedure')}" data-payment-source-id="${escapeHtml(procedure?.id || '')}" data-payment-name="${escapeHtml(itemName)}" data-payment-discount-mode="${mode}">
       <div class="payment-procedure__head">
         <strong class="payment-procedure__name">${escapeHtml(itemName)}</strong>
-        <button type="button" class="payment-procedure__remove" data-payment-remove aria-label="Удалить ${escapeHtml(itemName)}">×</button>
+        ${iconButton('×', { className: 'remove-button payment-procedure__remove', data: 'data-payment-remove', aria: `Удалить ${itemName}` })}
       </div>
       <div class="payment-fields payment-fields--three">
         <label><span>Цена</span><input type="number" inputmode="decimal" step="0.01" min="0" value="${escapeHtml(moneyText(price))}" data-payment-price></label>
