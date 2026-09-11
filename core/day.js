@@ -87,6 +87,27 @@ export function getScheduleConflicts(days, { workplaceId, date, from, to, exclud
   });
 }
 export function hasScheduleConflict(days, options = {}) { return getScheduleConflicts(days, options).length > 0; }
+
+export function getDayDraftScheduleConflicts(entries = []) {
+  const values = (Array.isArray(entries) ? entries : []).map((entry, index) => ({ ...entry, index }));
+  const conflicts = [];
+  for (let left = 0; left < values.length; left += 1) {
+    const a = values[left];
+    if (!isValidRange(a?.from, a?.to)) continue;
+    for (let right = left + 1; right < values.length; right += 1) {
+      const b = values[right];
+      if (!isValidRange(b?.from, b?.to) || !rangesOverlap(a.from, a.to, b.from, b.to)) continue;
+      conflicts.push({
+        leftIndex: a.index,
+        rightIndex: b.index,
+        from: a.from > b.from ? a.from : b.from,
+        to: a.to < b.to ? a.to : b.to,
+      });
+    }
+  }
+  return conflicts;
+}
+
 export function findSuggestedInterval(days, { workplaceId, date, baseFrom, baseTo } = {}) {
   if (!isValidRange(baseFrom, baseTo)) return null;
   const baseStart = timeToMinutes(baseFrom), baseEnd = timeToMinutes(baseTo), duration = baseEnd - baseStart;
