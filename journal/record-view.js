@@ -23,7 +23,8 @@ import { clientDisplay } from '../main/clients/presentation.js';
 import { openClientProfile } from '../main/clients/clients.js';
 import { getProcedures } from '../settings/service/procedures/data.js';
 import { getProducts } from '../settings/service/products/data.js';
-import { getRecords, updateRecord, cancelRecord, checkRecordTime } from './record-data.js';
+import { getRecords } from './record-read.js';
+import { updateRecord, cancelRecord, checkRecordTime } from './record-service.js';
 
 const people = () => getAllClients();
 const procedures = () => getProcedures();
@@ -330,10 +331,10 @@ function openPhoneActions(phone) {
   });
   const m = mountModal(document.body, modal(content, { variant: 'compact' }));
   if (!m) return;
-  m.querySelector('[data-record-view-phone-call]')?.addEventListener('click', () => {
+  m.querySelector('[data-record-phone-call]')?.addEventListener('click', () => {
     window.location.href = `tel:${value.replace(/[^\d+]/g, '')}`;
   });
-  m.querySelector('[data-record-view-phone-write]')?.addEventListener('click', () => {
+  m.querySelector('[data-record-phone-write]')?.addEventListener('click', () => {
     m.remove();
     mountModal(document.body, modal('<div class="muted">Чат в разработке</div>', { variant: 'compact' }));
   });

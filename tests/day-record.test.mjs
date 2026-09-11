@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { createDay, getDays, getScheduleConflicts, hasScheduleConflict, removeDay, saveDays } from '../core/day.js';
 import { configureTimeUsageSource, configureSoftTimeUsageReleaseSource, getWorkingTimeUsageConflicts } from '../core/time-usage.js';
-import { createRecord, moveRecord, cancelRecord, deleteRecord, getRecords } from '../journal/record-data.js';
+import { createRecord, moveRecord, cancelRecord, deleteRecord } from '../journal/record-service.js';
+import { getRecords } from '../journal/record-read.js';
 import { createJournalBreak, getJournalBreaks, getJournalBreaksForDay } from '../journal/break-data.js';
 import { getJournalTimeUsages, releaseJournalSoftTimeUsages } from '../journal/time-usage-source.js';
 

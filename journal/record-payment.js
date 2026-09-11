@@ -5,7 +5,8 @@ import { getWorkplaces } from '../core/workplace-time.js';
 import { getAllClients } from '../main/clients/data.js';
 import { clientDisplay } from '../main/clients/presentation.js';
 import { getWallets } from '../settings/wallets/data.js';
-import { getRecords, updateRecord } from './record-data.js';
+import { getRecord } from './record-read.js';
+import { setRecordAttendance, updateRecord } from './record-service.js';
 
 const money = (value) => `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(Number(value || 0)).replaceAll('\u00a0', ' ')} ₽`;
 
@@ -35,7 +36,7 @@ function sourcesFromFinance(sources, finance, type) {
 }
 
 function saveFinancialCorrection(record, finance) {
-  const current = getRecords().find((item) => String(item?.id || '') === String(record?.id || '')) || record;
+  const current = getRecord(record?.id) || record;
   return updateRecord(current.id, {
     procedures: sourcesFromFinance(current?.procedures, finance, 'procedure'),
     products: sourcesFromFinance(current?.products, finance, 'product'),
@@ -155,7 +156,7 @@ function openPaymentMethodsModal(payment, paymentModal) {
   const finish = (completed) => {
     if (!completed) return;
     if (completed?.source?.type === 'record' && completed?.source?.id) {
-      updateRecord(completed.source.id, { attendance: 'arrived' });
+      setRecordAttendance(completed.source.id, 'arrived');
     }
     methodsModal.remove();
     paymentModal?.remove();
@@ -177,7 +178,7 @@ function openPaymentMethodsModal(payment, paymentModal) {
 
 function openPaymentModal(record) {
   if (paymentStateForRecord(record).fullyPaid) return;
-  const current = getRecords().find((item) => String(item?.id || '') === String(record?.id || '')) || record;
+  const current = getRecord(record?.id) || record;
   const payment = paymentFromRecord(current);
   const finance = payment.finance;
   const content = `<div class="modal-title"><h2>Оплата</h2></div>${paymentForm({
@@ -259,7 +260,6 @@ function openRefundModal(payment) {
     if (!amount || !wallet) return;
     const refund = recordRefundExpense(payment.id, { amount, walletId: wallet.id, walletName: wallet.name });
     if (!refund) return;
-    if (refund?.source?.type === 'record' && refund?.source?.id) updateRecord(refund.source.id, {});
     m.remove();
   });
   sync();
@@ -289,7 +289,7 @@ export function openRecordPaymentEntry(record) {
     bottom.querySelector('[data-record-payment-paid]')?.addEventListener('click', () => openPaidState(current));
   };
   const renderPaymentState = () => {
-    const current = getRecords().find((item) => String(item?.id || '') === String(record.id)) || record;
+    const current = getRecord(record.id) || record;
     const sheet = bottom.querySelector('.modal-sheet');
     if (!sheet) return;
     sheet.innerHTML = paymentEntryContent(current);

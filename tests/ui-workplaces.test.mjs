@@ -143,8 +143,10 @@ assert.match(coreSource, /configureSoftTimeUsageReleaseSource\(releaseJournalSof
 assert.doesNotMatch(coreSource, /configureWorkingTimeConflictSource/);
 
 const recordDataSource = readFileSync(new URL('../journal/record-data.js', import.meta.url), 'utf8');
-assert.match(recordDataSource, /checkTimeAvailability/);
-assert.doesNotMatch(recordDataSource, /getDays|getDayTime|getWorkplaces|getJournalBreaks|rangesOverlap|containsRange/);
+const recordServiceSource = readFileSync(new URL('../journal/record-service.js', import.meta.url), 'utf8');
+assert.match(recordServiceSource, /checkTimeAvailability/);
+assert.doesNotMatch(recordServiceSource, /getDays|getDayTime|getWorkplaces|getJournalBreaks|rangesOverlap|containsRange/);
+assert.doesNotMatch(recordDataSource, /checkTimeAvailability|getDays|getDayTime|getWorkplaces|getJournalBreaks|rangesOverlap|containsRange/);
 
 const daySource = readFileSync(new URL('../core/day.js', import.meta.url), 'utf8');
 assert.match(daySource, /releaseWorkingTimeSoftUsages/);

@@ -4,7 +4,7 @@ import { getWorkplaces } from '../core/workplace-time.js';
 import { getActiveDayWorkplaces, getAvailableDayWorkplaces } from '../core/day-workplaces.js';
 import { recordPlanTotal } from '../core/financial-model.js';
 import { openTimetableDayEditor } from '../timetable/day-editor.js';
-import { getActiveRecordCountForDay, getRecordsForDay } from './record-data.js';
+import { getActiveRecordCountForDay, getRecordsForDay } from './record-read.js';
 import { openJournalWorkplaceControl } from './workplace-control.js';
 import { renderJournalDay } from './день.js';
 import { renderJournalMonth } from './месяц.js';
