@@ -49,6 +49,11 @@ assert.match(workplaceSource, /title\s*=\s*''/);
 assert.match(workplaceSource, /subtitle\s*=\s*''/);
 assert.match(workplaceSource, /openHeaderControl\(content,\s*\{\s*title:\s*visibleTitle\s*\|\|\s*visibleSubtitle\s*\}\)/);
 
+const dayControlSource = readFileSync(new URL('../ui/workplaces/day-control.js', import.meta.url), 'utf8');
+assert.match(dayControlSource, /data-day-workplace-time-add/);
+assert.match(dayControlSource, /\+ Добавить рабочее пространство/);
+assert.match(dayControlSource, /openCatalog\(\{ workplaces: available, title: catalogTitle, onSelect: onAdd \}\)/);
+
 const graphSource = readFileSync(new URL('../timetable/timetable.js', import.meta.url), 'utf8');
 assert.match(graphSource, /openWorkplaceControl/);
 assert.match(graphSource, /title:\s*'Рабочий график'/);
@@ -59,13 +64,29 @@ assert.match(graphSource, /getWorkingTimeUsageConflicts/);
 assert.match(graphSource, /actionsRoot\.hidden\s*=\s*allMode/);
 assert.match(graphSource, /Пересечение с/);
 assert.match(graphSource, /Запись \$\{conflict\.from\}–\$\{conflict\.to\} выходит за рабочее время/);
+assert.match(graphSource, /data-aggregate-day-add/);
+assert.match(graphSource, /openDayWorkplaceControl/);
+assert.match(graphSource, /Добавить рабочее пространство/);
+assert.match(graphSource, /createDay\(\{ date, workplaceId: value\.workplaceId/);
 assert.doesNotMatch(graphSource, /journal\/record-data\.js/);
 assert.doesNotMatch(graphSource, /canCorrectTime|onSaveTime/);
 
 const journalSource = readFileSync(new URL('../journal/journal.js', import.meta.url), 'utf8');
 assert.match(journalSource, /openJournalWorkplaceControl/);
+assert.match(journalSource, /onWorkplaceFieldClick:\s*openDayTime/);
+assert.match(journalSource, /available,\s*\n\s*catalogTitle:\s*'Добавить рабочее пространство'/);
 assert.doesNotMatch(journalSource, /openWorkplaceControl/);
 assert.doesNotMatch(journalSource, /canCorrectTime|onSaveTime|updateDayTime|hasScheduleConflict/);
+
+const journalDaySource = readFileSync(new URL('../journal/день.js', import.meta.url), 'utf8');
+assert.match(journalDaySource, /onWorkplaceFieldClick\s*=\s*\(\)\s*=>\s*\{\}/);
+assert.match(journalDaySource, /onWorkFieldClick:/);
+
+const journalTimelineSource = readFileSync(new URL('../ui/time/journal-day.js', import.meta.url), 'utf8');
+assert.match(journalTimelineSource, /usageMarkup\(usage,\s*\{ interactive:\s*false \}\)/);
+assert.match(journalTimelineSource, /data-journal-work-field/);
+assert.match(journalTimelineSource, /onWorkFieldClick\s*=\s*\(\)\s*=>\s*\{\}/);
+assert.match(journalTimelineSource, /aria-disabled="true"/);
 
 const journalControlSource = readFileSync(new URL('../journal/workplace-control.js', import.meta.url), 'utf8');
 assert.match(journalControlSource, /export function openJournalWorkplaceControl/);
