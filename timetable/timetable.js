@@ -15,6 +15,7 @@ function formatDuration(totalMinutes) {
   if (!hours) return `${minutes} м`;
   return `${hours} ч ${minutes} м`;
 }
+function occupiedLabel(item) { return item?.type === 'break' ? 'Перерыв' : 'Запись'; }
 
 export function renderTimetable(root) {
   const workplaces = getWorkplaces();
@@ -174,18 +175,18 @@ export function renderTimetable(root) {
     const blocked = (Array.isArray(entries) ? entries : []).filter((entry) => Array.isArray(entry?.conflicts) && entry.conflicts.length);
     if (!blocked.length) return;
     const workplace = workplaces.find((item) => String(item?.key || '') === String(selectedWorkplaceId || '')) || null;
-    const workplaceName = workplace?.name || 'Рабочее место';
+    const workplaceName = workplace?.name || 'Рабочее пространство';
     const multiple = blocked.length > 1;
     const title = multiple ? 'Не все дни можно сделать выходными' : 'День нельзя сделать выходным';
     const description = multiple
-      ? `${workplaceName}: на этих датах есть записи. Рабочие дни сохранены.`
-      : `${workplaceName}: на этой дате есть запись. Рабочий день сохранён.`;
+      ? `${workplaceName}: на этих датах есть занятое время. Рабочие дни сохранены.`
+      : `${workplaceName}: на этой дате есть занятое время. Рабочий день сохранён.`;
     const rows = blocked.map((entry) => {
-      const times = entry.conflicts
-        .filter((conflict) => conflict?.type === 'record' && conflict?.from && conflict?.to)
-        .map((conflict) => `${conflict.from}–${conflict.to}`)
+      const details = entry.conflicts
+        .filter((conflict) => conflict?.from && conflict?.to)
+        .map((conflict) => `${occupiedLabel(conflict)} ${conflict.from}–${conflict.to}`)
         .join(', ');
-      return `<div><span>${escapeHtml(formatDateLabel(entry.date))}</span><strong>${escapeHtml(times ? `Запись ${times}` : 'Есть запись')}</strong></div>`;
+      return `<div><span>${escapeHtml(formatDateLabel(entry.date))}</span><strong>${escapeHtml(details || 'Есть занятое время')}</strong></div>`;
     }).join('');
     const content = `<div class="modal-title"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(description)}</p></div><div class="entity-details">${rows}</div>${button('Понятно', { data: 'data-removal-blocked-close' })}`;
     const m = mountModal(document.body, modal(content, { title, variant: 'compact' }));
