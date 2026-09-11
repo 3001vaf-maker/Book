@@ -1,6 +1,7 @@
 import { actionBlock, button, pageHeader, initCalendar, initMultiSelect, modal, mountModal, timePicker, initTimePickers, escapeHtml, headerControl, workplaceContent, openWorkplaceControl, ALL_WORKPLACES_ID, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js';
 import { getWorkplaces, resolveWorkplaceTime, getWorkingDayIndicators, getWorkingDayTotalMinutes, getWorkplaceMonthStats, getAllWorkplacesMonthStats, getWorkplaceMonthStatsMap } from '../core/workplace-time.js';
 import { getDays, saveDays, getDay, getDayTime, createDay, updateDayTime, removeDay, getDayRemovalConflicts, getScheduleConflicts, hasScheduleConflict, findSuggestedInterval } from '../core/day/index.js';
+import { isValidRange } from '../core/time/index.js';
 import { openTimetableDayEditor } from './day-editor.js';
 
 function datesForWorkplace(days, workplaceId) { return days.filter((item) => item?.workplaceId === workplaceId).map((item) => item.date).filter(Boolean); }
@@ -171,6 +172,46 @@ export function renderTimetable(root) {
     });
   }
 
+  function applyWorkingDays(dates, base) {
+    const candidates = dates.filter((date) => !getDay(workingDays, selectedWorkplaceId, date));
+    const conflictEntries = candidates.map((date) => buildConflictEntry(date, base)).filter(Boolean);
+    const conflictDates = new Set(conflictEntries.map((entry) => entry.date));
+    const freeDates = candidates.filter((date) => !conflictDates.has(date));
+    for (const date of freeDates) {
+      const day = createDay({ date, workplaceId: selectedWorkplaceId, from: base.from, to: base.to });
+      if (day) workingDays.push(day);
+    }
+    if (freeDates.length) saveDays(workingDays);
+    if (conflictEntries.length) {
+      const month = calendar?.getDisplayedMonth() || initialMonth;
+      if (freeDates.length) { startSelectionSession(month); renderHeader(month); }
+      openWorkingDaysConflictModal(conflictEntries, base);
+      return;
+    }
+    saveDays(workingDays);
+    const month = calendar?.getDisplayedMonth() || initialMonth;
+    startSelectionSession(month); renderHeader(month);
+  }
+
+  function openWorkingTimePicker(dates) {
+    const content = `<div class="modal-title"><h2>Рабочее время</h2><p>У этого рабочего места время не задано. Выберите интервал для отмеченных дат. Постоянное расписание рабочего места не изменится.</p></div><div class="compact-form">${timePicker({ name: 'timetableWorkingFrom', label: 'Начало', value: '00:00' })}${timePicker({ name: 'timetableWorkingTo', label: 'Окончание', value: '00:00' })}<div class="form-error" data-timetable-working-time-error></div>${button('Применить', { data: 'data-timetable-working-time-save' })}</div>`;
+    const m = mountModal(document.body, modal(content, { title: 'Рабочее время', variant: 'compact' }));
+    if (!m) return;
+    initTimePickers(m);
+    m.querySelector('[data-timetable-working-time-save]')?.addEventListener('click', () => {
+      const from = m.querySelector('[name="timetableWorkingFrom"]')?.value || '';
+      const to = m.querySelector('[name="timetableWorkingTo"]')?.value || '';
+      const error = m.querySelector('[data-timetable-working-time-error]');
+      if (!isValidRange(from, to)) {
+        if (error) error.textContent = 'Окончание должно быть позже начала.';
+        return;
+      }
+      if (error) error.textContent = '';
+      m.remove();
+      applyWorkingDays(dates, { from, to });
+    });
+  }
+
   function openRemovalBlockedModal(entries = []) {
     const blocked = (Array.isArray(entries) ? entries : []).filter((entry) => Array.isArray(entry?.conflicts) && entry.conflicts.length);
     if (!blocked.length) return;
@@ -223,29 +264,21 @@ export function renderTimetable(root) {
     if (isAllMode()) return;
     const dates = selection?.getSelectedDates?.() || []; if (!dates.length || !selectionMode) return;
     const makeWorking = selectionMode === 'make-working';
-    const blockedRemoval = [];
     if (makeWorking) {
-      const base = resolveWorkplaceTime(workplaces, selectedWorkplaceId); if (!base) return;
-      const candidates = dates.filter((date) => !getDay(workingDays, selectedWorkplaceId, date));
-      const conflictEntries = candidates.map((date) => buildConflictEntry(date, base)).filter(Boolean);
-      const conflictDates = new Set(conflictEntries.map((entry) => entry.date));
-      const freeDates = candidates.filter((date) => !conflictDates.has(date));
-      for (const date of freeDates) {
-        const day = createDay({ date, workplaceId: selectedWorkplaceId, from: base.from, to: base.to }); if (day) workingDays.push(day);
-      }
-      if (freeDates.length) saveDays(workingDays);
-      if (conflictEntries.length) {
-        const month = calendar?.getDisplayedMonth() || initialMonth;
-        if (freeDates.length) { startSelectionSession(month); renderHeader(month); }
-        openWorkingDaysConflictModal(conflictEntries, base);
+      const base = resolveWorkplaceTime(workplaces, selectedWorkplaceId);
+      if (!base) {
+        openWorkingTimePicker(dates);
         return;
       }
-    } else {
-      for (const date of dates) {
-        if (removeDay(workingDays, selectedWorkplaceId, date)) continue;
-        const conflicts = getDayRemovalConflicts(selectedWorkplaceId, date);
-        if (conflicts.length) blockedRemoval.push({ date, conflicts });
-      }
+      applyWorkingDays(dates, base);
+      return;
+    }
+
+    const blockedRemoval = [];
+    for (const date of dates) {
+      if (removeDay(workingDays, selectedWorkplaceId, date)) continue;
+      const conflicts = getDayRemovalConflicts(selectedWorkplaceId, date);
+      if (conflicts.length) blockedRemoval.push({ date, conflicts });
     }
     saveDays(workingDays); const month = calendar.getDisplayedMonth(); startSelectionSession(month); renderHeader(month);
     if (blockedRemoval.length) openRemovalBlockedModal(blockedRemoval);

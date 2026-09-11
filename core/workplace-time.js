@@ -1,4 +1,4 @@
-import { createTimeRange, minutesBetween } from './time/index.js';
+import { createTimeRange, isValidRange, minutesBetween } from './time/index.js';
 import { getDay, getDayTime, getDays, getDaysForDate, hasScheduleConflict } from './day/index.js';
 
 const WORKPLACE_FALLBACK_COLOR = '#212529';
@@ -108,7 +108,7 @@ export function getWorkingDayTotalMinutes(workingDays, workplaces, date) {
 
 export function resolveWorkplaceTime(workplaces, workplaceId) {
   const workplace = getWorkplace(workplaces, workplaceId);
-  if (!workplace?.from || !workplace?.to) return null;
+  if (!workplace?.from || !workplace?.to || !isValidRange(workplace.from, workplace.to)) return null;
   return createTimeRange(workplace.from, workplace.to);
 }
 
