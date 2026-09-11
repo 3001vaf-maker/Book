@@ -55,7 +55,8 @@ function renderPublicBooking(route) {
   workspaceReady = false;
   disposeView();
   disposeView = () => {};
-  app.innerHTML = '<main class="app-content" id="app-content"></main>';
+  app.classList.add('app-shell--booking');
+  app.innerHTML = '<main class="booking-content" id="app-content"></main>';
   void renderOnlineBooking(document.querySelector('#app-content'), route);
   syncViewport();
 }
@@ -74,6 +75,7 @@ function navigate(section) {
 }
 
 function renderWorkspace() {
+  app.classList.remove('app-shell--booking');
   workspaceReady = true;
   disposeView();
   disposeView = () => {};
@@ -88,6 +90,7 @@ function renderWorkspace() {
 }
 
 function renderMigrationPending() {
+  app.classList.remove('app-shell--booking');
   workspaceReady = false;
   disposeView();
   disposeView = () => {};
@@ -134,6 +137,7 @@ async function renderAuthenticated(account = authenticatedAccount) {
 }
 
 function renderLogin(message = '') {
+  app.classList.remove('app-shell--booking');
   workspaceReady = false;
   disposeView();
   disposeView = () => {};

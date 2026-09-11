@@ -10,29 +10,33 @@ import {
   registerBookingAccount,
   updateBookingAccount,
 } from '../core/booking-account/index.js';
+import { normalizeBookingSettings } from '../core/booking-settings/index.js';
 import { formatPhone } from '../core/phone/index.js';
 import {
-  actionBlock,
-  agreementBlock,
-  button,
-  details,
-  durationText,
+  accordion,
+  bookingAccountHeader,
+  bookingAction,
+  bookingActions,
+  bookingAgreementCards,
+  bookingChoiceCards,
+  bookingDocument,
+  bookingHeading,
+  bookingHistoryCards,
+  bookingPersonalDataButton,
+  bookingScreen,
+  bookingTimeGroups,
   emptyState,
   entityCard,
   escapeHtml,
   field,
+  initAccordions,
   initCalendar,
-  initMultiSelect,
-  list,
   modal,
   mountModal,
-  page,
-  pageHeader,
   phoneField,
-  timeSlots,
+  select,
 } from '../ui/ui.js';
 import {
-  bookingDuration,
   bookingProcedureCost,
   bookingSelection,
   getBookingProcedures,
@@ -54,20 +58,31 @@ function formatDate(value) {
 }
 
 function money(value) {
-  if (value === '' || value == null) return '';
+  if (value === '' || value == null) return '0 ₽';
   const number = Number(String(value).replace(',', '.'));
   return Number.isFinite(number) ? `${number.toLocaleString('ru-RU').replaceAll('\u00a0', ' ')} ₽` : `${value} ₽`;
 }
 
-function selectedTotal(context, workplaceKey, ids) {
-  return bookingSelection(context, workplaceKey, ids).reduce((sum, procedure) => {
-    const value = Number(String(bookingProcedureCost(procedure, workplaceKey)).replace(',', '.'));
-    return Number.isFinite(value) ? sum + value : sum;
-  }, 0);
+function numericCost(value) {
+  const number = Number(String(value ?? '').replace(',', '.'));
+  return Number.isFinite(number) ? Math.max(0, number) : 0;
+}
+
+function selectedSubtotal(context, workplaceKey, ids) {
+  return bookingSelection(context, workplaceKey, ids).reduce((sum, procedure) => sum + numericCost(bookingProcedureCost(procedure, workplaceKey)), 0);
 }
 
 function accountName(account = {}) {
   return [account.name, account.surname].filter(Boolean).join(' ') || 'Аккаунт';
+}
+
+function accountDiscount(account = {}) {
+  const value = Number(account?.discountPercent || 0);
+  return Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
+}
+
+function discountedTotal(subtotal, discountPercent) {
+  return Math.max(0, Number(subtotal || 0) * (1 - Number(discountPercent || 0) / 100));
 }
 
 function errorBlock(message = '') {
@@ -92,8 +107,7 @@ function seedConsents(state, facts = []) {
 }
 
 function resetBookingChoice(state) {
-  if (!state.lockedWorkplaceKey) state.workplaceKey = '';
-  else state.workplaceKey = state.lockedWorkplaceKey;
+  state.workplaceKey = state.lockedWorkplaceKey || '';
   state.procedureIds = [];
   state.date = '';
   state.from = '';
@@ -101,8 +115,8 @@ function resetBookingChoice(state) {
   state.error = '';
 }
 
-function renderPage(root, blocks = []) {
-  root.innerHTML = page(blocks);
+function renderPage(root, state, blocks = [], { mode = 'center', className = '' } = {}) {
+  root.innerHTML = bookingScreen(blocks, { settings: state.settings, mode, className });
 }
 
 function nextAfterAgreements(root, state) {
@@ -118,15 +132,20 @@ function nextAfterAgreements(root, state) {
 function openDocument(state, documentId) {
   const document = requiredBookingDocuments(state.context).find((item) => String(item.id) === String(documentId));
   if (!document) return;
-  mountModal(document.body, modal(`${pageHeader(document.title || 'Документ', `Версия ${document.version || 1}`)}${details([{ label: 'Текст', value: document.text || 'Текст документа не заполнен.' }])}`, { variant: 'large' }));
+  mountModal(document.body, modal(bookingDocument({
+    title: document.title || 'Документ',
+    version: document.version || 1,
+    text: document.text || '',
+  }), { variant: 'large' }));
 }
 
 function renderWelcome(root, state) {
   const profile = state.context.profile || {};
   const owner = [profile.name, profile.surname].filter(Boolean).join(' ');
-  renderPage(root, [
-    pageHeader('Добро пожаловать', owner ? `Онлайн-запись · ${owner}` : 'Онлайн-запись'),
-    actionBlock(`${button('Далее', { data: 'data-booking-welcome-next' })}${button('Войти', { variant: 'secondary', data: 'data-booking-login-open' })}`),
+  const subtitle = [state.settings.welcomeText, owner ? owner : ''].filter(Boolean).join('\n');
+  renderPage(root, state, [
+    bookingHeading(state.settings.welcomeTitle, subtitle),
+    bookingActions(`${bookingAction('Далее', { data: 'data-booking-welcome-next' })}${bookingAction('Войти', { secondary: true, data: 'data-booking-login-open' })}`),
   ]);
   root.querySelector('[data-booking-welcome-next]')?.addEventListener('click', () => renderAgreements(root, state));
   root.querySelector('[data-booking-login-open]')?.addEventListener('click', () => renderLogin(root, state));
@@ -134,9 +153,9 @@ function renderWelcome(root, state) {
 
 function renderLogin(root, state) {
   const email = state.loginEmail || getRememberedBookingEmail(state.tenantId) || '';
-  renderPage(root, [
-    pageHeader('Вход', 'Войдите в свой аккаунт'),
-    `<form data-booking-login-form>${field({ label: 'Email', name: 'email', value: email, type: 'email', required: true, autocomplete: 'username' })}${field({ label: 'Пароль', name: 'password', type: 'password', required: true, autocomplete: 'current-password' })}${errorBlock(state.error)}${actionBlock(`${button('Войти', { type: 'submit' })}${button('Показать пароль', { variant: 'secondary', data: 'data-booking-password-toggle' })}${button('Назад', { variant: 'secondary', data: 'data-booking-login-back' })}`)}</form>`,
+  renderPage(root, state, [
+    bookingHeading('Вход', 'Войдите в свой аккаунт'),
+    `<form data-booking-login-form>${field({ label: 'Email', name: 'email', value: email, type: 'email', required: true, autocomplete: 'username' })}${field({ label: 'Пароль', name: 'password', type: 'password', required: true, autocomplete: 'current-password' })}${errorBlock(state.error)}${bookingActions(`${bookingAction('Войти', { type: 'submit' })}${bookingAction('Показать пароль', { secondary: true, data: 'data-booking-password-toggle' })}${bookingAction('Назад', { secondary: true, data: 'data-booking-login-back' })}`)}</form>`,
   ]);
   const form = root.querySelector('[data-booking-login-form]');
   root.querySelector('[data-booking-password-toggle]')?.addEventListener('click', () => {
@@ -170,7 +189,7 @@ function renderLogin(root, state) {
 function renderAgreements(root, state) {
   const documents = requiredBookingDocuments(state.context);
   const canContinue = documents.filter((document) => document.required).every((document) => state.consents[String(document.id || '')]);
-  const rows = agreementBlock(documents.map((document) => ({
+  const cards = bookingAgreementCards(documents.map((document) => ({
     label: document.title || 'Документ',
     checked: Boolean(state.consents[String(document.id || '')]),
     openData: `data-booking-document="${escapeHtml(document.id)}"`,
@@ -178,12 +197,11 @@ function renderAgreements(root, state) {
     openAria: `Открыть документ ${document.title || ''}`,
     toggleAria: `${state.consents[String(document.id || '')] ? 'Снять' : 'Дать'} согласие: ${document.title || ''}`,
   })));
-  const next = button('Далее', { data: `data-booking-agreements-next${canContinue ? '' : ' disabled'}` });
-  renderPage(root, [
-    pageHeader('Соглашения', 'Откройте документ, ознакомьтесь и отметьте согласие'),
-    documents.length ? rows : emptyState('Документов нет', 'Для онлайн-записи не настроены документы согласия.'),
+  renderPage(root, state, [
+    bookingHeading('Соглашения', 'Откройте документ, ознакомьтесь и отметьте согласие'),
+    documents.length ? cards : emptyState('Документов нет', 'Для онлайн-записи не настроены документы согласия.'),
     errorBlock(state.error),
-    actionBlock(next),
+    bookingActions(bookingAction('Далее', { data: 'data-booking-agreements-next', disabled: !canContinue })),
   ]);
   root.querySelectorAll('[data-booking-document]').forEach((node) => node.addEventListener('click', () => openDocument(state, node.dataset.bookingDocument)));
   root.querySelectorAll('[data-booking-consent]').forEach((node) => node.addEventListener('click', () => {
@@ -199,18 +217,15 @@ function renderAgreements(root, state) {
 
 function renderWorkplaces(root, state) {
   const workplaces = Array.isArray(state.context.workplaces) ? state.context.workplaces : [];
-  const content = list({
-    items: workplaces.map((workplace) => ({
-      title: workplace.name || 'Рабочее пространство',
-      secondary: [workplace.city || '', workplace.address || ''],
-      indicatorColor: workplace.color || '',
-      interactive: true,
-      data: `data-booking-workplace="${escapeHtml(workplace.key)}"`,
-      aria: `Выбрать рабочее пространство ${workplace.name || ''}`,
-    })),
-  });
-  renderPage(root, [
-    pageHeader('Рабочее пространство', 'Выберите, где хотите записаться'),
+  const content = bookingChoiceCards(workplaces.map((workplace) => ({
+    title: workplace.name || 'Рабочее пространство',
+    secondary: [workplace.city || '', workplace.address || ''].filter(Boolean),
+    image: workplace.photo || '',
+    data: `data-booking-workplace="${escapeHtml(workplace.key)}"`,
+    aria: `Выбрать рабочее пространство ${workplace.name || ''}`,
+  })));
+  renderPage(root, state, [
+    bookingHeading('Рабочее пространство', 'Выберите, где хотите записаться'),
     content || emptyState('Нет доступных пространств', 'Рабочие пространства для онлайн-записи не найдены.'),
   ]);
   root.querySelectorAll('[data-booking-workplace]').forEach((node) => node.addEventListener('click', () => {
@@ -225,37 +240,31 @@ function renderWorkplaces(root, state) {
 function renderProcedures(root, state) {
   const procedures = getBookingProcedures(state.context, state.workplaceKey);
   const selected = new Set(state.procedureIds);
-  const content = list({
-    items: procedures.map((procedure) => {
-      const cost = bookingProcedureCost(procedure, state.workplaceKey);
-      return {
-        title: procedure.name || '',
-        secondary: [durationText(procedure.duration), cost !== '' ? money(cost) : ''],
-        interactive: true,
-        data: `data-booking-procedure="${escapeHtml(procedure.id)}"`,
-        selected: selected.has(String(procedure.id)),
-        aria: `Выбрать процедуру ${procedure.name || ''}`,
-      };
-    }),
-  });
-  const nextDisabled = state.procedureIds.length === 0;
-  renderPage(root, [
-    pageHeader('Процедуры', 'Можно выбрать несколько'),
+  const content = bookingChoiceCards(procedures.map((procedure) => {
+    const cost = bookingProcedureCost(procedure, state.workplaceKey);
+    return {
+      title: procedure.name || '',
+      secondary: [procedure.duration ? `${Number(procedure.duration)} мин` : '', procedure.description || ''].filter(Boolean),
+      right: cost !== '' ? money(cost) : '',
+      image: procedure.photo || '',
+      selected: selected.has(String(procedure.id)),
+      data: `data-booking-procedure="${escapeHtml(procedure.id)}"`,
+      aria: `Выбрать процедуру ${procedure.name || ''}`,
+    };
+  }), { multiple: true });
+  renderPage(root, state, [
+    bookingHeading('Процедуры', 'Выберите всё, что хотите сделать'),
     content || emptyState('Процедур нет', 'Для этого рабочего пространства процедуры не настроены.'),
-    actionBlock(button('Далее', { data: `data-booking-procedures-next${nextDisabled ? ' disabled' : ''}` })),
+    bookingActions(bookingAction('Далее', { data: 'data-booking-procedures-next', disabled: state.procedureIds.length === 0 })),
   ]);
-  const host = root.querySelector('[data-ui-list]');
-  if (host) {
-    initMultiSelect(host, {
-      selectedValues: state.procedureIds,
-      selector: '[data-booking-procedure]',
-      valueAttribute: 'bookingProcedure',
-      onChange: (values) => {
-        state.procedureIds = values.map(String);
-        renderProcedures(root, state);
-      },
-    });
-  }
+  root.querySelectorAll('[data-booking-procedure]').forEach((node) => node.addEventListener('click', () => {
+    const id = String(node.dataset.bookingProcedure || '');
+    const next = new Set(state.procedureIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    state.procedureIds = [...next];
+    renderProcedures(root, state);
+  }));
   root.querySelector('[data-booking-procedures-next]')?.addEventListener('click', () => {
     if (!state.procedureIds.length) return;
     state.date = '';
@@ -268,8 +277,8 @@ function renderDates(root, state) {
   const dates = getBookingWorkingDates(state.context, state.workplaceKey, { fromDate: localDateKey() });
   const first = dates[0] || localDateKey();
   const firstDate = new Date(`${first}T00:00:00`);
-  renderPage(root, [
-    pageHeader('Дата', 'Выберите доступный рабочий день'),
+  renderPage(root, state, [
+    bookingHeading('Дата', 'Выберите удобный день'),
     dates.length ? '<div data-booking-calendar></div>' : emptyState('Свободных дат нет', 'В графике пока нет доступных дат.'),
   ]);
   const calendarRoot = root.querySelector('[data-booking-calendar]');
@@ -291,12 +300,12 @@ function renderTimes(root, state) {
     workplaceKey: state.workplaceKey,
     date: state.date,
     procedureIds: state.procedureIds,
-    step: 15,
+    step: state.settings.slotStep,
   });
-  renderPage(root, [
-    pageHeader('Время', formatDate(state.date)),
+  renderPage(root, state, [
+    bookingHeading('Время', formatDate(state.date)),
     slots.length
-      ? timeSlots({ values: slots.map((slot) => ({ value: slot.from, label: slot.from })), data: 'data-booking-time', ariaLabel: 'Выберите время записи' })
+      ? bookingTimeGroups(slots, { data: 'data-booking-time' })
       : emptyState('Свободного времени нет', 'На эту дату нет интервала для выбранных процедур.'),
     errorBlock(state.error),
   ]);
@@ -313,9 +322,9 @@ function renderTimes(root, state) {
 
 function renderAccountDetails(root, state) {
   const draft = state.accountDraft || {};
-  renderPage(root, [
-    pageHeader('Ваши данные'),
-    `<form data-booking-account-form>${field({ label: 'Имя', name: 'name', value: draft.name || '', required: true, autocomplete: 'given-name' })}${field({ label: 'Фамилия', name: 'surname', value: draft.surname || '', autocomplete: 'family-name' })}${phoneField({ label: 'Телефон', name: 'phone', value: draft.phone || '', required: true })}${field({ label: 'Email', name: 'email', value: draft.email || '', type: 'email', required: true, autocomplete: 'email' })}${errorBlock(state.error)}${actionBlock(button('Далее', { type: 'submit' }))}</form>`,
+  renderPage(root, state, [
+    bookingHeading('Ваши данные', 'Они сохранятся в вашем аккаунте'),
+    `<form data-booking-account-form>${field({ label: 'Имя', name: 'name', value: draft.name || '', required: true, autocomplete: 'given-name' })}${field({ label: 'Фамилия', name: 'surname', value: draft.surname || '', autocomplete: 'family-name' })}${phoneField({ label: 'Телефон', name: 'phone', value: draft.phone || '', required: true })}${field({ label: 'Email', name: 'email', value: draft.email || '', type: 'email', required: true, autocomplete: 'email' })}${errorBlock(state.error)}${bookingActions(bookingAction('Далее', { type: 'submit' }))}</form>`,
   ]);
   const form = root.querySelector('[data-booking-account-form]');
   form?.addEventListener('submit', async (event) => {
@@ -344,9 +353,9 @@ function renderAccountDetails(root, state) {
 
 function renderPassword(root, state) {
   const register = state.passwordMode !== 'login';
-  renderPage(root, [
-    pageHeader(register ? 'Создайте пароль' : 'Введите пароль', state.accountDraft.email || ''),
-    `<form data-booking-password-form>${field({ label: 'Пароль', name: 'password', type: 'password', required: true, autocomplete: register ? 'new-password' : 'current-password' })}${errorBlock(state.error)}${actionBlock(`${button(register ? 'Создать аккаунт' : 'Войти', { type: 'submit' })}${button('Показать пароль', { variant: 'secondary', data: 'data-booking-password-toggle' })}`)}</form>`,
+  renderPage(root, state, [
+    bookingHeading(register ? 'Создайте пароль' : 'Введите пароль', state.accountDraft.email || ''),
+    `<form data-booking-password-form>${field({ label: 'Пароль', name: 'password', type: 'password', required: true, autocomplete: register ? 'new-password' : 'current-password' })}${errorBlock(state.error)}${bookingActions(`${bookingAction(register ? 'Создать аккаунт' : 'Войти', { type: 'submit' })}${bookingAction('Показать пароль', { secondary: true, data: 'data-booking-password-toggle' })}`)}</form>`,
   ]);
   const form = root.querySelector('[data-booking-password-form]');
   root.querySelector('[data-booking-password-toggle]')?.addEventListener('click', () => {
@@ -385,12 +394,13 @@ function renderPassword(root, state) {
   });
 }
 
-function renderConfirmation(root, state) {
+function confirmationCard(state) {
   const workplace = getBookingWorkplace(state.context, state.workplaceKey) || {};
   const procedures = bookingSelection(state.context, state.workplaceKey, state.procedureIds);
-  const duration = bookingDuration(state.context, state.workplaceKey, state.procedureIds);
-  const total = selectedTotal(state.context, state.workplaceKey, state.procedureIds);
-  const card = entityCard({
+  const subtotal = selectedSubtotal(state.context, state.workplaceKey, state.procedureIds);
+  const discount = accountDiscount(state.account);
+  const total = discountedTotal(subtotal, discount);
+  return entityCard({
     title: accountName(state.account),
     subtitle: formatPhone(state.account?.phone || state.accountDraft?.phone || ''),
     topMeta: [{ value: workplace.name || 'Рабочее пространство', row: 1 }],
@@ -398,20 +408,25 @@ function renderConfirmation(root, state) {
       { value: formatDate(state.date), row: 2 },
       { value: `${state.from} - ${state.to}`, row: 3 },
     ],
-    detailRows: [
-      { left: durationText(duration), right: money(total), weight: 'strong' },
-      ...procedures.map((procedure) => ({
-        left: procedure.name || '',
-        right: money(bookingProcedureCost(procedure, state.workplaceKey)),
-      })),
+    meta: [
+      { value: money(subtotal), label: 'Стоимость' },
+      { value: `${discount} %`, label: 'Скидка' },
+      { value: money(total), label: 'Итого' },
     ],
+    detailRows: procedures.map((procedure) => ({
+      left: procedure.name || '',
+      right: money(bookingProcedureCost(procedure, state.workplaceKey)),
+    })),
     className: 'entity-card--hero entity-card--top-dark',
   });
-  renderPage(root, [
-    pageHeader('Подтверждение'),
-    card,
+}
+
+function renderConfirmation(root, state) {
+  renderPage(root, state, [
+    bookingHeading('Подтверждение'),
+    confirmationCard(state),
     errorBlock(state.error),
-    actionBlock(`${button('Подтвердить', { data: 'data-booking-confirm' })}${button('Выбрать другое время', { variant: 'secondary', data: 'data-booking-change-time' })}`),
+    bookingActions(`${bookingAction('Подтвердить', { data: 'data-booking-confirm' })}${bookingAction('Выбрать другое время', { secondary: true, data: 'data-booking-change-time' })}`),
   ]);
   root.querySelector('[data-booking-change-time]')?.addEventListener('click', () => {
     state.error = '';
@@ -444,41 +459,161 @@ function requestStatus(status) {
   return 'Подтверждается';
 }
 
+function requestProcedures(request = {}) {
+  const snapshot = request.recordSnapshot && typeof request.recordSnapshot === 'object' ? request.recordSnapshot : {};
+  return Array.isArray(snapshot.procedures) && snapshot.procedures.length
+    ? snapshot.procedures
+    : Array.isArray(request.procedures) ? request.procedures : [];
+}
+
+function requestPricing(request = {}) {
+  const snapshot = request.recordSnapshot && typeof request.recordSnapshot === 'object' ? request.recordSnapshot : {};
+  const pricing = snapshot.pricing && typeof snapshot.pricing === 'object' ? snapshot.pricing : {};
+  const procedures = requestProcedures(request);
+  const subtotal = Number.isFinite(Number(pricing.subtotal))
+    ? Number(pricing.subtotal)
+    : procedures.reduce((sum, item) => sum + numericCost(item.cost), 0);
+  const discountPercent = Number(pricing.discountPercent || 0);
+  const total = Number.isFinite(Number(pricing.total)) ? Number(pricing.total) : discountedTotal(subtotal, discountPercent);
+  return { subtotal, discountPercent, total };
+}
+
+function requestPayment(request = {}) {
+  const snapshot = request.recordSnapshot && typeof request.recordSnapshot === 'object' ? request.recordSnapshot : {};
+  const payment = snapshot.payment && typeof snapshot.payment === 'object' ? snapshot.payment : {};
+  const pricing = requestPricing(request);
+  return {
+    state: String(payment.state || 'unpaid'),
+    paid: Math.max(0, Number(payment.paid || 0)),
+    due: Math.max(0, Number.isFinite(Number(payment.due)) ? Number(payment.due) : pricing.total),
+  };
+}
+
+function openRequestDetails(state, request) {
+  const workplace = getBookingWorkplace(state.context, request.workplaceKey) || {};
+  const procedures = requestProcedures(request);
+  const pricing = requestPricing(request);
+  const payment = requestPayment(request);
+  const paymentText = payment.state === 'paid'
+    ? 'Оплачено'
+    : payment.state === 'partial'
+      ? `К оплате ${money(payment.due)}`
+      : `К оплате ${money(payment.due)}`;
+  const card = entityCard({
+    title: procedures.map((item) => item.name).filter(Boolean).join(', ') || 'Запись',
+    topMeta: [{ value: workplace.name || 'Рабочее пространство', row: 1 }],
+    topRightMeta: [
+      { value: formatDate(request.date), row: 2 },
+      { value: `${request.from} - ${request.to}`, row: 3 },
+    ],
+    meta: [
+      { value: money(pricing.subtotal), label: 'Стоимость' },
+      { value: `${pricing.discountPercent || 0} %`, label: 'Скидка' },
+      { value: money(pricing.total), label: 'Итого' },
+    ],
+    detailRows: [
+      ...procedures.map((item) => ({ left: item.name || '', right: money(item.cost) })),
+      { left: paymentText, right: payment.state === 'paid' ? money(payment.paid || pricing.total) : '', weight: 'strong' },
+    ],
+    className: 'entity-card--hero entity-card--top-dark',
+  });
+  mountModal(document.body, modal(card, { variant: 'large' }));
+}
+
+function personalDataAccordion(account = {}) {
+  const profileData = account.profileData || {};
+  return accordion([
+    {
+      title: 'Личные данные',
+      value: '',
+      content: `<div class="form-grid">${field({ label: 'Имя', name: 'name', value: account.name || '', required: true })}${field({ label: 'Фамилия', name: 'surname', value: account.surname || '' })}${phoneField({ label: 'Телефон', name: 'phone', value: account.phone || '', required: true })}${field({ label: 'Email', name: 'email', value: account.email || '', type: 'email', readonly: true })}${select({ label: 'Пол', name: 'gender', value: profileData.gender || '', options: [{ value: '', label: 'Не указан' }, { value: 'male', label: 'Мужской' }, { value: 'female', label: 'Женский' }, { value: 'other', label: 'Другой' }] })}${field({ label: 'Дата рождения', name: 'birthDate', value: profileData.birthDate || '', type: 'date' })}</div>`,
+    },
+  ], { openFirst: true });
+}
+
+function openPersonalData(root, state) {
+  const content = `<form data-booking-personal-form>${personalDataAccordion(state.account || {})}${errorBlock(state.personalError)}${bookingActions(bookingAction('Сохранить', { type: 'submit' }))}</form>`;
+  const modalRoot = mountModal(document.body, modal(content, { variant: 'medium' }));
+  if (!modalRoot) return;
+  initAccordions(modalRoot);
+  const form = modalRoot.querySelector('[data-booking-personal-form]');
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const data = new FormData(form);
+    try {
+      state.account = await updateBookingAccount(state.tenantId, {
+        name: data.get('name'),
+        surname: data.get('surname'),
+        phone: data.get('phone'),
+        profileData: {
+          gender: data.get('gender'),
+          birthDate: data.get('birthDate'),
+        },
+      });
+      state.personalError = '';
+      modalRoot.remove();
+      await renderAccountHome(root, state);
+    } catch (error) {
+      state.personalError = error instanceof Error ? error.message : 'Не удалось сохранить данные';
+      const errorNode = modalRoot.querySelector('.form-error');
+      if (errorNode) errorNode.textContent = state.personalError;
+      else form?.insertAdjacentHTML('beforeend', errorBlock(state.personalError));
+    }
+  });
+}
+
+function accountPrograms(account = {}) {
+  const programs = Array.isArray(account.programs) ? account.programs : [];
+  return programs.map((program) => ({
+    left: String(program?.name || program?.title || 'Программа'),
+    right: String(program?.value || program?.balance || ''),
+  }));
+}
+
 async function renderAccountHome(root, state) {
-  renderPage(root, [pageHeader('Ваш аккаунт'), emptyState('Загрузка', 'Получаем ваши записи.')]);
+  renderPage(root, state, [bookingAccountHeader(), emptyState('Загрузка', 'Получаем ваши записи.')], { mode: 'account' });
   let requests = [];
   try {
     requests = await getBookingRequests(state.tenantId);
+    const freshAccount = await getBookingAccount(state.tenantId);
+    if (freshAccount) state.account = freshAccount;
   } catch (error) {
     state.error = error instanceof Error ? error.message : 'Не удалось загрузить записи';
   }
   const account = state.account || {};
+  const discount = accountDiscount(account);
   const card = entityCard({
+    id: account.uei || '',
     title: accountName(account),
     subtitle: formatPhone(account.phone || ''),
-    topMeta: [{ value: account.email || '' }],
-    className: 'entity-card--hero',
+    topMeta: [{ value: account.email || '', row: 1 }],
+    topRightMeta: discount > 0 ? [{ value: `−${discount} %`, row: 1 }] : [],
+    meta: [
+      { value: String(Number(account.visits || 0)), label: 'Посещения' },
+      { value: money(account.totalSpent || 0), label: 'Оплачено' },
+      { value: account.lastVisit ? formatDate(account.lastVisit) : '—', label: 'Последний визит' },
+    ],
+    detailRows: accountPrograms(account),
+    className: 'entity-card--hero entity-card--top-dark',
   });
-  const requestList = list({
-    items: (Array.isArray(requests) ? requests : []).map((request) => {
-      const workplace = getBookingWorkplace(state.context, request.workplaceKey);
-      const procedures = Array.isArray(request.procedures) ? request.procedures.map((item) => item.name).filter(Boolean).join(', ') : '';
-      return {
-        title: procedures || 'Запись',
-        secondary: [`${formatDate(request.date)} · ${request.from}`, workplace?.name || ''],
-        right: requestStatus(request.status),
-        interactive: false,
-      };
-    }),
+  const historyItems = (Array.isArray(requests) ? requests : []).map((request) => {
+    const procedures = requestProcedures(request).map((item) => item.name).filter(Boolean).join(', ');
+    return {
+      title: procedures || 'Запись',
+      secondary: `${formatDate(request.date)} · ${request.from}`,
+      status: requestStatus(request.status),
+      data: `data-booking-history="${escapeHtml(request.id)}"`,
+      aria: `Открыть запись ${procedures || ''} ${formatDate(request.date)}`,
+    };
   });
-  renderPage(root, [
-    pageHeader('Ваш аккаунт'),
+  renderPage(root, state, [
+    bookingAccountHeader(),
     card,
+    bookingPersonalDataButton(),
     state.notice ? `<div class="muted">${escapeHtml(state.notice)}</div>` : '',
-    requestList || emptyState('Записей пока нет', 'Здесь появятся ваши онлайн-записи.'),
+    historyItems.length ? bookingHistoryCards(historyItems) : emptyState('Записей пока нет', 'Здесь появятся ваши онлайн-записи.'),
     errorBlock(state.error),
-    actionBlock(`${button('Записаться', { data: 'data-booking-new' })}${button('Выйти', { variant: 'secondary', data: 'data-booking-logout' })}`),
-  ]);
+  ], { mode: 'account' });
   state.notice = '';
   root.querySelector('[data-booking-new]')?.addEventListener('click', () => {
     resetBookingChoice(state);
@@ -492,10 +627,16 @@ async function renderAccountHome(root, state) {
     state.error = '';
     renderLogin(root, state);
   });
+  root.querySelector('[data-booking-personal-data]')?.addEventListener('click', () => openPersonalData(root, state));
+  root.querySelectorAll('[data-booking-history]').forEach((node) => node.addEventListener('click', () => {
+    const request = requests.find((item) => String(item.id) === String(node.dataset.bookingHistory));
+    if (request) openRequestDetails(state, request);
+  }));
 }
 
 async function refreshContext(state) {
   state.context = await getBookingContext(state.tenantId, state.lockedWorkplaceKey);
+  state.settings = normalizeBookingSettings(state.context.settings);
 }
 
 export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = '', telegramId = '' } = {}) {
@@ -505,6 +646,7 @@ export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = 
     workplaceKey: String(workplaceKey || ''),
     telegramId: String(telegramId || ''),
     context: {},
+    settings: normalizeBookingSettings(),
     procedureIds: [],
     date: '',
     from: '',
@@ -515,13 +657,14 @@ export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = 
     passwordMode: 'register',
     loginEmail: '',
     error: '',
+    personalError: '',
     notice: '',
     lastRequest: null,
   };
 
-  renderPage(root, [pageHeader('Онлайн-запись'), emptyState('Загрузка', 'Получаем доступные данные.')]);
+  renderPage(root, state, [bookingHeading('Онлайн-запись', 'Загрузка…')]);
   if (!state.tenantId) {
-    renderPage(root, [pageHeader('Онлайн-запись'), emptyState('Ссылка недействительна', 'В ссылке отсутствует идентификатор онлайн-записи.')]);
+    renderPage(root, state, [bookingHeading('Онлайн-запись'), emptyState('Ссылка недействительна', 'В ссылке отсутствует идентификатор онлайн-записи.')]);
     return;
   }
 
@@ -542,8 +685,8 @@ export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = 
     }
     renderWelcome(root, state);
   } catch (error) {
-    renderPage(root, [
-      pageHeader('Онлайн-запись'),
+    renderPage(root, state, [
+      bookingHeading('Онлайн-запись'),
       emptyState('Запись недоступна', error instanceof Error ? error.message : 'Не удалось открыть онлайн-запись.'),
     ]);
   }

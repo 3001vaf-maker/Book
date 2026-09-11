@@ -31,6 +31,15 @@ function dateValue(value: unknown) {
   return /^\d{4}-\d{2}-\d{2}$/.test(result) ? result : '';
 }
 
+function numeric(value: unknown, fallback = 0) {
+  const result = Number(value);
+  return Number.isFinite(result) ? result : fallback;
+}
+
+function percent(value: unknown) {
+  return Math.max(0, Math.min(100, numeric(value, 0)));
+}
+
 function timeToMinutes(value: unknown) {
   const match = text(value).match(/^(\d{1,2}):(\d{2})$/);
   if (!match) return null;
@@ -92,6 +101,14 @@ function normalizeConsents(value: unknown) {
   })).filter((item) => item.documentId);
 }
 
+function normalizeProfileData(value: unknown) {
+  const source = objectValue(value);
+  return {
+    gender: text(source.gender).slice(0, 32),
+    birthDate: dateValue(source.birthDate),
+  };
+}
+
 function publicAccount(account: any) {
   return {
     id: account.id,
@@ -101,7 +118,26 @@ function publicAccount(account: any) {
     phone: account.phone,
     telegramId: account.telegramId || '',
     consents: arrayValue(account.consents),
+    profileData: normalizeProfileData(account.profileData),
+    uei: text(account.uei),
+    discountPercent: percent(account.discountPercent),
+    visits: Math.max(0, Math.floor(numeric(account.visits, 0))),
+    totalSpent: Math.max(0, numeric(account.totalSpent, 0)),
+    lastVisit: text(account.lastVisit),
+    programs: arrayValue(account.programs),
     createdAt: account.createdAt,
+  };
+}
+
+function initialRequestSnapshot(procedures: any[], account: any) {
+  const subtotal = procedures.reduce((sum, item) => sum + Math.max(0, numeric(item?.cost, 0)), 0);
+  const discountPercent = percent(account?.discountPercent);
+  const total = Math.max(0, subtotal * (1 - discountPercent / 100));
+  return {
+    procedures,
+    pricing: { subtotal, discountPercent, total },
+    payment: { state: 'unpaid', paid: 0, due: total },
+    updatedAt: new Date().toISOString(),
   };
 }
 
@@ -178,6 +214,7 @@ export class OnlineBookingService {
       tenantId,
       revision: publication.revision,
       profile: objectValue(data.profile),
+      settings: objectValue(data.settings),
       workplaces,
       procedures,
       days,
@@ -233,6 +270,7 @@ export class OnlineBookingService {
         phone,
         telegramId: text(body.telegramId),
         consents: consents as Prisma.InputJsonValue,
+        profileData: normalizeProfileData(body.profileData) as Prisma.InputJsonValue,
       },
     });
     return { accessToken: await this.issueAccountToken(account), account: publicAccount(account) };
@@ -272,6 +310,10 @@ export class OnlineBookingService {
 
     const phone = text(body.phone) || account.phone;
     if (!/^\+\d{8,15}$/.test(phone)) throw new BadRequestException('Введите телефон полностью');
+    const profileData = {
+      ...normalizeProfileData(account.profileData),
+      ...normalizeProfileData(body.profileData),
+    };
     const updated = await this.prisma.bookingAccount.update({
       where: { id: account.id },
       data: {
@@ -280,6 +322,7 @@ export class OnlineBookingService {
         phone,
         telegramId: text(body.telegramId) || account.telegramId,
         consents: merged as Prisma.InputJsonValue,
+        profileData: profileData as Prisma.InputJsonValue,
       },
     });
     return publicAccount(updated);
@@ -336,6 +379,7 @@ export class OnlineBookingService {
       duration: Math.max(0, Number(procedure?.duration || 0)),
       cost: procedureCost(procedure, workplaceKey),
     }));
+    const recordSnapshot = initialRequestSnapshot(procedures, account);
     const request = await this.prisma.bookingRequest.create({
       data: {
         tenantId,
@@ -345,16 +389,49 @@ export class OnlineBookingService {
         from,
         to,
         procedures: procedures as Prisma.InputJsonValue,
+        recordSnapshot: recordSnapshot as Prisma.InputJsonValue,
       },
     });
-    return { ...request, procedures };
+    return { ...request, procedures, recordSnapshot };
   }
 
   async getMyRequests(tenantId: string, accountId: string) {
     return this.prisma.bookingRequest.findMany({
       where: { tenantId, accountId, status: { not: BookingRequestStatus.CANCELLED } },
-      orderBy: [{ date: 'asc' }, { from: 'asc' }],
+      orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async ownerAccounts(tenantId: string) {
+    const accounts = await this.prisma.bookingAccount.findMany({
+      where: { tenantId },
+      orderBy: { updatedAt: 'desc' },
+    });
+    return accounts.map(publicAccount);
+  }
+
+  async syncOwnerAccounts(tenantId: string, value: unknown) {
+    const items = arrayValue(value);
+    let updated = 0;
+    for (const item of items) {
+      const accountId = text(item?.accountId ?? item?.id);
+      if (!accountId) continue;
+      const account = await this.prisma.bookingAccount.findFirst({ where: { id: accountId, tenantId } });
+      if (!account) continue;
+      await this.prisma.bookingAccount.update({
+        where: { id: account.id },
+        data: {
+          uei: text(item?.uei),
+          discountPercent: percent(item?.discountPercent),
+          visits: Math.max(0, Math.floor(numeric(item?.visits, 0))),
+          totalSpent: Math.max(0, numeric(item?.totalSpent, 0)),
+          lastVisit: text(item?.lastVisit),
+          programs: arrayValue(item?.programs) as Prisma.InputJsonValue,
+        },
+      });
+      updated += 1;
+    }
+    return { updated };
   }
 
   async pendingRequests(tenantId: string) {
@@ -363,7 +440,7 @@ export class OnlineBookingService {
       orderBy: { createdAt: 'asc' },
       include: {
         account: {
-          select: { id: true, email: true, name: true, surname: true, phone: true, telegramId: true },
+          select: { id: true, email: true, name: true, surname: true, phone: true, telegramId: true, consents: true, profileData: true },
         },
       },
     });
@@ -375,6 +452,17 @@ export class OnlineBookingService {
     return this.prisma.bookingRequest.update({
       where: { id: request.id },
       data: { status: BookingRequestStatus.IMPORTED, importedRecordId: text(recordId) },
+    });
+  }
+
+  async syncRequestSnapshot(tenantId: string, requestId: string, snapshot: unknown) {
+    const request = await this.prisma.bookingRequest.findFirst({ where: { id: requestId, tenantId } });
+    if (!request) throw new NotFoundException('Запрос записи не найден');
+    const normalized = objectValue(snapshot);
+    return this.prisma.bookingRequest.update({
+      where: { id: request.id },
+      data: { recordSnapshot: normalized as Prisma.InputJsonValue },
+      select: { id: true, updatedAt: true },
     });
   }
 
