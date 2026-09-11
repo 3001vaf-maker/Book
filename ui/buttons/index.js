@@ -15,7 +15,7 @@ export function iconButton(label, { className = '', data = '', aria = label } = 
 }
 
 export function sheetIconButton({ data = '', aria = 'Открыть список' } = {}) {
-  return iconButton('▤', { data, aria });
+  return iconButton('▤', { className: 'sheet-icon-button', data, aria });
 }
 
 export function iconButtonGroup(items = []) {
