@@ -1,13 +1,13 @@
 import { button, details, escapeHtml, initPaymentForm, initPaymentMethods, modal, mountModal, paymentForm, paymentMethods, select, shortDate, shortDateTimeParts, shortTime } from '../ui/ui.js';
 import { calculateFinancialPlan } from '../core/financial-model.js';
-import { getActivePaymentForSource, getRefundsForPayment, recordPaymentIncome, recordRefundExpense } from '../core/dds.js';
+import { getActivePaymentForSource, getPaymentStateForSource, getRefundsForPayment, recordPaymentIncome, recordRefundExpense } from '../core/dds.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getAllClients } from '../main/clients/data.js';
 import { clientDisplay } from '../main/clients/presentation.js';
 import { getWallets } from '../settings/wallets/data.js';
 import { getRecords, updateRecord } from './record-data.js';
 
-const money = (value) => `${new Intl.NumberFormat('ru-RU').format(Number(value || 0))} ₽`;
+const money = (value) => `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(Number(value || 0)).replaceAll('\u00a0', ' ')} ₽`;
 
 function clientForRecord(record) {
   const source = record?.client || {};
@@ -19,6 +19,11 @@ function clientForRecord(record) {
 
 function financeForRecord(record) {
   return record?.finance || calculateFinancialPlan(record?.procedures || []);
+}
+
+function paymentStateForRecord(record) {
+  const finance = financeForRecord(record);
+  return getPaymentStateForSource('record', record?.id, Number(finance?.planTotal || 0));
 }
 
 function proceduresFromFinance(record, finance) {
@@ -37,10 +42,12 @@ function saveFinancialCorrection(record, finance) {
 }
 
 function paymentEntryContent(record) {
-  const completed = getActivePaymentForSource('record', record?.id);
-  if (completed) return `<button type="button" class="modal-bottom-action modal-bottom-action--paid" data-record-payment-paid aria-label="Открыть оплату ${completed.total} рублей"><strong>Оплачено</strong><strong>${money(completed.total)}</strong></button>`;
-  const total = Number(financeForRecord(record)?.planTotal || 0);
-  return `<button type="button" class="modal-bottom-action" data-record-payment-open aria-label="Открыть оплату, к оплате ${total} рублей"><span>К оплате</span><strong>${money(total)}</strong></button>`;
+  const state = paymentStateForRecord(record);
+  if (state.fullyPaid) {
+    return `<button type="button" class="modal-bottom-action modal-bottom-action--paid" data-record-payment-paid aria-label="Открыть оплату ${state.paidTotal} рублей"><strong>Оплачено</strong><strong>${money(state.paidTotal)}</strong></button>`;
+  }
+  const partialClass = state.partiallyPaid ? ' modal-bottom-action--partial' : '';
+  return `<button type="button" class="modal-bottom-action${partialClass}" data-record-payment-open aria-label="Открыть оплату, к оплате ${state.remaining} рублей"><span>К оплате</span><strong>${money(state.remaining)}</strong></button>`;
 }
 
 function workplaceName(id) {
@@ -108,8 +115,26 @@ function paymentFactMarkup(payment) {
   ], { variant: 'split' });
 }
 
+function sourcePaymentFactMarkup(state) {
+  const payments = Array.isArray(state?.payments) ? state.payments : [];
+  const latest = state?.latestPayment || payments[payments.length - 1] || null;
+  if (!latest) return '';
+  const when = paymentDateTime(latest);
+  const wallets = [];
+  payments.forEach((payment) => paymentAllocations(payment).forEach((allocation) => {
+    const name = allocation.walletName || 'Кошелёк';
+    if (!wallets.includes(name)) wallets.push(name);
+  }));
+  return details([
+    { left: when.date || '—', right: when.time || '—' },
+    { left: money(state?.paidTotal || 0), right: wallets.join(' + ') || '—' },
+  ], { variant: 'split' });
+}
+
 function openPaymentMethodsModal(payment, paymentModal) {
-  const total = Number(payment?.finance?.planTotal || 0);
+  const state = getPaymentStateForSource('record', payment?.source?.id, Number(payment?.finance?.planTotal || 0));
+  const total = Number(state.remaining || 0);
+  if (total <= 0.009) return;
   const content = `<div class="modal-title"><h2>Способ оплаты</h2></div>${paymentMethods({ wallets: getWallets(), total })}`;
   const methodsModal = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
   if (!methodsModal) return;
@@ -124,14 +149,7 @@ function openPaymentMethodsModal(payment, paymentModal) {
   };
 
   initPaymentMethods(methodsModal.querySelector('[data-payment-methods]'), {
-    onWallet: (wallet) => finish(recordPaymentIncome({
-      source: payment.source,
-      workplace: payment.workplace,
-      client: payment.client,
-      finance: payment.finance,
-      allocations: [{ walletId: wallet.id, walletName: wallet.name, amount: total }],
-    })),
-    onSplit: (allocations) => finish(recordPaymentIncome({
+    onPay: (allocations) => finish(recordPaymentIncome({
       source: payment.source,
       workplace: payment.workplace,
       client: payment.client,
@@ -229,10 +247,11 @@ function openRefundModal(payment) {
 }
 
 function openPaidState(record) {
-  const payment = getActivePaymentForSource('record', record?.id);
-  if (!payment) return;
+  const state = paymentStateForRecord(record);
+  if (!state.fullyPaid || !state.latestPayment) return;
+  const payment = state.latestPayment;
   const refunds = getRefundsForPayment(payment.id);
-  const html = `<div class="modal-title"><h2>Оплачено</h2></div>${paymentFactMarkup(payment)}${refundHistoryMarkup(refunds)}<div class="modal-actions">${button('Возврат оплаты', { variant: 'danger', data: 'data-refund-payment' })}</div>`;
+  const html = `<div class="modal-title"><h2>Оплачено</h2></div>${sourcePaymentFactMarkup(state)}${refundHistoryMarkup(refunds)}<div class="modal-actions">${button('Возврат оплаты', { variant: 'danger', data: 'data-refund-payment' })}</div>`;
   const m = mountModal(document.body, modal(html, { variant: 'medium', surface: 'app' }));
   if (!m) return;
   m.querySelector('[data-refund-payment]')?.addEventListener('click', () => {
