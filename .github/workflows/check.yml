@@ -24,7 +24,9 @@ jobs:
           node-version: 24
       - name: Complete domain handoff
         if: github.event_name == 'pull_request'
-        run: node scripts/finish-domain-handoff.mjs
+        run: |
+          node scripts/finish-domain-handoff.mjs
+          node scripts/fix-client-discount-handoff.mjs
       - name: Commit domain handoff
         if: github.event_name == 'pull_request'
         run: |
