@@ -30,6 +30,7 @@ export const RECORD_EVENT_TYPES = Object.freeze({
   UNCONFIRMED: 'unconfirmed',
   ARRIVED: 'arrived',
   NO_SHOW: 'no-show',
+  ATTENDANCE_CLEARED: 'attendance-cleared',
   CANCELLED: 'cancelled',
 });
 
