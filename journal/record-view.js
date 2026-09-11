@@ -14,8 +14,9 @@ import {
   timeSlots,
 } from '../ui/ui.js';
 import { getRecordPaymentState, recordFinancialItems, repriceFinancialPlan } from '../core/financial-model.js';
+import { listAvailableStartTimes } from '../core/availability.js';
 import { getWorkplaces } from '../core/workplace-time.js';
-import { getDays, getDay, getDayTime } from '../core/day.js';
+import { getDays } from '../core/day.js';
 import { timeToMinutes, minutesToTime } from '../core/time.js';
 import { getAllClients } from '../main/clients/data.js';
 import { clientDisplay } from '../main/clients/presentation.js';
@@ -111,6 +112,13 @@ function productAvailable(product, workplaceId) {
   return !assigned.length || Boolean(workplaceAssignment(product, workplaceId));
 }
 
+function workingDatesForWorkplace(workplaceId) {
+  return getDays()
+    .filter((item) => String(item?.workplaceId || '') === String(workplaceId || '') && item?.date)
+    .map((item) => String(item.date))
+    .sort();
+}
+
 function openWorkplacePicker(state, onSelected) {
   const items = getWorkplaces().map((workplace) => ({
     title: workplace.name || workplace.title || 'Без названия',
@@ -131,15 +139,22 @@ function openWorkplacePicker(state, onSelected) {
 }
 
 function openDatePicker(state, onSelected) {
+  const workingDates = workingDatesForWorkplace(state.workplaceId);
+  if (!workingDates.length) {
+    openNotice({ title: 'Нет рабочего дня', message: 'Для этого рабочего пространства нет доступных рабочих дат.' });
+    return;
+  }
   const value = state.date instanceof Date ? state.date : new Date(`${state.date}T00:00:00`);
   const content = '<div data-record-view-date-calendar></div>';
   const m = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
   if (!m) return;
   const calendarRoot = m.querySelector('[data-record-view-date-calendar]');
   initCalendar(calendarRoot, {
-    month: Number.isNaN(value.getTime()) ? new Date() : value,
+    month: Number.isNaN(value.getTime()) ? new Date(`${workingDates[0]}T00:00:00`) : value,
     selectedValue: dateKey(state.date),
+    workingDates,
     onDateSelect: (key) => {
+      if (!workingDates.includes(String(key || ''))) return;
       const [year, month, day] = String(key || '').split('-').map(Number);
       if (!year || !month || !day) return;
       m.remove();
@@ -149,24 +164,21 @@ function openDatePicker(state, onSelected) {
 }
 
 function openTimePicker(state, record, onSelected) {
-  const day = getDay(getDays(), state.workplaceId, state.date);
-  const workingTime = getDayTime(day, getWorkplaces());
-  if (!workingTime) return;
-  const occupied = getRecords()
-    .filter((item) => item?.status !== 'cancelled'
-      && String(item?.date || '') === String(state.date || '')
-      && String(item?.workplaceId || '') === String(state.workplaceId || '')
-      && String(item?.id || '') !== String(record?.id || ''))
-    .map((item) => ({ from: item.from, to: item.to }));
-  const content = `<div class="record-editor-screen record-editor-screen--time"><div class="modal-title"><h2>Время</h2><p>Выберите новое время записи.</p></div>${timeSlots({ from: workingTime.from, to: workingTime.to, duration: procedureTotalDuration(state.procedures) || 30, occupied, selected: state.from })}</div>`;
+  const duration = procedureTotalDuration(state.procedures) || 30;
+  const values = listAvailableStartTimes({
+    date: dateKey(state.date),
+    workplaceId: state.workplaceId,
+    duration,
+    step: 15,
+    excludeId: record?.id || '',
+  });
+  const content = `<div class="record-editor-screen record-editor-screen--time"><div class="modal-title"><h2>Время</h2><p>Выберите новое время записи.</p></div>${timeSlots({ values, selected: state.from, data: 'data-record-view-time-option', ariaLabel: 'Выбрать время записи' })}</div>`;
   const m = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app', className: 'record-editor-modal' }));
   if (!m) return;
-  m.querySelectorAll('[data-time-slot]').forEach((node) => node.addEventListener('click', () => {
-    const from = node.dataset.timeSlot;
-    if (!from) return;
+  m.querySelectorAll('[data-record-view-time-option]').forEach((node) => node.addEventListener('click', () => {
+    const from = node.dataset.recordViewTimeOption;
     const start = timeToMinutes(from);
-    const duration = procedureTotalDuration(state.procedures) || 30;
-    if (start == null) return;
+    if (!from || start == null) return;
     m.remove();
     onSelected?.({ from, to: minutesToTime(start + duration) });
   }));
@@ -362,6 +374,44 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     render();
   };
 
+  const chooseTimeForDraft = (draft, onSelected) => {
+    openTimePicker(draft, original, ({ from, to }) => onSelected?.({ ...draft, from, to }));
+  };
+
+  const startDateEdit = (draft, onSelected) => {
+    openDatePicker(draft, (date) => {
+      const datedDraft = { ...draft, date };
+      chooseTimeForDraft(datedDraft, (scheduledDraft) => onSelected?.(scheduledDraft));
+    });
+  };
+
+  const startWorkplaceEdit = () => {
+    openWorkplacePicker(state, (workplaceId) => {
+      const workplaceDraft = { ...state, workplaceId };
+      startDateEdit(workplaceDraft, (scheduledDraft) => applyPatch({
+        workplaceId: scheduledDraft.workplaceId,
+        date: scheduledDraft.date,
+        from: scheduledDraft.from,
+        to: scheduledDraft.to,
+      }));
+    });
+  };
+
+  const startRecordDateEdit = () => {
+    startDateEdit({ ...state }, (scheduledDraft) => applyPatch({
+      date: scheduledDraft.date,
+      from: scheduledDraft.from,
+      to: scheduledDraft.to,
+    }));
+  };
+
+  const startRecordTimeEdit = () => {
+    chooseTimeForDraft({ ...state }, (scheduledDraft) => applyPatch({
+      from: scheduledDraft.from,
+      to: scheduledDraft.to,
+    }));
+  };
+
   const applyProcedures = (nextProcedures) => {
     if (isPaid()) return;
     const start = timeToMinutes(state.from);
@@ -511,15 +561,15 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
 
     root.querySelector('[data-record-view-workplace-edit]')?.addEventListener('click', () => {
       if (isPaid()) return;
-      openWorkplacePicker(state, (workplaceId) => applyPatch({ workplaceId }));
+      startWorkplaceEdit();
     });
     root.querySelector('[data-record-view-date-edit]')?.addEventListener('click', () => {
       if (isPaid()) return;
-      openDatePicker(state, (date) => applyPatch({ date }));
+      startRecordDateEdit();
     });
     root.querySelector('[data-record-view-time-edit]')?.addEventListener('click', () => {
       if (isPaid()) return;
-      openTimePicker(state, original, ({ from, to }) => applyPatch({ from, to }));
+      startRecordTimeEdit();
     });
     root.querySelectorAll('[data-record-view-client-profile]').forEach((node) => node.addEventListener('click', () => {
       if (!currentPerson?.key) return;

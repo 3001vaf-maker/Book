@@ -14,14 +14,14 @@ function recordMarkup(usage, { interactive = true } = {}) {
   const statusClass = usage?.paid ? ' journal-record--paid' : usage?.attendance === 'no-show' ? ' journal-record--no-show' : '';
   const content = `<span class="journal-record__head"><strong class="journal-record__identity">${identity}</strong><strong class="journal-record__total">${escape(total)}</strong></span>${phone}${services}`;
   return interactive
-    ? `<button type="button" class="journal-record${statusClass}" data-journal-record="${escape(usage.id)}">${content}</button>`
+    ? `<button type="button" class="journal-record${statusClass}" data-journal-usage="${escape(usage.sourceId || usage.id)}">${content}</button>`
     : `<div class="journal-record${statusClass}" aria-disabled="true">${content}</div>`;
 }
 
 function usageMarkup(usage, { interactive = true } = {}) {
   if (usage?.type === 'record') return recordMarkup(usage, { interactive });
   return interactive
-    ? `<button type="button" class="journal-record journal-record--break" data-journal-break="${escape(usage.id)}"><strong>Перерыв</strong></button>`
+    ? `<button type="button" class="journal-record journal-record--break" data-journal-usage="${escape(usage.sourceId || usage.id)}"><strong>Перерыв</strong></button>`
     : '<div class="journal-record journal-record--break" aria-disabled="true"><strong>Перерыв</strong></div>';
 }
 
@@ -65,7 +65,7 @@ function aggregateTimeline(columns = []) {
       const clippedEnd = Math.min(column.end, usageEnd);
       const usageTop = ((clippedStart - column.start) / fieldDuration) * 100;
       const usageHeight = ((clippedEnd - clippedStart) / fieldDuration) * 100;
-      return `<div class="journal-work-field__usage" style="top:${usageTop}%;height:${usageHeight}%" data-time-usage="${escape(usage.id)}">${usageMarkup(usage, { interactive: false })}</div>`;
+      return `<div class="journal-work-field__usage" style="top:${usageTop}%;height:${usageHeight}%" data-time-usage="${escape(usage.sourceId || usage.id)}">${usageMarkup(usage, { interactive: false })}</div>`;
     }).join('');
     return `<div class="journal-work-column"><div class="journal-work-field${column?.conflict ? ' is-conflict' : ''}" role="button" tabindex="0" aria-label="Изменить рабочее пространство ${escape(column?.name || '')}" style="top:${top}%;height:${height}%" data-journal-work-field="${escape(column?.workplaceId || '')}">${usages}</div></div>`;
   }).join('');
@@ -84,13 +84,17 @@ export function journalDayTimeline({ from = '09:00', to = '18:00', usages = [], 
     const clippedStart = Math.max(start, usageStart), clippedEnd = Math.min(end, usageEnd);
     const top = ((clippedStart - start) / total) * 100;
     const height = ((clippedEnd - clippedStart) / total) * 100;
-    return `<div class="time-timeline__usage" style="top:${top}%;height:${height}%" data-time-usage="${escape(usage.id)}">${usageMarkup(usage)}</div>`;
+    return `<div class="time-timeline__usage" style="top:${top}%;height:${height}%" data-time-usage="${escape(usage.sourceId || usage.id)}">${usageMarkup(usage)}</div>`;
   }).join('');
 
   return `<section class="time-timeline" data-time-timeline data-time-from="${escape(from)}" data-time-to="${escape(to)}" style="--time-total-minutes:${total}">${slotsMarkup(start, end)}<div class="time-timeline__usages">${overlays}</div></section>`;
 }
 
-export function initJournalDayTimeline(root, { onSlotClick = () => {}, onWorkFieldClick = () => {}, usages = [] } = {}) {
+export function initJournalDayTimeline(root, {
+  onSlotClick = () => {},
+  onUsageClick = () => {},
+  onWorkFieldClick = () => {},
+} = {}) {
   if (root.__bookTimeUsageChangeHandler) window.removeEventListener('book:time-usage-changed', root.__bookTimeUsageChangeHandler);
   root.__bookTimeUsageChangeHandler = () => {};
   window.addEventListener('book:time-usage-changed', root.__bookTimeUsageChangeHandler);
@@ -109,20 +113,15 @@ export function initJournalDayTimeline(root, { onSlotClick = () => {}, onWorkFie
   });
 
   root.querySelectorAll('[data-time-slot-from]').forEach((slot) => slot.addEventListener('click', () => {
-    const from = slot.dataset.timeSlotFrom || '';
-    const to = slot.dataset.timeSlotTo || '';
-    const point = timeToMinutes(from);
-    const usage = (Array.isArray(usages) ? usages : []).find((item) => {
-      const start = timeToMinutes(item?.from), end = timeToMinutes(item?.to);
-      return point != null && start != null && end != null && start <= point && point < end;
-    }) || null;
-    onSlotClick({ from, to, usage });
+    onSlotClick({
+      from: slot.dataset.timeSlotFrom || '',
+      to: slot.dataset.timeSlotTo || '',
+    });
   }));
 
-  root.querySelectorAll('[data-journal-record],[data-journal-break]').forEach((node) => node.addEventListener('click', (event) => {
+  root.querySelectorAll('[data-journal-usage]').forEach((node) => node.addEventListener('click', (event) => {
     event.stopPropagation();
-    const usageId = node.dataset.journalRecord || node.dataset.journalBreak || '';
-    const usage = (Array.isArray(usages) ? usages : []).find((item) => String(item?.id) === String(usageId));
-    if (usage) onSlotClick({ from: usage.from, to: usage.to, usage });
+    const usageId = String(node.dataset.journalUsage || '');
+    if (usageId) onUsageClick({ usageId });
   }));
 }

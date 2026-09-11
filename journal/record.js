@@ -1,16 +1,16 @@
 import { button, durationPicker, durationText, entityCard, escapeHtml, iconButton, list, listEntry, stateView, initStateView, initCalendar, mountModal, modal, openNotice, initDurationPickers, initMultiSelect, viewNavigation, initViewNavigation } from '../ui/ui.js';
-import { createRecord, getRecords } from './record-data.js';
-import { getJournalBreaks, createJournalBreak } from './break-data.js';
+import { createRecord } from './record-data.js';
+import { createJournalBreak } from './break-data.js';
 import { getAllClients } from '../main/clients/data.js';
 import { clientDisplay } from '../main/clients/presentation.js';
 import { openClientCreate } from '../main/clients/create.js';
 import { openClientProfile } from '../main/clients/clients.js';
 import { getProcedures } from '../settings/service/procedures/data.js';
 import { openProcedureForm } from '../settings/service/procedures/form.js';
-import { isTimeRangeAvailable, getTimeUsages } from '../core/time-usage.js';
+import { checkTimeAvailability, listAvailableEndTimes, listAvailableStartTimes } from '../core/availability.js';
 import { timeToMinutes, minutesToTime } from '../core/time.js';
 import { getWorkplaces } from '../core/workplace-time.js';
-import { getDays, getDay, getDayTime } from '../core/day.js';
+import { getDays } from '../core/day.js';
 
 const RECORD_MODES = [
   { id: 'record', label: 'Создать запись' },
@@ -26,22 +26,20 @@ function dateKey(date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function scopedUsages(date, workplaceId) {
-  const day = dateKey(date);
-  return getTimeUsages({
-    records: getRecords().filter((item) => item?.date === day && item?.workplaceId === String(workplaceId || '')),
-    breaks: getJournalBreaks().filter((item) => item?.date === day && item?.workplaceId === String(workplaceId || '')),
-  });
-}
-
-function nextFiveMinutes(from) {
+function recordStartTimes({ date, workplaceId, from }) {
   const start = timeToMinutes(from);
   if (start == null) return [];
-  const hourStart = Math.floor(start / 60) * 60;
-  const hourEnd = hourStart + 60;
-  const result = [];
-  for (let value = Math.ceil(start / 5) * 5; value < hourEnd; value += 5) result.push(minutesToTime(value));
-  return result;
+  const hourEnd = Math.floor(start / 60) * 60 + 60;
+  const to = minutesToTime(Math.min(hourEnd, 23 * 60 + 59));
+  if (!to) return [];
+  return listAvailableStartTimes({
+    date: dateKey(date),
+    workplaceId,
+    duration: 5,
+    step: 5,
+    from,
+    to,
+  });
 }
 
 function flowHost(modalRoot) {
@@ -61,12 +59,7 @@ function openRecordTimeNotice(message) {
 
 function renderTimeStep(modalRoot, { date, workplaceId, from, to, onCreated }) {
   let activeMode = 'record';
-  const usages = scopedUsages(date, workplaceId);
-  const values = nextFiveMinutes(from).filter((value) => isTimeRangeAvailable({
-    from: value,
-    to: minutesToTime(timeToMinutes(value) + 5),
-    usages,
-  }));
+  const values = recordStartTimes({ date, workplaceId, from });
   const times = values.map((value) => `<button type="button" class="record-time-option${/:(00|15|30|45)$/.test(value) ? ' is-quarter' : ''}" data-record-time="${value}">${value}</button>`).join('');
   const toggle = viewNavigation({ views: RECORD_MODES, activeView: activeMode, className: 'segment-control--two', ariaLabel: 'Режим записи' });
   const host = renderFlow(modalRoot, `<div class="record-screen record-screen--time">${toggle}<div class="record-time-list">${times || '<div class="muted">Нет свободного времени</div>'}</div></div>`);
@@ -137,8 +130,8 @@ function renderProceduresStep(modalRoot, { date, workplaceId, from, to, onCreate
     actions.querySelector('[data-record-next]')?.addEventListener('click', () => {
       const duration = [...selected.values()].reduce((sum, item) => sum + (Number(item.duration) || 0), 0);
       const end = minutesToTime(timeToMinutes(from) + duration);
-      const usages = scopedUsages(date, workplaceId);
-      if (!isTimeRangeAvailable({ from, to: end, usages })) {
+      const availability = checkTimeAvailability({ date: dateKey(date), workplaceId, from, to: end });
+      if (!availability.ok) {
         openRecordTimeNotice('Запись не может быть создана: выбранным процедурам не хватает свободного времени. Скорректируйте время записи.');
         return;
       }
@@ -354,21 +347,13 @@ function openConfirmationDateModal({ workplaceId, date, onSelected }) {
 }
 
 function availableConfirmationTimes({ date, workplaceId, duration }) {
-  const day = getDay(getDays(), workplaceId, date);
-  const workTime = getDayTime(day, getWorkplaces());
-  if (!workTime) return [];
-  const start = timeToMinutes(workTime.from);
-  const end = timeToMinutes(workTime.to);
-  if (start == null || end == null) return [];
   const appointmentDuration = Math.max(1, Number(duration) || 0);
-  const first = Math.ceil(start / 15) * 15;
-  const result = [];
-  for (let value = first; value + appointmentDuration <= end; value += 15) {
-    const from = minutesToTime(value);
-    const to = minutesToTime(value + appointmentDuration);
-    if (isTimeRangeAvailable({ from, to, usages: scopedUsages(date, workplaceId) })) result.push({ from, to });
-  }
-  return result;
+  return listAvailableStartTimes({
+    date: dateKey(date),
+    workplaceId,
+    duration: appointmentDuration,
+    step: 15,
+  }).map((from) => ({ from, to: minutesToTime(timeToMinutes(from) + appointmentDuration) }));
 }
 
 function openConfirmationTimeModal({ date, workplaceId, from, duration, onSelected }) {
@@ -445,7 +430,12 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
   const calculatedTo = () => minutesToTime(timeToMinutes(currentFrom) + duration());
   const fitsCurrentSlot = (nextDuration = duration()) => {
     const end = minutesToTime(timeToMinutes(currentFrom) + nextDuration);
-    return isTimeRangeAvailable({ from: currentFrom, to: end, usages: scopedUsages(currentDate, currentWorkplaceId) });
+    return checkTimeAvailability({
+      date: currentDate,
+      workplaceId: currentWorkplaceId,
+      from: currentFrom,
+      to: end,
+    }).ok;
   };
 
   const chooseDateAfterWorkplace = (nextWorkplaceId) => {
@@ -597,8 +587,13 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
     }));
 
     host.querySelector('[data-record-confirm]')?.addEventListener('click', () => {
-      const usages = scopedUsages(currentDate, currentWorkplaceId);
-      if (!isTimeRangeAvailable({ from: currentFrom, to: currentTo, usages })) {
+      const availability = checkTimeAvailability({
+        date: currentDate,
+        workplaceId: currentWorkplaceId,
+        from: currentFrom,
+        to: currentTo,
+      });
+      if (!availability.ok) {
         openRecordTimeNotice('Запись не может быть создана: выбранное время уже занято. Скорректируйте время записи.');
         return;
       }
@@ -630,25 +625,12 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
 }
 
 function blockEndValues({ date, workplaceId, from }) {
-  const start = timeToMinutes(from);
-  if (start == null) return [];
-  const day = getDay(getDays(), workplaceId, date);
-  const workTime = getDayTime(day, getWorkplaces());
-  const workEnd = timeToMinutes(workTime?.to);
-  if (workEnd == null || workEnd <= start) return [];
-
-  const usages = scopedUsages(date, workplaceId);
-  const nextUsageStart = usages
-    .map((usage) => timeToMinutes(usage?.from))
-    .filter((value) => value != null && value > start)
-    .reduce((nearest, value) => nearest == null || value < nearest ? value : nearest, null);
-  const limit = Math.min(workEnd, nextUsageStart ?? workEnd);
-  const values = [];
-  for (let value = start + 5; value <= limit; value += 5) {
-    const end = minutesToTime(value);
-    if (isTimeRangeAvailable({ from, to: end, usages })) values.push(end);
-  }
-  return values;
+  return listAvailableEndTimes({
+    date: dateKey(date),
+    workplaceId,
+    from,
+    step: 5,
+  });
 }
 
 function renderBlockEndStep(modalRoot, { date, workplaceId, from, onCreated }) {
@@ -677,18 +659,12 @@ function renderBreakConfirmationStep(modalRoot, { date, workplaceId, from, to, o
   });
   host.innerHTML = `<div class="record-screen record-screen--state-view">${card}<div class="record-modal-actions modal-actions">${button('Подтвердить перерыв', { data: 'data-break-confirm' })}</div></div>`;
   host.querySelector('[data-break-confirm]')?.addEventListener('click', () => {
-    const day = getDay(getDays(), workplaceId, date);
-    const workTime = getDayTime(day, getWorkplaces());
-    const start = timeToMinutes(from);
-    const end = timeToMinutes(to);
-    const workStart = timeToMinutes(workTime?.from);
-    const workEnd = timeToMinutes(workTime?.to);
-    if (start == null || end == null || workStart == null || workEnd == null || start < workStart || end > workEnd || end <= start) {
-      openNotice({ title: 'Перерыв', message: 'Это время находится вне рабочего периода.' });
-      return;
-    }
-    if (!isTimeRangeAvailable({ from, to, usages: scopedUsages(date, workplaceId) })) {
-      openNotice({ title: 'Перерыв', message: 'Это время уже занято.' });
+    const availability = checkTimeAvailability({ date: dateKey(date), workplaceId, from, to });
+    if (!availability.ok) {
+      const message = availability.reason === 'occupied'
+        ? 'Это время уже занято.'
+        : 'Это время находится вне рабочего периода.';
+      openNotice({ title: 'Перерыв', message });
       return;
     }
     if (!createJournalBreak({ workplaceId: String(workplaceId || ''), date: dateKey(date), from: String(from), to: String(to) })) return;
