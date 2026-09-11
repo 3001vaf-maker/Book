@@ -4,9 +4,9 @@ export { getDay, getDayTime, getDays, getDaysForDate } from './read.js';
 export {
   dayDate,
   getDayDraftScheduleConflicts,
-  getScheduleConflictsForDays,
-  hasScheduleConflictForDays,
-  findSuggestedDayInterval,
+  getScheduleConflictsForDays as getScheduleConflicts,
+  hasScheduleConflictForDays as hasScheduleConflict,
+  findSuggestedDayInterval as findSuggestedInterval,
   resolveDayTime,
   totalDayMinutes,
 } from './rules.js';
