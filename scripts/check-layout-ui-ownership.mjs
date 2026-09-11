@@ -22,6 +22,7 @@ const ownerCss = 'ui/layout/layout.css';
 const facade = 'ui/ui.js';
 const graph = 'timetable/timetable.js';
 const html = 'index.html';
+const standard = 'docs/UI_LAYOUT_STANDARD.md';
 
 if (!/export function twoColumnLayout\b/.test(read(ownerJs))) {
   fail(ownerJs, 'twoColumnLayout() must be the canonical two-column layout owner');
@@ -37,6 +38,9 @@ if (!/ui\/layout\/layout\.css/.test(read(html))) {
 }
 if (!/\btwoColumnLayout\s*\(/.test(read(graph))) {
   fail(graph, 'Graph conflict editor must use canonical twoColumnLayout()');
+}
+if (!/## twoColumnLayout\(\)/.test(read(standard)) || !/содержимое колонок компоненту неизвестно/.test(read(standard))) {
+  fail(standard, 'canonical twoColumnLayout() contract must stay documented as content-neutral');
 }
 
 for (const file of [...walk('main'), ...walk('settings'), ...walk('timetable'), ...walk('journal'), ...walk('ui')]) {
