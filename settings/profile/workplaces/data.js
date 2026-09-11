@@ -1,4 +1,5 @@
 import { apiRequest } from '../../../core/auth.js';
+import { normalizePhoneForStorage } from '../../../core/phone/index.js';
 
 const WORKPLACES_KEY = 'book.workplaces';
 const WORKPLACE_FALLBACK_COLOR = '#212529';
@@ -25,7 +26,7 @@ export function normalizeWorkplace(workplace = {}) {
     color: String(workplace.color || ''),
     city: String(workplace.city || ''),
     address: String(workplace.address || ''),
-    phone: String(workplace.phone || ''),
+    phone: normalizePhoneForStorage(workplace.phone),
     currency: String(workplace.currency || 'RUB'),
     from: String(workplace.from || '09:00'),
     to: String(workplace.to || '18:00'),
