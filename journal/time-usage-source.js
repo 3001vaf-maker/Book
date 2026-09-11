@@ -1,13 +1,13 @@
-import { containsRange, isValidRange } from '../core/time.js';
 import { getJournalBreaks, getJournalBreaksForDay, removeJournalBreaksForDay } from './break-data.js';
 import { getRecordsForDay } from './record-data.js';
 
-function journalUsagesForDay(date, workplaceId) {
+export function getJournalTimeUsages({ date, workplaceId } = {}) {
   const day = String(date || '').slice(0, 10);
   const workplace = String(workplaceId || '');
   const records = getRecordsForDay(day, workplace)
     .filter((record) => record?.status !== 'cancelled')
     .map((record) => ({
+      ...record,
       type: 'record',
       rigidity: 'hard',
       sourceId: String(record?.id || ''),
@@ -16,6 +16,7 @@ function journalUsagesForDay(date, workplaceId) {
     }));
   const breaks = getJournalBreaksForDay(getJournalBreaks(), workplace, day)
     .map((item) => ({
+      ...item,
       type: 'break',
       rigidity: 'soft',
       sourceId: String(item?.id || ''),
@@ -25,14 +26,7 @@ function journalUsagesForDay(date, workplaceId) {
   return [...records, ...breaks];
 }
 
-export function getJournalWorkingTimeConflicts({ date, workplaceId, from, to, operation = 'resize' } = {}) {
-  const usages = journalUsagesForDay(date, workplaceId);
-  if (operation === 'remove') return usages.filter((usage) => usage.rigidity === 'hard');
-  if (!isValidRange(from, to)) return [];
-  return usages.filter((usage) => isValidRange(usage.from, usage.to) && !containsRange(from, to, usage.from, usage.to));
-}
-
-export function releaseJournalSoftWorkingTimeUsages({ date, workplaceId, operation = 'remove' } = {}) {
+export function releaseJournalSoftTimeUsages({ date, workplaceId, operation = 'remove' } = {}) {
   if (operation !== 'remove') return 0;
   return removeJournalBreaksForDay(workplaceId, date);
 }
