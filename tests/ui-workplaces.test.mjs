@@ -60,7 +60,6 @@ assert.match(graphSource, /title:\s*'Рабочий график'/);
 assert.match(graphSource, /openTimetableDayEditor/);
 assert.doesNotMatch(graphSource, /function\s+openAggregateDayEditor/);
 assert.match(graphSource, /actionsRoot\.hidden\s*=\s*allMode/);
-assert.match(graphSource, /Пересечение с/);
 assert.doesNotMatch(graphSource, /journal\/record-data\.js/);
 assert.doesNotMatch(graphSource, /canCorrectTime|onSaveTime/);
 
@@ -69,6 +68,7 @@ assert.match(dayEditorSource, /export function openTimetableDayEditor/);
 assert.match(dayEditorSource, /variant:\s*'medium'/);
 assert.match(dayEditorSource, /time-range-fields/);
 assert.match(dayEditorSource, /getWorkingTimeUsageConflicts/);
+assert.match(dayEditorSource, /Пересечение с/);
 assert.match(dayEditorSource, /data-aggregate-day-add/);
 assert.match(dayEditorSource, /openDayWorkplaceControl/);
 assert.match(dayEditorSource, /Добавить рабочее пространство/);
