@@ -1,4 +1,4 @@
-import { actionBlock, button, pageHeader, initCalendar, initMultiSelect, modal, mountModal, timePicker, initTimePickers, escapeHtml, headerControl, workplaceContent, openWorkplaceControl, ALL_WORKPLACES_ID, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js';
+import { actionBlock, button, pageHeader, initCalendar, initMultiSelect, modal, mountModal, timePicker, initTimePickers, twoColumnLayout, escapeHtml, headerControl, workplaceContent, openWorkplaceControl, ALL_WORKPLACES_ID, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js';
 import { getWorkplaces, resolveWorkplaceTime, getWorkingDayIndicators, getWorkingDayTotalMinutes, getWorkplaceMonthStats, getAllWorkplacesMonthStats, getWorkplaceMonthStatsMap } from '../core/workplace-time.js';
 import { getDays, saveDays, getDay, getDayTime, createDay, updateDayTime, removeDay, getDayRemovalConflicts, getScheduleConflicts, hasScheduleConflict, findSuggestedInterval } from '../core/day/index.js';
 import { isValidRange } from '../core/time/index.js';
@@ -142,7 +142,12 @@ export function renderTimetable(root) {
       const occupied = entry.conflicts.map((day) => `<div><span>Занято в другом месте</span><strong>${escapeHtml(conflictWorkplaceLabel(day))} · ${escapeHtml(day.from)}–${escapeHtml(day.to)}</strong></div>`).join('');
       const initialFrom = entry.suggested?.from || base.from;
       const initialTo = entry.suggested?.to || base.to;
-      return `<div class="compact-form" data-timetable-conflict-row="${index}"><div class="entity-details"><div><span>Дата</span><strong>${escapeHtml(formatDateLabel(entry.date))}</strong></div>${occupied}</div><div class="compact-form">${timePicker({ name: `timetableConflictFrom${index}`, label: 'Начало', value: initialFrom })}${timePicker({ name: `timetableConflictTo${index}`, label: 'Окончание', value: initialTo })}</div><div class="form-error" data-timetable-conflict-error="${index}"></div></div>`;
+      const timeFields = twoColumnLayout(
+        timePicker({ name: `timetableConflictFrom${index}`, label: 'Начало', value: initialFrom }),
+        timePicker({ name: `timetableConflictTo${index}`, label: 'Окончание', value: initialTo }),
+        { ariaLabel: 'Интервал рабочего времени' },
+      );
+      return `<div class="compact-form" data-timetable-conflict-row="${index}"><div class="entity-details"><div><span>Дата</span><strong>${escapeHtml(formatDateLabel(entry.date))}</strong></div>${occupied}</div>${timeFields}<div class="form-error" data-timetable-conflict-error="${index}"></div></div>`;
     }).join('');
     const content = `<div class="modal-title"><h2>Конфликт времени</h2><p>На этих датах вы уже работаете в другом месте. Скорректируйте время для выбранного места.</p></div>${rows}${button('Сохранить', { data: 'data-timetable-conflicts-save' })}`;
     const m = mountModal(document.body, modal(content, { title: 'Конфликт времени' })); if (!m) return; initTimePickers(m);

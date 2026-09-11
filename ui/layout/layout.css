@@ -1,0 +1,1 @@
+.two-column-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;align-items:start}.two-column-layout__column{min-width:0}@media(max-width:360px){.two-column-layout{gap:8px}}
