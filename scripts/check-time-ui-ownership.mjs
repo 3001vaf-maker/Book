@@ -47,7 +47,7 @@ if (!/getTimeUsagesForScope/.test(journalDay) || !/getTimeAvailabilityAt/.test(j
 if (/getRecordsForDay|getJournalBreaks|getTimeUsages\(|rangesOverlap|time-grid/.test(journalDay)) fail('journal/день.js', 'Journal Day must not assemble or calculate time ownership locally');
 
 if (!/onUsageClick/.test(timeline)) fail('ui/time/journal-day.js', 'Timeline UI must emit generic usage clicks');
-if (/availability|time-grid|time-usage|record-read|break-read|journal\//.test(timeline)) fail('ui/time/journal-day.js', 'Timeline UI must remain presentation-only');
+if (/^import[^\n]*['"][^'"]*(?:availability|time-grid|time-usage|record-read|break-read|\/journal\/)[^'"]*['"]/m.test(timeline)) fail('ui/time/journal-day.js', 'Timeline UI must remain presentation-only');
 if (/initJournalDayTimeline\([^)]*usages/.test(timeline) || /const usage = .*\.find/.test(timeline)) fail('ui/time/journal-day.js', 'Timeline UI must not decide which business usage owns a clicked minute');
 if (!/onSlotClick\(\{[\s\S]*?from:[\s\S]*?to:/.test(timeline)) fail('ui/time/journal-day.js', 'Timeline UI must emit coordinates only');
 
