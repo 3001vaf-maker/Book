@@ -1,4 +1,4 @@
-import { emptyState, folderList, listEntries, listEntry, pageHeader, shortDateTime } from '../../ui/ui.js';
+import { actionBlock, button, emptyState, folderCard, list, pageHeader, shortDateTime } from '../../ui/ui.js';
 import { getDDSMovements } from '../../core/finance/index.js';
 import { getWalletTotalBalance } from '../../settings/wallets/data.js';
 import { renderWallets } from '../../settings/wallets/wallets.js';
@@ -49,27 +49,47 @@ function operationDetails(item) {
   return details.join(' · ');
 }
 
-function renderMovement(item) {
-  return listEntry({
+function movementListItem(item) {
+  return {
     overline: operationMoment(item),
     title: operationName(item),
-    subtitle: operationDetails(item),
-    rightTop: formatMoney(operationAmount(item), { signed: true }),
-    initial: '₽',
+    secondary: operationDetails(item),
+    right: formatMoney(operationAmount(item), { signed: true }),
     interactive: false,
-  });
+  };
+}
+
+function renderDDS(root) {
+  const movements = [...getDDSMovements()].reverse();
+  const operations = movements.length
+    ? list({ items: movements.map(movementListItem) })
+    : emptyState('Все операции', 'Финансовых операций пока нет.');
+
+  root.innerHTML = `${pageHeader('ДДС', 'Все операции')}${operations}${actionBlock(button('Назад', { variant: 'secondary', data: 'data-finance-dds-back' }))}`;
+  root.querySelector('[data-finance-dds-back]')?.addEventListener('click', () => renderFinance(root));
 }
 
 export function renderFinance(root) {
-  const movements = [...getDDSMovements()].reverse();
   const cashTotal = formatMoney(getWalletTotalBalance());
-  const cashFolder = folderList([{ title: 'Касса', count: cashTotal, data: 'data-finance-cash', aria: `Открыть кассу, ${cashTotal}` }]);
-  const operations = movements.length
-    ? listEntries(movements.map(renderMovement))
-    : emptyState('Все операции', 'Финансовых операций пока нет.');
+  const cashFolder = folderCard({
+    title: 'Касса',
+    icon: '₽',
+    count: cashTotal,
+    variant: 'compact',
+    data: 'data-finance-cash',
+    aria: `Открыть кассу, ${cashTotal}`,
+  });
+  const ddsFolder = folderCard({
+    title: 'ДДС',
+    icon: '▤',
+    variant: 'compact',
+    data: 'data-finance-dds',
+    aria: 'Открыть движение денежных средств',
+  });
 
-  root.innerHTML = `${pageHeader('Финансы', 'Все операции')}${cashFolder}${operations}`;
+  root.innerHTML = `${pageHeader('Финансы')}<div class="ui-folder-grid">${cashFolder}${ddsFolder}</div>`;
   root.querySelector('[data-finance-cash]')?.addEventListener('click', () => renderWallets(root, () => renderFinance(root)));
+  root.querySelector('[data-finance-dds]')?.addEventListener('click', () => renderDDS(root));
 }
 
 export { renderFinance as render };
