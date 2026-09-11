@@ -106,17 +106,30 @@ assert.doesNotMatch(journalControlSource, /Общий график|data-workplac
 const journalTimeUsageSource = readFileSync(new URL('../journal/time-usage-source.js', import.meta.url), 'utf8');
 assert.match(journalTimeUsageSource, /export function getJournalWorkingTimeConflicts/);
 assert.match(journalTimeUsageSource, /type:\s*'record'/);
+assert.match(journalTimeUsageSource, /rigidity:\s*'hard'/);
 assert.match(journalTimeUsageSource, /type:\s*'break'/);
+assert.match(journalTimeUsageSource, /rigidity:\s*'soft'/);
+assert.match(journalTimeUsageSource, /operation\s*===\s*'remove'[^\n]*rigidity\s*===\s*'hard'/);
+assert.match(journalTimeUsageSource, /export function releaseJournalSoftWorkingTimeUsages/);
+assert.match(journalTimeUsageSource, /removeJournalBreaksForDay/);
 assert.match(journalTimeUsageSource, /getRecordsForDay/);
 assert.match(journalTimeUsageSource, /getJournalBreaksForDay/);
 
 const timeUsageSource = readFileSync(new URL('../core/time-usage.js', import.meta.url), 'utf8');
 assert.match(timeUsageSource, /configureWorkingTimeConflictSource/);
 assert.match(timeUsageSource, /getWorkingTimeUsageConflicts/);
+assert.match(timeUsageSource, /configureWorkingTimeSoftReleaseSource/);
+assert.match(timeUsageSource, /releaseWorkingTimeSoftUsages/);
 
 const coreSource = readFileSync(new URL('../core.js', import.meta.url), 'utf8');
 assert.match(coreSource, /configureWorkingTimeConflictSource\(getJournalWorkingTimeConflicts\)/);
+assert.match(coreSource, /configureWorkingTimeSoftReleaseSource\(releaseJournalSoftWorkingTimeUsages\)/);
 assert.doesNotMatch(coreSource, /configureWorkingTimeConflictSource\(getWorkingTimeRecordConflicts\)/);
+
+const daySource = readFileSync(new URL('../core/day.js', import.meta.url), 'utf8');
+assert.match(daySource, /releaseWorkingTimeSoftUsages/);
+assert.match(daySource, /operation:\s*'remove'/);
+assert.doesNotMatch(daySource, /journal\//);
 
 const timeSource = readFileSync(new URL('../ui/time/index.js', import.meta.url), 'utf8');
 assert.match(timeSource, /dispatchEvent\(new Event\('change',\{bubbles:true\}\)\)/);
