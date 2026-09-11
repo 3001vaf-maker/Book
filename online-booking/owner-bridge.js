@@ -2,6 +2,8 @@ import { apiRequest } from '../core/auth.js';
 import { getDays } from '../core/day/index.js';
 import { createRecord, getRecords } from '../core/record/index.js';
 import { getJournalBreaks } from '../journal/break-read.js';
+import { upsertPersonFromBookingAccount } from '../main/clients/data.js';
+import { getLatestClientConsent, recordConsent } from '../settings/documents/consents.js';
 import { getDocuments } from '../settings/documents/data.js';
 import { getProfile } from '../settings/profile/data.js';
 import { getWorkplaces } from '../settings/profile/workplaces/data.js';
@@ -136,18 +138,43 @@ async function markRejected(requestId) {
   await responseJson(response);
 }
 
-function accountSnapshot(request = {}) {
+function persistAccountConsents(person, account = {}) {
+  if (!person?.key) return;
+  for (const fact of Array.isArray(account.consents) ? account.consents : []) {
+    if (!fact?.accepted || !fact?.documentId) continue;
+    const documentId = String(fact.documentId);
+    const version = Math.max(1, Number(fact.documentVersion || 1));
+    const latest = getLatestClientConsent(person.key, documentId);
+    if (latest?.status === 'accepted' && Number(latest.documentVersion || 1) === version) continue;
+    recordConsent({
+      clientId: person.key,
+      documentId,
+      documentVersion: version,
+      status: 'accepted',
+      source: 'online-booking-account',
+      acceptedAt: String(fact.acceptedAt || new Date().toISOString()),
+    });
+  }
+}
+
+function accountPerson(request = {}) {
   const account = request.account || {};
+  const person = upsertPersonFromBookingAccount(account);
+  persistAccountConsents(person, account);
+  return person;
+}
+
+function personSnapshot(person = {}, account = {}) {
   return {
-    key: '',
-    id: '',
-    accountId: String(account.id || request.accountId || ''),
-    name: String(account.name || ''),
-    surname: String(account.surname || ''),
-    phone: String(account.phone || ''),
-    email: String(account.email || ''),
-    telegramId: String(account.telegramId || ''),
-    discountPercent: 0,
+    key: String(person?.key || ''),
+    id: String(person?.id || ''),
+    accountId: String(account?.id || ''),
+    name: String(person?.name || account?.name || ''),
+    surname: String(person?.surname || account?.surname || ''),
+    phone: String(person?.phones?.[0] || account?.phone || ''),
+    email: String(person?.emails?.[0] || account?.email || ''),
+    telegramId: String(account?.telegramId || ''),
+    discountPercent: Number(person?.discountPercent || 0),
   };
 }
 
@@ -160,12 +187,13 @@ async function importRequest(request) {
     return false;
   }
 
+  const person = accountPerson(request);
   const record = createRecord({
     date: request.date,
     workplaceId: request.workplaceKey,
     from: request.from,
     to: request.to,
-    client: accountSnapshot(request),
+    client: personSnapshot(person, request.account || {}),
     procedures: Array.isArray(request.procedures) ? request.procedures : [],
     source: 'online-booking',
     sourceRequestId: requestId,
