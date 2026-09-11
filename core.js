@@ -4,15 +4,16 @@ import { renderTimetable } from './timetable/timetable.js';
 import { renderSettings } from './settings/settings.js';
 import { getWorkplaces as getWorkplaceEntities } from './settings/profile/workplaces/data.js';
 import { initializeProfileWorkplaces } from './settings/profile/migration.js';
-import { getJournalWorkingTimeConflicts } from './journal/time-usage-source.js';
+import { getJournalWorkingTimeConflicts, releaseJournalSoftWorkingTimeUsages } from './journal/time-usage-source.js';
 import { configureWorkplaceSource } from './core/workplace-time.js';
-import { configureWorkingTimeConflictSource } from './core/time-usage.js';
+import { configureWorkingTimeConflictSource, configureWorkingTimeSoftReleaseSource } from './core/time-usage.js';
 import { getCurrentUser, login } from './core/auth.js';
 import { isOnboardingComplete, renderOnboarding } from './onboarding/onboarding.js';
 import { bottomNavigation } from './ui/ui.js';
 
 configureWorkplaceSource(getWorkplaceEntities);
 configureWorkingTimeConflictSource(getJournalWorkingTimeConflicts);
+configureWorkingTimeSoftReleaseSource(releaseJournalSoftWorkingTimeUsages);
 
 const routes = {
   main: renderMain,
