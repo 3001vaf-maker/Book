@@ -1,6 +1,6 @@
-import { button, details, escapeHtml, initPaymentForm, initPaymentMethods, modal, mountModal, paymentForm, paymentMethods, select, shortDate, shortDateTimeParts, shortTime } from '../ui/ui.js';
-import { calculateFinancialPlan } from '../core/financial-model.js';
-import { getActivePaymentForSource, getPaymentStateForSource, getRefundsForPayment, recordPaymentIncome, recordRefundExpense } from '../core/dds.js';
+import { button, details, initPaymentForm, initPaymentMethods, modal, mountModal, paymentForm, paymentMethods, select, shortDate, shortDateTimeParts, shortTime } from '../ui/ui.js';
+import { calculateFinancialPlan, getRecordPaymentState } from '../core/financial-model.js';
+import { getRefundsForPayment, recordPaymentIncome, recordRefundExpense } from '../core/dds.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getAllClients } from '../main/clients/data.js';
 import { clientDisplay } from '../main/clients/presentation.js';
@@ -22,8 +22,7 @@ function financeForRecord(record) {
 }
 
 function paymentStateForRecord(record) {
-  const finance = financeForRecord(record);
-  return getPaymentStateForSource('record', record?.id, Number(finance?.planTotal || 0));
+  return getRecordPaymentState(record);
 }
 
 function proceduresFromFinance(record, finance) {
@@ -109,10 +108,12 @@ function walletSummary(payment) {
 
 function paymentFactMarkup(payment) {
   const when = paymentDateTime(payment);
-  return details([
+  const rows = [
     { left: when.date || '—', right: when.time || '—' },
-    { left: money(payment?.total), right: walletSummary(payment) },
-  ], { variant: 'split' });
+    { left: money(payment?.serviceAmount ?? payment?.total), right: walletSummary(payment) },
+  ];
+  if (Number(payment?.tips || 0) > 0) rows.push({ left: 'Tips', right: money(payment.tips) });
+  return details(rows, { variant: 'split' });
 }
 
 function sourcePaymentFactMarkup(state) {
@@ -125,15 +126,17 @@ function sourcePaymentFactMarkup(state) {
     const name = allocation.walletName || 'Кошелёк';
     if (!wallets.includes(name)) wallets.push(name);
   }));
-  return details([
+  const rows = [
     { left: when.date || '—', right: when.time || '—' },
     { left: money(state?.paidTotal || 0), right: wallets.join(' + ') || '—' },
-  ], { variant: 'split' });
+  ];
+  if (Number(state?.tipsTotal || 0) > 0) rows.push({ left: 'Tips', right: money(state.tipsTotal) });
+  return details(rows, { variant: 'split' });
 }
 
 function openPaymentMethodsModal(payment, paymentModal) {
-  const state = getPaymentStateForSource('record', payment?.source?.id, Number(payment?.finance?.planTotal || 0));
-  const total = Number(state.remaining || 0);
+  const recordState = getRecordPaymentState({ id: payment?.source?.id || '', finance: payment?.finance || null });
+  const total = Number(recordState.remaining || 0);
   if (total <= 0.009) return;
   const content = `<div class="modal-title"><h2>Способ оплаты</h2></div>${paymentMethods({ wallets: getWallets(), total })}`;
   const methodsModal = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
@@ -149,18 +152,21 @@ function openPaymentMethodsModal(payment, paymentModal) {
   };
 
   initPaymentMethods(methodsModal.querySelector('[data-payment-methods]'), {
-    onPay: (allocations) => finish(recordPaymentIncome({
+    onPay: ({ allocations, tips, appliedAmount }) => finish(recordPaymentIncome({
       source: payment.source,
       workplace: payment.workplace,
       client: payment.client,
       finance: payment.finance,
       allocations,
+      maxAmount: total,
+      serviceAmount: appliedAmount,
+      tips,
     })),
   });
 }
 
 function openPaymentModal(record) {
-  if (getActivePaymentForSource('record', record?.id)) return;
+  if (paymentStateForRecord(record).fullyPaid) return;
   const current = getRecords().find((item) => String(item?.id || '') === String(record?.id || '')) || record;
   const payment = paymentFromRecord(current);
   const finance = payment.finance;
