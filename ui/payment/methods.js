@@ -31,7 +31,7 @@ function allocationRow(index, wallets, initial = {}) {
   </div>`;
 }
 
-export function paymentMethodsMarkup({ wallets = [], total = 0, initialAllocations = [], tips = 0 } = {}) {
+export function paymentMethodsMarkup({ wallets = [], total = 0, initialAllocations = [] } = {}) {
   const allocations = Array.isArray(initialAllocations) ? initialAllocations : [];
   return `<div class="payment-methods__allocation" data-payment-allocation-owner>
     <div class="payment-methods__total" data-payment-remaining><span>К оплате</span><strong>${escapeHtml(moneyDisplay(total))}</strong></div>
@@ -39,7 +39,7 @@ export function paymentMethodsMarkup({ wallets = [], total = 0, initialAllocatio
       ${allocationRow(0, wallets, allocations[0] || {})}
       ${allocationRow(1, wallets, allocations[1] || {})}
     </div>
-    <label class="payment-tips"><span>Tips</span><input class="payment-allocation-input" type="text" inputmode="decimal" autocomplete="off" placeholder="0" value="${escapeHtml(tips ? moneyInputText(tips) : '')}" data-payment-tips></label>
+    <div class="payment-tips" data-payment-tips-row hidden><span>Tips</span><strong data-payment-tips>0 ₽</strong></div>
     ${button('Сохранить', { data: 'data-payment-allocation-submit' })}
   </div>`;
 }
@@ -47,7 +47,8 @@ export function paymentMethodsMarkup({ wallets = [], total = 0, initialAllocatio
 export function initPaymentMethodsAllocation(root, { wallets = [], total = 0, onPay = () => {} } = {}) {
   if (!root) return;
   const remainingNode = root.querySelector('[data-payment-remaining] strong');
-  const tipsInput = root.querySelector('[data-payment-tips]');
+  const tipsRow = root.querySelector('[data-payment-tips-row]');
+  const tipsNode = root.querySelector('[data-payment-tips]');
   const submit = root.querySelector('[data-payment-allocation-submit]');
   const rows = () => [...root.querySelectorAll('[data-payment-allocation-row]')].map((part) => ({
     walletInput: part.querySelector('input[data-payment-allocation-wallet]'),
@@ -65,21 +66,21 @@ export function initPaymentMethodsAllocation(root, { wallets = [], total = 0, on
 
   function state() {
     const allocations = normalizedAllocations();
-    const cashTotal = allocations.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-    const tips = Math.max(0, numberValue(tipsInput?.value));
-    const applied = Math.max(0, cashTotal - tips);
+    const received = allocations.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const applied = Math.min(Math.max(0, total), received);
+    const tips = Math.max(0, received - applied);
     const remaining = Math.max(0, total - applied);
     const valid = allocations.length > 0
       && allocations.every((item) => item.walletId && item.amount > 0)
-      && tips <= cashTotal + 0.009
-      && applied > 0
-      && applied <= total + 0.009;
-    return { allocations, cashTotal, tips, applied, remaining, valid };
+      && received > 0;
+    return { allocations, received, tips, applied, remaining, valid };
   }
 
   function sync() {
     const current = state();
     if (remainingNode) remainingNode.textContent = moneyDisplay(current.remaining);
+    if (tipsNode) tipsNode.textContent = moneyDisplay(current.tips);
+    if (tipsRow) tipsRow.hidden = current.tips <= 0.009;
     if (submit) submit.disabled = !current.valid;
   }
 
@@ -92,17 +93,16 @@ export function initPaymentMethodsAllocation(root, { wallets = [], total = 0, on
       sync();
     });
   });
-  tipsInput?.addEventListener('input', sync);
-  tipsInput?.addEventListener('blur', () => {
-    const value = numberValue(tipsInput.value);
-    tipsInput.value = value > 0 ? moneyInputText(value) : '';
-    sync();
-  });
 
   submit?.addEventListener('click', () => {
     const current = state();
     if (!current.valid) return;
-    onPay?.({ allocations: current.allocations, tips: current.tips, appliedAmount: current.applied });
+    onPay?.({
+      allocations: current.allocations,
+      receivedAmount: current.received,
+      appliedAmount: current.applied,
+      tips: current.tips,
+    });
   });
   sync();
 }
