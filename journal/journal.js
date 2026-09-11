@@ -1,7 +1,7 @@
 import { pageHeader, viewNavigation, initViewNavigation, headerControl, workplaceContent, ALL_WORKPLACES_ID } from '../ui/ui.js';
 import { getWorkplaceContext, setWorkplaceContext } from '../core/workplace-context.js';
 import { getWorkplaces } from '../core/workplace-time.js';
-import { getActiveDayWorkplaces, getAvailableDayWorkplaces } from '../core/day/index.js';
+import { getActiveDayWorkplaces } from '../core/day/index.js';
 import { recordPlanTotal } from '../core/finance/index.js';
 import { openTimetableDayEditor } from '../timetable/day-editor.js';
 import { getActiveRecordCountForDay, getRecordsForDay } from '../core/record/index.js';
@@ -103,15 +103,12 @@ export function renderJournal(root) {
       const key = String(workplace?.key || '');
       return [key, key ? getActiveRecordCountForDay(day, key) : 0];
     }));
-    const available = getAvailableDayWorkplaces(selectedDate, workplaces);
 
     openJournalWorkplaceControl({
       workplaces: active,
       workplaceId: selectedWorkplaceId,
       recordCounts,
-      available,
       onSelect: selectWorkplace,
-      onAdd: openDayTime,
     });
   };
 
