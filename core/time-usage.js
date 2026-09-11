@@ -1,18 +1,28 @@
 // Technical interval helpers for Journal rendering and collision checks.
-// This module does not own working time or Record state.
+// This module does not own working time or Journal usage state.
 import { timeToMinutes, rangesOverlap } from './time.js';
 
 export { timeToMinutes, rangesOverlap };
 
 let workingTimeConflictSource = () => [];
+let workingTimeSoftReleaseSource = () => 0;
 
 export function configureWorkingTimeConflictSource(source) {
   workingTimeConflictSource = typeof source === 'function' ? source : () => [];
 }
 
+export function configureWorkingTimeSoftReleaseSource(source) {
+  workingTimeSoftReleaseSource = typeof source === 'function' ? source : () => 0;
+}
+
 export function getWorkingTimeUsageConflicts(options = {}) {
   const conflicts = workingTimeConflictSource(options);
   return Array.isArray(conflicts) ? conflicts : [];
+}
+
+export function releaseWorkingTimeSoftUsages(options = {}) {
+  const released = Number(workingTimeSoftReleaseSource(options));
+  return Number.isFinite(released) && released > 0 ? released : 0;
 }
 
 export function isTimeRangeAvailable({ from, to, usages = [], excludeId = '' } = {}) {

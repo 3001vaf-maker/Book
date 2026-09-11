@@ -1,19 +1,12 @@
-import { actionBlock, button, pageHeader, initCalendar, initMultiSelect, modal, mountModal, timePicker, initTimePickers, escapeHtml, headerControl, workplaceContent, openWorkplaceControl, openDayWorkplaceControl, ALL_WORKPLACES_ID, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js';
+import { actionBlock, button, pageHeader, initCalendar, initMultiSelect, modal, mountModal, timePicker, initTimePickers, escapeHtml, headerControl, workplaceContent, openWorkplaceControl, ALL_WORKPLACES_ID, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js';
 import { getWorkplaces, resolveWorkplaceTime, getWorkingDayIndicators, getWorkingDayTotalMinutes, getWorkplaceMonthStats, getAllWorkplacesMonthStats, getWorkplaceMonthStatsMap } from '../core/workplace-time.js';
-import { getDays, saveDays, getDay, getDayTime, getDaysForDate, createDay, updateDayTime, removeDay, getDayRemovalConflicts, getScheduleConflicts, hasScheduleConflict, findSuggestedInterval } from '../core/day.js';
-import { getWorkingTimeUsageConflicts } from '../core/time-usage.js';
-import { isValidRange, rangesOverlap } from '../core/time.js';
+import { getDays, saveDays, getDay, getDayTime, createDay, updateDayTime, removeDay, getDayRemovalConflicts, getScheduleConflicts, hasScheduleConflict, findSuggestedInterval } from '../core/day.js';
+import { openTimetableDayEditor } from './day-editor.js';
 
 function datesForWorkplace(days, workplaceId) { return days.filter((item) => item?.workplaceId === workplaceId).map((item) => item.date).filter(Boolean); }
 function datesForAllWorkplaces(days) { return [...new Set(days.map((item) => item?.date).filter(Boolean))]; }
 function workingDayForDate(days, workplaceId, date) { return getDay(days, workplaceId, date); }
 function formatDateLabel(value) { const [year, month, day] = String(value || '').split('-'); return year && month && day ? `${day}.${month}.${year}` : String(value || ''); }
-function formatModalDate(value) {
-  const months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
-  const [, month, day] = String(value || '').split('-');
-  const monthName = months[Math.max(0, Number(month) - 1)] || '';
-  return day && monthName ? `${Number(day)} ${monthName}` : formatDateLabel(value);
-}
 function formatDuration(totalMinutes) {
   const total = Math.max(0, Number(totalMinutes) || 0);
   const hours = Math.floor(total / 60);
@@ -22,11 +15,7 @@ function formatDuration(totalMinutes) {
   if (!hours) return `${minutes} м`;
   return `${hours} ч ${minutes} м`;
 }
-function overlapLabel(a, b) {
-  const from = a.from > b.from ? a.from : b.from;
-  const to = a.to < b.to ? a.to : b.to;
-  return `${from}–${to}`;
-}
+function occupiedLabel(item) { return item?.type === 'break' ? 'Перерыв' : 'Запись'; }
 
 export function renderTimetable(root) {
   const workplaces = getWorkplaces();
@@ -95,144 +84,6 @@ export function renderTimetable(root) {
     syncApplyButton([]);
   };
 
-  function aggregateDayEntries(date) {
-    return getDaysForDate(workingDays, date).map((day) => {
-      const workplaceId = String(day?.workplaceId || '');
-      const workplace = workplaces.find((item) => String(item?.key || '') === workplaceId) || null;
-      const time = getDayTime(day, workplaces);
-      if (!workplaceId || !time) return null;
-      return {
-        workplaceId,
-        name: workplace?.name || 'Рабочее место',
-        from: time.from,
-        to: time.to,
-      };
-    }).filter(Boolean);
-  }
-
-  function openAggregateDayEditor(date) {
-    const entries = aggregateDayEntries(date);
-    if (!entries.length) return;
-    const rowMarkup = (entry, index) => `<div class="compact-form" data-aggregate-workplace="${escapeHtml(entry.workplaceId)}"><strong>${escapeHtml(entry.name)}</strong><div class="time-range-fields">${timePicker({ name: `aggregateFrom${index}`, label: 'Начало', value: entry.from })}${timePicker({ name: `aggregateTo${index}`, label: 'Окончание', value: entry.to })}</div><div class="form-error" data-aggregate-error="${index}" aria-live="polite"></div></div>`;
-    const dateTitle = formatModalDate(date);
-    const content = `<div class="compact-form"><div class="modal-title"><h2>${escapeHtml(dateTitle)}</h2></div><div data-aggregate-day-rows>${entries.map(rowMarkup).join('')}</div>${button('+ Добавить рабочее пространство', { variant: 'secondary', data: 'data-aggregate-day-add' })}${button('Применить', { data: 'data-aggregate-day-apply' })}</div>`;
-    const m = mountModal(document.body, modal(content, { title: dateTitle, variant: 'medium' }));
-    if (!m) return;
-    initTimePickers(m);
-    const rowsRoot = m.querySelector('[data-aggregate-day-rows]');
-    const add = m.querySelector('[data-aggregate-day-add]');
-    const save = m.querySelector('[data-aggregate-day-apply]');
-
-    const availableWorkplaces = () => {
-      const active = new Set(entries.map((entry) => String(entry.workplaceId || '')));
-      return workplaces.filter((workplace) => {
-        const key = String(workplace?.key || '');
-        return key && !active.has(key);
-      });
-    };
-    const syncAdd = () => { if (add) add.hidden = availableWorkplaces().length === 0; };
-
-    const readValues = () => entries.map((entry, index) => ({
-      ...entry,
-      from: m.querySelector(`[name="aggregateFrom${index}"]`)?.value || entry.from,
-      to: m.querySelector(`[name="aggregateTo${index}"]`)?.value || entry.to,
-    }));
-
-    const validate = () => {
-      const values = readValues();
-      const errors = values.map(() => []);
-
-      values.forEach((value, index) => {
-        if (!isValidRange(value.from, value.to)) errors[index].push('Проверьте рабочее время.');
-      });
-
-      for (let left = 0; left < values.length; left += 1) {
-        if (!isValidRange(values[left].from, values[left].to)) continue;
-        for (let right = left + 1; right < values.length; right += 1) {
-          if (!isValidRange(values[right].from, values[right].to)) continue;
-          if (!rangesOverlap(values[left].from, values[left].to, values[right].from, values[right].to)) continue;
-          const overlap = overlapLabel(values[left], values[right]);
-          errors[left].push(`Пересечение с ${values[right].name}: ${overlap}`);
-          errors[right].push(`Пересечение с ${values[left].name}: ${overlap}`);
-        }
-      }
-
-      values.forEach((value, index) => {
-        if (!isValidRange(value.from, value.to)) return;
-        const conflicts = getWorkingTimeUsageConflicts({ date, workplaceId: value.workplaceId, from: value.from, to: value.to });
-        conflicts.forEach((conflict) => {
-          if (!conflict?.from || !conflict?.to) return;
-          errors[index].push(`Запись ${conflict.from}–${conflict.to} выходит за рабочее время`);
-        });
-      });
-
-      errors.forEach((messages, index) => {
-        const error = m.querySelector(`[data-aggregate-error="${index}"]`);
-        if (error) error.innerHTML = messages.map((message) => `<div>${escapeHtml(message)}</div>`).join('');
-      });
-      const hasErrors = errors.some((messages) => messages.length > 0);
-      if (save) save.disabled = hasErrors;
-      return { ok: !hasErrors, values };
-    };
-
-    const appendWorkplace = (workplaceId) => {
-      const workplace = workplaces.find((item) => String(item?.key || '') === String(workplaceId || '')) || null;
-      const base = resolveWorkplaceTime(workplaces, workplaceId);
-      if (!workplace || !base) return;
-      const suggested = findSuggestedInterval(workingDays, { workplaceId, date, baseFrom: base.from, baseTo: base.to }) || base;
-      const entry = {
-        workplaceId: String(workplaceId),
-        name: workplace.name || 'Рабочее пространство',
-        from: suggested.from,
-        to: suggested.to,
-      };
-      entries.push(entry);
-      const shell = document.createElement('div');
-      shell.innerHTML = rowMarkup(entry, entries.length - 1);
-      const row = shell.firstElementChild;
-      if (row && rowsRoot) {
-        rowsRoot.append(row);
-        initTimePickers(row);
-      }
-      syncAdd();
-      validate();
-    };
-
-    add?.addEventListener('click', () => {
-      const available = availableWorkplaces();
-      if (!available.length) return;
-      openDayWorkplaceControl({
-        active: [],
-        available,
-        catalogTitle: 'Добавить рабочее пространство',
-        onAdd: appendWorkplace,
-      });
-    });
-    m.addEventListener('change', (event) => {
-      if (event.target?.matches?.('[data-time-value]')) validate();
-    });
-    syncAdd();
-    validate();
-
-    save?.addEventListener('click', () => {
-      const result = validate();
-      if (!result.ok) return;
-      result.values.forEach((value) => {
-        const existing = getDay(workingDays, value.workplaceId, date);
-        if (existing) updateDayTime(workingDays, value.workplaceId, date, value.from, value.to);
-        else {
-          const day = createDay({ date, workplaceId: value.workplaceId, from: value.from, to: value.to });
-          if (day) workingDays.push(day);
-        }
-      });
-      saveDays(workingDays);
-      const month = calendar?.getDisplayedMonth() || initialMonth;
-      startSelectionSession(month);
-      renderHeader(month);
-      m.remove();
-    });
-  }
-
   const startSelectionSession = (month) => {
     const allMode = isAllMode();
     calendar = initCalendar(calendarRoot, {
@@ -252,7 +103,16 @@ export function renderTimetable(root) {
         const nextDate = new Date(`${date}T00:00:00`);
         if (allMode) {
           setWorkplaceContext({ date: nextDate });
-          openAggregateDayEditor(date);
+          openTimetableDayEditor({
+            date,
+            onSave: () => {
+              const refreshedDays = getDays();
+              workingDays.splice(0, workingDays.length, ...refreshedDays);
+              const month = calendar?.getDisplayedMonth() || initialMonth;
+              startSelectionSession(month);
+              renderHeader(month);
+            },
+          });
         } else setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: nextDate });
       },
       onMonthChange: (nextMonth) => {
@@ -315,18 +175,18 @@ export function renderTimetable(root) {
     const blocked = (Array.isArray(entries) ? entries : []).filter((entry) => Array.isArray(entry?.conflicts) && entry.conflicts.length);
     if (!blocked.length) return;
     const workplace = workplaces.find((item) => String(item?.key || '') === String(selectedWorkplaceId || '')) || null;
-    const workplaceName = workplace?.name || 'Рабочее место';
+    const workplaceName = workplace?.name || 'Рабочее пространство';
     const multiple = blocked.length > 1;
     const title = multiple ? 'Не все дни можно сделать выходными' : 'День нельзя сделать выходным';
     const description = multiple
-      ? `${workplaceName}: на этих датах есть записи. Рабочие дни сохранены.`
-      : `${workplaceName}: на этой дате есть запись. Рабочий день сохранён.`;
+      ? `${workplaceName}: на этих датах есть занятое время. Рабочие дни сохранены.`
+      : `${workplaceName}: на этой дате есть занятое время. Рабочий день сохранён.`;
     const rows = blocked.map((entry) => {
-      const times = entry.conflicts
-        .filter((conflict) => conflict?.type === 'record' && conflict?.from && conflict?.to)
-        .map((conflict) => `${conflict.from}–${conflict.to}`)
+      const details = entry.conflicts
+        .filter((conflict) => conflict?.from && conflict?.to)
+        .map((conflict) => `${occupiedLabel(conflict)} ${conflict.from}–${conflict.to}`)
         .join(', ');
-      return `<div><span>${escapeHtml(formatDateLabel(entry.date))}</span><strong>${escapeHtml(times ? `Запись ${times}` : 'Есть запись')}</strong></div>`;
+      return `<div><span>${escapeHtml(formatDateLabel(entry.date))}</span><strong>${escapeHtml(details || 'Есть занятое время')}</strong></div>`;
     }).join('');
     const content = `<div class="modal-title"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(description)}</p></div><div class="entity-details">${rows}</div>${button('Понятно', { data: 'data-removal-blocked-close' })}`;
     const m = mountModal(document.body, modal(content, { title, variant: 'compact' }));

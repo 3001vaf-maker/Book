@@ -1,5 +1,5 @@
 import { createTimeRange, rangesOverlap, timeToMinutes, minutesToTime, isValidRange } from './time.js';
-import { getWorkingTimeUsageConflicts } from './time-usage.js';
+import { getWorkingTimeUsageConflicts, releaseWorkingTimeSoftUsages } from './time-usage.js';
 
 const TIMETABLE_STATE_KEY = 'book:timetable-state';
 
@@ -37,7 +37,14 @@ export function saveDays(days) {
   for (const entry of blocked) if (!next.some((day) => dayIdentity(day) === dayIdentity(entry.day))) next.push(entry.day);
 
   if (Array.isArray(days) && blocked.length) days.splice(0, days.length, ...next);
+  const nextIds = new Set(next.map(dayIdentity));
+  const removed = current.filter((day) => !nextIds.has(dayIdentity(day)));
   writeState({ workingDays: next });
+  removed.forEach((day) => releaseWorkingTimeSoftUsages({
+    operation: 'remove',
+    date: dateValue(day?.date),
+    workplaceId: String(day?.workplaceId || ''),
+  }));
   return blocked.length
     ? { ok: false, reason: 'usage-conflict', blocked }
     : { ok: true, reason: '', blocked: [] };

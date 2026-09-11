@@ -1,8 +1,9 @@
-import { pageHeader, viewNavigation, initViewNavigation, headerControl, workplaceContent, ALL_WORKPLACES_ID, openDayWorkplaceTime } from '../ui/ui.js';
+import { pageHeader, viewNavigation, initViewNavigation, headerControl, workplaceContent, ALL_WORKPLACES_ID } from '../ui/ui.js';
 import { getWorkplaceContext, setWorkplaceContext } from '../core/workplace-context.js';
 import { getWorkplaces } from '../core/workplace-time.js';
-import { getActiveDayWorkplaces, getAvailableDayWorkplaces, getDayWorkplaceDraft, saveDayWorkplaceTime } from '../core/day-workplaces.js';
+import { getActiveDayWorkplaces, getAvailableDayWorkplaces } from '../core/day-workplaces.js';
 import { recordPlanTotal } from '../core/financial-model.js';
+import { openTimetableDayEditor } from '../timetable/day-editor.js';
 import { getActiveRecordCountForDay, getRecordsForDay } from './record-data.js';
 import { openJournalWorkplaceControl } from './workplace-control.js';
 import { renderJournalDay } from './день.js';
@@ -70,26 +71,13 @@ export function renderJournal(root) {
     });
   };
 
-  const openDayTime = (workplaceId) => {
-    const workplace = workplaces.find((item) => String(item?.key || '') === String(workplaceId || '')) || null;
-    const draft = getDayWorkplaceDraft(selectedDate, workplaceId, workplaces);
-    if (!draft) return;
-    const available = getAvailableDayWorkplaces(selectedDate, workplaces);
-
-    openDayWorkplaceTime({
-      title: workplace?.name || 'Рабочее пространство',
-      from: draft.from,
-      to: draft.to,
-      occupied: draft.occupied,
-      available,
-      catalogTitle: 'Добавить рабочее пространство',
-      onAdd: openDayTime,
-      onSave: ({ from, to }) => {
-        const result = saveDayWorkplaceTime({ date: selectedDate, workplaceId, from, to }, workplaces);
-        if (!result.ok) return result;
+  const openDayTime = (workplaceId = '') => {
+    openTimetableDayEditor({
+      date: selectedDate,
+      focusWorkplaceId: workplaceId,
+      onSave: () => {
         setWorkplaceContext({ date: selectedDate, scope: JOURNAL_CONTEXT_SCOPE });
         renderView();
-        return result;
       },
     });
   };

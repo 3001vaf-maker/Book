@@ -25,11 +25,13 @@ const calendarCss = read('ui/calendar/calendar.css');
 const timeUi = read('ui/time/index.js');
 const timeCss = read('ui/time/time.css');
 const listUi = read('ui/lists/list.js');
+const dayWorkplaces = read('core/day-workplaces.js');
 const graph = read('timetable/timetable.js');
+const dayEditor = read('timetable/day-editor.js');
 const journal = read('journal/journal.js');
 const journalWorkplaceControl = read('journal/workplace-control.js');
 const journalMonth = read('journal/месяц.js');
-const recordData = read('journal/record-data.js');
+const journalTimeUsage = read('journal/time-usage-source.js');
 const timeUsage = read('core/time-usage.js');
 const coreEntry = read('core.js');
 const allCss = [...walkCss('ui'), ...walkCss('css')];
@@ -62,31 +64,44 @@ if (!/title\s*=\s*['"]['"]/.test(workplaceUi) || !/subtitle\s*=\s*['"]['"]/.test
 if (!/openHeaderControl\(content,\s*\{\s*title:\s*visibleTitle\s*\|\|\s*visibleSubtitle\s*\}\)/.test(workplaceUi)) fail('ui/workplaces/index.js', 'Graph Workplace manifestation must pass the caller-owned heading to Header Control');
 if (/Корректировка времени|data-workplace-control-open-time|workplaceControlFrom|workplaceControlTo/.test(workplaceUi)) fail('ui/workplaces/index.js', 'Graph Header Workplace List must not own working-time correction');
 
+if (!/getActiveDayWorkplaces/.test(dayWorkplaces) || !/getAvailableDayWorkplaces/.test(dayWorkplaces)) fail('core/day-workplaces.js', 'day workplace read-model must expose active/available queries');
+if (/saveDayWorkplaceTime|getDayWorkplaceDraft|createDay|updateDayTime|saveDays/.test(dayWorkplaces)) fail('core/day-workplaces.js', 'day workplace read-model must not expose a second working-time mutation path');
+
 if (!/ALL_WORKPLACES_ID/.test(graph) || !/includeAggregate:\s*true/.test(graph)) fail('timetable/timetable.js', 'Graph must expose the aggregate workplace schedule through its Workplace control');
 if (!/getWorkingDayTotalMinutes/.test(graph)) fail('timetable/timetable.js', 'aggregate Graph dates must show summed duration instead of a false continuous interval');
 if (!/resolveDateIndicators/.test(graph) || /calendar__date-indicator/.test(graph)) fail('timetable/timetable.js', 'Graph must pass indicator data to Calendar instead of drawing indicators locally');
 if (!/openWorkplaceControl\s*\(\s*\{[\s\S]*?title:\s*['"]Рабочий график['"]/.test(graph)) fail('timetable/timetable.js', 'Graph must own and pass its visible Header Control title');
 if (!/actionsRoot\.hidden\s*=\s*allMode/.test(graph)) fail('timetable/timetable.js', 'aggregate Graph mode must hide the working-day apply action');
-if (!/openAggregateDayEditor/.test(graph) || !/variant:\s*['"]medium['"]/.test(graph)) fail('timetable/timetable.js', 'aggregate date click must open the shared medium Modal editor');
-if (!/time-range-fields/.test(graph) || !/timePicker\(\{\s*name:\s*`aggregateFrom/.test(graph) || !/timePicker\(\{\s*name:\s*`aggregateTo/.test(graph)) fail('timetable/timetable.js', 'aggregate date editor must use the shared TimePicker for start/end fields');
-if (!/getWorkingTimeUsageConflicts/.test(graph)) fail('timetable/timetable.js', 'aggregate date editor must ask Core for occupied-time conflicts');
-if (/journal\/record-data\.js/.test(graph)) fail('timetable/timetable.js', 'Graph must not import or own Record data directly');
-if (!/Пересечение с/.test(graph) || !/Запись \$\{conflict\.from\}–\$\{conflict\.to\} выходит за рабочее время/.test(graph)) fail('timetable/timetable.js', 'aggregate date editor must show only actual schedule/record conflicts');
+if (!/openTimetableDayEditor/.test(graph)) fail('timetable/timetable.js', 'aggregate date click must call the Timetable-owned day editor');
+if (/function\s+openAggregateDayEditor/.test(graph)) fail('timetable/timetable.js', 'Graph page must not keep a second local day-editor implementation');
+if (/journal\//.test(graph)) fail('timetable/timetable.js', 'Graph page must not depend on Journal implementation');
 if (/canCorrectTime|onSaveTime/.test(graph)) fail('timetable/timetable.js', 'Graph Header Workplace List must not receive time-correction callbacks');
+
+if (!/export function openTimetableDayEditor/.test(dayEditor)) fail('timetable/day-editor.js', 'Timetable must own one canonical working-day editor');
+if (!/variant:\s*['"]medium['"]/.test(dayEditor)) fail('timetable/day-editor.js', 'canonical day editor must use the shared medium Modal');
+if (!/time-range-fields/.test(dayEditor) || !/timePicker\(\{\s*name:\s*`aggregateFrom/.test(dayEditor) || !/timePicker\(\{\s*name:\s*`aggregateTo/.test(dayEditor)) fail('timetable/day-editor.js', 'canonical day editor must use shared TimePicker fields');
+if (!/getWorkingTimeUsageConflicts/.test(dayEditor)) fail('timetable/day-editor.js', 'canonical day editor must ask Core for occupied-time conflicts');
+if (!/usageLabel\(conflict\)/.test(dayEditor) || !/usage\?\.type\s*===\s*['"]break['"]/.test(dayEditor)) fail('timetable/day-editor.js', 'canonical day editor must preserve Record/Break conflict semantics');
+if (!/Пересечение с/.test(dayEditor)) fail('timetable/day-editor.js', 'canonical day editor must show workspace schedule conflicts');
+if (!/\+ Добавить рабочее пространство/.test(dayEditor) || !/openDayWorkplaceControl/.test(dayEditor)) fail('timetable/day-editor.js', 'canonical day editor must own workspace addition for the day');
+if (/journal\//.test(dayEditor)) fail('timetable/day-editor.js', 'Timetable day editor must not depend on Journal implementation');
 
 if (/openWorkplaceControl/.test(journal)) fail('journal/journal.js', 'Journal must not call the Graph Workplace control');
 if (!/openJournalWorkplaceControl/.test(journal)) fail('journal/journal.js', 'Journal must use its own Header manifestation');
-if (/canCorrectTime|onSaveTime|updateDayTime|hasScheduleConflict/.test(journal)) fail('journal/journal.js', 'Journal Header manifestation must not own time correction');
+if (!/openTimetableDayEditor/.test(journal) || !/timetable\/day-editor\.js/.test(journal)) fail('journal/journal.js', 'Journal must call the Timetable-owned working-day editor instead of recreating it');
+if (/getDayWorkplaceDraft|saveDayWorkplaceTime|openDayWorkplaceTime|updateDayTime|hasScheduleConflict|createDay|saveDays/.test(journal)) fail('journal/journal.js', 'Journal must not own working-day mutation or validation');
 if (!/export function openJournalWorkplaceControl/.test(journalWorkplaceControl)) fail('journal/workplace-control.js', 'Journal must own a separate Workplace selection manifestation');
 if (!/openHeaderControl/.test(journalWorkplaceControl) || !/list\(\{\s*items\s*\}\)/.test(journalWorkplaceControl)) fail('journal/workplace-control.js', 'Journal manifestation must reuse shared Header Control and List');
 if (!/Все записи/.test(journalWorkplaceControl) || /Общий график/.test(journalWorkplaceControl)) fail('journal/workplace-control.js', 'Journal manifestation must own only Journal aggregate semantics');
 if (!/data-journal-workplace-select/.test(journalWorkplaceControl) || /data-workplace-control-select/.test(journalWorkplaceControl)) fail('journal/workplace-control.js', 'Journal and Graph controls must have separate interaction channels');
 if (!/getWorkingDayIndicators/.test(journalMonth) || !/resolveDateIndicators/.test(journalMonth) || /calendar__date-indicator/.test(journalMonth)) fail('journal/месяц.js', 'Journal Month must use the same Calendar indicator channel and must not draw its own indicators');
 
-if (!/export function getWorkingTimeRecordConflicts/.test(recordData)) fail('journal/record-data.js', 'Record owner must expose only conflicts against a proposed working interval');
-if (!/!containsRange\(from, to, record\.from, record\.to\)/.test(recordData)) fail('journal/record-data.js', 'Record conflict query must return only records that fall outside the proposed working interval');
-if (!/configureWorkingTimeConflictSource/.test(timeUsage) || !/getWorkingTimeUsageConflicts/.test(timeUsage)) fail('core/time-usage.js', 'Core time usage must expose a configured conflict contract without owning Record state');
-if (!/configureWorkingTimeConflictSource\(getWorkingTimeRecordConflicts\)/.test(coreEntry)) fail('core.js', 'App composition must wire the Record owner into the Core time-usage conflict contract');
+if (!/export function getJournalWorkingTimeConflicts/.test(journalTimeUsage)) fail('journal/time-usage-source.js', 'Journal must expose one occupied-time contract to the composition root');
+if (!/type:\s*'record'/.test(journalTimeUsage) || !/type:\s*'break'/.test(journalTimeUsage)) fail('journal/time-usage-source.js', 'occupied-time contract must include both Record and Break');
+if (!/getRecordsForDay/.test(journalTimeUsage) || !/getJournalBreaksForDay/.test(journalTimeUsage)) fail('journal/time-usage-source.js', 'occupied-time provider must read Journal-owned Record and Break facts');
+if (!/configureWorkingTimeConflictSource/.test(timeUsage) || !/getWorkingTimeUsageConflicts/.test(timeUsage)) fail('core/time-usage.js', 'Core time usage must expose a configured conflict contract without owning Journal state');
+if (!/configureWorkingTimeConflictSource\(getJournalWorkingTimeConflicts\)/.test(coreEntry)) fail('core.js', 'App composition must wire Journal occupied time into the Core conflict contract');
+if (/configureWorkingTimeConflictSource\(getWorkingTimeRecordConflicts\)/.test(coreEntry)) fail('core.js', 'Record-only conflict source must not be wired as the occupied-time contract');
 if (!/hidden\.dispatchEvent\(new Event\(['"]change['"],\{bubbles:true\}\)\)/.test(timeUi)) fail('ui/time/index.js', 'shared TimePicker must emit change so conflict validation updates after edits');
 if (!/\.time-range-fields\b/.test(timeCss)) fail('ui/time/time.css', 'shared Time UI must own the two-column time-range layout');
 
