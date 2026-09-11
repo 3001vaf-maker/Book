@@ -13,3 +13,11 @@ export function button(label, { className = '', data = '', type = 'button', aria
 export function iconButton(label, { className = '', data = '', aria = label } = {}) {
   return `<button type="button" class="icon-button ${className}" ${data} aria-label="${escapeHtml(aria)}">${label}</button>`;
 }
+
+export function sheetIconButton({ data = '', aria = 'Открыть список' } = {}) {
+  return iconButton('▤', { className: 'sheet-icon-button', data, aria });
+}
+
+export function iconButtonGroup(items = []) {
+  return `<div class="icon-button-group">${items.join('')}</div>`;
+}
