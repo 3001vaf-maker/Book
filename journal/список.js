@@ -1,7 +1,7 @@
 import { emptyState, listEntries, listEntry, shortDate } from '../ui/ui.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getRecordPaymentState, recordPlanTotal } from '../core/financial-model.js';
-import { getRecords } from './record-data.js';
+import { getRecords } from './record-read.js';
 import { isRecordCompletedSide, recordActivityTime, recordAppointmentTime, recordVisualState } from './record-state.js';
 
 function formatMoney(value = 0) {
