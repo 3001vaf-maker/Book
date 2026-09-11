@@ -54,6 +54,8 @@ function appendLifecyclePatch(record, patch = {}) {
         record.id,
         next === 'arrived' ? RECORD_EVENT_TYPES.ARRIVED : RECORD_EVENT_TYPES.NO_SHOW,
       );
+    } else if (!next && record.attendance) {
+      appendRecordEvent(record.id, RECORD_EVENT_TYPES.ATTENDANCE_CLEARED);
     }
   }
 }
@@ -176,7 +178,6 @@ export function setRecordConfirmed(id, confirmed) {
 
 export function setRecordAttendance(id, attendance) {
   const value = attendance === 'arrived' || attendance === 'no-show' ? attendance : '';
-  if (!value) return null;
   return updateRecord(id, { attendance: value });
 }
 
