@@ -1,4 +1,5 @@
 import { apiRequest } from '../../core/auth.js';
+import { normalizePhoneForStorage } from '../../core/phone/index.js';
 
 const PROFILE_KEY = 'book.profile';
 const CUSTOM_PROFESSIONS_KEY = 'book.profile.customProfessions';
@@ -17,8 +18,12 @@ function normalizeList(values) {
     .filter(Boolean);
 }
 
+function normalizePhones(values) {
+  return [...new Set(normalizeList(values).map((value) => normalizePhoneForStorage(value)).filter(Boolean))];
+}
+
 export function normalizeProfile(profile = {}) {
-  const phones = normalizeList(profile.phones?.length ? profile.phones : [profile.phone]);
+  const phones = normalizePhones(profile.phones?.length ? profile.phones : [profile.phone]);
   return {
     key: String(profile.key || 'profile'),
     name: String(profile.name || ''),
