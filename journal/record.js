@@ -1,5 +1,5 @@
 import { button, durationPicker, durationText, entityCard, escapeHtml, iconButton, list, listEntry, stateView, initStateView, initCalendar, mountModal, modal, openNotice, initDurationPickers, initMultiSelect, viewNavigation, initViewNavigation } from '../ui/ui.js';
-import { createRecord } from './record-data.js';
+import { createRecord } from './record-service.js';
 import { createJournalBreak } from './break-data.js';
 import { getAllClients } from '../main/clients/data.js';
 import { clientDisplay } from '../main/clients/presentation.js';
@@ -33,12 +33,12 @@ function recordStartTimes({ date, workplaceId, from }) {
   const to = minutesToTime(Math.min(hourEnd, 23 * 60 + 59));
   if (!to) return [];
   return listAvailableStartTimes({
-    date: dateKey(date),
+    date,
     workplaceId,
-    duration: 5,
-    step: 5,
     from,
     to,
+    duration: 5,
+    step: 5,
   });
 }
 
@@ -59,7 +59,7 @@ function openRecordTimeNotice(message) {
 
 function renderTimeStep(modalRoot, { date, workplaceId, from, to, onCreated }) {
   let activeMode = 'record';
-  const values = recordStartTimes({ date, workplaceId, from });
+  const values = recordStartTimes({ date: dateKey(date), workplaceId, from });
   const times = values.map((value) => `<button type="button" class="record-time-option${/:(00|15|30|45)$/.test(value) ? ' is-quarter' : ''}" data-record-time="${value}">${value}</button>`).join('');
   const toggle = viewNavigation({ views: RECORD_MODES, activeView: activeMode, className: 'segment-control--two', ariaLabel: 'Режим записи' });
   const host = renderFlow(modalRoot, `<div class="record-screen record-screen--time">${toggle}<div class="record-time-list">${times || '<div class="muted">Нет свободного времени</div>'}</div></div>`);
@@ -130,8 +130,7 @@ function renderProceduresStep(modalRoot, { date, workplaceId, from, to, onCreate
     actions.querySelector('[data-record-next]')?.addEventListener('click', () => {
       const duration = [...selected.values()].reduce((sum, item) => sum + (Number(item.duration) || 0), 0);
       const end = minutesToTime(timeToMinutes(from) + duration);
-      const availability = checkTimeAvailability({ date: dateKey(date), workplaceId, from, to: end });
-      if (!availability.ok) {
+      if (!checkTimeAvailability({ date: dateKey(date), workplaceId, from, to: end }).ok) {
         openRecordTimeNotice('Запись не может быть создана: выбранным процедурам не хватает свободного времени. Скорректируйте время записи.');
         return;
       }
@@ -347,13 +346,12 @@ function openConfirmationDateModal({ workplaceId, date, onSelected }) {
 }
 
 function availableConfirmationTimes({ date, workplaceId, duration }) {
-  const appointmentDuration = Math.max(1, Number(duration) || 0);
   return listAvailableStartTimes({
-    date: dateKey(date),
+    date,
     workplaceId,
-    duration: appointmentDuration,
+    duration: Math.max(1, Number(duration) || 0),
     step: 15,
-  }).map((from) => ({ from, to: minutesToTime(timeToMinutes(from) + appointmentDuration) }));
+  }).map((from) => ({ from, to: minutesToTime(timeToMinutes(from) + Math.max(1, Number(duration) || 0)) }));
 }
 
 function openConfirmationTimeModal({ date, workplaceId, from, duration, onSelected }) {
@@ -587,13 +585,12 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
     }));
 
     host.querySelector('[data-record-confirm]')?.addEventListener('click', () => {
-      const availability = checkTimeAvailability({
+      if (!checkTimeAvailability({
         date: currentDate,
         workplaceId: currentWorkplaceId,
         from: currentFrom,
         to: currentTo,
-      });
-      if (!availability.ok) {
+      }).ok) {
         openRecordTimeNotice('Запись не может быть создана: выбранное время уже занято. Скорректируйте время записи.');
         return;
       }
@@ -659,12 +656,17 @@ function renderBreakConfirmationStep(modalRoot, { date, workplaceId, from, to, o
   });
   host.innerHTML = `<div class="record-screen record-screen--state-view">${card}<div class="record-modal-actions modal-actions">${button('Подтвердить перерыв', { data: 'data-break-confirm' })}</div></div>`;
   host.querySelector('[data-break-confirm]')?.addEventListener('click', () => {
-    const availability = checkTimeAvailability({ date: dateKey(date), workplaceId, from, to });
+    const availability = checkTimeAvailability({
+      date: dateKey(date),
+      workplaceId,
+      from,
+      to,
+    });
     if (!availability.ok) {
-      const message = availability.reason === 'occupied'
-        ? 'Это время уже занято.'
-        : 'Это время находится вне рабочего периода.';
-      openNotice({ title: 'Перерыв', message });
+      openNotice({
+        title: 'Перерыв',
+        message: availability.reason === 'occupied' ? 'Это время уже занято.' : 'Это время находится вне рабочего периода.',
+      });
       return;
     }
     if (!createJournalBreak({ workplaceId: String(workplaceId || ''), date: dateKey(date), from: String(from), to: String(to) })) return;
