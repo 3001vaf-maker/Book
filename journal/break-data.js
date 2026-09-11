@@ -79,6 +79,19 @@ export function removeJournalBreak(id) {
   return true;
 }
 
+export function removeJournalBreaksForDay(workplaceId, date) {
+  const workplace = String(workplaceId || '');
+  const day = String(date || '').slice(0, 10);
+  if (!workplace || !day) return 0;
+  const breaks = getJournalBreaks();
+  const removed = breaks.filter((item) => String(item?.workplaceId || '') === workplace && String(item?.date || '').slice(0, 10) === day);
+  if (!removed.length) return 0;
+  const kept = breaks.filter((item) => !removed.includes(item));
+  writeBreaks(kept);
+  removed.forEach((item) => notifyTimeUsageChanged({ action: 'release', usageId: item.id, sourceId: item.id, date: item.date, workplaceId: item.workplaceId, from: item.from, to: item.to }));
+  return removed.length;
+}
+
 export function journalBreakMinutes(item) {
   return minutesBetween(item?.from, item?.to);
 }
