@@ -3,7 +3,7 @@ import { createDay, getDays, getScheduleConflicts, hasScheduleConflict, removeDa
 import { configureTimeUsageSource, configureSoftTimeUsageReleaseSource, getWorkingTimeUsageConflicts } from '../core/time-usage.js';
 import { createRecord, moveRecord, cancelRecord, deleteRecord } from '../journal/record-service.js';
 import { getRecords } from '../journal/record-read.js';
-import { createJournalBreak } from '../journal/break-service.js';
+import { createJournalBreak, moveJournalBreak } from '../journal/break-service.js';
 import { getJournalBreaks, getJournalBreaksForDay } from '../journal/break-read.js';
 import { getJournalTimeUsages, releaseJournalSoftTimeUsages } from '../journal/time-usage-source.js';
 
@@ -33,6 +33,7 @@ const record = createRecord({ date: '2026-09-15', workplaceId: 'romashka', from:
 assert.ok(record);
 assert.equal(createRecord({ date: '2026-09-15', workplaceId: 'romashka', from: '12:30', to: '13:30' }), null);
 assert.equal(createRecord({ date: '2026-09-15', workplaceId: 'romashka', from: '15:55', to: '16:05' }), null);
+assert.equal(createJournalBreak({ workplaceId: 'romashka', date: '2026-09-15', from: '12:30', to: '13:30' }), null);
 
 const moved = moveRecord(record.id, { date: '2026-09-15', workplaceId: 'romashka', from: '13:00', to: '14:00' });
 assert.equal(moved.from, '13:00');
@@ -40,6 +41,13 @@ assert.equal(moved.to, '14:00');
 
 const breakItem = createJournalBreak({ workplaceId: 'romashka', date: '2026-09-15', from: '14:30', to: '15:00' });
 assert.ok(breakItem);
+const movedBreak = moveJournalBreak(breakItem.id, { from: '14:45', to: '15:15' });
+assert.equal(movedBreak?.from, '14:45');
+assert.equal(movedBreak?.to, '15:15');
+const restoredBreak = moveJournalBreak(breakItem.id, { from: '14:30', to: '15:00' });
+assert.equal(restoredBreak?.from, '14:30');
+assert.equal(restoredBreak?.to, '15:00');
+
 const shrinkConflicts = getWorkingTimeUsageConflicts({ date: '2026-09-15', workplaceId: 'romashka', from: '12:00', to: '14:00' });
 assert.equal(shrinkConflicts.some((item) => item.type === 'break' && item.rigidity === 'soft' && item.from === '14:30' && item.to === '15:00'), true);
 assert.equal(shrinkConflicts.some((item) => item.type === 'record'), false);
