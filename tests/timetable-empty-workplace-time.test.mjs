@@ -28,4 +28,9 @@ assert.match(source, /applyWorkingDays\(dates, \{ from, to \}\)/);
 assert.match(source, /Постоянное расписание рабочего места не изменится/);
 assert.doesNotMatch(source, /workplace\.(?:from|to)\s*=/);
 
+assert.match(source, /const targetWorkplace = workplaces\.find\([\s\S]*?selectedWorkplaceId/);
+assert.match(source, /const targetWorkplaceName = targetWorkplace\?\.name \|\| 'Рабочее пространство'/);
+assert.match(source, /Рабочее место: <strong>\$\{escapeHtml\(targetWorkplaceName\)\}<\/strong>/);
+assert.match(source, /Занято в другом месте/);
+
 console.log('timetable empty workplace time tests: OK');
