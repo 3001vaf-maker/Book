@@ -149,17 +149,24 @@ model BookingPublication {
 }
 
 model BookingAccount {
-  id           String   @id @default(cuid())
-  tenantId     String
-  email        String
-  passwordHash String
-  name         String   @default("")
-  surname      String   @default("")
-  phone        String   @default("")
-  telegramId   String   @default("")
-  consents     Json
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id              String   @id @default(cuid())
+  tenantId        String
+  email           String
+  passwordHash    String
+  name            String   @default("")
+  surname         String   @default("")
+  phone           String   @default("")
+  telegramId      String   @default("")
+  consents        Json
+  profileData     Json     @default("{}")
+  uei             String   @default("")
+  discountPercent Float    @default(0)
+  visits          Int      @default(0)
+  totalSpent      Float    @default(0)
+  lastVisit       String   @default("")
+  programs        Json     @default("[]")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   requests BookingRequest[]
@@ -180,6 +187,7 @@ model BookingRequest {
   procedures       Json
   status           BookingRequestStatus @default(PENDING)
   importedRecordId String               @default("")
+  recordSnapshot   Json?
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
 
