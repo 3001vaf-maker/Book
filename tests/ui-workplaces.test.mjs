@@ -57,24 +57,30 @@ assert.match(dayControlSource, /openCatalog\(\{ workplaces: available, title: ca
 const graphSource = readFileSync(new URL('../timetable/timetable.js', import.meta.url), 'utf8');
 assert.match(graphSource, /openWorkplaceControl/);
 assert.match(graphSource, /title:\s*'Рабочий график'/);
-assert.match(graphSource, /openAggregateDayEditor/);
-assert.match(graphSource, /variant:\s*'medium'/);
-assert.match(graphSource, /time-range-fields/);
-assert.match(graphSource, /getWorkingTimeUsageConflicts/);
+assert.match(graphSource, /openTimetableDayEditor/);
+assert.doesNotMatch(graphSource, /function\s+openAggregateDayEditor/);
 assert.match(graphSource, /actionsRoot\.hidden\s*=\s*allMode/);
 assert.match(graphSource, /Пересечение с/);
-assert.match(graphSource, /Запись \$\{conflict\.from\}–\$\{conflict\.to\} выходит за рабочее время/);
-assert.match(graphSource, /data-aggregate-day-add/);
-assert.match(graphSource, /openDayWorkplaceControl/);
-assert.match(graphSource, /Добавить рабочее пространство/);
-assert.match(graphSource, /createDay\(\{ date, workplaceId: value\.workplaceId/);
 assert.doesNotMatch(graphSource, /journal\/record-data\.js/);
 assert.doesNotMatch(graphSource, /canCorrectTime|onSaveTime/);
+
+const dayEditorSource = readFileSync(new URL('../timetable/day-editor.js', import.meta.url), 'utf8');
+assert.match(dayEditorSource, /export function openTimetableDayEditor/);
+assert.match(dayEditorSource, /variant:\s*'medium'/);
+assert.match(dayEditorSource, /time-range-fields/);
+assert.match(dayEditorSource, /getWorkingTimeUsageConflicts/);
+assert.match(dayEditorSource, /data-aggregate-day-add/);
+assert.match(dayEditorSource, /openDayWorkplaceControl/);
+assert.match(dayEditorSource, /Добавить рабочее пространство/);
+assert.match(dayEditorSource, /createDay\(\{ date:\s*day, workplaceId:\s*value\.workplaceId/);
+assert.match(dayEditorSource, /saveDays\(workingDays\)/);
 
 const journalSource = readFileSync(new URL('../journal/journal.js', import.meta.url), 'utf8');
 assert.match(journalSource, /openJournalWorkplaceControl/);
 assert.match(journalSource, /onWorkplaceFieldClick:\s*openDayTime/);
-assert.match(journalSource, /available,\s*\n\s*catalogTitle:\s*'Добавить рабочее пространство'/);
+assert.match(journalSource, /openTimetableDayEditor/);
+assert.match(journalSource, /from '..\/timetable\/day-editor\.js'/);
+assert.doesNotMatch(journalSource, /getDayWorkplaceDraft|saveDayWorkplaceTime|openDayWorkplaceTime/);
 assert.doesNotMatch(journalSource, /openWorkplaceControl/);
 assert.doesNotMatch(journalSource, /canCorrectTime|onSaveTime|updateDayTime|hasScheduleConflict/);
 
