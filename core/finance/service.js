@@ -68,11 +68,42 @@ export function recordPaymentIncome({ source = null, workplace = '', client = nu
   return { ...payment, allocations: payment.allocations.map((item) => ({ ...item })) };
 }
 
+export function cancelPaymentOperation(paymentId, { reason = 'incorrect-entry', now = new Date() } = {}) {
+  const id = String(paymentId || '');
+  if (!id) return null;
+  const state = readFinanceState();
+  const original = state.income.find((payment) => String(payment?.id || '') === id);
+  if (!original || original.status === 'cancelled') return null;
+
+  const cancelledAt = now.toISOString();
+  original.status = 'cancelled';
+  original.cancelReason = String(reason || 'incorrect-entry');
+  original.cancelledAt = cancelledAt;
+
+  state.expense.forEach((expense) => {
+    if (expense?.expenseType !== 'refund') return;
+    if (String(expense?.originalPaymentId || '') !== id) return;
+    if (expense.status === 'cancelled') return;
+    expense.status = 'cancelled';
+    expense.cancelReason = 'original-payment-cancelled';
+    expense.cancelledBecausePaymentId = id;
+    expense.cancelledAt = cancelledAt;
+  });
+
+  const saved = writeFinanceState(state);
+  const cancelled = saved.income.find((payment) => String(payment?.id || '') === id) || original;
+  notifyFinanceChanged({ action: 'payment-cancelled', paymentId: id, source: cancelled.source || null });
+  return {
+    ...cancelled,
+    allocations: Array.isArray(cancelled.allocations) ? cancelled.allocations.map((item) => ({ ...item })) : [],
+  };
+}
+
 export function recordRefundExpense(paymentId, { reason = '', amount = null, walletId = '', walletName = '', now = new Date() } = {}) {
   const id = String(paymentId || '');
   const state = readFinanceState();
   const original = state.income.find((payment) => String(payment?.id || '') === id);
-  if (!original) return null;
+  if (!original || original.status === 'cancelled') return null;
   const refunds = getRefundsForPayment(id);
   const split = splitRefund(original, refunds, amount);
   if (!split) return null;
