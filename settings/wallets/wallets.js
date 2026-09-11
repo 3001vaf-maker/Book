@@ -11,7 +11,7 @@ function operationMoment(payment) {
 
 function renderList(root, navigateBack) {
   const items = getWallets();
-  root.innerHTML = `<div class="entity-page-header">${pageHeader('Кошелёк')}<div class="page-header-action">${iconButton('+', { className: 'icon-button--primary', data: 'data-add-wallet', aria: 'Добавить кошелёк' })}</div></div>${items.length ? listEntries(items.map(renderRow)) : emptyState('Кошельков пока нет', 'Добавьте первый кошелёк кнопкой «+».')}${actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-back-wallets' }))}`;
+  root.innerHTML = `<div class="entity-page-header">${pageHeader('Касса')}<div class="page-header-action">${iconButton('+', { className: 'icon-button--primary', data: 'data-add-wallet', aria: 'Добавить кошелёк' })}</div></div>${items.length ? listEntries(items.map(renderRow)) : emptyState('Кошельков пока нет', 'Добавьте первый кошелёк кнопкой «+».')}${actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-back-wallets' }))}`;
   root.querySelector('[data-add-wallet]')?.addEventListener('click', () => openForm(root, null, navigateBack));
   root.querySelectorAll('[data-wallet]').forEach((element) => element.addEventListener('click', () => renderCard(root, element.dataset.wallet, navigateBack)));
   root.querySelector('[data-back-wallets]')?.addEventListener('click', navigateBack);
