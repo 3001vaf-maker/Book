@@ -1,6 +1,6 @@
 import { shortDate } from '../../ui/ui.js';
 import { getFinancialFactForRecords } from '../../core/financial-model.js';
-import { getRecords } from '../../journal/record-data.js';
+import { getRecords } from '../../journal/record-read.js';
 
 const clientKey = (value) => String(value || '');
 
