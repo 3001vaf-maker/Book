@@ -138,6 +138,8 @@ export function renderTimetable(root) {
   }
 
   function openWorkingDaysConflictModal(entries, base) {
+    const targetWorkplace = workplaces.find((item) => String(item?.key || '') === String(selectedWorkplaceId || '')) || null;
+    const targetWorkplaceName = targetWorkplace?.name || 'Рабочее пространство';
     const rows = entries.map((entry, index) => {
       const occupied = entry.conflicts.map((day) => `<div><span>Занято в другом месте</span><strong>${escapeHtml(conflictWorkplaceLabel(day))} · ${escapeHtml(day.from)}–${escapeHtml(day.to)}</strong></div>`).join('');
       const initialFrom = entry.suggested?.from || base.from;
@@ -149,7 +151,7 @@ export function renderTimetable(root) {
       );
       return `<div class="compact-form" data-timetable-conflict-row="${index}"><div class="entity-details"><div><span>Дата</span><strong>${escapeHtml(formatDateLabel(entry.date))}</strong></div>${occupied}</div>${timeFields}<div class="form-error" data-timetable-conflict-error="${index}"></div></div>`;
     }).join('');
-    const content = `<div class="modal-title"><h2>Конфликт времени</h2><p>На этих датах вы уже работаете в другом месте. Скорректируйте время для выбранного места.</p></div>${rows}${button('Сохранить', { data: 'data-timetable-conflicts-save' })}`;
+    const content = `<div class="modal-title"><h2>Конфликт времени</h2><p>Рабочее место: <strong>${escapeHtml(targetWorkplaceName)}</strong></p><p>На этих датах вы уже работаете в другом месте. Скорректируйте время для выбранного места.</p></div>${rows}${button('Сохранить', { data: 'data-timetable-conflicts-save' })}`;
     const m = mountModal(document.body, modal(content, { title: 'Конфликт времени' })); if (!m) return; initTimePickers(m);
     m.querySelector('[data-timetable-conflicts-save]')?.addEventListener('click', () => {
       const updates = [];
