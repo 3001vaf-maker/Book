@@ -33,11 +33,13 @@ assert.match(methodsHtml, /data-payment-allocation-row="0"/);
 assert.match(methodsHtml, /data-payment-allocation-row="1"/);
 assert.match(methodsHtml, /data-payment-allocation-amount="0"/);
 assert.match(methodsHtml, /data-payment-allocation-amount="1"/);
-assert.match(methodsHtml, /data-payment-tips/);
+assert.match(methodsHtml, /data-payment-tips-row hidden/);
+assert.match(methodsHtml, /data-payment-tips>0 ₽/);
 assert.match(methodsHtml, />Tips</);
 assert.match(methodsHtml, />Сохранить</);
 assert.doesNotMatch(methodsHtml, /data-payment-mode|Оплата<\/button>|Разделить/);
 assert.doesNotMatch(methodsHtml, /type="number"[^>]*data-payment-allocation-amount/);
+assert.doesNotMatch(methodsHtml, /data-payment-tips[^>]*input/);
 
 const split = details([
   { left: '11.09.26', right: '02:41' },
@@ -74,9 +76,11 @@ assert.match(paymentSource, /preserve:\s*percentInput/);
 assert.doesNotMatch(paymentSource, /singlePaymentMarkup|splitPaymentMarkup|data-payment-mode/);
 assert.match(methodsSource, /data-payment-allocation-row="\$\{index\}"/);
 assert.match(methodsSource, /data-payment-remaining/);
-assert.match(methodsSource, /data-payment-tips/);
-assert.match(methodsSource, /cashTotal - tips/);
+assert.match(methodsSource, /data-payment-tips-row/);
+assert.match(methodsSource, /const applied = Math\.min\(Math\.max\(0, total\), received\)/);
+assert.match(methodsSource, /const tips = Math\.max\(0, received - applied\)/);
 assert.match(methodsSource, /remaining = Math\.max\(0, total - applied\)/);
+assert.doesNotMatch(methodsSource, /tipsInput|data-payment-tips[^\n]*input/);
 assert.match(paymentCss, /payment-client-uei[^}]*font-size:16px/);
 assert.match(paymentCss, /ui-select__value[^}]*font-size:16px/);
 assert.match(inputCss, /input\[type="number"\]::-webkit-outer-spin-button/);
@@ -90,6 +94,7 @@ assert.match(recordPaymentSource, /variant:\s*'split'/);
 assert.match(recordPaymentSource, /getRecordPaymentState/);
 assert.match(recordPaymentSource, /modal-bottom-action--partial/);
 assert.match(recordPaymentSource, /left:\s*'Tips'/);
+assert.match(recordPaymentSource, /receivedTotal/);
 assert.match(recordPaymentSource, /Возврат оплаты',\s*\{\s*variant:\s*'danger'/);
 assert.match(recordPaymentSource, /Подтвердить возврат',[\s\S]*variant:\s*'danger'/);
 assert.doesNotMatch(recordPaymentSource, /toLocaleDateString/);
