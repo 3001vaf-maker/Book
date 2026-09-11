@@ -64,6 +64,7 @@ function scrollToFocus(root, selector) {
 }
 
 function bindRecordClicks(root, records) {
+  if (typeof root?.querySelectorAll !== 'function') return;
   const byId = new Map(records.map((record) => [recordId(record), record]).filter(([id]) => Boolean(id)));
   root.querySelectorAll('[data-journal-list-record]').forEach((node) => node.addEventListener('click', () => {
     const record = byId.get(String(node.dataset.journalListRecord || ''));
