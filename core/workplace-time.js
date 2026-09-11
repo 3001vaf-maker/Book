@@ -21,6 +21,14 @@ export function getWorkingDays() {
   return getDays();
 }
 
+export function getWorkplaceWorkingDates(workplaceId) {
+  const id = String(workplaceId || '');
+  return getDays()
+    .filter((day) => String(day?.workplaceId || '') === id && day?.date)
+    .map((day) => String(day.date))
+    .sort();
+}
+
 export function getWorkingDay(workingDays, workplaceId, date) {
   return getDay(workingDays, workplaceId, date);
 }

@@ -1,9 +1,13 @@
-import { isValidRange, minutesBetween, normalizeTime, timeToMinutes } from '../core/time.js';
-import { notifyTimeUsageChanged } from '../core/time-usage.js';
-
+// Persistence gateway for Break facts.
+// No availability, lifecycle, UI, or workflow decisions belong here.
 const KEY = 'book.journalBreaks';
 
-function readBreaks() {
+function clone(value) {
+  if (value == null) return value;
+  return JSON.parse(JSON.stringify(value));
+}
+
+function readRows() {
   try {
     const value = JSON.parse(localStorage.getItem(KEY) || '[]');
     return Array.isArray(value) ? value : [];
@@ -12,86 +16,62 @@ function readBreaks() {
   }
 }
 
-function writeBreaks(values) {
-  localStorage.setItem(KEY, JSON.stringify(Array.isArray(values) ? values : []));
+function writeRows(rows) {
+  localStorage.setItem(KEY, JSON.stringify(Array.isArray(rows) ? rows : []));
 }
 
-export function getJournalBreaks() {
-  return readBreaks();
+function normalizeId(value) {
+  return String(value || '');
 }
 
-export function getJournalBreaksForDay(breaks, workplaceId, date) {
-  const workplace = String(workplaceId || '');
-  const day = String(date || '');
-  return (Array.isArray(breaks) ? breaks : [])
-    .filter((item) => String(item?.workplaceId || '') === workplace && String(item?.date || '') === day)
-    .sort((a, b) => (timeToMinutes(a?.from) ?? 0) - (timeToMinutes(b?.from) ?? 0));
+export function getBreakRows() {
+  return readRows().map((row) => clone(row));
 }
 
-export function createJournalBreak({ workplaceId, date, from, to } = {}) {
-  const workplace = String(workplaceId || '');
-  const day = String(date || '').slice(0, 10);
-  const start = normalizeTime(from, '');
-  const end = normalizeTime(to, '');
-  if (!workplace || !day || !isValidRange(start, end)) return null;
-
-  const item = {
-    id: crypto.randomUUID(),
-    workplaceId: workplace,
-    date: day,
-    from: start,
-    to: end,
-    createdAt: new Date().toISOString(),
-  };
-  const breaks = getJournalBreaks();
-  breaks.push(item);
-  writeBreaks(breaks);
-  notifyTimeUsageChanged({ action: 'occupy', usageId: item.id, sourceId: item.id, date: item.date, workplaceId: item.workplaceId, from: item.from, to: item.to });
-  return item;
+export function getBreakRow(id) {
+  const breakId = normalizeId(id);
+  const row = readRows().find((item) => normalizeId(item?.id) === breakId) || null;
+  return clone(row);
 }
 
-export function moveJournalBreak(id, { from, to } = {}) {
-  const breakId = String(id || '');
-  const start = normalizeTime(from, '');
-  const end = normalizeTime(to, '');
-  if (!breakId || !isValidRange(start, end)) return null;
-  const breaks = getJournalBreaks();
-  const index = breaks.findIndex((item) => String(item?.id || '') === breakId);
+export function insertBreakRow(row = null) {
+  if (!row?.id || getBreakRow(row.id)) return null;
+  const rows = readRows();
+  const stored = clone(row);
+  rows.push(stored);
+  writeRows(rows);
+  return clone(stored);
+}
+
+export function patchBreakRow(id, patch = {}) {
+  const breakId = normalizeId(id);
+  const rows = readRows();
+  const index = rows.findIndex((item) => normalizeId(item?.id) === breakId);
   if (index < 0) return null;
-  const previous = breaks[index];
-  const updated = { ...previous, from: start, to: end };
-  breaks[index] = updated;
-  writeBreaks(breaks);
-  notifyTimeUsageChanged({ action: 'release', usageId: breakId, sourceId: breakId, date: previous.date, workplaceId: previous.workplaceId, from: previous.from, to: previous.to });
-  notifyTimeUsageChanged({ action: 'occupy', usageId: breakId, sourceId: breakId, date: updated.date, workplaceId: updated.workplaceId, from: updated.from, to: updated.to });
-  return updated;
+  rows[index] = { ...rows[index], ...clone(patch) };
+  writeRows(rows);
+  return clone(rows[index]);
 }
 
-export function removeJournalBreak(id) {
-  const breakId = String(id || '');
-  if (!breakId) return false;
-  const breaks = getJournalBreaks();
-  const index = breaks.findIndex((item) => String(item?.id || '') === breakId);
-  if (index < 0) return false;
-  const [removed] = breaks.splice(index, 1);
-  writeBreaks(breaks);
-  notifyTimeUsageChanged({ action: 'release', usageId: breakId, sourceId: breakId, date: removed?.date, workplaceId: removed?.workplaceId, from: removed?.from, to: removed?.to });
-  return true;
+export function deleteBreakRow(id) {
+  const breakId = normalizeId(id);
+  const rows = readRows();
+  const index = rows.findIndex((item) => normalizeId(item?.id) === breakId);
+  if (index < 0) return null;
+  const [removed] = rows.splice(index, 1);
+  writeRows(rows);
+  return clone(removed);
 }
 
-export function removeJournalBreaksForDay(workplaceId, date) {
+export function deleteBreakRowsForDay(workplaceId, date) {
   const workplace = String(workplaceId || '');
   const day = String(date || '').slice(0, 10);
-  if (!workplace || !day) return 0;
-  const breaks = getJournalBreaks();
-  const removed = breaks.filter((item) => String(item?.workplaceId || '') === workplace && String(item?.date || '').slice(0, 10) === day);
-  if (!removed.length) return 0;
-  const kept = breaks.filter((item) => !removed.includes(item));
-  writeBreaks(kept);
-  removed.forEach((item) => notifyTimeUsageChanged({ action: 'release', usageId: item.id, sourceId: item.id, date: item.date, workplaceId: item.workplaceId, from: item.from, to: item.to }));
-  return removed.length;
-}
-
-export function journalBreakMinutes(item) {
-  return minutesBetween(item?.from, item?.to);
+  if (!workplace || !day) return [];
+  const rows = readRows();
+  const removed = rows.filter((item) => String(item?.workplaceId || '') === workplace
+    && String(item?.date || '').slice(0, 10) === day);
+  if (!removed.length) return [];
+  const kept = rows.filter((item) => !removed.includes(item));
+  writeRows(kept);
+  return removed.map((item) => clone(item));
 }

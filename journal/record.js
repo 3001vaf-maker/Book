@@ -1,6 +1,6 @@
 import { button, durationPicker, durationText, entityCard, escapeHtml, iconButton, list, listEntry, stateView, initStateView, initCalendar, mountModal, modal, openNotice, initDurationPickers, initMultiSelect, viewNavigation, initViewNavigation } from '../ui/ui.js';
 import { createRecord } from './record-service.js';
-import { createJournalBreak } from './break-data.js';
+import { createJournalBreak } from './break-service.js';
 import { getAllClients } from '../main/clients/data.js';
 import { clientDisplay } from '../main/clients/presentation.js';
 import { openClientCreate } from '../main/clients/create.js';
@@ -9,8 +9,7 @@ import { getProcedures } from '../settings/service/procedures/data.js';
 import { openProcedureForm } from '../settings/service/procedures/form.js';
 import { checkTimeAvailability, listAvailableEndTimes, listAvailableStartTimes } from '../core/availability.js';
 import { timeToMinutes, minutesToTime } from '../core/time.js';
-import { getWorkplaces } from '../core/workplace-time.js';
-import { getDays } from '../core/day.js';
+import { getWorkplaces, getWorkplaceWorkingDates } from '../core/workplace-time.js';
 
 const RECORD_MODES = [
   { id: 'record', label: 'Создать запись' },
@@ -301,13 +300,6 @@ function renderClientStep(modalRoot, { date, workplaceId, from, to, procedures: 
   render();
 }
 
-function workingDatesForWorkplace(workplaceId) {
-  return getDays()
-    .filter((item) => String(item?.workplaceId || '') === String(workplaceId || '') && item?.date)
-    .map((item) => item.date)
-    .sort();
-}
-
 function openConfirmationWorkplaceModal({ workplaceId, onSelected }) {
   const workplaces = getWorkplaces();
   const items = workplaces.map((workplace) => ({
@@ -328,7 +320,7 @@ function openConfirmationWorkplaceModal({ workplaceId, onSelected }) {
 }
 
 function openConfirmationDateModal({ workplaceId, date, onSelected }) {
-  const workingDates = workingDatesForWorkplace(workplaceId);
+  const workingDates = getWorkplaceWorkingDates(workplaceId);
   const current = date instanceof Date ? date : new Date(`${String(date || workingDates[0] || dateKey(new Date()))}T00:00:00`);
   const content = `<div class="modal-title"><h2>Выбор даты</h2></div><div data-record-confirm-calendar></div>`;
   const m = mountModal(document.body, modal(content, { variant: 'large', surface: 'app' }));

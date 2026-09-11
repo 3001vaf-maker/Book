@@ -15,8 +15,7 @@ import {
 } from '../ui/ui.js';
 import { getRecordPaymentState, recordFinancialItems, repriceFinancialPlan } from '../core/financial-model.js';
 import { listAvailableStartTimes } from '../core/availability.js';
-import { getWorkplaces } from '../core/workplace-time.js';
-import { getDays } from '../core/day.js';
+import { getWorkplaces, getWorkplaceWorkingDates } from '../core/workplace-time.js';
 import { timeToMinutes, minutesToTime } from '../core/time.js';
 import { getAllClients } from '../main/clients/data.js';
 import { clientDisplay } from '../main/clients/presentation.js';
@@ -113,13 +112,6 @@ function productAvailable(product, workplaceId) {
   return !assigned.length || Boolean(workplaceAssignment(product, workplaceId));
 }
 
-function workingDatesForWorkplace(workplaceId) {
-  return getDays()
-    .filter((item) => String(item?.workplaceId || '') === String(workplaceId || '') && item?.date)
-    .map((item) => String(item.date))
-    .sort();
-}
-
 function openWorkplacePicker(state, onSelected) {
   const items = getWorkplaces().map((workplace) => ({
     title: workplace.name || workplace.title || 'Без названия',
@@ -140,7 +132,7 @@ function openWorkplacePicker(state, onSelected) {
 }
 
 function openDatePicker(state, onSelected) {
-  const workingDates = workingDatesForWorkplace(state.workplaceId);
+  const workingDates = getWorkplaceWorkingDates(state.workplaceId);
   if (!workingDates.length) {
     openNotice({ title: 'Нет рабочего дня', message: 'Для этого рабочего пространства нет доступных рабочих дат.' });
     return;
@@ -642,7 +634,6 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     baseline = stateSnapshot(state);
     render();
   };
-
   const onRecordsChanged = (event) => {
     if (updatingFromView || String(event?.detail?.recordId || '') !== String(record.id)) return;
     syncFromStoredRecord();

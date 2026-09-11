@@ -1,7 +1,7 @@
 import { button, escapeHtml, initTimePickers, modal, mountModal, openDayWorkplaceControl, timePicker } from '../ui/ui.js';
-import { createDay, findSuggestedInterval, getDay, getDayTime, getDays, getDaysForDate, saveDays, updateDayTime } from '../core/day.js';
+import { createDay, findSuggestedInterval, getDay, getDayDraftScheduleConflicts, getDayTime, getDays, getDaysForDate, saveDays, updateDayTime } from '../core/day.js';
 import { getWorkingTimeUsageConflicts } from '../core/time-usage.js';
-import { isValidRange, rangesOverlap } from '../core/time.js';
+import { isValidRange } from '../core/time.js';
 import { getWorkplaces, resolveWorkplaceTime } from '../core/workplace-time.js';
 
 function dateKey(value) {
@@ -17,12 +17,6 @@ function formatModalDate(value) {
   const [, month, day] = key.split('-');
   const monthName = months[Math.max(0, Number(month) - 1)] || '';
   return day && monthName ? `${Number(day)} ${monthName}` : key;
-}
-
-function overlapLabel(a, b) {
-  const from = a.from > b.from ? a.from : b.from;
-  const to = a.to < b.to ? a.to : b.to;
-  return `${from}–${to}`;
 }
 
 function usageLabel(usage) {
@@ -118,16 +112,11 @@ export function openTimetableDayEditor({
       if (!isValidRange(value.from, value.to)) errors[index].push('Проверьте рабочее время.');
     });
 
-    for (let left = 0; left < values.length; left += 1) {
-      if (!isValidRange(values[left].from, values[left].to)) continue;
-      for (let right = left + 1; right < values.length; right += 1) {
-        if (!isValidRange(values[right].from, values[right].to)) continue;
-        if (!rangesOverlap(values[left].from, values[left].to, values[right].from, values[right].to)) continue;
-        const overlap = overlapLabel(values[left], values[right]);
-        errors[left].push(`Пересечение с ${values[right].name}: ${overlap}`);
-        errors[right].push(`Пересечение с ${values[left].name}: ${overlap}`);
-      }
-    }
+    getDayDraftScheduleConflicts(values).forEach((conflict) => {
+      const overlap = `${conflict.from}–${conflict.to}`;
+      errors[conflict.leftIndex].push(`Пересечение с ${values[conflict.rightIndex].name}: ${overlap}`);
+      errors[conflict.rightIndex].push(`Пересечение с ${values[conflict.leftIndex].name}: ${overlap}`);
+    });
 
     values.forEach((value, index) => {
       if (!isValidRange(value.from, value.to)) return;

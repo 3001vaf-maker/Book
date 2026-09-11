@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { saveDays } from '../core/day.js';
 import { getActiveDayWorkplaces, getAvailableDayWorkplaces } from '../core/day-workplaces.js';
+import { getWorkplaceWorkingDates } from '../core/workplace-time.js';
 
 const storage = new Map();
 globalThis.localStorage = {
@@ -16,7 +17,13 @@ const workplaces = [
   { key: 'studio', name: 'Studio 1', from: '12:00', to: '21:00', color: '#333333' },
 ];
 
-saveDays([{ date: '2026-09-08', workplaceId: 'beauty', from: '12:00', to: '13:00' }]);
+saveDays([
+  { date: '2026-09-10', workplaceId: 'beauty', from: '12:00', to: '13:00' },
+  { date: '2026-09-08', workplaceId: 'beauty', from: '12:00', to: '13:00' },
+]);
+
+assert.deepEqual(getWorkplaceWorkingDates('beauty'), ['2026-09-08', '2026-09-10']);
+assert.deepEqual(getWorkplaceWorkingDates('fairy'), []);
 
 const active = getActiveDayWorkplaces('2026-09-08', workplaces);
 assert.equal(active.length, 1);
