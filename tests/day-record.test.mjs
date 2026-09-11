@@ -3,7 +3,8 @@ import { createDay, getDays, getScheduleConflicts, hasScheduleConflict, removeDa
 import { configureTimeUsageSource, configureSoftTimeUsageReleaseSource, getWorkingTimeUsageConflicts } from '../core/time-usage.js';
 import { createRecord, moveRecord, cancelRecord, deleteRecord } from '../journal/record-service.js';
 import { getRecords } from '../journal/record-read.js';
-import { createJournalBreak, getJournalBreaks, getJournalBreaksForDay } from '../journal/break-data.js';
+import { createJournalBreak } from '../journal/break-service.js';
+import { getJournalBreaks, getJournalBreaksForDay } from '../journal/break-read.js';
 import { getJournalTimeUsages, releaseJournalSoftTimeUsages } from '../journal/time-usage-source.js';
 
 const store = new Map();
