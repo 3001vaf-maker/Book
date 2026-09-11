@@ -35,6 +35,10 @@ export function getWalletBalance(id) {
   }, 0);
 }
 
+export function getWalletTotalBalance() {
+  return getWallets().reduce((sum, wallet) => sum + getWalletBalance(wallet.id), 0);
+}
+
 export function saveWallet(wallet) {
   const values = getWallets();
   const exists = values.some((item) => item.id === wallet.id);

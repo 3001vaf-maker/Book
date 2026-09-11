@@ -4,7 +4,6 @@ const folders = [
   ['profile', 'Профиль', '◫', () => import('./profile/profile.js')],
   ['service', 'Сервис', '◫', () => import('./service/service.js')],
   ['documents', 'Документы', '◫', () => import('./documents/documents.js')],
-  ['wallets', 'Кошелёк', '◫', () => import('./wallets/wallets.js')],
   ['tags', 'Ярлыки', '◫', () => import('./tags/tags.js')],
 ];
 
