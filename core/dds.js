@@ -138,45 +138,12 @@ function refundTotal(state, paymentId) {
     .reduce((sum, item) => sum + Math.max(0, numberValue(item?.total)), 0);
 }
 
-function paymentsForSource(state, source = null) {
-  const key = sourceKey(source);
-  if (key === ':') return [];
-  return state.income.filter((payment) => sourceKey(payment?.source) === key);
-}
-
-function paymentNet(state, payment) {
-  return Math.max(0, numberValue(payment?.total) - refundTotal(state, payment?.id));
-}
-
-function paymentStateForSource(state, source = null, planTotalOverride = null) {
-  const payments = paymentsForSource(state, source);
-  const latestFinance = [...payments].reverse().find((payment) => payment?.finance)?.finance || null;
-  const override = planTotalOverride == null ? null : Math.max(0, numberValue(planTotalOverride));
-  const planTotal = override == null ? Math.max(0, numberValue(latestFinance?.planTotal)) : override;
-  const paidTotal = payments.reduce((sum, payment) => sum + paymentNet(state, payment), 0);
-  const remaining = Math.max(0, planTotal - paidTotal);
-  const fullyPaid = planTotal > 0 && remaining <= 0.009;
-  const partiallyPaid = paidTotal > 0.009 && !fullyPaid;
-  const activePayments = payments.filter((payment) => paymentNet(state, payment) > 0.009);
-  return {
-    planTotal,
-    paidTotal,
-    remaining,
-    fullyPaid,
-    partiallyPaid,
-    hasPayments: activePayments.length > 0,
-    payments: activePayments,
-    latestPayment: activePayments.length ? activePayments[activePayments.length - 1] : null,
-  };
-}
-
-export function recordPaymentIncome({ source = null, workplace = '', client = null, finance = null, allocations = [], now = new Date() } = {}) {
+export function recordPaymentIncome({ source = null, workplace = '', client = null, finance = null, allocations = [], maxAmount = null, now = new Date() } = {}) {
   if (!source?.type || !source?.id) return null;
   const snapshot = normalizeFinancialSnapshot(finance);
-  if (!snapshot) return null;
-  const state = readState();
-  const before = paymentStateForSource(state, source, snapshot.planTotal);
-  if (before.remaining <= 0.009) return null;
+  if (!snapshot || maxAmount == null) return null;
+  const limit = Math.max(0, numberValue(maxAmount));
+  if (limit <= 0.009) return null;
 
   const preparedAllocations = (Array.isArray(allocations) ? allocations : [])
     .map((item) => ({
@@ -187,7 +154,7 @@ export function recordPaymentIncome({ source = null, workplace = '', client = nu
     }))
     .filter((item) => item.walletId && item.amount > 0);
   const allocated = preparedAllocations.reduce((sum, item) => sum + item.amount, 0);
-  if (!preparedAllocations.length || allocated <= 0 || allocated > before.remaining + 0.009) return null;
+  if (!preparedAllocations.length || allocated <= 0 || allocated > limit + 0.009) return null;
 
   const payment = normalizeIncome({
     id: globalThis.crypto?.randomUUID?.() || `payment-${Date.now()}`,
@@ -202,16 +169,10 @@ export function recordPaymentIncome({ source = null, workplace = '', client = nu
     createdAt: now.toISOString(),
     paidAt: now.toISOString(),
   });
+  const state = readState();
   state.income.push(payment);
   writeState(state);
-  const after = paymentStateForSource(state, source, snapshot.planTotal);
-  notifyDDSChanged({
-    action: after.fullyPaid ? 'income-full' : 'income-partial',
-    paymentId: payment.id,
-    total: payment.total,
-    remaining: after.remaining,
-    source: payment.source,
-  });
+  notifyDDSChanged({ action: 'income', paymentId: payment.id, total: payment.total, source: payment.source });
   return payment;
 }
 
@@ -305,31 +266,6 @@ export function getWalletDDSMovements(walletId) {
   });
 
   return entries.sort((a, b) => String(a?.createdAt || '').localeCompare(String(b?.createdAt || '')));
-}
-
-export function getPaymentStateForSource(type, id, planTotal = null) {
-  const source = { type: String(type || ''), id: String(id || '') };
-  if (!source.type || !source.id) return {
-    planTotal: Math.max(0, numberValue(planTotal)),
-    paidTotal: 0,
-    remaining: Math.max(0, numberValue(planTotal)),
-    fullyPaid: false,
-    partiallyPaid: false,
-    hasPayments: false,
-    payments: [],
-    latestPayment: null,
-  };
-  const value = paymentStateForSource(readState(), source, planTotal);
-  return {
-    ...value,
-    payments: value.payments.map((item) => ({ ...item })),
-    latestPayment: value.latestPayment ? { ...value.latestPayment } : null,
-  };
-}
-
-export function getActivePaymentForSource(type, id) {
-  const state = getPaymentStateForSource(type, id);
-  return state.fullyPaid ? state.latestPayment : null;
 }
 
 export function getRefundsForPayment(paymentId) {
