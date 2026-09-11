@@ -12,8 +12,7 @@ import {
   openNotice,
   timeSlots,
 } from '../ui/ui.js';
-import { getActivePaymentForSource } from '../core/dds.js';
-import { repriceFinancialPlan } from '../core/financial-model.js';
+import { getRecordPaymentState, repriceFinancialPlan } from '../core/financial-model.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getDays, getDay, getDayTime } from '../core/day.js';
 import { timeToMinutes, minutesToTime } from '../core/time.js';
@@ -275,8 +274,9 @@ function confirmCancel(record, onCancelled) {
 
 export function openRecordView(record, { onClose = () => {} } = {}) {
   if (!record?.id) return;
-  const isPaid = () => Boolean(getActivePaymentForSource('record', record.id));
-  let state = stateFromRecord(record, { paid: isPaid() });
+  const recordPaid = (value) => Boolean(getRecordPaymentState(value).fullyPaid);
+  let state = stateFromRecord(record, { paid: recordPaid(record) });
+  const isPaid = () => recordPaid({ ...record, ...state, id: record.id });
   const original = { ...record };
   let baseline = stateSnapshot(state);
   let startTimer = null;
@@ -503,7 +503,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
   const onDDSChanged = (event) => {
     const source = event?.detail?.source;
     if (String(source?.type || '') !== 'record' || String(source?.id || '') !== String(record.id)) return;
-    syncFromStoredRecord({ paid: true });
+    syncFromStoredRecord();
   };
   window.addEventListener('book:records-changed', onRecordsChanged);
   window.addEventListener('book:dds-changed', onDDSChanged);

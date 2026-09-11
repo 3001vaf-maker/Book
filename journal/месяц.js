@@ -1,5 +1,5 @@
 import { initCalendar, ALL_WORKPLACES_ID } from '../ui/ui.js';
-import { getActivePaymentForSource } from '../core/dds.js';
+import { getRecordPaymentState } from '../core/financial-model.js';
 import { minutesBetween } from '../core/time.js';
 import { getWorkplaces, getWorkingDays, getWorkingDates, getAllWorkingDates, getWorkingDayIndicators, getWorkingDay, getWorkingDayTotalMinutes, resolveWorkingDayTime } from '../core/workplace-time.js';
 import { getRecordsForDay } from './record-data.js';
@@ -28,7 +28,7 @@ function dayRecordData({ dateKey, workplaceId, allMode, workingDays, workplaces 
 
   records.forEach((record) => {
     const duration = recordMinutes(record);
-    const paid = Boolean(record?.id && getActivePaymentForSource('record', record.id));
+    const paid = Boolean(getRecordPaymentState(record).fullyPaid);
     const state = recordVisualState(record, { paid });
     if (state === 'paid') minutes.paid += duration;
     else if (state === 'no-show') minutes.noShow += duration;

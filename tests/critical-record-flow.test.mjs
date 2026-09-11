@@ -64,6 +64,8 @@ const payment = recordPaymentIncome({
   workplace: 'Студия',
   client: { key: 'client-1', name: 'Анна Тест' },
   finance: noShow.finance,
+  maxAmount: 6400,
+  serviceAmount: 6400,
   allocations: [{ walletId: 'cash', walletName: 'Наличные', amount: 6400 }],
 });
 assert.ok(payment);
@@ -127,6 +129,8 @@ const paymentStageIncome = recordPaymentIncome({
   workplace: 'Студия',
   client: { key: 'client-2', name: 'Ирина БезСкидки' },
   finance: paymentStageUpdated.finance,
+  maxAmount: 6400,
+  serviceAmount: 6400,
   allocations: [{ walletId: 'cash', walletName: 'Наличные', amount: 6400 }],
 });
 assert.ok(paymentStageIncome);
@@ -161,6 +165,8 @@ const historicalIncome = recordPaymentIncome({
   workplace: 'Студия',
   client: { key: 'client-history', name: 'История' },
   finance: historicalPlan,
+  maxAmount: 6400,
+  serviceAmount: 6400,
   allocations: [{ walletId: 'cashless', walletName: 'Безналичные', amount: 6400 }],
 });
 assert.ok(historicalIncome);
