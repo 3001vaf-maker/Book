@@ -165,7 +165,7 @@ function renderProceduresStep(modalRoot, { date, workplaceId, from, to, onCreate
   let items = procedures().filter((procedure) => procedureForWorkplace(procedure, workplaceId));
   const selected = new Map();
   let selectionController = null;
-  const host = renderFlow(modalRoot, `<div class="record-screen record-screen--procedures"><div class="record-modal-toolbar"><strong>Процедуры</strong>${button('Из прайса', { className: 'ui-button--compact', data: 'data-record-from-price', variant: 'secondary' })}${iconButton('+', { className: 'icon-button--primary', data: 'data-record-add', aria: 'Добавить процедуру' })}</div><div data-record-procedures></div><div class="record-modal-actions modal-actions" data-record-actions></div></div>`);
+  const host = renderFlow(modalRoot, `<div class="record-screen record-screen--procedures"><div class="record-modal-toolbar"><strong>Процедуры</strong>${button('Из прайса', { data: 'data-record-from-price', variant: 'secondary' })}${iconButton('+', { className: 'icon-button--primary', data: 'data-record-add', aria: 'Добавить процедуру' })}</div><div data-record-procedures></div><div class="record-modal-actions modal-actions" data-record-actions></div></div>`);
   if (!host) return;
 
   const syncActions = () => {
