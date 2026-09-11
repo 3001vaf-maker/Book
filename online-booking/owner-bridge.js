@@ -1,0 +1,232 @@
+import { apiRequest } from '../core/auth.js';
+import { getDays } from '../core/day/index.js';
+import { createRecord, getRecords } from '../core/record/index.js';
+import { getJournalBreaks } from '../journal/break-read.js';
+import { getDocuments } from '../settings/documents/data.js';
+import { getProfile } from '../settings/profile/data.js';
+import { getWorkplaces } from '../settings/profile/workplaces/data.js';
+import { getProcedures } from '../settings/service/procedures/data.js';
+
+const POLL_MS = 4000;
+let timer = null;
+let running = false;
+let lastPublication = '';
+let stopListeners = () => {};
+
+function safeProfile(profile = {}) {
+  return {
+    name: String(profile.name || ''),
+    surname: String(profile.surname || ''),
+    photo: String(profile.photo || ''),
+    profession: String(profile.profession || ''),
+    about: String(profile.about || ''),
+  };
+}
+
+function safeWorkplace(workplace = {}) {
+  return {
+    key: String(workplace.key || ''),
+    photo: String(workplace.photo || ''),
+    name: String(workplace.name || ''),
+    color: String(workplace.color || ''),
+    city: String(workplace.city || ''),
+    address: String(workplace.address || ''),
+    phone: String(workplace.phone || ''),
+    currency: String(workplace.currency || 'RUB'),
+    from: String(workplace.from || ''),
+    to: String(workplace.to || ''),
+    about: String(workplace.about || ''),
+  };
+}
+
+function safeProcedure(procedure = {}) {
+  return {
+    id: String(procedure.id || ''),
+    photo: String(procedure.photo || ''),
+    name: String(procedure.name || ''),
+    description: String(procedure.description || ''),
+    duration: Math.max(0, Number(procedure.duration || 0)),
+    breakDuration: Math.max(0, Number(procedure.breakDuration || 0)),
+    cost: procedure.cost || {},
+    workplaces: Array.isArray(procedure.workplaces) ? procedure.workplaces : [],
+  };
+}
+
+function safeDay(day = {}) {
+  return {
+    date: String(day.date || '').slice(0, 10),
+    workplaceId: String(day.workplaceId || ''),
+    from: String(day.from || ''),
+    to: String(day.to || ''),
+  };
+}
+
+function safeDocument(document = {}) {
+  return {
+    id: String(document.id || ''),
+    title: String(document.title || ''),
+    text: String(document.text || ''),
+    version: Math.max(1, Number(document.version || 1)),
+    required: Boolean(document.required),
+    clientConsent: Boolean(document.clientConsent),
+  };
+}
+
+function publicationData() {
+  const records = getRecords()
+    .filter((record) => record?.status !== 'cancelled')
+    .map((record) => ({
+      id: String(record.id || ''),
+      type: 'record',
+      date: String(record.date || '').slice(0, 10),
+      workplaceId: String(record.workplaceId || ''),
+      from: String(record.from || ''),
+      to: String(record.to || ''),
+    }));
+  const breaks = getJournalBreaks().map((item) => ({
+    id: String(item.id || ''),
+    type: 'break',
+    date: String(item.date || '').slice(0, 10),
+    workplaceId: String(item.workplaceId || ''),
+    from: String(item.from || ''),
+    to: String(item.to || ''),
+  }));
+
+  return {
+    profile: safeProfile(getProfile()),
+    workplaces: getWorkplaces().map(safeWorkplace).filter((item) => item.key),
+    procedures: getProcedures().map(safeProcedure).filter((item) => item.id),
+    days: getDays().map(safeDay).filter((item) => item.date && item.workplaceId),
+    documents: getDocuments().filter((item) => item.clientConsent).map(safeDocument),
+    occupancy: [...records, ...breaks].filter((item) => item.date && item.workplaceId && item.from && item.to),
+  };
+}
+
+async function responseJson(response, fallback = 'Ошибка онлайн-записи') {
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.message || fallback);
+  return payload;
+}
+
+async function publish(force = false) {
+  const data = publicationData();
+  const serialized = JSON.stringify(data);
+  if (!force && serialized === lastPublication) return false;
+  const response = await apiRequest('/online-booking/owner/publication', {
+    method: 'PUT',
+    body: JSON.stringify({ data }),
+  });
+  await responseJson(response, 'Не удалось опубликовать онлайн-запись');
+  lastPublication = serialized;
+  return true;
+}
+
+async function markImported(requestId, recordId) {
+  const response = await apiRequest(`/online-booking/owner/requests/${encodeURIComponent(requestId)}/imported`, {
+    method: 'POST',
+    body: JSON.stringify({ recordId }),
+  });
+  await responseJson(response);
+}
+
+async function markRejected(requestId) {
+  const response = await apiRequest(`/online-booking/owner/requests/${encodeURIComponent(requestId)}/rejected`, {
+    method: 'POST',
+  });
+  await responseJson(response);
+}
+
+function accountSnapshot(request = {}) {
+  const account = request.account || {};
+  return {
+    key: '',
+    id: '',
+    accountId: String(account.id || request.accountId || ''),
+    name: String(account.name || ''),
+    surname: String(account.surname || ''),
+    phone: String(account.phone || ''),
+    email: String(account.email || ''),
+    telegramId: String(account.telegramId || ''),
+    discountPercent: 0,
+  };
+}
+
+async function importRequest(request) {
+  const requestId = String(request?.id || '');
+  if (!requestId) return false;
+  const existing = getRecords().find((record) => String(record?.sourceRequestId || '') === requestId);
+  if (existing) {
+    await markImported(requestId, existing.id);
+    return false;
+  }
+
+  const record = createRecord({
+    date: request.date,
+    workplaceId: request.workplaceKey,
+    from: request.from,
+    to: request.to,
+    client: accountSnapshot(request),
+    procedures: Array.isArray(request.procedures) ? request.procedures : [],
+    source: 'online-booking',
+    sourceRequestId: requestId,
+  });
+  if (!record) {
+    await markRejected(requestId);
+    return false;
+  }
+  await markImported(requestId, record.id);
+  return true;
+}
+
+async function pullRequests() {
+  const response = await apiRequest('/online-booking/owner/requests');
+  const requests = await responseJson(response, 'Не удалось получить онлайн-записи');
+  let changed = false;
+  for (const request of Array.isArray(requests) ? requests : []) {
+    try {
+      if (await importRequest(request)) changed = true;
+    } catch {
+      // The next poll retries the request; canonical Record remains the final import gate.
+    }
+  }
+  return changed;
+}
+
+async function run() {
+  if (running) return;
+  running = true;
+  try {
+    await publish();
+    const changed = await pullRequests();
+    if (changed) await publish(true);
+  } catch {
+    // Owner UI keeps working if the public booking server is temporarily unavailable.
+  } finally {
+    running = false;
+  }
+}
+
+export function startOnlineBookingBridge() {
+  if (timer) return () => stopOnlineBookingBridge();
+  void run();
+  timer = window.setInterval(() => void run(), POLL_MS);
+  const refresh = () => void run();
+  window.addEventListener('book:records-changed', refresh);
+  window.addEventListener('book:time-usage-changed', refresh);
+  document.addEventListener('visibilitychange', refresh);
+  stopListeners = () => {
+    window.removeEventListener('book:records-changed', refresh);
+    window.removeEventListener('book:time-usage-changed', refresh);
+    document.removeEventListener('visibilitychange', refresh);
+  };
+  return () => stopOnlineBookingBridge();
+}
+
+export function stopOnlineBookingBridge() {
+  if (timer) window.clearInterval(timer);
+  timer = null;
+  stopListeners();
+  stopListeners = () => {};
+}
+
+export { publicationData as buildOnlineBookingPublication };
