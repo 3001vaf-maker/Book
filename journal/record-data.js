@@ -1,9 +1,6 @@
-import { containsRange, isValidRange, rangesOverlap } from '../core/time.js';
-import { getDays, getDay, getDayTime } from '../core/day.js';
-import { getWorkplaces } from '../core/workplace-time.js';
+import { checkTimeAvailability } from '../core/availability.js';
 import { calculateFinancialPlan, getRecordFinancialPlanFact, recordFinancialItems, repriceFinancialPlan, resolveRecordFinancialPlan } from '../core/financial-model.js';
 import { getAllClients } from '../main/clients/data.js';
-import { getJournalBreaks } from './break-data.js';
 
 const KEY = 'book.records';
 
@@ -24,23 +21,6 @@ function numberValue(value) {
   return Number.isFinite(number) ? number : 0;
 }
 function percent(value) { return Math.max(0, Math.min(100, numberValue(value))); }
-function usagesForDay(date, workplaceId, records = readList(KEY), breaks = getJournalBreaks()) {
-  const day = normalizeDate(date), workplace = normalizeId(workplaceId);
-  return [
-    ...records.filter((item) => item?.date === day && normalizeId(item?.workplaceId) === workplace && item?.status !== 'cancelled').map((item) => ({ ...item, type: 'record', sourceId: item.id })),
-    ...breaks.filter((item) => item?.date === day && normalizeId(item?.workplaceId) === workplace).map((item) => ({ ...item, type: 'break', sourceId: item.id })),
-  ];
-}
-function dayAllows({ date, workplaceId, from, to }) {
-  const day = getDay(getDays(), workplaceId, date);
-  if (!day) return { ok: false, reason: 'day-not-working', day: null, time: null };
-  const time = getDayTime(day, getWorkplaces());
-  if (!time || !containsRange(time.from, time.to, from, to)) return { ok: false, reason: 'outside-working-time', day, time };
-  return { ok: true, reason: '', day, time };
-}
-function hasUsageConflict({ date, workplaceId, from, to, excludeId = '' }) {
-  return usagesForDay(date, workplaceId).some((usage) => usage?.sourceId !== excludeId && rangesOverlap(from, to, usage.from, usage.to));
-}
 
 function clientDiscount(client = null) {
   if (!client) return 0;
@@ -101,23 +81,9 @@ export function getActiveRecordCountForDay(date, workplaceId = '') {
   return getRecordsForDay(date, workplaceId).filter((record) => record?.status !== 'cancelled').length;
 }
 
-export function getWorkingTimeRecordConflicts({ date, workplaceId, from, to, operation = 'resize' } = {}) {
-  const activeRecords = getRecordsForDay(date, workplaceId).filter((record) => record?.status !== 'cancelled');
-  if (operation === 'remove') {
-    return activeRecords.map((record) => ({ type: 'record', from: String(record?.from || ''), to: String(record?.to || '') }));
-  }
-  if (!isValidRange(from, to)) return [];
-  return activeRecords
-    .filter((record) => isValidRange(record?.from, record?.to) && !containsRange(from, to, record.from, record.to))
-    .map((record) => ({ type: 'record', from: String(record.from), to: String(record.to) }));
-}
-
 export function checkRecordTime({ date, workplaceId, from, to, excludeId = '' } = {}) {
-  if (!isValidRange(from, to)) return { ok: false, reason: 'invalid-time' };
-  const day = dayAllows({ date, workplaceId, from, to });
-  if (!day.ok) return day;
-  if (hasUsageConflict({ date, workplaceId, from, to, excludeId })) return { ok: false, reason: 'occupied', day: day.day, time: day.time };
-  return day;
+  const result = checkTimeAvailability({ date, workplaceId, from, to, excludeId });
+  return { ok: result.ok, reason: result.reason, conflicts: result.conflicts || [] };
 }
 
 export function createRecord({ date, workplaceId, from, to, client, procedures = [], products = [] } = {}) {
