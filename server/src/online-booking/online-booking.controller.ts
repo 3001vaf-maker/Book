@@ -18,6 +18,18 @@ export class OnlineBookingController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get('owner/accounts')
+  ownerAccounts(@Req() request: OwnerRequest) {
+    return this.booking.ownerAccounts(request.auth!.tenantId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Put('owner/accounts/sync')
+  syncOwnerAccounts(@Req() request: OwnerRequest, @Body() body: { accounts?: unknown }) {
+    return this.booking.syncOwnerAccounts(request.auth!.tenantId, body?.accounts || []);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get('owner/requests')
   pendingRequests(@Req() request: OwnerRequest) {
     return this.booking.pendingRequests(request.auth!.tenantId);
@@ -27,6 +39,12 @@ export class OnlineBookingController {
   @Post('owner/requests/:requestId/imported')
   markImported(@Req() request: OwnerRequest, @Param('requestId') requestId: string, @Body() body: { recordId?: string }) {
     return this.booking.markImported(request.auth!.tenantId, requestId, body?.recordId || '');
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Put('owner/requests/:requestId/snapshot')
+  syncRequestSnapshot(@Req() request: OwnerRequest, @Param('requestId') requestId: string, @Body() body: { snapshot?: unknown }) {
+    return this.booking.syncRequestSnapshot(request.auth!.tenantId, requestId, body?.snapshot || {});
   }
 
   @UseGuards(JwtAuthGuard)
