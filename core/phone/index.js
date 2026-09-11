@@ -68,21 +68,17 @@ function internationalCountry(digits, preferredIso = '') {
 }
 
 function stripKnownPrefix(digits, country) {
-  let value = digits;
-  if (value.length <= country.maxLength) return value;
+  if (digits.length <= country.maxLength) return digits;
 
-  if (value.startsWith(country.dialCode)) {
-    const withoutDial = value.slice(country.dialCode.length);
-    if (withoutDial.length <= country.maxLength) return withoutDial;
+  if (digits.startsWith(country.dialCode)) {
+    return digits.slice(country.dialCode.length);
   }
 
   for (const prefix of country.trunkPrefixes) {
-    if (!value.startsWith(prefix)) continue;
-    const withoutPrefix = value.slice(prefix.length);
-    if (withoutPrefix.length <= country.maxLength) return withoutPrefix;
+    if (digits.startsWith(prefix)) return digits.slice(prefix.length);
   }
 
-  return value;
+  return digits;
 }
 
 function groupByPattern(digits, pattern) {
