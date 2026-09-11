@@ -1,8 +1,10 @@
 import { apiRequest } from '../core/auth.js';
+import { getBookingSettings } from '../core/booking-settings/index.js';
 import { getDays } from '../core/day/index.js';
+import { getRecordPaymentState } from '../core/finance/index.js';
 import { createRecord, getRecords } from '../core/record/index.js';
 import { getJournalBreaks } from '../journal/break-read.js';
-import { upsertPersonFromBookingAccount } from '../main/clients/data.js';
+import { findPersonByAccountId, upsertPersonFromBookingAccount } from '../main/clients/data.js';
 import { getLatestClientConsent, recordConsent } from '../settings/documents/consents.js';
 import { getDocuments } from '../settings/documents/data.js';
 import { getProfile } from '../settings/profile/data.js';
@@ -14,6 +16,7 @@ let timer = null;
 let running = false;
 let lastPublication = '';
 let stopListeners = () => {};
+const lastSnapshots = new Map();
 
 function safeProfile(profile = {}) {
   return {
@@ -96,6 +99,7 @@ function publicationData() {
 
   return {
     profile: safeProfile(getProfile()),
+    settings: getBookingSettings(),
     workplaces: getWorkplaces().map(safeWorkplace).filter((item) => item.key),
     procedures: getProcedures().map(safeProcedure).filter((item) => item.id),
     days: getDays().map(safeDay).filter((item) => item.date && item.workplaceId),
@@ -220,12 +224,81 @@ async function pullRequests() {
   return changed;
 }
 
+function recordSnapshot(record = {}) {
+  const finance = record.finance || {};
+  const payment = getRecordPaymentState(record);
+  const subtotal = Math.max(0, Number(finance.serviceTotal || 0));
+  const total = Math.max(0, Number(finance.planTotal || 0));
+  const discountPercent = Math.max(0, Number(finance.discountPercent ?? record?.client?.discountPercent ?? 0));
+  return {
+    recordId: String(record.id || ''),
+    procedures: (Array.isArray(record.procedures) ? record.procedures : []).map((item) => ({
+      id: String(item.id || ''),
+      name: String(item.name || ''),
+      cost: item.cost ?? '',
+      duration: Math.max(0, Number(item.duration || 0)),
+    })),
+    pricing: { subtotal, discountPercent, total },
+    payment: {
+      state: payment.fullyPaid ? 'paid' : payment.partiallyPaid ? 'partial' : 'unpaid',
+      paid: Math.max(0, Number(payment.paidTotal || 0)),
+      due: Math.max(0, Number(payment.remaining ?? total)),
+    },
+    updatedAt: String(record.updatedAt || new Date().toISOString()),
+  };
+}
+
+async function syncRecordSnapshots() {
+  const records = getRecords().filter((record) => record?.source === 'online-booking' && record?.sourceRequestId);
+  for (const record of records) {
+    const requestId = String(record.sourceRequestId || '');
+    const snapshot = recordSnapshot(record);
+    const serialized = JSON.stringify(snapshot);
+    if (lastSnapshots.get(requestId) === serialized) continue;
+    const response = await apiRequest(`/online-booking/owner/requests/${encodeURIComponent(requestId)}/snapshot`, {
+      method: 'PUT',
+      body: JSON.stringify({ snapshot }),
+    });
+    await responseJson(response, 'Не удалось обновить карточку записи');
+    lastSnapshots.set(requestId, serialized);
+  }
+}
+
+async function syncAccounts() {
+  const response = await apiRequest('/online-booking/owner/accounts');
+  const accounts = await responseJson(response, 'Не удалось получить аккаунты онлайн-записи');
+  const masterFacts = [];
+  for (const account of Array.isArray(accounts) ? accounts : []) {
+    const person = upsertPersonFromBookingAccount(account);
+    persistAccountConsents(person, account);
+    const current = findPersonByAccountId(account.id) || person;
+    if (!current) continue;
+    masterFacts.push({
+      accountId: account.id,
+      uei: current.uei || '',
+      discountPercent: Number(current.discountPercent || 0),
+      visits: Number(current.visits || 0),
+      totalSpent: Number(current.totalSpent || 0),
+      lastVisit: String(current.lastVisit || ''),
+      programs: Array.isArray(current.programs) ? current.programs : [],
+    });
+  }
+  if (!masterFacts.length) return;
+  const syncResponse = await apiRequest('/online-booking/owner/accounts/sync', {
+    method: 'PUT',
+    body: JSON.stringify({ accounts: masterFacts }),
+  });
+  await responseJson(syncResponse, 'Не удалось обновить данные аккаунтов');
+}
+
 async function run() {
   if (running) return;
   running = true;
   try {
     await publish();
+    await syncAccounts();
     const changed = await pullRequests();
+    await syncRecordSnapshots();
     if (changed) await publish(true);
   } catch {
     // Owner UI keeps working if the public booking server is temporarily unavailable.
@@ -241,10 +314,12 @@ export function startOnlineBookingBridge() {
   const refresh = () => void run();
   window.addEventListener('book:records-changed', refresh);
   window.addEventListener('book:time-usage-changed', refresh);
+  window.addEventListener('book:booking-settings-changed', refresh);
   document.addEventListener('visibilitychange', refresh);
   stopListeners = () => {
     window.removeEventListener('book:records-changed', refresh);
     window.removeEventListener('book:time-usage-changed', refresh);
+    window.removeEventListener('book:booking-settings-changed', refresh);
     document.removeEventListener('visibilitychange', refresh);
   };
   return () => stopOnlineBookingBridge();
