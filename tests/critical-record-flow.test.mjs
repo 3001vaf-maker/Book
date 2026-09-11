@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs';
 import { calculateFinancialPlan, getFinancialItemFact } from '../core/financial-model.js';
 import { createDay } from '../core/day.js';
 import { recordPaymentIncome, recordRefundExpense } from '../core/dds.js';
-import { createRecord, getRecords, moveRecord, updateRecord } from '../journal/record-data.js';
+import { getRecords } from '../journal/record-read.js';
+import { createRecord, moveRecord, updateRecord } from '../journal/record-service.js';
 import { recordVisualState } from '../journal/record-state.js';
 import { renderJournalList } from '../journal/список.js';
 import { getClientMetadata } from '../main/clients/metadata.js';
@@ -146,7 +147,6 @@ assert.equal(getWalletBalance('cash'), 12800);
 
 const returned = recordRefundExpense(paymentStageIncome.id, { reason: 'Возврат клиенту' });
 assert.ok(returned);
-updateRecord(paymentStageRecord.id, {});
 assert.equal(getClientMetadata('client-2').paidTotal, 0);
 assert.equal(getFinancialItemFact('procedure', 'procedure-2').factTotal, 0);
 assert.equal(getWalletBalance('cash'), 6400);
