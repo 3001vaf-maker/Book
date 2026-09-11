@@ -198,7 +198,7 @@ function openClientPicker(state, onSelected) {
       if (!person) return;
       m.remove();
       const display = clientDisplay(person);
-      onSelected?.({ key: person.key, id: person.id, uei: display.uei, name: person.name, surname: person.surname, phone: display.phone });
+      onSelected?.({ key: person.key, id: person.id, uei: display.uei, name: person.name, surname: person.surname, phone: display.phone, discountPercent: Number(person.discountPercent) || 0 });
     }));
   };
   const search = m.querySelector('[data-record-view-client-search]');

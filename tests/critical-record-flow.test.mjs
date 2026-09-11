@@ -33,7 +33,7 @@ const record = createRecord({
   workplaceId: 'studio',
   from: '10:00',
   to: '11:00',
-  client: { key: 'client-1', name: 'Анна', surname: 'Тест', phone: '+70000000000' },
+  client: { key: 'client-1', name: 'Анна', surname: 'Тест', phone: '+70000000000', discountPercent: 20 },
   procedures: [{ id: 'procedure-1', name: 'Стрижка', cost: 5000, duration: 60 }],
 });
 assert.ok(record);
