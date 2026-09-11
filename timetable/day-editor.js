@@ -25,6 +25,10 @@ function overlapLabel(a, b) {
   return `${from}–${to}`;
 }
 
+function usageLabel(usage) {
+  return usage?.type === 'break' ? 'Перерыв' : 'Запись';
+}
+
 function dayEntries(date, workingDays, workplaces) {
   return getDaysForDate(workingDays, date).map((day) => {
     const workplaceId = String(day?.workplaceId || '');
@@ -135,7 +139,7 @@ export function openTimetableDayEditor({
       });
       conflicts.forEach((conflict) => {
         if (!conflict?.from || !conflict?.to) return;
-        errors[index].push(`Запись ${conflict.from}–${conflict.to} выходит за рабочее время`);
+        errors[index].push(`${usageLabel(conflict)} ${conflict.from}–${conflict.to} выходит за рабочее время`);
       });
     });
 
