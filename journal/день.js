@@ -26,7 +26,12 @@ function openExistingRecord(record) {
   closePayment = openRecordPaymentEntry(record);
 }
 
-export function renderJournalDay(root, { date = new Date(), workplaceId = '', onChange = () => {} } = {}) {
+export function renderJournalDay(root, {
+  date = new Date(),
+  workplaceId = '',
+  onChange = () => {},
+  onWorkplaceFieldClick = () => {},
+} = {}) {
   root.innerHTML = '<div data-journal-day-navigator></div><div data-journal-day-content></div>';
   initDateNavigator(root.querySelector('[data-journal-day-navigator]'), { date, onChange });
   const contentRoot = root.querySelector('[data-journal-day-content]');
@@ -65,16 +70,8 @@ export function renderJournalDay(root, { date = new Date(), workplaceId = '', on
     contentRoot.innerHTML = journalDayTimeline({ columns });
     initJournalDayTimeline(contentRoot, {
       usages,
-      onSlotClick: ({ usage }) => {
-        if (usage?.type === 'record') {
-          const record = records.find((item) => item?.id === usage.sourceId);
-          if (record) openExistingRecord(record);
-          return;
-        }
-        if (usage?.type === 'break') {
-          const item = breaks.find((entry) => entry?.id === usage.sourceId);
-          if (item) openBreakView(item, { onClose: () => renderJournalDay(root, { date, workplaceId, onChange }) });
-        }
+      onWorkFieldClick: ({ workplaceId: nextWorkplaceId }) => {
+        if (nextWorkplaceId) onWorkplaceFieldClick(nextWorkplaceId);
       },
     });
     return;
@@ -98,7 +95,7 @@ export function renderJournalDay(root, { date = new Date(), workplaceId = '', on
       }
       if (usage?.type === 'break') {
         const item = breaks.find((entry) => entry?.id === usage.sourceId);
-        if (item) openBreakView(item, { onClose: () => renderJournalDay(root, { date, workplaceId, onChange }) });
+        if (item) openBreakView(item, { onClose: () => renderJournalDay(root, { date, workplaceId, onChange, onWorkplaceFieldClick }) });
         return;
       }
       if (usage) return;
