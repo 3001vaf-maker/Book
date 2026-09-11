@@ -110,7 +110,7 @@ function paymentFactMarkup(payment) {
   const when = paymentDateTime(payment);
   const rows = [
     { left: when.date || '—', right: when.time || '—' },
-    { left: money(payment?.serviceAmount ?? payment?.total), right: walletSummary(payment) },
+    { left: money(payment?.total), right: walletSummary(payment) },
   ];
   if (Number(payment?.tips || 0) > 0) rows.push({ left: 'Tips', right: money(payment.tips) });
   return details(rows, { variant: 'split' });
@@ -126,9 +126,10 @@ function sourcePaymentFactMarkup(state) {
     const name = allocation.walletName || 'Кошелёк';
     if (!wallets.includes(name)) wallets.push(name);
   }));
+  const receivedTotal = payments.reduce((sum, payment) => sum + Number(payment?.total || 0), 0);
   const rows = [
     { left: when.date || '—', right: when.time || '—' },
-    { left: money(state?.paidTotal || 0), right: wallets.join(' + ') || '—' },
+    { left: money(receivedTotal), right: wallets.join(' + ') || '—' },
   ];
   if (Number(state?.tipsTotal || 0) > 0) rows.push({ left: 'Tips', right: money(state.tipsTotal) });
   return details(rows, { variant: 'split' });
