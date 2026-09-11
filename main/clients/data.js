@@ -1,3 +1,4 @@
+import { normalizePhoneForStorage, phonesMatch } from '../../core/phone/index.js';
 import { getMembers, getUEI } from '../../core/uei.js';
 import { getTags } from '../../settings/tags/data.js';
 import { getLatestClientConsent, migrateLegacyConsents } from '../../settings/documents/consents.js';
@@ -28,6 +29,12 @@ function normalizeDiscount(person = {}) {
   return Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
 }
 
+function normalizePhones(values = []) {
+  return [...new Set((Array.isArray(values) ? values : [])
+    .map((value) => normalizePhoneForStorage(value))
+    .filter(Boolean))];
+}
+
 function normalizeClient(person = {}) {
   return {
     key: String(person.key || ''),
@@ -37,7 +44,7 @@ function normalizeClient(person = {}) {
     photo: String(person.photo || ''),
     gender: String(person.gender || ''),
     birthDate: String(person.birthDate || ''),
-    phones: Array.isArray(person.phones) ? person.phones : [],
+    phones: normalizePhones(person.phones),
     telegrams: Array.isArray(person.telegrams) ? person.telegrams : [],
     emails: Array.isArray(person.emails) ? person.emails : [],
     links: Array.isArray(person.links) ? person.links : [],
@@ -86,6 +93,12 @@ export function getClients() {
   return people.filter((person) => !linkedSecondary.has(person.key));
 }
 
+export function findPeopleByPhone(phone) {
+  const target = String(phone || '').trim();
+  if (!target) return [];
+  return getAllClients().filter((person) => (person.phones || []).some((value) => phonesMatch(value, target)));
+}
+
 export function getClientCount() {
   return getClients().length;
 }
@@ -94,12 +107,13 @@ export function saveClients(people = []) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(people.map(normalizeClient)));
 }
 
-export function createClient(name, surname, phone) {
+export function createClient(name, surname, phone = '') {
+  const normalizedPhone = normalizePhoneForStorage(phone);
   return normalizeClient({
     key: crypto.randomUUID(),
     name,
     surname,
-    phones: [phone],
+    phones: normalizedPhone ? [normalizedPhone] : [],
     createdAt: new Date().toISOString(),
   });
 }
