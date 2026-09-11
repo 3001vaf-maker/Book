@@ -60,7 +60,7 @@ assert.match(graphSource, /title:\s*'Рабочий график'/);
 assert.match(graphSource, /openTimetableDayEditor/);
 assert.doesNotMatch(graphSource, /function\s+openAggregateDayEditor/);
 assert.match(graphSource, /actionsRoot\.hidden\s*=\s*allMode/);
-assert.doesNotMatch(graphSource, /journal\/record-data\.js/);
+assert.doesNotMatch(graphSource, /journal\//);
 assert.doesNotMatch(graphSource, /canCorrectTime|onSaveTime/);
 
 const dayEditorSource = readFileSync(new URL('../timetable/day-editor.js', import.meta.url), 'utf8');
@@ -74,6 +74,7 @@ assert.match(dayEditorSource, /openDayWorkplaceControl/);
 assert.match(dayEditorSource, /Добавить рабочее пространство/);
 assert.match(dayEditorSource, /createDay\(\{ date:\s*day, workplaceId:\s*value\.workplaceId/);
 assert.match(dayEditorSource, /saveDays\(workingDays\)/);
+assert.doesNotMatch(dayEditorSource, /journal\//);
 
 const journalSource = readFileSync(new URL('../journal/journal.js', import.meta.url), 'utf8');
 assert.match(journalSource, /openJournalWorkplaceControl/);
@@ -82,7 +83,7 @@ assert.match(journalSource, /openTimetableDayEditor/);
 assert.match(journalSource, /from '..\/timetable\/day-editor\.js'/);
 assert.doesNotMatch(journalSource, /getDayWorkplaceDraft|saveDayWorkplaceTime|openDayWorkplaceTime/);
 assert.doesNotMatch(journalSource, /openWorkplaceControl/);
-assert.doesNotMatch(journalSource, /canCorrectTime|onSaveTime|updateDayTime|hasScheduleConflict/);
+assert.doesNotMatch(journalSource, /canCorrectTime|onSaveTime|updateDayTime|hasScheduleConflict|createDay|saveDays/);
 
 const journalDaySource = readFileSync(new URL('../journal/день.js', import.meta.url), 'utf8');
 assert.match(journalDaySource, /onWorkplaceFieldClick\s*=\s*\(\)\s*=>\s*\{\}/);
@@ -102,16 +103,20 @@ assert.match(journalControlSource, /openHeaderControl/);
 assert.match(journalControlSource, /list\(\{\s*items\s*\}\)/);
 assert.doesNotMatch(journalControlSource, /Общий график|data-workplace-control-select/);
 
-const recordDataSource = readFileSync(new URL('../journal/record-data.js', import.meta.url), 'utf8');
-assert.match(recordDataSource, /export function getWorkingTimeRecordConflicts/);
-assert.match(recordDataSource, /!containsRange\(from, to, record\.from, record\.to\)/);
+const journalTimeUsageSource = readFileSync(new URL('../journal/time-usage-source.js', import.meta.url), 'utf8');
+assert.match(journalTimeUsageSource, /export function getJournalWorkingTimeConflicts/);
+assert.match(journalTimeUsageSource, /type:\s*'record'/);
+assert.match(journalTimeUsageSource, /type:\s*'break'/);
+assert.match(journalTimeUsageSource, /getRecordsForDay/);
+assert.match(journalTimeUsageSource, /getJournalBreaksForDay/);
 
 const timeUsageSource = readFileSync(new URL('../core/time-usage.js', import.meta.url), 'utf8');
 assert.match(timeUsageSource, /configureWorkingTimeConflictSource/);
 assert.match(timeUsageSource, /getWorkingTimeUsageConflicts/);
 
 const coreSource = readFileSync(new URL('../core.js', import.meta.url), 'utf8');
-assert.match(coreSource, /configureWorkingTimeConflictSource\(getWorkingTimeRecordConflicts\)/);
+assert.match(coreSource, /configureWorkingTimeConflictSource\(getJournalWorkingTimeConflicts\)/);
+assert.doesNotMatch(coreSource, /configureWorkingTimeConflictSource\(getWorkingTimeRecordConflicts\)/);
 
 const timeSource = readFileSync(new URL('../ui/time/index.js', import.meta.url), 'utf8');
 assert.match(timeSource, /dispatchEvent\(new Event\('change',\{bubbles:true\}\)\)/);
