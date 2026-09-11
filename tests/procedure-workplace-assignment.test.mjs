@@ -65,12 +65,17 @@ assert.equal(JSON.parse(localStorage.getItem('book.procedures.history') || '[]')
 
 const recordSource = readFileSync(new URL('../journal/record.js', import.meta.url), 'utf8');
 const recordCss = readFileSync(new URL('../ui/record/record.css', import.meta.url), 'utf8');
+const buttonSource = readFileSync(new URL('../ui/buttons/index.js', import.meta.url), 'utf8');
+const buttonCss = readFileSync(new URL('../ui/buttons/buttons.css', import.meta.url), 'utf8');
 assert.match(recordSource, /assignProceduresToWorkplace/);
 assert.match(recordSource, /button\('Из прайса'/);
 assert.match(recordSource, /data-record-from-price/);
 assert.match(recordSource, /iconButton\('\+', \{ className: 'icon-button--primary', data: 'data-record-add', aria: 'Добавить процедуру' \}\)/);
-assert.match(recordCss, /\[data-record-from-price\]\{[^}]*width:48px[^}]*height:48px/s);
-assert.match(recordCss, /\[data-record-from-price\]::before\{content:"▤"/);
+assert.match(buttonSource, /export function sheetIconButton/);
+assert.match(buttonSource, /iconButton\('▤', \{ className: 'sheet-icon-button'/);
+assert.match(buttonCss, /\.sheet-icon-button,.ui-button\[data-record-from-price\]\{[^}]*width:48px[^}]*height:48px/s);
+assert.match(buttonCss, /\.ui-button\[data-record-from-price\]::before\{content:"▤"/);
+assert.doesNotMatch(recordCss, /data-record-from-price|sheet-icon-button/);
 assert.doesNotMatch(recordSource, /saveProcedure/);
 
 console.log('procedure workplace assignment tests: OK');
