@@ -64,10 +64,13 @@ assert.equal(repeated.length, 0);
 assert.equal(JSON.parse(localStorage.getItem('book.procedures.history') || '[]').length, 1);
 
 const recordSource = readFileSync(new URL('../journal/record.js', import.meta.url), 'utf8');
+const recordCss = readFileSync(new URL('../ui/record/record.css', import.meta.url), 'utf8');
 assert.match(recordSource, /assignProceduresToWorkplace/);
 assert.match(recordSource, /button\('Из прайса'/);
 assert.match(recordSource, /data-record-from-price/);
-assert.match(recordSource, /iconButton\('\+',\s*\{[^}]*data:\s*'data-record-add'/s);
+assert.match(recordSource, /iconButton\('\+', \{ className: 'icon-button--primary', data: 'data-record-add', aria: 'Добавить процедуру' \}\)/);
+assert.match(recordCss, /\[data-record-from-price\]\{[^}]*width:48px[^}]*height:48px/s);
+assert.match(recordCss, /\[data-record-from-price\]::before\{content:"▤"/);
 assert.doesNotMatch(recordSource, /saveProcedure/);
 
 console.log('procedure workplace assignment tests: OK');
