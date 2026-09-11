@@ -34,14 +34,22 @@ const mainSource = readFileSync(new URL('../main/main.js', import.meta.url), 'ut
 const financeSource = readFileSync(new URL('../main/finance/finance.js', import.meta.url), 'utf8');
 const settingsSource = readFileSync(new URL('../settings/settings.js', import.meta.url), 'utf8');
 const walletSource = readFileSync(new URL('../settings/wallets/wallets.js', import.meta.url), 'utf8');
+const folderSource = readFileSync(new URL('../ui/cards/folder-card.js', import.meta.url), 'utf8');
 
 assert.match(mainSource, /title: 'Финансы'/);
 assert.match(mainSource, /\.\/finance\/finance\.js/);
 assert.match(financeSource, /getDDSMovements/);
 assert.match(financeSource, /getWalletTotalBalance/);
 assert.match(financeSource, /title: 'Касса'/);
+assert.match(financeSource, /title: 'ДДС'/);
+assert.match(financeSource, /variant: 'compact'/);
 assert.match(financeSource, /renderWallets/);
 assert.match(financeSource, /status === 'cancelled'/);
+assert.match(financeSource, /list\(\{ items: movements\.map\(movementListItem\) \}\)/);
+assert.doesNotMatch(financeSource, /listEntr(?:y|ies)/);
+assert.match(financeSource, /button\('Excel'/);
+assert.match(financeSource, /Book-ДДС\.csv/);
+assert.match(folderSource, /variant === 'compact'/);
 assert.doesNotMatch(settingsSource, /\['wallets', 'Кошелёк'/);
 assert.match(walletSource, /pageHeader\('Касса'\)/);
 
