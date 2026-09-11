@@ -156,7 +156,7 @@ export function renderJournal(root) {
           renderView();
         },
       });
-    } else renderJournalList(viewRoot, { mode: listMode });
+    } else renderJournalList(viewRoot, { mode: listMode, workplaceId: selectedWorkplaceId });
 
     root.querySelector('[data-workplace-header-open]')?.addEventListener('click', activeView === 'day' ? openDayWorkplaces : openWorkplace);
     const listModeRoot = root.querySelector('[data-journal-list-mode-navigation]');

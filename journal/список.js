@@ -1,8 +1,9 @@
-import { emptyState, listEntries, listEntry, shortDate } from '../ui/ui.js';
+import { ALL_WORKPLACES_ID, emptyState, escapeHtml, listEntries, listEntry, shortDate } from '../ui/ui.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getRecordPaymentState, recordPlanTotal } from '../core/finance/index.js';
 import { getRecords } from '../core/record/index.js';
 import { isRecordCompletedSide, recordActivityTime, recordAppointmentTime, recordVisualState } from '../core/record/index.js';
+import { openRecordView } from './record-view.js';
 
 function formatMoney(value = 0) {
   const amount = Math.max(0, Math.round(Number(value) || 0));
@@ -27,15 +28,22 @@ function recordStatusClass(record, payment = null) {
   return `journal-list-record--${recordVisualState(record, { paid: Boolean(payment) })}`;
 }
 
+function recordId(record) {
+  return String(record?.id || record?.sourceId || '');
+}
+
 function recordEntry(record, workplaces, { focus = false, payment = null } = {}) {
   const classes = [recordStatusClass(record, payment), focus ? 'journal-list-focus' : ''].filter(Boolean).join(' ');
+  const id = recordId(record);
   return listEntry({
     overline: workplaceName(workplaces, record?.workplaceId),
     title: clientName(record?.client),
     subtitle: record?.client?.phone || '',
     rightTop: [shortDate(record?.date), String(record?.from || '')].filter(Boolean).join(' · '),
     rightBottom: formatMoney(recordPlanTotal(record)),
-    interactive: false,
+    interactive: Boolean(id),
+    data: id ? `data-journal-list-record="${escapeHtml(id)}"` : '',
+    aria: id ? `Открыть запись ${clientName(record?.client)}` : '',
     className: classes,
     initial: (clientName(record?.client) || '?').slice(0, 1).toUpperCase(),
   });
@@ -55,6 +63,15 @@ function scrollToFocus(root, selector) {
   });
 }
 
+function bindRecordClicks(root, records) {
+  if (typeof root?.querySelectorAll !== 'function') return;
+  const byId = new Map(records.map((record) => [recordId(record), record]).filter(([id]) => Boolean(id)));
+  root.querySelectorAll('[data-journal-list-record]').forEach((node) => node.addEventListener('click', () => {
+    const record = byId.get(String(node.dataset.journalListRecord || ''));
+    if (record) openRecordView(record);
+  }));
+}
+
 function renderTimeMode(root, records, workplaces) {
   const now = Date.now();
   const ordered = [...records].sort((a, b) => recordAppointmentTime(a, 'from') - recordAppointmentTime(b, 'from'));
@@ -68,6 +85,7 @@ function renderTimeMode(root, records, workplaces) {
   if (splitIndex === ordered.length) entries.push(anchorEntry());
 
   root.innerHTML = listEntries(entries);
+  bindRecordClicks(root, ordered);
   scrollToFocus(root, '[data-journal-list-anchor]');
 }
 
@@ -91,12 +109,16 @@ function renderFlowMode(root, records, workplaces) {
     ...pending.map(({ record, payment }) => recordEntry(record, workplaces, { payment })),
   ];
   root.innerHTML = listEntries(entries);
+  bindRecordClicks(root, records);
   scrollToFocus(root, '[data-journal-list-anchor]');
 }
 
-export function renderJournalList(root, { mode = 'flow' } = {}) {
+export function renderJournalList(root, { mode = 'flow', workplaceId = ALL_WORKPLACES_ID } = {}) {
   const workplaces = getWorkplaces();
-  const records = getRecords();
+  const allRecords = getRecords();
+  const records = workplaceId === ALL_WORKPLACES_ID
+    ? allRecords
+    : allRecords.filter((record) => String(record?.workplaceId || '') === String(workplaceId || ''));
 
   if (!records.length) {
     root.innerHTML = emptyState('Список', 'Записей пока нет.');
