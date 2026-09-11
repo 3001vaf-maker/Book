@@ -1,6 +1,6 @@
 // Pure WorkPlan Day rules.
 // No persistence, UI, Record/Break ownership or side effects belong here.
-import { createTimeRange, isValidRange, minutesBetween, minutesToTime, rangesOverlap, timeToMinutes } from '../time.js';
+import { createTimeRange, isValidRange, minutesBetween, minutesToTime, rangesOverlap, timeToMinutes } from '../time/index.js';
 
 export function dayDate(value) {
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
