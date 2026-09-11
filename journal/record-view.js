@@ -6,13 +6,14 @@ import {
   escapeHtml,
   initCalendar,
   initDurationPickers,
+  initMultiSelect,
   list,
   modal,
   mountModal,
   openNotice,
   timeSlots,
 } from '../ui/ui.js';
-import { getRecordPaymentState, repriceFinancialPlan } from '../core/financial-model.js';
+import { getRecordPaymentState, recordFinancialItems, repriceFinancialPlan } from '../core/financial-model.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getDays, getDay, getDayTime } from '../core/day.js';
 import { timeToMinutes, minutesToTime } from '../core/time.js';
@@ -20,10 +21,12 @@ import { getAllClients } from '../main/clients/data.js';
 import { clientDisplay } from '../main/clients/presentation.js';
 import { openClientProfile } from '../main/clients/clients.js';
 import { getProcedures } from '../settings/service/procedures/data.js';
+import { getProducts } from '../settings/service/products/data.js';
 import { getRecords, updateRecord, cancelRecord, checkRecordTime } from './record-data.js';
 
 const people = () => getAllClients();
 const procedures = () => getProcedures();
+const products = () => getProducts();
 const dateKey = (value) => {
   const date = value instanceof Date ? value : new Date(value);
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -64,6 +67,7 @@ const stateSnapshot = (state) => JSON.stringify({
   to: String(state.to || ''),
   client: state.client || null,
   procedures: Array.isArray(state.procedures) ? state.procedures : [],
+  products: Array.isArray(state.products) ? state.products : [],
   confirmed: Boolean(state.confirmed),
   attendance: normalizedAttendance(state.attendance),
 });
@@ -74,6 +78,7 @@ const stateFromRecord = (record, { paid = false } = {}) => ({
   to: record.to,
   client: record.client ? { ...record.client } : null,
   procedures: Array.isArray(record.procedures) ? record.procedures.map((item) => ({ ...item })) : [],
+  products: Array.isArray(record.products) ? record.products.map((item) => ({ ...item })) : [],
   finance: record.finance ? {
     ...record.finance,
     items: Array.isArray(record.finance.items) ? record.finance.items.map((item) => ({ ...item })) : [],
@@ -82,23 +87,28 @@ const stateFromRecord = (record, { paid = false } = {}) => ({
   attendance: paid ? 'arrived' : normalizedAttendance(record.attendance),
 });
 
-function workplaceAssignment(procedure, workplaceId) {
+function workplaceAssignment(item, workplaceId) {
   const id = String(workplaceId || '');
-  return (procedure?.workplaces || []).find((workplace) => String(workplace?.workplaceId ?? workplace?.id ?? workplace?.key ?? '') === id) || null;
+  return (item?.workplaces || []).find((workplace) => String(workplace?.workplaceId ?? workplace?.id ?? workplace?.key ?? '') === id) || null;
 }
 
-function defaultCost(procedure, workplaceId) {
-  const assignment = workplaceAssignment(procedure, workplaceId);
+function defaultCost(item, workplaceId) {
+  const assignment = workplaceAssignment(item, workplaceId);
   const assignmentCost = assignment?.cost;
-  const procedureCost = procedure?.cost;
+  const itemCost = item?.cost;
   const cost = assignmentCost && typeof assignmentCost === 'object' && !assignmentCost.free && (
     assignmentCost.amount !== '' && assignmentCost.amount != null
     || assignmentCost.from !== '' && assignmentCost.from != null
     || assignmentCost.to !== '' && assignmentCost.to != null
-  ) ? assignmentCost : procedureCost;
+  ) ? assignmentCost : itemCost;
   if (!cost || cost.free) return '';
   if (typeof cost === 'number' || typeof cost === 'string') return cost;
   return cost.amount ?? cost.from ?? '';
+}
+
+function productAvailable(product, workplaceId) {
+  const assigned = Array.isArray(product?.workplaces) ? product.workplaces : [];
+  return !assigned.length || Boolean(workplaceAssignment(product, workplaceId));
 }
 
 function openWorkplacePicker(state, onSelected) {
@@ -211,6 +221,51 @@ function openAddProcedurePicker(state, onSelected) {
     onSelected?.({ id: procedure.id, name: procedure.name || '', cost: defaultCost(procedure, state.workplaceId), duration });
     m.remove();
   }));
+}
+
+function openSalePicker(state, onSave) {
+  const available = products().filter((product) => productAvailable(product, state.workplaceId));
+  const selected = new Set((state.products || []).map((item) => String(item?.id || '')).filter(Boolean));
+  const currentById = new Map((state.products || []).map((item) => [String(item?.id || ''), item]));
+  const items = available.map((product) => {
+    const cost = currentById.get(String(product.id || ''))?.cost ?? defaultCost(product, state.workplaceId);
+    return {
+      title: product.name || 'Товар',
+      secondary: cost === '' || cost == null ? '' : formatMoney(cost),
+      interactive: true,
+      selected: selected.has(String(product.id || '')),
+      data: `data-record-sale-product="${escapeHtml(product.id || '')}"`,
+      aria: `Выбрать товар ${product.name || ''}`,
+    };
+  });
+  const content = `<div class="modal-title"><h2>Продажа</h2></div><div data-record-sale-products>${list({ items }) || '<div class="muted">Товаров пока нет.</div>'}</div><div class="modal-actions">${button('Сохранить', { data: 'data-record-sale-save' })}</div>`;
+  const m = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
+  if (!m) return;
+  const listRoot = m.querySelector('[data-record-sale-products]');
+  const controller = listRoot && available.length ? initMultiSelect(listRoot, {
+    selectedValues: [...selected],
+    selector: '[data-record-sale-product]',
+    valueAttribute: 'recordSaleProduct',
+    onChange: (values) => {
+      selected.clear();
+      values.forEach((value) => selected.add(String(value)));
+    },
+  }) : null;
+  m.querySelector('[data-record-sale-save]')?.addEventListener('click', () => {
+    const nextProducts = available
+      .filter((product) => selected.has(String(product.id || '')))
+      .map((product) => {
+        const current = currentById.get(String(product.id || ''));
+        return current ? { ...current } : {
+          id: product.id,
+          name: product.name || '',
+          cost: defaultCost(product, state.workplaceId),
+        };
+      });
+    controller?.destroy();
+    m.remove();
+    onSave?.(nextProducts);
+  });
 }
 
 function openProcedureCorrection(state, index, { onSave, onAdd, onDelete } = {}) {
@@ -326,6 +381,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       to: state.to,
       client: state.client,
       procedures: state.procedures,
+      products: state.products,
       confirmed: Boolean(state.confirmed),
       attendance: normalizedAttendance(state.attendance),
     });
@@ -361,7 +417,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     const client = clientDisplay(currentPerson);
     const workplace = workplaceName(state.workplaceId);
     const totalDuration = state.procedures.length ? procedureTotalDuration(state.procedures) : 30;
-    const finance = repriceFinancialPlan(state.procedures, state.finance);
+    const finance = repriceFinancialPlan(recordFinancialItems(state), state.finance);
     const discountTotal = Math.max(0, Number(finance?.discountTotal) || 0);
     const discountPercent = finance?.discountPercent;
     const meta = [
@@ -372,12 +428,18 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
         label: Number(discountPercent) > 0 ? `скидка ${formatPercent(discountPercent)}%` : 'скидка',
       },
     ];
-    const detailRows = state.procedures.map((item, index) => ({
-      left: item.name || '',
-      right: item.cost === '' || item.cost == null ? '' : `${item.cost} ₽`,
-      data: paid ? '' : `data-record-view-procedure-edit="${index}"`,
-      aria: paid ? '' : `Изменить время процедуры ${item.name || ''}`,
-    }));
+    const detailRows = [
+      ...state.procedures.map((item, index) => ({
+        left: item.name || '',
+        right: item.cost === '' || item.cost == null ? '' : formatMoney(item.cost),
+        data: paid ? '' : `data-record-view-procedure-edit="${index}"`,
+        aria: paid ? '' : `Изменить время процедуры ${item.name || ''}`,
+      })),
+      ...state.products.map((item) => ({
+        left: item.name || '',
+        right: item.cost === '' || item.cost == null ? '' : formatMoney(item.cost),
+      })),
+    ];
     const card = entityCard({
       id: client.uei,
       title: client.name,
@@ -428,9 +490,10 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     const confirmAction = !paid && dirty
       ? `<div class="record-modal-actions modal-actions">${button('Подтвердить изменения', { data: 'data-record-view-confirm' })}</div>`
       : '';
+    const saleAction = paid ? '' : `<div class="record-modal-actions modal-actions">${button('Продажа', { data: 'data-record-view-sale', variant: 'secondary' })}</div>`;
     const cancelAction = paid ? '' : `<div class="record-modal-actions modal-actions">${button('Отменить запись', { data: 'data-record-view-cancel', variant: 'danger' })}</div>`;
 
-    root.innerHTML = `<div class="record-screen record-screen--state-view">${card}${statusControl}${confirmAction}${cancelAction}</div>`;
+    root.innerHTML = `<div class="record-screen record-screen--state-view">${card}${statusControl}${confirmAction}${saleAction}${cancelAction}</div>`;
 
     root.querySelector('[data-record-view-workplace-edit]')?.addEventListener('click', () => {
       if (isPaid()) return;
@@ -479,6 +542,13 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       applyPatch({ attendance: next });
     }));
     root.querySelector('[data-record-view-confirm]')?.addEventListener('click', persistChanges);
+    root.querySelector('[data-record-view-sale]')?.addEventListener('click', () => {
+      if (isPaid()) return;
+      openSalePicker(state, (nextProducts) => {
+        state = { ...state, products: nextProducts };
+        persistChanges();
+      });
+    });
     root.querySelector('[data-record-view-cancel]')?.addEventListener('click', () => {
       if (isPaid()) return;
       confirmCancel(record, () => {
