@@ -1,4 +1,4 @@
-import { button, details, initPaymentForm, initPaymentMethods, modal, mountModal, paymentForm, paymentMethods, select, shortDate, shortDateTimeParts, shortTime } from '../ui/ui.js';
+import { button, details, initPaymentForm, initPaymentMethods, modal, mountModal, paymentForm, paymentMethods, paymentReceipt, select, shortDate, shortDateTimeParts, shortTime } from '../ui/ui.js';
 import { calculateFinancialPlan, getRecordPaymentState, recordFinancialItems } from '../core/financial-model.js';
 import { getRefundsForPayment, recordPaymentIncome, recordRefundExpense } from '../core/dds.js';
 import { getWorkplaces } from '../core/workplace-time.js';
@@ -111,12 +111,15 @@ function walletSummary(payment) {
 
 function paymentFactMarkup(payment) {
   const when = paymentDateTime(payment);
-  const rows = [
-    { left: when.date || '—', right: when.time || '—' },
-    { left: money(payment?.total), right: walletSummary(payment) },
-  ];
-  if (Number(payment?.tips || 0) > 0) rows.push({ left: 'Tips', right: money(payment.tips) });
-  return details(rows, { variant: 'split' });
+  return paymentReceipt({
+    workplace: payment?.workplace || '',
+    date: when.date || '—',
+    time: when.time || '—',
+    client: payment?.client || {},
+    amount: money(payment?.total),
+    wallet: walletSummary(payment),
+    tips: Number(payment?.tips || 0) > 0 ? money(payment.tips) : '',
+  });
 }
 
 function sourcePaymentFactMarkup(state) {
@@ -130,12 +133,15 @@ function sourcePaymentFactMarkup(state) {
     if (!wallets.includes(name)) wallets.push(name);
   }));
   const receivedTotal = payments.reduce((sum, payment) => sum + Number(payment?.total || 0), 0);
-  const rows = [
-    { left: when.date || '—', right: when.time || '—' },
-    { left: money(receivedTotal), right: wallets.join(' + ') || '—' },
-  ];
-  if (Number(state?.tipsTotal || 0) > 0) rows.push({ left: 'Tips', right: money(state.tipsTotal) });
-  return details(rows, { variant: 'split' });
+  return paymentReceipt({
+    workplace: latest?.workplace || '',
+    date: when.date || '—',
+    time: when.time || '—',
+    client: latest?.client || {},
+    amount: money(receivedTotal),
+    wallet: wallets.join(' + ') || '—',
+    tips: Number(state?.tipsTotal || 0) > 0 ? money(state.tipsTotal) : '',
+  });
 }
 
 function openPaymentMethodsModal(payment, paymentModal) {

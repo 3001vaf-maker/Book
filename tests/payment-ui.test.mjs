@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { details } from '../ui/page/page.js';
 import { paymentForm, paymentMethods } from '../ui/payment/index.js';
+import { paymentReceipt } from '../ui/payment/receipt.js';
 import { modal } from '../ui/modals/index.js';
 import { shortDate } from '../ui/utils/date-time.js';
 
@@ -43,6 +44,28 @@ assert.doesNotMatch(methodsHtml, /data-payment-mode|Оплата<\/button>|Ра�
 assert.doesNotMatch(methodsHtml, /type="number"[^>]*data-payment-allocation-amount/);
 assert.doesNotMatch(methodsHtml, /data-payment-tips[^>]*input/);
 
+const receipt = paymentReceipt({
+  workplace: 'Бьюти тория',
+  date: '11.09.26',
+  time: '02:41',
+  client: { uei: '0278', name: 'Наталья Гусева', phone: '+7 999 000-00-00' },
+  amount: '7 000 ₽',
+  wallet: 'СберБанк',
+  tips: '400 ₽',
+});
+assert.match(receipt, /class="payment-receipt"/);
+assert.match(receipt, /Бьюти тория/);
+assert.match(receipt, /11\.09\.26/);
+assert.match(receipt, /02:41/);
+assert.match(receipt, /0278/);
+assert.match(receipt, /Наталья Гусева/);
+assert.match(receipt, /7 000 ₽/);
+assert.match(receipt, /СберБанк/);
+assert.match(receipt, />Tips</);
+assert.match(receipt, /400 ₽/);
+assert.doesNotMatch(receipt, /\+7 999 000-00-00/);
+assert.equal((receipt.match(/class="payment-receipt"/g) || []).length, 1);
+
 const split = details([
   { left: '11.09.26', right: '02:41' },
   { left: '7 000 ₽', right: 'СберБанк' },
@@ -60,6 +83,7 @@ const modalSource = readFileSync(new URL('../ui/modals/index.js', import.meta.ur
 const modalCss = readFileSync(new URL('../ui/modals/modal.css', import.meta.url), 'utf8');
 const inputCss = readFileSync(new URL('../ui/inputs/inputs.css', import.meta.url), 'utf8');
 const paymentSource = readFileSync(new URL('../ui/payment/index.js', import.meta.url), 'utf8');
+const receiptSource = readFileSync(new URL('../ui/payment/receipt.js', import.meta.url), 'utf8');
 const methodsSource = readFileSync(new URL('../ui/payment/methods.js', import.meta.url), 'utf8');
 const paymentCss = readFileSync(new URL('../ui/payment/payment.css', import.meta.url), 'utf8');
 const recordViewSource = readFileSync(new URL('../journal/record-view.js', import.meta.url), 'utf8');
@@ -79,6 +103,10 @@ assert.match(paymentSource, /iconButton\('×'/);
 assert.match(paymentSource, /onRemove/);
 assert.doesNotMatch(paymentSource, /singlePaymentMarkup|splitPaymentMarkup|data-payment-mode/);
 assert.doesNotMatch(paymentCss, /payment-procedure__remove[^}]*font-size/);
+assert.match(paymentCss, /payment-receipt\{/);
+assert.match(receiptSource, /payment-receipt__workplace/);
+assert.match(receiptSource, /payment-receipt__client/);
+assert.doesNotMatch(receiptSource, /phone/);
 assert.match(methodsSource, /data-payment-allocation-row="\$\{index\}"/);
 assert.match(methodsSource, /data-payment-remaining/);
 assert.match(methodsSource, /data-payment-tips-row/);
@@ -100,8 +128,10 @@ assert.match(recordPaymentSource, /modal\(content,\s*\{\s*variant:\s*'large'/);
 assert.match(recordPaymentSource, /variant:\s*'split'/);
 assert.match(recordPaymentSource, /getRecordPaymentState/);
 assert.match(recordPaymentSource, /modal-bottom-action--partial/);
-assert.match(recordPaymentSource, /left:\s*'Tips'/);
+assert.match(recordPaymentSource, /paymentReceipt\(/);
 assert.match(recordPaymentSource, /receivedTotal/);
+assert.match(recordPaymentSource, /client:\s*latest\?\.client/);
+assert.match(recordPaymentSource, /workplace:\s*latest\?\.workplace/);
 assert.match(recordPaymentSource, /Возврат оплаты',\s*\{\s*variant:\s*'danger'/);
 assert.match(recordPaymentSource, /Подтвердить возврат',[\s\S]*variant:\s*'danger'/);
 assert.match(recordPaymentSource, /flatMap/);
