@@ -8,13 +8,14 @@ function orderedEvents(events = []) {
 }
 
 export function projectRecordLifecycle(record = {}, events = []) {
-  let status = 'active';
-  let confirmed = false;
-  let attendance = '';
-  let confirmedAt = '';
-  let attendanceAt = '';
-  let cancelledAt = '';
-  let lifecycleUpdatedAt = record?.createdAt || record?.updatedAt || '';
+  // Legacy fields are read-only migration fallback. New lifecycle facts live in Record Events.
+  let status = record?.status === 'cancelled' ? 'cancelled' : 'active';
+  let confirmed = Boolean(record?.confirmed);
+  let attendance = record?.attendance === 'arrived' || record?.attendance === 'no-show' ? record.attendance : '';
+  let confirmedAt = String(record?.confirmedAt || '');
+  let attendanceAt = String(record?.attendanceAt || '');
+  let cancelledAt = String(record?.cancelledAt || '');
+  let lifecycleUpdatedAt = record?.updatedAt || record?.createdAt || '';
 
   for (const event of orderedEvents(events)) {
     const at = String(event?.at || '');
@@ -29,9 +30,6 @@ export function projectRecordLifecycle(record = {}, events = []) {
       attendanceAt = at;
     } else if (event.type === RECORD_EVENT_TYPES.NO_SHOW) {
       attendance = 'no-show';
-      attendanceAt = at;
-    } else if (event.type === RECORD_EVENT_TYPES.ATTENDANCE_CLEARED) {
-      attendance = '';
       attendanceAt = at;
     } else if (event.type === RECORD_EVENT_TYPES.CANCELLED) {
       status = 'cancelled';
