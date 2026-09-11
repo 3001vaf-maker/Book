@@ -1,6 +1,6 @@
 import { actionBlock, button, costCardMeta, costListParts, durationText, emptyState, entityCard, escapeHtml, iconButton, listEntries, listEntry, mountModal, modal, page, pageHeader, workplaceCountText } from '../../../ui/ui.js';
 import { getFinancialItemFact } from '../../../core/financial-model.js';
-import { getRecords } from '../../../journal/record-data.js';
+import { getRecords } from '../../../journal/record-read.js';
 import { deleteProcedure as deleteProcedureData, getProcedures } from './data.js';
 import { openProcedureForm } from './form.js';
 
