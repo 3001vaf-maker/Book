@@ -9,6 +9,8 @@ import { configureWorkplaceSource } from './core/workplace-time.js';
 import { configureTimeUsageSource, configureSoftTimeUsageReleaseSource } from './core/time/index.js';
 import { getCurrentUser, login } from './core/auth.js';
 import { isOnboardingComplete, renderOnboarding } from './onboarding/onboarding.js';
+import { startOnlineBookingBridge } from './online-booking/owner-bridge.js';
+import { renderOnlineBooking } from './online-booking/booking.js';
 import { bottomNavigation } from './ui/ui.js';
 
 configureWorkplaceSource(getWorkplaceEntities);
@@ -27,6 +29,7 @@ const app = document.querySelector('#app');
 let disposeView = () => {};
 let workspaceReady = false;
 let authenticatedAccount = null;
+let bookingBridgeStarted = false;
 
 function syncViewport() {
   const vv = window.visualViewport;
@@ -35,6 +38,32 @@ function syncViewport() {
   document.documentElement.style.setProperty('--visual-vh', `${height}px`);
   document.documentElement.style.setProperty('--visual-vw', `${width}px`);
   document.documentElement.classList.toggle('keyboard-open', vv ? height < window.innerHeight * 0.78 : false);
+}
+
+function bookingRoute() {
+  const params = new URLSearchParams(location.search);
+  const tenantId = String(params.get('booking') || '').trim();
+  if (!tenantId) return null;
+  return {
+    tenantId,
+    workplaceKey: String(params.get('workplace') || '').trim(),
+    telegramId: String(params.get('tg') || params.get('telegram') || '').trim(),
+  };
+}
+
+function renderPublicBooking(route) {
+  workspaceReady = false;
+  disposeView();
+  disposeView = () => {};
+  app.innerHTML = '<main class="app-content" id="app-content"></main>';
+  void renderOnlineBooking(document.querySelector('#app-content'), route);
+  syncViewport();
+}
+
+function ensureBookingBridge() {
+  if (bookingBridgeStarted) return;
+  bookingBridgeStarted = true;
+  startOnlineBookingBridge();
 }
 
 function navigate(section) {
@@ -81,6 +110,7 @@ async function renderAuthenticated(account = authenticatedAccount) {
     renderMigrationPending();
     return;
   }
+  ensureBookingBridge();
 
   const serverWorkspaceUnlocked = Boolean(authenticatedAccount?.user?.workspaceUnlocked);
   if (!serverWorkspaceUnlocked && !isOnboardingComplete()) {
@@ -175,14 +205,19 @@ document.addEventListener('focusin', (event) => {
 
 syncViewport();
 
-try {
-  const currentUser = await getCurrentUser();
-  if (currentUser) {
-    authenticatedAccount = currentUser;
-    await renderAuthenticated(currentUser);
-  } else {
-    renderLogin();
+const publicBooking = bookingRoute();
+if (publicBooking) {
+  renderPublicBooking(publicBooking);
+} else {
+  try {
+    const currentUser = await getCurrentUser();
+    if (currentUser) {
+      authenticatedAccount = currentUser;
+      await renderAuthenticated(currentUser);
+    } else {
+      renderLogin();
+    }
+  } catch {
+    renderLogin('Сервер временно недоступен');
   }
-} catch {
-  renderLogin('Сервер временно недоступен');
 }
