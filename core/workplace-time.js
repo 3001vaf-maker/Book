@@ -1,6 +1,5 @@
 import { createTimeRange, minutesBetween } from './time.js';
-import { getDay, getDayTime, getDays, getDaysForDate } from './day-read.js';
-import { hasScheduleConflictForDays } from './day-rules.js';
+import { getDay, getDayTime, getDays, getDaysForDate, hasScheduleConflict } from './day/index.js';
 
 const WORKPLACE_FALLBACK_COLOR = '#212529';
 let workplaceSource = () => [];
@@ -119,7 +118,7 @@ export function resolveWorkingDayTime(workplaces, workingDay) {
 }
 
 export function canScheduleWork(days, { workplaceId, date, from, to, excludeWorkplaceId = '', excludeDate = '' } = {}) {
-  return !hasScheduleConflictForDays(days, { workplaceId, date, from, to, excludeWorkplaceId, excludeDate });
+  return !hasScheduleConflict(days, { workplaceId, date, from, to, excludeWorkplaceId, excludeDate });
 }
 
 export function getOtherWorkDays(days, date, workplaceId) {
