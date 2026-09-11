@@ -35,16 +35,16 @@ if (!/getRecordRows/.test(recordData)
   errors.push('core/record/data.js: persistence gateway API is incomplete');
 }
 
-if (!/from '.\/record-data\.js'/.test(recordRead)
-  || !/from '.\/record-events\.js'/.test(recordRead)
-  || !/from '.\/record-state\.js'/.test(recordRead)
+if (!/from '.\/data\.js'/.test(recordRead)
+  || !/from '.\/events\.js'/.test(recordRead)
+  || !/from '.\/state\.js'/.test(recordRead)
   || !/hydrateRecordFinance/.test(recordRead)) {
   errors.push('core/record/read.js: read model must compose storage + lifecycle + finance');
 }
 
-if (!/from '.\/record-data\.js'/.test(recordService)
-  || !/from '.\/record-read\.js'/.test(recordService)
-  || !/from '.\/record-events\.js'/.test(recordService)
+if (!/from '.\/data\.js'/.test(recordService)
+  || !/from '.\/read\.js'/.test(recordService)
+  || !/from '.\/events\.js'/.test(recordService)
   || !/checkTimeAvailability/.test(recordService)) {
   errors.push('core/record/service.js: command service must own Record mutations');
 }
@@ -52,28 +52,21 @@ if (!/appendRecordEvent/.test(recordService) || !/RECORD_EVENT_TYPES\.CANCELLED/
   errors.push('core/record/service.js: lifecycle commands must append immutable Record events');
 }
 
-if (!/from '.\/record-data\.js'/.test(recordEvents)
+if (!/from '.\/data\.js'/.test(recordEvents)
   || !/appendRecordEvent/.test(recordEvents)
   || !/insertRecordEventRow/.test(recordEvents)
   || /localStorage/.test(recordEvents)) {
-  errors.push('core/record/events.js: Record Events must own lifecycle meaning while persistence stays in record-data.js');
+  errors.push('core/record/events.js: Record Events must own lifecycle meaning while persistence stays in core/record/data.js');
 }
 if (!/projectRecordLifecycle/.test(recordState) || !/RECORD_EVENT_TYPES/.test(recordState)) {
   errors.push('core/record/state.js: Record State must be projected from lifecycle facts');
 }
 
-const allowedDirectDataConsumers = new Set([
-  'core/record/read.js',
-  'core/record/service.js',
-  'core/record/events.js',
-  'tests/record-lifecycle.test.mjs',
-]);
-const directDataImport = /(?:from\s+['"][^'"]*record-data\.js['"]|import\s*\(\s*['"][^'"]*record-data\.js['"]\s*\))/;
+const directDataImport = /(?:from\s+['"][^'"]*core\/record\/data\.js['"]|import\s*\(\s*['"][^'"]*core\/record\/data\.js['"]\s*\))/;
 for (const path of [...walk('journal'), ...walk('main'), ...walk('settings'), ...walk('tests')]) {
-  if (allowedDirectDataConsumers.has(path)) continue;
   const source = read(path);
   if (directDataImport.test(source)) {
-    errors.push(`${path}: must use record-read.js for queries or record-service.js for commands, not record-data.js`);
+    errors.push(`${path}: must use core/record/index.js instead of the private data atom`);
   }
 }
 
