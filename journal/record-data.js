@@ -1,170 +1,64 @@
-import { checkTimeAvailability } from '../core/availability.js';
-import { calculateFinancialPlan, getRecordFinancialPlanFact, recordFinancialItems, repriceFinancialPlan, resolveRecordFinancialPlan } from '../core/financial-model.js';
-import { getAllClients } from '../main/clients/data.js';
-
+// Persistence gateway for Record facts.
+// No scheduling, finance, lifecycle, UI, or workflow decisions belong here.
 const KEY = 'book.records';
 
-function readList(key) {
+function clone(value) {
+  if (value == null) return value;
+  return JSON.parse(JSON.stringify(value));
+}
+
+function readRows() {
   try {
-    const value = JSON.parse(localStorage.getItem(key) || '[]');
+    const value = JSON.parse(localStorage.getItem(KEY) || '[]');
     return Array.isArray(value) ? value : [];
   } catch {
     return [];
   }
 }
-function writeList(key, value) { localStorage.setItem(key, JSON.stringify(Array.isArray(value) ? value : [])); }
-function notify(name, detail = {}) { if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(name, { detail })); }
-function normalizeDate(value) { return String(value || '').slice(0, 10); }
-function normalizeId(value) { return String(value || ''); }
-function numberValue(value) {
-  const number = Number(String(value ?? '').replace(',', '.'));
-  return Number.isFinite(number) ? number : 0;
-}
-function percent(value) { return Math.max(0, Math.min(100, numberValue(value))); }
 
-function clientDiscount(client = null) {
-  if (!client) return 0;
-  const people = getAllClients();
-  const person = people.find((item) => String(item?.key || '') === String(client?.key || ''))
-    || people.find((item) => String(item?.id || '') === String(client?.id || ''));
-  return percent(person?.discountPercent ?? client?.discountPercent ?? 0);
+function writeRows(rows) {
+  localStorage.setItem(KEY, JSON.stringify(Array.isArray(rows) ? rows : []));
 }
 
-function normalizeFinance(value = null) {
-  if (!value || typeof value !== 'object') return null;
-  return {
-    items: Array.isArray(value.items) ? value.items.map((item) => ({ ...item })) : [],
-    serviceTotal: Math.max(0, numberValue(value.serviceTotal)),
-    discountPercent: value.discountPercent == null ? null : percent(value.discountPercent),
-    discountTotal: Math.max(0, numberValue(value.discountTotal)),
-    planTotal: Math.max(0, numberValue(value.planTotal ?? value.dueTotal)),
-    factIncome: Math.max(0, numberValue(value.factIncome ?? value.paidTotal)),
-    factExpense: Math.max(0, numberValue(value.factExpense ?? value.refundedTotal)),
-    factTotal: numberValue(value.factTotal ?? value.netPaidTotal),
-  };
+function normalizeId(value) {
+  return String(value || '');
 }
 
-function storedRecordFinance(record) {
-  const legacyDiscount = record?.clientDiscountPercent == null ? clientDiscount(record?.client) : percent(record.clientDiscountPercent);
-  return resolveRecordFinancialPlan(record, { discountPercent: legacyDiscount });
+export function getRecordRows() {
+  return readRows().map((row) => clone(row));
 }
 
-function hydrateRecord(record) {
-  if (!record?.id) return record;
-  const legacyDiscount = record?.clientDiscountPercent == null ? clientDiscount(record?.client) : percent(record.clientDiscountPercent);
-  const { clientDiscountPercent: _legacyDiscount, ...cleanRecord } = record;
-  const normalizedRecord = {
-    ...cleanRecord,
-    procedures: Array.isArray(cleanRecord.procedures) ? cleanRecord.procedures : [],
-    products: Array.isArray(cleanRecord.products) ? cleanRecord.products : [],
-  };
-  const finance = getRecordFinancialPlanFact({ ...normalizedRecord, finance: storedRecordFinance(normalizedRecord) }, { discountPercent: legacyDiscount });
-  return { ...normalizedRecord, finance: normalizeFinance(finance) };
+export function getRecordRow(id) {
+  const recordId = normalizeId(id);
+  const row = readRows().find((item) => normalizeId(item?.id) === recordId) || null;
+  return clone(row);
 }
 
-export function getRecords() {
-  const stored = readList(KEY);
-  let changed = false;
-  const records = stored.map((record) => {
-    const next = hydrateRecord(record);
-    if (JSON.stringify(next) !== JSON.stringify(record)) changed = true;
-    return next;
-  });
-  if (changed) writeList(KEY, records);
-  return records;
-}
-export function getRecordsForDay(date, workplaceId = '') {
-  const day = normalizeDate(date), workplace = normalizeId(workplaceId);
-  return getRecords().filter((record) => record?.date === day && (!workplace || normalizeId(record?.workplaceId) === workplace));
-}
-export function getActiveRecordCountForDay(date, workplaceId = '') {
-  return getRecordsForDay(date, workplaceId).filter((record) => record?.status !== 'cancelled').length;
+export function insertRecordRow(row = null) {
+  if (!row?.id || getRecordRow(row.id)) return null;
+  const rows = readRows();
+  const stored = clone(row);
+  rows.push(stored);
+  writeRows(rows);
+  return clone(stored);
 }
 
-export function checkRecordTime({ date, workplaceId, from, to, excludeId = '' } = {}) {
-  const result = checkTimeAvailability({ date, workplaceId, from, to, excludeId });
-  return { ok: result.ok, reason: result.reason, conflicts: result.conflicts || [] };
-}
-
-export function createRecord({ date, workplaceId, from, to, client, procedures = [], products = [] } = {}) {
-  const normalizedDate = normalizeDate(date), normalizedWorkplaceId = normalizeId(workplaceId);
-  if (!checkRecordTime({ date: normalizedDate, workplaceId: normalizedWorkplaceId, from, to }).ok) return null;
-  const now = new Date().toISOString();
-  const sourceRecord = {
-    procedures: Array.isArray(procedures) ? procedures : [],
-    products: Array.isArray(products) ? products : [],
-  };
-  const finance = calculateFinancialPlan(recordFinancialItems(sourceRecord), { discountPercent: clientDiscount(client) });
-  const record = hydrateRecord({
-    id: crypto.randomUUID(),
-    status: 'active',
-    confirmed: false,
-    attendance: '',
-    date: normalizedDate,
-    workplaceId: normalizedWorkplaceId,
-    from: String(from),
-    to: String(to),
-    client: client || null,
-    procedures: sourceRecord.procedures,
-    products: sourceRecord.products,
-    finance,
-    createdAt: now,
-    updatedAt: now,
-  });
-  const records = getRecords(); records.push(record); writeList(KEY, records);
-  notify('book:records-changed', { action: 'create', recordId: record.id });
-  notify('book:time-usage-changed', { action: 'occupy', usageId: record.id, sourceId: record.id, date: record.date, workplaceId: record.workplaceId, from: record.from, to: record.to });
-  return record;
-}
-
-export function updateRecord(id, patch = {}) {
-  const records = getRecords(), index = records.findIndex((record) => record?.id === id);
+export function patchRecordRow(id, patch = {}) {
+  const recordId = normalizeId(id);
+  const rows = readRows();
+  const index = rows.findIndex((item) => normalizeId(item?.id) === recordId);
   if (index < 0) return null;
-  const current = records[index];
-  if (current.status === 'cancelled' && patch.status !== 'active') return null;
-  const next = { ...current, ...patch };
-  if (next.status !== 'cancelled' && !checkRecordTime({ date: next.date, workplaceId: next.workplaceId, from: next.from, to: next.to, excludeId: id }).ok) return null;
-
-  const hasExplicitFinance = Object.prototype.hasOwnProperty.call(patch, 'finance');
-  const serviceChanged = Object.prototype.hasOwnProperty.call(patch, 'procedures');
-  const productChanged = Object.prototype.hasOwnProperty.call(patch, 'products');
-  const clientChanged = Object.prototype.hasOwnProperty.call(patch, 'client');
-  if (hasExplicitFinance) {
-    next.finance = normalizeFinance(patch.finance);
-  } else if (clientChanged) {
-    next.finance = calculateFinancialPlan(recordFinancialItems(next), { discountPercent: clientDiscount(next.client) });
-  } else if (serviceChanged || productChanged) {
-    next.finance = repriceFinancialPlan(recordFinancialItems(next), current.finance);
-  } else {
-    next.finance = current.finance;
-  }
-
-  records[index] = hydrateRecord({ ...next, updatedAt: new Date().toISOString() });
-  writeList(KEY, records);
-  notify('book:records-changed', { action: 'update', recordId: id });
-  notify('book:time-usage-changed', { action: 'change', usageId: id, sourceId: id, date: records[index].date, workplaceId: records[index].workplaceId, from: records[index].from, to: records[index].to });
-  return records[index];
+  rows[index] = { ...rows[index], ...clone(patch) };
+  writeRows(rows);
+  return clone(rows[index]);
 }
 
-export function cancelRecord(id) {
-  const records = getRecords(), index = records.findIndex((record) => record?.id === id);
-  if (index < 0 || records[index].status === 'cancelled') return null;
-  const previous = records[index];
-  records[index] = hydrateRecord({ ...previous, status: 'cancelled', cancelledAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
-  writeList(KEY, records);
-  notify('book:records-changed', { action: 'cancel', recordId: id });
-  notify('book:time-usage-changed', { action: 'release', usageId: id, sourceId: id, date: previous.date, workplaceId: previous.workplaceId, from: previous.from, to: previous.to });
-  return records[index];
+export function deleteRecordRow(id) {
+  const recordId = normalizeId(id);
+  const rows = readRows();
+  const index = rows.findIndex((item) => normalizeId(item?.id) === recordId);
+  if (index < 0) return null;
+  const [removed] = rows.splice(index, 1);
+  writeRows(rows);
+  return clone(removed);
 }
-
-export function deleteRecord(id) {
-  const records = getRecords(), index = records.findIndex((record) => record?.id === id);
-  if (index < 0) return false;
-  const removed = records[index];
-  records.splice(index, 1); writeList(KEY, records);
-  notify('book:records-changed', { action: 'delete', recordId: id });
-  notify('book:time-usage-changed', { action: 'release', usageId: id, sourceId: id, date: removed.date, workplaceId: removed.workplaceId, from: removed.from, to: removed.to });
-  return true;
-}
-export function moveRecord(id, { date, workplaceId, from, to } = {}) { return updateRecord(id, { date: normalizeDate(date), workplaceId: normalizeId(workplaceId), from: String(from || ''), to: String(to || '') }); }
-export function removeRecord(id) { return Boolean(cancelRecord(id)); }
