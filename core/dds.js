@@ -40,6 +40,9 @@ function legacyFinancialSnapshot(item = {}) {
 function normalizeIncome(item = {}) {
   const { finance: currentFinance, ...rest } = item;
   delete rest['business'];
+  const total = Math.max(0, numberValue(item.total));
+  const tips = Math.max(0, Math.min(total, numberValue(item.tips)));
+  const serviceAmount = Math.max(0, Math.min(total, numberValue(item.serviceAmount ?? (total - tips))));
   const finance = normalizeFinancialSnapshot(currentFinance || legacyFinancialSnapshot(item));
   return {
     ...rest,
@@ -47,7 +50,9 @@ function normalizeIncome(item = {}) {
     movementType: 'income',
     incomeType: item.incomeType || 'payment',
     source: item.source || null,
-    total: Math.max(0, numberValue(item.total)),
+    total,
+    serviceAmount,
+    tips,
     allocations: Array.isArray(item.allocations) ? item.allocations.map((entry) => ({ ...entry })) : [],
     finance,
   };
@@ -138,7 +143,7 @@ function refundTotal(state, paymentId) {
     .reduce((sum, item) => sum + Math.max(0, numberValue(item?.total)), 0);
 }
 
-export function recordPaymentIncome({ source = null, workplace = '', client = null, finance = null, allocations = [], maxAmount = null, now = new Date() } = {}) {
+export function recordPaymentIncome({ source = null, workplace = '', client = null, finance = null, allocations = [], maxAmount = null, serviceAmount = null, tips = 0, now = new Date() } = {}) {
   if (!source?.type || !source?.id) return null;
   const snapshot = normalizeFinancialSnapshot(finance);
   if (!snapshot || maxAmount == null) return null;
@@ -154,7 +159,10 @@ export function recordPaymentIncome({ source = null, workplace = '', client = nu
     }))
     .filter((item) => item.walletId && item.amount > 0);
   const allocated = preparedAllocations.reduce((sum, item) => sum + item.amount, 0);
-  if (!preparedAllocations.length || allocated <= 0 || allocated > limit + 0.009) return null;
+  const tipsTotal = Math.max(0, numberValue(tips));
+  const applied = Math.max(0, numberValue(serviceAmount == null ? allocated - tipsTotal : serviceAmount));
+  if (!preparedAllocations.length || allocated <= 0 || applied <= 0 || applied > limit + 0.009) return null;
+  if (Math.abs(allocated - applied - tipsTotal) > 0.009) return null;
 
   const payment = normalizeIncome({
     id: globalThis.crypto?.randomUUID?.() || `payment-${Date.now()}`,
@@ -165,6 +173,8 @@ export function recordPaymentIncome({ source = null, workplace = '', client = nu
     walletId: preparedAllocations.length === 1 ? preparedAllocations[0].walletId : '',
     walletName: preparedAllocations.length === 1 ? preparedAllocations[0].walletName : '',
     total: allocated,
+    serviceAmount: applied,
+    tips: tipsTotal,
     finance: snapshot,
     createdAt: now.toISOString(),
     paidAt: now.toISOString(),
@@ -172,7 +182,7 @@ export function recordPaymentIncome({ source = null, workplace = '', client = nu
   const state = readState();
   state.income.push(payment);
   writeState(state);
-  notifyDDSChanged({ action: 'income', paymentId: payment.id, total: payment.total, source: payment.source });
+  notifyDDSChanged({ action: 'income', paymentId: payment.id, total: payment.total, serviceAmount: payment.serviceAmount, tips: payment.tips, source: payment.source });
   return payment;
 }
 
