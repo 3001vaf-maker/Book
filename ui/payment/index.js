@@ -1,4 +1,4 @@
-import { button } from '../buttons/index.js';
+import { button, iconButton } from '../buttons/index.js';
 import { select } from '../selectors/index.js';
 import { escapeHtml } from '../utils/escape-html.js';
 import { paymentMethodsMarkup, initPaymentMethodsAllocation } from './methods.js';
@@ -35,9 +35,13 @@ export function paymentForm({ workplace = '', date = '', time = '', client = {},
     const mode = explicitMode === 'percent' || explicitMode === 'money' || explicitMode === 'none'
       ? explicitMode
       : percent ? 'percent' : money ? 'money' : 'none';
+    const itemName = procedure?.name || '';
     return `
-    <section class="payment-procedure" data-payment-procedure="${index}" data-payment-source-type="${escapeHtml(procedure?.sourceType || 'procedure')}" data-payment-source-id="${escapeHtml(procedure?.id || '')}" data-payment-name="${escapeHtml(procedure?.name || '')}" data-payment-discount-mode="${mode}">
-      <strong class="payment-procedure__name">${escapeHtml(procedure?.name || '')}</strong>
+    <section class="payment-procedure" data-payment-procedure="${index}" data-payment-source-type="${escapeHtml(procedure?.sourceType || 'procedure')}" data-payment-source-id="${escapeHtml(procedure?.id || '')}" data-payment-name="${escapeHtml(itemName)}" data-payment-discount-mode="${mode}">
+      <div class="payment-procedure__head">
+        <strong class="payment-procedure__name">${escapeHtml(itemName)}</strong>
+        ${iconButton('×', { className: 'remove-button payment-procedure__remove', data: 'data-payment-remove', aria: `Удалить ${itemName}` })}
+      </div>
       <div class="payment-fields payment-fields--three">
         <label><span>Цена</span><input type="number" inputmode="decimal" step="0.01" min="0" value="${escapeHtml(moneyText(price))}" data-payment-price></label>
         <div class="payment-discount-percent">${select({ label: 'Скидка %', value: percent ? percentText(percent) : '', options: discountOptions, data: 'data-payment-discount-percent', aria: 'Скидка в процентах' })}</div>
@@ -124,20 +128,35 @@ function recalculate(root, calculate, { preserve = null } = {}) {
   return plan;
 }
 
-export function initPaymentForm(root, { calculate = null, onSave = () => {}, onPay = () => {} } = {}) {
-  if (!root) return;
-  root.querySelectorAll('[data-payment-procedure]').forEach((row) => {
-    const { priceInput, percentInput, moneyInput } = rowValues(row);
-    priceInput?.addEventListener('input', () => recalculate(root, calculate, { preserve: priceInput }));
-    percentInput?.addEventListener('change', () => {
-      row.dataset.paymentDiscountMode = percentInput.value ? 'percent' : 'none';
-      recalculate(root, calculate, { preserve: percentInput });
-    });
-    moneyInput?.addEventListener('input', () => {
-      row.dataset.paymentDiscountMode = moneyInput.value ? 'money' : 'none';
-      recalculate(root, calculate, { preserve: moneyInput });
-    });
+function bindPaymentRow(root, row, calculate) {
+  const { priceInput, percentInput, moneyInput } = rowValues(row);
+  priceInput?.addEventListener('input', () => recalculate(root, calculate, { preserve: priceInput }));
+  percentInput?.addEventListener('change', () => {
+    row.dataset.paymentDiscountMode = percentInput.value ? 'percent' : 'none';
+    recalculate(root, calculate, { preserve: percentInput });
   });
+  moneyInput?.addEventListener('input', () => {
+    row.dataset.paymentDiscountMode = moneyInput.value ? 'money' : 'none';
+    recalculate(root, calculate, { preserve: moneyInput });
+  });
+}
+
+export function initPaymentForm(root, { calculate = null, onSave = () => {}, onPay = () => {}, onRemove = () => {} } = {}) {
+  if (!root) return;
+  root.querySelectorAll('[data-payment-procedure]').forEach((row) => bindPaymentRow(root, row, calculate));
+  root.querySelectorAll('[data-payment-remove]').forEach((remove) => remove.addEventListener('click', () => {
+    const row = remove.closest('[data-payment-procedure]');
+    if (!row) return;
+    const removed = {
+      sourceType: row.dataset.paymentSourceType || 'procedure',
+      sourceId: row.dataset.paymentSourceId || '',
+      name: row.dataset.paymentName || '',
+    };
+    row.remove();
+    const plan = recalculate(root, calculate);
+    if (!plan) return;
+    onRemove?.({ ...removed, finance: plan, items: plan.items, total: plan.planTotal });
+  }));
   root.querySelector('[data-payment-save]')?.addEventListener('click', () => {
     const plan = recalculate(root, calculate);
     if (!plan) return;

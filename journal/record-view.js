@@ -295,6 +295,18 @@ function openProcedureCorrection(state, index, { onSave, onAdd, onDelete } = {})
   });
 }
 
+function openProductRemoval(state, index, onDelete) {
+  const item = state.products[index];
+  if (!item) return;
+  const html = `<div class="modal-title"><h2>${escapeHtml(item.name || 'Товар')}</h2></div><div class="modal-actions">${button('Удалить товар', { data: 'data-record-view-product-delete', variant: 'danger' })}</div>`;
+  const m = mountModal(document.body, modal(html, { variant: 'compact', surface: 'app' }));
+  if (!m) return;
+  m.querySelector('[data-record-view-product-delete]')?.addEventListener('click', () => {
+    m.remove();
+    onDelete?.();
+  });
+}
+
 function openPhoneActions(phone) {
   const value = String(phone || '').trim();
   if (!value) return;
@@ -435,9 +447,11 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
         data: paid ? '' : `data-record-view-procedure-edit="${index}"`,
         aria: paid ? '' : `Изменить время процедуры ${item.name || ''}`,
       })),
-      ...state.products.map((item) => ({
+      ...state.products.map((item, index) => ({
         left: item.name || '',
         right: item.cost === '' || item.cost == null ? '' : formatMoney(item.cost),
+        data: paid ? '' : `data-record-view-product-edit="${index}"`,
+        aria: paid ? '' : `Удалить товар ${item.name || ''}`,
       })),
     ];
     const card = entityCard({
@@ -528,6 +542,18 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
           const nextProcedures = state.procedures.filter((_, itemIndex) => itemIndex !== index).map((item) => ({ ...item }));
           applyProcedures(nextProcedures);
         },
+      });
+    }));
+    root.querySelectorAll('[data-record-view-product-edit]').forEach((node) => node.addEventListener('click', () => {
+      if (isPaid()) return;
+      const index = Number(node.dataset.recordViewProductEdit);
+      if (!Number.isInteger(index) || !state.products[index]) return;
+      openProductRemoval(state, index, () => {
+        state = {
+          ...state,
+          products: state.products.filter((_, itemIndex) => itemIndex !== index).map((item) => ({ ...item })),
+        };
+        persistChanges();
       });
     }));
     root.querySelector('[data-record-view-confirmed]')?.addEventListener('click', () => {
