@@ -35,6 +35,7 @@ const journalWorkplaceControl = read('journal/workplace-control.js');
 const journalMonth = read('journal/месяц.js');
 const journalTimeUsage = read('journal/time-usage-source.js');
 const recordData = read('journal/record-data.js');
+const recordService = read('journal/record-service.js');
 const timeUsage = read('core/time-usage.js');
 const coreEntry = read('core.js');
 const allCss = [...walkCss('ui'), ...walkCss('css')];
@@ -118,8 +119,9 @@ if (/configureWorkingTimeConflictSource/.test(timeUsage)) fail('core/time-usage.
 if (!/configureTimeUsageSource\(getJournalTimeUsages\)/.test(coreEntry)) fail('core.js', 'composition root must wire Journal facts into the neutral Core occupancy contract');
 if (!/configureSoftTimeUsageReleaseSource\(releaseJournalSoftTimeUsages\)/.test(coreEntry)) fail('core.js', 'composition root must wire soft-usage release to its Journal owner');
 
-if (!/checkTimeAvailability/.test(recordData)) fail('journal/record-data.js', 'Record timing must ask canonical Availability');
-if (/getDays|getDayTime|getWorkplaces|getJournalBreaks|rangesOverlap|containsRange/.test(recordData)) fail('journal/record-data.js', 'Record owner must not rebuild WorkPlan or occupancy availability');
+if (!/checkTimeAvailability/.test(recordService)) fail('journal/record-service.js', 'Record commands must ask canonical Availability');
+if (/getDays|getDayTime|getWorkplaces|getJournalBreaks|rangesOverlap|containsRange/.test(recordService)) fail('journal/record-service.js', 'Record command owner must not rebuild WorkPlan or occupancy availability');
+if (/checkTimeAvailability|getDays|getDayTime|getWorkplaces|getJournalBreaks|rangesOverlap|containsRange/.test(recordData)) fail('journal/record-data.js', 'Record data must remain persistence-only and know nothing about time rules');
 
 if (!/hidden\.dispatchEvent\(new Event\(['"]change['"],\{bubbles:true\}\)\)/.test(timeUi)) fail('ui/time/index.js', 'shared TimePicker must emit change so conflict validation updates after edits');
 if (!/\.time-range-fields\b/.test(timeCss)) fail('ui/time/time.css', 'shared Time UI must own the two-column time-range layout');
