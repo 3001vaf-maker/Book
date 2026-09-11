@@ -1,10 +1,7 @@
 import { button, entityCard, modal, mountModal, timeSlots } from '../ui/ui.js';
+import { listAvailableEndTimes, listAvailableStartTimes } from '../core/availability.js';
 import { getWorkplaces } from '../core/workplace-time.js';
-import { getDays, getDay, getDayTime } from '../core/day.js';
-import { getTimeUsages, isTimeRangeAvailable } from '../core/time-usage.js';
-import { minutesToTime, timeToMinutes } from '../core/time.js';
-import { getRecordsForDay } from './record-read.js';
-import { getJournalBreaks, moveJournalBreak, removeJournalBreak } from './break-data.js';
+import { moveJournalBreak, removeJournalBreak } from './break-service.js';
 
 function formatDate(value) {
   const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -16,40 +13,24 @@ function workplaceName(workplaceId) {
   return workplace?.name || workplace?.title || 'Рабочее пространство';
 }
 
-function breakContext(item) {
-  const workplaces = getWorkplaces();
-  const day = getDay(getDays(), item.workplaceId, item.date);
-  const workTime = getDayTime(day, workplaces);
-  const workStart = timeToMinutes(workTime?.from);
-  const workEnd = timeToMinutes(workTime?.to);
-  const records = getRecordsForDay(item.date, item.workplaceId).filter((record) => record?.status !== 'cancelled');
-  const usages = getTimeUsages({ records, breaks: getJournalBreaks() });
-  return { workStart, workEnd, usages };
-}
-
 function availableBreakStarts(item) {
-  const { workStart, workEnd, usages } = breakContext(item);
-  if (workStart == null || workEnd == null) return [];
-  const values = [];
-  for (let value = workStart; value + 5 <= workEnd; value += 5) {
-    const from = minutesToTime(value);
-    const minimumTo = minutesToTime(value + 5);
-    if (isTimeRangeAvailable({ from, to: minimumTo, usages, excludeId: item.id })) values.push(from);
-  }
-  return values;
+  return listAvailableStartTimes({
+    date: item.date,
+    workplaceId: item.workplaceId,
+    duration: 5,
+    step: 5,
+    excludeId: item.id,
+  });
 }
 
 function availableBreakEnds(item, from) {
-  const { workEnd, usages } = breakContext(item);
-  const start = timeToMinutes(from);
-  if (start == null || workEnd == null || start >= workEnd) return [];
-  const values = [];
-  for (let value = start + 5; value <= workEnd; value += 5) {
-    const to = minutesToTime(value);
-    if (!isTimeRangeAvailable({ from, to, usages, excludeId: item.id })) break;
-    values.push(to);
-  }
-  return values;
+  return listAvailableEndTimes({
+    date: item.date,
+    workplaceId: item.workplaceId,
+    from,
+    step: 5,
+    excludeId: item.id,
+  });
 }
 
 function openBreakEndSlots(item, from, onSelected) {
