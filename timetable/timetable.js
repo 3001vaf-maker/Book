@@ -1,7 +1,7 @@
 import { actionBlock, button, pageHeader, initCalendar, initMultiSelect, modal, mountModal, timePicker, initTimePickers, twoColumnLayout, escapeHtml, headerControl, workplaceContent, openWorkplaceControl, ALL_WORKPLACES_ID, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js';
 import { getWorkplaces, resolveWorkplaceTime, getWorkingDayIndicators, getWorkingDayTotalMinutes, getWorkplaceMonthStats, getAllWorkplacesMonthStats, getWorkplaceMonthStatsMap } from '../core/workplace-time.js';
 import { getDays, saveDays, getDay, getDayTime, createDay, updateDayTime, removeDay, getDayRemovalConflicts, getScheduleConflicts, hasScheduleConflict, findSuggestedInterval } from '../core/day/index.js';
-import { isValidRange } from '../core/time/index.js';
+import { getWorkingTimeUsageConflicts, isValidRange } from '../core/time/index.js';
 import { openTimetableDayEditor } from './day-editor.js';
 
 function datesForWorkplace(days, workplaceId) { return days.filter((item) => item?.workplaceId === workplaceId).map((item) => item.date).filter(Boolean); }
@@ -137,28 +137,113 @@ export function renderTimetable(root) {
     return { date, conflicts, suggested };
   }
 
+  function conflictParticipant(day, { target = false, from = '', to = '' } = {}) {
+    const workplaceId = String(day?.workplaceId || selectedWorkplaceId || '');
+    return {
+      workplaceId,
+      name: target ? (workplaces.find((item) => String(item?.key || '') === workplaceId)?.name || 'Рабочее пространство') : conflictWorkplaceLabel(day),
+      from: String(from || day?.from || ''),
+      to: String(to || day?.to || ''),
+      target,
+    };
+  }
+
+  function conflictParticipants(entry, base) {
+    const target = conflictParticipant({ workplaceId: selectedWorkplaceId }, {
+      target: true,
+      from: entry.suggested?.from || base.from,
+      to: entry.suggested?.to || base.to,
+    });
+    const seen = new Set([target.workplaceId]);
+    const existing = [];
+    entry.conflicts.forEach((day) => {
+      const workplaceId = String(day?.workplaceId || '');
+      if (!workplaceId || seen.has(workplaceId)) return;
+      seen.add(workplaceId);
+      existing.push(conflictParticipant(day));
+    });
+    return [target, ...existing];
+  }
+
+  function draftDaysForConflict(date, participants) {
+    const ids = new Set(participants.map((item) => String(item?.workplaceId || '')));
+    const untouched = workingDays.filter((day) => String(day?.date || '').slice(0, 10) !== String(date || '').slice(0, 10)
+      || !ids.has(String(day?.workplaceId || '')));
+    const drafts = participants.map((item) => ({ date, workplaceId: item.workplaceId, from: item.from, to: item.to }));
+    return [...untouched, ...drafts];
+  }
+
+  function draftScheduleConflicts(date, participants) {
+    const draftDays = draftDaysForConflict(date, participants);
+    const found = [];
+    const seen = new Set();
+    participants.forEach((participant) => {
+      getScheduleConflicts(draftDays, {
+        workplaceId: participant.workplaceId,
+        date,
+        from: participant.from,
+        to: participant.to,
+      }).forEach((other) => {
+        const pair = [String(participant.workplaceId || ''), String(other?.workplaceId || '')].sort().join('::');
+        if (!other?.workplaceId || seen.has(pair)) return;
+        seen.add(pair);
+        found.push({ participant, other });
+      });
+    });
+    return found;
+  }
+
+  function expandConflictParticipants(participants, conflicts) {
+    const next = participants.map((item) => ({ ...item }));
+    const seen = new Set(next.map((item) => String(item?.workplaceId || '')));
+    conflicts.forEach(({ other }) => {
+      const workplaceId = String(other?.workplaceId || '');
+      if (!workplaceId || seen.has(workplaceId)) return;
+      seen.add(workplaceId);
+      next.push(conflictParticipant(other));
+    });
+    return next;
+  }
+
+  function usageConflictMessages(date, participants) {
+    const messages = [];
+    participants.forEach((participant) => {
+      if (!isValidRange(participant.from, participant.to)) return;
+      getWorkingTimeUsageConflicts({
+        date,
+        workplaceId: participant.workplaceId,
+        from: participant.from,
+        to: participant.to,
+      }).forEach((conflict) => {
+        if (!conflict?.from || !conflict?.to) return;
+        messages.push(`${participant.name}: ${occupiedLabel(conflict)} ${conflict.from}–${conflict.to} выходит за рабочее время.`);
+      });
+    });
+    return messages;
+  }
+
   function openWorkingDaysConflictModal(entries, base) {
-    const targetWorkplace = workplaces.find((item) => String(item?.key || '') === String(selectedWorkplaceId || '')) || null;
-    const targetWorkplaceName = targetWorkplace?.name || 'Рабочее пространство';
     let activeEntries = entries.map((entry) => ({
-      ...entry,
-      draftFrom: entry.suggested?.from || base.from,
-      draftTo: entry.suggested?.to || base.to,
+      date: entry.date,
+      participants: conflictParticipants(entry, base),
       error: '',
     }));
 
-    const rowMarkup = (entry, index) => {
-      const occupied = entry.conflicts.map((day) => `<div><span>Конфликтует</span><strong>${escapeHtml(conflictWorkplaceLabel(day))} · ${escapeHtml(day.from)}–${escapeHtml(day.to)}</strong></div>`).join('');
-      const timeFields = twoColumnLayout(
-        timePicker({ name: `timetableConflictFrom${index}`, label: 'Начало', value: entry.draftFrom }),
-        timePicker({ name: `timetableConflictTo${index}`, label: 'Окончание', value: entry.draftTo }),
-        { ariaLabel: 'Интервал рабочего времени' },
-      );
-      return `<div class="compact-form" data-timetable-conflict-row="${index}"><div class="entity-details"><div><span>Дата</span><strong>${escapeHtml(formatDateLabel(entry.date))}</strong></div><div><span>Корректируем</span><strong>${escapeHtml(targetWorkplaceName)}</strong></div></div>${timeFields}<div class="entity-details">${occupied}</div><div class="form-error" data-timetable-conflict-error="${index}">${escapeHtml(entry.error || '')}</div></div>`;
+    const rowMarkup = (entry, entryIndex) => {
+      const participants = entry.participants.map((participant, participantIndex) => {
+        const role = participant.target ? 'Добавляем' : 'Уже в графике';
+        const timeFields = twoColumnLayout(
+          timePicker({ name: `timetableConflictFrom${entryIndex}_${participantIndex}`, label: 'Начало', value: participant.from }),
+          timePicker({ name: `timetableConflictTo${entryIndex}_${participantIndex}`, label: 'Окончание', value: participant.to }),
+          { ariaLabel: `Интервал ${participant.name}` },
+        );
+        return `<div class="compact-form" data-timetable-conflict-participant="${participantIndex}"><div class="entity-details"><div><span>${escapeHtml(role)}</span><strong>${escapeHtml(participant.name)}</strong></div></div>${timeFields}</div>`;
+      }).join('');
+      return `<div class="compact-form" data-timetable-conflict-row="${entryIndex}"><div class="entity-details"><div><span>Дата</span><strong>${escapeHtml(formatDateLabel(entry.date))}</strong></div></div>${participants}<div class="form-error" data-timetable-conflict-error="${entryIndex}">${escapeHtml(entry.error || '')}</div></div>`;
     };
 
-    const content = `<div class="modal-title"><h2>Конфликт времени</h2><p>Исправленные даты применяются сразу. Даты, где конфликт остаётся, останутся здесь для дальнейшей корректировки.</p></div><div data-timetable-conflict-rows></div>${button('Сохранить', { data: 'data-timetable-conflicts-save' })}`;
-    const m = mountModal(document.body, modal(content, { title: 'Конфликт времени' }));
+    const content = `<div class="modal-title"><h2>Конфликт времени</h2><p>Можно изменить время нового и уже существующих рабочих мест. Исправленные даты применяются сразу, остальные остаются для дальнейшей корректировки.</p></div><div data-timetable-conflict-rows></div>${button('Сохранить', { data: 'data-timetable-conflicts-save' })}`;
+    const m = mountModal(document.body, modal(content, { title: 'Конфликт времени', variant: 'list' }));
     if (!m) return;
     const rowsRoot = m.querySelector('[data-timetable-conflict-rows]');
 
@@ -168,31 +253,48 @@ export function renderTimetable(root) {
       initTimePickers(rowsRoot);
     };
 
+    const readParticipants = (entry, entryIndex) => entry.participants.map((participant, participantIndex) => ({
+      ...participant,
+      from: m.querySelector(`[name="timetableConflictFrom${entryIndex}_${participantIndex}"]`)?.value || participant.from,
+      to: m.querySelector(`[name="timetableConflictTo${entryIndex}_${participantIndex}"]`)?.value || participant.to,
+    }));
+
     renderRows();
     m.querySelector('[data-timetable-conflicts-save]')?.addEventListener('click', () => {
       const remaining = [];
       let applied = 0;
 
-      activeEntries.forEach((entry, index) => {
-        const from = m.querySelector(`[name="timetableConflictFrom${index}"]`)?.value || entry.draftFrom;
-        const to = m.querySelector(`[name="timetableConflictTo${index}"]`)?.value || entry.draftTo;
-        if (!isValidRange(from, to)) {
-          remaining.push({ ...entry, draftFrom: from, draftTo: to, error: 'Окончание должно быть позже начала.' });
+      activeEntries.forEach((entry, entryIndex) => {
+        const participants = readParticipants(entry, entryIndex);
+        if (participants.some((participant) => !isValidRange(participant.from, participant.to))) {
+          remaining.push({ ...entry, participants, error: 'Окончание должно быть позже начала.' });
           return;
         }
 
-        const conflicts = getScheduleConflicts(workingDays, { workplaceId: selectedWorkplaceId, date: entry.date, from, to });
-        if (conflicts.length) {
-          remaining.push({ ...entry, conflicts, draftFrom: from, draftTo: to, error: 'Это время всё ещё пересекается с другой работой.' });
+        const usageErrors = usageConflictMessages(entry.date, participants);
+        if (usageErrors.length) {
+          remaining.push({ ...entry, participants, error: usageErrors.join(' ') });
           return;
         }
 
-        const existing = getDay(workingDays, selectedWorkplaceId, entry.date);
-        if (existing) updateDayTime(workingDays, selectedWorkplaceId, entry.date, from, to);
-        else {
-          const day = createDay({ date: entry.date, workplaceId: selectedWorkplaceId, from, to });
-          if (day) workingDays.push(day);
+        const scheduleConflicts = draftScheduleConflicts(entry.date, participants);
+        if (scheduleConflicts.length) {
+          remaining.push({
+            ...entry,
+            participants: expandConflictParticipants(participants, scheduleConflicts),
+            error: 'Время всё ещё пересекается. Скорректируйте рабочие места этой даты.',
+          });
+          return;
         }
+
+        participants.forEach((participant) => {
+          const existing = getDay(workingDays, participant.workplaceId, entry.date);
+          if (existing) updateDayTime(workingDays, participant.workplaceId, entry.date, participant.from, participant.to);
+          else {
+            const day = createDay({ date: entry.date, workplaceId: participant.workplaceId, from: participant.from, to: participant.to });
+            if (day) workingDays.push(day);
+          }
+        });
         applied += 1;
       });
 
