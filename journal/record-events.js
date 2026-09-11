@@ -1,19 +1,6 @@
 // Append-only lifecycle facts for Record.
-// Record data does not own cancellation / confirmation / attendance history.
-const KEY = 'book.recordEvents';
-
-function readEvents() {
-  try {
-    const values = JSON.parse(localStorage.getItem(KEY) || '[]');
-    return Array.isArray(values) ? values : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeEvents(values) {
-  localStorage.setItem(KEY, JSON.stringify(Array.isArray(values) ? values : []));
-}
+// This module owns lifecycle event meaning; record-data.js owns physical persistence only.
+import { deleteRecordEventRows, getRecordEventRows, insertRecordEventRow } from './record-data.js';
 
 function normalizeRecordId(value) {
   return String(value || '');
@@ -35,13 +22,19 @@ export const RECORD_EVENT_TYPES = Object.freeze({
 });
 
 export function getAllRecordEvents() {
-  return readEvents().map((event) => ({ ...event, payload: event?.payload && typeof event.payload === 'object' ? { ...event.payload } : {} }));
+  return getRecordEventRows().map((event) => ({
+    ...event,
+    payload: event?.payload && typeof event.payload === 'object' ? { ...event.payload } : {},
+  }));
 }
 
 export function getRecordEvents(recordId) {
   const id = normalizeRecordId(recordId);
-  return getAllRecordEvents()
-    .filter((event) => normalizeRecordId(event?.recordId) === id)
+  return getRecordEventRows(id)
+    .map((event) => ({
+      ...event,
+      payload: event?.payload && typeof event.payload === 'object' ? { ...event.payload } : {},
+    }))
     .sort((left, right) => Date.parse(left?.at || '') - Date.parse(right?.at || ''));
 }
 
@@ -49,17 +42,15 @@ export function appendRecordEvent(recordId, type, { at = '', payload = {} } = {}
   const id = normalizeRecordId(recordId);
   const eventType = String(type || '');
   if (!id || !Object.values(RECORD_EVENT_TYPES).includes(eventType)) return null;
-  const event = Object.freeze({
+  const event = {
     id: crypto.randomUUID(),
     recordId: id,
     type: eventType,
     at: normalizeAt(at),
     payload: payload && typeof payload === 'object' ? { ...payload } : {},
-  });
-  const events = readEvents();
-  events.push(event);
-  writeEvents(events);
-  return { ...event, payload: { ...event.payload } };
+  };
+  const stored = insertRecordEventRow(event);
+  return stored ? { ...stored, payload: { ...(stored.payload || {}) } } : null;
 }
 
 export function hasRecordEvent(recordId, type) {
@@ -92,11 +83,5 @@ export function ensureLegacyRecordEvents(record = {}) {
 }
 
 export function deleteRecordEvents(recordId) {
-  const id = normalizeRecordId(recordId);
-  if (!id) return 0;
-  const events = readEvents();
-  const next = events.filter((event) => normalizeRecordId(event?.recordId) !== id);
-  const removed = events.length - next.length;
-  if (removed) writeEvents(next);
-  return removed;
+  return deleteRecordEventRows(recordId);
 }
