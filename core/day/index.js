@@ -17,3 +17,4 @@ export {
   saveDays,
   updateDayTime,
 } from './service.js';
+export { getActiveDayWorkplaces, getAvailableDayWorkplaces } from './workplaces.js';
