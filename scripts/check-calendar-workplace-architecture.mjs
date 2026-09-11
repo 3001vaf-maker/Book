@@ -26,12 +26,15 @@ const timeUi = read('ui/time/index.js');
 const timeCss = read('ui/time/time.css');
 const listUi = read('ui/lists/list.js');
 const dayWorkplaces = read('core/day-workplaces.js');
+const timeGrid = read('core/time-grid.js');
+const availability = read('core/availability.js');
 const graph = read('timetable/timetable.js');
 const dayEditor = read('timetable/day-editor.js');
 const journal = read('journal/journal.js');
 const journalWorkplaceControl = read('journal/workplace-control.js');
 const journalMonth = read('journal/месяц.js');
 const journalTimeUsage = read('journal/time-usage-source.js');
+const recordData = read('journal/record-data.js');
 const timeUsage = read('core/time-usage.js');
 const coreEntry = read('core.js');
 const allCss = [...walkCss('ui'), ...walkCss('css')];
@@ -67,6 +70,15 @@ if (/Корректировка времени|data-workplace-control-open-time|
 if (!/getActiveDayWorkplaces/.test(dayWorkplaces) || !/getAvailableDayWorkplaces/.test(dayWorkplaces)) fail('core/day-workplaces.js', 'day workplace read-model must expose active/available queries');
 if (/saveDayWorkplaceTime|getDayWorkplaceDraft|createDay|updateDayTime|saveDays/.test(dayWorkplaces)) fail('core/day-workplaces.js', 'day workplace read-model must not expose a second working-time mutation path');
 
+if (!/export function createTimeGrid/.test(timeGrid)) fail('core/time-grid.js', 'Core must own one neutral TimeGrid');
+if (!/getTimeGridMinuteState/.test(timeGrid) || !/getTimeGridRangeState/.test(timeGrid)) fail('core/time-grid.js', 'TimeGrid must resolve minute and range state');
+if (!/listTimeGridAvailableStarts/.test(timeGrid) || !/listTimeGridAvailableEnds/.test(timeGrid)) fail('core/time-grid.js', 'TimeGrid must own minute-resolution availability projection');
+if (/journal\/|timetable\/|settings\/|ui\//.test(timeGrid)) fail('core/time-grid.js', 'TimeGrid must not depend on feature or UI owners');
+
+if (!/getAvailabilityGrid/.test(availability) || !/checkTimeAvailability/.test(availability)) fail('core/availability.js', 'Availability must be the canonical WorkPlan + TimeGrid query service');
+if (!/createTimeGrid/.test(availability) || !/getTimeUsagesForScope/.test(availability)) fail('core/availability.js', 'Availability must compose TimeGrid with the neutral occupancy contract');
+if (/journal\/|timetable\/|settings\/|ui\//.test(availability)) fail('core/availability.js', 'Availability must not depend on feature or UI implementations');
+
 if (!/ALL_WORKPLACES_ID/.test(graph) || !/includeAggregate:\s*true/.test(graph)) fail('timetable/timetable.js', 'Graph must expose the aggregate workplace schedule through its Workplace control');
 if (!/getWorkingDayTotalMinutes/.test(graph)) fail('timetable/timetable.js', 'aggregate Graph dates must show summed duration instead of a false continuous interval');
 if (!/resolveDateIndicators/.test(graph) || /calendar__date-indicator/.test(graph)) fail('timetable/timetable.js', 'Graph must pass indicator data to Calendar instead of drawing indicators locally');
@@ -96,12 +108,19 @@ if (!/Все записи/.test(journalWorkplaceControl) || /Общий граф
 if (!/data-journal-workplace-select/.test(journalWorkplaceControl) || /data-workplace-control-select/.test(journalWorkplaceControl)) fail('journal/workplace-control.js', 'Journal and Graph controls must have separate interaction channels');
 if (!/getWorkingDayIndicators/.test(journalMonth) || !/resolveDateIndicators/.test(journalMonth) || /calendar__date-indicator/.test(journalMonth)) fail('journal/месяц.js', 'Journal Month must use the same Calendar indicator channel and must not draw its own indicators');
 
-if (!/export function getJournalWorkingTimeConflicts/.test(journalTimeUsage)) fail('journal/time-usage-source.js', 'Journal must expose one occupied-time contract to the composition root');
-if (!/type:\s*'record'/.test(journalTimeUsage) || !/type:\s*'break'/.test(journalTimeUsage)) fail('journal/time-usage-source.js', 'occupied-time contract must include both Record and Break');
-if (!/getRecordsForDay/.test(journalTimeUsage) || !/getJournalBreaksForDay/.test(journalTimeUsage)) fail('journal/time-usage-source.js', 'occupied-time provider must read Journal-owned Record and Break facts');
-if (!/configureWorkingTimeConflictSource/.test(timeUsage) || !/getWorkingTimeUsageConflicts/.test(timeUsage)) fail('core/time-usage.js', 'Core time usage must expose a configured conflict contract without owning Journal state');
-if (!/configureWorkingTimeConflictSource\(getJournalWorkingTimeConflicts\)/.test(coreEntry)) fail('core.js', 'App composition must wire Journal occupied time into the Core conflict contract');
-if (/configureWorkingTimeConflictSource\(getWorkingTimeRecordConflicts\)/.test(coreEntry)) fail('core.js', 'Record-only conflict source must not be wired as the occupied-time contract');
+if (!/export function getJournalTimeUsages/.test(journalTimeUsage)) fail('journal/time-usage-source.js', 'Journal must expose occupancy facts, not Core conflict decisions');
+if (!/rigidity:\s*'hard'/.test(journalTimeUsage) || !/rigidity:\s*'soft'/.test(journalTimeUsage)) fail('journal/time-usage-source.js', 'Journal must classify Record as hard and Break as soft');
+if (/containsRange|rangesOverlap|isValidRange/.test(journalTimeUsage)) fail('journal/time-usage-source.js', 'Journal occupancy source must not implement Core time rules');
+if (!/getRecordsForDay/.test(journalTimeUsage) || !/getJournalBreaksForDay/.test(journalTimeUsage)) fail('journal/time-usage-source.js', 'occupancy provider must read Journal-owned Record and Break facts');
+
+if (!/configureTimeUsageSource/.test(timeUsage) || !/getTimeUsagesForScope/.test(timeUsage)) fail('core/time-usage.js', 'Core must own one configured occupancy contract');
+if (/configureWorkingTimeConflictSource/.test(timeUsage)) fail('core/time-usage.js', 'legacy precomputed conflict-source contract must not remain');
+if (!/configureTimeUsageSource\(getJournalTimeUsages\)/.test(coreEntry)) fail('core.js', 'composition root must wire Journal facts into the neutral Core occupancy contract');
+if (!/configureSoftTimeUsageReleaseSource\(releaseJournalSoftTimeUsages\)/.test(coreEntry)) fail('core.js', 'composition root must wire soft-usage release to its Journal owner');
+
+if (!/checkTimeAvailability/.test(recordData)) fail('journal/record-data.js', 'Record timing must ask canonical Availability');
+if (/getDays|getDayTime|getWorkplaces|getJournalBreaks|rangesOverlap|containsRange/.test(recordData)) fail('journal/record-data.js', 'Record owner must not rebuild WorkPlan or occupancy availability');
+
 if (!/hidden\.dispatchEvent\(new Event\(['"]change['"],\{bubbles:true\}\)\)/.test(timeUi)) fail('ui/time/index.js', 'shared TimePicker must emit change so conflict validation updates after edits');
 if (!/\.time-range-fields\b/.test(timeCss)) fail('ui/time/time.css', 'shared Time UI must own the two-column time-range layout');
 
