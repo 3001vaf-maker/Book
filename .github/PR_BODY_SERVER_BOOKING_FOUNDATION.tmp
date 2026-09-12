@@ -1,0 +1,16 @@
+Переводит следующий связанный контур Book с browser-owned localStorage на серверный источник истины.
+
+Входит:
+- WorkPlan Day/График: серверная гидратация, дальнейшие изменения сохраняются на сервер.
+- Break/«Занять время»: серверная гидратация и серверное сохранение без нарушения persistence-only контракта Break data.
+- Процедуры и их история: серверный источник истины после проверенного переноса.
+- Настройки онлайн-записи: серверный источник истины, включая корректный серверный default при отсутствии старого browser snapshot.
+- Отдельная one-time migration с точной сверкой browser → server перед переключением.
+- Новый BusinessOperationalState в PostgreSQL + Prisma migration + health-check operationalStorage.
+- Общая persistence queue используется и для operational datasets.
+- Перед публикацией онлайн-записи очередь серверного сохранения принудительно flush-ится.
+- Старые localStorage snapshots не удаляются автоматически: остаются страховочной копией, но после verified migration рабочий runtime их не использует как источник этих сущностей.
+
+Не входит пока: документы/согласия, финансы, продукты, ярлыки/кошельки и полное удаление owner-bridge из публичной онлайн-записи.
+
+Проверено: architecture/syntax OK, domain regression tests OK, Prisma generate OK, server build OK.
