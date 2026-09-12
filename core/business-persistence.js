@@ -154,7 +154,7 @@ export function queueOperationalDataset(dataset, value) {
 export function queueAuxiliaryDataset(dataset, value) {
   const key = String(dataset || '').trim();
   if (!key) return Promise.resolve();
-  return enqueue(`/business-state/auxiliary/${encodeURIComponent(key)}`, {
+  return enqueue(`/auxiliary-state/${encodeURIComponent(key)}`, {
     method: 'PUT',
     body: JSON.stringify({ value }),
   }, 'Не удалось сохранить связанные данные на сервере');
