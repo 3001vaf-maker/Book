@@ -15,6 +15,25 @@ export class DocumentStateController {
     return this.documents.get(request.auth!.tenantId);
   }
 
+  @Get('consents/report')
+  consentReport(@Req() request: AuthenticatedRequest) {
+    return this.documents.consentReport(request.auth!.tenantId);
+  }
+
+  @Get('consents/client/:clientId')
+  clientConsents(@Req() request: AuthenticatedRequest, @Param('clientId') clientId: string) {
+    return this.documents.clientConsentProjection(request.auth!.tenantId, clientId);
+  }
+
+  @Post('consents/client/:clientId/:documentId/revoke')
+  revokeConsent(
+    @Req() request: AuthenticatedRequest,
+    @Param('clientId') clientId: string,
+    @Param('documentId') documentId: string,
+  ) {
+    return this.documents.revokeConsent(request.auth!.tenantId, clientId, documentId, 'owner');
+  }
+
   @Post('migrate')
   migrate(@Req() request: AuthenticatedRequest, @Body() body: unknown) {
     return this.documents.migrate(request.auth!.tenantId, body);
