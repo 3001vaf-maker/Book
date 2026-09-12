@@ -1,31 +1,23 @@
-// Compatibility cleanup for browser-owned business data from pre-server Book versions.
-// These keys may be read during one-time migration, but after every server owner is
-// verified they must not remain as a working database in the browser.
-export const LEGACY_BUSINESS_STORAGE_KEYS = Object.freeze([
-  'book.profile',
-  'book.profile.customProfessions',
-  'book.workplaces',
-  'book.people',
-  'book.uei',
-  'book.records',
-  'book.recordEvents',
-  'book:timetable-state',
-  'book.journalBreaks',
-  'book.procedures',
-  'book.procedures.history',
-  'book.booking-settings.v1',
-  'book.documents.templates.v1',
-  'book.documents.consents.v1',
-  'book.documents.consents.legacy-migrated.v1',
-  'book.documents.history.v1',
-  'book.dds',
-  'book.payments',
-  'book.wallets',
-  'book.tags',
-  'book.products',
-  'book.products.history',
-]);
+// Lifecycle cleanup for browser-owned data from pre-server Book versions.
+// It deliberately does not know entity storage keys: canonical data owners keep
+// ownership of those keys. After every server owner is verified, any Book-local
+// key that is not explicitly technical/session/UI state is obsolete and removed.
+
+function isBookNamespace(key) {
+  return key.startsWith('book.') || key.startsWith('book:');
+}
+
+function isTechnicalBrowserState(key) {
+  return key === 'book.people.sort'
+    || key.startsWith('book.booking-account.token.')
+    || key.startsWith('book.booking-account.email.')
+    || key.startsWith('book.onboarding.')
+    || key === 'book:workplace-context'
+    || key.startsWith('book:workplace-context:');
+}
 
 export function clearLegacyBusinessStorage(storage = localStorage) {
-  for (const key of LEGACY_BUSINESS_STORAGE_KEYS) storage.removeItem(key);
+  Object.keys(storage)
+    .filter((key) => isBookNamespace(key) && !isTechnicalBrowserState(key))
+    .forEach((key) => storage.removeItem(key));
 }
