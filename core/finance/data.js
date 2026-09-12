@@ -132,27 +132,12 @@ export function hydrateFinanceFromServer(value = null) {
 }
 
 export function writeFinanceState(state) {
-  const normalized = normalizedState(state) || emptyState();
-  if (financeState === null) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
-  } else {
-    financeState = normalized;
-    void queueAuxiliaryDataset('finance', financeState);
-  }
-  return clone(normalized);
+  financeState = normalizedState(state) || emptyState();
+  void queueAuxiliaryDataset('finance', financeState);
+  return clone(financeState);
 }
 
 export function readFinanceState() {
   if (financeState !== null) return clone(financeState);
-  const stored = readLegacyState();
-  try {
-    const storedRaw = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-    const hasLegacySnapshot = [...(storedRaw?.income || []), ...(storedRaw?.expense || [])].some((item) => item?.['business']);
-    if (storedRaw && (storedRaw?.version !== VERSION || Array.isArray(storedRaw?.operational) || hasLegacySnapshot)) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
-    } else if (!storedRaw && (stored.income.length || stored.expense.length)) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
-    }
-  } catch {}
-  return clone(stored);
+  return clone(readLegacyState());
 }
