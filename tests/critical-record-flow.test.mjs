@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { calculateFinancialPlan, getFinancialItemFact } from '../core/finance/index.js';
 import { createDay } from '../core/day/index.js';
 import { recordPaymentIncome, recordRefundExpense } from '../core/finance/index.js';
-import { getRecords } from '../core/record/index.js';
+import { getRecords, hydrateRecordStateFromServer } from '../core/record/index.js';
 import { createRecord, moveRecord, updateRecord } from '../core/record/index.js';
 import { recordVisualState } from '../core/record/index.js';
 import { renderJournalList } from '../journal/список.js';
@@ -151,7 +151,7 @@ assert.equal(getClientMetadata('client-2').paidTotal, 0);
 assert.equal(getFinancialItemFact('procedure', 'procedure-2').factTotal, 0);
 assert.equal(getWalletBalance('cash'), 6400);
 
-// Legacy paid records with a payment-stage discount recover the exact financial snapshot.
+// A record restored on another device comes from the server; Finance recovers the exact payment-stage snapshot.
 const historicalPlan = calculateFinancialPlan([{
   sourceType: 'procedure',
   sourceId: 'procedure-history',
@@ -170,24 +170,29 @@ const historicalIncome = recordPaymentIncome({
   allocations: [{ walletId: 'cashless', walletName: 'Безналичные', amount: 6400 }],
 });
 assert.ok(historicalIncome);
-const rawRecords = JSON.parse(localStorage.getItem('book.records') || '[]');
-rawRecords.push({
-  id: 'record-history',
-  status: 'active',
-  date: '2026-09-01',
-  workplaceId: 'studio',
-  from: '09:00',
-  to: '10:00',
-  client: { key: 'client-history', name: 'История' },
-  procedures: [{ id: 'procedure-history', name: 'Историческая услуга', cost: 8000, duration: 60 }],
+hydrateRecordStateFromServer({
+  records: [{
+    id: 'record-history',
+    date: '2026-09-01',
+    workplaceId: 'studio',
+    from: '09:00',
+    to: '10:00',
+    client: { key: 'client-history', name: 'История' },
+    procedures: [{ id: 'procedure-history', name: 'Историческая услуга', cost: 8000, duration: 60 }],
+    products: [],
+    createdAt: '2026-09-01T08:00:00.000Z',
+    updatedAt: '2026-09-01T08:00:00.000Z',
+  }],
+  recordEvents: [],
 });
-localStorage.setItem('book.records', JSON.stringify(rawRecords));
 const restoredHistory = getRecords().find((item) => item.id === 'record-history');
+assert.ok(restoredHistory);
 assert.equal(restoredHistory.procedures[0].cost, 8000);
 assert.equal(restoredHistory.finance.discountPercent, 20);
 assert.equal(restoredHistory.finance.discountTotal, 1600);
 assert.equal(restoredHistory.finance.planTotal, 6400);
 assert.equal(restoredHistory.finance.factTotal, 6400);
+assert.equal(localStorage.getItem('book.records'), null);
 
 // Record card shows expense / service value / discount metadata. Amount due belongs only to payment bottom sheet.
 const recordViewSource = readFileSync(new URL('../journal/record-view.js', import.meta.url), 'utf8');
