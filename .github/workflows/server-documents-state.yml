@@ -1,0 +1,43 @@
+name: Server Documents State
+
+on:
+  push:
+    branches: [feat/server-documents-context]
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: feat/server-documents-context
+          fetch-depth: 0
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Apply server Documents ownership
+        run: python scripts/_apply_server_documents_state.py
+      - name: Syntax and architecture checks
+        run: npm run check
+      - name: Domain regression tests
+        run: npm test
+      - name: Install server dependencies
+        run: npm install --prefix server
+      - name: Generate Prisma client
+        run: npm run prisma:generate --prefix server
+      - name: Build server
+        run: npm run build --prefix server
+      - name: Commit verified implementation
+        shell: bash
+        run: |
+          rm -f .github/workflows/server-documents-state.yml scripts/_apply_server_documents_state.py server/package-lock.json server/tsconfig.tsbuildinfo
+          git config user.name "Book Server Migration"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Move Documents state to server"
+          git push origin HEAD:feat/server-documents-context
