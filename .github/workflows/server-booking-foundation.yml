@@ -1,0 +1,45 @@
+name: Server Booking Foundation
+
+on:
+  push:
+    branches: [feat/server-booking-foundation]
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: feat/server-booking-foundation
+          fetch-depth: 0
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Apply operational server ownership
+        run: |
+          python scripts/_apply_server_booking_foundation.py
+          python scripts/_fix_server_booking_foundation.py
+      - name: Syntax and architecture checks
+        run: npm run check
+      - name: Domain regression tests
+        run: npm test
+      - name: Install server dependencies
+        run: npm install --prefix server
+      - name: Generate Prisma client
+        run: npm run prisma:generate --prefix server
+      - name: Build server
+        run: npm run build --prefix server
+      - name: Commit verified implementation
+        shell: bash
+        run: |
+          rm -f .github/workflows/server-booking-foundation.yml scripts/_apply_server_booking_foundation.py scripts/_fix_server_booking_foundation.py server/package-lock.json server/tsconfig.tsbuildinfo
+          git config user.name "Book Server Migration"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Move booking foundation data to server"
+          git push origin HEAD:feat/server-booking-foundation
