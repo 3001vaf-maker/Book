@@ -1,36 +1,23 @@
 import { getWalletDDSMovements } from '../../core/finance/index.js';
 import { queueAuxiliaryDataset } from '../../core/business-persistence.js';
 
-const KEY = 'book.wallets';
 const SYSTEM_WALLETS = [
   { id: 'cash', name: 'Наличные', photo: '', system: true },
   { id: 'cashless', name: 'Безналичные', photo: '', system: true },
 ];
-let walletsState = null;
+let walletsState = [];
 
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
 }
 
-function readLegacy(fallback) {
-  try { return JSON.parse(localStorage.getItem(KEY) || JSON.stringify(fallback)); }
-  catch { return fallback; }
-}
-
 function readRaw() {
-  const value = walletsState === null ? readLegacy(null) : walletsState;
-  return Array.isArray(value) ? clone(value) : null;
+  return clone(walletsState);
 }
 
 function write(value) {
   walletsState = Array.isArray(value) ? clone(value) : [];
   void queueAuxiliaryDataset('wallets', walletsState);
-}
-
-export function readLegacyWalletSnapshot() {
-  const present = localStorage.getItem(KEY) != null;
-  const value = readLegacy([]);
-  return { present, wallets: Array.isArray(value) ? clone(value) : [] };
 }
 
 export function hydrateWalletsFromServer(value = []) {
@@ -40,7 +27,7 @@ export function hydrateWalletsFromServer(value = []) {
 
 export function getWallets() {
   const stored = readRaw();
-  if (!Array.isArray(stored) || !stored.length) {
+  if (!stored.length) {
     write(SYSTEM_WALLETS);
     return SYSTEM_WALLETS.map((wallet) => ({ ...wallet }));
   }
