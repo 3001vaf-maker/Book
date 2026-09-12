@@ -65,7 +65,7 @@ function hydrate(value) {
 
 async function verify(local, remote) {
   if (!same(local, remote)) throw new Error('Финансы, кошельки, ярлыки и товары на сервере не совпадают с данными браузера');
-  const response = await apiRequest('/business-state/auxiliary/migrate/verify', {
+  const response = await apiRequest('/auxiliary-state/migrate/verify', {
     method: 'POST',
     body: JSON.stringify(local),
   });
@@ -77,7 +77,7 @@ async function verify(local, remote) {
 export async function initializeAuxiliaryState(account = {}) {
   const legacy = legacyBundle();
   const local = legacy.value;
-  const response = await apiRequest('/business-state/auxiliary');
+  const response = await apiRequest('/auxiliary-state');
   const remote = await responseJson(response, 'Не удалось загрузить Финансы и связанные данные');
 
   if (remote?.verified) {
@@ -93,7 +93,7 @@ export async function initializeAuxiliaryState(account = {}) {
   }
 
   if (legacy.present) {
-    const migrateResponse = await apiRequest('/business-state/auxiliary/migrate', {
+    const migrateResponse = await apiRequest('/auxiliary-state/migrate', {
       method: 'POST',
       body: JSON.stringify(local),
     });
@@ -106,7 +106,7 @@ export async function initializeAuxiliaryState(account = {}) {
 
   if (account?.user?.workspaceUnlocked) return { source: 'awaiting-populated-browser', verified: false };
 
-  const bootstrapResponse = await apiRequest('/business-state/auxiliary/bootstrap', { method: 'POST' });
+  const bootstrapResponse = await apiRequest('/auxiliary-state/bootstrap', { method: 'POST' });
   const bootstrapped = await responseJson(bootstrapResponse, 'Не удалось создать серверное хранилище Финансов');
   if (!bootstrapped?.verified) throw new Error('Серверное хранилище Финансов не подтверждено');
   hydrate(bootstrapped);
