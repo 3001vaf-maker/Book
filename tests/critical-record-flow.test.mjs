@@ -1,32 +1,26 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { calculateFinancialPlan, getFinancialItemFact } from '../core/finance/index.js';
-import { createDay } from '../core/day/index.js';
-import { recordPaymentIncome, recordRefundExpense } from '../core/finance/index.js';
-import { getRecords, hydrateRecordStateFromServer } from '../core/record/index.js';
-import { createRecord, moveRecord, updateRecord } from '../core/record/index.js';
-import { recordVisualState } from '../core/record/index.js';
+import { hydrateDaysFromServer } from '../core/day/index.js';
+import { calculateFinancialPlan, getFinancialItemFact, hydrateFinanceFromServer, recordPaymentIncome, recordRefundExpense } from '../core/finance/index.js';
+import { createRecord, getRecords, hydrateRecordStateFromServer, moveRecord, recordVisualState, updateRecord } from '../core/record/index.js';
 import { renderJournalList } from '../journal/список.js';
+import { hydrateClientsFromServer } from '../main/clients/data.js';
 import { getClientMetadata } from '../main/clients/metadata.js';
-import { getWalletBalance } from '../settings/wallets/data.js';
+import { getWalletBalance, hydrateWalletsFromServer } from '../settings/wallets/data.js';
 
-const store = new Map();
-globalThis.localStorage = {
-  getItem: (key) => store.has(key) ? store.get(key) : null,
-  setItem: (key, value) => store.set(key, String(value)),
-  removeItem: (key) => store.delete(key),
-};
 globalThis.requestAnimationFrame = (callback) => callback();
 
-const days = [
-  createDay({ date: '2026-09-10', workplaceId: 'studio', from: '09:00', to: '18:00' }),
-  createDay({ date: '2026-09-11', workplaceId: 'studio', from: '09:00', to: '18:00' }),
-];
-store.set('book:timetable-state', JSON.stringify({ workingDays: days }));
-store.set('book.people', JSON.stringify([
+hydrateDaysFromServer([
+  { date: '2026-09-10', workplaceId: 'studio', from: '09:00', to: '18:00' },
+  { date: '2026-09-11', workplaceId: 'studio', from: '09:00', to: '18:00' },
+]);
+hydrateClientsFromServer([
   { key: 'client-1', name: 'Анна', surname: 'Тест', phones: ['+70000000000'], discountPercent: 20 },
   { key: 'client-2', name: 'Ирина', surname: 'БезСкидки', phones: ['+71111111111'], discountPercent: 0 },
-]));
+]);
+hydrateRecordStateFromServer({ records: [], recordEvents: [] });
+hydrateFinanceFromServer({ version: 5, income: [], expense: [] });
+hydrateWalletsFromServer([]);
 
 const record = createRecord({
   date: '2026-09-10',
@@ -192,7 +186,6 @@ assert.equal(restoredHistory.finance.discountPercent, 20);
 assert.equal(restoredHistory.finance.discountTotal, 1600);
 assert.equal(restoredHistory.finance.planTotal, 6400);
 assert.equal(restoredHistory.finance.factTotal, 6400);
-assert.equal(localStorage.getItem('book.records'), null);
 
 // Record card shows expense / service value / discount metadata. Amount due belongs only to payment bottom sheet.
 const recordViewSource = readFileSync(new URL('../journal/record-view.js', import.meta.url), 'utf8');
