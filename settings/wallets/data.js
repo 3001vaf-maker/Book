@@ -23,12 +23,8 @@ function readRaw() {
 }
 
 function write(value) {
-  const normalized = Array.isArray(value) ? clone(value) : [];
-  if (walletsState === null) localStorage.setItem(KEY, JSON.stringify(normalized));
-  else {
-    walletsState = normalized;
-    void queueAuxiliaryDataset('wallets', walletsState);
-  }
+  walletsState = Array.isArray(value) ? clone(value) : [];
+  void queueAuxiliaryDataset('wallets', walletsState);
 }
 
 export function readLegacyWalletSnapshot() {
