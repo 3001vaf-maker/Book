@@ -1,10 +1,8 @@
 import { queueAuxiliaryDataset } from '../business-persistence.js';
 
 // Finance persistence only. Business meaning belongs to rules/model/service.
-const STORAGE_KEY = 'book.dds';
-const LEGACY_PAYMENT_KEY = 'book.payments';
 const VERSION = 5;
-let financeState = null;
+let financeState = emptyState();
 
 function numberValue(value) {
   const number = Number(String(value ?? '').replace(',', '.'));
@@ -22,15 +20,6 @@ function clone(value) {
 
 function emptyState() {
   return { version: VERSION, income: [], expense: [] };
-}
-
-function readLegacyPayments() {
-  try {
-    const value = JSON.parse(localStorage.getItem(LEGACY_PAYMENT_KEY) || '[]');
-    return Array.isArray(value) ? value : [];
-  } catch {
-    return [];
-  }
 }
 
 function normalizeFinancialSnapshot(value = null) {
@@ -87,15 +76,6 @@ function normalizeExpense(item = {}) {
   };
 }
 
-function migrateLegacyPayments() {
-  const state = emptyState();
-  readLegacyPayments().forEach((item) => {
-    if (item?.status === 'completed') state.income.push(normalizeIncome(item));
-    else if (item?.status === 'refund' || item?.status === 'refunded') state.expense.push(normalizeExpense({ ...item, status: 'refund', expenseType: 'refund' }));
-  });
-  return state;
-}
-
 function normalizedState(value) {
   if (!value || typeof value !== 'object') return null;
   const legacyOperational = Array.isArray(value.operational) ? value.operational : [];
@@ -112,20 +92,6 @@ function normalizedState(value) {
   return { version: VERSION, income, expense };
 }
 
-function readLegacyState() {
-  try {
-    const storedRaw = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-    const stored = normalizedState(storedRaw);
-    if (stored) return stored;
-  } catch {}
-  return migrateLegacyPayments();
-}
-
-export function readLegacyFinanceSnapshot() {
-  const present = localStorage.getItem(STORAGE_KEY) != null || localStorage.getItem(LEGACY_PAYMENT_KEY) != null;
-  return { present, finance: clone(readLegacyState()) };
-}
-
 export function hydrateFinanceFromServer(value = null) {
   financeState = normalizedState(value) || emptyState();
   return clone(financeState);
@@ -138,6 +104,5 @@ export function writeFinanceState(state) {
 }
 
 export function readFinanceState() {
-  if (financeState !== null) return clone(financeState);
-  return clone(readLegacyState());
+  return clone(financeState);
 }
