@@ -17,8 +17,12 @@ async function bootstrap() {
   const frontendOrigin = normalizeOrigin(
     String(process.env.FRONTEND_ORIGIN || 'http://localhost:8080').trim(),
   );
+  const allowedOrigins: Array<string | RegExp> = [frontendOrigin];
+  if (process.env.ALLOW_CODESPACES_ORIGIN === '1') {
+    allowedOrigins.push(/^https:\/\/[a-z0-9-]+-8080\.app\.github\.dev$/i);
+  }
   app.enableCors({
-    origin: frontendOrigin,
+    origin: allowedOrigins,
     credentials: true,
   });
   const port = Number(process.env.PORT || 3000);
