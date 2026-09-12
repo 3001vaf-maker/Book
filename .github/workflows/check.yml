@@ -68,13 +68,25 @@ jobs:
           set -euo pipefail
           docker compose -f docker-compose.staging.yml up -d frontend
           for attempt in $(seq 1 30); do
-            if curl -fsS http://localhost:8080/ >/dev/null 2>&1; then
-              exit 0
+            if curl -fsS http://localhost:8080/ >/dev/null 2>&1 \
+              && curl -fsS http://localhost:8080/core.js >/dev/null 2>&1 \
+              && curl -fsS http://localhost:8080/core/environment.js >/dev/null 2>&1 \
+              && curl -fsS http://localhost:8080/api/health >/dev/null 2>&1; then
+              break
+            fi
+            if [ "$attempt" = "30" ]; then
+              docker compose -f docker-compose.staging.yml logs frontend backend
+              exit 1
             fi
             sleep 2
           done
-          docker compose -f docker-compose.staging.yml logs frontend
-          exit 1
+
+          login_payload=$(curl -fsS \
+            -H 'Content-Type: application/json' \
+            -d '{"email":"staging@book.local","password":"BookStaging-2026!"}' \
+            http://localhost:8080/api/auth/login)
+          access_token=$(node -e "const p=JSON.parse(process.argv[1]); if(!p.accessToken) process.exit(1); process.stdout.write(p.accessToken)" "$login_payload")
+          curl -fsS -H "Authorization: Bearer $access_token" http://localhost:8080/api/auth/me >/dev/null
       - name: Stop isolated staging
         if: always()
         run: docker compose -f docker-compose.staging.yml down -v
