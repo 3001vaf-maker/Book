@@ -1,24 +1,14 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createDay } from '../core/day/index.js';
-import { calculateFinancialPlan, getFinancialItemFact } from '../core/finance/index.js';
-import { recordPaymentIncome } from '../core/finance/index.js';
-import { getRecords } from '../core/record/index.js';
-import { createRecord, updateRecord } from '../core/record/index.js';
+import { hydrateDaysFromServer } from '../core/day/index.js';
+import { calculateFinancialPlan, getFinancialItemFact, hydrateFinanceFromServer, recordPaymentIncome } from '../core/finance/index.js';
+import { createRecord, getRecords, hydrateRecordStateFromServer, updateRecord } from '../core/record/index.js';
 
-const storage = new Map();
-globalThis.localStorage = {
-  getItem: (key) => storage.has(key) ? storage.get(key) : null,
-  setItem: (key, value) => storage.set(key, String(value)),
-  removeItem: (key) => storage.delete(key),
-};
-
-storage.set('book:timetable-state', JSON.stringify({
-  workingDays: [createDay({ date: '2026-09-11', workplaceId: 'studio', from: '09:00', to: '18:00' })],
-}));
-storage.set('book.people', JSON.stringify([
-  { key: 'client-products', name: 'Анна', surname: 'Товар', phones: ['+70000000000'], discountPercent: 0 },
-]));
+hydrateDaysFromServer([
+  { date: '2026-09-11', workplaceId: 'studio', from: '09:00', to: '18:00' },
+]);
+hydrateRecordStateFromServer({ records: [], recordEvents: [] });
+hydrateFinanceFromServer({ version: 5, income: [], expense: [] });
 
 const record = createRecord({
   date: '2026-09-11',
