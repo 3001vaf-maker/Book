@@ -1,25 +1,21 @@
 import assert from 'node:assert/strict';
-import { createDay, getDays, getScheduleConflicts, hasScheduleConflict, removeDay, saveDays } from '../core/day/index.js';
+import { createDay, getDays, getScheduleConflicts, hasScheduleConflict, hydrateDaysFromServer, removeDay, saveDays } from '../core/day/index.js';
 import { configureTimeUsageSource, configureSoftTimeUsageReleaseSource, getWorkingTimeUsageConflicts } from '../core/time/index.js';
-import { createRecord, moveRecord, cancelRecord, deleteRecord } from '../core/record/index.js';
-import { getRecords } from '../core/record/index.js';
+import { createRecord, moveRecord, cancelRecord, deleteRecord, getRecords, hydrateRecordStateFromServer } from '../core/record/index.js';
+import { hydrateBreaksFromServer } from '../journal/break-data.js';
 import { createJournalBreak, moveJournalBreak } from '../journal/break-service.js';
 import { getJournalBreaks, getJournalBreaksForDay } from '../journal/break-read.js';
 import { getJournalTimeUsages, releaseJournalSoftTimeUsages } from '../journal/time-usage-source.js';
 
-const store = new Map();
-globalThis.localStorage = {
-  getItem: (key) => store.has(key) ? store.get(key) : null,
-  setItem: (key, value) => store.set(key, String(value)),
-  removeItem: (key) => store.delete(key),
-};
 globalThis.window = { dispatchEvent() {} };
 
 configureTimeUsageSource(getJournalTimeUsages);
 configureSoftTimeUsageReleaseSource(releaseJournalSoftTimeUsages);
 
 const days = [createDay({ date: '2026-09-15', workplaceId: 'romashka', from: '12:00', to: '16:00' })];
-store.set('book:timetable-state', JSON.stringify({ workingDays: days }));
+hydrateDaysFromServer(days);
+hydrateRecordStateFromServer({ records: [], recordEvents: [] });
+hydrateBreaksFromServer([]);
 
 assert.equal(hasScheduleConflict(days, { workplaceId: 'charodeyka', date: '2026-09-15', from: '16:00', to: '20:00' }), false);
 assert.equal(hasScheduleConflict(days, { workplaceId: 'charodeyka', date: '2026-09-15', from: '15:00', to: '18:00' }), true);
