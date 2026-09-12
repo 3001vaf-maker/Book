@@ -1,6 +1,13 @@
-const STORAGE_KEY = 'book.tags';
+import { queueAuxiliaryDataset } from '../../core/business-persistence.js';
 
-function readTags() {
+const STORAGE_KEY = 'book.tags';
+let tagsState = null;
+
+function clone(value) {
+  return value == null ? value : JSON.parse(JSON.stringify(value));
+}
+
+function readLegacyTags() {
   try {
     const value = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
     return Array.isArray(value) ? value : [];
@@ -19,6 +26,20 @@ function normalizeTag(tag = {}) {
   };
 }
 
+function readTags() {
+  const value = tagsState === null ? readLegacyTags() : tagsState;
+  return Array.isArray(value) ? clone(value) : [];
+}
+
+export function readLegacyTagSnapshot() {
+  return { present: localStorage.getItem(STORAGE_KEY) != null, tags: clone(readLegacyTags()) };
+}
+
+export function hydrateTagsFromServer(value = []) {
+  tagsState = Array.isArray(value) ? value.map(normalizeTag) : [];
+  return clone(tagsState);
+}
+
 export function getTags() {
   return readTags()
     .map(normalizeTag)
@@ -26,7 +47,12 @@ export function getTags() {
 }
 
 export function saveTags(tags = []) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(tags.map(normalizeTag)));
+  const normalized = tags.map(normalizeTag);
+  if (tagsState === null) localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+  else {
+    tagsState = clone(normalized);
+    void queueAuxiliaryDataset('tags', tagsState);
+  }
 }
 
 export function createTag({ name, color }) {
