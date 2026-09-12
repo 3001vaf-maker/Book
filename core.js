@@ -4,6 +4,7 @@ import { renderTimetable } from './timetable/timetable.js';
 import { renderSettings } from './settings/settings.js';
 import { getWorkplaces as getWorkplaceEntities } from './settings/profile/workplaces/data.js';
 import { initializeProfileWorkplaces } from './settings/profile/migration.js';
+import { initializeBusinessState } from './business-migration.js';
 import { getJournalTimeUsages, releaseJournalSoftTimeUsages } from './journal/time-usage-source.js';
 import { configureWorkplaceSource } from './core/workplace-time.js';
 import { configureTimeUsageSource, configureSoftTimeUsageReleaseSource } from './core/time/index.js';
@@ -110,6 +111,11 @@ async function renderAuthenticated(account = authenticatedAccount) {
   authenticatedAccount = account || authenticatedAccount;
   const migration = await initializeProfileWorkplaces(authenticatedAccount);
   if (!migration.verified) {
+    renderMigrationPending();
+    return;
+  }
+  const businessMigration = await initializeBusinessState(authenticatedAccount);
+  if (!businessMigration.verified) {
     renderMigrationPending();
     return;
   }

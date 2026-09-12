@@ -1,11 +1,17 @@
 import { normalizePhoneForStorage, phonesMatch } from '../../core/phone/index.js';
 import { getMembers, getUEI } from '../../core/uei.js';
+import { queuePersonDelete, queuePersonUpsert } from '../../core/business-persistence.js';
 import { getTags } from '../../settings/tags/data.js';
 import { getLatestClientConsent, migrateLegacyConsents } from '../../settings/documents/consents.js';
 
 const STORAGE_KEY = 'book.people';
+let peopleState = null;
 
-function readStoredClients() {
+function clone(value) {
+  return value == null ? value : JSON.parse(JSON.stringify(value));
+}
+
+function readLegacyClients() {
   try {
     const value = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
     return Array.isArray(value) ? value : [];
@@ -14,12 +20,16 @@ function readStoredClients() {
   }
 }
 
+function readStoredClients() {
+  return peopleState === null ? readLegacyClients() : clone(peopleState);
+}
+
 function normalizeTagAssignments(values = []) {
   const catalog = getTags();
   const ids = new Set(catalog.map((tag) => tag.id));
   const byName = new Map(catalog.map((tag) => [tag.name, tag.id]));
   return [...new Set((Array.isArray(values) ? values : [])
-    .map((value) => ids.has(value) ? value : byName.get(value))
+    .map((value) => ids.has(value) ? value : (byName.get(value) || String(value || '').trim()))
     .filter(Boolean))];
 }
 
@@ -39,7 +49,7 @@ function normalizeStrings(values = []) {
   return [...new Set((Array.isArray(values) ? values : []).map((value) => String(value || '').trim()).filter(Boolean))];
 }
 
-function normalizeClient(person = {}) {
+export function normalizeClient(person = {}) {
   return {
     key: String(person.key || ''),
     id: String(person.id || ''),
@@ -65,6 +75,19 @@ function normalizeClient(person = {}) {
     programs: Array.isArray(person.programs) ? person.programs : [],
     createdAt: String(person.createdAt || ''),
   };
+}
+
+export function readLegacyClientsSnapshot() {
+  return readLegacyClients().map(normalizeClient).filter((person) => person.key);
+}
+
+export function hasLegacyClientFacts(people = readLegacyClientsSnapshot()) {
+  return Array.isArray(people) && people.length > 0;
+}
+
+export function hydrateClientsFromServer(people = []) {
+  peopleState = (Array.isArray(people) ? people : []).map(normalizeClient).filter((person) => person.key);
+  return clone(peopleState);
 }
 
 function accepted(fact) {
@@ -157,7 +180,26 @@ export function getClientCount() {
 }
 
 export function saveClients(people = []) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(people.map(normalizeClient)));
+  const normalized = (Array.isArray(people) ? people : []).map(normalizeClient).filter((person) => person.key);
+  if (peopleState === null) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+    return;
+  }
+
+  const previous = peopleState;
+  const previousByKey = new Map(previous.map((person, position) => [person.key, { person, position }]));
+  const nextByKey = new Map(normalized.map((person, position) => [person.key, { person, position }]));
+  peopleState = clone(normalized);
+
+  for (const [key] of previousByKey) {
+    if (!nextByKey.has(key)) void queuePersonDelete(key);
+  }
+  for (const [key, next] of nextByKey) {
+    const before = previousByKey.get(key);
+    if (!before || before.position !== next.position || JSON.stringify(before.person) !== JSON.stringify(next.person)) {
+      void queuePersonUpsert(next.person, next.position);
+    }
+  }
 }
 
 export function createClient(name, surname, phone = '') {

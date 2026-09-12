@@ -1,14 +1,24 @@
 // Persistence gateway for Record facts.
-// Storage only: no scheduling, finance, lifecycle meaning, UI, or workflow decisions belong here.
+// Runtime reads are synchronous from an in-memory cache hydrated from the server.
+// localStorage is retained only as legacy migration/test fallback.
+import {
+  queueRecordDelete,
+  queueRecordEventUpsert,
+  queueRecordEventsDelete,
+  queueRecordUpsert,
+} from '../business-persistence.js';
+
 const RECORDS_KEY = 'book.records';
 const EVENTS_KEY = 'book.recordEvents';
+let recordRowsState = null;
+let eventRowsState = null;
 
 function clone(value) {
   if (value == null) return value;
   return JSON.parse(JSON.stringify(value));
 }
 
-function readRows(key) {
+function readLegacyRows(key) {
   try {
     const value = JSON.parse(localStorage.getItem(key) || '[]');
     return Array.isArray(value) ? value : [];
@@ -17,12 +27,40 @@ function readRows(key) {
   }
 }
 
+function readRows(key) {
+  if (key === RECORDS_KEY && recordRowsState !== null) return clone(recordRowsState);
+  if (key === EVENTS_KEY && eventRowsState !== null) return clone(eventRowsState);
+  return readLegacyRows(key);
+}
+
 function writeRows(key, rows) {
-  localStorage.setItem(key, JSON.stringify(Array.isArray(rows) ? rows : []));
+  const normalized = Array.isArray(rows) ? clone(rows) : [];
+  if (key === RECORDS_KEY && recordRowsState !== null) {
+    recordRowsState = normalized;
+    return;
+  }
+  if (key === EVENTS_KEY && eventRowsState !== null) {
+    eventRowsState = normalized;
+    return;
+  }
+  localStorage.setItem(key, JSON.stringify(normalized));
 }
 
 function normalizeId(value) {
   return String(value || '');
+}
+
+export function readLegacyRecordSnapshot() {
+  return {
+    records: readLegacyRows(RECORDS_KEY).map((row) => clone(row)),
+    recordEvents: readLegacyRows(EVENTS_KEY).map((row) => clone(row)),
+  };
+}
+
+export function hydrateRecordStateFromServer({ records = [], recordEvents = [] } = {}) {
+  recordRowsState = (Array.isArray(records) ? records : []).map((row) => clone(row));
+  eventRowsState = (Array.isArray(recordEvents) ? recordEvents : []).map((row) => clone(row));
+  return { records: clone(recordRowsState), recordEvents: clone(eventRowsState) };
 }
 
 export function getRecordRows() {
@@ -41,6 +79,7 @@ export function insertRecordRow(row = null) {
   const stored = clone(row);
   rows.push(stored);
   writeRows(RECORDS_KEY, rows);
+  if (recordRowsState !== null) void queueRecordUpsert(stored, rows.length - 1);
   return clone(stored);
 }
 
@@ -51,6 +90,7 @@ export function patchRecordRow(id, patch = {}) {
   if (index < 0) return null;
   rows[index] = { ...rows[index], ...clone(patch) };
   writeRows(RECORDS_KEY, rows);
+  if (recordRowsState !== null) void queueRecordUpsert(rows[index], index);
   return clone(rows[index]);
 }
 
@@ -61,6 +101,7 @@ export function deleteRecordRow(id) {
   if (index < 0) return null;
   const [removed] = rows.splice(index, 1);
   writeRows(RECORDS_KEY, rows);
+  if (recordRowsState !== null) void queueRecordDelete(recordId);
   return clone(removed);
 }
 
@@ -78,6 +119,7 @@ export function insertRecordEventRow(row = null) {
   const stored = clone(row);
   rows.push(stored);
   writeRows(EVENTS_KEY, rows);
+  if (eventRowsState !== null) void queueRecordEventUpsert(stored, rows.length - 1);
   return clone(stored);
 }
 
@@ -87,6 +129,9 @@ export function deleteRecordEventRows(recordId) {
   const rows = readRows(EVENTS_KEY);
   const next = rows.filter((row) => normalizeId(row?.recordId) !== id);
   const removed = rows.length - next.length;
-  if (removed) writeRows(EVENTS_KEY, next);
+  if (removed) {
+    writeRows(EVENTS_KEY, next);
+    if (eventRowsState !== null) void queueRecordEventsDelete(id);
+  }
   return removed;
 }

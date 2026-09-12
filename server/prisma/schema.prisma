@@ -31,6 +31,11 @@ model Tenant {
   bookingPublication BookingPublication?
   bookingAccounts    BookingAccount[]
   bookingRequests    BookingRequest[]
+  businessStateMeta   BusinessStateMeta?
+  businessPeople      BusinessPerson[]
+  businessIdentity    BusinessIdentityState?
+  businessRecords     BusinessRecord[]
+  businessRecordEvents BusinessRecordEvent[]
 }
 
 model User {
@@ -197,4 +202,71 @@ model BookingRequest {
   @@index([tenantId, status])
   @@index([tenantId, workplaceKey, date])
   @@index([accountId])
+}
+
+model BusinessStateMeta {
+  id                  String   @id @default(cuid())
+  tenantId            String   @unique
+  migrationVerifiedAt DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model BusinessPerson {
+  id        String   @id @default(cuid())
+  tenantId  String
+  key       String
+  position  Int      @default(0)
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, key])
+  @@index([tenantId, position])
+}
+
+model BusinessIdentityState {
+  id        String   @id @default(cuid())
+  tenantId  String   @unique
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model BusinessRecord {
+  id        String   @id @default(cuid())
+  tenantId  String
+  recordId  String
+  position  Int      @default(0)
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, recordId])
+  @@index([tenantId, position])
+}
+
+model BusinessRecordEvent {
+  id        String   @id @default(cuid())
+  tenantId  String
+  eventId   String
+  recordId  String
+  position  Int      @default(0)
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, eventId])
+  @@index([tenantId, recordId])
+  @@index([tenantId, position])
 }
