@@ -73,8 +73,19 @@ if (!(auxiliaryCheck >= 0 && cleanupCall > auxiliaryCheck && workspaceRender > c
 }
 
 const cleanup = source(path.join(ROOT, CLEANUP_OWNER));
-for (const forbidden of ['book.auth.token', 'book.booking-account.token.', 'book.booking-account.email.', 'book.people.sort', 'book.onboarding.', 'book.workplace-context']) {
-  if (cleanup.includes(forbidden)) violations.push(`${CLEANUP_OWNER}: technical/session/UI key must not be purged: ${forbidden}`);
+for (const requiredTechnicalKey of [
+  'book.booking-account.token.',
+  'book.booking-account.email.',
+  'book.people.sort',
+  'book.onboarding.',
+  'book:workplace-context',
+]) {
+  if (!cleanup.includes(requiredTechnicalKey)) {
+    violations.push(`${CLEANUP_OWNER}: technical/session/UI preservation rule is missing: ${requiredTechnicalKey}`);
+  }
+}
+if (/book\.(?:workplaces|records)|book\.journalBreaks/.test(cleanup)) {
+  violations.push(`${CLEANUP_OWNER}: cleanup must stay entity-agnostic and must not duplicate canonical business storage keys`);
 }
 
 if (violations.length) {
