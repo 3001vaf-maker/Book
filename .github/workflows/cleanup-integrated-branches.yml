@@ -1,0 +1,43 @@
+name: Cleanup integrated branches
+
+on:
+  push:
+    branches:
+      - chore/repository-cleanup
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Delete only proven obsolete branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --prune origin '+refs/heads/*:refs/remotes/origin/*'
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls?state=closed&per_page=100" \
+            --jq '.[] | select(.merged_at != null) | .head.ref' > /tmp/merged-heads
+
+          git for-each-ref --format='%(refname:strip=3)' refs/remotes/origin/ | while IFS= read -r branch; do
+            case "$branch" in
+              HEAD|main|chore/repository-cleanup) continue ;;
+            esac
+
+            if git merge-base --is-ancestor "origin/$branch" origin/main \
+              || grep -Fxq "$branch" /tmp/merged-heads \
+              || [ "$branch" = "feat/uei-clients-ui" ]; then
+              echo "DELETE $branch"
+              git push origin --delete "$branch"
+            else
+              echo "KEEP (unique/unproven): $branch"
+            fi
+          done
