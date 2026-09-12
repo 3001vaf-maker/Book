@@ -151,6 +151,15 @@ export function queueOperationalDataset(dataset, value) {
   }, 'Не удалось сохранить рабочие данные на сервере');
 }
 
+export function queueAuxiliaryDataset(dataset, value) {
+  const key = String(dataset || '').trim();
+  if (!key) return Promise.resolve();
+  return enqueue(`/business-state/auxiliary/${encodeURIComponent(key)}`, {
+    method: 'PUT',
+    body: JSON.stringify({ value }),
+  }, 'Не удалось сохранить связанные данные на сервере');
+}
+
 export async function flushBusinessPersistence({ timeoutMs = 12000 } = {}) {
   if (!serverReady || (!queue.length && !running)) return;
   let timer;
