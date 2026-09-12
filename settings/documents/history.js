@@ -1,5 +1,4 @@
-const STORAGE_KEY = 'book.documents.history.v1';
-let historyState = null;
+let historyState = [];
 let persistHistory = null;
 
 function clone(value) {
@@ -18,17 +17,8 @@ function normalize(item = {}) {
   };
 }
 
-function readLegacy() {
-  try {
-    const value = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    return Array.isArray(value) ? value.map(normalize).filter((item) => item.documentId) : [];
-  } catch {
-    return [];
-  }
-}
-
 function read() {
-  return historyState !== null ? clone(historyState) : readLegacy();
+  return clone(historyState);
 }
 
 function writeItems(items = []) {
@@ -39,10 +29,6 @@ function writeItems(items = []) {
 
 export function configureDocumentHistoryPersistence(handler = null) {
   persistHistory = typeof handler === 'function' ? handler : null;
-}
-
-export function readLegacyDocumentHistorySnapshot() {
-  return readLegacy().map((item) => clone(item));
 }
 
 export function hydrateDocumentHistoryFromServer(items = []) {
