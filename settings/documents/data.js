@@ -88,14 +88,9 @@ export function getDocuments() {
 }
 
 export function saveDocuments(items = []) {
-  const normalized = (Array.isArray(items) ? items : []).map(normalize);
-  if (documentsState !== null) {
-    documentsState = clone(normalized);
-    if (typeof persistDocuments === 'function') void persistDocuments(clone(documentsState));
-  } else {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
-  }
-  return clone(normalized);
+  documentsState = (Array.isArray(items) ? items : []).map(normalize);
+  if (typeof persistDocuments === 'function') void persistDocuments(clone(documentsState));
+  return clone(documentsState);
 }
 
 export function saveDocument(document) {
@@ -135,7 +130,5 @@ export function createDocument({ title = 'Новый документ', text = '
 }
 
 export function resetDocumentTemplates() {
-  if (documentsState !== null) return saveDocuments(getDefaultDocuments());
-  localStorage.removeItem(STORAGE_KEY);
-  return getDocuments();
+  return saveDocuments(getDefaultDocuments());
 }
