@@ -21,7 +21,9 @@ jobs:
         with:
           node-version: 24
       - name: Apply server business-state implementation
-        run: python scripts/_apply_server_business_state.py
+        run: |
+          python scripts/_apply_server_business_state.py
+          python scripts/_fix_server_business_state_arch.py
       - name: Syntax and architecture checks
         run: npm run check
       - name: Domain regression tests
@@ -35,7 +37,7 @@ jobs:
       - name: Commit verified implementation
         shell: bash
         run: |
-          rm -f .github/workflows/server-business-state.yml scripts/_apply_server_business_state.py server/package-lock.json server/tsconfig.tsbuildinfo
+          rm -f .github/workflows/server-business-state.yml scripts/_apply_server_business_state.py scripts/_fix_server_business_state_arch.py server/package-lock.json server/tsconfig.tsbuildinfo
           git config user.name "Book Server Migration"
           git config user.email "actions@users.noreply.github.com"
           git add -A
