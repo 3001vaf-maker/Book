@@ -1,5 +1,4 @@
-const STORAGE_KEY = 'book.documents.consents.v1';
-let consentState = null;
+let consentState = [];
 let persistConsents = null;
 
 function clone(value) {
@@ -20,17 +19,8 @@ function normalize(item = {}) {
   };
 }
 
-function readLegacy() {
-  try {
-    const value = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    return Array.isArray(value) ? value.map(normalize).filter((item) => item.clientId && item.documentId) : [];
-  } catch {
-    return [];
-  }
-}
-
 function read() {
-  return consentState !== null ? clone(consentState) : readLegacy();
+  return clone(consentState);
 }
 
 function writeItems(items) {
@@ -41,10 +31,6 @@ function writeItems(items) {
 
 export function configureConsentPersistence(handler = null) {
   persistConsents = typeof handler === 'function' ? handler : null;
-}
-
-export function readLegacyConsentSnapshot() {
-  return readLegacy().map((item) => clone(item));
 }
 
 export function hydrateConsentsFromServer(items = []) {
