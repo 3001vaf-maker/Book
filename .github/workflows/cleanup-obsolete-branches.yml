@@ -1,0 +1,44 @@
+name: Cleanup obsolete branches
+
+on:
+  push:
+    branches:
+      - chore/repository-cleanup
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete audited obsolete branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          branches=(
+            "audit-ui-cycle-fix"
+            "backup-before-rollback-tz07-20260902"
+            "backup-ui-refactor-2026-09-01"
+            "develop"
+            "feat/online-booking-client-ui"
+            "fix/uei-identity-integration-final2"
+            "journal-day-selector-20260903"
+            "release/profile-workplaces-frontend"
+            "tз-07-safe-implementation"
+            "verify/amvera-document-storage"
+            "verify/amvera-operational-storage"
+            "verify/amvera-profile-api"
+            "verify/amvera-profile-storage"
+          )
+
+          for branch in "${branches[@]}"; do
+            if gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${branch}" >/dev/null 2>&1; then
+              echo "DELETE $branch"
+              gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/heads/${branch}"
+            else
+              echo "ALREADY ABSENT $branch"
+            fi
+          done
