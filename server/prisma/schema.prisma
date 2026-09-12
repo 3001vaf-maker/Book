@@ -21,23 +21,24 @@ enum BookingRequestStatus {
 }
 
 model Tenant {
-  id                 String              @id @default(cuid())
-  name               String
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
-  memberships        Membership[]
-  workspaceStates    WorkspaceState[]
-  profiles           Profile[]
-  bookingPublication BookingPublication?
-  bookingAccounts    BookingAccount[]
-  bookingRequests    BookingRequest[]
-  businessStateMeta   BusinessStateMeta?
-  businessPeople      BusinessPerson[]
-  businessIdentity    BusinessIdentityState?
-  businessRecords     BusinessRecord[]
-  businessRecordEvents BusinessRecordEvent[]
+  id                       String                    @id @default(cuid())
+  name                     String
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+  memberships              Membership[]
+  workspaceStates          WorkspaceState[]
+  profiles                 Profile[]
+  bookingPublication       BookingPublication?
+  bookingAccounts          BookingAccount[]
+  bookingRequests          BookingRequest[]
+  businessStateMeta        BusinessStateMeta?
+  businessPeople           BusinessPerson[]
+  businessIdentity         BusinessIdentityState?
+  businessRecords          BusinessRecord[]
+  businessRecordEvents     BusinessRecordEvent[]
   businessOperationalState BusinessOperationalState?
-  businessDocuments   BusinessDocumentState?
+  businessDocuments        BusinessDocumentState?
+  businessAuxiliaryState   BusinessAuxiliaryState?
 }
 
 model User {
@@ -273,7 +274,6 @@ model BusinessRecordEvent {
   @@index([tenantId, position])
 }
 
-
 model BusinessOperationalState {
   id                  String   @id @default(cuid())
   tenantId            String   @unique
@@ -285,8 +285,18 @@ model BusinessOperationalState {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
 
-
 model BusinessDocumentState {
+  id                  String   @id @default(cuid())
+  tenantId            String   @unique
+  data                Json
+  migrationVerifiedAt DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model BusinessAuxiliaryState {
   id                  String   @id @default(cuid())
   tenantId            String   @unique
   data                Json
