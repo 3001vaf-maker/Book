@@ -27,8 +27,8 @@ function recordFor(id, finance) {
   return { id, finance, procedures: [] };
 }
 
-// Existing DDS entries keep their financial snapshot and gain service/tips defaults safely.
-storage.set('book.dds', JSON.stringify({
+// Existing DDS entries are normalized for migration reads without rewriting browser storage.
+const legacyRaw = JSON.stringify({
   version: 2,
   income: [{
     id: 'legacy-income',
@@ -45,7 +45,8 @@ storage.set('book.dds', JSON.stringify({
     },
   }],
   expense: [],
-}));
+});
+storage.set('book.dds', legacyRaw);
 const migratedLegacy = getDDSIncome();
 assert.equal(migratedLegacy.length, 1);
 assert.equal(migratedLegacy[0].finance.serviceTotal, 8000);
@@ -54,10 +55,7 @@ assert.equal(migratedLegacy[0].finance.planTotal, 6400);
 assert.equal(migratedLegacy[0].serviceAmount, 6400);
 assert.equal(migratedLegacy[0].tips, 0);
 assert.equal(migratedLegacy[0].business, undefined);
-const storedMigrated = JSON.parse(storage.get('book.dds') || '{}');
-assert.equal(storedMigrated.version, 5);
-assert.equal(storedMigrated.income[0].finance.planTotal, 6400);
-assert.equal(storedMigrated.income[0].business, undefined);
+assert.equal(storage.get('book.dds'), legacyRaw);
 storage.clear();
 
 const discounted = calculateFinancialPlan([{ sourceId: 'procedure-discount', name: 'Стрижка', price: 8000, discountPercent: 10 }]);
@@ -82,6 +80,7 @@ assert.equal(completed.total, 5000);
 assert.equal(completed.serviceAmount, 5000);
 assert.equal(completed.tips, 0);
 assert.equal(getWalletDDSMovements('cash').length, 1);
+assert.equal(localStorage.getItem('book.dds'), null);
 let state = getRecordPaymentState(recordFor('record-1', finance));
 assert.equal(state.paidTotal, 5000);
 assert.equal(state.remaining, 0);
@@ -107,6 +106,7 @@ assert.equal(state.paidTotal, 0);
 assert.equal(state.remaining, 5000);
 assert.equal(state.fullyPaid, false);
 assert.equal(recordRefundExpense(completed.id), null);
+assert.equal(localStorage.getItem('book.dds'), null);
 
 const repaid = recordPaymentIncome({
   source: { type: 'record', id: 'record-1' },
@@ -260,5 +260,6 @@ assert.equal(split.status, 'completed');
 assert.equal(split.allocations.length, 2);
 assert.equal(getWalletDDSMovements('split-cash').reduce((sum, item) => sum + Number(item.total || 0), 0), 2000);
 assert.equal(getWalletDDSMovements('split-card').reduce((sum, item) => sum + Number(item.total || 0), 0), 4000);
+assert.equal(localStorage.getItem('book.dds'), null);
 
 console.log('payment refund tests: OK');
