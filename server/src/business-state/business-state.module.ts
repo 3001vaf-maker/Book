@@ -8,5 +8,6 @@ import { BusinessStateService } from './business-state.service';
   imports: [AuthModule],
   controllers: [BusinessStateController],
   providers: [BusinessStateService, PrismaService],
+  exports: [BusinessStateService],
 })
 export class BusinessStateModule {}

@@ -342,4 +342,25 @@ export class ProfileService {
     await this.prisma.workplace.delete({ where: { tenantId_key: { tenantId, key } } });
     return this.bundle(tenantId, userId);
   }
+
+  async publicBookingBundle(tenantId: string) {
+    const row = await this.prisma.profile.findFirst({
+      where: { tenantId, migrationVerifiedAt: { not: null } },
+      include: { workplaces: { orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] } },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (!row) throw new ConflictException('Профиль для онлайн-записи ещё не готов');
+    return {
+      profile: {
+        name: row.name,
+        surname: row.surname,
+        photo: row.photo,
+        profession: row.profession,
+        about: row.about,
+      },
+      workplaces: row.workplaces.map(workplaceDto),
+      updatedAt: row.updatedAt,
+    };
+  }
+
 }

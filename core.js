@@ -12,7 +12,7 @@ import { configureWorkplaceSource } from './core/workplace-time.js';
 import { configureTimeUsageSource, configureSoftTimeUsageReleaseSource } from './core/time/index.js';
 import { getCurrentUser, login } from './core/auth.js';
 import { isOnboardingComplete, renderOnboarding } from './onboarding/onboarding.js';
-import { startOnlineBookingBridge } from './online-booking/owner-bridge.js';
+import { startServerBookingSync } from './online-booking/server-sync.js';
 import { renderOnlineBooking } from './online-booking/booking.js';
 import { bottomNavigation } from './ui/ui.js';
 
@@ -32,7 +32,7 @@ const app = document.querySelector('#app');
 let disposeView = () => {};
 let workspaceReady = false;
 let authenticatedAccount = null;
-let bookingBridgeStarted = false;
+let serverBookingSyncStarted = false;
 
 function syncViewport() {
   const vv = window.visualViewport;
@@ -64,10 +64,10 @@ function renderPublicBooking(route) {
   syncViewport();
 }
 
-function ensureBookingBridge() {
-  if (bookingBridgeStarted) return;
-  bookingBridgeStarted = true;
-  startOnlineBookingBridge();
+function ensureServerBookingSync() {
+  if (serverBookingSyncStarted) return;
+  serverBookingSyncStarted = true;
+  startServerBookingSync();
 }
 
 function navigate(section) {
@@ -131,7 +131,7 @@ async function renderAuthenticated(account = authenticatedAccount) {
     renderMigrationPending();
     return;
   }
-  ensureBookingBridge();
+  ensureServerBookingSync();
 
   const serverWorkspaceUnlocked = Boolean(authenticatedAccount?.user?.workspaceUnlocked);
   if (!serverWorkspaceUnlocked && !isOnboardingComplete()) {
