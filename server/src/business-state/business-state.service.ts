@@ -10,6 +10,16 @@ type BusinessBundle = {
   recordEvents: JsonObject[];
 };
 
+type OperationalBundle = {
+  days: JsonObject[];
+  breaks: JsonObject[];
+  procedures: JsonObject[];
+  procedureHistory: JsonObject[];
+  bookingSettings: JsonObject | null;
+};
+
+const OPERATIONAL_DATASETS = new Set(['days', 'breaks', 'procedures', 'procedureHistory', 'bookingSettings']);
+
 function objectValue(value: unknown): JsonObject {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonObject : {};
 }
@@ -55,6 +65,20 @@ function normalizeBundle(value: unknown): BusinessBundle {
   };
 }
 
+function normalizeOperational(value: unknown): OperationalBundle {
+  const source = objectValue(value);
+  const bookingSettings = source.bookingSettings && typeof source.bookingSettings === 'object' && !Array.isArray(source.bookingSettings)
+    ? clone(objectValue(source.bookingSettings))
+    : null;
+  return {
+    days: (Array.isArray(source.days) ? source.days : []).map((item) => clone(objectValue(item))),
+    breaks: (Array.isArray(source.breaks) ? source.breaks : []).map((item) => clone(objectValue(item))),
+    procedures: (Array.isArray(source.procedures) ? source.procedures : []).map((item) => clone(objectValue(item))),
+    procedureHistory: (Array.isArray(source.procedureHistory) ? source.procedureHistory : []).map((item) => clone(objectValue(item))),
+    bookingSettings,
+  };
+}
+
 function stable(value: any): any {
   if (Array.isArray(value)) return value.map(stable);
   if (!value || typeof value !== 'object') return value;
@@ -62,6 +86,10 @@ function stable(value: any): any {
 }
 
 function canonical(value: BusinessBundle) {
+  return JSON.stringify(stable(value));
+}
+
+function canonicalOperational(value: OperationalBundle) {
   return JSON.stringify(stable(value));
 }
 
@@ -229,5 +257,70 @@ export class BusinessStateService {
       update: { recordId, position: positionValue(source.position), data: json(event) },
     });
     return event;
+  }
+
+  private async operationalBundle(tenantId: string) {
+    const row = await this.prisma.businessOperationalState.findUnique({ where: { tenantId } });
+    const data = normalizeOperational(row?.data || {});
+    return {
+      migrated: Boolean(row),
+      verified: Boolean(row?.migrationVerifiedAt),
+      migrationVerifiedAt: row?.migrationVerifiedAt || null,
+      ...data,
+    };
+  }
+
+  getOperational(tenantId: string) {
+    return this.operationalBundle(tenantId);
+  }
+
+  private async requireOperationalVerified(tenantId: string) {
+    const row = await this.prisma.businessOperationalState.findUnique({ where: { tenantId } });
+    if (!row?.migrationVerifiedAt) throw new ConflictException('Перенос Графика, процедур и онлайн-записи ещё не подтверждён');
+    return row;
+  }
+
+  async migrateOperational(tenantId: string, body: unknown) {
+    const expected = normalizeOperational(body);
+    const existing = await this.prisma.businessOperationalState.findUnique({ where: { tenantId } });
+    if (!existing) {
+      await this.prisma.businessOperationalState.create({ data: { tenantId, data: json(expected) } });
+    }
+    return this.operationalBundle(tenantId);
+  }
+
+  async verifyOperationalMigration(tenantId: string, body: unknown) {
+    const expected = normalizeOperational(body);
+    const current = await this.operationalBundle(tenantId);
+    if (!current.migrated) throw new ConflictException('График, процедуры и онлайн-запись ещё не перенесены');
+    const actual = normalizeOperational(current);
+    if (canonicalOperational(actual) !== canonicalOperational(expected)) {
+      throw new ConflictException('Проверка переноса Графика, процедур и онлайн-записи не пройдена');
+    }
+    await this.prisma.businessOperationalState.update({ where: { tenantId }, data: { migrationVerifiedAt: new Date() } });
+    return this.operationalBundle(tenantId);
+  }
+
+  async bootstrapOperational(tenantId: string) {
+    const existing = await this.prisma.businessOperationalState.findUnique({ where: { tenantId } });
+    if (!existing) {
+      await this.prisma.businessOperationalState.create({
+        data: { tenantId, data: json(normalizeOperational({})), migrationVerifiedAt: new Date() },
+      });
+    }
+    return this.operationalBundle(tenantId);
+  }
+
+  async updateOperationalDataset(tenantId: string, dataset: string, body: unknown) {
+    const key = text(dataset);
+    if (!OPERATIONAL_DATASETS.has(key)) throw new BadRequestException('Неизвестный набор рабочих данных');
+    const row = await this.requireOperationalVerified(tenantId);
+    const current = normalizeOperational(row.data);
+    const source = objectValue(body);
+    const value = source.value;
+    if (key === 'bookingSettings') current.bookingSettings = value && typeof value === 'object' && !Array.isArray(value) ? clone(objectValue(value)) : null;
+    else (current as any)[key] = Array.isArray(value) ? clone(value) : [];
+    await this.prisma.businessOperationalState.update({ where: { tenantId }, data: { data: json(current) } });
+    return current;
   }
 }

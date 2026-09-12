@@ -64,4 +64,29 @@ export class BusinessStateController {
   upsertRecordEvent(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Body() body: unknown) {
     return this.businessState.upsertRecordEvent(request.auth!.tenantId, eventId, body);
   }
+
+  @Get('operational')
+  operational(@Req() request: AuthenticatedRequest) {
+    return this.businessState.getOperational(request.auth!.tenantId);
+  }
+
+  @Post('operational/migrate')
+  migrateOperational(@Req() request: AuthenticatedRequest, @Body() body: unknown) {
+    return this.businessState.migrateOperational(request.auth!.tenantId, body);
+  }
+
+  @Post('operational/migrate/verify')
+  verifyOperational(@Req() request: AuthenticatedRequest, @Body() body: unknown) {
+    return this.businessState.verifyOperationalMigration(request.auth!.tenantId, body);
+  }
+
+  @Post('operational/bootstrap')
+  bootstrapOperational(@Req() request: AuthenticatedRequest) {
+    return this.businessState.bootstrapOperational(request.auth!.tenantId);
+  }
+
+  @Put('operational/:dataset')
+  updateOperational(@Req() request: AuthenticatedRequest, @Param('dataset') dataset: string, @Body() body: unknown) {
+    return this.businessState.updateOperationalDataset(request.auth!.tenantId, dataset, body);
+  }
 }

@@ -1,4 +1,8 @@
+import { queueOperationalDataset } from '../business-persistence.js';
+
 const STORAGE_KEY = 'book.booking-settings.v1';
+let bookingSettingsState = null;
+let bookingSettingsHydrated = false;
 
 export const BOOKING_SHAPES = Object.freeze([
   { value: 'soft', label: 'Мягкие углы' },
@@ -61,7 +65,21 @@ export function normalizeBookingSettings(value = {}) {
   };
 }
 
+export function readLegacyBookingSettingsSnapshot() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (raw == null) return null;
+  try { return normalizeBookingSettings(JSON.parse(raw)); }
+  catch { return null; }
+}
+
+export function hydrateBookingSettingsFromServer(value = null) {
+  bookingSettingsHydrated = true;
+  bookingSettingsState = normalizeBookingSettings(value || {});
+  return getBookingSettings();
+}
+
 export function getBookingSettings() {
+  if (bookingSettingsHydrated) return normalizeBookingSettings(bookingSettingsState || {});
   try {
     return normalizeBookingSettings(JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'));
   } catch {
@@ -71,7 +89,11 @@ export function getBookingSettings() {
 
 export function saveBookingSettings(value = {}) {
   const settings = normalizeBookingSettings(value);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  if (!bookingSettingsHydrated) localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  else {
+    bookingSettingsState = settings;
+    void queueOperationalDataset('bookingSettings', settings);
+  }
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('book:booking-settings-changed', { detail: { settings } }));
   }

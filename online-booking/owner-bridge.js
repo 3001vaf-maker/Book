@@ -117,6 +117,7 @@ async function responseJson(response, fallback = 'Ошибка онлайн-за
 }
 
 async function publish(force = false) {
+  await flushBusinessPersistence();
   const data = publicationData();
   const serialized = JSON.stringify(data);
   if (!force && serialized === lastPublication) return false;

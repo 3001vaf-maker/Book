@@ -133,6 +133,15 @@ export function queueRecordEventsDelete(recordId) {
   return enqueue(`/business-state/records/${encodeURIComponent(id)}/events`, { method: 'DELETE' }, 'Не удалось удалить историю записи на сервере');
 }
 
+export function queueOperationalDataset(dataset, value) {
+  const key = String(dataset || '').trim();
+  if (!key) return Promise.resolve();
+  return enqueue(`/business-state/operational/${encodeURIComponent(key)}`, {
+    method: 'PUT',
+    body: JSON.stringify({ value }),
+  }, 'Не удалось сохранить рабочие данные на сервере');
+}
+
 export async function flushBusinessPersistence({ timeoutMs = 12000 } = {}) {
   if (!serverReady || (!queue.length && !running)) return;
   let timer;
