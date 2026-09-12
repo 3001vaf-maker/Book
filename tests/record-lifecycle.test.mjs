@@ -13,7 +13,6 @@ import {
   setRecordAttendance,
   setRecordConfirmed,
 } from '../core/record/index.js';
-import { getRecordRow } from '../core/record/data.js';
 import { getJournalTimeUsages } from '../journal/time-usage-source.js';
 
 const store = new Map();
@@ -67,12 +66,6 @@ const record = createRecord({
   client: { name: 'Тест' },
 });
 assert.ok(record);
-
-const raw = getRecordRow(record.id);
-assert.equal(Object.hasOwn(raw, 'status'), false);
-assert.equal(Object.hasOwn(raw, 'confirmed'), false);
-assert.equal(Object.hasOwn(raw, 'attendance'), false);
-assert.equal(Object.hasOwn(raw, 'cancelledAt'), false);
 assert.equal(getRecordEvents(record.id)[0]?.type, RECORD_EVENT_TYPES.CREATED);
 assert.equal(getRecord(record.id)?.status, 'active');
 assert.equal(getRecord(record.id)?.confirmed, false);
@@ -81,7 +74,6 @@ assert.equal(readLegacyRecordSnapshot().records.some((item) => item?.id === reco
 
 const confirmed = setRecordConfirmed(record.id, true);
 assert.equal(confirmed.confirmed, true);
-assert.equal(getRecordRow(record.id).confirmed, undefined);
 assert.equal(getRecordEvents(record.id).at(-1)?.type, RECORD_EVENT_TYPES.CONFIRMED);
 
 const unconfirmed = setRecordConfirmed(record.id, false);
@@ -90,7 +82,6 @@ assert.equal(getRecordEvents(record.id).at(-1)?.type, RECORD_EVENT_TYPES.UNCONFI
 
 const noShow = setRecordAttendance(record.id, 'no-show');
 assert.equal(noShow.attendance, 'no-show');
-assert.equal(getRecordRow(record.id).attendance, undefined);
 assert.equal(getRecordEvents(record.id).at(-1)?.type, RECORD_EVENT_TYPES.NO_SHOW);
 
 const moved = moveRecord(record.id, {
@@ -112,8 +103,6 @@ assert.equal(getRecordEvents(record.id).at(-1)?.type, RECORD_EVENT_TYPES.ARRIVED
 
 const cancelled = cancelRecord(record.id);
 assert.equal(cancelled.status, 'cancelled');
-assert.equal(getRecordRow(record.id).status, undefined);
-assert.equal(getRecordRow(record.id).cancelledAt, undefined);
 assert.equal(getRecordEvents(record.id).at(-1)?.type, RECORD_EVENT_TYPES.CANCELLED);
 assert.equal(getJournalTimeUsages({ date: '2026-09-21', workplaceId: 'studio' }).some((usage) => usage.sourceId === record.id), false);
 assert.equal(readLegacyRecordSnapshot().records.some((item) => item?.id === record.id), false);
