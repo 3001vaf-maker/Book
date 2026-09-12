@@ -1,10 +1,9 @@
 import { queueUEIStore } from './business-persistence.js';
 
-const STORAGE_KEY = 'book.uei';
 const EMPTY = '0000';
 const MAX_LENGTH = 4;
 const ALLOWED = /^[A-Za-zА-Яа-яЁё0-9]+$/;
-let storeState = null;
+let storeState = normalizeStore();
 
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
@@ -18,30 +17,14 @@ function normalizeStore(value = {}) {
   };
 }
 
-function readLegacyStore() {
-  try {
-    return normalizeStore(JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'));
-  } catch {
-    return normalizeStore();
-  }
-}
-
 function readStore() {
-  return storeState === null ? readLegacyStore() : clone(storeState);
+  return clone(storeState);
 }
 
 function writeStore(store) {
   const normalized = normalizeStore(store);
-  if (storeState === null) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
-    return;
-  }
   storeState = clone(normalized);
   void queueUEIStore(normalized);
-}
-
-export function readLegacyUEISnapshot() {
-  return readLegacyStore();
 }
 
 export function hydrateUEIFromServer(value = {}) {
@@ -192,6 +175,5 @@ export function applyUEI({ entityType, entityId, currentUEI = '', value = '', li
 }
 
 export function clearTestState() {
-  if (storeState === null) localStorage.removeItem(STORAGE_KEY);
-  else writeStore(normalizeStore());
+  writeStore(normalizeStore());
 }

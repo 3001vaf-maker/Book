@@ -1,52 +1,28 @@
 import { queueOperationalDataset } from '../../../core/business-persistence.js';
 
-const KEY = 'book.procedures';
-const HISTORY_KEY = 'book.procedures.history';
-let proceduresState = null;
-let historyState = null;
+let proceduresState = [];
+let historyState = [];
 
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
 }
 
-function readLegacy(key, fallback) {
-  try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); }
-  catch { return fallback; }
-}
-
 function readRawProcedures() {
-  const value = proceduresState === null ? readLegacy(KEY, []) : proceduresState;
-  return Array.isArray(value) ? clone(value) : [];
+  return clone(proceduresState);
 }
 
 function readHistory() {
-  const value = historyState === null ? readLegacy(HISTORY_KEY, []) : historyState;
-  return Array.isArray(value) ? clone(value) : [];
+  return clone(historyState);
 }
 
 function writeProcedures(value) {
-  const normalized = Array.isArray(value) ? clone(value) : [];
-  if (proceduresState === null) localStorage.setItem(KEY, JSON.stringify(normalized));
-  else {
-    proceduresState = normalized;
-    void queueOperationalDataset('procedures', proceduresState);
-  }
+  proceduresState = Array.isArray(value) ? clone(value) : [];
+  void queueOperationalDataset('procedures', proceduresState);
 }
 
 function writeHistory(value) {
-  const normalized = Array.isArray(value) ? clone(value) : [];
-  if (historyState === null) localStorage.setItem(HISTORY_KEY, JSON.stringify(normalized));
-  else {
-    historyState = normalized;
-    void queueOperationalDataset('procedureHistory', historyState);
-  }
-}
-
-export function readLegacyProcedureSnapshot() {
-  return {
-    procedures: Array.isArray(readLegacy(KEY, [])) ? clone(readLegacy(KEY, [])) : [],
-    procedureHistory: Array.isArray(readLegacy(HISTORY_KEY, [])) ? clone(readLegacy(HISTORY_KEY, [])) : [],
-  };
+  historyState = Array.isArray(value) ? clone(value) : [];
+  void queueOperationalDataset('procedureHistory', historyState);
 }
 
 export function hydrateProceduresFromServer({ procedures = [], procedureHistory = [] } = {}) {

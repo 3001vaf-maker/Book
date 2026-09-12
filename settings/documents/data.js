@@ -1,6 +1,5 @@
 import { recordDocumentHistory } from './history.js';
 
-const STORAGE_KEY = 'book.documents.templates.v1';
 let documentsState = null;
 let persistDocuments = null;
 
@@ -54,15 +53,6 @@ function normalize(item = {}) {
   };
 }
 
-function legacySaved() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-    return Array.isArray(saved) && saved.length ? saved.map(normalize) : null;
-  } catch {
-    return null;
-  }
-}
-
 export function configureDocumentPersistence(handler = null) {
   persistDocuments = typeof handler === 'function' ? handler : null;
 }
@@ -71,31 +61,19 @@ export function getDefaultDocuments() {
   return clone(DEFAULT_DOCUMENTS).map(normalize);
 }
 
-export function readLegacyDocumentsSnapshot() {
-  const saved = legacySaved();
-  return saved ? saved.map((item) => clone(item)) : null;
-}
-
 export function hydrateDocumentsFromServer(items = []) {
   documentsState = (Array.isArray(items) && items.length ? items : DEFAULT_DOCUMENTS).map(normalize);
   return getDocuments();
 }
 
 export function getDocuments() {
-  if (documentsState !== null) return clone(documentsState).map(normalize);
-  const saved = legacySaved();
-  return saved || getDefaultDocuments();
+  return clone(documentsState === null ? DEFAULT_DOCUMENTS : documentsState).map(normalize);
 }
 
 export function saveDocuments(items = []) {
-  const normalized = (Array.isArray(items) ? items : []).map(normalize);
-  if (documentsState !== null) {
-    documentsState = clone(normalized);
-    if (typeof persistDocuments === 'function') void persistDocuments(clone(documentsState));
-  } else {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
-  }
-  return clone(normalized);
+  documentsState = (Array.isArray(items) ? items : []).map(normalize);
+  if (typeof persistDocuments === 'function') void persistDocuments(clone(documentsState));
+  return clone(documentsState);
 }
 
 export function saveDocument(document) {
@@ -135,7 +113,5 @@ export function createDocument({ title = 'Новый документ', text = '
 }
 
 export function resetDocumentTemplates() {
-  if (documentsState !== null) return saveDocuments(getDefaultDocuments());
-  localStorage.removeItem(STORAGE_KEY);
-  return getDocuments();
+  return saveDocuments(getDefaultDocuments());
 }

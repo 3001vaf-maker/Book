@@ -60,7 +60,9 @@ for (const [path, pattern, message] of ownershipRules) {
 }
 
 const financeData = source('core/finance/data.js');
-if (!/const STORAGE_KEY = ['"]book\.dds['"]/.test(financeData)) errors.push('core/finance/data.js must own DDS movement persistence');
+if (!/queueAuxiliaryDataset\(['"]finance['"]/.test(financeData) || !/let financeState = emptyState\(\)/.test(financeData)) {
+  errors.push('core/finance/data.js must own server-backed DDS movement persistence');
+}
 
 const financeService = source('core/finance/service.js');
 if (!/export function recordPaymentIncome/.test(financeService) || !/export function recordRefundExpense/.test(financeService) || !/export function cancelPaymentOperation/.test(financeService)) {

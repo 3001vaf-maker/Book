@@ -4,24 +4,10 @@ import { queuePersonDelete, queuePersonUpsert } from '../../core/business-persis
 import { getTags } from '../../settings/tags/data.js';
 import { getLatestClientConsent, migrateLegacyConsents } from '../../settings/documents/consents.js';
 
-const STORAGE_KEY = 'book.people';
-let peopleState = null;
+let peopleState = [];
 
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
-}
-
-function readLegacyClients() {
-  try {
-    const value = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    return Array.isArray(value) ? value : [];
-  } catch {
-    return [];
-  }
-}
-
-function readStoredClients() {
-  return peopleState === null ? readLegacyClients() : clone(peopleState);
 }
 
 function normalizeTagAssignments(values = []) {
@@ -77,14 +63,6 @@ export function normalizeClient(person = {}) {
   };
 }
 
-export function readLegacyClientsSnapshot() {
-  return readLegacyClients().map(normalizeClient).filter((person) => person.key);
-}
-
-export function hasLegacyClientFacts(people = readLegacyClientsSnapshot()) {
-  return Array.isArray(people) && people.length > 0;
-}
-
 export function hydrateClientsFromServer(people = []) {
   peopleState = (Array.isArray(people) ? people : []).map(normalizeClient).filter((person) => person.key);
   return clone(peopleState);
@@ -95,7 +73,7 @@ function accepted(fact) {
 }
 
 export function getAllClients() {
-  const stored = readStoredClients().map(normalizeClient).filter((person) => person.key);
+  const stored = clone(peopleState).map(normalizeClient).filter((person) => person.key);
   migrateLegacyConsents(stored);
   return stored.map((person) => ({
     ...person,
@@ -181,11 +159,6 @@ export function getClientCount() {
 
 export function saveClients(people = []) {
   const normalized = (Array.isArray(people) ? people : []).map(normalizeClient).filter((person) => person.key);
-  if (peopleState === null) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
-    return;
-  }
-
   const previous = peopleState;
   const previousByKey = new Map(previous.map((person, position) => [person.key, { person, position }]));
   const nextByKey = new Map(normalized.map((person, position) => [person.key, { person, position }]));

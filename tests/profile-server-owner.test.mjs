@@ -13,18 +13,19 @@ assert.doesNotMatch(auth, /prepareProductionWorkspace|localStorage\.removeItem/)
 assert.doesNotMatch(core, /workspace-sync|syncWorkspaceBeforeRender|startWorkspaceSync/);
 assert.match(core, /initializeProfileWorkplaces/);
 
-assert.doesNotMatch(profileData, /localStorage\.setItem/);
-assert.match(profileData, /readLegacyProfileSnapshot/);
+assert.doesNotMatch(profileData, /localStorage|readLegacyProfileSnapshot/);
 assert.match(profileData, /apiRequest\('\/profile'/);
+assert.match(profileData, /hydrateProfileFromServer/);
 
-assert.doesNotMatch(workplaceData, /localStorage\.setItem/);
-assert.match(workplaceData, /readLegacyWorkplacesSnapshot/);
+assert.doesNotMatch(workplaceData, /localStorage|readLegacyWorkplacesSnapshot/);
 assert.match(workplaceData, /apiRequest\(`\/profile\/workplaces\//);
+assert.match(workplaceData, /hydrateWorkplacesFromServer/);
 
-assert.match(migration, /\/profile\/migrate/);
-assert.match(migration, /\/profile\/migrate\/verify/);
-assert.match(migration, /sameBundle/);
-assert.match(migration, /awaiting-populated-browser/);
+assert.match(migration, /apiRequest\('\/profile'\)/);
+assert.match(migration, /apiRequest\('\/profile\/bootstrap'/);
+assert.match(migration, /hydrateProfileFromServer/);
+assert.match(migration, /hydrateWorkplacesFromServer/);
+assert.doesNotMatch(migration, /localStorage|readLegacy|\/profile\/migrate/);
 
 assert.match(schema, /model Profile\s*\{/);
 assert.match(schema, /model Workplace\s*\{/);

@@ -1,14 +1,8 @@
 import assert from 'node:assert/strict';
+import { hydrateDaysFromServer } from '../core/day/index.js';
 import { configureWorkplaceSource } from '../core/workplace-time.js';
 import { configureTimeUsageSource } from '../core/time/index.js';
 import { checkTimeAvailability, getTimeAvailabilityAt, listAvailableStartTimes } from '../core/time/index.js';
-
-const store = new Map();
-globalThis.localStorage = {
-  getItem: (key) => store.has(key) ? store.get(key) : null,
-  setItem: (key, value) => store.set(key, String(value)),
-  removeItem: (key) => store.delete(key),
-};
 
 globalThis.window = { dispatchEvent() {} };
 
@@ -21,9 +15,9 @@ configureTimeUsageSource(({ date, workplaceId } = {}) => {
   ];
 });
 
-store.set('book:timetable-state', JSON.stringify({
-  workingDays: [{ date: '2026-09-16', workplaceId: 'studio', from: '09:00', to: '15:00' }],
-}));
+hydrateDaysFromServer([
+  { date: '2026-09-16', workplaceId: 'studio', from: '09:00', to: '15:00' },
+]);
 
 assert.equal(checkTimeAvailability({ date: '2026-09-16', workplaceId: 'studio', from: '09:00', to: '10:00' }).ok, true);
 assert.equal(checkTimeAvailability({ date: '2026-09-16', workplaceId: 'studio', from: '10:30', to: '11:30' }).reason, 'occupied');

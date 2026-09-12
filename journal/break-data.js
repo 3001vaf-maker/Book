@@ -1,7 +1,6 @@
 // Persistence gateway for Break facts.
 // No availability, lifecycle, UI, or workflow decisions belong here.
-const KEY = 'book.journalBreaks';
-let breakRowsState = null;
+let breakRowsState = [];
 let persistBreakRows = null;
 
 function clone(value) {
@@ -9,35 +8,17 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-function legacyRows() {
-  try {
-    const value = JSON.parse(localStorage.getItem(KEY) || '[]');
-    return Array.isArray(value) ? value : [];
-  } catch {
-    return [];
-  }
-}
-
 function readRows() {
-  return (breakRowsState === null ? legacyRows() : breakRowsState).map((row) => clone(row));
+  return breakRowsState.map((row) => clone(row));
 }
 
 function writeRows(rows) {
-  const normalized = (Array.isArray(rows) ? rows : []).map((row) => clone(row));
-  if (breakRowsState === null) {
-    localStorage.setItem(KEY, JSON.stringify(normalized));
-  } else {
-    breakRowsState = normalized.map((row) => clone(row));
-    if (typeof persistBreakRows === 'function') void persistBreakRows(breakRowsState.map((row) => clone(row)));
-  }
+  breakRowsState = (Array.isArray(rows) ? rows : []).map((row) => clone(row));
+  if (typeof persistBreakRows === 'function') void persistBreakRows(readRows());
 }
 
 export function configureBreakPersistence(handler = null) {
   persistBreakRows = typeof handler === 'function' ? handler : null;
-}
-
-export function readLegacyBreakSnapshot() {
-  return legacyRows().map((row) => clone(row));
 }
 
 export function hydrateBreaksFromServer(rows = []) {

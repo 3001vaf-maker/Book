@@ -1,21 +1,17 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { calculateFinancialPlan, getRecordPaymentState } from '../core/finance/index.js';
 import {
+  calculateFinancialPlan,
   getDDSExpenses,
   getDDSIncome,
   getPaymentRemaining,
+  getRecordPaymentState,
   getRefundsForPayment,
   getWalletDDSMovements,
+  hydrateFinanceFromServer,
   recordPaymentIncome,
   recordRefundExpense,
 } from '../core/finance/index.js';
-
-const storage = new Map();
-globalThis.localStorage = {
-  getItem: (key) => storage.has(key) ? storage.get(key) : null,
-  setItem: (key, value) => storage.set(key, String(value)),
-};
 
 const ddsSource = readFileSync(new URL('../core/finance/service.js', import.meta.url), 'utf8');
 const paymentUiSource = readFileSync(new URL('../ui/payment/index.js', import.meta.url), 'utf8');
@@ -27,8 +23,8 @@ function recordFor(id, finance) {
   return { id, finance, procedures: [] };
 }
 
-// Existing DDS entries keep their financial snapshot and gain service/tips defaults safely.
-storage.set('book.dds', JSON.stringify({
+// Existing server DDS entries from an older payload shape are normalized in memory.
+hydrateFinanceFromServer({
   version: 2,
   income: [{
     id: 'legacy-income',
@@ -45,7 +41,7 @@ storage.set('book.dds', JSON.stringify({
     },
   }],
   expense: [],
-}));
+});
 const migratedLegacy = getDDSIncome();
 assert.equal(migratedLegacy.length, 1);
 assert.equal(migratedLegacy[0].finance.serviceTotal, 8000);
@@ -54,11 +50,8 @@ assert.equal(migratedLegacy[0].finance.planTotal, 6400);
 assert.equal(migratedLegacy[0].serviceAmount, 6400);
 assert.equal(migratedLegacy[0].tips, 0);
 assert.equal(migratedLegacy[0].business, undefined);
-const storedMigrated = JSON.parse(storage.get('book.dds') || '{}');
-assert.equal(storedMigrated.version, 5);
-assert.equal(storedMigrated.income[0].finance.planTotal, 6400);
-assert.equal(storedMigrated.income[0].business, undefined);
-storage.clear();
+
+hydrateFinanceFromServer({ version: 5, income: [], expense: [] });
 
 const discounted = calculateFinancialPlan([{ sourceId: 'procedure-discount', name: 'Стрижка', price: 8000, discountPercent: 10 }]);
 assert.equal(discounted.serviceTotal, 8000);

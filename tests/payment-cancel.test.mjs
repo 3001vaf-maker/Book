@@ -10,20 +10,16 @@ import {
   getRecordPaymentState,
   getRefundsForPayment,
   getWalletDDSMovements,
+  hydrateFinanceFromServer,
   recordPaymentIncome,
   recordRefundExpense,
 } from '../core/finance/index.js';
-
-const storage = new Map();
-globalThis.localStorage = {
-  getItem: (key) => storage.has(key) ? storage.get(key) : null,
-  setItem: (key, value) => storage.set(key, String(value)),
-};
 
 function recordFor(id, finance) {
   return { id, finance, procedures: [] };
 }
 
+hydrateFinanceFromServer({ version: 5, income: [], expense: [] });
 const finance = calculateFinancialPlan([{ sourceId: 'procedure-cancel', name: 'Стрижка', price: 5000 }]);
 const payment = recordPaymentIncome({
   source: { type: 'record', id: 'record-cancel' },
@@ -55,7 +51,7 @@ assert.equal(state.hasPayments, false);
 assert.equal(cancelPaymentOperation(payment.id), null);
 
 // If an incorrect payment already has a refund, cancelling the payment cancels the whole erroneous chain.
-storage.clear();
+hydrateFinanceFromServer({ version: 5, income: [], expense: [] });
 const chainFinance = calculateFinancialPlan([{ sourceId: 'procedure-chain', name: 'Окрашивание', price: 5000 }]);
 const chainPayment = recordPaymentIncome({
   source: { type: 'record', id: 'record-chain' },

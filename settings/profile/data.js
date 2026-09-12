@@ -1,16 +1,9 @@
 import { apiRequest } from '../../core/auth.js';
 import { normalizePhoneForStorage } from '../../core/phone/index.js';
 
-const PROFILE_KEY = 'book.profile';
-const CUSTOM_PROFESSIONS_KEY = 'book.profile.customProfessions';
 let profileState = null;
 let customProfessionsState = [];
 let serverReady = false;
-
-function readLegacy(key, fallback) {
-  try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); }
-  catch { return fallback; }
-}
 
 function normalizeList(values) {
   return (Array.isArray(values) ? values : [])
@@ -52,22 +45,6 @@ async function responseJson(response, fallbackMessage) {
 
 function requireServerReady() {
   if (!serverReady) throw new Error('Profile + Workplaces ещё не готовы к серверной записи');
-}
-
-export function readLegacyProfileSnapshot() {
-  return {
-    profile: normalizeProfile(readLegacy(PROFILE_KEY, {})),
-    customProfessions: normalizeCustomProfessions(readLegacy(CUSTOM_PROFESSIONS_KEY, [])),
-  };
-}
-
-export function hasLegacyProfileFacts(snapshot = readLegacyProfileSnapshot()) {
-  const profile = normalizeProfile(snapshot.profile);
-  return Boolean(
-    profile.name || profile.surname || profile.phone || profile.phones.length || profile.telegrams.length ||
-    profile.emails.length || profile.about || profile.photo || profile.profession || profile.experience ||
-    profile.professionAbout || normalizeCustomProfessions(snapshot.customProfessions).length
-  );
 }
 
 export function hydrateProfileFromServer(profile = {}, customProfessions = []) {

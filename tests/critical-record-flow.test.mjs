@@ -1,32 +1,26 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { calculateFinancialPlan, getFinancialItemFact } from '../core/finance/index.js';
-import { createDay } from '../core/day/index.js';
-import { recordPaymentIncome, recordRefundExpense } from '../core/finance/index.js';
-import { getRecords } from '../core/record/index.js';
-import { createRecord, moveRecord, updateRecord } from '../core/record/index.js';
-import { recordVisualState } from '../core/record/index.js';
+import { hydrateDaysFromServer } from '../core/day/index.js';
+import { calculateFinancialPlan, getFinancialItemFact, hydrateFinanceFromServer, recordPaymentIncome, recordRefundExpense } from '../core/finance/index.js';
+import { createRecord, getRecords, hydrateRecordStateFromServer, moveRecord, recordVisualState, updateRecord } from '../core/record/index.js';
 import { renderJournalList } from '../journal/список.js';
+import { hydrateClientsFromServer } from '../main/clients/data.js';
 import { getClientMetadata } from '../main/clients/metadata.js';
-import { getWalletBalance } from '../settings/wallets/data.js';
+import { getWalletBalance, hydrateWalletsFromServer } from '../settings/wallets/data.js';
 
-const store = new Map();
-globalThis.localStorage = {
-  getItem: (key) => store.has(key) ? store.get(key) : null,
-  setItem: (key, value) => store.set(key, String(value)),
-  removeItem: (key) => store.delete(key),
-};
 globalThis.requestAnimationFrame = (callback) => callback();
 
-const days = [
-  createDay({ date: '2026-09-10', workplaceId: 'studio', from: '09:00', to: '18:00' }),
-  createDay({ date: '2026-09-11', workplaceId: 'studio', from: '09:00', to: '18:00' }),
-];
-store.set('book:timetable-state', JSON.stringify({ workingDays: days }));
-store.set('book.people', JSON.stringify([
+hydrateDaysFromServer([
+  { date: '2026-09-10', workplaceId: 'studio', from: '09:00', to: '18:00' },
+  { date: '2026-09-11', workplaceId: 'studio', from: '09:00', to: '18:00' },
+]);
+hydrateClientsFromServer([
   { key: 'client-1', name: 'Анна', surname: 'Тест', phones: ['+70000000000'], discountPercent: 20 },
   { key: 'client-2', name: 'Ирина', surname: 'БезСкидки', phones: ['+71111111111'], discountPercent: 0 },
-]));
+]);
+hydrateRecordStateFromServer({ records: [], recordEvents: [] });
+hydrateFinanceFromServer({ version: 5, income: [], expense: [] });
+hydrateWalletsFromServer([]);
 
 const record = createRecord({
   date: '2026-09-10',
@@ -151,7 +145,7 @@ assert.equal(getClientMetadata('client-2').paidTotal, 0);
 assert.equal(getFinancialItemFact('procedure', 'procedure-2').factTotal, 0);
 assert.equal(getWalletBalance('cash'), 6400);
 
-// Legacy paid records with a payment-stage discount recover the exact financial snapshot.
+// A record restored on another device comes from the server; Finance recovers the exact payment-stage snapshot.
 const historicalPlan = calculateFinancialPlan([{
   sourceType: 'procedure',
   sourceId: 'procedure-history',
@@ -170,19 +164,23 @@ const historicalIncome = recordPaymentIncome({
   allocations: [{ walletId: 'cashless', walletName: 'Безналичные', amount: 6400 }],
 });
 assert.ok(historicalIncome);
-const rawRecords = JSON.parse(localStorage.getItem('book.records') || '[]');
-rawRecords.push({
-  id: 'record-history',
-  status: 'active',
-  date: '2026-09-01',
-  workplaceId: 'studio',
-  from: '09:00',
-  to: '10:00',
-  client: { key: 'client-history', name: 'История' },
-  procedures: [{ id: 'procedure-history', name: 'Историческая услуга', cost: 8000, duration: 60 }],
+hydrateRecordStateFromServer({
+  records: [{
+    id: 'record-history',
+    date: '2026-09-01',
+    workplaceId: 'studio',
+    from: '09:00',
+    to: '10:00',
+    client: { key: 'client-history', name: 'История' },
+    procedures: [{ id: 'procedure-history', name: 'Историческая услуга', cost: 8000, duration: 60 }],
+    products: [],
+    createdAt: '2026-09-01T08:00:00.000Z',
+    updatedAt: '2026-09-01T08:00:00.000Z',
+  }],
+  recordEvents: [],
 });
-localStorage.setItem('book.records', JSON.stringify(rawRecords));
 const restoredHistory = getRecords().find((item) => item.id === 'record-history');
+assert.ok(restoredHistory);
 assert.equal(restoredHistory.procedures[0].cost, 8000);
 assert.equal(restoredHistory.finance.discountPercent, 20);
 assert.equal(restoredHistory.finance.discountTotal, 1600);

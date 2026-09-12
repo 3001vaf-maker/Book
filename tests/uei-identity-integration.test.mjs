@@ -1,42 +1,49 @@
 import assert from 'node:assert/strict';
+import { calculateFinancialPlan, hydrateFinanceFromServer, recordPaymentIncome } from '../core/finance/index.js';
+import { hydrateRecordStateFromServer } from '../core/record/index.js';
+import { createUEI, detachUEI, hydrateUEIFromServer, linkUEI } from '../core/uei.js';
+import {
+  findIdentityOwnerByAccountId,
+  getClients,
+  getIdentityMemberKeys,
+  getIdentityOwner,
+  hydrateClientsFromServer,
+} from '../main/clients/data.js';
+import { getClientMetadata } from '../main/clients/metadata.js';
 
-const storage = new Map();
-globalThis.localStorage = {
-  getItem: (key) => storage.has(key) ? storage.get(key) : null,
-  setItem: (key, value) => storage.set(key, String(value)),
-  removeItem: (key) => storage.delete(key),
-  clear: () => storage.clear(),
-};
-
-localStorage.setItem('book.people', JSON.stringify([
+hydrateClientsFromServer([
   { key: 'p1', name: 'Александр', phones: ['+79030000001'], accounts: ['a1'], discountPercent: 15, programs: [{ name: 'VIP' }] },
   { key: 'p2', name: 'Александр', phones: ['+79030000002'], accounts: ['a2'] },
   { key: 'p3', name: 'Александр', phones: ['+79030000003'], accounts: ['a3'] },
   { key: 'p4', name: 'Анна', phones: ['+79030000004'], accounts: ['a4'] },
-]));
+]);
+hydrateUEIFromServer({ entities: {}, relations: {}, revoked: [] });
+hydrateRecordStateFromServer({
+  records: [
+    { id: 'r1', date: '2026-09-01', client: { key: 'p1' }, procedures: [], products: [] },
+    { id: 'r2', date: '2026-09-02', client: { key: 'p2' }, procedures: [], products: [] },
+    { id: 'r3', date: '2026-09-03', client: { key: 'p3' }, procedures: [], products: [] },
+    { id: 'r4', date: '2026-09-04', client: { key: 'p4' }, procedures: [], products: [] },
+  ],
+  recordEvents: [],
+});
+hydrateFinanceFromServer({ version: 5, income: [], expense: [] });
 
-localStorage.setItem('book.records', JSON.stringify([
-  { id: 'r1', status: 'active', date: '2026-09-01', client: { key: 'p1' } },
-  { id: 'r2', status: 'active', date: '2026-09-02', client: { key: 'p2' } },
-  { id: 'r3', status: 'active', date: '2026-09-03', client: { key: 'p3' } },
-  { id: 'r4', status: 'active', date: '2026-09-04', client: { key: 'p4' } },
-]));
+function pay(recordId, amount) {
+  const finance = calculateFinancialPlan([{ sourceType: 'procedure', sourceId: `service-${recordId}`, name: 'Услуга', price: amount }]);
+  return recordPaymentIncome({
+    source: { type: 'record', id: recordId },
+    finance,
+    maxAmount: amount,
+    serviceAmount: amount,
+    allocations: [{ walletId: 'cash', walletName: 'Наличные', amount }],
+  });
+}
 
-localStorage.setItem('book.payments', JSON.stringify([
-  { id: 'pay1', status: 'completed', source: { type: 'record', id: 'r1' }, total: 1000 },
-  { id: 'pay2', status: 'completed', source: { type: 'record', id: 'r2' }, total: 2000 },
-  { id: 'pay3', status: 'completed', source: { type: 'record', id: 'r3' }, total: 3000 },
-  { id: 'pay4', status: 'completed', source: { type: 'record', id: 'r4' }, total: 4000 },
-]));
-
-const { createUEI, linkUEI, detachUEI } = await import('../core/uei.js');
-const {
-  getClients,
-  getIdentityMemberKeys,
-  getIdentityOwner,
-  findIdentityOwnerByAccountId,
-} = await import('../main/clients/data.js');
-const { getClientMetadata } = await import('../main/clients/metadata.js');
+assert.ok(pay('r1', 1000));
+assert.ok(pay('r2', 2000));
+assert.ok(pay('r3', 3000));
+assert.ok(pay('r4', 4000));
 
 createUEI({ entityType: 'person', entityId: 'p1', value: 'A1', identifiers: ['+79030000001'] });
 linkUEI({ entityType: 'person', entityId: 'p2', value: '00A1', identifiers: ['+79030000002'] });

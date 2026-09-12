@@ -1,30 +1,27 @@
 import assert from 'node:assert/strict';
-import { createDay } from '../core/day/index.js';
+import { hydrateDaysFromServer } from '../core/day/index.js';
 import { configureTimeUsageSource } from '../core/time/index.js';
-import { getRecordEvents, RECORD_EVENT_TYPES } from '../core/record/index.js';
-import { getRecord } from '../core/record/index.js';
-import { cancelRecord, createRecord, moveRecord, setRecordAttendance, setRecordConfirmed } from '../core/record/index.js';
+import {
+  getRecordEvents,
+  RECORD_EVENT_TYPES,
+  getRecord,
+  hydrateRecordStateFromServer,
+  cancelRecord,
+  createRecord,
+  moveRecord,
+  setRecordAttendance,
+  setRecordConfirmed,
+} from '../core/record/index.js';
 import { getJournalTimeUsages } from '../journal/time-usage-source.js';
 
-const store = new Map();
-globalThis.localStorage = {
-  getItem: (key) => store.has(key) ? store.get(key) : null,
-  setItem: (key, value) => store.set(key, String(value)),
-  removeItem: (key) => store.delete(key),
-};
 globalThis.window = { dispatchEvent() {} };
+globalThis.CustomEvent = class CustomEvent { constructor(type, options = {}) { this.type = type; this.detail = options.detail; } };
 
-function storedRecord(id) {
-  return JSON.parse(localStorage.getItem('book.records') || '[]')
-    .find((item) => item?.id === id);
-}
-
-store.set('book:timetable-state', JSON.stringify({
-  workingDays: [
-    createDay({ date: '2026-09-20', workplaceId: 'studio', from: '09:00', to: '18:00' }),
-    createDay({ date: '2026-09-21', workplaceId: 'studio', from: '09:00', to: '18:00' }),
-  ],
-}));
+hydrateDaysFromServer([
+  { date: '2026-09-20', workplaceId: 'studio', from: '09:00', to: '18:00' },
+  { date: '2026-09-21', workplaceId: 'studio', from: '09:00', to: '18:00' },
+]);
+hydrateRecordStateFromServer({ records: [], recordEvents: [] });
 configureTimeUsageSource(getJournalTimeUsages);
 
 const record = createRecord({
@@ -35,12 +32,6 @@ const record = createRecord({
   client: { name: 'Тест' },
 });
 assert.ok(record);
-
-const stored = storedRecord(record.id);
-assert.equal(Object.hasOwn(stored, 'status'), false);
-assert.equal(Object.hasOwn(stored, 'confirmed'), false);
-assert.equal(Object.hasOwn(stored, 'attendance'), false);
-assert.equal(Object.hasOwn(stored, 'cancelledAt'), false);
 assert.equal(getRecordEvents(record.id)[0]?.type, RECORD_EVENT_TYPES.CREATED);
 assert.equal(getRecord(record.id)?.status, 'active');
 assert.equal(getRecord(record.id)?.confirmed, false);
@@ -48,7 +39,6 @@ assert.equal(getRecord(record.id)?.attendance, '');
 
 const confirmed = setRecordConfirmed(record.id, true);
 assert.equal(confirmed.confirmed, true);
-assert.equal(storedRecord(record.id).confirmed, undefined);
 assert.equal(getRecordEvents(record.id).at(-1)?.type, RECORD_EVENT_TYPES.CONFIRMED);
 
 const unconfirmed = setRecordConfirmed(record.id, false);
@@ -57,7 +47,6 @@ assert.equal(getRecordEvents(record.id).at(-1)?.type, RECORD_EVENT_TYPES.UNCONFI
 
 const noShow = setRecordAttendance(record.id, 'no-show');
 assert.equal(noShow.attendance, 'no-show');
-assert.equal(storedRecord(record.id).attendance, undefined);
 assert.equal(getRecordEvents(record.id).at(-1)?.type, RECORD_EVENT_TYPES.NO_SHOW);
 
 const moved = moveRecord(record.id, {
@@ -79,35 +68,7 @@ assert.equal(getRecordEvents(record.id).at(-1)?.type, RECORD_EVENT_TYPES.ARRIVED
 
 const cancelled = cancelRecord(record.id);
 assert.equal(cancelled.status, 'cancelled');
-assert.equal(storedRecord(record.id).status, undefined);
-assert.equal(storedRecord(record.id).cancelledAt, undefined);
 assert.equal(getRecordEvents(record.id).at(-1)?.type, RECORD_EVENT_TYPES.CANCELLED);
 assert.equal(getJournalTimeUsages({ date: '2026-09-21', workplaceId: 'studio' }).some((usage) => usage.sourceId === record.id), false);
-
-// Legacy rows remain readable without destructive migration.
-store.set('book.records', JSON.stringify([
-  ...JSON.parse(store.get('book.records') || '[]'),
-  {
-    id: 'legacy-record',
-    status: 'cancelled',
-    confirmed: true,
-    attendance: 'no-show',
-    cancelledAt: '2026-09-19T12:00:00.000Z',
-    date: '2026-09-20',
-    workplaceId: 'studio',
-    from: '15:00',
-    to: '16:00',
-    procedures: [],
-    products: [],
-    createdAt: '2026-09-18T12:00:00.000Z',
-    updatedAt: '2026-09-19T12:00:00.000Z',
-  },
-]));
-const legacy = getRecord('legacy-record');
-assert.equal(legacy.status, 'cancelled');
-assert.equal(legacy.confirmed, true);
-assert.equal(legacy.attendance, 'no-show');
-assert.equal(getRecordEvents('legacy-record').length, 0);
-assert.equal(storedRecord('legacy-record').status, 'cancelled');
 
 console.log('record lifecycle tests: OK');

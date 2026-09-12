@@ -1,53 +1,28 @@
 import { queueAuxiliaryDataset } from '../../../core/business-persistence.js';
 
-const KEY = 'book.products';
-const HISTORY_KEY = 'book.products.history';
-let productsState = null;
-let historyState = null;
+let productsState = [];
+let historyState = [];
 
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
 }
 
-function readLegacy(key, fallback) {
-  try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); }
-  catch { return fallback; }
-}
-
 function readRawProducts() {
-  const value = productsState === null ? readLegacy(KEY, []) : productsState;
-  return Array.isArray(value) ? clone(value) : [];
+  return clone(productsState);
 }
 
 function readHistory() {
-  const value = historyState === null ? readLegacy(HISTORY_KEY, []) : historyState;
-  return Array.isArray(value) ? clone(value) : [];
+  return clone(historyState);
 }
 
 function writeProducts(value) {
-  const normalized = Array.isArray(value) ? clone(value) : [];
-  if (productsState === null) localStorage.setItem(KEY, JSON.stringify(normalized));
-  else {
-    productsState = normalized;
-    void queueAuxiliaryDataset('products', productsState);
-  }
+  productsState = Array.isArray(value) ? clone(value) : [];
+  void queueAuxiliaryDataset('products', productsState);
 }
 
 function writeHistory(value) {
-  const normalized = Array.isArray(value) ? clone(value) : [];
-  if (historyState === null) localStorage.setItem(HISTORY_KEY, JSON.stringify(normalized));
-  else {
-    historyState = normalized;
-    void queueAuxiliaryDataset('productHistory', historyState);
-  }
-}
-
-export function readLegacyProductSnapshot() {
-  return {
-    present: localStorage.getItem(KEY) != null || localStorage.getItem(HISTORY_KEY) != null,
-    products: Array.isArray(readLegacy(KEY, [])) ? clone(readLegacy(KEY, [])) : [],
-    productHistory: Array.isArray(readLegacy(HISTORY_KEY, [])) ? clone(readLegacy(HISTORY_KEY, [])) : [],
-  };
+  historyState = Array.isArray(value) ? clone(value) : [];
+  void queueAuxiliaryDataset('productHistory', historyState);
 }
 
 export function hydrateProductsFromServer({ products = [], productHistory = [] } = {}) {
