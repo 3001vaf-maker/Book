@@ -1,0 +1,244 @@
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { Prisma } from '@prisma/client';
+import { BusinessStateService } from '../business-state/business-state.service';
+import { PrismaService } from '../prisma.service';
+
+type TelegramEntryRow = {
+  id: string;
+  tenantId: string;
+  telegramUserId: string;
+  username: string;
+  expiresAt: Date;
+  usedAt: Date | null;
+};
+
+type TelegramIdentityRow = {
+  id: string;
+  cardPhone: string;
+  uei: string;
+  externalUserId: string;
+  display: string;
+};
+
+type CommunicationMessageRow = {
+  id: string;
+  tenantId: string;
+  cardPhone: string;
+  uei: string;
+  direction: string;
+  kind: string;
+  channel: string;
+  body: string;
+  externalMessageId: string;
+  externalThreadId: string;
+  status: string;
+  createdAt: Date;
+  sentAt: Date | null;
+  deliveredAt: Date | null;
+  readAt: Date | null;
+  failedAt: Date | null;
+  error: string;
+};
+
+function text(value: unknown) {
+  return String(value ?? '').trim();
+}
+
+function objectValue(value: unknown): Record<string, any> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : {};
+}
+
+function canonicalPhone(value: unknown) {
+  const digits = text(value).replace(/\D/g, '');
+  if (digits.length === 10) return `7${digits}`;
+  if (digits.length === 11 && digits.startsWith('8')) return `7${digits.slice(1)}`;
+  return digits;
+}
+
+function personHasPhone(person: Record<string, any>, phone: string) {
+  const phones = Array.isArray(person.phones) ? person.phones : [];
+  return phones.some((value) => canonicalPhone(value) === phone);
+}
+
+function telegramUsername(value: unknown) {
+  const clean = text(value).replace(/^@+/, '');
+  return clean ? `@${clean}` : '';
+}
+
+function tokenHash(value: string) {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function json(value: unknown): Prisma.InputJsonValue {
+  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+}
+
+@Injectable()
+export class CommunicationService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly businessState: BusinessStateService,
+  ) {}
+
+  async createTelegramEntry(tenantId: string, input: { telegramUserId?: unknown; username?: unknown }) {
+    const telegramUserId = text(input?.telegramUserId);
+    if (!/^\d+$/.test(telegramUserId)) throw new BadRequestException('Некорректный Telegram ID');
+    const username = telegramUsername(input?.username);
+    const token = randomBytes(32).toString('base64url');
+    const hash = tokenHash(token);
+    const id = randomUUID();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    await this.prisma.$executeRaw`
+      INSERT INTO "TelegramEntryTicket" ("id", "tenantId", "tokenHash", "telegramUserId", "username", "createdAt", "expiresAt")
+      VALUES (${id}, ${tenantId}, ${hash}, ${telegramUserId}, ${username}, CURRENT_TIMESTAMP, ${expiresAt})
+    `;
+    return { token, expiresAt, username };
+  }
+
+  private async telegramEntry(tenantId: string, entryToken: unknown) {
+    const token = text(entryToken);
+    if (!token) throw new BadRequestException('Не указан Telegram-вход');
+    const hash = tokenHash(token);
+    const rows = await this.prisma.$queryRaw<TelegramEntryRow[]>`
+      SELECT "id", "tenantId", "telegramUserId", "username", "expiresAt", "usedAt"
+      FROM "TelegramEntryTicket"
+      WHERE "tenantId" = ${tenantId} AND "tokenHash" = ${hash}
+      LIMIT 1
+    `;
+    const ticket = rows[0];
+    if (!ticket) throw new NotFoundException('Telegram-вход не найден');
+    if (ticket.usedAt) throw new ConflictException('Telegram-вход уже использован');
+    if (ticket.expiresAt.getTime() <= Date.now()) throw new ConflictException('Telegram-вход истёк');
+    return ticket;
+  }
+
+  async bindTelegramEntry(tenantId: string, accountId: string, entryToken: unknown) {
+    const ticket = await this.telegramEntry(tenantId, entryToken);
+    const account = await this.prisma.bookingAccount.findFirst({ where: { id: accountId, tenantId }, select: { phone: true } });
+    if (!account) throw new NotFoundException('Клиентский аккаунт не найден');
+    const cardPhone = canonicalPhone(account.phone);
+    if (!cardPhone) throw new BadRequestException('У клиента не определён телефон');
+
+    const telegramRows = await this.prisma.$queryRaw<TelegramIdentityRow[]>`
+      SELECT "id", "cardPhone", "uei", "externalUserId", "display"
+      FROM "CommunicationIdentity"
+      WHERE "tenantId" = ${tenantId} AND "channel" = 'TELEGRAM' AND "externalUserId" = ${ticket.telegramUserId}
+      LIMIT 1
+    `;
+    const existingTelegram = telegramRows[0] || null;
+    const phoneAndTelegramMatch = Boolean(existingTelegram && canonicalPhone(existingTelegram.cardPhone) === cardPhone);
+    const business = await this.businessState.get(tenantId);
+    const phoneMatch = (Array.isArray(business.people) ? business.people : [])
+      .map((value) => objectValue(value)).find((person) => personHasPhone(person, cardPhone)) || null;
+    const match = phoneAndTelegramMatch ? 'phone+telegram' : phoneMatch ? 'phone' : 'new';
+    const identity = await this.businessState.bookingIdentityForAccount(tenantId, accountId);
+    const personKey = text(identity?.person?.key || identity?.matchedPerson?.key);
+    if (!personKey) throw new NotFoundException('Клиентская карта не найдена');
+    const uei = text(identity?.uei);
+    const display = telegramUsername(ticket.username);
+
+    if (existingTelegram && !phoneAndTelegramMatch && existingTelegram.uei && uei && existingTelegram.uei !== uei) {
+      throw new ConflictException('Этот Telegram уже связан с другой клиентской картой');
+    }
+
+    await this.prisma.$executeRaw`
+      INSERT INTO "CommunicationIdentity" (
+        "id", "tenantId", "cardPhone", "uei", "channel", "externalUserId", "display", "verifiedAt", "createdAt", "updatedAt"
+      ) VALUES (
+        ${randomUUID()}, ${tenantId}, ${cardPhone}, ${uei}, 'TELEGRAM', ${ticket.telegramUserId}, ${display}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+      )
+      ON CONFLICT ("tenantId", "channel", "externalUserId") DO UPDATE
+      SET "cardPhone" = EXCLUDED."cardPhone", "uei" = EXCLUDED."uei", "display" = EXCLUDED."display",
+          "verifiedAt" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP
+    `;
+
+    if (display) {
+      const personRow = await this.prisma.businessPerson.findUnique({ where: { tenantId_key: { tenantId, key: personKey } } });
+      if (personRow) {
+        const person = objectValue(personRow.data);
+        const telegrams = Array.isArray(person.telegrams) ? person.telegrams.map(text).filter(Boolean) : [];
+        person.telegrams = [...new Set([...telegrams.filter((item) => !/^\d+$/.test(item)), display])];
+        await this.prisma.businessPerson.update({ where: { id: personRow.id }, data: { data: json(person) } });
+      }
+    }
+
+    const used = await this.prisma.$executeRaw`
+      UPDATE "TelegramEntryTicket" SET "usedAt" = CURRENT_TIMESTAMP WHERE "id" = ${ticket.id} AND "usedAt" IS NULL
+    `;
+    if (!used) throw new ConflictException('Telegram-вход уже использован');
+    return { linked: true, channel: 'TELEGRAM', username: display, match };
+  }
+
+  async telegramIdentity(tenantId: string, input: { phone?: unknown; uei?: unknown }) {
+    const cardPhone = canonicalPhone(input?.phone);
+    const uei = text(input?.uei);
+    if (!cardPhone && !uei) throw new BadRequestException('Не указан клиент');
+    const rows = await this.prisma.$queryRaw<TelegramIdentityRow[]>`
+      SELECT "id", "cardPhone", "uei", "externalUserId", "display"
+      FROM "CommunicationIdentity"
+      WHERE "tenantId" = ${tenantId} AND "channel" = 'TELEGRAM'
+        AND ((${cardPhone} <> '' AND "cardPhone" = ${cardPhone}) OR (${uei} <> '' AND "uei" = ${uei}))
+      ORDER BY "verifiedAt" DESC NULLS LAST, "updatedAt" DESC LIMIT 1
+    `;
+    return rows[0] || null;
+  }
+
+  async recordMessage(tenantId: string, input: {
+    phone?: unknown; uei?: unknown; direction?: unknown; kind?: unknown; channel?: unknown; body?: unknown;
+    externalMessageId?: unknown; externalThreadId?: unknown; status?: unknown; error?: unknown;
+  }) {
+    const cardPhone = canonicalPhone(input?.phone);
+    const uei = text(input?.uei);
+    const direction = text(input?.direction).toLowerCase() || 'system';
+    const kind = text(input?.kind).toLowerCase() || 'message';
+    const channel = text(input?.channel).toUpperCase() || 'IN_APP';
+    const body = text(input?.body);
+    const status = text(input?.status).toLowerCase() || 'created';
+    const externalMessageId = text(input?.externalMessageId);
+    const externalThreadId = text(input?.externalThreadId);
+    const error = text(input?.error).slice(0, 2000);
+    if (!cardPhone && !uei) throw new BadRequestException('Не указан клиент');
+    const id = randomUUID();
+    const now = new Date();
+    await this.prisma.$executeRaw`
+      INSERT INTO "CommunicationMessage" (
+        "id", "tenantId", "cardPhone", "uei", "direction", "kind", "channel", "body",
+        "externalMessageId", "externalThreadId", "status", "createdAt", "sentAt", "deliveredAt", "failedAt", "error"
+      ) VALUES (
+        ${id}, ${tenantId}, ${cardPhone}, ${uei}, ${direction}, ${kind}, ${channel}, ${body},
+        ${externalMessageId}, ${externalThreadId}, ${status}, ${now},
+        ${status === 'sent' ? now : null}, ${status === 'delivered' ? now : null}, ${status === 'failed' ? now : null}, ${error}
+      ) ON CONFLICT DO NOTHING
+    `;
+    return { id, tenantId, cardPhone, uei, direction, kind, channel, body, externalMessageId, externalThreadId, status, createdAt: now, error };
+  }
+
+  async listThread(tenantId: string, input: { phone?: unknown; uei?: unknown }, limit = 300) {
+    const cardPhone = canonicalPhone(input?.phone);
+    const uei = text(input?.uei);
+    if (!cardPhone && !uei) throw new BadRequestException('Не указан клиент');
+    const safeLimit = Math.max(1, Math.min(1000, Math.floor(Number(limit) || 300)));
+    return this.prisma.$queryRaw<CommunicationMessageRow[]>`
+      SELECT "id", "tenantId", "cardPhone", "uei", "direction", "kind", "channel", "body",
+             "externalMessageId", "externalThreadId", "status", "createdAt", "sentAt", "deliveredAt", "readAt", "failedAt", "error"
+      FROM "CommunicationMessage"
+      WHERE "tenantId" = ${tenantId}
+        AND ((${cardPhone} <> '' AND "cardPhone" = ${cardPhone}) OR (${uei} <> '' AND "uei" = ${uei}))
+      ORDER BY "createdAt" ASC, "id" ASC LIMIT ${safeLimit}
+    `;
+  }
+
+  async listThreads(tenantId: string, limit = 200) {
+    const safeLimit = Math.max(1, Math.min(500, Math.floor(Number(limit) || 200)));
+    return this.prisma.$queryRaw<CommunicationMessageRow[]>`
+      SELECT DISTINCT ON (COALESCE(NULLIF("uei", ''), "cardPhone"))
+             "id", "tenantId", "cardPhone", "uei", "direction", "kind", "channel", "body",
+             "externalMessageId", "externalThreadId", "status", "createdAt", "sentAt", "deliveredAt", "readAt", "failedAt", "error"
+      FROM "CommunicationMessage"
+      WHERE "tenantId" = ${tenantId}
+      ORDER BY COALESCE(NULLIF("uei", ''), "cardPhone"), "createdAt" DESC, "id" DESC
+      LIMIT ${safeLimit}
+    `;
+  }
+}
