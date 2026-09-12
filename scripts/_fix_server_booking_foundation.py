@@ -53,3 +53,15 @@ text = text.replace(
 1,
 )
 p.write_text(text, encoding='utf-8')
+
+# The operational guard must validate the injected Break persistence contract,
+# not require Break data to import server infrastructure directly.
+p = Path('scripts/check-operational-server-ownership.mjs')
+text = p.read_text(encoding='utf-8')
+text = text.replace("const bridge = read('online-booking/owner-bridge.js');\n", "const bridge = read('online-booking/owner-bridge.js');\nconst migration = read('operational-migration.js');\n", 1)
+text = text.replace(
+"if (!breaks.includes('hydrateBreaksFromServer') || !breaks.includes(\"queueOperationalDataset('breaks'\")) failures.push('Break must become server-owned after migration.');",
+"if (!breaks.includes('hydrateBreaksFromServer') || !breaks.includes('configureBreakPersistence') || !migration.includes(\"queueOperationalDataset('breaks'\")) failures.push('Break must become server-owned after migration.');",
+1,
+)
+p.write_text(text, encoding='utf-8')
