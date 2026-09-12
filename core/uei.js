@@ -32,10 +32,6 @@ function readStore() {
 
 function writeStore(store) {
   const normalized = normalizeStore(store);
-  if (storeState === null) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
-    return;
-  }
   storeState = clone(normalized);
   void queueUEIStore(normalized);
 }
@@ -192,6 +188,5 @@ export function applyUEI({ entityType, entityId, currentUEI = '', value = '', li
 }
 
 export function clearTestState() {
-  if (storeState === null) localStorage.removeItem(STORAGE_KEY);
-  else writeStore(normalizeStore());
+  writeStore(normalizeStore());
 }
