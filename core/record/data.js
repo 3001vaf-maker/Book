@@ -35,15 +35,8 @@ function readRows(key) {
 
 function writeRows(key, rows) {
   const normalized = Array.isArray(rows) ? clone(rows) : [];
-  if (key === RECORDS_KEY && recordRowsState !== null) {
-    recordRowsState = normalized;
-    return;
-  }
-  if (key === EVENTS_KEY && eventRowsState !== null) {
-    eventRowsState = normalized;
-    return;
-  }
-  localStorage.setItem(key, JSON.stringify(normalized));
+  if (key === RECORDS_KEY) recordRowsState = normalized;
+  if (key === EVENTS_KEY) eventRowsState = normalized;
 }
 
 function normalizeId(value) {
@@ -79,7 +72,7 @@ export function insertRecordRow(row = null) {
   const stored = clone(row);
   rows.push(stored);
   writeRows(RECORDS_KEY, rows);
-  if (recordRowsState !== null) void queueRecordUpsert(stored, rows.length - 1);
+  void queueRecordUpsert(stored, rows.length - 1);
   return clone(stored);
 }
 
@@ -90,7 +83,7 @@ export function patchRecordRow(id, patch = {}) {
   if (index < 0) return null;
   rows[index] = { ...rows[index], ...clone(patch) };
   writeRows(RECORDS_KEY, rows);
-  if (recordRowsState !== null) void queueRecordUpsert(rows[index], index);
+  void queueRecordUpsert(rows[index], index);
   return clone(rows[index]);
 }
 
@@ -101,7 +94,7 @@ export function deleteRecordRow(id) {
   if (index < 0) return null;
   const [removed] = rows.splice(index, 1);
   writeRows(RECORDS_KEY, rows);
-  if (recordRowsState !== null) void queueRecordDelete(recordId);
+  void queueRecordDelete(recordId);
   return clone(removed);
 }
 
@@ -119,7 +112,7 @@ export function insertRecordEventRow(row = null) {
   const stored = clone(row);
   rows.push(stored);
   writeRows(EVENTS_KEY, rows);
-  if (eventRowsState !== null) void queueRecordEventUpsert(stored, rows.length - 1);
+  void queueRecordEventUpsert(stored, rows.length - 1);
   return clone(stored);
 }
 
@@ -131,7 +124,7 @@ export function deleteRecordEventRows(recordId) {
   const removed = rows.length - next.length;
   if (removed) {
     writeRows(EVENTS_KEY, next);
-    if (eventRowsState !== null) void queueRecordEventsDelete(id);
+    void queueRecordEventsDelete(id);
   }
   return removed;
 }
