@@ -1,5 +1,5 @@
 import { apiRequest } from './core/auth.js';
-import { hydrateFinanceFromServer, readLegacyFinanceSnapshot } from './core/finance/data.js';
+import { hydrateFinanceFromServer, readLegacyFinanceSnapshot } from './core/finance/index.js';
 import { hydrateProductsFromServer, readLegacyProductSnapshot } from './settings/service/products/data.js';
 import { hydrateTagsFromServer, readLegacyTagSnapshot } from './settings/tags/data.js';
 import { hydrateWalletsFromServer, readLegacyWalletSnapshot } from './settings/wallets/data.js';
