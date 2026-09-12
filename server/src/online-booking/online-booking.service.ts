@@ -396,8 +396,29 @@ export class OnlineBookingService {
   }
 
   async getMyRequests(tenantId: string, accountId: string) {
+    const account = await this.prisma.bookingAccount.findFirst({
+      where: { id: accountId, tenantId },
+      select: { id: true, uei: true },
+    });
+    if (!account) throw new UnauthorizedException('Аккаунт не найден');
+
+    const uei = text(account.uei);
+    let accountIds = [account.id];
+    if (uei) {
+      const linked = await this.prisma.bookingAccount.findMany({
+        where: { tenantId, uei },
+        select: { id: true },
+      });
+      const linkedIds = linked.map((item) => item.id).filter(Boolean);
+      if (linkedIds.length) accountIds = linkedIds;
+    }
+
     return this.prisma.bookingRequest.findMany({
-      where: { tenantId, accountId, status: { not: BookingRequestStatus.CANCELLED } },
+      where: {
+        tenantId,
+        accountId: { in: accountIds },
+        status: { not: BookingRequestStatus.CANCELLED },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }

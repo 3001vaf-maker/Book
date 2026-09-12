@@ -1,13 +1,14 @@
 import { shortDate } from '../../ui/ui.js';
 import { getFinancialFactForRecords } from '../../core/finance/index.js';
 import { getRecords } from '../../core/record/index.js';
+import { getIdentityMemberKeys } from './data.js';
 
 const clientKey = (value) => String(value || '');
 
 function clientRecords(key) {
-  const target = clientKey(key);
-  if (!target) return [];
-  return getRecords().filter((record) => record?.status !== 'cancelled' && clientKey(record?.client?.key) === target);
+  const identityKeys = new Set(getIdentityMemberKeys(key).map(clientKey).filter(Boolean));
+  if (!identityKeys.size) return [];
+  return getRecords().filter((record) => record?.status !== 'cancelled' && identityKeys.has(clientKey(record?.client?.key)));
 }
 
 export function getClientMetadata(key) {
