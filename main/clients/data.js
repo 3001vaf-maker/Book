@@ -99,6 +99,47 @@ export function getClients() {
   return people.filter((person) => !linkedSecondary.has(person.key));
 }
 
+function personKeyFromUEIMember(member) {
+  const value = String(member || '');
+  if (value.startsWith('person:')) return value.slice(7);
+  if (!value.includes(':')) return value;
+  return '';
+}
+
+function identityKeysForUEI(uei, people = []) {
+  if (!uei) return [];
+  const known = new Set(people.map((person) => person.key));
+  return [...new Set(getMembers(uei)
+    .map(personKeyFromUEIMember)
+    .filter((key) => key && known.has(key)))];
+}
+
+export function getIdentityMemberKeys(key) {
+  const target = String(key || '').trim();
+  if (!target) return [];
+  const people = getAllClients();
+  const person = people.find((item) => item.key === target);
+  if (!person) return [target];
+  if (!person.uei) return [target];
+  const keys = identityKeysForUEI(person.uei, people);
+  return keys.length ? keys : [target];
+}
+
+export function getIdentityPeople(key) {
+  const keys = new Set(getIdentityMemberKeys(key));
+  if (!keys.size) return [];
+  return getAllClients().filter((person) => keys.has(person.key));
+}
+
+export function getIdentityOwner(key) {
+  return getIdentityPeople(key)[0] || null;
+}
+
+export function findIdentityOwnerByAccountId(accountId) {
+  const person = findPersonByAccountId(accountId);
+  return person ? (getIdentityOwner(person.key) || person) : null;
+}
+
 export function findPeopleByPhone(phone) {
   const target = String(phone || '').trim();
   if (!target) return [];

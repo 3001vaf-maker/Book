@@ -1,7 +1,7 @@
 import { button, durationPicker, durationText, entityCard, escapeHtml, iconButton, list, listEntry, stateView, initStateView, initCalendar, mountModal, modal, openNotice, initDurationPickers, initMultiSelect, viewNavigation, initViewNavigation } from '../ui/ui.js';
 import { createRecord } from '../core/record/index.js';
 import { createJournalBreak } from './break-service.js';
-import { getAllClients } from '../main/clients/data.js';
+import { getClients } from '../main/clients/data.js';
 import { clientDisplay } from '../main/clients/presentation.js';
 import { openClientCreate } from '../main/clients/create.js';
 import { openClientProfile } from '../main/clients/clients.js';
@@ -17,7 +17,7 @@ const RECORD_MODES = [
   { id: 'block', label: 'Занять время' },
 ];
 
-const people = () => getAllClients();
+const people = () => getClients();
 const procedures = () => getProcedures();
 const clientName = (person) => clientDisplay(person).name;
 

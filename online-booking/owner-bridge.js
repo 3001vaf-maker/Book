@@ -4,7 +4,8 @@ import { getDays } from '../core/day/index.js';
 import { getRecordPaymentState } from '../core/finance/index.js';
 import { createRecord, getRecords } from '../core/record/index.js';
 import { getJournalBreaks } from '../journal/break-read.js';
-import { findPersonByAccountId, upsertPersonFromBookingAccount } from '../main/clients/data.js';
+import { findIdentityOwnerByAccountId, upsertPersonFromBookingAccount } from '../main/clients/data.js';
+import { getClientMetadata } from '../main/clients/metadata.js';
 import { getLatestClientConsent, recordConsent } from '../settings/documents/consents.js';
 import { getDocuments } from '../settings/documents/data.js';
 import { getProfile } from '../settings/profile/data.js';
@@ -271,15 +272,16 @@ async function syncAccounts() {
   for (const account of Array.isArray(accounts) ? accounts : []) {
     const person = upsertPersonFromBookingAccount(account);
     persistAccountConsents(person, account);
-    const current = findPersonByAccountId(account.id) || person;
+    const current = findIdentityOwnerByAccountId(account.id) || person;
     if (!current) continue;
+    const metadata = getClientMetadata(current.key);
     masterFacts.push({
       accountId: account.id,
       uei: current.uei || '',
       discountPercent: Number(current.discountPercent || 0),
-      visits: Number(current.visits || 0),
-      totalSpent: Number(current.totalSpent || 0),
-      lastVisit: String(current.lastVisit || ''),
+      visits: Number(metadata.recordCount || 0),
+      totalSpent: Number(metadata.paidTotal || 0),
+      lastVisit: String(metadata.lastVisit || ''),
       programs: Array.isArray(current.programs) ? current.programs : [],
     });
   }
