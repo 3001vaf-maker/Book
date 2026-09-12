@@ -48,11 +48,8 @@ export function getTags() {
 
 export function saveTags(tags = []) {
   const normalized = tags.map(normalizeTag);
-  if (tagsState === null) localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
-  else {
-    tagsState = clone(normalized);
-    void queueAuxiliaryDataset('tags', tagsState);
-  }
+  tagsState = clone(normalized);
+  void queueAuxiliaryDataset('tags', tagsState);
 }
 
 export function createTag({ name, color }) {

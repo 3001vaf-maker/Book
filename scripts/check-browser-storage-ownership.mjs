@@ -5,6 +5,7 @@ const ROOT = process.cwd();
 const EXTENSIONS = new Set(['.js', '.mjs', '.html']);
 const SKIP_DIRS = new Set(['.git', 'node_modules', 'server', 'tests', 'scripts']);
 const STORAGE_PATTERN = /\b(localStorage|sessionStorage|indexedDB|caches\b|CacheStorage|document\.cookie|window\.name)\b/;
+const STORAGE_WRITE_PATTERN = /\blocalStorage\.(?:setItem|removeItem|clear)\s*\(/;
 
 const TECHNICAL_STORAGE_OWNERS = new Set([
   'core/auth.js',
@@ -33,6 +34,10 @@ const LEGACY_MIGRATION_OWNERS = new Set([
   'settings/wallets/data.js',
 ]);
 
+const READ_ONLY_LEGACY_MIGRATION_OWNERS = new Set([
+  'settings/tags/data.js',
+]);
+
 const CLEANUP_OWNER = 'core/legacy-browser-business.js';
 const ALLOWED = new Set([...TECHNICAL_STORAGE_OWNERS, ...LEGACY_MIGRATION_OWNERS, CLEANUP_OWNER]);
 
@@ -57,6 +62,17 @@ for (const file of walk(ROOT)) {
   const text = source(file);
   if (!STORAGE_PATTERN.test(text)) continue;
   if (!ALLOWED.has(relative)) violations.push(`${relative}: browser storage has no approved owner role`);
+}
+
+for (const relative of READ_ONLY_LEGACY_MIGRATION_OWNERS) {
+  const file = path.join(ROOT, relative);
+  if (!fs.existsSync(file)) {
+    violations.push(`${relative}: read-only legacy migration owner is missing`);
+    continue;
+  }
+  if (STORAGE_WRITE_PATTERN.test(source(file))) {
+    violations.push(`${relative}: legacy migration may read browser business data but may not write it`);
+  }
 }
 
 if (fs.existsSync(path.join(ROOT, 'core/workspace-sync.js'))) {
@@ -94,4 +110,4 @@ if (violations.length) {
   process.exit(1);
 }
 
-console.log(`browser storage ownership check: OK (${TECHNICAL_STORAGE_OWNERS.size} technical owners, ${LEGACY_MIGRATION_OWNERS.size} legacy migration owners)`);
+console.log(`browser storage ownership check: OK (${TECHNICAL_STORAGE_OWNERS.size} technical owners, ${LEGACY_MIGRATION_OWNERS.size} legacy migration owners, ${READ_ONLY_LEGACY_MIGRATION_OWNERS.size} read-only)`);
