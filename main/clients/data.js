@@ -181,12 +181,7 @@ export function getClientCount() {
 
 export function saveClients(people = []) {
   const normalized = (Array.isArray(people) ? people : []).map(normalizeClient).filter((person) => person.key);
-  if (peopleState === null) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
-    return;
-  }
-
-  const previous = peopleState;
+  const previous = peopleState === null ? readLegacyClientsSnapshot() : peopleState;
   const previousByKey = new Map(previous.map((person, position) => [person.key, { person, position }]));
   const nextByKey = new Map(normalized.map((person, position) => [person.key, { person, position }]));
   peopleState = clone(normalized);
