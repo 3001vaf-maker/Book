@@ -25,8 +25,5 @@ export {
   recordPlanTotal,
   resolveRecordFinancialPlan,
 } from './model.js';
-export {
-  hydrateFinanceFromServer,
-  readLegacyFinanceSnapshot,
-} from './data.js';
+export { hydrateFinanceFromServer } from './data.js';
 export { cancelPaymentOperation, recordPaymentIncome, recordRefundExpense } from './service.js';
