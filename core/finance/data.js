@@ -1,7 +1,10 @@
+import { queueAuxiliaryDataset } from '../business-persistence.js';
+
 // Finance persistence only. Business meaning belongs to rules/model/service.
 const STORAGE_KEY = 'book.dds';
 const LEGACY_PAYMENT_KEY = 'book.payments';
 const VERSION = 5;
+let financeState = null;
 
 function numberValue(value) {
   const number = Number(String(value ?? '').replace(',', '.'));
@@ -109,23 +112,47 @@ function normalizedState(value) {
   return { version: VERSION, income, expense };
 }
 
+function readLegacyState() {
+  try {
+    const storedRaw = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+    const stored = normalizedState(storedRaw);
+    if (stored) return stored;
+  } catch {}
+  return migrateLegacyPayments();
+}
+
+export function readLegacyFinanceSnapshot() {
+  const present = localStorage.getItem(STORAGE_KEY) != null || localStorage.getItem(LEGACY_PAYMENT_KEY) != null;
+  return { present, finance: clone(readLegacyState()) };
+}
+
+export function hydrateFinanceFromServer(value = null) {
+  financeState = normalizedState(value) || emptyState();
+  return clone(financeState);
+}
+
 export function writeFinanceState(state) {
   const normalized = normalizedState(state) || emptyState();
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+  if (financeState === null) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+  } else {
+    financeState = normalized;
+    void queueAuxiliaryDataset('finance', financeState);
+  }
   return clone(normalized);
 }
 
 export function readFinanceState() {
+  if (financeState !== null) return clone(financeState);
+  const stored = readLegacyState();
   try {
     const storedRaw = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-    const stored = normalizedState(storedRaw);
-    if (stored) {
-      const hasLegacySnapshot = [...(storedRaw?.income || []), ...(storedRaw?.expense || [])].some((item) => item?.['business']);
-      if (storedRaw?.version !== VERSION || Array.isArray(storedRaw?.operational) || hasLegacySnapshot) writeFinanceState(stored);
-      return clone(stored);
+    const hasLegacySnapshot = [...(storedRaw?.income || []), ...(storedRaw?.expense || [])].some((item) => item?.['business']);
+    if (storedRaw && (storedRaw?.version !== VERSION || Array.isArray(storedRaw?.operational) || hasLegacySnapshot)) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
+    } else if (!storedRaw && (stored.income.length || stored.expense.length)) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
     }
   } catch {}
-  const migrated = migrateLegacyPayments();
-  if (migrated.income.length || migrated.expense.length) writeFinanceState(migrated);
-  return clone(migrated);
+  return clone(stored);
 }

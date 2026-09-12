@@ -1,27 +1,60 @@
 import { getWalletDDSMovements } from '../../core/finance/index.js';
+import { queueAuxiliaryDataset } from '../../core/business-persistence.js';
 
 const KEY = 'book.wallets';
 const SYSTEM_WALLETS = [
   { id: 'cash', name: 'Наличные', photo: '', system: true },
   { id: 'cashless', name: 'Безналичные', photo: '', system: true },
 ];
+let walletsState = null;
 
-function read(fallback) {
+function clone(value) {
+  return value == null ? value : JSON.parse(JSON.stringify(value));
+}
+
+function readLegacy(fallback) {
   try { return JSON.parse(localStorage.getItem(KEY) || JSON.stringify(fallback)); }
   catch { return fallback; }
 }
 
+function readRaw() {
+  const value = walletsState === null ? readLegacy(null) : walletsState;
+  return Array.isArray(value) ? clone(value) : null;
+}
+
 function write(value) {
-  localStorage.setItem(KEY, JSON.stringify(value));
+  const normalized = Array.isArray(value) ? clone(value) : [];
+  if (walletsState === null) localStorage.setItem(KEY, JSON.stringify(normalized));
+  else {
+    walletsState = normalized;
+    void queueAuxiliaryDataset('wallets', walletsState);
+  }
+}
+
+export function readLegacyWalletSnapshot() {
+  const present = localStorage.getItem(KEY) != null;
+  const value = readLegacy([]);
+  return { present, wallets: Array.isArray(value) ? clone(value) : [] };
+}
+
+export function hydrateWalletsFromServer(value = []) {
+  walletsState = Array.isArray(value) ? clone(value) : [];
+  return clone(walletsState);
 }
 
 export function getWallets() {
-  const stored = read(null);
-  if (!Array.isArray(stored)) {
+  const stored = readRaw();
+  if (!Array.isArray(stored) || !stored.length) {
     write(SYSTEM_WALLETS);
     return SYSTEM_WALLETS.map((wallet) => ({ ...wallet }));
   }
-  return stored.filter((wallet) => !wallet.deletedAt);
+  const ids = new Set(stored.map((wallet) => String(wallet?.id || '')));
+  const withSystem = [
+    ...SYSTEM_WALLETS.filter((wallet) => !ids.has(wallet.id)),
+    ...stored,
+  ];
+  if (withSystem.length !== stored.length) write(withSystem);
+  return withSystem.filter((wallet) => !wallet.deletedAt).map((wallet) => ({ ...wallet }));
 }
 
 export function getWalletHistory(id) {

@@ -7,9 +7,10 @@ import { ProfileModule } from './profile/profile.module';
 import { OnlineBookingModule } from './online-booking/online-booking.module';
 import { BusinessStateModule } from './business-state/business-state.module';
 import { DocumentStateModule } from './document-state/document-state.module';
+import { AuxiliaryStateModule } from './auxiliary-state/auxiliary-state.module';
 
 @Module({
-  imports: [AuthModule, WorkspaceModule, ProfileModule, BusinessStateModule, DocumentStateModule, OnlineBookingModule],
+  imports: [AuthModule, WorkspaceModule, ProfileModule, BusinessStateModule, DocumentStateModule, AuxiliaryStateModule, OnlineBookingModule],
   controllers: [HealthController],
   providers: [PrismaService],
 })

@@ -7,6 +7,7 @@ import { initializeProfileWorkplaces } from './settings/profile/migration.js';
 import { initializeBusinessState } from './business-migration.js';
 import { initializeOperationalState } from './operational-migration.js';
 import { initializeDocumentState } from './document-migration.js';
+import { initializeAuxiliaryState } from './auxiliary-migration.js';
 import { getJournalTimeUsages, releaseJournalSoftTimeUsages } from './journal/time-usage-source.js';
 import { configureWorkplaceSource } from './core/workplace-time.js';
 import { configureTimeUsageSource, configureSoftTimeUsageReleaseSource } from './core/time/index.js';
@@ -128,6 +129,11 @@ async function renderAuthenticated(account = authenticatedAccount) {
   }
   const documentMigration = await initializeDocumentState(authenticatedAccount);
   if (!documentMigration.verified) {
+    renderMigrationPending();
+    return;
+  }
+  const auxiliaryMigration = await initializeAuxiliaryState(authenticatedAccount);
+  if (!auxiliaryMigration.verified) {
     renderMigrationPending();
     return;
   }
