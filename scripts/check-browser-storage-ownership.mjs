@@ -36,6 +36,7 @@ const LEGACY_MIGRATION_OWNERS = new Set([
 
 const READ_ONLY_LEGACY_MIGRATION_OWNERS = new Set([
   'settings/tags/data.js',
+  'settings/wallets/data.js',
 ]);
 
 const CLEANUP_OWNER = 'core/legacy-browser-business.js';
