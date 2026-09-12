@@ -34,10 +34,7 @@ const LEGACY_MIGRATION_OWNERS = new Set([
   'settings/wallets/data.js',
 ]);
 
-const READ_ONLY_LEGACY_MIGRATION_OWNERS = new Set([
-  'settings/tags/data.js',
-  'settings/wallets/data.js',
-]);
+const READ_ONLY_LEGACY_MIGRATION_OWNERS = new Set(LEGACY_MIGRATION_OWNERS);
 
 const CLEANUP_OWNER = 'core/legacy-browser-business.js';
 const ALLOWED = new Set([...TECHNICAL_STORAGE_OWNERS, ...LEGACY_MIGRATION_OWNERS, CLEANUP_OWNER]);
@@ -111,4 +108,4 @@ if (violations.length) {
   process.exit(1);
 }
 
-console.log(`browser storage ownership check: OK (${TECHNICAL_STORAGE_OWNERS.size} technical owners, ${LEGACY_MIGRATION_OWNERS.size} legacy migration owners, ${READ_ONLY_LEGACY_MIGRATION_OWNERS.size} read-only)`);
+console.log(`browser storage ownership check: OK (${TECHNICAL_STORAGE_OWNERS.size} technical owners, ${LEGACY_MIGRATION_OWNERS.size} legacy migration owners, all legacy owners read-only)`);
