@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -36,26 +40,40 @@ jobs:
   staging-smoke:
     if: github.ref == 'refs/heads/staging' || github.base_ref == 'staging'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Build and start isolated staging
-        run: docker compose -f docker-compose.staging.yml up --build -d
-      - name: Verify staging backend and frontend
+      - name: Build staging backend image
+        run: docker compose -f docker-compose.staging.yml build backend
+      - name: Start isolated database and backend
+        run: |
+          docker compose -f docker-compose.staging.yml up -d db
+          docker compose -f docker-compose.staging.yml up -d backend
+      - name: Verify staging backend
         shell: bash
         run: |
           set -euo pipefail
-          backend_ok=0
-          frontend_ok=0
           for attempt in $(seq 1 60); do
-            if curl -fsS http://localhost:3000/health >/dev/null 2>&1; then backend_ok=1; fi
-            if curl -fsS http://localhost:8080/ >/dev/null 2>&1; then frontend_ok=1; fi
-            if [ "$backend_ok" = "1" ] && [ "$frontend_ok" = "1" ]; then
+            if curl -fsS http://localhost:3000/health >/dev/null 2>&1; then
               exit 0
             fi
             sleep 2
           done
-          docker compose -f docker-compose.staging.yml logs
+          docker compose -f docker-compose.staging.yml logs db backend
+          exit 1
+      - name: Start and verify staging frontend
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.staging.yml up -d frontend
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://localhost:8080/ >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose -f docker-compose.staging.yml logs frontend
           exit 1
       - name: Stop isolated staging
         if: always()
