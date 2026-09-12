@@ -1,4 +1,5 @@
 import { apiRequest } from '../core/auth.js';
+import { flushBusinessPersistence } from '../core/business-persistence.js';
 import { getBookingSettings } from '../core/booking-settings/index.js';
 import { getDays } from '../core/day/index.js';
 import { getRecordPaymentState } from '../core/finance/index.js';
@@ -188,6 +189,7 @@ async function importRequest(request) {
   if (!requestId) return false;
   const existing = getRecords().find((record) => String(record?.sourceRequestId || '') === requestId);
   if (existing) {
+    await flushBusinessPersistence();
     await markImported(requestId, existing.id);
     return false;
   }
@@ -207,6 +209,7 @@ async function importRequest(request) {
     await markRejected(requestId);
     return false;
   }
+  await flushBusinessPersistence();
   await markImported(requestId, record.id);
   return true;
 }
@@ -286,6 +289,7 @@ async function syncAccounts() {
     });
   }
   if (!masterFacts.length) return;
+  await flushBusinessPersistence();
   const syncResponse = await apiRequest('/online-booking/owner/accounts/sync', {
     method: 'PUT',
     body: JSON.stringify({ accounts: masterFacts }),

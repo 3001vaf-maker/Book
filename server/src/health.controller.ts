@@ -11,7 +11,8 @@ export class HealthController {
       await this.prisma.$queryRaw`SELECT 1`;
       await this.prisma.$queryRaw`SELECT 1 FROM "Profile" LIMIT 1`;
       await this.prisma.$queryRaw`SELECT 1 FROM "Workplace" LIMIT 1`;
-      return { status: 'ok', database: 'ok', profileStorage: 'ok' };
+      await this.prisma.$queryRaw`SELECT 1 FROM "BusinessStateMeta" LIMIT 1`;
+      return { status: 'ok', database: 'ok', profileStorage: 'ok', businessStorage: 'ok' };
     } catch {
       throw new ServiceUnavailableException({ status: 'error', database: 'unavailable' });
     }

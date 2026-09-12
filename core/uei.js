@@ -1,22 +1,54 @@
+import { queueUEIStore } from './business-persistence.js';
+
 const STORAGE_KEY = 'book.uei';
 const EMPTY = '0000';
 const MAX_LENGTH = 4;
 const ALLOWED = /^[A-Za-zА-Яа-яЁё0-9]+$/;
+let storeState = null;
 
-function readStore() {
+function clone(value) {
+  return value == null ? value : JSON.parse(JSON.stringify(value));
+}
+
+function normalizeStore(value = {}) {
+  return {
+    entities: value.entities && typeof value.entities === 'object' && !Array.isArray(value.entities) ? clone(value.entities) : {},
+    relations: value.relations && typeof value.relations === 'object' && !Array.isArray(value.relations) ? clone(value.relations) : {},
+    revoked: Array.isArray(value.revoked) ? clone(value.revoked) : [],
+  };
+}
+
+function readLegacyStore() {
   try {
-    const value = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-    return {
-      entities: value.entities && typeof value.entities === 'object' ? value.entities : {},
-      relations: value.relations && typeof value.relations === 'object' ? value.relations : {},
-      revoked: Array.isArray(value.revoked) ? value.revoked : [],
-    };
+    return normalizeStore(JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'));
   } catch {
-    return { entities: {}, relations: {}, revoked: [] };
+    return normalizeStore();
   }
 }
 
-function writeStore(store) { localStorage.setItem(STORAGE_KEY, JSON.stringify(store)); }
+function readStore() {
+  return storeState === null ? readLegacyStore() : clone(storeState);
+}
+
+function writeStore(store) {
+  const normalized = normalizeStore(store);
+  if (storeState === null) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+    return;
+  }
+  storeState = clone(normalized);
+  void queueUEIStore(normalized);
+}
+
+export function readLegacyUEISnapshot() {
+  return readLegacyStore();
+}
+
+export function hydrateUEIFromServer(value = {}) {
+  storeState = normalizeStore(value);
+  return clone(storeState);
+}
+
 function relationKey(type, id) { return `${String(type)}:${String(id)}`; }
 
 export function normalizeUEI(value) {
@@ -141,8 +173,6 @@ export function findHistoricalUEI(entityType, identifier) {
 export function applyUEI({ entityType, entityId, currentUEI = '', value = '', linkValue = '', identifiers = [] } = {}) {
   const current = normalizeUEI(currentUEI);
 
-  // The two UI fields have two different meanings:
-  // UEI input creates a NEW UEI only; the existing-UEI selector links to an existing UEI.
   if (linkValue) {
     return { uei: linkUEI({ entityType, entityId, value: linkValue, identifiers }), linked: true };
   }
@@ -161,4 +191,7 @@ export function applyUEI({ entityType, entityId, currentUEI = '', value = '', li
   return { uei: '' };
 }
 
-export function clearTestState() { localStorage.removeItem(STORAGE_KEY); }
+export function clearTestState() {
+  if (storeState === null) localStorage.removeItem(STORAGE_KEY);
+  else writeStore(normalizeStore());
+}

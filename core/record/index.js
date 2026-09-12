@@ -1,5 +1,9 @@
 // Public Record Core contract.
 export {
+  hydrateRecordStateFromServer,
+  readLegacyRecordSnapshot,
+} from './data.js';
+export {
   getActiveRecordCountForDay,
   getRecord,
   getRecords,
