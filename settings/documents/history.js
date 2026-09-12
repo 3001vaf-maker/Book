@@ -32,14 +32,9 @@ function read() {
 }
 
 function writeItems(items = []) {
-  const normalized = (Array.isArray(items) ? items : []).map(normalize).filter((item) => item.documentId);
-  if (historyState !== null) {
-    historyState = clone(normalized);
-    if (typeof persistHistory === 'function') void persistHistory(clone(historyState));
-  } else {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
-  }
-  return clone(normalized);
+  historyState = (Array.isArray(items) ? items : []).map(normalize).filter((item) => item.documentId);
+  if (typeof persistHistory === 'function') void persistHistory(clone(historyState));
+  return clone(historyState);
 }
 
 export function configureDocumentHistoryPersistence(handler = null) {
