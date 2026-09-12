@@ -25,21 +25,13 @@ function readHistory() {
 }
 
 function writeProducts(value) {
-  const normalized = Array.isArray(value) ? clone(value) : [];
-  if (productsState === null) localStorage.setItem(KEY, JSON.stringify(normalized));
-  else {
-    productsState = normalized;
-    void queueAuxiliaryDataset('products', productsState);
-  }
+  productsState = Array.isArray(value) ? clone(value) : [];
+  void queueAuxiliaryDataset('products', productsState);
 }
 
 function writeHistory(value) {
-  const normalized = Array.isArray(value) ? clone(value) : [];
-  if (historyState === null) localStorage.setItem(HISTORY_KEY, JSON.stringify(normalized));
-  else {
-    historyState = normalized;
-    void queueAuxiliaryDataset('productHistory', historyState);
-  }
+  historyState = Array.isArray(value) ? clone(value) : [];
+  void queueAuxiliaryDataset('productHistory', historyState);
 }
 
 export function readLegacyProductSnapshot() {
