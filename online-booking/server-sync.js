@@ -12,6 +12,7 @@ let timer = null;
 let running = false;
 let lastBusiness = '';
 let lastDocuments = '';
+let stopListeners = () => {};
 
 async function responseJson(response, fallback) {
   const payload = await response.json().catch(() => ({}));
@@ -70,12 +71,16 @@ export function startServerBookingSync() {
   const refresh = () => void pull();
   document.addEventListener('visibilitychange', refresh);
   window.addEventListener('focus', refresh);
+  stopListeners = () => {
+    document.removeEventListener('visibilitychange', refresh);
+    window.removeEventListener('focus', refresh);
+  };
   return () => stopServerBookingSync();
 }
 
 export function stopServerBookingSync() {
   if (timer) window.clearInterval(timer);
   timer = null;
-  document.removeEventListener('visibilitychange', pull);
-  window.removeEventListener('focus', pull);
+  stopListeners();
+  stopListeners = () => {};
 }
