@@ -125,3 +125,25 @@ feature/staging branch
 ```
 
 `main` — production. Промежуточная разработка в `main` запрещена.
+
+## 14. Journal → WorkPlan → Availability → TimeGrid → UI
+
+Каноническая цепочка планирования и занятого времени:
+
+```text
+Journal / Timetable
+        ↓
+WorkPlan: core/day/index.js
+        ↓
+Availability: core/time/index.js
+        ↓
+TimeGrid: internal core/time/grid.js
+        ↓
+Shared Time / Calendar UI
+```
+
+`Journal` и `Timetable` передают факты и запускают сценарии, но не создают собственные правила пересечений или доступности. `WorkPlan` владеет рабочим временем дня. `Availability` является публичным контрактом вопроса «можно ли занять это время?». `TimeGrid` — внутренний нейтральный механизм минутной сетки и не знает о конкретных UI/фичах.
+
+Record — hard occupancy, Break — soft occupancy в нейтральном time-usage contract. UI получает готовое состояние/варианты времени и не определяет владельца минуты самостоятельно.
+
+**Обычное продуктовое ТЗ не является разрешением менять эту архитектуру.** Если требуется новое архитектурное правило, сначала изменяется канонический Core-контракт и его guard, а затем все потребители; локальный обход запрещён.
