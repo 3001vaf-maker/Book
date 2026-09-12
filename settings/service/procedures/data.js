@@ -1,27 +1,18 @@
 import { queueOperationalDataset } from '../../../core/business-persistence.js';
 
-const KEY = 'book.procedures';
-const HISTORY_KEY = 'book.procedures.history';
-let proceduresState = null;
-let historyState = null;
+let proceduresState = [];
+let historyState = [];
 
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
 }
 
-function readLegacy(key, fallback) {
-  try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); }
-  catch { return fallback; }
-}
-
 function readRawProcedures() {
-  const value = proceduresState === null ? readLegacy(KEY, []) : proceduresState;
-  return Array.isArray(value) ? clone(value) : [];
+  return clone(proceduresState);
 }
 
 function readHistory() {
-  const value = historyState === null ? readLegacy(HISTORY_KEY, []) : historyState;
-  return Array.isArray(value) ? clone(value) : [];
+  return clone(historyState);
 }
 
 function writeProcedures(value) {
@@ -32,13 +23,6 @@ function writeProcedures(value) {
 function writeHistory(value) {
   historyState = Array.isArray(value) ? clone(value) : [];
   void queueOperationalDataset('procedureHistory', historyState);
-}
-
-export function readLegacyProcedureSnapshot() {
-  return {
-    procedures: Array.isArray(readLegacy(KEY, [])) ? clone(readLegacy(KEY, [])) : [],
-    procedureHistory: Array.isArray(readLegacy(HISTORY_KEY, [])) ? clone(readLegacy(HISTORY_KEY, [])) : [],
-  };
 }
 
 export function hydrateProceduresFromServer({ procedures = [], procedureHistory = [] } = {}) {
