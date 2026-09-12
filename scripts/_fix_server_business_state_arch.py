@@ -22,6 +22,23 @@ replace_once(
     "import { hydrateRecordStateFromServer, readLegacyRecordSnapshot } from './record/index.js';",
 )
 
+# The migration coordinator combines Core with feature/entity data, so it must
+# not live inside Core. Move it to the application composition layer.
+source = Path('core/business-migration.js')
+text = source.read_text(encoding='utf-8')
+text = text.replace("from './auth.js'", "from './core/auth.js'")
+text = text.replace("from './business-persistence.js'", "from './core/business-persistence.js'")
+text = text.replace("from './uei.js'", "from './core/uei.js'")
+text = text.replace("from './record/index.js'", "from './core/record/index.js'")
+text = text.replace("from '../main/clients/data.js'", "from './main/clients/data.js'")
+Path('business-migration.js').write_text(text, encoding='utf-8')
+source.unlink()
+replace_once(
+    'core.js',
+    "import { initializeBusinessState } from './core/business-migration.js';",
+    "import { initializeBusinessState } from './business-migration.js';",
+)
+
 # Regression test also stays on the public Record contract. Persistence mutation
 # ownership itself is protected by the architecture guard.
 p = Path('tests/business-server-owner.test.mjs')
