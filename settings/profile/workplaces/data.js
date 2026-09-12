@@ -1,15 +1,9 @@
 import { apiRequest } from '../../../core/auth.js';
 import { normalizePhoneForStorage } from '../../../core/phone/index.js';
 
-const WORKPLACES_KEY = 'book.workplaces';
 const WORKPLACE_FALLBACK_COLOR = '#212529';
 let workplacesState = [];
 let serverReady = false;
-
-function readLegacy(fallback) {
-  try { return JSON.parse(localStorage.getItem(WORKPLACES_KEY) || JSON.stringify(fallback)); }
-  catch { return fallback; }
-}
 
 function normalizeLinks(values) {
   return (Array.isArray(values) ? values : [])
@@ -49,15 +43,6 @@ async function responseJson(response, fallbackMessage) {
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload?.message || fallbackMessage);
   return payload;
-}
-
-export function readLegacyWorkplacesSnapshot() {
-  const values = readLegacy([]);
-  return Array.isArray(values) ? values.map(normalizeWorkplace) : [];
-}
-
-export function hasLegacyWorkplaceFacts(values = readLegacyWorkplacesSnapshot()) {
-  return values.length > 0;
 }
 
 export function hydrateWorkplacesFromServer(values = []) {
