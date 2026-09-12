@@ -1,6 +1,6 @@
 // Public WorkPlan Day Core contract.
 // Manifestations import this facade; storage stays internal to the Day owner.
-export { hydrateDaysFromServer, readLegacyDaySnapshot } from './data.js';
+export { hydrateDaysFromServer } from './data.js';
 export { getDay, getDayTime, getDays, getDaysForDate } from './read.js';
 export {
   dayDate,
