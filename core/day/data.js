@@ -39,12 +39,7 @@ export function getDayRows() {
 }
 
 export function replaceDayRows(rows = []) {
-  const stored = (Array.isArray(rows) ? rows : []).map((row) => clone(row));
-  if (dayRowsState === null) {
-    localStorage.setItem(TIMETABLE_STATE_KEY, JSON.stringify({ workingDays: stored }));
-  } else {
-    dayRowsState = stored.map((row) => clone(row));
-    void queueOperationalDataset('days', dayRowsState);
-  }
-  return stored.map((row) => clone(row));
+  dayRowsState = (Array.isArray(rows) ? rows : []).map((row) => clone(row));
+  void queueOperationalDataset('days', dayRowsState);
+  return dayRowsState.map((row) => clone(row));
 }
