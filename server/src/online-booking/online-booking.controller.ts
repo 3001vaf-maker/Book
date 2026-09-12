@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Post, Put, Query, Req, UseGuards } from '
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { BookingAccountGuard } from './booking-account.guard';
+import { BookingRequiredConsentGuard } from './booking-required-consent.guard';
 import { OnlineBookingService } from './online-booking.service';
 
 type OwnerRequest = Request & { auth?: { userId: string; tenantId: string; role: string } };
@@ -59,8 +60,8 @@ export class OnlineBookingController {
   }
 
   @Post(':tenantId/account/prepare')
-  prepareAccount(@Param('tenantId') tenantId: string, @Body() body: { email?: string }) {
-    return this.booking.prepareAccount(tenantId, body?.email || '');
+  prepareAccount(@Param('tenantId') tenantId: string, @Body() body: Record<string, any>) {
+    return this.booking.prepareAccount(tenantId, body || {});
   }
 
   @Post(':tenantId/account/register')
@@ -85,13 +86,13 @@ export class OnlineBookingController {
     return this.booking.updateAccount(tenantId, request.bookingAccountAuth!.accountId, body || {});
   }
 
-  @UseGuards(BookingAccountGuard)
+  @UseGuards(BookingAccountGuard, BookingRequiredConsentGuard)
   @Get(':tenantId/account/requests')
   myRequests(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
     return this.booking.getMyRequests(tenantId, request.bookingAccountAuth!.accountId);
   }
 
-  @UseGuards(BookingAccountGuard)
+  @UseGuards(BookingAccountGuard, BookingRequiredConsentGuard)
   @Post(':tenantId/requests')
   createRequest(@Param('tenantId') tenantId: string, @Req() request: AccountRequest, @Body() body: Record<string, any>) {
     return this.booking.createRequest(tenantId, request.bookingAccountAuth!.accountId, body || {});
