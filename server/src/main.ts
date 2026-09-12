@@ -18,7 +18,7 @@ async function bootstrap() {
     String(process.env.FRONTEND_ORIGIN || 'http://localhost:8080').trim(),
   );
   const allowedOrigins: Array<string | RegExp> = [frontendOrigin];
-  if (process.env.ALLOW_CODESPACES_ORIGIN === '1') {
+  if (frontendOrigin === 'http://localhost:8080') {
     allowedOrigins.push(/^https:\/\/[a-z0-9-]+-8080\.app\.github\.dev$/i);
   }
   app.enableCors({
