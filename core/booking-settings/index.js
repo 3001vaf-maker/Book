@@ -89,11 +89,9 @@ export function getBookingSettings() {
 
 export function saveBookingSettings(value = {}) {
   const settings = normalizeBookingSettings(value);
-  if (!bookingSettingsHydrated) localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-  else {
-    bookingSettingsState = settings;
-    void queueOperationalDataset('bookingSettings', settings);
-  }
+  bookingSettingsHydrated = true;
+  bookingSettingsState = settings;
+  void queueOperationalDataset('bookingSettings', settings);
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('book:booking-settings-changed', { detail: { settings } }));
   }
