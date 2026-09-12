@@ -65,3 +65,14 @@ text = text.replace(
 1,
 )
 p.write_text(text, encoding='utf-8')
+
+# Regression test must load the root coordinator because it installs the injected
+# Break persistence sink used by the production runtime.
+p = Path('tests/operational-server-owner.test.mjs')
+text = p.read_text(encoding='utf-8')
+text = text.replace(
+"const persistence = await import('../core/business-persistence.js');\n",
+"const persistence = await import('../core/business-persistence.js');\nawait import('../operational-migration.js');\n",
+1,
+)
+p.write_text(text, encoding='utf-8')
