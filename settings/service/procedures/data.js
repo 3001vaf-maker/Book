@@ -1,38 +1,82 @@
+import { queueOperationalDataset } from '../../../core/business-persistence.js';
+
 const KEY = 'book.procedures';
 const HISTORY_KEY = 'book.procedures.history';
+let proceduresState = null;
+let historyState = null;
 
-function read(key, fallback) {
+function clone(value) {
+  return value == null ? value : JSON.parse(JSON.stringify(value));
+}
+
+function readLegacy(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); }
   catch { return fallback; }
 }
 
-function write(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
+function readRawProcedures() {
+  const value = proceduresState === null ? readLegacy(KEY, []) : proceduresState;
+  return Array.isArray(value) ? clone(value) : [];
+}
+
+function readHistory() {
+  const value = historyState === null ? readLegacy(HISTORY_KEY, []) : historyState;
+  return Array.isArray(value) ? clone(value) : [];
+}
+
+function writeProcedures(value) {
+  const normalized = Array.isArray(value) ? clone(value) : [];
+  if (proceduresState === null) localStorage.setItem(KEY, JSON.stringify(normalized));
+  else {
+    proceduresState = normalized;
+    void queueOperationalDataset('procedures', proceduresState);
+  }
+}
+
+function writeHistory(value) {
+  const normalized = Array.isArray(value) ? clone(value) : [];
+  if (historyState === null) localStorage.setItem(HISTORY_KEY, JSON.stringify(normalized));
+  else {
+    historyState = normalized;
+    void queueOperationalDataset('procedureHistory', historyState);
+  }
+}
+
+export function readLegacyProcedureSnapshot() {
+  return {
+    procedures: Array.isArray(readLegacy(KEY, [])) ? clone(readLegacy(KEY, [])) : [],
+    procedureHistory: Array.isArray(readLegacy(HISTORY_KEY, [])) ? clone(readLegacy(HISTORY_KEY, [])) : [],
+  };
+}
+
+export function hydrateProceduresFromServer({ procedures = [], procedureHistory = [] } = {}) {
+  proceduresState = Array.isArray(procedures) ? clone(procedures) : [];
+  historyState = Array.isArray(procedureHistory) ? clone(procedureHistory) : [];
+  return { procedures: clone(proceduresState), procedureHistory: clone(historyState) };
 }
 
 export function getProcedures() {
-  const values = read(KEY, []);
-  return Array.isArray(values) ? values.filter((item) => !item.deletedAt) : [];
+  return readRawProcedures().filter((item) => !item.deletedAt);
 }
 
 export function saveProcedure(item) {
-  const values = getProcedures();
+  const values = readRawProcedures();
   const exists = values.some((value) => value.id === item.id);
-  write(KEY, exists ? values.map((value) => value.id === item.id ? item : value) : [...values, item]);
+  writeProcedures(exists ? values.map((value) => value.id === item.id ? item : value) : [...values, item]);
   return item;
 }
 
 export function pushProcedureHistory(record, action) {
-  const history = read(HISTORY_KEY, []);
+  const history = readHistory();
   history.push({ ...record, historyAction: action, historyAt: new Date().toISOString() });
-  write(HISTORY_KEY, history);
+  writeHistory(history);
 }
 
 export function deleteProcedure(id) {
-  const values = getProcedures();
-  const found = values.find((item) => item.id === id);
+  const values = readRawProcedures();
+  const found = values.find((item) => item.id === id && !item.deletedAt);
   if (!found) return false;
   pushProcedureHistory(found, 'deleted');
-  write(KEY, values.map((item) => item.id === id ? { ...item, deletedAt: new Date().toISOString() } : item));
+  writeProcedures(values.map((item) => item.id === id ? { ...item, deletedAt: new Date().toISOString() } : item));
   return true;
 }
