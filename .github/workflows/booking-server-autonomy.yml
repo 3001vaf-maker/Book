@@ -21,7 +21,9 @@ jobs:
         with:
           node-version: 24
       - name: Apply server autonomy
-        run: python scripts/_apply_booking_server_autonomy.py
+        run: |
+          python scripts/_apply_booking_server_autonomy.py
+          python scripts/_fix_booking_server_autonomy.py
       - name: Syntax and architecture checks
         run: npm run check
       - name: Domain regression tests
@@ -35,7 +37,7 @@ jobs:
       - name: Commit verified implementation
         shell: bash
         run: |
-          rm -f .github/workflows/booking-server-autonomy.yml scripts/_apply_booking_server_autonomy.py server/package-lock.json server/tsconfig.tsbuildinfo
+          rm -f .github/workflows/booking-server-autonomy.yml scripts/_apply_booking_server_autonomy.py scripts/_fix_booking_server_autonomy.py server/package-lock.json server/tsconfig.tsbuildinfo
           git config user.name "Book Server Autonomy"
           git config user.email "actions@users.noreply.github.com"
           git add -A
