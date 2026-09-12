@@ -1,0 +1,22 @@
+{
+  "name": "Book Staging",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-24-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+  "forwardPorts": [8080, 3000],
+  "portsAttributes": {
+    "8080": {
+      "label": "Book Staging",
+      "onAutoForward": "openBrowser",
+      "protocol": "http"
+    },
+    "3000": {
+      "label": "Book Staging API",
+      "onAutoForward": "silent",
+      "protocol": "http"
+    }
+  },
+  "postStartCommand": "docker compose -f docker-compose.staging.yml up -d --build",
+  "remoteUser": "node"
+}
