@@ -25,21 +25,13 @@ function readHistory() {
 }
 
 function writeProcedures(value) {
-  const normalized = Array.isArray(value) ? clone(value) : [];
-  if (proceduresState === null) localStorage.setItem(KEY, JSON.stringify(normalized));
-  else {
-    proceduresState = normalized;
-    void queueOperationalDataset('procedures', proceduresState);
-  }
+  proceduresState = Array.isArray(value) ? clone(value) : [];
+  void queueOperationalDataset('procedures', proceduresState);
 }
 
 function writeHistory(value) {
-  const normalized = Array.isArray(value) ? clone(value) : [];
-  if (historyState === null) localStorage.setItem(HISTORY_KEY, JSON.stringify(normalized));
-  else {
-    historyState = normalized;
-    void queueOperationalDataset('procedureHistory', historyState);
-  }
+  historyState = Array.isArray(value) ? clone(value) : [];
+  void queueOperationalDataset('procedureHistory', historyState);
 }
 
 export function readLegacyProcedureSnapshot() {
