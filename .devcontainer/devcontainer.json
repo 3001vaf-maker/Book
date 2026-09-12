@@ -17,6 +17,6 @@
       "protocol": "http"
     }
   },
-  "postStartCommand": "docker compose -f docker-compose.staging.yml up -d --build",
+  "postStartCommand": "bash .devcontainer/start-staging.sh",
   "remoteUser": "node"
 }
