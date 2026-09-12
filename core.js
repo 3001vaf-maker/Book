@@ -16,6 +16,7 @@ import { isOnboardingComplete, renderOnboarding } from './onboarding/onboarding.
 import { startServerBookingSync } from './online-booking/server-sync.js';
 import { renderOnlineBooking } from './online-booking/booking.js';
 import { bottomNavigation } from './ui/ui.js';
+import { clearLegacyBusinessStorage } from './core/legacy-browser-business.js';
 
 configureWorkplaceSource(getWorkplaceEntities);
 configureTimeUsageSource(getJournalTimeUsages);
@@ -137,6 +138,7 @@ async function renderAuthenticated(account = authenticatedAccount) {
     renderMigrationPending();
     return;
   }
+  clearLegacyBusinessStorage();
   ensureServerBookingSync();
 
   const serverWorkspaceUnlocked = Boolean(authenticatedAccount?.user?.workspaceUnlocked);
