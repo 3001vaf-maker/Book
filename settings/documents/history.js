@@ -1,4 +1,10 @@
 const STORAGE_KEY = 'book.documents.history.v1';
+let historyState = null;
+let persistHistory = null;
+
+function clone(value) {
+  return value == null ? value : JSON.parse(JSON.stringify(value));
+}
 
 function normalize(item = {}) {
   return {
@@ -12,7 +18,7 @@ function normalize(item = {}) {
   };
 }
 
-function read() {
+function readLegacy() {
   try {
     const value = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
     return Array.isArray(value) ? value.map(normalize).filter((item) => item.documentId) : [];
@@ -21,10 +27,32 @@ function read() {
   }
 }
 
-function write(items = []) {
+function read() {
+  return historyState !== null ? clone(historyState) : readLegacy();
+}
+
+function writeItems(items = []) {
   const normalized = (Array.isArray(items) ? items : []).map(normalize).filter((item) => item.documentId);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
-  return normalized;
+  if (historyState !== null) {
+    historyState = clone(normalized);
+    if (typeof persistHistory === 'function') void persistHistory(clone(historyState));
+  } else {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+  }
+  return clone(normalized);
+}
+
+export function configureDocumentHistoryPersistence(handler = null) {
+  persistHistory = typeof handler === 'function' ? handler : null;
+}
+
+export function readLegacyDocumentHistorySnapshot() {
+  return readLegacy().map((item) => clone(item));
+}
+
+export function hydrateDocumentHistoryFromServer(items = []) {
+  historyState = (Array.isArray(items) ? items : []).map(normalize).filter((item) => item.documentId);
+  return getDocumentHistory();
 }
 
 export function getDocumentHistory() {
@@ -36,6 +64,6 @@ export function recordDocumentHistory({ documentId, documentTitle, documentVersi
   const item = normalize({ documentId, documentTitle, documentVersion, action, source, createdAt: new Date().toISOString() });
   const items = read();
   items.push(item);
-  write(items);
+  writeItems(items);
   return item;
 }

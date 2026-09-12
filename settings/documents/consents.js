@@ -1,5 +1,11 @@
 const STORAGE_KEY = 'book.documents.consents.v1';
 const MIGRATION_KEY = 'book.documents.consents.legacy-migrated.v1';
+let consentState = null;
+let persistConsents = null;
+
+function clone(value) {
+  return value == null ? value : JSON.parse(JSON.stringify(value));
+}
 
 function normalize(item = {}) {
   return {
@@ -15,7 +21,7 @@ function normalize(item = {}) {
   };
 }
 
-function read() {
+function readLegacy() {
   try {
     const value = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
     return Array.isArray(value) ? value.map(normalize).filter((item) => item.clientId && item.documentId) : [];
@@ -24,14 +30,36 @@ function read() {
   }
 }
 
-function write(items) {
+function read() {
+  return consentState !== null ? clone(consentState) : readLegacy();
+}
+
+function writeItems(items) {
   const normalized = (Array.isArray(items) ? items : []).map(normalize).filter((item) => item.clientId && item.documentId);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
-  return normalized;
+  if (consentState !== null) {
+    consentState = clone(normalized);
+    if (typeof persistConsents === 'function') void persistConsents(clone(consentState));
+  } else {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+  }
+  return clone(normalized);
+}
+
+export function configureConsentPersistence(handler = null) {
+  persistConsents = typeof handler === 'function' ? handler : null;
+}
+
+export function readLegacyConsentSnapshot() {
+  return readLegacy().map((item) => clone(item));
+}
+
+export function hydrateConsentsFromServer(items = []) {
+  consentState = (Array.isArray(items) ? items : []).map(normalize).filter((item) => item.clientId && item.documentId);
+  return getConsents();
 }
 
 export function migrateLegacyConsents(clients = []) {
-  if (localStorage.getItem(MIGRATION_KEY) === '1') return;
+  if (consentState === null && localStorage.getItem(MIGRATION_KEY) === '1') return;
   const existing = read();
   const keys = new Set(existing.map((item) => `${item.clientId}:${item.documentId}`));
   const next = [...existing];
@@ -47,8 +75,8 @@ export function migrateLegacyConsents(clients = []) {
     }
   }
 
-  write(next);
-  localStorage.setItem(MIGRATION_KEY, '1');
+  if (next.length !== existing.length) writeItems(next);
+  if (consentState === null) localStorage.setItem(MIGRATION_KEY, '1');
 }
 
 export function getConsents() {
@@ -71,6 +99,6 @@ export function recordConsent({ clientId, documentId, documentVersion = 1, statu
   const item = normalize({ clientId, documentId, documentVersion, status, source, acceptedAt, revokedAt, createdAt: new Date().toISOString() });
   const items = getConsents();
   items.push(item);
-  write(items);
+  writeItems(items);
   return item;
 }

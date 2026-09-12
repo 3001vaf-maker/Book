@@ -6,9 +6,10 @@ import { WorkspaceModule } from './workspace/workspace.module';
 import { ProfileModule } from './profile/profile.module';
 import { OnlineBookingModule } from './online-booking/online-booking.module';
 import { BusinessStateModule } from './business-state/business-state.module';
+import { DocumentStateModule } from './document-state/document-state.module';
 
 @Module({
-  imports: [AuthModule, WorkspaceModule, ProfileModule, BusinessStateModule, OnlineBookingModule],
+  imports: [AuthModule, WorkspaceModule, ProfileModule, BusinessStateModule, DocumentStateModule, OnlineBookingModule],
   controllers: [HealthController],
   providers: [PrismaService],
 })
