@@ -23,13 +23,8 @@ function readRows() {
 }
 
 function writeRows(rows) {
-  const normalized = (Array.isArray(rows) ? rows : []).map((row) => clone(row));
-  if (breakRowsState === null) {
-    localStorage.setItem(KEY, JSON.stringify(normalized));
-  } else {
-    breakRowsState = normalized.map((row) => clone(row));
-    if (typeof persistBreakRows === 'function') void persistBreakRows(breakRowsState.map((row) => clone(row)));
-  }
+  breakRowsState = (Array.isArray(rows) ? rows : []).map((row) => clone(row));
+  if (typeof persistBreakRows === 'function') void persistBreakRows(breakRowsState.map((row) => clone(row)));
 }
 
 export function configureBreakPersistence(handler = null) {
