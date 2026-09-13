@@ -12,4 +12,6 @@ assert.match(request, /publicBookingOccupancy/);
 assert.match(business, /source: 'online-booking'/);
 assert.match(business, /type: 'created'/);
 assert.match(documentState, /source: 'online-booking-account'/);
+assert.match(service, /payment:\s*\{\s*state:\s*total <= 0\.009 \? 'paid' : 'unpaid', paid: 0, due: total \}/s, 'Zero-due booking starts settled without a money operation');
+assert.match(business, /payment:\s*\{\s*state:\s*due <= 0\.009 \? 'paid' : paid > 0 \? 'partial' : 'unpaid', paid, due \}/s, 'Live zero-due snapshot remains settled');
 console.log('booking server autonomy tests passed');

@@ -72,14 +72,28 @@ export class CommunicationController {
   deleteBroadcastTemplate(@Req() request: OwnerRequest, @Param('id') id: string) { return this.broadcasts.deleteTemplate(request.auth!.tenantId, id); }
 
   @UseGuards(JwtAuthGuard)
+  @Get('broadcasts/groups')
+  broadcastGroups(@Req() request: OwnerRequest) { return this.broadcasts.listGroups(request.auth!.tenantId); }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('broadcasts/groups')
+  saveBroadcastGroup(@Req() request: OwnerRequest, @Body() body: { id?: unknown; name?: unknown; personKeys?: unknown }) {
+    return this.broadcasts.saveGroup(request.auth!.tenantId, body || {});
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('broadcasts/groups/:id')
+  deleteBroadcastGroup(@Req() request: OwnerRequest, @Param('id') id: string) { return this.broadcasts.deleteGroup(request.auth!.tenantId, id); }
+
+  @UseGuards(JwtAuthGuard)
   @Post('broadcasts/preview')
-  previewBroadcast(@Req() request: OwnerRequest, @Body() body: { channel?: unknown; all?: unknown; phones?: unknown }) {
+  previewBroadcast(@Req() request: OwnerRequest, @Body() body: { channel?: unknown; all?: unknown; phones?: unknown; personKeys?: unknown; groupId?: unknown }) {
     return this.broadcasts.preview(request.auth!.tenantId, body || {});
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('broadcasts/send')
-  sendBroadcast(@Req() request: OwnerRequest, @Body() body: { channel?: unknown; all?: unknown; phones?: unknown; name?: unknown; body?: unknown }) {
+  sendBroadcast(@Req() request: OwnerRequest, @Body() body: { channel?: unknown; all?: unknown; phones?: unknown; personKeys?: unknown; groupId?: unknown; name?: unknown; body?: unknown }) {
     return this.broadcasts.send(request.auth!.tenantId, body || {});
   }
 

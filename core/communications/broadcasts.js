@@ -15,9 +15,20 @@ export async function saveBroadcastTemplate({ id = '', name = '', body = '' } = 
 export async function deleteBroadcastTemplate(id = '') {
   return jsonResponse(await apiRequest(`/communications/broadcasts/templates/${encodeURIComponent(String(id || ''))}`, { method: 'DELETE' }), 'Не удалось удалить шаблон');
 }
-export async function previewBroadcast({ channel = 'TELEGRAM', all = false, phones = [] } = {}) {
-  return jsonResponse(await apiRequest('/communications/broadcasts/preview', { method: 'POST', body: JSON.stringify({ channel, all, phones }) }), 'Не удалось проверить аудиторию');
+
+export async function getCommunicationGroups() {
+  return jsonResponse(await apiRequest('/communications/broadcasts/groups'), 'Не удалось загрузить группы');
 }
-export async function sendBroadcast({ channel = 'TELEGRAM', all = false, phones = [], name = '', body = '' } = {}) {
-  return jsonResponse(await apiRequest('/communications/broadcasts/send', { method: 'POST', body: JSON.stringify({ channel, all, phones, name, body }) }), 'Не удалось отправить рассылку');
+export async function saveCommunicationGroup({ id = '', name = '', personKeys = [] } = {}) {
+  return jsonResponse(await apiRequest('/communications/broadcasts/groups', { method: 'POST', body: JSON.stringify({ id, name, personKeys }) }), 'Не удалось сохранить группу');
+}
+export async function deleteCommunicationGroup(id = '') {
+  return jsonResponse(await apiRequest(`/communications/broadcasts/groups/${encodeURIComponent(String(id || ''))}`, { method: 'DELETE' }), 'Не удалось удалить группу');
+}
+
+export async function previewBroadcast({ channel = 'TELEGRAM', all = false, phones = [], personKeys = [], groupId = '' } = {}) {
+  return jsonResponse(await apiRequest('/communications/broadcasts/preview', { method: 'POST', body: JSON.stringify({ channel, all, phones, personKeys, groupId }) }), 'Не удалось проверить аудиторию');
+}
+export async function sendBroadcast({ channel = 'TELEGRAM', all = false, phones = [], personKeys = [], groupId = '', name = '', body = '' } = {}) {
+  return jsonResponse(await apiRequest('/communications/broadcasts/send', { method: 'POST', body: JSON.stringify({ channel, all, phones, personKeys, groupId, name, body }) }), 'Не удалось отправить сообщение');
 }

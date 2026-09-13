@@ -62,6 +62,25 @@ export class ClientCardLinkService {
     return { business, people, members, owner: members[0] || null };
   }
 
+  async reconcileLegacyAccountDuplicates(tenantId: string) {
+    const business = await this.businessState.get(tenantId);
+    if (!business.verified) return { repaired: 0, candidates: 0, requiresManualReview: false };
+
+    const people = arrayValue(business.people).map((value) => objectValue(value));
+    const identity = objectValue(business.uei);
+    const relations = objectValue(identity.relations);
+    const candidates = people.filter((person) => {
+      const key = text(person.key);
+      return key.startsWith('account-')
+        && accountIds(person).length > 0
+        && !text(relations[`person:${key}`]);
+    }).length;
+
+    // A shared phone or matching name is not proof that two Person records are one human.
+    // Legacy duplicates are therefore reported for explicit master review and never merged into UEI automatically.
+    return { repaired: 0, candidates, requiresManualReview: candidates > 0 };
+  }
+
   async findOrAttachExistingCard(tenantId: string, account: Record<string, any>): Promise<ClientCardBinding | null> {
     const accountId = text(account?.id);
     if (!accountId) throw new BadRequestException('У аккаунта онлайн-записи отсутствует id');

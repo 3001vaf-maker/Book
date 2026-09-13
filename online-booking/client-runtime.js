@@ -2,7 +2,6 @@ import {
   bindBookingTelegramEntry,
   getBookingAccountToken,
 } from '../core/booking-account/index.js';
-import { mountBookingNotifications } from './notifications.js';
 
 function removeTelegramEntryFromUrl() {
   const url = new URL(location.href);
@@ -16,7 +15,6 @@ export function startBookingClientRuntime({ tenantId = '', telegramEntry = '' } 
   const entry = String(telegramEntry || '').trim();
   if (!tenant) return () => {};
 
-  const disposeNotifications = mountBookingNotifications(tenant);
   let telegramAttempted = !entry;
   let disposed = false;
 
@@ -37,6 +35,5 @@ export function startBookingClientRuntime({ tenantId = '', telegramEntry = '' } 
   return () => {
     disposed = true;
     window.clearInterval(interval);
-    disposeNotifications();
   };
 }

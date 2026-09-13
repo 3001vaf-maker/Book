@@ -10,6 +10,7 @@ import { BookingRequestStatus, Prisma } from '@prisma/client';
 import { compare, hash } from 'bcryptjs';
 import { PrismaService } from '../prisma.service';
 import { BusinessStateService } from '../business-state/business-state.service';
+import { ConsentPolicyService } from '../document-state/consent-policy.service';
 import { DocumentStateService } from '../document-state/document-state.service';
 import { ProfileService } from '../profile/profile.service';
 import { ClientCardLinkService } from './client-card-link.service';
@@ -140,7 +141,7 @@ function initialRequestSnapshot(procedures: any[], account: any) {
   return {
     procedures,
     pricing: { subtotal, discountPercent, total },
-    payment: { state: 'unpaid', paid: 0, due: total },
+    payment: { state: total <= 0.009 ? 'paid' : 'unpaid', paid: 0, due: total },
     updatedAt: new Date().toISOString(),
   };
 }
@@ -152,6 +153,7 @@ export class OnlineBookingService {
     private readonly jwt: JwtService,
     private readonly businessState: BusinessStateService,
     private readonly documentState: DocumentStateService,
+    private readonly consentPolicy: ConsentPolicyService,
     private readonly profile: ProfileService,
     private readonly clientCards: ClientCardLinkService,
   ) {}
@@ -317,6 +319,10 @@ export class OnlineBookingService {
           clientCardExisted: false,
         };
     await this.documentState.recordAcceptedConsents(tenantId, text(binding.person.key), consents);
+    if (consents.some((item) => item.documentId === 'messages-consent' && item.accepted)) {
+      await this.consentPolicy.acceptContactPointConsent(tenantId, text(binding.person.key), 'PHONE', account.phone, 'messages-consent', 'online-booking-registration');
+      await this.consentPolicy.acceptContactPointConsent(tenantId, text(binding.person.key), 'EMAIL', account.email, 'messages-consent', 'online-booking-registration');
+    }
     return {
       accessToken: await this.issueAccountToken(account),
       account: await this.accountView(tenantId, account),

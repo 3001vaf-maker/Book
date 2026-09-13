@@ -1,11 +1,13 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CommunicationService } from '../communication/communication.service';
+import { ConsentPolicyService } from '../document-state/consent-policy.service';
 import { NotificationService } from '../notification/notification.service';
 import { WebPushService } from '../notification/web-push.service';
 import { BookingAccountGuard } from './booking-account.guard';
 import { BookingRequiredConsentGuard } from './booking-required-consent.guard';
+import { ClientCardLinkService } from './client-card-link.service';
 import { OnlineBookingService } from './online-booking.service';
 
 type OwnerRequest = Request & { auth?: { userId: string; tenantId: string; role: string } };
@@ -17,8 +19,29 @@ export class OnlineBookingController {
     private readonly booking: OnlineBookingService,
     private readonly notifications: NotificationService,
     private readonly communications: CommunicationService,
+    private readonly consents: ConsentPolicyService,
     private readonly webPush: WebPushService,
+    private readonly clientCards: ClientCardLinkService,
   ) {}
+
+  private async accountTelegramSettings(tenantId: string, accountId: string) {
+    const account = await this.booking.getAccount(tenantId, accountId);
+    const identity = await this.communications.telegramIdentity(tenantId, { phone: account.phone, uei: account.uei });
+    if (!identity) return { telegram: { linked: false, enabled: false, username: '' } };
+    const consent = await this.consents.contactPointConsentState(
+      tenantId,
+      'TELEGRAM',
+      identity.externalUserId,
+      'messages-consent',
+    );
+    return {
+      telegram: {
+        linked: true,
+        enabled: Boolean(consent.allowed),
+        username: identity.display || '',
+      },
+    };
+  }
 
   @UseGuards(JwtAuthGuard)
   @Put('owner/publication')
@@ -36,6 +59,12 @@ export class OnlineBookingController {
   @Put('owner/accounts/sync')
   syncOwnerAccounts(@Req() request: OwnerRequest, @Body() body: { accounts?: unknown }) {
     return this.booking.syncOwnerAccounts(request.auth!.tenantId, body?.accounts || []);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('owner/reconcile-legacy-client-cards')
+  reconcileLegacyClientCards(@Req() request: OwnerRequest) {
+    return this.clientCards.reconcileLegacyAccountDuplicates(request.auth!.tenantId);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -101,6 +130,45 @@ export class OnlineBookingController {
   }
 
   @UseGuards(BookingAccountGuard)
+  @Get(':tenantId/account/chat/settings')
+  chatSettings(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
+    return this.accountTelegramSettings(tenantId, request.bookingAccountAuth!.accountId);
+  }
+
+  @UseGuards(BookingAccountGuard)
+  @Put(':tenantId/account/chat/telegram-consent')
+  async updateTelegramConsent(
+    @Param('tenantId') tenantId: string,
+    @Req() request: AccountRequest,
+    @Body() body: { enabled?: unknown },
+  ) {
+    const accountId = request.bookingAccountAuth!.accountId;
+    const account = await this.booking.getAccount(tenantId, accountId);
+    const identity = await this.communications.telegramIdentity(tenantId, { phone: account.phone, uei: account.uei });
+    if (!identity) throw new BadRequestException('Telegram не привязан');
+    if (body?.enabled === true) {
+      await this.consents.acceptContactPointConsent(
+        tenantId,
+        accountId,
+        'TELEGRAM',
+        identity.externalUserId,
+        'messages-consent',
+        'client-chat-settings',
+      );
+    } else {
+      await this.consents.revokeContactPointConsent(
+        tenantId,
+        accountId,
+        'TELEGRAM',
+        identity.externalUserId,
+        'messages-consent',
+        'client-chat-settings',
+      );
+    }
+    return this.accountTelegramSettings(tenantId, accountId);
+  }
+
+  @UseGuards(BookingAccountGuard)
   @Get(':tenantId/account/push/config')
   pushConfiguration() {
     return this.webPush.configuration();
@@ -154,6 +222,34 @@ export class OnlineBookingController {
     @Req() request: AccountRequest,
   ) {
     return this.notifications.markReadForAccount(tenantId, request.bookingAccountAuth!.accountId, notificationId);
+  }
+
+  @UseGuards(BookingAccountGuard)
+  @Get(':tenantId/account/chat')
+  async accountChat(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
+    const account = await this.booking.getAccount(tenantId, request.bookingAccountAuth!.accountId);
+    return this.communications.listThread(tenantId, { phone: account.phone, uei: account.uei }, 500);
+  }
+
+  @UseGuards(BookingAccountGuard)
+  @Post(':tenantId/account/chat/messages')
+  async sendAccountChatMessage(
+    @Param('tenantId') tenantId: string,
+    @Req() request: AccountRequest,
+    @Body() body: { body?: unknown },
+  ) {
+    const message = String(body?.body ?? '').trim();
+    if (!message) throw new BadRequestException('Пустое сообщение');
+    const account = await this.booking.getAccount(tenantId, request.bookingAccountAuth!.accountId);
+    return this.communications.recordMessage(tenantId, {
+      phone: account.phone,
+      uei: account.uei,
+      direction: 'inbound',
+      kind: 'message',
+      channel: 'IN_APP',
+      body: message,
+      status: 'delivered',
+    });
   }
 
   @UseGuards(BookingAccountGuard, BookingRequiredConsentGuard)

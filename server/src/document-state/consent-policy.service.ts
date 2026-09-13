@@ -10,6 +10,25 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value));
 }
 
+function canonicalPhone(value: unknown) {
+  const digits = text(value).replace(/\D/g, '');
+  if (digits.length === 10) return `7${digits}`;
+  if (digits.length === 11 && digits.startsWith('8')) return `7${digits.slice(1)}`;
+  return digits;
+}
+
+function contactType(value: unknown) {
+  const type = text(value).toUpperCase();
+  return ['PHONE', 'EMAIL', 'TELEGRAM', 'SMS', 'WHATSAPP'].includes(type) ? type : '';
+}
+
+function contactValue(typeValue: unknown, value: unknown) {
+  const type = contactType(typeValue);
+  if (type === 'PHONE' || type === 'SMS' || type === 'WHATSAPP') return canonicalPhone(value);
+  if (type === 'EMAIL') return text(value).toLowerCase();
+  return text(value);
+}
+
 function eventMoment(event: any) {
   return text(event?.revokedAt || event?.acceptedAt || event?.createdAt);
 }
@@ -26,8 +45,17 @@ function sortEventsNewest(events: any[]) {
     .map(({ event }) => event);
 }
 
-function latestEvent(events: any[], clientId: string, documentId: string) {
+function latestLegacyEvent(events: any[], clientId: string, documentId: string) {
   return sortEventsNewest(events.filter((event) => text(event?.clientId) === clientId && text(event?.documentId) === documentId))[0] || null;
+}
+
+function latestContactEvent(events: any[], typeValue: unknown, value: unknown, documentId: string) {
+  const type = contactType(typeValue);
+  const normalizedValue = contactValue(type, value);
+  if (!type || !normalizedValue) return null;
+  return sortEventsNewest(events.filter((event) => contactType(event?.contactType) === type
+    && contactValue(type, event?.contactValue) === normalizedValue
+    && text(event?.documentId) === documentId))[0] || null;
 }
 
 @Injectable()
@@ -46,6 +74,92 @@ export class ConsentPolicyService {
 
   async acceptConsents(tenantId: string, clientId: string, facts: unknown) {
     return this.documents.recordAcceptedConsents(tenantId, clientId, facts);
+  }
+
+  async acceptContactPointConsent(
+    tenantId: string,
+    clientId: string,
+    typeValue: unknown,
+    value: unknown,
+    documentId = 'messages-consent',
+    source = 'manual',
+  ) {
+    const type = contactType(typeValue);
+    const normalizedValue = contactValue(type, value);
+    const id = text(clientId);
+    const targetDocumentId = text(documentId);
+    if (!type || !normalizedValue || !targetDocumentId) throw new BadRequestException('Не указан Contact Point или документ');
+
+    const current = await this.state(tenantId);
+    const document = current.documents.find((item: any) => text(item?.id) === targetDocumentId);
+    if (!document) throw new BadRequestException('Документ не найден');
+    const documentVersion = Math.max(1, Number(document.version || 1));
+    const latest = latestContactEvent(current.consents, type, normalizedValue, targetDocumentId);
+    if (latest && text(latest?.status) === 'accepted' && Number(latest?.documentVersion || 1) === documentVersion) return latest;
+
+    const now = new Date().toISOString();
+    const event = {
+      id: randomUUID(),
+      clientId: id,
+      contactType: type,
+      contactValue: normalizedValue,
+      documentId: targetDocumentId,
+      documentVersion,
+      status: 'accepted',
+      acceptedAt: now,
+      revokedAt: '',
+      source: text(source) || 'manual',
+      createdAt: now,
+    };
+    await this.documents.updateDataset(tenantId, 'consents', { value: [...clone(current.consents), event] });
+    return event;
+  }
+
+  async revokeContactPointConsent(
+    tenantId: string,
+    clientId: string,
+    typeValue: unknown,
+    value: unknown,
+    documentId = 'messages-consent',
+    source = 'manual',
+  ) {
+    const type = contactType(typeValue);
+    const normalizedValue = contactValue(type, value);
+    const targetDocumentId = text(documentId);
+    if (!type || !normalizedValue || !targetDocumentId) throw new BadRequestException('Не указан Contact Point или документ');
+
+    const current = await this.state(tenantId);
+    const document = current.documents.find((item: any) => text(item?.id) === targetDocumentId);
+    if (!document) throw new BadRequestException('Документ не найден');
+    const now = new Date().toISOString();
+    const event = {
+      id: randomUUID(),
+      clientId: text(clientId),
+      contactType: type,
+      contactValue: normalizedValue,
+      documentId: targetDocumentId,
+      documentVersion: Math.max(1, Number(document.version || 1)),
+      status: 'revoked',
+      acceptedAt: '',
+      revokedAt: now,
+      source: text(source) || 'manual',
+      createdAt: now,
+    };
+    await this.documents.updateDataset(tenantId, 'consents', { value: [...clone(current.consents), event] });
+    return event;
+  }
+
+  async contactPointConsentState(tenantId: string, typeValue: unknown, value: unknown, documentId = 'messages-consent') {
+    const type = contactType(typeValue);
+    const normalizedValue = contactValue(type, value);
+    const current = await this.state(tenantId);
+    const document = current.documents.find((item: any) => text(item?.id) === text(documentId));
+    if (!type || !normalizedValue || !document) return { allowed: false, contactType: type, contactValue: normalizedValue, event: null };
+    const latest = latestContactEvent(current.consents, type, normalizedValue, text(documentId));
+    const allowed = Boolean(latest
+      && text(latest?.status) === 'accepted'
+      && Number(latest?.documentVersion || 1) === Math.max(1, Number(document.version || 1)));
+    return { allowed, contactType: type, contactValue: normalizedValue, event: latest };
   }
 
   async revokeConsent(tenantId: string, clientId: string, documentId: string, source = 'manual') {
@@ -84,7 +198,7 @@ export class ConsentPolicyService {
       .map((document: any) => {
         const documentId = text(document?.id);
         const documentVersion = Math.max(1, Number(document?.version || 1));
-        const latest = latestEvent(current.consents, id, documentId);
+        const latest = latestLegacyEvent(current.consents, id, documentId);
         const status = text(latest?.status) || 'missing';
         const accepted = Boolean(latest && status === 'accepted' && Number(latest?.documentVersion || 1) === documentVersion);
         return {
@@ -108,9 +222,8 @@ export class ConsentPolicyService {
     return { allowed: missing.length === 0, required, missing, consents };
   }
 
-  async canSendMessages(tenantId: string, clientId: string) {
-    const consents = await this.clientConsentProjection(tenantId, clientId);
-    return Boolean(consents.find((item) => item.documentId === 'messages-consent')?.accepted);
+  async canSendMessages(tenantId: string, typeValue: unknown, value: unknown) {
+    return (await this.contactPointConsentState(tenantId, typeValue, value, 'messages-consent')).allowed;
   }
 
   async consentReport(tenantId: string) {
@@ -120,15 +233,24 @@ export class ConsentPolicyService {
     for (const event of sortEventsNewest(current.consents)) {
       const clientId = text(event?.clientId);
       const documentId = text(event?.documentId);
-      if (!clientId || !documentId) continue;
-      const key = `${clientId}:${documentId}`;
+      const type = contactType(event?.contactType);
+      const value = contactValue(type, event?.contactValue);
+      if (!documentId) continue;
+      const subject = type && value ? `contact:${type}:${value}` : `client:${clientId}`;
+      if (!subject || subject === 'client:') continue;
+      const key = `${subject}:${documentId}`;
       if (!latestIds.has(key)) latestIds.set(key, text(event?.id));
     }
-    return sortEventsNewest(current.consents).map((event) => ({
-      ...event,
-      documentTitle: titles.get(text(event?.documentId)) || text(event?.documentId),
-      eventAt: eventMoment(event),
-      current: latestIds.get(`${text(event?.clientId)}:${text(event?.documentId)}`) === text(event?.id),
-    }));
+    return sortEventsNewest(current.consents).map((event) => {
+      const type = contactType(event?.contactType);
+      const value = contactValue(type, event?.contactValue);
+      const subject = type && value ? `contact:${type}:${value}` : `client:${text(event?.clientId)}`;
+      return {
+        ...event,
+        documentTitle: titles.get(text(event?.documentId)) || text(event?.documentId),
+        eventAt: eventMoment(event),
+        current: latestIds.get(`${subject}:${text(event?.documentId)}`) === text(event?.id),
+      };
+    });
   }
 }

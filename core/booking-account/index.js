@@ -186,6 +186,44 @@ export async function markBookingNotificationRead(tenantId, notificationId) {
   );
 }
 
+export async function getBookingChat(tenantId) {
+  return jsonResponse(
+    await request(`/online-booking/${encodeURIComponent(tenantId)}/account/chat`, { tenantId, auth: true }),
+    'Не удалось загрузить чат',
+  );
+}
+
+export async function getBookingChatSettings(tenantId) {
+  return jsonResponse(
+    await request(`/online-booking/${encodeURIComponent(tenantId)}/account/chat/settings`, { tenantId, auth: true }),
+    'Не удалось загрузить настройки чата',
+  );
+}
+
+export async function setBookingTelegramConsent(tenantId, enabled) {
+  return jsonResponse(
+    await request(`/online-booking/${encodeURIComponent(tenantId)}/account/chat/telegram-consent`, {
+      tenantId,
+      auth: true,
+      method: 'PUT',
+      body: JSON.stringify({ enabled: Boolean(enabled) }),
+    }),
+    'Не удалось изменить Telegram',
+  );
+}
+
+export async function sendBookingChatMessage(tenantId, body) {
+  return jsonResponse(
+    await request(`/online-booking/${encodeURIComponent(tenantId)}/account/chat/messages`, {
+      tenantId,
+      auth: true,
+      method: 'POST',
+      body: JSON.stringify({ body: String(body || '').trim() }),
+    }),
+    'Не удалось отправить сообщение',
+  );
+}
+
 export async function getWebPushConfiguration(tenantId) {
   return jsonResponse(
     await request(`/online-booking/${encodeURIComponent(tenantId)}/account/push/config`, { tenantId, auth: true }),

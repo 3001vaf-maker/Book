@@ -150,7 +150,7 @@ function liveRecordSnapshot(record: JsonObject, fallback: unknown = null) {
     recordId: text(record.id),
     procedures,
     pricing: { subtotal, discountPercent, total },
-    payment: { state: paid > 0 ? (due <= 0.009 ? 'paid' : 'partial') : 'unpaid', paid, due },
+    payment: { state: due <= 0.009 ? 'paid' : paid > 0 ? 'partial' : 'unpaid', paid, due },
     updatedAt: text(record.updatedAt) || new Date().toISOString(),
   };
 }

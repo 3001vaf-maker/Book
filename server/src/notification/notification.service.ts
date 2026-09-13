@@ -239,9 +239,11 @@ export class NotificationService {
     return true;
   }
 
-  private async externalAllowed(tenantId: string, identity: Awaited<ReturnType<NotificationService['accountIdentity']>>) {
-    if (!identity.personKey) return false;
-    return this.documents.canSendMessages(tenantId, identity.personKey);
+  private async externalAllowed(tenantId: string, identity: Awaited<ReturnType<NotificationService['accountIdentity']>>, channel: string) {
+    if (channel === 'PUSH') return true;
+    const recipient = this.recipientForChannel(identity, channel);
+    if (!recipient) return false;
+    return this.documents.canSendMessages(tenantId, channel, recipient);
   }
 
   private async queueExternalByPolicy(
@@ -250,7 +252,6 @@ export class NotificationService {
     eventType: string,
     identity: Awaited<ReturnType<NotificationService['accountIdentity']>>,
   ) {
-    if (!(await this.externalAllowed(tenantId, identity))) return [];
     const policy = await this.getRoutingPolicy(tenantId, eventType);
     const routed: Array<{ channel: string; recipient: string }> = [];
 
@@ -263,9 +264,12 @@ export class NotificationService {
     }
 
     const configured = policy.channels.filter((channel) => ACTIVE_EXTERNAL_CHANNELS.has(channel));
-    const available = configured
-      .map((channel) => ({ channel, recipient: this.recipientForChannel(identity, channel) }))
-      .filter((item) => item.recipient);
+    const available: Array<{ channel: string; recipient: string }> = [];
+    for (const channel of configured) {
+      const recipient = this.recipientForChannel(identity, channel);
+      if (!recipient || !(await this.externalAllowed(tenantId, identity, channel))) continue;
+      available.push({ channel, recipient });
+    }
     const selected = policy.mode === 'fallback' ? available.slice(0, 1) : available;
     for (const item of selected) await this.queueDelivery(tenantId, notificationId, item.channel, item.recipient);
     return [...routed, ...selected];
@@ -425,7 +429,7 @@ export class NotificationService {
       LIMIT 1
     `;
     const identity = rows[0]?.cardPhone ? await this.accountIdentityByPhone(tenantId, rows[0].cardPhone) : null;
-    return Boolean(identity && await this.externalAllowed(tenantId, identity));
+    return Boolean(identity && await this.externalAllowed(tenantId, identity, channel));
   }
 
   async canSendEmailDelivery(tenantId: string, notificationId: string) {
@@ -479,11 +483,11 @@ export class NotificationService {
         const failedIndex = policy.channels.indexOf(current.channel);
         const nextChannels = failedIndex >= 0 ? policy.channels.slice(failedIndex + 1) : [];
         const identity = await this.accountIdentityByPhone(tenantId, current.cardPhone);
-        if (identity && await this.externalAllowed(tenantId, identity)) {
+        if (identity) {
           for (const nextChannel of nextChannels) {
             if (!ACTIVE_EXTERNAL_CHANNELS.has(nextChannel)) continue;
             const recipient = this.recipientForChannel(identity, nextChannel);
-            if (!recipient) continue;
+            if (!recipient || !(await this.externalAllowed(tenantId, identity, nextChannel))) continue;
             await this.queueDelivery(tenantId, current.notificationId, nextChannel, recipient);
             break;
           }
@@ -492,7 +496,6 @@ export class NotificationService {
     }
     return { deliveryId, status: 'failed', failedAt: now, error: message };
   }
-
   async markEmailSent(tenantId: string, deliveryId: string) {
     return this.markDeliverySent(tenantId, deliveryId, 'EMAIL');
   }
@@ -513,8 +516,8 @@ export class NotificationService {
     return this.markDeliveryFailed(tenantId, deliveryId, 'TELEGRAM', error);
   }
 
-  async canSendMessagesForAccount(tenantId: string, accountId: string) {
+  async canSendMessagesForAccount(tenantId: string, accountId: string, channel: 'PUSH' | 'EMAIL' | 'TELEGRAM') {
     const identity = await this.accountIdentity(tenantId, accountId);
-    return this.externalAllowed(tenantId, identity);
+    return this.externalAllowed(tenantId, identity, channel);
   }
 }
