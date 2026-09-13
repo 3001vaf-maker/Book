@@ -9,6 +9,8 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from 'node:crypto';
+import { BusinessStateService } from '../business-state/business-state.service';
+import { ConsentPolicyService } from '../document-state/consent-policy.service';
 import { NotificationService } from '../notification/notification.service';
 import { PrismaService } from '../prisma.service';
 import { CommunicationService } from './communication.service';
@@ -37,6 +39,8 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly communications: CommunicationService,
     private readonly notifications: NotificationService,
+    private readonly businessState: BusinessStateService,
+    private readonly consentPolicy: ConsentPolicyService,
   ) {}
 
   onModuleInit() {
@@ -115,12 +119,25 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     return this.telegramApi(this.decryptToken(row), 'sendMessage', { chat_id: telegramUserId, text: body });
   }
 
+  private async personKeyForIdentity(tenantId: string, identity: { cardPhone: string; uei: string }) {
+    const business = await this.businessState.get(tenantId);
+    const relations = business?.uei?.relations && typeof business.uei.relations === 'object' ? business.uei.relations : {};
+    const uei = text(identity.uei);
+    if (uei) {
+      const relation = Object.entries(relations).find(([key, value]) => key.startsWith('person:') && text(value) === uei);
+      if (relation) return relation[0].slice('person:'.length);
+    }
+    const cardPhone = canonicalPhone(identity.cardPhone);
+    const people = Array.isArray(business.people) ? business.people : [];
+    const person = people.find((value: any) => (Array.isArray(value?.phones) ? value.phones : []).some((phone: unknown) => canonicalPhone(phone) === cardPhone));
+    return text((person as any)?.key);
+  }
+
   async sendChatMessage(tenantId: string, input: { phone?: unknown; uei?: unknown; body?: unknown }) {
     const body = text(input?.body); if (!body) throw new BadRequestException('Пустое сообщение');
     const identity = await this.communications.telegramIdentity(tenantId, input || {}); if (!identity) throw new NotFoundException('Telegram у клиента не подключён');
-    const accounts = await this.prisma.bookingAccount.findMany({ where: { tenantId }, select: { id: true, phone: true } });
-    const account = accounts.find((item) => canonicalPhone(item.phone) === canonicalPhone(identity.cardPhone));
-    if (!account || !(await this.notifications.canSendMessagesForAccount(tenantId, account.id))) throw new BadRequestException('Нет действующего согласия на сообщения');
+    const personKey = await this.personKeyForIdentity(tenantId, identity);
+    if (!personKey || !(await this.consentPolicy.canSendMessages(tenantId, personKey))) throw new BadRequestException('Нет действующего согласия на сообщения');
     try {
       const result = await this.sendMessage(tenantId, identity.externalUserId, body);
       return this.communications.recordMessage(tenantId, { phone: identity.cardPhone, uei: identity.uei, direction: 'outbound', kind: 'message', channel: 'TELEGRAM', body, externalMessageId: String(result?.message_id || ''), externalThreadId: String(result?.chat?.id || identity.externalUserId), status: 'sent' });
