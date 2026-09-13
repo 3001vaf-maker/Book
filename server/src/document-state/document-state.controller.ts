@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Post, Put, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ConsentPolicyService } from './consent-policy.service';
 import { DocumentStateService } from './document-state.service';
 
 type AuthenticatedRequest = Request & { auth?: { userId: string; tenantId: string; role: string } };
@@ -8,7 +9,10 @@ type AuthenticatedRequest = Request & { auth?: { userId: string; tenantId: strin
 @Controller('document-state')
 @UseGuards(JwtAuthGuard)
 export class DocumentStateController {
-  constructor(private readonly documents: DocumentStateService) {}
+  constructor(
+    private readonly documents: DocumentStateService,
+    private readonly consentPolicy: ConsentPolicyService,
+  ) {}
 
   @Get()
   get(@Req() request: AuthenticatedRequest) {
@@ -17,12 +21,12 @@ export class DocumentStateController {
 
   @Get('consents/report')
   consentReport(@Req() request: AuthenticatedRequest) {
-    return this.documents.consentReport(request.auth!.tenantId);
+    return this.consentPolicy.consentReport(request.auth!.tenantId);
   }
 
   @Get('consents/client/:clientId')
   clientConsents(@Req() request: AuthenticatedRequest, @Param('clientId') clientId: string) {
-    return this.documents.clientConsentProjection(request.auth!.tenantId, clientId);
+    return this.consentPolicy.clientConsentProjection(request.auth!.tenantId, clientId);
   }
 
   @Post('consents/client/:clientId/:documentId/revoke')
@@ -31,7 +35,7 @@ export class DocumentStateController {
     @Param('clientId') clientId: string,
     @Param('documentId') documentId: string,
   ) {
-    return this.documents.revokeConsent(request.auth!.tenantId, clientId, documentId, 'owner');
+    return this.consentPolicy.revokeConsent(request.auth!.tenantId, clientId, documentId, 'owner');
   }
 
   @Post('migrate')
