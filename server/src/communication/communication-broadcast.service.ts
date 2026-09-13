@@ -111,13 +111,12 @@ export class CommunicationBroadcastService {
     const all = input?.all === true;
     const phones = [...new Set((Array.isArray(input?.phones) ? input.phones : []).map(canonicalPhone).filter(Boolean))];
     if (!all && !phones.length) throw new BadRequestException('Выберите клиентов или явно укажите «все клиенты»');
-    const byIdentity = new Map<string, (typeof people)[number]>();
+    const byCardPhone = new Map<string, (typeof people)[number]>();
     for (const person of people) {
-      const key = person.uei || person.phone;
-      if (!byIdentity.has(key)) byIdentity.set(key, person);
+      if (!byCardPhone.has(person.phone)) byCardPhone.set(person.phone, person);
     }
-    if (all) return [...byIdentity.values()];
-    return phones.map((phone) => people.find((person) => person.phone === phone)).filter(Boolean) as Array<(typeof people)[number]>;
+    if (all) return [...byCardPhone.values()];
+    return phones.map((phone) => byCardPhone.get(phone)).filter(Boolean) as Array<(typeof people)[number]>;
   }
 
   private async channelAvailable(tenantId: string, channel: string, person: { phone: string; uei: string; email: string }) {
