@@ -5,10 +5,15 @@ const booking = fs.readFileSync('online-booking/booking.js', 'utf8');
 const accountShell = fs.readFileSync('online-booking/account-shell.js', 'utf8');
 const personalData = fs.readFileSync('online-booking/personal-data.js', 'utf8');
 const passwordSettings = fs.readFileSync('online-booking/password-settings.js', 'utf8');
+const consentSettings = fs.readFileSync('online-booking/consent-settings.js', 'utf8');
+const bookingSettingsUi = fs.readFileSync('settings/online-booking/online-booking.js', 'utf8');
 const bookingAccountApi = fs.readFileSync('core/booking-account/index.js', 'utf8');
 const onlineBookingController = fs.readFileSync('server/src/online-booking/online-booking.controller.ts', 'utf8');
 const accountSettingsController = fs.readFileSync('server/src/online-booking/booking-account-settings.controller.ts', 'utf8');
 const onlineBookingService = fs.readFileSync('server/src/online-booking/online-booking.service.ts', 'utf8');
+const communicationService = fs.readFileSync('server/src/communication/communication.service.ts', 'utf8');
+const communicationHistory = fs.readFileSync('server/src/communication/communication-history.service.ts', 'utf8');
+const messageAttachmentMigration = fs.readFileSync('server/prisma/migrations/20260914010000_message_attachments/migration.sql', 'utf8');
 const consentPolicy = fs.readFileSync('server/src/document-state/consent-policy.service.ts', 'utf8');
 const telegramBot = fs.readFileSync('server/src/communication/telegram-bot.service.ts', 'utf8');
 const inputsUi = fs.readFileSync('ui/inputs/index.js', 'utf8');
@@ -20,14 +25,37 @@ const clientAccountThemeCss = fs.readFileSync('ui/shell/client-account-theme.css
 const indexHtml = fs.readFileSync('index.html', 'utf8');
 const bookingUi = fs.readFileSync('ui/booking/index.js', 'utf8');
 
+// Online booking uses the same client shell and keeps the agreed business sequence.
 assert.match(booking, /renderClientAccount/);
+assert.match(booking, /appHeader\(\{ title, back, action \}\)/);
+assert.match(booking, /appShell\(\{/);
+assert.match(booking, /bookingThemeStyle\(state\.settings\)/);
 assert.match(booking, /bookingChoiceCards\(/);
 assert.match(booking, /bookingTimeGroups\(/);
+assert.match(booking, /function renderAgreements/);
+assert.match(booking, /function renderWorkplaces/);
+assert.match(booking, /function renderProcedures/);
+assert.match(booking, /function renderDates/);
+assert.match(booking, /function renderTimes/);
+assert.match(booking, /function renderConfirmation/);
+assert.match(booking, /renderWorkplaces\(root, state\)/);
+assert.match(booking, /renderProcedures\(root, state\)/);
+assert.match(booking, /renderDates\(root, state\)/);
+assert.match(booking, /renderTimes\(root, state\)/);
 assert.match(booking, /meta:\s*\[\s*\{ value: money\(subtotal\), label: 'Стоимость' \}/);
+assert.match(booking, /\{ value: state\.from, row: 3 \}/);
+assert.doesNotMatch(booking, /\$\{state\.from\} - \$\{state\.to\}/);
 assert.match(booking, /onRepeat:/);
 assert.doesNotMatch(booking, /−\$\{discount\}/);
 assert.doesNotMatch(booking, /durationText\(duration\)/);
+assert.doesNotMatch(booking, /personalDataAccordion/);
+assert.doesNotMatch(booking, /type:\s*'date'/);
+assert.match(booking, /getBookingConsentState/);
+assert.match(booking, /async function refreshAccountConsentState/);
+assert.match(booking, /if \(consentState\.allowed\) nextAfterAgreements/);
+assert.match(booking, /if \(consentState\.allowed\) continueRepeat/);
 
+// Client profile/account stays on canonical shared primitives.
 assert.match(accountShell, /entityCard\(\{/);
 assert.match(accountShell, /className: 'entity-card--hero'/);
 assert.match(accountShell, /image: profile\.photo \|\| ''/);
@@ -43,13 +71,22 @@ assert.doesNotMatch(accountShell, /label: 'Личный счёт'/);
 assert.match(accountShell, /app-media-rail--placeholder/);
 assert.match(accountShell, /openClientPersonalData/);
 assert.match(accountShell, /openClientPasswordSettings/);
+assert.match(accountShell, /openClientConsentSettings/);
 assert.match(accountShell, /label: 'Изменить пароль'/);
+assert.match(accountShell, /label: 'Согласия'/);
+assert.match(accountShell, /data-client-consents/);
+assert.match(accountShell, /data-chat-consents/);
 assert.match(accountShell, /listEntry\(\{\s*columns:/s);
 assert.match(accountShell, /variant: 'large'/);
 assert.match(accountShell, /readOnlyReceipt\(/);
-assert.match(accountShell, /label: 'Повторить процедуру'/);
+assert.match(accountShell, /label: 'Повторить запись'/);
+assert.doesNotMatch(accountShell, /label: 'Повторить процедуру'/);
 assert.match(accountShell, /action: \{ label: 'Записаться'/);
-assert.match(accountShell, /messageComposer\(/);
+assert.match(accountShell, /messageComposer\(\{ attachments: true \}\)/);
+assert.match(accountShell, /data-message-attachment/);
+assert.match(accountShell, /sendBookingChatMessage\(state\.tenantId, body, attachments\)/);
+assert.match(accountShell, /className: 'app-view-shell--chat'/);
+assert.match(accountShell, /getBookingRequests\(state\.tenantId\)\.catch\(\(\) => \[\]\)/);
 assert.match(accountShell, /data-client-chat-settings/);
 assert.match(accountShell, /getBookingChatSettings\(state\.tenantId\)/);
 assert.match(accountShell, /setBookingTelegramConsent\(state\.tenantId, !telegram\.enabled\)/);
@@ -59,6 +96,7 @@ assert.doesNotMatch(accountShell, /markBookingNotificationRead\(state\.tenantId,
 assert.match(accountShell, /markBookingNotificationRead\(state\.tenantId, message\.notificationId\)/);
 assert.match(accountShell, /node\.addEventListener\('click', \(\) => void openNotification\(\)\)/);
 
+// Personal-data modal uses the Book controls, including Book calendar.
 assert.match(personalData, /photoField\(\{ name: 'photo'/);
 assert.match(personalData, /addLabel: '\+ Телефон'/);
 assert.match(personalData, /addLabel: '\+ Email'/);
@@ -82,11 +120,16 @@ assert.match(repeatedFields, /showEmptyRow = true/);
 assert.match(inputsUi, /phoneCountryLabel/);
 assert.match(inputsUi, /full\.match\(\/\\\+\\d\{1,4\}\\b\/\)/);
 
+// Password and consent account settings are functional server-backed controls.
 assert.match(passwordSettings, /Текущий пароль/);
 assert.match(passwordSettings, /Новый пароль/);
 assert.match(passwordSettings, /Повторите новый пароль/);
 assert.match(passwordSettings, /changeBookingPassword\(state\.tenantId/);
 assert.match(passwordSettings, /newPassword !== repeatPassword/);
+assert.match(consentSettings, /getBookingConsentState\(state\.tenantId\)/);
+assert.match(consentSettings, /revokeBookingConsent\(state\.tenantId, consent\.documentId\)/);
+assert.match(consentSettings, /Отозвать согласие/);
+assert.match(consentSettings, /Отмена/);
 assert.match(bookingAccountApi, /account\/password/);
 assert.match(accountSettingsController, /@Put\(':tenantId\/account\/password'\)/);
 assert.match(accountSettingsController, /changeAccountPassword/);
@@ -99,6 +142,14 @@ assert.match(onlineBookingService, /emails: uniqueStrings/);
 assert.match(onlineBookingService, /telegram: text\(source\.telegram\)/);
 assert.match(onlineBookingService, /links,/);
 
+// Online style editor previews drafts immediately but can discard them before save.
+assert.match(bookingSettingsUi, /form\.addEventListener\('input', updatePreview\)/);
+assert.match(bookingSettingsUi, /form\.addEventListener\('change', updatePreview\)/);
+assert.match(bookingSettingsUi, /Отменить изменения/);
+assert.match(bookingSettingsUi, /onCancel: \(\) => renderReady\(root, navigateBack, tenantId\)/);
+assert.match(bookingSettingsUi, /saveBookingSettings\(settingsDraft\(form\)\)/);
+
+// Chat consent remains exact Contact Point policy.
 assert.match(bookingAccountApi, /account\/chat\/settings/);
 assert.match(bookingAccountApi, /account\/chat\/telegram-consent/);
 assert.match(onlineBookingController, /contactPointConsentState\([\s\S]*?'TELEGRAM'[\s\S]*?identity\.externalUserId[\s\S]*?'messages-consent'/);
@@ -108,19 +159,43 @@ assert.match(consentPolicy, /async canSendMessages\(tenantId: string, typeValue:
 assert.match(telegramBot, /canSendMessages\(tenantId, 'TELEGRAM', identity\.externalUserId\)/);
 assert.doesNotMatch(telegramBot, /canSendMessages\(tenantId, personKey/);
 
+// Media is a real persisted message property, not a decorative paperclip.
+assert.match(bookingAccountApi, /sendBookingChatMessage\(tenantId, body, attachments = \[\]\)/);
+assert.match(onlineBookingController, /@Body\(\) body: \{ body\?: unknown; attachments\?: unknown \}/);
+assert.match(onlineBookingController, /attachments,/);
+assert.match(communicationService, /function normalizeAttachments/);
+assert.match(communicationService, /"attachments"/);
+assert.match(communicationService, /\$\{attachmentsJson\}::jsonb/);
+assert.match(communicationHistory, /m\."attachments"/);
+assert.match(communicationHistory, /'\[\]'::jsonb AS "attachments"/);
+assert.match(messageAttachmentMigration, /ADD COLUMN "attachments" JSONB NOT NULL DEFAULT '\[\]'::jsonb/);
+
+// Shared shell owns A/B/C roles and compact mobile geometry.
 assert.match(shellUi, /appHeader/);
 assert.match(shellUi, /clientBottomNavigation/);
 assert.match(shellUi, /messageThread/);
 assert.match(shellUi, /readOnlyReceipt/);
+assert.match(shellUi, /label: 'Сообщения', icon: '💬'/);
+assert.match(shellUi, /back\.aria \|\| 'Назад', variant: 'secondary'/);
+assert.match(shellUi, /settings\.aria \|\| 'Настройки', variant: 'secondary'/);
+assert.match(shellUi, /disabled: Boolean\(action\.disabled\)/);
+assert.match(shellUi, /attachments = false/);
+assert.match(shellUi, /data-message-attachment/);
 assert.match(shellCss, /grid-template-columns:var\(--shell-icon-slot\) minmax\(0,1fr\) var\(--shell-action-slot\) var\(--shell-icon-slot\)/);
 assert.match(shellCss, /bottom-nav--client/);
+assert.match(shellCss, /\.app-view-shell--chat/);
+assert.match(shellCss, /\.app-view-shell--chat \.app-view-shell__screen[\s\S]*?overflow-y:auto/);
+assert.match(shellCss, /\.message-composer\{position:fixed/);
+assert.match(shellCss, /\.message-composer__attach/);
 assert.match(indexHtml, /ui\/shell\/client-mobile\.css/);
 assert.match(indexHtml, /ui\/shell\/client-account-theme\.css/);
+assert.match(clientMobileCss, /--app-max-width:390px/);
 assert.match(clientMobileCss, /\.app-shell\.app-shell--booking\s*\{[\s\S]*?width:min\(100%,var\(--app-max-width\)\);[\s\S]*?max-width:var\(--app-max-width\);/);
 assert.match(clientMobileCss, /\.app-shell\.app-shell--booking \.app-view-shell[\s\S]*?max-width:100%/);
 assert.doesNotMatch(clientMobileCss, /max-width:none/);
 assert.match(clientAccountThemeCss, /--text:var\(--booking-dark\)/);
 assert.match(clientAccountThemeCss, /--button-secondary:var\(--booking-light\)/);
+assert.match(clientAccountThemeCss, /\.app-view-shell--booking-flow/);
 assert.match(clientAccountThemeCss, /\.app-view-shell--profile \.app-view-shell__screen\s*\{[\s\S]*?align-content:center;[\s\S]*?place-items:center;/);
 assert.match(clientAccountThemeCss, /\.booking-client--account\.booking-shape--round/);
 assert.match(clientAccountThemeCss, /\.booking-client--account\.booking-shape--straight/);
