@@ -12,17 +12,7 @@ import { NotificationModule } from './notification/notification.module';
 import { CommunicationModule } from './communication/communication.module';
 
 @Module({
-  imports: [
-    AuthModule,
-    WorkspaceModule,
-    ProfileModule,
-    BusinessStateModule,
-    DocumentStateModule,
-    AuxiliaryStateModule,
-    NotificationModule,
-    CommunicationModule,
-    OnlineBookingModule,
-  ],
+  imports: [AuthModule, WorkspaceModule, ProfileModule, BusinessStateModule, DocumentStateModule, AuxiliaryStateModule, NotificationModule, CommunicationModule, OnlineBookingModule],
   controllers: [HealthController],
   providers: [PrismaService],
 })
