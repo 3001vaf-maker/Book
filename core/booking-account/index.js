@@ -193,6 +193,25 @@ export async function getBookingChat(tenantId) {
   );
 }
 
+export async function getBookingChatSettings(tenantId) {
+  return jsonResponse(
+    await request(`/online-booking/${encodeURIComponent(tenantId)}/account/chat/settings`, { tenantId, auth: true }),
+    'Не удалось загрузить настройки чата',
+  );
+}
+
+export async function setBookingTelegramConsent(tenantId, enabled) {
+  return jsonResponse(
+    await request(`/online-booking/${encodeURIComponent(tenantId)}/account/chat/telegram-consent`, {
+      tenantId,
+      auth: true,
+      method: 'PUT',
+      body: JSON.stringify({ enabled: Boolean(enabled) }),
+    }),
+    'Не удалось изменить Telegram',
+  );
+}
+
 export async function sendBookingChatMessage(tenantId, body) {
   return jsonResponse(
     await request(`/online-booking/${encodeURIComponent(tenantId)}/account/chat/messages`, {
