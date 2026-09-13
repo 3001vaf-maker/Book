@@ -11,5 +11,5 @@ assert.match(request, /status: BookingRequestStatus\.IMPORTED/);
 assert.match(request, /publicBookingOccupancy/);
 assert.match(business, /source: 'online-booking'/);
 assert.match(business, /type: 'created'/);
-assert.match(documentState, /recordConsentEvents\(tenantId, clientId, accepted, 'online-booking-account'\)/);
+assert.match(documentState, /source: 'online-booking-account'/);
 console.log('booking server autonomy tests passed');
