@@ -470,7 +470,7 @@ async function renderMessages(root, state, handlers) {
     back: { data: 'data-client-chat-back', aria: 'К списку диалогов' },
     action: { label: 'Записаться', data: 'data-client-chat-booking' },
     settings: { data: 'data-client-chat-settings', aria: 'Настройки чата' },
-    body: `${messages.length ? messageThread(messages, { viewer: 'client' }) : emptyState('Сообщений пока нет', 'Напишите мастеру первое сообщение.')}${messageComposer()}`,
+    body: `${messages.length ? messageThread(messages, { viewer: 'client' }) : emptyState('Сообщений пока нет', 'Напишите мастеру первое сообщение.')}${messageComposer({ attachments: true })}`,
     media: '',
     className: 'app-view-shell--chat',
   });
@@ -535,7 +535,7 @@ export async function renderClientAccount(root, state, callbacks = {}) {
   state.clientChatOpen = Boolean(state.clientChatOpen);
   try {
     const [requests, account] = await Promise.all([
-      getBookingRequests(state.tenantId),
+      getBookingRequests(state.tenantId).catch(() => []),
       getBookingAccount(state.tenantId),
     ]);
     state.clientRequests = Array.isArray(requests) ? requests : [];
