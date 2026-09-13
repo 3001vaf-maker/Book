@@ -309,7 +309,13 @@ export class OnlineBookingService {
         profileData: normalizeProfileData(body.profileData) as Prisma.InputJsonValue,
       },
     });
-    const binding = await this.clientCards.bindFirstAccess(tenantId, account as any);
+    const card = await this.clientCards.cardState(tenantId, account.phone);
+    const binding = card.owner
+      ? await this.clientCards.bindFirstAccess(tenantId, account as any)
+      : {
+          person: await this.businessState.upsertBookingPersonFromAccount(tenantId, account as any),
+          clientCardExisted: false,
+        };
     await this.documentState.recordAcceptedConsents(tenantId, text(binding.person.key), consents);
     return {
       accessToken: await this.issueAccountToken(account),
