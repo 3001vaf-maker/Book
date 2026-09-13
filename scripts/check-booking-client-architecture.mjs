@@ -22,7 +22,21 @@ expect(booking.includes('bookingChoiceCards('), 'Public booking choices must use
 expect(booking.includes('bookingTimeGroups('), 'Public booking time must use shared grouped time UI.');
 expect(booking.includes('initCalendar('), 'Public booking date must use the shared Book calendar.');
 expect(!booking.includes("type: 'date'"), 'Public booking must not use native technical date controls.');
-expect(booking.includes('renderAgreements') && booking.includes('renderWorkplaces') && booking.includes('renderProcedures') && booking.includes('renderDates') && booking.includes('renderTimes') && booking.includes('renderConfirmation'), 'Booking workflow must preserve the agreed booking sequence.');
+
+expect(booking.includes('renderRegistrationAgreements') && booking.includes('renderAccountEntry') && booking.includes('renderAccountDetails') && booking.includes('renderPassword'), 'Registration must own agreements, account lookup, details and password.');
+expect(booking.includes("subtitle: 'Согласия относятся к регистрации и аккаунту клиента'"), 'Consent UI must be explicitly registration/account scoped.');
+expect(booking.includes('if (prepared.exists) renderPassword(root, state);') && booking.includes('else renderAccountDetails(root, state);'), 'Registration must branch between an existing account and a new client.');
+expect(booking.includes('if (payload.clientCardExisted)') && booking.includes("state.clientTab = 'profile'"), 'Known clients must land on the personal page after registration.');
+expect(booking.includes('else {\n          nextBookingStep(root, state);'), 'New clients without an existing card must continue into booking after registration.');
+
+expect(booking.includes('renderWorkplaces') && booking.includes('renderProcedures') && booking.includes('renderDates') && booking.includes('renderTimes') && booking.includes('renderConfirmation'), 'Booking itself must preserve workplace -> procedures -> date -> time -> confirmation.');
+expect(booking.includes("root.querySelector('[data-booking-workplaces-back]')?.addEventListener('click', () => backFromFirstBookingStep(root, state));"), 'Back from the first booking step must leave booking, not return to registration.');
+expect(booking.includes("if (state.lockedWorkplaceKey) backFromFirstBookingStep(root, state);"), 'Back from procedures on a locked-workplace link must leave booking, not return to registration.');
+expect(booking.includes("root.querySelector('[data-booking-dates-back]')?.addEventListener('click', () => renderProcedures(root, state));"), 'Date back must return to procedures.');
+expect(booking.includes("root.querySelector('[data-booking-times-back]')?.addEventListener('click', () => renderDates(root, state));"), 'Time back must return to date.');
+expect(booking.includes("root.querySelector('[data-booking-confirm-back]')?.addEventListener('click'"), 'Confirmation must have a back control.');
+expect(booking.includes('function backFromFirstBookingStep') && booking.includes('renderAccountHome(root, state)'), 'The booking back boundary must return to the personal page.');
+
 expect(booking.includes('renderClientAccount'), 'Authenticated client account must use the unified client shell.');
 expect(!booking.includes('step: 15'), 'Public booking must not hardcode a 15 minute slot step.');
 expect(settings.includes("from '../../core/booking-settings/index.js'"), 'Online booking settings must use canonical booking settings owner.');
