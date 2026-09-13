@@ -22,4 +22,6 @@ function renderRows(root) {
   });
 }
 
-export function renderSettings(root) { renderRows(root); }
+export function renderSettings(root) {
+  renderRows(root);
+}
