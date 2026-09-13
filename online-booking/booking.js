@@ -2,6 +2,7 @@ import {
   clearBookingAccount,
   createBookingRequest,
   getBookingAccount,
+  getBookingConsentState,
   getBookingContext,
   getRememberedBookingEmail,
   loginBookingAccount,
@@ -37,7 +38,6 @@ import {
   getBookingSlots,
   getBookingWorkingDates,
   getBookingWorkplace,
-  hasRequiredBookingConsents,
   requiredBookingDocuments,
 } from './model.js';
 import { renderClientAccount } from './account-shell.js';
@@ -99,6 +99,12 @@ function seedConsents(state, facts = []) {
     if (!fact?.accepted) continue;
     state.consents[String(fact.documentId || '')] = true;
   }
+}
+
+async function refreshAccountConsentState(state) {
+  const consentState = await getBookingConsentState(state.tenantId);
+  seedConsents(state, consentState?.consents || []);
+  return consentState || { allowed: false, consents: [] };
 }
 
 function resetBookingChoice(state) {
@@ -551,15 +557,20 @@ function renderConfirmation(root, state) {
   });
 }
 
-function startBookingFromAccount(root, state) {
+async function startBookingFromAccount(root, state) {
   state.bookingOrigin = 'account';
   resetBookingChoice(state);
-  seedConsents(state, state.account?.consents || []);
-  if (hasRequiredBookingConsents(state.context, state.account?.consents || [])) nextAfterAgreements(root, state);
-  else renderAgreements(root, state);
+  try {
+    const consentState = await refreshAccountConsentState(state);
+    if (consentState.allowed) nextAfterAgreements(root, state);
+    else renderAgreements(root, state);
+  } catch (error) {
+    state.error = error instanceof Error ? error.message : 'Не удалось проверить согласия';
+    renderAgreements(root, state);
+  }
 }
 
-function repeatBooking(root, state, request) {
+async function repeatBooking(root, state, request) {
   state.bookingOrigin = 'account';
   const procedureIds = requestProcedures(request).map((item) => String(item?.id || '')).filter(Boolean);
   state.repeatSelection = {
@@ -569,15 +580,20 @@ function repeatBooking(root, state, request) {
   state.date = '';
   state.from = '';
   state.to = '';
-  seedConsents(state, state.account?.consents || []);
-  if (hasRequiredBookingConsents(state.context, state.account?.consents || [])) continueRepeat(root, state);
-  else renderAgreements(root, state);
+  try {
+    const consentState = await refreshAccountConsentState(state);
+    if (consentState.allowed) continueRepeat(root, state);
+    else renderAgreements(root, state);
+  } catch (error) {
+    state.error = error instanceof Error ? error.message : 'Не удалось проверить согласия';
+    renderAgreements(root, state);
+  }
 }
 
 async function renderAccountHome(root, state) {
   await renderClientAccount(root, state, {
-    onStartBooking: () => startBookingFromAccount(root, state),
-    onRepeat: (request) => repeatBooking(root, state, request),
+    onStartBooking: () => void startBookingFromAccount(root, state),
+    onRepeat: (request) => void repeatBooking(root, state, request),
     onLogout: () => {
       clearBookingAccount(state.tenantId);
       state.account = null;
