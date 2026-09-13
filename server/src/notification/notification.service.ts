@@ -496,7 +496,6 @@ export class NotificationService {
     }
     return { deliveryId, status: 'failed', failedAt: now, error: message };
   }
-
   async markEmailSent(tenantId: string, deliveryId: string) {
     return this.markDeliverySent(tenantId, deliveryId, 'EMAIL');
   }
@@ -517,8 +516,8 @@ export class NotificationService {
     return this.markDeliveryFailed(tenantId, deliveryId, 'TELEGRAM', error);
   }
 
-  async canSendMessagesForAccount(tenantId: string, accountId: string) {
+  async canSendMessagesForAccount(tenantId: string, accountId: string, channel: 'PUSH' | 'EMAIL' | 'TELEGRAM') {
     const identity = await this.accountIdentity(tenantId, accountId);
-    return this.externalAllowed(tenantId, identity);
+    return this.externalAllowed(tenantId, identity, channel);
   }
 }
