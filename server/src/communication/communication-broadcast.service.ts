@@ -1,7 +1,7 @@
 import { BadRequestException, HttpException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { BusinessStateService } from '../business-state/business-state.service';
-import { DocumentStateService } from '../document-state/document-state.service';
+import { ConsentPolicyService } from '../document-state/consent-policy.service';
 import { PrismaService } from '../prisma.service';
 import { CommunicationService } from './communication.service';
 import { CommunicationDispatchService } from './communication-dispatch.service';
@@ -25,7 +25,7 @@ export class CommunicationBroadcastService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly businessState: BusinessStateService,
-    private readonly documents: DocumentStateService,
+    private readonly documents: ConsentPolicyService,
     private readonly communications: CommunicationService,
     private readonly dispatch: CommunicationDispatchService,
   ) {}
