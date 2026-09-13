@@ -30,6 +30,7 @@ import {
   readOnlyReceipt,
   settingsPanel,
 } from '../ui/ui.js';
+import { openClientConsentSettings } from './consent-settings.js';
 import { openClientPasswordSettings } from './password-settings.js';
 import { openClientPersonalData } from './personal-data.js';
 
@@ -203,7 +204,7 @@ function openHistoryDetail(state, request, onRepeat) {
     time: request.from || '',
     items: procedures.map((item) => ({ label: item?.name || 'Процедура', value: money(item?.cost || 0) })),
     totals,
-    action: procedures.length ? { label: 'Повторить процедуру', data: 'data-repeat-procedure' } : null,
+    action: procedures.length ? { label: 'Повторить запись', data: 'data-repeat-procedure' } : null,
   }), { variant: 'large', surface: 'app', title: 'Запись' }));
   layer?.querySelector('[data-repeat-procedure]')?.addEventListener('click', () => {
     layer.remove();
@@ -227,6 +228,47 @@ function messageTime(value) {
   const date = new Date(value || 0);
   if (!Number.isFinite(date.getTime())) return '';
   return new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' }).format(date);
+}
+
+async function fileAttachment(file) {
+  if (!(file instanceof File)) return null;
+  if (!/^(image|video)\//i.test(file.type || '')) throw new Error('Можно прикрепить фото или видео');
+  if (file.size > 8 * 1024 * 1024) throw new Error('Один файл должен быть не больше 8 МБ');
+  const dataUrl = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('Не удалось прочитать файл'));
+    reader.readAsDataURL(file);
+  });
+  return { name: file.name || 'Медиа', type: file.type || '', size: file.size || 0, dataUrl };
+}
+
+function bindMessageAttachments(form) {
+  const selected = [];
+  const input = form?.querySelector('[data-message-attachment-input]');
+  const trigger = form?.querySelector('[data-message-attachment]');
+  const preview = form?.querySelector('[data-message-attachment-preview]');
+  const redraw = () => {
+    if (!preview) return;
+    preview.innerHTML = selected.map((item) => `<span class="message-composer__attachment-chip">${escapeHtml(item.name || 'Медиа')}</span>`).join('');
+  };
+  trigger?.addEventListener('click', () => input?.click());
+  input?.addEventListener('change', async () => {
+    const files = [...(input.files || [])].slice(0, 3);
+    try {
+      const next = (await Promise.all(files.map(fileAttachment))).filter(Boolean);
+      selected.splice(0, selected.length, ...next);
+      redraw();
+      input.setCustomValidity('');
+    } catch (error) {
+      selected.splice(0, selected.length);
+      redraw();
+      input.setCustomValidity(error instanceof Error ? error.message : 'Не удалось прикрепить файл');
+      input.reportValidity();
+      input.setCustomValidity('');
+    }
+  });
+  return () => [...selected];
 }
 
 async function loadMessages(state) {
@@ -278,6 +320,7 @@ async function openChatSettings(state) {
   const render = () => settingsPanel([
     { type: 'toggle', label: 'Push', checked: Boolean(push.subscribed), data: 'data-chat-push', disabled: !push.supported || !push.enabled || push.permission === 'denied' },
     { type: 'toggle', label: 'Telegram', checked: Boolean(telegram.enabled), data: 'data-chat-telegram', disabled: !telegram.linked },
+    { label: 'Согласия', data: 'data-chat-consents' },
   ]);
   const layer = mountModal(document.body, modal(render(), { variant: 'medium', surface: 'app', title: 'Настройки чата' }));
   const redraw = () => {
@@ -296,14 +339,19 @@ async function openChatSettings(state) {
       if (next?.telegram) telegram = next.telegram;
       redraw();
     });
+    layer?.querySelector('[data-chat-consents]')?.addEventListener('click', () => {
+      layer.remove();
+      void openClientConsentSettings(state);
+    });
   };
   bind();
 }
 
-function openProfileSettings(state, { onPersonalData, onPassword, onLogout }) {
+function openProfileSettings(state, { onPersonalData, onPassword, onConsents, onLogout }) {
   const layer = mountModal(document.body, modal(settingsPanel([
     { label: 'Личные данные', data: 'data-client-personal-data' },
     { label: 'Изменить пароль', data: 'data-client-change-password' },
+    { label: 'Согласия', data: 'data-client-consents' },
     { label: 'Выход', data: 'data-client-logout', variant: 'danger' },
   ]), { variant: 'medium', surface: 'app', title: 'Настройки профиля' }));
   layer?.querySelector('[data-client-personal-data]')?.addEventListener('click', () => {
@@ -313,6 +361,10 @@ function openProfileSettings(state, { onPersonalData, onPassword, onLogout }) {
   layer?.querySelector('[data-client-change-password]')?.addEventListener('click', () => {
     layer.remove();
     onPassword?.();
+  });
+  layer?.querySelector('[data-client-consents]')?.addEventListener('click', () => {
+    layer.remove();
+    onConsents?.();
   });
   layer?.querySelector('[data-client-logout]')?.addEventListener('click', () => {
     layer.remove();
@@ -372,6 +424,7 @@ async function renderProfile(root, state, handlers) {
   root.querySelector('[data-client-profile-settings]')?.addEventListener('click', () => openProfileSettings(state, {
     onPersonalData: handlers.onPersonalData,
     onPassword: handlers.onPassword,
+    onConsents: handlers.onConsents,
     onLogout: handlers.onLogout,
   }));
   root.querySelectorAll('[data-client-program]').forEach((node) => node.addEventListener('click', () => openProgram(rows[Number(node.dataset.clientProgram)])));
@@ -395,9 +448,10 @@ async function renderMessages(root, state, handlers) {
   const master = masterName(state);
   if (!state.clientChatOpen) {
     const last = messages[messages.length - 1];
+    const lastLabel = last?.body ? String(last.body).split('\n')[0] : Array.isArray(last?.attachments) && last.attachments.length ? 'Медиа' : 'Открыть диалог';
     const body = listEntries([listEntry({
       title: master,
-      subtitle: last?.body ? String(last.body).split('\n')[0] : 'Открыть диалог',
+      subtitle: lastLabel,
       rightTop: last?.time || '',
       data: 'data-client-open-chat',
       aria: `Открыть диалог с ${master}`,
@@ -417,6 +471,8 @@ async function renderMessages(root, state, handlers) {
     action: { label: 'Записаться', data: 'data-client-chat-booking' },
     settings: { data: 'data-client-chat-settings', aria: 'Настройки чата' },
     body: `${messages.length ? messageThread(messages, { viewer: 'client' }) : emptyState('Сообщений пока нет', 'Напишите мастеру первое сообщение.')}${messageComposer()}`,
+    media: '',
+    className: 'app-view-shell--chat',
   });
   bindBottomNavigation(root, state, handlers);
   root.querySelector('[data-client-chat-back]')?.addEventListener('click', () => {
@@ -449,15 +505,17 @@ async function renderMessages(root, state, handlers) {
     });
   });
   const form = root.querySelector('[data-message-composer]');
+  const getAttachments = bindMessageAttachments(form);
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const input = form.querySelector('[name="message"]');
     const body = String(input?.value || '').trim();
-    if (!body) return;
+    const attachments = getAttachments();
+    if (!body && !attachments.length) return;
     const submit = form.querySelector('button[type="submit"]');
     if (submit) submit.disabled = true;
     try {
-      await sendBookingChatMessage(state.tenantId, body);
+      await sendBookingChatMessage(state.tenantId, body, attachments);
       await handlers.render();
     } catch (error) {
       if (submit) submit.disabled = false;
@@ -467,8 +525,8 @@ async function renderMessages(root, state, handlers) {
     }
   });
   requestAnimationFrame(() => {
-    const thread = root.querySelector('[data-message-thread]');
-    thread?.lastElementChild?.scrollIntoView?.({ block: 'end' });
+    const screen = root.querySelector('.app-view-shell--chat .app-view-shell__screen');
+    if (screen) screen.scrollTop = screen.scrollHeight;
   });
 }
 
@@ -495,6 +553,9 @@ export async function renderClientAccount(root, state, callbacks = {}) {
       onSaved: () => renderClientAccount(root, state, callbacks),
     }),
     onPassword: () => openClientPasswordSettings(state),
+    onConsents: () => openClientConsentSettings(state, {
+      onChanged: () => renderClientAccount(root, state, callbacks),
+    }),
     onLogout: callbacks.onLogout || (() => {
       clearBookingAccount(state.tenantId);
     }),
