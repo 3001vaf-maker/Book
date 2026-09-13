@@ -14,10 +14,11 @@ import { disableWebPush, enableWebPush, getWebPushState } from '../core/notifica
 import {
   appHeader,
   appShell,
+  bookingThemeStyle,
   button,
   clientBottomNavigation,
-  clientProfileCard,
   emptyState,
+  entityCard,
   escapeHtml,
   listEntries,
   listEntry,
@@ -138,20 +139,13 @@ function aggregateFinance(requests = [], account = {}) {
 
 function programRows(account = {}) {
   const source = Array.isArray(account.programs) ? account.programs : [];
-  const find = (pattern) => source.find((item) => pattern.test(String(item?.name || item?.title || '')));
-  const deposit = find(/депозит/i);
-  const personal = find(/личн.*сч[её]т/i);
-  const valueOf = (item) => item ? String(item.value ?? item.balance ?? '') : '0 ₽';
-  const fixed = [
-    { label: 'Депозит', value: valueOf(deposit), source: deposit || { name: 'Депозит', value: '0 ₽' } },
-    { label: 'Личный счёт', value: valueOf(personal), source: personal || { name: 'Личный счёт', value: '0 ₽' } },
-  ];
-  const rest = source.filter((item) => item !== deposit && item !== personal).map((item) => ({
-    label: String(item?.name || item?.title || 'Программа'),
-    value: String(item?.value ?? item?.balance ?? ''),
-    source: item,
-  }));
-  return [...fixed, ...rest];
+  return source
+    .filter((item) => item && typeof item === 'object')
+    .map((item) => ({
+      label: String(item?.name || item?.title || 'Программа'),
+      value: String(item?.value ?? item?.balance ?? ''),
+      source: item,
+    }));
 }
 
 function openProgram(row) {
@@ -253,8 +247,15 @@ function bindBottomNavigation(root, state, handlers) {
   }));
 }
 
+function accountThemeClasses(state) {
+  const theme = state.settings?.theme && typeof state.settings.theme === 'object' ? state.settings.theme : {};
+  const shape = ['soft', 'round', 'straight', 'cut'].includes(theme.shape) ? theme.shape : 'soft';
+  const choiceStyle = ['cards', 'compact', 'list'].includes(theme.choiceStyle) ? theme.choiceStyle : 'cards';
+  return `booking-client booking-client--account booking-shape--${shape} booking-choice-style--${choiceStyle}`;
+}
+
 function renderShell(root, state, { title, back = null, action = null, settings = null, body = '', primaryAction = '', className = '', media = null } = {}) {
-  root.innerHTML = appShell({
+  const shell = appShell({
     header: appHeader({ title, back, action, settings }),
     media: media === null ? mediaRail(mediaItems(state)) : media,
     body,
@@ -262,6 +263,7 @@ function renderShell(root, state, { title, back = null, action = null, settings 
     bottomNavigation: clientBottomNavigation(state.clientTab || 'profile'),
     className,
   });
+  root.innerHTML = `<section class="${accountThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${shell}</section>`;
 }
 
 async function openChatSettings(state) {
@@ -318,26 +320,41 @@ async function renderProfile(root, state, handlers) {
   const request = visit.request;
   const finance = aggregateFinance(requests, account);
   const rows = programRows(account);
-  const card = clientProfileCard({
-    workplace: request ? workplaceName(state, request) : '',
-    visitLabel: visit.label,
-    date: request ? formatDate(request.date) : '',
-    time: request?.from || '',
-    uei: account.uei || '',
-    discount: Number(account.discountPercent || 0),
-    name: [account.name, account.surname].filter(Boolean).join(' '),
-    phone: formatPhone(account.phone || ''),
-    financial: [
+  const discount = Math.max(0, Number(account.discountPercent || 0));
+  const card = entityCard({
+    id: account.uei ? `UEI ${account.uei}` : '',
+    title: [account.name, account.surname].filter(Boolean).join(' '),
+    subtitle: formatPhone(account.phone || ''),
+    topMeta: request ? [
+      { value: workplaceName(state, request), row: 1 },
+      { value: visit.label, weight: 'regular', row: 2 },
+    ] : [],
+    topRightMeta: [
+      ...(discount > 0 ? [{ value: `${discount}%`, row: 1 }] : []),
+      ...(request ? [
+        { value: formatDate(request.date), row: 2 },
+        { value: request.from || '', row: 3 },
+      ] : []),
+    ],
+    meta: [
       { value: money(finance.subtotal), label: 'Стоимость' },
       { value: money(finance.discount), label: 'Скидка' },
       { value: money(finance.paid), label: 'Оплачено' },
     ],
-    rows: rows.map((row, index) => ({ ...row, data: `data-client-program="${index}"` })),
+    detailRows: rows.map((row, index) => ({
+      left: row.label,
+      right: row.value,
+      data: `data-client-program="${index}"`,
+      aria: `Открыть программу ${row.label}`,
+    })),
+    className: 'entity-card--hero',
   });
+  const profileMedia = mediaRail(mediaItems(state)) || '<div class="app-media-rail app-media-rail--placeholder" aria-hidden="true"></div>';
   renderShell(root, state, {
     title: 'Профиль',
     settings: { data: 'data-client-profile-settings', aria: 'Настройки профиля' },
     body: card,
+    media: profileMedia,
     primaryAction: button('Записаться', { data: 'data-client-booking' }),
     className: 'app-view-shell--profile',
   });
