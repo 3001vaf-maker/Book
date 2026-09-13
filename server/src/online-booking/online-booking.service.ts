@@ -12,6 +12,7 @@ import { PrismaService } from '../prisma.service';
 import { BusinessStateService } from '../business-state/business-state.service';
 import { DocumentStateService } from '../document-state/document-state.service';
 import { ProfileService } from '../profile/profile.service';
+import { ClientCardLinkService } from './client-card-link.service';
 
 function objectValue(value: unknown): Record<string, any> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : {};
@@ -27,33 +28,6 @@ function text(value: unknown) {
 
 function emailValue(value: unknown) {
   return text(value).toLowerCase();
-}
-
-function uniqueStrings(values: unknown[]) {
-  return [...new Set(values.map((value) => text(value)).filter(Boolean))];
-}
-
-function phoneDigits(value: unknown) {
-  return text(value).replace(/\D/g, '');
-}
-
-function phonesMatch(left: unknown, right: unknown) {
-  const a = phoneDigits(left);
-  const b = phoneDigits(right);
-  if (!a || !b) return false;
-  if (a === b) return true;
-  if (a.length === 11 && b.length === 11 && a.slice(1) === b.slice(1)) {
-    return (a.startsWith('7') && b.startsWith('8')) || (a.startsWith('8') && b.startsWith('7'));
-  }
-  return false;
-}
-
-function personHasPhone(person: Record<string, any>, phone: unknown) {
-  return arrayValue(person.phones).some((value) => phonesMatch(value, phone));
-}
-
-function personAccountIds(person: Record<string, any>) {
-  return uniqueStrings(arrayValue(person.accounts));
 }
 
 function dateValue(value: unknown) {
@@ -146,6 +120,7 @@ function publicAccount(account: any) {
     name: account.name,
     surname: account.surname,
     phone: account.phone,
+    telegramId: account.telegramId || '',
     consents: arrayValue(account.consents),
     profileData: normalizeProfileData(account.profileData),
     uei: text(account.uei),
@@ -178,6 +153,7 @@ export class OnlineBookingService {
     private readonly businessState: BusinessStateService,
     private readonly documentState: DocumentStateService,
     private readonly profile: ProfileService,
+    private readonly clientCards: ClientCardLinkService,
   ) {}
 
   private async publication(tenantId: string) {
@@ -195,86 +171,17 @@ export class OnlineBookingService {
     return { ...profile, ...operational, documents };
   }
 
-  private async clientCardState(tenantId: string, phone: unknown) {
-    const business = await this.businessState.get(tenantId);
-    const people = arrayValue(business.people).map((value) => objectValue(value));
-    const members = people
-      .map((person, position) => ({ person, position }))
-      .filter(({ person }) => personHasPhone(person, phone));
-    return {
-      business,
-      people,
-      members,
-      owner: members[0] || null,
-    };
-  }
-
-  private async bindAccountToClientCard(
-    tenantId: string,
-    account: any,
-  ): Promise<{ person: Record<string, any>; clientCardExisted: boolean }> {
-    const accountId = text(account?.id);
-    if (!accountId) throw new BadRequestException('У аккаунта онлайн-записи отсутствует id');
-    const card = await this.clientCardState(tenantId, account.phone);
-
-    if (card.owner) {
-      const ownerKey = text(card.owner.person.key);
-      for (const [position, current] of card.people.entries()) {
-        const key = text(current.key);
-        if (!key || key === ownerKey || !personAccountIds(current).includes(accountId)) continue;
-        const detached = {
-          ...current,
-          accounts: personAccountIds(current).filter((id) => id !== accountId),
-        };
-        await this.businessState.upsertPerson(tenantId, key, { person: detached, position });
-      }
-
-      const owner: Record<string, any> = {
-        ...card.owner.person,
-        accounts: uniqueStrings([...personAccountIds(card.owner.person), accountId]),
-        phones: uniqueStrings([...arrayValue(card.owner.person.phones), account.phone]),
-        emails: uniqueStrings([...arrayValue(card.owner.person.emails), emailValue(account.email)]),
-        telegrams: uniqueStrings(arrayValue(card.owner.person.telegrams)),
-      };
-      await this.businessState.upsertPerson(tenantId, ownerKey, { person: owner, position: card.owner.position });
-      return { person: owner, clientCardExisted: true };
-    }
-
-    for (const [position, current] of card.people.entries()) {
-      const key = text(current.key);
-      if (!key || !personAccountIds(current).includes(accountId)) continue;
-      const detached = {
-        ...current,
-        accounts: personAccountIds(current).filter((id) => id !== accountId),
-      };
-      await this.businessState.upsertPerson(tenantId, key, { person: detached, position });
-    }
-
-    const person = objectValue(await this.businessState.upsertBookingPersonFromAccount(tenantId, account as any));
-    return { person, clientCardExisted: false };
-  }
-
   private async accountView(tenantId: string, account: any) {
     const identity = await this.businessState.bookingIdentityForAccount(tenantId, account.id);
     const person = identity?.person || {};
-    const card = await this.clientCardState(tenantId, account.phone);
-    const cardPeople = card.members.map(({ person: member }) => member);
-    const visits = cardPeople.length
-      ? cardPeople.reduce((sum, member) => sum + Math.max(0, Math.floor(numeric(member.visits, 0))), 0)
-      : person.visits ?? account.visits;
-    const totalSpent = cardPeople.length
-      ? cardPeople.reduce((sum, member) => sum + Math.max(0, numeric(member.totalSpent, 0)), 0)
-      : person.totalSpent ?? account.totalSpent;
-    const lastVisit = cardPeople.map((member) => text(member.lastVisit)).filter(Boolean).sort().at(-1)
-      || text(person.lastVisit)
-      || text(account.lastVisit);
+    const cardStats = await this.clientCards.cardStats(tenantId, account);
     return publicAccount({
       ...account,
       uei: identity?.uei || account.uei,
       discountPercent: person.discountPercent ?? account.discountPercent,
-      visits,
-      totalSpent,
-      lastVisit,
+      visits: cardStats?.visits ?? person.visits ?? account.visits,
+      totalSpent: cardStats?.totalSpent ?? person.totalSpent ?? account.totalSpent,
+      lastVisit: cardStats?.lastVisit || person.lastVisit || account.lastVisit,
       programs: Array.isArray(person.programs) ? person.programs : account.programs,
     });
   }
@@ -363,19 +270,14 @@ export class OnlineBookingService {
     };
   }
 
-  async prepareAccount(tenantId: string, body: Record<string, any>) {
-    const normalizedEmail = emailValue(body.email);
-    const phone = text(body.phone);
+  async prepareAccount(tenantId: string, email: unknown) {
+    const normalizedEmail = emailValue(email);
     if (!normalizedEmail) throw new BadRequestException('Введите email');
-    if (!/^\+\d{8,15}$/.test(phone)) throw new BadRequestException('Введите телефон полностью');
-    const [account, card] = await Promise.all([
-      this.prisma.bookingAccount.findUnique({
-        where: { tenantId_email: { tenantId, email: normalizedEmail } },
-        select: { id: true },
-      }),
-      this.clientCardState(tenantId, phone),
-    ]);
-    return { exists: Boolean(account), clientCardExists: Boolean(card.owner) };
+    const account = await this.prisma.bookingAccount.findUnique({
+      where: { tenantId_email: { tenantId, email: normalizedEmail } },
+      select: { id: true },
+    });
+    return { exists: Boolean(account) };
   }
 
   async registerAccount(tenantId: string, body: Record<string, any>) {
@@ -402,11 +304,12 @@ export class OnlineBookingService {
         name,
         surname: text(body.surname),
         phone,
+        telegramId: text(body.telegramId),
         consents: consents as Prisma.InputJsonValue,
         profileData: normalizeProfileData(body.profileData) as Prisma.InputJsonValue,
       },
     });
-    const binding = await this.bindAccountToClientCard(tenantId, account);
+    const binding = await this.clientCards.bindFirstAccess(tenantId, account as any);
     await this.documentState.recordAcceptedConsents(tenantId, text(binding.person.key), consents);
     return {
       accessToken: await this.issueAccountToken(account),
@@ -423,7 +326,7 @@ export class OnlineBookingService {
     if (!account || !(await compare(text(password), account.passwordHash))) {
       throw new UnauthorizedException('Неверный email или пароль');
     }
-    const binding = await this.bindAccountToClientCard(tenantId, account);
+    const binding = await this.clientCards.bindFirstAccess(tenantId, account as any);
     await this.documentState.recordAcceptedConsents(tenantId, text(binding.person.key), normalizeConsents(account.consents));
     return {
       accessToken: await this.issueAccountToken(account),
@@ -435,7 +338,7 @@ export class OnlineBookingService {
   async getAccount(tenantId: string, accountId: string) {
     const account = await this.prisma.bookingAccount.findFirst({ where: { id: accountId, tenantId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
-    const binding = await this.bindAccountToClientCard(tenantId, account);
+    const binding = await this.clientCards.bindFirstAccess(tenantId, account as any);
     await this.documentState.recordAcceptedConsents(tenantId, text(binding.person.key), normalizeConsents(account.consents));
     return this.accountView(tenantId, account);
   }
@@ -466,11 +369,12 @@ export class OnlineBookingService {
         name: text(body.name) || account.name,
         surname: body.surname == null ? account.surname : text(body.surname),
         phone,
+        telegramId: text(body.telegramId) || account.telegramId,
         consents: merged as Prisma.InputJsonValue,
         profileData: profileData as Prisma.InputJsonValue,
       },
     });
-    const binding = await this.bindAccountToClientCard(tenantId, updated);
+    const binding = await this.clientCards.bindFirstAccess(tenantId, updated as any);
     await this.documentState.recordAcceptedConsents(tenantId, text(binding.person.key), merged);
     return this.accountView(tenantId, updated);
   }
@@ -529,7 +433,7 @@ export class OnlineBookingService {
       duration: Math.max(0, Number(procedure?.duration || 0)),
       cost: procedureCost(procedure, workplaceKey),
     }));
-    const binding = await this.bindAccountToClientCard(tenantId, account);
+    const binding = await this.clientCards.bindFirstAccess(tenantId, account as any);
     const person = binding.person;
     await this.documentState.recordAcceptedConsents(tenantId, text(person.key), accountConsents);
     const identity = await this.businessState.bookingIdentityForAccount(tenantId, account.id);
@@ -542,6 +446,7 @@ export class OnlineBookingService {
       surname: text(account.surname),
       phone: text(account.phone),
       email: text(account.email),
+      telegramId: text(account.telegramId),
       discountPercent: percent(pricingPerson?.discountPercent),
     };
     const recordSnapshot = initialRequestSnapshot(procedures, { discountPercent: client.discountPercent });
@@ -587,7 +492,7 @@ export class OnlineBookingService {
   async getMyRequests(tenantId: string, accountId: string) {
     const account = await this.prisma.bookingAccount.findFirst({ where: { id: accountId, tenantId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
-    await this.bindAccountToClientCard(tenantId, account);
+    await this.clientCards.bindFirstAccess(tenantId, account as any);
     const identity = await this.businessState.bookingIdentityForAccount(tenantId, accountId);
     const accountIds = identity?.accountIds?.length ? identity.accountIds : [account.id];
     const requests = await this.prisma.bookingRequest.findMany({
@@ -598,49 +503,14 @@ export class OnlineBookingService {
       },
       orderBy: { createdAt: 'desc' },
     });
-
     const requestViews = await Promise.all(requests.map(async (request) => ({
       ...request,
       recordSnapshot: request.importedRecordId
         ? await this.businessState.bookingRecordSnapshot(tenantId, request.importedRecordId, request.recordSnapshot)
         : request.recordSnapshot,
     })));
-
     const importedRecordIds = new Set(requests.map((request) => text(request.importedRecordId)).filter(Boolean));
-    const card = await this.clientCardState(tenantId, account.phone);
-    const memberKeys = new Set(card.members.map(({ person }) => text(person.key)).filter(Boolean));
-    const cancelled = new Set(arrayValue(card.business.recordEvents)
-      .filter((event) => text(event?.type) === 'cancelled')
-      .map((event) => text(event?.recordId))
-      .filter(Boolean));
-    const manualRecords = arrayValue(card.business.records).filter((value) => {
-      const record = objectValue(value);
-      const recordId = text(record.id);
-      if (!recordId || importedRecordIds.has(recordId) || cancelled.has(recordId) || text(record.status) === 'cancelled') return false;
-      const client = objectValue(record.client);
-      return memberKeys.has(text(client.key)) || phonesMatch(client.phone, account.phone);
-    });
-
-    const manualViews = await Promise.all(manualRecords.map(async (value) => {
-      const record = objectValue(value);
-      const recordId = text(record.id);
-      return {
-        id: `record:${recordId}`,
-        tenantId,
-        accountId: account.id,
-        workplaceKey: text(record.workplaceId),
-        date: dateValue(record.date),
-        from: text(record.from),
-        to: text(record.to),
-        procedures: arrayValue(record.procedures),
-        status: BookingRequestStatus.IMPORTED,
-        importedRecordId: recordId,
-        recordSnapshot: await this.businessState.bookingRecordSnapshot(tenantId, recordId, null),
-        createdAt: text(record.createdAt),
-        updatedAt: text(record.updatedAt),
-      };
-    }));
-
+    const manualViews = await this.clientCards.manualRecordViews(tenantId, account as any, importedRecordIds);
     return [...requestViews, ...manualViews].sort((left, right) => {
       const a = `${dateValue((left as any).date)}T${text((left as any).from)}`;
       const b = `${dateValue((right as any).date)}T${text((right as any).from)}`;
@@ -686,7 +556,7 @@ export class OnlineBookingService {
       orderBy: { createdAt: 'asc' },
       include: {
         account: {
-          select: { id: true, email: true, name: true, surname: true, phone: true, consents: true, profileData: true },
+          select: { id: true, email: true, name: true, surname: true, phone: true, telegramId: true, consents: true, profileData: true },
         },
       },
     });
