@@ -213,9 +213,12 @@ export class CommunicationBroadcastService {
     });
   }
 
-  private async channelAvailable(tenantId: string, channel: string, person: { phone: string; uei: string; email: string }) {
-    if (channel === 'TELEGRAM') return Boolean(await this.communications.telegramIdentity(tenantId, { phone: person.phone, uei: person.uei }));
-    return false;
+  private async channelDestination(tenantId: string, channel: string, person: { phone: string; uei: string; email: string }) {
+    if (channel === 'TELEGRAM') {
+      const identity = await this.communications.telegramIdentity(tenantId, { phone: person.phone, uei: person.uei });
+      return text(identity?.externalUserId);
+    }
+    return '';
   }
 
   async preview(tenantId: string, input: { channel?: unknown; all?: unknown; phones?: unknown; personKeys?: unknown; groupId?: unknown }) {
@@ -225,8 +228,9 @@ export class CommunicationBroadcastService {
     const audience: Array<(typeof requested)[number]> = [];
     const excluded: Array<{ personKey: string; phone: string; reason: string }> = [];
     for (const person of requested) {
-      if (!(await this.documents.canSendMessages(tenantId, person.personKey))) { excluded.push({ personKey: person.personKey, phone: person.phone, reason: 'no-consent' }); continue; }
-      if (!(await this.channelAvailable(tenantId, channel, person))) { excluded.push({ personKey: person.personKey, phone: person.phone, reason: 'no-channel' }); continue; }
+      const destination = await this.channelDestination(tenantId, channel, person);
+      if (!destination) { excluded.push({ personKey: person.personKey, phone: person.phone, reason: 'no-channel' }); continue; }
+      if (!(await this.documents.canSendMessages(tenantId, channel, destination))) { excluded.push({ personKey: person.personKey, phone: person.phone, reason: 'no-consent' }); continue; }
       audience.push(person);
     }
     return { channel, requestedCount: requested.length, eligibleCount: audience.length, excludedCount: excluded.length, audience, excluded };
