@@ -1,6 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { Prisma } from '@prisma/client';
 import { BusinessStateService } from '../business-state/business-state.service';
 import { PrismaService } from '../prisma.service';
 
@@ -70,10 +69,6 @@ function tokenHash(value: string) {
   return createHash('sha256').update(value).digest('hex');
 }
 
-function json(value: unknown): Prisma.InputJsonValue {
-  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
-}
-
 @Injectable()
 export class CommunicationService {
   constructor(
@@ -127,46 +122,50 @@ export class CommunicationService {
       LIMIT 1
     `;
     const existingTelegram = telegramRows[0] || null;
-    const phoneAndTelegramMatch = Boolean(existingTelegram && canonicalPhone(existingTelegram.cardPhone) === cardPhone);
+    const samePhone = Boolean(existingTelegram && canonicalPhone(existingTelegram.cardPhone) === cardPhone);
+
     const business = await this.businessState.get(tenantId);
     const phoneMatch = (Array.isArray(business.people) ? business.people : [])
       .map((value) => objectValue(value)).find((person) => personHasPhone(person, cardPhone)) || null;
-    const match = phoneAndTelegramMatch ? 'phone+telegram' : phoneMatch ? 'phone' : 'new';
+    const match = samePhone ? 'phone+telegram' : phoneMatch ? 'phone' : 'new';
+
     const identity = await this.businessState.bookingIdentityForAccount(tenantId, accountId);
     const personKey = text(identity?.person?.key || identity?.matchedPerson?.key);
     if (!personKey) throw new NotFoundException('Клиентская карта не найдена');
     const uei = text(identity?.uei);
     const display = telegramUsername(ticket.username);
 
-    if (existingTelegram && !phoneAndTelegramMatch && existingTelegram.uei && uei && existingTelegram.uei !== uei) {
-      throw new ConflictException('Этот Telegram уже связан с другой клиентской картой');
-    }
-
-    await this.prisma.$executeRaw`
-      INSERT INTO "CommunicationIdentity" (
-        "id", "tenantId", "cardPhone", "uei", "channel", "externalUserId", "display", "verifiedAt", "createdAt", "updatedAt"
-      ) VALUES (
-        ${randomUUID()}, ${tenantId}, ${cardPhone}, ${uei}, 'TELEGRAM', ${ticket.telegramUserId}, ${display}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-      )
-      ON CONFLICT ("tenantId", "channel", "externalUserId") DO UPDATE
-      SET "cardPhone" = EXCLUDED."cardPhone", "uei" = EXCLUDED."uei", "display" = EXCLUDED."display",
-          "verifiedAt" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP
-    `;
-
-    if (display) {
-      const personRow = await this.prisma.businessPerson.findUnique({ where: { tenantId_key: { tenantId, key: personKey } } });
-      if (personRow) {
-        const person = objectValue(personRow.data);
-        const telegrams = Array.isArray(person.telegrams) ? person.telegrams.map(text).filter(Boolean) : [];
-        person.telegrams = [...new Set([...telegrams.filter((item) => !/^\d+$/.test(item)), display])];
-        await this.prisma.businessPerson.update({ where: { id: personRow.id }, data: { data: json(person) } });
+    if (existingTelegram) {
+      if (!samePhone) throw new ConflictException('Этот Telegram уже связан с другой клиентской картой');
+      if (existingTelegram.uei && uei && existingTelegram.uei !== uei) {
+        throw new ConflictException('Этот Telegram уже связан с другим UEI');
       }
     }
+    const resolvedUei = uei || text(existingTelegram?.uei);
 
-    const used = await this.prisma.$executeRaw`
-      UPDATE "TelegramEntryTicket" SET "usedAt" = CURRENT_TIMESTAMP WHERE "id" = ${ticket.id} AND "usedAt" IS NULL
-    `;
-    if (!used) throw new ConflictException('Telegram-вход уже использован');
+    await this.prisma.$transaction(async (tx) => {
+      const used = await tx.$executeRaw`
+        UPDATE "TelegramEntryTicket"
+        SET "usedAt" = CURRENT_TIMESTAMP
+        WHERE "id" = ${ticket.id}
+          AND "usedAt" IS NULL
+          AND "expiresAt" > CURRENT_TIMESTAMP
+      `;
+      if (!used) throw new ConflictException('Telegram-вход уже использован или истёк');
+
+      await tx.$executeRaw`
+        INSERT INTO "CommunicationIdentity" (
+          "id", "tenantId", "cardPhone", "uei", "channel", "externalUserId", "display", "verifiedAt", "createdAt", "updatedAt"
+        ) VALUES (
+          ${randomUUID()}, ${tenantId}, ${cardPhone}, ${resolvedUei}, 'TELEGRAM', ${ticket.telegramUserId}, ${display}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        )
+        ON CONFLICT ("tenantId", "channel", "externalUserId") DO UPDATE
+        SET "display" = EXCLUDED."display",
+            "verifiedAt" = CURRENT_TIMESTAMP,
+            "updatedAt" = CURRENT_TIMESTAMP
+      `;
+    });
+
     return { linked: true, channel: 'TELEGRAM', username: display, match };
   }
 
