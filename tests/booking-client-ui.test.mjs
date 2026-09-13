@@ -9,6 +9,8 @@ const consentPolicy = fs.readFileSync('server/src/document-state/consent-policy.
 const telegramBot = fs.readFileSync('server/src/communication/telegram-bot.service.ts', 'utf8');
 const shellUi = fs.readFileSync('ui/shell/index.js', 'utf8');
 const shellCss = fs.readFileSync('ui/shell/shell.css', 'utf8');
+const clientMobileCss = fs.readFileSync('ui/shell/client-mobile.css', 'utf8');
+const indexHtml = fs.readFileSync('index.html', 'utf8');
 const bookingUi = fs.readFileSync('ui/booking/index.js', 'utf8');
 
 assert.match(booking, /renderClientAccount/);
@@ -56,6 +58,10 @@ assert.match(shellCss, /grid-template-columns:var\(--shell-icon-slot\) minmax\(0
 assert.match(shellCss, /bottom-nav--client/);
 assert.match(shellCss, /client-profile-card__metric strong/);
 assert.match(shellCss, /font-size:clamp\(18px,4\.8vw,20px\)/);
+assert.match(indexHtml, /ui\/shell\/client-mobile\.css/);
+assert.match(clientMobileCss, /\.app-shell\.app-shell--booking\s*\{[\s\S]*?width:min\(100%,var\(--app-max-width\)\);[\s\S]*?max-width:var\(--app-max-width\);/);
+assert.match(clientMobileCss, /\.app-shell\.app-shell--booking \.app-view-shell[\s\S]*?max-width:100%/);
+assert.doesNotMatch(clientMobileCss, /max-width:none/);
 assert.match(bookingUi, /Утро/);
 assert.match(bookingUi, /День/);
 assert.match(bookingUi, /Вечер/);
