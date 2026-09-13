@@ -80,3 +80,14 @@ export async function enableWebPush(tenantId) {
   if (Notification.permission === 'default') await Notification.requestPermission();
   return syncWebPush(tenantId);
 }
+
+export async function disableWebPush(tenantId) {
+  if (!supported() || !getBookingAccountToken(tenantId)) return getWebPushState(tenantId);
+  const registration = await navigator.serviceWorker.getRegistration('/');
+  const subscription = await registration?.pushManager.getSubscription();
+  if (subscription) {
+    await deleteWebPushSubscription(tenantId, subscription.endpoint).catch(() => null);
+    await subscription.unsubscribe().catch(() => false);
+  }
+  return getWebPushState(tenantId);
+}
