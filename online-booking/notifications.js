@@ -4,7 +4,7 @@ import {
   markBookingNotificationRead,
 } from '../core/booking-account/index.js';
 import { enableWebPush, getWebPushState, syncWebPush } from '../core/notifications/web-push.js';
-import { escapeHtml, modal, mountModal } from '../ui/ui.js';
+import { button, escapeHtml, modal, mountModal } from '../ui/ui.js';
 
 const STYLE_ID = 'book-client-notifications-style';
 
@@ -17,20 +17,20 @@ function ensureStyles() {
     .booking-notifications-button.is-visible{display:flex}
     .booking-notifications-button svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
     .booking-notifications-badge{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#d93025;color:#fff;font:600 11px/18px system-ui;text-align:center;border:2px solid var(--surface,#fff)}
-    .booking-notifications-feed{display:grid;gap:8px}
-    .booking-notifications-item{width:100%;border:1px solid rgba(127,127,127,.28);border-radius:14px;background:transparent;color:inherit;padding:12px 14px;text-align:left;display:grid;gap:4px;cursor:pointer}
+    .modal-sheet.booking-notifications-modal{width:calc(100vw - 32px);max-width:398px;min-width:0}
+    .booking-notifications-feed{display:grid;gap:8px;min-width:0}
+    .booking-notifications-item{width:100%;min-width:0;max-width:100%;overflow:hidden;border:1px solid rgba(127,127,127,.28);border-radius:14px;background:transparent;color:inherit;padding:12px 14px;text-align:left;display:grid;gap:4px;cursor:pointer}
     .booking-notifications-item.is-unread{border-color:currentColor}
-    .booking-notifications-item__top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
-    .booking-notifications-item__title{font-weight:650}
+    .booking-notifications-item__top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;min-width:0}
+    .booking-notifications-item__title{font-weight:650;min-width:0;overflow-wrap:anywhere}
     .booking-notifications-item__date{font-size:12px;opacity:.58;white-space:nowrap}
     .booking-notifications-item__body{font-size:14px;opacity:.72;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .booking-notifications-empty{padding:20px 4px;text-align:center;opacity:.62}
-    .booking-notifications-push{border:1px solid rgba(127,127,127,.28);border-radius:14px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:12px}
-    .booking-notifications-push p{margin:0;font-size:13px;opacity:.72}
-    .booking-notifications-push button{border:1px solid currentColor;border-radius:999px;background:transparent;color:inherit;padding:8px 12px;font:inherit;cursor:pointer;white-space:nowrap}
-    .booking-notification-detail{display:grid;gap:14px}
-    .booking-notification-detail h2{margin:0;font-size:20px}
-    .booking-notification-detail p{margin:0;line-height:1.45;white-space:pre-wrap}
+    .booking-notifications-push{border:1px solid rgba(127,127,127,.28);border-radius:14px;padding:12px 14px;margin-bottom:12px;display:grid;gap:10px;min-width:0;max-width:100%;overflow:hidden}
+    .booking-notifications-push p{margin:0;min-width:0;font-size:13px;opacity:.72;overflow-wrap:anywhere}
+    .booking-notification-detail{display:grid;gap:14px;min-width:0}
+    .booking-notification-detail h2{margin:0;font-size:20px;overflow-wrap:anywhere}
+    .booking-notification-detail p{margin:0;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}
     .booking-notification-detail time{font-size:13px;opacity:.6}
   `;
   document.head.appendChild(style);
@@ -54,7 +54,7 @@ function iconMarkup() {
 
 function notificationDetail(item) {
   const content = `<div class="booking-notification-detail"><h2>${escapeHtml(item?.title || 'Уведомление')}</h2>${item?.body ? `<p>${escapeHtml(item.body)}</p>` : ''}<time>${escapeHtml(dateText(item?.createdAt))}</time></div>`;
-  mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
+  mountModal(document.body, modal(content, { className: 'booking-notifications-modal', variant: 'medium', surface: 'app' }));
 }
 
 function pushBlock(state) {
@@ -65,7 +65,7 @@ function pushBlock(state) {
   if (state.permission === 'denied') {
     return '<div class="booking-notifications-push"><p>Push запрещены в настройках браузера.</p></div>';
   }
-  return '<div class="booking-notifications-push"><p>Получать уведомления, даже когда Book закрыт.</p><button type="button" data-enable-booking-push>Включить Push</button></div>';
+  return `<div class="booking-notifications-push"><p>Получать уведомления, даже когда Book закрыт.</p>${button('Включить Push', { data: 'data-enable-booking-push' })}</div>`;
 }
 
 export function mountBookingNotifications(tenantId) {
@@ -115,7 +115,7 @@ export function mountBookingNotifications(tenantId) {
         ${item.body ? `<span class="booking-notifications-item__body">${escapeHtml(item.body)}</span>` : ''}
       </button>`).join('');
     const content = `<div>${pushBlock(pushState)}<div class="booking-notifications-feed">${rows || '<div class="booking-notifications-empty">Уведомлений пока нет</div>'}</div></div>`;
-    const layer = mountModal(document.body, modal(content, { title: 'Уведомления', variant: 'medium', surface: 'app' }));
+    const layer = mountModal(document.body, modal(content, { title: 'Уведомления', className: 'booking-notifications-modal', variant: 'medium', surface: 'app' }));
     if (!layer) return;
 
     layer.querySelector('[data-enable-booking-push]')?.addEventListener('click', async (event) => {
