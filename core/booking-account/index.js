@@ -107,6 +107,18 @@ export async function updateBookingAccount(tenantId, data) {
   );
 }
 
+export async function changeBookingPassword(tenantId, currentPassword, newPassword) {
+  return jsonResponse(
+    await request(`/online-booking/${encodeURIComponent(tenantId)}/account/password`, {
+      tenantId,
+      auth: true,
+      method: 'PUT',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    }),
+    'Не удалось изменить пароль',
+  );
+}
+
 export async function createBookingRequest(tenantId, data) {
   return jsonResponse(
     await request(`/online-booking/${encodeURIComponent(tenantId)}/requests`, {
