@@ -84,6 +84,13 @@ export class ClientCardLinkService {
     return { person: owner, clientCardExisted: true };
   }
 
+  async bindFirstAccess(tenantId: string, account: Record<string, any>): Promise<ClientCardBinding> {
+    const existing = await this.findOrAttachExistingCard(tenantId, account);
+    if (existing) return existing;
+    const person = objectValue(await this.businessState.upsertBookingPersonFromAccount(tenantId, account));
+    return { person, clientCardExisted: false };
+  }
+
   async cardStats(tenantId: string, account: Record<string, any>) {
     const card = await this.cardState(tenantId, account.phone);
     if (!card.members.length) return null;
