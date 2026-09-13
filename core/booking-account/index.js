@@ -1,4 +1,4 @@
-import { API_BASE } from '../auth.js';
+import { API_BASE } from '../environment.js';
 
 function tokenKey(tenantId) {
   return `book.booking-account.token.${String(tenantId || '')}`;
@@ -165,5 +165,54 @@ export async function bindBookingTelegramEntry(tenantId, token) {
       body: JSON.stringify({ token: String(token || '').trim() }),
     }),
     'Не удалось привязать Telegram',
+  );
+}
+
+export async function getBookingNotifications(tenantId) {
+  return jsonResponse(
+    await request(`/online-booking/${encodeURIComponent(tenantId)}/account/notifications`, { tenantId, auth: true }),
+    'Не удалось загрузить уведомления',
+  );
+}
+
+export async function markBookingNotificationRead(tenantId, notificationId) {
+  return jsonResponse(
+    await request(`/online-booking/${encodeURIComponent(tenantId)}/account/notifications/${encodeURIComponent(notificationId)}/read`, {
+      tenantId,
+      auth: true,
+      method: 'POST',
+    }),
+    'Не удалось открыть уведомление',
+  );
+}
+
+export async function getWebPushConfiguration(tenantId) {
+  return jsonResponse(
+    await request(`/online-booking/${encodeURIComponent(tenantId)}/account/push/config`, { tenantId, auth: true }),
+    'Не удалось проверить Push',
+  );
+}
+
+export async function saveWebPushSubscription(tenantId, subscription) {
+  return jsonResponse(
+    await request(`/online-booking/${encodeURIComponent(tenantId)}/account/push/subscription`, {
+      tenantId,
+      auth: true,
+      method: 'PUT',
+      body: JSON.stringify({ subscription }),
+    }),
+    'Не удалось подключить Push',
+  );
+}
+
+export async function deleteWebPushSubscription(tenantId, endpoint) {
+  return jsonResponse(
+    await request(`/online-booking/${encodeURIComponent(tenantId)}/account/push/subscription`, {
+      tenantId,
+      auth: true,
+      method: 'DELETE',
+      body: JSON.stringify({ endpoint: String(endpoint || '') }),
+    }),
+    'Не удалось отключить Push',
   );
 }
