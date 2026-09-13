@@ -12,7 +12,6 @@ let timer = null;
 let running = false;
 let lastBusiness = '';
 let lastDocuments = '';
-let legacyClientCardsReconciled = false;
 let stopListeners = () => {};
 
 async function responseJson(response, fallback) {
@@ -21,19 +20,11 @@ async function responseJson(response, fallback) {
   return payload;
 }
 
-async function reconcileLegacyClientCards() {
-  if (legacyClientCardsReconciled) return;
-  const response = await apiRequest('/online-booking/owner/reconcile-legacy-client-cards', { method: 'POST' });
-  await responseJson(response, 'Не удалось проверить старые дубли клиентов');
-  legacyClientCardsReconciled = true;
-}
-
 async function pull() {
   if (running) return;
   running = true;
   try {
     await flushBusinessPersistence();
-    await reconcileLegacyClientCards();
     const [businessResponse, documentResponse] = await Promise.all([
       apiRequest('/business-state'),
       apiRequest('/document-state'),
