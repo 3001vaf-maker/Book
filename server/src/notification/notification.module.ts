@@ -5,11 +5,12 @@ import { DocumentStateModule } from '../document-state/document-state.module';
 import { PrismaService } from '../prisma.service';
 import { NotificationController } from './notification.controller';
 import { NotificationService } from './notification.service';
+import { WebPushService } from './web-push.service';
 
 @Module({
   imports: [AuthModule, BusinessStateModule, DocumentStateModule],
   controllers: [NotificationController],
-  providers: [NotificationService, PrismaService],
-  exports: [NotificationService],
+  providers: [NotificationService, WebPushService, PrismaService],
+  exports: [NotificationService, WebPushService],
 })
 export class NotificationModule {}
