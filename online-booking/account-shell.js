@@ -30,6 +30,8 @@ import {
   readOnlyReceipt,
   settingsPanel,
 } from '../ui/ui.js';
+import { openClientPasswordSettings } from './password-settings.js';
+import { openClientPersonalData } from './personal-data.js';
 
 function money(value) {
   const number = Number(value || 0);
@@ -298,14 +300,19 @@ async function openChatSettings(state) {
   bind();
 }
 
-function openProfileSettings(state, { onPersonalData, onLogout }) {
+function openProfileSettings(state, { onPersonalData, onPassword, onLogout }) {
   const layer = mountModal(document.body, modal(settingsPanel([
     { label: 'Личные данные', data: 'data-client-personal-data' },
+    { label: 'Изменить пароль', data: 'data-client-change-password' },
     { label: 'Выход', data: 'data-client-logout', variant: 'danger' },
   ]), { variant: 'medium', surface: 'app', title: 'Настройки профиля' }));
   layer?.querySelector('[data-client-personal-data]')?.addEventListener('click', () => {
     layer.remove();
     onPersonalData?.();
+  });
+  layer?.querySelector('[data-client-change-password]')?.addEventListener('click', () => {
+    layer.remove();
+    onPassword?.();
   });
   layer?.querySelector('[data-client-logout]')?.addEventListener('click', () => {
     layer.remove();
@@ -316,6 +323,7 @@ function openProfileSettings(state, { onPersonalData, onLogout }) {
 async function renderProfile(root, state, handlers) {
   const requests = state.clientRequests || [];
   const account = state.account || {};
+  const profile = account.profileData && typeof account.profileData === 'object' ? account.profileData : {};
   const visit = nearestVisit(requests);
   const request = visit.request;
   const finance = aggregateFinance(requests, account);
@@ -325,6 +333,7 @@ async function renderProfile(root, state, handlers) {
     id: account.uei ? `UEI ${account.uei}` : '',
     title: [account.name, account.surname].filter(Boolean).join(' '),
     subtitle: formatPhone(account.phone || ''),
+    image: profile.photo || '',
     topMeta: request ? [
       { value: workplaceName(state, request), row: 1 },
       { value: visit.label, weight: 'regular', row: 2 },
@@ -362,6 +371,7 @@ async function renderProfile(root, state, handlers) {
   root.querySelector('[data-client-booking]')?.addEventListener('click', handlers.onStartBooking);
   root.querySelector('[data-client-profile-settings]')?.addEventListener('click', () => openProfileSettings(state, {
     onPersonalData: handlers.onPersonalData,
+    onPassword: handlers.onPassword,
     onLogout: handlers.onLogout,
   }));
   root.querySelectorAll('[data-client-program]').forEach((node) => node.addEventListener('click', () => openProgram(rows[Number(node.dataset.clientProgram)])));
@@ -481,7 +491,10 @@ export async function renderClientAccount(root, state, callbacks = {}) {
     render: () => renderClientAccount(root, state, callbacks),
     onStartBooking: callbacks.onStartBooking || (() => {}),
     onRepeat: callbacks.onRepeat || (() => {}),
-    onPersonalData: callbacks.onPersonalData || (() => {}),
+    onPersonalData: () => openClientPersonalData(state, {
+      onSaved: () => renderClientAccount(root, state, callbacks),
+    }),
+    onPassword: () => openClientPasswordSettings(state),
     onLogout: callbacks.onLogout || (() => {
       clearBookingAccount(state.tenantId);
     }),
