@@ -214,8 +214,38 @@ export class DocumentStateService {
   }
 
   async recordAcceptedConsents(tenantId: string, clientId: string, facts: unknown) {
-    const accepted = (Array.isArray(facts) ? facts : []).filter((fact: any) => Boolean(fact?.accepted));
-    return this.recordConsentEvents(tenantId, clientId, accepted, 'online-booking-account');
+    const id = String(clientId || '').trim();
+    if (!id) return [];
+    const state = await this.prisma.businessDocumentState.findUnique({ where: { tenantId } });
+    if (!state?.migrationVerifiedAt) throw new ConflictException('Документы для онлайн-записи ещё не готовы');
+    const current = normalize(state.data);
+    const accepted = (Array.isArray(facts) ? facts : []).filter((item: any) => Boolean(item?.accepted) && String(item?.documentId || '').trim());
+    if (!accepted.length) return current.consents;
+    const next = [...current.consents];
+    for (const fact of accepted as any[]) {
+      const documentId = String(fact.documentId || '').trim();
+      const documentVersion = Math.max(1, Number(fact.documentVersion || 1));
+      const exists = next.some((item: any) => String(item?.clientId || '') === id
+        && String(item?.documentId || '') === documentId
+        && Number(item?.documentVersion || 1) === documentVersion
+        && String(item?.status || 'accepted') === 'accepted');
+      if (exists) continue;
+      const now = new Date().toISOString();
+      next.push({
+        id: randomUUID(),
+        clientId: id,
+        documentId,
+        documentVersion,
+        status: 'accepted',
+        acceptedAt: String(fact.acceptedAt || now),
+        revokedAt: '',
+        source: 'online-booking-account',
+        createdAt: now,
+      });
+    }
+    current.consents = next;
+    await this.prisma.businessDocumentState.update({ where: { tenantId }, data: { data: json(current) } });
+    return next;
   }
 
   async revokeConsent(tenantId: string, clientId: string, documentId: string, source = 'manual') {
