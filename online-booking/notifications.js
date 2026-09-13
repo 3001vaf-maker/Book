@@ -3,7 +3,7 @@ import {
   getBookingNotifications,
   markBookingNotificationRead,
 } from '../core/booking-account/index.js';
-import { getWebPushState, syncWebPush } from '../core/notifications/web-push.js';
+import { enableWebPush, getWebPushState, syncWebPush } from '../core/notifications/web-push.js';
 import { escapeHtml, modal, mountModal } from '../ui/ui.js';
 
 const STYLE_ID = 'book-client-notifications-style';
@@ -122,7 +122,7 @@ export function mountBookingNotifications(tenantId) {
       const control = event.currentTarget;
       control.disabled = true;
       try {
-        pushState = await syncWebPush(tenantId, { requestPermission: true });
+        pushState = await enableWebPush(tenantId);
         const block = control.closest('.booking-notifications-push');
         if (block) block.outerHTML = pushBlock(pushState);
       } catch {
