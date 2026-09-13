@@ -2,7 +2,6 @@ import {
   clearBookingAccount,
   createBookingRequest,
   getBookingAccount,
-  getBookingRequests,
   getBookingContext,
   getRememberedBookingEmail,
   loginBookingAccount,
@@ -14,15 +13,12 @@ import { normalizeBookingSettings } from '../core/booking-settings/index.js';
 import { formatPhone } from '../core/phone/index.js';
 import {
   accordion,
-  bookingAccountHeader,
   bookingAction,
   bookingActions,
   bookingAgreementCards,
   bookingChoiceCards,
   bookingDocument,
   bookingHeading,
-  bookingHistoryCards,
-  bookingPersonalDataButton,
   bookingScreen,
   bookingTimeGroups,
   emptyState,
@@ -46,6 +42,7 @@ import {
   hasRequiredBookingConsents,
   requiredBookingDocuments,
 } from './model.js';
+import { renderClientAccount } from './account-shell.js';
 
 function localDateKey(value = new Date()) {
   const date = value instanceof Date ? value : new Date(value);
@@ -113,14 +110,45 @@ function resetBookingChoice(state) {
   state.from = '';
   state.to = '';
   state.error = '';
+  state.repeatSelection = null;
 }
 
 function renderPage(root, state, blocks = [], { mode = 'center', className = '' } = {}) {
   root.innerHTML = bookingScreen(blocks, { settings: state.settings, mode, className });
 }
 
+function requestProcedures(request = {}) {
+  const snapshot = request.recordSnapshot && typeof request.recordSnapshot === 'object' ? request.recordSnapshot : {};
+  return Array.isArray(snapshot.procedures) && snapshot.procedures.length
+    ? snapshot.procedures
+    : Array.isArray(request.procedures) ? request.procedures : [];
+}
+
+function continueRepeat(root, state) {
+  const selection = state.repeatSelection;
+  if (!selection) return false;
+  state.repeatSelection = null;
+  const requestWorkplace = String(selection.workplaceKey || '').trim();
+  state.workplaceKey = state.lockedWorkplaceKey || requestWorkplace;
+  state.procedureIds = [...new Set((Array.isArray(selection.procedureIds) ? selection.procedureIds : []).map(String).filter(Boolean))];
+  state.date = '';
+  state.from = '';
+  state.to = '';
+  if (!state.workplaceKey) {
+    renderWorkplaces(root, state);
+    return true;
+  }
+  if (!state.procedureIds.length) {
+    renderProcedures(root, state);
+    return true;
+  }
+  renderDates(root, state);
+  return true;
+}
+
 function nextAfterAgreements(root, state) {
   state.error = '';
+  if (continueRepeat(root, state)) return;
   if (state.lockedWorkplaceKey) {
     state.workplaceKey = state.lockedWorkplaceKey;
     renderProcedures(root, state);
@@ -443,80 +471,13 @@ function renderConfirmation(root, state) {
       state.notice = 'Запись отправлена в журнал.';
       state.error = '';
       await refreshContext(state);
+      state.clientTab = 'profile';
       await renderAccountHome(root, state);
     } catch (error) {
       state.error = error instanceof Error ? error.message : 'Не удалось подтвердить запись';
       renderConfirmation(root, state);
     }
   });
-}
-
-function requestStatus(status) {
-  if (status === 'IMPORTED') return 'Подтверждена';
-  if (status === 'REJECTED') return 'Нужно выбрать другое время';
-  if (status === 'CANCELLED') return 'Отменена';
-  return 'Подтверждается';
-}
-
-function requestProcedures(request = {}) {
-  const snapshot = request.recordSnapshot && typeof request.recordSnapshot === 'object' ? request.recordSnapshot : {};
-  return Array.isArray(snapshot.procedures) && snapshot.procedures.length
-    ? snapshot.procedures
-    : Array.isArray(request.procedures) ? request.procedures : [];
-}
-
-function requestPricing(request = {}) {
-  const snapshot = request.recordSnapshot && typeof request.recordSnapshot === 'object' ? request.recordSnapshot : {};
-  const pricing = snapshot.pricing && typeof snapshot.pricing === 'object' ? snapshot.pricing : {};
-  const procedures = requestProcedures(request);
-  const subtotal = Number.isFinite(Number(pricing.subtotal))
-    ? Number(pricing.subtotal)
-    : procedures.reduce((sum, item) => sum + numericCost(item.cost), 0);
-  const discountPercent = Number(pricing.discountPercent || 0);
-  const total = Number.isFinite(Number(pricing.total)) ? Number(pricing.total) : discountedTotal(subtotal, discountPercent);
-  return { subtotal, discountPercent, total };
-}
-
-function requestPayment(request = {}) {
-  const snapshot = request.recordSnapshot && typeof request.recordSnapshot === 'object' ? request.recordSnapshot : {};
-  const payment = snapshot.payment && typeof snapshot.payment === 'object' ? snapshot.payment : {};
-  const pricing = requestPricing(request);
-  return {
-    state: String(payment.state || 'unpaid'),
-    paid: Math.max(0, Number(payment.paid || 0)),
-    due: Math.max(0, Number.isFinite(Number(payment.due)) ? Number(payment.due) : pricing.total),
-  };
-}
-
-function openRequestDetails(state, request) {
-  const workplace = getBookingWorkplace(state.context, request.workplaceKey) || {};
-  const procedures = requestProcedures(request);
-  const pricing = requestPricing(request);
-  const payment = requestPayment(request);
-  const paymentText = payment.state === 'paid'
-    ? 'Оплачено'
-    : payment.state === 'partial'
-      ? `К оплате ${money(payment.due)}`
-      : `К оплате ${money(payment.due)}`;
-  const card = entityCard({
-    title: procedures.map((item) => item.name).filter(Boolean).join(', ') || 'Запись',
-    topMeta: [{ value: workplace.name || 'Рабочее пространство', row: 1 }],
-    topRightMeta: [
-      { value: formatDate(request.date), row: 2 },
-      { value: `${request.from} - ${request.to}`, row: 3 },
-    ],
-    meta: [
-      { value: money(pricing.subtotal), label: 'Стоимость' },
-      { value: `${pricing.discountPercent || 0} %`, label: 'Скидка' },
-      { value: money(pricing.total), label: 'Итого' },
-    ],
-    detailRows: [
-      ...procedures.map((item) => ({ left: item.name || '', right: money(item.cost) })),
-      { left: paymentText, right: payment.state === 'paid' ? money(payment.paid || pricing.total) : '', weight: 'strong' },
-    ],
-    className: 'entity-card--hero entity-card--top-dark',
-  });
-  mountModal(document.body, modal(card, { variant: 'large' }));
 }
 
 function personalDataAccordion(account = {}) {
@@ -532,7 +493,7 @@ function personalDataAccordion(account = {}) {
 
 function openPersonalData(root, state) {
   const content = `<form data-booking-personal-form>${personalDataAccordion(state.account || {})}${errorBlock(state.personalError)}${bookingActions(bookingAction('Сохранить', { type: 'submit' }))}</form>`;
-  const modalRoot = mountModal(document.body, modal(content, { variant: 'medium' }));
+  const modalRoot = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app', title: 'Личные данные' }));
   if (!modalRoot) return;
   initAccordions(modalRoot);
   const form = modalRoot.querySelector('[data-booking-personal-form]');
@@ -561,76 +522,41 @@ function openPersonalData(root, state) {
   });
 }
 
-function accountPrograms(account = {}) {
-  const programs = Array.isArray(account.programs) ? account.programs : [];
-  return programs.map((program) => ({
-    left: String(program?.name || program?.title || 'Программа'),
-    right: String(program?.value || program?.balance || ''),
-  }));
+function startBookingFromAccount(root, state) {
+  resetBookingChoice(state);
+  seedConsents(state, state.account?.consents || []);
+  if (hasRequiredBookingConsents(state.context, state.account?.consents || [])) nextAfterAgreements(root, state);
+  else renderAgreements(root, state);
+}
+
+function repeatBooking(root, state, request) {
+  const procedureIds = requestProcedures(request).map((item) => String(item?.id || '')).filter(Boolean);
+  state.repeatSelection = {
+    workplaceKey: String(request?.workplaceKey || ''),
+    procedureIds,
+  };
+  state.date = '';
+  state.from = '';
+  state.to = '';
+  seedConsents(state, state.account?.consents || []);
+  if (hasRequiredBookingConsents(state.context, state.account?.consents || [])) continueRepeat(root, state);
+  else renderAgreements(root, state);
 }
 
 async function renderAccountHome(root, state) {
-  renderPage(root, state, [bookingAccountHeader(), emptyState('Загрузка', 'Получаем ваши записи.')], { mode: 'account' });
-  let requests = [];
-  try {
-    requests = await getBookingRequests(state.tenantId);
-    const freshAccount = await getBookingAccount(state.tenantId);
-    if (freshAccount) state.account = freshAccount;
-  } catch (error) {
-    state.error = error instanceof Error ? error.message : 'Не удалось загрузить записи';
-  }
-  const account = state.account || {};
-  const discount = accountDiscount(account);
-  const card = entityCard({
-    id: account.uei || '',
-    title: accountName(account),
-    subtitle: formatPhone(account.phone || ''),
-    topMeta: [{ value: account.email || '', row: 1 }],
-    topRightMeta: discount > 0 ? [{ value: `−${discount} %`, row: 1 }] : [],
-    meta: [
-      { value: String(Number(account.visits || 0)), label: 'Посещения' },
-      { value: money(account.totalSpent || 0), label: 'Оплачено' },
-      { value: account.lastVisit ? formatDate(account.lastVisit) : '—', label: 'Последний визит' },
-    ],
-    detailRows: accountPrograms(account),
-    className: 'entity-card--hero entity-card--top-dark',
+  await renderClientAccount(root, state, {
+    onStartBooking: () => startBookingFromAccount(root, state),
+    onRepeat: (request) => repeatBooking(root, state, request),
+    onPersonalData: () => openPersonalData(root, state),
+    onLogout: () => {
+      clearBookingAccount(state.tenantId);
+      state.account = null;
+      state.error = '';
+      state.clientTab = 'profile';
+      state.clientChatOpen = false;
+      renderLogin(root, state);
+    },
   });
-  const historyItems = (Array.isArray(requests) ? requests : []).map((request) => {
-    const procedures = requestProcedures(request).map((item) => item.name).filter(Boolean).join(', ');
-    return {
-      title: procedures || 'Запись',
-      secondary: `${formatDate(request.date)} · ${request.from}`,
-      status: requestStatus(request.status),
-      data: `data-booking-history="${escapeHtml(request.id)}"`,
-      aria: `Открыть запись ${procedures || ''} ${formatDate(request.date)}`,
-    };
-  });
-  renderPage(root, state, [
-    bookingAccountHeader(),
-    card,
-    bookingPersonalDataButton(),
-    state.notice ? `<div class="muted">${escapeHtml(state.notice)}</div>` : '',
-    historyItems.length ? bookingHistoryCards(historyItems) : emptyState('Записей пока нет', 'Здесь появятся ваши онлайн-записи.'),
-    errorBlock(state.error),
-  ], { mode: 'account' });
-  state.notice = '';
-  root.querySelector('[data-booking-new]')?.addEventListener('click', () => {
-    resetBookingChoice(state);
-    seedConsents(state, state.account?.consents || []);
-    if (hasRequiredBookingConsents(state.context, state.account?.consents || [])) nextAfterAgreements(root, state);
-    else renderAgreements(root, state);
-  });
-  root.querySelector('[data-booking-logout]')?.addEventListener('click', () => {
-    clearBookingAccount(state.tenantId);
-    state.account = null;
-    state.error = '';
-    renderLogin(root, state);
-  });
-  root.querySelector('[data-booking-personal-data]')?.addEventListener('click', () => openPersonalData(root, state));
-  root.querySelectorAll('[data-booking-history]').forEach((node) => node.addEventListener('click', () => {
-    const request = requests.find((item) => String(item.id) === String(node.dataset.bookingHistory));
-    if (request) openRequestDetails(state, request);
-  }));
 }
 
 async function refreshContext(state) {
@@ -658,6 +584,10 @@ export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = 
     personalError: '',
     notice: '',
     lastRequest: null,
+    repeatSelection: null,
+    clientTab: 'profile',
+    clientChatOpen: false,
+    clientRequests: [],
   };
 
   renderPage(root, state, [bookingHeading('Онлайн-запись', 'Загрузка…')]);
