@@ -140,7 +140,7 @@ function initialRequestSnapshot(procedures: any[], account: any) {
   return {
     procedures,
     pricing: { subtotal, discountPercent, total },
-    payment: { state: 'unpaid', paid: 0, due: total },
+    payment: { state: total <= 0.009 ? 'paid' : 'unpaid', paid: 0, due: total },
     updatedAt: new Date().toISOString(),
   };
 }
