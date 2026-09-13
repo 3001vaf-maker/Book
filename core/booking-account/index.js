@@ -1,4 +1,4 @@
-import { API_BASE } from '../auth.js';
+import { API_BASE } from '../environment.js';
 
 function tokenKey(tenantId) {
   return `book.booking-account.token.${String(tenantId || '')}`;
@@ -6,6 +6,29 @@ function tokenKey(tenantId) {
 
 function emailKey(tenantId) {
   return `book.booking-account.email.${String(tenantId || '')}`;
+}
+
+function telegramEntryToken() {
+  const params = new URLSearchParams(location.search);
+  return String(params.get('tg_entry') || params.get('telegram_entry') || '').trim();
+}
+
+function clearTelegramEntryFromUrl() {
+  const url = new URL(location.href);
+  if (!url.searchParams.has('tg_entry') && !url.searchParams.has('telegram_entry')) return;
+  url.searchParams.delete('tg_entry');
+  url.searchParams.delete('telegram_entry');
+  history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+}
+
+function sanitizeAccountData(data = {}) {
+  const source = { ...(data || {}) };
+  delete source.telegramId;
+  delete source.telegramUserId;
+  delete source.telegramUsername;
+  delete source.first_name;
+  delete source.last_name;
+  return source;
 }
 
 export function getBookingAccountToken(tenantId) {
@@ -32,7 +55,12 @@ async function request(path, { tenantId = '', auth = false, ...options } = {}) {
 
 async function jsonResponse(response, fallbackMessage) {
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload?.message || fallbackMessage);
+  if (!response.ok) {
+    const error = new Error(payload?.message || fallbackMessage);
+    error.code = payload?.code || '';
+    error.payload = payload;
+    throw error;
+  }
   return payload;
 }
 
@@ -40,6 +68,48 @@ function storeSession(tenantId, payload) {
   if (payload?.accessToken) localStorage.setItem(tokenKey(tenantId), payload.accessToken);
   if (payload?.account?.email) localStorage.setItem(emailKey(tenantId), payload.account.email);
   return payload;
+}
+
+async function bindTelegramEntryIfPresent(tenantId) {
+  const entry = telegramEntryToken();
+  if (!entry || !getBookingAccountToken(tenantId)) return null;
+  try {
+    const response = await request(`/online-booking/${encodeURIComponent(tenantId)}/account/telegram-entry`, {
+      tenantId,
+      auth: true,
+      method: 'POST',
+      body: JSON.stringify({ token: entry }),
+    });
+    if (!response.ok) {
+      if (response.status === 404 || response.status === 409) clearTelegramEntryFromUrl();
+      return null;
+    }
+    const payload = await response.json().catch(() => ({}));
+    clearTelegramEntryFromUrl();
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+function consentFacts(state = {}) {
+  return (Array.isArray(state?.consents) ? state.consents : []).map((item) => ({
+    documentId: String(item?.documentId || ''),
+    documentVersion: Math.max(1, Number(item?.documentVersion || 1)),
+    accepted: Boolean(item?.accepted),
+    acceptedAt: item?.accepted ? String(item?.eventAt || '') : '',
+    status: String(item?.status || ''),
+  })).filter((item) => item.documentId);
+}
+
+async function decorateAccountWithConsentState(tenantId, account) {
+  if (!account) return null;
+  const consentAccess = await getBookingConsentState(tenantId);
+  return {
+    ...account,
+    consents: consentFacts(consentAccess),
+    consentAccess,
+  };
 }
 
 export async function getBookingContext(tenantId, workplaceKey = '') {
@@ -52,13 +122,17 @@ export async function getBookingContext(tenantId, workplaceKey = '') {
   );
 }
 
-export async function prepareBookingAccount(tenantId, email) {
+export async function prepareBookingAccount(tenantId, value = {}) {
+  const data = typeof value === 'string' ? { email: value } : (value || {});
   return jsonResponse(
     await request(`/online-booking/${encodeURIComponent(tenantId)}/account/prepare`, {
       method: 'POST',
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({
+        email: String(data.email || '').trim().toLowerCase(),
+        phone: String(data.phone || '').trim(),
+      }),
     }),
-    'Не удалось проверить аккаунт',
+    'Не удалось проверить данные',
   );
 }
 
@@ -66,11 +140,14 @@ export async function registerBookingAccount(tenantId, data) {
   const payload = await jsonResponse(
     await request(`/online-booking/${encodeURIComponent(tenantId)}/account/register`, {
       method: 'POST',
-      body: JSON.stringify(data || {}),
+      body: JSON.stringify(sanitizeAccountData(data || {})),
     }),
     'Не удалось создать аккаунт',
   );
-  return storeSession(tenantId, payload);
+  storeSession(tenantId, payload);
+  await bindTelegramEntryIfPresent(tenantId);
+  payload.account = await decorateAccountWithConsentState(tenantId, payload.account);
+  return payload;
 }
 
 export async function loginBookingAccount(tenantId, email, password) {
@@ -81,7 +158,39 @@ export async function loginBookingAccount(tenantId, email, password) {
     }),
     'Не удалось войти',
   );
-  return storeSession(tenantId, payload);
+  storeSession(tenantId, payload);
+  await bindTelegramEntryIfPresent(tenantId);
+  return payload;
+}
+
+export async function getBookingConsentState(tenantId) {
+  return jsonResponse(
+    await request(`/online-booking/${encodeURIComponent(tenantId)}/account/consent-state`, { tenantId, auth: true }),
+    'Не удалось проверить согласия',
+  );
+}
+
+export async function submitBookingConsents(tenantId, consents = []) {
+  return jsonResponse(
+    await request(`/online-booking/${encodeURIComponent(tenantId)}/account/consents`, {
+      tenantId,
+      auth: true,
+      method: 'POST',
+      body: JSON.stringify({ consents }),
+    }),
+    'Не удалось сохранить согласия',
+  );
+}
+
+export async function revokeBookingConsent(tenantId, documentId) {
+  return jsonResponse(
+    await request(`/online-booking/${encodeURIComponent(tenantId)}/account/consents/${encodeURIComponent(documentId)}/revoke`, {
+      tenantId,
+      auth: true,
+      method: 'POST',
+    }),
+    'Не удалось отозвать согласие',
+  );
 }
 
 export async function getBookingAccount(tenantId) {
@@ -92,19 +201,29 @@ export async function getBookingAccount(tenantId) {
     clearBookingAccount(tenantId);
     return null;
   }
-  return jsonResponse(response, 'Не удалось открыть аккаунт');
+  const account = await jsonResponse(response, 'Не удалось открыть аккаунт');
+  await bindTelegramEntryIfPresent(tenantId);
+  const consentAccess = await getBookingConsentState(tenantId);
+  if (!consentAccess?.allowed) return null;
+  return {
+    ...account,
+    consents: consentFacts(consentAccess),
+    consentAccess,
+  };
 }
 
 export async function updateBookingAccount(tenantId, data) {
-  return jsonResponse(
+  const account = await jsonResponse(
     await request(`/online-booking/${encodeURIComponent(tenantId)}/account/me`, {
       tenantId,
       auth: true,
       method: 'PUT',
-      body: JSON.stringify(data || {}),
+      body: JSON.stringify(sanitizeAccountData(data || {})),
     }),
     'Не удалось обновить аккаунт',
   );
+  await bindTelegramEntryIfPresent(tenantId);
+  return decorateAccountWithConsentState(tenantId, account);
 }
 
 export async function createBookingRequest(tenantId, data) {
