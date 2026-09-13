@@ -51,6 +51,9 @@
   background:var(--booking-light);
   color:var(--booking-dark);
 }
+.booking-client--account .ui-button:disabled{
+  opacity:.42;
+}
 .booking-client--account .app-header .ui-button.app-header__control{
   border-radius:var(--radius-control);
 }
@@ -73,6 +76,21 @@
 }
 .booking-client--account .app-setting-toggle.is-on .app-setting-toggle__switch{
   background:var(--booking-dark);
+}
+
+.booking-client--account .app-view-shell--booking-flow{
+  min-height:var(--visual-vh,100dvh);
+  padding-bottom:calc(24px + env(safe-area-inset-bottom));
+}
+.booking-client--account .app-view-shell--booking-flow .app-view-shell__screen{
+  width:100%;
+  max-width:100%;
+  padding-top:18px;
+  padding-bottom:24px;
+}
+.booking-client--account .app-view-shell--booking-flow-center .app-view-shell__screen{
+  min-height:calc(var(--visual-vh,100dvh) - 64px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  align-content:center;
 }
 
 .booking-client--account .app-view-shell--profile{
@@ -103,6 +121,7 @@
 .booking-client--account.booking-shape--cut .ui-button,
 .booking-client--account.booking-shape--cut .message-bubble,
 .booking-client--account.booking-shape--cut .message-composer__input,
+.booking-client--account.booking-shape--cut .message-composer__attach,
 .booking-client--account.booking-shape--cut .app-setting-toggle,
 .booking-client--account.booking-shape--cut .nav-item.is-active{
   clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);
