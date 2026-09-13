@@ -1,0 +1,142 @@
+import { button } from '../buttons/index.js';
+import { navigationBar } from '../navigation/navigation.js';
+import { escapeHtml } from '../utils/escape-html.js';
+
+const CLIENT_NAV_ITEMS = [
+  { id: 'profile', label: 'Профиль', icon: '◉' },
+  { id: 'messages', label: 'Сообщения', icon: '◌' },
+  { id: 'history', label: 'История', icon: '▤' },
+];
+
+function text(value = '') {
+  return escapeHtml(String(value ?? ''));
+}
+
+export function appHeader({
+  title = '',
+  back = null,
+  action = null,
+  settings = null,
+} = {}) {
+  const backButton = back
+    ? button('‹', { className: 'app-header__control app-header__control--icon', data: back.data || '', aria: back.aria || 'Назад' })
+    : '<span class="app-header__placeholder" aria-hidden="true"></span>';
+  const actionButton = action
+    ? button(text(action.label || ''), { className: 'app-header__control app-header__control--action', data: action.data || '', aria: action.aria || action.label || '' })
+    : '<span class="app-header__placeholder app-header__placeholder--action" aria-hidden="true"></span>';
+  const settingsButton = settings
+    ? button(settings.label || '•••', { className: 'app-header__control app-header__control--icon', data: settings.data || '', aria: settings.aria || 'Настройки' })
+    : '<span class="app-header__placeholder" aria-hidden="true"></span>';
+
+  return `<header class="app-header" data-app-header>
+    <div class="app-header__slot app-header__slot--back">${backButton}</div>
+    <h1 class="app-header__title">${text(title)}</h1>
+    <div class="app-header__slot app-header__slot--action">${actionButton}</div>
+    <div class="app-header__slot app-header__slot--settings">${settingsButton}</div>
+  </header>`;
+}
+
+export function mediaRail(items = []) {
+  const values = (Array.isArray(items) ? items : []).filter(Boolean);
+  if (!values.length) return '';
+  return `<div class="app-media-rail" data-media-rail>${values.map((item, index) => {
+    const label = text(item.label || item.title || `Новость ${index + 1}`);
+    const image = String(item.image || '').trim();
+    const style = image ? ` style="--media-image:url('${text(image)}')"` : '';
+    const data = item.data ? ` ${item.data}` : '';
+    return `<button type="button" class="app-media-rail__item"${data}${style}><span class="app-media-rail__circle" aria-hidden="true"></span><span>${label}</span></button>`;
+  }).join('')}</div>`;
+}
+
+export function clientBottomNavigation(active = 'profile') {
+  return navigationBar(CLIENT_NAV_ITEMS, active, {
+    className: 'bottom-nav--client',
+    aria: 'Клиентская навигация',
+    dataAttribute: 'data-client-nav',
+  });
+}
+
+export function appShell({
+  header = '',
+  media = '',
+  body = '',
+  primaryAction = '',
+  bottomNavigation = '',
+  className = '',
+} = {}) {
+  const classes = ['app-view-shell', className].filter(Boolean).join(' ');
+  return `<section class="${classes}" data-app-view-shell>
+    ${header}
+    ${media ? `<div class="app-view-shell__media">${media}</div>` : ''}
+    <main class="app-view-shell__screen">${body}</main>
+    ${primaryAction ? `<div class="app-view-shell__primary-action">${primaryAction}</div>` : ''}
+    ${bottomNavigation}
+  </section>`;
+}
+
+export function clientProfileCard({
+  workplace = '',
+  visitLabel = 'Последний визит',
+  date = '',
+  time = '',
+  uei = '',
+  discount = 0,
+  name = '',
+  phone = '',
+  financial = [],
+  rows = [],
+} = {}) {
+  const finance = (Array.isArray(financial) ? financial : []).slice(0, 3);
+  const details = Array.isArray(rows) ? rows : [];
+  return `<article class="client-profile-card" data-client-profile-card>
+    <div class="client-profile-card__visit">
+      <strong class="client-profile-card__workplace">${text(workplace)}</strong>
+      <span class="client-profile-card__visit-label">${text(visitLabel)}</span>
+      <strong class="client-profile-card__visit-date">${text(date)}</strong>
+      <strong class="client-profile-card__visit-time">${text(time)}</strong>
+    </div>
+    <div class="client-profile-card__identity">
+      <strong class="client-profile-card__uei">${uei ? `UEI ${text(uei)}` : ''}</strong>
+      <strong class="client-profile-card__discount">${Number(discount) > 0 ? `${text(discount)}%` : ''}</strong>
+      <strong class="client-profile-card__name">${text(name)}</strong>
+      <span class="client-profile-card__phone">${text(phone)}</span>
+    </div>
+    <div class="client-profile-card__finance">${finance.map((item) => `<div class="client-profile-card__metric"><strong>${text(item.value)}</strong><span>${text(item.label)}</span></div>`).join('')}</div>
+    <div class="client-profile-card__rows">${details.map((item, index) => `<button type="button" class="client-profile-card__row"${item.data ? ` ${item.data}` : ''} data-profile-row="${index}"><span>${text(item.label)}</span><strong>${text(item.value)}</strong></button>`).join('')}</div>
+  </article>`;
+}
+
+export function messageBubble(message = {}, { viewer = 'client' } = {}) {
+  const direction = String(message.direction || '').toLowerCase();
+  const system = direction === 'system' || String(message.kind || '').toLowerCase() === 'system';
+  const outgoing = viewer === 'master' ? direction === 'outbound' : direction === 'inbound';
+  const classes = ['message-bubble', system ? 'message-bubble--system' : outgoing ? 'message-bubble--outgoing' : 'message-bubble--incoming'].join(' ');
+  const time = message.time || message.createdAt || '';
+  return `<div class="${classes}" data-message-id="${text(message.id || '')}"><div class="message-bubble__body">${text(message.body || '').replaceAll('\n', '<br>')}</div>${time ? `<span class="message-bubble__time">${text(time)}</span>` : ''}</div>`;
+}
+
+export function messageThread(messages = [], options = {}) {
+  const values = Array.isArray(messages) ? messages : [];
+  return `<div class="message-thread" data-message-thread>${values.map((message) => messageBubble(message, options)).join('')}</div>`;
+}
+
+export function messageComposer({ placeholder = 'Написать сообщение...', data = 'data-message-composer', sendData = 'data-message-send' } = {}) {
+  return `<form class="message-composer" ${data}><textarea class="message-composer__input" name="message" rows="1" placeholder="${text(placeholder)}" aria-label="${text(placeholder)}"></textarea>${button('➤', { className: 'message-composer__send', type: 'submit', data: sendData, aria: 'Отправить' })}</form>`;
+}
+
+export function readOnlyReceipt({
+  title = '',
+  status = '',
+  date = '',
+  time = '',
+  items = [],
+  totals = [],
+  action = null,
+} = {}) {
+  return `<section class="read-only-sheet" data-read-only-sheet>
+    <header class="read-only-sheet__header"><h2>${text(title)}</h2><div class="read-only-sheet__meta"><strong>${text(status)}</strong><span>${text(date)}</span><span>${text(time)}</span></div></header>
+    <div class="read-only-sheet__items">${(Array.isArray(items) ? items : []).map((item) => `<div class="read-only-sheet__row"><span>${text(item.label)}</span><strong>${text(item.value)}</strong></div>`).join('')}</div>
+    <div class="read-only-sheet__totals">${(Array.isArray(totals) ? totals : []).map((item) => `<div class="read-only-sheet__row${item.strong ? ' is-strong' : ''}"><span>${text(item.label)}</span><strong>${text(item.value)}</strong></div>`).join('')}</div>
+    ${action ? `<div class="read-only-sheet__action">${button(text(action.label || ''), { data: action.data || '', aria: action.aria || action.label || '' })}</div>` : ''}
+  </section>`;
+}
