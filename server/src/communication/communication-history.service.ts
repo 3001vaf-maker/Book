@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma.service';
 
 type CommunicationHistoryRow = {
   id: string; tenantId: string; cardPhone: string; uei: string; direction: string; kind: string; channel: string; body: string;
-  externalMessageId: string; externalThreadId: string; status: string; createdAt: Date; sentAt: Date | null;
+  attachments: unknown; externalMessageId: string; externalThreadId: string; status: string; createdAt: Date; sentAt: Date | null;
   deliveredAt: Date | null; readAt: Date | null; failedAt: Date | null; error: string;
 };
 
@@ -37,7 +37,7 @@ export class CommunicationHistoryService {
     const safeLimit = Math.max(1, Math.min(1000, Math.floor(Number(limit) || 300)));
     return this.prisma.$queryRaw<CommunicationHistoryRow[]>`
       WITH history AS (
-        SELECT m."id", m."tenantId", m."cardPhone", m."uei", m."direction", m."kind", m."channel", m."body",
+        SELECT m."id", m."tenantId", m."cardPhone", m."uei", m."direction", m."kind", m."channel", m."body", m."attachments",
           m."externalMessageId", m."externalThreadId", m."status", m."createdAt", m."sentAt", m."deliveredAt",
           m."readAt", m."failedAt", m."error"
         FROM "CommunicationMessage" m
@@ -47,7 +47,7 @@ export class CommunicationHistoryService {
         SELECT ('notification:' || n."id") AS "id", n."tenantId", n."cardPhone", n."uei", 'system' AS "direction",
           'notification' AS "kind", 'IN_APP' AS "channel",
           CASE WHEN n."body" = '' THEN n."title" ELSE n."title" || E'\n' || n."body" END AS "body",
-          '' AS "externalMessageId", n."entityId" AS "externalThreadId", d."status", n."createdAt", d."sentAt",
+          '[]'::jsonb AS "attachments", '' AS "externalMessageId", n."entityId" AS "externalThreadId", d."status", n."createdAt", d."sentAt",
           d."deliveredAt", d."readAt", d."failedAt", d."error"
         FROM "Notification" n
         INNER JOIN "NotificationDelivery" d ON d."notificationId" = n."id" AND d."tenantId" = n."tenantId" AND d."channel" = 'IN_APP'
@@ -62,7 +62,7 @@ export class CommunicationHistoryService {
     const safeLimit = Math.max(1, Math.min(500, Math.floor(Number(limit) || 200)));
     return this.prisma.$queryRaw<CommunicationHistoryRow[]>`
       WITH history AS (
-        SELECT m."id", m."tenantId", m."cardPhone", m."uei", m."direction", m."kind", m."channel", m."body",
+        SELECT m."id", m."tenantId", m."cardPhone", m."uei", m."direction", m."kind", m."channel", m."body", m."attachments",
           m."externalMessageId", m."externalThreadId", m."status", m."createdAt", m."sentAt", m."deliveredAt",
           m."readAt", m."failedAt", m."error"
         FROM "CommunicationMessage" m WHERE m."tenantId" = ${tenantId}
@@ -70,7 +70,7 @@ export class CommunicationHistoryService {
         SELECT ('notification:' || n."id") AS "id", n."tenantId", n."cardPhone", n."uei", 'system' AS "direction",
           'notification' AS "kind", 'IN_APP' AS "channel",
           CASE WHEN n."body" = '' THEN n."title" ELSE n."title" || E'\n' || n."body" END AS "body",
-          '' AS "externalMessageId", n."entityId" AS "externalThreadId", d."status", n."createdAt", d."sentAt",
+          '[]'::jsonb AS "attachments", '' AS "externalMessageId", n."entityId" AS "externalThreadId", d."status", n."createdAt", d."sentAt",
           d."deliveredAt", d."readAt", d."failedAt", d."error"
         FROM "Notification" n
         INNER JOIN "NotificationDelivery" d ON d."notificationId" = n."id" AND d."tenantId" = n."tenantId" AND d."channel" = 'IN_APP'
