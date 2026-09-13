@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { BusinessStateService } from '../business-state/business-state.service';
 import { ConsentPolicyService } from '../document-state/consent-policy.service';
 import { PrismaService } from '../prisma.service';
+import { WebPushService } from './web-push.service';
 
 type NotificationInput = {
   type?: string;
@@ -93,12 +94,17 @@ function normalizeChannels(value: unknown) {
   return [...new Set(source.map((item) => text(item).toUpperCase()).filter((item) => ROUTING_CHANNELS.has(item)))];
 }
 
+function channelsWithPush(value: unknown) {
+  return ['PUSH', ...normalizeChannels(value).filter((channel) => channel !== 'PUSH')];
+}
+
 @Injectable()
 export class NotificationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly businessState: BusinessStateService,
     private readonly documents: ConsentPolicyService,
+    private readonly webPush: WebPushService,
   ) {}
 
   private async accountIdentity(tenantId: string, accountId: string) {
@@ -166,7 +172,7 @@ export class NotificationService {
     return {
       eventType,
       mode: normalizeMode(row?.mode),
-      channels: normalizeChannels(row?.channels),
+      channels: channelsWithPush(row?.channels),
     };
   }
 
@@ -196,7 +202,7 @@ export class NotificationService {
     const type = text(eventType);
     if (!type) throw new BadRequestException('Не указан тип уведомления');
     const mode = normalizeMode(input?.mode);
-    const channels = normalizeChannels(input?.channels);
+    const channels = channelsWithPush(input?.channels);
     const id = randomUUID();
     const channelsJson = JSON.stringify(channels);
     await this.prisma.$executeRaw`
@@ -246,14 +252,23 @@ export class NotificationService {
   ) {
     if (!(await this.externalAllowed(tenantId, identity))) return [];
     const policy = await this.getRoutingPolicy(tenantId, eventType);
+    const routed: Array<{ channel: string; recipient: string }> = [];
+
+    if (policy.channels.includes('PUSH')) {
+      const endpoints = await this.webPush.listAccountEndpoints(tenantId, identity.accountId);
+      for (const endpoint of endpoints) {
+        await this.queueDelivery(tenantId, notificationId, 'PUSH', endpoint);
+        routed.push({ channel: 'PUSH', recipient: endpoint });
+      }
+    }
+
     const configured = policy.channels.filter((channel) => ACTIVE_EXTERNAL_CHANNELS.has(channel));
     const available = configured
       .map((channel) => ({ channel, recipient: this.recipientForChannel(identity, channel) }))
       .filter((item) => item.recipient);
-    if (!available.length) return [];
     const selected = policy.mode === 'fallback' ? available.slice(0, 1) : available;
     for (const item of selected) await this.queueDelivery(tenantId, notificationId, item.channel, item.recipient);
-    return selected;
+    return [...routed, ...selected];
   }
 
   private async createForAccountInternal(
@@ -291,6 +306,9 @@ export class NotificationService {
     });
 
     const routed = routeExternal ? await this.queueExternalByPolicy(tenantId, notificationId, type, identity) : [];
+    if (routeExternal && routed.some((item) => item.channel === 'PUSH')) {
+      await this.webPush.dispatchNotification(tenantId, notificationId);
+    }
     return { notification: await this.getForAccount(tenantId, accountId, notificationId), routed };
   }
 
