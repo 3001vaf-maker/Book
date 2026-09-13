@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { BusinessStateService } from '../business-state/business-state.service';
-import { DocumentStateService } from '../document-state/document-state.service';
+import { ConsentPolicyService } from '../document-state/consent-policy.service';
 import { BookingAccountGuard } from './booking-account.guard';
 
 type AccountRequest = Request & { bookingAccountAuth?: { accountId: string; tenantId: string } };
@@ -10,7 +10,7 @@ type AccountRequest = Request & { bookingAccountAuth?: { accountId: string; tena
 export class BookingConsentController {
   constructor(
     private readonly businessState: BusinessStateService,
-    private readonly documents: DocumentStateService,
+    private readonly consentPolicy: ConsentPolicyService,
   ) {}
 
   private async clientId(request: AccountRequest) {
@@ -25,7 +25,7 @@ export class BookingConsentController {
     const auth = request.bookingAccountAuth!;
     const clientId = await this.clientId(request);
     if (!clientId) return { allowed: false, required: [], missing: [], consents: [] };
-    return this.documents.requiredConsentState(auth.tenantId, clientId);
+    return this.consentPolicy.requiredConsentState(auth.tenantId, clientId);
   }
 
   @UseGuards(BookingAccountGuard)
@@ -34,8 +34,8 @@ export class BookingConsentController {
     const auth = request.bookingAccountAuth!;
     const clientId = await this.clientId(request);
     if (!clientId) return { allowed: false, required: [], missing: [], consents: [] };
-    await this.documents.recordConsentEvents(auth.tenantId, clientId, body?.consents || [], 'online-booking');
-    return this.documents.requiredConsentState(auth.tenantId, clientId);
+    await this.consentPolicy.acceptConsents(auth.tenantId, clientId, body?.consents || []);
+    return this.consentPolicy.requiredConsentState(auth.tenantId, clientId);
   }
 
   @UseGuards(BookingAccountGuard)
@@ -47,7 +47,7 @@ export class BookingConsentController {
     const auth = request.bookingAccountAuth!;
     const clientId = await this.clientId(request);
     if (!clientId) return { allowed: false, required: [], missing: [], consents: [] };
-    await this.documents.revokeConsent(auth.tenantId, clientId, documentId, 'online-booking');
-    return this.documents.requiredConsentState(auth.tenantId, clientId);
+    await this.consentPolicy.revokeConsent(auth.tenantId, clientId, documentId, 'online-booking');
+    return this.consentPolicy.requiredConsentState(auth.tenantId, clientId);
   }
 }
