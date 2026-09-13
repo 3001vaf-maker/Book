@@ -4,6 +4,7 @@ import {
   button,
   collectLinks,
   collectRepeatedField,
+  escapeHtml,
   field,
   initAccordions,
   initCalendar,
@@ -44,7 +45,7 @@ function birthDateLabel(value = '') {
 }
 
 function birthDateField(value = '') {
-  return `<label class="field" data-client-birth-date><span>Дата рождения</span><button type="button" class="ui-select__control" data-client-birth-open><span class="ui-select__value">${birthDateLabel(value)}</span><span class="ui-select__chevron" aria-hidden="true">⌄</span></button><input type="hidden" name="birthDate" value="${String(value || '')}" data-client-birth-value></label>`;
+  return `<label class="field" data-client-birth-date><span>Дата рождения</span><button type="button" class="ui-select__control" data-client-birth-open><span class="ui-select__value">${escapeHtml(birthDateLabel(value))}</span><span class="ui-select__chevron" aria-hidden="true">⌄</span></button><input type="hidden" name="birthDate" value="${escapeHtml(String(value || ''))}" data-client-birth-value></label>`;
 }
 
 function yearOptions() {
@@ -138,9 +139,9 @@ function editorMarkup(account = {}) {
         ${field({ label: 'Имя', name: 'name', value: account.name || '', required: true, autocomplete: 'given-name' })}
         ${field({ label: 'Фамилия', name: 'surname', value: account.surname || '', autocomplete: 'family-name' })}
         ${phoneField({ label: 'Телефон', name: 'phone', value: account.phone || '', required: true })}
-        ${repeatedField({ label: 'Дополнительные телефоны', name: 'additionalPhone', values: profile.phones || [], type: 'tel', addLabel: '+ Телефон' })}
+        ${repeatedField({ label: 'Дополнительные телефоны', name: 'additionalPhone', values: profile.phones || [], type: 'tel', addLabel: '+ Телефон', showEmptyRow: false })}
         ${field({ label: 'Email', name: 'email', value: account.email || '', type: 'email', readonly: true })}
-        ${repeatedField({ label: 'Дополнительные email', name: 'additionalEmail', values: profile.emails || [], type: 'email', placeholder: 'name@example.com', addLabel: '+ Email' })}
+        ${repeatedField({ label: 'Дополнительные email', name: 'additionalEmail', values: profile.emails || [], type: 'email', placeholder: 'name@example.com', addLabel: '+ Email', showEmptyRow: false })}
         ${field({ label: 'Telegram', name: 'telegram', value: profile.telegram || '', placeholder: '@username', maxlength: 100 })}
         ${select({
           label: 'Пол',
