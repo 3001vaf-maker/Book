@@ -1,0 +1,15 @@
+# Local-only environment files
+.env
+.env.*
+!.env.example
+
+# Generated/build output
+_site/
+node_modules/
+server/node_modules/
+server/dist/
+
+# Local staging runtime
+.staging-data/
+*.log
+.DS_Store

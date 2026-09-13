@@ -12,13 +12,17 @@ This file is the compact continuity anchor for Book. Current `main`, current cod
 - Legacy browser business keys are purged only by `core/legacy-browser-business.js` after all server domains are verified.
 - Do not use production as a development environment.
 
-## Release rule
+## Development / release rule
+
+Permanent integration branch: `staging`.
 
 Work must follow:
 
-`feature/staging branch -> Check Book -> staging/manual verification -> merge to main -> one production deployment`
+`feature/* -> PR to staging -> Check Book -> staging verification -> release PR to main -> one production deployment`
 
-Do not push intermediate development commits to `main`.
+Do not push intermediate development commits to `main`. Short-lived feature branches are deleted after merge.
+
+Local staging is isolated from production and uses its own PostgreSQL database, local backend and local frontend. Details: `docs/DEVELOPMENT_WORKFLOW.md`.
 
 ## Architecture
 
@@ -103,6 +107,13 @@ Do not keep:
 
 Git history and merged pull requests preserve implementation history; the production tree should contain only current code, current guards and current documentation.
 
-## Current next infrastructure direction
+## Current infrastructure checkpoint
 
-Before substantial new production features, establish a development/staging contour isolated from production Amvera/database. Auth transactional notifications (registration verification / password reset / security notifications) should be developed and verified there before a production release.
+The isolated development contour now exists in code:
+- `staging` is the permanent integration branch;
+- localhost frontend automatically targets localhost API, never production Amvera;
+- `docker-compose.staging.yml` creates an isolated PostgreSQL/backend/frontend stack;
+- staging fixtures contain synthetic profile/workplace/client/record/payment data;
+- Check Book runs on pushes and PRs for both `staging` and `main`.
+
+The next functional block after infrastructure verification is Auth transactional communication: registration verification, password reset and security notifications. Real email/SMS providers must not be enabled in staging by default.

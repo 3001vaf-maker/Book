@@ -2,13 +2,17 @@ name: Check Book
 
 on:
   push:
-    branches: [main]
+    branches: [main, staging]
   pull_request:
-    branches: [main]
+    branches: [main, staging]
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   check:
@@ -24,9 +28,87 @@ jobs:
         run: npm run check
       - name: Domain regression tests
         run: npm test
+      - name: Validate staging compose
+        run: docker compose -f docker-compose.staging.yml config >/dev/null
       - name: Install server dependencies
         run: npm install --prefix server
       - name: Generate Prisma client
         run: npm run prisma:generate --prefix server
       - name: Build server
         run: npm run build --prefix server
+
+  staging-smoke:
+    if: github.ref == 'refs/heads/staging' || github.base_ref == 'staging'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build staging backend image
+        run: docker compose -f docker-compose.staging.yml build backend
+      - name: Start isolated database and backend
+        run: |
+          docker compose -f docker-compose.staging.yml up -d db
+          docker compose -f docker-compose.staging.yml up -d backend
+      - name: Verify staging backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://localhost:3000/health >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose -f docker-compose.staging.yml logs db backend
+          exit 1
+      - name: Start and verify staging frontend
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.staging.yml up -d frontend
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://localhost:8080/ >/dev/null 2>&1 \
+              && curl -fsS http://localhost:8080/core.js >/dev/null 2>&1 \
+              && curl -fsS http://localhost:8080/core/environment.js >/dev/null 2>&1 \
+              && curl -fsS http://localhost:8080/service-worker.js >/dev/null 2>&1 \
+              && curl -fsS http://localhost:8080/online-booking/notifications.js >/dev/null 2>&1 \
+              && curl -fsS http://localhost:8080/core/notifications/web-push.js >/dev/null 2>&1 \
+              && curl -fsS http://localhost:8080/api/health >/dev/null 2>&1; then
+              break
+            fi
+            if [ "$attempt" = "30" ]; then
+              docker compose -f docker-compose.staging.yml logs frontend backend
+              exit 1
+            fi
+            sleep 2
+          done
+
+          login_payload=$(curl -fsS \
+            -H 'Content-Type: application/json' \
+            -d '{"email":"staging@book.local","password":"BookStaging-2026!"}' \
+            http://localhost:8080/api/auth/login)
+          access_token=$(node -e "const p=JSON.parse(process.argv[1]); if(!p.accessToken) process.exit(1); process.stdout.write(p.accessToken)" "$login_payload")
+          tenant_id=$(node -e "const p=JSON.parse(process.argv[1]); if(!p.tenant?.id) process.exit(1); process.stdout.write(p.tenant.id)" "$login_payload")
+          curl -fsS -H "Authorization: Bearer $access_token" http://localhost:8080/api/auth/me >/dev/null
+
+          booking_payload=$(curl -fsS \
+            -H 'Content-Type: application/json' \
+            -d '{"email":"push-smoke@book.local","password":"BookPush-2026!","name":"Push","phone":"+79990000999","consents":[]}' \
+            "http://localhost:8080/api/online-booking/$tenant_id/account/register")
+          booking_token=$(node -e "const p=JSON.parse(process.argv[1]); if(!p.accessToken) process.exit(1); process.stdout.write(p.accessToken)" "$booking_payload")
+
+          push_config=$(curl -fsS \
+            -H "Authorization: Bearer $booking_token" \
+            "http://localhost:8080/api/online-booking/$tenant_id/account/push/config")
+          node -e "const p=JSON.parse(process.argv[1]); if(!p.enabled || !p.publicKey) process.exit(1)" "$push_config"
+
+          curl -fsS \
+            -X PUT \
+            -H "Authorization: Bearer $booking_token" \
+            -H 'Content-Type: application/json' \
+            -d '{"subscription":{"endpoint":"https://push.example.invalid/book-smoke","keys":{"p256dh":"staging-p256dh","auth":"staging-auth"}}}' \
+            "http://localhost:8080/api/online-booking/$tenant_id/account/push/subscription" >/dev/null
+      - name: Stop isolated staging
+        if: always()
+        run: docker compose -f docker-compose.staging.yml down -v

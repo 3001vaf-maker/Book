@@ -1,0 +1,3 @@
+ALTER TABLE "CommunicationBroadcastRun"
+  ADD COLUMN "name" TEXT NOT NULL DEFAULT '',
+  ADD COLUMN "body" TEXT NOT NULL DEFAULT '';
