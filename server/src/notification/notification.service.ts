@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { BusinessStateService } from '../business-state/business-state.service';
-import { DocumentStateService } from '../document-state/document-state.service';
+import { ConsentPolicyService } from '../document-state/consent-policy.service';
 import { PrismaService } from '../prisma.service';
 
 type NotificationInput = {
@@ -98,7 +98,7 @@ export class NotificationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly businessState: BusinessStateService,
-    private readonly documents: DocumentStateService,
+    private readonly documents: ConsentPolicyService,
   ) {}
 
   private async accountIdentity(tenantId: string, accountId: string) {
