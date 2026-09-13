@@ -224,13 +224,13 @@ export async function setBookingTelegramConsent(tenantId, enabled) {
   );
 }
 
-export async function sendBookingChatMessage(tenantId, body) {
+export async function sendBookingChatMessage(tenantId, body, attachments = []) {
   return jsonResponse(
     await request(`/online-booking/${encodeURIComponent(tenantId)}/account/chat/messages`, {
       tenantId,
       auth: true,
       method: 'POST',
-      body: JSON.stringify({ body: String(body || '').trim() }),
+      body: JSON.stringify({ body: String(body || '').trim(), attachments: Array.isArray(attachments) ? attachments : [] }),
     }),
     'Не удалось отправить сообщение',
   );
