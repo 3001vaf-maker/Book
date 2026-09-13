@@ -16,6 +16,7 @@ import { getCurrentUser, login } from './core/auth.js';
 import { isOnboardingComplete, renderOnboarding } from './onboarding/onboarding.js';
 import { startServerBookingSync } from './online-booking/server-sync.js';
 import { renderOnlineBooking } from './online-booking/booking.js';
+import { startBookingClientRuntime } from './online-booking/client-runtime.js';
 import { bottomNavigation } from './ui/ui.js';
 import { clearLegacyBusinessStorage } from './core/legacy-browser-business.js';
 
@@ -54,14 +55,14 @@ function bookingRoute() {
   return {
     tenantId,
     workplaceKey: String(params.get('workplace') || '').trim(),
-    telegramId: String(params.get('tg') || params.get('telegram') || '').trim(),
+    telegramEntry: String(params.get('tg_entry') || '').trim(),
   };
 }
 
 function renderPublicBooking(route) {
   workspaceReady = false;
   disposeView();
-  disposeView = () => {};
+  disposeView = startBookingClientRuntime(route);
   app.classList.add('app-shell--booking');
   app.innerHTML = '<main class="booking-content" id="app-content"></main>';
   void renderOnlineBooking(document.querySelector('#app-content'), route);
