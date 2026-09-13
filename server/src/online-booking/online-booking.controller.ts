@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CommunicationService } from '../communication/communication.service';
@@ -162,6 +162,34 @@ export class OnlineBookingController {
     @Req() request: AccountRequest,
   ) {
     return this.notifications.markReadForAccount(tenantId, request.bookingAccountAuth!.accountId, notificationId);
+  }
+
+  @UseGuards(BookingAccountGuard)
+  @Get(':tenantId/account/chat')
+  async accountChat(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
+    const account = await this.booking.getAccount(tenantId, request.bookingAccountAuth!.accountId);
+    return this.communications.listThread(tenantId, { phone: account.phone, uei: account.uei }, 500);
+  }
+
+  @UseGuards(BookingAccountGuard)
+  @Post(':tenantId/account/chat/messages')
+  async sendAccountChatMessage(
+    @Param('tenantId') tenantId: string,
+    @Req() request: AccountRequest,
+    @Body() body: { body?: unknown },
+  ) {
+    const message = String(body?.body ?? '').trim();
+    if (!message) throw new BadRequestException('Пустое сообщение');
+    const account = await this.booking.getAccount(tenantId, request.bookingAccountAuth!.accountId);
+    return this.communications.recordMessage(tenantId, {
+      phone: account.phone,
+      uei: account.uei,
+      direction: 'inbound',
+      kind: 'message',
+      channel: 'IN_APP',
+      body: message,
+      status: 'delivered',
+    });
   }
 
   @UseGuards(BookingAccountGuard, BookingRequiredConsentGuard)
