@@ -22,7 +22,7 @@ function renderRoutingForm(root, navigateBack, policy) {
   root.innerHTML = `${pageHeader('Настройки уведомлений')}
     <form class="form-grid" data-communications-routing>
       <div class="section-heading"><h2>Новая запись</h2></div>
-      <div class="action-block"><strong>Push — всегда</strong><div class="muted">Уведомление в Book создаётся по умолчанию. Отдельно выбираются внешние каналы.</div></div>
+      <div class="action-block"><strong>Push — всегда</strong><div class="muted">Системный Push отправляется автоматически, если клиент разрешил уведомления на устройстве. Уведомление внутри Book создаётся всегда.</div></div>
       ${select({ label: 'Как отправлять во внешние каналы', name: 'mode', value: policy.mode || 'always', options: [
         { value: 'always', label: 'Всегда отправлять по выбранным каналам' },
         { value: 'fallback', label: 'Поэтапно — следующий, если предыдущий не доставлен' },
