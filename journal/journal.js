@@ -174,9 +174,7 @@ export function renderJournal(root) {
   };
 
   const recordsChangedHandler = () => renderView();
-  const ddsChangedHandler = () => {
-    if (activeView === 'list' || activeView === 'month') renderView();
-  };
+  const ddsChangedHandler = () => renderView();
 
   window.addEventListener('book:records-changed', recordsChangedHandler);
   window.addEventListener('book:dds-changed', ddsChangedHandler);
