@@ -15,11 +15,11 @@ function defaultAddLabel(label) {
   return label ? `+ Добавить ${label}` : '+ Добавить';
 }
 
-export function repeatedField({ label = '', name = '', values = [], type = 'text', placeholder = 'Добавить значение', addLabel = '', className = '' } = {}) {
+export function repeatedField({ label = '', name = '', values = [], type = 'text', placeholder = 'Добавить значение', addLabel = '', className = '', showEmptyRow = true } = {}) {
   const items = normalizeItems(values);
-  const rows = items.length ? items : [{ value: '', source: '' }];
+  const rows = items.length ? items : (showEmptyRow ? [{ value: '', source: '' }] : []);
   const resolvedAddLabel = addLabel || defaultAddLabel(label);
-  return `<div class="array-group ${escapeHtml(className)}" data-repeated-field data-repeated-name="${escapeHtml(name)}" data-repeated-label="${escapeHtml(label)}" data-repeated-type="${escapeHtml(type)}" data-repeated-placeholder="${escapeHtml(placeholder)}"><span class="array-label">${escapeHtml(label)}</span><div data-repeated-list>${rows.map(item => repeatedRow({ name, type, value: item.value, source: item.source, placeholder, label })).join('')}</div>${button(resolvedAddLabel, { variant: 'secondary', data: `data-repeated-add="${escapeHtml(name)}"` })}</div>`;
+  return `<div class="array-group ${escapeHtml(className)}" data-repeated-field data-repeated-name="${escapeHtml(name)}" data-repeated-label="${escapeHtml(label)}" data-repeated-type="${escapeHtml(type)}" data-repeated-placeholder="${escapeHtml(placeholder)}"><span class="array-label">${escapeHtml(label)}</span><div data-repeated-list>${rows.map(item => repeatedRow({ name, type, value: item.value, source: item.source, placeholder, label })).join('')}</div>${button(resolvedAddLabel, { variant:'secondary', data:`data-repeated-add="${escapeHtml(name)}"` })}</div>`;
 }
 
 function repeatedRow({ name, type, value = '', source = '', placeholder, label = '' }) {
