@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CommunicationService } from '../communication/communication.service';
 import { NotificationService } from '../notification/notification.service';
+import { WebPushService } from '../notification/web-push.service';
 import { BookingAccountGuard } from './booking-account.guard';
 import { BookingRequiredConsentGuard } from './booking-required-consent.guard';
 import { OnlineBookingService } from './online-booking.service';
@@ -16,6 +17,7 @@ export class OnlineBookingController {
     private readonly booking: OnlineBookingService,
     private readonly notifications: NotificationService,
     private readonly communications: CommunicationService,
+    private readonly webPush: WebPushService,
   ) {}
 
   @UseGuards(JwtAuthGuard)
@@ -96,6 +98,40 @@ export class OnlineBookingController {
   @Post(':tenantId/account/telegram-entry')
   bindTelegramEntry(@Param('tenantId') tenantId: string, @Req() request: AccountRequest, @Body() body: { token?: unknown }) {
     return this.communications.bindTelegramEntry(tenantId, request.bookingAccountAuth!.accountId, body?.token);
+  }
+
+  @UseGuards(BookingAccountGuard)
+  @Get(':tenantId/account/push/config')
+  pushConfiguration() {
+    return this.webPush.configuration();
+  }
+
+  @UseGuards(BookingAccountGuard)
+  @Put(':tenantId/account/push/subscription')
+  savePushSubscription(
+    @Param('tenantId') tenantId: string,
+    @Req() request: AccountRequest,
+    @Body() body: { subscription?: unknown },
+  ) {
+    const userAgent = Array.isArray(request.headers['user-agent'])
+      ? request.headers['user-agent'][0] || ''
+      : request.headers['user-agent'] || '';
+    return this.webPush.saveSubscription(
+      tenantId,
+      request.bookingAccountAuth!.accountId,
+      body?.subscription,
+      userAgent,
+    );
+  }
+
+  @UseGuards(BookingAccountGuard)
+  @Delete(':tenantId/account/push/subscription')
+  deletePushSubscription(
+    @Param('tenantId') tenantId: string,
+    @Req() request: AccountRequest,
+    @Body() body: { endpoint?: unknown },
+  ) {
+    return this.webPush.deleteSubscription(tenantId, request.bookingAccountAuth!.accountId, body?.endpoint);
   }
 
   @UseGuards(BookingAccountGuard, BookingRequiredConsentGuard)
