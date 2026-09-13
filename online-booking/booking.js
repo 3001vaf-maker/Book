@@ -335,7 +335,6 @@ function renderAccountDetails(root, state) {
       surname: String(data.get('surname') || '').trim(),
       phone: String(data.get('phone') || '').trim(),
       email: String(data.get('email') || '').trim().toLowerCase(),
-      telegramId: state.telegramId || '',
     };
     const submit = form.querySelector('button[type="submit"]');
     if (submit) submit.disabled = true;
@@ -639,12 +638,11 @@ async function refreshContext(state) {
   state.settings = normalizeBookingSettings(state.context.settings);
 }
 
-export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = '', telegramId = '' } = {}) {
+export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = '' } = {}) {
   const state = {
     tenantId: String(tenantId || ''),
     lockedWorkplaceKey: String(workplaceKey || ''),
     workplaceKey: String(workplaceKey || ''),
-    telegramId: String(telegramId || ''),
     context: {},
     settings: normalizeBookingSettings(),
     procedureIds: [],
