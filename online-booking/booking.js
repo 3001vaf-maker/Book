@@ -8,6 +8,7 @@ import {
   loginBookingAccount,
   prepareBookingAccount,
   registerBookingAccount,
+  submitBookingConsents,
   updateBookingAccount,
 } from '../core/booking-account/index.js';
 import { normalizeBookingSettings } from '../core/booking-settings/index.js';
@@ -107,6 +108,13 @@ async function refreshAccountConsentState(state) {
   return consentState || { allowed: false, consents: [] };
 }
 
+async function saveRegistrationConsents(state) {
+  const consents = currentConsentFacts(state);
+  state.account = await updateBookingAccount(state.tenantId, { consents });
+  await submitBookingConsents(state.tenantId, consents);
+  seedConsents(state, consents);
+}
+
 function resetBookingChoice(state) {
   state.workplaceKey = state.lockedWorkplaceKey || '';
   state.procedureIds = [];
@@ -174,7 +182,7 @@ function continueRepeat(root, state) {
   return true;
 }
 
-function nextAfterAgreements(root, state) {
+function nextBookingStep(root, state) {
   state.error = '';
   if (continueRepeat(root, state)) return;
   if (state.lockedWorkplaceKey) {
@@ -185,13 +193,10 @@ function nextAfterAgreements(root, state) {
   }
 }
 
-function backFromAgreements(root, state) {
+function backFromFirstBookingStep(root, state) {
   state.error = '';
-  if (state.bookingOrigin === 'account' && state.account) {
-    void renderAccountHome(root, state);
-    return;
-  }
-  renderWelcome(root, state);
+  state.repeatSelection = null;
+  void renderAccountHome(root, state);
 }
 
 function openDocument(state, documentId) {
@@ -205,65 +210,23 @@ function openDocument(state, documentId) {
 }
 
 function renderWelcome(root, state) {
-  state.bookingOrigin = 'public';
+  state.registrationMode = 'initial';
   const profile = state.context.profile || {};
   const owner = [profile.name, profile.surname].filter(Boolean).join(' ');
   const subtitle = [state.settings.welcomeText, owner].filter(Boolean).join('\n');
   renderFlowPage(root, state, {
     title: state.settings.welcomeTitle,
     subtitle,
-    body: bookingActions(bookingAction('Войти', { secondary: true, data: 'data-booking-login-open' })),
     action: { label: 'Далее', data: 'data-booking-welcome-next' },
     center: true,
   });
   root.querySelector('[data-booking-welcome-next]')?.addEventListener('click', () => {
     resetBookingChoice(state);
-    renderAgreements(root, state);
-  });
-  root.querySelector('[data-booking-login-open]')?.addEventListener('click', () => renderLogin(root, state));
-}
-
-function renderLogin(root, state) {
-  const email = state.loginEmail || getRememberedBookingEmail(state.tenantId) || '';
-  renderFlowPage(root, state, {
-    title: 'Вход',
-    subtitle: 'Войдите в свой аккаунт',
-    back: { data: 'data-booking-login-back', aria: 'Назад' },
-    action: { label: 'Войти', data: 'data-booking-login-submit' },
-    body: `<form data-booking-login-form>${field({ label: 'Email', name: 'email', value: email, type: 'email', required: true, autocomplete: 'username' })}${field({ label: 'Пароль', name: 'password', type: 'password', required: true, autocomplete: 'current-password' })}${errorBlock(state.error)}${bookingActions(bookingAction('Показать пароль', { secondary: true, data: 'data-booking-password-toggle' }))}</form>`,
-    center: true,
-  });
-  const form = root.querySelector('[data-booking-login-form]');
-  root.querySelector('[data-booking-login-submit]')?.addEventListener('click', () => form?.requestSubmit());
-  root.querySelector('[data-booking-password-toggle]')?.addEventListener('click', () => {
-    const input = form?.querySelector('[name="password"]');
-    if (!input) return;
-    input.type = input.type === 'password' ? 'text' : 'password';
-  });
-  root.querySelector('[data-booking-login-back]')?.addEventListener('click', () => {
-    state.error = '';
-    renderWelcome(root, state);
-  });
-  form?.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const data = new FormData(form);
-    const submit = root.querySelector('[data-booking-login-submit]');
-    if (submit) submit.disabled = true;
-    try {
-      const payload = await loginBookingAccount(state.tenantId, data.get('email'), data.get('password'));
-      state.account = payload.account;
-      state.loginEmail = payload.account?.email || '';
-      state.error = '';
-      seedConsents(state, state.account?.consents || []);
-      await renderAccountHome(root, state);
-    } catch (error) {
-      state.error = error instanceof Error ? error.message : 'Не удалось войти';
-      renderLogin(root, state);
-    }
+    renderRegistrationAgreements(root, state);
   });
 }
 
-function renderAgreements(root, state) {
+function renderRegistrationAgreements(root, state) {
   const documents = requiredBookingDocuments(state.context);
   const canContinue = documents.filter((document) => document.required).every((document) => state.consents[String(document.id || '')]);
   const cards = bookingAgreementCards(documents.map((document) => ({
@@ -276,21 +239,161 @@ function renderAgreements(root, state) {
   })));
   renderFlowPage(root, state, {
     title: 'Соглашения',
-    subtitle: 'Откройте документ, ознакомьтесь и отметьте согласие',
+    subtitle: 'Согласия относятся к регистрации и аккаунту клиента',
     back: { data: 'data-booking-agreements-back', aria: 'Назад' },
     action: { label: 'Далее', data: 'data-booking-agreements-next', disabled: !canContinue },
-    body: `${documents.length ? cards : emptyState('Документов нет', 'Для онлайн-записи не настроены документы согласия.')}${errorBlock(state.error)}`,
+    body: `${documents.length ? cards : emptyState('Документов нет', 'Для регистрации не настроены документы согласия.')}${errorBlock(state.error)}`,
   });
-  root.querySelector('[data-booking-agreements-back]')?.addEventListener('click', () => backFromAgreements(root, state));
+  root.querySelector('[data-booking-agreements-back]')?.addEventListener('click', () => {
+    state.error = '';
+    if (state.registrationMode === 'repair' && state.account) void renderAccountHome(root, state);
+    else renderWelcome(root, state);
+  });
   root.querySelectorAll('[data-booking-document]').forEach((node) => node.addEventListener('click', () => openDocument(state, node.dataset.bookingDocument)));
   root.querySelectorAll('[data-booking-consent]').forEach((node) => node.addEventListener('click', () => {
     const id = String(node.dataset.bookingConsent || '');
     state.consents[id] = !state.consents[id];
-    renderAgreements(root, state);
+    renderRegistrationAgreements(root, state);
   }));
-  root.querySelector('[data-booking-agreements-next]')?.addEventListener('click', () => {
+  root.querySelector('[data-booking-agreements-next]')?.addEventListener('click', async (event) => {
     if (!canContinue) return;
-    nextAfterAgreements(root, state);
+    if (state.registrationMode !== 'repair') {
+      renderAccountEntry(root, state);
+      return;
+    }
+    event.currentTarget.disabled = true;
+    try {
+      await saveRegistrationConsents(state);
+      state.registrationMode = 'initial';
+      await renderAccountHome(root, state);
+    } catch (error) {
+      state.error = error instanceof Error ? error.message : 'Не удалось сохранить согласия';
+      renderRegistrationAgreements(root, state);
+    }
+  });
+}
+
+function renderAccountEntry(root, state) {
+  const rememberedEmail = state.accountDraft?.email || getRememberedBookingEmail(state.tenantId) || '';
+  renderFlowPage(root, state, {
+    title: 'Регистрация',
+    subtitle: 'Введите email. Если аккаунт уже существует, откроется вход.',
+    back: { data: 'data-booking-entry-back', aria: 'Назад' },
+    action: { label: 'Далее', data: 'data-booking-entry-submit' },
+    body: `<form data-booking-entry-form>${field({ label: 'Email', name: 'email', value: rememberedEmail, type: 'email', required: true, autocomplete: 'email' })}${errorBlock(state.error)}</form>`,
+    center: true,
+  });
+  const form = root.querySelector('[data-booking-entry-form]');
+  root.querySelector('[data-booking-entry-back]')?.addEventListener('click', () => {
+    state.error = '';
+    renderRegistrationAgreements(root, state);
+  });
+  root.querySelector('[data-booking-entry-submit]')?.addEventListener('click', () => form?.requestSubmit());
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const email = String(new FormData(form).get('email') || '').trim().toLowerCase();
+    state.accountDraft = { ...(state.accountDraft || {}), email };
+    const submit = root.querySelector('[data-booking-entry-submit]');
+    if (submit) submit.disabled = true;
+    try {
+      const prepared = await prepareBookingAccount(state.tenantId, email);
+      state.passwordMode = prepared.exists ? 'login' : 'register';
+      state.error = '';
+      if (prepared.exists) renderPassword(root, state);
+      else renderAccountDetails(root, state);
+    } catch (error) {
+      state.error = error instanceof Error ? error.message : 'Не удалось проверить аккаунт';
+      renderAccountEntry(root, state);
+    }
+  });
+}
+
+function renderAccountDetails(root, state) {
+  const draft = state.accountDraft || {};
+  renderFlowPage(root, state, {
+    title: 'Ваши данные',
+    subtitle: draft.email || 'Они сохранятся в вашем аккаунте',
+    back: { data: 'data-booking-account-back', aria: 'Назад' },
+    action: { label: 'Далее', data: 'data-booking-account-submit' },
+    body: `<form data-booking-account-form>${field({ label: 'Имя', name: 'name', value: draft.name || '', required: true, autocomplete: 'given-name' })}${field({ label: 'Фамилия', name: 'surname', value: draft.surname || '', autocomplete: 'family-name' })}${phoneField({ label: 'Телефон', name: 'phone', value: draft.phone || '', required: true })}${errorBlock(state.error)}</form>`,
+  });
+  const form = root.querySelector('[data-booking-account-form]');
+  root.querySelector('[data-booking-account-back]')?.addEventListener('click', () => {
+    state.error = '';
+    renderAccountEntry(root, state);
+  });
+  root.querySelector('[data-booking-account-submit]')?.addEventListener('click', () => form?.requestSubmit());
+  form?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const data = new FormData(form);
+    state.accountDraft = {
+      ...(state.accountDraft || {}),
+      name: String(data.get('name') || '').trim(),
+      surname: String(data.get('surname') || '').trim(),
+      phone: String(data.get('phone') || '').trim(),
+    };
+    state.passwordMode = 'register';
+    state.error = '';
+    renderPassword(root, state);
+  });
+}
+
+function renderPassword(root, state) {
+  const register = state.passwordMode !== 'login';
+  renderFlowPage(root, state, {
+    title: register ? 'Создайте пароль' : 'Введите пароль',
+    subtitle: state.accountDraft.email || '',
+    back: { data: 'data-booking-password-back', aria: 'Назад' },
+    action: { label: register ? 'Создать' : 'Войти', data: 'data-booking-password-submit' },
+    body: `<form data-booking-password-form>${field({ label: 'Пароль', name: 'password', type: 'password', required: true, autocomplete: register ? 'new-password' : 'current-password' })}${errorBlock(state.error)}${bookingActions(bookingAction('Показать пароль', { secondary: true, data: 'data-booking-password-toggle' }))}</form>`,
+    center: true,
+  });
+  const form = root.querySelector('[data-booking-password-form]');
+  root.querySelector('[data-booking-password-back]')?.addEventListener('click', () => {
+    state.error = '';
+    if (register) renderAccountDetails(root, state);
+    else renderAccountEntry(root, state);
+  });
+  root.querySelector('[data-booking-password-submit]')?.addEventListener('click', () => form?.requestSubmit());
+  root.querySelector('[data-booking-password-toggle]')?.addEventListener('click', () => {
+    const input = form?.querySelector('[name="password"]');
+    if (!input) return;
+    input.type = input.type === 'password' ? 'text' : 'password';
+  });
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const password = String(new FormData(form).get('password') || '');
+    const submit = root.querySelector('[data-booking-password-submit]');
+    if (submit) submit.disabled = true;
+    try {
+      if (register) {
+        const payload = await registerBookingAccount(state.tenantId, {
+          ...state.accountDraft,
+          password,
+          consents: currentConsentFacts(state),
+        });
+        state.account = payload.account;
+        state.error = '';
+        seedConsents(state, state.account?.consents || currentConsentFacts(state));
+        if (payload.clientCardExisted) {
+          state.clientTab = 'profile';
+          await renderAccountHome(root, state);
+        } else {
+          nextBookingStep(root, state);
+        }
+        return;
+      }
+
+      const payload = await loginBookingAccount(state.tenantId, state.accountDraft.email, password);
+      state.account = payload.account;
+      state.error = '';
+      await saveRegistrationConsents(state);
+      state.clientTab = 'profile';
+      await renderAccountHome(root, state);
+    } catch (error) {
+      state.error = error instanceof Error ? error.message : 'Не удалось войти';
+      renderPassword(root, state);
+    }
   });
 }
 
@@ -309,7 +412,7 @@ function renderWorkplaces(root, state) {
     back: { data: 'data-booking-workplaces-back', aria: 'Назад' },
     body: content || emptyState('Нет доступных пространств', 'Рабочие пространства для онлайн-записи не найдены.'),
   });
-  root.querySelector('[data-booking-workplaces-back]')?.addEventListener('click', () => renderAgreements(root, state));
+  root.querySelector('[data-booking-workplaces-back]')?.addEventListener('click', () => backFromFirstBookingStep(root, state));
   root.querySelectorAll('[data-booking-workplace]').forEach((node) => node.addEventListener('click', () => {
     state.workplaceKey = node.dataset.bookingWorkplace || '';
     state.procedureIds = [];
@@ -342,7 +445,7 @@ function renderProcedures(root, state) {
     body: content || emptyState('Процедур нет', 'Для этого рабочего пространства процедуры не настроены.'),
   });
   root.querySelector('[data-booking-procedures-back]')?.addEventListener('click', () => {
-    if (state.lockedWorkplaceKey) renderAgreements(root, state);
+    if (state.lockedWorkplaceKey) backFromFirstBookingStep(root, state);
     else renderWorkplaces(root, state);
   });
   root.querySelectorAll('[data-booking-procedure]').forEach((node) => node.addEventListener('click', () => {
@@ -408,93 +511,8 @@ function renderTimes(root, state) {
     state.from = slot.from;
     state.to = slot.to;
     state.error = '';
-    if (state.account) renderConfirmation(root, state);
-    else renderAccountDetails(root, state);
+    renderConfirmation(root, state);
   }));
-}
-
-function renderAccountDetails(root, state) {
-  const draft = state.accountDraft || {};
-  renderFlowPage(root, state, {
-    title: 'Ваши данные',
-    subtitle: 'Они сохранятся в вашем аккаунте',
-    back: { data: 'data-booking-account-back', aria: 'Назад' },
-    action: { label: 'Далее', data: 'data-booking-account-submit' },
-    body: `<form data-booking-account-form>${field({ label: 'Имя', name: 'name', value: draft.name || '', required: true, autocomplete: 'given-name' })}${field({ label: 'Фамилия', name: 'surname', value: draft.surname || '', autocomplete: 'family-name' })}${phoneField({ label: 'Телефон', name: 'phone', value: draft.phone || '', required: true })}${field({ label: 'Email', name: 'email', value: draft.email || '', type: 'email', required: true, autocomplete: 'email' })}${errorBlock(state.error)}</form>`,
-  });
-  const form = root.querySelector('[data-booking-account-form]');
-  root.querySelector('[data-booking-account-back]')?.addEventListener('click', () => renderTimes(root, state));
-  root.querySelector('[data-booking-account-submit]')?.addEventListener('click', () => form?.requestSubmit());
-  form?.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const data = new FormData(form);
-    state.accountDraft = {
-      name: String(data.get('name') || '').trim(),
-      surname: String(data.get('surname') || '').trim(),
-      phone: String(data.get('phone') || '').trim(),
-      email: String(data.get('email') || '').trim().toLowerCase(),
-    };
-    const submit = root.querySelector('[data-booking-account-submit]');
-    if (submit) submit.disabled = true;
-    try {
-      const prepared = await prepareBookingAccount(state.tenantId, state.accountDraft.email);
-      state.passwordMode = prepared.exists ? 'login' : 'register';
-      state.error = '';
-      renderPassword(root, state);
-    } catch (error) {
-      state.error = error instanceof Error ? error.message : 'Не удалось проверить аккаунт';
-      renderAccountDetails(root, state);
-    }
-  });
-}
-
-function renderPassword(root, state) {
-  const register = state.passwordMode !== 'login';
-  renderFlowPage(root, state, {
-    title: register ? 'Создайте пароль' : 'Введите пароль',
-    subtitle: state.accountDraft.email || '',
-    back: { data: 'data-booking-password-back', aria: 'Назад' },
-    action: { label: register ? 'Создать' : 'Войти', data: 'data-booking-password-submit' },
-    body: `<form data-booking-password-form>${field({ label: 'Пароль', name: 'password', type: 'password', required: true, autocomplete: register ? 'new-password' : 'current-password' })}${errorBlock(state.error)}${bookingActions(bookingAction('Показать пароль', { secondary: true, data: 'data-booking-password-toggle' }))}</form>`,
-    center: true,
-  });
-  const form = root.querySelector('[data-booking-password-form]');
-  root.querySelector('[data-booking-password-back]')?.addEventListener('click', () => renderAccountDetails(root, state));
-  root.querySelector('[data-booking-password-submit]')?.addEventListener('click', () => form?.requestSubmit());
-  root.querySelector('[data-booking-password-toggle]')?.addEventListener('click', () => {
-    const input = form?.querySelector('[name="password"]');
-    if (!input) return;
-    input.type = input.type === 'password' ? 'text' : 'password';
-  });
-  form?.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const password = String(new FormData(form).get('password') || '');
-    const submit = root.querySelector('[data-booking-password-submit]');
-    if (submit) submit.disabled = true;
-    try {
-      let payload;
-      if (register) {
-        payload = await registerBookingAccount(state.tenantId, {
-          ...state.accountDraft,
-          password,
-          consents: currentConsentFacts(state),
-        });
-      } else {
-        payload = await loginBookingAccount(state.tenantId, state.accountDraft.email, password);
-        payload.account = await updateBookingAccount(state.tenantId, {
-          ...state.accountDraft,
-          consents: currentConsentFacts(state),
-        });
-      }
-      state.account = payload.account;
-      state.error = '';
-      seedConsents(state, state.account?.consents || currentConsentFacts(state));
-      renderConfirmation(root, state);
-    } catch (error) {
-      state.error = error instanceof Error ? error.message : 'Не удалось войти';
-      renderPassword(root, state);
-    }
-  });
 }
 
 function confirmationCard(state) {
@@ -527,7 +545,7 @@ function confirmationCard(state) {
 function renderConfirmation(root, state) {
   renderFlowPage(root, state, {
     title: 'Подтверждение',
-    back: { data: 'data-booking-confirm-back', aria: 'Выбрать другое время' },
+    back: { data: 'data-booking-confirm-back', aria: 'Назад' },
     action: { label: 'Подтвердить', data: 'data-booking-confirm' },
     body: `${confirmationCard(state)}${errorBlock(state.error)}`,
     center: true,
@@ -558,20 +576,23 @@ function renderConfirmation(root, state) {
 }
 
 async function startBookingFromAccount(root, state) {
-  state.bookingOrigin = 'account';
   resetBookingChoice(state);
   try {
     const consentState = await refreshAccountConsentState(state);
-    if (consentState.allowed) nextAfterAgreements(root, state);
-    else renderAgreements(root, state);
+    if (consentState.allowed) {
+      nextBookingStep(root, state);
+      return;
+    }
+    state.registrationMode = 'repair';
+    renderRegistrationAgreements(root, state);
   } catch (error) {
     state.error = error instanceof Error ? error.message : 'Не удалось проверить согласия';
-    renderAgreements(root, state);
+    state.registrationMode = 'repair';
+    renderRegistrationAgreements(root, state);
   }
 }
 
 async function repeatBooking(root, state, request) {
-  state.bookingOrigin = 'account';
   const procedureIds = requestProcedures(request).map((item) => String(item?.id || '')).filter(Boolean);
   state.repeatSelection = {
     workplaceKey: String(request?.workplaceKey || ''),
@@ -582,11 +603,18 @@ async function repeatBooking(root, state, request) {
   state.to = '';
   try {
     const consentState = await refreshAccountConsentState(state);
-    if (consentState.allowed) continueRepeat(root, state);
-    else renderAgreements(root, state);
+    if (consentState.allowed) {
+      continueRepeat(root, state);
+      return;
+    }
+    state.repeatSelection = null;
+    state.registrationMode = 'repair';
+    renderRegistrationAgreements(root, state);
   } catch (error) {
+    state.repeatSelection = null;
     state.error = error instanceof Error ? error.message : 'Не удалось проверить согласия';
-    renderAgreements(root, state);
+    state.registrationMode = 'repair';
+    renderRegistrationAgreements(root, state);
   }
 }
 
@@ -600,7 +628,9 @@ async function renderAccountHome(root, state) {
       state.error = '';
       state.clientTab = 'profile';
       state.clientChatOpen = false;
-      renderLogin(root, state);
+      state.registrationMode = 'initial';
+      seedConsents(state, []);
+      renderWelcome(root, state);
     },
   });
 }
@@ -625,12 +655,11 @@ export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = 
     account: null,
     consents: {},
     passwordMode: 'register',
-    loginEmail: '',
     error: '',
     notice: '',
     lastRequest: null,
     repeatSelection: null,
-    bookingOrigin: 'public',
+    registrationMode: 'initial',
     clientTab: 'profile',
     clientChatOpen: false,
     clientRequests: [],
@@ -649,12 +678,6 @@ export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = 
       state.account = account;
       seedConsents(state, account.consents || []);
       await renderAccountHome(root, state);
-      return;
-    }
-    const remembered = getRememberedBookingEmail(state.tenantId);
-    if (remembered) {
-      state.loginEmail = remembered;
-      renderLogin(root, state);
       return;
     }
     renderWelcome(root, state);
