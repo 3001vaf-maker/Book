@@ -110,11 +110,11 @@ function themeForm(settings) {
     <div class="muted">Шаг определяет, как часто клиенту показываются возможные начала записи. Длительность процедур при этом не меняется.</div>
 
     <div data-booking-settings-status class="muted" aria-live="polite"></div>
-    ${actionBlock(button('Сохранить оформление', { type: 'submit' }))}
+    ${actionBlock(`${button('Сохранить оформление', { type: 'submit' })}${button('Отменить изменения', { variant: 'secondary', data: 'data-booking-settings-cancel' })}`)}
   </form>`;
 }
 
-function bindSettings(root) {
+function bindSettings(root, { onCancel } = {}) {
   const form = root.querySelector('[data-online-booking-settings]');
   if (!form) return;
   initColorPickers(form);
@@ -124,6 +124,7 @@ function bindSettings(root) {
   };
   form.addEventListener('input', updatePreview);
   form.addEventListener('change', updatePreview);
+  form.querySelector('[data-booking-settings-cancel]')?.addEventListener('click', () => onCancel?.());
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     const saved = saveBookingSettings(settingsDraft(form));
@@ -158,7 +159,7 @@ function renderReady(root, navigateBack, tenantId) {
     ${actionBlock(button('Назад', { variant: 'secondary', data: 'data-online-booking-back' }))}`;
 
   bindCopyButtons(root);
-  bindSettings(root);
+  bindSettings(root, { onCancel: () => renderReady(root, navigateBack, tenantId) });
   root.querySelector('input[name="bookingWorkplace"]')?.addEventListener('change', (event) => {
     const host = root.querySelector('[data-workplace-booking-link]');
     if (!host) return;
