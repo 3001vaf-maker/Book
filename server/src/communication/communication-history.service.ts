@@ -42,7 +42,7 @@ export class CommunicationHistoryService {
           m."readAt", m."failedAt", m."error"
         FROM "CommunicationMessage" m
         WHERE m."tenantId" = ${tenantId}
-          AND ((${uei} <> '' AND m."uei" = ${uei}) OR (${uei} = '' AND ${cardPhone} <> '' AND m."cardPhone" = ${cardPhone}))
+          AND ((${cardPhone} <> '' AND m."cardPhone" = ${cardPhone}) OR (${cardPhone} = '' AND ${uei} <> '' AND m."uei" = ${uei}))
         UNION ALL
         SELECT ('notification:' || n."id") AS "id", n."tenantId", n."cardPhone", n."uei", 'system' AS "direction",
           'notification' AS "kind", 'IN_APP' AS "channel",
@@ -52,7 +52,7 @@ export class CommunicationHistoryService {
         FROM "Notification" n
         INNER JOIN "NotificationDelivery" d ON d."notificationId" = n."id" AND d."tenantId" = n."tenantId" AND d."channel" = 'IN_APP'
         WHERE n."tenantId" = ${tenantId}
-          AND ((${uei} <> '' AND n."uei" = ${uei}) OR (${uei} = '' AND ${cardPhone} <> '' AND n."cardPhone" = ${cardPhone}))
+          AND ((${cardPhone} <> '' AND n."cardPhone" = ${cardPhone}) OR (${cardPhone} = '' AND ${uei} <> '' AND n."uei" = ${uei}))
       )
       SELECT * FROM history ORDER BY "createdAt" ASC, "id" ASC LIMIT ${safeLimit}
     `;
@@ -76,9 +76,9 @@ export class CommunicationHistoryService {
         INNER JOIN "NotificationDelivery" d ON d."notificationId" = n."id" AND d."tenantId" = n."tenantId" AND d."channel" = 'IN_APP'
         WHERE n."tenantId" = ${tenantId}
       ), latest AS (
-        SELECT DISTINCT ON (COALESCE(NULLIF("uei", ''), "cardPhone")) * FROM history
+        SELECT DISTINCT ON (COALESCE(NULLIF("cardPhone", ''), "uei")) * FROM history
         WHERE "uei" <> '' OR "cardPhone" <> ''
-        ORDER BY COALESCE(NULLIF("uei", ''), "cardPhone"), "createdAt" DESC, "id" DESC
+        ORDER BY COALESCE(NULLIF("cardPhone", ''), "uei"), "createdAt" DESC, "id" DESC
       )
       SELECT * FROM latest ORDER BY "createdAt" DESC, "id" DESC LIMIT ${safeLimit}
     `;
@@ -92,7 +92,7 @@ export class CommunicationHistoryService {
       SELECT "id", "tenantId", "cardPhone", "uei", "preferredChannels", "createdAt", "updatedAt"
       FROM "CommunicationPreference"
       WHERE "tenantId" = ${tenantId}
-        AND ((${uei} <> '' AND "uei" = ${uei}) OR (${uei} = '' AND ${cardPhone} <> '' AND "cardPhone" = ${cardPhone}))
+        AND ((${cardPhone} <> '' AND "cardPhone" = ${cardPhone}) OR (${cardPhone} = '' AND ${uei} <> '' AND "uei" = ${uei}))
       ORDER BY "updatedAt" DESC LIMIT 1
     `;
     const row = rows[0] || null;
