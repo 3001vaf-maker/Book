@@ -2,10 +2,12 @@ import {
   clearBookingAccount,
   getBookingAccount,
   getBookingChat,
+  getBookingChatSettings,
   getBookingNotifications,
   getBookingRequests,
   markBookingNotificationRead,
   sendBookingChatMessage,
+  setBookingTelegramConsent,
 } from '../core/booking-account/index.js';
 import { formatPhone } from '../core/phone/index.js';
 import { disableWebPush, enableWebPush, getWebPushState } from '../core/notifications/web-push.js';
@@ -236,12 +238,9 @@ async function loadMessages(state) {
     getBookingChat(state.tenantId).catch(() => []),
     getBookingNotifications(state.tenantId).catch(() => ({ items: [], unreadCount: 0 })),
   ]);
-  const combined = [...(Array.isArray(messages) ? messages : []), ...notificationMessages(feed)]
+  return [...(Array.isArray(messages) ? messages : []), ...notificationMessages(feed)]
     .sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime())
     .map((item) => ({ ...item, time: messageTime(item.createdAt) }));
-  const unread = notificationMessages(feed).filter((item) => item.unread && item.notificationId);
-  void Promise.allSettled(unread.map((item) => markBookingNotificationRead(state.tenantId, item.notificationId)));
-  return combined;
 }
 
 function bindBottomNavigation(root, state, handlers) {
@@ -266,18 +265,32 @@ function renderShell(root, state, { title, back = null, action = null, settings 
 }
 
 async function openChatSettings(state) {
-  let push = await getWebPushState(state.tenantId).catch(() => ({ supported: false, enabled: false, subscribed: false, permission: 'unsupported' }));
+  const [pushState, chatSettings] = await Promise.all([
+    getWebPushState(state.tenantId).catch(() => ({ supported: false, enabled: false, subscribed: false, permission: 'unsupported' })),
+    getBookingChatSettings(state.tenantId).catch(() => ({ telegram: { linked: false, enabled: false, username: '' } })),
+  ]);
+  let push = pushState;
+  let telegram = chatSettings?.telegram || { linked: false, enabled: false, username: '' };
   const render = () => settingsPanel([
     { type: 'toggle', label: 'Push', checked: Boolean(push.subscribed), data: 'data-chat-push', disabled: !push.supported || !push.enabled || push.permission === 'denied' },
-    { type: 'toggle', label: 'Telegram', checked: Boolean(state.account?.telegramId), data: 'data-chat-telegram', disabled: true },
+    { type: 'toggle', label: 'Telegram', checked: Boolean(telegram.enabled), data: 'data-chat-telegram', disabled: !telegram.linked },
   ]);
   const layer = mountModal(document.body, modal(render(), { variant: 'medium', surface: 'app', title: 'Настройки чата' }));
+  const redraw = () => {
+    const panel = layer?.querySelector('.app-settings-panel');
+    if (panel) panel.outerHTML = render();
+    bind();
+  };
   const bind = () => {
     layer?.querySelector('[data-chat-push]')?.addEventListener('click', async () => {
       push = push.subscribed ? await disableWebPush(state.tenantId) : await enableWebPush(state.tenantId);
-      const sheet = layer?.querySelector('.modal-sheet');
-      if (sheet) sheet.innerHTML = `<button type="button" class="modal-close" data-modal-close aria-label="Закрыть">×</button>${render()}`;
-      bind();
+      redraw();
+    });
+    layer?.querySelector('[data-chat-telegram]')?.addEventListener('click', async () => {
+      if (!telegram.linked) return;
+      const next = await setBookingTelegramConsent(state.tenantId, !telegram.enabled).catch(() => null);
+      if (next?.telegram) telegram = next.telegram;
+      redraw();
     });
   };
   bind();
@@ -385,6 +398,29 @@ async function renderMessages(root, state, handlers) {
   });
   root.querySelector('[data-client-chat-booking]')?.addEventListener('click', handlers.onStartBooking);
   root.querySelector('[data-client-chat-settings]')?.addEventListener('click', () => void openChatSettings(state));
+  root.querySelectorAll('[data-message-id]').forEach((node) => {
+    const message = messages.find((item) => String(item?.id || '') === String(node.dataset.messageId || ''));
+    if (!message?.notificationId || !message.unread) return;
+    node.setAttribute('role', 'button');
+    node.setAttribute('tabindex', '0');
+    node.setAttribute('aria-label', 'Открыть уведомление');
+    const openNotification = async () => {
+      if (!message.unread) return;
+      try {
+        await markBookingNotificationRead(state.tenantId, message.notificationId);
+        message.unread = false;
+        node.removeAttribute('tabindex');
+        node.removeAttribute('role');
+        node.removeAttribute('aria-label');
+      } catch {}
+    };
+    node.addEventListener('click', () => void openNotification());
+    node.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      void openNotification();
+    });
+  });
   const form = root.querySelector('[data-message-composer]');
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
