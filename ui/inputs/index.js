@@ -12,7 +12,8 @@ function labelText(label, required) {
 }
 
 function phoneCountryLabel(iso) {
-  return phoneCountryOptions().find((option) => option.value === iso)?.label || iso;
+  const full = phoneCountryOptions().find((option) => option.value === iso)?.label || '';
+  return full.match(/\+\d{1,4}\b/)?.[0] || iso;
 }
 
 function setPhoneCountry(host, iso) {
@@ -81,7 +82,7 @@ export function phoneInput({ name = 'phone', value = '', required = false, aria 
     className: 'phone-input__country',
     data: 'data-phone-country',
     searchable: true,
-  });
+  }).replace(/(<span class="ui-select__value">)[\s\S]*?(<\/span>)/, `$1${escapeHtml(phoneCountryLabel(state.countryIso))}$2`);
   return `<div class="phone-input" data-phone-input>${countrySelect}<input class="phone-input__national" type="tel" value="${escapeHtml(state.displayNational)}" placeholder="903 123-45-67" inputmode="tel" autocomplete="tel" data-phone-national aria-label="${escapeHtml(aria)}"${required ? ' required' : ''}><input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(state.canonical)}" data-phone-value></div>`;
 }
 
