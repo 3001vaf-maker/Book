@@ -44,6 +44,11 @@ function dateValue(value: unknown) {
   return /^\d{4}-\d{2}-\d{2}$/.test(result) ? result : '';
 }
 
+type ClientCardBinding = {
+  person: Record<string, any>;
+  clientCardExisted: boolean;
+};
+
 @Injectable()
 export class ClientCardLinkService {
   constructor(private readonly businessState: BusinessStateService) {}
@@ -57,7 +62,7 @@ export class ClientCardLinkService {
     return { business, people, members, owner: members[0] || null };
   }
 
-  async bindFirstAccess(tenantId: string, account: Record<string, any>) {
+  async bindFirstAccess(tenantId: string, account: Record<string, any>): Promise<ClientCardBinding> {
     const accountId = text(account?.id);
     if (!accountId) throw new BadRequestException('У аккаунта онлайн-записи отсутствует id');
 
@@ -72,8 +77,8 @@ export class ClientCardLinkService {
       return { person, clientCardExisted: false };
     }
 
-    const owner = {
-      ...card.owner.person,
+    const owner: Record<string, any> = {
+      ...objectValue(card.owner.person),
       accounts: uniqueStrings([...accountIds(card.owner.person), accountId]),
       phones: uniqueStrings([...arrayValue(card.owner.person.phones), account.phone]),
       emails: uniqueStrings([...arrayValue(card.owner.person.emails), text(account.email).toLowerCase()]),
