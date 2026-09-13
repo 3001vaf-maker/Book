@@ -2,7 +2,7 @@ import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@
 import { Prisma } from '@prisma/client';
 import type { Request } from 'express';
 import { BusinessStateService } from '../business-state/business-state.service';
-import { DocumentStateService } from '../document-state/document-state.service';
+import { ConsentPolicyService } from '../document-state/consent-policy.service';
 import { PrismaService } from '../prisma.service';
 
 type AccountRequest = Request & {
@@ -14,7 +14,7 @@ type AccountRequest = Request & {
 export class BookingRequiredConsentGuard implements CanActivate {
   constructor(
     private readonly businessState: BusinessStateService,
-    private readonly documents: DocumentStateService,
+    private readonly consentPolicy: ConsentPolicyService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -27,7 +27,7 @@ export class BookingRequiredConsentGuard implements CanActivate {
     const clientId = String(identity?.person?.key || '').trim();
     if (!clientId) throw new ForbiddenException('Не определена клиентская карта');
 
-    const state = await this.documents.requiredConsentState(auth.tenantId, clientId);
+    const state = await this.consentPolicy.requiredConsentState(auth.tenantId, clientId);
     request.bookingConsentAccess = state;
     if (!state.allowed) {
       throw new ForbiddenException({
