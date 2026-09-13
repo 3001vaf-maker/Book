@@ -29,6 +29,7 @@ type CommunicationMessageRow = {
   kind: string;
   channel: string;
   body: string;
+  attachments: unknown;
   externalMessageId: string;
   externalThreadId: string;
   status: string;
@@ -67,6 +68,25 @@ function telegramUsername(value: unknown) {
 
 function tokenHash(value: string) {
   return createHash('sha256').update(value).digest('hex');
+}
+
+function normalizeAttachments(value: unknown) {
+  const source = Array.isArray(value) ? value.slice(0, 3) : [];
+  let totalEncoded = 0;
+  return source.map((raw) => {
+    const item = objectValue(raw);
+    const type = text(item.type).toLowerCase();
+    const name = text(item.name).slice(0, 200) || 'Медиа';
+    const dataUrl = text(item.dataUrl);
+    const size = Math.max(0, Number(item.size || 0));
+    if (!/^(image|video)\//.test(type)) throw new BadRequestException('Поддерживаются только фото и видео');
+    if (!dataUrl.startsWith(`data:${type};base64,`)) throw new BadRequestException('Некорректный медиафайл');
+    if (size > 8 * 1024 * 1024) throw new BadRequestException('Один файл должен быть не больше 8 МБ');
+    if (dataUrl.length > 12 * 1024 * 1024) throw new BadRequestException('Медиафайл слишком большой');
+    totalEncoded += dataUrl.length;
+    if (totalEncoded > 24 * 1024 * 1024) throw new BadRequestException('Слишком большой общий объём вложений');
+    return { name, type, size, dataUrl };
+  });
 }
 
 @Injectable()
@@ -184,7 +204,7 @@ export class CommunicationService {
   }
 
   async recordMessage(tenantId: string, input: {
-    phone?: unknown; uei?: unknown; direction?: unknown; kind?: unknown; channel?: unknown; body?: unknown;
+    phone?: unknown; uei?: unknown; direction?: unknown; kind?: unknown; channel?: unknown; body?: unknown; attachments?: unknown;
     externalMessageId?: unknown; externalThreadId?: unknown; status?: unknown; error?: unknown;
   }) {
     const cardPhone = canonicalPhone(input?.phone);
@@ -193,24 +213,27 @@ export class CommunicationService {
     const kind = text(input?.kind).toLowerCase() || 'message';
     const channel = text(input?.channel).toUpperCase() || 'IN_APP';
     const body = text(input?.body);
+    const attachments = normalizeAttachments(input?.attachments);
+    const attachmentsJson = JSON.stringify(attachments);
     const status = text(input?.status).toLowerCase() || 'created';
     const externalMessageId = text(input?.externalMessageId);
     const externalThreadId = text(input?.externalThreadId);
     const error = text(input?.error).slice(0, 2000);
     if (!cardPhone && !uei) throw new BadRequestException('Не указан клиент');
+    if (!body && !attachments.length) throw new BadRequestException('Пустое сообщение');
     const id = randomUUID();
     const now = new Date();
     await this.prisma.$executeRaw`
       INSERT INTO "CommunicationMessage" (
-        "id", "tenantId", "cardPhone", "uei", "direction", "kind", "channel", "body",
+        "id", "tenantId", "cardPhone", "uei", "direction", "kind", "channel", "body", "attachments",
         "externalMessageId", "externalThreadId", "status", "createdAt", "sentAt", "deliveredAt", "failedAt", "error"
       ) VALUES (
-        ${id}, ${tenantId}, ${cardPhone}, ${uei}, ${direction}, ${kind}, ${channel}, ${body},
+        ${id}, ${tenantId}, ${cardPhone}, ${uei}, ${direction}, ${kind}, ${channel}, ${body}, ${attachmentsJson}::jsonb,
         ${externalMessageId}, ${externalThreadId}, ${status}, ${now},
         ${status === 'sent' ? now : null}, ${status === 'delivered' ? now : null}, ${status === 'failed' ? now : null}, ${error}
       ) ON CONFLICT DO NOTHING
     `;
-    return { id, tenantId, cardPhone, uei, direction, kind, channel, body, externalMessageId, externalThreadId, status, createdAt: now, error };
+    return { id, tenantId, cardPhone, uei, direction, kind, channel, body, attachments, externalMessageId, externalThreadId, status, createdAt: now, error };
   }
 
   async listThread(tenantId: string, input: { phone?: unknown; uei?: unknown }, limit = 300) {
@@ -219,7 +242,7 @@ export class CommunicationService {
     if (!cardPhone && !uei) throw new BadRequestException('Не указан клиент');
     const safeLimit = Math.max(1, Math.min(1000, Math.floor(Number(limit) || 300)));
     return this.prisma.$queryRaw<CommunicationMessageRow[]>`
-      SELECT "id", "tenantId", "cardPhone", "uei", "direction", "kind", "channel", "body",
+      SELECT "id", "tenantId", "cardPhone", "uei", "direction", "kind", "channel", "body", "attachments",
              "externalMessageId", "externalThreadId", "status", "createdAt", "sentAt", "deliveredAt", "readAt", "failedAt", "error"
       FROM "CommunicationMessage"
       WHERE "tenantId" = ${tenantId}
@@ -232,7 +255,7 @@ export class CommunicationService {
     const safeLimit = Math.max(1, Math.min(500, Math.floor(Number(limit) || 200)));
     return this.prisma.$queryRaw<CommunicationMessageRow[]>`
       SELECT DISTINCT ON (COALESCE(NULLIF("uei", ''), "cardPhone"))
-             "id", "tenantId", "cardPhone", "uei", "direction", "kind", "channel", "body",
+             "id", "tenantId", "cardPhone", "uei", "direction", "kind", "channel", "body", "attachments",
              "externalMessageId", "externalThreadId", "status", "createdAt", "sentAt", "deliveredAt", "readAt", "failedAt", "error"
       FROM "CommunicationMessage"
       WHERE "tenantId" = ${tenantId}

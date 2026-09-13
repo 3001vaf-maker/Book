@@ -236,18 +236,20 @@ export class OnlineBookingController {
   async sendAccountChatMessage(
     @Param('tenantId') tenantId: string,
     @Req() request: AccountRequest,
-    @Body() body: { body?: unknown },
+    @Body() body: { body?: unknown; attachments?: unknown },
   ) {
     const message = String(body?.body ?? '').trim();
-    if (!message) throw new BadRequestException('Пустое сообщение');
+    const attachments = Array.isArray(body?.attachments) ? body.attachments : [];
+    if (!message && !attachments.length) throw new BadRequestException('Пустое сообщение');
     const account = await this.booking.getAccount(tenantId, request.bookingAccountAuth!.accountId);
     return this.communications.recordMessage(tenantId, {
       phone: account.phone,
       uei: account.uei,
       direction: 'inbound',
-      kind: 'message',
+      kind: attachments.length ? 'media' : 'message',
       channel: 'IN_APP',
       body: message,
+      attachments,
       status: 'delivered',
     });
   }

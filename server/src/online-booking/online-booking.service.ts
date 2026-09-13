@@ -106,11 +106,31 @@ function normalizeConsents(value: unknown) {
   })).filter((item) => item.documentId);
 }
 
+function uniqueStrings(value: unknown, normalize: (item: unknown) => string, limit = 5) {
+  return [...new Set(arrayValue(value).map(normalize).filter(Boolean))].slice(0, limit);
+}
+
 function normalizeProfileData(value: unknown) {
   const source = objectValue(value);
+  const gender = text(source.gender);
+  const links = arrayValue(source.links).map((item) => ({
+    type: text(item?.type).slice(0, 40),
+    url: text(item?.url).slice(0, 1000),
+  })).filter((item) => item.url).slice(0, 8);
   return {
-    gender: text(source.gender).slice(0, 32),
+    gender: ['male', 'female'].includes(gender) ? gender : '',
     birthDate: dateValue(source.birthDate),
+    photo: text(source.photo).slice(0, 5_000_000),
+    phones: uniqueStrings(source.phones, (item) => {
+      const value = text(item);
+      return /^\+\d{8,15}$/.test(value) ? value : '';
+    }),
+    emails: uniqueStrings(source.emails, (item) => {
+      const value = emailValue(item);
+      return value.includes('@') ? value.slice(0, 254) : '';
+    }),
+    telegram: text(source.telegram).slice(0, 100),
+    links,
   };
 }
 
@@ -371,10 +391,9 @@ export class OnlineBookingService {
 
     const phone = text(body.phone) || account.phone;
     if (!/^\+\d{8,15}$/.test(phone)) throw new BadRequestException('Введите телефон полностью');
-    const profileData = {
-      ...normalizeProfileData(account.profileData),
-      ...normalizeProfileData(body.profileData),
-    };
+    const profileData = body.profileData == null
+      ? normalizeProfileData(account.profileData)
+      : normalizeProfileData({ ...objectValue(account.profileData), ...objectValue(body.profileData) });
     const updated = await this.prisma.bookingAccount.update({
       where: { id: account.id },
       data: {
@@ -389,6 +408,21 @@ export class OnlineBookingService {
     const binding = await this.clientCards.bindFirstAccess(tenantId, updated as any);
     await this.documentState.recordAcceptedConsents(tenantId, text(binding.person.key), merged);
     return this.accountView(tenantId, updated);
+  }
+
+  async changeAccountPassword(tenantId: string, accountId: string, currentPassword: unknown, newPassword: unknown) {
+    const current = String(currentPassword ?? '');
+    const next = String(newPassword ?? '');
+    if (next.length < 8) throw new BadRequestException('Новый пароль должен содержать минимум 8 символов');
+    const account = await this.prisma.bookingAccount.findFirst({ where: { id: accountId, tenantId } });
+    if (!account) throw new UnauthorizedException('Аккаунт не найден');
+    if (!(await compare(current, account.passwordHash))) throw new BadRequestException('Текущий пароль указан неверно');
+    if (await compare(next, account.passwordHash)) throw new BadRequestException('Новый пароль должен отличаться от текущего');
+    await this.prisma.bookingAccount.update({
+      where: { id: account.id },
+      data: { passwordHash: await hash(next, 12) },
+    });
+    return { changed: true };
   }
 
   async createRequest(tenantId: string, accountId: string, body: Record<string, any>) {

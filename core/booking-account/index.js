@@ -107,6 +107,18 @@ export async function updateBookingAccount(tenantId, data) {
   );
 }
 
+export async function changeBookingPassword(tenantId, currentPassword, newPassword) {
+  return jsonResponse(
+    await request(`/online-booking/${encodeURIComponent(tenantId)}/account/password`, {
+      tenantId,
+      auth: true,
+      method: 'PUT',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    }),
+    'Не удалось изменить пароль',
+  );
+}
+
 export async function createBookingRequest(tenantId, data) {
   return jsonResponse(
     await request(`/online-booking/${encodeURIComponent(tenantId)}/requests`, {
@@ -212,13 +224,13 @@ export async function setBookingTelegramConsent(tenantId, enabled) {
   );
 }
 
-export async function sendBookingChatMessage(tenantId, body) {
+export async function sendBookingChatMessage(tenantId, body, attachments = []) {
   return jsonResponse(
     await request(`/online-booking/${encodeURIComponent(tenantId)}/account/chat/messages`, {
       tenantId,
       auth: true,
       method: 'POST',
-      body: JSON.stringify({ body: String(body || '').trim() }),
+      body: JSON.stringify({ body: String(body || '').trim(), attachments: Array.isArray(attachments) ? attachments : [] }),
     }),
     'Не удалось отправить сообщение',
   );

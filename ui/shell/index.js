@@ -4,7 +4,7 @@ import { escapeHtml } from '../utils/escape-html.js';
 
 const CLIENT_NAV_ITEMS = [
   { id: 'profile', label: 'Профиль', icon: '◉' },
-  { id: 'messages', label: 'Сообщения', icon: '◌' },
+  { id: 'messages', label: 'Сообщения', icon: '💬' },
   { id: 'history', label: 'История', icon: '▤' },
 ];
 
@@ -19,13 +19,13 @@ export function appHeader({
   settings = null,
 } = {}) {
   const backButton = back
-    ? button('‹', { className: 'app-header__control app-header__control--icon', data: back.data || '', aria: back.aria || 'Назад' })
+    ? button('‹', { className: 'app-header__control app-header__control--icon', data: back.data || '', aria: back.aria || 'Назад', variant: 'secondary' })
     : '<span class="app-header__placeholder" aria-hidden="true"></span>';
   const actionButton = action
-    ? button(text(action.label || ''), { className: 'app-header__control app-header__control--action', data: action.data || '', aria: action.aria || action.label || '' })
+    ? button(text(action.label || ''), { className: 'app-header__control app-header__control--action', data: action.data || '', aria: action.aria || action.label || '', disabled: Boolean(action.disabled) })
     : '<span class="app-header__placeholder app-header__placeholder--action" aria-hidden="true"></span>';
   const settingsButton = settings
-    ? button(settings.label || '•••', { className: 'app-header__control app-header__control--icon', data: settings.data || '', aria: settings.aria || 'Настройки' })
+    ? button(settings.label || '•••', { className: 'app-header__control app-header__control--icon', data: settings.data || '', aria: settings.aria || 'Настройки', variant: 'secondary' })
     : '<span class="app-header__placeholder" aria-hidden="true"></span>';
 
   return `<header class="app-header" data-app-header>
@@ -106,13 +106,28 @@ export function clientProfileCard({
   </article>`;
 }
 
+function attachmentMarkup(attachment = {}) {
+  const dataUrl = String(attachment?.dataUrl || '').trim();
+  const type = String(attachment?.type || '').toLowerCase();
+  const name = text(attachment?.name || 'Вложение');
+  if (type.startsWith('image/') && dataUrl.startsWith('data:image/')) {
+    return `<a class="message-attachment message-attachment--image" href="${text(dataUrl)}" target="_blank" rel="noopener" aria-label="Открыть ${name}"><img src="${text(dataUrl)}" alt="${name}"></a>`;
+  }
+  if (type.startsWith('video/') && dataUrl.startsWith('data:video/')) {
+    return `<video class="message-attachment message-attachment--video" controls preload="metadata"><source src="${text(dataUrl)}" type="${text(type)}"></video>`;
+  }
+  return '';
+}
+
 export function messageBubble(message = {}, { viewer = 'client' } = {}) {
   const direction = String(message.direction || '').toLowerCase();
   const system = direction === 'system' || String(message.kind || '').toLowerCase() === 'system';
   const outgoing = viewer === 'master' ? direction === 'outbound' : direction === 'inbound';
   const classes = ['message-bubble', system ? 'message-bubble--system' : outgoing ? 'message-bubble--outgoing' : 'message-bubble--incoming'].join(' ');
   const time = message.time || message.createdAt || '';
-  return `<div class="${classes}" data-message-id="${text(message.id || '')}"><div class="message-bubble__body">${text(message.body || '').replaceAll('\n', '<br>')}</div>${time ? `<span class="message-bubble__time">${text(time)}</span>` : ''}</div>`;
+  const attachments = (Array.isArray(message.attachments) ? message.attachments : []).map(attachmentMarkup).filter(Boolean).join('');
+  const body = text(message.body || '').replaceAll('\n', '<br>');
+  return `<div class="${classes}" data-message-id="${text(message.id || '')}">${attachments ? `<div class="message-bubble__attachments">${attachments}</div>` : ''}${body ? `<div class="message-bubble__body">${body}</div>` : ''}${time ? `<span class="message-bubble__time">${text(time)}</span>` : ''}</div>`;
 }
 
 export function messageThread(messages = [], options = {}) {
@@ -120,8 +135,8 @@ export function messageThread(messages = [], options = {}) {
   return `<div class="message-thread" data-message-thread>${values.map((message) => messageBubble(message, options)).join('')}</div>`;
 }
 
-export function messageComposer({ placeholder = 'Написать сообщение...', data = 'data-message-composer', sendData = 'data-message-send' } = {}) {
-  return `<form class="message-composer" ${data}><textarea class="message-composer__input" name="message" rows="1" placeholder="${text(placeholder)}" aria-label="${text(placeholder)}"></textarea>${button('➤', { className: 'message-composer__send', type: 'submit', data: sendData, aria: 'Отправить' })}</form>`;
+export function messageComposer({ placeholder = 'Написать сообщение...', data = 'data-message-composer', sendData = 'data-message-send', attachments = false } = {}) {
+  return `<form class="message-composer" ${data}>${attachments ? `<input class="sr-only" type="file" accept="image/*,video/*" multiple data-message-attachment-input><button type="button" class="message-composer__attach" data-message-attachment aria-label="Прикрепить фото или медиа">📎</button>` : ''}<textarea class="message-composer__input" name="message" rows="1" placeholder="${text(placeholder)}" aria-label="${text(placeholder)}"></textarea>${button('➤', { className: 'message-composer__send', type: 'submit', data: sendData, aria: 'Отправить' })}${attachments ? '<div class="message-composer__attachments" data-message-attachment-preview></div>' : ''}</form>`;
 }
 
 export function settingToggle({ label = '', checked = false, data = '', disabled = false } = {}) {

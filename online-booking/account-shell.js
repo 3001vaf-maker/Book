@@ -14,10 +14,11 @@ import { disableWebPush, enableWebPush, getWebPushState } from '../core/notifica
 import {
   appHeader,
   appShell,
+  bookingThemeStyle,
   button,
   clientBottomNavigation,
-  clientProfileCard,
   emptyState,
+  entityCard,
   escapeHtml,
   listEntries,
   listEntry,
@@ -29,6 +30,9 @@ import {
   readOnlyReceipt,
   settingsPanel,
 } from '../ui/ui.js';
+import { openClientConsentSettings } from './consent-settings.js';
+import { openClientPasswordSettings } from './password-settings.js';
+import { openClientPersonalData } from './personal-data.js';
 
 function money(value) {
   const number = Number(value || 0);
@@ -138,20 +142,13 @@ function aggregateFinance(requests = [], account = {}) {
 
 function programRows(account = {}) {
   const source = Array.isArray(account.programs) ? account.programs : [];
-  const find = (pattern) => source.find((item) => pattern.test(String(item?.name || item?.title || '')));
-  const deposit = find(/депозит/i);
-  const personal = find(/личн.*сч[её]т/i);
-  const valueOf = (item) => item ? String(item.value ?? item.balance ?? '') : '0 ₽';
-  const fixed = [
-    { label: 'Депозит', value: valueOf(deposit), source: deposit || { name: 'Депозит', value: '0 ₽' } },
-    { label: 'Личный счёт', value: valueOf(personal), source: personal || { name: 'Личный счёт', value: '0 ₽' } },
-  ];
-  const rest = source.filter((item) => item !== deposit && item !== personal).map((item) => ({
-    label: String(item?.name || item?.title || 'Программа'),
-    value: String(item?.value ?? item?.balance ?? ''),
-    source: item,
-  }));
-  return [...fixed, ...rest];
+  return source
+    .filter((item) => item && typeof item === 'object')
+    .map((item) => ({
+      label: String(item?.name || item?.title || 'Программа'),
+      value: String(item?.value ?? item?.balance ?? ''),
+      source: item,
+    }));
 }
 
 function openProgram(row) {
@@ -207,7 +204,7 @@ function openHistoryDetail(state, request, onRepeat) {
     time: request.from || '',
     items: procedures.map((item) => ({ label: item?.name || 'Процедура', value: money(item?.cost || 0) })),
     totals,
-    action: procedures.length ? { label: 'Повторить процедуру', data: 'data-repeat-procedure' } : null,
+    action: procedures.length ? { label: 'Повторить запись', data: 'data-repeat-procedure' } : null,
   }), { variant: 'large', surface: 'app', title: 'Запись' }));
   layer?.querySelector('[data-repeat-procedure]')?.addEventListener('click', () => {
     layer.remove();
@@ -233,6 +230,47 @@ function messageTime(value) {
   return new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' }).format(date);
 }
 
+async function fileAttachment(file) {
+  if (!(file instanceof File)) return null;
+  if (!/^(image|video)\//i.test(file.type || '')) throw new Error('Можно прикрепить фото или видео');
+  if (file.size > 8 * 1024 * 1024) throw new Error('Один файл должен быть не больше 8 МБ');
+  const dataUrl = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('Не удалось прочитать файл'));
+    reader.readAsDataURL(file);
+  });
+  return { name: file.name || 'Медиа', type: file.type || '', size: file.size || 0, dataUrl };
+}
+
+function bindMessageAttachments(form) {
+  const selected = [];
+  const input = form?.querySelector('[data-message-attachment-input]');
+  const trigger = form?.querySelector('[data-message-attachment]');
+  const preview = form?.querySelector('[data-message-attachment-preview]');
+  const redraw = () => {
+    if (!preview) return;
+    preview.innerHTML = selected.map((item) => `<span class="message-composer__attachment-chip">${escapeHtml(item.name || 'Медиа')}</span>`).join('');
+  };
+  trigger?.addEventListener('click', () => input?.click());
+  input?.addEventListener('change', async () => {
+    const files = [...(input.files || [])].slice(0, 3);
+    try {
+      const next = (await Promise.all(files.map(fileAttachment))).filter(Boolean);
+      selected.splice(0, selected.length, ...next);
+      redraw();
+      input.setCustomValidity('');
+    } catch (error) {
+      selected.splice(0, selected.length);
+      redraw();
+      input.setCustomValidity(error instanceof Error ? error.message : 'Не удалось прикрепить файл');
+      input.reportValidity();
+      input.setCustomValidity('');
+    }
+  });
+  return () => [...selected];
+}
+
 async function loadMessages(state) {
   const [messages, feed] = await Promise.all([
     getBookingChat(state.tenantId).catch(() => []),
@@ -253,8 +291,15 @@ function bindBottomNavigation(root, state, handlers) {
   }));
 }
 
+function accountThemeClasses(state) {
+  const theme = state.settings?.theme && typeof state.settings.theme === 'object' ? state.settings.theme : {};
+  const shape = ['soft', 'round', 'straight', 'cut'].includes(theme.shape) ? theme.shape : 'soft';
+  const choiceStyle = ['cards', 'compact', 'list'].includes(theme.choiceStyle) ? theme.choiceStyle : 'cards';
+  return `booking-client booking-client--account booking-shape--${shape} booking-choice-style--${choiceStyle}`;
+}
+
 function renderShell(root, state, { title, back = null, action = null, settings = null, body = '', primaryAction = '', className = '', media = null } = {}) {
-  root.innerHTML = appShell({
+  const shell = appShell({
     header: appHeader({ title, back, action, settings }),
     media: media === null ? mediaRail(mediaItems(state)) : media,
     body,
@@ -262,6 +307,7 @@ function renderShell(root, state, { title, back = null, action = null, settings 
     bottomNavigation: clientBottomNavigation(state.clientTab || 'profile'),
     className,
   });
+  root.innerHTML = `<section class="${accountThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${shell}</section>`;
 }
 
 async function openChatSettings(state) {
@@ -274,6 +320,7 @@ async function openChatSettings(state) {
   const render = () => settingsPanel([
     { type: 'toggle', label: 'Push', checked: Boolean(push.subscribed), data: 'data-chat-push', disabled: !push.supported || !push.enabled || push.permission === 'denied' },
     { type: 'toggle', label: 'Telegram', checked: Boolean(telegram.enabled), data: 'data-chat-telegram', disabled: !telegram.linked },
+    { label: 'Согласия', data: 'data-chat-consents' },
   ]);
   const layer = mountModal(document.body, modal(render(), { variant: 'medium', surface: 'app', title: 'Настройки чата' }));
   const redraw = () => {
@@ -292,18 +339,32 @@ async function openChatSettings(state) {
       if (next?.telegram) telegram = next.telegram;
       redraw();
     });
+    layer?.querySelector('[data-chat-consents]')?.addEventListener('click', () => {
+      layer.remove();
+      void openClientConsentSettings(state);
+    });
   };
   bind();
 }
 
-function openProfileSettings(state, { onPersonalData, onLogout }) {
+function openProfileSettings(state, { onPersonalData, onPassword, onConsents, onLogout }) {
   const layer = mountModal(document.body, modal(settingsPanel([
     { label: 'Личные данные', data: 'data-client-personal-data' },
+    { label: 'Изменить пароль', data: 'data-client-change-password' },
+    { label: 'Согласия', data: 'data-client-consents' },
     { label: 'Выход', data: 'data-client-logout', variant: 'danger' },
   ]), { variant: 'medium', surface: 'app', title: 'Настройки профиля' }));
   layer?.querySelector('[data-client-personal-data]')?.addEventListener('click', () => {
     layer.remove();
     onPersonalData?.();
+  });
+  layer?.querySelector('[data-client-change-password]')?.addEventListener('click', () => {
+    layer.remove();
+    onPassword?.();
+  });
+  layer?.querySelector('[data-client-consents]')?.addEventListener('click', () => {
+    layer.remove();
+    onConsents?.();
   });
   layer?.querySelector('[data-client-logout]')?.addEventListener('click', () => {
     layer.remove();
@@ -314,30 +375,47 @@ function openProfileSettings(state, { onPersonalData, onLogout }) {
 async function renderProfile(root, state, handlers) {
   const requests = state.clientRequests || [];
   const account = state.account || {};
+  const profile = account.profileData && typeof account.profileData === 'object' ? account.profileData : {};
   const visit = nearestVisit(requests);
   const request = visit.request;
   const finance = aggregateFinance(requests, account);
   const rows = programRows(account);
-  const card = clientProfileCard({
-    workplace: request ? workplaceName(state, request) : '',
-    visitLabel: visit.label,
-    date: request ? formatDate(request.date) : '',
-    time: request?.from || '',
-    uei: account.uei || '',
-    discount: Number(account.discountPercent || 0),
-    name: [account.name, account.surname].filter(Boolean).join(' '),
-    phone: formatPhone(account.phone || ''),
-    financial: [
+  const discount = Math.max(0, Number(account.discountPercent || 0));
+  const card = entityCard({
+    id: account.uei ? `UEI ${account.uei}` : '',
+    title: [account.name, account.surname].filter(Boolean).join(' '),
+    subtitle: formatPhone(account.phone || ''),
+    image: profile.photo || '',
+    topMeta: request ? [
+      { value: workplaceName(state, request), row: 1 },
+      { value: visit.label, weight: 'regular', row: 2 },
+    ] : [],
+    topRightMeta: [
+      ...(discount > 0 ? [{ value: `${discount}%`, row: 1 }] : []),
+      ...(request ? [
+        { value: formatDate(request.date), row: 2 },
+        { value: request.from || '', row: 3 },
+      ] : []),
+    ],
+    meta: [
       { value: money(finance.subtotal), label: 'Стоимость' },
       { value: money(finance.discount), label: 'Скидка' },
       { value: money(finance.paid), label: 'Оплачено' },
     ],
-    rows: rows.map((row, index) => ({ ...row, data: `data-client-program="${index}"` })),
+    detailRows: rows.map((row, index) => ({
+      left: row.label,
+      right: row.value,
+      data: `data-client-program="${index}"`,
+      aria: `Открыть программу ${row.label}`,
+    })),
+    className: 'entity-card--hero',
   });
+  const profileMedia = mediaRail(mediaItems(state)) || '<div class="app-media-rail app-media-rail--placeholder" aria-hidden="true"></div>';
   renderShell(root, state, {
     title: 'Профиль',
     settings: { data: 'data-client-profile-settings', aria: 'Настройки профиля' },
     body: card,
+    media: profileMedia,
     primaryAction: button('Записаться', { data: 'data-client-booking' }),
     className: 'app-view-shell--profile',
   });
@@ -345,6 +423,8 @@ async function renderProfile(root, state, handlers) {
   root.querySelector('[data-client-booking]')?.addEventListener('click', handlers.onStartBooking);
   root.querySelector('[data-client-profile-settings]')?.addEventListener('click', () => openProfileSettings(state, {
     onPersonalData: handlers.onPersonalData,
+    onPassword: handlers.onPassword,
+    onConsents: handlers.onConsents,
     onLogout: handlers.onLogout,
   }));
   root.querySelectorAll('[data-client-program]').forEach((node) => node.addEventListener('click', () => openProgram(rows[Number(node.dataset.clientProgram)])));
@@ -368,9 +448,10 @@ async function renderMessages(root, state, handlers) {
   const master = masterName(state);
   if (!state.clientChatOpen) {
     const last = messages[messages.length - 1];
+    const lastLabel = last?.body ? String(last.body).split('\n')[0] : Array.isArray(last?.attachments) && last.attachments.length ? 'Медиа' : 'Открыть диалог';
     const body = listEntries([listEntry({
       title: master,
-      subtitle: last?.body ? String(last.body).split('\n')[0] : 'Открыть диалог',
+      subtitle: lastLabel,
       rightTop: last?.time || '',
       data: 'data-client-open-chat',
       aria: `Открыть диалог с ${master}`,
@@ -389,7 +470,9 @@ async function renderMessages(root, state, handlers) {
     back: { data: 'data-client-chat-back', aria: 'К списку диалогов' },
     action: { label: 'Записаться', data: 'data-client-chat-booking' },
     settings: { data: 'data-client-chat-settings', aria: 'Настройки чата' },
-    body: `${messages.length ? messageThread(messages, { viewer: 'client' }) : emptyState('Сообщений пока нет', 'Напишите мастеру первое сообщение.')}${messageComposer()}`,
+    body: `${messages.length ? messageThread(messages, { viewer: 'client' }) : emptyState('Сообщений пока нет', 'Напишите мастеру первое сообщение.')}${messageComposer({ attachments: true })}`,
+    media: '',
+    className: 'app-view-shell--chat',
   });
   bindBottomNavigation(root, state, handlers);
   root.querySelector('[data-client-chat-back]')?.addEventListener('click', () => {
@@ -422,15 +505,17 @@ async function renderMessages(root, state, handlers) {
     });
   });
   const form = root.querySelector('[data-message-composer]');
+  const getAttachments = bindMessageAttachments(form);
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const input = form.querySelector('[name="message"]');
     const body = String(input?.value || '').trim();
-    if (!body) return;
+    const attachments = getAttachments();
+    if (!body && !attachments.length) return;
     const submit = form.querySelector('button[type="submit"]');
     if (submit) submit.disabled = true;
     try {
-      await sendBookingChatMessage(state.tenantId, body);
+      await sendBookingChatMessage(state.tenantId, body, attachments);
       await handlers.render();
     } catch (error) {
       if (submit) submit.disabled = false;
@@ -440,8 +525,8 @@ async function renderMessages(root, state, handlers) {
     }
   });
   requestAnimationFrame(() => {
-    const thread = root.querySelector('[data-message-thread]');
-    thread?.lastElementChild?.scrollIntoView?.({ block: 'end' });
+    const screen = root.querySelector('.app-view-shell--chat .app-view-shell__screen');
+    if (screen) screen.scrollTop = screen.scrollHeight;
   });
 }
 
@@ -450,7 +535,7 @@ export async function renderClientAccount(root, state, callbacks = {}) {
   state.clientChatOpen = Boolean(state.clientChatOpen);
   try {
     const [requests, account] = await Promise.all([
-      getBookingRequests(state.tenantId),
+      getBookingRequests(state.tenantId).catch(() => []),
       getBookingAccount(state.tenantId),
     ]);
     state.clientRequests = Array.isArray(requests) ? requests : [];
@@ -464,7 +549,13 @@ export async function renderClientAccount(root, state, callbacks = {}) {
     render: () => renderClientAccount(root, state, callbacks),
     onStartBooking: callbacks.onStartBooking || (() => {}),
     onRepeat: callbacks.onRepeat || (() => {}),
-    onPersonalData: callbacks.onPersonalData || (() => {}),
+    onPersonalData: () => openClientPersonalData(state, {
+      onSaved: () => renderClientAccount(root, state, callbacks),
+    }),
+    onPassword: () => openClientPasswordSettings(state),
+    onConsents: () => openClientConsentSettings(state, {
+      onChanged: () => renderClientAccount(root, state, callbacks),
+    }),
     onLogout: callbacks.onLogout || (() => {
       clearBookingAccount(state.tenantId);
     }),
