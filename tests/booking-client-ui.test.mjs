@@ -25,23 +25,34 @@ const clientAccountThemeCss = fs.readFileSync('ui/shell/client-account-theme.css
 const indexHtml = fs.readFileSync('index.html', 'utf8');
 const bookingUi = fs.readFileSync('ui/booking/index.js', 'utf8');
 
-// Online booking uses the same client shell and keeps the agreed business sequence.
+// Registration owns agreements. Booking starts only after account resolution.
 assert.match(booking, /renderClientAccount/);
 assert.match(booking, /appHeader\(\{ title, back, action \}\)/);
 assert.match(booking, /appShell\(\{/);
 assert.match(booking, /bookingThemeStyle\(state\.settings\)/);
 assert.match(booking, /bookingChoiceCards\(/);
 assert.match(booking, /bookingTimeGroups\(/);
-assert.match(booking, /function renderAgreements/);
+assert.match(booking, /function renderRegistrationAgreements/);
+assert.match(booking, /function renderAccountEntry/);
+assert.match(booking, /function renderAccountDetails/);
+assert.match(booking, /function renderPassword/);
 assert.match(booking, /function renderWorkplaces/);
 assert.match(booking, /function renderProcedures/);
 assert.match(booking, /function renderDates/);
 assert.match(booking, /function renderTimes/);
 assert.match(booking, /function renderConfirmation/);
-assert.match(booking, /renderWorkplaces\(root, state\)/);
-assert.match(booking, /renderProcedures\(root, state\)/);
-assert.match(booking, /renderDates\(root, state\)/);
-assert.match(booking, /renderTimes\(root, state\)/);
+assert.match(booking, /subtitle: 'Согласия относятся к регистрации и аккаунту клиента'/);
+assert.match(booking, /if \(prepared\.exists\) renderPassword\(root, state\);/);
+assert.match(booking, /else renderAccountDetails\(root, state\);/);
+assert.match(booking, /if \(payload\.clientCardExisted\)/);
+assert.match(booking, /nextBookingStep\(root, state\)/);
+assert.match(booking, /saveRegistrationConsents\(state\)/);
+assert.match(booking, /submitBookingConsents\(state\.tenantId, consents\)/);
+assert.match(booking, /data-booking-workplaces-back[\s\S]*?backFromFirstBookingStep\(root, state\)/);
+assert.match(booking, /if \(state\.lockedWorkplaceKey\) backFromFirstBookingStep\(root, state\)/);
+assert.match(booking, /data-booking-dates-back[\s\S]*?renderProcedures\(root, state\)/);
+assert.match(booking, /data-booking-times-back[\s\S]*?renderDates\(root, state\)/);
+assert.match(booking, /data-booking-confirm-back[\s\S]*?renderTimes\(root, state\)/);
 assert.match(booking, /meta:\s*\[\s*\{ value: money\(subtotal\), label: 'Стоимость' \}/);
 assert.match(booking, /\{ value: state\.from, row: 3 \}/);
 assert.doesNotMatch(booking, /\$\{state\.from\} - \$\{state\.to\}/);
@@ -52,8 +63,8 @@ assert.doesNotMatch(booking, /personalDataAccordion/);
 assert.doesNotMatch(booking, /type:\s*'date'/);
 assert.match(booking, /getBookingConsentState/);
 assert.match(booking, /async function refreshAccountConsentState/);
-assert.match(booking, /if \(consentState\.allowed\) nextAfterAgreements/);
-assert.match(booking, /if \(consentState\.allowed\) continueRepeat/);
+assert.match(booking, /if \(consentState\.allowed\) \{[\s\S]*?nextBookingStep\(root, state\)/);
+assert.match(booking, /state\.registrationMode = 'repair'/);
 
 // Client profile/account stays on canonical shared primitives.
 assert.match(accountShell, /entityCard\(\{/);
