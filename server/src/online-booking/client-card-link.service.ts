@@ -57,7 +57,7 @@ export class ClientCardLinkService {
     return { business, people, members, owner: members[0] || null };
   }
 
-  async findOrAttachExistingCard(tenantId: string, account: Record<string, any>) {
+  async bindFirstAccess(tenantId: string, account: Record<string, any>) {
     const accountId = text(account?.id);
     if (!accountId) throw new BadRequestException('У аккаунта онлайн-записи отсутствует id');
 
@@ -67,7 +67,10 @@ export class ClientCardLinkService {
     }
 
     const card = await this.cardState(tenantId, account.phone);
-    if (!card.owner) return null;
+    if (!card.owner) {
+      const person = objectValue(await this.businessState.upsertBookingPersonFromAccount(tenantId, account));
+      return { person, clientCardExisted: false };
+    }
 
     const owner = {
       ...card.owner.person,
