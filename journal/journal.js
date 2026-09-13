@@ -173,9 +173,7 @@ export function renderJournal(root) {
     initViewNavigation(root, { views, activeView, onChange: (nextView) => { activeView = nextView; renderView(); } });
   };
 
-  const recordsChangedHandler = () => {
-    if (activeView === 'day' || activeView === 'list') renderView();
-  };
+  const recordsChangedHandler = () => renderView();
   const ddsChangedHandler = () => {
     if (activeView === 'list' || activeView === 'month') renderView();
   };
