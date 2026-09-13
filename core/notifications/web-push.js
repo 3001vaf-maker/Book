@@ -33,16 +33,12 @@ export async function getWebPushState(tenantId) {
   };
 }
 
-export async function syncWebPush(tenantId, { requestPermission = false } = {}) {
+export async function syncWebPush(tenantId) {
   if (!supported() || !getBookingAccountToken(tenantId)) return getWebPushState(tenantId);
 
   const configuration = await getWebPushConfiguration(tenantId);
   if (!configuration?.enabled || !configuration?.publicKey) {
     return { supported: true, enabled: false, permission: Notification.permission, subscribed: false };
-  }
-
-  if (Notification.permission === 'default' && requestPermission) {
-    await Notification.requestPermission();
   }
 
   const registration = await navigator.serviceWorker.register('/service-worker.js', { scope: '/' });
@@ -77,4 +73,10 @@ export async function syncWebPush(tenantId, { requestPermission = false } = {}) 
     permission: Notification.permission,
     subscribed: true,
   };
+}
+
+export async function enableWebPush(tenantId) {
+  if (!supported() || !getBookingAccountToken(tenantId)) return getWebPushState(tenantId);
+  if (Notification.permission === 'default') await Notification.requestPermission();
+  return syncWebPush(tenantId);
 }
