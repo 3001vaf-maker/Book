@@ -11,6 +11,8 @@ assert.match(timelineSource, /onWorkFieldClick\(\{\s*workplaceId\s*\}\)/);
 assert.match(timelineCss, /\.journal-work-field\{[^}]*pointer-events:auto[^}]*cursor:pointer/);
 assert.match(timelineCss, /\.journal-work-field__usage\{[^}]*pointer-events:none/);
 assert.match(journalSource, /const recordsChangedHandler = \(\) => renderView\(\)/, 'Every active Journal view, including Month, must rerender after server record changes');
+assert.match(journalSource, /const ddsChangedHandler = \(\) => renderView\(\)/, 'Every active Journal view, including Day, must rerender after payment cancellation or refund');
 assert.doesNotMatch(journalSource, /activeView === 'day' \|\| activeView === 'list'\) renderView/, 'Month must not be excluded from record-change refresh');
+assert.doesNotMatch(journalSource, /activeView === 'list' \|\| activeView === 'month'\) renderView/, 'Day must not be excluded from finance refresh');
 
 console.log('journal all-records click tests: OK');
