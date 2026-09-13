@@ -6,6 +6,7 @@ import { NotificationService } from '../notification/notification.service';
 import { WebPushService } from '../notification/web-push.service';
 import { BookingAccountGuard } from './booking-account.guard';
 import { BookingRequiredConsentGuard } from './booking-required-consent.guard';
+import { ClientCardLinkService } from './client-card-link.service';
 import { OnlineBookingService } from './online-booking.service';
 
 type OwnerRequest = Request & { auth?: { userId: string; tenantId: string; role: string } };
@@ -18,6 +19,7 @@ export class OnlineBookingController {
     private readonly notifications: NotificationService,
     private readonly communications: CommunicationService,
     private readonly webPush: WebPushService,
+    private readonly clientCards: ClientCardLinkService,
   ) {}
 
   @UseGuards(JwtAuthGuard)
@@ -36,6 +38,12 @@ export class OnlineBookingController {
   @Put('owner/accounts/sync')
   syncOwnerAccounts(@Req() request: OwnerRequest, @Body() body: { accounts?: unknown }) {
     return this.booking.syncOwnerAccounts(request.auth!.tenantId, body?.accounts || []);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('owner/reconcile-legacy-client-cards')
+  reconcileLegacyClientCards(@Req() request: OwnerRequest) {
+    return this.clientCards.reconcileLegacyAccountDuplicates(request.auth!.tenantId);
   }
 
   @UseGuards(JwtAuthGuard)
