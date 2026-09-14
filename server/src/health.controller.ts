@@ -14,7 +14,16 @@ export class HealthController {
       await this.prisma.$queryRaw`SELECT 1 FROM "BusinessStateMeta" LIMIT 1`;
       await this.prisma.$queryRaw`SELECT 1 FROM "BusinessOperationalState" LIMIT 1`;
       await this.prisma.$queryRaw`SELECT 1 FROM "BusinessDocumentState" LIMIT 1`;
-      return { status: 'ok', database: 'ok', profileStorage: 'ok', businessStorage: 'ok', operationalStorage: 'ok', documentStorage: 'ok', bookingAutonomy: 'server' };
+      return {
+        status: 'ok',
+        database: 'ok',
+        profileStorage: 'ok',
+        businessStorage: 'ok',
+        operationalStorage: 'ok',
+        documentStorage: 'ok',
+        bookingAutonomy: 'server',
+        release: 'master-login-session-v1',
+      };
     } catch {
       throw new ServiceUnavailableException({ status: 'error', database: 'unavailable' });
     }
