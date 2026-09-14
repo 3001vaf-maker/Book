@@ -11,7 +11,7 @@ export function getAuthToken() {
 export function setAuthToken(token, remember = false) {
   const value = String(token || '').trim();
   activeToken = value;
-  localStorage.removeItem(TOKEN_KEY);
+  localStorage.setItem(TOKEN_KEY, '');
   sessionStorage.removeItem(TOKEN_KEY);
   if (!value) return;
   const storage = remember ? localStorage : sessionStorage;
@@ -20,7 +20,7 @@ export function setAuthToken(token, remember = false) {
 
 export function clearAuthToken() {
   activeToken = '';
-  localStorage.removeItem(TOKEN_KEY);
+  localStorage.setItem(TOKEN_KEY, '');
   sessionStorage.removeItem(TOKEN_KEY);
 }
 
