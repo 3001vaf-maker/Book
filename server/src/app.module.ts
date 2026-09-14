@@ -11,6 +11,8 @@ import { AuxiliaryStateModule } from './auxiliary-state/auxiliary-state.module';
 import { NotificationModule } from './notification/notification.module';
 import { CommunicationModule } from './communication/communication.module';
 import { SaasAccessModule } from './saas-access/saas-access.module';
+import { MasterInvitationModule } from './master-invitation/master-invitation.module';
+import { SaasAdminModule } from './saas-admin/saas-admin.module';
 
 @Module({
   imports: [
@@ -24,6 +26,8 @@ import { SaasAccessModule } from './saas-access/saas-access.module';
     CommunicationModule,
     OnlineBookingModule,
     SaasAccessModule,
+    MasterInvitationModule,
+    SaasAdminModule,
   ],
   controllers: [HealthController],
   providers: [PrismaService],
