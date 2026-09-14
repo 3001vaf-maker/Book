@@ -10,6 +10,10 @@ const shellUi = fs.readFileSync('ui/shell/index.js', 'utf8');
 const shellCss = fs.readFileSync('ui/shell/shell.css', 'utf8');
 const styleCss = fs.readFileSync('css/style.css', 'utf8');
 const clientMobileCss = fs.readFileSync('ui/shell/client-mobile.css', 'utf8');
+const navigationUi = fs.readFileSync('ui/navigation/navigation.js', 'utf8');
+const navigationCss = fs.readFileSync('ui/navigation/navigation.css', 'utf8');
+const referenceUi = fs.readFileSync('ui/reference/reference.js', 'utf8');
+const rootHtml = fs.readFileSync('index.html', 'utf8');
 
 const failures = [];
 const expect = (condition, message) => { if (!condition) failures.push(message); };
@@ -66,6 +70,19 @@ expect(accountShell.includes("label: 'Повторить запись'"), 'Clien
 expect(accountShell.includes("label: 'Согласия'"), 'Client account and chat settings must expose consent controls.');
 expect(consentSettings.includes('revokeBookingConsent'), 'Client consent settings must use the canonical server-backed revoke flow.');
 expect(bookingUi.includes('bookingChoiceCards'), 'Shared booking UI must continue to own booking choice controls.');
+
+expect(navigationUi.includes("{ id: 'main', label: 'Главная'") && navigationUi.includes("{ id: 'timetable', label: 'График'") && navigationUi.includes("{ id: 'journal', label: 'Журнал'") && navigationUi.includes("{ id: 'chat', label: 'Чат'") && navigationUi.includes("{ id: 'settings', label: 'Настройки'"), 'Book bottom navigation must keep the canonical five destinations.');
+expect(navigationUi.includes('class="nav-label"'), 'Bottom navigation labels must use the canonical label class.');
+expect(navigationCss.includes('grid-template-columns:repeat(5,minmax(0,1fr))'), 'Book bottom navigation must divide the available width into five equal slots.');
+expect(navigationCss.includes('font-size:10px') && navigationCss.includes('white-space:nowrap'), 'All five bottom navigation labels must share a compact single-line label rule.');
+expect(rootHtml.includes('ui/navigation/navigation.css'), 'Book must load the canonical navigation stylesheet.');
+expect(referenceUi.includes("bottomNavigation('settings')"), 'The Book UI reference must render the same five-slot bottom navigation used by the master application.');
+const personalIndex = referenceUi.indexOf("button('Личные данные'");
+const consentIndex = referenceUi.indexOf("button('Согласия'");
+const passwordIndex = referenceUi.indexOf("button('Изменить пароль'");
+const logoutIndex = referenceUi.indexOf("button('Выход'");
+expect(personalIndex >= 0 && personalIndex < consentIndex && consentIndex < passwordIndex && passwordIndex < logoutIndex, 'Reference profile settings must keep the approved action order.');
+expect(referenceUi.includes("button('Личные данные', { variant: 'outline' })") && referenceUi.includes("button('Согласия', { variant: 'outline' })") && referenceUi.includes("button('Изменить пароль')") && referenceUi.includes("button('Выход', { variant: 'danger' })"), 'Reference profile settings must keep the approved button variants.');
 
 if (failures.length) {
   failures.forEach((message) => console.error(`booking client architecture: ${message}`));
