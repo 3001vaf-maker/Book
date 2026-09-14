@@ -30,6 +30,17 @@ export class TransactionalEmailService {
       throw new ServiceUnavailableException('Транзакционная почта Book ещё не настроена');
     }
 
+    const clientAppUrl = String(process.env.CLIENT_APP_URL || '').trim().replace(/\/+$/, '');
+    const frontendOrigin = String(process.env.FRONTEND_ORIGIN || '').trim().replace(/\/+$/, '');
+    const inviteSource = frontendOrigin ? `${frontendOrigin}/invite/` : '';
+    const inviteTarget = clientAppUrl ? `${clientAppUrl}/invite/` : inviteSource;
+    const htmlContent = input.tag === 'master-invitation' && inviteSource && inviteTarget
+      ? input.html.split(inviteSource).join(inviteTarget)
+      : input.html;
+    const textContent = input.tag === 'master-invitation' && input.text && inviteSource && inviteTarget
+      ? input.text.split(inviteSource).join(inviteTarget)
+      : input.text;
+
     const response = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
       headers: {
@@ -41,8 +52,8 @@ export class TransactionalEmailService {
         sender: { email: fromEmail, name: fromName },
         to: [{ email: String(input.to || '').trim().toLowerCase(), name: String(input.toName || '').trim() }],
         subject: input.subject,
-        htmlContent: input.html,
-        textContent: input.text || undefined,
+        htmlContent,
+        textContent: textContent || undefined,
         tags: input.tag ? [input.tag] : undefined,
       }),
     });
