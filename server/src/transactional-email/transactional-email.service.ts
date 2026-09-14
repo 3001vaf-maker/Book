@@ -15,6 +15,8 @@ type BrevoResponse = {
   code?: string;
 };
 
+const DEFAULT_CLIENT_APP_URL = 'https://3001vaf-maker.github.io/Book';
+
 @Injectable()
 export class TransactionalEmailService {
   async send(input: TransactionalEmailInput) {
@@ -30,14 +32,14 @@ export class TransactionalEmailService {
       throw new ServiceUnavailableException('Транзакционная почта Book ещё не настроена');
     }
 
-    const clientAppUrl = String(process.env.CLIENT_APP_URL || '').trim().replace(/\/+$/, '');
+    const clientAppUrl = String(process.env.CLIENT_APP_URL || DEFAULT_CLIENT_APP_URL).trim().replace(/\/+$/, '');
     const frontendOrigin = String(process.env.FRONTEND_ORIGIN || '').trim().replace(/\/+$/, '');
     const inviteSource = frontendOrigin ? `${frontendOrigin}/invite/` : '';
-    const inviteTarget = clientAppUrl ? `${clientAppUrl}/invite/` : inviteSource;
-    const htmlContent = input.tag === 'master-invitation' && inviteSource && inviteTarget
+    const inviteTarget = `${clientAppUrl}/invite/`;
+    const htmlContent = input.tag === 'master-invitation' && inviteSource
       ? input.html.split(inviteSource).join(inviteTarget)
       : input.html;
-    const textContent = input.tag === 'master-invitation' && input.text && inviteSource && inviteTarget
+    const textContent = input.tag === 'master-invitation' && input.text && inviteSource
       ? input.text.split(inviteSource).join(inviteTarget)
       : input.text;
 
