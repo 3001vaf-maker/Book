@@ -13,10 +13,15 @@ export const COLOR_PALETTE = Object.freeze([
   '#FFFFFF', '#E9ECEF', '#ADB5BD', '#6C757D', '#212529'
 ]);
 
+function exactHex(value = '') {
+  const normalized = String(value || '').trim().toUpperCase();
+  return /^#[0-9A-F]{6}$/.test(normalized) ? normalized : '';
+}
+
 export function colorPicker({ name = 'color', value = COLOR_PALETTE[0], colors = COLOR_PALETTE, required = false } = {}) {
   const palette = Array.isArray(colors) && colors.length ? colors : COLOR_PALETTE;
-  const requested = String(value || '');
-  const selected = palette.includes(requested) ? requested : (required ? '' : palette[0]);
+  const requested = exactHex(value);
+  const selected = requested || (required ? '' : palette[0]);
   const swatchStyle = selected ? ` style="background:${escapeHtml(selected)}"` : '';
   const emptyClass = selected ? '' : ' is-empty';
   return `<div class="color-picker" data-color-picker data-color-name="${escapeHtml(name)}" data-color-required="${required ? 'true' : 'false'}"><input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(selected)}" data-color-value><button type="button" class="color-picker__trigger" data-color-open><span class="color-picker__swatch${emptyClass}" data-color-swatch${swatchStyle}></span><span>Выбор цвета</span></button></div>`;

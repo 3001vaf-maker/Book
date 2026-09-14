@@ -153,12 +153,27 @@ assert.match(onlineBookingService, /emails: uniqueStrings/);
 assert.match(onlineBookingService, /telegram: text\(source\.telegram\)/);
 assert.match(onlineBookingService, /links,/);
 
-// Online style editor previews drafts immediately but can discard them before save.
+// Online booking settings use the shared Book shell and three focused screens.
+assert.match(bookingSettingsUi, /appShell\(\{/);
+assert.match(bookingSettingsUi, /appHeader\(\{/);
+assert.match(bookingSettingsUi, /folderList\(\[/);
+assert.match(bookingSettingsUi, /Приветствие/);
+assert.match(bookingSettingsUi, /Внешний вид/);
+assert.match(bookingSettingsUi, /Время записи/);
+assert.match(bookingSettingsUi, /function renderWelcome/);
+assert.match(bookingSettingsUi, /function renderAppearance/);
+assert.match(bookingSettingsUi, /function renderTime/);
+assert.match(bookingSettingsUi, /setSaveVisible\(root, false\)/);
 assert.match(bookingSettingsUi, /form\.addEventListener\('input', updatePreview\)/);
 assert.match(bookingSettingsUi, /form\.addEventListener\('change', updatePreview\)/);
-assert.match(bookingSettingsUi, /Отменить изменения/);
-assert.match(bookingSettingsUi, /onCancel: \(\) => renderReady\(root, navigateBack, tenantId\)/);
-assert.match(bookingSettingsUi, /saveBookingSettings\(settingsDraft\(form\)\)/);
+assert.match(bookingSettingsUi, /twoColumnLayout\(/);
+assert.match(bookingSettingsUi, /label: 'Отменить'/);
+assert.match(bookingSettingsUi, /label: 'Сбросить'/);
+assert.match(bookingSettingsUi, /variant: 'outline'/);
+assert.match(bookingSettingsUi, /saveBookingSettings\(settingsDraft\(form, saved\)\)/);
+assert.match(bookingSettingsUi, /BOOKING_SLOT_STEPS\.map/);
+assert.doesNotMatch(bookingSettingsUi, /Сохранить оформление/);
+assert.match(indexHtml, /settings\/online-booking\/online-booking\.css/);
 
 // Chat consent remains exact Contact Point policy.
 assert.match(bookingAccountApi, /account\/chat\/settings/);

@@ -3,6 +3,7 @@ import { escapeHtml } from '../utils/escape-html.js';
 const BUTTON_VARIANTS = {
   secondary: 'ui-button--secondary',
   danger: 'ui-button--danger',
+  outline: 'ui-button--outline',
 };
 
 export function button(label, { className = '', data = '', type = 'button', aria = '', variant = '', disabled = false } = {}) {

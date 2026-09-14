@@ -1,0 +1,10 @@
+.app-content.app-content--book-shell{padding:0}
+.app-view-shell--online-booking .app-view-shell__screen{gap:14px}
+.online-booking-link-stack{display:grid;gap:14px}
+.online-booking-info-row{display:flex;justify-content:flex-end;min-height:44px}
+.online-booking-info-row .icon-button{width:44px;height:44px;font-size:18px}
+.online-booking-color-grid .field>span{min-height:2.4em;display:flex;align-items:flex-end}
+.online-booking-color-grid .color-picker__trigger{justify-content:center;padding-inline:8px}
+.online-booking-color-grid .color-picker__trigger>span:last-child{display:none}
+.online-booking-color-grid .color-picker__swatch{width:30px;height:30px;flex-basis:30px}
+@media(max-width:360px){.online-booking-color-grid .field>span{font-size:12px}.online-booking-color-grid .color-picker__trigger{padding-inline:6px}}
