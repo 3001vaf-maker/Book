@@ -20,19 +20,19 @@ export function appHeader({
 } = {}) {
   const backButton = back
     ? button('‹', { className: 'app-header__control app-header__control--icon', data: back.data || '', aria: back.aria || 'Назад', variant: 'secondary' })
-    : '<span class="app-header__placeholder" aria-hidden="true"></span>';
+    : '';
   const actionButton = action
     ? button(text(action.label || ''), { className: 'app-header__control app-header__control--action', data: action.data || '', aria: action.aria || action.label || '', disabled: Boolean(action.disabled) })
-    : '<span class="app-header__placeholder app-header__placeholder--action" aria-hidden="true"></span>';
+    : '';
   const settingsButton = settings
     ? button(settings.label || '•••', { className: 'app-header__control app-header__control--icon', data: settings.data || '', aria: settings.aria || 'Настройки', variant: 'secondary' })
-    : '<span class="app-header__placeholder" aria-hidden="true"></span>';
+    : '';
 
   return `<header class="app-header" data-app-header>
-    <div class="app-header__slot app-header__slot--back">${backButton}</div>
+    <div class="app-header__slot app-header__slot--back${back ? '' : ' is-empty'}">${backButton}</div>
     <h1 class="app-header__title">${text(title)}</h1>
-    <div class="app-header__slot app-header__slot--action">${actionButton}</div>
-    <div class="app-header__slot app-header__slot--settings">${settingsButton}</div>
+    <div class="app-header__slot app-header__slot--action${action ? '' : ' is-empty'}">${actionButton}</div>
+    <div class="app-header__slot app-header__slot--settings${settings ? '' : ' is-empty'}">${settingsButton}</div>
   </header>`;
 }
 
@@ -64,7 +64,7 @@ export function appShell({
   bottomNavigation = '',
   className = '',
 } = {}) {
-  const classes = ['app-view-shell', className].filter(Boolean).join(' ');
+  const classes = ['app-view-shell', media ? 'app-view-shell--has-media' : '', className].filter(Boolean).join(' ');
   return `<section class="${classes}" data-app-view-shell>
     ${header}
     ${media ? `<div class="app-view-shell__media">${media}</div>` : ''}
@@ -136,7 +136,8 @@ export function messageThread(messages = [], options = {}) {
 }
 
 export function messageComposer({ placeholder = 'Написать сообщение...', data = 'data-message-composer', sendData = 'data-message-send', attachments = false } = {}) {
-  return `<form class="message-composer" ${data}>${attachments ? `<input class="sr-only" type="file" accept="image/*,video/*" multiple data-message-attachment-input><button type="button" class="message-composer__attach" data-message-attachment aria-label="Прикрепить фото или медиа">📎</button>` : ''}<textarea class="message-composer__input" name="message" rows="1" placeholder="${text(placeholder)}" aria-label="${text(placeholder)}"></textarea>${button('➤', { className: 'message-composer__send', type: 'submit', data: sendData, aria: 'Отправить' })}${attachments ? '<div class="message-composer__attachments" data-message-attachment-preview></div>' : ''}</form>`;
+  const composerClass = attachments ? 'message-composer message-composer--with-attachments' : 'message-composer message-composer--plain';
+  return `<form class="${composerClass}" ${data}>${attachments ? `<input class="sr-only" type="file" accept="image/*,video/*" multiple data-message-attachment-input><button type="button" class="message-composer__attach" data-message-attachment aria-label="Прикрепить фото или медиа">📎</button>` : ''}<textarea class="message-composer__input" name="message" rows="1" placeholder="${text(placeholder)}" aria-label="${text(placeholder)}"></textarea>${button('➤', { className: 'message-composer__send', type: 'submit', data: sendData, aria: 'Отправить' })}${attachments ? '<div class="message-composer__attachments" data-message-attachment-preview></div>' : ''}</form>`;
 }
 
 export function settingToggle({ label = '', checked = false, data = '', disabled = false } = {}) {
