@@ -27,7 +27,8 @@ export class ProfileController {
   }
 
   @Post('bootstrap')
-  bootstrap(@Req() request: AuthenticatedRequest) {
+  async bootstrap(@Req() request: AuthenticatedRequest) {
+    await this.profile.get(request.auth!.tenantId, request.auth!.userId);
     return this.profile.bootstrap(request.auth!.tenantId, request.auth!.userId);
   }
 

@@ -31,16 +31,17 @@ export async function initializeProfileWorkplaces(account = {}) {
     return { source: 'server', verified: true };
   }
 
-  if (remote?.migrated) {
-    const repairResponse = await apiRequest('/manual-invitations/repair-profile', { method: 'POST' });
-    const repair = await responseJson(repairResponse, 'Не удалось проверить новый профиль');
-    if (repair?.verified) {
-      remote = await loadRemoteProfile();
-      if (remote?.verified) {
-        hydrate(remote, true);
-        return { source: repair?.repaired ? 'invitation-repair' : 'server', verified: true };
-      }
+  if (remote?.migrated && account?.user?.workspaceUnlocked === false) {
+    const bootstrapResponse = await apiRequest('/profile/bootstrap', { method: 'POST' });
+    const bootstrapped = await responseJson(bootstrapResponse, 'Не удалось подтвердить профиль нового мастера');
+    if (bootstrapped?.verified) {
+      hydrate(bootstrapped, true);
+      return { source: 'registration-bootstrap', verified: true };
     }
+    remote = bootstrapped;
+  }
+
+  if (remote?.migrated) {
     hydrate(remote, false);
     return { source: 'server-awaiting-verification', verified: false };
   }
