@@ -13,6 +13,7 @@ import { getJournalTimeUsages, releaseJournalSoftTimeUsages } from './journal/ti
 import { configureWorkplaceSource } from './core/workplace-time.js';
 import { configureTimeUsageSource, configureSoftTimeUsageReleaseSource } from './core/time/index.js';
 import { getCurrentUser, login } from './core/auth.js';
+import { canUseBookCapability, getBookAccess, loadBookAccess } from './core/access.js';
 import { isOnboardingComplete, renderOnboarding } from './onboarding/onboarding.js';
 import { startServerBookingSync } from './online-booking/server-sync.js';
 import { renderOnlineBooking } from './online-booking/booking.js';
@@ -32,7 +33,13 @@ const routes = {
   settings: renderSettings,
 };
 
-const state = { activeSection: 'journal' };
+const sectionCapabilities = {
+  timetable: 'timetable.access',
+  journal: 'journal.access',
+  chat: 'chat.access',
+};
+
+const state = { activeSection: 'main' };
 const app = document.querySelector('#app');
 let disposeView = () => {};
 let workspaceReady = false;
@@ -70,13 +77,30 @@ function renderPublicBooking(route) {
 }
 
 function ensureServerBookingSync() {
-  if (serverBookingSyncStarted) return;
+  if (serverBookingSyncStarted || !canUseBookCapability('online_booking.access')) return;
   serverBookingSyncStarted = true;
   startServerBookingSync();
 }
 
+function sectionAllowed(section) {
+  if (!routes[section]) return false;
+  const capability = sectionCapabilities[section];
+  return capability ? canUseBookCapability(capability) : true;
+}
+
+function allowedSections() {
+  return Object.keys(routes).filter(sectionAllowed);
+}
+
+function defaultSection() {
+  if (sectionAllowed('main')) return 'main';
+  if (sectionAllowed('journal')) return 'journal';
+  if (sectionAllowed('timetable')) return 'timetable';
+  return 'settings';
+}
+
 function navigate(section) {
-  if (!workspaceReady || !routes[section]) return;
+  if (!workspaceReady || !sectionAllowed(section)) return;
   state.activeSection = section;
   renderWorkspace();
   history.replaceState({}, '', `#${section}`);
@@ -87,8 +111,9 @@ function renderWorkspace() {
   workspaceReady = true;
   disposeView();
   disposeView = () => {};
+  if (!sectionAllowed(state.activeSection)) state.activeSection = defaultSection();
   const view = routes[state.activeSection];
-  app.innerHTML = `<main class="app-content" id="app-content"></main>${bottomNavigation(state.activeSection)}`;
+  app.innerHTML = `<main class="app-content" id="app-content"></main>${bottomNavigation(state.activeSection, allowedSections())}`;
   const nextDispose = view(document.querySelector('#app-content'), { navigate });
   if (typeof nextDispose === 'function') disposeView = nextDispose;
   app.querySelectorAll('[data-nav]').forEach((button) => {
@@ -108,6 +133,23 @@ function renderMigrationPending() {
         <div class="auth-card__heading">
           <h1>Book</h1>
           <p>Сервер ожидает безопасный перенос данных из основного браузера. Текущие данные не изменены.</p>
+        </div>
+      </section>
+    </main>`;
+  syncViewport();
+}
+
+function renderSuspended() {
+  app.classList.remove('app-shell--booking');
+  workspaceReady = false;
+  disposeView();
+  disposeView = () => {};
+  app.innerHTML = `
+    <main class="auth-view">
+      <section class="auth-card">
+        <div class="auth-card__heading">
+          <h1>Book временно недоступен</h1>
+          <p>Доступ к этому рабочему пространству приостановлен владельцем платформы.</p>
         </div>
       </section>
     </main>`;
@@ -142,6 +184,11 @@ async function renderAuthenticated(account = authenticatedAccount) {
     return;
   }
   clearLegacyBusinessStorage();
+  await loadBookAccess();
+  if (getBookAccess().status === 'SUSPENDED') {
+    renderSuspended();
+    return;
+  }
   ensureServerBookingSync();
 
   const serverWorkspaceUnlocked = Boolean(authenticatedAccount?.user?.workspaceUnlocked);
@@ -151,8 +198,8 @@ async function renderAuthenticated(account = authenticatedAccount) {
     await renderOnboarding(app, {
       accountEmail: authenticatedAccount?.user?.email || '',
       onComplete: () => {
-        state.activeSection = 'journal';
-        history.replaceState({}, '', '#journal');
+        state.activeSection = defaultSection();
+        history.replaceState({}, '', `#${state.activeSection}`);
         renderWorkspace();
       },
     });
@@ -160,8 +207,9 @@ async function renderAuthenticated(account = authenticatedAccount) {
     return;
   }
 
-  state.activeSection = 'journal';
-  history.replaceState({}, '', '#journal');
+  const requested = location.hash.slice(1);
+  state.activeSection = sectionAllowed(requested) ? requested : defaultSection();
+  history.replaceState({}, '', `#${state.activeSection}`);
   renderWorkspace();
 }
 
@@ -220,9 +268,11 @@ function renderLogin(message = '') {
 window.addEventListener('hashchange', () => {
   if (!workspaceReady) return;
   const section = location.hash.slice(1);
-  if (routes[section]) {
+  if (sectionAllowed(section)) {
     state.activeSection = section;
     renderWorkspace();
+  } else {
+    history.replaceState({}, '', `#${state.activeSection}`);
   }
 });
 window.addEventListener('resize', syncViewport, { passive: true });
