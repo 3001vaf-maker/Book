@@ -20,22 +20,6 @@ async function loadRemoteProfile() {
   return responseJson(response, 'Не удалось загрузить Profile + Workplaces');
 }
 
-function isFreshRegisteredProfile(remote, account) {
-  const email = String(account?.user?.email || '').trim().toLowerCase();
-  const emails = Array.isArray(remote?.profile?.emails)
-    ? remote.profile.emails.map((item) => String(item || '').trim().toLowerCase())
-    : [];
-  const workplaces = Array.isArray(remote?.workplaces) ? remote.workplaces : [];
-  return Boolean(
-    remote?.migrated
-    && !remote?.verified
-    && account?.user?.workspaceUnlocked === false
-    && email
-    && emails.includes(email)
-    && workplaces.length === 0
-  );
-}
-
 export async function initializeProfileWorkplaces(account = {}) {
   setProfileServerReady(false);
   setWorkplacesServerReady(false);
@@ -47,20 +31,14 @@ export async function initializeProfileWorkplaces(account = {}) {
     return { source: 'server', verified: true };
   }
 
-  if (isFreshRegisteredProfile(remote, account)) {
-    const verifyResponse = await apiRequest('/profile/migrate/verify', {
-      method: 'POST',
-      body: JSON.stringify({
-        profile: remote.profile,
-        customProfessions: remote.customProfessions || [],
-        workplaces: remote.workplaces || [],
-      }),
-    });
-    const verified = await responseJson(verifyResponse, 'Не удалось подтвердить профиль нового мастера');
-    if (verified?.verified) {
-      hydrate(verified, true);
-      return { source: 'registration-verify', verified: true };
+  if (remote?.migrated && account?.user?.workspaceUnlocked === false) {
+    const bootstrapResponse = await apiRequest('/profile/bootstrap', { method: 'POST' });
+    const bootstrapped = await responseJson(bootstrapResponse, 'Не удалось подтвердить профиль нового мастера');
+    if (bootstrapped?.verified) {
+      hydrate(bootstrapped, true);
+      return { source: 'registration-bootstrap', verified: true };
     }
+    remote = bootstrapped;
   }
 
   if (remote?.migrated) {
