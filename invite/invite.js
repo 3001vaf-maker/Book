@@ -37,6 +37,8 @@ function renderForm(invitation) {
         <span>Повторите пароль</span>
         <input name="passwordConfirm" type="password" minlength="10" autocomplete="new-password" required>
       </label>
+      <label style="display:flex;align-items:center;gap:9px;font-size:14px;font-weight:600"><input name="showPassword" type="checkbox" style="width:18px;height:18px">Показать пароли</label>
+      <label style="display:flex;align-items:center;gap:9px;font-size:14px;font-weight:600"><input name="remember" type="checkbox" checked style="width:18px;height:18px">Запомнить меня на этом устройстве</label>
       <p class="invite-error" data-form-error role="alert"></p>
       <button class="invite-button" type="submit">Создать пароль и войти</button>
     </form>`;
@@ -47,6 +49,15 @@ function renderForm(invitation) {
   const form = state.querySelector('[data-form]');
   const error = state.querySelector('[data-form-error]');
   const button = form.querySelector('button[type="submit"]');
+  const passwordInput = form.querySelector('input[name="password"]');
+  const passwordConfirmInput = form.querySelector('input[name="passwordConfirm"]');
+  const showPassword = form.querySelector('input[name="showPassword"]');
+
+  showPassword.addEventListener('change', () => {
+    const type = showPassword.checked ? 'text' : 'password';
+    passwordInput.type = type;
+    passwordConfirmInput.type = type;
+  });
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -67,7 +78,7 @@ function renderForm(invitation) {
     button.textContent = 'Создаём Book…';
     try {
       const account = await post('/master-invitations/accept', { token, password });
-      setAuthToken(account.accessToken);
+      setAuthToken(account.accessToken, data.get('remember') === 'on');
       state.innerHTML = '<h1>Book создан</h1><p class="invite-success">Открываем ваше рабочее пространство…</p>';
       window.setTimeout(() => location.replace('../'), 350);
     } catch (acceptError) {

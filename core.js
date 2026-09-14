@@ -234,6 +234,8 @@ function renderLogin(message = '') {
             <span>Пароль</span>
             <input name="password" type="password" autocomplete="current-password" required>
           </label>
+          <label style="display:flex;align-items:center;gap:9px;font-size:14px;font-weight:600"><input name="showPassword" type="checkbox" style="width:18px;height:18px">Показать пароль</label>
+          <label style="display:flex;align-items:center;gap:9px;font-size:14px;font-weight:600"><input name="remember" type="checkbox" checked style="width:18px;height:18px">Запомнить меня на этом устройстве</label>
           <p class="auth-error" id="auth-error" role="alert">${message}</p>
           <button class="ui-button" type="submit">Войти</button>
         </form>
@@ -243,6 +245,12 @@ function renderLogin(message = '') {
   const form = app.querySelector('#auth-form');
   const error = app.querySelector('#auth-error');
   const button = form.querySelector('button[type="submit"]');
+  const passwordInput = form.querySelector('input[name="password"]');
+  const showPassword = form.querySelector('input[name="showPassword"]');
+
+  showPassword.addEventListener('change', () => {
+    passwordInput.type = showPassword.checked ? 'text' : 'password';
+  });
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -252,7 +260,11 @@ function renderLogin(message = '') {
     const data = new FormData(form);
 
     try {
-      const account = await login(data.get('email'), data.get('password'));
+      const account = await login(
+        data.get('email'),
+        data.get('password'),
+        data.get('remember') === 'on',
+      );
       authenticatedAccount = account;
       await renderAuthenticated(account);
     } catch (loginError) {
