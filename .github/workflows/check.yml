@@ -112,3 +112,22 @@ jobs:
       - name: Stop isolated staging
         if: always()
         run: docker compose -f docker-compose.staging.yml down -v
+
+  production-health-probe:
+    if: github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Verify production backend release
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 30); do
+            payload=$(curl -fsS --max-time 10 https://book-api-volokovykh.amvera.io/health || true)
+            echo "health=$payload"
+            if printf '%s' "$payload" | grep -q '"release":"master-login-session-v1"'; then
+              exit 0
+            fi
+            sleep 5
+          done
+          exit 1
