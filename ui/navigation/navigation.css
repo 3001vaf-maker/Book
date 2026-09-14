@@ -1,10 +1,14 @@
 .bottom-nav{
-  grid-template-columns:repeat(var(--nav-count,5),minmax(0,1fr));
+  grid-template-columns:repeat(5,minmax(0,1fr));
 }
 
 .bottom-nav .nav-item{
   min-width:0;
   padding:0 2px;
+}
+
+.bottom-nav .nav-item--empty{
+  pointer-events:none;
 }
 
 .bottom-nav .nav-label{
