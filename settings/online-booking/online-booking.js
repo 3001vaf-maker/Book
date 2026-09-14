@@ -4,6 +4,7 @@ import {
   BOOKING_CHOICE_STYLES,
   BOOKING_SHAPES,
   BOOKING_SLOT_STEPS,
+  DEFAULT_BOOKING_SETTINGS,
   getBookingSettings,
   saveBookingSettings,
 } from '../../core/booking-settings/index.js';
@@ -99,6 +100,7 @@ function themeForm(settings) {
     ${select({ label: 'Форма элементов', name: 'shape', value: settings.theme.shape, options: BOOKING_SHAPES })}
     ${select({ label: 'Вид выбора', name: 'choiceStyle', value: settings.theme.choiceStyle, options: BOOKING_CHOICE_STYLES })}
     <div data-online-booking-preview>${bookingThemePreview(settings)}</div>
+    ${button('Вернуть стандартное оформление', { variant: 'secondary', data: 'data-booking-settings-reset-theme' })}
 
     <div class="section-heading"><h2>Время</h2></div>
     ${select({
@@ -114,7 +116,7 @@ function themeForm(settings) {
   </form>`;
 }
 
-function bindSettings(root, { onCancel } = {}) {
+function bindSettings(root, { onCancel, onResetTheme } = {}) {
   const form = root.querySelector('[data-online-booking-settings]');
   if (!form) return;
   initColorPickers(form);
@@ -124,6 +126,12 @@ function bindSettings(root, { onCancel } = {}) {
   };
   form.addEventListener('input', updatePreview);
   form.addEventListener('change', updatePreview);
+  form.querySelector('[data-booking-settings-reset-theme]')?.addEventListener('click', () => {
+    onResetTheme?.({
+      ...settingsDraft(form),
+      theme: { ...DEFAULT_BOOKING_SETTINGS.theme },
+    });
+  });
   form.querySelector('[data-booking-settings-cancel]')?.addEventListener('click', () => onCancel?.());
   form.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -135,9 +143,9 @@ function bindSettings(root, { onCancel } = {}) {
   });
 }
 
-function renderReady(root, navigateBack, tenantId) {
+function renderReady(root, navigateBack, tenantId, draftSettings = null) {
   const workplaces = getWorkplaces();
-  const settings = getBookingSettings();
+  const settings = draftSettings || getBookingSettings();
   const options = [
     { value: '', label: 'Выбрать рабочее пространство' },
     ...workplaces.map((item) => ({ value: item.key, label: item.name || 'Без названия' })),
@@ -159,7 +167,10 @@ function renderReady(root, navigateBack, tenantId) {
     ${actionBlock(button('Назад', { variant: 'secondary', data: 'data-online-booking-back' }))}`;
 
   bindCopyButtons(root);
-  bindSettings(root, { onCancel: () => renderReady(root, navigateBack, tenantId) });
+  bindSettings(root, {
+    onCancel: () => renderReady(root, navigateBack, tenantId),
+    onResetTheme: (draft) => renderReady(root, navigateBack, tenantId, draft),
+  });
   root.querySelector('input[name="bookingWorkplace"]')?.addEventListener('change', (event) => {
     const host = root.querySelector('[data-workplace-booking-link]');
     if (!host) return;
