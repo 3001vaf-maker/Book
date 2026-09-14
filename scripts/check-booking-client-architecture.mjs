@@ -40,7 +40,14 @@ expect(booking.includes('function backFromFirstBookingStep') && booking.includes
 expect(booking.includes('renderClientAccount'), 'Authenticated client account must use the unified client shell.');
 expect(!booking.includes('step: 15'), 'Public booking must not hardcode a 15 minute slot step.');
 expect(settings.includes("from '../../core/booking-settings/index.js'"), 'Online booking settings must use canonical booking settings owner.');
-expect(settings.includes('Отменить изменения'), 'Online booking style drafts must provide a cancel path before save.');
+expect(settings.includes('appShell({') && settings.includes('appHeader({'), 'Online booking settings must use the shared Book shell instead of a local page header.');
+expect(settings.includes("title: 'Онлайн-запись'") && settings.includes("data: 'data-online-booking-sections'"), 'Online booking parent screen must expose settings from C while V remains link-focused.');
+expect(settings.includes("title: 'Приветствие'") && settings.includes("title: 'Внешний вид'") && settings.includes("title: 'Время записи'"), 'Online booking settings must be three separate screens.');
+expect(settings.includes("{ title: 'Приветствие', data: 'data-online-booking-open=\"welcome\"' }") && settings.includes("{ title: 'Внешний вид', data: 'data-online-booking-open=\"appearance\"' }") && settings.includes("{ title: 'Время записи', data: 'data-online-booking-open=\"time\"' }"), 'Online booking C navigation must be a folder list, not a button group.');
+expect(settings.includes("label: 'Сохранить'") && settings.includes('setSaveVisible(root, false)'), 'B Save must exist only as a change-dependent action.');
+expect(settings.includes("label: 'Отменить'") && settings.includes("label: 'Сбросить'") && settings.includes("variant: 'outline'"), 'Appearance C actions must use the compact outlined action pattern.');
+expect(settings.includes('twoColumnLayout(') && settings.includes("ariaLabel: 'Цвета фона'") && settings.includes("ariaLabel: 'Цвета интерфейса'"), 'Appearance colors must use the shared two-column layout.');
+expect(settings.includes('BOOKING_SLOT_STEPS.map') && settings.includes("value === 60 ? '1 час'"), 'Time screen must use the canonical 5/10/15/30/60 slot select.');
 expect(serverSync.includes("apiRequest('/business-state')"), 'Open Book must refresh from canonical server business state.');
 expect(shellUi.includes('appHeader'), 'Shared UI must own stable A/title/B/C header.');
 expect(shellUi.includes("variant: 'secondary'"), 'Shared header secondary controls must use the canonical light button role.');
