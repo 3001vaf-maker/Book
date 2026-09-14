@@ -18,7 +18,7 @@
 | Navigation | `ui/navigation/` | `bottomNavigation` |
 | View navigation | `ui/view-navigation/` | `viewNavigation`, `initViewNavigation` |
 | Calendar / Date | `ui/calendar/` | `calendar`, `initCalendar`, `monthDayPicker`, `initMonthDayPickers`, `dateNavigator`, `initDateNavigator` |
-| Selection | `ui/selection/` | `initMultiSelect` |
+| Selection | `ui/selection/` | `initMultiSelect`, `segmentControl`, `initSegmentControls` |
 | Entity / Folder cards | `ui/cards/` | `entityCard`, `folderCard`, `folderList` |
 | Lists | `ui/lists/` | `list`, `listEntry`, `listEntries` |
 | Selectors | `ui/selectors/` | `select`, `searchableSelect` |
@@ -27,7 +27,7 @@
 | Cost | `ui/cost/` | `costField`, `initCostFields`, `collectCost`, `costListParts`, `costCardMeta` |
 | Duration | `ui/duration/` | `durationPicker`, `durationText`, `initDurationPickers` |
 | Time | `ui/time/` | `timePicker`, `timeSlots`, `initTimePickers`, `journalDayTimeline`, `initJournalDayTimeline` |
-| Layout | `ui/layout/` | `twoColumnLayout` |
+| Layout | `ui/layout/` | `twoColumnLayout`, `columnLayout` |
 | Workplaces | `ui/workplaces/` | `workplaceSelector`, `initWorkplaceSelectors`, `collectWorkplaceSelections`, `workplaceAddButton`, `workplaceContent`, `openWorkplaceControl`, `workplaceCountText`, `ALL_WORKPLACES_ID`, `getWorkplaceContext`, `setWorkplaceContext`, `dayWorkplaceContent`, `openDayWorkplaceControl`, `openDayWorkplaceTime` |
 | Header | `ui/header/` | `pageHeader`, `headerControl`, `headerToggle`, `headerControlGroup`, `openHeaderControl` |
 | Modals | `ui/modals/` | `modal`, `mountModal`, `openNotice` |
