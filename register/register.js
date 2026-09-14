@@ -31,6 +31,7 @@ function renderForm() {
       <label class="invite-field"><span>Email</span><input name="email" type="email" autocomplete="email" required></label>
       <label class="invite-field"><span>Пароль</span><input name="password" type="password" minlength="10" autocomplete="new-password" required></label>
       <label class="invite-field"><span>Повторите пароль</span><input name="passwordConfirm" type="password" minlength="10" autocomplete="new-password" required></label>
+      <label style="display:flex;align-items:center;gap:9px;font-size:14px;font-weight:600"><input name="showPassword" type="checkbox" style="width:18px;height:18px">Показать пароли</label>
       <label style="display:flex;align-items:center;gap:9px;font-size:14px;font-weight:600"><input name="remember" type="checkbox" checked style="width:18px;height:18px">Запомнить меня на этом устройстве</label>
       <p class="invite-error" data-form-error role="alert"></p>
       <button class="invite-button" type="submit">Создать Book и войти</button>
@@ -39,6 +40,15 @@ function renderForm() {
   const form = state.querySelector('[data-form]');
   const error = state.querySelector('[data-form-error]');
   const button = form.querySelector('button[type="submit"]');
+  const passwordInput = form.querySelector('input[name="password"]');
+  const passwordConfirmInput = form.querySelector('input[name="passwordConfirm"]');
+  const showPassword = form.querySelector('input[name="showPassword"]');
+
+  showPassword.addEventListener('change', () => {
+    const type = showPassword.checked ? 'text' : 'password';
+    passwordInput.type = type;
+    passwordConfirmInput.type = type;
+  });
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
