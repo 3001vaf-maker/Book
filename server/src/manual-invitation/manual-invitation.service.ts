@@ -156,6 +156,7 @@ export class ManualInvitationService {
           experience: '',
           professionAbout: '',
           customProfessions: [],
+          migrationVerifiedAt: new Date(),
         },
       });
       await tx.tenant.update({
