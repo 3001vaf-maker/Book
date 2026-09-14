@@ -1,4 +1,5 @@
-import { accordion, actionBlock, button, collectRepeatedField, entityCard, escapeHtml, field, initAccordions, initPhotoField, initRepeatedFields, modal, mountModal, page, photoField, repeatedField, select, textareaField, workplaceAddButton, workplaceCountText } from '../../ui/ui.js';
+import { accordion, actionBlock, button, collectRepeatedField, entityCard, escapeHtml, field, folderList, initAccordions, initPhotoField, initRepeatedFields, modal, mountModal, page, photoField, repeatedField, select, textareaField, workplaceAddButton, workplaceCountText } from '../../ui/ui.js';
+import { getBookLimit } from '../../core/access.js';
 import { addCustomProfession, getCustomProfessions, getProfile, saveProfile as saveProfileData } from './data.js';
 import { getWorkplaces } from './workplaces/data.js';
 import { initWorkplaceListDeletion, openWorkplaceModal, renderWorkplace, workplaceList } from './workplaces/workplaces.js';
@@ -32,6 +33,17 @@ function profileCard(p){
 
 function showProfileError(message){
   mountModal(document.body,modal(`<div class="modal-title"><h2>Не удалось сохранить</h2><p>${escapeHtml(message||'Ошибка сервера')}</p></div>`,{variant:'compact'}));
+}
+
+function openWorkplaceLimitModal(root,limit){
+  const current=Number.isFinite(limit)?String(limit):'текущий лимит';
+  const choices=folderList([
+    {title:'До 3 рабочих пространств'},
+    {title:'До 5 рабочих пространств'},
+    {title:'Без ограничения'}
+  ]);
+  const m=mountModal(root,modal(`<div class="modal-title"><h2>Работаете в нескольких местах?</h2><p>Сейчас вашему Book доступно рабочих пространств: ${escapeHtml(current)}. Book поддерживает несколько мест работы с отдельными адресами и настройками. Дополнительный лимит можно подключить отдельно.</p></div>${choices}${actionBlock(button('Понятно',{data:'data-close-workplace-limit'}))}`,{variant:'medium'}));
+  m?.querySelector('[data-close-workplace-limit]')?.addEventListener('click',()=>m.remove());
 }
 
 function applyProfessionValue(root,value){
@@ -123,6 +135,11 @@ function renderProfile(root,navigateBack,options={}){
   root.querySelector('[data-add-workplace]')?.addEventListener('click',async()=>{
     if(options.onboarding){
       try{await persistDraft(root)}catch(error){showProfileError(error instanceof Error?error.message:'Не удалось сохранить профиль');return}
+    }
+    const workplaceLimit=getBookLimit('workplaces.max');
+    if(workplaceLimit!==null&&getWorkplaces().length>=workplaceLimit){
+      openWorkplaceLimitModal(root,workplaceLimit);
+      return;
     }
     openWorkplaceModal(root,null,()=>renderProfile(root,navigateBack,options));
   });
