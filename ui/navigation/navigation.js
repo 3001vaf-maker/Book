@@ -13,7 +13,7 @@ export function navigationBar(items = [], active = '', { className = '', aria = 
     const id = String(item.id || '');
     const label = String(item.label || id);
     const icon = String(item.icon || '');
-    return `<button type="button" class="nav-item ${String(active) === id ? 'is-active' : ''}" ${dataAttribute}="${id}"><span class="nav-icon" aria-hidden="true">${icon}</span><span>${label}</span></button>`;
+    return `<button type="button" class="nav-item ${String(active) === id ? 'is-active' : ''}" ${dataAttribute}="${id}"><span class="nav-icon" aria-hidden="true">${icon}</span><span class="nav-label">${label}</span></button>`;
   }).join('')}</nav>`;
 }
 
