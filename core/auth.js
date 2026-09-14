@@ -3,19 +3,20 @@ import { API_BASE } from './environment.js';
 const TOKEN_KEY = 'book.auth.token';
 
 export function getAuthToken() {
-  return sessionStorage.getItem(TOKEN_KEY) || '';
+  return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY) || '';
 }
 
-export function setAuthToken(token) {
+export function setAuthToken(token, remember = false) {
   const value = String(token || '').trim();
-  if (!value) {
-    sessionStorage.removeItem(TOKEN_KEY);
-    return;
-  }
-  sessionStorage.setItem(TOKEN_KEY, value);
+  localStorage.setItem(TOKEN_KEY, '');
+  sessionStorage.removeItem(TOKEN_KEY);
+  if (!value) return;
+  const storage = remember ? localStorage : sessionStorage;
+  storage.setItem(TOKEN_KEY, value);
 }
 
 export function clearAuthToken() {
+  localStorage.setItem(TOKEN_KEY, '');
   sessionStorage.removeItem(TOKEN_KEY);
 }
 
@@ -27,7 +28,7 @@ export async function apiRequest(path, options = {}) {
   return fetch(`${API_BASE}${path}`, { ...options, headers });
 }
 
-export async function login(email, password) {
+export async function login(email, password, remember = false) {
   const response = await fetch(`${API_BASE}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -39,7 +40,7 @@ export async function login(email, password) {
     throw new Error(payload?.message || 'Не удалось войти');
   }
 
-  setAuthToken(payload.accessToken);
+  setAuthToken(payload.accessToken, remember);
   return payload;
 }
 
