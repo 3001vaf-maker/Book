@@ -1,5 +1,4 @@
 .app-shell.app-shell--booking{
-  --app-max-width:390px;
   width:min(100%,var(--app-max-width));
   max-width:var(--app-max-width);
   min-width:320px;
