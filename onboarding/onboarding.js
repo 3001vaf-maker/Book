@@ -1,3 +1,4 @@
+import { canUseBookCapability } from '../core/access.js';
 import { getWorkplaces } from '../settings/profile/workplaces/data.js';
 import { getProcedures } from '../settings/service/procedures/data.js';
 import { getDays } from '../core/day/index.js';
@@ -13,9 +14,10 @@ function infoModal(title, message, variant = 'compact') {
   return mountModal(document.body, modal(`<div class="modal-title"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(message)}</p></div>`, { title, variant, surface: 'app' }));
 }
 
-const stages = [
+const allStages = [
   {
     id: 'profile',
+    capability: 'profile.access',
     load: () => import('../settings/profile/profile.js'),
     render: (module, root, context) => module.render(root, () => {}, { onboarding: true, accountEmail: context.accountEmail }),
     ready: (module, root) => module.isOnboardingProfileReady(root),
@@ -23,6 +25,7 @@ const stages = [
   },
   {
     id: 'procedures',
+    capability: 'services.access',
     load: () => import('../settings/service/procedures/procedures.js'),
     render(module, root) {
       module.render(root, () => {});
@@ -32,6 +35,7 @@ const stages = [
   },
   {
     id: 'documents',
+    capability: 'documents.access',
     load: () => import('../settings/documents/documents.js'),
     render(module, root) {
       module.render(root, () => {});
@@ -49,6 +53,7 @@ const stages = [
   },
   {
     id: 'wallets',
+    capability: 'finance.access',
     load: () => import('../settings/wallets/wallets.js'),
     render(module, root) {
       module.render(root, () => {});
@@ -58,6 +63,7 @@ const stages = [
   },
   {
     id: 'timetable',
+    capability: 'timetable.access',
     load: () => import('../timetable/timetable.js'),
     render(module, root) {
       module.renderTimetable(root);
@@ -67,25 +73,31 @@ const stages = [
   },
   {
     id: 'clients',
+    capability: 'clients.access',
     load: () => import('../main/clients/clients.js'),
     render(module, root) {
       module.renderClients(root);
-      queueMicrotask(() => infoModal('Клиенты', 'Добавьте 1–3 клиентов, которые записаны на ближайшее время. Одного клиента можно создать кнопкой «+», список — загрузить через Excel. Это позволит сразу перейти к реальным записям в Журнале.', 'medium'));
+      queueMicrotask(() => infoModal('Клиенты', 'Соберите свою текущую базу клиентов. Одного клиента можно создать кнопкой «+», список — загрузить через Excel. Первая задача — увидеть реальное количество клиентов, с которыми вы работаете.', 'medium'));
     },
     ready: () => getClientCount() > 0,
   },
 ];
 
-function readStep() {
-  if (localStorage.getItem(COMPLETE_KEY) === '1' && localStorage.getItem(DOCUMENTS_ACK_KEY) !== '1') {
-    return stages.findIndex((stage) => stage.id === 'documents');
+function availableStages() {
+  return allStages.filter((stage) => canUseBookCapability(stage.capability));
+}
+
+function readStep(stages) {
+  if (canUseBookCapability('documents.access') && localStorage.getItem(COMPLETE_KEY) === '1' && localStorage.getItem(DOCUMENTS_ACK_KEY) !== '1') {
+    const documentsIndex = stages.findIndex((stage) => stage.id === 'documents');
+    if (documentsIndex >= 0) return documentsIndex;
   }
 
   const current = Number(localStorage.getItem(STEP_KEY));
   if (Number.isInteger(current) && current >= 0 && current < stages.length) return current;
 
   const legacy = Number(localStorage.getItem(LEGACY_STEP_KEY));
-  if (Number.isInteger(legacy) && legacy >= 0 && legacy <= 4) {
+  if (Number.isInteger(legacy) && legacy >= 0 && legacy <= 4 && stages.length === allStages.length) {
     const migrated = legacy >= 2 ? legacy + 1 : legacy;
     localStorage.setItem(STEP_KEY, String(migrated));
     return migrated;
@@ -99,11 +111,19 @@ function writeStep(index) {
 }
 
 export function isOnboardingComplete() {
-  return localStorage.getItem(COMPLETE_KEY) === '1' && localStorage.getItem(DOCUMENTS_ACK_KEY) === '1';
+  if (localStorage.getItem(COMPLETE_KEY) !== '1') return false;
+  if (canUseBookCapability('documents.access') && localStorage.getItem(DOCUMENTS_ACK_KEY) !== '1') return false;
+  return true;
 }
 
 export async function renderOnboarding(root, { onComplete = () => {}, accountEmail = '' } = {}) {
-  const stepIndex = readStep();
+  const stages = availableStages();
+  if (!stages.length) {
+    localStorage.setItem(COMPLETE_KEY, '1');
+    onComplete();
+    return;
+  }
+  const stepIndex = readStep(stages);
   const stage = stages[stepIndex];
   if (!stage) return;
 
@@ -128,8 +148,9 @@ export async function renderOnboarding(root, { onComplete = () => {}, accountEma
     if (stage.id === 'procedures' && !procedureWorkplaceNoticeShown) {
       const procedures = getProcedures();
       if (procedures.length > 0 && !procedures.some((procedure) => Array.isArray(procedure.workplaces) && procedure.workplaces.length > 0)) {
+        profileWorkplaceNoticeShown = true;
         procedureWorkplaceNoticeShown = true;
-        infoModal('Рабочее пространство', 'Чтобы корректно продолжить работу, хотя бы одна процедура должна быть связана с рабочим пространством.', 'medium');
+        infoModal('Рабочее пространство', 'Чтобы корректно продолжить работу, хотя бы одна услуга должна быть связана с рабочим пространством.', 'medium');
       }
     }
   };
@@ -161,7 +182,7 @@ export async function renderOnboarding(root, { onComplete = () => {}, accountEma
     }
 
     localStorage.setItem(COMPLETE_KEY, '1');
-    localStorage.setItem(DOCUMENTS_ACK_KEY, '1');
+    if (canUseBookCapability('documents.access')) localStorage.setItem(DOCUMENTS_ACK_KEY, '1');
     localStorage.removeItem(STEP_KEY);
     localStorage.removeItem(LEGACY_STEP_KEY);
     onComplete();

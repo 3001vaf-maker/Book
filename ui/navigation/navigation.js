@@ -10,6 +10,7 @@ export function navigationBar(items = [], active = '', { className = '', aria = 
   const values = (Array.isArray(items) ? items : []).filter((item) => item && item.id);
   const classes = ['bottom-nav', className].filter(Boolean).join(' ');
   return `<nav class="${classes}" aria-label="${aria}">${values.map((item) => {
+    if (item.hidden) return '<span class="nav-item nav-item--empty" aria-hidden="true"></span>';
     const id = String(item.id || '');
     const label = String(item.label || id);
     const icon = String(item.icon || '');
@@ -17,6 +18,8 @@ export function navigationBar(items = [], active = '', { className = '', aria = 
   }).join('')}</nav>`;
 }
 
-export function bottomNavigation(active) {
-  return navigationBar(defaultItems, active);
+export function bottomNavigation(active, allowedIds = null) {
+  const allowed = Array.isArray(allowedIds) ? new Set(allowedIds) : null;
+  const items = allowed ? defaultItems.map((item) => allowed.has(item.id) ? item : { ...item, hidden: true }) : defaultItems;
+  return navigationBar(items, active);
 }

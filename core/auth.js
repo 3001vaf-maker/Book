@@ -6,6 +6,15 @@ export function getAuthToken() {
   return sessionStorage.getItem(TOKEN_KEY) || '';
 }
 
+export function setAuthToken(token) {
+  const value = String(token || '').trim();
+  if (!value) {
+    sessionStorage.removeItem(TOKEN_KEY);
+    return;
+  }
+  sessionStorage.setItem(TOKEN_KEY, value);
+}
+
 export function clearAuthToken() {
   sessionStorage.removeItem(TOKEN_KEY);
 }
@@ -30,7 +39,7 @@ export async function login(email, password) {
     throw new Error(payload?.message || 'Не удалось войти');
   }
 
-  sessionStorage.setItem(TOKEN_KEY, payload.accessToken);
+  setAuthToken(payload.accessToken);
   return payload;
 }
 
