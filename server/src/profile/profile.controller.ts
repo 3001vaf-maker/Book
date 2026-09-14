@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, Post, Put, Req, UseGuards } from 
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ProfileService } from './profile.service';
+import { WorkplaceLimitGuard } from './workplace-limit.guard';
 
 type AuthenticatedRequest = Request & { auth?: { userId: string; tenantId: string; role: string } };
 
@@ -36,6 +37,7 @@ export class ProfileController {
   }
 
   @Put('workplaces/:key')
+  @UseGuards(WorkplaceLimitGuard)
   upsertWorkplace(
     @Req() request: AuthenticatedRequest,
     @Param('key') key: string,
