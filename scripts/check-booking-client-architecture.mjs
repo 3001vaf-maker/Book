@@ -13,6 +13,8 @@ const clientMobileCss = fs.readFileSync('ui/shell/client-mobile.css', 'utf8');
 const navigationUi = fs.readFileSync('ui/navigation/navigation.js', 'utf8');
 const navigationCss = fs.readFileSync('ui/navigation/navigation.css', 'utf8');
 const referenceUi = fs.readFileSync('ui/reference/reference.js', 'utf8');
+const referenceHtml = fs.readFileSync('ui/reference/index.html', 'utf8');
+const referenceCss = fs.readFileSync('ui/reference/reference.css', 'utf8');
 const rootHtml = fs.readFileSync('index.html', 'utf8');
 
 const failures = [];
@@ -58,8 +60,11 @@ expect(shellUi.includes('appHeader'), 'Shared UI must own stable A/title/B/C hea
 expect(shellUi.includes("variant: 'secondary'"), 'Shared header secondary controls must use the canonical light button role.');
 expect(shellUi.includes('clientBottomNavigation'), 'Shared UI must own client bottom navigation.');
 expect(shellUi.includes('messageComposer'), 'Shared UI must own messenger composer.');
+expect(shellUi.includes('message-composer--plain') && shellUi.includes('message-composer--with-attachments'), 'Shared messenger composer must own both master/plain and attachment layouts.');
 expect(shellUi.includes('readOnlyReceipt'), 'Shared UI must own read-only receipt sheet.');
-expect(shellCss.includes('--shell-icon-slot'), 'Shared shell CSS must own stable header slots.');
+expect(shellUi.includes('app-view-shell--has-media'), 'Shared shell must know whether S/media is present.');
+expect(shellCss.includes('--shell-icon-slot'), 'Shared shell CSS must own stable header control sizing.');
+expect(shellCss.includes('grid-template-columns:auto minmax(0,1fr) auto auto'), 'Shared A/J/B/C header must redistribute unused space instead of reserving empty fixed columns.');
 expect(shellCss.includes('.app-view-shell--chat') && shellCss.includes('.message-composer{position:fixed'), 'Shared shell CSS must keep chat composer fixed while the thread scrolls.');
 expect(styleCss.includes('--app-max-width:390px'), 'Book must use one shared 390px application width for master and client surfaces.');
 expect(!clientMobileCss.includes('--app-max-width:'), 'Client shell must inherit the shared Book application width instead of redefining it.');
@@ -76,13 +81,21 @@ expect(navigationUi.includes('class="nav-label"'), 'Bottom navigation labels mus
 expect(navigationCss.includes('grid-template-columns:repeat(5,minmax(0,1fr))'), 'Book bottom navigation must divide the available width into five equal slots.');
 expect(navigationCss.includes('font-size:10px') && navigationCss.includes('white-space:nowrap'), 'All five bottom navigation labels must share a compact single-line label rule.');
 expect(rootHtml.includes('ui/navigation/navigation.css'), 'Book must load the canonical navigation stylesheet.');
+
+expect(referenceHtml.includes('reference.css') && referenceHtml.includes('reference-controls'), 'The Book UI reference must keep lab controls outside the 390px application shell.');
+expect(referenceCss.includes('.ui-reference-toolbar') && referenceCss.includes('position:fixed'), 'Reference-only controls must remain outside the Book phone surface.');
 expect(referenceUi.includes("bottomNavigation('settings')"), 'The Book UI reference must render the same five-slot bottom navigation used by the master application.');
+expect(referenceUi.includes("['profile', 'Карточка — без S']") && referenceUi.includes("['profile-media', 'Карточка — с S']") && referenceUi.includes("['chat', 'Чат']") && referenceUi.includes("['form', 'Форма']"), 'Reference must expose multiple UI screen forms and S/no-S states.');
+expect(referenceUi.includes("'Сохранить', 'Далее', 'Готово', 'Добавить', 'Создать'"), 'Reference must expose canonical B label fit checks.');
+expect(referenceUi.includes('modal(') && referenceUi.includes('mountModal('), 'Reference must exercise the real shared modal component.');
+expect(referenceUi.includes("button('Личные данные'") && referenceUi.includes("button('Согласия'") && referenceUi.includes("button('Изменить пароль'") && referenceUi.includes("button('Выход'"), 'Reference profile settings must include all approved actions.');
 const personalIndex = referenceUi.indexOf("button('Личные данные'");
 const consentIndex = referenceUi.indexOf("button('Согласия'");
 const passwordIndex = referenceUi.indexOf("button('Изменить пароль'");
 const logoutIndex = referenceUi.indexOf("button('Выход'");
 expect(personalIndex >= 0 && personalIndex < consentIndex && consentIndex < passwordIndex && passwordIndex < logoutIndex, 'Reference profile settings must keep the approved action order.');
-expect(referenceUi.includes("button('Личные данные', { variant: 'outline' })") && referenceUi.includes("button('Согласия', { variant: 'outline' })") && referenceUi.includes("button('Изменить пароль')") && referenceUi.includes("button('Выход', { variant: 'danger' })"), 'Reference profile settings must keep the approved button variants.');
+expect(referenceUi.includes("button('Личные данные', { variant: 'outline'") && referenceUi.includes("button('Согласия', { variant: 'outline'") && referenceUi.includes("button('Изменить пароль', {") && referenceUi.includes("button('Выход', { variant: 'danger'"), 'Reference profile settings must keep the approved button variants.');
+expect(!referenceUi.includes('apiRequest(') && !referenceUi.includes('fetch(') && !referenceUi.includes('localStorage') && !referenceUi.includes('sessionStorage') && !referenceUi.includes("from '../../core/") && !referenceUi.includes("from '../core/"), 'Reference must remain free of API, persistence and business-layer dependencies.');
 
 if (failures.length) {
   failures.forEach((message) => console.error(`booking client architecture: ${message}`));

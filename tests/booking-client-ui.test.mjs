@@ -197,7 +197,7 @@ assert.match(communicationHistory, /m\."attachments"/);
 assert.match(communicationHistory, /'\[\]'::jsonb AS "attachments"/);
 assert.match(messageAttachmentMigration, /ADD COLUMN "attachments" JSONB NOT NULL DEFAULT '\[\]'::jsonb/);
 
-// Shared shell owns A/B/C roles and compact mobile geometry.
+// Shared shell owns adaptive A/J/B/C roles and compact mobile geometry.
 assert.match(shellUi, /appHeader/);
 assert.match(shellUi, /clientBottomNavigation/);
 assert.match(shellUi, /messageThread/);
@@ -206,13 +206,20 @@ assert.match(shellUi, /label: 'Сообщения', icon: '💬'/);
 assert.match(shellUi, /back\.aria \|\| 'Назад', variant: 'secondary'/);
 assert.match(shellUi, /settings\.aria \|\| 'Настройки', variant: 'secondary'/);
 assert.match(shellUi, /disabled: Boolean\(action\.disabled\)/);
+assert.match(shellUi, /app-view-shell--has-media/);
+assert.match(shellUi, /message-composer--with-attachments/);
+assert.match(shellUi, /message-composer--plain/);
 assert.match(shellUi, /attachments = false/);
 assert.match(shellUi, /data-message-attachment/);
-assert.match(shellCss, /grid-template-columns:var\(--shell-icon-slot\) minmax\(0,1fr\) var\(--shell-action-slot\) var\(--shell-icon-slot\)/);
+assert.match(shellCss, /grid-template-columns:auto minmax\(0,1fr\) auto auto/);
+assert.match(shellCss, /\.app-header__slot\.is-empty\{width:0/);
+assert.match(shellCss, /\.app-header__title[\s\S]*?white-space:normal[\s\S]*?text-overflow:clip/);
 assert.match(shellCss, /bottom-nav--client/);
+assert.match(shellCss, /\.app-view-shell--profile:not\(\.app-view-shell--has-media\)/);
 assert.match(shellCss, /\.app-view-shell--chat/);
 assert.match(shellCss, /\.app-view-shell--chat \.app-view-shell__screen[\s\S]*?overflow-y:auto/);
 assert.match(shellCss, /\.message-composer\{position:fixed/);
+assert.match(shellCss, /\.message-composer--with-attachments\{grid-template-columns:44px minmax\(0,1fr\) 46px/);
 assert.match(shellCss, /\.message-composer__attach/);
 assert.match(indexHtml, /ui\/shell\/client-mobile\.css/);
 assert.match(indexHtml, /ui\/shell\/client-account-theme\.css/);
