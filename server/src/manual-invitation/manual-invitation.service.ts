@@ -18,6 +18,7 @@ import { MasterInvitationService } from '../master-invitation/master-invitation.
 const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const MANUAL_EMAIL_PREFIX = 'manual+';
 const MANUAL_EMAIL_SUFFIX = '@book.invalid';
+const DEFAULT_CLIENT_APP_URL = 'https://3001vaf-maker.github.io/Book';
 
 function text(value: unknown) {
   return String(value || '').trim();
@@ -78,9 +79,7 @@ export class ManualInvitationService {
     });
 
     const origin = String(
-      process.env.CLIENT_APP_URL ||
-      process.env.FRONTEND_ORIGIN ||
-      'https://3001vaf-maker.github.io/Book',
+      process.env.CLIENT_APP_URL || DEFAULT_CLIENT_APP_URL,
     ).trim().replace(/\/+$/, '');
 
     return {
