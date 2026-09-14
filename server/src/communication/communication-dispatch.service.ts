@@ -33,9 +33,24 @@ export class CommunicationDispatchService {
     return selected;
   }
 
-  async send(tenantId: string, input: { phone?: unknown; uei?: unknown; channel?: unknown; body?: unknown }) {
+  async send(tenantId: string, input: { phone?: unknown; uei?: unknown; channel?: unknown; body?: unknown; attachments?: unknown }) {
     const body = text(input?.body);
-    if (!body) throw new BadRequestException('Пустое сообщение');
+    const attachments = Array.isArray(input?.attachments) ? input.attachments : [];
+    if (!body && !attachments.length) throw new BadRequestException('Пустое сообщение');
+
+    if (attachments.length) {
+      return this.communications.recordMessage(tenantId, {
+        phone: input?.phone,
+        uei: input?.uei,
+        direction: 'outbound',
+        kind: 'media',
+        channel: 'IN_APP',
+        body,
+        attachments,
+        status: 'delivered',
+      });
+    }
+
     const channel = await this.resolveChannel(tenantId, input || {});
     if (channel === 'TELEGRAM') return this.telegram.sendChatMessage(tenantId, { phone: input?.phone, uei: input?.uei, body });
     throw new BadRequestException('Канал пока не подключён к двустороннему Chat');
