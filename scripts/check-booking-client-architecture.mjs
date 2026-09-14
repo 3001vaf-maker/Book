@@ -8,6 +8,7 @@ const serverSync = fs.readFileSync('online-booking/server-sync.js', 'utf8');
 const bookingUi = fs.readFileSync('ui/booking/index.js', 'utf8');
 const shellUi = fs.readFileSync('ui/shell/index.js', 'utf8');
 const shellCss = fs.readFileSync('ui/shell/shell.css', 'utf8');
+const styleCss = fs.readFileSync('css/style.css', 'utf8');
 const clientMobileCss = fs.readFileSync('ui/shell/client-mobile.css', 'utf8');
 
 const failures = [];
@@ -56,7 +57,8 @@ expect(shellUi.includes('messageComposer'), 'Shared UI must own messenger compos
 expect(shellUi.includes('readOnlyReceipt'), 'Shared UI must own read-only receipt sheet.');
 expect(shellCss.includes('--shell-icon-slot'), 'Shared shell CSS must own stable header slots.');
 expect(shellCss.includes('.app-view-shell--chat') && shellCss.includes('.message-composer{position:fixed'), 'Shared shell CSS must keep chat composer fixed while the thread scrolls.');
-expect(clientMobileCss.includes('--app-max-width:390px'), 'Client application must keep the compact phone-width contract.');
+expect(styleCss.includes('--app-max-width:390px'), 'Book must use one shared 390px application width for master and client surfaces.');
+expect(!clientMobileCss.includes('--app-max-width:'), 'Client shell must inherit the shared Book application width instead of redefining it.');
 expect(!clientMobileCss.includes('max-width:none'), 'Client application must never disable its phone-width limit.');
 expect(!accountShell.includes("document.createElement('style')") && !accountShell.includes('<style>'), 'Client features must not own local CSS.');
 expect(accountShell.includes("messageComposer({ attachments: true })"), 'Client chat must use the shared composer with media attachment control.');
