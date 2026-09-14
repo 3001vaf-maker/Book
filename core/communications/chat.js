@@ -27,8 +27,8 @@ export async function saveCommunicationPreferences({ phone = '', uei = '', prefe
   }), 'Не удалось сохранить настройки каналов');
 }
 
-export async function sendCommunicationMessage({ channel = '', phone = '', uei = '', body = '' } = {}) {
+export async function sendCommunicationMessage({ channel = '', phone = '', uei = '', body = '', attachments = [] } = {}) {
   return jsonResponse(await apiRequest('/communications/chat/messages', {
-    method: 'POST', body: JSON.stringify({ channel, phone, uei, body }),
+    method: 'POST', body: JSON.stringify({ channel, phone, uei, body, attachments }),
   }), 'Не удалось отправить сообщение');
 }

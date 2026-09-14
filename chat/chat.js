@@ -11,10 +11,12 @@ import {
 import { findPeopleByPhone, getAllClients } from '../main/clients/data.js';
 import {
   appHeader,
+  appShell,
   button,
   checkList,
   collectCheckList,
   emptyState,
+  escapeHtml,
   field,
   initCheckList,
   listEntries,
@@ -52,8 +54,50 @@ function withTimes(messages = []) {
   return (Array.isArray(messages) ? messages : []).map((message) => ({ ...message, time: messageTime(message.createdAt) }));
 }
 
-function screen(root, header, body = '') {
-  root.innerHTML = `${header}<div class="form-grid">${body}</div>`;
+function screen(root, header, body = '', className = '') {
+  root.classList.add('app-content--shell');
+  root.innerHTML = appShell({ header, body, media: '', className });
+}
+
+async function fileAttachment(file) {
+  if (!(file instanceof File)) return null;
+  if (!/^(image|video)\//i.test(file.type || '')) throw new Error('Можно прикрепить фото или видео');
+  if (file.size > 8 * 1024 * 1024) throw new Error('Один файл должен быть не больше 8 МБ');
+  const dataUrl = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('Не удалось прочитать файл'));
+    reader.readAsDataURL(file);
+  });
+  return { name: file.name || 'Медиа', type: file.type || '', size: file.size || 0, dataUrl };
+}
+
+function bindMessageAttachments(form) {
+  const selected = [];
+  const input = form?.querySelector('[data-message-attachment-input]');
+  const trigger = form?.querySelector('[data-message-attachment]');
+  const preview = form?.querySelector('[data-message-attachment-preview]');
+  const redraw = () => {
+    if (!preview) return;
+    preview.innerHTML = selected.map((item) => `<span class="message-composer__attachment-chip">${escapeHtml(item.name || 'Медиа')}</span>`).join('');
+  };
+  trigger?.addEventListener('click', () => input?.click());
+  input?.addEventListener('change', async () => {
+    const files = [...(input.files || [])].slice(0, 3);
+    try {
+      const next = (await Promise.all(files.map(fileAttachment))).filter(Boolean);
+      selected.splice(0, selected.length, ...next);
+      redraw();
+      input.setCustomValidity('');
+    } catch (error) {
+      selected.splice(0, selected.length);
+      redraw();
+      input.setCustomValidity(error instanceof Error ? error.message : 'Не удалось прикрепить файл');
+      input.reportValidity();
+      input.setCustomValidity('');
+    }
+  });
+  return () => [...selected];
 }
 
 function peopleList() {
@@ -92,23 +136,26 @@ async function chooseTemplate(input) {
 async function renderCompose(root, state, recipient) {
   state.view = 'compose';
   state.recipient = recipient;
+  const allowsAttachments = recipient.mode === 'one';
   screen(root, appHeader({
     title: 'Новое сообщение',
     back: { data: 'data-master-compose-back', aria: 'К диалогам' },
   }), `
     <div class="action-block"><strong>Кому: ${recipientLabel(recipient)}</strong></div>
     ${button('Выбрать шаблон', { variant: 'secondary', data: 'data-master-template-choose' })}
-    ${messageComposer({ placeholder: 'Написать сообщение...' })}
+    ${messageComposer({ placeholder: 'Написать сообщение...', attachments: allowsAttachments })}
     <div class="muted" data-master-compose-status aria-live="polite"></div>
-  `);
+  `, 'app-view-shell--chat');
   root.querySelector('[data-master-compose-back]')?.addEventListener('click', () => void renderThreads(root, state));
   const form = root.querySelector('[data-message-composer]');
   const input = form?.querySelector('[name="message"]');
+  const getAttachments = allowsAttachments ? bindMessageAttachments(form) : () => [];
   root.querySelector('[data-master-template-choose]')?.addEventListener('click', () => void chooseTemplate(input));
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const body = String(input?.value || '').trim();
-    if (!body) return;
+    const attachments = getAttachments();
+    if (!body && !attachments.length) return;
     const submit = form.querySelector('button[type="submit"]');
     const status = root.querySelector('[data-master-compose-status]');
     if (submit) submit.disabled = true;
@@ -117,7 +164,7 @@ async function renderCompose(root, state, recipient) {
       if (recipient.mode === 'one') {
         const person = personByKey(recipient.personKeys?.[0]);
         if (!person) throw new Error('Клиент не найден');
-        await sendCommunicationMessage({ phone: phoneOf(person), uei: person.uei || '', body });
+        await sendCommunicationMessage({ phone: phoneOf(person), uei: person.uei || '', body, attachments });
       } else {
         await sendBroadcast({
           channel: 'TELEGRAM',
@@ -281,22 +328,24 @@ async function openThread(root, state, thread) {
   state.thread = thread;
   const phone = String(thread?.cardPhone || '').trim();
   const uei = String(thread?.uei || '').trim();
-  screen(root, appHeader({ title: clientName(phone, uei), back: { data: 'data-chat-back', aria: 'К диалогам' } }), emptyState('Загрузка', 'Получаем переписку.'));
+  screen(root, appHeader({ title: clientName(phone, uei), back: { data: 'data-chat-back', aria: 'К диалогам' } }), emptyState('Загрузка', 'Получаем переписку.'), 'app-view-shell--chat');
   try {
     const messages = withTimes(await getCommunicationThread({ phone, uei }));
-    screen(root, appHeader({ title: clientName(phone, uei), back: { data: 'data-chat-back', aria: 'К диалогам' } }), `${messages.length ? messageThread(messages, { viewer: 'master' }) : emptyState('Сообщений пока нет', 'Напишите клиенту первое сообщение.')}${messageComposer({ placeholder: 'Написать сообщение...' })}<div class="muted" data-chat-status aria-live="polite"></div>`);
+    screen(root, appHeader({ title: clientName(phone, uei), back: { data: 'data-chat-back', aria: 'К диалогам' } }), `${messages.length ? messageThread(messages, { viewer: 'master' }) : emptyState('Сообщений пока нет', 'Напишите клиенту первое сообщение.')}${messageComposer({ placeholder: 'Написать сообщение...', attachments: true })}<div class="muted" data-chat-status aria-live="polite"></div>`, 'app-view-shell--chat');
     root.querySelector('[data-chat-back]')?.addEventListener('click', () => void renderThreads(root, state));
     const form = root.querySelector('[data-message-composer]');
+    const getAttachments = bindMessageAttachments(form);
     form?.addEventListener('submit', async (event) => {
       event.preventDefault();
       const input = form.querySelector('[name="message"]');
       const body = String(input?.value || '').trim();
-      if (!body) return;
+      const attachments = getAttachments();
+      if (!body && !attachments.length) return;
       const submit = form.querySelector('button[type="submit"]');
       const status = root.querySelector('[data-chat-status]');
       if (submit) submit.disabled = true;
       try {
-        await sendCommunicationMessage({ phone, uei, body });
+        await sendCommunicationMessage({ phone, uei, body, attachments });
         await openThread(root, state, thread);
       } catch (error) {
         if (status) status.textContent = error instanceof Error ? error.message : 'Не удалось отправить';
@@ -304,7 +353,7 @@ async function openThread(root, state, thread) {
       }
     });
   } catch (error) {
-    screen(root, appHeader({ title: clientName(phone, uei), back: { data: 'data-chat-back', aria: 'К диалогам' } }), emptyState('Чат недоступен', error instanceof Error ? error.message : 'Не удалось загрузить переписку'));
+    screen(root, appHeader({ title: clientName(phone, uei), back: { data: 'data-chat-back', aria: 'К диалогам' } }), emptyState('Чат недоступен', error instanceof Error ? error.message : 'Не удалось загрузить переписку'), 'app-view-shell--chat');
     root.querySelector('[data-chat-back]')?.addEventListener('click', () => void renderThreads(root, state));
   }
 }
@@ -317,7 +366,7 @@ async function renderThreads(root, state) {
     const threads = await getCommunicationThreads();
     const items = threads.map((thread, index) => listEntry({
       title: clientName(thread.cardPhone, thread.uei),
-      subtitle: thread.body || 'Открыть диалог',
+      subtitle: thread.body || (Array.isArray(thread.attachments) && thread.attachments.length ? 'Медиа' : 'Открыть диалог'),
       rightTop: messageTime(thread.createdAt),
       data: `data-chat-thread="${index}"`,
       aria: `Открыть диалог с ${clientName(thread.cardPhone, thread.uei)}`,
