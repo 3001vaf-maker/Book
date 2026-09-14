@@ -7,6 +7,10 @@
   padding:0 2px;
 }
 
+.bottom-nav .nav-item--empty{
+  pointer-events:none;
+}
+
 .bottom-nav .nav-label{
   display:block;
   width:100%;
