@@ -15,19 +15,37 @@ function hydrate(bundle, ready) {
   setWorkplacesServerReady(ready);
 }
 
+async function loadRemoteProfile() {
+  const response = await apiRequest('/profile');
+  return responseJson(response, 'Не удалось загрузить Profile + Workplaces');
+}
+
 export async function initializeProfileWorkplaces(account = {}) {
   setProfileServerReady(false);
   setWorkplacesServerReady(false);
 
-  const remoteResponse = await apiRequest('/profile');
-  const remote = await responseJson(remoteResponse, 'Не удалось загрузить Profile + Workplaces');
+  let remote = await loadRemoteProfile();
 
   if (remote?.verified) {
     hydrate(remote, true);
     return { source: 'server', verified: true };
   }
 
-  if (remote?.migrated || account?.user?.workspaceUnlocked) {
+  if (remote?.migrated) {
+    const repairResponse = await apiRequest('/manual-invitations/repair-profile', { method: 'POST' });
+    const repair = await responseJson(repairResponse, 'Не удалось проверить новый профиль');
+    if (repair?.verified) {
+      remote = await loadRemoteProfile();
+      if (remote?.verified) {
+        hydrate(remote, true);
+        return { source: repair?.repaired ? 'invitation-repair' : 'server', verified: true };
+      }
+    }
+    hydrate(remote, false);
+    return { source: 'server-awaiting-verification', verified: false };
+  }
+
+  if (account?.user?.workspaceUnlocked) {
     hydrate(remote, false);
     return { source: 'server-awaiting-verification', verified: false };
   }
