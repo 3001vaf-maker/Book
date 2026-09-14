@@ -1,14 +1,21 @@
 import { API_BASE } from './environment.js';
 
-const TOKEN_KEY = 'book.auth.token';
+const BOOK_TOKEN_KEY = 'book.auth.token';
+const ADMIN_TOKEN_KEY = 'book.admin.auth.token';
+const isAdminContext = typeof globalThis.location?.pathname === 'string'
+  && /\/admin(?:\/|$)/.test(globalThis.location.pathname);
+const TOKEN_KEY = isAdminContext ? ADMIN_TOKEN_KEY : BOOK_TOKEN_KEY;
+let memoryToken = '';
 
 export function getAuthToken() {
+  if (memoryToken) return memoryToken;
   return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY) || '';
 }
 
 export function setAuthToken(token, remember = false) {
   const value = String(token || '').trim();
-  localStorage.setItem(TOKEN_KEY, '');
+  memoryToken = value;
+  localStorage.removeItem(TOKEN_KEY);
   sessionStorage.removeItem(TOKEN_KEY);
   if (!value) return;
   const storage = remember ? localStorage : sessionStorage;
@@ -16,7 +23,8 @@ export function setAuthToken(token, remember = false) {
 }
 
 export function clearAuthToken() {
-  localStorage.setItem(TOKEN_KEY, '');
+  memoryToken = '';
+  localStorage.removeItem(TOKEN_KEY);
   sessionStorage.removeItem(TOKEN_KEY);
 }
 
