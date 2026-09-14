@@ -1,6 +1,6 @@
+import { setAuthToken } from '../core/auth.js';
 import { API_BASE } from '../core/environment.js';
 
-const TOKEN_KEY = 'book.auth.token';
 const state = document.querySelector('#invite-state');
 const token = new URLSearchParams(location.search).get('token') || '';
 
@@ -67,7 +67,7 @@ function renderForm(invitation) {
     button.textContent = 'Создаём Book…';
     try {
       const account = await post('/master-invitations/accept', { token, password });
-      sessionStorage.setItem(TOKEN_KEY, account.accessToken);
+      setAuthToken(account.accessToken);
       state.innerHTML = '<h1>Book создан</h1><p class="invite-success">Открываем ваше рабочее пространство…</p>';
       window.setTimeout(() => location.replace('../'), 350);
     } catch (acceptError) {
