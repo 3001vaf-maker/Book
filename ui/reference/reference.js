@@ -164,6 +164,7 @@ function formScreen() {
       ${textareaField({ label: 'Textarea', name: 'referenceTextarea', placeholder: 'Несколько строк текста' })}
       ${button('Основное действие')}
       ${button('Вторичное действие', { variant: 'outline' })}
+      ${button('Вторичное действие', { variant: 'secondary' })}
     </div>`,
   };
 }
