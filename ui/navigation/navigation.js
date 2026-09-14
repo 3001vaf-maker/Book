@@ -9,7 +9,7 @@ const defaultItems = [
 export function navigationBar(items = [], active = '', { className = '', aria = 'Основная навигация', dataAttribute = 'data-nav' } = {}) {
   const values = (Array.isArray(items) ? items : []).filter((item) => item && item.id);
   const classes = ['bottom-nav', className].filter(Boolean).join(' ');
-  return `<nav class="${classes}" aria-label="${aria}">${values.map((item) => {
+  return `<nav class="${classes}" aria-label="${aria}" style="--nav-count:${Math.max(values.length, 1)}">${values.map((item) => {
     const id = String(item.id || '');
     const label = String(item.label || id);
     const icon = String(item.icon || '');
@@ -17,6 +17,8 @@ export function navigationBar(items = [], active = '', { className = '', aria = 
   }).join('')}</nav>`;
 }
 
-export function bottomNavigation(active) {
-  return navigationBar(defaultItems, active);
+export function bottomNavigation(active, allowedIds = null) {
+  const allowed = Array.isArray(allowedIds) ? new Set(allowedIds) : null;
+  const items = allowed ? defaultItems.filter((item) => allowed.has(item.id)) : defaultItems;
+  return navigationBar(items, active);
 }
