@@ -277,6 +277,17 @@ function renderLogin(message = '') {
   syncViewport();
 }
 
+window.addEventListener('book:access-updated', (event) => {
+  if (!workspaceReady || !event?.detail?.changed) return;
+  if (getBookAccess().status === 'SUSPENDED') {
+    renderSuspended();
+    return;
+  }
+  ensureServerBookingSync();
+  renderWorkspace();
+  history.replaceState({}, '', `#${state.activeSection}`);
+});
+
 window.addEventListener('hashchange', () => {
   if (!workspaceReady) return;
   const section = location.hash.slice(1);

@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { CapabilityValueType, TenantAccessStatus } from '@prisma/client';
+import { CapabilityAccessChangeType, CapabilityValueType, TenantAccessStatus } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma.service';
 import { SaasAccessService } from '../saas-access/saas-access.service';
 import { MasterInvitationService } from '../master-invitation/master-invitation.service';
@@ -8,9 +9,15 @@ type ValidatedCapabilityUpdate = {
   key: string;
   capabilityId: string;
   valueType: CapabilityValueType;
+  defaultEnabled: boolean;
   inherit: boolean;
   enabled: boolean | null;
   limit: number | null;
+};
+
+type CapabilityStateChange = {
+  capabilityId: string;
+  changeType: CapabilityAccessChangeType;
 };
 
 @Injectable()
@@ -115,6 +122,7 @@ export class SaasAdminService {
           key,
           capabilityId: capability.id,
           valueType: capability.valueType,
+          defaultEnabled: capability.defaultEnabled,
           inherit: true,
           enabled: null,
           limit: null,
@@ -128,6 +136,7 @@ export class SaasAdminService {
           key,
           capabilityId: capability.id,
           valueType: capability.valueType,
+          defaultEnabled: capability.defaultEnabled,
           inherit: false,
           enabled: value.enabled,
           limit: null,
@@ -143,6 +152,7 @@ export class SaasAdminService {
         key,
         capabilityId: capability.id,
         valueType: capability.valueType,
+        defaultEnabled: capability.defaultEnabled,
         inherit: false,
         enabled: null,
         limit,
@@ -150,6 +160,48 @@ export class SaasAdminService {
     }
 
     return updates;
+  }
+
+  private async inheritedBooleanValue(tenantId: string, update: ValidatedCapabilityUpdate) {
+    const access = await this.prisma.tenantAccess.findUnique({
+      where: { tenantId },
+      include: {
+        plan: {
+          include: {
+            capabilityValues: {
+              where: { capabilityId: update.capabilityId },
+              take: 1,
+            },
+          },
+        },
+      },
+    });
+    if (!access) return true;
+    if (access.isOwnerBook && !access.plan) return true;
+    const planValue = access.plan?.capabilityValues[0];
+    if (planValue && planValue.enabled !== null) return planValue.enabled;
+    return update.defaultEnabled;
+  }
+
+  private async capabilityStateChanges(tenantId: string, updates: ValidatedCapabilityUpdate[]) {
+    const before = await this.access.resolveTenantAccess(tenantId);
+    const beforeMap = new Map(before.capabilities.map((item) => [item.key, item]));
+    const changes: CapabilityStateChange[] = [];
+
+    for (const update of updates) {
+      if (update.valueType !== CapabilityValueType.BOOLEAN) continue;
+      const previous = beforeMap.get(update.key)?.enabled;
+      const next = update.inherit
+        ? await this.inheritedBooleanValue(tenantId, update)
+        : update.enabled;
+      if (typeof next !== 'boolean' || previous === next) continue;
+      changes.push({
+        capabilityId: update.capabilityId,
+        changeType: next ? CapabilityAccessChangeType.ENABLED : CapabilityAccessChangeType.DISABLED,
+      });
+    }
+
+    return changes;
   }
 
   async updateTenantAccess(tenantId: string, input: {
@@ -170,6 +222,9 @@ export class SaasAdminService {
 
     const rawValues = Array.isArray(input?.capabilities) ? input.capabilities : [];
     const updates = await this.validateCapabilityUpdates(rawValues);
+    const stateChanges = await this.capabilityStateChanges(tenantId, updates);
+    const batchId = stateChanges.length ? randomUUID() : '';
+    const changedAt = new Date();
 
     await this.prisma.$transaction(async (tx) => {
       if (nextStatus) {
@@ -198,6 +253,32 @@ export class SaasAdminService {
           update: {
             enabled: update.valueType === CapabilityValueType.BOOLEAN ? update.enabled : null,
             limit: update.valueType === CapabilityValueType.LIMIT ? update.limit : null,
+          },
+        });
+      }
+
+      for (const change of stateChanges) {
+        await tx.capabilityAccessEvent.updateMany({
+          where: {
+            tenantId,
+            capabilityId: change.capabilityId,
+            cancelledAt: null,
+            OR: [
+              { summaryAcknowledgedAt: null },
+              {
+                changeType: CapabilityAccessChangeType.ENABLED,
+                detailAcknowledgedAt: null,
+              },
+            ],
+          },
+          data: { cancelledAt: changedAt },
+        });
+        await tx.capabilityAccessEvent.create({
+          data: {
+            tenantId,
+            capabilityId: change.capabilityId,
+            batchId,
+            changeType: change.changeType,
           },
         });
       }
