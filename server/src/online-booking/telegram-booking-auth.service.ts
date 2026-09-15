@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { CommunicationService } from '../communication/communication.service';
 import { ConsentPolicyService } from '../document-state/consent-policy.service';
 import { PrismaService } from '../prisma.service';
@@ -33,7 +33,7 @@ function canonicalPhone(value: unknown) {
 }
 
 function tokenHash(value: string) {
-  return require('node:crypto').createHash('sha256').update(value).digest('hex');
+  return createHash('sha256').update(value).digest('hex');
 }
 
 @Injectable()
@@ -139,8 +139,8 @@ export class TelegramBookingAuthService {
       return this.session(tenantId, alreadyLinked);
     }
 
-    // A Telegram-created account is passwordless. A high-entropy internal credential only
-    // satisfies the legacy non-null database column; it is never shown to or requested from the client.
+    // Telegram is the verified login method. This private high-entropy value only satisfies
+    // the legacy non-null password column and is never shown to or requested from the client.
     const internalCredential = randomBytes(48).toString('base64url');
     const created = await this.booking.registerAccount(tenantId, {
       ...body,
