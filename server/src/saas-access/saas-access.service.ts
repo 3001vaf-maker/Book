@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { CapabilityValueType, TenantAccessStatus } from '@prisma/client';
+import { CapabilityAccessChangeType, CapabilityValueType, TenantAccessStatus } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 
 type ResolutionSource = 'TENANT_OVERRIDE' | 'PLAN' | 'DEFAULT' | 'LEGACY_COMPAT' | 'SUSPENDED';
@@ -238,6 +238,99 @@ export class SaasAccessService {
       plan: access.plan ? { id: access.plan.id, key: access.plan.key, name: access.plan.name } : null,
       capabilities: resolved,
     };
+  }
+
+  async pendingCapabilityChanges(tenantId: string) {
+    const events = await this.prisma.capabilityAccessEvent.findMany({
+      where: {
+        tenantId,
+        cancelledAt: null,
+        OR: [
+          { summaryAcknowledgedAt: null },
+          {
+            changeType: CapabilityAccessChangeType.ENABLED,
+            detailAcknowledgedAt: null,
+          },
+        ],
+      },
+      include: {
+        capability: {
+          select: { key: true },
+        },
+      },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+
+    const summaryMap = new Map<string, {
+      batchId: string;
+      createdAt: Date;
+      changes: Array<{ eventId: string; key: string; changeType: CapabilityAccessChangeType }>;
+    }>();
+
+    for (const event of events) {
+      if (event.summaryAcknowledgedAt) continue;
+      const current = summaryMap.get(event.batchId) || {
+        batchId: event.batchId,
+        createdAt: event.createdAt,
+        changes: [],
+      };
+      current.changes.push({
+        eventId: event.id,
+        key: event.capability.key,
+        changeType: event.changeType,
+      });
+      summaryMap.set(event.batchId, current);
+    }
+
+    const summaries = [...summaryMap.values()].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    const introductions = events
+      .filter((event) => (
+        event.changeType === CapabilityAccessChangeType.ENABLED
+        && event.summaryAcknowledgedAt !== null
+        && event.detailAcknowledgedAt === null
+      ))
+      .map((event) => ({
+        eventId: event.id,
+        batchId: event.batchId,
+        key: event.capability.key,
+        createdAt: event.createdAt,
+      }));
+
+    return { summaries, introductions };
+  }
+
+  async acknowledgeCapabilitySummary(tenantId: string, batchId: string) {
+    const id = String(batchId || '').trim();
+    if (!id) throw new NotFoundException('Изменение доступа не найдено');
+    const result = await this.prisma.capabilityAccessEvent.updateMany({
+      where: {
+        tenantId,
+        batchId: id,
+        cancelledAt: null,
+        summaryAcknowledgedAt: null,
+      },
+      data: { summaryAcknowledgedAt: new Date() },
+    });
+    if (!result.count) throw new NotFoundException('Изменение доступа не найдено');
+    return this.pendingCapabilityChanges(tenantId);
+  }
+
+  async acknowledgeCapabilityIntroduction(tenantId: string, eventId: string) {
+    const id = String(eventId || '').trim();
+    if (!id) throw new NotFoundException('Знакомство с возможностью не найдено');
+    const result = await this.prisma.capabilityAccessEvent.updateMany({
+      where: {
+        id,
+        tenantId,
+        cancelledAt: null,
+        changeType: CapabilityAccessChangeType.ENABLED,
+        summaryAcknowledgedAt: { not: null },
+        detailAcknowledgedAt: null,
+      },
+      data: { detailAcknowledgedAt: new Date() },
+    });
+    if (!result.count) throw new NotFoundException('Знакомство с возможностью не найдено');
+    return this.pendingCapabilityChanges(tenantId);
   }
 
   private legacyCompatibilityValue(key: string, valueType: CapabilityValueType): ResolvedCapability {
