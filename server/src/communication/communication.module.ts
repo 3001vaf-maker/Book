@@ -11,12 +11,13 @@ import { CommunicationController } from './communication.controller';
 import { CommunicationDispatchService } from './communication-dispatch.service';
 import { CommunicationHistoryService } from './communication-history.service';
 import { CommunicationService } from './communication.service';
+import { InAppProfilePushService } from './in-app-profile-push.service';
 import { TelegramBotService } from './telegram-bot.service';
 
 @Module({
   imports: [AuthModule, BusinessStateModule, DocumentStateModule, NotificationModule],
   controllers: [CommunicationController],
-  providers: [ClientProfileThreadService, CommunicationService, CommunicationHistoryService, CommunicationChannelResolverService, CommunicationDispatchService, CommunicationBroadcastService, TelegramBotService, PrismaService],
-  exports: [ClientProfileThreadService, CommunicationService, CommunicationHistoryService, CommunicationChannelResolverService, CommunicationDispatchService, CommunicationBroadcastService, TelegramBotService],
+  providers: [ClientProfileThreadService, InAppProfilePushService, CommunicationService, CommunicationHistoryService, CommunicationChannelResolverService, CommunicationDispatchService, CommunicationBroadcastService, TelegramBotService, PrismaService],
+  exports: [ClientProfileThreadService, InAppProfilePushService, CommunicationService, CommunicationHistoryService, CommunicationChannelResolverService, CommunicationDispatchService, CommunicationBroadcastService, TelegramBotService],
 })
 export class CommunicationModule {}
