@@ -4,6 +4,14 @@ import { PrismaService } from '../prisma.service';
 
 type JsonObject = Record<string, any>;
 
+type ProfileState = {
+  people: JsonObject[];
+  peopleByKey: Map<string, JsonObject>;
+  accountToPersonKey: Map<string, string>;
+  relations: JsonObject;
+  entities: JsonObject;
+};
+
 function text(value: unknown) { return String(value ?? '').trim(); }
 function objectValue(value: unknown): JsonObject {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonObject : {};
@@ -42,15 +50,27 @@ export class ClientProfileThreadService {
     private readonly prisma: PrismaService,
   ) {}
 
-  private async state(tenantId: string) {
+  private async state(tenantId: string): Promise<ProfileState> {
     const business = await this.businessState.get(tenantId);
     const people = (Array.isArray(business.people) ? business.people : []).map((value) => objectValue(value));
-    const relations = objectValue(business.uei?.relations);
-    const entities = objectValue(business.uei?.entities);
-    return { people, relations, entities };
+    const peopleByKey = new Map<string, JsonObject>();
+    const accountToPersonKey = new Map<string, string>();
+    for (const person of people) {
+      const key = text(person.key);
+      if (!key) continue;
+      peopleByKey.set(key, person);
+      for (const accountId of accountIds(person)) if (!accountToPersonKey.has(accountId)) accountToPersonKey.set(accountId, key);
+    }
+    return {
+      people,
+      peopleByKey,
+      accountToPersonKey,
+      relations: objectValue(business.uei?.relations),
+      entities: objectValue(business.uei?.entities),
+    };
   }
 
-  private build(state: Awaited<ReturnType<ClientProfileThreadService['state']>>, source: JsonObject): ClientProfileThread {
+  private build(state: ProfileState, source: JsonObject): ClientProfileThread {
     const sourceKey = text(source.key);
     if (!sourceKey) throw new NotFoundException('Профиль клиента не найден');
     const uei = text(state.relations[`person:${sourceKey}`]);
@@ -60,20 +80,20 @@ export class ClientProfileThreadService {
           .map((value) => text(value))
           .filter((value) => value.startsWith('person:'))
           .map((value) => value.slice(7))
+          .filter((key) => state.peopleByKey.has(key))
       : [];
     const memberKeys = [...new Set([sourceKey, ...relationMembers])];
-    const members = state.people.filter((person) => memberKeys.includes(text(person.key)));
     const owner = objectValue(entity.owner);
     const ownerKey = owner.type === 'person' ? text(owner.id) : '';
-    const profile = members.find((person) => text(person.key) === ownerKey) || source;
-    const profileKey = text(profile.key) || sourceKey;
+    const profileKey = ownerKey && memberKeys.includes(ownerKey) ? ownerKey : sourceKey;
+    const profile = state.peopleByKey.get(profileKey) || source;
     const profileUei = text(state.relations[`person:${profileKey}`]) || uei;
-    const allAccountIds = [...new Set(members.flatMap((person) => accountIds(person)))];
+    const allAccountIds = [...new Set(memberKeys.flatMap((key) => accountIds(state.peopleByKey.get(key) || {})))];
     return {
       profileKey,
       profileName: personName(profile),
       profileUei,
-      memberKeys: members.length ? members.map((person) => text(person.key)).filter(Boolean) : [sourceKey],
+      memberKeys,
       accountIds: allAccountIds,
       sourcePersonKey: sourceKey,
       sourceName: personName(source),
@@ -85,7 +105,8 @@ export class ClientProfileThreadService {
     const accountId = text(accountIdValue);
     if (!accountId) throw new BadRequestException('Не указан клиентский аккаунт');
     const state = await this.state(tenantId);
-    const source = state.people.find((person) => accountIds(person).includes(accountId));
+    const sourceKey = state.accountToPersonKey.get(accountId) || '';
+    const source = sourceKey ? state.peopleByKey.get(sourceKey) : null;
     if (!source) throw new NotFoundException('Профиль клиентского аккаунта не найден');
     const profile = this.build(state, source);
     if (!profile.accountIds.includes(accountId)) profile.accountIds.push(accountId);
@@ -96,7 +117,7 @@ export class ClientProfileThreadService {
     const profileKey = text(profileKeyValue);
     if (!profileKey) throw new BadRequestException('Не указан профиль клиента');
     const state = await this.state(tenantId);
-    const source = state.people.find((person) => text(person.key) === profileKey);
+    const source = state.peopleByKey.get(profileKey);
     if (!source) throw new NotFoundException('Профиль клиента не найден');
     return this.build(state, source);
   }
@@ -109,9 +130,21 @@ export class ClientProfileThreadService {
     if (phone) source = state.people.find((person) => personHasPhone(person, phone)) || null;
     if (!source && uei) {
       const member = Object.entries(state.relations).find(([key, value]) => key.startsWith('person:') && text(value) === uei);
-      if (member) source = state.people.find((person) => text(person.key) === member[0].slice(7)) || null;
+      if (member) source = state.peopleByKey.get(member[0].slice(7)) || null;
     }
     return source ? this.build(state, source) : null;
+  }
+
+  async canonicalizeProfileKeys(tenantId: string, storedKeys: unknown[]) {
+    const state = await this.state(tenantId);
+    const result = new Map<string, ClientProfileThread>();
+    for (const rawKey of storedKeys) {
+      const key = text(rawKey);
+      if (!key || result.has(key)) continue;
+      const source = state.peopleByKey.get(key);
+      if (source) result.set(key, this.build(state, source));
+    }
+    return result;
   }
 
   async accountsForProfile(tenantId: string, profileKeyValue: unknown) {
