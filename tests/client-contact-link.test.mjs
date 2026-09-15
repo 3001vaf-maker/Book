@@ -42,6 +42,7 @@ assert.match(clientData, /uei: getUEI\('person', person\.key\) \|\| ''/);
 assert.match(clientData, /contactViaUei:/);
 assert.match(clientUi, /label:'Связь через'/);
 assert.match(clientUi, /label:option\.value/);
+assert.doesNotMatch(clientUi, /linkValue&&!hasContact/);
 assert.match(clientCreate, /phoneField\(\{ label: 'Телефон', name: 'phone'/);
 assert.doesNotMatch(clientCreate, /phoneField\(\{[^}]*required:\s*true/);
 
