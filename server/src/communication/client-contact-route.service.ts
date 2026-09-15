@@ -66,4 +66,24 @@ export class ClientContactRouteService {
     const route = await this.resolveByProfileKey(tenantId, profileKey);
     return this.profiles.accountsForProfile(tenantId, route.delivery.profileKey);
   }
+
+  async accessibleProfilesForAccount(tenantId: string, accountIdValue: unknown) {
+    const accountId = text(accountIdValue);
+    const own = await this.profiles.byAccount(tenantId, accountId);
+    const business = await this.businessState.get(tenantId);
+    const keys = (Array.isArray(business.people) ? business.people : [])
+      .map((value) => text(objectValue(value).key))
+      .filter(Boolean);
+    const canonical = await this.profiles.canonicalizeProfileKeys(tenantId, keys);
+    const candidates = new Map<string, ClientProfileThread>();
+    candidates.set(own.profileKey, own);
+    for (const profile of canonical.values()) candidates.set(profile.profileKey, profile);
+
+    const accessible = new Map<string, ClientProfileThread>();
+    for (const source of candidates.values()) {
+      const route = await this.resolve(tenantId, source);
+      if (route.delivery.profileKey === own.profileKey) accessible.set(source.profileKey, source);
+    }
+    return [...accessible.values()];
+  }
 }
