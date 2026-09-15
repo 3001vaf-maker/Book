@@ -52,7 +52,10 @@ assert.match(cardLink, /validateNewAccountContacts/);
 assert.match(cardLink, /validateAccountContactUpdate/);
 assert.match(bookingController, /validateNewAccountContacts/);
 assert.match(bookingController, /validateAccountContactUpdate/);
-assert.match(booking, /if \(!\/\^\\\\\+\\d\{8,15\}\$\/\.test\(phone\)\)/, 'Client self-registration must keep phone mandatory');
+assert.ok(
+  booking.includes("if (!/^\\+\\d{8,15}$/.test(phone)) throw new BadRequestException('Введите телефон полностью')"),
+  'Client self-registration must keep phone mandatory',
+);
 
 assert.match(route, /contactViaUei/);
 assert.match(route, /accessibleProfilesForAccount/);
