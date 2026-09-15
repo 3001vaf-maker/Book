@@ -1,82 +1,89 @@
 let consentState = [];
-let persistConsents = null;
 
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
 }
 
+function contactPointType(value) {
+  const type = String(value || '').trim().toUpperCase();
+  if (type === 'SMS' || type === 'WHATSAPP') return 'PHONE';
+  return ['PHONE', 'EMAIL', 'TELEGRAM'].includes(type) ? type : '';
+}
+
+function contactPointValue(typeValue, value) {
+  const type = contactPointType(typeValue);
+  const raw = String(value || '').trim();
+  if (type === 'PHONE') {
+    const digits = raw.replace(/\D/g, '');
+    if (digits.length === 10) return `7${digits}`;
+    if (digits.length === 11 && digits.startsWith('8')) return `7${digits.slice(1)}`;
+    return digits;
+  }
+  if (type === 'EMAIL') return raw.toLowerCase();
+  return raw;
+}
+
 function normalize(item = {}) {
+  const subjectType = String(item.subjectType || '').trim().toUpperCase();
+  const contactType = contactPointType(item.contactType);
+  const contactValue = contactPointValue(contactType, item.contactValue);
   return {
-    id: String(item.id || crypto.randomUUID()),
-    clientId: String(item.clientId || ''),
-    documentId: String(item.documentId || ''),
-    documentVersion: Number(item.documentVersion || 1),
+    id: String(item.id || ''),
+    subjectType,
+    subjectKey: String(item.subjectKey || '').trim(),
+    contactType,
+    contactValue,
+    documentId: String(item.documentId || '').trim(),
+    documentVersion: Math.max(1, Number(item.documentVersion || 1)),
     status: item.status === 'revoked' ? 'revoked' : item.status === 'declined' ? 'declined' : 'accepted',
     acceptedAt: String(item.acceptedAt || ''),
     revokedAt: String(item.revokedAt || ''),
-    source: String(item.source || 'manual'),
-    createdAt: String(item.createdAt || new Date().toISOString()),
+    source: String(item.source || ''),
+    eventAt: String(item.eventAt || item.revokedAt || item.acceptedAt || item.createdAt || ''),
+    createdAt: String(item.createdAt || item.eventAt || ''),
+    migratedFromEventId: String(item.migratedFromEventId || ''),
   };
 }
 
-function read() {
-  return clone(consentState);
+function validSubject(item) {
+  return item.documentId
+    && ((item.subjectType === 'BOOKING_ACCOUNT' && item.subjectKey)
+      || (item.subjectType === 'CONTACT_POINT' && item.subjectKey && item.contactType && item.contactValue));
 }
 
-function writeItems(items) {
-  consentState = (Array.isArray(items) ? items : []).map(normalize).filter((item) => item.clientId && item.documentId);
-  if (typeof persistConsents === 'function') void persistConsents(clone(consentState));
-  return clone(consentState);
-}
-
-export function configureConsentPersistence(handler = null) {
-  persistConsents = typeof handler === 'function' ? handler : null;
+function newest(items) {
+  return [...items].sort((a, b) => {
+    const at = Date.parse(a.eventAt || a.createdAt || 0) || 0;
+    const bt = Date.parse(b.eventAt || b.createdAt || 0) || 0;
+    return bt - at;
+  })[0] || null;
 }
 
 export function hydrateConsentsFromServer(items = []) {
-  consentState = (Array.isArray(items) ? items : []).map(normalize).filter((item) => item.clientId && item.documentId);
+  consentState = (Array.isArray(items) ? items : []).map(normalize).filter(validSubject);
   return getConsents();
 }
 
-export function migrateLegacyConsents(clients = []) {
-  const existing = read();
-  const keys = new Set(existing.map((item) => `${item.clientId}:${item.documentId}`));
-  const next = [...existing];
-
-  for (const client of Array.isArray(clients) ? clients : []) {
-    if (client.agreements?.personalData && !keys.has(`${client.key}:pdn-consent`)) {
-      next.push(normalize({ clientId: client.key, documentId: 'pdn-consent', status: 'accepted', source: 'legacy', acceptedAt: '' }));
-      keys.add(`${client.key}:pdn-consent`);
-    }
-    if (client.agreements?.mailings && !keys.has(`${client.key}:messages-consent`)) {
-      next.push(normalize({ clientId: client.key, documentId: 'messages-consent', status: 'accepted', source: 'legacy', acceptedAt: '' }));
-      keys.add(`${client.key}:messages-consent`);
-    }
-  }
-
-  if (next.length !== existing.length) writeItems(next);
-}
-
 export function getConsents() {
-  return read();
+  return clone(consentState);
 }
 
-export function getClientConsents(clientId) {
-  const id = String(clientId || '');
-  return getConsents().filter((item) => item.clientId === id);
+export function getLatestAccountConsent(accountId, documentId) {
+  const subjectKey = String(accountId || '').trim();
+  const targetDocument = String(documentId || '').trim();
+  if (!subjectKey || !targetDocument) return null;
+  return newest(consentState.filter((item) => item.subjectType === 'BOOKING_ACCOUNT'
+    && item.subjectKey === subjectKey
+    && item.documentId === targetDocument));
 }
 
-export function getLatestClientConsent(clientId, documentId) {
-  const matches = getClientConsents(clientId)
-    .filter((item) => item.documentId === String(documentId || ''))
-    .sort((a, b) => Date.parse(b.createdAt || 0) - Date.parse(a.createdAt || 0));
-  return matches[0] || null;
-}
-
-export function recordConsent({ clientId, documentId, documentVersion = 1, status = 'accepted', source = 'manual', acceptedAt = new Date().toISOString(), revokedAt = '' } = {}) {
-  const item = normalize({ clientId, documentId, documentVersion, status, source, acceptedAt, revokedAt, createdAt: new Date().toISOString() });
-  const items = getConsents();
-  items.push(item);
-  writeItems(items);
-  return item;
+export function getLatestContactConsent(typeValue, value, documentId = 'messages-consent') {
+  const type = contactPointType(typeValue);
+  const normalizedValue = contactPointValue(type, value);
+  const targetDocument = String(documentId || '').trim();
+  if (!type || !normalizedValue || !targetDocument) return null;
+  return newest(consentState.filter((item) => item.subjectType === 'CONTACT_POINT'
+    && item.contactType === type
+    && item.contactValue === normalizedValue
+    && item.documentId === targetDocument));
 }
