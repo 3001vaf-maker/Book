@@ -1,6 +1,7 @@
 import { button } from '../buttons/index.js';
 import { navigationBar } from '../navigation/navigation.js';
 import { escapeHtml } from '../utils/escape-html.js';
+import { bindRichTextEditor, normalizeRichText, renderRichText, richTextEditorMarkup, richTextPlainText } from './rich-text.js';
 
 const CLIENT_NAV_ITEMS = [
   { id: 'profile', label: 'Профиль', icon: '◉' },
@@ -119,15 +120,19 @@ function attachmentMarkup(attachment = {}) {
   return '';
 }
 
-export function messageBubble(message = {}, { viewer = 'client' } = {}) {
+export function messageBubble(message = {}, { viewer = 'client', actions = false } = {}) {
   const direction = String(message.direction || '').toLowerCase();
   const system = direction === 'system' || String(message.kind || '').toLowerCase() === 'system';
   const outgoing = viewer === 'master' ? direction === 'outbound' : direction === 'inbound';
-  const classes = ['message-bubble', system ? 'message-bubble--system' : outgoing ? 'message-bubble--outgoing' : 'message-bubble--incoming'].join(' ');
+  const deleted = Boolean(message.deletedAt);
+  const classes = ['message-bubble', system ? 'message-bubble--system' : outgoing ? 'message-bubble--outgoing' : 'message-bubble--incoming', deleted ? 'message-bubble--deleted' : ''].filter(Boolean).join(' ');
   const time = message.time || message.createdAt || '';
-  const attachments = (Array.isArray(message.attachments) ? message.attachments : []).map(attachmentMarkup).filter(Boolean).join('');
-  const body = text(message.body || '').replaceAll('\n', '<br>');
-  return `<div class="${classes}" data-message-id="${text(message.id || '')}">${attachments ? `<div class="message-bubble__attachments">${attachments}</div>` : ''}${body ? `<div class="message-bubble__body">${body}</div>` : ''}${time ? `<span class="message-bubble__time">${text(time)}</span>` : ''}</div>`;
+  const attachments = deleted ? '' : (Array.isArray(message.attachments) ? message.attachments : []).map(attachmentMarkup).filter(Boolean).join('');
+  const richBody = deleted ? '<em>Сообщение удалено</em>' : renderRichText(message.content, message.body || '');
+  const meta = [message.editedAt && !deleted ? 'изменено' : '', time].filter(Boolean).join(' · ');
+  const canAct = actions && outgoing && !system && !deleted && String(message.channel || '').toUpperCase() === 'IN_APP';
+  const action = canAct ? `<button type="button" class="message-bubble__actions" data-message-actions="${text(message.id || '')}" aria-label="Действия с сообщением">•••</button>` : '';
+  return `<div class="${classes}" data-message-id="${text(message.id || '')}">${action}${attachments ? `<div class="message-bubble__attachments">${attachments}</div>` : ''}${richBody ? `<div class="message-bubble__body message-rich">${richBody}</div>` : ''}${meta ? `<span class="message-bubble__time">${text(meta)}</span>` : ''}</div>`;
 }
 
 export function messageThread(messages = [], options = {}) {
@@ -135,9 +140,17 @@ export function messageThread(messages = [], options = {}) {
   return `<div class="message-thread" data-message-thread>${values.map((message) => messageBubble(message, options)).join('')}</div>`;
 }
 
-export function messageComposer({ placeholder = 'Написать сообщение...', data = 'data-message-composer', sendData = 'data-message-send', attachments = false } = {}) {
-  const composerClass = attachments ? 'message-composer message-composer--with-attachments' : 'message-composer message-composer--plain';
-  return `<form class="${composerClass}" ${data}>${attachments ? `<input class="sr-only" type="file" accept="image/*,video/*" multiple data-message-attachment-input><button type="button" class="message-composer__attach" data-message-attachment aria-label="Прикрепить фото или медиа">📎</button>` : ''}<textarea class="message-composer__input" name="message" rows="1" placeholder="${text(placeholder)}" aria-label="${text(placeholder)}"></textarea>${button('➤', { className: 'message-composer__send', type: 'submit', data: sendData, aria: 'Отправить' })}${attachments ? '<div class="message-composer__attachments" data-message-attachment-preview></div>' : ''}</form>`;
+export function messageComposer({ placeholder = 'Написать сообщение...', data = 'data-message-composer', sendData = 'data-message-send', attachments = false, rich = true, embedded = false, value = null } = {}) {
+  const composerClass = [
+    'message-composer',
+    attachments ? 'message-composer--with-attachments' : 'message-composer--plain',
+    rich ? 'message-composer--rich' : '',
+    embedded ? 'message-composer--embedded' : '',
+  ].filter(Boolean).join(' ');
+  const input = rich
+    ? richTextEditorMarkup({ placeholder, value })
+    : `<textarea class="message-composer__input" name="message" rows="1" placeholder="${text(placeholder)}" aria-label="${text(placeholder)}"></textarea>`;
+  return `<form class="${composerClass}" ${data}>${attachments ? `<input class="sr-only" type="file" accept="image/*,video/*" multiple data-message-attachment-input><button type="button" class="message-composer__attach" data-message-attachment aria-label="Прикрепить фото или медиа">📎</button>` : ''}${input}${button('➤', { className: 'message-composer__send', type: 'submit', data: sendData, aria: 'Отправить' })}${attachments ? '<div class="message-composer__attachments" data-message-attachment-preview></div>' : ''}</form>`;
 }
 
 export function settingToggle({ label = '', checked = false, data = '', disabled = false } = {}) {
@@ -167,3 +180,5 @@ export function readOnlyReceipt({
     ${action ? `<div class="read-only-sheet__action">${button(text(action.label || ''), { data: action.data || '', aria: action.aria || action.label || '' })}</div>` : ''}
   </section>`;
 }
+
+export { bindRichTextEditor, normalizeRichText, richTextPlainText };
