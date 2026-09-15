@@ -18,6 +18,7 @@ jobs:
       - name: Probe production API health
         run: |
           set -euo pipefail
+          echo 'probe_attempt=3'
           curl --fail --silent --show-error --location --max-time 30 https://book-api-volokovykh.amvera.io/health | tee /tmp/health.json
           grep -q '"status":"ok"' /tmp/health.json
           grep -q '"bookingAutonomy":"server"' /tmp/health.json
