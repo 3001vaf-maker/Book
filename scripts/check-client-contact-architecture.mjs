@@ -12,12 +12,16 @@ const controller = read('server/src/business-state/business-state.controller.ts'
 const cardLink = read('server/src/online-booking/client-card-link.service.ts');
 const booking = read('server/src/online-booking/online-booking.service.ts');
 const bookingController = read('server/src/online-booking/online-booking.controller.ts');
+const profileThread = read('server/src/communication/client-profile-thread.service.ts');
 const route = read('server/src/communication/client-contact-route.service.ts');
 const resolver = read('server/src/communication/communication-channel-resolver.service.ts');
 const broadcast = read('server/src/communication/communication-broadcast.service.ts');
 
-if (!clientData.includes('assertNoNewClientContactConflicts(peopleState, normalized)')) {
+if (!clientData.includes('assertNoNewClientContactConflicts(peopleState, validationPeople)')) {
   failures.push('Client state must reject newly introduced duplicate Contact Points.');
+}
+if (!clientData.includes("uei: getUEI('person', person.key) || ''")) {
+  failures.push('Duplicate Contact Point errors must retain the master UEI code for the existing client.');
 }
 if (!clientData.includes('contactViaUei')) {
   failures.push('Client Person data must retain the contact-via relation.');
@@ -28,7 +32,7 @@ if (!clientUi.includes("label:'Связь через'") || !clientUi.includes('l
 if (!rules.includes('validatePersonUpsert') || !controller.includes('validatePersonUpsert')) {
   failures.push('Server must enforce Contact Point uniqueness independently of the UI.');
 }
-if (!cardLink.includes('assertUnambiguousPhone')) {
+if (!cardLink.includes('assertUnambiguousPhone') || !profileThread.includes('canonicalKeys.size > 1')) {
   failures.push('Legacy duplicate phones must never silently choose the first Person.');
 }
 if (!cardLink.includes('validateNewAccountContacts') || !bookingController.includes('validateNewAccountContacts')) {
