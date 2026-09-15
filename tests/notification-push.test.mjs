@@ -7,6 +7,7 @@ const accountShell = fs.readFileSync('online-booking/account-shell.js', 'utf8');
 const notifications = fs.readFileSync('online-booking/notifications.js', 'utf8');
 const clientRuntime = fs.readFileSync('online-booking/client-runtime.js', 'utf8');
 const telegramEntryAuth = fs.readFileSync('core/telegram-entry-auth.js', 'utf8');
+const telegramRegistration = fs.readFileSync('telegram-registration-flow.js', 'utf8');
 const browserPush = fs.readFileSync('core/notifications/web-push.js', 'utf8');
 const serviceWorker = fs.readFileSync('service-worker.js', 'utf8');
 const notificationService = fs.readFileSync('server/src/notification/notification.service.ts', 'utf8');
@@ -18,7 +19,7 @@ assert.doesNotMatch(core, /params\.get\('tg'\)|params\.get\('telegram'\)/);
 assert.doesNotMatch(booking, /telegramId/);
 assert.match(clientRuntime, /window\.Telegram\?\.WebApp/);
 assert.match(telegramEntryAuth, /exchangeBookingTelegramEntry/);
-assert.match(telegramEntryAuth, /registerBookingTelegramAccount/);
+assert.match(telegramRegistration, /registerBookingTelegramAccount/);
 assert.doesNotMatch(clientRuntime, /mountBookingNotifications/);
 
 assert.match(accountShell, /getBookingNotifications/);
