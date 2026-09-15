@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { ConsentPolicyService } from '../document-state/consent-policy.service';
 import { PrismaService } from '../prisma.service';
+import { ClientContactRouteService } from './client-contact-route.service';
 import { ClientProfileThreadService } from './client-profile-thread.service';
 import { CommunicationService } from './communication.service';
 import { TelegramBotService } from './telegram-bot.service';
@@ -27,23 +28,39 @@ export class CommunicationChannelResolverService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly profiles: ClientProfileThreadService,
+    private readonly contactRoutes: ClientContactRouteService,
     private readonly communications: CommunicationService,
     private readonly consentPolicy: ConsentPolicyService,
     private readonly telegram: TelegramBotService,
   ) {}
 
-  async resolveInAppProfile(tenantId: string, input: { profileKey?: unknown; phone?: unknown; uei?: unknown }) {
+  private async sourceProfile(tenantId: string, input: { profileKey?: unknown; phone?: unknown; uei?: unknown }) {
     const profileKey = text(input?.profileKey);
     if (profileKey) return this.profiles.byProfileKey(tenantId, profileKey).catch(() => null);
     return this.profiles.byLegacy(tenantId, input || {}).catch(() => null);
   }
 
-  async resolveTelegramIdentity(tenantId: string, input: { phone?: unknown; uei?: unknown }) {
-    const direct = await this.communications.telegramIdentity(tenantId, input || {});
-    if (direct) return direct;
+  async resolveInAppProfile(tenantId: string, input: { profileKey?: unknown; phone?: unknown; uei?: unknown }) {
+    const source = await this.sourceProfile(tenantId, input || {});
+    if (!source) return null;
+    const route = await this.contactRoutes.resolve(tenantId, source);
+    return route.delivery;
+  }
 
-    const cardPhone = canonicalPhone(input?.phone);
-    const uei = text(input?.uei);
+  async resolveTelegramIdentity(tenantId: string, input: { profileKey?: unknown; phone?: unknown; uei?: unknown }) {
+    const source = await this.sourceProfile(tenantId, input || {});
+    const route = source ? await this.contactRoutes.resolve(tenantId, source) : null;
+    const routeUei = text(route?.delivery?.profileUei);
+    const requestedPhone = canonicalPhone(input?.phone);
+    const requestedUei = routeUei || text(input?.uei);
+
+    if (requestedPhone || requestedUei) {
+      const direct = await this.communications.telegramIdentity(tenantId, { phone: route?.via ? '' : requestedPhone, uei: requestedUei }).catch(() => null);
+      if (direct) return direct;
+    }
+
+    const cardPhone = route?.via ? '' : requestedPhone;
+    const uei = requestedUei;
     if (!cardPhone && !uei) return null;
 
     if (cardPhone) {
@@ -92,19 +109,22 @@ export class CommunicationChannelResolverService {
     return threadRows[0] || null;
   }
 
-  async sendTelegram(tenantId: string, input: { phone?: unknown; uei?: unknown; body?: unknown }) {
+  async sendTelegram(tenantId: string, input: { profileKey?: unknown; phone?: unknown; uei?: unknown; body?: unknown }) {
     const body = text(input?.body);
     if (!body) throw new BadRequestException('Пустое сообщение');
+    const subject = await this.sourceProfile(tenantId, input || {});
     const identity = await this.resolveTelegramIdentity(tenantId, input || {});
     if (!identity) throw new NotFoundException('Telegram у клиента не подключён');
     if (!(await this.consentPolicy.canSendMessages(tenantId, 'TELEGRAM', identity.externalUserId))) {
       throw new BadRequestException('Нет действующего согласия на этот Telegram Contact Point');
     }
-    const threadPhone = canonicalPhone(input?.phone) || canonicalPhone(identity.cardPhone);
-    const threadUei = text(input?.uei) || text(identity.uei);
+    const threadPhone = canonicalPhone(input?.phone);
+    const threadUei = text(subject?.profileUei) || text(input?.uei);
+    const threadProfileKey = text(subject?.profileKey) || text(input?.profileKey);
     try {
       const result = await this.telegram.sendMessage(tenantId, identity.externalUserId, body);
       return this.communications.recordMessage(tenantId, {
+        profileKey: threadProfileKey,
         bookingAccountId: identity.bookingAccountId,
         phone: threadPhone,
         uei: threadUei,
@@ -118,6 +138,7 @@ export class CommunicationChannelResolverService {
       });
     } catch (error) {
       await this.communications.recordMessage(tenantId, {
+        profileKey: threadProfileKey,
         bookingAccountId: identity.bookingAccountId,
         phone: threadPhone,
         uei: threadUei,

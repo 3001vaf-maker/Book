@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { BusinessStateService } from '../business-state/business-state.service';
 import { PrismaService } from '../prisma.service';
 
@@ -127,7 +127,14 @@ export class ClientProfileThreadService {
     const uei = text(input?.uei);
     const state = await this.state(tenantId);
     let source: JsonObject | null = null;
-    if (phone) source = state.people.find((person) => personHasPhone(person, phone)) || null;
+    if (phone) {
+      const matches = state.people.filter((person) => personHasPhone(person, phone));
+      if (matches.length) {
+        const canonicalKeys = new Set(matches.map((person) => this.build(state, person).profileKey));
+        if (canonicalKeys.size > 1) throw new ConflictException('Этот телефон относится к нескольким клиентам. Нужна явная связь мастера.');
+        source = matches[0];
+      }
+    }
     if (!source && uei) {
       const member = Object.entries(state.relations).find(([key, value]) => key.startsWith('person:') && text(value) === uei);
       if (member) source = state.peopleByKey.get(member[0].slice(7)) || null;

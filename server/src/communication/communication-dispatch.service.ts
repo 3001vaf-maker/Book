@@ -23,15 +23,15 @@ export class CommunicationDispatchService {
     return this.profiles.byLegacy(tenantId, input || {}).catch(() => null);
   }
 
-  private hasInAppAccess(profile: Awaited<ReturnType<ClientProfileThreadService['byProfileKey']>> | null) {
-    return Boolean(profile?.profileKey && Array.isArray(profile.accountIds) && profile.accountIds.length > 0);
+  private async inAppDeliveryProfile(tenantId: string, input: { profileKey?: unknown; phone?: unknown; uei?: unknown }) {
+    const delivery = await this.channels.resolveInAppProfile(tenantId, input || {});
+    return delivery?.profileKey && Array.isArray(delivery.accountIds) && delivery.accountIds.length > 0 ? delivery : null;
   }
 
   async resolveChannel(tenantId: string, input: { profileKey?: unknown; phone?: unknown; uei?: unknown; channel?: unknown }) {
     const requested = text(input?.channel).toUpperCase();
-    const profile = await this.resolveProfile(tenantId, input || {});
     if (requested === 'IN_APP') {
-      if (!this.hasInAppAccess(profile)) throw new NotFoundException('Внутренний чат клиента недоступен');
+      if (!(await this.inAppDeliveryProfile(tenantId, input || {}))) throw new NotFoundException('Внутренний чат клиента недоступен');
       return 'IN_APP';
     }
     if (requested === 'TELEGRAM') {
@@ -40,7 +40,7 @@ export class CommunicationDispatchService {
     }
     if (requested) throw new NotFoundException(`Канал ${requested} у клиента недоступен`);
 
-    if (this.hasInAppAccess(profile)) return 'IN_APP';
+    if (await this.inAppDeliveryProfile(tenantId, input || {})) return 'IN_APP';
 
     const available: string[] = [];
     if (await this.channels.resolveTelegramIdentity(tenantId, input || {})) available.push('TELEGRAM');
@@ -60,11 +60,12 @@ export class CommunicationDispatchService {
     const channel = await this.resolveChannel(tenantId, input || {});
     if (channel === 'IN_APP') {
       const profile = await this.resolveProfile(tenantId, input || {});
-      if (!this.hasInAppAccess(profile)) throw new NotFoundException('Внутренний чат клиента недоступен');
+      const delivery = await this.inAppDeliveryProfile(tenantId, input || {});
+      if (!profile || !delivery) throw new NotFoundException('Внутренний чат клиента недоступен');
       const message = await this.communications.recordMessage(tenantId, {
-        profileKey: profile!.profileKey,
+        profileKey: profile.profileKey,
         phone: input?.phone,
-        uei: profile!.profileUei || input?.uei,
+        uei: profile.profileUei || input?.uei,
         direction: 'outbound',
         kind: attachments.length ? 'media' : 'message',
         channel: 'IN_APP',
@@ -73,7 +74,7 @@ export class CommunicationDispatchService {
         attachments,
         status: 'delivered',
       });
-      await this.profilePush.notify(tenantId, profile!.profileKey, {
+      await this.profilePush.notify(tenantId, profile.profileKey, {
         type: 'chat.message',
         title: 'Новое сообщение',
         body: message.body || (attachments.length ? 'Новое сообщение с вложением' : 'Новое сообщение'),
@@ -82,7 +83,7 @@ export class CommunicationDispatchService {
       }).catch(() => null);
       return message;
     }
-    if (channel === 'TELEGRAM') return this.channels.sendTelegram(tenantId, { phone: input?.phone, uei: input?.uei, body });
+    if (channel === 'TELEGRAM') return this.channels.sendTelegram(tenantId, { profileKey: input?.profileKey, phone: input?.phone, uei: input?.uei, body });
     throw new BadRequestException('Канал пока не подключён к двустороннему Chat');
   }
 }
