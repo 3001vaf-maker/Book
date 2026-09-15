@@ -37,8 +37,14 @@ export class CommunicationController {
 
   @UseGuards(JwtAuthGuard)
   @Get('chat/thread')
-  chatThread(@Req() request: OwnerRequest, @Query('phone') phone = '', @Query('uei') uei = '', @Query('limit') limit = '300') {
-    return this.history.listThread(request.auth!.tenantId, { phone, uei }, Number(limit));
+  chatThread(
+    @Req() request: OwnerRequest,
+    @Query('profileKey') profileKey = '',
+    @Query('phone') phone = '',
+    @Query('uei') uei = '',
+    @Query('limit') limit = '300',
+  ) {
+    return this.history.listThread(request.auth!.tenantId, { profileKey, phone, uei }, Number(limit));
   }
 
   @UseGuards(JwtAuthGuard)
@@ -55,7 +61,7 @@ export class CommunicationController {
 
   @UseGuards(JwtAuthGuard)
   @Post('chat/messages')
-  sendChatMessage(@Req() request: OwnerRequest, @Body() body: { channel?: unknown; phone?: unknown; uei?: unknown; body?: unknown; content?: unknown; attachments?: unknown }) {
+  sendChatMessage(@Req() request: OwnerRequest, @Body() body: { profileKey?: unknown; channel?: unknown; phone?: unknown; uei?: unknown; body?: unknown; content?: unknown; attachments?: unknown }) {
     return this.dispatch.send(request.auth!.tenantId, body || {});
   }
 
