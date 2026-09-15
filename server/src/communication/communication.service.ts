@@ -14,10 +14,13 @@ type TelegramEntryRow = {
 
 type TelegramIdentityRow = {
   id: string;
+  bookingAccountId: string | null;
   cardPhone: string;
   uei: string;
   externalUserId: string;
   display: string;
+  verifiedAt: Date | null;
+  updatedAt: Date;
 };
 
 type CommunicationMessageRow = {
@@ -59,6 +62,10 @@ function canonicalPhone(value: unknown) {
 function personHasPhone(person: Record<string, any>, phone: string) {
   const phones = Array.isArray(person.phones) ? person.phones : [];
   return phones.some((value) => canonicalPhone(value) === phone);
+}
+
+function personAccounts(person: Record<string, any>) {
+  return [...new Set((Array.isArray(person.accounts) ? person.accounts : []).map((value) => text(value)).filter(Boolean))];
 }
 
 function telegramUsername(value: unknown) {
@@ -136,7 +143,7 @@ export class CommunicationService {
     if (!cardPhone) throw new BadRequestException('У клиента не определён телефон');
 
     const telegramRows = await this.prisma.$queryRaw<TelegramIdentityRow[]>`
-      SELECT "id", "cardPhone", "uei", "externalUserId", "display"
+      SELECT "id", "bookingAccountId", "cardPhone", "uei", "externalUserId", "display", "verifiedAt", "updatedAt"
       FROM "CommunicationIdentity"
       WHERE "tenantId" = ${tenantId} AND "channel" = 'TELEGRAM' AND "externalUserId" = ${ticket.telegramUserId}
       LIMIT 1
@@ -147,7 +154,9 @@ export class CommunicationService {
     const business = await this.businessState.get(tenantId);
     const phoneMatch = (Array.isArray(business.people) ? business.people : [])
       .map((value) => objectValue(value)).find((person) => personHasPhone(person, cardPhone)) || null;
-    const match = samePhone ? 'phone+telegram' : phoneMatch ? 'phone' : 'new';
+    const match = existingTelegram?.bookingAccountId === accountId
+      ? 'account+telegram'
+      : samePhone ? 'phone+telegram' : phoneMatch ? 'phone' : 'new';
 
     const identity = await this.businessState.bookingIdentityForAccount(tenantId, accountId);
     const personKey = text(identity?.person?.key || identity?.matchedPerson?.key);
@@ -156,9 +165,11 @@ export class CommunicationService {
     const display = telegramUsername(ticket.username);
 
     if (existingTelegram) {
-      if (!samePhone) throw new ConflictException('Этот Telegram уже связан с другой клиентской картой');
-      if (existingTelegram.uei && uei && existingTelegram.uei !== uei) {
-        throw new ConflictException('Этот Telegram уже связан с другим UEI');
+      if (existingTelegram.bookingAccountId && existingTelegram.bookingAccountId !== accountId) {
+        throw new ConflictException('Этот Telegram уже связан с другим клиентским аккаунтом');
+      }
+      if (!existingTelegram.bookingAccountId && !samePhone && existingTelegram.uei && uei && existingTelegram.uei !== uei) {
+        throw new ConflictException('Этот Telegram уже связан с другим клиентом');
       }
     }
     const resolvedUei = uei || text(existingTelegram?.uei);
@@ -175,12 +186,15 @@ export class CommunicationService {
 
       await tx.$executeRaw`
         INSERT INTO "CommunicationIdentity" (
-          "id", "tenantId", "cardPhone", "uei", "channel", "externalUserId", "display", "verifiedAt", "createdAt", "updatedAt"
+          "id", "tenantId", "bookingAccountId", "cardPhone", "uei", "channel", "externalUserId", "display", "verifiedAt", "createdAt", "updatedAt"
         ) VALUES (
-          ${randomUUID()}, ${tenantId}, ${cardPhone}, ${resolvedUei}, 'TELEGRAM', ${ticket.telegramUserId}, ${display}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+          ${randomUUID()}, ${tenantId}, ${accountId}, ${cardPhone}, ${resolvedUei}, 'TELEGRAM', ${ticket.telegramUserId}, ${display}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
         )
         ON CONFLICT ("tenantId", "channel", "externalUserId") DO UPDATE
-        SET "display" = EXCLUDED."display",
+        SET "bookingAccountId" = EXCLUDED."bookingAccountId",
+            "cardPhone" = EXCLUDED."cardPhone",
+            "uei" = EXCLUDED."uei",
+            "display" = EXCLUDED."display",
             "verifiedAt" = CURRENT_TIMESTAMP,
             "updatedAt" = CURRENT_TIMESTAMP
       `;
@@ -189,18 +203,115 @@ export class CommunicationService {
     return { linked: true, channel: 'TELEGRAM', username: display, match };
   }
 
+  private async telegramAnchors(tenantId: string, input: { phone?: unknown; uei?: unknown }) {
+    const requestedPhone = canonicalPhone(input?.phone);
+    const requestedUei = text(input?.uei);
+    if (!requestedPhone && !requestedUei) throw new BadRequestException('Не указан клиент');
+
+    const business = await this.businessState.get(tenantId);
+    const people = (Array.isArray(business.people) ? business.people : []).map((value) => objectValue(value));
+    const relations = objectValue(business.uei?.relations);
+    const memberKeys = new Set<string>();
+    const ueis = new Set<string>();
+    const phones = new Set<string>();
+    const accountIds = new Set<string>();
+
+    if (requestedPhone) phones.add(requestedPhone);
+    if (requestedUei) ueis.add(requestedUei);
+
+    const addUeiMembers = (uei: string) => {
+      if (!uei) return;
+      ueis.add(uei);
+      for (const person of people) {
+        const key = text(person.key);
+        if (key && text(relations[`person:${key}`]) === uei) memberKeys.add(key);
+      }
+    };
+
+    addUeiMembers(requestedUei);
+    for (const person of people) {
+      const key = text(person.key);
+      if (!key) continue;
+      if (requestedPhone && personHasPhone(person, requestedPhone)) {
+        memberKeys.add(key);
+        addUeiMembers(text(relations[`person:${key}`]));
+      }
+    }
+
+    for (const person of people) {
+      const key = text(person.key);
+      if (!key || !memberKeys.has(key)) continue;
+      for (const phone of Array.isArray(person.phones) ? person.phones : []) {
+        const normalized = canonicalPhone(phone);
+        if (normalized) phones.add(normalized);
+      }
+      for (const accountId of personAccounts(person)) accountIds.add(accountId);
+      const currentUei = text(relations[`person:${key}`]);
+      if (currentUei) ueis.add(currentUei);
+    }
+
+    const accounts = accountIds.size
+      ? await this.prisma.bookingAccount.findMany({
+          where: { tenantId, id: { in: [...accountIds] } },
+          select: { id: true, phone: true, uei: true },
+        })
+      : [];
+    for (const account of accounts) {
+      const phone = canonicalPhone(account.phone);
+      if (phone) phones.add(phone);
+      const accountUei = text(account.uei);
+      if (accountUei) ueis.add(accountUei);
+    }
+
+    return { requestedPhone, requestedUei, accountIds, phones, ueis, accounts };
+  }
+
   async telegramIdentity(tenantId: string, input: { phone?: unknown; uei?: unknown }) {
-    const cardPhone = canonicalPhone(input?.phone);
-    const uei = text(input?.uei);
-    if (!cardPhone && !uei) throw new BadRequestException('Не указан клиент');
+    const anchors = await this.telegramAnchors(tenantId, input || {});
     const rows = await this.prisma.$queryRaw<TelegramIdentityRow[]>`
-      SELECT "id", "cardPhone", "uei", "externalUserId", "display"
+      SELECT "id", "bookingAccountId", "cardPhone", "uei", "externalUserId", "display", "verifiedAt", "updatedAt"
       FROM "CommunicationIdentity"
       WHERE "tenantId" = ${tenantId} AND "channel" = 'TELEGRAM'
-        AND ((${cardPhone} <> '' AND "cardPhone" = ${cardPhone}) OR (${uei} <> '' AND "uei" = ${uei}))
-      ORDER BY "verifiedAt" DESC NULLS LAST, "updatedAt" DESC LIMIT 1
+      ORDER BY "verifiedAt" DESC NULLS LAST, "updatedAt" DESC
     `;
-    return rows[0] || null;
+
+    const byAccount = rows.find((row) => row.bookingAccountId && anchors.accountIds.has(row.bookingAccountId));
+    const byPhone = rows.find((row) => anchors.phones.has(canonicalPhone(row.cardPhone)));
+    const byUei = rows.find((row) => text(row.uei) && anchors.ueis.has(text(row.uei)));
+    const identity = byAccount || byPhone || byUei || null;
+    if (!identity) return null;
+
+    let resolvedAccountId = text(identity.bookingAccountId);
+    if (!resolvedAccountId) {
+      const rowPhone = canonicalPhone(identity.cardPhone);
+      const matchingAccounts = anchors.accounts.filter((account) => canonicalPhone(account.phone) === rowPhone);
+      if (matchingAccounts.length === 1) resolvedAccountId = matchingAccounts[0].id;
+      else if (anchors.accountIds.size === 1) resolvedAccountId = [...anchors.accountIds][0];
+    }
+
+    const resolvedAccount = resolvedAccountId ? anchors.accounts.find((account) => account.id === resolvedAccountId) : null;
+    const resolvedPhone = canonicalPhone(resolvedAccount?.phone) || canonicalPhone(identity.cardPhone) || anchors.requestedPhone;
+    const resolvedUei = anchors.requestedUei || text(resolvedAccount?.uei) || [...anchors.ueis][0] || text(identity.uei);
+
+    if (resolvedAccountId !== text(identity.bookingAccountId)
+      || (resolvedPhone && resolvedPhone !== canonicalPhone(identity.cardPhone))
+      || (resolvedUei && resolvedUei !== text(identity.uei))) {
+      await this.prisma.$executeRaw`
+        UPDATE "CommunicationIdentity"
+        SET "bookingAccountId" = ${resolvedAccountId || null},
+            "cardPhone" = ${resolvedPhone || identity.cardPhone},
+            "uei" = ${resolvedUei},
+            "updatedAt" = CURRENT_TIMESTAMP
+        WHERE "id" = ${identity.id} AND "tenantId" = ${tenantId}
+      `;
+    }
+
+    return {
+      ...identity,
+      bookingAccountId: resolvedAccountId || null,
+      cardPhone: resolvedPhone || identity.cardPhone,
+      uei: resolvedUei,
+    };
   }
 
   async recordMessage(tenantId: string, input: {
