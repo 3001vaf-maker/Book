@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma.service';
 import { WebPushService } from '../notification/web-push.service';
+import { ClientContactRouteService } from './client-contact-route.service';
 import { ClientProfileThreadService } from './client-profile-thread.service';
 
 function text(value: unknown) { return String(value ?? '').trim(); }
@@ -17,6 +18,7 @@ export class InAppProfilePushService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly profiles: ClientProfileThreadService,
+    private readonly contactRoutes: ClientContactRouteService,
     private readonly webPush: WebPushService,
   ) {}
 
@@ -28,7 +30,8 @@ export class InAppProfilePushService {
     entityId?: unknown;
   }) {
     const profile = await this.profiles.byProfileKey(tenantId, profileKeyValue);
-    const accounts = await this.profiles.accountsForProfile(tenantId, profile.profileKey);
+    const route = await this.contactRoutes.resolve(tenantId, profile);
+    const accounts = await this.profiles.accountsForProfile(tenantId, route.delivery.profileKey);
     const notificationId = randomUUID();
     const now = new Date();
     const firstAccount = accounts[0] || null;
@@ -63,6 +66,6 @@ export class InAppProfilePushService {
       `;
     }
     const result = endpointSet.size ? await this.webPush.dispatchNotification(tenantId, notificationId) : { sent: 0, failed: 0 };
-    return { notificationId, profileKey: profile.profileKey, accountIds: accounts.map((account) => account.id), endpoints: endpointSet.size, ...result };
+    return { notificationId, profileKey: profile.profileKey, deliveryProfileKey: route.delivery.profileKey, accountIds: accounts.map((account) => account.id), endpoints: endpointSet.size, ...result };
   }
 }
