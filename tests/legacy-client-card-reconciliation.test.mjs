@@ -14,7 +14,7 @@ assert.doesNotMatch(service, /sameNamedPerson\(/, 'Matching names must not be us
 assert.doesNotMatch(service, /identity\.relations\[relationKey\]\s*=\s*uei/, 'Code must not assign a legacy Person to a UEI by inference');
 assert.doesNotMatch(service, /await this\.reconcileLegacyAccountDuplicates\(tenantId\)/, 'Client login/access must not run identity reconciliation automatically');
 
-const cardState = service.slice(service.indexOf('async cardState('), service.indexOf('async reconcileLegacyAccountDuplicates('));
+const cardState = service.slice(service.indexOf('async cardState('), service.indexOf('private assertUnambiguousPhone('));
 assert.match(cardState, /personHasPhone\(person, phone\)/, 'Client profile lookup must use phone');
 assert.doesNotMatch(cardState, /email/i, 'Email must never choose an existing client profile');
 assert.doesNotMatch(cardState, /telegram/i, 'Telegram must never choose an existing client profile');
