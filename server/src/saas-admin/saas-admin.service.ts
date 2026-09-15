@@ -4,6 +4,15 @@ import { PrismaService } from '../prisma.service';
 import { SaasAccessService } from '../saas-access/saas-access.service';
 import { MasterInvitationService } from '../master-invitation/master-invitation.service';
 
+type ValidatedCapabilityUpdate = {
+  key: string;
+  capabilityId: string;
+  valueType: CapabilityValueType;
+  inherit: boolean;
+  enabled: boolean | null;
+  limit: number | null;
+};
+
 @Injectable()
 export class SaasAdminService {
   constructor(
@@ -90,26 +99,10 @@ export class SaasAdminService {
     }));
   }
 
-  async updateTenantAccess(tenantId: string, input: {
-    status?: unknown;
-    capabilities?: unknown;
-  }) {
-    const tenantAccess = await this.prisma.tenantAccess.findUnique({ where: { tenantId } });
-    if (!tenantAccess) throw new NotFoundException('Book не найден');
+  private async validateCapabilityUpdates(rawValues: unknown[]): Promise<ValidatedCapabilityUpdate[]> {
+    const updates: ValidatedCapabilityUpdate[] = [];
 
-    const statusText = String(input?.status || '').trim().toUpperCase();
-    if (statusText) {
-      if (!Object.values(TenantAccessStatus).includes(statusText as TenantAccessStatus)) {
-        throw new BadRequestException('Неизвестный статус Book');
-      }
-      await this.prisma.tenantAccess.update({
-        where: { tenantId },
-        data: { status: statusText as TenantAccessStatus },
-      });
-    }
-
-    const values = Array.isArray(input?.capabilities) ? input.capabilities : [];
-    for (const raw of values) {
+    for (const raw of rawValues) {
       if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
       const value = raw as Record<string, unknown>;
       const key = String(value.key || '').trim();
@@ -118,18 +111,26 @@ export class SaasAdminService {
       if (!capability || !capability.isActive) throw new BadRequestException(`Неизвестная возможность: ${key}`);
 
       if (value.inherit === true) {
-        await this.prisma.tenantCapabilityOverride.deleteMany({
-          where: { tenantId, capabilityId: capability.id },
+        updates.push({
+          key,
+          capabilityId: capability.id,
+          valueType: capability.valueType,
+          inherit: true,
+          enabled: null,
+          limit: null,
         });
         continue;
       }
 
       if (capability.valueType === CapabilityValueType.BOOLEAN) {
         if (typeof value.enabled !== 'boolean') throw new BadRequestException(`Для ${key} требуется ON/OFF`);
-        await this.prisma.tenantCapabilityOverride.upsert({
-          where: { tenantId_capabilityId: { tenantId, capabilityId: capability.id } },
-          create: { tenantId, capabilityId: capability.id, enabled: value.enabled, limit: null },
-          update: { enabled: value.enabled, limit: null },
+        updates.push({
+          key,
+          capabilityId: capability.id,
+          valueType: capability.valueType,
+          inherit: false,
+          enabled: value.enabled,
+          limit: null,
         });
         continue;
       }
@@ -138,12 +139,69 @@ export class SaasAdminService {
       if (limit !== null && (!Number.isInteger(limit) || limit < 0)) {
         throw new BadRequestException(`Для ${key} требуется целый лимит или без ограничения`);
       }
-      await this.prisma.tenantCapabilityOverride.upsert({
-        where: { tenantId_capabilityId: { tenantId, capabilityId: capability.id } },
-        create: { tenantId, capabilityId: capability.id, enabled: null, limit },
-        update: { enabled: null, limit },
+      updates.push({
+        key,
+        capabilityId: capability.id,
+        valueType: capability.valueType,
+        inherit: false,
+        enabled: null,
+        limit,
       });
     }
+
+    return updates;
+  }
+
+  async updateTenantAccess(tenantId: string, input: {
+    status?: unknown;
+    capabilities?: unknown;
+  }) {
+    const tenantAccess = await this.prisma.tenantAccess.findUnique({ where: { tenantId } });
+    if (!tenantAccess) throw new NotFoundException('Book не найден');
+
+    const statusText = String(input?.status || '').trim().toUpperCase();
+    let nextStatus: TenantAccessStatus | null = null;
+    if (statusText) {
+      if (!Object.values(TenantAccessStatus).includes(statusText as TenantAccessStatus)) {
+        throw new BadRequestException('Неизвестный статус Book');
+      }
+      nextStatus = statusText as TenantAccessStatus;
+    }
+
+    const rawValues = Array.isArray(input?.capabilities) ? input.capabilities : [];
+    const updates = await this.validateCapabilityUpdates(rawValues);
+
+    await this.prisma.$transaction(async (tx) => {
+      if (nextStatus) {
+        await tx.tenantAccess.update({
+          where: { tenantId },
+          data: { status: nextStatus },
+        });
+      }
+
+      for (const update of updates) {
+        if (update.inherit) {
+          await tx.tenantCapabilityOverride.deleteMany({
+            where: { tenantId, capabilityId: update.capabilityId },
+          });
+          continue;
+        }
+
+        await tx.tenantCapabilityOverride.upsert({
+          where: { tenantId_capabilityId: { tenantId, capabilityId: update.capabilityId } },
+          create: {
+            tenantId,
+            capabilityId: update.capabilityId,
+            enabled: update.valueType === CapabilityValueType.BOOLEAN ? update.enabled : null,
+            limit: update.valueType === CapabilityValueType.LIMIT ? update.limit : null,
+          },
+          update: {
+            enabled: update.valueType === CapabilityValueType.BOOLEAN ? update.enabled : null,
+            limit: update.valueType === CapabilityValueType.LIMIT ? update.limit : null,
+          },
+        });
+      }
+    });
 
     return this.access.resolveTenantAccess(tenantId);
   }
