@@ -31,11 +31,26 @@ assert.match(bootstrap, /prepareTelegramEntryAuth/);
 assert.match(entryAuth, /exchangeBookingTelegramEntry\(tenantId, entryToken\)/);
 assert.match(entryAuth, /result\?\.state === 'authenticated'/);
 assert.match(entryAuth, /registerBookingTelegramAccount\(tenantId, entryToken/);
-assert.match(entryAuth, /name="phone"/);
-assert.match(entryAuth, /name="email"/);
-assert.doesNotMatch(entryAuth, /name="password"/);
+assert.match(entryAuth, /name:\s*'phone'/);
+assert.match(entryAuth, /name:\s*'email'/);
+assert.doesNotMatch(entryAuth, /name:\s*'password'/);
 assert.match(bookingAccount, /account\/telegram-entry\/exchange/);
 assert.match(bookingAccount, /account\/telegram-entry\/register/);
+
+// A new Telegram client must use the already approved Book registration sequence.
+// Telegram changes authentication only; it does not introduce its own registration design.
+assert.match(entryAuth, /title:\s*settings\.welcomeTitle/);
+assert.match(entryAuth, /app\.querySelector\('\[data-booking-welcome-next\]'\).*renderAgreements/);
+assert.match(entryAuth, /title:\s*'Соглашения'/);
+assert.match(entryAuth, /if \(canContinue\) renderDetails\(\)/);
+assert.match(entryAuth, /title:\s*'Ваши данные'/);
+assert.match(entryAuth, /label:\s*'Имя'/);
+assert.match(entryAuth, /label:\s*'Фамилия'/);
+assert.match(entryAuth, /label:\s*'Телефон'/);
+assert.match(entryAuth, /label:\s*'Email'/);
+assert.doesNotMatch(entryAuth, /Регистрация через Telegram/);
+assert.doesNotMatch(entryAuth, /Telegram уже подтверждён\. Пароль не нужен\./);
+assert.match(entryAuth, /Telegram changes only the authentication method/);
 
 // Telegram Main App can launch directly. It validates Telegram initData server-side, mints the same one-time entry,
 // then continues through the exact same account/profile path as /start.
