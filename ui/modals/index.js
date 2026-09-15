@@ -63,7 +63,7 @@ export function openBlockingNotice({
   surface = 'app',
   onConfirm = null,
 } = {}) {
-  const content = `<div class="modal-title"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(message)}</p></div><div class="modal-actions">${button(escapeHtml(action), { data: 'data-blocking-confirm', autofocus: true })}</div><p class="auth-error" data-blocking-error role="alert"></p>`;
+  const content = `<div class="modal-title"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(message)}</p></div><div class="modal-actions">${button(escapeHtml(action), { data: 'data-blocking-confirm data-modal-autofocus' })}</div><p class="auth-error" data-blocking-error role="alert"></p>`;
   const m = mountModal(document.body, modal(content, { variant, surface, title, dismissible: false }));
   if (!m) return null;
   const confirm = m.querySelector('[data-blocking-confirm]');
