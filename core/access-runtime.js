@@ -127,7 +127,7 @@ function showCapabilityIntroduction(meta, introduction, element) {
   });
 }
 
-async function handleCapabilityEntry(event, meta, element) {
+async function handleCapabilityEntry(meta, element) {
   queuedEntry = { meta, element };
   try {
     await refreshRuntimeState();
@@ -158,7 +158,7 @@ function onEntryClick(event) {
   if (!element) return;
   event.preventDefault();
   event.stopImmediatePropagation();
-  void handleCapabilityEntry(event, meta, element);
+  void handleCapabilityEntry(meta, element);
 }
 
 function activityRefresh() {
@@ -176,6 +176,6 @@ document.addEventListener('visibilitychange', () => {
 });
 
 window.addEventListener('book:access-updated', () => {
-  if (summaryModal?.isConnected || introModal?.isConnected) return;
+  if (refreshInFlight || summaryModal?.isConnected || introModal?.isConnected) return;
   void reloadPendingState().then(showPendingSummary).catch(() => {});
 });
