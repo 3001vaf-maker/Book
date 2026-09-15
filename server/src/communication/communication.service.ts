@@ -26,23 +26,32 @@ type TelegramIdentityRow = {
 type CommunicationMessageRow = {
   id: string;
   tenantId: string;
+  bookingAccountId: string | null;
   cardPhone: string;
   uei: string;
   direction: string;
   kind: string;
   channel: string;
   body: string;
+  content: unknown;
   attachments: unknown;
   externalMessageId: string;
   externalThreadId: string;
   status: string;
   createdAt: Date;
+  editedAt: Date | null;
+  deletedAt: Date | null;
   sentAt: Date | null;
   deliveredAt: Date | null;
   readAt: Date | null;
   failedAt: Date | null;
   error: string;
 };
+
+type MessageActor = { side: 'master' } | { side: 'client'; accountId: string };
+
+const RICH_BLOCK_TYPES = new Set(['paragraph', 'heading', 'subheading', 'quote', 'list-item']);
+const RICH_MARKS = new Set(['bold', 'italic', 'underline', 'strike', 'code']);
 
 function text(value: unknown) {
   return String(value ?? '').trim();
@@ -94,6 +103,37 @@ function normalizeAttachments(value: unknown) {
     if (totalEncoded > 24 * 1024 * 1024) throw new BadRequestException('Слишком большой общий объём вложений');
     return { name, type, size, dataUrl };
   });
+}
+
+function normalizeRichContent(value: unknown, fallbackBody: unknown = '') {
+  const source = objectValue(value);
+  const blocks: Array<{ type: string; spans: Array<{ text: string; marks: string[] }> }> = [];
+  let totalText = 0;
+  for (const rawBlock of (Array.isArray(source.blocks) ? source.blocks : []).slice(0, 120)) {
+    const block = objectValue(rawBlock);
+    const type = RICH_BLOCK_TYPES.has(text(block.type).toLowerCase()) ? text(block.type).toLowerCase() : 'paragraph';
+    const spans: Array<{ text: string; marks: string[] }> = [];
+    for (const rawSpan of (Array.isArray(block.spans) ? block.spans : []).slice(0, 300)) {
+      const span = objectValue(rawSpan);
+      const spanText = String(span.text ?? '').replace(/\u0000/g, '').slice(0, 12000);
+      if (!spanText) continue;
+      totalText += spanText.length;
+      if (totalText > 30000) throw new BadRequestException('Сообщение слишком длинное');
+      const marks = [...new Set((Array.isArray(span.marks) ? span.marks : []).map((mark) => text(mark).toLowerCase()).filter((mark) => RICH_MARKS.has(mark)))];
+      spans.push({ text: spanText, marks });
+    }
+    if (spans.length) blocks.push({ type, spans });
+  }
+  if (!blocks.length) {
+    const fallback = text(fallbackBody).slice(0, 30000);
+    if (fallback) blocks.push({ type: 'paragraph', spans: [{ text: fallback, marks: [] }] });
+  }
+  return { version: 1, blocks };
+}
+
+function richPlainText(value: unknown) {
+  const normalized = normalizeRichContent(value);
+  return normalized.blocks.map((block) => block.spans.map((span) => span.text).join('')).join('\n').trim();
 }
 
 @Injectable()
@@ -314,50 +354,126 @@ export class CommunicationService {
     };
   }
 
+  private async ensureBookingAccount(tenantId: string, accountId: string) {
+    if (!accountId) return null;
+    const account = await this.prisma.bookingAccount.findFirst({
+      where: { id: accountId, tenantId },
+      select: { id: true, phone: true, uei: true },
+    });
+    if (!account) throw new NotFoundException('Клиентский аккаунт не найден');
+    return account;
+  }
+
   async recordMessage(tenantId: string, input: {
-    phone?: unknown; uei?: unknown; direction?: unknown; kind?: unknown; channel?: unknown; body?: unknown; attachments?: unknown;
+    bookingAccountId?: unknown; phone?: unknown; uei?: unknown; direction?: unknown; kind?: unknown; channel?: unknown; body?: unknown; content?: unknown; attachments?: unknown;
     externalMessageId?: unknown; externalThreadId?: unknown; status?: unknown; error?: unknown;
   }) {
-    const cardPhone = canonicalPhone(input?.phone);
-    const uei = text(input?.uei);
+    const bookingAccountId = text(input?.bookingAccountId);
+    const account = bookingAccountId ? await this.ensureBookingAccount(tenantId, bookingAccountId) : null;
+    const cardPhone = canonicalPhone(input?.phone) || canonicalPhone(account?.phone);
+    const uei = text(input?.uei) || text(account?.uei);
     const direction = text(input?.direction).toLowerCase() || 'system';
     const kind = text(input?.kind).toLowerCase() || 'message';
     const channel = text(input?.channel).toUpperCase() || 'IN_APP';
-    const body = text(input?.body);
+    const content = normalizeRichContent(input?.content, input?.body);
+    const body = richPlainText(content) || text(input?.body);
     const attachments = normalizeAttachments(input?.attachments);
     const attachmentsJson = JSON.stringify(attachments);
+    const contentJson = JSON.stringify(content);
     const status = text(input?.status).toLowerCase() || 'created';
     const externalMessageId = text(input?.externalMessageId);
     const externalThreadId = text(input?.externalThreadId);
     const error = text(input?.error).slice(0, 2000);
-    if (!cardPhone && !uei) throw new BadRequestException('Не указан клиент');
+    if (!bookingAccountId && !cardPhone && !uei) throw new BadRequestException('Не указан клиент');
     if (!body && !attachments.length) throw new BadRequestException('Пустое сообщение');
     const id = randomUUID();
     const now = new Date();
     await this.prisma.$executeRaw`
       INSERT INTO "CommunicationMessage" (
-        "id", "tenantId", "cardPhone", "uei", "direction", "kind", "channel", "body", "attachments",
+        "id", "tenantId", "bookingAccountId", "cardPhone", "uei", "direction", "kind", "channel", "body", "content", "attachments",
         "externalMessageId", "externalThreadId", "status", "createdAt", "sentAt", "deliveredAt", "failedAt", "error"
       ) VALUES (
-        ${id}, ${tenantId}, ${cardPhone}, ${uei}, ${direction}, ${kind}, ${channel}, ${body}, ${attachmentsJson}::jsonb,
+        ${id}, ${tenantId}, ${bookingAccountId || null}, ${cardPhone}, ${uei}, ${direction}, ${kind}, ${channel}, ${body}, ${contentJson}::jsonb, ${attachmentsJson}::jsonb,
         ${externalMessageId}, ${externalThreadId}, ${status}, ${now},
         ${status === 'sent' ? now : null}, ${status === 'delivered' ? now : null}, ${status === 'failed' ? now : null}, ${error}
       ) ON CONFLICT DO NOTHING
     `;
-    return { id, tenantId, cardPhone, uei, direction, kind, channel, body, attachments, externalMessageId, externalThreadId, status, createdAt: now, error };
+    return { id, tenantId, bookingAccountId: bookingAccountId || null, cardPhone, uei, direction, kind, channel, body, content, attachments, externalMessageId, externalThreadId, status, createdAt: now, editedAt: null, deletedAt: null, error };
   }
 
-  async listThread(tenantId: string, input: { phone?: unknown; uei?: unknown }, limit = 300) {
+  private async messageById(tenantId: string, messageId: string) {
+    const rows = await this.prisma.$queryRaw<CommunicationMessageRow[]>`
+      SELECT "id", "tenantId", "bookingAccountId", "cardPhone", "uei", "direction", "kind", "channel", "body", "content", "attachments",
+             "externalMessageId", "externalThreadId", "status", "createdAt", "editedAt", "deletedAt", "sentAt", "deliveredAt", "readAt", "failedAt", "error"
+      FROM "CommunicationMessage"
+      WHERE "tenantId" = ${tenantId} AND "id" = ${messageId}
+      LIMIT 1
+    `;
+    return rows[0] || null;
+  }
+
+  private assertMessageActor(message: CommunicationMessageRow, actor: MessageActor) {
+    if (message.channel !== 'IN_APP') throw new BadRequestException('Можно изменять только внутренние сообщения');
+    if (message.deletedAt) throw new BadRequestException('Сообщение уже удалено');
+    if (actor.side === 'master') {
+      if (message.direction !== 'outbound') throw new BadRequestException('Можно изменять только свои сообщения');
+      return;
+    }
+    if (message.direction !== 'inbound' || message.bookingAccountId !== actor.accountId) {
+      throw new BadRequestException('Можно изменять только свои сообщения');
+    }
+  }
+
+  async editMessage(tenantId: string, messageIdValue: unknown, actor: MessageActor, input: { body?: unknown; content?: unknown }) {
+    const messageId = text(messageIdValue);
+    const current = await this.messageById(tenantId, messageId);
+    if (!current) throw new NotFoundException('Сообщение не найдено');
+    this.assertMessageActor(current, actor);
+    const content = normalizeRichContent(input?.content, input?.body);
+    const body = richPlainText(content);
+    if (!body) throw new BadRequestException('Пустое сообщение');
+    const contentJson = JSON.stringify(content);
+    await this.prisma.$executeRaw`
+      UPDATE "CommunicationMessage"
+      SET "body" = ${body}, "content" = ${contentJson}::jsonb, "editedAt" = CURRENT_TIMESTAMP
+      WHERE "tenantId" = ${tenantId} AND "id" = ${messageId}
+    `;
+    return this.messageById(tenantId, messageId);
+  }
+
+  async deleteMessage(tenantId: string, messageIdValue: unknown, actor: MessageActor) {
+    const messageId = text(messageIdValue);
+    const current = await this.messageById(tenantId, messageId);
+    if (!current) throw new NotFoundException('Сообщение не найдено');
+    this.assertMessageActor(current, actor);
+    await this.prisma.$executeRaw`
+      UPDATE "CommunicationMessage"
+      SET "body" = '',
+          "content" = '{"version":1,"blocks":[]}'::jsonb,
+          "attachments" = '[]'::jsonb,
+          "status" = 'deleted',
+          "deletedAt" = CURRENT_TIMESTAMP
+      WHERE "tenantId" = ${tenantId} AND "id" = ${messageId}
+    `;
+    return this.messageById(tenantId, messageId);
+  }
+
+  async listThread(tenantId: string, input: { bookingAccountId?: unknown; phone?: unknown; uei?: unknown }, limit = 300) {
+    const bookingAccountId = text(input?.bookingAccountId);
     const cardPhone = canonicalPhone(input?.phone);
     const uei = text(input?.uei);
-    if (!cardPhone && !uei) throw new BadRequestException('Не указан клиент');
+    if (!bookingAccountId && !cardPhone && !uei) throw new BadRequestException('Не указан клиент');
     const safeLimit = Math.max(1, Math.min(1000, Math.floor(Number(limit) || 300)));
     return this.prisma.$queryRaw<CommunicationMessageRow[]>`
-      SELECT "id", "tenantId", "cardPhone", "uei", "direction", "kind", "channel", "body", "attachments",
-             "externalMessageId", "externalThreadId", "status", "createdAt", "sentAt", "deliveredAt", "readAt", "failedAt", "error"
+      SELECT "id", "tenantId", "bookingAccountId", "cardPhone", "uei", "direction", "kind", "channel", "body", "content", "attachments",
+             "externalMessageId", "externalThreadId", "status", "createdAt", "editedAt", "deletedAt", "sentAt", "deliveredAt", "readAt", "failedAt", "error"
       FROM "CommunicationMessage"
       WHERE "tenantId" = ${tenantId}
-        AND ((${cardPhone} <> '' AND "cardPhone" = ${cardPhone}) OR (${uei} <> '' AND "uei" = ${uei}))
+        AND (
+          (${bookingAccountId} <> '' AND "bookingAccountId" = ${bookingAccountId})
+          OR (${cardPhone} <> '' AND "cardPhone" = ${cardPhone})
+          OR (${uei} <> '' AND "uei" = ${uei})
+        )
       ORDER BY "createdAt" ASC, "id" ASC LIMIT ${safeLimit}
     `;
   }
@@ -365,12 +481,12 @@ export class CommunicationService {
   async listThreads(tenantId: string, limit = 200) {
     const safeLimit = Math.max(1, Math.min(500, Math.floor(Number(limit) || 200)));
     return this.prisma.$queryRaw<CommunicationMessageRow[]>`
-      SELECT DISTINCT ON (COALESCE(NULLIF("uei", ''), "cardPhone"))
-             "id", "tenantId", "cardPhone", "uei", "direction", "kind", "channel", "body", "attachments",
-             "externalMessageId", "externalThreadId", "status", "createdAt", "sentAt", "deliveredAt", "readAt", "failedAt", "error"
+      SELECT DISTINCT ON (COALESCE(NULLIF("bookingAccountId", ''), NULLIF("uei", ''), "cardPhone"))
+             "id", "tenantId", "bookingAccountId", "cardPhone", "uei", "direction", "kind", "channel", "body", "content", "attachments",
+             "externalMessageId", "externalThreadId", "status", "createdAt", "editedAt", "deletedAt", "sentAt", "deliveredAt", "readAt", "failedAt", "error"
       FROM "CommunicationMessage"
       WHERE "tenantId" = ${tenantId}
-      ORDER BY COALESCE(NULLIF("uei", ''), "cardPhone"), "createdAt" DESC, "id" DESC
+      ORDER BY COALESCE(NULLIF("bookingAccountId", ''), NULLIF("uei", ''), "cardPhone"), "createdAt" DESC, "id" DESC
       LIMIT ${safeLimit}
     `;
   }
