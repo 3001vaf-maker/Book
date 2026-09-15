@@ -36,6 +36,11 @@ enum MasterInvitationStatus {
   REVOKED
 }
 
+enum CapabilityAccessChangeType {
+  ENABLED
+  DISABLED
+}
+
 model Tenant {
   id                       String                     @id @default(cuid())
   name                     String
@@ -352,6 +357,7 @@ model Capability {
 
   planValues      PlanCapability[]
   tenantOverrides TenantCapabilityOverride[]
+  accessEvents    CapabilityAccessEvent[]
 
   @@index([groupKey, position])
 }
@@ -387,16 +393,17 @@ model PlanCapability {
 }
 
 model TenantAccess {
-  tenantId   String             @id
-  planId     String?
-  status     TenantAccessStatus @default(ACTIVE)
-  isOwnerBook Boolean           @default(false)
-  createdAt  DateTime           @default(now())
-  updatedAt  DateTime           @updatedAt
+  tenantId    String             @id
+  planId      String?
+  status      TenantAccessStatus @default(ACTIVE)
+  isOwnerBook Boolean            @default(false)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
 
-  tenant    Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  plan      Plan?                      @relation(fields: [planId], references: [id], onDelete: SetNull)
-  overrides TenantCapabilityOverride[]
+  tenant       Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan         Plan?                      @relation(fields: [planId], references: [id], onDelete: SetNull)
+  overrides    TenantCapabilityOverride[]
+  accessEvents CapabilityAccessEvent[]
 
   @@index([planId])
   @@index([status])
@@ -416,6 +423,27 @@ model TenantCapabilityOverride {
 
   @@unique([tenantId, capabilityId])
   @@index([capabilityId])
+}
+
+model CapabilityAccessEvent {
+  id                    String                     @id @default(cuid())
+  tenantId              String
+  capabilityId          String
+  batchId               String
+  changeType            CapabilityAccessChangeType
+  summaryAcknowledgedAt DateTime?
+  detailAcknowledgedAt  DateTime?
+  cancelledAt           DateTime?
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
+
+  tenantAccess TenantAccess @relation(fields: [tenantId], references: [tenantId], onDelete: Cascade)
+  capability   Capability   @relation(fields: [capabilityId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, summaryAcknowledgedAt])
+  @@index([tenantId, capabilityId, detailAcknowledgedAt])
+  @@index([batchId])
 }
 
 model MasterInvitation {
