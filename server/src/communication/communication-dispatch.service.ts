@@ -1,8 +1,9 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { NotificationService } from '../notification/notification.service';
+import { ClientProfileThreadService } from './client-profile-thread.service';
 import { CommunicationChannelResolverService } from './communication-channel-resolver.service';
 import { CommunicationService } from './communication.service';
 import { CommunicationHistoryService } from './communication-history.service';
+import { InAppProfilePushService } from './in-app-profile-push.service';
 
 function text(value: unknown) { return String(value ?? '').trim(); }
 
@@ -12,13 +13,21 @@ export class CommunicationDispatchService {
     private readonly communications: CommunicationService,
     private readonly history: CommunicationHistoryService,
     private readonly channels: CommunicationChannelResolverService,
-    private readonly notifications: NotificationService,
+    private readonly profiles: ClientProfileThreadService,
+    private readonly profilePush: InAppProfilePushService,
   ) {}
 
-  async resolveChannel(tenantId: string, input: { phone?: unknown; uei?: unknown; channel?: unknown }) {
+  private async resolveProfile(tenantId: string, input: { profileKey?: unknown; phone?: unknown; uei?: unknown }) {
+    const profileKey = text(input?.profileKey);
+    if (profileKey) return this.profiles.byProfileKey(tenantId, profileKey).catch(() => null);
+    return this.profiles.byLegacy(tenantId, input || {}).catch(() => null);
+  }
+
+  async resolveChannel(tenantId: string, input: { profileKey?: unknown; phone?: unknown; uei?: unknown; channel?: unknown }) {
     const requested = text(input?.channel).toUpperCase();
+    const profile = await this.resolveProfile(tenantId, input || {});
     if (requested === 'IN_APP') {
-      if (!(await this.channels.resolveInAppAccount(tenantId, input || {}))) throw new NotFoundException('Внутренний чат клиента недоступен');
+      if (!profile) throw new NotFoundException('Внутренний чат клиента недоступен');
       return 'IN_APP';
     }
     if (requested === 'TELEGRAM') {
@@ -27,7 +36,7 @@ export class CommunicationDispatchService {
     }
     if (requested) throw new NotFoundException(`Канал ${requested} у клиента недоступен`);
 
-    if (await this.channels.resolveInAppAccount(tenantId, input || {})) return 'IN_APP';
+    if (profile) return 'IN_APP';
 
     const available: string[] = [];
     if (await this.channels.resolveTelegramIdentity(tenantId, input || {})) available.push('TELEGRAM');
@@ -38,7 +47,7 @@ export class CommunicationDispatchService {
     return selected;
   }
 
-  async send(tenantId: string, input: { phone?: unknown; uei?: unknown; channel?: unknown; body?: unknown; content?: unknown; attachments?: unknown }) {
+  async send(tenantId: string, input: { profileKey?: unknown; phone?: unknown; uei?: unknown; channel?: unknown; body?: unknown; content?: unknown; attachments?: unknown }) {
     const body = text(input?.body);
     const attachments = Array.isArray(input?.attachments) ? input.attachments : [];
     const hasRichContent = Boolean(input?.content && typeof input.content === 'object');
@@ -46,12 +55,12 @@ export class CommunicationDispatchService {
 
     const channel = await this.resolveChannel(tenantId, input || {});
     if (channel === 'IN_APP') {
-      const account = await this.channels.resolveInAppAccount(tenantId, input || {});
-      if (!account) throw new NotFoundException('Внутренний чат клиента недоступен');
+      const profile = await this.resolveProfile(tenantId, input || {});
+      if (!profile) throw new NotFoundException('Внутренний чат клиента недоступен');
       const message = await this.communications.recordMessage(tenantId, {
-        bookingAccountId: account.id,
-        phone: input?.phone || account.phone,
-        uei: input?.uei || account.uei,
+        profileKey: profile.profileKey,
+        phone: input?.phone,
+        uei: profile.profileUei || input?.uei,
         direction: 'outbound',
         kind: attachments.length ? 'media' : 'message',
         channel: 'IN_APP',
@@ -60,13 +69,12 @@ export class CommunicationDispatchService {
         attachments,
         status: 'delivered',
       });
-      await this.notifications.createForAccount(tenantId, account.id, {
+      await this.profilePush.notify(tenantId, profile.profileKey, {
         type: 'chat.message',
         title: 'Новое сообщение',
         body: message.body || (attachments.length ? 'Новое сообщение с вложением' : 'Новое сообщение'),
         entityType: 'chat-message',
         entityId: message.id,
-        uei: message.uei,
       }).catch(() => null);
       return message;
     }
