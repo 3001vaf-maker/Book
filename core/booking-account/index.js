@@ -84,6 +84,31 @@ export async function loginBookingAccount(tenantId, email, password) {
   return storeSession(tenantId, payload);
 }
 
+export async function exchangeBookingTelegramEntry(tenantId, token) {
+  const payload = await jsonResponse(
+    await request(`/online-booking/${encodeURIComponent(tenantId)}/account/telegram-entry/exchange`, {
+      method: 'POST',
+      body: JSON.stringify({ token: String(token || '').trim() }),
+    }),
+    'Не удалось войти через Telegram',
+  );
+  return payload?.state === 'authenticated' ? storeSession(tenantId, payload) : payload;
+}
+
+export async function registerBookingTelegramAccount(tenantId, token, account) {
+  const payload = await jsonResponse(
+    await request(`/online-booking/${encodeURIComponent(tenantId)}/account/telegram-entry/register`, {
+      method: 'POST',
+      body: JSON.stringify({
+        token: String(token || '').trim(),
+        account: account || {},
+      }),
+    }),
+    'Не удалось зарегистрироваться через Telegram',
+  );
+  return storeSession(tenantId, payload);
+}
+
 export async function getBookingAccount(tenantId) {
   const token = getBookingAccountToken(tenantId);
   if (!token) return null;
