@@ -32,6 +32,9 @@ if (!clientUi.includes("label:'Связь через'") || !clientUi.includes('l
 if (!rules.includes('validatePersonUpsert') || !controller.includes('validatePersonUpsert')) {
   failures.push('Server must enforce Contact Point uniqueness independently of the UI.');
 }
+if (!rules.includes('validateUeiUpdate') || !controller.includes('validateUeiUpdate')) {
+  failures.push('UEI updates must stay separate from the contact-via relation and reject self/cyclic routing.');
+}
 if (!cardLink.includes('assertUnambiguousPhone') || !profileThread.includes('canonicalKeys.size > 1')) {
   failures.push('Legacy duplicate phones must never silently choose the first Person.');
 }
