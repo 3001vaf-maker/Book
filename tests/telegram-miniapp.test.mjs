@@ -28,6 +28,6 @@ assert.match(telegramBot, /requiredHttpsUrl\('CLIENT_APP_URL'\)/);
 // Telegram never becomes the client identity key: booking accounts still attach to an existing client by phone.
 assert.match(cardLink, /findOrAttachExistingCard/);
 assert.match(cardLink, /cardState\(tenantId, account\.phone\)/);
-assert.match(cardLink, /accountId:\s*account\.id/);
+assert.match(cardLink, /accounts:\s*uniqueStrings\(\[\.\.\.accountIds\(card\.owner\.person\), accountId\]\)/);
 
 console.log('telegram-miniapp.test.mjs: ok');
