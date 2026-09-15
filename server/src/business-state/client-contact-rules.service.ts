@@ -118,7 +118,6 @@ export class ClientContactRulesService {
       if (!via) continue;
       const ownUei = text(relations[`person:${key}`]).toUpperCase();
       if (ownUei && ownUei === via) throw new ConflictException('UEI нельзя объединить с клиентом, указанным в «Связь через»');
-      if (!personMemberKeys(objectValue(entities[via])).length) throw new ConflictException('Клиент из «Связь через» больше не существует');
     }
 
     const viaForUei = (uei: string) => {
