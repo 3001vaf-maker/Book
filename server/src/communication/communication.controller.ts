@@ -1,9 +1,10 @@
-import { Body, Controller, Delete, Get, Headers, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CommunicationBroadcastService } from './communication-broadcast.service';
 import { CommunicationDispatchService } from './communication-dispatch.service';
 import { CommunicationHistoryService } from './communication-history.service';
+import { CommunicationService } from './communication.service';
 import { TelegramBotService } from './telegram-bot.service';
 
 type OwnerRequest = Request & { auth?: { userId: string; tenantId: string; role: string } };
@@ -12,6 +13,7 @@ type OwnerRequest = Request & { auth?: { userId: string; tenantId: string; role:
 export class CommunicationController {
   constructor(
     private readonly telegramBots: TelegramBotService,
+    private readonly communications: CommunicationService,
     private readonly history: CommunicationHistoryService,
     private readonly dispatch: CommunicationDispatchService,
     private readonly broadcasts: CommunicationBroadcastService,
@@ -53,8 +55,20 @@ export class CommunicationController {
 
   @UseGuards(JwtAuthGuard)
   @Post('chat/messages')
-  sendChatMessage(@Req() request: OwnerRequest, @Body() body: { channel?: unknown; phone?: unknown; uei?: unknown; body?: unknown; attachments?: unknown }) {
+  sendChatMessage(@Req() request: OwnerRequest, @Body() body: { channel?: unknown; phone?: unknown; uei?: unknown; body?: unknown; content?: unknown; attachments?: unknown }) {
     return this.dispatch.send(request.auth!.tenantId, body || {});
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('chat/messages/:messageId')
+  editChatMessage(@Req() request: OwnerRequest, @Param('messageId') messageId: string, @Body() body: { body?: unknown; content?: unknown }) {
+    return this.communications.editMessage(request.auth!.tenantId, messageId, { side: 'master' }, body || {});
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('chat/messages/:messageId')
+  deleteChatMessage(@Req() request: OwnerRequest, @Param('messageId') messageId: string) {
+    return this.communications.deleteMessage(request.auth!.tenantId, messageId, { side: 'master' });
   }
 
   @UseGuards(JwtAuthGuard)
