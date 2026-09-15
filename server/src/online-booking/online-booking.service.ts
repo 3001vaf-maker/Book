@@ -338,10 +338,10 @@ export class OnlineBookingService {
           person: await this.businessState.upsertBookingPersonFromAccount(tenantId, account as any),
           clientCardExisted: false,
         };
-    await this.documentState.recordAcceptedConsents(tenantId, text(binding.person.key), consents);
+    await this.consentPolicy.acceptAccountConsents(tenantId, account.id, consents, 'online-booking-registration');
     if (consents.some((item) => item.documentId === 'messages-consent' && item.accepted)) {
-      await this.consentPolicy.acceptContactPointConsent(tenantId, text(binding.person.key), 'PHONE', account.phone, 'messages-consent', 'online-booking-registration');
-      await this.consentPolicy.acceptContactPointConsent(tenantId, text(binding.person.key), 'EMAIL', account.email, 'messages-consent', 'online-booking-registration');
+      await this.consentPolicy.acceptContactPointConsent(tenantId, 'PHONE', account.phone, 'messages-consent', 'online-booking-registration');
+      await this.consentPolicy.acceptContactPointConsent(tenantId, 'EMAIL', account.email, 'messages-consent', 'online-booking-registration');
     }
     return {
       accessToken: await this.issueAccountToken(account),
@@ -359,7 +359,7 @@ export class OnlineBookingService {
       throw new UnauthorizedException('Неверный email или пароль');
     }
     const binding = await this.clientCards.bindFirstAccess(tenantId, account as any);
-    await this.documentState.recordAcceptedConsents(tenantId, text(binding.person.key), normalizeConsents(account.consents));
+    await this.consentPolicy.ensureCanonicalConsentEvents(tenantId);
     return {
       accessToken: await this.issueAccountToken(account),
       account: await this.accountView(tenantId, account),
@@ -370,24 +370,14 @@ export class OnlineBookingService {
   async getAccount(tenantId: string, accountId: string) {
     const account = await this.prisma.bookingAccount.findFirst({ where: { id: accountId, tenantId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
-    const binding = await this.clientCards.bindFirstAccess(tenantId, account as any);
-    await this.documentState.recordAcceptedConsents(tenantId, text(binding.person.key), normalizeConsents(account.consents));
+    await this.clientCards.bindFirstAccess(tenantId, account as any);
+    await this.consentPolicy.ensureCanonicalConsentEvents(tenantId);
     return this.accountView(tenantId, account);
   }
 
   async updateAccount(tenantId: string, accountId: string, body: Record<string, any>) {
     const account = await this.prisma.bookingAccount.findFirst({ where: { id: accountId, tenantId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
-    const documents = await this.documentState.publicDocuments(tenantId);
-    const incomingConsents = normalizeConsents(body.consents);
-    const previous = normalizeConsents(account.consents);
-    const merged = [...previous];
-    for (const consent of incomingConsents) {
-      const index = merged.findIndex((item) => item.documentId === consent.documentId && item.documentVersion === consent.documentVersion);
-      if (index >= 0) merged[index] = consent;
-      else merged.push(consent);
-    }
-    this.ensureRequiredConsents({ documents }, merged);
 
     const phone = text(body.phone) || account.phone;
     if (!/^\+\d{8,15}$/.test(phone)) throw new BadRequestException('Введите телефон полностью');
@@ -401,12 +391,10 @@ export class OnlineBookingService {
         surname: body.surname == null ? account.surname : text(body.surname),
         phone,
         telegramId: text(body.telegramId) || account.telegramId,
-        consents: merged as Prisma.InputJsonValue,
         profileData: profileData as Prisma.InputJsonValue,
       },
     });
-    const binding = await this.clientCards.bindFirstAccess(tenantId, updated as any);
-    await this.documentState.recordAcceptedConsents(tenantId, text(binding.person.key), merged);
+    await this.clientCards.bindFirstAccess(tenantId, updated as any);
     return this.accountView(tenantId, updated);
   }
 
@@ -429,8 +417,8 @@ export class OnlineBookingService {
     const account = await this.prisma.bookingAccount.findFirst({ where: { id: accountId, tenantId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
     const data = await this.bookingSource(tenantId);
-    const accountConsents = normalizeConsents(account.consents);
-    this.ensureRequiredConsents({ documents: data.documents }, accountConsents);
+    const consentState = await this.consentPolicy.requiredConsentState(tenantId, accountId);
+    if (!consentState.allowed) throw new ConflictException('Необходимо заново подтвердить обязательные документы');
     const workplaceKey = text(body.workplaceKey);
     const date = dateValue(body.date);
     const from = text(body.from);
@@ -481,7 +469,6 @@ export class OnlineBookingService {
     }));
     const binding = await this.clientCards.bindFirstAccess(tenantId, account as any);
     const person = binding.person;
-    await this.documentState.recordAcceptedConsents(tenantId, text(person.key), accountConsents);
     const identity = await this.businessState.bookingIdentityForAccount(tenantId, account.id);
     const pricingPerson = identity?.person || person;
     const client = {

@@ -2,7 +2,7 @@ import { normalizePhoneForStorage, phonesMatch } from '../../core/phone/index.js
 import { getMembers, getUEI } from '../../core/uei.js';
 import { queuePersonDelete, queuePersonUpsert } from '../../core/business-persistence.js';
 import { getTags } from '../../settings/tags/data.js';
-import { getLatestClientConsent, migrateLegacyConsents } from '../../settings/documents/consents.js';
+import { getLatestAccountConsent, getLatestContactConsent } from '../../settings/documents/consents.js';
 
 let peopleState = [];
 
@@ -72,17 +72,48 @@ function accepted(fact) {
   return Boolean(fact && fact.status === 'accepted');
 }
 
+function personKeyFromUEIMember(member) {
+  const value = String(member || '');
+  if (value.startsWith('person:')) return value.slice(7);
+  if (!value.includes(':')) return value;
+  return '';
+}
+
+function identityPeopleFor(person, people) {
+  const uei = getUEI('person', person.key) || '';
+  if (!uei) return [person];
+  const keys = new Set(getMembers(uei).map(personKeyFromUEIMember).filter(Boolean));
+  keys.add(person.key);
+  const members = people.filter((item) => keys.has(item.key));
+  return members.length ? members : [person];
+}
+
+function accountConsentAccepted(people, documentId) {
+  return people.some((person) => (person.accounts || []).some((accountId) => accepted(getLatestAccountConsent(accountId, documentId))));
+}
+
+function messageConsentAccepted(people) {
+  for (const person of people) {
+    if ((person.phones || []).some((value) => accepted(getLatestContactConsent('PHONE', value, 'messages-consent')))) return true;
+    if ((person.emails || []).some((value) => accepted(getLatestContactConsent('EMAIL', value, 'messages-consent')))) return true;
+    if ((person.telegrams || []).some((value) => accepted(getLatestContactConsent('TELEGRAM', value, 'messages-consent')))) return true;
+  }
+  return false;
+}
+
 export function getAllClients() {
   const stored = clone(peopleState).map(normalizeClient).filter((person) => person.key);
-  migrateLegacyConsents(stored);
-  return stored.map((person) => ({
-    ...person,
-    agreements: {
-      personalData: accepted(getLatestClientConsent(person.key, 'pdn-consent')),
-      mailings: accepted(getLatestClientConsent(person.key, 'messages-consent')),
-    },
-    uei: getUEI('person', person.key) || '',
-  }));
+  return stored.map((person) => {
+    const members = identityPeopleFor(person, stored);
+    return {
+      ...person,
+      agreements: {
+        personalData: accountConsentAccepted(members, 'pdn-consent'),
+        mailings: messageConsentAccepted(members),
+      },
+      uei: getUEI('person', person.key) || '',
+    };
+  });
 }
 
 export function getClients() {
@@ -98,13 +129,6 @@ export function getClients() {
   }
 
   return people.filter((person) => !linkedSecondary.has(person.key));
-}
-
-function personKeyFromUEIMember(member) {
-  const value = String(member || '');
-  if (value.startsWith('person:')) return value.slice(7);
-  if (!value.includes(':')) return value;
-  return '';
 }
 
 function identityKeysForUEI(uei, people = []) {
