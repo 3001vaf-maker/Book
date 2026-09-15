@@ -5,6 +5,7 @@ import {
   getPendingCapabilityChanges,
   refreshBookAccess,
 } from './access.js';
+import { getAuthToken } from './auth.js';
 import {
   getCapabilityByEntryTarget,
   getCapabilityIntro,
@@ -43,10 +44,11 @@ async function reloadPendingState() {
 }
 
 async function refreshRuntimeState() {
+  if (!getAuthToken()) return pendingState;
   if (refreshInFlight) return refreshInFlight;
   refreshInFlight = (async () => {
-    await refreshBookAccess();
     await reloadPendingState();
+    if (pendingState.summaries.length) await refreshBookAccess();
     showPendingSummary();
     return pendingState;
   })().finally(() => {
@@ -162,7 +164,7 @@ function onEntryClick(event) {
 }
 
 function activityRefresh() {
-  if (summaryModal?.isConnected || introModal?.isConnected) return;
+  if (!getAuthToken() || summaryModal?.isConnected || introModal?.isConnected) return;
   void refreshRuntimeState().catch(() => {});
 }
 
@@ -176,6 +178,6 @@ document.addEventListener('visibilitychange', () => {
 });
 
 window.addEventListener('book:access-updated', () => {
-  if (refreshInFlight || summaryModal?.isConnected || introModal?.isConnected) return;
+  if (!getAuthToken() || refreshInFlight || summaryModal?.isConnected || introModal?.isConnected) return;
   void reloadPendingState().then(showPendingSummary).catch(() => {});
 });
