@@ -5,6 +5,7 @@ import { CommunicationService } from '../communication/communication.service';
 import { ConsentPolicyService } from '../document-state/consent-policy.service';
 import { PrismaService } from '../prisma.service';
 import { OnlineBookingService } from './online-booking.service';
+import { TelegramWebAppAuthService } from './telegram-webapp-auth.service';
 
 type TelegramEntryRow = {
   id: string;
@@ -44,6 +45,7 @@ export class TelegramBookingAuthService {
     private readonly communications: CommunicationService,
     private readonly consents: ConsentPolicyService,
     private readonly booking: OnlineBookingService,
+    private readonly webAppAuth: TelegramWebAppAuthService,
   ) {}
 
   private async ticket(tenantId: string, rawToken: unknown) {
@@ -106,6 +108,20 @@ export class TelegramBookingAuthService {
       kind: 'booking-account',
     }, { expiresIn: '30d' });
     return { state: 'authenticated', authMethod: 'telegram', accessToken, account };
+  }
+
+  async createMainAppEntry(rawBotUsername: unknown, rawInitData: unknown) {
+    const verified = await this.webAppAuth.verify(rawBotUsername, rawInitData);
+    const entry = await this.communications.createTelegramEntry(verified.tenantId, {
+      telegramUserId: verified.telegramUserId,
+      username: verified.username,
+    });
+    return {
+      tenantId: verified.tenantId,
+      token: entry.token,
+      expiresAt: entry.expiresAt,
+      telegram: verified.user,
+    };
   }
 
   async exchange(tenantId: string, rawToken: unknown) {
