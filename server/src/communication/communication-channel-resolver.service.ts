@@ -92,11 +92,13 @@ export class CommunicationChannelResolverService {
     if (!(await this.consentPolicy.canSendMessages(tenantId, 'TELEGRAM', identity.externalUserId))) {
       throw new BadRequestException('Нет действующего согласия на этот Telegram Contact Point');
     }
+    const threadPhone = canonicalPhone(input?.phone) || canonicalPhone(identity.cardPhone);
+    const threadUei = text(input?.uei) || text(identity.uei);
     try {
       const result = await this.telegram.sendMessage(tenantId, identity.externalUserId, body);
       return this.communications.recordMessage(tenantId, {
-        phone: identity.cardPhone,
-        uei: identity.uei,
+        phone: threadPhone,
+        uei: threadUei,
         direction: 'outbound',
         kind: 'message',
         channel: 'TELEGRAM',
@@ -107,8 +109,8 @@ export class CommunicationChannelResolverService {
       });
     } catch (error) {
       await this.communications.recordMessage(tenantId, {
-        phone: identity.cardPhone,
-        uei: identity.uei,
+        phone: threadPhone,
+        uei: threadUei,
         direction: 'outbound',
         kind: 'message',
         channel: 'TELEGRAM',
