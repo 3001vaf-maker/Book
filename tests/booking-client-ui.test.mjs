@@ -196,8 +196,8 @@ assert.match(communicationService, /function normalizeAttachments/);
 assert.match(communicationService, /function normalizeRichContent/);
 assert.match(communicationService, /"attachments"/);
 assert.match(communicationService, /\$\{attachmentsJson\}::jsonb/);
-assert.match(communicationHistory, /m\."attachments"/);
-assert.match(communicationHistory, /'\[\]'::jsonb AS "attachments"/);
+assert.match(communicationHistory, /return this\.communications\.listThread\(tenantId, input \|\| \{\}, limit\)/);
+assert.match(communicationHistory, /return this\.communications\.listThreads\(tenantId, limit\)/);
 assert.match(messageAttachmentMigration, /ADD COLUMN "attachments" JSONB NOT NULL DEFAULT '\[\]'::jsonb/);
 
 // Shared shell owns adaptive A/J/B/C roles and compact mobile geometry.
