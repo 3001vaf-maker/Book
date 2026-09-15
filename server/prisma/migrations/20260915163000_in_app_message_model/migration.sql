@@ -1,19 +1,28 @@
 ALTER TABLE "CommunicationMessage"
-ADD COLUMN "bookingAccountId" TEXT,
+ADD COLUMN "profileKey" TEXT NOT NULL DEFAULT '',
+ADD COLUMN "actorAccountId" TEXT,
+ADD COLUMN "actorPersonKey" TEXT NOT NULL DEFAULT '',
+ADD COLUMN "actorName" TEXT NOT NULL DEFAULT '',
+ADD COLUMN "actorUei" TEXT NOT NULL DEFAULT '',
 ADD COLUMN "content" JSONB NOT NULL DEFAULT '{"version":1,"blocks":[]}'::jsonb,
 ADD COLUMN "editedAt" TIMESTAMP(3),
 ADD COLUMN "deletedAt" TIMESTAMP(3);
 
 ALTER TABLE "CommunicationMessage"
-ADD CONSTRAINT "CommunicationMessage_bookingAccountId_fkey"
-FOREIGN KEY ("bookingAccountId") REFERENCES "BookingAccount"("id")
+ADD CONSTRAINT "CommunicationMessage_actorAccountId_fkey"
+FOREIGN KEY ("actorAccountId") REFERENCES "BookingAccount"("id")
 ON DELETE SET NULL ON UPDATE CASCADE;
 
-CREATE INDEX "CommunicationMessage_tenantId_bookingAccountId_createdAt_idx"
-ON "CommunicationMessage"("tenantId", "bookingAccountId", "createdAt");
+CREATE INDEX "CommunicationMessage_tenantId_profileKey_createdAt_idx"
+ON "CommunicationMessage"("tenantId", "profileKey", "createdAt");
 
--- Recover a stable account anchor from legacy messages only when the normalized phone is unique in the tenant.
-WITH phone_matches AS (
+CREATE INDEX "CommunicationMessage_tenantId_actorAccountId_createdAt_idx"
+ON "CommunicationMessage"("tenantId", "actorAccountId", "createdAt");
+
+-- Legacy messages are anchored to the business client profile from which the account/contact originated.
+-- The profile key remains stable when a UEI is assigned. When profiles are linked, runtime profile resolution
+-- aggregates member profile keys into one thread instead of rewriting history.
+WITH phone_account_matches AS (
   SELECT m."id" AS "messageId", MIN(ba."id") AS "accountId"
   FROM "CommunicationMessage" m
   JOIN "BookingAccount" ba
@@ -37,32 +46,47 @@ WITH phone_matches AS (
        ELSE regexp_replace(m."cardPhone", '[^0-9]', '', 'g')
      END
    )
-  WHERE m."bookingAccountId" IS NULL
-    AND m."channel" = 'IN_APP'
-    AND m."cardPhone" <> ''
+  WHERE m."channel" = 'IN_APP' AND m."cardPhone" <> ''
   GROUP BY m."id"
   HAVING COUNT(*) = 1
+), account_people AS (
+  SELECT pam."messageId", pam."accountId", bp."key" AS "personKey",
+         COALESCE(NULLIF(trim(concat_ws(' ', bp."data"->>'name', bp."data"->>'surname')), ''), '') AS "actorName"
+  FROM phone_account_matches pam
+  JOIN "CommunicationMessage" m ON m."id" = pam."messageId"
+  JOIN "BusinessPerson" bp ON bp."tenantId" = m."tenantId"
+  WHERE EXISTS (
+    SELECT 1 FROM jsonb_array_elements_text(COALESCE(bp."data"->'accounts', '[]'::jsonb)) a(value)
+    WHERE a.value = pam."accountId"
+  )
 )
 UPDATE "CommunicationMessage" m
-SET "bookingAccountId" = phone_matches."accountId"
-FROM phone_matches
-WHERE m."id" = phone_matches."messageId";
+SET "profileKey" = ap."personKey",
+    "actorAccountId" = CASE WHEN m."direction" = 'inbound' THEN ap."accountId" ELSE NULL END,
+    "actorPersonKey" = CASE WHEN m."direction" = 'inbound' THEN ap."personKey" ELSE '' END,
+    "actorName" = CASE WHEN m."direction" = 'inbound' THEN ap."actorName" ELSE '' END
+FROM account_people ap
+WHERE m."id" = ap."messageId";
 
--- If phone recovery was impossible, use a unique non-empty UEI as a conservative fallback.
-WITH uei_matches AS (
-  SELECT m."id" AS "messageId", MIN(ba."id") AS "accountId"
+-- Conservative fallback for old rows without a recoverable account: unique business profile phone.
+WITH person_phone_matches AS (
+  SELECT m."id" AS "messageId", MIN(bp."key") AS "personKey"
   FROM "CommunicationMessage" m
-  JOIN "BookingAccount" ba
-    ON ba."tenantId" = m."tenantId"
-   AND ba."uei" <> ''
-   AND ba."uei" = m."uei"
-  WHERE m."bookingAccountId" IS NULL
-    AND m."channel" = 'IN_APP'
-    AND m."uei" <> ''
+  JOIN "BusinessPerson" bp ON bp."tenantId" = m."tenantId"
+  WHERE m."profileKey" = ''
+    AND m."cardPhone" <> ''
+    AND EXISTS (
+      SELECT 1
+      FROM jsonb_array_elements_text(COALESCE(bp."data"->'phones', '[]'::jsonb)) p(value)
+      WHERE regexp_replace(p.value, '[^0-9]', '', 'g') = regexp_replace(m."cardPhone", '[^0-9]', '', 'g')
+         OR (length(regexp_replace(p.value, '[^0-9]', '', 'g')) = 11
+             AND left(regexp_replace(p.value, '[^0-9]', '', 'g'), 1) = '8'
+             AND '7' || substring(regexp_replace(p.value, '[^0-9]', '', 'g') from 2) = regexp_replace(m."cardPhone", '[^0-9]', '', 'g'))
+    )
   GROUP BY m."id"
   HAVING COUNT(*) = 1
 )
 UPDATE "CommunicationMessage" m
-SET "bookingAccountId" = uei_matches."accountId"
-FROM uei_matches
-WHERE m."id" = uei_matches."messageId";
+SET "profileKey" = ppm."personKey"
+FROM person_phone_matches ppm
+WHERE m."id" = ppm."messageId";
