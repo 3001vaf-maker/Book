@@ -4,6 +4,7 @@ import { BusinessStateModule } from '../business-state/business-state.module';
 import { DocumentStateModule } from '../document-state/document-state.module';
 import { NotificationModule } from '../notification/notification.module';
 import { PrismaService } from '../prisma.service';
+import { ClientProfileThreadService } from './client-profile-thread.service';
 import { CommunicationBroadcastService } from './communication-broadcast.service';
 import { CommunicationChannelResolverService } from './communication-channel-resolver.service';
 import { CommunicationController } from './communication.controller';
@@ -15,7 +16,7 @@ import { TelegramBotService } from './telegram-bot.service';
 @Module({
   imports: [AuthModule, BusinessStateModule, DocumentStateModule, NotificationModule],
   controllers: [CommunicationController],
-  providers: [CommunicationService, CommunicationHistoryService, CommunicationChannelResolverService, CommunicationDispatchService, CommunicationBroadcastService, TelegramBotService, PrismaService],
-  exports: [CommunicationService, CommunicationHistoryService, CommunicationChannelResolverService, CommunicationDispatchService, CommunicationBroadcastService, TelegramBotService],
+  providers: [ClientProfileThreadService, CommunicationService, CommunicationHistoryService, CommunicationChannelResolverService, CommunicationDispatchService, CommunicationBroadcastService, TelegramBotService, PrismaService],
+  exports: [ClientProfileThreadService, CommunicationService, CommunicationHistoryService, CommunicationChannelResolverService, CommunicationDispatchService, CommunicationBroadcastService, TelegramBotService],
 })
 export class CommunicationModule {}
