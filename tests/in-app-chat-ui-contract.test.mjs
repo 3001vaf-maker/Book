@@ -9,9 +9,18 @@ const ownerApi = await readFile(new URL('../core/communications/chat.js', import
 for (const source of [master, client]) {
   assert.match(source, /bindRichTextEditor/);
   assert.match(source, /messageThread\(messages, \{ viewer: '[^']+', actions: true \}\)/);
-  assert.match(source, /data-message-delete/);
-  assert.match(source, /data-message-edit/);
+  assert.match(source, /data-message-actions/);
 }
+
+assert.match(master, /data-message-delete/);
+assert.match(master, /data-message-edit/);
+assert.match(master, /editCommunicationMessage\(message\.id, value\)/);
+assert.match(master, /deleteCommunicationMessage\(message\.id\)/);
+
+assert.match(client, /data-client-message-delete/);
+assert.match(client, /data-client-message-edit/);
+assert.match(client, /editBookingChatMessage\(state\.tenantId, message\.id, value\)/);
+assert.match(client, /deleteBookingChatMessage\(state\.tenantId, message\.id\)/);
 
 assert.match(master, /sendCommunicationMessage\(\{ profileKey, phone, uei, body: value\.body, content: value\.content, attachments \}\)/);
 assert.match(master, /threadProfileKey/);
