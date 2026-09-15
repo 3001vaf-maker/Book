@@ -70,7 +70,7 @@ expect(styleCss.includes('--app-max-width:390px'), 'Book must use one shared 390
 expect(!clientMobileCss.includes('--app-max-width:'), 'Client shell must inherit the shared Book application width instead of redefining it.');
 expect(!clientMobileCss.includes('max-width:none'), 'Client application must never disable its phone-width limit.');
 expect(!accountShell.includes("document.createElement('style')") && !accountShell.includes('<style>'), 'Client features must not own local CSS.');
-expect(accountShell.includes("messageComposer({ attachments: true })"), 'Client chat must use the shared composer with media attachment control.');
+expect(accountShell.includes("messageComposer({ attachments: true, rich: true })"), 'Client chat must use the shared rich composer with media attachment control.');
 expect(accountShell.includes("label: 'Повторить запись'"), 'Client history must use the agreed repeat-booking action.');
 expect(accountShell.includes("label: 'Согласия'"), 'Client account and chat settings must expose consent controls.');
 expect(consentSettings.includes('revokeBookingConsent'), 'Client consent settings must use the canonical server-backed revoke flow.');
