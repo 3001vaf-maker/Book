@@ -1,0 +1,24 @@
+name: Live Book Probe
+
+on:
+  push:
+    branches: [probe/telegram-live]
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe production frontend
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --max-time 30 https://3001vaf-maker.github.io/Book/ -o /tmp/book.html
+          grep -q 'telegram.org/js/telegram-web-app.js' /tmp/book.html
+          grep -q 'core/bootstrap.js' /tmp/book.html
+          echo 'frontend=ok'
+      - name: Probe production API health
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --max-time 30 https://book-api-volokovykh.amvera.io/health | tee /tmp/health.json
+          grep -q '"status":"ok"' /tmp/health.json
+          grep -q '"bookingAutonomy":"server"' /tmp/health.json
+          echo 'api=ok'
