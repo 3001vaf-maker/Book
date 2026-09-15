@@ -6,8 +6,8 @@ const person = (key, values = {}) => ({ key, name: key, phones: [], emails: [], 
 
 assert.throws(() => assertNoNewClientContactConflicts(
   [person('a', { phones: ['+7 903 000-00-01'] })],
-  [person('a', { phones: ['+7 903 000-00-01'] }), person('b', { phones: ['8 903 000 00 01'] })],
-), /Телефон уже принадлежит клиенту/);
+  [person('a', { phones: ['+7 903 000-00-01'], uei: '0020' }), person('b', { phones: ['8 903 000 00 01'] })],
+), /Телефон уже принадлежит клиенту 0020/);
 
 assert.doesNotThrow(() => assertNoNewClientContactConflicts(
   [person('a', { phones: ['+7 903 000-00-01'] }), person('b', { phones: ['8 903 000 00 01'] })],
@@ -32,11 +32,13 @@ const controller = await readFile(new URL('../server/src/business-state/business
 const cardLink = await readFile(new URL('../server/src/online-booking/client-card-link.service.ts', import.meta.url), 'utf8');
 const booking = await readFile(new URL('../server/src/online-booking/online-booking.service.ts', import.meta.url), 'utf8');
 const bookingController = await readFile(new URL('../server/src/online-booking/online-booking.controller.ts', import.meta.url), 'utf8');
+const profileThread = await readFile(new URL('../server/src/communication/client-profile-thread.service.ts', import.meta.url), 'utf8');
 const route = await readFile(new URL('../server/src/communication/client-contact-route.service.ts', import.meta.url), 'utf8');
 const dispatch = await readFile(new URL('../server/src/communication/communication-dispatch.service.ts', import.meta.url), 'utf8');
 const broadcast = await readFile(new URL('../server/src/communication/communication-broadcast.service.ts', import.meta.url), 'utf8');
 
-assert.match(clientData, /assertNoNewClientContactConflicts\(peopleState, normalized\)/);
+assert.match(clientData, /assertNoNewClientContactConflicts\(peopleState, validationPeople\)/);
+assert.match(clientData, /uei: getUEI\('person', person\.key\) \|\| ''/);
 assert.match(clientData, /contactViaUei:/);
 assert.match(clientUi, /label:'Связь через'/);
 assert.match(clientUi, /label:option\.value/);
@@ -48,6 +50,7 @@ assert.match(rules, /Email/);
 assert.match(rules, /Telegram/);
 assert.match(controller, /validatePersonUpsert/);
 assert.match(cardLink, /assertUnambiguousPhone/);
+assert.match(profileThread, /canonicalKeys\.size > 1/);
 assert.match(cardLink, /validateNewAccountContacts/);
 assert.match(cardLink, /validateAccountContactUpdate/);
 assert.match(bookingController, /validateNewAccountContacts/);
