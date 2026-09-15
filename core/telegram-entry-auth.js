@@ -4,6 +4,7 @@ import {
   getBookingContext,
   registerBookingTelegramAccount,
 } from './booking-account/index.js';
+import { API_BASE } from './environment.js';
 import { normalizePhone } from './phone/index.js';
 import { requiredBookingDocuments } from '../online-booking/model.js';
 
@@ -16,10 +17,17 @@ function escapeHtml(value = '') {
     .replaceAll("'", '&#039;');
 }
 
-function removeTelegramEntryFromUrl() {
+function replaceTelegramRoute({ tenantId = '', entryToken = '', removeBot = false } = {}) {
   const url = new URL(location.href);
-  url.searchParams.delete('tg_entry');
+  if (tenantId) url.searchParams.set('booking', tenantId);
+  if (entryToken) url.searchParams.set('tg_entry', entryToken);
+  else url.searchParams.delete('tg_entry');
+  if (removeBot) url.searchParams.delete('tg_bot');
   history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+}
+
+function removeTelegramEntryFromUrl() {
+  replaceTelegramRoute({});
 }
 
 function telegramUserPrefill() {
@@ -42,6 +50,18 @@ function renderStatus(app, title, message, action = '') {
         ${action}
       </section>
     </main>`;
+}
+
+async function createTelegramMainAppEntry(botUsername, initData) {
+  const cleanBot = String(botUsername || '').trim().replace(/^@+/, '');
+  const response = await fetch(`${API_BASE}/online-booking/telegram-main-app/${encodeURIComponent(cleanBot)}/entry`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: String(initData || '') }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.message || 'Не удалось подтвердить Telegram Mini App');
+  return payload;
 }
 
 function consentMarkup(documents) {
@@ -145,14 +165,7 @@ function telegramRegistration(app, tenantId, entryToken, context) {
   });
 }
 
-export async function prepareTelegramEntryAuth() {
-  const params = new URLSearchParams(location.search);
-  const tenantId = String(params.get('booking') || '').trim();
-  const entryToken = String(params.get('tg_entry') || '').trim();
-  if (!tenantId || !entryToken) return;
-
-  const app = document.querySelector('#app');
-  if (!app) return;
+async function runTelegramEntryAuth(app, tenantId, entryToken) {
   renderStatus(app, 'Вход через Telegram', 'Проверяем Telegram…');
 
   try {
@@ -181,4 +194,41 @@ export async function prepareTelegramEntryAuth() {
       });
     });
   }
+}
+
+export async function prepareTelegramEntryAuth() {
+  const params = new URLSearchParams(location.search);
+  let tenantId = String(params.get('booking') || '').trim();
+  let entryToken = String(params.get('tg_entry') || '').trim();
+  const mainAppBot = String(params.get('tg_bot') || '').trim();
+  const app = document.querySelector('#app');
+
+  if (!entryToken && mainAppBot) {
+    if (!app) return { halt: true };
+    const initData = String(window.Telegram?.WebApp?.initData || '').trim();
+    if (!initData) {
+      renderStatus(app, 'Telegram Mini App', 'Откройте приложение из Telegram.');
+      return { halt: true };
+    }
+    renderStatus(app, 'Вход через Telegram', 'Проверяем Telegram…');
+    try {
+      const entry = await createTelegramMainAppEntry(mainAppBot, initData);
+      tenantId = String(entry?.tenantId || '').trim();
+      entryToken = String(entry?.token || '').trim();
+      if (!tenantId || !entryToken) throw new Error('Telegram Mini App не определил аккаунт мастера');
+      replaceTelegramRoute({ tenantId, entryToken, removeBot: true });
+    } catch (error) {
+      renderStatus(
+        app,
+        'Telegram-вход недоступен',
+        error instanceof Error ? error.message : 'Не удалось подтвердить Telegram Mini App',
+      );
+      return { halt: true };
+    }
+  }
+
+  if (!tenantId || !entryToken) return { halt: false };
+  if (!app) return { halt: true };
+  await runTelegramEntryAuth(app, tenantId, entryToken);
+  return { halt: false };
 }
