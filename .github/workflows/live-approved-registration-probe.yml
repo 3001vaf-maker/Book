@@ -1,0 +1,33 @@
+name: Probe approved registration flow live
+
+on:
+  push:
+    branches:
+      - probe/approved-registration-live
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify production registration flow
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='https://3001vaf-maker.github.io/Book'
+          auth="$(curl --retry 5 --retry-delay 2 --fail --silent --show-error "$BASE/core/telegram-entry-auth.js")"
+          flow="$(curl --retry 5 --retry-delay 2 --fail --silent --show-error "$BASE/telegram-registration-flow.js")"
+
+          printf '%s' "$auth" | grep -q 'runTelegramRegistrationFlow'
+          printf '%s' "$auth" | grep -q 'Registration keeps the approved Book screens and order'
+          printf '%s' "$flow" | grep -q 'title: settings.welcomeTitle'
+          printf '%s' "$flow" | grep -q "title: 'Соглашения'"
+          printf '%s' "$flow" | grep -q "title: 'Ваши данные'"
+          printf '%s' "$flow" | grep -q "label: 'Имя'"
+          printf '%s' "$flow" | grep -q "label: 'Фамилия'"
+          printf '%s' "$flow" | grep -q "label: 'Телефон'"
+          printf '%s' "$flow" | grep -q "label: 'Email'"
+          ! printf '%s' "$flow" | grep -q 'Регистрация через Telegram'
+          ! printf '%s' "$flow" | grep -q 'Telegram уже подтверждён. Пароль не нужен.'
+          ! printf '%s' "$flow" | grep -q "name: 'password'"
+
+          echo 'production approved registration flow: OK'
