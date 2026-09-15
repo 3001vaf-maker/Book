@@ -1,6 +1,7 @@
 import { button, details, initPaymentForm, initPaymentMethods, modal, mountModal, paymentForm, paymentMethods, paymentReceipt, select, shortDate, shortDateTimeParts, shortTime } from '../ui/ui.js';
 import { calculateFinancialPlan, getRecordPaymentState, recordFinancialItems } from '../core/finance/index.js';
 import { cancelPaymentOperation, getRefundsForPayment, recordPaymentIncome, recordRefundExpense } from '../core/finance/index.js';
+import { canUseBookCapability } from '../core/access.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getAllClients } from '../main/clients/data.js';
 import { clientDisplay } from '../main/clients/presentation.js';
@@ -313,7 +314,7 @@ function openPaidState(record) {
 }
 
 export function openRecordPaymentEntry(record) {
-  if (!record?.id) return () => {};
+  if (!record?.id || !canUseBookCapability('payments.access')) return () => {};
   const bottom = mountModal(document.body, modal(paymentEntryContent(record), { variant: 'bottom' }));
   if (!bottom) return () => {};
 

@@ -9,6 +9,7 @@ function installStyles() {
   style.id = 'manual-invite-styles';
   style.textContent = `
     #${BUTTON_ID}{position:fixed;right:24px;bottom:24px;z-index:80;border:0;border-radius:14px;padding:13px 18px;background:#292522;color:#fff;font:700 14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;cursor:pointer;box-shadow:0 10px 30px rgba(41,37,34,.22)}
+    #${BUTTON_ID}[hidden]{display:none!important}
     #${MODAL_ID}{position:fixed;inset:0;z-index:90;background:rgba(41,37,34,.35);display:grid;place-items:center;padding:20px}
     #${MODAL_ID} .manual-card{width:min(100%,560px);background:#fff;border-radius:20px;padding:24px;box-shadow:0 24px 70px rgba(41,37,34,.25);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#292522}
     #${MODAL_ID} h3{margin:0 0 8px;font-size:22px} #${MODAL_ID} p{margin:0 0 16px;color:#817a74;line-height:1.45}
@@ -80,14 +81,19 @@ function ensureButton() {
     document.querySelector(`#${BUTTON_ID}`)?.remove();
     return;
   }
-  if (document.querySelector(`#${BUTTON_ID}`)) return;
-  installStyles();
-  const button = document.createElement('button');
-  button.id = BUTTON_ID;
-  button.type = 'button';
-  button.textContent = 'Бесплатный доступ';
-  button.addEventListener('click', () => createManualInvitation(button));
-  document.body.append(button);
+
+  let button = document.querySelector(`#${BUTTON_ID}`);
+  if (!button) {
+    installStyles();
+    button = document.createElement('button');
+    button.id = BUTTON_ID;
+    button.type = 'button';
+    button.textContent = 'Бесплатный доступ';
+    button.addEventListener('click', () => createManualInvitation(button));
+    document.body.append(button);
+  }
+
+  button.hidden = Boolean(document.querySelector('.admin-drawer-backdrop, #manual-invite-modal'));
 }
 
 const observer = new MutationObserver(ensureButton);

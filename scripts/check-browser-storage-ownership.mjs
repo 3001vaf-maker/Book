@@ -8,6 +8,7 @@ const STORAGE_PATTERN = /\b(localStorage|sessionStorage|indexedDB|caches\b|Cache
 
 const TECHNICAL_STORAGE_OWNERS = new Set([
   'core/auth.js',
+  'core/access.js',
   'core/booking-account/index.js',
   'core/workplace-context.js',
   'main/clients/view-state.js',
