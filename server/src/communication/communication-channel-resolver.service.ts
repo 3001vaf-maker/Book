@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { ConsentPolicyService } from '../document-state/consent-policy.service';
 import { PrismaService } from '../prisma.service';
+import { ClientProfileThreadService } from './client-profile-thread.service';
 import { CommunicationService } from './communication.service';
 import { TelegramBotService } from './telegram-bot.service';
 
@@ -25,10 +26,17 @@ function canonicalPhone(value: unknown) {
 export class CommunicationChannelResolverService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly profiles: ClientProfileThreadService,
     private readonly communications: CommunicationService,
     private readonly consentPolicy: ConsentPolicyService,
     private readonly telegram: TelegramBotService,
   ) {}
+
+  async resolveInAppProfile(tenantId: string, input: { profileKey?: unknown; phone?: unknown; uei?: unknown }) {
+    const profileKey = text(input?.profileKey);
+    if (profileKey) return this.profiles.byProfileKey(tenantId, profileKey).catch(() => null);
+    return this.profiles.byLegacy(tenantId, input || {}).catch(() => null);
+  }
 
   async resolveTelegramIdentity(tenantId: string, input: { phone?: unknown; uei?: unknown }) {
     const direct = await this.communications.telegramIdentity(tenantId, input || {});
@@ -97,6 +105,7 @@ export class CommunicationChannelResolverService {
     try {
       const result = await this.telegram.sendMessage(tenantId, identity.externalUserId, body);
       return this.communications.recordMessage(tenantId, {
+        bookingAccountId: identity.bookingAccountId,
         phone: threadPhone,
         uei: threadUei,
         direction: 'outbound',
@@ -109,6 +118,7 @@ export class CommunicationChannelResolverService {
       });
     } catch (error) {
       await this.communications.recordMessage(tenantId, {
+        bookingAccountId: identity.bookingAccountId,
         phone: threadPhone,
         uei: threadUei,
         direction: 'outbound',
