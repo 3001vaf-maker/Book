@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { CommunicationChannelResolverService } from './communication-channel-resolver.service';
 import { CommunicationService } from './communication.service';
 import { CommunicationHistoryService } from './communication-history.service';
-import { TelegramBotService } from './telegram-bot.service';
 
 function text(value: unknown) { return String(value ?? '').trim(); }
 
@@ -10,12 +10,12 @@ export class CommunicationDispatchService {
   constructor(
     private readonly communications: CommunicationService,
     private readonly history: CommunicationHistoryService,
-    private readonly telegram: TelegramBotService,
+    private readonly channels: CommunicationChannelResolverService,
   ) {}
 
   private async availableChannels(tenantId: string, input: { phone?: unknown; uei?: unknown }) {
     const channels: string[] = [];
-    if (await this.communications.telegramIdentity(tenantId, input || {})) channels.push('TELEGRAM');
+    if (await this.channels.resolveTelegramIdentity(tenantId, input || {})) channels.push('TELEGRAM');
     return channels;
   }
 
@@ -52,7 +52,7 @@ export class CommunicationDispatchService {
     }
 
     const channel = await this.resolveChannel(tenantId, input || {});
-    if (channel === 'TELEGRAM') return this.telegram.sendChatMessage(tenantId, { phone: input?.phone, uei: input?.uei, body });
+    if (channel === 'TELEGRAM') return this.channels.sendTelegram(tenantId, { phone: input?.phone, uei: input?.uei, body });
     throw new BadRequestException('Канал пока не подключён к двустороннему Chat');
   }
 }
