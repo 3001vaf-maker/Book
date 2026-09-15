@@ -10,9 +10,9 @@ import { clientDisplay } from './presentation.js';
 import { getClientSortMode, setClientSortMode } from './view-state.js';
 
 const name=p=>[p.name,p.surname].filter(Boolean).join(' '), money=v=>new Intl.NumberFormat('ru-RU').format(Number(v||0))+' ₽';
-function sortItems(items,mode){return [...items].sort((a,b)=>{if(mode.startsWith('name')){const n=name(a).localeCompare(name(b),'ru');return mode==='nameDesc'?-n:n}const av=a.lastVisit?Date.parse(a.lastVisit):0,bv=b.lastVisit?Date.parse(b.lastVisit):0;return mode==='lastDesc'?bv-av:av-bv})}
+function sortItems(items,mode){return [...items].sort((a,b)=>{if(mode.startsWith('uei')){const av=String(clientDisplay(a).uei||'').trim(),bv=String(clientDisplay(b).uei||'').trim();if(!av&&!bv)return name(a).localeCompare(name(b),'ru');if(!av)return 1;if(!bv)return-1;const n=av.localeCompare(bv,'ru',{numeric:true,sensitivity:'base'});if(n)return mode==='ueiDesc'?-n:n;return name(a).localeCompare(name(b),'ru')}if(mode.startsWith('name')){const n=name(a).localeCompare(name(b),'ru');return mode==='nameDesc'?-n:n}const av=a.lastVisit?Date.parse(a.lastVisit):0,bv=b.lastVisit?Date.parse(b.lastVisit):0;return mode==='lastDesc'?bv-av:av-bv})}
 function initial(p){return name(p).slice(0,1).toUpperCase()||'?'}
-function sortOptions(){return [['nameAsc','Имя ↑'],['nameDesc','Имя ↓'],['lastAsc','Последнее посещение ↑'],['lastDesc','Последнее посещение ↓']].map(([value,label])=>({value,label}))}
+function sortOptions(){return [['ueiAsc','Код ↑'],['ueiDesc','Код ↓'],['nameAsc','Имя ↑'],['nameDesc','Имя ↓'],['lastAsc','Последнее посещение ↑'],['lastDesc','Последнее посещение ↓']].map(([value,label])=>({value,label}))}
 function consentStatus(fact){if(!fact)return'Не подписано';if(fact.status==='revoked')return'Отозвано';if(fact.status==='declined')return'Не подписано';return'Подписано'}
 function consentMoment(fact){const value=fact?.eventAt||fact?.revokedAt||fact?.acceptedAt||fact?.createdAt||'';return shortDateTime(value,'—')}
 function consentSource(source){if(source==='online-booking'||source==='online-booking-registration')return'Онлайн-запись';if(source==='legacy')return'Перенесено из прежних данных';if(source==='manual')return'Вручную';return source||'—'}

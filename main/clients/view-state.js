@@ -1,6 +1,6 @@
 const SORT_KEY = 'book.people.sort';
-const DEFAULT_SORT = 'nameAsc';
-const SORT_MODES = new Set(['nameAsc', 'nameDesc', 'lastAsc', 'lastDesc']);
+const DEFAULT_SORT = 'ueiAsc';
+const SORT_MODES = new Set(['ueiAsc', 'ueiDesc', 'nameAsc', 'nameDesc', 'lastAsc', 'lastDesc']);
 
 export function getClientSortMode() {
   const value = localStorage.getItem(SORT_KEY) || DEFAULT_SORT;
