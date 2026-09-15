@@ -58,6 +58,18 @@ function writeSeenCapabilities(tenantId, keys) {
   }
 }
 
+function publishAccessChange() {
+  if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function' || typeof CustomEvent === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('book:access-updated', {
+    detail: {
+      access: currentAccess,
+      changed: lastAccessChange.changed,
+      newlyEnabled: [...lastAccessChange.newlyEnabled],
+      newlyDisabled: [...lastAccessChange.newlyDisabled],
+    },
+  }));
+}
+
 function applyAccess(value) {
   const previousFingerprint = currentFingerprint;
   currentAccess = value && typeof value === 'object' ? value : currentAccess;
@@ -77,6 +89,7 @@ function applyAccess(value) {
     newlyEnabled,
     newlyDisabled,
   };
+  publishAccessChange();
   return currentAccess;
 }
 
