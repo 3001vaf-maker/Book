@@ -1,4 +1,4 @@
-import { getCommunicationThread, getCommunicationThreads, sendCommunicationMessage } from '../core/communications/chat.js';
+import { deleteCommunicationMessage, editCommunicationMessage, getCommunicationThread, getCommunicationThreads, sendCommunicationMessage } from '../core/communications/chat.js';
 import {
   deleteBroadcastTemplate,
   deleteCommunicationGroup,
@@ -8,10 +8,11 @@ import {
   saveCommunicationGroup,
   sendBroadcast,
 } from '../core/communications/broadcasts.js';
-import { findPeopleByPhone, getAllClients } from '../main/clients/data.js';
+import { findPeopleByPhone, getAllClients, getClients } from '../main/clients/data.js';
 import {
   appHeader,
   appShell,
+  bindRichTextEditor,
   button,
   checkList,
   collectCheckList,
@@ -44,6 +45,24 @@ function phoneOf(person = {}) {
   return String((Array.isArray(person.phones) ? person.phones : []).find(Boolean) || '');
 }
 
+function personByProfileKey(key) {
+  const profileKey = String(key || '').trim();
+  if (!profileKey) return null;
+  return getAllClients().find((person) => String(person.key || '') === profileKey) || null;
+}
+
+function threadProfileKey(thread = {}) {
+  return String(thread.threadProfileKey || thread.profileKey || '').trim();
+}
+
+function threadName(thread = {}) {
+  const named = String(thread.threadProfileName || '').trim();
+  if (named) return named;
+  const person = personByProfileKey(threadProfileKey(thread));
+  if (person) return personName(person);
+  return clientName(thread.cardPhone, thread.uei);
+}
+
 function messageTime(value) {
   const date = new Date(value || 0);
   if (!Number.isFinite(date.getTime())) return '';
@@ -52,6 +71,12 @@ function messageTime(value) {
 
 function withTimes(messages = []) {
   return (Array.isArray(messages) ? messages : []).map((message) => ({ ...message, time: messageTime(message.createdAt) }));
+}
+
+function messageContent(message = {}) {
+  if (Array.isArray(message?.content?.blocks) && message.content.blocks.length) return message.content;
+  const body = String(message.body || '').trim();
+  return body ? { version: 1, blocks: [{ type: 'paragraph', spans: [{ text: body, marks: [] }] }] } : { version: 1, blocks: [] };
 }
 
 function screen(root, header, body = '', className = '') {
@@ -101,11 +126,11 @@ function bindMessageAttachments(form) {
 }
 
 function peopleList() {
-  return getAllClients().filter((person) => person.key && phoneOf(person));
+  return getClients().filter((person) => person.key);
 }
 
 function personByKey(key) {
-  return peopleList().find((person) => String(person.key) === String(key)) || null;
+  return getAllClients().find((person) => String(person.key) === String(key)) || null;
 }
 
 function recipientLabel(recipient = {}) {
@@ -116,7 +141,7 @@ function recipientLabel(recipient = {}) {
   return 'Получатели';
 }
 
-async function chooseTemplate(input) {
+async function chooseTemplate(applyTemplate) {
   const templates = await getBroadcastTemplates();
   if (!templates.length) return;
   const layer = mountModal(document.body, modal(listEntries(templates.map((template, index) => listEntry({
@@ -127,33 +152,39 @@ async function chooseTemplate(input) {
   }))), { title: 'Шаблоны', variant: 'large', surface: 'app' }));
   layer?.querySelectorAll('[data-chat-template]').forEach((node) => node.addEventListener('click', () => {
     const template = templates[Number(node.dataset.chatTemplate)];
-    if (template && input) input.value = template.body || '';
+    if (template) applyTemplate?.(template.body || '');
     layer.remove();
-    input?.focus();
   }));
 }
 
 async function renderCompose(root, state, recipient) {
   state.view = 'compose';
   state.recipient = recipient;
-  const allowsAttachments = recipient.mode === 'one';
+  const oneClient = recipient.mode === 'one';
   screen(root, appHeader({
     title: 'Новое сообщение',
     back: { data: 'data-master-compose-back', aria: 'К диалогам' },
   }), `
     <div class="action-block"><strong>Кому: ${recipientLabel(recipient)}</strong></div>
     ${button('Выбрать шаблон', { variant: 'secondary', data: 'data-master-template-choose' })}
-    ${messageComposer({ placeholder: 'Написать сообщение...', attachments: allowsAttachments })}
+    ${messageComposer({ placeholder: 'Написать сообщение...', attachments: oneClient, rich: oneClient })}
     <div class="muted" data-master-compose-status aria-live="polite"></div>
   `, 'app-view-shell--chat');
   root.querySelector('[data-master-compose-back]')?.addEventListener('click', () => void renderThreads(root, state));
   const form = root.querySelector('[data-message-composer]');
-  const input = form?.querySelector('[name="message"]');
-  const getAttachments = allowsAttachments ? bindMessageAttachments(form) : () => [];
-  root.querySelector('[data-master-template-choose]')?.addEventListener('click', () => void chooseTemplate(input));
+  const plainInput = form?.querySelector('[name="message"]');
+  const richEditor = oneClient ? bindRichTextEditor(form) : null;
+  const getAttachments = oneClient ? bindMessageAttachments(form) : () => [];
+  root.querySelector('[data-master-template-choose]')?.addEventListener('click', () => void chooseTemplate((templateBody) => {
+    if (richEditor) richEditor.setValue(messageContent({ body: templateBody }));
+    else if (plainInput) plainInput.value = templateBody;
+    (richEditor || { focus: () => plainInput?.focus() }).focus();
+  }));
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const body = String(input?.value || '').trim();
+    const richValue = richEditor?.getValue();
+    const body = oneClient ? String(richValue?.body || '').trim() : String(plainInput?.value || '').trim();
+    const content = oneClient ? richValue?.content || null : null;
     const attachments = getAttachments();
     if (!body && !attachments.length) return;
     const submit = form.querySelector('button[type="submit"]');
@@ -161,10 +192,10 @@ async function renderCompose(root, state, recipient) {
     if (submit) submit.disabled = true;
     if (status) status.textContent = 'Отправляем…';
     try {
-      if (recipient.mode === 'one') {
+      if (oneClient) {
         const person = personByKey(recipient.personKeys?.[0]);
         if (!person) throw new Error('Клиент не найден');
-        await sendCommunicationMessage({ phone: phoneOf(person), uei: person.uei || '', body, attachments });
+        await sendCommunicationMessage({ profileKey: person.key, phone: phoneOf(person), uei: person.uei || '', body, content, attachments });
       } else {
         await sendBroadcast({
           channel: 'TELEGRAM',
@@ -323,29 +354,82 @@ function openMasterChatSettings() {
   layer?.querySelector('[data-chat-templates]')?.addEventListener('click', () => { layer.remove(); void manageTemplates(); });
 }
 
+function openMessageActions(root, state, thread, message) {
+  const layer = mountModal(document.body, modal(settingsPanel([
+    { label: 'Изменить', data: 'data-message-edit' },
+    { label: 'Удалить', data: 'data-message-delete', variant: 'danger' },
+  ]), { title: 'Сообщение', variant: 'medium', surface: 'app' }));
+  layer?.querySelector('[data-message-edit]')?.addEventListener('click', () => {
+    layer.remove();
+    const editLayer = mountModal(document.body, modal(`<form class="form-grid" data-message-edit-form>${messageComposer({ placeholder: 'Сообщение', attachments: false, rich: true, embedded: true, value: messageContent(message) })}<div class="muted" data-message-edit-status></div></form>`, { title: 'Изменить сообщение', variant: 'large', surface: 'app' }));
+    const form = editLayer?.querySelector('[data-message-edit-form]');
+    const editor = bindRichTextEditor(form, { value: messageContent(message) });
+    form?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const value = editor.getValue();
+      if (!value.body) return;
+      const submit = form.querySelector('button[type="submit"]');
+      if (submit) submit.disabled = true;
+      try {
+        await editCommunicationMessage(message.id, value);
+        editLayer.remove();
+        await openThread(root, state, thread);
+      } catch (error) {
+        const status = form.querySelector('[data-message-edit-status]');
+        if (status) status.textContent = error instanceof Error ? error.message : 'Не удалось изменить';
+        if (submit) submit.disabled = false;
+      }
+    });
+  });
+  layer?.querySelector('[data-message-delete]')?.addEventListener('click', () => {
+    layer.remove();
+    const confirmLayer = mountModal(document.body, modal(`<div class="form-grid"><p>Удалить это сообщение?</p>${button('Удалить', { variant: 'danger', data: 'data-message-delete-confirm' })}${button('Отмена', { variant: 'secondary', data: 'data-message-delete-cancel' })}<div class="muted" data-message-delete-status></div></div>`, { title: 'Удаление сообщения', variant: 'medium', surface: 'app' }));
+    confirmLayer?.querySelector('[data-message-delete-cancel]')?.addEventListener('click', () => confirmLayer.remove());
+    confirmLayer?.querySelector('[data-message-delete-confirm]')?.addEventListener('click', async () => {
+      const control = confirmLayer.querySelector('[data-message-delete-confirm]');
+      if (control) control.disabled = true;
+      try {
+        await deleteCommunicationMessage(message.id);
+        confirmLayer.remove();
+        await openThread(root, state, thread);
+      } catch (error) {
+        const status = confirmLayer.querySelector('[data-message-delete-status]');
+        if (status) status.textContent = error instanceof Error ? error.message : 'Не удалось удалить';
+        if (control) control.disabled = false;
+      }
+    });
+  });
+}
+
 async function openThread(root, state, thread) {
   state.view = 'thread';
   state.thread = thread;
+  const profileKey = threadProfileKey(thread);
   const phone = String(thread?.cardPhone || '').trim();
-  const uei = String(thread?.uei || '').trim();
-  screen(root, appHeader({ title: clientName(phone, uei), back: { data: 'data-chat-back', aria: 'К диалогам' } }), emptyState('Загрузка', 'Получаем переписку.'), 'app-view-shell--chat');
+  const uei = String(thread?.threadProfileUei || thread?.uei || '').trim();
+  const title = threadName(thread);
+  screen(root, appHeader({ title, back: { data: 'data-chat-back', aria: 'К диалогам' } }), emptyState('Загрузка', 'Получаем переписку.'), 'app-view-shell--chat');
   try {
-    const messages = withTimes(await getCommunicationThread({ phone, uei }));
-    screen(root, appHeader({ title: clientName(phone, uei), back: { data: 'data-chat-back', aria: 'К диалогам' } }), `${messages.length ? messageThread(messages, { viewer: 'master' }) : emptyState('Сообщений пока нет', 'Напишите клиенту первое сообщение.')}${messageComposer({ placeholder: 'Написать сообщение...', attachments: true })}<div class="muted" data-chat-status aria-live="polite"></div>`, 'app-view-shell--chat');
+    const messages = withTimes(await getCommunicationThread({ profileKey, phone, uei }));
+    screen(root, appHeader({ title, back: { data: 'data-chat-back', aria: 'К диалогам' } }), `${messages.length ? messageThread(messages, { viewer: 'master', actions: true }) : emptyState('Сообщений пока нет', 'Напишите клиенту первое сообщение.')}${messageComposer({ placeholder: 'Написать сообщение...', attachments: true, rich: true })}<div class="muted" data-chat-status aria-live="polite"></div>`, 'app-view-shell--chat');
     root.querySelector('[data-chat-back]')?.addEventListener('click', () => void renderThreads(root, state));
+    root.querySelectorAll('[data-message-actions]').forEach((control) => control.addEventListener('click', () => {
+      const message = messages.find((item) => String(item.id) === String(control.dataset.messageActions));
+      if (message) openMessageActions(root, state, thread, message);
+    }));
     const form = root.querySelector('[data-message-composer]');
+    const editor = bindRichTextEditor(form);
     const getAttachments = bindMessageAttachments(form);
     form?.addEventListener('submit', async (event) => {
       event.preventDefault();
-      const input = form.querySelector('[name="message"]');
-      const body = String(input?.value || '').trim();
+      const value = editor.getValue();
       const attachments = getAttachments();
-      if (!body && !attachments.length) return;
+      if (!value.body && !attachments.length) return;
       const submit = form.querySelector('button[type="submit"]');
       const status = root.querySelector('[data-chat-status]');
       if (submit) submit.disabled = true;
       try {
-        await sendCommunicationMessage({ phone, uei, body, attachments });
+        await sendCommunicationMessage({ profileKey, phone, uei, body: value.body, content: value.content, attachments });
         await openThread(root, state, thread);
       } catch (error) {
         if (status) status.textContent = error instanceof Error ? error.message : 'Не удалось отправить';
@@ -353,7 +437,7 @@ async function openThread(root, state, thread) {
       }
     });
   } catch (error) {
-    screen(root, appHeader({ title: clientName(phone, uei), back: { data: 'data-chat-back', aria: 'К диалогам' } }), emptyState('Чат недоступен', error instanceof Error ? error.message : 'Не удалось загрузить переписку'), 'app-view-shell--chat');
+    screen(root, appHeader({ title, back: { data: 'data-chat-back', aria: 'К диалогам' } }), emptyState('Чат недоступен', error instanceof Error ? error.message : 'Не удалось загрузить переписку'), 'app-view-shell--chat');
     root.querySelector('[data-chat-back]')?.addEventListener('click', () => void renderThreads(root, state));
   }
 }
@@ -364,14 +448,17 @@ async function renderThreads(root, state) {
   screen(root, appHeader({ title: 'Сообщения', action: { label: 'Новое', data: 'data-chat-new' }, settings: { data: 'data-chat-settings', aria: 'Настройки сообщений' } }), emptyState('Загрузка', 'Получаем диалоги.'));
   try {
     const threads = await getCommunicationThreads();
-    const items = threads.map((thread, index) => listEntry({
-      title: clientName(thread.cardPhone, thread.uei),
-      subtitle: thread.body || (Array.isArray(thread.attachments) && thread.attachments.length ? 'Медиа' : 'Открыть диалог'),
-      rightTop: messageTime(thread.createdAt),
-      data: `data-chat-thread="${index}"`,
-      aria: `Открыть диалог с ${clientName(thread.cardPhone, thread.uei)}`,
-    }));
-    screen(root, appHeader({ title: 'Сообщения', action: { label: 'Новое', data: 'data-chat-new' }, settings: { data: 'data-chat-settings', aria: 'Настройки сообщений' } }), items.length ? listEntries(items) : emptyState('Чат пока пуст', 'Сообщения и системные уведомления клиентов появятся здесь.'));
+    const items = threads.map((thread, index) => {
+      const name = threadName(thread);
+      return listEntry({
+        title: name,
+        subtitle: thread.deletedAt ? 'Сообщение удалено' : thread.body || (Array.isArray(thread.attachments) && thread.attachments.length ? 'Медиа' : 'Открыть диалог'),
+        rightTop: messageTime(thread.createdAt),
+        data: `data-chat-thread="${index}"`,
+        aria: `Открыть диалог с ${name}`,
+      });
+    });
+    screen(root, appHeader({ title: 'Сообщения', action: { label: 'Новое', data: 'data-chat-new' }, settings: { data: 'data-chat-settings', aria: 'Настройки сообщений' } }), items.length ? listEntries(items) : emptyState('Чат пока пуст', 'Сообщения клиентов появятся здесь.'));
     root.querySelector('[data-chat-new]')?.addEventListener('click', () => recipientOptions(root, state));
     root.querySelector('[data-chat-settings]')?.addEventListener('click', openMasterChatSettings);
     root.querySelectorAll('[data-chat-thread]').forEach((element) => element.addEventListener('click', () => {

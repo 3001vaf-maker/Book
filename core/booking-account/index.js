@@ -200,7 +200,7 @@ export async function markBookingNotificationRead(tenantId, notificationId) {
 
 export async function getBookingChat(tenantId) {
   return jsonResponse(
-    await request(`/online-booking/${encodeURIComponent(tenantId)}/account/chat`, { tenantId, auth: true }),
+    await request(`/online-booking/${encodeURIComponent(tenantId)}/account/internal-chat`, { tenantId, auth: true }),
     'Не удалось загрузить чат',
   );
 }
@@ -224,15 +224,45 @@ export async function setBookingTelegramConsent(tenantId, enabled) {
   );
 }
 
-export async function sendBookingChatMessage(tenantId, body, attachments = []) {
+export async function sendBookingChatMessage(tenantId, value, legacyAttachments = []) {
+  const input = value && typeof value === 'object' && !Array.isArray(value)
+    ? value
+    : { body: String(value || ''), attachments: legacyAttachments };
   return jsonResponse(
-    await request(`/online-booking/${encodeURIComponent(tenantId)}/account/chat/messages`, {
+    await request(`/online-booking/${encodeURIComponent(tenantId)}/account/internal-chat/messages`, {
       tenantId,
       auth: true,
       method: 'POST',
-      body: JSON.stringify({ body: String(body || '').trim(), attachments: Array.isArray(attachments) ? attachments : [] }),
+      body: JSON.stringify({
+        body: String(input.body || '').trim(),
+        content: input.content || null,
+        attachments: Array.isArray(input.attachments) ? input.attachments : [],
+      }),
     }),
     'Не удалось отправить сообщение',
+  );
+}
+
+export async function editBookingChatMessage(tenantId, messageId, { body = '', content = null } = {}) {
+  return jsonResponse(
+    await request(`/online-booking/${encodeURIComponent(tenantId)}/account/internal-chat/messages/${encodeURIComponent(String(messageId || ''))}`, {
+      tenantId,
+      auth: true,
+      method: 'PATCH',
+      body: JSON.stringify({ body, content }),
+    }),
+    'Не удалось изменить сообщение',
+  );
+}
+
+export async function deleteBookingChatMessage(tenantId, messageId) {
+  return jsonResponse(
+    await request(`/online-booking/${encodeURIComponent(tenantId)}/account/internal-chat/messages/${encodeURIComponent(String(messageId || ''))}`, {
+      tenantId,
+      auth: true,
+      method: 'DELETE',
+    }),
+    'Не удалось удалить сообщение',
   );
 }
 
