@@ -71,6 +71,41 @@ export class ClientCardLinkService {
     throw new ConflictException('Этот телефон уже указан у нескольких клиентов. Мастер должен сначала разобрать старый дубль.');
   }
 
+  async validateNewAccountContacts(tenantId: string, input: Record<string, any>) {
+    const phone = text(input?.phone);
+    const email = text(input?.email).toLowerCase();
+    const telegramId = text(input?.telegramId);
+    const card = phone ? await this.cardState(tenantId, phone) : null;
+    if (card) this.assertUnambiguousPhone(card);
+    const owner = card?.owner?.person ? objectValue(card.owner.person) : null;
+    const key = text(owner?.key) || '__pending-registration__';
+    const candidate = {
+      ...(owner || {}),
+      key,
+      phones: uniqueStrings([...(arrayValue(owner?.phones)), phone]),
+      emails: uniqueStrings([...(arrayValue(owner?.emails)), email]),
+      telegrams: uniqueStrings([...(arrayValue(owner?.telegrams)), telegramId]),
+      contactViaUei: text(owner?.contactViaUei),
+    };
+    await this.clientContactRules.validatePersonUpsert(tenantId, key, { person: candidate });
+  }
+
+  async validateAccountContactUpdate(tenantId: string, accountIdValue: unknown, input: Record<string, any>) {
+    const accountId = text(accountIdValue);
+    const identity = await this.businessState.bookingIdentityForAccount(tenantId, accountId);
+    const current = objectValue(identity?.matchedPerson || identity?.person || {});
+    const key = text(current.key) || `__pending-account-${accountId}`;
+    const phone = text(input?.phone);
+    const telegramId = text(input?.telegramId);
+    const candidate = {
+      ...current,
+      key,
+      phones: phone ? uniqueStrings([...arrayValue(current.phones), phone]) : arrayValue(current.phones),
+      telegrams: telegramId ? uniqueStrings([...arrayValue(current.telegrams), telegramId]) : arrayValue(current.telegrams),
+    };
+    await this.clientContactRules.validatePersonUpsert(tenantId, key, { person: candidate });
+  }
+
   async reconcileLegacyAccountDuplicates(tenantId: string) {
     const business = await this.businessState.get(tenantId);
     if (!business.verified) return { repaired: 0, candidates: 0, requiresManualReview: false };
