@@ -117,7 +117,13 @@ function showCapabilityIntroduction(meta, introduction, element) {
     action: copy?.action || 'Продолжить',
     onConfirm: async () => {
       pendingState = normalizedPending(await acknowledgeCapabilityIntroduction(introduction.eventId));
+      await refreshBookAccess();
       introModal = null;
+      if (pendingState.summaries.length) {
+        queuedEntry = null;
+        window.setTimeout(showPendingSummary, 0);
+        return;
+      }
       if (!element?.isConnected || !canUseBookCapability(meta.key)) return;
       replayingEntry = true;
       try {
@@ -170,6 +176,7 @@ function activityRefresh() {
 
 document.addEventListener('click', onEntryClick, true);
 document.addEventListener('pointerdown', activityRefresh, { capture: true, passive: true });
+document.addEventListener('keydown', activityRefresh, { capture: true, passive: true });
 document.addEventListener('submit', activityRefresh, { capture: true, passive: true });
 window.addEventListener('focus', activityRefresh, { passive: true });
 window.addEventListener('hashchange', activityRefresh, { passive: true });
