@@ -29,7 +29,11 @@ export class ClientContactRouteService {
   async resolve(tenantId: string, source: ClientProfileThread) {
     const business = await this.businessState.get(tenantId);
     const people = (Array.isArray(business.people) ? business.people : []).map((value) => objectValue(value));
-    const peopleByKey = new Map(people.map((person) => [text(person.key), person]).filter(([key]) => Boolean(key)));
+    const peopleByKey = new Map<string, Record<string, any>>();
+    for (const person of people) {
+      const key = text(person.key);
+      if (key) peopleByKey.set(key, person);
+    }
     const visited = new Set<string>();
     let delivery = source;
     let viaUei = '';
