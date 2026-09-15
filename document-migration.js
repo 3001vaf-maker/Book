@@ -1,9 +1,6 @@
 import { apiRequest } from './core/auth.js';
 import { queueDocumentDataset } from './core/business-persistence.js';
-import {
-  configureConsentPersistence,
-  hydrateConsentsFromServer,
-} from './settings/documents/consents.js';
+import { hydrateConsentsFromServer } from './settings/documents/consents.js';
 import {
   configureDocumentPersistence,
   getDefaultDocuments,
@@ -15,7 +12,6 @@ import {
 } from './settings/documents/history.js';
 
 configureDocumentPersistence((value) => queueDocumentDataset('documents', value));
-configureConsentPersistence((value) => queueDocumentDataset('consents', value));
 configureDocumentHistoryPersistence((value) => queueDocumentDataset('history', value));
 
 function clone(value) {
