@@ -14,10 +14,12 @@ import { BookingRequiredConsentGuard } from './booking-required-consent.guard';
 import { ClientCardLinkService } from './client-card-link.service';
 import { OnlineBookingController } from './online-booking.controller';
 import { OnlineBookingService } from './online-booking.service';
+import { TelegramBookingAuthController } from './telegram-booking-auth.controller';
+import { TelegramBookingAuthService } from './telegram-booking-auth.service';
 
 @Module({
   imports: [AuthModule, BusinessStateModule, CommunicationModule, DocumentStateModule, NotificationModule, ProfileModule],
-  controllers: [OnlineBookingController, BookingChatController, BookingConsentController, BookingAccountSettingsController],
-  providers: [OnlineBookingService, BookingAccountGuard, BookingRequiredConsentGuard, ClientCardLinkService, PrismaService],
+  controllers: [OnlineBookingController, BookingChatController, BookingConsentController, BookingAccountSettingsController, TelegramBookingAuthController],
+  providers: [OnlineBookingService, TelegramBookingAuthService, BookingAccountGuard, BookingRequiredConsentGuard, ClientCardLinkService, PrismaService],
 })
 export class OnlineBookingModule {}
