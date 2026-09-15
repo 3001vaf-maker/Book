@@ -5,6 +5,7 @@ import { BOOK_CAPABILITIES } from '../core/capability-registry.js';
 const serverCatalog = readFileSync(new URL('../server/src/master-invitation/master-invitation.service.ts', import.meta.url), 'utf8');
 const accessRuntime = readFileSync(new URL('../core/access-runtime.js', import.meta.url), 'utf8');
 const accessClient = readFileSync(new URL('../core/access.js', import.meta.url), 'utf8');
+const bootstrap = readFileSync(new URL('../core/bootstrap.js', import.meta.url), 'utf8');
 const index = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 
 const serverKeys = [...serverCatalog.matchAll(/\{\s*key:\s*'([^']+)'/g)].map((match) => match[1]).sort();
@@ -22,7 +23,9 @@ for (const [key, meta] of Object.entries(BOOK_CAPABILITIES)) {
   assert.match(ownerSource, new RegExp(key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `${key}: owner does not enforce or expose capability`);
 }
 
-assert.match(index, /core\/access-runtime\.js/);
+assert.match(index, /core\/bootstrap\.js/);
+assert.match(bootstrap, /import '\.\/access-runtime\.js'/);
+assert.match(bootstrap, /import\('\.\.\/core\.js'\)/);
 assert.match(accessClient, /cache:\s*'no-store'/);
 assert.match(accessClient, /book:access-updated/);
 assert.match(accessRuntime, /visibilitychange/);
