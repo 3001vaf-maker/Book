@@ -69,9 +69,52 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     if (!response.ok || !data.ok) throw new BadRequestException(text(data?.description) || 'Telegram отклонил запрос');
     return data.result;
   }
-  private publicConnection(row: TelegramBotRow | null) {
-    if (!row) return { connected: false };
-    return { connected: true, botId: row.botId, botUsername: telegramUsername(row.botUsername), status: row.status, webhookActive: row.status === 'active', connectedAt: row.connectedAt, updatedAt: row.updatedAt };
+  private environmentStatus() {
+    const publicApiUrl = text(process.env.PUBLIC_API_URL).replace(/\/$/, '');
+    const clientAppUrl = text(process.env.CLIENT_APP_URL).replace(/\/$/, '');
+    const isHttps = (value: string) => {
+      if (!value) return false;
+      try { return new URL(value).protocol === 'https:'; } catch { return false; }
+    };
+    const credentialsKeyConfigured = Boolean(text(process.env.TELEGRAM_CREDENTIALS_KEY));
+    const publicApiUrlConfigured = isHttps(publicApiUrl);
+    const clientAppUrlConfigured = isHttps(clientAppUrl);
+    return {
+      credentialsKeyConfigured,
+      publicApiUrlConfigured,
+      clientAppUrlConfigured,
+      ready: credentialsKeyConfigured && publicApiUrlConfigured && clientAppUrlConfigured,
+    };
+  }
+  private requiredHttpsUrl(name: 'PUBLIC_API_URL' | 'CLIENT_APP_URL') {
+    const value = text(process.env[name]).replace(/\/$/, '');
+    if (!value) throw new ServiceUnavailableException(`Не настроен ${name}`);
+    try {
+      const url = new URL(value);
+      if (url.protocol !== 'https:') throw new Error('https required');
+      return url.toString().replace(/\/$/, '');
+    } catch {
+      throw new ServiceUnavailableException(`${name} должен быть корректным HTTPS URL`);
+    }
+  }
+  private webhookUrl(webhookKey: string) {
+    const publicApiUrl = text(process.env.PUBLIC_API_URL).replace(/\/$/, '');
+    return publicApiUrl ? `${publicApiUrl}/communications/telegram/webhook/${webhookKey}` : '';
+  }
+  private publicConnection(row: TelegramBotRow | null, webhook: Record<string, any> = {}) {
+    const configuration = this.environmentStatus();
+    if (!row) return { connected: false, configuration };
+    return {
+      connected: true,
+      botId: row.botId,
+      botUsername: telegramUsername(row.botUsername),
+      status: row.status,
+      webhookActive: false,
+      connectedAt: row.connectedAt,
+      updatedAt: row.updatedAt,
+      configuration,
+      ...webhook,
+    };
   }
   private async rowForTenant(tenantId: string) {
     const rows = await this.prisma.$queryRaw<TelegramBotRow[]>`
@@ -80,22 +123,43 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     `;
     return rows[0] || null;
   }
-  async getConnection(tenantId: string) { return this.publicConnection(await this.rowForTenant(tenantId)); }
+  async getConnection(tenantId: string) {
+    const row = await this.rowForTenant(tenantId);
+    if (!row) return this.publicConnection(null);
+    try {
+      const info = await this.telegramApi(this.decryptToken(row), 'getWebhookInfo');
+      const expectedUrl = this.webhookUrl(row.webhookKey);
+      const webhookActive = Boolean(expectedUrl && text(info?.url) === expectedUrl && !text(info?.last_error_message));
+      return this.publicConnection(row, {
+        webhookActive,
+        webhookPendingUpdateCount: Number(info?.pending_update_count || 0),
+        webhookError: text(info?.last_error_message),
+      });
+    } catch (error) {
+      return this.publicConnection(row, {
+        webhookActive: false,
+        webhookError: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
 
   async connect(tenantId: string, rawToken: unknown) {
     const token = text(rawToken);
     if (!/^\d{5,}:[A-Za-z0-9_-]{20,}$/.test(token)) throw new BadRequestException('Некорректный токен Telegram-бота');
+    this.encryptionKey();
+    const publicApiUrl = this.requiredHttpsUrl('PUBLIC_API_URL');
+    this.requiredHttpsUrl('CLIENT_APP_URL');
     const bot = await this.telegramApi(token, 'getMe');
     if (!bot?.id || !bot?.is_bot) throw new BadRequestException('Токен не принадлежит Telegram-боту');
     const botId = String(bot.id); const botUsername = telegramUsername(bot.username);
     const ownership = await this.prisma.$queryRaw<Array<{ tenantId: string }>>`SELECT "tenantId" FROM "TelegramBotConnection" WHERE "botId" = ${botId} LIMIT 1`;
     if (ownership[0] && ownership[0].tenantId !== tenantId) throw new ConflictException('Этот Telegram-бот уже подключён к другому аккаунту Book');
     const encrypted = this.encryptToken(token); const webhookKey = randomBytes(24).toString('base64url'); const webhookSecret = randomBytes(24).toString('base64url');
-    let status = 'connected'; const publicApiUrl = text(process.env.PUBLIC_API_URL).replace(/\/$/, '');
-    if (publicApiUrl) {
-      await this.telegramApi(token, 'setWebhook', { url: `${publicApiUrl}/communications/telegram/webhook/${webhookKey}`, secret_token: webhookSecret, allowed_updates: ['message'], drop_pending_updates: false });
-      status = 'active';
-    }
+    const webhookUrl = `${publicApiUrl}/communications/telegram/webhook/${webhookKey}`;
+    await this.telegramApi(token, 'setWebhook', { url: webhookUrl, secret_token: webhookSecret, allowed_updates: ['message'], drop_pending_updates: false });
+    const webhookInfo = await this.telegramApi(token, 'getWebhookInfo');
+    if (text(webhookInfo?.url) !== webhookUrl) throw new ServiceUnavailableException('Telegram не подтвердил webhook Book');
+    const status = 'active';
     await this.prisma.$executeRaw`
       INSERT INTO "TelegramBotConnection" ("id", "tenantId", "botId", "botUsername", "encryptedToken", "tokenIv", "tokenTag", "webhookKey", "webhookSecretHash", "status", "connectedAt", "updatedAt")
       VALUES (${randomUUID()}, ${tenantId}, ${botId}, ${botUsername}, ${encrypted.encryptedToken}, ${encrypted.tokenIv}, ${encrypted.tokenTag}, ${webhookKey}, ${sha256(webhookSecret)}, ${status}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
@@ -109,7 +173,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     const row = await this.rowForTenant(tenantId); if (!row) return { connected: false };
     try { await this.telegramApi(this.decryptToken(row), 'deleteWebhook', { drop_pending_updates: false }); } catch {}
     await this.prisma.$executeRaw`DELETE FROM "TelegramBotConnection" WHERE "tenantId" = ${tenantId}`;
-    return { connected: false };
+    return { connected: false, configuration: this.environmentStatus() };
   }
 
   async sendMessage(tenantId: string, telegramUserId: string, body: string) {
@@ -161,21 +225,25 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     if (sha256(text(secretToken)) !== connection.webhookSecretHash) throw new UnauthorizedException('Некорректный Telegram webhook secret');
     const message = update?.message; if (!message?.from?.id || !message?.chat?.id) return { ok: true };
     const telegramUserId = String(message.from.id); const username = telegramUsername(message.from.username); const messageBody = text(message.text || message.caption);
+    const isStart = /^\/start(?:@\w+)?(?:\s|$)/i.test(messageBody);
     const identities = await this.prisma.$queryRaw<TelegramIdentityRow[]>`
       SELECT "cardPhone", "uei" FROM "CommunicationIdentity"
       WHERE "tenantId" = ${connection.tenantId} AND "channel" = 'TELEGRAM' AND "externalUserId" = ${telegramUserId} LIMIT 1
     `;
     const identity = identities[0] || null;
-    if (!identity || messageBody === '/start') {
+    if (!identity || isStart) {
       const entry = await this.communications.createTelegramEntry(connection.tenantId, { telegramUserId, username });
       const clientAppUrl = text(process.env.CLIENT_APP_URL).replace(/\/$/, '');
       if (clientAppUrl) {
         const url = new URL(clientAppUrl); url.searchParams.set('booking', connection.tenantId); url.searchParams.set('tg_entry', entry.token);
-        await this.telegramApi(this.decryptToken(connection), 'sendMessage', { chat_id: message.chat.id, text: 'Откройте Book, чтобы продолжить.', reply_markup: { inline_keyboard: [[{ text: 'Открыть Book', url: url.toString() }]] } });
+        const launchButton = message.chat.type === 'private'
+          ? { text: 'Открыть Book', web_app: { url: url.toString() } }
+          : { text: 'Открыть Book', url: url.toString() };
+        await this.telegramApi(this.decryptToken(connection), 'sendMessage', { chat_id: message.chat.id, text: 'Откройте Book, чтобы продолжить.', reply_markup: { inline_keyboard: [[launchButton]] } });
       }
       if (!identity) return { ok: true, linked: false };
     }
-    if (messageBody && messageBody !== '/start') {
+    if (messageBody && !isStart) {
       await this.communications.recordMessage(connection.tenantId, { phone: identity.cardPhone, uei: identity.uei, direction: 'inbound', kind: 'message', channel: 'TELEGRAM', body: messageBody, externalMessageId: String(message.message_id || ''), externalThreadId: String(message.chat.id), status: 'delivered' });
     }
     return { ok: true, linked: true };

@@ -10,10 +10,24 @@ function removeTelegramEntryFromUrl() {
   history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
 }
 
+function initializeTelegramMiniApp() {
+  const webApp = window.Telegram?.WebApp;
+  if (!webApp) return;
+  try {
+    webApp.ready();
+    webApp.expand();
+    document.documentElement.classList.add('telegram-mini-app');
+  } catch {
+    // Booking remains the same normal web app when Telegram shell APIs are unavailable.
+  }
+}
+
 export function startBookingClientRuntime({ tenantId = '', telegramEntry = '' } = {}) {
   const tenant = String(tenantId || '').trim();
   const entry = String(telegramEntry || '').trim();
   if (!tenant) return () => {};
+
+  initializeTelegramMiniApp();
 
   let telegramAttempted = !entry;
   let disposed = false;
