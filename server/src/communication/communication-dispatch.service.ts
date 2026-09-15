@@ -15,21 +15,22 @@ export class CommunicationDispatchService {
     private readonly notifications: NotificationService,
   ) {}
 
-  private async availableChannels(tenantId: string, input: { phone?: unknown; uei?: unknown }) {
-    const channels: string[] = [];
-    if (await this.channels.resolveInAppAccount(tenantId, input || {})) channels.push('IN_APP');
-    if (await this.channels.resolveTelegramIdentity(tenantId, input || {})) channels.push('TELEGRAM');
-    return channels;
-  }
-
   async resolveChannel(tenantId: string, input: { phone?: unknown; uei?: unknown; channel?: unknown }) {
     const requested = text(input?.channel).toUpperCase();
-    const available = await this.availableChannels(tenantId, input || {});
-    if (requested) {
-      if (!available.includes(requested)) throw new NotFoundException(`Канал ${requested} у клиента недоступен`);
-      return requested;
+    if (requested === 'IN_APP') {
+      if (!(await this.channels.resolveInAppAccount(tenantId, input || {}))) throw new NotFoundException('Внутренний чат клиента недоступен');
+      return 'IN_APP';
     }
-    if (available.includes('IN_APP')) return 'IN_APP';
+    if (requested === 'TELEGRAM') {
+      if (!(await this.channels.resolveTelegramIdentity(tenantId, input || {}))) throw new NotFoundException('Канал TELEGRAM у клиента недоступен');
+      return 'TELEGRAM';
+    }
+    if (requested) throw new NotFoundException(`Канал ${requested} у клиента недоступен`);
+
+    if (await this.channels.resolveInAppAccount(tenantId, input || {})) return 'IN_APP';
+
+    const available: string[] = [];
+    if (await this.channels.resolveTelegramIdentity(tenantId, input || {})) available.push('TELEGRAM');
     const preferences = await this.history.getPreferences(tenantId, input || {});
     const preferred = preferences.preferredChannels.find((channel) => available.includes(channel));
     const selected = preferred || available[0] || '';
