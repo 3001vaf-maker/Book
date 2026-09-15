@@ -21,10 +21,9 @@ export class BookingChatController {
   }
 
   @Get()
-  async thread(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
+  thread(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
     const accountId = this.accountId(request, tenantId);
-    const account = await this.booking.getAccount(tenantId, accountId);
-    return this.communications.listThread(tenantId, { bookingAccountId: accountId, phone: account.phone, uei: account.uei }, 500);
+    return this.communications.listThread(tenantId, { bookingAccountId: accountId }, 500);
   }
 
   @Post('messages')
@@ -36,7 +35,7 @@ export class BookingChatController {
     const accountId = this.accountId(request, tenantId);
     const account = await this.booking.getAccount(tenantId, accountId);
     return this.communications.recordMessage(tenantId, {
-      bookingAccountId: accountId,
+      actorAccountId: accountId,
       phone: account.phone,
       uei: account.uei,
       direction: 'inbound',
