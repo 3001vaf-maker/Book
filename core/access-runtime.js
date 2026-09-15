@@ -35,8 +35,13 @@ function handleAccessUpdate(event) {
       variant: 'compact',
       surface: 'app',
     });
-    if (detail.changed) {
-      modal?.querySelector('[data-notice-close]')?.addEventListener('click', reloadBook, { once: true });
+    if (detail.changed && modal) {
+      modal.addEventListener('click', (clickEvent) => {
+        const target = clickEvent.target;
+        const dismissed = target === modal
+          || (target instanceof Element && Boolean(target.closest('[data-notice-close], [data-modal-close]')));
+        if (dismissed) window.setTimeout(reloadBook, 0);
+      });
     }
     return;
   }
