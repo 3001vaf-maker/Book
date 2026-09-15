@@ -2,13 +2,17 @@ import { Body, Controller, Delete, Get, Param, Post, Put, Req, UseGuards } from 
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { BusinessStateService } from './business-state.service';
+import { ClientContactRulesService } from './client-contact-rules.service';
 
 type AuthenticatedRequest = Request & { auth?: { userId: string; tenantId: string; role: string } };
 
 @Controller('business-state')
 @UseGuards(JwtAuthGuard)
 export class BusinessStateController {
-  constructor(private readonly businessState: BusinessStateService) {}
+  constructor(
+    private readonly businessState: BusinessStateService,
+    private readonly clientContactRules: ClientContactRulesService,
+  ) {}
 
   @Get()
   get(@Req() request: AuthenticatedRequest) {
@@ -31,7 +35,8 @@ export class BusinessStateController {
   }
 
   @Put('people/:key')
-  upsertPerson(@Req() request: AuthenticatedRequest, @Param('key') key: string, @Body() body: unknown) {
+  async upsertPerson(@Req() request: AuthenticatedRequest, @Param('key') key: string, @Body() body: unknown) {
+    await this.clientContactRules.validatePersonUpsert(request.auth!.tenantId, key, body);
     return this.businessState.upsertPerson(request.auth!.tenantId, key, body);
   }
 
