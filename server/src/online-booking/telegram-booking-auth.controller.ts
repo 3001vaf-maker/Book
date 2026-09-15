@@ -9,6 +9,14 @@ export class TelegramBookingAuthController {
     private readonly clientCards: ClientCardLinkService,
   ) {}
 
+  @Post('telegram-main-app/:botUsername/entry')
+  mainAppEntry(
+    @Param('botUsername') botUsername: string,
+    @Body() body: { initData?: unknown },
+  ) {
+    return this.telegramAuth.createMainAppEntry(botUsername, body?.initData);
+  }
+
   @Post(':tenantId/account/telegram-entry/exchange')
   exchange(
     @Param('tenantId') tenantId: string,
