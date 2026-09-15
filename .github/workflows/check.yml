@@ -84,19 +84,54 @@ jobs:
             sleep 2
           done
 
+          staging_password=$(docker compose -f docker-compose.staging.yml exec -T backend printenv OWNER_PASSWORD | tr -d '\r')
+          login_body=$(node -e 'process.stdout.write(JSON.stringify({email:"staging@book.local",password:process.argv[1]}))' "$staging_password")
           login_payload=$(curl -fsS \
             -H 'Content-Type: application/json' \
-            -d '{"email":"staging@book.local","password":"BookStaging-2026!"}' \
+            -d "$login_body" \
             http://localhost:8080/api/auth/login)
           access_token=$(node -e "const p=JSON.parse(process.argv[1]); if(!p.accessToken) process.exit(1); process.stdout.write(p.accessToken)" "$login_payload")
           tenant_id=$(node -e "const p=JSON.parse(process.argv[1]); if(!p.tenant?.id) process.exit(1); process.stdout.write(p.tenant.id)" "$login_payload")
           curl -fsS -H "Authorization: Bearer $access_token" http://localhost:8080/api/auth/me >/dev/null
 
+          booking_password="Smoke-$(date +%s)-Aa1!"
+          booking_body=$(node -e 'process.stdout.write(JSON.stringify({email:"push-smoke@book.local",password:process.argv[1],name:"Push",phone:"+79990000999",consents:[]}))' "$booking_password")
           booking_payload=$(curl -fsS \
             -H 'Content-Type: application/json' \
-            -d '{"email":"push-smoke@book.local","password":"BookPush-2026!","name":"Push","phone":"+79990000999","consents":[]}' \
+            -d "$booking_body" \
             "http://localhost:8080/api/online-booking/$tenant_id/account/register")
           booking_token=$(node -e "const p=JSON.parse(process.argv[1]); if(!p.accessToken) process.exit(1); process.stdout.write(p.accessToken)" "$booking_payload")
+          booking_account_id=$(node -e "const p=JSON.parse(process.argv[1]); if(!p.account?.id) process.exit(1); process.stdout.write(p.account.id)" "$booking_payload")
+
+          # Reproduce the production failure: an existing visible thread still carries historical phone/UEI aliases,
+          # while its Telegram Contact Point and BookingAccount are current.
+          docker compose -f docker-compose.staging.yml exec -T db psql -U book -d book_staging \
+            -v tenant_id="$tenant_id" -v account_id="$booking_account_id" <<'SQL'
+          INSERT INTO "CommunicationIdentity" (
+            "id", "tenantId", "bookingAccountId", "cardPhone", "uei", "channel", "externalUserId", "display", "verifiedAt", "createdAt", "updatedAt"
+          ) VALUES (
+            'smoke-telegram-identity', :'tenant_id', :'account_id', '79990000999', 'NEW1', 'TELEGRAM', '987654321', '@smoke', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+          );
+
+          INSERT INTO "CommunicationMessage" (
+            "id", "tenantId", "cardPhone", "uei", "direction", "kind", "channel", "body", "externalMessageId", "externalThreadId", "status", "createdAt", "deliveredAt", "error"
+          ) VALUES (
+            'smoke-telegram-inbound', :'tenant_id', '70000000001', 'OLD1', 'inbound', 'message', 'TELEGRAM', 'stale thread', 'smoke-inbound-1', '987654321', 'delivered', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ''
+          );
+          SQL
+
+          reply_status=$(curl -sS -o /tmp/book-telegram-reply.json -w '%{http_code}' \
+            -X POST \
+            -H "Authorization: Bearer $access_token" \
+            -H 'Content-Type: application/json' \
+            -d '{"phone":"70000000001","uei":"OLD1","body":"smoke reply"}' \
+            http://localhost:8080/api/communications/chat/messages)
+          test "$reply_status" = "400"
+          grep -q 'Нет действующего согласия на этот Telegram Contact Point' /tmp/book-telegram-reply.json
+          if grep -q 'нет доступного двустороннего канала' /tmp/book-telegram-reply.json; then
+            cat /tmp/book-telegram-reply.json
+            exit 1
+          fi
 
           push_config=$(curl -fsS \
             -H "Authorization: Bearer $booking_token" \
