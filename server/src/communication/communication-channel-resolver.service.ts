@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { ConsentPolicyService } from '../document-state/consent-policy.service';
 import { PrismaService } from '../prisma.service';
+import { ClientProfileThreadService } from './client-profile-thread.service';
 import { CommunicationService } from './communication.service';
 import { TelegramBotService } from './telegram-bot.service';
 
@@ -11,13 +12,6 @@ type TelegramIdentityRow = {
   uei: string;
   externalUserId: string;
   display: string;
-};
-
-type InAppAccountRow = {
-  id: string;
-  phone: string;
-  uei: string;
-  email: string;
 };
 
 function text(value: unknown) { return String(value ?? '').trim(); }
@@ -32,53 +26,16 @@ function canonicalPhone(value: unknown) {
 export class CommunicationChannelResolverService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly profiles: ClientProfileThreadService,
     private readonly communications: CommunicationService,
     private readonly consentPolicy: ConsentPolicyService,
     private readonly telegram: TelegramBotService,
   ) {}
 
-  async resolveInAppAccount(tenantId: string, input: { phone?: unknown; uei?: unknown }) {
-    const cardPhone = canonicalPhone(input?.phone);
-    const uei = text(input?.uei);
-    if (!cardPhone && !uei) return null;
-
-    const messageAccounts = await this.prisma.$queryRaw<InAppAccountRow[]>`
-      SELECT DISTINCT ba."id", ba."phone", ba."uei", ba."email"
-      FROM "CommunicationMessage" m
-      INNER JOIN "BookingAccount" ba
-        ON ba."tenantId" = m."tenantId" AND ba."id" = m."bookingAccountId"
-      WHERE m."tenantId" = ${tenantId}
-        AND m."channel" = 'IN_APP'
-        AND (
-          (${cardPhone} <> '' AND m."cardPhone" = ${cardPhone})
-          OR (${uei} <> '' AND m."uei" = ${uei})
-        )
-      ORDER BY ba."id"
-      LIMIT 2
-    `;
-    if (messageAccounts.length === 1) return messageAccounts[0];
-
-    const accountRows = await this.prisma.$queryRaw<InAppAccountRow[]>`
-      SELECT ba."id", ba."phone", ba."uei", ba."email"
-      FROM "BookingAccount" ba
-      WHERE ba."tenantId" = ${tenantId}
-        AND (
-          (${cardPhone} <> '' AND (
-            CASE
-              WHEN length(regexp_replace(ba."phone", '[^0-9]', '', 'g')) = 10
-                THEN '7' || regexp_replace(ba."phone", '[^0-9]', '', 'g')
-              WHEN length(regexp_replace(ba."phone", '[^0-9]', '', 'g')) = 11
-                   AND left(regexp_replace(ba."phone", '[^0-9]', '', 'g'), 1) = '8'
-                THEN '7' || substring(regexp_replace(ba."phone", '[^0-9]', '', 'g') from 2)
-              ELSE regexp_replace(ba."phone", '[^0-9]', '', 'g')
-            END
-          ) = ${cardPhone})
-          OR (${uei} <> '' AND ba."uei" <> '' AND ba."uei" = ${uei})
-        )
-      ORDER BY ba."updatedAt" DESC, ba."id" DESC
-      LIMIT 2
-    `;
-    return accountRows.length === 1 ? accountRows[0] : null;
+  async resolveInAppProfile(tenantId: string, input: { profileKey?: unknown; phone?: unknown; uei?: unknown }) {
+    const profileKey = text(input?.profileKey);
+    if (profileKey) return this.profiles.byProfileKey(tenantId, profileKey).catch(() => null);
+    return this.profiles.byLegacy(tenantId, input || {}).catch(() => null);
   }
 
   async resolveTelegramIdentity(tenantId: string, input: { phone?: unknown; uei?: unknown }) {
