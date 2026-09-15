@@ -424,10 +424,10 @@ async function renderProfile(root, state, handlers) {
   const profileMedia = mediaRail(mediaItems(state)) || '<div class="app-media-rail app-media-rail--placeholder" aria-hidden="true"></div>';
   renderShell(root, state, {
     title: 'Профиль',
+    action: { label: 'Записаться', data: 'data-client-booking' },
     settings: { data: 'data-client-profile-settings', aria: 'Настройки профиля' },
     body: card,
     media: profileMedia,
-    primaryAction: button('Записаться', { data: 'data-client-booking' }),
     className: 'app-view-shell--profile',
   });
   bindBottomNavigation(root, state, handlers);
