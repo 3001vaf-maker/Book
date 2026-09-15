@@ -302,7 +302,7 @@ export class SaasAccessService {
   async acknowledgeCapabilitySummary(tenantId: string, batchId: string) {
     const id = String(batchId || '').trim();
     if (!id) throw new NotFoundException('Изменение доступа не найдено');
-    const result = await this.prisma.capabilityAccessEvent.updateMany({
+    await this.prisma.capabilityAccessEvent.updateMany({
       where: {
         tenantId,
         batchId: id,
@@ -311,14 +311,13 @@ export class SaasAccessService {
       },
       data: { summaryAcknowledgedAt: new Date() },
     });
-    if (!result.count) throw new NotFoundException('Изменение доступа не найдено');
     return this.pendingCapabilityChanges(tenantId);
   }
 
   async acknowledgeCapabilityIntroduction(tenantId: string, eventId: string) {
     const id = String(eventId || '').trim();
     if (!id) throw new NotFoundException('Знакомство с возможностью не найдено');
-    const result = await this.prisma.capabilityAccessEvent.updateMany({
+    await this.prisma.capabilityAccessEvent.updateMany({
       where: {
         id,
         tenantId,
@@ -329,7 +328,6 @@ export class SaasAccessService {
       },
       data: { detailAcknowledgedAt: new Date() },
     });
-    if (!result.count) throw new NotFoundException('Знакомство с возможностью не найдено');
     return this.pendingCapabilityChanges(tenantId);
   }
 
