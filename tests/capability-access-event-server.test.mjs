@@ -17,5 +17,6 @@ assert.match(adminService, /batchId/);
 assert.match(accessService, /pendingCapabilityChanges/);
 assert.match(accessService, /summaryAcknowledgedAt/);
 assert.match(accessService, /detailAcknowledgedAt/);
+assert.doesNotMatch(accessService, /if \(!result\.count\)/, 'Acknowledgements must be idempotent when a stale event was already cancelled or acknowledged');
 
 console.log('capability access event server tests: OK');
