@@ -45,6 +45,13 @@ function contacts(person: Record<string, any>) {
   return result;
 }
 
+function personMemberKeys(entity: Record<string, any>) {
+  return (Array.isArray(entity.members) ? entity.members : [])
+    .map((value) => text(value))
+    .filter((value) => value.startsWith('person:'))
+    .map((value) => value.slice(7));
+}
+
 @Injectable()
 export class ClientContactRulesService {
   constructor(private readonly businessState: BusinessStateService) {}
@@ -72,11 +79,7 @@ export class ClientContactRulesService {
     if (!contactViaUei) return;
 
     const entities = objectValue(business.uei?.entities);
-    const target = objectValue(entities[contactViaUei]);
-    const targetMembers = (Array.isArray(target.members) ? target.members : [])
-      .map((value) => text(value))
-      .filter((value) => value.startsWith('person:'))
-      .map((value) => value.slice(7));
+    const targetMembers = personMemberKeys(objectValue(entities[contactViaUei]));
     if (!targetMembers.length) throw new ConflictException('Клиент для связи не найден');
 
     const currentUei = text(relations[`person:${personKey}`]);
@@ -86,14 +89,62 @@ export class ClientContactRulesService {
     const visited = new Set<string>();
     let cursor = contactViaUei;
     for (let depth = 0; depth < 20 && cursor; depth += 1) {
-      if (cursor === currentUei) throw new ConflictException('Связь через образует замкнутую цепочку');
-      if (visited.has(cursor)) throw new ConflictException('Связь через образует замкнутую цепочку');
+      if (cursor === currentUei || visited.has(cursor)) throw new ConflictException('Связь через образует замкнутую цепочку');
       visited.add(cursor);
       const entity = objectValue(entities[cursor]);
       const owner = objectValue(entity.owner);
       const ownerKey = owner.type === 'person' ? text(owner.id) : '';
       const ownerPerson = people.find((person) => text(person.key) === ownerKey) || null;
       cursor = text(ownerPerson?.contactViaUei).toUpperCase();
+    }
+  }
+
+  async validateUeiUpdate(tenantId: string, body: unknown) {
+    const source = objectValue(body);
+    const proposed = objectValue(source.uei ?? source);
+    const relations = objectValue(proposed.relations);
+    const entities = objectValue(proposed.entities);
+    const business = await this.businessState.get(tenantId);
+    const people = (Array.isArray(business.people) ? business.people : []).map((value) => objectValue(value));
+    const peopleByKey = new Map<string, Record<string, any>>();
+    for (const person of people) {
+      const key = text(person.key);
+      if (key) peopleByKey.set(key, person);
+    }
+
+    for (const person of people) {
+      const key = text(person.key);
+      const via = text(person.contactViaUei).toUpperCase();
+      if (!via) continue;
+      const ownUei = text(relations[`person:${key}`]).toUpperCase();
+      if (ownUei && ownUei === via) throw new ConflictException('UEI нельзя объединить с клиентом, указанным в «Связь через»');
+      if (!personMemberKeys(objectValue(entities[via])).length) throw new ConflictException('Клиент из «Связь через» больше не существует');
+    }
+
+    const viaForUei = (uei: string) => {
+      const entity = objectValue(entities[uei]);
+      const owner = objectValue(entity.owner);
+      const ownerKey = owner.type === 'person' ? text(owner.id) : '';
+      const ordered = [ownerKey, ...personMemberKeys(entity).filter((key) => key !== ownerKey)].filter(Boolean);
+      for (const key of ordered) {
+        const via = text(peopleByKey.get(key)?.contactViaUei).toUpperCase();
+        if (via) return via;
+      }
+      return '';
+    };
+
+    for (const uei of Object.keys(entities)) {
+      const start = text(uei).toUpperCase();
+      if (!start) continue;
+      const visited = new Set<string>();
+      let cursor = start;
+      for (let depth = 0; depth < 20; depth += 1) {
+        const next = viaForUei(cursor);
+        if (!next) break;
+        if (next === start || visited.has(next)) throw new ConflictException('Связь через образует замкнутую цепочку');
+        visited.add(next);
+        cursor = next;
+      }
     }
   }
 }
