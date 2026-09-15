@@ -185,7 +185,8 @@ export function getClientCount() {
 
 export function saveClients(people = []) {
   const normalized = (Array.isArray(people) ? people : []).map(normalizeClient).filter((person) => person.key);
-  assertNoNewClientContactConflicts(peopleState, normalized);
+  const validationPeople = normalized.map((person) => ({ ...person, uei: getUEI('person', person.key) || '' }));
+  assertNoNewClientContactConflicts(peopleState, validationPeople);
   const previous = peopleState;
   const previousByKey = new Map(previous.map((person, position) => [person.key, { person, position }]));
   const nextByKey = new Map(normalized.map((person, position) => [person.key, { person, position }]));
