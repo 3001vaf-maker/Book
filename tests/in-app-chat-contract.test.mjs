@@ -8,9 +8,11 @@ const dispatch = await readFile(new URL('../server/src/communication/communicati
 const profilePush = await readFile(new URL('../server/src/communication/in-app-profile-push.service.ts', import.meta.url), 'utf8');
 const ownerController = await readFile(new URL('../server/src/communication/communication.controller.ts', import.meta.url), 'utf8');
 const clientController = await readFile(new URL('../server/src/online-booking/booking-chat.controller.ts', import.meta.url), 'utf8');
+const cardLink = await readFile(new URL('../server/src/online-booking/client-card-link.service.ts', import.meta.url), 'utf8');
 const masterClient = await readFile(new URL('../core/communications/chat.js', import.meta.url), 'utf8');
 const richUi = await readFile(new URL('../ui/shell/rich-text.js', import.meta.url), 'utf8');
 const shellUi = await readFile(new URL('../ui/shell/index.js', import.meta.url), 'utf8');
+const contract = await readFile(new URL('../docs/INTERNAL_CHAT_MESSAGE_MODEL.md', import.meta.url), 'utf8');
 
 assert.match(migration, /ADD COLUMN "profileKey" TEXT/);
 assert.match(migration, /ADD COLUMN "actorAccountId" TEXT/);
@@ -33,8 +35,10 @@ assert.match(profiles, /async byProfileKey/);
 assert.match(profiles, /async canonicalizeProfileKeys/);
 
 assert.match(dispatch, /profileKey\?: unknown/);
-assert.match(dispatch, /if \(profile\) return 'IN_APP'/);
-assert.match(dispatch, /profileKey: profile\.profileKey/);
+assert.match(dispatch, /hasInAppAccess/);
+assert.match(dispatch, /profile\.accountIds\.length > 0/);
+assert.match(dispatch, /if \(this\.hasInAppAccess\(profile\)\) return 'IN_APP'/);
+assert.match(dispatch, /profileKey: profile!\.profileKey/);
 assert.match(dispatch, /profilePush\.notify/);
 assert.doesNotMatch(dispatch, /createForAccount/);
 
@@ -43,6 +47,9 @@ assert.match(profilePush, /listAccountEndpoints/);
 assert.match(profilePush, /'PUSH'/);
 assert.doesNotMatch(profilePush, /'TELEGRAM'/);
 assert.doesNotMatch(profilePush, /'EMAIL'/);
+
+assert.match(cardLink, /cardState\(tenantId, account\.phone\)/);
+assert.doesNotMatch(cardLink.slice(cardLink.indexOf('async findOrAttachExistingCard('), cardLink.indexOf('async bindFirstAccess(')), /account\.telegramId/);
 
 assert.match(service, /const RICH_BLOCK_TYPES = new Set\(\['paragraph', 'heading', 'subheading', 'quote', 'list-item'\]\)/);
 assert.match(service, /const RICH_MARKS = new Set\(\['bold', 'italic', 'underline', 'strike', 'code'\]\)/);
@@ -77,5 +84,10 @@ assert.match(shellUi, /message\.editedAt/);
 assert.match(shellUi, /data-message-actions/);
 assert.match(shellUi, /message\.actorName/);
 assert.match(shellUi, /message\.actorUei/);
+
+assert.match(contract, /First client access is reconciled by normalized phone only/);
+assert.match(contract, /Email and Telegram are never identity\/deduplication keys/);
+assert.match(contract, /profile-only dependent with no linked account is not a direct message destination/);
+assert.match(contract, /Push is not Telegram, email or a Contact Point/);
 
 console.log('internal profile chat contract regression: ok');
