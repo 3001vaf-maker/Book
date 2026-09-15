@@ -19,9 +19,8 @@ ON "CommunicationMessage"("tenantId", "profileKey", "createdAt");
 CREATE INDEX "CommunicationMessage_tenantId_actorAccountId_createdAt_idx"
 ON "CommunicationMessage"("tenantId", "actorAccountId", "createdAt");
 
--- Legacy messages are anchored to the business client profile from which the account/contact originated.
--- The profile key remains stable when a UEI is assigned. When profiles are linked, runtime profile resolution
--- aggregates member profile keys into one thread instead of rewriting history.
+-- Legacy messages are anchored to the BusinessPerson from which their login/contact originated.
+-- Existing rows are never merged or rewritten into a different human merely because data looks similar.
 WITH phone_account_matches AS (
   SELECT m."id" AS "messageId", MIN(ba."id") AS "accountId"
   FROM "CommunicationMessage" m
@@ -68,7 +67,31 @@ SET "profileKey" = ap."personKey",
 FROM account_people ap
 WHERE m."id" = ap."messageId";
 
--- Conservative fallback for old rows without a recoverable account: unique business profile phone.
+-- If an old row already carries a UEI, preserve the master's explicit identity decision.
+-- Resolve only an explicit UEI entity owner that still exists as a BusinessPerson in the same tenant.
+WITH explicit_uei_owners AS (
+  SELECT m."id" AS "messageId", owner."id" AS "personKey"
+  FROM "CommunicationMessage" m
+  JOIN "BusinessIdentityState" bis ON bis."tenantId" = m."tenantId"
+  CROSS JOIN LATERAL jsonb_to_record(
+    COALESCE(bis."data"->'entities'->m."uei"->'owner', '{}'::jsonb)
+  ) AS owner("type" TEXT, "id" TEXT)
+  WHERE m."profileKey" = ''
+    AND m."uei" <> ''
+    AND owner."type" = 'person'
+    AND owner."id" <> ''
+    AND EXISTS (
+      SELECT 1 FROM "BusinessPerson" bp
+      WHERE bp."tenantId" = m."tenantId" AND bp."key" = owner."id"
+    )
+)
+UPDATE "CommunicationMessage" m
+SET "profileKey" = e."personKey"
+FROM explicit_uei_owners e
+WHERE m."id" = e."messageId";
+
+-- Conservative final fallback for old rows without recoverable account/UEI ownership:
+-- use a phone only when exactly one BusinessPerson in the tenant owns that normalized phone.
 WITH person_phone_matches AS (
   SELECT m."id" AS "messageId", MIN(bp."key") AS "personKey"
   FROM "CommunicationMessage" m
@@ -78,10 +101,25 @@ WITH person_phone_matches AS (
     AND EXISTS (
       SELECT 1
       FROM jsonb_array_elements_text(COALESCE(bp."data"->'phones', '[]'::jsonb)) p(value)
-      WHERE regexp_replace(p.value, '[^0-9]', '', 'g') = regexp_replace(m."cardPhone", '[^0-9]', '', 'g')
-         OR (length(regexp_replace(p.value, '[^0-9]', '', 'g')) = 11
-             AND left(regexp_replace(p.value, '[^0-9]', '', 'g'), 1) = '8'
-             AND '7' || substring(regexp_replace(p.value, '[^0-9]', '', 'g') from 2) = regexp_replace(m."cardPhone", '[^0-9]', '', 'g'))
+      WHERE (
+        CASE
+          WHEN length(regexp_replace(p.value, '[^0-9]', '', 'g')) = 10
+            THEN '7' || regexp_replace(p.value, '[^0-9]', '', 'g')
+          WHEN length(regexp_replace(p.value, '[^0-9]', '', 'g')) = 11
+               AND left(regexp_replace(p.value, '[^0-9]', '', 'g'), 1) = '8'
+            THEN '7' || substring(regexp_replace(p.value, '[^0-9]', '', 'g') from 2)
+          ELSE regexp_replace(p.value, '[^0-9]', '', 'g')
+        END
+      ) = (
+        CASE
+          WHEN length(regexp_replace(m."cardPhone", '[^0-9]', '', 'g')) = 10
+            THEN '7' || regexp_replace(m."cardPhone", '[^0-9]', '', 'g')
+          WHEN length(regexp_replace(m."cardPhone", '[^0-9]', '', 'g')) = 11
+               AND left(regexp_replace(m."cardPhone", '[^0-9]', '', 'g'), 1) = '8'
+            THEN '7' || substring(regexp_replace(m."cardPhone", '[^0-9]', '', 'g') from 2)
+          ELSE regexp_replace(m."cardPhone", '[^0-9]', '', 'g')
+        END
+      )
     )
   GROUP BY m."id"
   HAVING COUNT(*) = 1
