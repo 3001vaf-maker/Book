@@ -10,6 +10,8 @@ const bookingAccount = await readFile(new URL('../core/booking-account/index.js'
 const telegramBot = await readFile(new URL('../server/src/communication/telegram-bot.service.ts', import.meta.url), 'utf8');
 const telegramAuth = await readFile(new URL('../server/src/online-booking/telegram-booking-auth.service.ts', import.meta.url), 'utf8');
 const telegramAuthController = await readFile(new URL('../server/src/online-booking/telegram-booking-auth.controller.ts', import.meta.url), 'utf8');
+const telegramWebAppAuth = await readFile(new URL('../server/src/online-booking/telegram-webapp-auth.service.ts', import.meta.url), 'utf8');
+const onlineBookingModule = await readFile(new URL('../server/src/online-booking/online-booking.module.ts', import.meta.url), 'utf8');
 const cardLink = await readFile(new URL('../server/src/online-booking/client-card-link.service.ts', import.meta.url), 'utf8');
 
 // Telegram is a shell around the same public Book web app, not a second booking implementation.
@@ -20,9 +22,12 @@ assert.match(clientRuntime, /webApp\.expand\(\)/);
 assert.match(core, /params\.get\('booking'\)/);
 assert.match(core, /telegramEntry:\s*String\(params\.get\('tg_entry'\)/);
 
-// Telegram entry is exchanged before the normal Book bootstrap, so a linked Telegram user never sees a password screen.
+// The ordinary browser URL remains independent: without a Telegram token/bootstrap signal, normal Book loads unchanged.
+assert.match(entryAuth, /if \(!tenantId \|\| !entryToken\) return \{ halt: false \}/);
+assert.match(bootstrap, /if \(!telegramAuth\?\.halt\) await import\('\.\.\/core\.js'\)/);
+
+// Telegram /start entry is exchanged before normal Book bootstrap, so a linked Telegram user never sees a password screen.
 assert.match(bootstrap, /prepareTelegramEntryAuth/);
-assert.match(bootstrap, /await prepareTelegramEntryAuth\(\)/);
 assert.match(entryAuth, /exchangeBookingTelegramEntry\(tenantId, entryToken\)/);
 assert.match(entryAuth, /result\?\.state === 'authenticated'/);
 assert.match(entryAuth, /registerBookingTelegramAccount\(tenantId, entryToken/);
@@ -31,6 +36,28 @@ assert.match(entryAuth, /name="email"/);
 assert.doesNotMatch(entryAuth, /name="password"/);
 assert.match(bookingAccount, /account\/telegram-entry\/exchange/);
 assert.match(bookingAccount, /account\/telegram-entry\/register/);
+
+// Telegram Main App can launch directly. It validates Telegram initData server-side, mints the same one-time entry,
+// then continues through the exact same account/profile path as /start.
+assert.match(entryAuth, /params\.get\('tg_bot'\)/);
+assert.match(entryAuth, /window\.Telegram\?\.WebApp\?\.initData/);
+assert.match(entryAuth, /telegram-main-app\/\$\{encodeURIComponent\(cleanBot\)\}\/entry/);
+assert.match(entryAuth, /replaceTelegramRoute\(\{ tenantId, entryToken, removeBot: true \}\)/);
+assert.match(telegramAuthController, /telegram-main-app\/:botUsername\/entry/);
+assert.match(telegramAuthController, /createMainAppEntry\(botUsername, body\?\.initData\)/);
+assert.match(telegramAuth, /webAppAuth\.verify\(rawBotUsername, rawInitData\)/);
+assert.match(telegramAuth, /communications\.createTelegramEntry\(verified\.tenantId/);
+assert.match(onlineBookingModule, /TelegramWebAppAuthService/);
+
+// Server verifies Main App data using the connected bot token and Telegram's WebAppData HMAC, never initDataUnsafe.
+assert.match(telegramWebAppAuth, /TELEGRAM_CREDENTIALS_KEY/);
+assert.match(telegramWebAppAuth, /createHmac\('sha256', 'WebAppData'\)/);
+assert.match(telegramWebAppAuth, /createHmac\('sha256', secretKey\)/);
+assert.match(telegramWebAppAuth, /timingSafeEqual/);
+assert.match(telegramWebAppAuth, /params\.get\('auth_date'\)/);
+assert.match(telegramWebAppAuth, /15 \* 60/);
+assert.match(telegramWebAppAuth, /params\.get\('user'\)/);
+assert.doesNotMatch(telegramWebAppAuth, /initDataUnsafe/);
 
 // Server owns the one-time Telegram ticket and issues the ordinary booking-account session.
 assert.match(telegramAuthController, /telegram-entry\/exchange/);
@@ -41,7 +68,7 @@ assert.match(telegramAuth, /authMethod:\s*'telegram'/);
 assert.match(telegramAuth, /randomBytes\(48\)/);
 assert.match(telegramAuth, /bindTelegramEntry\(tenantId/);
 
-// Bot opens that same URL as a real Mini App and verifies the webhook with Telegram.
+// Bot /start still opens that same URL as a real Mini App and verifies the webhook with Telegram.
 assert.match(telegramBot, /web_app:\s*\{\s*url:\s*url\.toString\(\)\s*\}/);
 assert.match(telegramBot, /'setWebhook'/);
 assert.match(telegramBot, /secret_token:\s*webhookSecret/);
