@@ -4,18 +4,23 @@ import {
   getBookingContext,
   registerBookingTelegramAccount,
 } from './booking-account/index.js';
+import { normalizeBookingSettings } from './booking-settings/index.js';
 import { API_BASE } from './environment.js';
 import { normalizePhone } from './phone/index.js';
 import { requiredBookingDocuments } from '../online-booking/model.js';
-
-function escapeHtml(value = '') {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
-}
+import {
+  appHeader,
+  appShell,
+  bookingAgreementCards,
+  bookingDocument,
+  bookingThemeStyle,
+  emptyState,
+  escapeHtml,
+  field,
+  modal,
+  mountModal,
+  phoneField,
+} from '../ui/ui.js';
 
 function replaceTelegramRoute({ tenantId = '', entryToken = '', removeBot = false } = {}) {
   const url = new URL(location.href);
@@ -52,6 +57,11 @@ function renderStatus(app, title, message, action = '') {
     </main>`;
 }
 
+function renderChecking(app) {
+  app.classList.add('app-shell--booking');
+  app.innerHTML = '<main class="booking-content"></main>';
+}
+
 async function createTelegramMainAppEntry(botUsername, initData) {
   const cleanBot = String(botUsername || '').trim().replace(/^@+/, '');
   const response = await fetch(`${API_BASE}/online-booking/telegram-main-app/${encodeURIComponent(cleanBot)}/entry`, {
@@ -64,109 +74,165 @@ async function createTelegramMainAppEntry(botUsername, initData) {
   return payload;
 }
 
-function consentMarkup(documents) {
-  return documents.map((document) => {
-    const id = String(document.id || '');
-    const title = String(document.title || 'Документ');
-    const body = String(document.body || document.text || '').trim();
-    return `
-      <section class="auth-consent-item">
-        <label style="display:flex;align-items:flex-start;gap:10px;font-size:14px;font-weight:600">
-          <input type="checkbox" name="consent:${escapeHtml(id)}" ${document.required ? 'required' : ''} style="width:18px;height:18px;margin-top:2px">
-          <span>${escapeHtml(title)}${document.required ? ' *' : ''}</span>
-        </label>
-        ${body ? `<details style="margin:6px 0 0 28px"><summary>Прочитать</summary><div class="muted" style="white-space:pre-wrap;margin-top:8px">${escapeHtml(body)}</div></details>` : ''}
-      </section>`;
-  }).join('');
+function flowThemeClasses(settings) {
+  const theme = settings?.theme && typeof settings.theme === 'object' ? settings.theme : {};
+  const shape = ['soft', 'round', 'straight', 'cut'].includes(theme.shape) ? theme.shape : 'soft';
+  const choiceStyle = ['cards', 'compact', 'list'].includes(theme.choiceStyle) ? theme.choiceStyle : 'cards';
+  return `booking-client booking-client--account booking-shape--${shape} booking-choice-style--${choiceStyle}`;
+}
+
+function subtitleBlock(value = '') {
+  const text = String(value || '').trim();
+  return text ? `<div class="muted">${escapeHtml(text).replaceAll('\n', '<br>')}</div>` : '';
+}
+
+function renderFlowPage(app, settings, {
+  title = '',
+  subtitle = '',
+  body = '',
+  back = null,
+  action = null,
+  center = false,
+} = {}) {
+  const shell = appShell({
+    header: appHeader({ title, back, action }),
+    body: `${subtitleBlock(subtitle)}${body}`,
+    className: `app-view-shell--booking-flow${center ? ' app-view-shell--booking-flow-center' : ''}`,
+  });
+  app.classList.add('app-shell--booking');
+  app.innerHTML = `<main class="booking-content"><section class="${flowThemeClasses(settings)}" style="${bookingThemeStyle(settings)}">${shell}</section></main>`;
+}
+
+function errorBlock(message = '') {
+  return message ? `<div class="form-error" role="alert">${escapeHtml(message)}</div>` : '';
 }
 
 function telegramRegistration(app, tenantId, entryToken, context) {
+  const settings = normalizeBookingSettings(context.settings);
   const documents = requiredBookingDocuments(context);
   const prefill = telegramUserPrefill();
+  const consents = {};
+  let error = '';
 
   return new Promise((resolve) => {
-    app.classList.remove('app-shell--booking');
-    app.innerHTML = `
-      <main class="auth-view">
-        <section class="auth-card" aria-labelledby="telegram-register-title">
-          <div class="auth-card__heading">
-            <h1 id="telegram-register-title">Регистрация через Telegram</h1>
-            <p>Telegram уже подтверждён. Пароль не нужен.</p>
-          </div>
-          <form class="auth-form" data-telegram-register-form>
-            <label class="field">
-              <span>Имя</span>
-              <input name="name" autocomplete="given-name" value="${escapeHtml(prefill.name)}" required>
-            </label>
-            <label class="field">
-              <span>Фамилия</span>
-              <input name="surname" autocomplete="family-name" value="${escapeHtml(prefill.surname)}">
-            </label>
-            <label class="field">
-              <span>Телефон</span>
-              <input name="phone" type="tel" autocomplete="tel" placeholder="+7 999 123-45-67" required>
-            </label>
-            <label class="field">
-              <span>Email</span>
-              <input name="email" type="email" autocomplete="email" required>
-            </label>
-            ${consentMarkup(documents)}
-            <p class="auth-error" data-telegram-register-error role="alert"></p>
-            <button class="ui-button" type="submit">Продолжить</button>
-            <button class="ui-button ui-button--secondary" type="button" data-telegram-normal-login>Войти другим способом</button>
-          </form>
-        </section>
-      </main>`;
+    const openDocument = (documentId) => {
+      const document = documents.find((item) => String(item.id) === String(documentId));
+      if (!document) return;
+      mountModal(document.body, modal(bookingDocument({
+        title: document.title || 'Документ',
+        version: document.version || 1,
+        text: document.text || '',
+      }), { variant: 'large' }));
+    };
 
-    const form = app.querySelector('[data-telegram-register-form]');
-    const error = app.querySelector('[data-telegram-register-error]');
-    const submit = form?.querySelector('button[type="submit"]');
+    const renderWelcome = () => {
+      error = '';
+      const profile = context.profile || {};
+      const owner = [profile.name, profile.surname].filter(Boolean).join(' ');
+      const subtitle = [settings.welcomeText, owner].filter(Boolean).join('\n');
+      renderFlowPage(app, settings, {
+        title: settings.welcomeTitle,
+        subtitle,
+        action: { label: 'Далее', data: 'data-booking-welcome-next' },
+        center: true,
+      });
+      app.querySelector('[data-booking-welcome-next]')?.addEventListener('click', renderAgreements);
+    };
 
-    app.querySelector('[data-telegram-normal-login]')?.addEventListener('click', () => {
-      removeTelegramEntryFromUrl();
-      resolve({ continue: true });
-    });
-
-    form?.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      if (submit) submit.disabled = true;
-      if (error) error.textContent = '';
-      const data = new FormData(form);
-      const phone = normalizePhone(data.get('phone'));
-      if (!phone) {
-        if (error) error.textContent = 'Введите телефон полностью.';
-        if (submit) submit.disabled = false;
-        return;
-      }
-      const consents = documents.map((document) => ({
-        documentId: String(document.id || ''),
-        documentVersion: Math.max(1, Number(document.version || 1)),
-        accepted: data.get(`consent:${String(document.id || '')}`) === 'on',
-        acceptedAt: new Date().toISOString(),
+    const renderAgreements = () => {
+      const canContinue = documents
+        .filter((document) => document.required)
+        .every((document) => consents[String(document.id || '')]);
+      const cards = bookingAgreementCards(documents.map((document) => ({
+        label: document.title || 'Документ',
+        checked: Boolean(consents[String(document.id || '')]),
+        openData: `data-booking-document="${escapeHtml(document.id)}"`,
+        toggleData: `data-booking-consent="${escapeHtml(document.id)}"`,
+        openAria: `Открыть документ ${document.title || ''}`,
+        toggleAria: `${consents[String(document.id || '')] ? 'Снять' : 'Дать'} согласие: ${document.title || ''}`,
+      })));
+      renderFlowPage(app, settings, {
+        title: 'Соглашения',
+        subtitle: 'Согласия относятся к регистрации и аккаунту клиента',
+        back: { data: 'data-booking-agreements-back', aria: 'Назад' },
+        action: { label: 'Далее', data: 'data-booking-agreements-next', disabled: !canContinue },
+        body: `${documents.length ? cards : emptyState('Документов нет', 'Для регистрации не настроены документы согласия.')}${errorBlock(error)}`,
+      });
+      app.querySelector('[data-booking-agreements-back]')?.addEventListener('click', renderWelcome);
+      app.querySelectorAll('[data-booking-document]').forEach((node) => node.addEventListener('click', () => openDocument(node.dataset.bookingDocument)));
+      app.querySelectorAll('[data-booking-consent]').forEach((node) => node.addEventListener('click', () => {
+        const id = String(node.dataset.bookingConsent || '');
+        consents[id] = !consents[id];
+        renderAgreements();
       }));
+      app.querySelector('[data-booking-agreements-next]')?.addEventListener('click', () => {
+        if (canContinue) renderDetails();
+      });
+    };
 
-      try {
-        await registerBookingTelegramAccount(tenantId, entryToken, {
-          name: String(data.get('name') || '').trim(),
-          surname: String(data.get('surname') || '').trim(),
-          phone,
-          email: String(data.get('email') || '').trim().toLowerCase(),
-          consents,
-        });
-        removeTelegramEntryFromUrl();
-        resolve({ continue: true });
-      } catch (registrationError) {
-        if (error) error.textContent = registrationError instanceof Error
-          ? registrationError.message
-          : 'Не удалось зарегистрироваться через Telegram';
-        if (submit) submit.disabled = false;
-      }
-    });
+    const renderDetails = () => {
+      renderFlowPage(app, settings, {
+        title: 'Ваши данные',
+        subtitle: 'Они сохранятся в вашем аккаунте',
+        back: { data: 'data-booking-account-back', aria: 'Назад' },
+        action: { label: 'Далее', data: 'data-booking-account-submit' },
+        body: `<form data-booking-account-form>
+          ${field({ label: 'Имя', name: 'name', value: prefill.name, required: true, autocomplete: 'given-name' })}
+          ${field({ label: 'Фамилия', name: 'surname', value: prefill.surname, autocomplete: 'family-name' })}
+          ${phoneField({ label: 'Телефон', name: 'phone', value: '', required: true })}
+          ${field({ label: 'Email', name: 'email', value: '', type: 'email', required: true, autocomplete: 'email' })}
+          ${errorBlock(error)}
+        </form>`,
+      });
+      const form = app.querySelector('[data-booking-account-form]');
+      const submit = app.querySelector('[data-booking-account-submit]');
+      app.querySelector('[data-booking-account-back]')?.addEventListener('click', () => {
+        error = '';
+        renderAgreements();
+      });
+      submit?.addEventListener('click', () => form?.requestSubmit());
+      form?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        if (submit) submit.disabled = true;
+        error = '';
+        const data = new FormData(form);
+        const phone = normalizePhone(data.get('phone'));
+        if (!phone) {
+          error = 'Введите телефон полностью.';
+          renderDetails();
+          return;
+        }
+        const consentFacts = documents.map((document) => ({
+          documentId: String(document.id || ''),
+          documentVersion: Math.max(1, Number(document.version || 1)),
+          accepted: Boolean(consents[String(document.id || '')]),
+          acceptedAt: new Date().toISOString(),
+        }));
+        try {
+          await registerBookingTelegramAccount(tenantId, entryToken, {
+            name: String(data.get('name') || '').trim(),
+            surname: String(data.get('surname') || '').trim(),
+            phone,
+            email: String(data.get('email') || '').trim().toLowerCase(),
+            consents: consentFacts,
+          });
+          removeTelegramEntryFromUrl();
+          resolve({ continue: true });
+        } catch (registrationError) {
+          error = registrationError instanceof Error
+            ? registrationError.message
+            : 'Не удалось зарегистрироваться через Telegram';
+          renderDetails();
+        }
+      });
+    };
+
+    renderWelcome();
   });
 }
 
 async function runTelegramEntryAuth(app, tenantId, entryToken) {
-  renderStatus(app, 'Вход через Telegram', 'Проверяем Telegram…');
+  renderChecking(app);
 
   try {
     const result = await exchangeBookingTelegramEntry(tenantId, entryToken);
@@ -175,7 +241,7 @@ async function runTelegramEntryAuth(app, tenantId, entryToken) {
       return;
     }
 
-    // Do not let a browser session for another client silently win over the Telegram identity.
+    // Telegram changes only the authentication method. The client registration screens remain the approved Book flow.
     clearBookingAccount(tenantId);
     const context = await getBookingContext(tenantId);
     await telegramRegistration(app, tenantId, entryToken, context);
@@ -210,7 +276,7 @@ export async function prepareTelegramEntryAuth() {
       renderStatus(app, 'Telegram Mini App', 'Откройте приложение из Telegram.');
       return { halt: true };
     }
-    renderStatus(app, 'Вход через Telegram', 'Проверяем Telegram…');
+    renderChecking(app);
     try {
       const entry = await createTelegramMainAppEntry(mainAppBot, initData);
       tenantId = String(entry?.tenantId || '').trim();
