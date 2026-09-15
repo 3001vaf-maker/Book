@@ -18,10 +18,25 @@ jobs:
       - name: Probe production API health
         run: |
           set -euo pipefail
-          echo 'probe_attempt=4'
+          echo 'probe_attempt=5'
           curl --fail --silent --show-error --location --max-time 30 https://book-api-volokovykh.amvera.io/health | tee /tmp/health.json
           grep -q '"status":"ok"' /tmp/health.json
           grep -q '"bookingAutonomy":"server"' /tmp/health.json
           grep -q '"release":"telegram-miniapp-v1"' /tmp/health.json
           grep -q '"telegramRuntime":"ready"' /tmp/health.json
           echo 'telegram_runtime=ready'
+      - name: Probe Telegram webhook ingress
+        run: |
+          set -euo pipefail
+          code=$(curl --silent --show-error --max-time 30 \
+            -o /tmp/webhook.json -w '%{http_code}' \
+            -X POST \
+            -H 'Content-Type: application/json' \
+            -H 'X-Telegram-Bot-Api-Secret-Token: probe' \
+            --data '{"update_id":1}' \
+            https://book-api-volokovykh.amvera.io/communications/telegram/webhook/probe)
+          cat /tmp/webhook.json
+          echo "webhook_http=$code"
+          test "$code" = "404"
+          grep -q 'Telegram webhook не найден' /tmp/webhook.json
+          echo 'webhook_ingress=ok'
