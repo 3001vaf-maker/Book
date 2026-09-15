@@ -150,7 +150,10 @@ export function messageComposer({ placeholder = 'Написать сообщен
   const input = rich
     ? richTextEditorMarkup({ placeholder, value })
     : `<textarea class="message-composer__input" name="message" rows="1" placeholder="${text(placeholder)}" aria-label="${text(placeholder)}"></textarea>`;
-  return `<form class="${composerClass}" ${data}>${attachments ? `<input class="sr-only" type="file" accept="image/*,video/*" multiple data-message-attachment-input><button type="button" class="message-composer__attach" data-message-attachment aria-label="Прикрепить фото или медиа">📎</button>` : ''}${input}${button('➤', { className: 'message-composer__send', type: 'submit', data: sendData, aria: 'Отправить' })}${attachments ? '<div class="message-composer__attachments" data-message-attachment-preview></div>' : ''}</form>`;
+  const content = `${attachments ? `<input class="sr-only" type="file" accept="image/*,video/*" multiple data-message-attachment-input><button type="button" class="message-composer__attach" data-message-attachment aria-label="Прикрепить фото или медиа">📎</button>` : ''}${input}${button('➤', { className: 'message-composer__send', type: 'submit', data: sendData, aria: 'Отправить' })}${attachments ? '<div class="message-composer__attachments" data-message-attachment-preview></div>' : ''}`;
+  return embedded
+    ? `<div class="${composerClass}" ${data}>${content}</div>`
+    : `<form class="${composerClass}" ${data}>${content}</form>`;
 }
 
 export function settingToggle({ label = '', checked = false, data = '', disabled = false } = {}) {
