@@ -18,15 +18,10 @@ jobs:
       - name: Probe production API health
         run: |
           set -euo pipefail
-          echo 'probe_attempt=3'
+          echo 'probe_attempt=4'
           curl --fail --silent --show-error --location --max-time 30 https://book-api-volokovykh.amvera.io/health | tee /tmp/health.json
           grep -q '"status":"ok"' /tmp/health.json
           grep -q '"bookingAutonomy":"server"' /tmp/health.json
           grep -q '"release":"telegram-miniapp-v1"' /tmp/health.json
-          echo 'api_release=telegram-miniapp-v1'
-          if grep -q '"telegramRuntime":"ready"' /tmp/health.json; then
-            echo 'telegram_runtime=ready'
-          else
-            grep -q '"telegramRuntime":"unconfigured"' /tmp/health.json
-            echo 'telegram_runtime=unconfigured'
-          fi
+          grep -q '"telegramRuntime":"ready"' /tmp/health.json
+          echo 'telegram_runtime=ready'
