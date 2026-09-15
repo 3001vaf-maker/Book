@@ -1,7 +1,5 @@
 import { apiRequest } from './auth.js';
 
-const ACCESS_SEEN_PREFIX = 'book.access.seen.';
-
 let currentAccess = {
   tenantId: '',
   status: 'LEGACY_COMPAT',
@@ -11,6 +9,7 @@ let currentAccess = {
 };
 let capabilityMap = new Map();
 let currentFingerprint = '';
+let previousEnabledKeys = [];
 let lastAccessChange = { changed: false, newlyEnabled: [], newlyDisabled: [] };
 
 function fingerprint(value) {
@@ -33,31 +32,6 @@ function enabledBooleanKeys(value) {
     .sort();
 }
 
-function seenKey(tenantId) {
-  return `${ACCESS_SEEN_PREFIX}${String(tenantId || '').trim()}`;
-}
-
-function readSeenCapabilities(tenantId) {
-  if (!tenantId) return null;
-  try {
-    const raw = localStorage.getItem(seenKey(tenantId));
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.map((item) => String(item || '').trim()).filter(Boolean) : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeSeenCapabilities(tenantId, keys) {
-  if (!tenantId) return;
-  try {
-    localStorage.setItem(seenKey(tenantId), JSON.stringify(keys));
-  } catch {
-    // Access still works when browser storage is unavailable.
-  }
-}
-
 function publishAccessChange() {
   if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function' || typeof CustomEvent === 'undefined') return;
   window.dispatchEvent(new CustomEvent('book:access-updated', {
@@ -72,32 +46,34 @@ function publishAccessChange() {
 
 function applyAccess(value) {
   const previousFingerprint = currentFingerprint;
+  const hadPreviousAccess = Boolean(previousFingerprint);
+  const previousSet = new Set(previousEnabledKeys);
+
   currentAccess = value && typeof value === 'object' ? value : currentAccess;
   capabilityMap = new Map((Array.isArray(currentAccess.capabilities) ? currentAccess.capabilities : []).map((item) => [item.key, item]));
   currentFingerprint = fingerprint(currentAccess);
 
   const enabled = enabledBooleanKeys(currentAccess);
-  const seen = readSeenCapabilities(currentAccess.tenantId);
-  const seenSet = new Set(seen || []);
   const enabledSet = new Set(enabled);
-  const newlyEnabled = seen ? enabled.filter((key) => !seenSet.has(key)) : [];
-  const newlyDisabled = seen ? seen.filter((key) => !enabledSet.has(key)) : [];
-  writeSeenCapabilities(currentAccess.tenantId, enabled);
-
   lastAccessChange = {
-    changed: Boolean(previousFingerprint && previousFingerprint !== currentFingerprint),
-    newlyEnabled,
-    newlyDisabled,
+    changed: Boolean(hadPreviousAccess && previousFingerprint !== currentFingerprint),
+    newlyEnabled: hadPreviousAccess ? enabled.filter((key) => !previousSet.has(key)) : [],
+    newlyDisabled: hadPreviousAccess ? previousEnabledKeys.filter((key) => !enabledSet.has(key)) : [],
   };
+  previousEnabledKeys = enabled;
   publishAccessChange();
   return currentAccess;
 }
 
-async function fetchBookAccess() {
-  const response = await apiRequest('/saas-access/me', { cache: 'no-store' });
+async function requestJson(path, options = {}) {
+  const response = await apiRequest(path, { cache: 'no-store', ...options });
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload?.message || 'Не удалось загрузить доступы Book');
+  if (!response.ok) throw new Error(payload?.message || 'Не удалось обновить доступы Book');
   return payload;
+}
+
+async function fetchBookAccess() {
+  return requestJson('/saas-access/me');
 }
 
 export async function loadBookAccess() {
@@ -107,6 +83,18 @@ export async function loadBookAccess() {
 export async function refreshBookAccess() {
   const access = await loadBookAccess();
   return { access, ...lastAccessChange };
+}
+
+export async function getPendingCapabilityChanges() {
+  return requestJson('/saas-access/changes');
+}
+
+export async function acknowledgeCapabilitySummary(batchId) {
+  return requestJson(`/saas-access/changes/${encodeURIComponent(batchId)}/ack-summary`, { method: 'POST' });
+}
+
+export async function acknowledgeCapabilityIntroduction(eventId) {
+  return requestJson(`/saas-access/changes/events/${encodeURIComponent(eventId)}/ack-detail`, { method: 'POST' });
 }
 
 export function getLastBookAccessChange() {
