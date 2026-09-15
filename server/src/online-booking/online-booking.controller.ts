@@ -1,6 +1,7 @@
 import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ClientContactRouteService } from '../communication/client-contact-route.service';
 import { CommunicationService } from '../communication/communication.service';
 import { ConsentPolicyService } from '../document-state/consent-policy.service';
 import { NotificationService } from '../notification/notification.service';
@@ -19,6 +20,7 @@ export class OnlineBookingController {
     private readonly booking: OnlineBookingService,
     private readonly notifications: NotificationService,
     private readonly communications: CommunicationService,
+    private readonly contactRoutes: ClientContactRouteService,
     private readonly consents: ConsentPolicyService,
     private readonly webPush: WebPushService,
     private readonly clientCards: ClientCardLinkService,
@@ -102,7 +104,8 @@ export class OnlineBookingController {
   }
 
   @Post(':tenantId/account/register')
-  registerAccount(@Param('tenantId') tenantId: string, @Body() body: Record<string, any>) {
+  async registerAccount(@Param('tenantId') tenantId: string, @Body() body: Record<string, any>) {
+    await this.clientCards.validateNewAccountContacts(tenantId, body || {});
     return this.booking.registerAccount(tenantId, body || {});
   }
 
@@ -119,8 +122,10 @@ export class OnlineBookingController {
 
   @UseGuards(BookingAccountGuard)
   @Put(':tenantId/account/me')
-  updateAccount(@Param('tenantId') tenantId: string, @Req() request: AccountRequest, @Body() body: Record<string, any>) {
-    return this.booking.updateAccount(tenantId, request.bookingAccountAuth!.accountId, body || {});
+  async updateAccount(@Param('tenantId') tenantId: string, @Req() request: AccountRequest, @Body() body: Record<string, any>) {
+    const accountId = request.bookingAccountAuth!.accountId;
+    await this.clientCards.validateAccountContactUpdate(tenantId, accountId, body || {});
+    return this.booking.updateAccount(tenantId, accountId, body || {});
   }
 
   @UseGuards(BookingAccountGuard)
@@ -242,8 +247,14 @@ export class OnlineBookingController {
   @UseGuards(BookingAccountGuard)
   @Get(':tenantId/account/chat')
   async accountChat(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
-    const account = await this.booking.getAccount(tenantId, request.bookingAccountAuth!.accountId);
-    return this.communications.listThread(tenantId, { phone: account.phone, uei: account.uei }, 500);
+    const accountId = request.bookingAccountAuth!.accountId;
+    const profiles = await this.contactRoutes.accessibleProfilesForAccount(tenantId, accountId);
+    const threads = await Promise.all(profiles.map((profile) => this.communications.listThread(tenantId, { profileKey: profile.profileKey }, 500)));
+    const merged = threads.flat().sort((left, right) => {
+      const byTime = new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime();
+      return byTime || String(left.id).localeCompare(String(right.id));
+    });
+    return merged.slice(Math.max(0, merged.length - 500));
   }
 
   @UseGuards(BookingAccountGuard)
