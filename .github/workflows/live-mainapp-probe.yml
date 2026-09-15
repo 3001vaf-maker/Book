@@ -1,0 +1,34 @@
+name: Probe Telegram Main App live
+
+on:
+  push:
+    branches:
+      - probe/telegram-mainapp-live
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify production frontend and API
+        shell: bash
+        run: |
+          set -euo pipefail
+          FRONTEND='https://3001vaf-maker.github.io/Book/core/telegram-entry-auth.js'
+          API='https://book-api-volokovykh.amvera.io'
+
+          frontend_body="$(curl --retry 3 --retry-delay 2 --fail --silent --show-error "$FRONTEND")"
+          printf '%s' "$frontend_body" | grep -q "params.get('tg_bot')"
+          printf '%s' "$frontend_body" | grep -q 'telegram-main-app'
+
+          health_body="$(curl --retry 3 --retry-delay 2 --fail --silent --show-error "$API/health")"
+          printf '%s' "$health_body" | grep -q '"status":"ok"'
+
+          body_file="$(mktemp)"
+          status="$(curl --retry 3 --retry-delay 2 --silent --show-error -o "$body_file" -w '%{http_code}' \
+            -X POST "$API/online-booking/telegram-main-app/SeeYouAV_bot/entry" \
+            -H 'Content-Type: application/json' \
+            --data '{"initData":""}')"
+          cat "$body_file"
+          test "$status" = '400'
+          grep -q 'Telegram Mini App' "$body_file"
