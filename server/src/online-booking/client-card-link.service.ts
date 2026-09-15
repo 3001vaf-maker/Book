@@ -1,6 +1,7 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { BookingRequestStatus } from '@prisma/client';
 import { BusinessStateService } from '../business-state/business-state.service';
+import { ClientContactRulesService } from '../business-state/client-contact-rules.service';
 
 function text(value: unknown) {
   return String(value ?? '').trim();
@@ -51,7 +52,10 @@ type ClientCardBinding = {
 
 @Injectable()
 export class ClientCardLinkService {
-  constructor(private readonly businessState: BusinessStateService) {}
+  constructor(
+    private readonly businessState: BusinessStateService,
+    private readonly clientContactRules: ClientContactRulesService,
+  ) {}
 
   async cardState(tenantId: string, phone: unknown) {
     const business = await this.businessState.get(tenantId);
@@ -60,6 +64,11 @@ export class ClientCardLinkService {
       .map((person, position) => ({ person, position }))
       .filter(({ person }) => personHasPhone(person, phone));
     return { business, people, members, owner: members[0] || null };
+  }
+
+  private assertUnambiguousPhone(card: Awaited<ReturnType<ClientCardLinkService['cardState']>>) {
+    if (card.members.length <= 1) return;
+    throw new ConflictException('Этот телефон уже указан у нескольких клиентов. Мастер должен сначала разобрать старый дубль.');
   }
 
   async reconcileLegacyAccountDuplicates(tenantId: string) {
@@ -92,13 +101,16 @@ export class ClientCardLinkService {
 
     const card = await this.cardState(tenantId, account.phone);
     if (!card.owner) return null;
+    this.assertUnambiguousPhone(card);
 
     const owner: Record<string, any> = {
       ...objectValue(card.owner.person),
       accounts: uniqueStrings([...accountIds(card.owner.person), accountId]),
       phones: uniqueStrings([...arrayValue(card.owner.person.phones), account.phone]),
       emails: uniqueStrings([...arrayValue(card.owner.person.emails), text(account.email).toLowerCase()]),
+      telegrams: uniqueStrings([...arrayValue(card.owner.person.telegrams), text(account.telegramId)]),
     };
+    await this.clientContactRules.validatePersonUpsert(tenantId, text(owner.key), { person: owner });
     await this.businessState.upsertPerson(tenantId, text(owner.key), { person: owner, position: card.owner.position });
     return { person: owner, clientCardExisted: true };
   }
@@ -106,6 +118,15 @@ export class ClientCardLinkService {
   async bindFirstAccess(tenantId: string, account: Record<string, any>): Promise<ClientCardBinding> {
     const existing = await this.findOrAttachExistingCard(tenantId, account);
     if (existing) return existing;
+    const accountId = text(account?.id);
+    const candidate = {
+      key: `account-${accountId}`,
+      phones: uniqueStrings([account.phone]),
+      emails: uniqueStrings([text(account.email).toLowerCase()]),
+      telegrams: uniqueStrings([account.telegramId]),
+      contactViaUei: '',
+    };
+    await this.clientContactRules.validatePersonUpsert(tenantId, candidate.key, { person: candidate });
     const person = objectValue(await this.businessState.upsertBookingPersonFromAccount(tenantId, account));
     return { person, clientCardExisted: false };
   }
@@ -113,6 +134,7 @@ export class ClientCardLinkService {
   async cardStats(tenantId: string, account: Record<string, any>) {
     const card = await this.cardState(tenantId, account.phone);
     if (!card.members.length) return null;
+    this.assertUnambiguousPhone(card);
     const members = card.members.map(({ person }) => person);
     return {
       visits: members.reduce((sum, person) => sum + Math.max(0, Number(person.visits || 0)), 0),
@@ -123,6 +145,7 @@ export class ClientCardLinkService {
 
   async manualRecordViews(tenantId: string, account: Record<string, any>, importedRecordIds: Set<string>) {
     const card = await this.cardState(tenantId, account.phone);
+    this.assertUnambiguousPhone(card);
     const memberKeys = new Set(card.members.map(({ person }) => text(person.key)).filter(Boolean));
     if (!memberKeys.size) return [];
 
