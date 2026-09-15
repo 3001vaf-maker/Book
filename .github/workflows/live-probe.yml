@@ -14,17 +14,36 @@ jobs:
           curl --fail --silent --show-error --location --max-time 30 https://3001vaf-maker.github.io/Book/ -o /tmp/book.html
           grep -q 'telegram.org/js/telegram-web-app.js' /tmp/book.html
           grep -q 'core/bootstrap.js' /tmp/book.html
-          echo 'frontend=ok'
+          curl --fail --silent --show-error --location --max-time 30 https://3001vaf-maker.github.io/Book/core/bootstrap.js -o /tmp/bootstrap.js
+          grep -q "telegram-entry-auth.js" /tmp/bootstrap.js
+          curl --fail --silent --show-error --location --max-time 30 https://3001vaf-maker.github.io/Book/core/telegram-entry-auth.js -o /tmp/telegram-entry-auth.js
+          grep -q 'exchangeBookingTelegramEntry' /tmp/telegram-entry-auth.js
+          grep -q 'registerBookingTelegramAccount' /tmp/telegram-entry-auth.js
+          echo 'frontend_direct_telegram_auth=ok'
       - name: Probe production API health
         run: |
           set -euo pipefail
-          echo 'probe_attempt=5'
+          echo 'probe_attempt=6'
           curl --fail --silent --show-error --location --max-time 30 https://book-api-volokovykh.amvera.io/health | tee /tmp/health.json
           grep -q '"status":"ok"' /tmp/health.json
           grep -q '"bookingAutonomy":"server"' /tmp/health.json
           grep -q '"release":"telegram-miniapp-v1"' /tmp/health.json
           grep -q '"telegramRuntime":"ready"' /tmp/health.json
           echo 'telegram_runtime=ready'
+      - name: Probe direct Telegram auth endpoint
+        run: |
+          set -euo pipefail
+          code=$(curl --silent --show-error --max-time 30 \
+            -o /tmp/tg-auth.json -w '%{http_code}' \
+            -X POST \
+            -H 'Content-Type: application/json' \
+            --data '{"token":"probe-not-a-real-token"}' \
+            https://book-api-volokovykh.amvera.io/online-booking/probe/account/telegram-entry/exchange)
+          cat /tmp/tg-auth.json
+          echo "telegram_auth_http=$code"
+          test "$code" = "404"
+          grep -q 'Telegram-вход не найден' /tmp/tg-auth.json
+          echo 'backend_direct_telegram_auth=ok'
       - name: Probe Telegram webhook ingress
         run: |
           set -euo pipefail
