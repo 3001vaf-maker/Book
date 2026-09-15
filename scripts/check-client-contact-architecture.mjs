@@ -29,6 +29,9 @@ if (!clientData.includes('contactViaUei')) {
 if (!clientUi.includes("label:'Связь через'") || !clientUi.includes('label:option.value')) {
   failures.push('Client UI must expose Связь через using UEI code as the primary selector label.');
 }
+if (clientUi.includes('linkValue&&!hasContact')) {
+  failures.push('A contactless client is a full Person and must never be deleted when linked by UEI.');
+}
 if (!rules.includes('validatePersonUpsert') || !controller.includes('validatePersonUpsert')) {
   failures.push('Server must enforce Contact Point uniqueness independently of the UI.');
 }
