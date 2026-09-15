@@ -8,7 +8,7 @@ import {
   saveCommunicationGroup,
   sendBroadcast,
 } from '../core/communications/broadcasts.js';
-import { findPeopleByPhone, getAllClients } from '../main/clients/data.js';
+import { findPeopleByPhone, getAllClients, getClients } from '../main/clients/data.js';
 import {
   appHeader,
   appShell,
@@ -43,6 +43,24 @@ function personName(person = {}) {
 
 function phoneOf(person = {}) {
   return String((Array.isArray(person.phones) ? person.phones : []).find(Boolean) || '');
+}
+
+function personByProfileKey(key) {
+  const profileKey = String(key || '').trim();
+  if (!profileKey) return null;
+  return getAllClients().find((person) => String(person.key || '') === profileKey) || null;
+}
+
+function threadProfileKey(thread = {}) {
+  return String(thread.threadProfileKey || thread.profileKey || '').trim();
+}
+
+function threadName(thread = {}) {
+  const named = String(thread.threadProfileName || '').trim();
+  if (named) return named;
+  const person = personByProfileKey(threadProfileKey(thread));
+  if (person) return personName(person);
+  return clientName(thread.cardPhone, thread.uei);
 }
 
 function messageTime(value) {
@@ -108,11 +126,11 @@ function bindMessageAttachments(form) {
 }
 
 function peopleList() {
-  return getAllClients().filter((person) => person.key && phoneOf(person));
+  return getClients().filter((person) => person.key);
 }
 
 function personByKey(key) {
-  return peopleList().find((person) => String(person.key) === String(key)) || null;
+  return getAllClients().find((person) => String(person.key) === String(key)) || null;
 }
 
 function recipientLabel(recipient = {}) {
@@ -177,7 +195,7 @@ async function renderCompose(root, state, recipient) {
       if (oneClient) {
         const person = personByKey(recipient.personKeys?.[0]);
         if (!person) throw new Error('Клиент не найден');
-        await sendCommunicationMessage({ phone: phoneOf(person), uei: person.uei || '', body, content, attachments });
+        await sendCommunicationMessage({ profileKey: person.key, phone: phoneOf(person), uei: person.uei || '', body, content, attachments });
       } else {
         await sendBroadcast({
           channel: 'TELEGRAM',
@@ -386,12 +404,14 @@ function openMessageActions(root, state, thread, message) {
 async function openThread(root, state, thread) {
   state.view = 'thread';
   state.thread = thread;
+  const profileKey = threadProfileKey(thread);
   const phone = String(thread?.cardPhone || '').trim();
-  const uei = String(thread?.uei || '').trim();
-  screen(root, appHeader({ title: clientName(phone, uei), back: { data: 'data-chat-back', aria: 'К диалогам' } }), emptyState('Загрузка', 'Получаем переписку.'), 'app-view-shell--chat');
+  const uei = String(thread?.threadProfileUei || thread?.uei || '').trim();
+  const title = threadName(thread);
+  screen(root, appHeader({ title, back: { data: 'data-chat-back', aria: 'К диалогам' } }), emptyState('Загрузка', 'Получаем переписку.'), 'app-view-shell--chat');
   try {
-    const messages = withTimes(await getCommunicationThread({ phone, uei }));
-    screen(root, appHeader({ title: clientName(phone, uei), back: { data: 'data-chat-back', aria: 'К диалогам' } }), `${messages.length ? messageThread(messages, { viewer: 'master', actions: true }) : emptyState('Сообщений пока нет', 'Напишите клиенту первое сообщение.')}${messageComposer({ placeholder: 'Написать сообщение...', attachments: true, rich: true })}<div class="muted" data-chat-status aria-live="polite"></div>`, 'app-view-shell--chat');
+    const messages = withTimes(await getCommunicationThread({ profileKey, phone, uei }));
+    screen(root, appHeader({ title, back: { data: 'data-chat-back', aria: 'К диалогам' } }), `${messages.length ? messageThread(messages, { viewer: 'master', actions: true }) : emptyState('Сообщений пока нет', 'Напишите клиенту первое сообщение.')}${messageComposer({ placeholder: 'Написать сообщение...', attachments: true, rich: true })}<div class="muted" data-chat-status aria-live="polite"></div>`, 'app-view-shell--chat');
     root.querySelector('[data-chat-back]')?.addEventListener('click', () => void renderThreads(root, state));
     root.querySelectorAll('[data-message-actions]').forEach((control) => control.addEventListener('click', () => {
       const message = messages.find((item) => String(item.id) === String(control.dataset.messageActions));
@@ -409,7 +429,7 @@ async function openThread(root, state, thread) {
       const status = root.querySelector('[data-chat-status]');
       if (submit) submit.disabled = true;
       try {
-        await sendCommunicationMessage({ phone, uei, body: value.body, content: value.content, attachments });
+        await sendCommunicationMessage({ profileKey, phone, uei, body: value.body, content: value.content, attachments });
         await openThread(root, state, thread);
       } catch (error) {
         if (status) status.textContent = error instanceof Error ? error.message : 'Не удалось отправить';
@@ -417,7 +437,7 @@ async function openThread(root, state, thread) {
       }
     });
   } catch (error) {
-    screen(root, appHeader({ title: clientName(phone, uei), back: { data: 'data-chat-back', aria: 'К диалогам' } }), emptyState('Чат недоступен', error instanceof Error ? error.message : 'Не удалось загрузить переписку'), 'app-view-shell--chat');
+    screen(root, appHeader({ title, back: { data: 'data-chat-back', aria: 'К диалогам' } }), emptyState('Чат недоступен', error instanceof Error ? error.message : 'Не удалось загрузить переписку'), 'app-view-shell--chat');
     root.querySelector('[data-chat-back]')?.addEventListener('click', () => void renderThreads(root, state));
   }
 }
@@ -428,14 +448,17 @@ async function renderThreads(root, state) {
   screen(root, appHeader({ title: 'Сообщения', action: { label: 'Новое', data: 'data-chat-new' }, settings: { data: 'data-chat-settings', aria: 'Настройки сообщений' } }), emptyState('Загрузка', 'Получаем диалоги.'));
   try {
     const threads = await getCommunicationThreads();
-    const items = threads.map((thread, index) => listEntry({
-      title: clientName(thread.cardPhone, thread.uei),
-      subtitle: thread.deletedAt ? 'Сообщение удалено' : thread.body || (Array.isArray(thread.attachments) && thread.attachments.length ? 'Медиа' : 'Открыть диалог'),
-      rightTop: messageTime(thread.createdAt),
-      data: `data-chat-thread="${index}"`,
-      aria: `Открыть диалог с ${clientName(thread.cardPhone, thread.uei)}`,
-    }));
-    screen(root, appHeader({ title: 'Сообщения', action: { label: 'Новое', data: 'data-chat-new' }, settings: { data: 'data-chat-settings', aria: 'Настройки сообщений' } }), items.length ? listEntries(items) : emptyState('Чат пока пуст', 'Сообщения и системные уведомления клиентов появятся здесь.'));
+    const items = threads.map((thread, index) => {
+      const name = threadName(thread);
+      return listEntry({
+        title: name,
+        subtitle: thread.deletedAt ? 'Сообщение удалено' : thread.body || (Array.isArray(thread.attachments) && thread.attachments.length ? 'Медиа' : 'Открыть диалог'),
+        rightTop: messageTime(thread.createdAt),
+        data: `data-chat-thread="${index}"`,
+        aria: `Открыть диалог с ${name}`,
+      });
+    });
+    screen(root, appHeader({ title: 'Сообщения', action: { label: 'Новое', data: 'data-chat-new' }, settings: { data: 'data-chat-settings', aria: 'Настройки сообщений' } }), items.length ? listEntries(items) : emptyState('Чат пока пуст', 'Сообщения клиентов появятся здесь.'));
     root.querySelector('[data-chat-new]')?.addEventListener('click', () => recipientOptions(root, state));
     root.querySelector('[data-chat-settings]')?.addEventListener('click', openMasterChatSettings);
     root.querySelectorAll('[data-chat-thread]').forEach((element) => element.addEventListener('click', () => {
