@@ -1,4 +1,5 @@
 import { normalizePhoneForStorage, phonesMatch } from '../../core/phone/index.js';
+import { assertNoNewClientContactConflicts } from '../../core/client-contact/index.js';
 import { getMembers, getUEI } from '../../core/uei.js';
 import { queuePersonDelete, queuePersonUpsert } from '../../core/business-persistence.js';
 import { getTags } from '../../settings/tags/data.js';
@@ -45,9 +46,10 @@ export function normalizeClient(person = {}) {
     gender: String(person.gender || ''),
     birthDate: String(person.birthDate || ''),
     phones: normalizePhones(person.phones),
-    telegrams: Array.isArray(person.telegrams) ? person.telegrams : [],
-    emails: normalizeStrings(person.emails),
+    telegrams: normalizeStrings(person.telegrams),
+    emails: normalizeStrings(person.emails).map((value) => value.toLowerCase()),
     accounts: normalizeStrings(person.accounts),
+    contactViaUei: String(person.contactViaUei || '').trim().toUpperCase(),
     links: Array.isArray(person.links) ? person.links : [],
     tags: normalizeTagAssignments(person.tags),
     discountPercent: normalizeDiscount(person),
@@ -183,6 +185,8 @@ export function getClientCount() {
 
 export function saveClients(people = []) {
   const normalized = (Array.isArray(people) ? people : []).map(normalizeClient).filter((person) => person.key);
+  const validationPeople = normalized.map((person) => ({ ...person, uei: getUEI('person', person.key) || '' }));
+  assertNoNewClientContactConflicts(peopleState, validationPeople);
   const previous = peopleState;
   const previousByKey = new Map(previous.map((person, position) => [person.key, { person, position }]));
   const nextByKey = new Map(normalized.map((person, position) => [person.key, { person, position }]));
@@ -233,6 +237,7 @@ export function upsertPersonFromBookingAccount(account = {}) {
     telegrams: telegramId ? [...(previous?.telegrams || []), telegramId] : previous?.telegrams || [],
     emails: email ? [...(previous?.emails || []), email] : previous?.emails || [],
     accounts: [...(previous?.accounts || []), accountId],
+    contactViaUei: previous?.contactViaUei || '',
     programs: previous?.programs || [],
     createdAt: previous?.createdAt || new Date().toISOString(),
   });

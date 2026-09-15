@@ -35,13 +35,15 @@ assert.match(profiles, /async byProfileKey/);
 assert.match(profiles, /async canonicalizeProfileKeys/);
 
 assert.match(dispatch, /profileKey\?: unknown/);
-assert.match(dispatch, /hasInAppAccess/);
-assert.match(dispatch, /profile\.accountIds\.length > 0/);
-assert.match(dispatch, /if \(this\.hasInAppAccess\(profile\)\) return 'IN_APP'/);
-assert.match(dispatch, /profileKey: profile!\.profileKey/);
+assert.match(dispatch, /inAppDeliveryProfile/);
+assert.match(dispatch, /resolveInAppProfile/);
+assert.match(dispatch, /delivery\.accountIds/);
+assert.match(dispatch, /if \(await this\.inAppDeliveryProfile\(tenantId, input \|\| \{\}\)\) return 'IN_APP'/);
+assert.match(dispatch, /profileKey: profile\.profileKey/);
 assert.match(dispatch, /profilePush\.notify/);
 assert.doesNotMatch(dispatch, /createForAccount/);
 
+assert.match(profilePush, /contactRoutes\.resolve/);
 assert.match(profilePush, /accountsForProfile/);
 assert.match(profilePush, /listAccountEndpoints/);
 assert.match(profilePush, /'PUSH'/);
@@ -49,7 +51,8 @@ assert.doesNotMatch(profilePush, /'TELEGRAM'/);
 assert.doesNotMatch(profilePush, /'EMAIL'/);
 
 assert.match(cardLink, /cardState\(tenantId, account\.phone\)/);
-assert.doesNotMatch(cardLink.slice(cardLink.indexOf('async findOrAttachExistingCard('), cardLink.indexOf('async bindFirstAccess(')), /account\.telegramId/);
+const cardIdentityChoice = cardLink.slice(cardLink.indexOf('async findOrAttachExistingCard('), cardLink.indexOf('const owner:'));
+assert.doesNotMatch(cardIdentityChoice, /account\.telegramId/);
 
 assert.match(service, /const RICH_BLOCK_TYPES = new Set\(\['paragraph', 'heading', 'subheading', 'quote', 'list-item'\]\)/);
 assert.match(service, /const RICH_MARKS = new Set\(\['bold', 'italic', 'underline', 'strike', 'code'\]\)/);
