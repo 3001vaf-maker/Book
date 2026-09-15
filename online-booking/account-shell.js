@@ -1,5 +1,7 @@
 import {
   clearBookingAccount,
+  deleteBookingChatMessage,
+  editBookingChatMessage,
   getBookingAccount,
   getBookingChat,
   getBookingChatSettings,
@@ -14,6 +16,7 @@ import { disableWebPush, enableWebPush, getWebPushState } from '../core/notifica
 import {
   appHeader,
   appShell,
+  bindRichTextEditor,
   bookingThemeStyle,
   button,
   clientBottomNavigation,
@@ -213,21 +216,29 @@ function openHistoryDetail(state, request, onRepeat) {
 }
 
 function notificationMessages(feed = {}) {
-  return (Array.isArray(feed?.items) ? feed.items : []).map((item) => ({
-    id: `notification:${item.id}`,
-    direction: 'system',
-    kind: 'system',
-    body: [item.title, item.body].filter(Boolean).join('\n'),
-    createdAt: item.createdAt,
-    notificationId: item.id,
-    unread: !item.read,
-  }));
+  return (Array.isArray(feed?.items) ? feed.items : [])
+    .filter((item) => String(item?.type || '') !== 'chat.message')
+    .map((item) => ({
+      id: `notification:${item.id}`,
+      direction: 'system',
+      kind: 'system',
+      body: [item.title, item.body].filter(Boolean).join('\n'),
+      createdAt: item.createdAt,
+      notificationId: item.id,
+      unread: !item.read,
+    }));
 }
 
 function messageTime(value) {
   const date = new Date(value || 0);
   if (!Number.isFinite(date.getTime())) return '';
   return new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' }).format(date);
+}
+
+function messageContent(message = {}) {
+  if (Array.isArray(message?.content?.blocks) && message.content.blocks.length) return message.content;
+  const body = String(message.body || '').trim();
+  return body ? { version: 1, blocks: [{ type: 'paragraph', spans: [{ text: body, marks: [] }] }] } : { version: 1, blocks: [] };
 }
 
 async function fileAttachment(file) {
@@ -443,12 +454,59 @@ async function renderHistory(root, state, handlers) {
   }));
 }
 
+function openClientMessageActions(root, state, handlers, message) {
+  const layer = mountModal(document.body, modal(settingsPanel([
+    { label: 'Изменить', data: 'data-client-message-edit' },
+    { label: 'Удалить', data: 'data-client-message-delete', variant: 'danger' },
+  ]), { title: 'Сообщение', variant: 'medium', surface: 'app' }));
+  layer?.querySelector('[data-client-message-edit]')?.addEventListener('click', () => {
+    layer.remove();
+    const editLayer = mountModal(document.body, modal(`<form class="form-grid" data-client-message-edit-form>${messageComposer({ placeholder: 'Сообщение', attachments: false, rich: true, embedded: true, value: messageContent(message) })}<div class="muted" data-client-message-edit-status></div></form>`, { title: 'Изменить сообщение', variant: 'large', surface: 'app' }));
+    const form = editLayer?.querySelector('[data-client-message-edit-form]');
+    const editor = bindRichTextEditor(form, { value: messageContent(message) });
+    form?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const value = editor.getValue();
+      if (!value.body) return;
+      const submit = form.querySelector('button[type="submit"]');
+      if (submit) submit.disabled = true;
+      try {
+        await editBookingChatMessage(state.tenantId, message.id, value);
+        editLayer.remove();
+        await handlers.render();
+      } catch (error) {
+        const status = form.querySelector('[data-client-message-edit-status]');
+        if (status) status.textContent = error instanceof Error ? error.message : 'Не удалось изменить';
+        if (submit) submit.disabled = false;
+      }
+    });
+  });
+  layer?.querySelector('[data-client-message-delete]')?.addEventListener('click', () => {
+    layer.remove();
+    const confirmLayer = mountModal(document.body, modal(`<div class="form-grid"><p>Удалить это сообщение?</p>${button('Удалить', { variant: 'danger', data: 'data-client-message-delete-confirm' })}${button('Отмена', { variant: 'secondary', data: 'data-client-message-delete-cancel' })}<div class="muted" data-client-message-delete-status></div></div>`, { title: 'Удаление сообщения', variant: 'medium', surface: 'app' }));
+    confirmLayer?.querySelector('[data-client-message-delete-cancel]')?.addEventListener('click', () => confirmLayer.remove());
+    confirmLayer?.querySelector('[data-client-message-delete-confirm]')?.addEventListener('click', async () => {
+      const control = confirmLayer.querySelector('[data-client-message-delete-confirm]');
+      if (control) control.disabled = true;
+      try {
+        await deleteBookingChatMessage(state.tenantId, message.id);
+        confirmLayer.remove();
+        await handlers.render();
+      } catch (error) {
+        const status = confirmLayer.querySelector('[data-client-message-delete-status]');
+        if (status) status.textContent = error instanceof Error ? error.message : 'Не удалось удалить';
+        if (control) control.disabled = false;
+      }
+    });
+  });
+}
+
 async function renderMessages(root, state, handlers) {
   const messages = await loadMessages(state);
   const master = masterName(state);
   if (!state.clientChatOpen) {
     const last = messages[messages.length - 1];
-    const lastLabel = last?.body ? String(last.body).split('\n')[0] : Array.isArray(last?.attachments) && last.attachments.length ? 'Медиа' : 'Открыть диалог';
+    const lastLabel = last?.deletedAt ? 'Сообщение удалено' : last?.body ? String(last.body).split('\n')[0] : Array.isArray(last?.attachments) && last.attachments.length ? 'Медиа' : 'Открыть диалог';
     const body = listEntries([listEntry({
       title: master,
       subtitle: lastLabel,
@@ -470,7 +528,7 @@ async function renderMessages(root, state, handlers) {
     back: { data: 'data-client-chat-back', aria: 'К списку диалогов' },
     action: { label: 'Записаться', data: 'data-client-chat-booking' },
     settings: { data: 'data-client-chat-settings', aria: 'Настройки чата' },
-    body: `${messages.length ? messageThread(messages, { viewer: 'client' }) : emptyState('Сообщений пока нет', 'Напишите мастеру первое сообщение.')}${messageComposer({ attachments: true })}`,
+    body: `${messages.length ? messageThread(messages, { viewer: 'client', actions: true }) : emptyState('Сообщений пока нет', 'Напишите мастеру первое сообщение.')}${messageComposer({ attachments: true, rich: true })}<div class="muted" data-client-chat-status aria-live="polite"></div>`,
     media: '',
     className: 'app-view-shell--chat',
   });
@@ -481,6 +539,11 @@ async function renderMessages(root, state, handlers) {
   });
   root.querySelector('[data-client-chat-booking]')?.addEventListener('click', handlers.onStartBooking);
   root.querySelector('[data-client-chat-settings]')?.addEventListener('click', () => void openChatSettings(state));
+  root.querySelectorAll('[data-message-actions]').forEach((control) => control.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const message = messages.find((item) => String(item.id) === String(control.dataset.messageActions));
+    if (message) openClientMessageActions(root, state, handlers, message);
+  }));
   root.querySelectorAll('[data-message-id]').forEach((node) => {
     const message = messages.find((item) => String(item?.id || '') === String(node.dataset.messageId || ''));
     if (!message?.notificationId || !message.unread) return;
@@ -505,23 +568,22 @@ async function renderMessages(root, state, handlers) {
     });
   });
   const form = root.querySelector('[data-message-composer]');
+  const editor = bindRichTextEditor(form);
   const getAttachments = bindMessageAttachments(form);
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const input = form.querySelector('[name="message"]');
-    const body = String(input?.value || '').trim();
+    const value = editor.getValue();
     const attachments = getAttachments();
-    if (!body && !attachments.length) return;
+    if (!value.body && !attachments.length) return;
     const submit = form.querySelector('button[type="submit"]');
+    const status = root.querySelector('[data-client-chat-status]');
     if (submit) submit.disabled = true;
     try {
-      await sendBookingChatMessage(state.tenantId, body, attachments);
+      await sendBookingChatMessage(state.tenantId, { body: value.body, content: value.content, attachments });
       await handlers.render();
     } catch (error) {
+      if (status) status.textContent = error instanceof Error ? error.message : 'Не удалось отправить';
       if (submit) submit.disabled = false;
-      input?.setCustomValidity?.(error instanceof Error ? error.message : 'Не удалось отправить');
-      input?.reportValidity?.();
-      input?.setCustomValidity?.('');
     }
   });
   requestAnimationFrame(() => {
