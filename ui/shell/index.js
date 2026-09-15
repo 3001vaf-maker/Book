@@ -130,9 +130,13 @@ export function messageBubble(message = {}, { viewer = 'client', actions = false
   const attachments = deleted ? '' : (Array.isArray(message.attachments) ? message.attachments : []).map(attachmentMarkup).filter(Boolean).join('');
   const richBody = deleted ? '<em>Сообщение удалено</em>' : renderRichText(message.content, message.body || '');
   const meta = [message.editedAt && !deleted ? 'изменено' : '', time].filter(Boolean).join(' · ');
+  const actorParts = viewer === 'master' && direction === 'inbound' && !system
+    ? [String(message.actorName || '').trim(), String(message.actorUei || '').trim() ? `UEI ${String(message.actorUei || '').trim()}` : ''].filter(Boolean)
+    : [];
+  const actor = actorParts.length ? `<div class="message-bubble__actor">${text(actorParts.join(' · '))}</div>` : '';
   const canAct = actions && outgoing && !system && !deleted && String(message.channel || '').toUpperCase() === 'IN_APP';
   const action = canAct ? `<button type="button" class="message-bubble__actions" data-message-actions="${text(message.id || '')}" aria-label="Действия с сообщением">•••</button>` : '';
-  return `<div class="${classes}" data-message-id="${text(message.id || '')}">${action}${attachments ? `<div class="message-bubble__attachments">${attachments}</div>` : ''}${richBody ? `<div class="message-bubble__body message-rich">${richBody}</div>` : ''}${meta ? `<span class="message-bubble__time">${text(meta)}</span>` : ''}</div>`;
+  return `<div class="${classes}" data-message-id="${text(message.id || '')}">${action}${actor}${attachments ? `<div class="message-bubble__attachments">${attachments}</div>` : ''}${richBody ? `<div class="message-bubble__body message-rich">${richBody}</div>` : ''}${meta ? `<span class="message-bubble__time">${text(meta)}</span>` : ''}</div>`;
 }
 
 export function messageThread(messages = [], options = {}) {
