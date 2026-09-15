@@ -46,7 +46,8 @@ export class BusinessStateController {
   }
 
   @Put('uei')
-  updateUEI(@Req() request: AuthenticatedRequest, @Body() body: unknown) {
+  async updateUEI(@Req() request: AuthenticatedRequest, @Body() body: unknown) {
+    await this.clientContactRules.validateUeiUpdate(request.auth!.tenantId, body);
     return this.businessState.updateUEI(request.auth!.tenantId, body);
   }
 
