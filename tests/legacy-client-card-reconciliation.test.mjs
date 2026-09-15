@@ -14,10 +14,19 @@ assert.doesNotMatch(service, /sameNamedPerson\(/, 'Matching names must not be us
 assert.doesNotMatch(service, /identity\.relations\[relationKey\]\s*=\s*uei/, 'Code must not assign a legacy Person to a UEI by inference');
 assert.doesNotMatch(service, /await this\.reconcileLegacyAccountDuplicates\(tenantId\)/, 'Client login/access must not run identity reconciliation automatically');
 
+const cardState = service.slice(service.indexOf('async cardState('), service.indexOf('async reconcileLegacyAccountDuplicates('));
+assert.match(cardState, /personHasPhone\(person, phone\)/, 'Client profile lookup must use phone');
+assert.doesNotMatch(cardState, /email/i, 'Email must never choose an existing client profile');
+assert.doesNotMatch(cardState, /telegram/i, 'Telegram must never choose an existing client profile');
+
 const findOrAttach = service.slice(service.indexOf('async findOrAttachExistingCard('), service.indexOf('async bindFirstAccess('));
 assert.match(findOrAttach, /const card = await this\.cardState\(tenantId, account\.phone\)/, 'Known phone lookup must happen before any new Person is created');
 assert.match(findOrAttach, /if \(!card\.owner\) return null/, 'Only an actually unknown phone may fall through to Person creation');
 assert.doesNotMatch(findOrAttach, /upsertBookingPersonFromAccount/, 'Known-phone path must never create a new Person');
+const identityChoice = findOrAttach.slice(0, findOrAttach.indexOf('const owner:'));
+assert.doesNotMatch(identityChoice, /account\.email/, 'Email may be stored after a phone match but must never select the profile');
+assert.doesNotMatch(identityChoice, /account\.telegramId/, 'Telegram may be stored as contact data but must never select the profile');
+
 const bindFirstAccess = service.slice(service.indexOf('async bindFirstAccess('), service.indexOf('async cardStats('));
 assert.match(bindFirstAccess, /if \(existing\) return existing/, 'Existing known-phone Person must be reused');
 assert.match(bindFirstAccess, /upsertBookingPersonFromAccount/, 'Person creation remains available only after existing-card lookup returns null');
