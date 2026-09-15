@@ -74,6 +74,8 @@ jobs:
               && curl -fsS http://localhost:8080/service-worker.js >/dev/null 2>&1 \
               && curl -fsS http://localhost:8080/online-booking/notifications.js >/dev/null 2>&1 \
               && curl -fsS http://localhost:8080/core/notifications/web-push.js >/dev/null 2>&1 \
+              && curl -fsS http://localhost:8080/ui/shell/rich-text.js >/dev/null 2>&1 \
+              && curl -fsS http://localhost:8080/ui/shell/rich-text.css >/dev/null 2>&1 \
               && curl -fsS http://localhost:8080/api/health >/dev/null 2>&1; then
               break
             fi
@@ -103,8 +105,7 @@ jobs:
           booking_token=$(node -e "const p=JSON.parse(process.argv[1]); if(!p.accessToken) process.exit(1); process.stdout.write(p.accessToken)" "$booking_payload")
           booking_account_id=$(node -e "const p=JSON.parse(process.argv[1]); if(!p.account?.id) process.exit(1); process.stdout.write(p.account.id)" "$booking_payload")
 
-          # Reproduce the production failure: an existing visible thread still carries historical phone/UEI aliases,
-          # while its Telegram Contact Point and BookingAccount are current.
+          # Legacy Telegram routing remains isolated from the internal channel.
           docker compose -f docker-compose.staging.yml exec -T db psql -U book -d book_staging \
             -v tenant_id="$tenant_id" -v account_id="$booking_account_id" <<'SQL'
           INSERT INTO "CommunicationIdentity" (
@@ -144,6 +145,63 @@ jobs:
             -H 'Content-Type: application/json' \
             -d '{"subscription":{"endpoint":"https://push.example.invalid/book-smoke","keys":{"p256dh":"staging-p256dh","auth":"staging-auth"}}}' \
             "http://localhost:8080/api/online-booking/$tenant_id/account/push/subscription" >/dev/null
+
+          # Client -> master: internal chat is account-anchored and preserves rich content.
+          client_message=$(curl -fsS \
+            -X POST \
+            -H "Authorization: Bearer $booking_token" \
+            -H 'Content-Type: application/json' \
+            -d '{"body":"Привет мастеру 🙂","content":{"version":1,"blocks":[{"type":"paragraph","spans":[{"text":"Привет мастеру 🙂","marks":["italic"]}]}]}}' \
+            "http://localhost:8080/api/online-booking/$tenant_id/account/internal-chat/messages")
+          client_message_id=$(node -e "const p=JSON.parse(process.argv[1]); if(!p.id || p.bookingAccountId !== process.argv[2] || p.channel !== 'IN_APP' || p.direction !== 'inbound') process.exit(1); process.stdout.write(p.id)" "$client_message" "$booking_account_id")
+
+          # Master -> client: this is the production regression. It must choose IN_APP without Telegram/email.
+          master_reply=$(curl -fsS \
+            -X POST \
+            -H "Authorization: Bearer $access_token" \
+            -H 'Content-Type: application/json' \
+            -d '{"phone":"79990000999","body":"Ответ мастера ✅","content":{"version":1,"blocks":[{"type":"heading","spans":[{"text":"Ответ мастера ✅","marks":["bold","underline"]}]}]}}' \
+            http://localhost:8080/api/communications/chat/messages)
+          master_message_id=$(node -e "const p=JSON.parse(process.argv[1]); if(!p.id || p.bookingAccountId !== process.argv[2] || p.channel !== 'IN_APP' || p.direction !== 'outbound' || p.content?.blocks?.[0]?.type !== 'heading' || !p.content.blocks[0].spans[0].marks.includes('bold')) process.exit(1); process.stdout.write(p.id)" "$master_reply" "$booking_account_id")
+
+          client_thread=$(curl -fsS -H "Authorization: Bearer $booking_token" "http://localhost:8080/api/online-booking/$tenant_id/account/internal-chat")
+          node -e "const rows=JSON.parse(process.argv[1]); const m=rows.find(x=>x.id===process.argv[2]); if(!m || m.body!=='Ответ мастера ✅' || m.channel!=='IN_APP' || m.content?.blocks?.[0]?.type!=='heading') process.exit(1)" "$client_thread" "$master_message_id"
+
+          # Master can correct its own internal message.
+          edited=$(curl -fsS \
+            -X PATCH \
+            -H "Authorization: Bearer $access_token" \
+            -H 'Content-Type: application/json' \
+            -d '{"body":"Исправленный ответ ✨","content":{"version":1,"blocks":[{"type":"subheading","spans":[{"text":"Исправленный ответ ✨","marks":["italic"]}]}]}}' \
+            "http://localhost:8080/api/communications/chat/messages/$master_message_id")
+          node -e "const p=JSON.parse(process.argv[1]); if(p.body!=='Исправленный ответ ✨' || !p.editedAt || p.content?.blocks?.[0]?.type!=='subheading') process.exit(1)" "$edited"
+
+          # Master can delete its own internal message; payload is actually cleared and only a tombstone remains.
+          deleted=$(curl -fsS \
+            -X DELETE \
+            -H "Authorization: Bearer $access_token" \
+            "http://localhost:8080/api/communications/chat/messages/$master_message_id")
+          node -e "const p=JSON.parse(process.argv[1]); if(!p.deletedAt || p.body!=='' || p.status!=='deleted' || (p.attachments||[]).length) process.exit(1)" "$deleted"
+
+          # Client has the same edit/delete rights, but only for its own inbound message.
+          client_edited=$(curl -fsS \
+            -X PATCH \
+            -H "Authorization: Bearer $booking_token" \
+            -H 'Content-Type: application/json' \
+            -d '{"body":"Исправлено клиентом 🙂","content":{"version":1,"blocks":[{"type":"paragraph","spans":[{"text":"Исправлено клиентом 🙂","marks":["underline"]}]}]}}' \
+            "http://localhost:8080/api/online-booking/$tenant_id/account/internal-chat/messages/$client_message_id")
+          node -e "const p=JSON.parse(process.argv[1]); if(p.body!=='Исправлено клиентом 🙂' || !p.editedAt) process.exit(1)" "$client_edited"
+
+          curl -fsS \
+            -X DELETE \
+            -H "Authorization: Bearer $booking_token" \
+            "http://localhost:8080/api/online-booking/$tenant_id/account/internal-chat/messages/$client_message_id" >/tmp/client-delete.json
+          node -e "const p=JSON.parse(process.argv[1]); if(!p.deletedAt || p.body!=='' || p.status!=='deleted') process.exit(1)" "$(cat /tmp/client-delete.json)"
+
+          # A master chat reply queues a PUSH delivery for the client account; it is not dependent on Telegram/email.
+          push_rows=$(docker compose -f docker-compose.staging.yml exec -T db psql -U book -d book_staging -At \
+            -v tenant_id="$tenant_id" -c "SELECT COUNT(*) FROM \"NotificationDelivery\" d JOIN \"Notification\" n ON n.\"id\"=d.\"notificationId\" AND n.\"tenantId\"=d.\"tenantId\" WHERE n.\"tenantId\"=:'tenant_id' AND n.\"type\"='chat.message' AND d.\"channel\"='PUSH';")
+          test "${push_rows:-0}" -ge 1
       - name: Stop isolated staging
         if: always()
         run: docker compose -f docker-compose.staging.yml down -v
