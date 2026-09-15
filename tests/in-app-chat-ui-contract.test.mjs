@@ -13,10 +13,12 @@ for (const source of [master, client]) {
   assert.match(source, /data-message-edit/);
 }
 
-assert.match(master, /sendCommunicationMessage\(\{ phone, uei, body: value\.body, content: value\.content, attachments \}\)/);
+assert.match(master, /sendCommunicationMessage\(\{ profileKey, phone, uei, body: value\.body, content: value\.content, attachments \}\)/);
+assert.match(master, /threadProfileKey/);
 assert.match(client, /sendBookingChatMessage\(state\.tenantId, \{ body: value\.body, content: value\.content, attachments \}\)/);
 assert.match(client, /filter\(\(item\) => String\(item\?\.type \|\| ''\) !== 'chat\.message'\)/);
 assert.match(bookingApi, /account\/internal-chat\/messages/);
+assert.match(ownerApi, /profileKey/);
 assert.match(ownerApi, /method: 'PATCH'/);
 assert.match(ownerApi, /method: 'DELETE'/);
 
