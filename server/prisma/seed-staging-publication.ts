@@ -43,23 +43,34 @@ async function main() {
     `;
 
     await tx.$executeRaw`
-      UPDATE "TenantLegalState"
-      SET "operationMode" = 'LIVE',
-          "filingStatus" = 'SUBMITTED',
-          "checklist" = '{
-            "operatorIdentityConfigured": true,
-            "privacyPolicyPublished": true,
-            "clientDocumentsPrepared": true,
-            "dpaAccepted": true,
-            "rknFilingPrepared": true
-          }'::jsonb,
-          "preparedAt" = CURRENT_TIMESTAMP,
-          "submittedAt" = CURRENT_TIMESTAMP,
-          "submissionReference" = 'STAGING-SYNTHETIC-NOT-A-REAL-FILING',
-          "evidenceMetadata" = '{"synthetic":true,"environment":"staging-smoke"}'::jsonb,
-          "liveAt" = CURRENT_TIMESTAMP,
-          "updatedAt" = CURRENT_TIMESTAMP
-      WHERE "tenantId" = ${tenantId}
+      INSERT INTO "TenantLegalState" (
+        "tenantId", "operationMode", "filingStatus", "checklist",
+        "preparedAt", "submittedAt", "submissionReference",
+        "evidenceMetadata", "liveAt", "updatedAt"
+      ) VALUES (
+        ${tenantId}, 'LIVE', 'SUBMITTED',
+        '{
+          "operatorIdentityConfigured": true,
+          "privacyPolicyPublished": true,
+          "clientDocumentsPrepared": true,
+          "dpaAccepted": true,
+          "rknFilingPrepared": true
+        }'::jsonb,
+        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP,
+        'STAGING-SYNTHETIC-NOT-A-REAL-FILING',
+        '{"synthetic":true,"environment":"staging-smoke"}'::jsonb,
+        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+      )
+      ON CONFLICT ("tenantId") DO UPDATE SET
+        "operationMode" = 'LIVE',
+        "filingStatus" = 'SUBMITTED',
+        "checklist" = EXCLUDED."checklist",
+        "preparedAt" = CURRENT_TIMESTAMP,
+        "submittedAt" = CURRENT_TIMESTAMP,
+        "submissionReference" = EXCLUDED."submissionReference",
+        "evidenceMetadata" = EXCLUDED."evidenceMetadata",
+        "liveAt" = CURRENT_TIMESTAMP,
+        "updatedAt" = CURRENT_TIMESTAMP
     `;
 
     const existingDocument = await tx.$queryRaw<Array<{ id: string }>>`
