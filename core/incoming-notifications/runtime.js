@@ -66,6 +66,9 @@ function renderThreadBadges(summary) {
     const thread = latestThreads[index] || {};
     const profileKey = String(thread.threadProfileKey || thread.profileKey || '').trim();
     const count = unreadByProfile.get(profileKey) || 0;
+    if (profileKey) button.dataset.incomingProfileKey = profileKey;
+    else delete button.dataset.incomingProfileKey;
+    button.dataset.incomingThreadIndex = String(index);
     let badge = button.querySelector('[data-incoming-thread-badge]');
     if (!count) {
       badge?.remove();
@@ -104,10 +107,20 @@ async function refresh() {
 }
 
 async function markOpenedThread(button) {
-  const index = Number(button?.dataset?.chatThread);
+  const profileKey = String(button?.dataset?.incomingProfileKey || '').trim();
+  const index = Number(button?.dataset?.incomingThreadIndex ?? button?.dataset?.chatThread);
+  if (profileKey) {
+    try {
+      await markThreadRead({ profileKey });
+      await refresh();
+    } catch {
+      // Opening a chat must remain available even if read-state update fails.
+    }
+    return;
+  }
   if (!Number.isInteger(index) || index < 0) return;
   try {
-    if (!latestThreads[index]) latestThreads = await getCommunicationThreads();
+    latestThreads = await getCommunicationThreads();
     const thread = latestThreads[index];
     if (!thread) return;
     await markThreadRead(thread);
