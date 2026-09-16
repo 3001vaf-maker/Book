@@ -62,7 +62,11 @@ export class CommunicationController {
   @UseGuards(JwtAuthGuard)
   @Post('chat/messages')
   sendChatMessage(@Req() request: OwnerRequest, @Body() body: { profileKey?: unknown; channel?: unknown; phone?: unknown; uei?: unknown; body?: unknown; content?: unknown; attachments?: unknown }) {
-    return this.dispatch.send(request.auth!.tenantId, body || {});
+    return this.dispatch.send(request.auth!.tenantId, {
+      ...(body || {}),
+      purpose: 'DIALOG',
+      actorUserId: request.auth!.userId,
+    });
   }
 
   @UseGuards(JwtAuthGuard)
