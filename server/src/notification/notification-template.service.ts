@@ -66,15 +66,6 @@ const TEMPLATE_CATALOG: TemplateDefinition[] = [
     variables: ['client', 'date', 'time', 'services'],
     active: true,
   },
-  {
-    key: 'owner.chat.message',
-    audience: 'MASTER',
-    name: 'Новое сообщение',
-    title: 'Новое сообщение',
-    body: '{{client}}: {{message}}',
-    variables: ['client', 'message'],
-    active: true,
-  },
 ];
 
 function text(value: unknown) {
