@@ -20,14 +20,16 @@ type TemplateOverrideRow = {
   body: string;
 };
 
+const BOOKING_VARIABLES = ['client', 'date', 'time', 'end_time', 'time_range', 'services'];
+
 const TEMPLATE_CATALOG: TemplateDefinition[] = [
   {
     key: 'booking.created',
     audience: 'CLIENT',
     name: 'Вы записаны',
     title: 'Вы записаны',
-    body: '{{date}} в {{time}} · {{services}}',
-    variables: ['date', 'time', 'services'],
+    body: '{{date}} в {{time}}\n{{services}}',
+    variables: BOOKING_VARIABLES,
     active: true,
   },
   {
@@ -36,7 +38,7 @@ const TEMPLATE_CATALOG: TemplateDefinition[] = [
     name: 'Отмена записи',
     title: 'Запись отменена',
     body: 'Запись на {{date}} в {{time}} отменена.',
-    variables: ['date', 'time', 'services'],
+    variables: BOOKING_VARIABLES,
     active: true,
   },
   {
@@ -44,8 +46,8 @@ const TEMPLATE_CATALOG: TemplateDefinition[] = [
     audience: 'CLIENT',
     name: 'Перенос записи',
     title: 'Запись перенесена',
-    body: 'Новая дата и время: {{date}} в {{time}} · {{services}}',
-    variables: ['date', 'time', 'services'],
+    body: '{{date}} в {{time}}\n{{services}}',
+    variables: BOOKING_VARIABLES,
     active: true,
   },
   {
@@ -53,23 +55,58 @@ const TEMPLATE_CATALOG: TemplateDefinition[] = [
     audience: 'CLIENT',
     name: 'Завершение записи',
     title: 'Запись завершена',
-    body: 'Спасибо за визит.',
-    variables: ['date', 'time', 'services'],
-    active: false,
+    body: 'Спасибо за визит, {{client}}.',
+    variables: BOOKING_VARIABLES,
+    active: true,
   },
   {
     key: 'owner.booking.created',
     audience: 'MASTER',
     name: 'Новая запись',
     title: 'Новая запись',
-    body: '{{client}} · {{date}} в {{time}} · {{services}}',
-    variables: ['client', 'date', 'time', 'services'],
+    body: '{{client}}\n{{date}} в {{time}}\n{{services}}',
+    variables: BOOKING_VARIABLES,
     active: true,
   },
 ];
 
 function text(value: unknown) {
   return String(value ?? '').trim();
+}
+
+export function formatNotificationDate(value: unknown) {
+  const source = text(value).slice(0, 10);
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(source);
+  if (!match) return source;
+  return `${match[3]}.${match[2]}.${match[1].slice(-2)}`;
+}
+
+export function formatNotificationTime(value: unknown) {
+  const source = text(value);
+  const match = /^(\d{1,2})(?::(\d{2}))?/.exec(source);
+  if (!match) return source;
+  const hour = String(Math.max(0, Math.min(23, Number(match[1])))).padStart(2, '0');
+  const minute = String(Math.max(0, Math.min(59, Number(match[2] ?? 0)))).padStart(2, '0');
+  return `${hour}:${minute}`;
+}
+
+export function bookingTemplateValues(input: {
+  client?: unknown;
+  date?: unknown;
+  from?: unknown;
+  to?: unknown;
+  services?: unknown;
+}) {
+  const time = formatNotificationTime(input.from);
+  const endTime = formatNotificationTime(input.to);
+  return {
+    client: text(input.client),
+    date: formatNotificationDate(input.date),
+    time,
+    end_time: endTime,
+    time_range: time && endTime ? `${time}-${endTime}` : time || endTime,
+    services: text(input.services),
+  };
 }
 
 function normalizeAudience(value: unknown): Audience | '' {
