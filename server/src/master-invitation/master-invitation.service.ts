@@ -166,7 +166,8 @@ export class MasterInvitationService {
   }
 
   async createInvitation(adminId: string, input: { email?: unknown; name?: unknown }) {
-    await this.legal.assertPlatformLegalReady(adminId);
+    const actorUserId = await this.platformAdminUserId(adminId);
+    await this.legal.assertPlatformLegalReady(actorUserId);
 
     const email = normalizeEmail(input?.email);
     const name = normalizeName(input?.name);
@@ -201,15 +202,6 @@ export class MasterInvitationService {
         INSERT INTO "TenantLegalState" ("tenantId", "operationMode", "filingStatus", "updatedAt")
         VALUES (${tenant.id}, 'DEMO', 'NOT_PREPARED', CURRENT_TIMESTAMP)
       `;
-      await tx.$executeRaw`
-        INSERT INTO "LegalStateEvent" (
-          "id", "scope", "tenantId", "actorUserId", "changeType", "oldState", "newState", "reason", "occurredAt"
-        ) VALUES (
-          ${randomUUID()}, 'TENANT', ${tenant.id}, ${adminId}, 'TENANT_CREATED_DEMO', '{}'::jsonb,
-          ${json({ operationMode: 'DEMO', filingStatus: 'NOT_PREPARED' })}::jsonb,
-          'New invited master starts fail-closed in DEMO', CURRENT_TIMESTAMP
-        )
-      `;
       const invitation = await tx.masterInvitation.create({
         data: {
           tenantId: tenant.id,
@@ -230,12 +222,22 @@ export class MasterInvitationService {
       throw error;
     }
 
-    await this.legal.audit(created.tenant.id, adminId, 'MASTER_INVITATION_CREATED', 'REGISTRATION', 'SUCCESS', { invitationId: created.invitation.id });
+    await this.prisma.$executeRaw`
+      INSERT INTO "LegalStateEvent" (
+        "id", "scope", "tenantId", "actorUserId", "changeType", "oldState", "newState", "reason", "occurredAt"
+      ) VALUES (
+        ${randomUUID()}, 'TENANT', ${created.tenant.id}, ${actorUserId}, 'TENANT_CREATED_DEMO', '{}'::jsonb,
+        ${json({ operationMode: 'DEMO', filingStatus: 'NOT_PREPARED' })}::jsonb,
+        'New invited master starts fail-closed in DEMO', CURRENT_TIMESTAMP
+      )
+    `;
+    await this.legal.audit(created.tenant.id, actorUserId, 'MASTER_INVITATION_CREATED', 'REGISTRATION', 'SUCCESS', { invitationId: created.invitation.id });
     return this.invitationDto(created.invitation);
   }
 
   async resendInvitation(adminId: string, invitationId: string) {
-    await this.legal.assertPlatformLegalReady(adminId);
+    const actorUserId = await this.platformAdminUserId(adminId);
+    await this.legal.assertPlatformLegalReady(actorUserId);
     const invitation = await this.prisma.masterInvitation.findUnique({ where: { id: invitationId } });
     if (!invitation || invitation.createdByAdminId !== adminId) throw new NotFoundException('Приглашение не найдено');
     if (invitation.status !== MasterInvitationStatus.PENDING) throw new ConflictException('Это приглашение уже не активно');
@@ -372,6 +374,15 @@ export class MasterInvitationService {
       ...this.invitationDto(row),
       tenant: { id: row.tenant.id, name: row.tenant.name },
     }));
+  }
+
+  private async platformAdminUserId(adminId: string) {
+    const admin = await this.prisma.platformAdmin.findUnique({
+      where: { id: adminId },
+      select: { userId: true },
+    });
+    if (!admin?.userId) throw new NotFoundException('Администратор Book не найден');
+    return admin.userId;
   }
 
   private async registrationDocuments() {
