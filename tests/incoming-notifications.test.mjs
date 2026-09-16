@@ -33,7 +33,7 @@ assert.match(clientChatController, /\.filter\(/);
 assert.match(runtime, /communications\/incoming\/unread/);
 assert.match(runtime, /communications\/incoming\/thread\/read/);
 assert.match(runtime, /data-chat-thread/);
-assert.match(runtime, /data\.incomingProfileKey/);
+assert.match(runtime, /dataset\.incomingProfileKey/);
 assert.match(runtime, /nav-unread-badge/);
 assert.match(runtime, /thread-unread-badge/);
 assert.match(runtime, /if \(threadButton\) void markOpenedThread\(threadButton\)/);
