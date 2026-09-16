@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, Post, Put, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, ConflictException, ForbiddenException, Get, Post, Put, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { LegalRuntimeService } from './legal-runtime.service';
@@ -56,8 +56,12 @@ export class TenantLegalController {
   }
 
   @Post('documents')
-  publishDocument(@Req() request: AuthRequest, @Body() body: Record<string, unknown>) {
+  async publishDocument(@Req() request: AuthRequest, @Body() body: Record<string, unknown>) {
     const auth = this.owner(request);
+    const state = await this.legal.tenantState(auth.tenantId);
+    if (!state || state.operationMode !== 'DEMO') {
+      throw new ConflictException('Новые версии юридических документов мастера публикуются только в DEMO');
+    }
     return this.legal.publishDocument(auth.userId, { ...body, scope: 'TENANT', tenantId: auth.tenantId });
   }
 
