@@ -39,7 +39,7 @@ function hydrate(bundle) {
   hydrateDocumentHistoryFromServer(normalized.history);
 }
 
-export async function initializeDocumentState(account = {}) {
+export async function initializeDocumentState() {
   const remoteResponse = await apiRequest('/document-state');
   const remote = await responseJson(remoteResponse, 'Не удалось загрузить документы');
 
@@ -48,17 +48,17 @@ export async function initializeDocumentState(account = {}) {
     return { source: 'server', verified: true };
   }
 
-  if (remote?.migrated || account?.user?.workspaceUnlocked) {
-    return { source: 'server-awaiting-verification', verified: false };
+  if (!remote?.migrated) {
+    const defaults = normalizeBundle({ documents: getDefaultDocuments(), consents: [], history: [] });
+    const bootstrapResponse = await apiRequest('/document-state/bootstrap', {
+      method: 'POST',
+      body: JSON.stringify(defaults),
+    });
+    const bootstrapped = await responseJson(bootstrapResponse, 'Не удалось создать пустое серверное хранилище документов');
+    if (!bootstrapped?.verified) throw new Error('Пустое серверное хранилище документов не подтверждено');
+    hydrate(bootstrapped);
+    return { source: 'server-bootstrap', verified: true };
   }
 
-  const defaults = normalizeBundle({ documents: getDefaultDocuments(), consents: [], history: [] });
-  const bootstrapResponse = await apiRequest('/document-state/bootstrap', {
-    method: 'POST',
-    body: JSON.stringify(defaults),
-  });
-  const bootstrapped = await responseJson(bootstrapResponse, 'Не удалось создать серверное хранилище документов');
-  if (!bootstrapped?.verified) throw new Error('Серверное хранилище документов не подтверждено');
-  hydrate(bootstrapped);
-  return { source: 'server-bootstrap', verified: true };
+  return { source: 'server-unverified', verified: false };
 }
