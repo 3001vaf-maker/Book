@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { BusinessStateModule } from '../business-state/business-state.module';
 import { DocumentStateModule } from '../document-state/document-state.module';
+import { LegalRuntimeModule } from '../legal-runtime/legal-runtime.module';
 import { NotificationModule } from '../notification/notification.module';
 import { PrismaService } from '../prisma.service';
 import { ClientContactRouteService } from './client-contact-route.service';
@@ -18,7 +19,7 @@ import { OwnerIncomingNotificationService } from './owner-incoming-notification.
 import { TelegramBotService } from './telegram-bot.service';
 
 @Module({
-  imports: [AuthModule, BusinessStateModule, DocumentStateModule, NotificationModule],
+  imports: [AuthModule, BusinessStateModule, DocumentStateModule, LegalRuntimeModule, NotificationModule],
   controllers: [CommunicationController, OwnerIncomingNotificationController],
   providers: [ClientProfileThreadService, ClientContactRouteService, InAppProfilePushService, CommunicationService, CommunicationHistoryService, CommunicationChannelResolverService, CommunicationDispatchService, CommunicationBroadcastService, OwnerIncomingNotificationService, TelegramBotService, PrismaService],
   exports: [ClientProfileThreadService, ClientContactRouteService, InAppProfilePushService, CommunicationService, CommunicationHistoryService, CommunicationChannelResolverService, CommunicationDispatchService, CommunicationBroadcastService, TelegramBotService],

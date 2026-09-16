@@ -82,6 +82,7 @@ jobs:
             sleep 2
           done
           bash scripts/staging-profile-chat-smoke.sh
+          bash scripts/staging-legal-runtime-smoke.sh
       - name: Stop isolated staging
         if: always()
         run: docker compose -f docker-compose.staging.yml down -v

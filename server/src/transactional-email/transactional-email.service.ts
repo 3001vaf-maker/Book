@@ -1,4 +1,5 @@
 import { BadGatewayException, Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 
 type TransactionalEmailInput = {
   to: string;
@@ -19,6 +20,18 @@ type BrevoResponse = {
 export class TransactionalEmailService {
   async send(input: TransactionalEmailInput) {
     const provider = String(process.env.TRANSACTIONAL_EMAIL_PROVIDER || 'brevo').trim().toLowerCase();
+
+    if (provider === 'staging-memory') {
+      if (String(process.env.NODE_ENV || '').trim().toLowerCase() !== 'staging') {
+        throw new ServiceUnavailableException('staging-memory transport запрещён вне staging');
+      }
+      return {
+        provider: 'staging-memory',
+        messageId: `staging-${randomUUID()}`,
+        to: String(input.to || '').trim().toLowerCase(),
+      };
+    }
+
     if (provider !== 'brevo') {
       throw new ServiceUnavailableException(`Неподдерживаемый провайдер транзакционной почты: ${provider}`);
     }

@@ -4,6 +4,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ClientContactRouteService } from '../communication/client-contact-route.service';
 import { CommunicationService } from '../communication/communication.service';
 import { ConsentPolicyService } from '../document-state/consent-policy.service';
+import { LegalRuntimeService } from '../legal-runtime/legal-runtime.service';
 import { NotificationService } from '../notification/notification.service';
 import { bookingTemplateValues, NotificationTemplateService } from '../notification/notification-template.service';
 import { WebPushService } from '../notification/web-push.service';
@@ -27,6 +28,7 @@ export class OnlineBookingController {
     private readonly consents: ConsentPolicyService,
     private readonly webPush: WebPushService,
     private readonly clientCards: ClientCardLinkService,
+    private readonly legal: LegalRuntimeService,
   ) {}
 
   private async accountTelegramSettings(tenantId: string, accountId: string) {
@@ -50,8 +52,11 @@ export class OnlineBookingController {
 
   @UseGuards(JwtAuthGuard)
   @Put('owner/publication')
-  publish(@Req() request: OwnerRequest, @Body() body: { data?: unknown }) {
-    return this.booking.publish(request.auth!.tenantId, body?.data || {});
+  async publish(@Req() request: OwnerRequest, @Body() body: { data?: unknown }) {
+    await this.legal.assertCanPublishBooking(request.auth!.tenantId, request.auth!.userId);
+    const result = await this.booking.publish(request.auth!.tenantId, body?.data || {});
+    await this.legal.audit(request.auth!.tenantId, request.auth!.userId, 'BOOKING_PUBLICATION_UPDATED', 'PUBLIC_BOOKING', 'SUCCESS');
+    return result;
   }
 
   @UseGuards(JwtAuthGuard)
@@ -62,13 +67,15 @@ export class OnlineBookingController {
 
   @UseGuards(JwtAuthGuard)
   @Put('owner/accounts/sync')
-  syncOwnerAccounts(@Req() request: OwnerRequest, @Body() body: { accounts?: unknown }) {
+  async syncOwnerAccounts(@Req() request: OwnerRequest, @Body() body: { accounts?: unknown }) {
+    await this.legal.assertRealClientMutation(request.auth!.tenantId, request.auth!.userId);
     return this.booking.syncOwnerAccounts(request.auth!.tenantId, body?.accounts || []);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('owner/reconcile-legacy-client-cards')
-  reconcileLegacyClientCards(@Req() request: OwnerRequest) {
+  async reconcileLegacyClientCards(@Req() request: OwnerRequest) {
+    await this.legal.assertRealClientMutation(request.auth!.tenantId, request.auth!.userId);
     return this.clientCards.reconcileLegacyAccountDuplicates(request.auth!.tenantId);
   }
 
@@ -80,19 +87,22 @@ export class OnlineBookingController {
 
   @UseGuards(JwtAuthGuard)
   @Post('owner/requests/:requestId/imported')
-  markImported(@Req() request: OwnerRequest, @Param('requestId') requestId: string, @Body() body: { recordId?: string }) {
+  async markImported(@Req() request: OwnerRequest, @Param('requestId') requestId: string, @Body() body: { recordId?: string }) {
+    await this.legal.assertRealClientMutation(request.auth!.tenantId, request.auth!.userId);
     return this.booking.markImported(request.auth!.tenantId, requestId, body?.recordId || '');
   }
 
   @UseGuards(JwtAuthGuard)
   @Put('owner/requests/:requestId/snapshot')
-  syncRequestSnapshot(@Req() request: OwnerRequest, @Param('requestId') requestId: string, @Body() body: { snapshot?: unknown }) {
+  async syncRequestSnapshot(@Req() request: OwnerRequest, @Param('requestId') requestId: string, @Body() body: { snapshot?: unknown }) {
+    await this.legal.assertRealClientMutation(request.auth!.tenantId, request.auth!.userId);
     return this.booking.syncRequestSnapshot(request.auth!.tenantId, requestId, body?.snapshot || {});
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('owner/requests/:requestId/rejected')
-  markRejected(@Req() request: OwnerRequest, @Param('requestId') requestId: string) {
+  async markRejected(@Req() request: OwnerRequest, @Param('requestId') requestId: string) {
+    await this.legal.assertRealClientMutation(request.auth!.tenantId, request.auth!.userId);
     return this.booking.markRejected(request.auth!.tenantId, requestId);
   }
 
@@ -100,6 +110,12 @@ export class OnlineBookingController {
   @Get(':tenantId/context')
   context(@Param('tenantId') tenantId: string, @Query('workplace') workplace = '') {
     return this.booking.getContext(tenantId, workplace);
+  }
+
+  @UseGuards(BookingPublicationGuard)
+  @Get(':tenantId/legal-documents')
+  legalDocuments(@Param('tenantId') tenantId: string) {
+    return this.legal.publicTenantDocuments(tenantId);
   }
 
   @UseGuards(BookingPublicationGuard)
@@ -130,6 +146,7 @@ export class OnlineBookingController {
   @UseGuards(BookingAccountGuard)
   @Put(':tenantId/account/me')
   async updateAccount(@Param('tenantId') tenantId: string, @Req() request: AccountRequest, @Body() body: Record<string, any>) {
+    await this.legal.assertPublicBooking(tenantId);
     const accountId = request.bookingAccountAuth!.accountId;
     await this.clientCards.validateAccountContactUpdate(tenantId, accountId, body || {});
     return this.booking.updateAccount(tenantId, accountId, body || {});
@@ -138,6 +155,7 @@ export class OnlineBookingController {
   @UseGuards(BookingAccountGuard)
   @Post(':tenantId/account/telegram-entry')
   async bindTelegramEntry(@Param('tenantId') tenantId: string, @Req() request: AccountRequest, @Body() body: { token?: unknown }) {
+    await this.legal.assertPublicBooking(tenantId);
     const accountId = request.bookingAccountAuth!.accountId;
     const result = await this.communications.bindTelegramEntry(tenantId, accountId, body?.token);
     const accountConsent = await this.consents.accountConsentProjection(tenantId, accountId);
@@ -160,7 +178,8 @@ export class OnlineBookingController {
 
   @UseGuards(BookingAccountGuard)
   @Get(':tenantId/account/chat/settings')
-  chatSettings(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
+  async chatSettings(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
+    await this.legal.assertPublicBooking(tenantId);
     return this.accountTelegramSettings(tenantId, request.bookingAccountAuth!.accountId);
   }
 
@@ -171,6 +190,7 @@ export class OnlineBookingController {
     @Req() request: AccountRequest,
     @Body() body: { enabled?: unknown },
   ) {
+    await this.legal.assertPublicBooking(tenantId);
     const accountId = request.bookingAccountAuth!.accountId;
     const account = await this.booking.getAccount(tenantId, accountId);
     const identity = await this.communications.telegramIdentity(tenantId, { phone: account.phone, uei: account.uei });
@@ -197,17 +217,19 @@ export class OnlineBookingController {
 
   @UseGuards(BookingAccountGuard)
   @Get(':tenantId/account/push/config')
-  pushConfiguration() {
+  async pushConfiguration(@Param('tenantId') tenantId: string) {
+    await this.legal.assertPublicBooking(tenantId);
     return this.webPush.configuration();
   }
 
   @UseGuards(BookingAccountGuard)
   @Put(':tenantId/account/push/subscription')
-  savePushSubscription(
+  async savePushSubscription(
     @Param('tenantId') tenantId: string,
     @Req() request: AccountRequest,
     @Body() body: { subscription?: unknown },
   ) {
+    await this.legal.assertPublicBooking(tenantId);
     const userAgent = Array.isArray(request.headers['user-agent'])
       ? request.headers['user-agent'][0] || ''
       : request.headers['user-agent'] || '';
@@ -221,39 +243,44 @@ export class OnlineBookingController {
 
   @UseGuards(BookingAccountGuard)
   @Delete(':tenantId/account/push/subscription')
-  deletePushSubscription(
+  async deletePushSubscription(
     @Param('tenantId') tenantId: string,
     @Req() request: AccountRequest,
     @Body() body: { endpoint?: unknown },
   ) {
+    await this.legal.assertPublicBooking(tenantId);
     return this.webPush.deleteSubscription(tenantId, request.bookingAccountAuth!.accountId, body?.endpoint);
   }
 
   @UseGuards(BookingAccountGuard, BookingRequiredConsentGuard)
   @Get(':tenantId/account/requests')
-  myRequests(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
+  async myRequests(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
+    await this.legal.assertPublicBooking(tenantId);
     return this.booking.getMyRequests(tenantId, request.bookingAccountAuth!.accountId);
   }
 
   @UseGuards(BookingAccountGuard, BookingRequiredConsentGuard)
   @Get(':tenantId/account/notifications')
-  notificationsFeed(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
+  async notificationsFeed(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
+    await this.legal.assertPublicBooking(tenantId);
     return this.notifications.listForAccount(tenantId, request.bookingAccountAuth!.accountId);
   }
 
   @UseGuards(BookingAccountGuard, BookingRequiredConsentGuard)
   @Post(':tenantId/account/notifications/:notificationId/read')
-  markNotificationRead(
+  async markNotificationRead(
     @Param('tenantId') tenantId: string,
     @Param('notificationId') notificationId: string,
     @Req() request: AccountRequest,
   ) {
+    await this.legal.assertPublicBooking(tenantId);
     return this.notifications.markReadForAccount(tenantId, request.bookingAccountAuth!.accountId, notificationId);
   }
 
   @UseGuards(BookingAccountGuard)
   @Get(':tenantId/account/chat')
   async accountChat(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
+    await this.legal.assertPublicBooking(tenantId);
     const accountId = request.bookingAccountAuth!.accountId;
     const profiles = await this.contactRoutes.accessibleProfilesForAccount(tenantId, accountId);
     const threads = await Promise.all(profiles.map((profile) => this.communications.listThread(tenantId, { profileKey: profile.profileKey }, 500)));
@@ -271,6 +298,7 @@ export class OnlineBookingController {
     @Req() request: AccountRequest,
     @Body() body: { body?: unknown; attachments?: unknown },
   ) {
+    await this.legal.assertPublicBooking(tenantId);
     const message = String(body?.body ?? '').trim();
     const attachments = Array.isArray(body?.attachments) ? body.attachments : [];
     if (!message && !attachments.length) throw new BadRequestException('Пустое сообщение');

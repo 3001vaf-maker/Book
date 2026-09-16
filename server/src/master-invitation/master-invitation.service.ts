@@ -11,8 +11,9 @@ import {
   MembershipRole,
   TenantAccessStatus,
 } from '@prisma/client';
-import { createHash, randomBytes } from 'crypto';
+import { createHash, randomBytes, randomUUID } from 'crypto';
 import { hash as hashPassword } from 'bcryptjs';
+import { LegalRuntimeService } from '../legal-runtime/legal-runtime.service';
 import { PrismaService } from '../prisma.service';
 import { TransactionalEmailService } from '../transactional-email/transactional-email.service';
 
@@ -70,12 +71,34 @@ function escapeHtml(value: string) {
   })[char] || char);
 }
 
+function json(value: unknown) {
+  return JSON.stringify(value ?? {});
+}
+
+type RegistrationInput = {
+  token?: unknown;
+  password?: unknown;
+  saasAgreementAccepted?: unknown;
+  privacyAcknowledged?: unknown;
+  pdConsentAccepted?: unknown;
+  marketingConsentAccepted?: unknown;
+  technicalEvidence?: unknown;
+};
+
+type RegistrationDocument = {
+  key: string;
+  requiredForRegistration: boolean;
+  versionId: string;
+  version: number;
+};
+
 @Injectable()
 export class MasterInvitationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly email: TransactionalEmailService,
     private readonly jwt: JwtService,
+    private readonly legal: LegalRuntimeService,
   ) {}
 
   async ensureStarterPlan() {
@@ -143,6 +166,9 @@ export class MasterInvitationService {
   }
 
   async createInvitation(adminId: string, input: { email?: unknown; name?: unknown }) {
+    const actorUserId = await this.platformAdminUserId(adminId);
+    await this.legal.assertPlatformLegalReady(actorUserId);
+
     const email = normalizeEmail(input?.email);
     const name = normalizeName(input?.name);
     if (!email || !email.includes('@')) throw new BadRequestException('Укажите корректный email мастера');
@@ -172,6 +198,10 @@ export class MasterInvitationService {
           isOwnerBook: false,
         },
       });
+      await tx.$executeRaw`
+        INSERT INTO "TenantLegalState" ("tenantId", "operationMode", "filingStatus", "updatedAt")
+        VALUES (${tenant.id}, 'DEMO', 'NOT_PREPARED', CURRENT_TIMESTAMP)
+      `;
       const invitation = await tx.masterInvitation.create({
         data: {
           tenantId: tenant.id,
@@ -192,10 +222,22 @@ export class MasterInvitationService {
       throw error;
     }
 
+    await this.prisma.$executeRaw`
+      INSERT INTO "LegalStateEvent" (
+        "id", "scope", "tenantId", "actorUserId", "changeType", "oldState", "newState", "reason", "occurredAt"
+      ) VALUES (
+        ${randomUUID()}, 'TENANT', ${created.tenant.id}, ${actorUserId}, 'TENANT_CREATED_DEMO', '{}'::jsonb,
+        ${json({ operationMode: 'DEMO', filingStatus: 'NOT_PREPARED' })}::jsonb,
+        'New invited master starts fail-closed in DEMO', CURRENT_TIMESTAMP
+      )
+    `;
+    await this.legal.audit(created.tenant.id, actorUserId, 'MASTER_INVITATION_CREATED', 'REGISTRATION', 'SUCCESS', { invitationId: created.invitation.id });
     return this.invitationDto(created.invitation);
   }
 
   async resendInvitation(adminId: string, invitationId: string) {
+    const actorUserId = await this.platformAdminUserId(adminId);
+    await this.legal.assertPlatformLegalReady(actorUserId);
     const invitation = await this.prisma.masterInvitation.findUnique({ where: { id: invitationId } });
     if (!invitation || invitation.createdByAdminId !== adminId) throw new NotFoundException('Приглашение не найдено');
     if (invitation.status !== MasterInvitationStatus.PENDING) throw new ConflictException('Это приглашение уже не активно');
@@ -226,24 +268,36 @@ export class MasterInvitationService {
 
   async inspect(tokenValue: unknown) {
     const invitation = await this.findActiveInvitation(String(tokenValue || ''));
+    const legalDocuments = await this.registrationDocuments();
     return {
       email: invitation.email,
       name: invitation.name,
       expiresAt: invitation.expiresAt,
       tenant: { id: invitation.tenant.id, name: invitation.tenant.name },
+      legal: {
+        required: legalDocuments.filter((item) => item.requiredForRegistration).map((item) => ({ key: item.key, version: item.version })),
+        marketingOptional: true,
+      },
     };
   }
 
-  async accept(input: { token?: unknown; password?: unknown }) {
+  async accept(input: RegistrationInput) {
     const token = String(input?.token || '').trim();
     const password = String(input?.password || '');
     if (password.length < 10) throw new BadRequestException('Пароль должен содержать минимум 10 символов');
 
     const invitation = await this.findActiveInvitation(token);
+    await this.legal.assertPlatformLegalReady('');
     const existingUser = await this.prisma.user.findUnique({ where: { email: invitation.email } });
     if (existingUser) throw new ConflictException('Пользователь с таким email уже зарегистрирован');
 
+    const legalDocuments = await this.registrationDocuments();
+    this.assertRegistrationFacts(legalDocuments, input);
     const passwordHash = await hashPassword(password, 12);
+    const evidence = input?.technicalEvidence && typeof input.technicalEvidence === 'object' && !Array.isArray(input.technicalEvidence)
+      ? input.technicalEvidence as Record<string, unknown>
+      : {};
+
     const result = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
@@ -267,6 +321,19 @@ export class MasterInvitationService {
           acceptedAt: new Date(),
         },
       });
+
+      for (const document of legalDocuments) {
+        const fact = this.registrationFact(document.key, input);
+        if (!fact.accepted) continue;
+        await tx.$executeRaw`
+          INSERT INTO "LegalAcceptanceEvent" (
+            "id", "tenantId", "userId", "documentVersionId", "action", "source", "technicalEvidence", "occurredAt"
+          ) VALUES (
+            ${randomUUID()}, ${invitation.tenantId}, ${user.id}, ${document.versionId}, ${fact.action},
+            'master-registration', ${json(evidence)}::jsonb, CURRENT_TIMESTAMP
+          )
+        `;
+      }
       return { user, membership };
     });
 
@@ -274,6 +341,13 @@ export class MasterInvitationService {
       sub: result.user.id,
       tenantId: invitation.tenantId,
       role: result.membership.role,
+    });
+
+    await this.legal.audit(invitation.tenantId, result.user.id, 'MASTER_REGISTRATION_ACCEPTED', 'REGISTRATION', 'SUCCESS', {
+      invitationId: invitation.id,
+      operationMode: 'DEMO',
+      filingStatus: 'NOT_PREPARED',
+      marketingConsent: input?.marketingConsentAccepted === true,
     });
 
     return {
@@ -286,6 +360,7 @@ export class MasterInvitationService {
       },
       tenant: { id: invitation.tenant.id, name: invitation.tenant.name },
       role: result.membership.role,
+      legal: { operationMode: 'DEMO', filingStatus: 'NOT_PREPARED' },
     };
   }
 
@@ -299,6 +374,44 @@ export class MasterInvitationService {
       ...this.invitationDto(row),
       tenant: { id: row.tenant.id, name: row.tenant.name },
     }));
+  }
+
+  private async platformAdminUserId(adminId: string) {
+    const admin = await this.prisma.platformAdmin.findUnique({
+      where: { id: adminId },
+      select: { userId: true },
+    });
+    if (!admin?.userId) throw new NotFoundException('Администратор Book не найден');
+    return admin.userId;
+  }
+
+  private async registrationDocuments() {
+    return this.prisma.$queryRaw<RegistrationDocument[]>`
+      SELECT d."key", d."requiredForRegistration", v."id" AS "versionId", v."version"
+      FROM "LegalDocument" d
+      JOIN "LegalDocumentVersion" v ON v."documentId" = d."id" AND v."supersededAt" IS NULL
+      WHERE d."scope" = 'PLATFORM' AND d."tenantId" IS NULL AND d."isActive" = true
+      ORDER BY d."createdAt" ASC, d."key" ASC
+    `;
+  }
+
+  private registrationFact(key: string, input: RegistrationInput) {
+    if (key === 'saas-agreement' || key === 'dpa') return { accepted: input?.saasAgreementAccepted === true, action: 'ACCEPTED' };
+    if (key === 'privacy-policy') return { accepted: input?.privacyAcknowledged === true, action: 'ACKNOWLEDGED' };
+    if (key === 'master-pd-consent') return { accepted: input?.pdConsentAccepted === true, action: 'CONSENTED' };
+    if (key === 'marketing-consent') return { accepted: input?.marketingConsentAccepted === true, action: 'CONSENTED' };
+    return { accepted: false, action: 'ACKNOWLEDGED' };
+  }
+
+  private assertRegistrationFacts(documents: RegistrationDocument[], input: RegistrationInput) {
+    for (const document of documents.filter((item) => item.requiredForRegistration)) {
+      if (!this.registrationFact(document.key, input).accepted) {
+        throw new BadRequestException(`Не подтверждён обязательный юридический факт: ${document.key}`);
+      }
+    }
+    if (input?.marketingConsentAccepted !== true && input?.marketingConsentAccepted !== false && input?.marketingConsentAccepted !== undefined) {
+      throw new BadRequestException('Некорректное значение marketing consent');
+    }
   }
 
   private async findActiveInvitation(token: string) {
@@ -325,8 +438,8 @@ export class MasterInvitationService {
       toName: input.name,
       subject: 'Приглашение в Book',
       tag: 'master-invitation',
-      text: `${input.name ? `Здравствуйте, ${input.name}.` : 'Здравствуйте.'}\n\nВам открыт персональный Book. Создайте пароль и начните настройку рабочего пространства:\n${url}\n\nСсылка действует 7 дней.`,
-      html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#292522"><h2>Book</h2><p>${greeting}</p><p>Вам открыт персональный Book. Создайте пароль и начните настройку своего рабочего пространства.</p><p style="margin:28px 0"><a href="${url}" style="background:#292522;color:#fff;text-decoration:none;padding:14px 20px;border-radius:12px;display:inline-block">Создать пароль и войти</a></p><p style="color:#817a74;font-size:14px">Ссылка действует 7 дней.</p></div>`,
+      text: `${input.name ? `Здравствуйте, ${input.name}.` : 'Здравствуйте.'}\n\nВам открыт персональный Book в режиме DEMO. Создайте пароль и начните настройку рабочего пространства:\n${url}\n\nСсылка действует 7 дней.`,
+      html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#292522"><h2>Book</h2><p>${greeting}</p><p>Вам открыт персональный Book в режиме DEMO. Создайте пароль и начните настройку своего рабочего пространства.</p><p style="margin:28px 0"><a href="${url}" style="background:#292522;color:#fff;text-decoration:none;padding:14px 20px;border-radius:12px;display:inline-block">Создать пароль и войти</a></p><p style="color:#817a74;font-size:14px">Ссылка действует 7 дней.</p></div>`,
     });
   }
 

@@ -176,7 +176,7 @@ export class SaasAdminService {
         },
       },
     });
-    if (!access) return true;
+    if (!access || access.status !== TenantAccessStatus.ACTIVE) return false;
     if (access.isOwnerBook && !access.plan) return true;
     const planValue = access.plan?.capabilityValues[0];
     if (planValue && planValue.enabled !== null) return planValue.enabled;
