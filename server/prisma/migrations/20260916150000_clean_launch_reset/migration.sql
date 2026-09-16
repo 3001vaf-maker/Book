@@ -6,6 +6,8 @@
 -- All business/client/test data is removed. The migration is transactional: any failed
 -- postcondition aborts the deployment instead of leaving a partially cleaned database.
 
+BEGIN;
+
 -- Record the actual public-table row counts in migration logs before deleting anything.
 DO $$
 DECLARE
@@ -257,3 +259,5 @@ BEGIN
   RAISE NOTICE 'BOOK_CLEAN_RESET AFTER Tenant=% User=% BookingAccount=0 BookingRequest=0 ConsentEvent=0 pendingInvitations=0 pendingExternalMessages=0',
     expected_owner_count, expected_owner_count;
 END $$;
+
+COMMIT;
