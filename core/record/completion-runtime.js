@@ -5,6 +5,8 @@ import { recordAppointmentTime } from './state.js';
 const COMPLETION_ROLLOUT_DATE = '2026-09-16';
 const COMPLETION_POLL_MS = 30_000;
 let sweeping = false;
+let started = false;
+let timer = 0;
 
 function shouldComplete(record, now) {
   if (!record?.id) return false;
@@ -35,10 +37,25 @@ function runSweep() {
   sweepCompletedRecords(Date.now());
 }
 
-runSweep();
-window.setInterval(runSweep, COMPLETION_POLL_MS);
-window.addEventListener('focus', runSweep, { passive: true });
-document.addEventListener('visibilitychange', () => {
+function onVisibilityChange() {
   if (document.visibilityState === 'visible') runSweep();
-});
-window.addEventListener('book:records-changed', runSweep);
+}
+
+export function startRecordCompletionRuntime() {
+  if (started || typeof window === 'undefined' || typeof document === 'undefined') return () => {};
+  started = true;
+  runSweep();
+  timer = window.setInterval(runSweep, COMPLETION_POLL_MS);
+  window.addEventListener('focus', runSweep, { passive: true });
+  document.addEventListener('visibilitychange', onVisibilityChange);
+  window.addEventListener('book:records-changed', runSweep);
+
+  return () => {
+    if (timer) window.clearInterval(timer);
+    timer = 0;
+    window.removeEventListener('focus', runSweep);
+    document.removeEventListener('visibilitychange', onVisibilityChange);
+    window.removeEventListener('book:records-changed', runSweep);
+    started = false;
+  };
+}
