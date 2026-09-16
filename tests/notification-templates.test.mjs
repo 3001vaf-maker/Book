@@ -10,6 +10,7 @@ const bookingController = await readFile(new URL('../server/src/online-booking/o
 const settings = await readFile(new URL('../settings/communications/communications.js', import.meta.url), 'utf8');
 const browserTemplates = await readFile(new URL('../core/notifications/templates.js', import.meta.url), 'utf8');
 const recordEvents = await readFile(new URL('../core/record/events.js', import.meta.url), 'utf8');
+const recordIndex = await readFile(new URL('../core/record/index.js', import.meta.url), 'utf8');
 const recordState = await readFile(new URL('../core/record/state.js', import.meta.url), 'utf8');
 const recordService = await readFile(new URL('../core/record/service.js', import.meta.url), 'utf8');
 const completionRuntime = await readFile(new URL('../core/record/completion-runtime.js', import.meta.url), 'utf8');
@@ -43,10 +44,14 @@ assert.match(recordEvents, /COMPLETED: 'completed'/);
 assert.match(recordState, /RECORD_EVENT_TYPES\.COMPLETED/);
 assert.match(recordState, /completedAt/);
 assert.match(recordService, /export function completeRecord/);
+assert.match(completionRuntime, /export function startRecordCompletionRuntime/);
 assert.match(completionRuntime, /sweepCompletedRecords/);
 assert.match(completionRuntime, /COMPLETION_ROLLOUT_DATE = '2026-09-16'/);
 assert.match(completionRuntime, /recordAppointmentTime\(record, 'to'\)/);
-assert.match(bootstrap, /record\/completion-runtime\.js/);
+assert.match(recordIndex, /startRecordCompletionRuntime/);
+assert.match(recordIndex, /completeRecord/);
+assert.match(bootstrap, /record\/index\.js/);
+assert.match(bootstrap, /startRecordCompletionRuntime\(\)/);
 
 assert.match(lifecycle, /booking\.rescheduled/);
 assert.match(lifecycle, /booking\.cancelled/);
