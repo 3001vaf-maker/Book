@@ -3,6 +3,7 @@
 }
 
 .bottom-nav .nav-item{
+  position:relative;
   min-width:0;
   padding:0 2px;
 }
@@ -19,4 +20,32 @@
   line-height:1.1;
   text-align:center;
   white-space:nowrap;
+}
+
+.nav-unread-badge,
+.thread-unread-badge{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:18px;
+  height:18px;
+  padding:0 5px;
+  border-radius:999px;
+  background:#d92d20;
+  color:#fff;
+  font-size:10px;
+  font-weight:700;
+  line-height:1;
+}
+
+.nav-unread-badge{
+  position:absolute;
+  top:2px;
+  left:calc(50% + 6px);
+  pointer-events:none;
+}
+
+.thread-unread-badge{
+  margin-top:4px;
+  align-self:flex-end;
 }
