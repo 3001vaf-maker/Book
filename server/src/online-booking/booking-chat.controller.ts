@@ -21,9 +21,10 @@ export class BookingChatController {
   }
 
   @Get()
-  thread(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
+  async thread(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
     const accountId = this.accountId(request, tenantId);
-    return this.communications.listThread(tenantId, { bookingAccountId: accountId }, 500);
+    const messages = await this.communications.listThread(tenantId, { bookingAccountId: accountId }, 500);
+    return messages.filter((message) => String(message.channel || '').toUpperCase() !== 'OWNER_IN_APP');
   }
 
   @Post('messages')
