@@ -1,5 +1,6 @@
 import { getNotificationRouting, saveNotificationRouting } from '../../core/notifications/routing.js';
-import { actionBlock, button, emptyState, folderList, pageHeader, select } from '../../ui/ui.js';
+import { getNotificationTemplates, saveNotificationTemplate } from '../../core/notifications/templates.js';
+import { actionBlock, button, emptyState, escapeHtml, field, folderList, pageHeader, select, textareaField } from '../../ui/ui.js';
 
 const CHANNEL_OPTIONS = [
   { value: '', label: 'Не использовать' },
@@ -7,57 +8,133 @@ const CHANNEL_OPTIONS = [
   { value: 'EMAIL', label: 'Email' },
 ];
 
-function policyFrom(items = []) {
-  const current = (Array.isArray(items) ? items : []).find((item) => item.eventType === 'booking.created') || { eventType: 'booking.created', mode: 'always', channels: ['PUSH'] };
-  return { ...current, channels: ['PUSH', ...(Array.isArray(current.channels) ? current.channels : []).filter((channel) => String(channel || '').toUpperCase() !== 'PUSH')] };
+function policyFrom(items = [], eventType = '') {
+  const current = (Array.isArray(items) ? items : []).find((item) => item.eventType === eventType)
+    || { eventType, mode: 'always', channels: ['PUSH'] };
+  return {
+    ...current,
+    channels: ['PUSH', ...(Array.isArray(current.channels) ? current.channels : []).filter((channel) => String(channel || '').toUpperCase() !== 'PUSH')],
+  };
 }
 
 function normalizedExternalChannels(form) {
   const data = new FormData(form);
-  return [...new Set([data.get('channel1'), data.get('channel2')].map((value) => String(value || '').trim().toUpperCase()).filter(Boolean))];
+  return [...new Set([data.get('channel1'), data.get('channel2')]
+    .map((value) => String(value || '').trim().toUpperCase())
+    .filter(Boolean))];
 }
 
-function renderRoutingForm(root, navigateBack, policy) {
+function templateVariables(template = {}) {
+  const variables = Array.isArray(template.variables) ? template.variables : [];
+  if (!variables.length) return '';
+  return `<div class="muted">Доступные подстановки: ${variables.map((name) => `<code>{{${escapeHtml(name)}}}</code>`).join(', ')}</div>`;
+}
+
+function deliveryFields(template, policy) {
+  if (template.audience !== 'CLIENT') {
+    return `<div class="action-block"><strong>В Book — всегда</strong><div class="muted">Это входящее уведомление мастеру. Внешние каналы мастера подключим отдельно, когда понадобится.</div></div>`;
+  }
   const channels = (Array.isArray(policy.channels) ? policy.channels : []).filter((channel) => String(channel || '').toUpperCase() !== 'PUSH');
-  root.innerHTML = `${pageHeader('Настройки уведомлений')}
-    <form class="form-grid" data-communications-routing>
-      <div class="section-heading"><h2>Новая запись</h2></div>
-      <div class="action-block"><strong>Push — всегда</strong><div class="muted">Системный Push отправляется автоматически, если клиент разрешил уведомления на устройстве. Уведомление внутри Book создаётся всегда.</div></div>
-      ${select({ label: 'Как отправлять во внешние каналы', name: 'mode', value: policy.mode || 'always', options: [
-        { value: 'always', label: 'Всегда отправлять по выбранным каналам' },
-        { value: 'fallback', label: 'Поэтапно — следующий, если предыдущий не доставлен' },
-      ] })}
-      ${select({ label: 'Внешний канал 1', name: 'channel1', value: channels[0] || 'TELEGRAM', options: CHANNEL_OPTIONS })}
-      ${select({ label: 'Внешний канал 2', name: 'channel2', value: channels[1] || '', options: CHANNEL_OPTIONS })}
-      <div class="muted" data-communications-status aria-live="polite"></div>
-      ${actionBlock(`${button('Сохранить', { type: 'submit' })}${button('Назад', { variant: 'secondary', data: 'data-communications-routing-back' })}`)}
-    </form>`;
-  root.querySelector('[data-communications-routing-back]')?.addEventListener('click', navigateBack);
-  root.querySelector('[data-communications-routing]')?.addEventListener('submit', async (event) => {
-    event.preventDefault(); const form = event.currentTarget; const status = root.querySelector('[data-communications-status]'); const data = new FormData(form);
-    try { await saveNotificationRouting('booking.created', { mode: String(data.get('mode') || 'always'), channels: normalizedExternalChannels(form) }); if (status) status.textContent = 'Сохранено.'; }
-    catch (error) { if (status) status.textContent = error instanceof Error ? error.message : 'Не удалось сохранить'; }
+  return `
+    <div class="action-block"><strong>Push — всегда</strong><div class="muted">Если клиент разрешил Push на устройстве. Внутри Book уведомление создаётся всегда.</div></div>
+    ${select({ label: 'Внешние каналы', name: 'mode', value: policy.mode || 'always', options: [
+      { value: 'always', label: 'Отправлять по всем выбранным каналам' },
+      { value: 'fallback', label: 'Следующий канал, если предыдущий не доставлен' },
+    ] })}
+    ${select({ label: 'Канал 1', name: 'channel1', value: channels[0] || 'TELEGRAM', options: CHANNEL_OPTIONS })}
+    ${select({ label: 'Канал 2', name: 'channel2', value: channels[1] || '', options: CHANNEL_OPTIONS })}`;
+}
+
+async function openTemplate(root, navigateBack, template) {
+  root.innerHTML = `${pageHeader(template.name)}${emptyState('Загрузка', 'Получаем настройки шаблона.')}`;
+  try {
+    const routing = template.audience === 'CLIENT' ? await getNotificationRouting() : [];
+    const policy = policyFrom(routing, template.key);
+    root.innerHTML = `${pageHeader(template.name)}
+      <form class="form-grid" data-notification-template-form>
+        ${!template.active ? '<div class="action-block"><strong>Подготовлено на будущее</strong><div class="muted">Текст можно настроить уже сейчас. Автоматическая отправка включится после появления надёжного события завершения записи.</div></div>' : ''}
+        ${field({ label: 'Заголовок', name: 'title', value: template.title || '', required: true, maxlength: 160 })}
+        ${textareaField({ label: 'Текст', name: 'body', value: template.body || '', rows: 5, maxlength: 2000, required: true })}
+        ${templateVariables(template)}
+        ${deliveryFields(template, policy)}
+        <div class="muted" data-notification-template-status aria-live="polite"></div>
+        ${actionBlock(`${button('Сохранить', { type: 'submit' })}${button('Назад', { type: 'button', variant: 'secondary', data: 'data-notification-template-back' })}`)}
+      </form>`;
+    root.querySelector('[data-notification-template-back]')?.addEventListener('click', navigateBack);
+    root.querySelector('[data-notification-template-form]')?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const status = root.querySelector('[data-notification-template-status]');
+      const data = new FormData(form);
+      const submit = form.querySelector('button[type="submit"]');
+      if (submit) submit.disabled = true;
+      try {
+        const saved = await saveNotificationTemplate(template.key, {
+          title: String(data.get('title') || ''),
+          body: String(data.get('body') || ''),
+        });
+        if (template.audience === 'CLIENT') {
+          await saveNotificationRouting(template.key, {
+            mode: String(data.get('mode') || 'always'),
+            channels: normalizedExternalChannels(form),
+          });
+        }
+        Object.assign(template, saved);
+        if (status) status.textContent = 'Сохранено.';
+      } catch (error) {
+        if (status) status.textContent = error instanceof Error ? error.message : 'Не удалось сохранить';
+      } finally {
+        if (submit) submit.disabled = false;
+      }
+    });
+  } catch (error) {
+    root.innerHTML = `${pageHeader(template.name)}${emptyState('Настройки недоступны', error instanceof Error ? error.message : 'Не удалось загрузить шаблон')}${actionBlock(button('Назад', { variant: 'secondary', data: 'data-notification-template-back' }))}`;
+    root.querySelector('[data-notification-template-back]')?.addEventListener('click', navigateBack);
+  }
+}
+
+function renderTemplateGroup(root, navigateBack, audience, title, templates) {
+  const items = templates.map((template, index) => ({
+    title: template.name,
+    count: template.active ? '' : 'позже',
+    data: `data-notification-template="${index}"`,
+    aria: `Открыть шаблон ${template.name}`,
+  }));
+  root.innerHTML = `${pageHeader(title)}${items.length ? folderList(items) : emptyState('Шаблонов нет', 'Для этой группы шаблоны не настроены.')}${actionBlock(button('Назад', { variant: 'secondary', data: 'data-notification-group-back' }))}`;
+  root.querySelector('[data-notification-group-back]')?.addEventListener('click', navigateBack);
+  root.querySelectorAll('[data-notification-template]').forEach((node) => node.addEventListener('click', () => {
+    const template = templates[Number(node.dataset.notificationTemplate)];
+    if (template) void openTemplate(root, () => renderTemplateGroup(root, navigateBack, audience, title, templates), template);
+  }));
+}
+
+function openTemplateGroup(root, navigateBack, audience, title) {
+  root.innerHTML = `${pageHeader(title)}${emptyState('Загрузка', 'Получаем шаблоны уведомлений.')}`;
+  void getNotificationTemplates(audience).then((templates) => {
+    renderTemplateGroup(root, navigateBack, audience, title, Array.isArray(templates) ? templates : []);
+  }).catch((error) => {
+    root.innerHTML = `${pageHeader(title)}${emptyState('Шаблоны недоступны', error instanceof Error ? error.message : 'Не удалось загрузить шаблоны')}${actionBlock(button('Назад', { variant: 'secondary', data: 'data-notification-group-back' }))}`;
+    root.querySelector('[data-notification-group-back]')?.addEventListener('click', navigateBack);
   });
 }
 
-function openRouting(root, navigateBack) {
-  root.innerHTML = `${pageHeader('Настройки уведомлений')}${emptyState('Загрузка', 'Получаем настройки каналов.')}`;
-  void getNotificationRouting().then((items) => renderRoutingForm(root, navigateBack, policyFrom(items))).catch((error) => {
-    root.innerHTML = `${pageHeader('Настройки уведомлений')}${emptyState('Настройки недоступны', error instanceof Error ? error.message : 'Не удалось загрузить настройки')}${actionBlock(button('Назад', { variant: 'secondary', data: 'data-communications-routing-back' }))}`;
-    root.querySelector('[data-communications-routing-back]')?.addEventListener('click', navigateBack);
-  });
+async function openBroadcasts(root, navigateBack) {
+  const { render } = await import('./broadcasts/broadcasts.js');
+  render(root, navigateBack);
 }
-
-async function openBroadcasts(root, navigateBack) { const { render } = await import('./broadcasts/broadcasts.js'); render(root, navigateBack); }
 
 function renderNotifications(root, navigateBack) {
   root.innerHTML = `${pageHeader('Уведомления')}${folderList([
-    { title: 'Настройки уведомлений', data: 'data-communications-open="routing"' },
+    { title: 'Клиенту', count: '4', data: 'data-communications-open="client"' },
+    { title: 'Мастеру', count: '2', data: 'data-communications-open="master"' },
     { title: 'Рассылки', data: 'data-communications-open="broadcasts"' },
   ])}${actionBlock(button('Назад', { variant: 'secondary', data: 'data-communications-back' }))}`;
-  root.querySelector('[data-communications-open="routing"]')?.addEventListener('click', () => openRouting(root, () => renderNotifications(root, navigateBack)));
+  root.querySelector('[data-communications-open="client"]')?.addEventListener('click', () => openTemplateGroup(root, () => renderNotifications(root, navigateBack), 'CLIENT', 'Клиенту'));
+  root.querySelector('[data-communications-open="master"]')?.addEventListener('click', () => openTemplateGroup(root, () => renderNotifications(root, navigateBack), 'MASTER', 'Мастеру'));
   root.querySelector('[data-communications-open="broadcasts"]')?.addEventListener('click', () => void openBroadcasts(root, () => renderNotifications(root, navigateBack)));
   root.querySelector('[data-communications-back]')?.addEventListener('click', navigateBack);
 }
 
-export function render(root, navigateBack = () => {}) { renderNotifications(root, navigateBack); }
+export function render(root, navigateBack = () => {}) {
+  renderNotifications(root, navigateBack);
+}
