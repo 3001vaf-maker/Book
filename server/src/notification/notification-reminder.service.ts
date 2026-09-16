@@ -210,7 +210,7 @@ export class NotificationReminderService implements OnModuleInit, OnModuleDestro
           const types = eventTypes.get(row.recordId) || new Set<string>();
           if (types.has('cancelled') || types.has('completed') || types.has('no-show')) continue;
           const source = objectValue(row.data);
-          const record = { ...source, id: text(source.id) || row.recordId };
+          const record: JsonObject = { ...source, id: text(source.id) || row.recordId };
           const appointmentMinute = appointmentWallClockMinute(record);
           if (!appointmentMinute) continue;
           const leadMinutes = appointmentMinute - currentMinute;
