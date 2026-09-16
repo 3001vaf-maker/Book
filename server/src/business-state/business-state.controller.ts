@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { BookingLifecycleNotificationService } from '../notification/booking-lifecycle-notification.service';
 import { BusinessStateService } from './business-state.service';
 import { ClientContactRulesService } from './client-contact-rules.service';
 
@@ -12,6 +13,7 @@ export class BusinessStateController {
   constructor(
     private readonly businessState: BusinessStateService,
     private readonly clientContactRules: ClientContactRulesService,
+    private readonly bookingNotifications: BookingLifecycleNotificationService,
   ) {}
 
   @Get()
@@ -52,8 +54,12 @@ export class BusinessStateController {
   }
 
   @Put('records/:recordId')
-  upsertRecord(@Req() request: AuthenticatedRequest, @Param('recordId') recordId: string, @Body() body: unknown) {
-    return this.businessState.upsertRecord(request.auth!.tenantId, recordId, body);
+  async upsertRecord(@Req() request: AuthenticatedRequest, @Param('recordId') recordId: string, @Body() body: unknown) {
+    const tenantId = request.auth!.tenantId;
+    const before = await this.bookingNotifications.recordBefore(tenantId, recordId);
+    const record = await this.businessState.upsertRecord(tenantId, recordId, body);
+    await this.bookingNotifications.afterRecordUpsert(tenantId, before, record).catch(() => null);
+    return record;
   }
 
   @Delete('records/:recordId')
@@ -67,8 +73,12 @@ export class BusinessStateController {
   }
 
   @Put('record-events/:eventId')
-  upsertRecordEvent(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Body() body: unknown) {
-    return this.businessState.upsertRecordEvent(request.auth!.tenantId, eventId, body);
+  async upsertRecordEvent(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Body() body: unknown) {
+    const tenantId = request.auth!.tenantId;
+    const alreadyExisted = await this.bookingNotifications.recordEventExists(tenantId, eventId);
+    const event = await this.businessState.upsertRecordEvent(tenantId, eventId, body);
+    await this.bookingNotifications.afterRecordEventUpsert(tenantId, event, alreadyExisted).catch(() => null);
+    return event;
   }
 
   @Get('operational')
