@@ -8,6 +8,15 @@ const CHANNEL_OPTIONS = [
   { value: 'EMAIL', label: 'Email' },
 ];
 
+const VARIABLE_LABELS = {
+  client: 'Имя клиента',
+  date: 'Дата · 16.09.26',
+  time: 'Время · 12:00',
+  end_time: 'Окончание · 13:00',
+  time_range: 'Время процедуры · 12:00-13:00',
+  services: 'Услуги',
+};
+
 function policyFrom(items = [], eventType = '') {
   const current = (Array.isArray(items) ? items : []).find((item) => item.eventType === eventType)
     || { eventType, mode: 'always', channels: ['PUSH'] };
@@ -27,7 +36,31 @@ function normalizedExternalChannels(form) {
 function templateVariables(template = {}) {
   const variables = Array.isArray(template.variables) ? template.variables : [];
   if (!variables.length) return '';
-  return `<div class="muted">Доступные подстановки: ${variables.map((name) => `<code>{{${escapeHtml(name)}}}</code>`).join(', ')}</div>`;
+  const controls = variables.map((name) => `
+    <button class="ui-button ui-button--secondary" type="button" data-template-variable="${escapeHtml(name)}">${escapeHtml(VARIABLE_LABELS[name] || name)}</button>`).join('');
+  return `<div class="action-block"><strong>Вставить в текст</strong><div class="muted">Нажмите поле «Заголовок» или «Текст», затем нужную переменную. Переносы строк в тексте сохраняются.</div><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">${controls}</div></div>`;
+}
+
+function installVariableInsertion(form) {
+  const title = form.querySelector('input[name="title"]');
+  const body = form.querySelector('textarea[name="body"]');
+  let target = body || title;
+  [title, body].filter(Boolean).forEach((fieldNode) => {
+    fieldNode.addEventListener('focus', () => { target = fieldNode; });
+  });
+  form.querySelectorAll('[data-template-variable]').forEach((control) => {
+    control.addEventListener('click', () => {
+      const fieldNode = target || body || title;
+      if (!fieldNode) return;
+      const token = `{{${control.dataset.templateVariable}}}`;
+      const start = Number.isInteger(fieldNode.selectionStart) ? fieldNode.selectionStart : fieldNode.value.length;
+      const end = Number.isInteger(fieldNode.selectionEnd) ? fieldNode.selectionEnd : start;
+      fieldNode.value = `${fieldNode.value.slice(0, start)}${token}${fieldNode.value.slice(end)}`;
+      const next = start + token.length;
+      fieldNode.focus();
+      fieldNode.setSelectionRange?.(next, next);
+    });
+  });
 }
 
 function deliveryFields(template, policy) {
@@ -52,16 +85,17 @@ async function openTemplate(root, navigateBack, template) {
     const policy = policyFrom(routing, template.key);
     root.innerHTML = `${pageHeader(template.name)}
       <form class="form-grid" data-notification-template-form>
-        ${!template.active ? '<div class="action-block"><strong>Подготовлено на будущее</strong><div class="muted">Текст можно настроить уже сейчас. Автоматическая отправка включится после появления надёжного события завершения записи.</div></div>' : ''}
         ${field({ label: 'Заголовок', name: 'title', value: template.title || '', required: true, maxlength: 160 })}
-        ${textareaField({ label: 'Текст', name: 'body', value: template.body || '', rows: 5, maxlength: 2000, required: true })}
+        ${textareaField({ label: 'Текст', name: 'body', value: template.body || '', rows: 7, maxlength: 2000, required: true })}
         ${templateVariables(template)}
         ${deliveryFields(template, policy)}
         <div class="muted" data-notification-template-status aria-live="polite"></div>
         ${actionBlock(`${button('Сохранить', { type: 'submit' })}${button('Назад', { type: 'button', variant: 'secondary', data: 'data-notification-template-back' })}`)}
       </form>`;
     root.querySelector('[data-notification-template-back]')?.addEventListener('click', navigateBack);
-    root.querySelector('[data-notification-template-form]')?.addEventListener('submit', async (event) => {
+    const templateForm = root.querySelector('[data-notification-template-form]');
+    if (templateForm) installVariableInsertion(templateForm);
+    templateForm?.addEventListener('submit', async (event) => {
       event.preventDefault();
       const form = event.currentTarget;
       const status = root.querySelector('[data-notification-template-status]');
@@ -96,7 +130,7 @@ async function openTemplate(root, navigateBack, template) {
 function renderTemplateGroup(root, navigateBack, audience, title, templates) {
   const items = templates.map((template, index) => ({
     title: template.name,
-    count: template.active ? '' : 'позже',
+    count: '',
     data: `data-notification-template="${index}"`,
     aria: `Открыть шаблон ${template.name}`,
   }));
