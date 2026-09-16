@@ -8,6 +8,7 @@ import { NotificationService } from '../notification/notification.service';
 import { bookingTemplateValues, NotificationTemplateService } from '../notification/notification-template.service';
 import { WebPushService } from '../notification/web-push.service';
 import { BookingAccountGuard } from './booking-account.guard';
+import { BookingPublicationGuard } from './booking-publication.guard';
 import { BookingRequiredConsentGuard } from './booking-required-consent.guard';
 import { ClientCardLinkService } from './client-card-link.service';
 import { OnlineBookingService } from './online-booking.service';
@@ -95,22 +96,26 @@ export class OnlineBookingController {
     return this.booking.markRejected(request.auth!.tenantId, requestId);
   }
 
+  @UseGuards(BookingPublicationGuard)
   @Get(':tenantId/context')
   context(@Param('tenantId') tenantId: string, @Query('workplace') workplace = '') {
     return this.booking.getContext(tenantId, workplace);
   }
 
+  @UseGuards(BookingPublicationGuard)
   @Post(':tenantId/account/prepare')
   prepareAccount(@Param('tenantId') tenantId: string, @Body() body: { email?: string }) {
     return this.booking.prepareAccount(tenantId, body?.email || '');
   }
 
+  @UseGuards(BookingPublicationGuard)
   @Post(':tenantId/account/register')
   async registerAccount(@Param('tenantId') tenantId: string, @Body() body: Record<string, any>) {
     await this.clientCards.validateNewAccountContacts(tenantId, body || {});
     return this.booking.registerAccount(tenantId, body || {});
   }
 
+  @UseGuards(BookingPublicationGuard)
   @Post(':tenantId/account/login')
   loginAccount(@Param('tenantId') tenantId: string, @Body() body: { email?: string; password?: string }) {
     return this.booking.loginAccount(tenantId, body?.email || '', body?.password || '');
@@ -282,7 +287,7 @@ export class OnlineBookingController {
     });
   }
 
-  @UseGuards(BookingAccountGuard, BookingRequiredConsentGuard)
+  @UseGuards(BookingPublicationGuard, BookingAccountGuard, BookingRequiredConsentGuard)
   @Post(':tenantId/requests')
   async createRequest(@Param('tenantId') tenantId: string, @Req() request: AccountRequest, @Body() body: Record<string, any>) {
     const accountId = request.bookingAccountAuth!.accountId;
