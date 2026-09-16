@@ -10,6 +10,7 @@ export {
 export {
   cancelRecord,
   checkRecordTime,
+  completeRecord,
   createRecord,
   deleteRecord,
   moveRecord,
@@ -33,3 +34,7 @@ export {
   recordAppointmentTime,
   recordVisualState,
 } from './state.js';
+export {
+  startRecordCompletionRuntime,
+  sweepCompletedRecords,
+} from './completion-runtime.js';
