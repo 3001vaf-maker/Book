@@ -6,8 +6,7 @@ import { getWorkplaces } from '../core/workplace-time.js';
 import { getAllClients } from '../main/clients/data.js';
 import { clientDisplay } from '../main/clients/presentation.js';
 import { getWallets } from '../settings/wallets/data.js';
-import { getRecord } from '../core/record/index.js';
-import { setRecordAttendance, updateRecord } from '../core/record/index.js';
+import { completeRecord, getRecord, isRecordCompletedSide, setRecordAttendance, updateRecord } from '../core/record/index.js';
 
 const money = (value) => `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(Number(value || 0)).replaceAll('\u00a0', ' ')} ₽`;
 
@@ -47,11 +46,13 @@ function saveFinancialCorrection(record, finance) {
 
 function paymentEntryContent(record) {
   const state = paymentStateForRecord(record);
+  const lifecycleDone = isRecordCompletedSide(record, { paid: false });
+  const completeAction = lifecycleDone ? '' : button('Завершить', { data: 'data-record-complete', variant: 'secondary' });
   if (state.fullyPaid) {
-    return `<button type="button" class="modal-bottom-action modal-bottom-action--paid" data-record-payment-paid aria-label="Открыть оплату ${state.paidTotal} рублей"><strong>Оплачено</strong><strong>${money(state.paidTotal)}</strong></button>`;
+    return `<button type="button" class="modal-bottom-action modal-bottom-action--paid" data-record-payment-paid aria-label="Открыть оплату ${state.paidTotal} рублей"><strong>Оплачено</strong><strong>${money(state.paidTotal)}</strong></button>${completeAction}`;
   }
   const partialClass = state.partiallyPaid ? ' modal-bottom-action--partial' : '';
-  return `<button type="button" class="modal-bottom-action${partialClass}" data-record-payment-open aria-label="Открыть оплату, к оплате ${state.remaining} рублей"><span>К оплате</span><strong>${money(state.remaining)}</strong></button>`;
+  return `<button type="button" class="modal-bottom-action${partialClass}" data-record-payment-open aria-label="Открыть оплату, к оплате ${state.remaining} рублей"><span>К оплате</span><strong>${money(state.remaining)}</strong></button>${completeAction}`;
 }
 
 function workplaceName(id) {
@@ -158,6 +159,7 @@ function openPaymentMethodsModal(payment, paymentModal) {
     if (!completed) return;
     if (completed?.source?.type === 'record' && completed?.source?.id) {
       setRecordAttendance(completed.source.id, 'arrived');
+      completeRecord(completed.source.id);
     }
     methodsModal.remove();
     paymentModal?.remove();
@@ -321,6 +323,10 @@ export function openRecordPaymentEntry(record) {
   const bindEntry = (current) => {
     bottom.querySelector('[data-record-payment-open]')?.addEventListener('click', () => openPaymentModal(current));
     bottom.querySelector('[data-record-payment-paid]')?.addEventListener('click', () => openPaidState(current));
+    bottom.querySelector('[data-record-complete]')?.addEventListener('click', () => {
+      completeRecord(current.id);
+      renderPaymentState();
+    });
   };
   const renderPaymentState = () => {
     const current = getRecord(record.id) || record;

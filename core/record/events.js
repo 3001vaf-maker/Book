@@ -19,6 +19,7 @@ export const RECORD_EVENT_TYPES = Object.freeze({
   NO_SHOW: 'no-show',
   ATTENDANCE_CLEARED: 'attendance-cleared',
   CANCELLED: 'cancelled',
+  COMPLETED: 'completed',
 });
 
 export function getAllRecordEvents() {

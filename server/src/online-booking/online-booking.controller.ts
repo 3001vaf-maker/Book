@@ -5,6 +5,7 @@ import { ClientContactRouteService } from '../communication/client-contact-route
 import { CommunicationService } from '../communication/communication.service';
 import { ConsentPolicyService } from '../document-state/consent-policy.service';
 import { NotificationService } from '../notification/notification.service';
+import { bookingTemplateValues, NotificationTemplateService } from '../notification/notification-template.service';
 import { WebPushService } from '../notification/web-push.service';
 import { BookingAccountGuard } from './booking-account.guard';
 import { BookingRequiredConsentGuard } from './booking-required-consent.guard';
@@ -19,6 +20,7 @@ export class OnlineBookingController {
   constructor(
     private readonly booking: OnlineBookingService,
     private readonly notifications: NotificationService,
+    private readonly templates: NotificationTemplateService,
     private readonly communications: CommunicationService,
     private readonly contactRoutes: ClientContactRouteService,
     private readonly consents: ConsentPolicyService,
@@ -250,7 +252,7 @@ export class OnlineBookingController {
     const accountId = request.bookingAccountAuth!.accountId;
     const profiles = await this.contactRoutes.accessibleProfilesForAccount(tenantId, accountId);
     const threads = await Promise.all(profiles.map((profile) => this.communications.listThread(tenantId, { profileKey: profile.profileKey }, 500)));
-    const merged = threads.flat().sort((left, right) => {
+    const merged = threads.flat().filter((message) => String(message.channel || '').toUpperCase() !== 'OWNER_IN_APP').sort((left, right) => {
       const byTime = new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime();
       return byTime || String(left.id).localeCompare(String(right.id));
     });
@@ -285,13 +287,43 @@ export class OnlineBookingController {
   async createRequest(@Param('tenantId') tenantId: string, @Req() request: AccountRequest, @Body() body: Record<string, any>) {
     const accountId = request.bookingAccountAuth!.accountId;
     const created = await this.booking.createRequest(tenantId, accountId, body || {});
-    await this.notifications.createForAccount(tenantId, accountId, {
-      type: 'booking.created',
-      title: 'Запись создана',
-      body: 'Новая запись добавлена в ваш клиентский аккаунт.',
-      entityType: 'booking-request',
-      entityId: String((created as any)?.id || ''),
+    const createdValue = created as any;
+    const procedureNames = Array.isArray(createdValue?.procedures)
+      ? createdValue.procedures.map((item: any) => String(item?.name || '').trim()).filter(Boolean)
+      : [];
+    const account = await this.booking.getAccount(tenantId, accountId);
+    const values = bookingTemplateValues({
+      client: [account.name, account.surname].filter(Boolean).join(' ').trim() || account.phone,
+      date: createdValue?.date,
+      from: createdValue?.from,
+      to: createdValue?.to,
+      services: procedureNames.join(', '),
     });
+    const [ownerTemplate, clientTemplate] = await Promise.all([
+      this.templates.render(tenantId, 'owner.booking.created', values),
+      this.templates.render(tenantId, 'booking.created', values),
+    ]);
+    if (ownerTemplate.enabled) {
+      await this.communications.recordMessage(tenantId, {
+        bookingAccountId: accountId,
+        direction: 'system',
+        kind: 'system',
+        channel: 'OWNER_IN_APP',
+        body: [ownerTemplate.title, ownerTemplate.body].filter(Boolean).join('\n'),
+        externalMessageId: `booking-request:${String(createdValue?.id || '')}`,
+        externalThreadId: 'booking',
+        status: 'delivered',
+      }).catch(() => null);
+    }
+    if (clientTemplate.enabled) {
+      await this.notifications.createForAccount(tenantId, accountId, {
+        type: 'booking.created',
+        title: clientTemplate.title,
+        body: clientTemplate.body,
+        entityType: 'booking-request',
+        entityId: String(createdValue?.id || ''),
+      }).catch(() => null);
+    }
     return created;
   }
 }
