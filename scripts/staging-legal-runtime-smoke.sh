@@ -31,6 +31,8 @@ platform=$(curl -fsS "${auth[@]}" "$base/platform/legal/readiness")
 node -e 'const p=JSON.parse(process.argv[1]);if(p.state?.status!=="LEGAL_READY"||p.state?.filingStatus!=="SUBMITTED")process.exit(1)' "$platform"
 tenant=$(curl -fsS "${auth[@]}" "$base/legal/readiness")
 node -e 'const p=JSON.parse(process.argv[1]);if(p.state?.operationMode!=="LIVE"||p.state?.filingStatus!=="SUBMITTED")process.exit(1)' "$tenant"
+expect_status 409 POST "$base/platform/legal/documents" '{}'
+expect_status 409 POST "$base/legal/documents" '{}'
 
 # Authorization must be refreshed from the database on every request: a stale JWT cannot bypass suspension.
 $compose exec -T db psql -U book -d book_staging -v ON_ERROR_STOP=1 -v tenant_id="$tenant_id" <<'SQL' >/dev/null
@@ -87,9 +89,9 @@ expect_status 200 GET "$base/online-booking/$tenant_id/context"
 # LEGAL_READY may create a master invitation, but the new tenant must remain DEMO and legal evidence must use the User id, not PlatformAdmin id.
 invite=$(curl -fsS -X POST "${auth[@]}" "${json_header[@]}" -d '{"email":"legal-smoke-master@book.local","name":"Legal Smoke"}' "$base/saas-admin/invitations")
 invited_tenant_id=$(node -e 'const p=JSON.parse(process.argv[1]);if(!p.tenantId)process.exit(1);process.stdout.write(p.tenantId)' "$invite")
-invited_mode=$($compose exec -T db psql -U book -d book_staging -At -v tenant_id="$invited_tenant_id" -c 'SELECT "operationMode" FROM "TenantLegalState" WHERE "tenantId"=:'\''tenant_id'\'';')
+invited_mode=$($compose exec -T db psql -U book -d book_staging -At -c "SELECT \"operationMode\" FROM \"TenantLegalState\" WHERE \"tenantId\"='$invited_tenant_id';")
 test "$invited_mode" = "DEMO"
-created_actor=$($compose exec -T db psql -U book -d book_staging -At -v tenant_id="$invited_tenant_id" -c 'SELECT COALESCE("actorUserId", '\'''\'') FROM "LegalStateEvent" WHERE "tenantId"=:'\''tenant_id'\'' AND "changeType"='\''TENANT_CREATED_DEMO'\'' ORDER BY "occurredAt" DESC LIMIT 1;')
+created_actor=$($compose exec -T db psql -U book -d book_staging -At -c "SELECT COALESCE(\"actorUserId\", '') FROM \"LegalStateEvent\" WHERE \"tenantId\"='$invited_tenant_id' AND \"changeType\"='TENANT_CREATED_DEMO' ORDER BY \"occurredAt\" DESC LIMIT 1;")
 test "$created_actor" = "$user_id"
 
 # Published legal evidence must be immutable in PostgreSQL itself, not only through service code.
@@ -108,11 +110,11 @@ if $compose exec -T db psql -U book -d book_staging -v ON_ERROR_STOP=1 -c 'DELET
 fi
 
 # Verify the negative checks produced legal policy evidence for the same tenant.
-audit_count=$($compose exec -T db psql -U book -d book_staging -At -v tenant_id="$tenant_id" -c 'SELECT COUNT(*) FROM "LegalAuditEvent" WHERE "tenantId"=:'\''tenant_id'\'' AND "result"='\''DENIED'\'';')
+audit_count=$($compose exec -T db psql -U book -d book_staging -At -c "SELECT COUNT(*) FROM \"LegalAuditEvent\" WHERE \"tenantId\"='$tenant_id' AND \"result\"='DENIED';")
 test "${audit_count:-0}" -gt 0
 
 # The platform-admin identity used above must still be the authenticated DB identity.
-admin_count=$($compose exec -T db psql -U book -d book_staging -At -v user_id="$user_id" -c 'SELECT COUNT(*) FROM "PlatformAdmin" WHERE "userId"=:'\''user_id'\'';')
+admin_count=$($compose exec -T db psql -U book -d book_staging -At -c "SELECT COUNT(*) FROM \"PlatformAdmin\" WHERE \"userId\"='$user_id';")
 test "$admin_count" = "1"
 
 echo "legal runtime negative/positive smoke: ok"
