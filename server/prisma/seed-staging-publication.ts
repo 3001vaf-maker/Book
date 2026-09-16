@@ -18,7 +18,7 @@ async function main() {
 
   // This seed is only for the isolated Docker staging smoke. Production migrations remain
   // fail-closed: PRE_LAUNCH + DEMO + NOT_PREPARED. Here we explicitly construct a synthetic
-  // legally-ready environment so public-booking/chat regression tests exercise the LIVE path.
+  // legally-ready environment so public-booking/chat/legal regression tests exercise LIVE paths.
   await prisma.$transaction(async (tx) => {
     await tx.$executeRaw`
       UPDATE "PlatformLegalState"
@@ -41,6 +41,54 @@ async function main() {
           "updatedAt" = CURRENT_TIMESTAMP
       WHERE "id" = 'platform'
     `;
+
+    const platformDocuments = [
+      { key: 'privacy-policy', type: 'PRIVACY_POLICY', title: 'Synthetic staging privacy policy', required: true },
+      { key: 'saas-agreement', type: 'SAAS_AGREEMENT', title: 'Synthetic staging SaaS agreement', required: true },
+      { key: 'dpa', type: 'DPA', title: 'Synthetic staging DPA', required: true },
+      { key: 'master-pd-consent', type: 'PD_CONSENT', title: 'Synthetic staging master PD consent', required: true },
+      { key: 'marketing-consent', type: 'MARKETING_CONSENT', title: 'Synthetic staging marketing consent', required: false },
+    ];
+
+    for (const item of platformDocuments) {
+      const existing = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT "id" FROM "LegalDocument"
+        WHERE "scope" = 'PLATFORM' AND "tenantId" IS NULL AND "key" = ${item.key}
+        LIMIT 1
+      `;
+      const documentId = existing[0]?.id || randomUUID();
+      if (!existing[0]) {
+        await tx.$executeRaw`
+          INSERT INTO "LegalDocument" (
+            "id", "scope", "tenantId", "key", "type", "title",
+            "requiredForRegistration", "requiredForLive", "requiredForPublicBooking",
+            "isActive", "createdAt", "updatedAt"
+          ) VALUES (
+            ${documentId}, 'PLATFORM', NULL, ${item.key}, ${item.type}, ${item.title},
+            ${item.required}, false, false, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+          )
+        `;
+      }
+
+      const version = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT "id" FROM "LegalDocumentVersion"
+        WHERE "documentId" = ${documentId} AND "supersededAt" IS NULL
+        LIMIT 1
+      `;
+      if (!version[0]) {
+        const content = `Synthetic staging-only ${item.key}. This is test evidence and is not a production legal document.`;
+        await tx.$executeRaw`
+          INSERT INTO "LegalDocumentVersion" (
+            "id", "documentId", "version", "contentSnapshot", "contentHash",
+            "operatorIdentitySnapshot", "publishedAt", "supersededAt"
+          ) VALUES (
+            ${randomUUID()}, ${documentId}, 1, ${content}, ${hash(content)},
+            '{"name":"Book Staging","synthetic":true}'::jsonb,
+            CURRENT_TIMESTAMP, NULL
+          )
+        `;
+      }
+    }
 
     await tx.$executeRaw`
       INSERT INTO "TenantLegalState" (
