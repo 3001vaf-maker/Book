@@ -74,12 +74,11 @@ export function recordVisualState(record, { paid = false } = {}) {
   return 'active';
 }
 
-export function isRecordCompletedSide(record, { paid = false, now = Date.now() } = {}) {
+export function isRecordCompletedSide(record, { paid = false } = {}) {
   return record?.status === 'cancelled'
     || record?.attendance === 'no-show'
     || Boolean(record?.completed)
-    || paid
-    || recordAppointmentTime(record, 'to') <= now;
+    || paid;
 }
 
 export function recordActivityTime(record, payment = null, { completed = false } = {}) {

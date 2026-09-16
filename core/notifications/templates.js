@@ -13,9 +13,20 @@ export async function getNotificationTemplates(audience = '') {
   return payload(await apiRequest(`/notifications/templates${suffix}`));
 }
 
-export async function saveNotificationTemplate(templateKey, { title = '', body = '' } = {}) {
+export async function saveNotificationTemplate(templateKey, { title = '', body = '', enabled = true } = {}) {
   return payload(await apiRequest(`/notifications/templates/${encodeURIComponent(String(templateKey || ''))}`, {
     method: 'PUT',
-    body: JSON.stringify({ title, body }),
+    body: JSON.stringify({ title, body, enabled: Boolean(enabled) }),
+  }));
+}
+
+export async function getNotificationReminderRules() {
+  return payload(await apiRequest('/notifications/reminder-rules'));
+}
+
+export async function saveNotificationReminderRules(minutesBefore = []) {
+  return payload(await apiRequest('/notifications/reminder-rules', {
+    method: 'PUT',
+    body: JSON.stringify({ minutesBefore: Array.isArray(minutesBefore) ? minutesBefore : [] }),
   }));
 }

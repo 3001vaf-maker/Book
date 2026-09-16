@@ -1,5 +1,10 @@
 import { getNotificationRouting, saveNotificationRouting } from '../../core/notifications/routing.js';
-import { getNotificationTemplates, saveNotificationTemplate } from '../../core/notifications/templates.js';
+import {
+  getNotificationReminderRules,
+  getNotificationTemplates,
+  saveNotificationReminderRules,
+  saveNotificationTemplate,
+} from '../../core/notifications/templates.js';
 import { actionBlock, button, emptyState, escapeHtml, field, folderList, pageHeader, select, textareaField } from '../../ui/ui.js';
 
 const CHANNEL_OPTIONS = [
@@ -16,6 +21,18 @@ const VARIABLE_LABELS = {
   time_range: 'Время процедуры · 12:00-13:00',
   services: 'Услуги',
 };
+
+const REMINDER_OPTIONS = [
+  { minutes: 2880, label: 'За 2 суток' },
+  { minutes: 1440, label: 'За сутки' },
+  { minutes: 720, label: 'За 12 часов' },
+  { minutes: 360, label: 'За 6 часов' },
+  { minutes: 180, label: 'За 3 часа' },
+  { minutes: 120, label: 'За 2 часа' },
+  { minutes: 60, label: 'За 1 час' },
+  { minutes: 30, label: 'За 30 минут' },
+  { minutes: 15, label: 'За 15 минут' },
+];
 
 function policyFrom(items = [], eventType = '') {
   const current = (Array.isArray(items) ? items : []).find((item) => item.eventType === eventType)
@@ -63,13 +80,27 @@ function installVariableInsertion(form) {
   });
 }
 
+function enabledField(template) {
+  if (template.audience !== 'CLIENT') return '';
+  return `<label class="action-block" style="display:flex;align-items:center;gap:10px">
+    <input type="checkbox" name="enabled" value="1"${template.enabled === false ? '' : ' checked'}>
+    <span><strong>Отправлять клиенту</strong><span class="muted" style="display:block">Снимите галочку, если это сервисное сообщение отправлять не нужно.</span></span>
+  </label>`;
+}
+
+function reminderRulesField(rules = []) {
+  const active = new Set((Array.isArray(rules) ? rules : []).filter((rule) => rule?.enabled !== false).map((rule) => Number(rule?.minutesBefore)));
+  const options = REMINDER_OPTIONS.map((item) => `<label style="display:flex;align-items:center;gap:8px;padding:5px 0"><input type="checkbox" name="reminderMinutes" value="${item.minutes}"${active.has(item.minutes) ? ' checked' : ''}><span>${escapeHtml(item.label)}</span></label>`).join('');
+  return `<div class="action-block"><strong>Когда напоминать</strong><div class="muted">Можно выбрать несколько вариантов. Например: за сутки и за час. Каждый вариант отправляется один раз. Если ничего не выбрано — напоминаний нет.</div><div style="margin-top:10px">${options}</div></div>`;
+}
+
 function deliveryFields(template, policy) {
   if (template.audience !== 'CLIENT') {
     return `<div class="action-block"><strong>В Book — всегда</strong><div class="muted">Это входящее уведомление мастеру. Внешние каналы мастера подключим отдельно, когда понадобится.</div></div>`;
   }
   const channels = (Array.isArray(policy.channels) ? policy.channels : []).filter((channel) => String(channel || '').toUpperCase() !== 'PUSH');
   return `
-    <div class="action-block"><strong>Push — всегда</strong><div class="muted">Если клиент разрешил Push на устройстве. Внутри Book уведомление создаётся всегда.</div></div>
+    <div class="action-block"><strong>Push — всегда</strong><div class="muted">Если клиент разрешил Push на устройстве. Внутри Book уведомление создаётся всегда, когда сервисное сообщение включено.</div></div>
     ${select({ label: 'Внешние каналы', name: 'mode', value: policy.mode || 'always', options: [
       { value: 'always', label: 'Отправлять по всем выбранным каналам' },
       { value: 'fallback', label: 'Следующий канал, если предыдущий не доставлен' },
@@ -81,13 +112,18 @@ function deliveryFields(template, policy) {
 async function openTemplate(root, navigateBack, template) {
   root.innerHTML = `${pageHeader(template.name)}${emptyState('Загрузка', 'Получаем настройки шаблона.')}`;
   try {
-    const routing = template.audience === 'CLIENT' ? await getNotificationRouting() : [];
+    const [routing, reminderRules] = await Promise.all([
+      template.audience === 'CLIENT' ? getNotificationRouting() : Promise.resolve([]),
+      template.key === 'booking.reminder' ? getNotificationReminderRules() : Promise.resolve([]),
+    ]);
     const policy = policyFrom(routing, template.key);
     root.innerHTML = `${pageHeader(template.name)}
       <form class="form-grid" data-notification-template-form>
+        ${enabledField(template)}
         ${field({ label: 'Заголовок', name: 'title', value: template.title || '', required: true, maxlength: 160 })}
         ${textareaField({ label: 'Текст', name: 'body', value: template.body || '', rows: 7, maxlength: 2000, required: true })}
         ${templateVariables(template)}
+        ${template.key === 'booking.reminder' ? reminderRulesField(reminderRules) : ''}
         ${deliveryFields(template, policy)}
         <div class="muted" data-notification-template-status aria-live="polite"></div>
         ${actionBlock(`${button('Сохранить', { type: 'submit' })}${button('Назад', { type: 'button', variant: 'secondary', data: 'data-notification-template-back' })}`)}
@@ -106,12 +142,18 @@ async function openTemplate(root, navigateBack, template) {
         const saved = await saveNotificationTemplate(template.key, {
           title: String(data.get('title') || ''),
           body: String(data.get('body') || ''),
+          enabled: template.audience === 'CLIENT'
+            ? Boolean(form.querySelector('input[name="enabled"]')?.checked)
+            : template.enabled !== false,
         });
         if (template.audience === 'CLIENT') {
           await saveNotificationRouting(template.key, {
             mode: String(data.get('mode') || 'always'),
             channels: normalizedExternalChannels(form),
           });
+        }
+        if (template.key === 'booking.reminder') {
+          await saveNotificationReminderRules(data.getAll('reminderMinutes').map((value) => Number(value)).filter(Number.isFinite));
         }
         Object.assign(template, saved);
         if (status) status.textContent = 'Сохранено.';
@@ -162,7 +204,7 @@ async function openBroadcasts(root, navigateBack) {
 
 function renderNotifications(root, navigateBack) {
   root.innerHTML = `${pageHeader('Уведомления')}${folderList([
-    { title: 'Клиенту', count: '4', data: 'data-communications-open="client"' },
+    { title: 'Клиенту', count: '5', data: 'data-communications-open="client"' },
     { title: 'Мастеру', count: '2', data: 'data-communications-open="master"' },
     { title: 'Рассылки', data: 'data-communications-open="broadcasts"' },
   ])}${actionBlock(button('Назад', { variant: 'secondary', data: 'data-communications-back' }))}`;

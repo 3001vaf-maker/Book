@@ -18,6 +18,7 @@ type TemplateOverrideRow = {
   templateKey: string;
   title: string;
   body: string;
+  enabled: boolean;
 };
 
 const BOOKING_VARIABLES = ['client', 'date', 'time', 'end_time', 'time_range', 'services'];
@@ -56,6 +57,15 @@ const TEMPLATE_CATALOG: TemplateDefinition[] = [
     name: 'Завершение записи',
     title: 'Запись завершена',
     body: 'Спасибо за визит, {{client}}.',
+    variables: BOOKING_VARIABLES,
+    active: true,
+  },
+  {
+    key: 'booking.reminder',
+    audience: 'CLIENT',
+    name: 'Напоминание о визите',
+    title: 'Напоминание о визите',
+    body: 'Напоминаем о записи {{date}} в {{time}}\n{{services}}',
     variables: BOOKING_VARIABLES,
     active: true,
   },
@@ -138,6 +148,7 @@ export class NotificationTemplateService {
       body: override?.body || definition.body,
       variables: [...definition.variables],
       active: definition.active,
+      enabled: override?.enabled ?? true,
       customized: Boolean(override),
     };
   }
@@ -146,7 +157,7 @@ export class NotificationTemplateService {
     const audience = normalizeAudience(audienceValue);
     const definitions = TEMPLATE_CATALOG.filter((item) => !audience || item.audience === audience);
     const rows = await this.prisma.$queryRaw<TemplateOverrideRow[]>`
-      SELECT "templateKey", "title", "body"
+      SELECT "templateKey", "title", "body", "enabled"
       FROM "NotificationTemplateOverride"
       WHERE "tenantId" = ${tenantId}
     `;
@@ -157,7 +168,7 @@ export class NotificationTemplateService {
   async get(tenantId: string, keyValue: unknown) {
     const definition = definitionFor(keyValue);
     const rows = await this.prisma.$queryRaw<TemplateOverrideRow[]>`
-      SELECT "templateKey", "title", "body"
+      SELECT "templateKey", "title", "body", "enabled"
       FROM "NotificationTemplateOverride"
       WHERE "tenantId" = ${tenantId} AND "templateKey" = ${definition.key}
       LIMIT 1
@@ -165,20 +176,29 @@ export class NotificationTemplateService {
     return this.project(definition, rows[0] || null);
   }
 
-  async save(tenantId: string, keyValue: unknown, input: { title?: unknown; body?: unknown }) {
+  async save(
+    tenantId: string,
+    keyValue: unknown,
+    input: { title?: unknown; body?: unknown; enabled?: unknown },
+  ) {
     const definition = definitionFor(keyValue);
+    const current = await this.get(tenantId, definition.key);
     const title = text(input?.title).slice(0, 160);
     const body = text(input?.body).slice(0, 2000);
+    const enabled = input?.enabled === true || input?.enabled === false ? input.enabled : current.enabled;
     if (!title) throw new BadRequestException('Заголовок уведомления не может быть пустым');
     if (!body) throw new BadRequestException('Текст уведомления не может быть пустым');
     await this.prisma.$executeRaw`
       INSERT INTO "NotificationTemplateOverride" (
-        "id", "tenantId", "templateKey", "title", "body", "createdAt", "updatedAt"
+        "id", "tenantId", "templateKey", "title", "body", "enabled", "createdAt", "updatedAt"
       ) VALUES (
-        ${randomUUID()}, ${tenantId}, ${definition.key}, ${title}, ${body}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        ${randomUUID()}, ${tenantId}, ${definition.key}, ${title}, ${body}, ${enabled}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
       )
       ON CONFLICT ("tenantId", "templateKey") DO UPDATE
-      SET "title" = EXCLUDED."title", "body" = EXCLUDED."body", "updatedAt" = CURRENT_TIMESTAMP
+      SET "title" = EXCLUDED."title",
+          "body" = EXCLUDED."body",
+          "enabled" = EXCLUDED."enabled",
+          "updatedAt" = CURRENT_TIMESTAMP
     `;
     return this.get(tenantId, definition.key);
   }

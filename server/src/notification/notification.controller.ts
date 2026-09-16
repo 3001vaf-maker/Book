@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Put, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { NotificationReminderService } from './notification-reminder.service';
 import { NotificationService } from './notification.service';
 import { NotificationTemplateService } from './notification-template.service';
 
@@ -12,6 +13,7 @@ export class NotificationController {
   constructor(
     private readonly notifications: NotificationService,
     private readonly templates: NotificationTemplateService,
+    private readonly reminders: NotificationReminderService,
   ) {}
 
   @Get('routing')
@@ -37,8 +39,21 @@ export class NotificationController {
   saveTemplate(
     @Req() request: OwnerRequest,
     @Param('templateKey') templateKey: string,
-    @Body() body: { title?: unknown; body?: unknown },
+    @Body() body: { title?: unknown; body?: unknown; enabled?: unknown },
   ) {
     return this.templates.save(request.auth!.tenantId, templateKey, body || {});
+  }
+
+  @Get('reminder-rules')
+  reminderRules(@Req() request: OwnerRequest) {
+    return this.reminders.listRules(request.auth!.tenantId);
+  }
+
+  @Put('reminder-rules')
+  saveReminderRules(
+    @Req() request: OwnerRequest,
+    @Body() body: { minutesBefore?: unknown },
+  ) {
+    return this.reminders.saveRules(request.auth!.tenantId, body || {});
   }
 }

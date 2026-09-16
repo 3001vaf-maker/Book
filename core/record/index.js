@@ -1,40 +1,30 @@
-// Public Record Core contract.
-export { hydrateRecordStateFromServer } from './data.js';
+// Public Record Domain facade.
 export {
-  getActiveRecordCountForDay,
-  getRecord,
-  getRecords,
-  getRecordsForDay,
-  readRecord,
-} from './read.js';
-export {
-  cancelRecord,
-  checkRecordTime,
-  completeRecord,
   createRecord,
-  deleteRecord,
   moveRecord,
-  removeRecord,
+  cancelRecord,
+  completeRecord,
   setRecordAttendance,
-  setRecordConfirmed,
-  updateRecord,
+  setRecordPrimaryNote,
+  deleteRecord,
 } from './service.js';
 export {
-  appendRecordEvent,
-  ensureLegacyRecordEvents,
-  getAllRecordEvents,
-  getRecordEvents,
-  hasRecordEvent,
-  RECORD_EVENT_TYPES,
-} from './events.js';
-export {
+  getRecords,
+  getRecord,
+  getRecordSnapshot,
+  getRecordsByDate,
+  getRecordsByYearMonth,
+  getRecordActivityTime,
+  isRecordPending,
   isRecordCompletedSide,
-  projectRecordLifecycle,
-  recordActivityTime,
-  recordAppointmentTime,
-  recordVisualState,
-} from './state.js';
+  isRecordUpcoming,
+  listRecords,
+} from './read.js';
 export {
-  startRecordCompletionRuntime,
-  sweepCompletedRecords,
-} from './completion-runtime.js';
+  RECORD_EVENT_TYPES,
+  RECORD_ATTENDANCE,
+  createRecordEvent,
+  getRecordEvents,
+  getRecordEventsForRecord,
+  projectRecordLifecycle,
+} from './events.js';

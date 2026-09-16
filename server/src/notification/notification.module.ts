@@ -5,6 +5,7 @@ import { DocumentStateModule } from '../document-state/document-state.module';
 import { PrismaService } from '../prisma.service';
 import { BookingLifecycleNotificationService } from './booking-lifecycle-notification.service';
 import { NotificationController } from './notification.controller';
+import { NotificationReminderService } from './notification-reminder.service';
 import { NotificationService } from './notification.service';
 import { NotificationTemplateService } from './notification-template.service';
 import { WebPushService } from './web-push.service';
@@ -12,7 +13,20 @@ import { WebPushService } from './web-push.service';
 @Module({
   imports: [AuthModule, forwardRef(() => BusinessStateModule), DocumentStateModule],
   controllers: [NotificationController],
-  providers: [NotificationService, NotificationTemplateService, BookingLifecycleNotificationService, WebPushService, PrismaService],
-  exports: [NotificationService, NotificationTemplateService, BookingLifecycleNotificationService, WebPushService],
+  providers: [
+    NotificationService,
+    NotificationTemplateService,
+    BookingLifecycleNotificationService,
+    NotificationReminderService,
+    WebPushService,
+    PrismaService,
+  ],
+  exports: [
+    NotificationService,
+    NotificationTemplateService,
+    BookingLifecycleNotificationService,
+    NotificationReminderService,
+    WebPushService,
+  ],
 })
 export class NotificationModule {}

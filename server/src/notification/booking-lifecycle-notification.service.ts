@@ -21,6 +21,33 @@ function text(value: unknown) {
   return String(value ?? '').trim();
 }
 
+function notificationTimeZone() {
+  return text(process.env.BOOK_TIME_ZONE) || 'Europe/Moscow';
+}
+
+function monthKeyAt(now = new Date()) {
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: notificationTimeZone(),
+      year: 'numeric',
+      month: '2-digit',
+    }).formatToParts(now);
+    const year = parts.find((part) => part.type === 'year')?.value || '';
+    const month = parts.find((part) => part.type === 'month')?.value || '';
+    if (year && month) return `${year}-${month}`;
+  } catch {}
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+export function isHistoricalNotificationDate(dateValue: unknown, now = new Date()) {
+  const month = text(dateValue).slice(0, 7);
+  return /^\d{4}-\d{2}$/.test(month) && month < monthKeyAt(now);
+}
+
+export function isCurrentNotificationMonth(dateValue: unknown, now = new Date()) {
+  return text(dateValue).slice(0, 7) === monthKeyAt(now);
+}
+
 function scheduleOf(record: JsonObject): Schedule {
   return {
     date: text(record.date).slice(0, 10),
@@ -126,8 +153,9 @@ export class BookingLifecycleNotificationService {
   }
 
   private async sendClient(tenantId: string, accountId: string, eventType: string, record: JsonObject) {
-    if (!accountId) return null;
+    if (!accountId || isHistoricalNotificationDate(record.date)) return null;
     const template = await this.templates.render(tenantId, eventType, this.templateValues(record));
+    if (!template.enabled) return null;
     return this.notifications.createForAccount(tenantId, accountId, {
       type: eventType,
       title: template.title,
@@ -160,6 +188,22 @@ export class BookingLifecycleNotificationService {
     return new Set(rows.map((row) => text(objectValue(row.data).type)).filter(Boolean));
   }
 
+  async notifyReminderForRecord(tenantId: string, recordValue: unknown) {
+    const record = objectValue(recordValue);
+    const recordId = text(record.id);
+    if (!recordId) return { notified: false, reason: 'missing-record' };
+    const eventTypes = await this.eventTypesForRecord(tenantId, recordId);
+    if (eventTypes.has('cancelled') || eventTypes.has('completed') || eventTypes.has('no-show')) {
+      return { notified: false, reason: 'record-not-remindable' };
+    }
+    const accountId = await this.accountIdForRecord(tenantId, record);
+    if (!accountId) return { notified: false, reason: 'no-client-account' };
+    const sent = await this.sendClient(tenantId, accountId, 'booking.reminder', record);
+    return sent
+      ? { notified: true, eventType: 'booking.reminder' }
+      : { notified: false, reason: 'notification-suppressed' };
+  }
+
   async afterRecordUpsert(tenantId: string, beforeValue: unknown, afterValue: unknown) {
     const before = beforeValue ? objectValue(beforeValue) : null;
     const after = objectValue(afterValue);
@@ -167,14 +211,18 @@ export class BookingLifecycleNotificationService {
     if (!accountId) return { notified: false, reason: 'no-client-account' };
 
     if (!before) {
-      await this.sendClient(tenantId, accountId, 'booking.created', after);
-      return { notified: true, eventType: 'booking.created' };
+      const sent = await this.sendClient(tenantId, accountId, 'booking.created', after);
+      return sent
+        ? { notified: true, eventType: 'booking.created' }
+        : { notified: false, reason: 'notification-suppressed' };
     }
 
     if (scheduleChanged(before, after)) {
       await this.syncRequestSchedule(tenantId, after);
-      await this.sendClient(tenantId, accountId, 'booking.rescheduled', after);
-      return { notified: true, eventType: 'booking.rescheduled' };
+      const sent = await this.sendClient(tenantId, accountId, 'booking.rescheduled', after);
+      return sent
+        ? { notified: true, eventType: 'booking.rescheduled' }
+        : { notified: false, reason: 'notification-suppressed' };
     }
 
     return { notified: false, reason: 'no-notifiable-change' };
@@ -207,16 +255,23 @@ export class BookingLifecycleNotificationService {
         });
       }
       if (!accountId) return { notified: false, reason: 'no-client-account' };
-      await this.sendClient(tenantId, accountId, 'booking.cancelled', record);
-      return { notified: true, eventType: 'booking.cancelled' };
+      const sent = await this.sendClient(tenantId, accountId, 'booking.cancelled', record);
+      return sent
+        ? { notified: true, eventType: 'booking.cancelled' }
+        : { notified: false, reason: 'notification-suppressed' };
     }
 
     const eventTypes = await this.eventTypesForRecord(tenantId, recordId);
     if (eventTypes.has('cancelled') || eventTypes.has('no-show')) {
       return { notified: false, reason: 'record-not-completable' };
     }
+    if (!isCurrentNotificationMonth(record.date)) {
+      return { notified: false, reason: 'completed-outside-current-month' };
+    }
     if (!accountId) return { notified: false, reason: 'no-client-account' };
-    await this.sendClient(tenantId, accountId, 'booking.completed', record);
-    return { notified: true, eventType: 'booking.completed' };
+    const sent = await this.sendClient(tenantId, accountId, 'booking.completed', record);
+    return sent
+      ? { notified: true, eventType: 'booking.completed' }
+      : { notified: false, reason: 'notification-suppressed' };
   }
 }

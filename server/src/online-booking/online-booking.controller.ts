@@ -303,23 +303,27 @@ export class OnlineBookingController {
       this.templates.render(tenantId, 'owner.booking.created', values),
       this.templates.render(tenantId, 'booking.created', values),
     ]);
-    await this.communications.recordMessage(tenantId, {
-      bookingAccountId: accountId,
-      direction: 'system',
-      kind: 'system',
-      channel: 'OWNER_IN_APP',
-      body: [ownerTemplate.title, ownerTemplate.body].filter(Boolean).join('\n'),
-      externalMessageId: `booking-request:${String(createdValue?.id || '')}`,
-      externalThreadId: 'booking',
-      status: 'delivered',
-    }).catch(() => null);
-    await this.notifications.createForAccount(tenantId, accountId, {
-      type: 'booking.created',
-      title: clientTemplate.title,
-      body: clientTemplate.body,
-      entityType: 'booking-request',
-      entityId: String(createdValue?.id || ''),
-    }).catch(() => null);
+    if (ownerTemplate.enabled) {
+      await this.communications.recordMessage(tenantId, {
+        bookingAccountId: accountId,
+        direction: 'system',
+        kind: 'system',
+        channel: 'OWNER_IN_APP',
+        body: [ownerTemplate.title, ownerTemplate.body].filter(Boolean).join('\n'),
+        externalMessageId: `booking-request:${String(createdValue?.id || '')}`,
+        externalThreadId: 'booking',
+        status: 'delivered',
+      }).catch(() => null);
+    }
+    if (clientTemplate.enabled) {
+      await this.notifications.createForAccount(tenantId, accountId, {
+        type: 'booking.created',
+        title: clientTemplate.title,
+        body: clientTemplate.body,
+        entityType: 'booking-request',
+        entityId: String(createdValue?.id || ''),
+      }).catch(() => null);
+    }
     return created;
   }
 }
