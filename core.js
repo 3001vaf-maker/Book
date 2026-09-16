@@ -122,7 +122,7 @@ function renderWorkspace() {
   syncViewport();
 }
 
-function renderMigrationPending() {
+function renderServerStatePending() {
   app.classList.remove('app-shell--booking');
   workspaceReady = false;
   disposeView();
@@ -132,7 +132,7 @@ function renderMigrationPending() {
       <section class="auth-card">
         <div class="auth-card__heading">
           <h1>Book</h1>
-          <p>Сервер ожидает безопасный перенос данных из основного браузера. Текущие данные не изменены.</p>
+          <p>Серверное состояние Book не подтверждено. Данные из браузера не используются.</p>
         </div>
       </section>
     </main>`;
@@ -160,27 +160,27 @@ async function renderAuthenticated(account = authenticatedAccount) {
   authenticatedAccount = account || authenticatedAccount;
   const migration = await initializeProfileWorkplaces(authenticatedAccount);
   if (!migration.verified) {
-    renderMigrationPending();
+    renderServerStatePending();
     return;
   }
   const businessMigration = await initializeBusinessState(authenticatedAccount);
   if (!businessMigration.verified) {
-    renderMigrationPending();
+    renderServerStatePending();
     return;
   }
   const operationalMigration = await initializeOperationalState(authenticatedAccount);
   if (!operationalMigration.verified) {
-    renderMigrationPending();
+    renderServerStatePending();
     return;
   }
   const documentMigration = await initializeDocumentState(authenticatedAccount);
   if (!documentMigration.verified) {
-    renderMigrationPending();
+    renderServerStatePending();
     return;
   }
   const auxiliaryMigration = await initializeAuxiliaryState(authenticatedAccount);
   if (!auxiliaryMigration.verified) {
-    renderMigrationPending();
+    renderServerStatePending();
     return;
   }
   clearLegacyBusinessStorage();

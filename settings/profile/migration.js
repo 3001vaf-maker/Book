@@ -35,40 +35,25 @@ async function loadRemoteProfile() {
   return responseJson(response, 'Не удалось загрузить Profile + Workplaces');
 }
 
-export async function initializeProfileWorkplaces(account = {}) {
+export async function initializeProfileWorkplaces() {
   setProfileServerReady(false);
   setWorkplacesServerReady(false);
 
-  let remote = await loadRemoteProfile();
+  const remote = await loadRemoteProfile();
 
   if (remote?.verified) {
     hydrate(remote, true);
     return { source: 'server', verified: true };
   }
 
-  if (remote?.migrated && account?.user?.workspaceUnlocked === false) {
+  if (!remote?.migrated) {
     const bootstrapResponse = await bootstrapProfile();
-    const bootstrapped = await responseJson(bootstrapResponse, 'Не удалось подтвердить профиль нового мастера');
-    if (bootstrapped?.verified) {
-      hydrate(bootstrapped, true);
-      return { source: 'registration-bootstrap', verified: true };
-    }
-    remote = bootstrapped;
+    const bootstrapped = await responseJson(bootstrapResponse, 'Не удалось создать пустой серверный профиль');
+    if (!bootstrapped?.verified) throw new Error('Пустой серверный профиль не подтверждён');
+    hydrate(bootstrapped, true);
+    return { source: 'server-bootstrap', verified: true };
   }
 
-  if (remote?.migrated) {
-    hydrate(remote, false);
-    return { source: 'server-awaiting-verification', verified: false };
-  }
-
-  if (account?.user?.workspaceUnlocked) {
-    hydrate(remote, false);
-    return { source: 'server-awaiting-verification', verified: false };
-  }
-
-  const bootstrapResponse = await bootstrapProfile();
-  const bootstrapped = await responseJson(bootstrapResponse, 'Не удалось создать серверный профиль');
-  if (!bootstrapped?.verified) throw new Error('Серверный профиль не подтверждён');
-  hydrate(bootstrapped, true);
-  return { source: 'server-bootstrap', verified: true };
+  hydrate(remote, false);
+  return { source: 'server-unverified', verified: false };
 }
