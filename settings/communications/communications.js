@@ -100,7 +100,10 @@ function renderTemplateGroup(root, navigateBack, audience, title, templates) {
     data: `data-notification-template="${index}"`,
     aria: `Открыть шаблон ${template.name}`,
   }));
-  root.innerHTML = `${pageHeader(title)}${items.length ? folderList(items) : emptyState('Шаблонов нет', 'Для этой группы шаблоны не настроены.')}${actionBlock(button('Назад', { variant: 'secondary', data: 'data-notification-group-back' }))}`;
+  const masterMessageInfo = audience === 'MASTER'
+    ? '<div class="action-block"><strong>Новое сообщение клиента</strong><div class="muted">Отдельный шаблон не нужен: мастеру показывается само сообщение клиента и счётчик непрочитанных.</div></div>'
+    : '';
+  root.innerHTML = `${pageHeader(title)}${masterMessageInfo}${items.length ? folderList(items) : emptyState('Шаблонов нет', 'Для этой группы шаблоны не настроены.')}${actionBlock(button('Назад', { variant: 'secondary', data: 'data-notification-group-back' }))}`;
   root.querySelector('[data-notification-group-back]')?.addEventListener('click', navigateBack);
   root.querySelectorAll('[data-notification-template]').forEach((node) => node.addEventListener('click', () => {
     const template = templates[Number(node.dataset.notificationTemplate)];
