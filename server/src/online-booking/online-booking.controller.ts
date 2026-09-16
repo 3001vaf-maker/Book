@@ -285,12 +285,31 @@ export class OnlineBookingController {
   async createRequest(@Param('tenantId') tenantId: string, @Req() request: AccountRequest, @Body() body: Record<string, any>) {
     const accountId = request.bookingAccountAuth!.accountId;
     const created = await this.booking.createRequest(tenantId, accountId, body || {});
+    const createdValue = created as any;
+    const procedureNames = Array.isArray(createdValue?.procedures)
+      ? createdValue.procedures.map((item: any) => String(item?.name || '').trim()).filter(Boolean)
+      : [];
+    const bookingDetails = [
+      String(createdValue?.date || '').trim(),
+      String(createdValue?.from || '').trim(),
+      procedureNames.join(', '),
+    ].filter(Boolean).join(' · ');
+    await this.communications.recordMessage(tenantId, {
+      bookingAccountId: accountId,
+      direction: 'system',
+      kind: 'system',
+      channel: 'IN_APP',
+      body: `Новая онлайн-запись${bookingDetails ? ` · ${bookingDetails}` : ''}`,
+      externalMessageId: `booking-request:${String(createdValue?.id || '')}`,
+      externalThreadId: 'booking',
+      status: 'delivered',
+    }).catch(() => null);
     await this.notifications.createForAccount(tenantId, accountId, {
       type: 'booking.created',
       title: 'Запись создана',
       body: 'Новая запись добавлена в ваш клиентский аккаунт.',
       entityType: 'booking-request',
-      entityId: String((created as any)?.id || ''),
+      entityId: String(createdValue?.id || ''),
     });
     return created;
   }
