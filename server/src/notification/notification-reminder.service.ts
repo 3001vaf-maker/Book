@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma.service';
+import { TenantTimeZoneService } from '../profile/tenant-time-zone.service';
 import { BookingLifecycleNotificationService } from './booking-lifecycle-notification.service';
 import { NotificationTemplateService } from './notification-template.service';
 
@@ -25,15 +26,11 @@ function objectValue(value: unknown): JsonObject {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonObject : {};
 }
 
-function reminderTimeZone() {
-  return text(process.env.BOOK_TIME_ZONE) || 'Europe/Moscow';
-}
-
-function zonedWallClockMinute(now: Date) {
+function zonedWallClockMinute(now: Date, timeZone: string) {
   let parts: Intl.DateTimeFormatPart[] = [];
   try {
     parts = new Intl.DateTimeFormat('en-GB', {
-      timeZone: reminderTimeZone(),
+      timeZone,
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -85,6 +82,7 @@ export class NotificationReminderService implements OnModuleInit, OnModuleDestro
     private readonly prisma: PrismaService,
     private readonly lifecycle: BookingLifecycleNotificationService,
     private readonly templates: NotificationTemplateService,
+    private readonly timeZones: TenantTimeZoneService,
   ) {}
 
   onModuleInit() {
@@ -182,11 +180,14 @@ export class NotificationReminderService implements OnModuleInit, OnModuleDestro
         current.push(rule);
         byTenant.set(rule.tenantId, current);
       }
-      const currentMinute = zonedWallClockMinute(now);
 
       for (const [tenantId, tenantRules] of byTenant) {
-        const template = await this.templates.get(tenantId, 'booking.reminder');
+        const [template, timeZone] = await Promise.all([
+          this.templates.get(tenantId, 'booking.reminder'),
+          this.timeZones.get(tenantId),
+        ]);
         if (!template.enabled) continue;
+        const currentMinute = zonedWallClockMinute(now, timeZone);
         const [recordRows, eventRows] = await Promise.all([
           this.prisma.businessRecord.findMany({
             where: { tenantId },
