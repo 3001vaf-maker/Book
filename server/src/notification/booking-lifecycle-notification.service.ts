@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { BookingRequestStatus } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { NotificationService } from './notification.service';
-import { NotificationTemplateService } from './notification-template.service';
+import { bookingTemplateValues, NotificationTemplateService } from './notification-template.service';
 
 type JsonObject = Record<string, any>;
 
@@ -44,6 +44,14 @@ function serviceNames(record: JsonObject) {
     .map((item) => text(item?.name))
     .filter(Boolean)
     .join(', ');
+}
+
+function clientName(record: JsonObject) {
+  const client = objectValue(record.client);
+  return [text(client.name), text(client.surname)].filter(Boolean).join(' ').trim()
+    || text(client.phone)
+    || text(client.id)
+    || text(client.key);
 }
 
 @Injectable()
@@ -108,11 +116,13 @@ export class BookingLifecycleNotificationService {
 
   private templateValues(record: JsonObject) {
     const schedule = scheduleOf(record);
-    return {
+    return bookingTemplateValues({
+      client: clientName(record),
       date: schedule.date,
-      time: schedule.from,
+      from: schedule.from,
+      to: schedule.to,
       services: serviceNames(record),
-    };
+    });
   }
 
   private async sendClient(tenantId: string, accountId: string, eventType: string, record: JsonObject) {
@@ -142,6 +152,14 @@ export class BookingLifecycleNotificationService {
     });
   }
 
+  private async eventTypesForRecord(tenantId: string, recordId: string) {
+    const rows = await this.prisma.businessRecordEvent.findMany({
+      where: { tenantId, recordId },
+      select: { data: true },
+    });
+    return new Set(rows.map((row) => text(objectValue(row.data).type)).filter(Boolean));
+  }
+
   async afterRecordUpsert(tenantId: string, beforeValue: unknown, afterValue: unknown) {
     const before = beforeValue ? objectValue(beforeValue) : null;
     const after = objectValue(afterValue);
@@ -165,7 +183,10 @@ export class BookingLifecycleNotificationService {
   async afterRecordEventUpsert(tenantId: string, eventValue: unknown, alreadyExisted: boolean) {
     if (alreadyExisted) return { notified: false, reason: 'existing-event' };
     const event = objectValue(eventValue);
-    if (text(event.type) !== 'cancelled') return { notified: false, reason: 'unsupported-event' };
+    const eventType = text(event.type);
+    if (eventType !== 'cancelled' && eventType !== 'completed') {
+      return { notified: false, reason: 'unsupported-event' };
+    }
 
     const recordId = text(event.recordId);
     if (!recordId) return { notified: false, reason: 'missing-record' };
@@ -176,15 +197,26 @@ export class BookingLifecycleNotificationService {
     if (!row) return { notified: false, reason: 'missing-record' };
     const record = objectValue(row.data);
     const accountId = await this.accountIdForRecord(tenantId, record);
-    const request = await this.requestForRecord(tenantId, record);
-    if (request && request.status !== BookingRequestStatus.CANCELLED) {
-      await this.prisma.bookingRequest.update({
-        where: { id: request.id },
-        data: { status: BookingRequestStatus.CANCELLED },
-      });
+
+    if (eventType === 'cancelled') {
+      const request = await this.requestForRecord(tenantId, record);
+      if (request && request.status !== BookingRequestStatus.CANCELLED) {
+        await this.prisma.bookingRequest.update({
+          where: { id: request.id },
+          data: { status: BookingRequestStatus.CANCELLED },
+        });
+      }
+      if (!accountId) return { notified: false, reason: 'no-client-account' };
+      await this.sendClient(tenantId, accountId, 'booking.cancelled', record);
+      return { notified: true, eventType: 'booking.cancelled' };
+    }
+
+    const eventTypes = await this.eventTypesForRecord(tenantId, recordId);
+    if (eventTypes.has('cancelled') || eventTypes.has('no-show')) {
+      return { notified: false, reason: 'record-not-completable' };
     }
     if (!accountId) return { notified: false, reason: 'no-client-account' };
-    await this.sendClient(tenantId, accountId, 'booking.cancelled', record);
-    return { notified: true, eventType: 'booking.cancelled' };
+    await this.sendClient(tenantId, accountId, 'booking.completed', record);
+    return { notified: true, eventType: 'booking.completed' };
   }
 }
