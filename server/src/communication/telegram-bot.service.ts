@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from 'node:crypto';
 import { ConsentPolicyService } from '../document-state/consent-policy.service';
+import { LegalRuntimeService } from '../legal-runtime/legal-runtime.service';
 import { NotificationService } from '../notification/notification.service';
 import { PrismaService } from '../prisma.service';
 import { CommunicationService } from './communication.service';
@@ -39,6 +40,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     private readonly communications: CommunicationService,
     private readonly notifications: NotificationService,
     private readonly consentPolicy: ConsentPolicyService,
+    private readonly legal: LegalRuntimeService,
   ) {}
 
   onModuleInit() {
@@ -177,6 +179,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
   }
 
   async sendMessage(tenantId: string, telegramUserId: string, body: string) {
+    await this.legal.assertTenantLive(tenantId, '', 'TELEGRAM_DIRECT_SEND');
     const row = await this.rowForTenant(tenantId); if (!row) throw new NotFoundException('Telegram-бот не подключён');
     return this.telegramApi(this.decryptToken(row), 'sendMessage', { chat_id: telegramUserId, text: body });
   }
@@ -184,6 +187,11 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
   async sendChatMessage(tenantId: string, input: { phone?: unknown; uei?: unknown; body?: unknown }) {
     const body = text(input?.body); if (!body) throw new BadRequestException('Пустое сообщение');
     const identity = await this.communications.telegramIdentity(tenantId, input || {}); if (!identity) throw new NotFoundException('Telegram у клиента не подключён');
+    await this.legal.assertExternalCommunication(tenantId, {
+      purpose: 'DIALOG',
+      channel: 'TELEGRAM',
+      destination: identity.externalUserId,
+    });
     if (!(await this.consentPolicy.canSendMessages(tenantId, 'TELEGRAM', identity.externalUserId))) throw new BadRequestException('Нет действующего согласия на этот Telegram Contact Point');
     try {
       const result = await this.sendMessage(tenantId, identity.externalUserId, body);
@@ -206,6 +214,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       const token = this.decryptToken(connection); const deliveries = await this.notifications.pendingTelegramDeliveries(tenantId, limit);
       for (const delivery of deliveries) {
         try {
+          await this.legal.assertTenantLive(tenantId, '', 'TELEGRAM_NOTIFICATION_DELIVERY');
           const allowed = await this.notifications.canSendTelegramDelivery(tenantId, delivery.notificationId);
           if (!allowed) { await this.notifications.markTelegramFailed(tenantId, delivery.deliveryId, 'messages-consent отсутствует или отозван'); failed += 1; continue; }
           await this.telegramApi(token, 'sendMessage', { chat_id: delivery.recipientKey, text: delivery.body || delivery.title });
@@ -223,6 +232,11 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     `;
     const connection = rows[0]; if (!connection) throw new NotFoundException('Telegram webhook не найден');
     if (sha256(text(secretToken)) !== connection.webhookSecretHash) throw new UnauthorizedException('Некорректный Telegram webhook secret');
+    try {
+      await this.legal.assertTenantLive(connection.tenantId, '', 'TELEGRAM_WEBHOOK');
+    } catch {
+      return { ok: true, ignored: true };
+    }
     const message = update?.message; if (!message?.from?.id || !message?.chat?.id) return { ok: true };
     const telegramUserId = String(message.from.id); const username = telegramUsername(message.from.username); const messageBody = text(message.text || message.caption);
     const isStart = /^\/start(?:@\w+)?(?:\s|$)/i.test(messageBody);
