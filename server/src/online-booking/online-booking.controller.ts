@@ -5,6 +5,7 @@ import { ClientContactRouteService } from '../communication/client-contact-route
 import { CommunicationService } from '../communication/communication.service';
 import { ConsentPolicyService } from '../document-state/consent-policy.service';
 import { NotificationService } from '../notification/notification.service';
+import { NotificationTemplateService } from '../notification/notification-template.service';
 import { WebPushService } from '../notification/web-push.service';
 import { BookingAccountGuard } from './booking-account.guard';
 import { BookingRequiredConsentGuard } from './booking-required-consent.guard';
@@ -19,6 +20,7 @@ export class OnlineBookingController {
   constructor(
     private readonly booking: OnlineBookingService,
     private readonly notifications: NotificationService,
+    private readonly templates: NotificationTemplateService,
     private readonly communications: CommunicationService,
     private readonly contactRoutes: ClientContactRouteService,
     private readonly consents: ConsentPolicyService,
@@ -289,28 +291,34 @@ export class OnlineBookingController {
     const procedureNames = Array.isArray(createdValue?.procedures)
       ? createdValue.procedures.map((item: any) => String(item?.name || '').trim()).filter(Boolean)
       : [];
-    const bookingDetails = [
-      String(createdValue?.date || '').trim(),
-      String(createdValue?.from || '').trim(),
-      procedureNames.join(', '),
-    ].filter(Boolean).join(' · ');
+    const account = await this.booking.getAccount(tenantId, accountId);
+    const values = {
+      client: [account.name, account.surname].filter(Boolean).join(' ').trim() || account.phone,
+      date: String(createdValue?.date || '').trim(),
+      time: String(createdValue?.from || '').trim(),
+      services: procedureNames.join(', '),
+    };
+    const [ownerTemplate, clientTemplate] = await Promise.all([
+      this.templates.render(tenantId, 'owner.booking.created', values),
+      this.templates.render(tenantId, 'booking.created', values),
+    ]);
     await this.communications.recordMessage(tenantId, {
       bookingAccountId: accountId,
       direction: 'system',
       kind: 'system',
       channel: 'IN_APP',
-      body: `Новая онлайн-запись${bookingDetails ? ` · ${bookingDetails}` : ''}`,
+      body: [ownerTemplate.title, ownerTemplate.body].filter(Boolean).join('\n'),
       externalMessageId: `booking-request:${String(createdValue?.id || '')}`,
       externalThreadId: 'booking',
       status: 'delivered',
     }).catch(() => null);
     await this.notifications.createForAccount(tenantId, accountId, {
       type: 'booking.created',
-      title: 'Запись создана',
-      body: 'Новая запись добавлена в ваш клиентский аккаунт.',
+      title: clientTemplate.title,
+      body: clientTemplate.body,
       entityType: 'booking-request',
       entityId: String(createdValue?.id || ''),
-    });
+    }).catch(() => null);
     return created;
   }
 }
