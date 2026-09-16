@@ -5,7 +5,7 @@ import { ClientContactRouteService } from '../communication/client-contact-route
 import { CommunicationService } from '../communication/communication.service';
 import { ConsentPolicyService } from '../document-state/consent-policy.service';
 import { NotificationService } from '../notification/notification.service';
-import { NotificationTemplateService } from '../notification/notification-template.service';
+import { bookingTemplateValues, NotificationTemplateService } from '../notification/notification-template.service';
 import { WebPushService } from '../notification/web-push.service';
 import { BookingAccountGuard } from './booking-account.guard';
 import { BookingRequiredConsentGuard } from './booking-required-consent.guard';
@@ -292,12 +292,13 @@ export class OnlineBookingController {
       ? createdValue.procedures.map((item: any) => String(item?.name || '').trim()).filter(Boolean)
       : [];
     const account = await this.booking.getAccount(tenantId, accountId);
-    const values = {
+    const values = bookingTemplateValues({
       client: [account.name, account.surname].filter(Boolean).join(' ').trim() || account.phone,
-      date: String(createdValue?.date || '').trim(),
-      time: String(createdValue?.from || '').trim(),
+      date: createdValue?.date,
+      from: createdValue?.from,
+      to: createdValue?.to,
       services: procedureNames.join(', '),
-    };
+    });
     const [ownerTemplate, clientTemplate] = await Promise.all([
       this.templates.render(tenantId, 'owner.booking.created', values),
       this.templates.render(tenantId, 'booking.created', values),
