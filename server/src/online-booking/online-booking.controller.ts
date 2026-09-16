@@ -252,7 +252,7 @@ export class OnlineBookingController {
     const accountId = request.bookingAccountAuth!.accountId;
     const profiles = await this.contactRoutes.accessibleProfilesForAccount(tenantId, accountId);
     const threads = await Promise.all(profiles.map((profile) => this.communications.listThread(tenantId, { profileKey: profile.profileKey }, 500)));
-    const merged = threads.flat().sort((left, right) => {
+    const merged = threads.flat().filter((message) => String(message.channel || '').toUpperCase() !== 'OWNER_IN_APP').sort((left, right) => {
       const byTime = new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime();
       return byTime || String(left.id).localeCompare(String(right.id));
     });
@@ -306,7 +306,7 @@ export class OnlineBookingController {
       bookingAccountId: accountId,
       direction: 'system',
       kind: 'system',
-      channel: 'IN_APP',
+      channel: 'OWNER_IN_APP',
       body: [ownerTemplate.title, ownerTemplate.body].filter(Boolean).join('\n'),
       externalMessageId: `booking-request:${String(createdValue?.id || '')}`,
       externalThreadId: 'booking',
