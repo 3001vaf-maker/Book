@@ -1,4 +1,5 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Post, Req } from '@nestjs/common';
+import type { Request } from 'express';
 import { MasterInvitationService } from './master-invitation.service';
 
 @Controller('master-invitations')
@@ -11,7 +12,23 @@ export class MasterInvitationController {
   }
 
   @Post('accept')
-  accept(@Body() body: { token?: unknown; password?: unknown }) {
-    return this.invitations.accept(body || {});
+  accept(
+    @Req() request: Request,
+    @Body() body: {
+      token?: unknown;
+      password?: unknown;
+      saasAgreementAccepted?: unknown;
+      privacyAcknowledged?: unknown;
+      pdConsentAccepted?: unknown;
+      marketingConsentAccepted?: unknown;
+    },
+  ) {
+    return this.invitations.accept({
+      ...(body || {}),
+      technicalEvidence: {
+        ip: request.ip || '',
+        userAgent: request.headers['user-agent'] || '',
+      },
+    });
   }
 }
