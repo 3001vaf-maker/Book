@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { LegalRuntimeService } from '../legal-runtime/legal-runtime.service';
 import { CommunicationBroadcastService } from './communication-broadcast.service';
 import { CommunicationDispatchService } from './communication-dispatch.service';
 import { CommunicationHistoryService } from './communication-history.service';
@@ -17,6 +18,7 @@ export class CommunicationController {
     private readonly history: CommunicationHistoryService,
     private readonly dispatch: CommunicationDispatchService,
     private readonly broadcasts: CommunicationBroadcastService,
+    private readonly legal: LegalRuntimeService,
   ) {}
 
   @UseGuards(JwtAuthGuard)
@@ -55,7 +57,8 @@ export class CommunicationController {
 
   @UseGuards(JwtAuthGuard)
   @Put('chat/preferences')
-  saveChatPreferences(@Req() request: OwnerRequest, @Body() body: { phone?: unknown; uei?: unknown; preferredChannels?: unknown }) {
+  async saveChatPreferences(@Req() request: OwnerRequest, @Body() body: { phone?: unknown; uei?: unknown; preferredChannels?: unknown }) {
+    await this.legal.assertRealClientMutation(request.auth!.tenantId, request.auth!.userId);
     return this.history.savePreferences(request.auth!.tenantId, body || {});
   }
 
@@ -71,13 +74,15 @@ export class CommunicationController {
 
   @UseGuards(JwtAuthGuard)
   @Patch('chat/messages/:messageId')
-  editChatMessage(@Req() request: OwnerRequest, @Param('messageId') messageId: string, @Body() body: { body?: unknown; content?: unknown }) {
+  async editChatMessage(@Req() request: OwnerRequest, @Param('messageId') messageId: string, @Body() body: { body?: unknown; content?: unknown }) {
+    await this.legal.assertRealClientMutation(request.auth!.tenantId, request.auth!.userId);
     return this.communications.editMessage(request.auth!.tenantId, messageId, { side: 'master' }, body || {});
   }
 
   @UseGuards(JwtAuthGuard)
   @Delete('chat/messages/:messageId')
-  deleteChatMessage(@Req() request: OwnerRequest, @Param('messageId') messageId: string) {
+  async deleteChatMessage(@Req() request: OwnerRequest, @Param('messageId') messageId: string) {
+    await this.legal.assertRealClientMutation(request.auth!.tenantId, request.auth!.userId);
     return this.communications.deleteMessage(request.auth!.tenantId, messageId, { side: 'master' });
   }
 
@@ -101,13 +106,17 @@ export class CommunicationController {
 
   @UseGuards(JwtAuthGuard)
   @Post('broadcasts/groups')
-  saveBroadcastGroup(@Req() request: OwnerRequest, @Body() body: { id?: unknown; name?: unknown; personKeys?: unknown }) {
+  async saveBroadcastGroup(@Req() request: OwnerRequest, @Body() body: { id?: unknown; name?: unknown; personKeys?: unknown }) {
+    await this.legal.assertRealClientMutation(request.auth!.tenantId, request.auth!.userId);
     return this.broadcasts.saveGroup(request.auth!.tenantId, body || {});
   }
 
   @UseGuards(JwtAuthGuard)
   @Delete('broadcasts/groups/:id')
-  deleteBroadcastGroup(@Req() request: OwnerRequest, @Param('id') id: string) { return this.broadcasts.deleteGroup(request.auth!.tenantId, id); }
+  async deleteBroadcastGroup(@Req() request: OwnerRequest, @Param('id') id: string) {
+    await this.legal.assertRealClientMutation(request.auth!.tenantId, request.auth!.userId);
+    return this.broadcasts.deleteGroup(request.auth!.tenantId, id);
+  }
 
   @UseGuards(JwtAuthGuard)
   @Post('broadcasts/preview')
@@ -117,7 +126,8 @@ export class CommunicationController {
 
   @UseGuards(JwtAuthGuard)
   @Post('broadcasts/send')
-  sendBroadcast(@Req() request: OwnerRequest, @Body() body: { channel?: unknown; all?: unknown; phones?: unknown; personKeys?: unknown; groupId?: unknown; name?: unknown; body?: unknown }) {
+  async sendBroadcast(@Req() request: OwnerRequest, @Body() body: { channel?: unknown; all?: unknown; phones?: unknown; personKeys?: unknown; groupId?: unknown; name?: unknown; body?: unknown }) {
+    await this.legal.assertTenantLive(request.auth!.tenantId, request.auth!.userId, 'MARKETING_BROADCAST');
     return this.broadcasts.send(request.auth!.tenantId, body || {});
   }
 
