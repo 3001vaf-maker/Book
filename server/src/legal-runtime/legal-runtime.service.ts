@@ -624,6 +624,7 @@ export class LegalRuntimeService {
 
   async recordRegistrationFacts(userId: string, tenantId: string, input: {
     saasAgreementAccepted?: unknown;
+    dpaAccepted?: unknown;
     privacyAcknowledged?: unknown;
     pdConsentAccepted?: unknown;
     marketingConsentAccepted?: unknown;
@@ -640,7 +641,7 @@ export class LegalRuntimeService {
       'privacy-policy': { accepted: input?.privacyAcknowledged === true, action: 'ACKNOWLEDGED' },
       'master-pd-consent': { accepted: input?.pdConsentAccepted === true, action: 'CONSENTED' },
       'marketing-consent': { accepted: input?.marketingConsentAccepted === true, action: 'CONSENTED' },
-      'dpa': { accepted: input?.saasAgreementAccepted === true, action: 'ACCEPTED' },
+      'dpa': { accepted: input?.dpaAccepted === true, action: 'ACCEPTED' },
     };
     for (const document of required) {
       const fact = factByKey[document.key];
