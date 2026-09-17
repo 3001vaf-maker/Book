@@ -2,7 +2,6 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { JwtService } from '@nestjs/jwt';
 import { createHash, randomBytes } from 'node:crypto';
 import { CommunicationService } from '../communication/communication.service';
-import { ConsentPolicyService } from '../document-state/consent-policy.service';
 import { PrismaService } from '../prisma.service';
 import { OnlineBookingService } from './online-booking.service';
 import { TelegramWebAppAuthService } from './telegram-webapp-auth.service';
@@ -43,7 +42,6 @@ export class TelegramBookingAuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly communications: CommunicationService,
-    private readonly consents: ConsentPolicyService,
     private readonly booking: OnlineBookingService,
     private readonly webAppAuth: TelegramWebAppAuthService,
   ) {}
@@ -169,20 +167,6 @@ export class TelegramBookingAuthService {
       where: { id: created.account.id },
       data: { telegramId: ticket.telegramUserId },
     });
-
-    const consentFacts = Array.isArray(body?.consents) ? body.consents : [];
-    const messagesAccepted = consentFacts.some((item) => (
-      text(item?.documentId) === 'messages-consent' && item?.accepted === true
-    ));
-    if (messagesAccepted) {
-      await this.consents.acceptContactPointConsent(
-        tenantId,
-        'TELEGRAM',
-        ticket.telegramUserId,
-        'messages-consent',
-        'telegram-passwordless-registration',
-      );
-    }
 
     return {
       ...created,

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createUEI, detachUEI, hydrateUEIFromServer, linkUEI } from '../core/uei.js';
 import { getClients, hydrateClientsFromServer } from '../main/clients/data.js';
-import { hydrateConsentsFromServer } from '../settings/documents/consents.js';
+import { getConsents, hydrateConsentsFromServer } from '../settings/documents/consents.js';
 
 hydrateClientsFromServer([
   { key: 'manual', name: 'Анна', phones: ['+79030000001'], accounts: [] },
@@ -31,10 +31,12 @@ hydrateConsentsFromServer([
   },
 ]);
 
+assert.equal(getConsents().some((item) => item.documentId === 'messages-consent'), true, 'legacy messages-consent evidence must remain available as history');
+
 let clients = getClients();
 assert.equal(clients.length, 2);
 assert.equal(clients.find((item) => item.key === 'registered')?.agreements.personalData, true);
-assert.equal(clients.find((item) => item.key === 'registered')?.agreements.mailings, true);
+assert.equal(clients.find((item) => item.key === 'registered')?.agreements.mailings, false, 'legacy messages-consent must not become active mailing permission');
 
 createUEI({ entityType: 'person', entityId: 'manual', value: 'A1', identifiers: ['+79030000001'] });
 linkUEI({ entityType: 'person', entityId: 'registered', value: '00A1', identifiers: ['+79030000002'] });
@@ -43,13 +45,13 @@ clients = getClients();
 assert.equal(clients.length, 1);
 assert.equal(clients[0].key, 'manual');
 assert.equal(clients[0].agreements.personalData, true);
-assert.equal(clients[0].agreements.mailings, true);
+assert.equal(clients[0].agreements.mailings, false);
 
 detachUEI({ entityType: 'person', entityId: 'registered', uei: '00A1', explicit: true });
 clients = getClients();
 assert.equal(clients.length, 2);
 assert.equal(clients.find((item) => item.key === 'registered')?.agreements.personalData, true);
-assert.equal(clients.find((item) => item.key === 'registered')?.agreements.mailings, true);
+assert.equal(clients.find((item) => item.key === 'registered')?.agreements.mailings, false);
 assert.equal(clients.find((item) => item.key === 'manual')?.agreements.personalData, false);
 assert.equal(clients.find((item) => item.key === 'manual')?.agreements.mailings, false);
 

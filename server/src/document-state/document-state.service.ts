@@ -21,6 +21,7 @@ type ConsentEventRow = {
 };
 
 const MUTABLE_DATASETS = new Set(['documents', 'history']);
+const RETIRED_ACTIVE_DOCUMENT_IDS = new Set(['messages-consent']);
 
 function objectValue(value: unknown): JsonObject {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonObject : {};
@@ -37,6 +38,12 @@ function normalize(value: unknown) {
     consents: Array.isArray(source.consents) ? clone(source.consents) : [],
     history: Array.isArray(source.history) ? clone(source.history) : [],
   };
+}
+
+function activeDocuments(value: unknown) {
+  return (Array.isArray(value) ? value : [])
+    .filter((item) => !RETIRED_ACTIVE_DOCUMENT_IDS.has(String(item?.id || '').trim()))
+    .map((item) => clone(item));
 }
 
 function stable(value: any): any {
@@ -91,6 +98,7 @@ export class DocumentStateService {
   private async snapshot(tenantId: string) {
     const state = await this.prisma.businessDocumentState.findUnique({ where: { tenantId } });
     const data = normalize(state?.data || {});
+    data.documents = activeDocuments(data.documents);
     if (state?.migrationVerifiedAt) data.consents = await this.canonicalConsentEvents(tenantId);
     else data.consents = [];
     return {
@@ -124,8 +132,10 @@ export class DocumentStateService {
   async bootstrap(tenantId: string, body: unknown) {
     const existing = await this.prisma.businessDocumentState.findUnique({ where: { tenantId } });
     if (!existing) {
+      const data = normalize(body);
+      data.documents = activeDocuments(data.documents);
       await this.prisma.businessDocumentState.create({
-        data: { tenantId, data: json(normalize(body)), migrationVerifiedAt: new Date() },
+        data: { tenantId, data: json(data), migrationVerifiedAt: new Date() },
       });
     }
     return this.snapshot(tenantId);
@@ -141,7 +151,9 @@ export class DocumentStateService {
     const current = normalize(state.data);
     const source = objectValue(body);
     const value = source.value;
-    current[dataset as 'documents' | 'history'] = Array.isArray(value) ? clone(value) : [];
+    current[dataset as 'documents' | 'history'] = dataset === 'documents'
+      ? activeDocuments(value)
+      : (Array.isArray(value) ? clone(value) : []);
     await this.prisma.businessDocumentState.update({ where: { tenantId }, data: { data: json(current) } });
     return { dataset, value: current[dataset as 'documents' | 'history'] };
   }
@@ -149,6 +161,6 @@ export class DocumentStateService {
   async publicDocuments(tenantId: string) {
     const state = await this.prisma.businessDocumentState.findUnique({ where: { tenantId } });
     if (!state?.migrationVerifiedAt) throw new ConflictException('Документы для онлайн-записи ещё не готовы');
-    return normalize(state.data).documents;
+    return activeDocuments(normalize(state.data).documents);
   }
 }

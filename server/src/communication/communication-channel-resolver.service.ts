@@ -1,5 +1,4 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { ConsentPolicyService } from '../document-state/consent-policy.service';
 import { PrismaService } from '../prisma.service';
 import { ClientContactRouteService } from './client-contact-route.service';
 import { ClientProfileThreadService } from './client-profile-thread.service';
@@ -30,7 +29,6 @@ export class CommunicationChannelResolverService {
     private readonly profiles: ClientProfileThreadService,
     private readonly contactRoutes: ClientContactRouteService,
     private readonly communications: CommunicationService,
-    private readonly consentPolicy: ConsentPolicyService,
     private readonly telegram: TelegramBotService,
   ) {}
 
@@ -115,9 +113,6 @@ export class CommunicationChannelResolverService {
     const subject = await this.sourceProfile(tenantId, input || {});
     const identity = await this.resolveTelegramIdentity(tenantId, input || {});
     if (!identity) throw new NotFoundException('Telegram у клиента не подключён');
-    if (!(await this.consentPolicy.canSendMessages(tenantId, 'TELEGRAM', identity.externalUserId))) {
-      throw new BadRequestException('Нет действующего согласия на этот Telegram Contact Point');
-    }
     const threadPhone = canonicalPhone(input?.phone);
     const threadUei = text(subject?.profileUei) || text(input?.uei);
     const threadProfileKey = text(subject?.profileKey) || text(input?.profileKey);

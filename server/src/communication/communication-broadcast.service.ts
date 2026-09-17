@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, HttpException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { BusinessStateService } from '../business-state/business-state.service';
-import { ConsentPolicyService } from '../document-state/consent-policy.service';
+import { MarketingConsentService } from '../legal-runtime/marketing-consent.service';
 import { PrismaService } from '../prisma.service';
 import { CommunicationChannelResolverService } from './communication-channel-resolver.service';
 import { CommunicationDispatchService } from './communication-dispatch.service';
@@ -27,7 +27,7 @@ export class CommunicationBroadcastService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly businessState: BusinessStateService,
-    private readonly documents: ConsentPolicyService,
+    private readonly marketing: MarketingConsentService,
     private readonly channels: CommunicationChannelResolverService,
     private readonly dispatch: CommunicationDispatchService,
   ) {}
@@ -230,7 +230,8 @@ export class CommunicationBroadcastService {
     for (const person of requested) {
       const destination = await this.channelDestination(tenantId, channel, person);
       if (!destination) { excluded.push({ personKey: person.personKey, phone: person.phone, reason: 'no-channel' }); continue; }
-      if (!(await this.documents.canSendMessages(tenantId, channel, destination))) { excluded.push({ personKey: person.personKey, phone: person.phone, reason: 'no-consent' }); continue; }
+      const consent = await this.marketing.state(tenantId, destination);
+      if (!consent.allowed) { excluded.push({ personKey: person.personKey, phone: person.phone, reason: 'no-marketing-consent' }); continue; }
       audience.push(person);
     }
     return { channel, requestedCount: requested.length, eligibleCount: audience.length, excludedCount: excluded.length, audience, excluded };
@@ -251,7 +252,7 @@ export class CommunicationBroadcastService {
     const name = text(input?.name) || 'Сообщение'; const body = text(input?.body);
     if (!body) throw new BadRequestException('Введите текст сообщения');
     const preview = await this.preview(tenantId, input || {});
-    if (!preview.eligibleCount) throw new BadRequestException('Нет клиентов, которым можно отправить сообщение');
+    if (!preview.eligibleCount) throw new BadRequestException('Нет клиентов, которым можно отправить маркетинговое сообщение');
     if (preview.channel !== 'TELEGRAM') throw new BadRequestException(`Транспорт ${preview.channel} пока не подключён к массовой отправке`);
     await this.ensureRateLimit(tenantId, preview.eligibleCount);
     const runId = randomUUID();
@@ -263,7 +264,14 @@ export class CommunicationBroadcastService {
     for (const recipient of preview.audience) {
       try {
         const renderedBody = this.renderTemplate(body, recipient);
-        await this.dispatch.send(tenantId, { profileKey: recipient.personKey, phone: recipient.phone, uei: recipient.uei, channel: preview.channel, body: renderedBody });
+        await this.dispatch.send(tenantId, {
+          profileKey: recipient.personKey,
+          phone: recipient.phone,
+          uei: recipient.uei,
+          channel: preview.channel,
+          body: renderedBody,
+          purpose: 'MARKETING',
+        });
         sentCount += 1;
       } catch (error) {
         failedCount += 1;

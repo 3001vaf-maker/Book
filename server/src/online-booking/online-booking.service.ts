@@ -339,10 +339,6 @@ export class OnlineBookingService {
           clientCardExisted: false,
         };
     await this.consentPolicy.acceptAccountConsents(tenantId, account.id, consents, 'online-booking-registration');
-    if (consents.some((item) => item.documentId === 'messages-consent' && item.accepted)) {
-      await this.consentPolicy.acceptContactPointConsent(tenantId, 'PHONE', account.phone, 'messages-consent', 'online-booking-registration');
-      await this.consentPolicy.acceptContactPointConsent(tenantId, 'EMAIL', account.email, 'messages-consent', 'online-booking-registration');
-    }
     return {
       accessToken: await this.issueAccountToken(account),
       account: await this.accountView(tenantId, account),
