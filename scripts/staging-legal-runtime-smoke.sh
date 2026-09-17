@@ -142,6 +142,46 @@ node -e 'const p=JSON.parse(process.argv[1]);if(p.state?.filingStatus!=="SUBMITT
 manual_live=$(curl -fsS -X POST "${manual_auth[@]}" "$base/legal/live")
 node -e 'const p=JSON.parse(process.argv[1]);if(p.state?.operationMode!=="LIVE")process.exit(1)' "$manual_live"
 
+# The email invitation path must enforce the same legal package and enter DEMO.
+email_token="staging-email-legal-token"
+email_hash=$(node -e 'const {createHash}=require("crypto");process.stdout.write(createHash("sha256").update(process.argv[1]).digest("hex"))' "$email_token")
+email_tenant_id="staging-email-legal-tenant"
+email_invitation_id="staging-email-legal-invitation"
+$compose exec -T db psql -U book -d book_staging -v ON_ERROR_STOP=1   -v tenant_id="$email_tenant_id" -v invitation_id="$email_invitation_id" -v token_hash="$email_hash" <<'SQL' >/dev/null
+INSERT INTO "Tenant" ("id","name","createdAt","updatedAt")
+VALUES (:'tenant_id','Email Legal Master',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+ON CONFLICT ("id") DO NOTHING;
+INSERT INTO "TenantAccess" ("tenantId","status","isOwnerBook","createdAt","updatedAt")
+VALUES (:'tenant_id','ACTIVE',false,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+ON CONFLICT ("tenantId") DO UPDATE SET "status"='ACTIVE',"isOwnerBook"=false,"updatedAt"=CURRENT_TIMESTAMP;
+INSERT INTO "TenantLegalState" ("tenantId","operationMode","filingStatus","updatedAt")
+VALUES (:'tenant_id','DEMO','NOT_PREPARED',CURRENT_TIMESTAMP)
+ON CONFLICT ("tenantId") DO UPDATE SET "operationMode"='DEMO',"filingStatus"='NOT_PREPARED',"updatedAt"=CURRENT_TIMESTAMP;
+INSERT INTO "MasterInvitation" ("id","tenantId","createdByAdminId","email","name","tokenHash","status","expiresAt","createdAt","updatedAt")
+SELECT :'invitation_id', :'tenant_id', pa."id", 'email-legal-master@book.invalid', 'Email Legal Master', :'token_hash', 'PENDING',
+       CURRENT_TIMESTAMP + INTERVAL '1 day', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+FROM "PlatformAdmin" pa
+LIMIT 1
+ON CONFLICT ("id") DO NOTHING;
+SQL
+
+email_inspect=$(curl -fsS -H 'Content-Type: application/json' -d "{\"token\":\"$email_token\"}" "$base/master-invitations/inspect")
+node -e 'const p=JSON.parse(process.argv[1]);if(p.tenant?.id!=="staging-email-legal-tenant")process.exit(1);const r=Array.isArray(p.legal?.required)?p.legal.required:[];for(const k of ["privacy-policy","saas-agreement","dpa","master-pd-consent"]){if(!r.some(x=>x.key===k))process.exit(1)}' "$email_inspect"
+
+email_documents=$(curl -fsS -H 'Content-Type: application/json' -d '{}' "$base/master-invitations/documents")
+node -e 'const d=JSON.parse(process.argv[1]);if(!Array.isArray(d))process.exit(1);for(const k of ["privacy-policy","saas-agreement","dpa","master-pd-consent"]){if(!d.some(x=>x.key===k))process.exit(1)}' "$email_documents"
+
+email_accept_body=$(node -e 'process.stdout.write(JSON.stringify({
+  token:process.argv[1],password:"EmailLegal123!",
+  saasAgreementAccepted:true,dpaAccepted:true,privacyAcknowledged:true,pdConsentAccepted:true,marketingConsentAccepted:false
+}))' "$email_token")
+email_account=$(curl -fsS -H 'Content-Type: application/json' -d "$email_accept_body" "$base/master-invitations/accept")
+node -e 'const p=JSON.parse(process.argv[1]);if(!p.accessToken||p.legal?.operationMode!=="DEMO"||p.tenant?.id!=="staging-email-legal-tenant")process.exit(1)' "$email_account"
+email_acceptance_count=$($compose exec -T db psql -U book -d book_staging -At -c "SELECT COUNT(*) FROM \"LegalAcceptanceEvent\" WHERE \"tenantId\"='$email_tenant_id' AND \"source\"='master-registration';")
+test "${email_acceptance_count:-0}" -ge 4
+email_dpa=$($compose exec -T db psql -U book -d book_staging -At -c "SELECT COALESCE((\"checklist\"->>'dpaAccepted')::boolean,false) FROM \"TenantLegalState\" WHERE \"tenantId\"='$email_tenant_id';")
+test "$email_dpa" = "t"
+
 # Published legal evidence must be immutable in PostgreSQL itself, not only through service code.
 version_count=$($compose exec -T db psql -U book -d book_staging -At -c 'SELECT COUNT(*) FROM "LegalDocumentVersion";')
 test "${version_count:-0}" -gt 0
