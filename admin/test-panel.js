@@ -19,6 +19,7 @@ function injectButton() {
   const button = document.createElement('button');
   button.type = 'button';
   button.dataset.testPanel = 'true';
+  button.dataset.section = 'test';
   button.textContent = 'Тестирование';
   button.addEventListener('click', () => renderTestPanel());
   nav.append(button);
@@ -39,14 +40,16 @@ function formatDate(value) {
 
 function testItem(item) {
   const registration = item.registered ? 'зарегистрирован' : 'ожидает TEST-регистрацию';
+  const access = item.accessStatus || 'ACTIVE';
+  const disabled = access === 'SUSPENDED';
   return `<div class="admin-test-item">
     <div class="admin-test-item-main">
       <strong>${escapeHtml(item.tenantName)}</strong>
       <small>TEST · ${escapeHtml(item.operationMode || 'DEMO')} · ${escapeHtml(item.filingStatus || 'NOT_PREPARED')} · ${registration}</small>
-      <small>${escapeHtml(item.userEmail || '')}${item.createdAt ? ` · ${formatDate(item.createdAt)}` : ''}</small>
+      <small>Доступ: ${escapeHtml(access)}${item.userEmail ? ` · ${escapeHtml(item.userEmail)}` : ''}${item.createdAt ? ` · ${formatDate(item.createdAt)}` : ''}</small>
     </div>
     <div class="admin-test-actions">
-      <button class="admin-button danger" type="button" data-remove-test="${escapeHtml(item.tenantId)}">Удалить TEST</button>
+      <button class="admin-button danger" type="button" data-remove-test="${escapeHtml(item.tenantId)}" ${disabled ? 'disabled' : ''}>${disabled ? 'TEST отключён' : 'Отключить TEST'}</button>
     </div>
   </div>`;
 }
@@ -108,13 +111,13 @@ async function renderTestPanel() {
 
     content.querySelectorAll('[data-remove-test]').forEach((button) => {
       button.addEventListener('click', async () => {
-        if (!window.confirm('Удалить этот синтетический TEST Book целиком?')) return;
+        if (!window.confirm('Отключить этот синтетический TEST Book? Юридические evidence-записи сохранятся неизменяемыми.')) return;
         button.disabled = true;
         try {
           await testRequest(`/${encodeURIComponent(button.dataset.removeTest)}`, { method: 'DELETE' });
           await renderTestPanel();
         } catch (error) {
-          window.alert(error instanceof Error ? error.message : 'Не удалось удалить TEST Book');
+          window.alert(error instanceof Error ? error.message : 'Не удалось отключить TEST Book');
           button.disabled = false;
         }
       });
