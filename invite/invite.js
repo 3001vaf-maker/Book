@@ -48,9 +48,11 @@ function legalCheckboxes(invitation, documents) {
   const marketing = byKey.get('marketing-consent');
   const rows = [];
 
-  if (saas || dpa) {
-    const must = Boolean((saas && required(saas, invitation)) || (dpa && required(dpa, invitation)));
-    rows.push(`<label class="invite-legal-check"><input name="saasAgreementAccepted" type="checkbox" ${must ? 'required' : ''}> <span>Принимаю договор / оферту SaaS${dpa ? ' и поручение на обработку ПД (DPA)' : ''}.</span></label>`);
+  if (saas) {
+    rows.push(`<label class="invite-legal-check"><input name="saasAgreementAccepted" type="checkbox" ${required(saas, invitation) ? 'required' : ''}> <span>Принимаю договор-оферту на использование Book.</span></label>`);
+  }
+  if (dpa) {
+    rows.push(`<label class="invite-legal-check"><input name="dpaAccepted" type="checkbox" ${required(dpa, invitation) ? 'required' : ''}> <span>Принимаю поручение на обработку персональных данных клиентов (DPA).</span></label>`);
   }
   if (privacy) {
     rows.push(`<label class="invite-legal-check"><input name="privacyAcknowledged" type="checkbox" ${required(privacy, invitation) ? 'required' : ''}> <span>Ознакомился с политикой обработки персональных данных Book.</span></label>`);
@@ -133,6 +135,7 @@ function renderForm(invitation, documents) {
         token,
         password,
         saasAgreementAccepted: data.get('saasAgreementAccepted') === 'on',
+        dpaAccepted: data.get('dpaAccepted') === 'on',
         privacyAcknowledged: data.get('privacyAcknowledged') === 'on',
         pdConsentAccepted: data.get('pdConsentAccepted') === 'on',
         marketingConsentAccepted: data.get('marketingConsentAccepted') === 'on',
