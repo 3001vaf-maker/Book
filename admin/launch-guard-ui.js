@@ -2,7 +2,15 @@ import { apiRequest } from '../core/auth.js';
 
 let checking = false;
 
+function syncInjectedNavState() {
+  const legal = document.querySelector('[data-legal-panel]');
+  if (legal && !legal.dataset.section) legal.dataset.section = 'legal';
+  const test = document.querySelector('[data-test-panel]');
+  if (test && !test.dataset.section) test.dataset.section = 'test';
+}
+
 async function applyLaunchState() {
+  syncInjectedNavState();
   const form = document.querySelector('[data-invite-form]');
   if (!form || form.dataset.launchGuard === 'ready' || checking) return;
   checking = true;
