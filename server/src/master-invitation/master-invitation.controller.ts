@@ -39,6 +39,7 @@ export class MasterInvitationController {
       token?: unknown;
       password?: unknown;
       saasAgreementAccepted?: unknown;
+      dpaAccepted?: unknown;
       privacyAcknowledged?: unknown;
       pdConsentAccepted?: unknown;
       marketingConsentAccepted?: unknown;
