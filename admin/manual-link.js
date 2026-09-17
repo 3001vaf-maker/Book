@@ -2,6 +2,25 @@ import { apiRequest, getAuthToken } from '../core/auth.js';
 
 const BUTTON_ID = 'manual-invite-button';
 const MODAL_ID = 'manual-invite-modal';
+let legalReady = false;
+let legalChecked = false;
+let legalChecking = false;
+
+async function checkLegalReady() {
+  if (legalChecking || legalChecked || !getAuthToken()) return;
+  legalChecking = true;
+  try {
+    const response = await apiRequest('/platform/legal/readiness');
+    const payload = await response.json().catch(() => ({}));
+    legalReady = response.ok && payload?.state?.status === 'LEGAL_READY';
+  } catch {
+    legalReady = false;
+  } finally {
+    legalChecked = true;
+    legalChecking = false;
+    ensureButton();
+  }
+}
 
 function installStyles() {
   if (document.querySelector('#manual-invite-styles')) return;
@@ -78,6 +97,15 @@ async function createManualInvitation(button) {
 
 function ensureButton() {
   if (!getAuthToken()) {
+    document.querySelector(`#${BUTTON_ID}`)?.remove();
+    return;
+  }
+  if (!legalChecked) {
+    document.querySelector(`#${BUTTON_ID}`)?.remove();
+    void checkLegalReady();
+    return;
+  }
+  if (!legalReady) {
     document.querySelector(`#${BUTTON_ID}`)?.remove();
     return;
   }

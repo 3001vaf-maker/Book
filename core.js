@@ -12,7 +12,7 @@ import { initializeAuxiliaryState } from './auxiliary-migration.js';
 import { getJournalTimeUsages, releaseJournalSoftTimeUsages } from './journal/time-usage-source.js';
 import { configureWorkplaceSource } from './core/workplace-time.js';
 import { configureTimeUsageSource, configureSoftTimeUsageReleaseSource } from './core/time/index.js';
-import { getCurrentUser, login } from './core/auth.js';
+import { apiRequest, getCurrentUser, login } from './core/auth.js';
 import { canUseBookCapability, getBookAccess, loadBookAccess } from './core/access.js';
 import { isOnboardingComplete, renderOnboarding } from './onboarding/onboarding.js';
 import { startServerBookingSync } from './online-booking/server-sync.js';
@@ -156,8 +156,252 @@ function renderSuspended() {
   syncViewport();
 }
 
+
+const MASTER_LEGAL_DOCUMENTS = [
+  { key: 'privacy-policy', type: 'PRIVACY_POLICY', title: 'Политика обработки персональных данных мастера', requiredForLive: true, requiredForPublicBooking: true },
+  { key: 'client-pd-consent', type: 'CLIENT_PD_CONSENT', title: 'Согласие клиента на обработку персональных данных', requiredForLive: true, requiredForPublicBooking: true },
+  { key: 'service-offer', type: 'SERVICE_OFFER', title: 'Условия оказания услуг / договор-оферта мастера', requiredForLive: true, requiredForPublicBooking: true },
+  { key: 'marketing-consent', type: 'MARKETING_CONSENT', title: 'Согласие клиента на рекламные и маркетинговые сообщения', requiredForLive: false, requiredForPublicBooking: true },
+];
+
+const MASTER_LEGAL_CHECKLIST_LABELS = {
+  operatorIdentityConfigured: 'Реквизиты оператора зафиксированы',
+  privacyPolicyPublished: 'Политика обработки ПД опубликована',
+  clientDocumentsPrepared: 'Документы для клиентов подготовлены',
+  dpaAccepted: 'Поручение Book на обработку ПД (DPA) принято',
+  rknFilingPrepared: 'Уведомление Роскомнадзора подготовлено',
+};
+
+async function tenantLegalRequest(path, options = {}) {
+  const response = await apiRequest(`/legal${path}`, options);
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.message || 'Ошибка юридической подготовки');
+  return payload;
+}
+
+function masterLegalDocumentByKey(readiness, key) {
+  return (Array.isArray(readiness?.documents) ? readiness.documents : []).find((item) => item.key === key) || null;
+}
+
+function masterLegalIdentity(readiness) {
+  for (const document of Array.isArray(readiness?.documents) ? readiness.documents : []) {
+    const identity = document?.currentVersion?.operatorIdentitySnapshot;
+    if (identity && typeof identity === 'object' && Object.keys(identity).length) return identity;
+  }
+  return {};
+}
+
+async function syncMasterLegalChecklist(readiness) {
+  const documents = Array.isArray(readiness?.documents) ? readiness.documents : [];
+  const keys = new Set(documents.filter((item) => item.currentVersion).map((item) => item.key));
+  const identity = masterLegalIdentity(readiness);
+  const patch = {
+    operatorIdentityConfigured: Boolean(String(identity.name || '').trim()),
+    privacyPolicyPublished: keys.has('privacy-policy'),
+    clientDocumentsPrepared: ['privacy-policy', 'client-pd-consent', 'service-offer'].every((key) => keys.has(key)),
+  };
+  const current = readiness?.state?.checklist || {};
+  const changed = Object.entries(patch).some(([key, value]) => current[key] !== value);
+  return changed ? tenantLegalRequest('/checklist', { method: 'PUT', body: JSON.stringify({ checklist: patch }) }) : readiness;
+}
+
+function renderMasterLegalSetup(account, readiness) {
+  workspaceReady = false;
+  disposeView();
+  disposeView = () => {};
+  app.classList.remove('app-shell--booking');
+  const legalState = readiness?.state || {};
+  const checklist = legalState.checklist && typeof legalState.checklist === 'object' ? legalState.checklist : {};
+  const documents = Array.isArray(readiness?.documents) ? readiness.documents : [];
+  const identity = masterLegalIdentity(readiness);
+  const filing = legalState.filingStatus || 'NOT_PREPARED';
+
+  app.innerHTML = `
+    <main class="auth-view" style="align-items:flex-start;padding:24px 12px;overflow:auto">
+      <section class="auth-card" style="width:min(760px,100%);max-width:760px">
+        <div class="auth-card__heading">
+          <h1>Юридическая готовность Book</h1>
+          <p>Режим: <strong>${escapeHtmlText(legalState.operationMode || 'DEMO')}</strong>. До LIVE рабочая часть Book закрыта.</p>
+        </div>
+
+        <section style="display:grid;gap:10px;margin-top:18px">
+          <h2 style="font-size:18px;margin:0">1. Реквизиты оператора</h2>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px">
+            <label class="field"><span>Оператор / ИП</span><input data-legal-identity="name" value="${escapeHtmlText(identity.name || '')}"></label>
+            <label class="field"><span>ИНН</span><input data-legal-identity="inn" value="${escapeHtmlText(identity.inn || '')}"></label>
+            <label class="field"><span>ОГРНИП</span><input data-legal-identity="ogrnip" value="${escapeHtmlText(identity.ogrnip || '')}"></label>
+            <label class="field"><span>Email</span><input data-legal-identity="email" type="email" value="${escapeHtmlText(identity.email || account?.user?.email || '')}"></label>
+            <label class="field"><span>Телефон</span><input data-legal-identity="phone" value="${escapeHtmlText(identity.phone || '')}"></label>
+            <label class="field"><span>Адрес</span><input data-legal-identity="address" value="${escapeHtmlText(identity.address || '')}"></label>
+          </div>
+        </section>
+
+        <section style="display:grid;gap:10px;margin-top:22px">
+          <h2 style="font-size:18px;margin:0">2. Документы мастера</h2>
+          ${MASTER_LEGAL_DOCUMENTS.map((preset) => {
+            const document = masterLegalDocumentByKey(readiness, preset.key);
+            const version = document?.currentVersion;
+            return `<button class="ui-button" style="justify-content:space-between" data-master-legal-doc="${escapeHtmlText(preset.key)}"><span>${escapeHtmlText(preset.title)}</span><span>${version ? `v${Number(version.version || 1)}` : 'добавить'}</span></button>`;
+          }).join('')}
+          <div data-master-legal-editor></div>
+        </section>
+
+        <section style="display:grid;gap:8px;margin-top:22px">
+          <h2 style="font-size:18px;margin:0">3. Готовность</h2>
+          ${(readiness?.checklistKeys || []).map((key) => {
+            const locked = key !== 'rknFilingPrepared';
+            return `<label style="display:flex;gap:9px;align-items:center"><input type="checkbox" data-master-check="${escapeHtmlText(key)}" ${checklist[key] === true ? 'checked' : ''} ${locked ? 'disabled' : ''}><span>${escapeHtmlText(MASTER_LEGAL_CHECKLIST_LABELS[key] || key)}</span></label>`;
+          }).join('')}
+          <p class="auth-error" data-master-legal-message></p>
+        </section>
+
+        <section style="display:grid;gap:10px;margin-top:22px">
+          <h2 style="font-size:18px;margin:0">4. Роскомнадзор и LIVE</h2>
+          <p style="margin:0">Статус подачи: <strong>${escapeHtmlText(filing)}</strong></p>
+          ${filing === 'NOT_PREPARED' ? '<button class="ui-button" data-master-prepared>Подготовка завершена → PREPARED</button>' : ''}
+          ${filing === 'PREPARED' ? `
+            <form data-master-submitted-form style="display:grid;gap:10px">
+              <label class="field"><span>Регистрационный номер / подтверждение подачи</span><input name="submissionReference" required></label>
+              <button class="ui-button" type="submit">Зафиксировать SUBMITTED</button>
+            </form>` : ''}
+          ${filing === 'SUBMITTED' ? `<p style="margin:0">Подача зафиксирована: ${escapeHtmlText(legalState.submissionReference || '—')}</p>` : ''}
+          <button class="ui-button" data-master-live ${readiness?.canBecomeLive ? '' : 'disabled'}>Перейти в LIVE</button>
+        </section>
+      </section>
+    </main>`;
+
+  app.querySelectorAll('[data-master-legal-doc]').forEach((button) => {
+    button.addEventListener('click', () => renderMasterLegalDocumentEditor(account, readiness, button.dataset.masterLegalDoc));
+  });
+
+  app.querySelector('[data-master-check="rknFilingPrepared"]')?.addEventListener('change', async (event) => {
+    const message = app.querySelector('[data-master-legal-message]');
+    try {
+      const next = await tenantLegalRequest('/checklist', {
+        method: 'PUT',
+        body: JSON.stringify({ checklist: { rknFilingPrepared: event.currentTarget.checked } }),
+      });
+      renderMasterLegalSetup(account, next);
+    } catch (error) {
+      message.textContent = error instanceof Error ? error.message : 'Не удалось сохранить';
+      event.currentTarget.checked = !event.currentTarget.checked;
+    }
+  });
+
+  app.querySelector('[data-master-prepared]')?.addEventListener('click', async () => {
+    const message = app.querySelector('[data-master-legal-message]');
+    try {
+      const next = await tenantLegalRequest('/filing/prepared', { method: 'POST', body: '{}' });
+      renderMasterLegalSetup(account, next);
+    } catch (error) {
+      message.textContent = error instanceof Error ? error.message : 'Подготовка ещё не завершена';
+    }
+  });
+
+  app.querySelector('[data-master-submitted-form]')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const message = app.querySelector('[data-master-legal-message]');
+    const data = new FormData(event.currentTarget);
+    try {
+      const next = await tenantLegalRequest('/filing/submitted', {
+        method: 'POST',
+        body: JSON.stringify({
+          submissionReference: String(data.get('submissionReference') || '').trim(),
+          evidenceMetadata: { source: 'master-legal-entry' },
+        }),
+      });
+      renderMasterLegalSetup(account, next);
+    } catch (error) {
+      message.textContent = error instanceof Error ? error.message : 'Не удалось зафиксировать подачу';
+    }
+  });
+
+  app.querySelector('[data-master-live]')?.addEventListener('click', async () => {
+    const message = app.querySelector('[data-master-legal-message]');
+    try {
+      const next = await tenantLegalRequest('/live', { method: 'POST', body: '{}' });
+      if (next?.state?.operationMode !== 'LIVE') throw new Error('LIVE не включён');
+      await renderAuthenticated(account);
+    } catch (error) {
+      message.textContent = error instanceof Error ? error.message : 'Book пока не готов к LIVE';
+    }
+  });
+
+  syncViewport();
+}
+
+function escapeHtmlText(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;',
+  })[char]);
+}
+
+function renderMasterLegalDocumentEditor(account, readiness, key) {
+  const preset = MASTER_LEGAL_DOCUMENTS.find((item) => item.key === key);
+  if (!preset) return;
+  const document = masterLegalDocumentByKey(readiness, key);
+  const current = document?.currentVersion || null;
+  const editor = app.querySelector('[data-master-legal-editor]');
+  if (!editor) return;
+  editor.innerHTML = `
+    <form data-master-document-form style="display:grid;gap:10px;padding:14px;border:1px solid #ddd;border-radius:12px">
+      <strong>${escapeHtmlText(preset.title)}</strong>
+      <label class="field"><span>Название</span><input name="title" value="${escapeHtmlText(document?.title || preset.title)}" required></label>
+      <label class="field"><span>Текст документа</span><textarea name="content" rows="16" required>${escapeHtmlText(current?.contentSnapshot || '')}</textarea></label>
+      <p class="auth-error" data-master-document-message></p>
+      <button class="ui-button" type="submit">Опубликовать версию</button>
+    </form>`;
+  const form = editor.querySelector('[data-master-document-form]');
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const message = form.querySelector('[data-master-document-message]');
+    const data = new FormData(form);
+    const identity = {};
+    app.querySelectorAll('[data-legal-identity]').forEach((input) => {
+      identity[input.dataset.legalIdentity] = String(input.value || '').trim();
+    });
+    if (!String(identity.name || '').trim()) {
+      message.textContent = 'Укажите оператора / ИП.';
+      return;
+    }
+    try {
+      await tenantLegalRequest('/documents', {
+        method: 'POST',
+        body: JSON.stringify({
+          key: preset.key,
+          type: preset.type,
+          title: String(data.get('title') || preset.title),
+          content: String(data.get('content') || ''),
+          operatorIdentity: identity,
+          requiredForRegistration: false,
+          requiredForLive: preset.requiredForLive,
+          requiredForPublicBooking: preset.requiredForPublicBooking,
+        }),
+      });
+      let next = await tenantLegalRequest('/readiness');
+      next = await syncMasterLegalChecklist(next);
+      renderMasterLegalSetup(account, next);
+    } catch (error) {
+      message.textContent = error instanceof Error ? error.message : 'Не удалось опубликовать документ';
+    }
+  });
+}
+
 async function renderAuthenticated(account = authenticatedAccount) {
   authenticatedAccount = account || authenticatedAccount;
+
+  try {
+    let legalReadiness = await tenantLegalRequest('/readiness');
+    legalReadiness = await syncMasterLegalChecklist(legalReadiness);
+    if (legalReadiness?.state?.operationMode !== 'LIVE') {
+      renderMasterLegalSetup(authenticatedAccount, legalReadiness);
+      return;
+    }
+  } catch (error) {
+    renderServerStatePending();
+    return;
+  }
+
   const migration = await initializeProfileWorkplaces(authenticatedAccount);
   if (!migration.verified) {
     renderServerStatePending();

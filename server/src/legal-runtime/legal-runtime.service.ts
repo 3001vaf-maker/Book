@@ -84,7 +84,8 @@ const TENANT_CHECKLIST_KEYS = [
   'rknFilingPrepared',
 ] as const;
 
-const PLATFORM_REQUIRED_DOCUMENT_KEYS = ['privacy-policy', 'saas-agreement', 'dpa'] as const;
+const PLATFORM_REQUIRED_DOCUMENT_KEYS = ['privacy-policy', 'saas-agreement', 'dpa', 'master-pd-consent'] as const;
+const TENANT_REQUIRED_LIVE_DOCUMENT_KEYS = ['privacy-policy', 'client-pd-consent', 'service-offer'] as const;
 const MARKETING_DOCUMENT_KEY = 'marketing-consent';
 
 function text(value: unknown) {
@@ -180,11 +181,26 @@ export class LegalRuntimeService {
   async platformReadiness() {
     const state = await this.platformState();
     const documents = await this.listDocuments('PLATFORM', null);
-    const currentKeys = new Set(documents.filter((item) => item.currentVersion).map((item) => item.key));
+    const currentDocuments = documents.filter((item) => item.currentVersion);
+    const currentKeys = new Set(currentDocuments.map((item) => item.key));
     const missingDocuments = PLATFORM_REQUIRED_DOCUMENT_KEYS.filter((key) => !currentKeys.has(key));
-    const checklist = objectValue(state?.checklist);
+    const storedChecklist = objectValue(state?.checklist);
+    const operatorIdentityConfigured = currentDocuments.some((item) => {
+      const identity = objectValue(item.currentVersion?.operatorIdentitySnapshot);
+      return Boolean(text(identity.name));
+    });
+    const checklist = {
+      ...storedChecklist,
+      operatorDocumentsPublished: missingDocuments.length === 0,
+      privacyPolicyPublished: currentKeys.has('privacy-policy'),
+      consentFormsPrepared: currentKeys.has('master-pd-consent'),
+      saasAgreementPublished: currentKeys.has('saas-agreement'),
+      dpaPublished: currentKeys.has('dpa'),
+      operatorIdentityConfigured,
+      rknFilingConfirmed: state?.filingStatus === 'SUBMITTED',
+    };
     return {
-      state,
+      state: state ? { ...state, checklist } : state,
       checklistKeys: PLATFORM_CHECKLIST_KEYS,
       checklistComplete: allTrue(checklist, PLATFORM_CHECKLIST_KEYS),
       missingDocuments,
@@ -201,22 +217,33 @@ export class LegalRuntimeService {
   async tenantReadiness(tenantId: string) {
     const state = await this.tenantState(tenantId);
     const documents = await this.listDocuments('TENANT', tenantId);
-    const currentRequiredForLive = documents.filter((item) => item.requiredForLive && item.currentVersion);
-    const privacyPublished = documents.some((item) => item.key === 'privacy-policy' && Boolean(item.currentVersion));
-    const checklist = objectValue(state?.checklist);
+    const currentDocuments = documents.filter((item) => item.currentVersion);
+    const currentKeys = new Set(currentDocuments.map((item) => item.key));
+    const missingLiveDocuments = TENANT_REQUIRED_LIVE_DOCUMENT_KEYS.filter((key) => !currentKeys.has(key));
+    const storedChecklist = objectValue(state?.checklist);
+    const operatorIdentityConfigured = currentDocuments.some((item) => {
+      const identity = objectValue(item.currentVersion?.operatorIdentitySnapshot);
+      return Boolean(text(identity.name));
+    });
+    const checklist = {
+      ...storedChecklist,
+      operatorIdentityConfigured,
+      privacyPolicyPublished: currentKeys.has('privacy-policy'),
+      clientDocumentsPrepared: missingLiveDocuments.length === 0,
+    };
     return {
-      state,
+      state: state ? { ...state, checklist } : state,
       checklistKeys: TENANT_CHECKLIST_KEYS,
       checklistComplete: allTrue(checklist, TENANT_CHECKLIST_KEYS),
-      privacyPublished,
-      requiredLiveDocuments: currentRequiredForLive,
+      privacyPublished: currentKeys.has('privacy-policy'),
+      missingLiveDocuments,
+      requiredLiveDocuments: documents.filter((item) => TENANT_REQUIRED_LIVE_DOCUMENT_KEYS.includes(item.key as any)),
       documents,
       canBecomeLive: Boolean(
         state
         && state.filingStatus === 'SUBMITTED'
         && allTrue(checklist, TENANT_CHECKLIST_KEYS)
-        && privacyPublished
-        && currentRequiredForLive.every((item) => Boolean(item.currentVersion))
+        && missingLiveDocuments.length === 0
       ),
     };
   }
@@ -236,8 +263,9 @@ export class LegalRuntimeService {
   }
 
   async markPlatformPrepared(actorUserId: string) {
+    const readiness = await this.platformReadiness();
     const before = await this.requirePlatformState();
-    if (!allTrue(objectValue(before.checklist), PLATFORM_CHECKLIST_KEYS.filter((key) => key !== 'rknFilingConfirmed'))) {
+    if (!allTrue(objectValue(readiness.state?.checklist), PLATFORM_CHECKLIST_KEYS.filter((key) => key !== 'rknFilingConfirmed'))) {
       throw new ConflictException('Сначала завершите внутренний checklist платформы');
     }
     await this.prisma.$executeRaw`
@@ -312,13 +340,14 @@ export class LegalRuntimeService {
   }
 
   async markTenantPrepared(tenantId: string, actorUserId: string) {
+    const readiness = await this.tenantReadiness(tenantId);
     const before = await this.requireTenantState(tenantId);
     if (before.operationMode !== 'DEMO') throw new ConflictException('Подготовка выполняется только в DEMO');
-    const checklist = objectValue(before.checklist);
-    if (!allTrue(checklist, TENANT_CHECKLIST_KEYS)) throw new ConflictException('Сначала завершите юридический checklist мастера');
-    const documents = await this.listDocuments('TENANT', tenantId);
-    if (!documents.some((item) => item.key === 'privacy-policy' && Boolean(item.currentVersion))) {
-      throw new ConflictException('Сначала опубликуйте политику обработки ПД мастера');
+    if (!allTrue(objectValue(readiness.state?.checklist), TENANT_CHECKLIST_KEYS)) {
+      throw new ConflictException('Сначала завершите юридический checklist мастера');
+    }
+    if ((readiness.missingLiveDocuments || []).length) {
+      throw new ConflictException('Сначала опубликуйте обязательные документы мастера');
     }
     await this.prisma.$executeRaw`
       UPDATE "TenantLegalState"
@@ -595,6 +624,7 @@ export class LegalRuntimeService {
 
   async recordRegistrationFacts(userId: string, tenantId: string, input: {
     saasAgreementAccepted?: unknown;
+    dpaAccepted?: unknown;
     privacyAcknowledged?: unknown;
     pdConsentAccepted?: unknown;
     marketingConsentAccepted?: unknown;
@@ -611,7 +641,7 @@ export class LegalRuntimeService {
       'privacy-policy': { accepted: input?.privacyAcknowledged === true, action: 'ACKNOWLEDGED' },
       'master-pd-consent': { accepted: input?.pdConsentAccepted === true, action: 'CONSENTED' },
       'marketing-consent': { accepted: input?.marketingConsentAccepted === true, action: 'CONSENTED' },
-      'dpa': { accepted: input?.saasAgreementAccepted === true, action: 'ACCEPTED' },
+      'dpa': { accepted: input?.dpaAccepted === true, action: 'ACCEPTED' },
     };
     for (const document of required) {
       const fact = factByKey[document.key];

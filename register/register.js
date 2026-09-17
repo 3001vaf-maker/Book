@@ -20,7 +20,39 @@ function renderError(message) {
   state.querySelector('[data-error]').textContent = message || 'Не удалось открыть регистрацию.';
 }
 
-function renderForm() {
+function documentBlock(document) {
+  return `
+    <details class="invite-legal-document">
+      <summary>${escapeHtml(document.title || document.key)} · версия ${Number(document.version || 1)}</summary>
+      <pre>${escapeHtml(document.content || '')}</pre>
+    </details>`;
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;',
+  })[char]);
+}
+
+function requiredKeys(payload) {
+  return new Set(Array.isArray(payload?.legal?.required) ? payload.legal.required.map((item) => String(item?.key || '')) : []);
+}
+
+function legalCheckboxes(payload) {
+  const documents = Array.isArray(payload?.documents) ? payload.documents : [];
+  const byKey = new Map(documents.map((item) => [item.key, item]));
+  const required = requiredKeys(payload);
+  const rows = [];
+  if (byKey.has('saas-agreement')) rows.push(`<label class="invite-legal-check"><input name="saasAgreementAccepted" type="checkbox" ${required.has('saas-agreement') ? 'required' : ''}> <span>Принимаю договор-оферту на использование Book.</span></label>`);
+  if (byKey.has('dpa')) rows.push(`<label class="invite-legal-check"><input name="dpaAccepted" type="checkbox" ${required.has('dpa') ? 'required' : ''}> <span>Принимаю поручение на обработку персональных данных клиентов (DPA).</span></label>`);
+  if (byKey.has('privacy-policy')) rows.push(`<label class="invite-legal-check"><input name="privacyAcknowledged" type="checkbox" ${required.has('privacy-policy') ? 'required' : ''}> <span>Ознакомился с политикой обработки персональных данных Book.</span></label>`);
+  if (byKey.has('master-pd-consent')) rows.push(`<label class="invite-legal-check"><input name="pdConsentAccepted" type="checkbox" ${required.has('master-pd-consent') ? 'required' : ''}> <span>Даю согласие на обработку моих персональных данных.</span></label>`);
+  if (byKey.has('marketing-consent')) rows.push('<label class="invite-legal-check"><input name="marketingConsentAccepted" type="checkbox"> <span>Хочу получать рекламные и маркетинговые сообщения Book. Это необязательно.</span></label>');
+  return rows.join('');
+}
+
+function renderForm(payload) {
+  const documents = Array.isArray(payload?.documents) ? payload.documents : [];
   state.innerHTML = `
     <h1>Создайте свой Book</h1>
     <p>Заполните основные данные и придумайте пароль.</p>
@@ -33,8 +65,15 @@ function renderForm() {
       <label class="invite-field"><span>Повторите пароль</span><input name="passwordConfirm" type="password" minlength="10" autocomplete="new-password" required></label>
       <label style="display:flex;align-items:center;gap:9px;font-size:14px;font-weight:600"><input name="showPassword" type="checkbox" style="width:18px;height:18px">Показать пароли</label>
       <label style="display:flex;align-items:center;gap:9px;font-size:14px;font-weight:600"><input name="remember" type="checkbox" checked style="width:18px;height:18px">Запомнить меня на этом устройстве</label>
+
+      <section class="invite-legal" aria-label="Юридические документы">
+        <h2>Документы Book</h2>
+        ${documents.map(documentBlock).join('')}
+        <div class="invite-legal-checks">${legalCheckboxes(payload)}</div>
+      </section>
+
       <p class="invite-error" data-form-error role="alert"></p>
-      <button class="invite-button" type="submit">Создать Book и войти</button>
+      <button class="invite-button" type="submit">Создать Book и войти в DEMO</button>
     </form>`;
 
   const form = state.querySelector('[data-form]');
@@ -75,9 +114,14 @@ function renderForm() {
         phone: data.get('phone'),
         email: data.get('email'),
         password,
+        saasAgreementAccepted: data.get('saasAgreementAccepted') === 'on',
+        dpaAccepted: data.get('dpaAccepted') === 'on',
+        privacyAcknowledged: data.get('privacyAcknowledged') === 'on',
+        pdConsentAccepted: data.get('pdConsentAccepted') === 'on',
+        marketingConsentAccepted: data.get('marketingConsentAccepted') === 'on',
       });
       setAuthToken(account.accessToken, data.get('remember') === 'on');
-      state.innerHTML = '<h1>Book создан</h1><p class="invite-success">Открываем ваше рабочее пространство…</p>';
+      state.innerHTML = '<h1>Book создан</h1><p class="invite-success">Открываем DEMO и юридическую подготовку…</p>';
       window.setTimeout(() => location.replace('../'), 350);
     } catch (submitError) {
       error.textContent = submitError instanceof Error ? submitError.message : 'Не удалось зарегистрироваться';
@@ -91,8 +135,8 @@ if (!token) {
   renderError('В ссылке отсутствует код регистрации.');
 } else {
   try {
-    await post('/manual-invitations/inspect', { token });
-    renderForm();
+    const payload = await post('/manual-invitations/inspect', { token });
+    renderForm(payload);
   } catch (error) {
     renderError(error instanceof Error ? error.message : 'Не удалось проверить ссылку');
   }

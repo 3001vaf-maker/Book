@@ -79,6 +79,7 @@ type RegistrationInput = {
   token?: unknown;
   password?: unknown;
   saasAgreementAccepted?: unknown;
+  dpaAccepted?: unknown;
   privacyAcknowledged?: unknown;
   pdConsentAccepted?: unknown;
   marketingConsentAccepted?: unknown;
@@ -343,6 +344,10 @@ export class MasterInvitationService {
       role: result.membership.role,
     });
 
+    if (input?.dpaAccepted === true) {
+      await this.legal.updateTenantChecklist(invitation.tenantId, result.user.id, { dpaAccepted: true });
+    }
+
     await this.legal.audit(invitation.tenantId, result.user.id, 'MASTER_REGISTRATION_ACCEPTED', 'REGISTRATION', 'SUCCESS', {
       invitationId: invitation.id,
       operationMode: 'DEMO',
@@ -396,7 +401,8 @@ export class MasterInvitationService {
   }
 
   private registrationFact(key: string, input: RegistrationInput) {
-    if (key === 'saas-agreement' || key === 'dpa') return { accepted: input?.saasAgreementAccepted === true, action: 'ACCEPTED' };
+    if (key === 'saas-agreement') return { accepted: input?.saasAgreementAccepted === true, action: 'ACCEPTED' };
+    if (key === 'dpa') return { accepted: input?.dpaAccepted === true, action: 'ACCEPTED' };
     if (key === 'privacy-policy') return { accepted: input?.privacyAcknowledged === true, action: 'ACKNOWLEDGED' };
     if (key === 'master-pd-consent') return { accepted: input?.pdConsentAccepted === true, action: 'CONSENTED' };
     if (key === 'marketing-consent') return { accepted: input?.marketingConsentAccepted === true, action: 'CONSENTED' };
