@@ -372,16 +372,16 @@ function renderLegalDocumentEditor(content, selectedKey = '') {
   });
 }
 
-function openLegalDocument(document) {
-  if (!document?.currentVersion) return;
-  const version = document.currentVersion;
-  const backdrop = documentRoot('div');
+function openLegalDocument(item) {
+  if (!item?.currentVersion) return;
+  const version = item.currentVersion;
+  const backdrop = document.createElement('div');
   backdrop.className = 'admin-drawer-backdrop';
   backdrop.innerHTML = `
     <aside class="admin-drawer admin-document-drawer">
       <div class="admin-drawer-head">
         <div>
-          <h3>${escapeHtml(document.title)}</h3>
+          <h3>${escapeHtml(item.title)}</h3>
           <p>Версия ${Number(version.version || 1)} · ${formatDate(version.publishedAt)} · действует</p>
         </div>
         <button class="admin-close" data-close aria-label="Закрыть">×</button>
@@ -399,11 +399,11 @@ function openLegalDocument(document) {
   backdrop.addEventListener('click', (event) => { if (event.target === backdrop) backdrop.remove(); });
 
   backdrop.querySelector('[data-download]').addEventListener('click', () => {
-    const blob = new Blob([documentHtml(document)], { type: 'text/html;charset=utf-8' });
+    const blob = new Blob([documentHtml(item)], { type: 'text/html;charset=utf-8' });
     const url = URL.createObjectURL(blob);
-    const link = documentRoot('a');
+    const link = document.createElement('a');
     link.href = url;
-    link.download = documentFileName(document.title, version.version);
+    link.download = documentFileName(item.title, version.version);
     link.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
@@ -412,7 +412,7 @@ function openLegalDocument(document) {
     const popup = window.open('', '_blank', 'noopener,noreferrer');
     if (!popup) return;
     popup.document.open();
-    popup.document.write(documentHtml(document));
+    popup.document.write(documentHtml(item));
     popup.document.close();
     popup.focus();
     window.setTimeout(() => popup.print(), 150);
@@ -420,16 +420,10 @@ function openLegalDocument(document) {
 
   backdrop.querySelector('[data-new-version]').addEventListener('click', () => {
     backdrop.remove();
-    renderLegalDocumentEditor(documentRoot('[data-content]'), document.key);
-    documentRoot('[data-legal-editor]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const content = document.querySelector('[data-content]');
+    renderLegalDocumentEditor(content, item.key);
+    content.querySelector('[data-legal-editor]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
-}
-
-function documentRoot(selectorOrTag) {
-  if (selectorOrTag.startsWith?.('[') || selectorOrTag.startsWith?.('.') || selectorOrTag.startsWith?.('#')) {
-    return document.querySelector(selectorOrTag);
-  }
-  return document.createElement(selectorOrTag);
 }
 
 function renderLegal() {
