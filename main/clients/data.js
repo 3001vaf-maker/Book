@@ -3,7 +3,7 @@ import { assertNoNewClientContactConflicts } from '../../core/client-contact/ind
 import { getMembers, getUEI } from '../../core/uei.js';
 import { queuePersonDelete, queuePersonUpsert } from '../../core/business-persistence.js';
 import { getTags } from '../../settings/tags/data.js';
-import { getLatestAccountConsent, getLatestContactConsent } from '../../settings/documents/consents.js';
+import { getLatestAccountConsent } from '../../settings/documents/consents.js';
 
 let peopleState = [];
 
@@ -55,7 +55,7 @@ export function normalizeClient(person = {}) {
     discountPercent: normalizeDiscount(person),
     agreements: {
       personalData: Boolean(person.agreements?.personalData),
-      mailings: Boolean(person.agreements?.mailings),
+      mailings: false,
     },
     visits: Number(person.visits || 0),
     totalSpent: Number(person.totalSpent || 0),
@@ -94,15 +94,6 @@ function accountConsentAccepted(people, documentId) {
   return people.some((person) => (person.accounts || []).some((accountId) => accepted(getLatestAccountConsent(accountId, documentId))));
 }
 
-function messageConsentAccepted(people) {
-  for (const person of people) {
-    if ((person.phones || []).some((value) => accepted(getLatestContactConsent('PHONE', value, 'messages-consent')))) return true;
-    if ((person.emails || []).some((value) => accepted(getLatestContactConsent('EMAIL', value, 'messages-consent')))) return true;
-    if ((person.telegrams || []).some((value) => accepted(getLatestContactConsent('TELEGRAM', value, 'messages-consent')))) return true;
-  }
-  return false;
-}
-
 export function getAllClients() {
   const stored = clone(peopleState).map(normalizeClient).filter((person) => person.key);
   return stored.map((person) => {
@@ -111,7 +102,7 @@ export function getAllClients() {
       ...person,
       agreements: {
         personalData: accountConsentAccepted(members, 'pdn-consent'),
-        mailings: messageConsentAccepted(members),
+        mailings: false,
       },
       uei: getUEI('person', person.key) || '',
     };
