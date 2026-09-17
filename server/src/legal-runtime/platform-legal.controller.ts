@@ -55,6 +55,11 @@ export class PlatformLegalController {
     return this.legal.publishDocument(request.auth!.userId, { ...body, scope: 'PLATFORM', tenantId: null });
   }
 
+  @Get('document-history')
+  documentHistory() {
+    return this.legal.documentHistory('PLATFORM', null);
+  }
+
   @Get('events')
   events() {
     return this.legal.legalEvents('PLATFORM', null);
