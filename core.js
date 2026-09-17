@@ -390,16 +390,31 @@ function renderMasterLegalDocumentEditor(account, readiness, key) {
 async function renderAuthenticated(account = authenticatedAccount) {
   authenticatedAccount = account || authenticatedAccount;
 
+  let access;
   try {
-    let legalReadiness = await tenantLegalRequest('/readiness');
-    legalReadiness = await syncMasterLegalChecklist(legalReadiness);
-    if (legalReadiness?.state?.operationMode !== 'LIVE') {
-      renderMasterLegalSetup(authenticatedAccount, legalReadiness);
-      return;
-    }
-  } catch (error) {
+    access = await loadBookAccess();
+  } catch {
     renderServerStatePending();
     return;
+  }
+
+  if (access.status === 'SUSPENDED') {
+    renderSuspended();
+    return;
+  }
+
+  if (access.isOwnerBook !== true) {
+    try {
+      let legalReadiness = await tenantLegalRequest('/readiness');
+      legalReadiness = await syncMasterLegalChecklist(legalReadiness);
+      if (legalReadiness?.state?.operationMode !== 'LIVE') {
+        renderMasterLegalSetup(authenticatedAccount, legalReadiness);
+        return;
+      }
+    } catch {
+      renderServerStatePending();
+      return;
+    }
   }
 
   const migration = await initializeProfileWorkplaces(authenticatedAccount);
@@ -428,15 +443,10 @@ async function renderAuthenticated(account = authenticatedAccount) {
     return;
   }
   clearLegacyBusinessStorage();
-  await loadBookAccess();
-  if (getBookAccess().status === 'SUSPENDED') {
-    renderSuspended();
-    return;
-  }
   ensureServerBookingSync();
 
   const serverWorkspaceUnlocked = Boolean(authenticatedAccount?.user?.workspaceUnlocked);
-  if (!serverWorkspaceUnlocked && !isOnboardingComplete()) {
+  if (access.isOwnerBook !== true && !serverWorkspaceUnlocked && !isOnboardingComplete()) {
     workspaceReady = false;
     history.replaceState({}, '', location.pathname);
     await renderOnboarding(app, {
