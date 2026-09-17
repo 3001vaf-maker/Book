@@ -732,6 +732,29 @@ export class LegalRuntimeService {
     throw new BadRequestException('Некорректный scope событий');
   }
 
+  async documentHistory(scopeValue: unknown, tenantIdValue: unknown) {
+    const scope = text(scopeValue).toUpperCase();
+    const tenantId = scope === 'TENANT' ? text(tenantIdValue) : '';
+    if (!['PLATFORM', 'TENANT'].includes(scope)) throw new BadRequestException('Некорректный scope');
+    return this.prisma.$queryRaw<any[]>`
+      SELECT
+        d."id" AS "documentId",
+        d."key",
+        d."type",
+        d."title",
+        v."id" AS "versionId",
+        v."version",
+        v."contentHash",
+        v."publishedAt",
+        v."supersededAt"
+      FROM "LegalDocument" d
+      JOIN "LegalDocumentVersion" v ON v."documentId" = d."id"
+      WHERE d."scope" = ${scope}
+        AND COALESCE(d."tenantId", '') = ${tenantId}
+      ORDER BY v."publishedAt" DESC, d."title" ASC, v."version" DESC
+    `;
+  }
+
   async audit(tenantId: string | null, actorUserId: string, action: string, purpose: string, result: string, metadata: unknown = {}) {
     await this.prisma.$executeRaw`
       INSERT INTO "LegalAuditEvent" ("id", "tenantId", "actorUserId", "action", "purpose", "result", "metadata", "occurredAt")
