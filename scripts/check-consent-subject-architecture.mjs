@@ -39,8 +39,11 @@ if (/recordAcceptedConsents|clientConsentProjection|revokeConsent\s*\(/.test(pol
 if (/recordConsent|migrateLegacyConsents|configureConsentPersistence/.test(browserConsents)) {
   failures.push('Browser consent module must be read-only and canonical.');
 }
-if (!clientProjection.includes('getLatestAccountConsent') || !clientProjection.includes('getLatestContactConsent')) {
-  failures.push('Client agreement display must be a projection from canonical account/contact consent subjects.');
+if (!clientProjection.includes('getLatestAccountConsent')) {
+  failures.push('Client PD agreement display must be a projection from canonical booking-account consent subjects.');
+}
+if (clientProjection.includes('getLatestContactConsent')) {
+  failures.push('Legacy contact-point consent must not be projected as an active mailing permission.');
 }
 if (!migration.includes('CREATE TABLE "ConsentEvent"') || !migration.includes('"consentMigratedAt"')) {
   failures.push('Canonical append-only ConsentEvent storage and one-time migration marker are required.');
