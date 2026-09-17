@@ -122,14 +122,9 @@ function renderShell() {
     </div>`;
 
   app.querySelectorAll('[data-section]').forEach((button) => {
-    const locked = state.platformLegal?.state?.status !== 'LEGAL_READY' && button.dataset.section !== 'legal';
-    button.disabled = locked;
+    button.disabled = false;
     button.addEventListener('click', () => {
-      if (state.platformLegal?.state?.status !== 'LEGAL_READY' && button.dataset.section !== 'legal') {
-        state.section = 'legal';
-      } else {
-        state.section = button.dataset.section;
-      }
+      state.section = button.dataset.section;
       renderCurrentSection();
     });
   });
