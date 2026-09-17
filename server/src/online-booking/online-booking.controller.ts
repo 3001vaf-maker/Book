@@ -2,6 +2,7 @@ import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Put, Q
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ClientContactRouteService } from '../communication/client-contact-route.service';
+import { CommunicationHistoryService } from '../communication/communication-history.service';
 import { CommunicationService } from '../communication/communication.service';
 import { LegalRuntimeService } from '../legal-runtime/legal-runtime.service';
 import { NotificationService } from '../notification/notification.service';
@@ -23,6 +24,7 @@ export class OnlineBookingController {
     private readonly notifications: NotificationService,
     private readonly templates: NotificationTemplateService,
     private readonly communications: CommunicationService,
+    private readonly history: CommunicationHistoryService,
     private readonly contactRoutes: ClientContactRouteService,
     private readonly webPush: WebPushService,
     private readonly clientCards: ClientCardLinkService,
@@ -33,10 +35,11 @@ export class OnlineBookingController {
     const account = await this.booking.getAccount(tenantId, accountId);
     const identity = await this.communications.telegramIdentity(tenantId, { phone: account.phone, uei: account.uei });
     if (!identity) return { telegram: { linked: false, enabled: false, username: '' } };
+    const preferences = await this.history.getPreferences(tenantId, { phone: account.phone, uei: account.uei });
     return {
       telegram: {
         linked: true,
-        enabled: true,
+        enabled: preferences.preferredChannels.includes('TELEGRAM'),
         username: identity.display || '',
       },
     };
@@ -156,6 +159,26 @@ export class OnlineBookingController {
   async chatSettings(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
     await this.legal.assertPublicBooking(tenantId);
     return this.accountTelegramSettings(tenantId, request.bookingAccountAuth!.accountId);
+  }
+
+  @UseGuards(BookingAccountGuard)
+  @Put(':tenantId/account/chat/telegram-consent')
+  async updateTelegramPreference(
+    @Param('tenantId') tenantId: string,
+    @Req() request: AccountRequest,
+    @Body() body: { enabled?: unknown },
+  ) {
+    await this.legal.assertPublicBooking(tenantId);
+    const accountId = request.bookingAccountAuth!.accountId;
+    const account = await this.booking.getAccount(tenantId, accountId);
+    const identity = await this.communications.telegramIdentity(tenantId, { phone: account.phone, uei: account.uei });
+    if (!identity) throw new BadRequestException('Telegram не привязан');
+    const current = await this.history.getPreferences(tenantId, { phone: account.phone, uei: account.uei });
+    const channels = new Set(current.preferredChannels);
+    if (body?.enabled === true) channels.add('TELEGRAM');
+    else channels.delete('TELEGRAM');
+    await this.history.savePreferences(tenantId, { phone: account.phone, uei: account.uei, preferredChannels: [...channels] });
+    return this.accountTelegramSettings(tenantId, accountId);
   }
 
   @UseGuards(BookingAccountGuard)
