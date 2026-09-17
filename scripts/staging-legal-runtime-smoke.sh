@@ -28,10 +28,12 @@ expect_status() {
 }
 
 platform=$(curl -fsS "${auth[@]}" "$base/platform/legal/readiness")
-node -e 'const p=JSON.parse(process.argv[1]);if(p.state?.status!=="LEGAL_READY"||p.state?.filingStatus!=="SUBMITTED")process.exit(1)' "$platform"
+node -e 'const p=JSON.parse(process.argv[1]);if(p.state?.status!=="LEGAL_READY"||p.state?.filingStatus!=="SUBMITTED")process.exit(1);const d=Array.isArray(p.documents)?p.documents:[];for(const k of ["privacy-policy","saas-agreement","master-pd-consent","marketing-consent","public-profile-consent","dpa"]){if(!d.some(x=>x.key===k&&x.currentVersion))process.exit(1)}' "$platform"
+document_history=$(curl -fsS "${auth[@]}" "$base/platform/legal/document-history")
+node -e 'const h=JSON.parse(process.argv[1]);if(!Array.isArray(h)||h.length<6)process.exit(1)' "$document_history"
 tenant=$(curl -fsS "${auth[@]}" "$base/legal/readiness")
 node -e 'const p=JSON.parse(process.argv[1]);if(p.state?.operationMode!=="LIVE"||p.state?.filingStatus!=="SUBMITTED")process.exit(1)' "$tenant"
-expect_status 409 POST "$base/platform/legal/documents" '{}'
+expect_status 400 POST "$base/platform/legal/documents" '{}'
 expect_status 409 POST "$base/legal/documents" '{}'
 
 # Authorization must be refreshed from the database on every request: a stale JWT cannot bypass suspension.

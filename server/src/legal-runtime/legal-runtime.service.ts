@@ -4,10 +4,12 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { randomUUID, createHash } from 'node:crypto';
 import { PrismaService } from '../prisma.service';
 import { SaasAccessService } from '../saas-access/saas-access.service';
+import { PLATFORM_LEGAL_PACKAGE, PLATFORM_OPERATOR_IDENTITY, PLATFORM_RKN_FILING } from './platform-legal-package';
 
 type PlatformLegalStatus = 'PRE_LAUNCH' | 'LEGAL_READY';
 type TenantOperationMode = 'DEMO' | 'LIVE';
@@ -136,11 +138,84 @@ function contactPoint(channelValue: unknown, destinationValue: unknown) {
 }
 
 @Injectable()
-export class LegalRuntimeService {
+export class LegalRuntimeService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: SaasAccessService,
   ) {}
+
+  async onModuleInit() {
+    await this.ensurePlatformLegalPackage();
+  }
+
+  private async ensurePlatformLegalPackage() {
+    const state = await this.platformState();
+    if (!state) return;
+
+    for (const item of PLATFORM_LEGAL_PACKAGE) {
+      await this.prisma.$executeRaw`
+        INSERT INTO "LegalDocument" (
+          "id", "scope", "tenantId", "key", "type", "title",
+          "requiredForRegistration", "requiredForLive", "requiredForPublicBooking",
+          "isActive", "createdAt", "updatedAt"
+        ) VALUES (
+          ${randomUUID()}, 'PLATFORM', NULL, ${item.key}, ${item.type}, ${item.title},
+          ${item.requiredForRegistration}, false, false,
+          true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        )
+        ON CONFLICT DO NOTHING
+      `;
+
+      const existing = await this.prisma.$queryRaw<Array<{ id: string }>>`
+        SELECT "id" FROM "LegalDocument"
+        WHERE "scope" = 'PLATFORM' AND "tenantId" IS NULL AND "key" = ${item.key}
+        LIMIT 1
+      `;
+      const documentId = existing[0]?.id;
+      if (!documentId) continue;
+
+      const versions = await this.prisma.$queryRaw<Array<{ id: string }>>`
+        SELECT "id" FROM "LegalDocumentVersion"
+        WHERE "documentId" = ${documentId}
+        LIMIT 1
+      `;
+      if (!versions[0]) {
+        await this.prisma.$executeRaw`
+          INSERT INTO "LegalDocumentVersion" (
+            "id", "documentId", "version", "contentSnapshot", "contentHash",
+            "operatorIdentitySnapshot", "publishedAt", "supersededAt"
+          ) VALUES (
+            ${randomUUID()}, ${documentId}, 1, ${item.content}, ${contentHash(item.content)},
+            ${json(PLATFORM_OPERATOR_IDENTITY)}::jsonb,
+            CURRENT_TIMESTAMP, NULL
+          )
+          ON CONFLICT DO NOTHING
+        `;
+      }
+    }
+
+    const evidence = {
+      ...objectValue(state.evidenceMetadata),
+      ...PLATFORM_RKN_FILING,
+    };
+    const checklist = {
+      ...objectValue(state.checklist),
+      rknFilingConfirmed: true,
+    };
+    await this.prisma.$executeRaw`
+      UPDATE "PlatformLegalState"
+      SET "filingStatus" = 'SUBMITTED',
+          "submittedAt" = COALESCE("submittedAt", CURRENT_TIMESTAMP),
+          "submissionReference" = CASE
+            WHEN COALESCE("submissionReference", '') = '' THEN ${PLATFORM_RKN_FILING.registrationNumber}
+            ELSE "submissionReference"
+          END,
+          "evidenceMetadata" = ${json(evidence)}::jsonb,
+          "checklist" = ${json(checklist)}::jsonb,
+          "updatedAt" = CURRENT_TIMESTAMP
+      WHERE "id" = 'platform'
+    `;
+  }
 
   async platformState() {
     const rows = await this.prisma.$queryRaw<PlatformStateRow[]>`
@@ -730,6 +805,29 @@ export class LegalRuntimeService {
       `;
     }
     throw new BadRequestException('Некорректный scope событий');
+  }
+
+  async documentHistory(scopeValue: unknown, tenantIdValue: unknown) {
+    const scope = text(scopeValue).toUpperCase();
+    const tenantId = scope === 'TENANT' ? text(tenantIdValue) : '';
+    if (!['PLATFORM', 'TENANT'].includes(scope)) throw new BadRequestException('Некорректный scope');
+    return this.prisma.$queryRaw<any[]>`
+      SELECT
+        d."id" AS "documentId",
+        d."key",
+        d."type",
+        d."title",
+        v."id" AS "versionId",
+        v."version",
+        v."contentHash",
+        v."publishedAt",
+        v."supersededAt"
+      FROM "LegalDocument" d
+      JOIN "LegalDocumentVersion" v ON v."documentId" = d."id"
+      WHERE d."scope" = ${scope}
+        AND COALESCE(d."tenantId", '') = ${tenantId}
+      ORDER BY v."publishedAt" DESC, d."title" ASC, v."version" DESC
+    `;
   }
 
   async audit(tenantId: string | null, actorUserId: string, action: string, purpose: string, result: string, metadata: unknown = {}) {

@@ -1,4 +1,4 @@
-import { Body, ConflictException, Controller, Get, Post, Put, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Put, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PlatformAdminGuard } from '../saas-admin/platform-admin.guard';
@@ -47,12 +47,13 @@ export class PlatformLegalController {
   }
 
   @Post('documents')
-  async publishDocument(@Req() request: AuthRequest, @Body() body: Record<string, unknown>) {
-    const state = await this.legal.platformState();
-    if (!state || state.status !== 'PRE_LAUNCH') {
-      throw new ConflictException('Новые версии юридических документов платформы публикуются только в PRE_LAUNCH');
-    }
+  publishDocument(@Req() request: AuthRequest, @Body() body: Record<string, unknown>) {
     return this.legal.publishDocument(request.auth!.userId, { ...body, scope: 'PLATFORM', tenantId: null });
+  }
+
+  @Get('document-history')
+  documentHistory() {
+    return this.legal.documentHistory('PLATFORM', null);
   }
 
   @Get('events')

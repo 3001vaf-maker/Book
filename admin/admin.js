@@ -7,7 +7,8 @@ const state = {
   masters: [],
   capabilities: [],
   platformLegal: null,
-  section: 'masters',
+  documentHistory: [],
+  section: 'overview',
 };
 
 function escapeHtml(value) {
@@ -30,24 +31,58 @@ async function legalRequest(path, options = {}) {
   return payload;
 }
 
-const PLATFORM_DOCUMENT_PRESETS = [
-  { key: 'privacy-policy', type: 'PRIVACY_POLICY', title: 'Политика обработки персональных данных Book', requiredForRegistration: true },
-  { key: 'saas-agreement', type: 'SAAS_AGREEMENT', title: 'Договор-оферта на использование Book', requiredForRegistration: true },
-  { key: 'dpa', type: 'DPA', title: 'Поручение на обработку персональных данных (DPA)', requiredForRegistration: true },
-  { key: 'master-pd-consent', type: 'MASTER_PD_CONSENT', title: 'Согласие мастера на обработку персональных данных', requiredForRegistration: true },
-  { key: 'marketing-consent', type: 'MARKETING_CONSENT', title: 'Согласие на рекламные и маркетинговые сообщения Book', requiredForRegistration: false },
+const PRIMARY_DOCUMENT_KEYS = [
+  'privacy-policy',
+  'saas-agreement',
+  'master-pd-consent',
+  'marketing-consent',
+  'public-profile-consent',
+  'dpa',
 ];
 
-const PLATFORM_CHECKLIST_LABELS = {
-  operatorDocumentsPublished: 'Документы оператора опубликованы',
-  privacyPolicyPublished: 'Политика обработки ПД опубликована',
-  consentFormsPrepared: 'Формы согласий подготовлены',
-  saasAgreementPublished: 'SaaS-оферта опубликована',
-  dpaPublished: 'DPA опубликовано',
-  operatorIdentityConfigured: 'Реквизиты оператора зафиксированы',
-  rknFilingConfirmed: 'Подача уведомления в Роскомнадзор зафиксирована',
-  productionInfrastructureChecked: 'Production-инфраструктура проверена',
-};
+function documentSortIndex(key) {
+  const index = PRIMARY_DOCUMENT_KEYS.indexOf(key);
+  return index === -1 ? PRIMARY_DOCUMENT_KEYS.length + 1 : index;
+}
+
+function formatDate(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString('ru-RU');
+}
+
+function documentFileName(title, version) {
+  const base = String(title || 'document')
+    .toLowerCase()
+    .replace(/[^a-zа-яё0-9]+/gi, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80) || 'document';
+  return `${base}-v${version || 1}.html`;
+}
+
+function documentHtml(document) {
+  const version = document?.currentVersion || {};
+  return `<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>${escapeHtml(document?.title || 'Документ')}</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;color:#292522;max-width:860px;margin:40px auto;padding:0 28px;line-height:1.5}
+h1{font-size:24px;margin:0 0 8px}
+.meta{color:#817a74;margin-bottom:28px}
+pre{white-space:pre-wrap;font:inherit;margin:0}
+@media print{body{margin:0;max-width:none}}
+</style>
+</head>
+<body>
+<h1>${escapeHtml(document?.title || 'Документ')}</h1>
+<div class="meta">Версия ${Number(version.version || 1)} · ${formatDate(version.publishedAt)}</div>
+<pre>${escapeHtml(version.contentSnapshot || '')}</pre>
+</body>
+</html>`;
+}
 
 function renderLogin(message = '') {
   app.innerHTML = `
@@ -85,19 +120,20 @@ function renderLogin(message = '') {
 async function loadAdmin() {
   state.admin = await adminRequest('/me');
   await refreshData();
-  if (state.platformLegal?.state?.status !== 'LEGAL_READY') state.section = 'legal';
   renderShell();
 }
 
 async function refreshData() {
-  const [masters, capabilities, platformLegal] = await Promise.all([
+  const [masters, capabilities, platformLegal, documentHistory] = await Promise.all([
     adminRequest('/masters'),
     adminRequest('/capabilities'),
     legalRequest('/readiness'),
+    legalRequest('/document-history'),
   ]);
   state.masters = Array.isArray(masters) ? masters : [];
   state.capabilities = Array.isArray(capabilities) ? capabilities : [];
   state.platformLegal = platformLegal || null;
+  state.documentHistory = Array.isArray(documentHistory) ? documentHistory : [];
 }
 
 function renderShell() {
@@ -107,7 +143,7 @@ function renderShell() {
         <div class="admin-brand">Book <span>Admin</span></div>
         <nav class="admin-nav">
           <button data-section="overview">Обзор</button>
-          <button data-section="legal">Документы и запуск</button>
+          <button data-section="legal">Документы</button>
           <button data-section="owner" class="owner-link">Мой Book</button>
           <button data-section="masters">Мастера</button>
           <button data-section="capabilities">Возможности</button>
@@ -122,14 +158,9 @@ function renderShell() {
     </div>`;
 
   app.querySelectorAll('[data-section]').forEach((button) => {
-    const locked = state.platformLegal?.state?.status !== 'LEGAL_READY' && button.dataset.section !== 'legal';
-    button.disabled = locked;
+    button.disabled = false;
     button.addEventListener('click', () => {
-      if (state.platformLegal?.state?.status !== 'LEGAL_READY' && button.dataset.section !== 'legal') {
-        state.section = 'legal';
-      } else {
-        state.section = button.dataset.section;
-      }
+      state.section = button.dataset.section;
       renderCurrentSection();
     });
   });
@@ -197,7 +228,7 @@ function renderMasters() {
   const legalReady = state.platformLegal?.state?.status === 'LEGAL_READY';
   content.innerHTML = `
     <div class="admin-heading"><div><h2>Мастера</h2><p>Каждый мастер работает только в своём персональном Book.</p></div></div>
-    ${legalReady ? '' : '<div class="admin-card" style="padding:16px;margin-bottom:14px"><strong>Регистрация реальных мастеров закрыта.</strong><p style="margin:6px 0 0;color:#817a74">Сначала завершите раздел «Документы и запуск» и переведите Book в LEGAL_READY.</p></div>'}
+    ${legalReady ? '' : '<div class="admin-card" style="padding:16px;margin-bottom:14px"><strong>Регистрация реальных мастеров закрыта.</strong><p style="margin:6px 0 0;color:#817a74">Сначала завершите раздел «Документы».</p></div>'}
     <section class="admin-invite-panel">
       <h3>Пригласить мастера</h3>
       <form class="admin-invite-grid" data-invite-form>
@@ -273,46 +304,41 @@ function masterRow(item) {
 }
 
 
-function legalStatusPill(value, goodValue) {
-  const good = value === goodValue;
-  return `<span class="admin-pill ${good ? 'active' : 'pending'}">${escapeHtml(value || '—')}</span>`;
-}
-
 function renderLegalDocumentEditor(content, selectedKey = '') {
   const readiness = state.platformLegal || {};
   const documents = Array.isArray(readiness.documents) ? readiness.documents : [];
-  const preset = PLATFORM_DOCUMENT_PRESETS.find((item) => item.key === selectedKey) || PLATFORM_DOCUMENT_PRESETS[0];
-  const selected = documents.find((item) => item.key === preset.key);
+  const selected = selectedKey ? documents.find((item) => item.key === selectedKey) : null;
   const current = selected?.currentVersion || null;
-  const identity = current?.operatorIdentitySnapshot && typeof current.operatorIdentitySnapshot === 'object'
-    ? current.operatorIdentitySnapshot
-    : {};
-
-  content.querySelector('[data-legal-editor]').innerHTML = `
-    <section class="admin-card" style="padding:18px;margin-top:14px">
-      <h3 style="margin-top:0">${current ? 'Новая версия документа' : 'Публикация документа'}</h3>
-      <form class="admin-form" data-platform-document-form>
-        <label class="admin-field"><span>Документ</span>
-          <select name="key">${PLATFORM_DOCUMENT_PRESETS.map((item) => `<option value="${escapeHtml(item.key)}" ${item.key === preset.key ? 'selected' : ''}>${escapeHtml(item.title)}</option>`).join('')}</select>
-        </label>
-        <label class="admin-field"><span>Название</span><input name="title" value="${escapeHtml(selected?.title || preset.title)}" required></label>
-        <label class="admin-field"><span>Тип</span><input name="type" value="${escapeHtml(selected?.type || preset.type)}" required></label>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
-          <label class="admin-field"><span>Оператор / ИП</span><input name="operatorName" value="${escapeHtml(identity.name || '')}" required></label>
-          <label class="admin-field"><span>ИНН</span><input name="inn" value="${escapeHtml(identity.inn || '')}"></label>
-          <label class="admin-field"><span>ОГРНИП</span><input name="ogrnip" value="${escapeHtml(identity.ogrnip || '')}"></label>
-          <label class="admin-field"><span>Email</span><input name="operatorEmail" type="email" value="${escapeHtml(identity.email || '')}"></label>
+  const identitySource = current?.operatorIdentitySnapshot
+    || documents.find((item) => item.currentVersion?.operatorIdentitySnapshot)?.currentVersion?.operatorIdentitySnapshot
+    || {};
+  const editor = content.querySelector('[data-legal-editor]');
+  const isNew = !selected;
+  editor.innerHTML = `
+    <section class="admin-card admin-document-editor">
+      <div class="admin-document-editor-head">
+        <div>
+          <h3>${isNew ? 'Новый документ' : `Новая версия: ${escapeHtml(selected.title)}`}</h3>
+          <p>${isNew ? 'Дополнительный документ в вашей папке.' : 'Предыдущая версия останется в истории.'}</p>
         </div>
-        <label class="admin-field"><span>Текст документа</span><textarea name="content" rows="18" required>${escapeHtml(current?.contentSnapshot || '')}</textarea></label>
-        <label style="display:flex;gap:8px;align-items:center"><input name="requiredForRegistration" type="checkbox" ${(selected?.requiredForRegistration ?? preset.requiredForRegistration) ? 'checked' : ''}> Обязателен при регистрации мастера</label>
+        <button class="admin-close" type="button" data-close-editor aria-label="Закрыть">×</button>
+      </div>
+      <form class="admin-form" data-platform-document-form>
+        <label class="admin-field"><span>Название</span><input name="title" value="${escapeHtml(selected?.title || '')}" required></label>
+        <label class="admin-field"><span>Текст документа</span><textarea name="content" rows="20" required>${escapeHtml(current?.contentSnapshot || '')}</textarea></label>
         <p class="admin-inline-message" data-platform-document-message></p>
-        <button class="admin-button" type="submit">Опубликовать версию</button>
+        <div class="admin-actions">
+          <button class="admin-button secondary" type="button" data-close-editor>Отмена</button>
+          <button class="admin-button" type="submit">Сохранить версию</button>
+        </div>
       </form>
     </section>`;
 
-  const form = content.querySelector('[data-platform-document-form]');
-  const select = form.querySelector('[name="key"]');
-  select.addEventListener('change', () => renderLegalDocumentEditor(content, select.value));
+  editor.querySelectorAll('[data-close-editor]').forEach((button) => {
+    button.addEventListener('click', () => { editor.innerHTML = ''; });
+  });
+
+  const form = editor.querySelector('[data-platform-document-form]');
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const message = form.querySelector('[data-platform-document-message]');
@@ -321,144 +347,172 @@ function renderLegalDocumentEditor(content, selectedKey = '') {
     message.textContent = '';
     try {
       const data = new FormData(form);
+      const title = String(data.get('title') || '').trim();
+      const key = selected?.key || `custom-${Date.now()}`;
       await legalRequest('/documents', {
         method: 'POST',
         body: JSON.stringify({
-          key: String(data.get('key') || ''),
-          type: String(data.get('type') || ''),
-          title: String(data.get('title') || ''),
+          key,
+          type: selected?.type || 'CUSTOM',
+          title,
           content: String(data.get('content') || ''),
-          operatorIdentity: {
-            name: String(data.get('operatorName') || '').trim(),
-            inn: String(data.get('inn') || '').trim(),
-            ogrnip: String(data.get('ogrnip') || '').trim(),
-            email: String(data.get('operatorEmail') || '').trim(),
-          },
-          requiredForRegistration: data.get('requiredForRegistration') === 'on',
-          requiredForLive: false,
-          requiredForPublicBooking: false,
+          operatorIdentity: identitySource,
+          requiredForRegistration: selected?.requiredForRegistration === true,
+          requiredForLive: selected?.requiredForLive === true,
+          requiredForPublicBooking: selected?.requiredForPublicBooking === true,
         }),
       });
       await refreshData();
       renderLegal();
     } catch (error) {
-      message.textContent = error instanceof Error ? error.message : 'Не удалось опубликовать документ';
+      message.textContent = error instanceof Error ? error.message : 'Не удалось сохранить документ';
       message.classList.add('error');
       button.disabled = false;
     }
   });
 }
 
+function openLegalDocument(item) {
+  if (!item?.currentVersion) return;
+  const version = item.currentVersion;
+  const backdrop = document.createElement('div');
+  backdrop.className = 'admin-drawer-backdrop';
+  backdrop.innerHTML = `
+    <aside class="admin-drawer admin-document-drawer">
+      <div class="admin-drawer-head">
+        <div>
+          <h3>${escapeHtml(item.title)}</h3>
+          <p>Версия ${Number(version.version || 1)} · ${formatDate(version.publishedAt)} · действует</p>
+        </div>
+        <button class="admin-close" data-close aria-label="Закрыть">×</button>
+      </div>
+      <div class="admin-document-content">${escapeHtml(version.contentSnapshot || '')}</div>
+      <div class="admin-actions">
+        <button class="admin-button secondary" data-download>Скачать</button>
+        <button class="admin-button secondary" data-print>Печать / PDF</button>
+        <button class="admin-button" data-new-version>Новая версия</button>
+      </div>
+    </aside>`;
+  document.body.append(backdrop);
+
+  backdrop.querySelector('[data-close]').addEventListener('click', () => backdrop.remove());
+  backdrop.addEventListener('click', (event) => { if (event.target === backdrop) backdrop.remove(); });
+
+  backdrop.querySelector('[data-download]').addEventListener('click', () => {
+    const blob = new Blob([documentHtml(item)], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = documentFileName(item.title, version.version);
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+
+  backdrop.querySelector('[data-print]').addEventListener('click', () => {
+    const popup = window.open('', '_blank', 'noopener,noreferrer');
+    if (!popup) return;
+    popup.document.open();
+    popup.document.write(documentHtml(item));
+    popup.document.close();
+    popup.focus();
+    window.setTimeout(() => popup.print(), 150);
+  });
+
+  backdrop.querySelector('[data-new-version]').addEventListener('click', () => {
+    backdrop.remove();
+    const content = document.querySelector('[data-content]');
+    renderLegalDocumentEditor(content, item.key);
+    content.querySelector('[data-legal-editor]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+}
+
 function renderLegal() {
-  setActiveSection('Документы и запуск');
+  setActiveSection('Документы');
   const content = app.querySelector('[data-content]');
   const readiness = state.platformLegal || {};
   const legalState = readiness.state || {};
-  const documents = Array.isArray(readiness.documents) ? readiness.documents : [];
-  const checklist = legalState.checklist && typeof legalState.checklist === 'object' ? legalState.checklist : {};
+  const documents = (Array.isArray(readiness.documents) ? readiness.documents : [])
+    .filter((item) => item.currentVersion)
+    .sort((a, b) => documentSortIndex(a.key) - documentSortIndex(b.key) || String(a.title).localeCompare(String(b.title), 'ru'));
+  const history = Array.isArray(state.documentHistory) ? state.documentHistory : [];
+  const evidence = legalState.evidenceMetadata && typeof legalState.evidenceMetadata === 'object'
+    ? legalState.evidenceMetadata
+    : {};
+  const rknSubmitted = legalState.filingStatus === 'SUBMITTED';
+  const rknDate = evidence.submittedDate || legalState.submittedAt;
+  const rknNumber = evidence.registrationNumber || legalState.submissionReference || '—';
+  const rknCode = evidence.submissionCode || '—';
 
   content.innerHTML = `
-    <div class="admin-heading"><div><h2>Документы и запуск Book</h2><p>Единственная точка юридической готовности платформы.</p></div></div>
-    <div class="admin-stats">
-      <div class="admin-stat"><strong>${legalStatusPill(legalState.status || 'PRE_LAUNCH', 'LEGAL_READY')}</strong><span>режим платформы</span></div>
-      <div class="admin-stat"><strong>${legalStatusPill(legalState.filingStatus || 'NOT_PREPARED', 'SUBMITTED')}</strong><span>Роскомнадзор</span></div>
-      <div class="admin-stat"><strong>${documents.filter((item) => item.currentVersion).length}</strong><span>опубликовано документов</span></div>
+    <div class="admin-heading">
+      <div>
+        <h2>Документы</h2>
+        <p>Действующие документы, сведения Роскомнадзора и история версий.</p>
+      </div>
     </div>
 
-    <section class="admin-card" style="padding:18px;margin-top:14px">
-      <h3 style="margin-top:0">Документы Book</h3>
-      ${PLATFORM_DOCUMENT_PRESETS.map((preset) => {
-        const doc = documents.find((item) => item.key === preset.key);
-        const version = doc?.currentVersion;
-        return `<div class="admin-capability"><div><strong>${escapeHtml(preset.title)}</strong><small>${version ? `версия ${Number(version.version || 1)} · опубликован` : 'не опубликован'}</small></div><button class="admin-button secondary" data-edit-legal="${escapeHtml(preset.key)}">${version ? 'Новая версия' : 'Добавить'}</button></div>`;
-      }).join('')}
+    <section class="admin-card admin-rkn-card">
+      <div>
+        <span class="admin-card-label">Роскомнадзор</span>
+        <h3>${rknSubmitted ? 'Зарегистрировано в СЭД Роскомнадзора' : 'Сведения о подаче не зафиксированы'}</h3>
+      </div>
+      <div class="admin-rkn-details">
+        <div><span>Дата</span><strong>${formatDate(rknDate)}</strong></div>
+        <div><span>Регистрационный номер</span><strong>${escapeHtml(rknNumber)}</strong></div>
+        <div><span>Код уведомления</span><strong>${escapeHtml(rknCode)}</strong></div>
+      </div>
+    </section>
+
+    <section class="admin-card admin-documents-card">
+      <div class="admin-section-head">
+        <div>
+          <h3>Действующие документы</h3>
+          <p>Открыть, скачать или распечатать можно прямо отсюда.</p>
+        </div>
+        <button class="admin-button secondary" data-add-document>Добавить документ</button>
+      </div>
+      <div class="admin-document-list">
+        ${documents.map((item) => `
+          <div class="admin-document-row">
+            <div>
+              <strong>${escapeHtml(item.title)}</strong>
+              <small>Версия ${Number(item.currentVersion?.version || 1)} · ${formatDate(item.currentVersion?.publishedAt)} · действует</small>
+            </div>
+            <button class="admin-button secondary" data-open-document="${escapeHtml(item.key)}">Открыть</button>
+          </div>`).join('') || '<div class="admin-empty">Документы ещё не загружены.</div>'}
+      </div>
     </section>
 
     <div data-legal-editor></div>
 
-    <section class="admin-card" style="padding:18px;margin-top:14px">
-      <h3 style="margin-top:0">Проверка готовности</h3>
-      ${(readiness.checklistKeys || []).map((key) => {
-        const derived = ['operatorDocumentsPublished', 'privacyPolicyPublished', 'consentFormsPrepared', 'saasAgreementPublished', 'dpaPublished', 'operatorIdentityConfigured', 'rknFilingConfirmed'].includes(key);
-        return `<label style="display:flex;gap:9px;align-items:center;padding:8px 0"><input type="checkbox" data-platform-check="${escapeHtml(key)}" ${checklist[key] === true ? 'checked' : ''} ${legalState.status === 'LEGAL_READY' || derived ? 'disabled' : ''}><span>${escapeHtml(PLATFORM_CHECKLIST_LABELS[key] || key)}</span></label>`;
-      }).join('')}
-      <p class="admin-inline-message" data-platform-check-message></p>
-    </section>
-
-    <section class="admin-card" style="padding:18px;margin-top:14px">
-      <h3 style="margin-top:0">Роскомнадзор и запуск</h3>
-      <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <button class="admin-button secondary" data-platform-prepared ${legalState.filingStatus !== 'NOT_PREPARED' ? 'disabled' : ''}>Документы готовы → PREPARED</button>
-        <button class="admin-button" data-platform-ready ${!readiness.canBecomeLegalReady || legalState.status === 'LEGAL_READY' ? 'disabled' : ''}>Перевести Book в LEGAL_READY</button>
+    <section class="admin-card admin-history-card">
+      <div class="admin-section-head">
+        <div>
+          <h3>История</h3>
+          <p>Старые версии не удаляются и не перезаписываются.</p>
+        </div>
       </div>
-      ${legalState.filingStatus === 'PREPARED' ? `
-        <form class="admin-form" data-platform-submitted-form style="margin-top:14px">
-          <label class="admin-field"><span>Регистрационный номер / подтверждение подачи</span><input name="submissionReference" required></label>
-          <button class="admin-button" type="submit">Зафиксировать SUBMITTED</button>
-          <p class="admin-inline-message" data-platform-submit-message></p>
-        </form>` : ''}
-      ${legalState.filingStatus === 'SUBMITTED' ? `<p style="margin:14px 0 0;color:#817a74">Подача зафиксирована: ${escapeHtml(legalState.submissionReference || 'без номера')}</p>` : ''}
+      <div class="admin-history-list">
+        ${history.slice(0, 30).map((item) => `
+          <div class="admin-history-row">
+            <span>${formatDate(item.publishedAt)}</span>
+            <strong>${escapeHtml(item.title)}</strong>
+            <span>версия ${Number(item.version || 1)}</span>
+            <span class="admin-pill ${item.supersededAt ? '' : 'active'}">${item.supersededAt ? 'архив' : 'действует'}</span>
+          </div>`).join('') || '<div class="admin-empty">История появится после публикации документов.</div>'}
+      </div>
     </section>`;
 
-  content.querySelectorAll('[data-edit-legal]').forEach((button) => {
-    button.addEventListener('click', () => renderLegalDocumentEditor(content, button.dataset.editLegal));
-  });
-
-  content.querySelectorAll('[data-platform-check]').forEach((checkbox) => {
-    checkbox.addEventListener('change', async () => {
-      const message = content.querySelector('[data-platform-check-message]');
-      checkbox.disabled = true;
-      try {
-        state.platformLegal = await legalRequest('/checklist', {
-          method: 'PUT',
-          body: JSON.stringify({ checklist: { [checkbox.dataset.platformCheck]: checkbox.checked } }),
-        });
-        renderLegal();
-      } catch (error) {
-        message.textContent = error instanceof Error ? error.message : 'Не удалось сохранить';
-        message.classList.add('error');
-        checkbox.disabled = false;
-      }
+  content.querySelectorAll('[data-open-document]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const item = documents.find((document) => document.key === button.dataset.openDocument);
+      openLegalDocument(item);
     });
   });
 
-  content.querySelector('[data-platform-prepared]')?.addEventListener('click', async () => {
-    try {
-      state.platformLegal = await legalRequest('/filing/prepared', { method: 'POST', body: '{}' });
-      renderLegal();
-    } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'Не удалось изменить статус');
-    }
-  });
-
-  content.querySelector('[data-platform-submitted-form]')?.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const data = new FormData(form);
-    const message = form.querySelector('[data-platform-submit-message]');
-    try {
-      state.platformLegal = await legalRequest('/filing/submitted', {
-        method: 'POST',
-        body: JSON.stringify({
-          submissionReference: String(data.get('submissionReference') || '').trim(),
-          evidenceMetadata: { source: 'book-admin' },
-        }),
-      });
-      renderLegal();
-    } catch (error) {
-      message.textContent = error instanceof Error ? error.message : 'Не удалось зафиксировать подачу';
-      message.classList.add('error');
-    }
-  });
-
-  content.querySelector('[data-platform-ready]')?.addEventListener('click', async () => {
-    try {
-      state.platformLegal = await legalRequest('/legal-ready', { method: 'POST', body: '{}' });
-      await refreshData();
-      renderLegal();
-    } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'Book пока не готов к LEGAL_READY');
-    }
+  content.querySelector('[data-add-document]')?.addEventListener('click', () => {
+    renderLegalDocumentEditor(content);
+    content.querySelector('[data-legal-editor]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 }
 
