@@ -129,6 +129,7 @@ export class TestMasterService {
         include: {
           memberships: { include: { user: { select: { id: true, email: true } } } },
           masterInvitations: { orderBy: { createdAt: 'desc' }, take: 1 },
+          saasAccess: { select: { status: true } },
         },
       });
       if (!tenant) continue;
@@ -137,6 +138,7 @@ export class TestMasterService {
         tenantId: tenant.id,
         tenantName: tenant.name,
         test: true,
+        accessStatus: tenant.saasAccess?.status || TenantAccessStatus.SUSPENDED,
         operationMode: legalState?.operationMode || 'DEMO',
         filingStatus: legalState?.filingStatus || 'NOT_PREPARED',
         registered: tenant.memberships.length > 0,
@@ -157,9 +159,12 @@ export class TestMasterService {
       SELECT "tenantId" FROM "TestTenant" WHERE "tenantId" = ${tenantId} LIMIT 1
     `;
     if (!rows[0]) throw new NotFoundException('TEST Book не найден');
-    await this.legal.audit(tenantId, adminUserId, 'TEST_MASTER_REMOVED', 'TEST_REGISTRATION', 'SUCCESS', { synthetic: true });
-    await this.prisma.tenant.delete({ where: { id: tenantId } });
-    return { removed: true, tenantId };
+    await this.prisma.tenantAccess.update({
+      where: { tenantId },
+      data: { status: TenantAccessStatus.SUSPENDED },
+    });
+    await this.legal.audit(tenantId, adminUserId, 'TEST_MASTER_DISABLED', 'TEST_REGISTRATION', 'SUCCESS', { synthetic: true });
+    return { disabled: true, tenantId };
   }
 
   async inspect(tokenValue: unknown) {
