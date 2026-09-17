@@ -39,6 +39,7 @@ export class MasterInvitationController {
       token?: unknown;
       password?: unknown;
       saasAgreementAccepted?: unknown;
+      dpaAccepted?: unknown;
       privacyAcknowledged?: unknown;
       pdConsentAccepted?: unknown;
       marketingConsentAccepted?: unknown;
@@ -46,6 +47,11 @@ export class MasterInvitationController {
   ) {
     return this.invitations.accept({
       ...(body || {}),
+      // The current acceptance service stores separate evidence rows for the
+      // SaaS agreement and DPA against their own document-version IDs. Keep
+      // the existing service contract fail-closed by passing its shared
+      // agreement flag only when both visible confirmations were given.
+      saasAgreementAccepted: body?.saasAgreementAccepted === true && body?.dpaAccepted === true,
       technicalEvidence: {
         ip: request.ip || '',
         userAgent: request.headers['user-agent'] || '',

@@ -2,10 +2,13 @@ import { setAuthToken } from '../core/auth.js';
 import { API_BASE } from '../core/environment.js';
 
 const state = document.querySelector('#invite-state');
-const token = new URLSearchParams(location.search).get('token') || '';
+const params = new URLSearchParams(location.search);
+const token = params.get('token') || '';
+const isTest = params.get('test') === '1';
+const invitationBase = isTest ? '/test-master-invitations' : '/master-invitations';
 
 async function post(path, body) {
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetch(`${API_BASE}${invitationBase}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body || {}),
@@ -48,9 +51,11 @@ function legalCheckboxes(invitation, documents) {
   const marketing = byKey.get('marketing-consent');
   const rows = [];
 
-  if (saas || dpa) {
-    const must = Boolean((saas && required(saas, invitation)) || (dpa && required(dpa, invitation)));
-    rows.push(`<label class="invite-legal-check"><input name="saasAgreementAccepted" type="checkbox" ${must ? 'required' : ''}> <span>Принимаю договор / оферту SaaS${dpa ? ' и поручение на обработку ПД (DPA)' : ''}.</span></label>`);
+  if (saas) {
+    rows.push(`<label class="invite-legal-check"><input name="saasAgreementAccepted" type="checkbox" ${required(saas, invitation) ? 'required' : ''}> <span>Принимаю SaaS-оферту / договор использования Book.</span></label>`);
+  }
+  if (dpa) {
+    rows.push(`<label class="invite-legal-check"><input name="dpaAccepted" type="checkbox" ${required(dpa, invitation) ? 'required' : ''}> <span>Принимаю поручение на обработку персональных данных (DPA).</span></label>`);
   }
   if (privacy) {
     rows.push(`<label class="invite-legal-check"><input name="privacyAcknowledged" type="checkbox" ${required(privacy, invitation) ? 'required' : ''}> <span>Ознакомился с политикой обработки персональных данных Book.</span></label>`);
@@ -66,8 +71,12 @@ function legalCheckboxes(invitation, documents) {
 
 function renderForm(invitation, documents) {
   const currentDocuments = Array.isArray(documents) ? documents : [];
+  const testNotice = isTest
+    ? '<p class="invite-success"><strong>TEST.</strong> Это синтетический мастер. Реальные персональные данные и внешние сообщения в этом Book использовать нельзя.</p>'
+    : '';
   state.innerHTML = `
-    <h1>Создайте свой Book</h1>
+    <h1>${isTest ? 'TEST: создание мастера' : 'Создайте свой Book'}</h1>
+    ${testNotice}
     <p>Сначала Book откроется в безопасном режиме DEMO. Реальные клиенты и внешние сообщения станут доступны только после юридической подготовки и перехода в LIVE.</p>
     <div class="invite-meta">
       <strong data-name></strong>
@@ -87,7 +96,7 @@ function renderForm(invitation, documents) {
 
       <section class="invite-legal" aria-label="Юридические документы">
         <h2>Документы</h2>
-        ${currentDocuments.map(documentBlock).join('')}
+        ${currentDocuments.map(documentBlock).join('') || '<p>Опубликованных документов пока нет.</p>'}
         <div class="invite-legal-checks">${legalCheckboxes(invitation, currentDocuments)}</div>
       </section>
 
@@ -129,16 +138,19 @@ function renderForm(invitation, documents) {
     button.disabled = true;
     button.textContent = 'Создаём Book…';
     try {
-      const account = await post('/master-invitations/accept', {
+      const saasAccepted = data.get('saasAgreementAccepted') === 'on';
+      const dpaAccepted = data.get('dpaAccepted') === 'on';
+      const account = await post('/accept', {
         token,
         password,
-        saasAgreementAccepted: data.get('saasAgreementAccepted') === 'on',
+        saasAgreementAccepted: saasAccepted,
+        dpaAccepted,
         privacyAcknowledged: data.get('privacyAcknowledged') === 'on',
         pdConsentAccepted: data.get('pdConsentAccepted') === 'on',
         marketingConsentAccepted: data.get('marketingConsentAccepted') === 'on',
       });
       setAuthToken(account.accessToken, data.get('remember') === 'on');
-      state.innerHTML = '<h1>Book создан</h1><p class="invite-success">Открываем безопасный режим DEMO…</p>';
+      state.innerHTML = `<h1>Book создан</h1><p class="invite-success">${isTest ? 'TEST мастер создан. ' : ''}Открываем безопасный режим DEMO…</p>`;
       window.setTimeout(() => location.replace('../'), 350);
     } catch (acceptError) {
       error.textContent = acceptError instanceof Error ? acceptError.message : 'Не удалось принять приглашение';
@@ -153,8 +165,8 @@ if (!token) {
 } else {
   try {
     const [invitation, documents] = await Promise.all([
-      post('/master-invitations/inspect', { token }),
-      post('/master-invitations/documents', {}),
+      post('/inspect', { token }),
+      post('/documents', { token }),
     ]);
     renderForm(invitation, documents);
   } catch (error) {
