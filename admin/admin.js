@@ -228,7 +228,7 @@ function renderMasters() {
   const legalReady = state.platformLegal?.state?.status === 'LEGAL_READY';
   content.innerHTML = `
     <div class="admin-heading"><div><h2>Мастера</h2><p>Каждый мастер работает только в своём персональном Book.</p></div></div>
-    ${legalReady ? '' : '<div class="admin-card" style="padding:16px;margin-bottom:14px"><strong>Регистрация реальных мастеров закрыта.</strong><p style="margin:6px 0 0;color:#817a74">Сначала завершите раздел «Документы и запуск» и переведите Book в LEGAL_READY.</p></div>'}
+    ${legalReady ? '' : '<div class="admin-card" style="padding:16px;margin-bottom:14px"><strong>Регистрация реальных мастеров закрыта.</strong><p style="margin:6px 0 0;color:#817a74">Сначала завершите раздел «Документы».</p></div>'}
     <section class="admin-invite-panel">
       <h3>Пригласить мастера</h3>
       <form class="admin-invite-grid" data-invite-form>
@@ -454,7 +454,7 @@ function renderLegal() {
     <section class="admin-card admin-rkn-card">
       <div>
         <span class="admin-card-label">Роскомнадзор</span>
-        <h3>${rknSubmitted ? 'Уведомление зарегистрировано' : 'Сведения о подаче не зафиксированы'}</h3>
+        <h3>${rknSubmitted ? 'Зарегистрировано в СЭД Роскомнадзора' : 'Сведения о подаче не зафиксированы'}</h3>
       </div>
       <div class="admin-rkn-details">
         <div><span>Дата</span><strong>${formatDate(rknDate)}</strong></div>
