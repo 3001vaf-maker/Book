@@ -3,7 +3,6 @@ import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ClientContactRouteService } from '../communication/client-contact-route.service';
 import { CommunicationService } from '../communication/communication.service';
-import { ConsentPolicyService } from '../document-state/consent-policy.service';
 import { LegalRuntimeService } from '../legal-runtime/legal-runtime.service';
 import { NotificationService } from '../notification/notification.service';
 import { bookingTemplateValues, NotificationTemplateService } from '../notification/notification-template.service';
@@ -25,7 +24,6 @@ export class OnlineBookingController {
     private readonly templates: NotificationTemplateService,
     private readonly communications: CommunicationService,
     private readonly contactRoutes: ClientContactRouteService,
-    private readonly consents: ConsentPolicyService,
     private readonly webPush: WebPushService,
     private readonly clientCards: ClientCardLinkService,
     private readonly legal: LegalRuntimeService,
@@ -35,16 +33,10 @@ export class OnlineBookingController {
     const account = await this.booking.getAccount(tenantId, accountId);
     const identity = await this.communications.telegramIdentity(tenantId, { phone: account.phone, uei: account.uei });
     if (!identity) return { telegram: { linked: false, enabled: false, username: '' } };
-    const consent = await this.consents.contactPointConsentState(
-      tenantId,
-      'TELEGRAM',
-      identity.externalUserId,
-      'messages-consent',
-    );
     return {
       telegram: {
         linked: true,
-        enabled: Boolean(consent.allowed),
+        enabled: true,
         username: identity.display || '',
       },
     };
@@ -156,24 +148,7 @@ export class OnlineBookingController {
   @Post(':tenantId/account/telegram-entry')
   async bindTelegramEntry(@Param('tenantId') tenantId: string, @Req() request: AccountRequest, @Body() body: { token?: unknown }) {
     await this.legal.assertPublicBooking(tenantId);
-    const accountId = request.bookingAccountAuth!.accountId;
-    const result = await this.communications.bindTelegramEntry(tenantId, accountId, body?.token);
-    const accountConsent = await this.consents.accountConsentProjection(tenantId, accountId);
-    const messagesAccepted = accountConsent.some((item) => item.documentId === 'messages-consent' && item.accepted);
-    if (messagesAccepted) {
-      const account = await this.booking.getAccount(tenantId, accountId);
-      const identity = await this.communications.telegramIdentity(tenantId, { phone: account.phone, uei: account.uei });
-      if (identity?.externalUserId) {
-        await this.consents.acceptContactPointConsent(
-          tenantId,
-          'TELEGRAM',
-          identity.externalUserId,
-          'messages-consent',
-          'telegram-contact-link',
-        );
-      }
-    }
-    return result;
+    return this.communications.bindTelegramEntry(tenantId, request.bookingAccountAuth!.accountId, body?.token);
   }
 
   @UseGuards(BookingAccountGuard)
@@ -181,38 +156,6 @@ export class OnlineBookingController {
   async chatSettings(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
     await this.legal.assertPublicBooking(tenantId);
     return this.accountTelegramSettings(tenantId, request.bookingAccountAuth!.accountId);
-  }
-
-  @UseGuards(BookingAccountGuard)
-  @Put(':tenantId/account/chat/telegram-consent')
-  async updateTelegramConsent(
-    @Param('tenantId') tenantId: string,
-    @Req() request: AccountRequest,
-    @Body() body: { enabled?: unknown },
-  ) {
-    await this.legal.assertPublicBooking(tenantId);
-    const accountId = request.bookingAccountAuth!.accountId;
-    const account = await this.booking.getAccount(tenantId, accountId);
-    const identity = await this.communications.telegramIdentity(tenantId, { phone: account.phone, uei: account.uei });
-    if (!identity) throw new BadRequestException('Telegram не привязан');
-    if (body?.enabled === true) {
-      await this.consents.acceptContactPointConsent(
-        tenantId,
-        'TELEGRAM',
-        identity.externalUserId,
-        'messages-consent',
-        'client-chat-settings',
-      );
-    } else {
-      await this.consents.revokeContactPointConsent(
-        tenantId,
-        'TELEGRAM',
-        identity.externalUserId,
-        'messages-consent',
-        'client-chat-settings',
-      );
-    }
-    return this.accountTelegramSettings(tenantId, accountId);
   }
 
   @UseGuards(BookingAccountGuard)
