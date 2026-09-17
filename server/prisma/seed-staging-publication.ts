@@ -121,43 +121,50 @@ async function main() {
         "updatedAt" = CURRENT_TIMESTAMP
     `;
 
-    const existingDocument = await tx.$queryRaw<Array<{ id: string }>>`
-      SELECT "id" FROM "LegalDocument"
-      WHERE "scope" = 'TENANT' AND "tenantId" = ${tenantId} AND "key" = 'privacy-policy'
-      LIMIT 1
-    `;
-    const documentId = existingDocument[0]?.id || randomUUID();
-    if (!existingDocument[0]) {
-      await tx.$executeRaw`
-        INSERT INTO "LegalDocument" (
-          "id", "scope", "tenantId", "key", "type", "title",
-          "requiredForRegistration", "requiredForLive", "requiredForPublicBooking",
-          "isActive", "createdAt", "updatedAt"
-        ) VALUES (
-          ${documentId}, 'TENANT', ${tenantId}, 'privacy-policy', 'PRIVACY_POLICY',
-          'Synthetic staging privacy policy', false, true, true, true,
-          CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-        )
-      `;
-    }
+    const tenantDocuments = [
+      { key: 'privacy-policy', type: 'PRIVACY_POLICY', title: 'Synthetic staging privacy policy' },
+      { key: 'client-pd-consent', type: 'CLIENT_PD_CONSENT', title: 'Synthetic staging client PD consent' },
+      { key: 'service-offer', type: 'SERVICE_OFFER', title: 'Synthetic staging service offer' },
+    ];
 
-    const existingVersion = await tx.$queryRaw<Array<{ id: string }>>`
-      SELECT "id" FROM "LegalDocumentVersion"
-      WHERE "documentId" = ${documentId} AND "supersededAt" IS NULL
-      LIMIT 1
-    `;
-    if (!existingVersion[0]) {
-      const content = 'Synthetic staging-only privacy policy. No real personal data is intended for this environment.';
-      await tx.$executeRaw`
-        INSERT INTO "LegalDocumentVersion" (
-          "id", "documentId", "version", "contentSnapshot", "contentHash",
-          "operatorIdentitySnapshot", "publishedAt", "supersededAt"
-        ) VALUES (
-          ${randomUUID()}, ${documentId}, 1, ${content}, ${hash(content)},
-          '{"name":"Book Staging","synthetic":true}'::jsonb,
-          CURRENT_TIMESTAMP, NULL
-        )
+    for (const item of tenantDocuments) {
+      const existingDocument = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT "id" FROM "LegalDocument"
+        WHERE "scope" = 'TENANT' AND "tenantId" = ${tenantId} AND "key" = ${item.key}
+        LIMIT 1
       `;
+      const documentId = existingDocument[0]?.id || randomUUID();
+      if (!existingDocument[0]) {
+        await tx.$executeRaw`
+          INSERT INTO "LegalDocument" (
+            "id", "scope", "tenantId", "key", "type", "title",
+            "requiredForRegistration", "requiredForLive", "requiredForPublicBooking",
+            "isActive", "createdAt", "updatedAt"
+          ) VALUES (
+            ${documentId}, 'TENANT', ${tenantId}, ${item.key}, ${item.type}, ${item.title},
+            false, true, true, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+          )
+        `;
+      }
+
+      const existingVersion = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT "id" FROM "LegalDocumentVersion"
+        WHERE "documentId" = ${documentId} AND "supersededAt" IS NULL
+        LIMIT 1
+      `;
+      if (!existingVersion[0]) {
+        const content = `Synthetic staging-only ${item.key}. No real personal data is intended for this environment.`;
+        await tx.$executeRaw`
+          INSERT INTO "LegalDocumentVersion" (
+            "id", "documentId", "version", "contentSnapshot", "contentHash",
+            "operatorIdentitySnapshot", "publishedAt", "supersededAt"
+          ) VALUES (
+            ${randomUUID()}, ${documentId}, 1, ${content}, ${hash(content)},
+            '{"name":"Book Staging","synthetic":true}'::jsonb,
+            CURRENT_TIMESTAMP, NULL
+          )
+        `;
+      }
     }
 
     await tx.bookingPublication.upsert({
