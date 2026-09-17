@@ -77,7 +77,7 @@ export function getLatestAccountConsent(accountId, documentId) {
     && item.documentId === targetDocument));
 }
 
-export function getLatestContactConsent(typeValue, value, documentId = 'messages-consent') {
+export function getLatestContactConsent(typeValue, value, documentId) {
   const type = contactPointType(typeValue);
   const normalizedValue = contactPointValue(type, value);
   const targetDocument = String(documentId || '').trim();
