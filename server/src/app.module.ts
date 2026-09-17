@@ -15,6 +15,7 @@ import { MasterInvitationModule } from './master-invitation/master-invitation.mo
 import { SaasAdminModule } from './saas-admin/saas-admin.module';
 import { ManualInvitationModule } from './manual-invitation/manual-invitation.module';
 import { LegalRuntimeModule } from './legal-runtime/legal-runtime.module';
+import { TestMasterModule } from './test-master/test-master.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { LegalRuntimeModule } from './legal-runtime/legal-runtime.module';
     MasterInvitationModule,
     ManualInvitationModule,
     SaasAdminModule,
+    TestMasterModule,
   ],
   controllers: [HealthController],
   providers: [PrismaService],
