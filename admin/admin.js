@@ -128,7 +128,7 @@ async function refreshData() {
     adminRequest('/masters'),
     adminRequest('/capabilities'),
     legalRequest('/readiness'),
-    legalRequest('/document-history'),
+    legalRequest('/document-history').catch(() => []),
   ]);
   state.masters = Array.isArray(masters) ? masters : [];
   state.capabilities = Array.isArray(capabilities) ? capabilities : [];
