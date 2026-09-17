@@ -153,26 +153,26 @@ export class LegalRuntimeService implements OnModuleInit {
     if (!state) return;
 
     for (const item of PLATFORM_LEGAL_PACKAGE) {
+      await this.prisma.$executeRaw`
+        INSERT INTO "LegalDocument" (
+          "id", "scope", "tenantId", "key", "type", "title",
+          "requiredForRegistration", "requiredForLive", "requiredForPublicBooking",
+          "isActive", "createdAt", "updatedAt"
+        ) VALUES (
+          ${randomUUID()}, 'PLATFORM', NULL, ${item.key}, ${item.type}, ${item.title},
+          ${item.requiredForRegistration}, false, false,
+          true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        )
+        ON CONFLICT DO NOTHING
+      `;
+
       const existing = await this.prisma.$queryRaw<Array<{ id: string }>>`
         SELECT "id" FROM "LegalDocument"
         WHERE "scope" = 'PLATFORM' AND "tenantId" IS NULL AND "key" = ${item.key}
         LIMIT 1
       `;
-      const documentId = existing[0]?.id || randomUUID();
-
-      if (!existing[0]) {
-        await this.prisma.$executeRaw`
-          INSERT INTO "LegalDocument" (
-            "id", "scope", "tenantId", "key", "type", "title",
-            "requiredForRegistration", "requiredForLive", "requiredForPublicBooking",
-            "isActive", "createdAt", "updatedAt"
-          ) VALUES (
-            ${documentId}, 'PLATFORM', NULL, ${item.key}, ${item.type}, ${item.title},
-            ${item.requiredForRegistration}, false, false,
-            true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-          )
-        `;
-      }
+      const documentId = existing[0]?.id;
+      if (!documentId) continue;
 
       const versions = await this.prisma.$queryRaw<Array<{ id: string }>>`
         SELECT "id" FROM "LegalDocumentVersion"
@@ -189,6 +189,7 @@ export class LegalRuntimeService implements OnModuleInit {
             ${json(PLATFORM_OPERATOR_IDENTITY)}::jsonb,
             CURRENT_TIMESTAMP, NULL
           )
+          ON CONFLICT DO NOTHING
         `;
       }
     }
