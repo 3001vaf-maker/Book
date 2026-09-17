@@ -122,8 +122,14 @@ function renderShell() {
     </div>`;
 
   app.querySelectorAll('[data-section]').forEach((button) => {
+    const locked = state.platformLegal?.state?.status !== 'LEGAL_READY' && button.dataset.section !== 'legal';
+    button.disabled = locked;
     button.addEventListener('click', () => {
-      state.section = button.dataset.section;
+      if (state.platformLegal?.state?.status !== 'LEGAL_READY' && button.dataset.section !== 'legal') {
+        state.section = 'legal';
+      } else {
+        state.section = button.dataset.section;
+      }
       renderCurrentSection();
     });
   });
@@ -372,7 +378,10 @@ function renderLegal() {
 
     <section class="admin-card" style="padding:18px;margin-top:14px">
       <h3 style="margin-top:0">Проверка готовности</h3>
-      ${(readiness.checklistKeys || []).map((key) => `<label style="display:flex;gap:9px;align-items:center;padding:8px 0"><input type="checkbox" data-platform-check="${escapeHtml(key)}" ${checklist[key] === true ? 'checked' : ''} ${legalState.status === 'LEGAL_READY' ? 'disabled' : ''}><span>${escapeHtml(PLATFORM_CHECKLIST_LABELS[key] || key)}</span></label>`).join('')}
+      ${(readiness.checklistKeys || []).map((key) => {
+        const derived = ['operatorDocumentsPublished', 'privacyPolicyPublished', 'consentFormsPrepared', 'saasAgreementPublished', 'dpaPublished', 'operatorIdentityConfigured', 'rknFilingConfirmed'].includes(key);
+        return `<label style="display:flex;gap:9px;align-items:center;padding:8px 0"><input type="checkbox" data-platform-check="${escapeHtml(key)}" ${checklist[key] === true ? 'checked' : ''} ${legalState.status === 'LEGAL_READY' || derived ? 'disabled' : ''}><span>${escapeHtml(PLATFORM_CHECKLIST_LABELS[key] || key)}</span></label>`;
+      }).join('')}
       <p class="admin-inline-message" data-platform-check-message></p>
     </section>
 
