@@ -28,15 +28,29 @@ export class ManualInvitationController {
   }
 
   @Post('accept')
-  accept(@Body() body: {
-    token?: unknown;
-    name?: unknown;
-    surname?: unknown;
-    phone?: unknown;
-    email?: unknown;
-    password?: unknown;
-  }) {
-    return this.manualInvitations.accept(body || {});
+  accept(
+    @Req() request: Request,
+    @Body() body: {
+      token?: unknown;
+      name?: unknown;
+      surname?: unknown;
+      phone?: unknown;
+      email?: unknown;
+      password?: unknown;
+      saasAgreementAccepted?: unknown;
+      dpaAccepted?: unknown;
+      privacyAcknowledged?: unknown;
+      pdConsentAccepted?: unknown;
+      marketingConsentAccepted?: unknown;
+    },
+  ) {
+    return this.manualInvitations.accept({
+      ...(body || {}),
+      technicalEvidence: {
+        ip: request.ip || '',
+        userAgent: request.headers['user-agent'] || '',
+      },
+    });
   }
 
   @Post('repair-profile')
