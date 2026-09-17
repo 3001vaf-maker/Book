@@ -82,6 +82,36 @@ node -e 'const p=JSON.parse(process.argv[1]);if(p.state?.status!=="PRE_LAUNCH")p
 expect_status 403 GET "$base/online-booking/$tenant_id/context"
 expect_status 403 POST "$base/saas-admin/invitations" '{"email":"must-not-send@book.local","name":"Blocked"}'
 
+# PRE_LAUNCH still permits the isolated TEST path. It uses a reserved .invalid email, sends no email,
+# remains DEMO, and the database itself forbids switching a TEST tenant to LIVE.
+test_invite=$(curl -fsS -X POST "${auth[@]}" "${json_header[@]}" -d '{"name":"Synthetic Smoke"}' "$base/saas-admin/test-masters")
+test_tenant_id=$(node -e 'const p=JSON.parse(process.argv[1]);if(!p.tenantId||!p.invitePath)process.exit(1);process.stdout.write(p.tenantId)' "$test_invite")
+test_token=$(node -e 'const p=JSON.parse(process.argv[1]);const u=new URL(p.invitePath,"http://book.local");const t=u.searchParams.get("token");if(!t)process.exit(1);process.stdout.write(t)' "$test_invite")
+test_mark=$($compose exec -T db psql -U book -d book_staging -At -c "SELECT COUNT(*) FROM \"TestTenant\" WHERE \"tenantId\"='$test_tenant_id';")
+test "$test_mark" = "1"
+test_mode=$($compose exec -T db psql -U book -d book_staging -At -c "SELECT \"operationMode\" FROM \"TenantLegalState\" WHERE \"tenantId\"='$test_tenant_id';")
+test "$test_mode" = "DEMO"
+
+inspect_test=$(curl -fsS -H 'Content-Type: application/json' -d "{\"token\":\"$test_token\"}" "$base/test-master-invitations/inspect")
+node -e 'const p=JSON.parse(process.argv[1]);if(p.test!==true||!String(p.email||"").endsWith("@book.invalid"))process.exit(1)' "$inspect_test"
+test_docs=$(curl -fsS -H 'Content-Type: application/json' -d "{\"token\":\"$test_token\"}" "$base/test-master-invitations/documents")
+node -e 'const p=JSON.parse(process.argv[1]);if(!Array.isArray(p)||!p.some(x=>x.key==="dpa"))process.exit(1)' "$test_docs"
+
+test_accept_body=$(node -e 'process.stdout.write(JSON.stringify({token:process.argv[1],password:"SyntheticSmoke123!",saasAgreementAccepted:true,dpaAccepted:true,privacyAcknowledged:true,pdConsentAccepted:true,marketingConsentAccepted:false}))' "$test_token")
+test_account=$(curl -fsS -H 'Content-Type: application/json' -d "$test_accept_body" "$base/test-master-invitations/accept")
+node -e 'const p=JSON.parse(process.argv[1]);if(p.test!==true||p.legal?.operationMode!=="DEMO"||!p.accessToken)process.exit(1)' "$test_account"
+acceptance_count=$($compose exec -T db psql -U book -d book_staging -At -c "SELECT COUNT(*) FROM \"LegalAcceptanceEvent\" WHERE \"tenantId\"='$test_tenant_id' AND \"source\"='test-master-registration';")
+test "${acceptance_count:-0}" -ge 4
+expect_status 200 GET "$base/platform/legal/acceptances"
+
+if $compose exec -T db psql -U book -d book_staging -v ON_ERROR_STOP=1 -c "UPDATE \"TenantLegalState\" SET \"operationMode\"='LIVE' WHERE \"tenantId\"='$test_tenant_id';" >/dev/null 2>&1; then
+  echo 'TEST tenant unexpectedly entered LIVE' >&2
+  exit 1
+fi
+expect_status 200 DELETE "$base/saas-admin/test-masters/$test_tenant_id"
+test_access=$($compose exec -T db psql -U book -d book_staging -At -c "SELECT \"status\" FROM \"TenantAccess\" WHERE \"tenantId\"='$test_tenant_id';")
+test "$test_access" = "SUSPENDED"
+
 ready=$(curl -fsS -X POST "${auth[@]}" "$base/platform/legal/legal-ready")
 node -e 'const p=JSON.parse(process.argv[1]);if(p.state?.status!=="LEGAL_READY")process.exit(1)' "$ready"
 expect_status 200 GET "$base/online-booking/$tenant_id/context"
