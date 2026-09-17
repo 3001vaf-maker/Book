@@ -81,6 +81,7 @@ prelaunch=$(curl -fsS -X POST "${auth[@]}" "${json_header[@]}" -d '{"reason":"st
 node -e 'const p=JSON.parse(process.argv[1]);if(p.state?.status!=="PRE_LAUNCH")process.exit(1)' "$prelaunch"
 expect_status 403 GET "$base/online-booking/$tenant_id/context"
 expect_status 403 POST "$base/saas-admin/invitations" '{"email":"must-not-send@book.local","name":"Blocked"}'
+expect_status 403 POST "$base/saas-admin/manual-invitations" '{}'
 
 ready=$(curl -fsS -X POST "${auth[@]}" "$base/platform/legal/legal-ready")
 node -e 'const p=JSON.parse(process.argv[1]);if(p.state?.status!=="LEGAL_READY")process.exit(1)' "$ready"
@@ -93,6 +94,53 @@ invited_mode=$($compose exec -T db psql -U book -d book_staging -At -c "SELECT \
 test "$invited_mode" = "DEMO"
 created_actor=$($compose exec -T db psql -U book -d book_staging -At -c "SELECT COALESCE(\"actorUserId\", '') FROM \"LegalStateEvent\" WHERE \"tenantId\"='$invited_tenant_id' AND \"changeType\"='TENANT_CREATED_DEMO' ORDER BY \"occurredAt\" DESC LIMIT 1;")
 test "$created_actor" = "$user_id"
+
+# The manual-link master path must use the same legal chain: platform docs -> acceptance -> DEMO -> tenant docs -> filing -> LIVE.
+manual_invite=$(curl -fsS -X POST "${auth[@]}" "$base/saas-admin/manual-invitations")
+manual_tenant_id=$(node -e 'const p=JSON.parse(process.argv[1]);if(!p.tenantId||!p.url)process.exit(1);process.stdout.write(p.tenantId)' "$manual_invite")
+manual_token=$(node -e 'const p=JSON.parse(process.argv[1]);const u=new URL(p.url);const t=u.searchParams.get("token");if(!t)process.exit(1);process.stdout.write(t)' "$manual_invite")
+manual_mode=$($compose exec -T db psql -U book -d book_staging -At -c "SELECT \"operationMode\" FROM \"TenantLegalState\" WHERE \"tenantId\"='$manual_tenant_id';")
+test "$manual_mode" = "DEMO"
+
+manual_inspect=$(curl -fsS -H 'Content-Type: application/json' -d "{\"token\":\"$manual_token\"}" "$base/manual-invitations/inspect")
+node -e 'const p=JSON.parse(process.argv[1]);const d=Array.isArray(p.documents)?p.documents:[];for(const k of ["privacy-policy","saas-agreement","dpa","master-pd-consent"]){if(!d.some(x=>x.key===k))process.exit(1)}' "$manual_inspect"
+
+manual_accept_body=$(node -e 'process.stdout.write(JSON.stringify({
+  token:process.argv[1],
+  name:"Legal",surname:"Master",phone:"+79990000991",email:"manual-legal-master@book.invalid",
+  password:"ManualLegal123!",
+  saasAgreementAccepted:true,dpaAccepted:true,privacyAcknowledged:true,pdConsentAccepted:true,marketingConsentAccepted:false
+}))' "$manual_token")
+manual_account=$(curl -fsS -H 'Content-Type: application/json' -d "$manual_accept_body" "$base/manual-invitations/accept")
+manual_master_token=$(node -e 'const p=JSON.parse(process.argv[1]);if(!p.accessToken||p.legal?.operationMode!=="DEMO")process.exit(1);process.stdout.write(p.accessToken)' "$manual_account")
+manual_auth=(-H "Authorization: Bearer $manual_master_token")
+manual_acceptance_count=$($compose exec -T db psql -U book -d book_staging -At -c "SELECT COUNT(*) FROM \"LegalAcceptanceEvent\" WHERE \"tenantId\"='$manual_tenant_id' AND \"source\"='manual-master-registration';")
+test "${manual_acceptance_count:-0}" -ge 4
+manual_dpa=$($compose exec -T db psql -U book -d book_staging -At -c "SELECT COALESCE((\"checklist\"->>'dpaAccepted')::boolean,false) FROM \"TenantLegalState\" WHERE \"tenantId\"='$manual_tenant_id';")
+test "$manual_dpa" = "t"
+
+publish_tenant_doc() {
+  local key="$1" type="$2" title="$3"
+  local body
+  body=$(node -e 'process.stdout.write(JSON.stringify({
+    key:process.argv[1],type:process.argv[2],title:process.argv[3],
+    content:"Synthetic staging legal document for "+process.argv[1],
+    operatorIdentity:{name:"Synthetic Legal Master",inn:"000000000000",email:"manual-legal-master@book.invalid"},
+    requiredForRegistration:false,requiredForLive:true,requiredForPublicBooking:true
+  }))' "$key" "$type" "$title")
+  curl -fsS -X POST "${manual_auth[@]}" -H 'Content-Type: application/json' -d "$body" "$base/legal/documents" >/dev/null
+}
+publish_tenant_doc "privacy-policy" "PRIVACY_POLICY" "Synthetic privacy policy"
+publish_tenant_doc "client-pd-consent" "CLIENT_PD_CONSENT" "Synthetic client PD consent"
+publish_tenant_doc "service-offer" "SERVICE_OFFER" "Synthetic service offer"
+
+curl -fsS -X PUT "${manual_auth[@]}" -H 'Content-Type: application/json' -d '{"checklist":{"rknFilingPrepared":true}}' "$base/legal/checklist" >/dev/null
+manual_prepared=$(curl -fsS -X POST "${manual_auth[@]}" "$base/legal/filing/prepared")
+node -e 'const p=JSON.parse(process.argv[1]);if(p.state?.filingStatus!=="PREPARED")process.exit(1)' "$manual_prepared"
+manual_submitted=$(curl -fsS -X POST "${manual_auth[@]}" -H 'Content-Type: application/json' -d '{"submissionReference":"STAGING-MANUAL-MASTER-FILING","evidenceMetadata":{"synthetic":true}}' "$base/legal/filing/submitted")
+node -e 'const p=JSON.parse(process.argv[1]);if(p.state?.filingStatus!=="SUBMITTED"||p.canBecomeLive!==true)process.exit(1)' "$manual_submitted"
+manual_live=$(curl -fsS -X POST "${manual_auth[@]}" "$base/legal/live")
+node -e 'const p=JSON.parse(process.argv[1]);if(p.state?.operationMode!=="LIVE")process.exit(1)' "$manual_live"
 
 # Published legal evidence must be immutable in PostgreSQL itself, not only through service code.
 version_count=$($compose exec -T db psql -U book -d book_staging -At -c 'SELECT COUNT(*) FROM "LegalDocumentVersion";')
