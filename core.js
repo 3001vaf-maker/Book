@@ -163,7 +163,7 @@ function renderWorkspace() {
   if (!sectionAllowed(state.activeSection)) state.activeSection = defaultSection();
   const view = routes[state.activeSection];
   const demoBanner = isDemoMode()
-    ? '<button class="demo-mode-banner" type="button" data-demo-banner><strong>DEMO</strong><span>Режим настройки · перейти к LIVE</span><b>›</b></button>'
+    ? '<button class="demo-mode-banner" type="button" data-demo-banner><strong>DEMO</strong><span>Помощник настройки · переход к LIVE</span><b>›</b></button>'
     : '';
   app.innerHTML = `${demoBanner}<main class="app-content ${isDemoMode() ? 'app-content--with-demo-banner' : ''}" id="app-content"></main>${bottomNavigation(state.activeSection, allowedSections())}`;
   const requestedFolder = state.activeSection === 'settings' ? pendingSettingsFolder : '';
@@ -232,26 +232,72 @@ function closeModal(node) {
   node?.closest('.modal-backdrop')?.remove();
 }
 
-function setupRow(label, ready, target) {
+function setupRow(label, ready, target, note = '') {
   return `<button class="demo-setup-row" type="button" data-demo-target="${escapeHtml(target)}">
-    <span>${ready ? '✓' : '○'}</span><strong>${escapeHtml(label)}</strong><b>›</b>
+    <span>${ready ? '✓' : '○'}</span>
+    <span class="demo-setup-row__copy"><strong>${escapeHtml(label)}</strong>${note ? `<small>${escapeHtml(note)}</small>` : ''}</span>
+    <b>›</b>
   </button>`;
 }
 
+function demoStage(title, subtitle, rows) {
+  const content = rows.filter(Boolean).join('');
+  if (!content) return '';
+  return `<section class="demo-stage">
+    <div class="demo-stage__head">
+      <strong>${escapeHtml(title)}</strong>
+      <span>${escapeHtml(subtitle)}</span>
+    </div>
+    <div class="demo-setup-list">${content}</div>
+  </section>`;
+}
+
+function openDemoTarget(target) {
+  if (target === 'timetable' || target === 'journal' || target === 'chat') {
+    navigate(target);
+    return;
+  }
+  openSettingsTarget(target);
+}
+
 function openDemoHub() {
-  const rows = [
-    setupRow('Профиль и рабочее место', profileSetupReady(), 'profile'),
-    canUseBookCapability('services.access') ? setupRow('Услуги и цены', getProcedures().length > 0, 'service') : '',
-    canUseBookCapability('timetable.access') ? setupRow('График работы', getDays().length > 0, 'timetable') : '',
-    canUseBookCapability('documents.access') ? setupRow('Документы для клиентов', profileSetupReady(), 'documents') : '',
-  ].filter(Boolean).join('');
+  const profileStage = demoStage(
+    'Этап 1 — Профиль',
+    'Проверьте данные из регистрации и дозаполните профиль.',
+    [
+      setupRow('Профиль и рабочее место', profileSetupReady(), 'profile', 'Имя и контакты уже подставлены из регистрации'),
+    ],
+  );
+
+  const workStage = demoStage(
+    'Этап 2 — Работа',
+    'Подготовьте ежедневную работу. Можно заполнять в удобном порядке.',
+    [
+      canUseBookCapability('services.access') ? setupRow('Услуги и цены', getProcedures().length > 0, 'service') : '',
+      canUseBookCapability('timetable.access') ? setupRow('График работы', getDays().length > 0, 'timetable') : '',
+      canUseBookCapability('journal.access') ? setupRow('Журнал', false, 'journal') : '',
+    ],
+  );
+
+  const capabilityStage = demoStage(
+    'Этап 3 — Возможности Book',
+    'Здесь только те разделы, которые открыты вашему Book.',
+    [
+      canUseBookCapability('online_booking.access') ? setupRow('Онлайн-запись', tenantRuntime?.state?.operationMode === 'LIVE', 'online-booking') : '',
+      canUseBookCapability('notifications.access') ? setupRow('Уведомления', false, 'communications') : '',
+      canUseBookCapability('chat.access') ? setupRow('Чат', false, 'chat') : '',
+      canUseBookCapability('integrations.access') ? setupRow('Интеграции', false, 'integrations') : '',
+      canUseBookCapability('documents.access') ? setupRow('Документы для клиентов', profileSetupReady(), 'documents', 'Формируются автоматически после готового профиля') : '',
+      canUseBookCapability('tags.access') ? setupRow('Ярлыки', false, 'tags') : '',
+    ],
+  );
 
   const m = mountModal(document.body, modal(`
     <div class="modal-title">
       <h2>Book работает в DEMO</h2>
-      <p>Настраивайте приложение и знакомьтесь с доступными разделами. Реальные клиентские операции откроются после перехода в LIVE.</p>
+      <p>Помощник ведёт по этапам, но ничего не блокирует. Можно закрыть его и пользоваться любыми открытыми разделами DEMO в своём порядке.</p>
     </div>
-    <div class="demo-setup-list">${rows}</div>
+    <div class="demo-stages">${profileStage}${workStage}${capabilityStage}</div>
     ${actionBlock(button('Перейти к LIVE', { data: 'data-demo-go-live' }))}
   `, { variant: 'medium', surface: 'app' }));
   if (!m) return;
@@ -260,11 +306,7 @@ function openDemoHub() {
     row.addEventListener('click', () => {
       const target = row.dataset.demoTarget;
       m.remove();
-      if (target === 'timetable') {
-        navigate('timetable');
-        return;
-      }
-      openSettingsTarget(target);
+      openDemoTarget(target);
     });
   });
   m.querySelector('[data-demo-go-live]')?.addEventListener('click', () => {
