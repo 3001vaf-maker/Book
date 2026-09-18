@@ -1,0 +1,56 @@
+import assert from 'node:assert/strict';
+import { existsSync, readFileSync } from 'node:fs';
+
+const catalogModule = await import('../admin/document-registry/catalog.js');
+const bookDocs = catalogModule.getRegistryBookUserDocuments();
+const userBases = catalogModule.getRegistryUserDocumentBases();
+
+assert.equal(bookDocs.length, 6, 'Document Registry must contain exactly 6 Book ↔ user documents');
+assert.equal(userBases.length, 3, 'Document Registry must contain exactly 3 user document bases');
+assert.equal(new Set([...bookDocs, ...userBases].map((item) => item.key)).size, 9, 'Registry document keys must be unique');
+
+for (const item of [...bookDocs, ...userBases]) {
+  assert.ok(item.title?.trim(), `Missing title for ${item.key}`);
+  assert.ok(item.content?.trim().length > 500, `Document content is unexpectedly short for ${item.key}`);
+}
+
+const admin = readFileSync(new URL('../admin/admin.js', import.meta.url), 'utf8');
+const view = readFileSync(new URL('../admin/document-registry/view.js', import.meta.url), 'utf8');
+const history = readFileSync(new URL('../admin/document-registry/history.js', import.meta.url), 'utf8');
+const profileMigration = readFileSync(new URL('../document-migration.js', import.meta.url), 'utf8');
+const controller = readFileSync(new URL('../server/src/saas-admin/saas-admin.controller.ts', import.meta.url), 'utf8');
+const service = readFileSync(new URL('../server/src/document-registry/document-registry.service.ts', import.meta.url), 'utf8');
+const migration = readFileSync(new URL('../server/prisma/migrations/20260919000000_document_registry_history/migration.sql', import.meta.url), 'utf8');
+const appModule = readFileSync(new URL('../server/src/app.module.ts', import.meta.url), 'utf8');
+
+assert.match(admin, /import \{ renderDocumentRegistry \} from '\.\/document-registry\/view\.js'/);
+assert.match(admin, /data-section="document-registry">Реестр документов</);
+assert.match(admin, /adminRequest\('\/document-registry\/history'\)/);
+assert.doesNotMatch(admin, /renderAdminDocuments|data-section="documents">Документы</);
+
+assert.match(view, /<h2>Реестр документов<\/h2>/);
+assert.match(view, /Book ↔ пользователь/);
+assert.match(view, /Основы документов пользователя/);
+assert.match(view, /История Book ↔ пользователь/);
+assert.match(view, /Подписанная версия/);
+assert.match(history, /Admin\/Document Registry only/);
+
+assert.match(profileMigration, /\.\/admin\/document-registry\/catalog\.js/);
+assert.doesNotMatch(profileMigration, /\.\/admin\/documents\/catalog\.js/);
+
+assert.match(controller, /@Get\('document-registry\/history'\)/);
+assert.match(service, /FROM "LegalAcceptanceEvent"/);
+assert.match(service, /v\."contentSnapshot" AS "documentContent"/);
+assert.match(service, /WHERE d\."scope" = 'PLATFORM'/);
+assert.match(migration, /CREATE TABLE IF NOT EXISTS "LegalAcceptanceEvent"/);
+assert.match(migration, /LegalAcceptanceEvent_append_only/);
+
+assert.equal(existsSync(new URL('../admin/documents/catalog.js', import.meta.url)), false, 'Old Admin/Documents catalog must be removed');
+assert.equal(existsSync(new URL('../admin/documents/view.js', import.meta.url)), false, 'Old Admin/Documents view must be removed');
+assert.equal(existsSync(new URL('../admin/documents/history.js', import.meta.url)), false, 'Old Admin/Documents history must be removed');
+
+assert.doesNotMatch(view, /settings\/documents/);
+assert.doesNotMatch(history, /settings\/documents/);
+assert.doesNotMatch(appModule, /LegalRuntimeModule/);
+
+console.log('Document Registry root and history tests: OK');
