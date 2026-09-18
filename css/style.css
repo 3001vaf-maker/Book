@@ -12,3 +12,12 @@
 
 
 .demo-mode-banner{position:sticky;top:env(safe-area-inset-top);z-index:22;width:100%;min-height:42px;border:0;border-bottom:1px solid #d9c9bd;padding:8px var(--page-x);display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:9px;background:#eee2dc;color:var(--text);text-align:left}.demo-mode-banner strong{font-size:12px;letter-spacing:.08em}.demo-mode-banner span{font-size:13px;color:var(--text-secondary)}.demo-mode-banner b{font-size:20px;font-weight:500}.app-content--with-demo-banner{padding-top:16px}.demo-setup-list,.demo-choice-list{display:grid;gap:8px}.demo-setup-row,.demo-choice{width:100%;border:1px solid var(--border);border-radius:14px;background:var(--white);color:var(--text);text-align:left}.demo-setup-row{min-height:54px;padding:10px 12px;display:grid;grid-template-columns:24px minmax(0,1fr) auto;align-items:center;gap:8px}.demo-setup-row span{font-size:18px}.demo-setup-row strong{font-size:15px}.demo-setup-row b{font-size:20px;font-weight:500;color:var(--text-secondary)}.demo-choice{padding:14px;display:grid;gap:5px}.demo-choice strong{font-size:15px}.demo-choice span{font-size:13px;line-height:1.45;color:var(--text-secondary)}.demo-responsibility{display:flex;align-items:flex-start;gap:9px;margin:14px 0;font-size:13px;line-height:1.45}.demo-responsibility input{width:18px;height:18px;flex:0 0 18px;margin-top:1px}.demo-help-note{padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--surface-soft);margin-bottom:14px}.demo-help-note strong{display:block;margin-bottom:5px}.demo-help-note p{margin:0;color:var(--text-secondary);font-size:13px;line-height:1.45}
+
+
+.demo-stages{display:grid;gap:14px}
+.demo-stage{display:grid;gap:8px}
+.demo-stage__head{display:grid;gap:3px;padding:0 2px}
+.demo-stage__head strong{font-size:14px}
+.demo-stage__head span{font-size:12px;line-height:1.4;color:var(--text-secondary)}
+.demo-setup-row__copy{display:grid;gap:2px;min-width:0}
+.demo-setup-row__copy small{font-size:12px;line-height:1.35;font-weight:500;color:var(--text-secondary)}

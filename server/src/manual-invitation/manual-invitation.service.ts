@@ -287,38 +287,6 @@ export class ManualInvitationService {
     };
   }
 
-  async repairProfile(userId: string, tenantId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { email: true },
-    });
-    if (!user) throw new NotFoundException('Пользователь не найден');
-
-    const profile = await this.prisma.profile.findUnique({
-      where: { tenantId_userId: { tenantId, userId } },
-      select: { migrationVerifiedAt: true },
-    });
-    if (!profile || profile.migrationVerifiedAt) {
-      return { repaired: false, verified: Boolean(profile?.migrationVerifiedAt) };
-    }
-
-    const invitation = await this.prisma.masterInvitation.findFirst({
-      where: {
-        tenantId,
-        email: user.email,
-        status: MasterInvitationStatus.ACCEPTED,
-      },
-      select: { id: true },
-    });
-    if (!invitation) return { repaired: false, verified: false };
-
-    await this.prisma.profile.update({
-      where: { tenantId_userId: { tenantId, userId } },
-      data: { migrationVerifiedAt: new Date() },
-    });
-    return { repaired: true, verified: true };
-  }
-
   private async findManualInvitation(token: string) {
     if (!token) throw new BadRequestException('Ссылка регистрации недействительна');
     const invitation = await this.prisma.masterInvitation.findUnique({

@@ -92,6 +92,10 @@ function json(value: unknown) {
 
 type RegistrationInput = {
   token?: unknown;
+  name?: unknown;
+  surname?: unknown;
+  phone?: unknown;
+  email?: unknown;
   password?: unknown;
   saasAgreementAccepted?: unknown;
   dpaAccepted?: unknown;
@@ -299,10 +303,19 @@ export class MasterInvitationService {
 
   async accept(input: RegistrationInput) {
     const token = String(input?.token || '').trim();
+    const name = normalizeName(input?.name);
+    const surname = normalizeName(input?.surname);
+    const phone = normalizeName(input?.phone);
+    const email = normalizeEmail(input?.email);
     const password = String(input?.password || '');
+    if (!name) throw new BadRequestException('Укажите имя');
+    if (!surname) throw new BadRequestException('Укажите фамилию');
+    if (!phone) throw new BadRequestException('Укажите телефон');
+    if (!email || !email.includes('@')) throw new BadRequestException('Укажите корректный email');
     if (password.length < 10) throw new BadRequestException('Пароль должен содержать минимум 10 символов');
 
     const invitation = await this.findActiveInvitation(token);
+    if (email !== invitation.email) throw new BadRequestException('Email должен совпадать с адресом приглашения');
     await this.legal.assertPlatformLegalReady('');
     const existingUser = await this.prisma.user.findUnique({ where: { email: invitation.email } });
     if (existingUser) throw new ConflictException('Пользователь с таким email уже зарегистрирован');
@@ -310,6 +323,7 @@ export class MasterInvitationService {
     const legalDocuments = await this.registrationDocuments();
     this.assertRegistrationFacts(legalDocuments, input);
     const passwordHash = await hashPassword(password, 12);
+    const fullName = `${name} ${surname}`.trim();
     const evidence = input?.technicalEvidence && typeof input.technicalEvidence === 'object' && !Array.isArray(input.technicalEvidence)
       ? input.technicalEvidence as Record<string, unknown>
       : {};
@@ -329,6 +343,30 @@ export class MasterInvitationService {
           userId: user.id,
           role: MembershipRole.OWNER,
         },
+      });
+      await tx.profile.create({
+        data: {
+          tenantId: invitation.tenantId,
+          userId: user.id,
+          key: 'profile',
+          name,
+          surname,
+          phone,
+          phones: [phone],
+          telegrams: [],
+          emails: [email],
+          about: '',
+          photo: '',
+          profession: '',
+          experience: '',
+          professionAbout: '',
+          customProfessions: [],
+          migrationVerifiedAt: new Date(),
+        },
+      });
+      await tx.tenant.update({
+        where: { id: invitation.tenantId },
+        data: { name: fullName },
       });
       await tx.masterInvitation.update({
         where: { id: invitation.id },
@@ -374,7 +412,7 @@ export class MasterInvitationService {
         onboardingStep: result.user.onboardingStep,
         workspaceUnlocked: result.user.workspaceUnlocked,
       },
-      tenant: { id: invitation.tenant.id, name: invitation.tenant.name },
+      tenant: { id: invitation.tenant.id, name: fullName },
       role: result.membership.role,
       legal: { operationMode: 'DEMO', filingStatus: 'NOT_PREPARED' },
     };

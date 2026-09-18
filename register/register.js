@@ -1,6 +1,6 @@
 import { setAuthToken } from '../core/auth.js';
 import { API_BASE } from '../core/environment.js';
-import { startRegistrationFlow } from '../ui/auth/registration-flow.js';
+import { startRegistrationFlow } from '../core/registration-flow.js';
 
 const state = document.querySelector('#register-state');
 const token = new URLSearchParams(location.search).get('token') || '';
@@ -29,15 +29,15 @@ if (!token) {
     startRegistrationFlow({
       root: state,
       documents: Array.isArray(payload?.documents) ? payload.documents : [],
-      collectIdentity: true,
-      onSubmit: async ({ identity, password, remember, facts }) => {
+      emailLocked: false,
+      onSubmit: async ({ identity, password, facts }) => {
         const account = await post('/manual-invitations/accept', {
           token,
           ...identity,
           password,
           ...facts,
         });
-        setAuthToken(account.accessToken, remember);
+        setAuthToken(account.accessToken, false);
         state.innerHTML = '<h1>Book создан</h1><p class="invite-success">Открываем ваш Book в режиме DEMO…</p>';
         window.setTimeout(() => location.replace('../'), 350);
       },

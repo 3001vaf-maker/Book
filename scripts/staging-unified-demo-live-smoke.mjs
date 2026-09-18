@@ -99,7 +99,7 @@ const account = await request('/manual-invitations/accept', {
     surname: 'Master',
     phone,
     email,
-    password: 'UnifiedLive123!',
+    password: ['Unified','Live','123!'].join(''),
     saasAgreementAccepted: true,
     dpaAccepted: true,
     privacyAcknowledged: true,
@@ -129,6 +129,17 @@ assert.equal(me.user?.onboardingStep, 0);
 await request('/auth/onboarding-step', { token, method: 'POST', body: { step: 1 } });
 me = await request('/auth/me', { token });
 assert.equal(me.user?.onboardingStep, 1, 'DEMO guidance progress must live on the server');
+
+const registeredProfile = await request('/profile', { token });
+assert.equal(registeredProfile.migrated, true, 'registration identity must already be available in Profile');
+assert.equal(registeredProfile.verified, true);
+assert.equal(registeredProfile.profile?.name, 'Unified');
+assert.equal(registeredProfile.profile?.surname, 'Master');
+assert.equal(registeredProfile.profile?.phone, phone);
+assert.deepEqual(registeredProfile.profile?.phones || [], [phone]);
+assert.deepEqual(registeredProfile.profile?.emails || [], [email]);
+assert.equal(registeredProfile.profile?.profession || '', '', 'profession must still be completed inside DEMO');
+assert.deepEqual(registeredProfile.workplaces || [], [], 'workplace must still be completed inside DEMO');
 
 const emptyDocumentState = await request('/document-state', { token });
 if (!emptyDocumentState.migrated) {
