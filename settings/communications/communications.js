@@ -96,7 +96,7 @@ function reminderRulesField(rules = []) {
 
 function deliveryFields(template, policy) {
   if (template.audience !== 'CLIENT') {
-    return `<div class="action-block"><strong>В Book — всегда</strong><div class="muted">Это входящее уведомление мастеру. Внешние каналы мастера подключим отдельно, когда понадобится.</div></div>`;
+    return `<div class="action-block"><strong>В Book — всегда</strong><div class="muted">Это входящее уведомление в Book. Внешние каналы пользователя подключим отдельно, когда понадобится.</div></div>`;
   }
   const channels = (Array.isArray(policy.channels) ? policy.channels : []).filter((channel) => String(channel || '').toUpperCase() !== 'PUSH');
   return `
@@ -177,7 +177,7 @@ function renderTemplateGroup(root, navigateBack, audience, title, templates) {
     aria: `Открыть шаблон ${template.name}`,
   }));
   const masterMessageInfo = audience === 'MASTER'
-    ? '<div class="action-block"><strong>Новое сообщение клиента</strong><div class="muted">Отдельный шаблон не нужен: мастеру показывается само сообщение клиента и счётчик непрочитанных.</div></div>'
+    ? '<div class="action-block"><strong>Новое сообщение клиента</strong><div class="muted">Отдельный шаблон не нужен: в Book показывается само сообщение клиента и счётчик непрочитанных.</div></div>'
     : '';
   root.innerHTML = `${pageHeader(title)}${masterMessageInfo}${items.length ? folderList(items) : emptyState('Шаблонов нет', 'Для этой группы шаблоны не настроены.')}${actionBlock(button('Назад', { variant: 'secondary', data: 'data-notification-group-back' }))}`;
   root.querySelector('[data-notification-group-back]')?.addEventListener('click', navigateBack);
@@ -205,11 +205,11 @@ async function openBroadcasts(root, navigateBack) {
 function renderNotifications(root, navigateBack) {
   root.innerHTML = `${pageHeader('Уведомления')}${folderList([
     { title: 'Клиенту', count: '5', data: 'data-communications-open="client"' },
-    { title: 'Мастеру', count: '2', data: 'data-communications-open="master"' },
+    { title: 'Пользователю', count: '2', data: 'data-communications-open="master"' },
     { title: 'Рассылки', data: 'data-communications-open="broadcasts"' },
   ])}${actionBlock(button('Назад', { variant: 'secondary', data: 'data-communications-back' }))}`;
   root.querySelector('[data-communications-open="client"]')?.addEventListener('click', () => openTemplateGroup(root, () => renderNotifications(root, navigateBack), 'CLIENT', 'Клиенту'));
-  root.querySelector('[data-communications-open="master"]')?.addEventListener('click', () => openTemplateGroup(root, () => renderNotifications(root, navigateBack), 'MASTER', 'Мастеру'));
+  root.querySelector('[data-communications-open="master"]')?.addEventListener('click', () => openTemplateGroup(root, () => renderNotifications(root, navigateBack), 'MASTER', 'Пользователю'));
   root.querySelector('[data-communications-open="broadcasts"]')?.addEventListener('click', () => void openBroadcasts(root, () => renderNotifications(root, navigateBack)));
   root.querySelector('[data-communications-back]')?.addEventListener('click', navigateBack);
 }
