@@ -20,4 +20,10 @@ export class AuthController {
   me(@Req() request: AuthRequest) {
     return this.auth.me(request.auth!.userId, request.auth!.tenantId);
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('onboarding-step')
+  onboardingStep(@Req() request: AuthRequest, @Body() body: { step?: unknown }) {
+    return this.auth.setOnboardingStep(request.auth!.userId, body?.step);
+  }
 }
