@@ -72,28 +72,11 @@ function rewriteJavaScript(dir) {
   }
 }
 
-function versionHtml(source) {
-  return source.replace(
-    /\b(src|href)=(['"])(?!https?:|data:|\/\/)([^'"]+\.(?:js|css))\2/g,
-    (_, attr, quote, specifier) => `${attr}=${quote}${specifier}?build=${buildToken}${quote}`,
-  );
-}
-
-function rewriteHtml(dir) {
-  for (const name of readdirSync(dir)) {
-    const file = join(dir, name);
-    const stat = statSync(file);
-    if (stat.isDirectory()) {
-      rewriteHtml(file);
-      continue;
-    }
-    if (!/\.html$/i.test(name)) continue;
-    const source = readFileSync(file, 'utf8');
-    writeFileSync(file, versionHtml(source));
-  }
-}
-
 rewriteJavaScript(out);
-rewriteHtml(out);
+
+const indexFile = join(out, 'index.html');
+let index = readFileSync(indexFile, 'utf8');
+index = index.replace(/\b(src|href)=(['"])(?!https?:|data:|\/\/)([^'"]+\.(?:js|css))\2/g, (_, attr, quote, specifier) => `${attr}=${quote}${specifier}?build=${buildToken}${quote}`);
+writeFileSync(indexFile, index);
 
 console.log(`Pages artifact ready: ${relative(root, out)} (${buildToken})`);
