@@ -40,6 +40,8 @@ assert.match(adminService, /BusinessAuxiliaryState|businessAuxiliaryState/);
 assert.match(adminUi, /Запуск Book/);
 assert.match(adminUi, /masterStartupStateHtml/);
 
-assert.match(legalService, /ensureTenantDemoState\(tenantId, '', 'readiness-self-heal'\)/);
+
+assert.equal(existsSync('server/src/legal-runtime/legal-runtime.service.ts'), false);
+assert.doesNotMatch(core, /tenantLegalRequest\('\/readiness'\)/);
 
 console.log('startup diagnostics tests: OK');
