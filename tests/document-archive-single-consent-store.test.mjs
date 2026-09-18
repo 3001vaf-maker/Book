@@ -11,10 +11,11 @@ const bookingConsent = read('server/src/online-booking/booking-consent.controlle
 const bookingGuard = read('server/src/online-booking/booking-required-consent.guard.ts');
 const migration = read('document-migration.js');
 const schema = read('server/prisma/schema.prisma');
+const consentMigration = read('server/prisma/migrations/20260915130000_canonical_consent_subjects/migration.sql');
 
 assert.match(schema, /model BusinessDocumentState/);
 assert.match(schema, /consentMigratedAt\s+DateTime\?/);
-assert.match(schema, /model ConsentEvent/);
+assert.match(consentMigration, /CREATE TABLE "ConsentEvent"/);
 
 assert.match(state, /MUTABLE_DATASETS = new Set\(\['documents', 'history'\]\)/);
 assert.doesNotMatch(state, /recordAcceptedConsents/);
