@@ -13,7 +13,6 @@ import {
 } from '@prisma/client';
 import { createHash, randomBytes, randomUUID } from 'crypto';
 import { hash as hashPassword } from 'bcryptjs';
-import { LegalRuntimeService } from '../legal-runtime/legal-runtime.service';
 import { PrismaService } from '../prisma.service';
 import { TransactionalEmailService } from '../transactional-email/transactional-email.service';
 
@@ -118,7 +117,6 @@ export class MasterInvitationService {
     private readonly prisma: PrismaService,
     private readonly email: TransactionalEmailService,
     private readonly jwt: JwtService,
-    private readonly legal: LegalRuntimeService,
   ) {}
 
   async ensureStarterPlan() {
@@ -187,7 +185,6 @@ export class MasterInvitationService {
 
   async createInvitation(adminId: string, input: { email?: unknown; name?: unknown }) {
     const actorUserId = await this.platformAdminUserId(adminId);
-    await this.legal.assertPlatformLegalReady(actorUserId);
 
     const email = normalizeEmail(input?.email);
     const name = normalizeName(input?.name);
@@ -218,10 +215,6 @@ export class MasterInvitationService {
           isOwnerBook: false,
         },
       });
-      await tx.$executeRaw`
-        INSERT INTO "TenantLegalState" ("tenantId", "operationMode", "filingStatus", "updatedAt")
-        VALUES (${tenant.id}, 'DEMO', 'NOT_PREPARED', CURRENT_TIMESTAMP)
-      `;
       const invitation = await tx.masterInvitation.create({
         data: {
           tenantId: tenant.id,
@@ -241,23 +234,11 @@ export class MasterInvitationService {
       await this.prisma.tenant.delete({ where: { id: created.tenant.id } }).catch(() => undefined);
       throw error;
     }
-
-    await this.prisma.$executeRaw`
-      INSERT INTO "LegalStateEvent" (
-        "id", "scope", "tenantId", "actorUserId", "changeType", "oldState", "newState", "reason", "occurredAt"
-      ) VALUES (
-        ${randomUUID()}, 'TENANT', ${created.tenant.id}, ${actorUserId}, 'TENANT_CREATED_DEMO', '{}'::jsonb,
-        ${json({ operationMode: 'DEMO', filingStatus: 'NOT_PREPARED' })}::jsonb,
-        'New invited master starts fail-closed in DEMO', CURRENT_TIMESTAMP
-      )
-    `;
-    await this.legal.audit(created.tenant.id, actorUserId, 'MASTER_INVITATION_CREATED', 'REGISTRATION', 'SUCCESS', { invitationId: created.invitation.id });
     return this.invitationDto(created.invitation);
   }
 
   async resendInvitation(adminId: string, invitationId: string) {
     const actorUserId = await this.platformAdminUserId(adminId);
-    await this.legal.assertPlatformLegalReady(actorUserId);
     const invitation = await this.prisma.masterInvitation.findUnique({ where: { id: invitationId } });
     if (!invitation || invitation.createdByAdminId !== adminId) throw new NotFoundException('Приглашение не найдено');
     if (invitation.status !== MasterInvitationStatus.PENDING) throw new ConflictException('Это приглашение уже не активно');
@@ -316,12 +297,10 @@ export class MasterInvitationService {
 
     const invitation = await this.findActiveInvitation(token);
     if (email !== invitation.email) throw new BadRequestException('Email должен совпадать с адресом приглашения');
-    await this.legal.assertPlatformLegalReady('');
     const existingUser = await this.prisma.user.findUnique({ where: { email: invitation.email } });
     if (existingUser) throw new ConflictException('Пользователь с таким email уже зарегистрирован');
 
     const legalDocuments = await this.registrationDocuments();
-    this.assertRegistrationFacts(legalDocuments, input);
     const passwordHash = await hashPassword(password, 12);
     const fullName = `${name} ${surname}`.trim();
     const evidence = input?.technicalEvidence && typeof input.technicalEvidence === 'object' && !Array.isArray(input.technicalEvidence)
@@ -397,13 +376,6 @@ export class MasterInvitationService {
       role: result.membership.role,
     });
 
-    await this.legal.audit(invitation.tenantId, result.user.id, 'MASTER_REGISTRATION_ACCEPTED', 'REGISTRATION', 'SUCCESS', {
-      invitationId: invitation.id,
-      operationMode: 'DEMO',
-      filingStatus: 'NOT_PREPARED',
-      marketingConsent: input?.marketingConsentAccepted === true,
-    });
-
     return {
       accessToken,
       user: {
@@ -414,7 +386,6 @@ export class MasterInvitationService {
       },
       tenant: { id: invitation.tenant.id, name: fullName },
       role: result.membership.role,
-      legal: { operationMode: 'DEMO', filingStatus: 'NOT_PREPARED' },
     };
   }
 
