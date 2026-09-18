@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   configureBookDocumentBases,
+  dismissBookBase,
   getDefaultDocuments,
   hydrateDocumentsFromServer,
   getDocuments,
@@ -15,7 +16,7 @@ const basesV1 = [
     documentId: 'pdn-agreement',
     title: 'Политика обработки персональных данных',
     version: 1,
-    text: 'Оператор: [ФИО пользователя]\nКонтакт: [Контакт пользователя]\nМесто: [Место деятельности]',
+    text: 'Оператор: [ФИО пользователя]\nКонтакт: [Контакт пользователя]',
     publishedAt: '2026-09-18T00:00:00.000Z',
   },
   {
@@ -84,5 +85,24 @@ assert.equal(currentConsent.version, 4, 'новая основа Book не до�
 assert.equal(currentConsent.baseVersion, 1);
 assert.equal(currentConsent.availableBaseVersion, 2);
 assert.match(currentConsent.availableBookText, /Новая редакция Book/);
+
+hydrateDocumentsFromServer(updateAvailable.documents);
+const dismissed = dismissBookBase('pdn-consent');
+assert.equal(dismissed.version, 4, 'отказ от предложенной основы не создаёт новую версию документа');
+assert.equal(dismissed.dismissedBaseVersion, 2);
+const afterDismiss = reconcileBookDocuments(getDocuments(), []);
+assert.equal(afterDismiss.documents.find((item) => item.id === 'pdn-consent').availableBaseVersion, 0, 'отклонённая редакция не должна предлагаться снова');
+
+configureBookDocumentBases(
+  basesV1.map((item) => item.documentId === 'pdn-consent'
+    ? { ...item, version: 3, text: item.text + '\nЕщё одна редакция Book.', publishedAt: '2026-09-20T00:00:00.000Z' }
+    : item),
+  {
+    profile: { name: 'Александр', surname: 'Волоковых', emails: ['a@example.test'], phones: [] },
+    workplaces: [{ address: 'Москва' }],
+  },
+);
+const nextOffer = reconcileBookDocuments(getDocuments(), []);
+assert.equal(nextOffer.documents.find((item) => item.id === 'pdn-consent').availableBaseVersion, 3, 'новая следующая редакция снова должна быть предложена');
 
 console.log('document base chain: ok');
