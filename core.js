@@ -23,6 +23,7 @@ import { renderOnlineBooking } from './online-booking/booking.js';
 import { startBookingClientRuntime } from './online-booking/client-runtime.js';
 import { bottomNavigation, modal, mountModal, button, actionBlock, escapeHtml } from './ui/ui.js';
 import { clearLegacyBusinessStorage } from './core/legacy-browser-business.js';
+import { hasUiPreference, setUiPreference } from './core/ui-preferences.js';
 
 configureWorkplaceSource(getWorkplaceEntities);
 configureTimeUsageSource(getJournalTimeUsages);
@@ -455,8 +456,8 @@ async function activateLive(modalNode, payload) {
 function maybeShowDemoWelcome() {
   if (!isDemoMode() || !authenticatedAccount?.tenant?.id) return;
   const key = `book.demo.welcome.v1.${authenticatedAccount.tenant.id}`;
-  if (localStorage.getItem(key) === '1') return;
-  localStorage.setItem(key, '1');
+  if (hasUiPreference(key)) return;
+  setUiPreference(key);
   const m = mountModal(document.body, modal(`
     <div class="modal-title">
       <h2>Вы в DEMO</h2>
