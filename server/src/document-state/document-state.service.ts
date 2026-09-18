@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable } from '@nestjs/comm
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
+import { PlatformDocumentsService } from '../platform-documents/platform-documents.service';
 
 type JsonObject = Record<string, any>;
 const DATASETS = new Set(['documents', 'consents', 'history']);
@@ -39,7 +40,10 @@ function json(value: unknown): Prisma.InputJsonValue {
 
 @Injectable()
 export class DocumentStateService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly platformDocuments: PlatformDocumentsService,
+  ) {}
 
   private async snapshot(tenantId: string) {
     const state = await this.prisma.businessDocumentState.findUnique({ where: { tenantId } });
@@ -53,6 +57,10 @@ export class DocumentStateService {
 
   get(tenantId: string) {
     return this.snapshot(tenantId);
+  }
+
+  userDocumentBases() {
+    return this.platformDocuments.userDocumentBases();
   }
 
   async migrate(tenantId: string, body: unknown) {
