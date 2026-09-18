@@ -28,7 +28,7 @@ expect_status() {
 }
 
 platform=$(curl -fsS "${auth[@]}" "$base/platform/legal/readiness")
-node -e 'const p=JSON.parse(process.argv[1]);if(p.state?.status!=="LEGAL_READY"||p.state?.filingStatus!=="SUBMITTED")process.exit(1);const d=Array.isArray(p.documents)?p.documents:[];for(const k of ["privacy-policy","saas-agreement","master-pd-consent","marketing-consent","public-profile-consent","dpa"]){if(!d.some(x=>x.key===k&&x.currentVersion))process.exit(1)}' "$platform"
+node -e 'const p=JSON.parse(process.argv[1]);if(p.state?.status!=="LEGAL_READY"||p.state?.filingStatus!=="SUBMITTED")process.exit(1);if((p.checklistKeys||[]).includes("productionInfrastructureChecked"))process.exit(1);const d=Array.isArray(p.documents)?p.documents:[];for(const k of ["privacy-policy","saas-agreement","master-pd-consent","marketing-consent","public-profile-consent","dpa"]){if(!d.some(x=>x.key===k&&x.currentVersion))process.exit(1)}' "$platform"
 document_history=$(curl -fsS "${auth[@]}" "$base/platform/legal/document-history")
 node -e 'const h=JSON.parse(process.argv[1]);if(!Array.isArray(h)||h.length<6)process.exit(1)' "$document_history"
 tenant=$(curl -fsS "${auth[@]}" "$base/legal/readiness")
@@ -136,13 +136,10 @@ publish_tenant_doc "privacy-policy" "PRIVACY_POLICY" "Synthetic privacy policy"
 publish_tenant_doc "client-pd-consent" "CLIENT_PD_CONSENT" "Synthetic client PD consent"
 publish_tenant_doc "service-offer" "SERVICE_OFFER" "Synthetic service offer"
 
-curl -fsS -X PUT "${manual_auth[@]}" -H 'Content-Type: application/json' -d '{"checklist":{"rknFilingPrepared":true}}' "$base/legal/checklist" >/dev/null
-manual_prepared=$(curl -fsS -X POST "${manual_auth[@]}" "$base/legal/filing/prepared")
-node -e 'const p=JSON.parse(process.argv[1]);if(p.state?.filingStatus!=="PREPARED")process.exit(1)' "$manual_prepared"
+manual_before_rkn=$(curl -fsS "${manual_auth[@]}" "$base/legal/readiness")
+node -e 'const p=JSON.parse(process.argv[1]);if((p.checklistKeys||[]).includes("rknFilingPrepared"))process.exit(1);if(p.state?.filingStatus!=="NOT_PREPARED"||p.state?.operationMode!=="DEMO")process.exit(1)' "$manual_before_rkn"
 manual_submitted=$(curl -fsS -X POST "${manual_auth[@]}" -H 'Content-Type: application/json' -d '{"submissionReference":"STAGING-MANUAL-MASTER-FILING","evidenceMetadata":{"synthetic":true}}' "$base/legal/filing/submitted")
-node -e 'const p=JSON.parse(process.argv[1]);if(p.state?.filingStatus!=="SUBMITTED"||p.canBecomeLive!==true)process.exit(1)' "$manual_submitted"
-manual_live=$(curl -fsS -X POST "${manual_auth[@]}" "$base/legal/live")
-node -e 'const p=JSON.parse(process.argv[1]);if(p.state?.operationMode!=="LIVE")process.exit(1)' "$manual_live"
+node -e 'const p=JSON.parse(process.argv[1]);if(p.state?.filingStatus!=="SUBMITTED"||p.state?.operationMode!=="LIVE")process.exit(1)' "$manual_submitted"
 
 # The email invitation path must enforce the same legal package and enter DEMO.
 email_token="staging-email-legal-token"
