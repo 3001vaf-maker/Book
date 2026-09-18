@@ -35,6 +35,16 @@ async function loadRemoteProfile() {
   return responseJson(response, 'Не удалось загрузить Profile + Workplaces');
 }
 
+async function loadCreationRequirement() {
+  const response = await apiRequest('/profile/creation-requirement');
+  return responseJson(response, 'Не удалось получить документ для создания профиля');
+}
+
+export async function acceptProfileCreationDocument() {
+  const response = await apiRequest('/profile/creation-consent', { method: 'POST' });
+  return responseJson(response, 'Не удалось зафиксировать принятие документа');
+}
+
 export async function initializeProfileWorkplaces() {
   setProfileServerReady(false);
   setWorkplacesServerReady(false);
@@ -44,6 +54,17 @@ export async function initializeProfileWorkplaces() {
   if (remote?.verified) {
     hydrate(remote, true);
     return { source: 'server', verified: true };
+  }
+
+  if (!remote?.migrated) {
+    const requirement = await loadCreationRequirement();
+    if (requirement?.required && (!requirement.configured || !requirement.accepted)) {
+      return {
+        source: 'profile-creation-document',
+        verified: false,
+        requirement,
+      };
+    }
   }
 
   const bootstrapResponse = await bootstrapProfile();
