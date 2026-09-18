@@ -348,7 +348,9 @@ export class OnlineBookingService {
     if (password.length < 6) throw new BadRequestException('Пароль должен содержать не менее 6 символов');
     if (!name) throw new BadRequestException('Введите имя');
     if (!/^\+\d{8,15}$/.test(phone)) throw new BadRequestException('Введите телефон полностью');
-    this.ensureRequiredConsents({ documents }, consents);
+    if (!(await this.isOwnerWorkspace(tenantId))) {
+      this.ensureRequiredConsents({ documents }, consents);
+    }
 
     const exists = await this.prisma.bookingAccount.findUnique({ where: { tenantId_email: { tenantId, email } } });
     if (exists) throw new ConflictException('Аккаунт с этим email уже существует');
@@ -452,8 +454,10 @@ export class OnlineBookingService {
     const account = await this.prisma.bookingAccount.findFirst({ where: { id: accountId, tenantId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
     const data = await this.bookingSource(tenantId);
-    const consentState = await this.consentPolicy.requiredConsentState(tenantId, accountId);
-    if (!consentState.allowed) throw new ConflictException('Необходимо заново подтвердить обязательные документы');
+    if (!(await this.isOwnerWorkspace(tenantId))) {
+      const consentState = await this.consentPolicy.requiredConsentState(tenantId, accountId);
+      if (!consentState.allowed) throw new ConflictException('Необходимо заново подтвердить обязательные документы');
+    }
     const workplaceKey = text(body.workplaceKey);
     const date = dateValue(body.date);
     const from = text(body.from);
