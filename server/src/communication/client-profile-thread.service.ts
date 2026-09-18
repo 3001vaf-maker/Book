@@ -131,7 +131,7 @@ export class ClientProfileThreadService {
       const matches = state.people.filter((person) => personHasPhone(person, phone));
       if (matches.length) {
         const canonicalKeys = new Set(matches.map((person) => this.build(state, person).profileKey));
-        if (canonicalKeys.size > 1) throw new ConflictException('Этот телефон относится к нескольким клиентам. Нужна явная связь мастера.');
+        if (canonicalKeys.size > 1) throw new ConflictException('Этот телефон относится к нескольким клиентам. Нужна явная связь в Book.');
         source = matches[0];
       }
     }
