@@ -38,7 +38,7 @@ function slotsMarkup(start, end, { interactive = true } = {}) {
   return slots.join('');
 }
 
-function aggregateTimeline(columns = []) {
+function aggregateTimeline(columns = [], { workFieldsInteractive = false } = {}) {
   const prepared = (Array.isArray(columns) ? columns : []).map((column) => {
     const start = timeToMinutes(column?.from);
     const end = timeToMinutes(column?.to);
@@ -67,14 +67,17 @@ function aggregateTimeline(columns = []) {
       const usageHeight = ((clippedEnd - clippedStart) / fieldDuration) * 100;
       return `<div class="journal-work-field__usage" style="top:${usageTop}%;height:${usageHeight}%" data-time-usage="${escape(usage.sourceId || usage.id)}">${usageMarkup(usage, { interactive: false })}</div>`;
     }).join('');
-    return `<div class="journal-work-column"><div class="journal-work-field${column?.conflict ? ' is-conflict' : ''}" role="button" tabindex="0" aria-label="Изменить рабочее пространство ${escape(column?.name || '')}" style="top:${top}%;height:${height}%" data-journal-work-field="${escape(column?.workplaceId || '')}">${usages}</div></div>`;
+    const interaction = workFieldsInteractive
+      ? ` role="button" tabindex="0" aria-label="Изменить рабочее время ${escape(column?.name || '')}" data-journal-work-field="${escape(column?.workplaceId || '')}"`
+      : ' aria-disabled="true"';
+    return `<div class="journal-work-column"><div class="journal-work-field${column?.conflict ? ' is-conflict' : ''}"${interaction} style="top:${top}%;height:${height}%">${usages}</div></div>`;
   }).join('');
 
   return `<div class="journal-day-columns" data-journal-day-columns><div class="journal-day-columns__inner" style="min-width:${minWidth}px;--journal-column-count:${prepared.length}"><div class="journal-day-columns__headings"><span aria-hidden="true"></span>${headings}</div><section class="time-timeline time-timeline--columns" data-time-timeline data-time-from="${escape(minutesToTime(start))}" data-time-to="${escape(minutesToTime(end))}" style="--time-total-minutes:${total}">${slotsMarkup(start, end, { interactive: false })}<div class="journal-work-columns">${fields}</div></section></div></div>`;
 }
 
-export function journalDayTimeline({ from = '09:00', to = '18:00', usages = [], columns = [] } = {}) {
-  if (Array.isArray(columns) && columns.length) return aggregateTimeline(columns);
+export function journalDayTimeline({ from = '09:00', to = '18:00', usages = [], columns = [], workFieldsInteractive = false } = {}) {
+  if (Array.isArray(columns) && columns.length) return aggregateTimeline(columns, { workFieldsInteractive });
   const start = timeToMinutes(from), end = timeToMinutes(to);
   if (start == null || end == null || end <= start) return '';
   const total = end - start;
@@ -93,7 +96,7 @@ export function journalDayTimeline({ from = '09:00', to = '18:00', usages = [], 
 export function initJournalDayTimeline(root, {
   onSlotClick = () => {},
   onUsageClick = () => {},
-  onWorkFieldClick = () => {},
+  onWorkFieldClick = null,
 } = {}) {
   if (root.__bookTimeUsageChangeHandler) window.removeEventListener('book:time-usage-changed', root.__bookTimeUsageChangeHandler);
   root.__bookTimeUsageChangeHandler = () => {};
@@ -102,7 +105,7 @@ export function initJournalDayTimeline(root, {
   root.querySelectorAll('[data-journal-work-field]').forEach((field) => {
     const open = () => {
       const workplaceId = String(field.dataset.journalWorkField || '');
-      if (workplaceId) onWorkFieldClick({ workplaceId });
+      if (workplaceId && typeof onWorkFieldClick === 'function') onWorkFieldClick({ workplaceId });
     };
     field.addEventListener('click', open);
     field.addEventListener('keydown', (event) => {
