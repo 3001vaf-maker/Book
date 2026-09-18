@@ -36,7 +36,8 @@ export function renderJournalDay(root, {
   date = new Date(),
   workplaceId = '',
   onChange = () => {},
-  onWorkplaceFieldClick = () => {},
+  onWorkplaceFieldClick = null,
+  workFieldsInteractive = false,
 } = {}) {
   root.innerHTML = '<div data-journal-day-navigator></div><div data-journal-day-content></div>';
   initDateNavigator(root.querySelector('[data-journal-day-navigator]'), { date, onChange });
@@ -70,11 +71,13 @@ export function renderJournalDay(root, {
 
     if (!columns.length) { contentRoot.innerHTML = '<div class="time-day-state" aria-disabled="true">Не задано рабочее время</div>'; return; }
 
-    contentRoot.innerHTML = journalDayTimeline({ columns });
+    contentRoot.innerHTML = journalDayTimeline({ columns, workFieldsInteractive });
     initJournalDayTimeline(contentRoot, {
-      onWorkFieldClick: ({ workplaceId: nextWorkplaceId }) => {
-        if (nextWorkplaceId) onWorkplaceFieldClick(nextWorkplaceId);
-      },
+      onWorkFieldClick: typeof onWorkplaceFieldClick === 'function'
+        ? ({ workplaceId: nextWorkplaceId }) => {
+            if (nextWorkplaceId) onWorkplaceFieldClick(nextWorkplaceId);
+          }
+        : null,
     });
     return;
   }
@@ -85,7 +88,7 @@ export function renderJournalDay(root, {
   if (!time) { contentRoot.innerHTML = '<div class="time-day-state" aria-disabled="true">Не задано рабочее время</div>'; return; }
   const usages = withFinancialState(getTimeUsagesForScope({ date: dayDate, workplaceId }));
   const usageById = new Map(usages.map((usage) => [String(usage?.sourceId || usage?.id || ''), usage]));
-  const rerender = () => renderJournalDay(root, { date, workplaceId, onChange, onWorkplaceFieldClick });
+  const rerender = () => renderJournalDay(root, { date, workplaceId, onChange, onWorkplaceFieldClick, workFieldsInteractive });
 
   contentRoot.innerHTML = journalDayTimeline({ from: time.from, to: time.to, usages });
   initJournalDayTimeline(contentRoot, {
