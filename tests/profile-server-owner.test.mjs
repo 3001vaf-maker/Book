@@ -38,5 +38,10 @@ assert.match(authGuard, /MembershipRole\.OWNER/);
 assert.match(authGuard, /platformAdmin\.findUnique/);
 assert.match(authGuard, /tenantAccess\.upsert/);
 assert.match(authGuard, /isOwnerBook:\s*true/);
+assert.match(authGuard, /planId:\s*null/);
+assert.ok(
+  authGuard.indexOf('membership.role === MembershipRole.OWNER') < authGuard.indexOf('Рабочее пространство недоступно'),
+  'platform owner access must be reasserted before generic access denial',
+);
 
 console.log('profile server owner tests: OK');
