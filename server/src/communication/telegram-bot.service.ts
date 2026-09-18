@@ -9,7 +9,6 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from 'node:crypto';
-import { ConsentPolicyService } from '../document-state/consent-policy.service';
 import { LegalRuntimeService } from '../legal-runtime/legal-runtime.service';
 import { NotificationService } from '../notification/notification.service';
 import { PrismaService } from '../prisma.service';
@@ -39,7 +38,6 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly communications: CommunicationService,
     private readonly notifications: NotificationService,
-    private readonly consentPolicy: ConsentPolicyService,
     private readonly legal: LegalRuntimeService,
   ) {}
 
@@ -192,7 +190,6 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       channel: 'TELEGRAM',
       destination: identity.externalUserId,
     });
-    if (!(await this.consentPolicy.canSendMessages(tenantId, 'TELEGRAM', identity.externalUserId))) throw new BadRequestException('Нет действующего согласия на этот Telegram Contact Point');
     try {
       const result = await this.sendMessage(tenantId, identity.externalUserId, body);
       return this.communications.recordMessage(tenantId, { phone: identity.cardPhone, uei: identity.uei, direction: 'outbound', kind: 'message', channel: 'TELEGRAM', body, externalMessageId: String(result?.message_id || ''), externalThreadId: String(result?.chat?.id || identity.externalUserId), status: 'sent' });
