@@ -34,7 +34,7 @@ services:
       WEB_PUSH_VAPID_PRIVATE_KEY: gxC9jcEI6J7exbNd0NA-KlF3w1ZfhIKyXnmEPCvyiig
       WEB_PUSH_VAPID_SUBJECT: mailto:staging@book.local
       PORT: 3000
-    command: ["sh", "-c", "npx prisma migrate deploy && npm run seed:owner && npm run seed:staging && npx ts-node prisma/seed-staging-publication.ts && node dist/main.js"]
+    command: ["sh", "-c", "npx prisma migrate deploy && npm run seed:owner && npm run seed:staging && node dist/main.js"]
     ports:
       - "3000:3000"
     depends_on:
