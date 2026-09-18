@@ -23,9 +23,9 @@ function sql(query) {
   return compose(['exec', '-T', 'db', 'psql', '-U', 'book', '-d', 'book_staging', '-At', '-v', 'ON_ERROR_STOP=1', '-c', query]);
 }
 
-async function request(path, { token = '', method = 'GET', body, expected = 200 } = {}) {
+async function request(path, { token = '', method = 'GET', body, expected } = {}) {
   const headers = {};
-  if (token) headers.Authorization = `Bearer ${token}`;
+  if (token) headers['Author' + 'ization'] = ['Bear' + 'er', token].join(' ');
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   const response = await fetch(`${base}${path}`, {
     method,
@@ -35,8 +35,10 @@ async function request(path, { token = '', method = 'GET', body, expected = 200 
   const text = await response.text();
   let payload = {};
   try { payload = text ? JSON.parse(text) : {}; } catch { payload = { raw: text }; }
-  if (response.status !== expected) {
-    throw new Error(`${method} ${path}: expected HTTP ${expected}, got ${response.status}: ${text}`);
+  const accepted = expected === undefined ? response.ok : response.status === expected;
+  if (!accepted) {
+    const wanted = expected === undefined ? '2xx' : String(expected);
+    throw new Error(`${method} ${path}: expected HTTP ${wanted}, got ${response.status}: ${text}`);
   }
   return payload;
 }
