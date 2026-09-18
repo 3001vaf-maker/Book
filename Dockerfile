@@ -1,3 +1,8 @@
+FROM node:24-alpine AS frontend-build
+WORKDIR /app
+COPY . .
+RUN node scripts/build-pages.mjs
+
 FROM node:24-alpine AS build
 WORKDIR /app/server
 COPY server/package*.json ./
@@ -15,5 +20,6 @@ COPY server/package*.json ./
 COPY server/prisma ./prisma
 COPY --from=build /app/server/node_modules ./node_modules
 COPY --from=build /app/server/dist ./dist
+COPY --from=frontend-build /app/_site /app/site
 EXPOSE 3000
 CMD ["sh", "-c", "npx prisma migrate deploy && npm run seed:owner && node dist/main.js"]

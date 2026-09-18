@@ -1,8 +1,15 @@
-export const PRODUCTION_API_BASE = 'https://book-api-volokovykh.amvera.io';
+export const PRODUCTION_API_BASE = 'https://api.va-tools.ru';
+export const BOOK_APP_ORIGIN = 'https://book.va-tools.ru';
+export const CLIENT_APP_ORIGIN = 'https://client.va-tools.ru';
 export const LOCAL_STAGING_API_BASE = 'http://localhost:3000';
 export const CODESPACES_STAGING_API_BASE = '/api';
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
+const PRODUCTION_HOSTS = new Set([
+  new URL(BOOK_APP_ORIGIN).hostname,
+  new URL(CLIENT_APP_ORIGIN).hostname,
+  new URL(PRODUCTION_API_BASE).hostname,
+]);
 const CODESPACES_SUFFIX = '.app.github.dev';
 
 function normalizedBase(value) {
@@ -12,10 +19,13 @@ function normalizedBase(value) {
 export function resolveApiBase({ hostname = '', override = '' } = {}) {
   const explicit = normalizedBase(override);
   if (explicit) return explicit;
+
   const host = String(hostname || '').trim().toLowerCase();
   if (LOCAL_HOSTS.has(host)) return LOCAL_STAGING_API_BASE;
   if (host.endsWith(CODESPACES_SUFFIX)) return CODESPACES_STAGING_API_BASE;
-  return PRODUCTION_API_BASE;
+  if (PRODUCTION_HOSTS.has(host)) return PRODUCTION_API_BASE;
+
+  return '';
 }
 
 export function resolveRuntimeEnvironment({ hostname = '', override = '' } = {}) {
