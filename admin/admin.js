@@ -11,6 +11,26 @@ const state = {
   section: 'overview',
 };
 
+const USER_DOCUMENTS = [
+  {
+    key: 'user-document-pdn-policy',
+    type: 'PERSONAL_DATA_POLICY',
+    title: 'Политика обработки персональных данных',
+  },
+  {
+    key: 'user-document-pdn-consent',
+    type: 'PERSONAL_DATA_CONSENT',
+    title: 'Согласие на обработку персональных данных',
+  },
+  {
+    key: 'user-document-messages-consent',
+    type: 'MARKETING_CONSENT',
+    title: 'Согласие на рекламные и маркетинговые сообщения',
+  },
+];
+
+const USER_DOCUMENT_KEYS = new Set(USER_DOCUMENTS.map((item) => item.key));
+
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;',
@@ -130,7 +150,7 @@ function contentNode() {
 function renderOverview() {
   setTitle('Обзор');
   const content = contentNode();
-  const profileDocument = state.documents.find((item) => item.key === 'user-pd-consent' && item.currentVersion);
+  const profileDocument = state.documents.find((item) => item.key === 'user-document-pdn-consent' && item.currentVersion);
   content.innerHTML = `
     <div class="admin-heading"><div><h2>Обзор</h2><p>Архитектурный контур владельца платформы.</p></div></div>
     <div class="admin-stats">
@@ -140,23 +160,39 @@ function renderOverview() {
     </div>`;
 }
 
-function documentRows() {
-  if (!state.documents.length) return '<div class="admin-empty">Документы ещё не загружены.</div>';
-  return state.documents.map((item) => {
+function userDocumentRows() {
+  return USER_DOCUMENTS.map((definition) => {
+    const item = state.documents.find((document) => document.key === definition.key);
+    const version = item?.currentVersion || null;
+    return `
+      <div class="admin-document-row">
+        <div>
+          <strong>${escapeHtml(definition.title)}</strong>
+          <small>${version ? `Версия ${Number(version.version || 1)} · ${formatDate(version.publishedAt)}` : 'Не настроен'}</small>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          ${definition.key === 'user-document-pdn-consent' ? '<span class="admin-pill active">создание Profile</span>' : ''}
+          <button class="admin-button secondary"
+                  data-user-document="${escapeHtml(definition.key)}">
+            ${version ? 'Открыть' : 'Создать'}
+          </button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function platformDocumentRows() {
+  const items = state.documents.filter((item) => !USER_DOCUMENT_KEYS.has(item.key));
+  if (!items.length) return '<div class="admin-empty">Других документов платформы пока нет.</div>';
+  return items.map((item) => {
     const version = item.currentVersion;
-    const profileRule = item.key === 'user-pd-consent'
-      ? '<span class="admin-pill active">создание Profile</span>'
-      : '';
     return `
       <div class="admin-document-row">
         <div>
           <strong>${escapeHtml(item.title)}</strong>
           <small>${escapeHtml(item.key)} · версия ${Number(version?.version || 0)} · ${formatDate(version?.publishedAt)}</small>
         </div>
-        <div style="display:flex;align-items:center;gap:8px">
-          ${profileRule}
-          <button class="admin-button secondary" data-edit-document="${escapeHtml(item.key)}">Открыть</button>
-        </div>
+        <button class="admin-button secondary" data-edit-document="${escapeHtml(item.key)}">Открыть</button>
       </div>`;
   }).join('');
 }
@@ -176,7 +212,7 @@ function historyRows() {
 function renderDocumentEditor(selected = null) {
   const content = contentNode();
   const current = selected?.currentVersion || null;
-  const isProfileDocument = selected?.key === 'user-pd-consent';
+  const isProfileDocument = selected?.key === 'user-document-pdn-consent';
   const form = document.createElement('section');
   form.className = 'admin-card admin-document-editor';
   form.innerHTML = `
@@ -236,39 +272,61 @@ function renderDocumentEditor(selected = null) {
 function renderDocuments() {
   setTitle('Документы');
   const content = contentNode();
-  const profileDocument = state.documents.find((item) => item.key === 'user-pd-consent' && item.currentVersion);
   content.innerHTML = `
     <div class="admin-heading">
       <div>
         <h2>Документы</h2>
-        <p>Системные документы платформы и история их версий.</p>
+        <p>Единый центр системных документов платформы.</p>
       </div>
     </div>
-    ${profileDocument ? '' : `
-      <section class="admin-card" style="padding:18px;margin-bottom:16px">
-        <strong>Не настроен документ создания Profile</strong>
-        <p style="color:#817a74">Без актуального user-pd-consent новый Profile создать нельзя.</p>
-        <button class="admin-button" data-create-profile-document>Создать документ</button>
-      </section>`}
+
     <section class="admin-card admin-documents-card">
       <div class="admin-section-head">
-        <div><h3>Действующие документы</h3><p>Содержание и текущие версии.</p></div>
+        <div>
+          <h3>Для пользователей</h3>
+          <p>Документы, которые используются в пользовательских процессах.</p>
+        </div>
+      </div>
+      <div class="admin-document-list">${userDocumentRows()}</div>
+    </section>
+
+    <section class="admin-card admin-documents-card">
+      <div class="admin-section-head">
+        <div>
+          <h3>Документы платформы</h3>
+          <p>Остальные действующие системные документы.</p>
+        </div>
         <button class="admin-button secondary" data-add-document>Добавить документ</button>
       </div>
-      <div class="admin-document-list">${documentRows()}</div>
+      <div class="admin-document-list">${platformDocumentRows()}</div>
     </section>
+
     <section class="admin-card admin-history-card">
-      <div class="admin-section-head"><div><h3>История</h3><p>Опубликованные версии не перезаписываются.</p></div></div>
+      <div class="admin-section-head">
+        <div>
+          <h3>История</h3>
+          <p>Все опубликованные версии документов. Старые версии не перезаписываются.</p>
+        </div>
+      </div>
       <div class="admin-history-list">${historyRows()}</div>
     </section>`;
 
   content.querySelector('[data-add-document]')?.addEventListener('click', () => renderDocumentEditor());
-  content.querySelector('[data-create-profile-document]')?.addEventListener('click', () => renderDocumentEditor({
-    key: 'user-pd-consent',
-    type: 'PERSONAL_DATA_CONSENT',
-    title: 'Согласие на обработку персональных данных пользователя',
-    currentVersion: null,
-  }));
+
+  content.querySelectorAll('[data-user-document]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const definition = USER_DOCUMENTS.find((item) => item.key === button.dataset.userDocument);
+      if (!definition) return;
+      const existing = state.documents.find((item) => item.key === definition.key);
+      renderDocumentEditor(existing || {
+        key: definition.key,
+        type: definition.type,
+        title: definition.title,
+        currentVersion: null,
+      });
+    });
+  });
+
   content.querySelectorAll('[data-edit-document]').forEach((button) => {
     button.addEventListener('click', () => {
       const selected = state.documents.find((item) => item.key === button.dataset.editDocument);
