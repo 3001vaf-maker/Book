@@ -33,17 +33,16 @@ if (!token) {
       root: state,
       documents: Array.isArray(documents) ? documents : [],
       initial: {
-        name: invitation?.name || invitation?.tenant?.name || '',
         email: invitation?.email || '',
       },
-      collectIdentity: false,
-      onSubmit: async ({ password, remember, facts }) => {
+      emailLocked: true,
+      onSubmit: async ({ password, facts }) => {
         const account = await post('/master-invitations/accept', {
           token,
           password,
           ...facts,
         });
-        setAuthToken(account.accessToken, remember);
+        setAuthToken(account.accessToken, false);
         state.innerHTML = '<h1>Book создан</h1><p class="invite-success">Открываем ваш Book в режиме DEMO…</p>';
         window.setTimeout(() => location.replace('../'), 350);
       },
