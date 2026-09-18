@@ -20,6 +20,16 @@ export class ProfileController {
     return this.profile.get(request.auth!.tenantId, request.auth!.userId);
   }
 
+  @Get('creation-requirement')
+  creationRequirement(@Req() request: AuthenticatedRequest) {
+    return this.profile.creationRequirement(request.auth!.tenantId, request.auth!.userId);
+  }
+
+  @Post('creation-consent')
+  acceptCreationDocument(@Req() request: AuthenticatedRequest) {
+    return this.profile.acceptCreationDocument(request.auth!.tenantId, request.auth!.userId);
+  }
+
   @Post('migrate')
   migrate(@Req() request: AuthenticatedRequest, @Body() body: unknown) {
     return this.profile.migrate(request.auth!.tenantId, request.auth!.userId, body);
