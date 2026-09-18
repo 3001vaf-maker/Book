@@ -18,7 +18,10 @@ const bookingController = readFileSync('server/src/online-booking/online-booking
 assert.match(registration, /Добро пожаловать в Book/);
 assert.match(registration, /Условия работы с Book/);
 assert.match(registration, /<h1>Регистрация<\/h1>/);
-assert.match(registration, /Документы ваших клиентов будут сформированы отдельно после настройки вашего профиля/);
+assert.match(registration, /Документы ваших клиентов будут сформированы отдельно после настройки профиля в DEMO/);
+assert.match(registration, /Имя, телефон, профессию и рабочее место вы заполните следующим шагом уже внутри DEMO/);
+assert.match(registration, /name="email"/);
+assert.doesNotMatch(registration, /name="name"|name="surname"|name="phone"|collectIdentity|repair-profile/);
 
 assert.match(core, /data-demo-banner/);
 assert.match(core, /Я уже могу работать с персональными данными/);
