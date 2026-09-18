@@ -6,22 +6,34 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import {
-  MasterInvitationStatus,
+  UserInvitationStatus,
   MembershipRole,
   TenantAccessStatus,
 } from '@prisma/client';
 import { createHash, randomBytes } from 'crypto';
 import { hash as hashPassword } from 'bcryptjs';
 import { PrismaService } from '../prisma.service';
-import { MasterInvitationService } from '../master-invitation/master-invitation.service';
+import { UserInvitationService } from '../user-invitation/user-invitation.service';
 
 const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const MANUAL_EMAIL_PREFIX = 'manual+';
-const MANUAL_EMAIL_SUFFIX = '@book.invalid';
-const DEFAULT_CLIENT_APP_URL = 'https://3001vaf-maker.github.io/Book';
+const MANUAL_EMAIL_SUFFIX = '@workspace.invalid';
+const DEFAULT_WORKSPACE_APP_URL = 'https://book.va-tools.ru';
 
 function text(value: unknown) {
   return String(value || '').trim();
+}
+
+function workspaceAppOrigin() {
+  const configured = text(process.env.WORKSPACE_APP_URL);
+  if (configured) return configured.replace(/\/+$/, '');
+
+  if (process.env.NODE_ENV !== 'production') {
+    const stagingOrigin = text(process.env.FRONTEND_ORIGIN);
+    if (stagingOrigin) return stagingOrigin.replace(/\/+$/, '');
+  }
+
+  return DEFAULT_WORKSPACE_APP_URL;
 }
 
 function normalizeEmail(value: unknown) {
@@ -44,7 +56,7 @@ function isManualEmail(email: string) {
 export class ManualInvitationService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly invitations: MasterInvitationService,
+    private readonly invitations: UserInvitationService,
     private readonly jwt: JwtService,
   ) {}
 
@@ -56,16 +68,16 @@ export class ManualInvitationService {
     const placeholderEmail = `${MANUAL_EMAIL_PREFIX}${tokenHash.slice(0, 24)}${MANUAL_EMAIL_SUFFIX}`;
 
     const created = await this.prisma.$transaction(async (tx) => {
-      const tenant = await tx.tenant.create({ data: { name: 'Новый мастер' } });
+      const tenant = await tx.tenant.create({ data: { name: 'Новый пользователь' } });
       await tx.tenantAccess.create({
         data: {
           tenantId: tenant.id,
           planId: plan.id,
           status: TenantAccessStatus.ACTIVE,
-          isOwnerBook: false,
+          isPlatformOwnerWorkspace: false,
         },
       });
-      const invitation = await tx.masterInvitation.create({
+      const invitation = await tx.userInvitation.create({
         data: {
           tenantId: tenant.id,
           createdByAdminId: adminId,
@@ -78,9 +90,7 @@ export class ManualInvitationService {
       return { tenant, invitation };
     });
 
-    const origin = String(
-      process.env.CLIENT_APP_URL || DEFAULT_CLIENT_APP_URL,
-    ).trim().replace(/\/+$/, '');
+    const origin = workspaceAppOrigin();
 
     return {
       id: created.invitation.id,
@@ -163,12 +173,12 @@ export class ManualInvitationService {
         where: { id: invitation.tenantId },
         data: { name: fullName },
       });
-      await tx.masterInvitation.update({
+      await tx.userInvitation.update({
         where: { id: invitation.id },
         data: {
           email,
           name: fullName,
-          status: MasterInvitationStatus.ACCEPTED,
+          status: UserInvitationStatus.ACCEPTED,
           acceptedAt: new Date(),
         },
       });
@@ -209,11 +219,11 @@ export class ManualInvitationService {
       return { repaired: false, verified: Boolean(profile?.migrationVerifiedAt) };
     }
 
-    const invitation = await this.prisma.masterInvitation.findFirst({
+    const invitation = await this.prisma.userInvitation.findFirst({
       where: {
         tenantId,
         email: user.email,
-        status: MasterInvitationStatus.ACCEPTED,
+        status: UserInvitationStatus.ACCEPTED,
       },
       select: { id: true },
     });
@@ -228,14 +238,14 @@ export class ManualInvitationService {
 
   private async findManualInvitation(token: string) {
     if (!token) throw new BadRequestException('Ссылка регистрации недействительна');
-    const invitation = await this.prisma.masterInvitation.findUnique({
+    const invitation = await this.prisma.userInvitation.findUnique({
       where: { tokenHash: invitationHash(token) },
       include: { tenant: true },
     });
     if (!invitation || !isManualEmail(invitation.email)) {
       throw new NotFoundException('Ссылка регистрации не найдена');
     }
-    if (invitation.status !== MasterInvitationStatus.PENDING) {
+    if (invitation.status !== UserInvitationStatus.PENDING) {
       throw new ConflictException('Эта ссылка уже использована');
     }
     if (invitation.expiresAt.getTime() <= Date.now()) {

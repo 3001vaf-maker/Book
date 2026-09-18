@@ -1,14 +1,14 @@
 import { folderCard, pageHeader } from '../ui/ui.js';
-import { canUseBookCapability } from '../core/access.js';
+import { canUseCapability } from '../core/access.js';
 import { getClientCount } from './clients/data.js';
 
 export function renderMain(root) {
   const count = getClientCount();
   const cards = [];
-  if (canUseBookCapability('clients.access')) {
+  if (canUseCapability('clients.access')) {
     cards.push(folderCard({ title: 'Клиенты', icon: '◫', count, data: 'data-open-clients' }));
   }
-  if (canUseBookCapability('finance.access')) {
+  if (canUseCapability('finance.access')) {
     cards.push(folderCard({ title: 'Финансы', icon: '◫', data: 'data-open-finance' }));
   }
   root.innerHTML = `${pageHeader('Главная')}${cards.join('')}`;

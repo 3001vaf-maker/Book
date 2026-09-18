@@ -22,8 +22,8 @@ function renderError(message) {
 
 function renderForm(invitation) {
   state.innerHTML = `
-    <h1>Создайте свой Book</h1>
-    <p>Задайте пароль. После этого откроется ваш персональный рабочий Book.</p>
+    <h1>Создайте рабочее пространство</h1>
+    <p>Задайте пароль. После этого откроется ваше рабочее пространство.</p>
     <div class="invite-meta">
       <strong data-name></strong>
       <span data-email></span>
@@ -43,7 +43,7 @@ function renderForm(invitation) {
       <button class="invite-button" type="submit">Создать пароль и войти</button>
     </form>`;
 
-  state.querySelector('[data-name]').textContent = invitation.name || invitation.tenant?.name || 'Ваш Book';
+  state.querySelector('[data-name]').textContent = invitation.name || invitation.tenant?.name || 'Ваше рабочее пространство';
   state.querySelector('[data-email]').textContent = invitation.email || '';
 
   const form = state.querySelector('[data-form]');
@@ -75,11 +75,11 @@ function renderForm(invitation) {
     }
 
     button.disabled = true;
-    button.textContent = 'Создаём Book…';
+    button.textContent = 'Создаём Workspace…';
     try {
-      const account = await post('/master-invitations/accept', { token, password });
+      const account = await post('/user-invitations/accept', { token, password });
       setAuthToken(account.accessToken, data.get('remember') === 'on');
-      state.innerHTML = '<h1>Book создан</h1><p class="invite-success">Открываем ваше рабочее пространство…</p>';
+      state.innerHTML = '<h1>Workspace создан</h1><p class="invite-success">Открываем ваше рабочее пространство…</p>';
       window.setTimeout(() => location.replace('../'), 350);
     } catch (acceptError) {
       error.textContent = acceptError instanceof Error ? acceptError.message : 'Не удалось принять приглашение';
@@ -93,7 +93,7 @@ if (!token) {
   renderError('В ссылке отсутствует код приглашения.');
 } else {
   try {
-    const invitation = await post('/master-invitations/inspect', { token });
+    const invitation = await post('/user-invitations/inspect', { token });
     renderForm(invitation);
   } catch (error) {
     renderError(error instanceof Error ? error.message : 'Не удалось проверить приглашение');

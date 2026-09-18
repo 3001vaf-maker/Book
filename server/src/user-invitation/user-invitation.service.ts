@@ -7,7 +7,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import {
   CapabilityValueType,
-  MasterInvitationStatus,
+  UserInvitationStatus,
   MembershipRole,
   TenantAccessStatus,
 } from '@prisma/client';
@@ -17,6 +17,19 @@ import { PrismaService } from '../prisma.service';
 import { TransactionalEmailService } from '../transactional-email/transactional-email.service';
 
 const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const DEFAULT_WORKSPACE_APP_URL = 'https://book.va-tools.ru';
+
+function workspaceAppOrigin() {
+  const configured = String(process.env.WORKSPACE_APP_URL || '').trim();
+  if (configured) return configured.replace(/\/+$/, '');
+
+  if (process.env.NODE_ENV !== 'production') {
+    const stagingOrigin = String(process.env.FRONTEND_ORIGIN || '').trim();
+    if (stagingOrigin) return stagingOrigin.replace(/\/+$/, '');
+  }
+
+  return DEFAULT_WORKSPACE_APP_URL;
+}
 const STARTER_PLAN_KEY = 'starter-clients';
 
 const CAPABILITY_CATALOG: Array<{
@@ -71,7 +84,7 @@ function escapeHtml(value: string) {
 }
 
 @Injectable()
-export class MasterInvitationService {
+export class UserInvitationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly email: TransactionalEmailService,
@@ -145,13 +158,13 @@ export class MasterInvitationService {
   async createInvitation(adminId: string, input: { email?: unknown; name?: unknown }) {
     const email = normalizeEmail(input?.email);
     const name = normalizeName(input?.name);
-    if (!email || !email.includes('@')) throw new BadRequestException('Укажите корректный email мастера');
+    if (!email || !email.includes('@')) throw new BadRequestException('Укажите корректный email пользователя');
 
     const existingUser = await this.prisma.user.findUnique({ where: { email } });
     if (existingUser) throw new ConflictException('Пользователь с таким email уже зарегистрирован');
 
-    const existingInvitation = await this.prisma.masterInvitation.findFirst({
-      where: { email, status: MasterInvitationStatus.PENDING },
+    const existingInvitation = await this.prisma.userInvitation.findFirst({
+      where: { email, status: UserInvitationStatus.PENDING },
       orderBy: { createdAt: 'desc' },
     });
     if (existingInvitation) throw new ConflictException('На этот email уже отправлено активное приглашение');
@@ -160,7 +173,7 @@ export class MasterInvitationService {
     const token = createToken();
     const tokenHash = invitationHash(token);
     const expiresAt = new Date(Date.now() + INVITATION_TTL_MS);
-    const tenantName = name || email.split('@')[0] || 'Book';
+    const tenantName = name || email.split('@')[0] || 'Workspace';
 
     const created = await this.prisma.$transaction(async (tx) => {
       const tenant = await tx.tenant.create({ data: { name: tenantName } });
@@ -169,10 +182,10 @@ export class MasterInvitationService {
           tenantId: tenant.id,
           planId: plan.id,
           status: TenantAccessStatus.ACTIVE,
-          isOwnerBook: false,
+          isPlatformOwnerWorkspace: false,
         },
       });
-      const invitation = await tx.masterInvitation.create({
+      const invitation = await tx.userInvitation.create({
         data: {
           tenantId: tenant.id,
           createdByAdminId: adminId,
@@ -196,9 +209,9 @@ export class MasterInvitationService {
   }
 
   async resendInvitation(adminId: string, invitationId: string) {
-    const invitation = await this.prisma.masterInvitation.findUnique({ where: { id: invitationId } });
+    const invitation = await this.prisma.userInvitation.findUnique({ where: { id: invitationId } });
     if (!invitation || invitation.createdByAdminId !== adminId) throw new NotFoundException('Приглашение не найдено');
-    if (invitation.status !== MasterInvitationStatus.PENDING) throw new ConflictException('Это приглашение уже не активно');
+    if (invitation.status !== UserInvitationStatus.PENDING) throw new ConflictException('Это приглашение уже не активно');
 
     const oldTokenHash = invitation.tokenHash;
     const oldExpiresAt = invitation.expiresAt;
@@ -206,7 +219,7 @@ export class MasterInvitationService {
     const tokenHash = invitationHash(token);
     const expiresAt = new Date(Date.now() + INVITATION_TTL_MS);
 
-    const updated = await this.prisma.masterInvitation.update({
+    const updated = await this.prisma.userInvitation.update({
       where: { id: invitation.id },
       data: { tokenHash, expiresAt },
     });
@@ -214,7 +227,7 @@ export class MasterInvitationService {
     try {
       await this.sendInvitationEmail({ email: invitation.email, name: invitation.name, token });
     } catch (error) {
-      await this.prisma.masterInvitation.update({
+      await this.prisma.userInvitation.update({
         where: { id: invitation.id },
         data: { tokenHash: oldTokenHash, expiresAt: oldExpiresAt },
       }).catch(() => undefined);
@@ -260,10 +273,10 @@ export class MasterInvitationService {
           role: MembershipRole.OWNER,
         },
       });
-      await tx.masterInvitation.update({
+      await tx.userInvitation.update({
         where: { id: invitation.id },
         data: {
-          status: MasterInvitationStatus.ACCEPTED,
+          status: UserInvitationStatus.ACCEPTED,
           acceptedAt: new Date(),
         },
       });
@@ -290,7 +303,7 @@ export class MasterInvitationService {
   }
 
   async listInvitations(adminId: string) {
-    const rows = await this.prisma.masterInvitation.findMany({
+    const rows = await this.prisma.userInvitation.findMany({
       where: { createdByAdminId: adminId },
       include: { tenant: true },
       orderBy: { createdAt: 'desc' },
@@ -303,19 +316,18 @@ export class MasterInvitationService {
 
   private async findActiveInvitation(token: string) {
     if (!token) throw new BadRequestException('Приглашение отсутствует');
-    const invitation = await this.prisma.masterInvitation.findUnique({
+    const invitation = await this.prisma.userInvitation.findUnique({
       where: { tokenHash: invitationHash(token) },
       include: { tenant: true },
     });
     if (!invitation) throw new NotFoundException('Приглашение не найдено');
-    if (invitation.status !== MasterInvitationStatus.PENDING) throw new ConflictException('Приглашение уже использовано или отозвано');
+    if (invitation.status !== UserInvitationStatus.PENDING) throw new ConflictException('Приглашение уже использовано или отозвано');
     if (invitation.expiresAt.getTime() <= Date.now()) throw new ConflictException('Срок действия приглашения истёк');
     return invitation;
   }
 
   private async sendInvitationEmail(input: { email: string; name: string; token: string }) {
-    const origin = String(process.env.FRONTEND_ORIGIN || '').trim().replace(/\/+$/, '');
-    if (!origin) throw new BadRequestException('FRONTEND_ORIGIN не настроен');
+    const origin = workspaceAppOrigin();
     const url = `${origin}/invite/?token=${encodeURIComponent(input.token)}`;
     const safeName = escapeHtml(input.name || '');
     const greeting = safeName ? `Здравствуйте, ${safeName}.` : 'Здравствуйте.';
@@ -323,10 +335,10 @@ export class MasterInvitationService {
     return this.email.send({
       to: input.email,
       toName: input.name,
-      subject: 'Приглашение в Book',
-      tag: 'master-invitation',
-      text: `${input.name ? `Здравствуйте, ${input.name}.` : 'Здравствуйте.'}\n\nВам открыт персональный Book. Создайте пароль и начните настройку рабочего пространства:\n${url}\n\nСсылка действует 7 дней.`,
-      html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#292522"><h2>Book</h2><p>${greeting}</p><p>Вам открыт персональный Book. Создайте пароль и начните настройку своего рабочего пространства.</p><p style="margin:28px 0"><a href="${url}" style="background:#292522;color:#fff;text-decoration:none;padding:14px 20px;border-radius:12px;display:inline-block">Создать пароль и войти</a></p><p style="color:#817a74;font-size:14px">Ссылка действует 7 дней.</p></div>`,
+      subject: 'Приглашение в рабочее пространство',
+      tag: 'user-invitation',
+      text: `${input.name ? `Здравствуйте, ${input.name}.` : 'Здравствуйте.'}\n\nВам открыт доступ к рабочему пространству. Создайте пароль и начните настройку:\n${url}\n\nСсылка действует 7 дней.`,
+      html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#292522"><h2>Workspace</h2><p>${greeting}</p><p>Вам открыт доступ к рабочему пространству. Создайте пароль и начните настройку.</p><p style="margin:28px 0"><a href="${url}" style="background:#292522;color:#fff;text-decoration:none;padding:14px 20px;border-radius:12px;display:inline-block">Создать пароль и войти</a></p><p style="color:#817a74;font-size:14px">Ссылка действует 7 дней.</p></div>`,
     });
   }
 
@@ -335,7 +347,7 @@ export class MasterInvitationService {
     tenantId: string;
     email: string;
     name: string;
-    status: MasterInvitationStatus;
+    status: UserInvitationStatus;
     expiresAt: Date;
     acceptedAt: Date | null;
     revokedAt: Date | null;
