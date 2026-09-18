@@ -16,7 +16,7 @@ test -n "$tenant_id"
 access_payload=$(curl -fsS -H "Authorization: Bearer $owner_token" "$base/saas-access/me")
 node -e '
 const p=JSON.parse(process.argv[1]);
-if(p.status!=="ACTIVE" || p.isOwnerBook!==true) process.exit(1);
+if(p.status!=="ACTIVE" || p.isPlatformOwnerWorkspace!==true) process.exit(1);
 ' "$access_payload"
 
 # Public booking must work directly from profile/workplace/procedures.
