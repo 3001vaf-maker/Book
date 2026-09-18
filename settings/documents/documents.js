@@ -1,4 +1,5 @@
 import { actionBlock, button, escapeHtml, field, folderList, iconButton, initViewNavigation, list, modal, mountModal, page, pageHeader, shortDateTime, textareaField, viewNavigation } from '../../ui/ui.js';
+import { phonesMatch } from '../../core/phone/index.js';
 import { getAllClients } from '../../main/clients/data.js';
 import { createDocument, getDocuments, saveDocument } from './data.js';
 import { getConsents } from './consents.js';
@@ -121,18 +122,67 @@ function documentHistoryMarkup() {
   });
 }
 
+function consentClient(item, clients) {
+  if (item.subjectType === 'BOOKING_ACCOUNT') {
+    return clients.find((client) => (client.accounts || []).includes(item.subjectKey)) || null;
+  }
+  if (item.subjectType !== 'CONTACT_POINT') {
+    return clients.find((client) => client.key === item.clientId) || null;
+  }
+  if (item.contactType === 'PHONE') {
+    return clients.find((client) => (client.phones || []).some((value) => phonesMatch(value, item.contactValue))) || null;
+  }
+  if (item.contactType === 'EMAIL') {
+    const target = String(item.contactValue || '').trim().toLowerCase();
+    return clients.find((client) => (client.emails || []).some((value) => String(value || '').trim().toLowerCase() === target)) || null;
+  }
+  if (item.contactType === 'TELEGRAM') {
+    const target = String(item.contactValue || '').trim();
+    return clients.find((client) => (client.telegrams || []).some((value) => String(value || '').trim() === target)) || null;
+  }
+  return null;
+}
+
+function consentSubjectLabel(item, clients) {
+  const client = consentClient(item, clients);
+  if (client) return [client.name, client.surname].filter(Boolean).join(' ') || client.phones?.[0] || 'Клиент';
+  if (item.subjectType === 'CONTACT_POINT') return item.contactValue || 'Contact Point';
+  return 'Клиент';
+}
+
+function signedDocumentSnapshot(item) {
+  const historical = getDocumentHistory().find((entry) => entry.documentId === item.documentId
+    && Number(entry.documentVersion || 0) === Number(item.documentVersion || 0)
+    && entry.snapshot);
+  if (historical?.snapshot) return historical.snapshot;
+  return getDocuments().find((document) => document.id === item.documentId) || null;
+}
+
+function openSignedDocument(item) {
+  const snapshot = signedDocumentSnapshot(item);
+  if (!snapshot) return;
+  const html = `
+    <div class="modal-title">
+      <h2>${escapeHtml(snapshot.title || item.documentId)}</h2>
+      <p>Версия ${escapeHtml(item.documentVersion || snapshot.version || 1)} · ${escapeHtml(consentStateText(item.status))}</p>
+    </div>
+    <div style="white-space:pre-wrap;line-height:1.55;padding:14px 0">${escapeHtml(snapshot.text || '')}</div>`;
+  mountModal(document.body, modal(html, { title: snapshot.title || 'Документ', variant: 'large', surface: 'app' }));
+}
+
 function signatureHistoryMarkup() {
-  const documents = new Map(getDocuments().map((item) => [item.id, item]));
-  const clients = new Map(getAllClients().map((item) => [item.key, item]));
-  const items = [...getConsents()].sort((a, b) => Date.parse(b.createdAt || 0) - Date.parse(a.createdAt || 0));
+  const clients = getAllClients();
+  const items = [...getConsents()].sort((a, b) => Date.parse(b.eventAt || b.createdAt || 0) - Date.parse(a.eventAt || a.createdAt || 0));
   return list({
     items: items.map((item) => {
-      const document = documents.get(item.documentId);
-      const client = clients.get(item.clientId);
-      const clientName = client ? [client.name, client.surname].filter(Boolean).join(' ') : 'Клиент';
+      const snapshot = signedDocumentSnapshot(item);
+      const subject = consentSubjectLabel(item, clients);
       return {
-        title: document?.title || item.documentId,
-        secondary: [`${clientName} · ${consentStateText(item.status)}`, `Версия ${item.documentVersion} · ${formatMoment(item.acceptedAt || item.revokedAt || item.createdAt)}`],
+        title: snapshot?.title || item.documentId,
+        secondary: [`${subject} · ${consentStateText(item.status)}`, `Версия ${item.documentVersion} · ${formatMoment(item.eventAt || item.acceptedAt || item.revokedAt || item.createdAt)}`],
+        interactive: Boolean(snapshot),
+        data: snapshot ? `data-signed-document-event="${escapeHtml(item.id)}"` : '',
+        aria: snapshot ? `Открыть подписанный документ версии ${item.documentVersion}` : '',
       };
     })
   });
@@ -164,6 +214,10 @@ function bind(root, navigateBack) {
   root.querySelectorAll('[data-document-id]').forEach((row) => row.addEventListener('click', () => {
     const item = getDocuments().find((document) => document.id === row.dataset.documentId);
     if (item) openDocumentEditor(item, () => render(root, navigateBack));
+  }));
+  root.querySelectorAll('[data-signed-document-event]').forEach((row) => row.addEventListener('click', () => {
+    const item = getConsents().find((event) => event.id === row.dataset.signedDocumentEvent);
+    if (item) openSignedDocument(item);
   }));
   if (currentSection === 'history') {
     initViewNavigation(root, {

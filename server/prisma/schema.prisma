@@ -309,6 +309,7 @@ model BusinessDocumentState {
   tenantId            String   @unique
   data                Json
   migrationVerifiedAt DateTime?
+  consentMigratedAt   DateTime?
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 

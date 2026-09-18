@@ -4,6 +4,23 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 
 type JsonObject = Record<string, any>;
+type ConsentEventRow = {
+  id: string;
+  subjectType: string;
+  subjectKey: string;
+  contactType: string;
+  contactValue: string;
+  documentId: string;
+  documentVersion: number;
+  status: string;
+  acceptedAt: Date | null;
+  revokedAt: Date | null;
+  source: string;
+  occurredAt: Date;
+  migratedFromEventId: string;
+  createdAt: Date;
+};
+
 const DATASETS = new Set(['documents', 'consents', 'history']);
 
 function objectValue(value: unknown): JsonObject {
@@ -37,17 +54,61 @@ function json(value: unknown): Prisma.InputJsonValue {
   return clone(value) as Prisma.InputJsonValue;
 }
 
+function publicConsentEvent(row: ConsentEventRow) {
+  return {
+    id: row.id,
+    subjectType: row.subjectType,
+    subjectKey: row.subjectKey,
+    contactType: row.contactType,
+    contactValue: row.contactValue,
+    documentId: row.documentId,
+    documentVersion: row.documentVersion,
+    status: row.status,
+    acceptedAt: row.acceptedAt?.toISOString() || '',
+    revokedAt: row.revokedAt?.toISOString() || '',
+    source: row.source,
+    eventAt: row.occurredAt.toISOString(),
+    createdAt: row.createdAt.toISOString(),
+    migratedFromEventId: row.migratedFromEventId,
+  };
+}
+
 @Injectable()
 export class DocumentStateService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private async canonicalConsentEvents(tenantId: string) {
+    const rows = await this.prisma.$queryRaw<ConsentEventRow[]>`
+      SELECT "id", "subjectType", "subjectKey", "contactType", "contactValue", "documentId",
+             "documentVersion", "status", "acceptedAt", "revokedAt", "source", "occurredAt",
+             "migratedFromEventId", "createdAt"
+      FROM "ConsentEvent"
+      WHERE "tenantId" = ${tenantId}
+      ORDER BY "occurredAt" ASC, "createdAt" ASC, "id" ASC
+    `;
+    return rows.map(publicConsentEvent);
+  }
+
   private async snapshot(tenantId: string) {
     const state = await this.prisma.businessDocumentState.findUnique({ where: { tenantId } });
+    const data = normalize(state?.data || {});
+
+    if (state?.migrationVerifiedAt) {
+      const canonicalEvents = await this.canonicalConsentEvents(tenantId);
+      const migratedLegacyIds = new Set(
+        canonicalEvents.map((item) => String(item.migratedFromEventId || '')).filter(Boolean),
+      );
+      const legacyEvents = data.consents.filter(
+        (item: any) => !migratedLegacyIds.has(String(item?.id || '')),
+      );
+      data.consents = [...legacyEvents, ...canonicalEvents];
+    }
+
     return {
       migrated: Boolean(state),
       verified: Boolean(state?.migrationVerifiedAt),
       migrationVerifiedAt: state?.migrationVerifiedAt || null,
-      data: normalize(state?.data || {}),
+      data,
     };
   }
 
