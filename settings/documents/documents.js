@@ -224,14 +224,18 @@ function consentSubjectLabel(item, clients) {
 
 function signatureHistoryMarkup() {
   const documents = new Map(getDocuments().map((item) => [item.id, item]));
+  const history = getDocumentHistory();
   const clients = getAllClients();
   const items = [...getConsents()].sort((a, b) => Date.parse(b.eventAt || b.createdAt || 0) - Date.parse(a.eventAt || a.createdAt || 0));
   return list({
     items: items.map((item) => {
       const document = documents.get(item.documentId);
+      const historical = history.find((entry) => entry.documentId === item.documentId
+        && Number(entry.documentVersion || 0) === Number(item.documentVersion || 0)
+        && entry.snapshot);
       const subject = consentSubjectLabel(item, clients);
       return {
-        title: document?.title || item.documentId,
+        title: historical?.snapshot?.title || document?.title || item.documentId,
         secondary: [`${subject} · ${consentStateText(item.status)}`, `Версия ${item.documentVersion} · ${formatMoment(item.eventAt || item.acceptedAt || item.revokedAt || item.createdAt)}`],
       };
     })
