@@ -1,5 +1,4 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { LegalRuntimeService } from '../legal-runtime/legal-runtime.service';
 import { ClientProfileThreadService } from './client-profile-thread.service';
 import { CommunicationChannelResolverService } from './communication-channel-resolver.service';
 import { CommunicationService } from './communication.service';
@@ -16,7 +15,6 @@ export class CommunicationDispatchService {
     private readonly channels: CommunicationChannelResolverService,
     private readonly profiles: ClientProfileThreadService,
     private readonly profilePush: InAppProfilePushService,
-    private readonly legal: LegalRuntimeService,
   ) {}
 
   private async resolveProfile(tenantId: string, input: { profileKey?: unknown; phone?: unknown; uei?: unknown }) {
@@ -53,37 +51,17 @@ export class CommunicationDispatchService {
     return selected;
   }
 
-  async send(tenantId: string, input: {
-    profileKey?: unknown;
-    phone?: unknown;
-    uei?: unknown;
-    channel?: unknown;
-    body?: unknown;
-    content?: unknown;
-    attachments?: unknown;
-    purpose?: unknown;
-    legalBasis?: unknown;
-    actorUserId?: unknown;
-  }) {
+  async send(tenantId: string, input: { profileKey?: unknown; phone?: unknown; uei?: unknown; channel?: unknown; body?: unknown; content?: unknown; attachments?: unknown }) {
     const body = text(input?.body);
     const attachments = Array.isArray(input?.attachments) ? input.attachments : [];
     const hasRichContent = Boolean(input?.content && typeof input.content === 'object');
     if (!body && !attachments.length && !hasRichContent) throw new BadRequestException('Пустое сообщение');
 
     const channel = await this.resolveChannel(tenantId, input || {});
-    const purpose = text(input?.purpose).toUpperCase() || 'MARKETING';
-
     if (channel === 'IN_APP') {
       const profile = await this.resolveProfile(tenantId, input || {});
       const delivery = await this.inAppDeliveryProfile(tenantId, input || {});
       if (!profile || !delivery) throw new NotFoundException('Внутренний чат клиента недоступен');
-      await this.legal.assertExternalCommunication(tenantId, {
-        actorUserId: input?.actorUserId,
-        purpose,
-        channel: 'IN_APP',
-        destination: profile.profileKey,
-        legalBasis: input?.legalBasis,
-      });
       const message = await this.communications.recordMessage(tenantId, {
         profileKey: profile.profileKey,
         phone: input?.phone,
@@ -103,31 +81,9 @@ export class CommunicationDispatchService {
         entityType: 'chat-message',
         entityId: message.id,
       }).catch(() => null);
-      await this.legal.audit(tenantId, text(input?.actorUserId), 'EXTERNAL_COMMUNICATION_SENT', purpose, 'SUCCESS', { channel: 'IN_APP', messageId: message.id });
       return message;
     }
-
-    if (channel === 'TELEGRAM') {
-      const identity = await this.channels.resolveTelegramIdentity(tenantId, input || {});
-      const destination = text(identity?.externalUserId);
-      if (!destination) throw new NotFoundException('Канал TELEGRAM у клиента недоступен');
-      await this.legal.assertExternalCommunication(tenantId, {
-        actorUserId: input?.actorUserId,
-        purpose,
-        channel: 'TELEGRAM',
-        destination,
-        legalBasis: input?.legalBasis,
-      });
-      const message = await this.channels.sendTelegram(tenantId, {
-        profileKey: input?.profileKey,
-        phone: input?.phone,
-        uei: input?.uei,
-        body,
-      });
-      await this.legal.audit(tenantId, text(input?.actorUserId), 'EXTERNAL_COMMUNICATION_SENT', purpose, 'SUCCESS', { channel: 'TELEGRAM' });
-      return message;
-    }
-
+    if (channel === 'TELEGRAM') return this.channels.sendTelegram(tenantId, { profileKey: input?.profileKey, phone: input?.phone, uei: input?.uei, body });
     throw new BadRequestException('Канал пока не подключён к двустороннему Chat');
   }
 }

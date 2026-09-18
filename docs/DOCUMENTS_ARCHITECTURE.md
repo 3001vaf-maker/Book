@@ -21,27 +21,6 @@ Clients / People
 
 A checkbox or `person.agreements` field is never a source of truth. Legacy agreement flags may be read only as migration input and must not become a second owner.
 
-## 1.1 Central Book bases and user-owned documents
-
-Book Admin owns the current **document bases** supplied by Book. They are versioned platform documents and are not the user's document themselves.
-
-Canonical mappings preserve the existing document ids because those ids are already referenced by consent projections and communication rules:
-
-- `user-document-pdn-policy` → `pdn-agreement`;
-- `user-document-pdn-consent` → `pdn-consent`;
-- `user-document-messages-consent` → `messages-consent`.
-
-A personal Book document may use either source:
-
-- `BOOK` — a snapshot assembled from the chosen Book base version plus data already present in the user's Book profile/workplace;
-- `CUSTOM` — text supplied by that user.
-
-Changing the source or text creates the next personal document version. Existing consent events continue to reference the exact old `documentId + documentVersion`.
-
-Publishing a newer base in Book Admin does **not** rewrite personal documents. The personal Book sees that a newer base is available and may explicitly adopt it. Adoption creates a new personal document version. Existing consent policy then naturally requires the current document version where that consent is required.
-
-If a legacy system document was never edited, migration keeps its original id, stores the legacy version in document history, and creates the Book-based next version. If the old document was edited, it is classified as `CUSTOM` and its text is not overwritten.
-
 ## 2. Consent subject — fixed rule
 
 Consent is never owned by a mutable Client/Person card and never by UEI.

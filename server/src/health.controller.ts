@@ -32,8 +32,7 @@ export class HealthController {
         documentStorage: 'ok',
         bookingAutonomy: 'server',
         telegramRuntime: telegramReady ? 'ready' : 'unconfigured',
-        release: 'clean-launch-reset-v2-redeploy',
-        cleanResetMigration: '20260916150000_clean_launch_reset',
+        release: 'telegram-miniapp-v1',
       };
     } catch {
       throw new ServiceUnavailableException({ status: 'error', database: 'unavailable' });

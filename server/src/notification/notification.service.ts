@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { BusinessStateService } from '../business-state/business-state.service';
+import { ConsentPolicyService } from '../document-state/consent-policy.service';
 import { PrismaService } from '../prisma.service';
 import { WebPushService } from './web-push.service';
 
@@ -102,6 +103,7 @@ export class NotificationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly businessState: BusinessStateService,
+    private readonly documents: ConsentPolicyService,
     private readonly webPush: WebPushService,
   ) {}
 
@@ -237,9 +239,11 @@ export class NotificationService {
     return true;
   }
 
-  private async externalAllowed(_tenantId: string, identity: Awaited<ReturnType<NotificationService['accountIdentity']>>, channel: string) {
+  private async externalAllowed(tenantId: string, identity: Awaited<ReturnType<NotificationService['accountIdentity']>>, channel: string) {
     if (channel === 'PUSH') return true;
-    return Boolean(this.recipientForChannel(identity, channel));
+    const recipient = this.recipientForChannel(identity, channel);
+    if (!recipient) return false;
+    return this.documents.canSendMessages(tenantId, channel, recipient);
   }
 
   private async queueExternalByPolicy(
@@ -512,7 +516,7 @@ export class NotificationService {
     return this.markDeliveryFailed(tenantId, deliveryId, 'TELEGRAM', error);
   }
 
-  async canSendServiceForAccount(tenantId: string, accountId: string, channel: 'PUSH' | 'EMAIL' | 'TELEGRAM') {
+  async canSendMessagesForAccount(tenantId: string, accountId: string, channel: 'PUSH' | 'EMAIL' | 'TELEGRAM') {
     const identity = await this.accountIdentity(tenantId, accountId);
     return this.externalAllowed(tenantId, identity, channel);
   }

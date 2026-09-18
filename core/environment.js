@@ -1,13 +1,15 @@
 export const PRODUCTION_API_BASE = 'https://api.va-tools.ru';
-export const BOOK_APP_ORIGIN = 'https://book.va-tools.ru';
-export const CLIENT_APP_ORIGIN = 'https://client.va-tools.ru';
+export const ADMIN_APP_ORIGIN = 'https://admin.va-tools.ru';
+export const WORKSPACE_APP_ORIGIN = 'https://book.va-tools.ru';
+export const PUBLIC_APP_ORIGIN = 'https://client.va-tools.ru';
 export const LOCAL_STAGING_API_BASE = 'http://localhost:3000';
 export const CODESPACES_STAGING_API_BASE = '/api';
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
 const PRODUCTION_HOSTS = new Set([
-  new URL(BOOK_APP_ORIGIN).hostname,
-  new URL(CLIENT_APP_ORIGIN).hostname,
+  new URL(ADMIN_APP_ORIGIN).hostname,
+  new URL(WORKSPACE_APP_ORIGIN).hostname,
+  new URL(PUBLIC_APP_ORIGIN).hostname,
   new URL(PRODUCTION_API_BASE).hostname,
 ]);
 const CODESPACES_SUFFIX = '.app.github.dev';
@@ -34,7 +36,7 @@ export function resolveRuntimeEnvironment({ hostname = '', override = '' } = {})
 }
 
 const runtimeHostname = typeof globalThis.location?.hostname === 'string' ? globalThis.location.hostname : '';
-const runtimeOverride = typeof globalThis.__BOOK_API_BASE__ === 'string' ? globalThis.__BOOK_API_BASE__ : '';
+const runtimeOverride = typeof globalThis.__RUNTIME_API_BASE__ === 'string' ? globalThis.__RUNTIME_API_BASE__ : '';
 
 export const API_BASE = resolveApiBase({ hostname: runtimeHostname, override: runtimeOverride });
 export const RUNTIME_ENVIRONMENT = resolveRuntimeEnvironment({ hostname: runtimeHostname, override: runtimeOverride });
