@@ -58,6 +58,39 @@ function formatDate(value) {
   return date.toLocaleDateString('ru-RU');
 }
 
+function formatDateTime(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString('ru-RU');
+}
+
+function acceptanceActionLabel(action) {
+  if (action === 'ACCEPTED') return 'Принято';
+  if (action === 'ACKNOWLEDGED') return 'Ознакомлен';
+  if (action === 'CONSENTED') return 'Согласие дано';
+  return String(action || 'Зафиксировано');
+}
+
+function masterLegalAcceptanceHtml(master) {
+  const items = Array.isArray(master?.legalAcceptances) ? master.legalAcceptances : [];
+  if (!master?.master) {
+    return '<p style="margin:0;color:#817a74">Мастер ещё не завершил регистрацию.</p>';
+  }
+  if (!items.length) {
+    return '<p style="margin:0;color:#a33d32">Нет зафиксированных акцептов регистрационных документов.</p>';
+  }
+  return `<div class="admin-document-list">${items.map((item) => `
+    <div class="admin-document-row">
+      <div>
+        <strong>${escapeHtml(item.title || item.documentKey)}</strong>
+        <small>версия ${Number(item.documentVersion || 1)} · ${escapeHtml(acceptanceActionLabel(item.action))} · ${escapeHtml(formatDateTime(item.occurredAt))}</small>
+      </div>
+      <span class="admin-pill active">${item.requiredForRegistration ? 'обязательно' : 'необязательно'}</span>
+    </div>
+  `).join('')}</div>`;
+}
+
 function documentFileName(title, version) {
   const base = String(title || 'document')
     .toLowerCase()
@@ -626,6 +659,10 @@ function openAccessDrawer(tenantId) {
         <div><h3>${escapeHtml(master.isOwnerBook ? 'Мой Book' : (master.master?.name || master.invitation?.name || master.tenantName))}</h3><p>${escapeHtml(master.master?.email || master.invitation?.email || '')}</p></div>
         <button class="admin-close" data-close aria-label="Закрыть">×</button>
       </div>
+      <section class="admin-section">
+        <h4>Соглашения при регистрации</h4>
+        ${masterLegalAcceptanceHtml(master)}
+      </section>
       <section class="admin-section">
         <h4>Доступ Book</h4>
         ${state.capabilities.map((capability) => capabilityEditor(capability, resolved.get(capability.key))).join('')}
