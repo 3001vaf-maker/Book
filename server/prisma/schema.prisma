@@ -10,7 +10,7 @@ datasource db {
 enum MembershipRole {
   OWNER
   ADMIN
-  MASTER
+  USER
 }
 
 enum BookingRequestStatus {
@@ -30,7 +30,7 @@ enum TenantAccessStatus {
   SUSPENDED
 }
 
-enum MasterInvitationStatus {
+enum UserInvitationStatus {
   PENDING
   ACCEPTED
   REVOKED
@@ -61,7 +61,7 @@ model Tenant {
   businessDocuments        BusinessDocumentState?
   businessAuxiliaryState   BusinessAuxiliaryState?
   saasAccess               TenantAccess?
-  masterInvitations        MasterInvitation[]
+  userInvitations        UserInvitation[]
 }
 
 model User {
@@ -338,7 +338,7 @@ model PlatformAdmin {
   updatedAt DateTime @updatedAt
 
   user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdInvitations MasterInvitation[]
+  createdInvitations UserInvitation[]
 }
 
 model Capability {
@@ -396,7 +396,7 @@ model TenantAccess {
   tenantId    String             @id
   planId      String?
   status      TenantAccessStatus @default(ACTIVE)
-  isOwnerBook Boolean            @default(false)
+  isPlatformOwnerWorkspace Boolean            @default(false)
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
 
@@ -446,14 +446,14 @@ model CapabilityAccessEvent {
   @@index([batchId])
 }
 
-model MasterInvitation {
+model UserInvitation {
   id               String                 @id @default(cuid())
   tenantId         String
   createdByAdminId String
   email            String
   name             String                 @default("")
   tokenHash        String                 @unique
-  status           MasterInvitationStatus @default(PENDING)
+  status           UserInvitationStatus @default(PENDING)
   expiresAt        DateTime
   acceptedAt       DateTime?
   revokedAt        DateTime?
