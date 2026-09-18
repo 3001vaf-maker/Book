@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { CapabilityValueType, TenantAccessStatus } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
+import { PlatformDocumentsService } from '../platform-documents/platform-documents.service';
 import { SaasAccessService } from '../saas-access/saas-access.service';
 import { MasterInvitationService } from '../master-invitation/master-invitation.service';
 
@@ -10,6 +11,7 @@ export class SaasAdminService {
     private readonly prisma: PrismaService,
     private readonly access: SaasAccessService,
     private readonly invitations: MasterInvitationService,
+    private readonly documents: PlatformDocumentsService,
   ) {}
 
   async me(adminId: string, userId: string) {
@@ -19,6 +21,14 @@ export class SaasAdminService {
     });
     if (!admin || admin.userId !== userId) throw new NotFoundException('Администратор не найден');
     return { id: admin.id, user: admin.user };
+  }
+
+  documentsCatalog() {
+    return this.documents.documents();
+  }
+
+  documentHistory() {
+    return this.documents.acceptanceHistory();
   }
 
   async capabilities() {
