@@ -36,6 +36,16 @@ assert.match(core, /data-demo-banner/);
 assert.match(core, /Я уже могу работать с персональными данными/);
 assert.match(core, /Мне нужна помощь/);
 assert.match(core, /CONTINUE_WITHOUT_CONFIRMATION/);
+assert.match(core, /Этап 1 — Профиль/);
+assert.match(core, /Этап 2 — Работа/);
+assert.match(core, /Этап 3 — Возможности Book/);
+assert.match(core, /Помощник ведёт по этапам, но ничего не блокирует/);
+assert.match(core, /data-demo-go-live/);
+assert.doesNotMatch(core, /profileSetupReady\(\).*disabled|canBecomeLive.*data-demo-go-live/s);
+assert.match(core, /canUseBookCapability\('services\.access'\)/);
+assert.match(core, /canUseBookCapability\('timetable\.access'\)/);
+assert.match(core, /canUseBookCapability\('online_booking\.access'\)/);
+
 assert.match(core, /Печать \/ сохранить как PDF/);
 assert.doesNotMatch(core, /renderMasterLegalSetup|data-legal-identity|operatorIdentityConfigured/);
 assert.doesNotMatch(core, /renderOnboarding|isOnboardingComplete/);
