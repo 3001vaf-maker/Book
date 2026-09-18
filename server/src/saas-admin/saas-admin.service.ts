@@ -153,11 +153,7 @@ export class SaasAdminService {
       };
       const startupReady = startupState.access === 'ACTIVE'
         && startupState.legal !== 'MISSING'
-        && startupState.profile === 'READY'
-        && startupState.business === 'READY'
-        && startupState.operational === 'READY'
-        && startupState.documents === 'READY'
-        && startupState.auxiliary === 'READY';
+        && startupState.profile === 'READY';
       return {
         tenantId: row.tenantId,
         tenantName: row.tenant.name,
