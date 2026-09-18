@@ -290,35 +290,12 @@ export class LegalRuntimeService implements OnModuleInit {
 
   async tenantReadiness(tenantId: string) {
     const state = await this.tenantState(tenantId);
-    const documents = await this.listDocuments('TENANT', tenantId);
-    const currentDocuments = documents.filter((item) => item.currentVersion);
-    const currentKeys = new Set(currentDocuments.map((item) => item.key));
-    const missingLiveDocuments = TENANT_REQUIRED_LIVE_DOCUMENT_KEYS.filter((key) => !currentKeys.has(key));
-    const storedChecklist = objectValue(state?.checklist);
-    const operatorIdentityConfigured = currentDocuments.some((item) => {
-      const identity = objectValue(item.currentVersion?.operatorIdentitySnapshot);
-      return Boolean(text(identity.name));
-    });
-    const checklist = {
-      ...storedChecklist,
-      operatorIdentityConfigured,
-      privacyPolicyPublished: currentKeys.has('privacy-policy'),
-      clientDocumentsPrepared: missingLiveDocuments.length === 0,
-    };
+    const evidence = objectValue(state?.evidenceMetadata);
     return {
-      state: state ? { ...state, checklist } : state,
-      checklistKeys: TENANT_CHECKLIST_KEYS,
-      checklistComplete: allTrue(checklist, TENANT_CHECKLIST_KEYS),
-      privacyPublished: currentKeys.has('privacy-policy'),
-      missingLiveDocuments,
-      requiredLiveDocuments: documents.filter((item) => TENANT_REQUIRED_LIVE_DOCUMENT_KEYS.includes(item.key as any)),
-      documents,
-      canBecomeLive: Boolean(
-        state
-        && state.filingStatus === 'SUBMITTED'
-        && allTrue(checklist, TENANT_CHECKLIST_KEYS)
-        && missingLiveDocuments.length === 0
-      ),
+      state,
+      liveDecision: text(evidence.liveDecision),
+      rknStatus: text(evidence.rknStatus) || (state?.filingStatus === 'SUBMITTED' ? 'SUBMITTED' : 'UNKNOWN'),
+      canBecomeLive: Boolean(state && state.operationMode === 'DEMO'),
     };
   }
 
@@ -478,20 +455,64 @@ export class LegalRuntimeService implements OnModuleInit {
     return this.activateTenantLive(tenantId, actorUserId);
   }
 
-  async activateTenantLive(tenantId: string, actorUserId: string) {
+  async activateTenantLive(tenantId: string, actorUserId: string, input: Record<string, unknown> = {}) {
     await this.assertPlatformLegalReady(actorUserId);
     await this.assertTenantActive(tenantId, actorUserId, 'TENANT_GO_LIVE');
-    const readiness = await this.tenantReadiness(tenantId);
-    if (!readiness.canBecomeLive) throw new ConflictException('Tenant не выполнил обязательные условия LIVE');
-    const before = readiness.state!;
-    if (before.operationMode === 'LIVE') return readiness;
+    const before = await this.requireTenantState(tenantId);
+    if (before.operationMode === 'LIVE') return this.tenantReadiness(tenantId);
+
+    const source = objectValue(input);
+    const decision = text(source.decision).toUpperCase();
+    const allowedDecisions = new Set(['READY', 'GUIDED_SUBMITTED', 'CONTINUE_WITHOUT_CONFIRMATION']);
+    if (!allowedDecisions.has(decision)) {
+      throw new BadRequestException('Подтвердите выбранный путь перехода в LIVE');
+    }
+    if (source.responsibilityAcknowledged !== true) {
+      throw new BadRequestException('Подтвердите, что решение о законности обработки данных принимаете вы');
+    }
+
+    const declaredRknStatus = text(source.rknStatus).toUpperCase();
+    const rknStatus = declaredRknStatus === 'SUBMITTED'
+      ? 'SUBMITTED'
+      : declaredRknStatus === 'NOT_SUBMITTED'
+        ? 'NOT_SUBMITTED'
+        : 'UNKNOWN';
+    const submissionReference = text(source.submissionReference);
+    const evidenceMetadata = {
+      ...objectValue(before.evidenceMetadata),
+      liveDecision: decision,
+      rknStatus,
+      responsibilityAcknowledged: true,
+      declaredAt: new Date().toISOString(),
+      source: 'book-live-assistant',
+    };
+    const filingStatus: LegalFilingStatus = rknStatus === 'SUBMITTED' ? 'SUBMITTED' : before.filingStatus;
+    const submittedAt = rknStatus === 'SUBMITTED' ? new Date() : before.submittedAt;
+    const nextSubmissionReference = submissionReference || before.submissionReference;
+
     await this.prisma.$executeRaw`
       UPDATE "TenantLegalState"
-      SET "operationMode" = 'LIVE', "liveAt" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP
+      SET "operationMode" = 'LIVE',
+          "filingStatus" = ${filingStatus},
+          "submittedAt" = ${submittedAt},
+          "submissionReference" = ${nextSubmissionReference},
+          "evidenceMetadata" = ${json(evidenceMetadata)}::jsonb,
+          "liveAt" = CURRENT_TIMESTAMP,
+          "updatedAt" = CURRENT_TIMESTAMP
       WHERE "tenantId" = ${tenantId}
     `;
     const after = await this.requireTenantState(tenantId);
-    await this.transition({ scope: 'TENANT', tenantId, actorUserId, changeType: 'TENANT_LIVE', oldState: before, newState: after });
+    await this.transition({
+      scope: 'TENANT',
+      tenantId,
+      actorUserId,
+      changeType: 'TENANT_LIVE',
+      oldState: before,
+      newState: after,
+      reason: 'User explicitly chose to enter LIVE after Book explained the personal-data responsibility boundary.',
+      evidenceMetadata,
+      submissionReference: nextSubmissionReference,
+    });
     return this.tenantReadiness(tenantId);
   }
 
@@ -549,7 +570,6 @@ export class LegalRuntimeService implements OnModuleInit {
       await this.audit(tenantId, actorUserId, 'POLICY_DENY', 'BOOKING_PUBLICATION', 'DENIED', { capability: capability.source });
       throw new ForbiddenException('Онлайн-запись не включена в доступе Tenant');
     }
-    await this.assertPublicBookingDocuments(tenantId, actorUserId);
   }
 
   async assertPublicBooking(tenantId: string) {
