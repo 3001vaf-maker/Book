@@ -76,7 +76,7 @@ export class AuthService {
   startupDiagnostic(userId: string, tenantId: string, stageValue: unknown, messageValue: unknown) {
     const stage = String(stageValue || 'unknown').trim().slice(0, 80) || 'unknown';
     const message = String(messageValue || '').replace(/\s+/g, ' ').trim().slice(0, 500);
-    this.logger.warn(`Book startup failed tenant=${tenantId} user=${userId} stage=${stage} message=${message || 'unknown'}`);
+    this.logger.warn(`Workspace startup failed tenant=${tenantId} user=${userId} stage=${stage} message=${message || 'unknown'}`);
     return { received: true };
   }
 
