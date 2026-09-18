@@ -40,7 +40,7 @@ export class JwtAuthGuard implements CanActivate {
     if (!user || !membership) throw new UnauthorizedException('Доступ пользователя к рабочему пространству прекращён');
 
     let effectiveAccess = access;
-    if (!effectiveAccess && membership.role === MembershipRole.OWNER) {
+    if (membership.role === MembershipRole.OWNER) {
       const platformOwner = await this.prisma.platformAdmin.findUnique({
         where: { userId: user.id },
         select: { id: true },
@@ -56,6 +56,7 @@ export class JwtAuthGuard implements CanActivate {
           update: {
             status: TenantAccessStatus.ACTIVE,
             isOwnerBook: true,
+            planId: null,
           },
           select: { status: true },
         });
