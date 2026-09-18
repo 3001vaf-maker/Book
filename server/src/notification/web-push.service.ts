@@ -1,7 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import * as webpush from 'web-push';
-import { LegalRuntimeService } from '../legal-runtime/legal-runtime.service';
 import { PrismaService } from '../prisma.service';
 
 type WebPushSubscriptionRow = {
@@ -48,7 +47,6 @@ function validEndpoint(value: string) {
 export class WebPushService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly legal: LegalRuntimeService,
   ) {}
 
   private vapid() {
@@ -80,7 +78,7 @@ export class WebPushService {
       where: { id: accountId, tenantId },
       select: { id: true },
     });
-    if (!account) throw new NotFoundException('Клиентский аккаунт не найден');
+    if (!account) throw new NotFoundException('Аккаунт не найден');
     return account;
   }
 
@@ -172,7 +170,6 @@ export class WebPushService {
 
   async dispatchNotification(tenantId: string, notificationId: string) {
     if (!this.vapid().enabled) return { sent: 0, failed: 0 };
-    await this.legal.assertTenantLive(tenantId, '', 'WEB_PUSH_DELIVERY');
     this.configureSender();
     const rows = await this.prisma.$queryRaw<PushDeliveryRow[]>`
       SELECT
