@@ -2,13 +2,13 @@ import { canUseBookCapability } from '../core/access.js';
 import { folderList, pageHeader } from '../ui/ui.js';
 
 const folders = [
-  ['profile', 'Профиль', '◫', () => import('./profile/profile.js'), 'profile.access'],
-  ['service', 'Сервис', '◫', () => import('./service/service.js'), 'services.access'],
-  ['online-booking', 'Онлайн-запись', '◫', () => import('./online-booking/online-booking.js'), 'online_booking.access'],
-  ['communications', 'Уведомления', '◫', () => import('./communications/communications.js'), 'notifications.access'],
-  ['integrations', 'Интеграции', '◫', () => import('./integrations/integrations.js'), 'integrations.access'],
-  ['documents', 'Документы', '◫', () => import('./documents/documents.js'), 'documents.access'],
-  ['tags', 'Ярлыки', '◫', () => import('./tags/tags.js'), 'tags.access'],
+  ['profile', 'Профиль', '◫', () => import('./profile/profile.js'), 'profile.access', []],
+  ['service', 'Сервис', '◫', () => import('./service/service.js'), 'services.access', ['operational']],
+  ['online-booking', 'Онлайн-запись', '◫', () => import('./online-booking/online-booking.js'), 'online_booking.access', ['operational', 'documents']],
+  ['communications', 'Уведомления', '◫', () => import('./communications/communications.js'), 'notifications.access', ['business', 'documents']],
+  ['integrations', 'Интеграции', '◫', () => import('./integrations/integrations.js'), 'integrations.access', []],
+  ['documents', 'Документы', '◫', () => import('./documents/documents.js'), 'documents.access', ['documents']],
+  ['tags', 'Ярлыки', '◫', () => import('./tags/tags.js'), 'tags.access', ['auxiliary']],
 ];
 
 function availableFolders() {
@@ -19,9 +19,15 @@ async function openFolder(root, key, options = {}) {
   const visible = availableFolders();
   const folder = visible.find(([folderKey]) => folderKey === key);
   if (!folder) return false;
-  const { render } = await folder[3]();
-  render(root, () => renderRows(root, options), { demoGuide: Boolean(options.demo) });
-  return true;
+  try {
+    await options.ensureDomains?.(folder[5] || []);
+    const { render } = await folder[3]();
+    render(root, () => renderRows(root, options), { demoGuide: Boolean(options.demo) });
+    return true;
+  } catch (error) {
+    options.onDomainError?.(error);
+    return false;
+  }
 }
 
 function renderRows(root, options = {}) {
