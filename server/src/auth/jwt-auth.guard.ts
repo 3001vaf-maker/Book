@@ -51,11 +51,11 @@ export class JwtAuthGuard implements CanActivate {
           create: {
             tenantId: payload.tenantId,
             status: TenantAccessStatus.ACTIVE,
-            isOwnerBook: true,
+            isPlatformOwnerWorkspace: true,
           },
           update: {
             status: TenantAccessStatus.ACTIVE,
-            isOwnerBook: true,
+            isPlatformOwnerWorkspace: true,
             planId: null,
           },
           select: { status: true },
