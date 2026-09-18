@@ -4,6 +4,7 @@ import { PrismaService } from './prisma.service';
 import { AuthModule } from './auth/auth.module';
 import { WorkspaceModule } from './workspace/workspace.module';
 import { ProfileModule } from './profile/profile.module';
+import { PlatformDocumentsModule } from './platform-documents/platform-documents.module';
 import { OnlineBookingModule } from './online-booking/online-booking.module';
 import { BusinessStateModule } from './business-state/business-state.module';
 import { DocumentStateModule } from './document-state/document-state.module';
@@ -20,6 +21,7 @@ import { ManualInvitationModule } from './manual-invitation/manual-invitation.mo
     AuthModule,
     WorkspaceModule,
     ProfileModule,
+    PlatformDocumentsModule,
     BusinessStateModule,
     DocumentStateModule,
     AuxiliaryStateModule,
