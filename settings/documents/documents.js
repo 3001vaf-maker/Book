@@ -1,7 +1,7 @@
 import { actionBlock, button, escapeHtml, field, folderList, iconButton, initViewNavigation, list, modal, mountModal, page, pageHeader, shortDateTime, textareaField, viewNavigation } from '../../ui/ui.js';
 import { phonesMatch } from '../../core/phone/index.js';
 import { getAllClients } from '../../main/clients/data.js';
-import { createDocument, getDocuments, saveCustomDocument, useBookBase } from './data.js';
+import { createDocument, dismissBookBase, getDocuments, saveCustomDocument, useBookBase } from './data.js';
 import { getConsents } from './consents.js';
 import { getDocumentHistory } from './history.js';
 
@@ -39,6 +39,33 @@ function formatMoment(value) {
 
 function documentTextMarkup(text) {
   return `<div style="white-space:pre-wrap;line-height:1.55;padding:14px 0">${escapeHtml(text || '')}</div>`;
+}
+
+function openBookBaseOffer(item, onSaved) {
+  const proposedVersion = Number(item.availableBaseVersion || 0);
+  if (!proposedVersion || !item.availableBookText) return;
+  const html = `
+    <div class="modal-title">
+      <h2>Новая редакция документа</h2>
+      <p>${escapeHtml(item.title)} · основа Book v${proposedVersion}</p>
+    </div>
+    ${documentTextMarkup(item.availableBookText)}
+    <div class="modal-actions">
+      ${button('Перейти на новую редакцию', { type: 'button', data: 'data-accept-book-base' })}
+      ${button('Оставить текущую', { type: 'button', className: 'ui-button--secondary', data: 'data-dismiss-book-base' })}
+    </div>`;
+  const m = mountModal(document.body, modal(html, { title: 'Новая редакция', variant: 'large', surface: 'app' }));
+  if (!m) return;
+  m.querySelector('[data-accept-book-base]')?.addEventListener('click', () => {
+    useBookBase(item.id);
+    m.remove();
+    onSaved?.();
+  });
+  m.querySelector('[data-dismiss-book-base]')?.addEventListener('click', () => {
+    dismissBookBase(item.id);
+    m.remove();
+    onSaved?.();
+  });
 }
 
 function openOwnDocumentEditor(item, onSaved) {
@@ -84,7 +111,7 @@ function openDocumentEditor(item, onSaved) {
   const updateAvailable = Number(item.availableBaseVersion || 0) > Number(item.baseVersion || 0);
   const profileUpdate = Boolean(item.profileUpdateAvailable);
   const updateLabel = updateAvailable
-    ? `Перейти на основу Book v${Number(item.availableBaseVersion)}`
+    ? `Посмотреть новую редакцию v${Number(item.availableBaseVersion)}`
     : profileUpdate
       ? 'Обновить данные документа'
       : '';
@@ -103,6 +130,11 @@ function openDocumentEditor(item, onSaved) {
   if (!m) return;
 
   m.querySelector('[data-update-book-base]')?.addEventListener('click', () => {
+    if (updateAvailable) {
+      m.remove();
+      openBookBaseOffer(item, onSaved);
+      return;
+    }
     useBookBase(item.id);
     m.remove();
     onSaved?.();
@@ -159,6 +191,16 @@ function rootMarkup() {
 
 function templatesMarkup() {
   const documents = getDocuments();
+  const offered = documents.filter((item) => Number(item.availableBaseVersion || 0) > 0 && item.availableBookText);
+  const offerRows = offered.length ? list({
+    items: offered.map((item) => ({
+      title: 'Обновление документа',
+      secondary: [item.title, `Можно перейти на основу Book v${Number(item.availableBaseVersion)} или оставить текущую версию`],
+      interactive: true,
+      data: `data-document-offer-id="${escapeHtml(item.id)}"`,
+      aria: `Посмотреть новую редакцию документа ${item.title}`,
+    }))
+  }) : '';
   const rows = list({
     items: documents.map((item) => {
       const update = Number(item.availableBaseVersion || 0) > Number(item.baseVersion || 0)
@@ -178,6 +220,7 @@ function templatesMarkup() {
 
   return page([
     `<div class="entity-page-header">${pageHeader('Документы')}<div class="page-header-action">${iconButton('+', { className: 'icon-button--primary', data: 'data-add-document', aria: 'Добавить документ' })}</div></div>`,
+    offerRows,
     rows,
     actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-documents-root' }))
   ]);
@@ -268,6 +311,10 @@ function bind(root, navigateBack) {
   root.querySelectorAll('[data-document-id]').forEach((row) => row.addEventListener('click', () => {
     const item = getDocuments().find((document) => document.id === row.dataset.documentId);
     if (item) openDocumentEditor(item, () => render(root, navigateBack));
+  }));
+  root.querySelectorAll('[data-document-offer-id]').forEach((row) => row.addEventListener('click', () => {
+    const item = getDocuments().find((document) => document.id === row.dataset.documentOfferId);
+    if (item) openBookBaseOffer(item, () => render(root, navigateBack));
   }));
   root.querySelectorAll('[data-document-history-id]').forEach((row) => row.addEventListener('click', () => {
     const item = getDocumentHistory().find((historyItem) => historyItem.id === row.dataset.documentHistoryId);
