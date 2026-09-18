@@ -77,7 +77,7 @@ export class ManualInvitationService {
     const placeholderEmail = `${MANUAL_EMAIL_PREFIX}${tokenHash.slice(0, 24)}${MANUAL_EMAIL_SUFFIX}`;
 
     const created = await this.prisma.$transaction(async (tx) => {
-      const tenant = await tx.tenant.create({ data: { name: 'Новый мастер' } });
+      const tenant = await tx.tenant.create({ data: { name: 'Новый пользователь' } });
       await tx.tenantAccess.create({
         data: {
           tenantId: tenant.id,
