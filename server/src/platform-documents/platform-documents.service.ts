@@ -9,9 +9,6 @@ type DocumentRow = {
   key: string;
   type: string;
   title: string;
-  requiredForRegistration: boolean;
-  requiredForLive: boolean;
-  requiredForPublicBooking: boolean;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -53,7 +50,6 @@ export class PlatformDocumentsService {
   async list() {
     const documents = await this.prisma.$queryRaw<DocumentRow[]>`
       SELECT "id", "scope", "tenantId", "key", "type", "title",
-             "requiredForRegistration", "requiredForLive", "requiredForPublicBooking",
              "isActive", "createdAt", "updatedAt"
       FROM "LegalDocument"
       WHERE "scope" = 'PLATFORM'
@@ -100,7 +96,6 @@ export class PlatformDocumentsService {
     const result = await this.prisma.$transaction(async (tx) => {
       const existingRows = await tx.$queryRaw<DocumentRow[]>`
         SELECT "id", "scope", "tenantId", "key", "type", "title",
-               "requiredForRegistration", "requiredForLive", "requiredForPublicBooking",
                "isActive", "createdAt", "updatedAt"
         FROM "LegalDocument"
         WHERE "scope" = 'PLATFORM' AND "tenantId" IS NULL AND "key" = ${key}
@@ -113,13 +108,9 @@ export class PlatformDocumentsService {
         await tx.$executeRaw`
           INSERT INTO "LegalDocument" (
             "id", "scope", "tenantId", "key", "type", "title",
-            "requiredForRegistration", "requiredForLive", "requiredForPublicBooking",
             "isActive", "createdAt", "updatedAt"
           ) VALUES (
             ${documentId}, 'PLATFORM', NULL, ${key}, ${type}, ${title},
-            ${input?.requiredForRegistration === true},
-            ${input?.requiredForLive === true},
-            ${input?.requiredForPublicBooking === true},
             true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
           )
         `;
@@ -130,9 +121,6 @@ export class PlatformDocumentsService {
           key,
           type,
           title,
-          requiredForRegistration: input?.requiredForRegistration === true,
-          requiredForLive: input?.requiredForLive === true,
-          requiredForPublicBooking: input?.requiredForPublicBooking === true,
           isActive: true,
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -142,9 +130,6 @@ export class PlatformDocumentsService {
           UPDATE "LegalDocument"
           SET "type" = ${type},
               "title" = ${title},
-              "requiredForRegistration" = ${input?.requiredForRegistration === true},
-              "requiredForLive" = ${input?.requiredForLive === true},
-              "requiredForPublicBooking" = ${input?.requiredForPublicBooking === true},
               "isActive" = true,
               "updatedAt" = CURRENT_TIMESTAMP
           WHERE "id" = ${document.id}
