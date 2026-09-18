@@ -1,5 +1,5 @@
 import { accordion, actionBlock, button, collectRepeatedField, entityCard, escapeHtml, field, folderList, initAccordions, initPhotoField, initRepeatedFields, modal, mountModal, page, photoField, repeatedField, select, textareaField, workplaceAddButton, workplaceCountText } from '../../ui/ui.js';
-import { getBookLimit } from '../../core/access.js';
+import { getLimit } from '../../core/access.js';
 import { addCustomProfession, getCustomProfessions, getProfile, saveProfile as saveProfileData } from './data.js';
 import { getWorkplaces } from './workplaces/data.js';
 import { initWorkplaceListDeletion, openWorkplaceModal, renderWorkplace, workplaceList } from './workplaces/workplaces.js';
@@ -39,7 +39,7 @@ function maybeShowDemoProfileGuide(options={}) {
   const phones=Array.isArray(profile.phones)?profile.phones:[];
   if(profile.name&&phones.length&&profile.profession&&profile.profession!=='Другая'&&getWorkplaces().length)return;
   demoProfileGuideShown=true;
-  const m=mountModal(document.body,modal(`<div class="modal-title"><h2>Заполните профиль</h2><p>Book использует данные профиля для вашего рабочего пространства и автоматически формирует документы для клиентов только после того, как профиль готов.</p></div><div class="demo-help-note"><strong>Что заполнить</strong><p>Имя и контакт · профессию · хотя бы одно рабочее место. После сохранения Book сам подготовит документы — отдельного юридического экрана не будет.</p></div>${actionBlock(button('Понятно',{data:'data-profile-guide-done'}))}`,{variant:'medium',surface:'app'}));
+  const m=mountModal(document.body,modal(`<div class="modal-title"><h2>Заполните профиль</h2><p>Система использует данные профиля для рабочего пространства и формирует документы только после того, как профиль готов.</p></div><div class="demo-help-note"><strong>Что заполнить</strong><p>Имя и контакт · профессию · хотя бы одно рабочее место. После сохранения система подготовит документы.</p></div>${actionBlock(button('Понятно',{data:'data-profile-guide-done'}))}`,{variant:'medium',surface:'app'}));
   m?.querySelector('[data-profile-guide-done]')?.addEventListener('click',()=>m.remove());
 }
 
@@ -54,7 +54,7 @@ function openWorkplaceLimitModal(root,limit){
     {title:'До 5 рабочих пространств'},
     {title:'Без ограничения'}
   ]);
-  const m=mountModal(root,modal(`<div class="modal-title"><h2>Работаете в нескольких местах?</h2><p>Сейчас вашему Book доступно рабочих пространств: ${escapeHtml(current)}. Book поддерживает несколько мест работы с отдельными адресами и настройками. Дополнительный лимит можно подключить отдельно.</p></div>${choices}${actionBlock(button('Понятно',{data:'data-close-workplace-limit'}))}`,{variant:'medium'}));
+  const m=mountModal(root,modal(`<div class="modal-title"><h2>Работаете в нескольких местах?</h2><p>Сейчас доступно рабочих пространств: ${escapeHtml(current)}. Система поддерживает несколько мест работы с отдельными адресами и настройками. Дополнительный лимит можно подключить отдельно.</p></div>${choices}${actionBlock(button('Понятно',{data:'data-close-workplace-limit'}))}`,{variant:'medium'}));
   m?.querySelector('[data-close-workplace-limit]')?.addEventListener('click',()=>m.remove());
 }
 
@@ -148,7 +148,7 @@ function renderProfile(root,navigateBack,options={}){queueMicrotask(()=>maybeSho
     if(options.onboarding){
       try{await persistDraft(root)}catch(error){showProfileError(error instanceof Error?error.message:'Не удалось сохранить профиль');return}
     }
-    const workplaceLimit=getBookLimit('workplaces.max');
+    const workplaceLimit=getLimit('workplaces.max');
     if(workplaceLimit!==null&&getWorkplaces().length>=workplaceLimit){
       openWorkplaceLimitModal(root,workplaceLimit);
       return;
