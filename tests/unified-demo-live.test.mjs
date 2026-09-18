@@ -23,6 +23,8 @@ const profileService = readFileSync('server/src/profile/profile.service.ts', 'ut
 const businessStateService = readFileSync('server/src/business-state/business-state.service.ts', 'utf8');
 const documentStateService = readFileSync('server/src/document-state/document-state.service.ts', 'utf8');
 const auxiliaryStateService = readFileSync('server/src/auxiliary-state/auxiliary-state.service.ts', 'utf8');
+const saasAdminService = readFileSync('server/src/saas-admin/saas-admin.service.ts', 'utf8');
+const adminUi = readFileSync('admin/admin.js', 'utf8');
 const manualInvitationService = readFileSync('server/src/manual-invitation/manual-invitation.service.ts', 'utf8');
 const masterInvitationService = readFileSync('server/src/master-invitation/master-invitation.service.ts', 'utf8');
 
@@ -111,6 +113,14 @@ assert.match(profileService, /else if \(!existing\.migrationVerifiedAt\)/);
 assert.match(businessStateService, /else if \(!existing\.migrationVerifiedAt\)/);
 assert.match(documentStateService, /else if \(!existing\.migrationVerifiedAt\)/);
 assert.match(auxiliaryStateService, /else if \(!existing\.migrationVerifiedAt\)/);
+assert.match(saasAdminService, /FROM "LegalAcceptanceEvent" e/);
+assert.match(saasAdminService, /documentKey/);
+assert.match(saasAdminService, /documentVersion/);
+assert.match(saasAdminService, /occurredAt/);
+assert.match(adminUi, /Соглашения при регистрации/);
+assert.match(adminUi, /masterLegalAcceptanceHtml/);
+assert.match(adminUi, /версия/);
+assert.match(adminUi, /Согласие дано/);
 assert.doesNotMatch(registration, /localStorage|sessionStorage/);
 
 console.log('unified DEMO to LIVE journey tests: OK');
