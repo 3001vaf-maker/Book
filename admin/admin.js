@@ -11,25 +11,65 @@ const state = {
   section: 'overview',
 };
 
-const USER_DOCUMENTS = [
+const ACTIVE_DOCUMENTS = [
   {
-    key: 'user-document-pdn-policy',
-    type: 'PERSONAL_DATA_POLICY',
+    key: 'privacy-policy',
+    group: 'user',
+    type: 'PRIVACY_POLICY',
     title: 'Политика обработки персональных данных',
   },
   {
-    key: 'user-document-pdn-consent',
+    key: 'user-pd-consent',
+    group: 'user',
     type: 'PERSONAL_DATA_CONSENT',
     title: 'Согласие на обработку персональных данных',
   },
   {
-    key: 'user-document-messages-consent',
+    key: 'marketing-consent',
+    group: 'user',
     type: 'MARKETING_CONSENT',
     title: 'Согласие на рекламные и маркетинговые сообщения',
   },
+  {
+    key: 'saas-agreement',
+    group: 'platform',
+    type: 'SAAS_AGREEMENT',
+    title: 'SaaS-соглашение',
+  },
+  {
+    key: 'public-profile-consent',
+    group: 'platform',
+    type: 'PUBLIC_PROFILE_CONSENT',
+    title: 'Согласие на публичный профиль',
+  },
+  {
+    key: 'dpa',
+    group: 'platform',
+    type: 'DPA',
+    title: 'Поручение на обработку персональных данных',
+  },
 ];
 
-const USER_DOCUMENT_KEYS = new Set(USER_DOCUMENTS.map((item) => item.key));
+const WORKSPACE_DOCUMENT_TEMPLATES = [
+  {
+    key: 'user-document-pdn-policy',
+    type: 'WORKSPACE_PERSONAL_DATA_POLICY',
+    title: 'Шаблон политики обработки персональных данных',
+  },
+  {
+    key: 'user-document-pdn-consent',
+    type: 'WORKSPACE_PERSONAL_DATA_CONSENT',
+    title: 'Шаблон согласия на обработку персональных данных',
+  },
+  {
+    key: 'user-document-messages-consent',
+    type: 'WORKSPACE_MESSAGES_CONSENT',
+    title: 'Шаблон согласия на сообщения',
+  },
+];
+
+const ACTIVE_DOCUMENT_KEYS = new Set(ACTIVE_DOCUMENTS.map((item) => item.key));
+const WORKSPACE_TEMPLATE_KEYS = new Set(WORKSPACE_DOCUMENT_TEMPLATES.map((item) => item.key));
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => ({
@@ -150,7 +190,7 @@ function contentNode() {
 function renderOverview() {
   setTitle('Обзор');
   const content = contentNode();
-  const profileDocument = state.documents.find((item) => item.key === 'user-document-pdn-consent' && item.currentVersion);
+  const profileDocument = state.documents.find((item) => item.key === 'user-pd-consent' && item.currentVersion);
   content.innerHTML = `
     <div class="admin-heading"><div><h2>Обзор</h2><p>Архитектурный контур владельца платформы.</p></div></div>
     <div class="admin-stats">
@@ -160,20 +200,20 @@ function renderOverview() {
     </div>`;
 }
 
-function userDocumentRows() {
-  return USER_DOCUMENTS.map((definition) => {
+function documentDefinitionRows(definitions, badgeKey = '') {
+  return definitions.map((definition) => {
     const item = state.documents.find((document) => document.key === definition.key);
     const version = item?.currentVersion || null;
     return `
       <div class="admin-document-row">
         <div>
           <strong>${escapeHtml(definition.title)}</strong>
-          <small>${version ? `Версия ${Number(version.version || 1)} · ${formatDate(version.publishedAt)}` : 'Не настроен'}</small>
+          <small>${escapeHtml(definition.key)} · ${version ? `версия ${Number(version.version || 1)} · ${formatDate(version.publishedAt)}` : 'не настроен'}</small>
         </div>
         <div style="display:flex;align-items:center;gap:8px">
-          ${definition.key === 'user-document-pdn-consent' ? '<span class="admin-pill active">создание Profile</span>' : ''}
+          ${definition.key === badgeKey ? '<span class="admin-pill active">создание Profile</span>' : ''}
           <button class="admin-button secondary"
-                  data-user-document="${escapeHtml(definition.key)}">
+                  data-defined-document="${escapeHtml(definition.key)}">
             ${version ? 'Открыть' : 'Создать'}
           </button>
         </div>
@@ -181,8 +221,11 @@ function userDocumentRows() {
   }).join('');
 }
 
-function platformDocumentRows() {
-  const items = state.documents.filter((item) => !USER_DOCUMENT_KEYS.has(item.key));
+function otherPlatformDocumentRows() {
+  const items = state.documents.filter((item) => (
+    !ACTIVE_DOCUMENT_KEYS.has(item.key)
+    && !WORKSPACE_TEMPLATE_KEYS.has(item.key)
+  ));
   if (!items.length) return '<div class="admin-empty">Других документов платформы пока нет.</div>';
   return items.map((item) => {
     const version = item.currentVersion;
@@ -212,7 +255,7 @@ function historyRows() {
 function renderDocumentEditor(selected = null) {
   const content = contentNode();
   const current = selected?.currentVersion || null;
-  const isProfileDocument = selected?.key === 'user-document-pdn-consent';
+  const isProfileDocument = selected?.key === 'user-pd-consent';
   const form = document.createElement('section');
   form.className = 'admin-card admin-document-editor';
   form.innerHTML = `
@@ -272,6 +315,9 @@ function renderDocumentEditor(selected = null) {
 function renderDocuments() {
   setTitle('Документы');
   const content = contentNode();
+  const userDocuments = ACTIVE_DOCUMENTS.filter((item) => item.group === 'user');
+  const platformDocuments = ACTIVE_DOCUMENTS.filter((item) => item.group === 'platform');
+
   content.innerHTML = `
     <div class="admin-heading">
       <div>
@@ -283,22 +329,47 @@ function renderDocuments() {
     <section class="admin-card admin-documents-card">
       <div class="admin-section-head">
         <div>
-          <h3>Для пользователей</h3>
-          <p>Документы, которые используются в пользовательских процессах.</p>
+          <h3>Действующие документы — 6</h3>
+          <p>Документы сохраняются как самостоятельные сущности и не объединяются с шаблонами.</p>
         </div>
       </div>
-      <div class="admin-document-list">${userDocumentRows()}</div>
+
+      <div class="admin-section-head">
+        <div><h3>Для пользователей</h3></div>
+      </div>
+      <div class="admin-document-list">
+        ${documentDefinitionRows(userDocuments, 'user-pd-consent')}
+      </div>
+
+      <div class="admin-section-head">
+        <div><h3>Для SaaS / платформы</h3></div>
+      </div>
+      <div class="admin-document-list">
+        ${documentDefinitionRows(platformDocuments)}
+      </div>
     </section>
 
     <section class="admin-card admin-documents-card">
       <div class="admin-section-head">
         <div>
-          <h3>Документы платформы</h3>
-          <p>Остальные действующие системные документы.</p>
+          <h3>Шаблоны рабочих документов</h3>
+          <p>Базовые документы, из которых формируются документы внутри рабочего пространства.</p>
+        </div>
+      </div>
+      <div class="admin-document-list">
+        ${documentDefinitionRows(WORKSPACE_DOCUMENT_TEMPLATES)}
+      </div>
+    </section>
+
+    <section class="admin-card admin-documents-card">
+      <div class="admin-section-head">
+        <div>
+          <h3>Другие документы платформы</h3>
+          <p>Резерв для будущей архитектуры SaaS.</p>
         </div>
         <button class="admin-button secondary" data-add-document>Добавить документ</button>
       </div>
-      <div class="admin-document-list">${platformDocumentRows()}</div>
+      <div class="admin-document-list">${otherPlatformDocumentRows()}</div>
     </section>
 
     <section class="admin-card admin-history-card">
@@ -313,9 +384,11 @@ function renderDocuments() {
 
   content.querySelector('[data-add-document]')?.addEventListener('click', () => renderDocumentEditor());
 
-  content.querySelectorAll('[data-user-document]').forEach((button) => {
+  content.querySelectorAll('[data-defined-document]').forEach((button) => {
     button.addEventListener('click', () => {
-      const definition = USER_DOCUMENTS.find((item) => item.key === button.dataset.userDocument);
+      const key = button.dataset.definedDocument;
+      const definition = [...ACTIVE_DOCUMENTS, ...WORKSPACE_DOCUMENT_TEMPLATES]
+        .find((item) => item.key === key);
       if (!definition) return;
       const existing = state.documents.find((item) => item.key === definition.key);
       renderDocumentEditor(existing || {
