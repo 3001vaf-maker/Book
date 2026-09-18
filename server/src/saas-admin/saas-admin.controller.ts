@@ -33,6 +33,16 @@ export class SaasAdminController {
     return this.admin.capabilities();
   }
 
+  @Get('documents')
+  documents() {
+    return this.admin.documentsCatalog();
+  }
+
+  @Get('documents/history')
+  documentHistory() {
+    return this.admin.documentHistory();
+  }
+
   @Get('invitations')
   listInvitations(@Req() request: AdminRequest) {
     return this.invitations.listInvitations(request.platformAdminId!);
