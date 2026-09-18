@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { CapabilityAccessChangeType, CapabilityValueType, TenantAccessStatus } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 
-type ResolutionSource = 'TENANT_OVERRIDE' | 'PLAN' | 'DEFAULT' | 'OWNER_BOOK' | 'MISSING_ACCESS' | 'SUSPENDED';
+type ResolutionSource = 'TENANT_OVERRIDE' | 'PLAN' | 'DEFAULT' | 'PLATFORM_OWNER' | 'MISSING_ACCESS' | 'SUSPENDED';
 
 export type ResolvedCapability = {
   key: string;
@@ -27,7 +27,7 @@ export class SaasAccessService {
   async resolveCapability(tenantId: string, capabilityKey: string): Promise<ResolvedCapability> {
     const capability = await this.prisma.capability.findUnique({ where: { key: capabilityKey } });
     if (!capability || !capability.isActive) {
-      throw new NotFoundException(`Неизвестная возможность Book: ${capabilityKey}`);
+      throw new NotFoundException(`Неизвестная возможность рабочего пространства: ${capabilityKey}`);
     }
 
     const access = await this.prisma.tenantAccess.findUnique({
@@ -204,9 +204,9 @@ export class SaasAccessService {
 
   private ownerValue(key: string, valueType: CapabilityValueType): ResolvedCapability {
     if (valueType === CapabilityValueType.BOOLEAN) {
-      return { key, valueType, enabled: true, limit: null, source: 'OWNER_BOOK' };
+      return { key, valueType, enabled: true, limit: null, source: 'PLATFORM_OWNER' };
     }
-    return { key, valueType, enabled: null, limit: null, source: 'OWNER_BOOK' };
+    return { key, valueType, enabled: null, limit: null, source: 'PLATFORM_OWNER' };
   }
 
   private deniedValue(key: string, valueType: CapabilityValueType, source: 'MISSING_ACCESS' | 'SUSPENDED'): ResolvedCapability {
