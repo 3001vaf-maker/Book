@@ -68,7 +68,7 @@ export class ClientCardLinkService {
 
   private assertUnambiguousPhone(card: Awaited<ReturnType<ClientCardLinkService['cardState']>>) {
     if (card.members.length <= 1) return;
-    throw new ConflictException('Этот телефон уже указан у нескольких клиентов. Мастер должен сначала разобрать старый дубль.');
+    throw new ConflictException('Этот телефон уже указан у нескольких клиентов. Сначала разберите старый дубль.');
   }
 
   async validateNewAccountContacts(tenantId: string, input: Record<string, any>) {
