@@ -13,7 +13,6 @@ import { CommunicationModule } from './communication/communication.module';
 import { SaasAccessModule } from './saas-access/saas-access.module';
 import { MasterInvitationModule } from './master-invitation/master-invitation.module';
 import { SaasAdminModule } from './saas-admin/saas-admin.module';
-import { PlatformDocumentsModule } from './platform-documents/platform-documents.module';
 
 @Module({
   imports: [
@@ -29,7 +28,6 @@ import { PlatformDocumentsModule } from './platform-documents/platform-documents
     SaasAccessModule,
     MasterInvitationModule,
     SaasAdminModule,
-    PlatformDocumentsModule,
   ],
   controllers: [HealthController],
   providers: [PrismaService],
