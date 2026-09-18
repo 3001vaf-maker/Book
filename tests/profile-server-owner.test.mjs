@@ -8,6 +8,7 @@ const workplaceData = readFileSync(new URL('../settings/profile/workplaces/data.
 const migration = readFileSync(new URL('../settings/profile/migration.js', import.meta.url), 'utf8');
 const serverService = readFileSync(new URL('../server/src/profile/profile.service.ts', import.meta.url), 'utf8');
 const schema = readFileSync(new URL('../server/prisma/schema.prisma', import.meta.url), 'utf8');
+const authGuard = readFileSync(new URL('../server/src/auth/jwt-auth.guard.ts', import.meta.url), 'utf8');
 
 assert.doesNotMatch(auth, /prepareProductionWorkspace|localStorage\.removeItem/);
 assert.doesNotMatch(core, /workspace-sync|syncWorkspaceBeforeRender|startWorkspaceSync/);
@@ -32,5 +33,10 @@ assert.match(schema, /model Workplace\s*\{/);
 assert.match(schema, /migrationVerifiedAt\s+DateTime\?/);
 assert.match(serverService, /migrationVerifiedAt/);
 assert.match(serverService, /ConflictException\('Проверка переноса Profile \+ Workplaces не пройдена'\)/);
+
+assert.match(authGuard, /MembershipRole\.OWNER/);
+assert.match(authGuard, /platformAdmin\.findUnique/);
+assert.match(authGuard, /tenantAccess\.upsert/);
+assert.match(authGuard, /isOwnerBook:\s*true/);
 
 console.log('profile server owner tests: OK');
