@@ -11,6 +11,9 @@ const notificationService = readFileSync('server/src/notification/notification.s
 const legalNotificationService = readFileSync('server/src/notification/legal-notification.service.ts', 'utf8');
 const broadcastService = readFileSync('server/src/communication/communication-broadcast.service.ts', 'utf8');
 const dispatchService = readFileSync('server/src/communication/communication-dispatch.service.ts', 'utf8');
+const marketingConsentService = readFileSync('server/src/legal-runtime/marketing-consent.service.ts', 'utf8');
+const telegramBotService = readFileSync('server/src/communication/telegram-bot.service.ts', 'utf8');
+const bookingController = readFileSync('server/src/online-booking/online-booking.controller.ts', 'utf8');
 
 assert.match(registration, /Добро пожаловать в Book/);
 assert.match(registration, /Условия работы с Book/);
@@ -52,6 +55,12 @@ assert.match(broadcastService, /canSendMessages/);
 assert.match(dispatchService, /const purpose = .*\|\| 'MARKETING'/);
 assert.match(legalService, /purpose === 'MARKETING'/);
 assert.match(legalService, /hasCurrentMarketingConsent/);
+assert.match(marketingConsentService, /documentId" = 'messages-consent'/);
+assert.doesNotMatch(marketingConsentService, /'marketing-consent'/);
+assert.match(bookingController, /telegram-channel/);
+assert.doesNotMatch(bookingController, /messages-consent|acceptContactPointConsent|revokeContactPointConsent/);
+assert.match(telegramBotService, /purpose: 'DIALOG'/);
+assert.doesNotMatch(telegramBotService, /canSendMessages\(tenantId/);
 
 assert.doesNotMatch(core, /localStorage|sessionStorage/);
 assert.doesNotMatch(registration, /localStorage|sessionStorage/);
