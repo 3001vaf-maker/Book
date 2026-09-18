@@ -4,7 +4,7 @@ import { renderTimetable } from './timetable/timetable.js';
 import { renderSettings } from './settings/settings.js';
 import { renderChat } from './chat/chat.js';
 import { getWorkplaces as getWorkplaceEntities } from './settings/profile/workplaces/data.js';
-import { initializeProfileWorkplaces } from './settings/profile/migration.js';
+import { acceptProfileCreationDocument, initializeProfileWorkplaces } from './settings/profile/migration.js';
 import { initializeBusinessState } from './business-migration.js';
 import { initializeOperationalState } from './operational-migration.js';
 import { initializeDocumentState } from './document-migration.js';
@@ -176,6 +176,67 @@ async function reportStartupFailure(stage, error) {
   }
 }
 
+function renderProfileCreationDocument(requirement = {}) {
+  app.classList.remove('app-shell--booking');
+  workspaceReady = false;
+  disposeView();
+  disposeView = () => {};
+
+  const document = requirement?.document || null;
+  if (!requirement?.configured || !document) {
+    app.innerHTML = `
+      <main class="auth-view">
+        <section class="auth-card">
+          <div class="auth-card__heading">
+            <h1>Профиль ещё нельзя создать</h1>
+            <p>В разделе владельца «Документы» не настроен системный документ user-pd-consent.</p>
+          </div>
+          <button class="ui-button" type="button" data-profile-document-retry>Повторить</button>
+        </section>
+      </main>`;
+    app.querySelector('[data-profile-document-retry]')?.addEventListener('click', () => void renderAuthenticated());
+    syncViewport();
+    return;
+  }
+
+  app.innerHTML = `
+    <main class="auth-view">
+      <section class="auth-card" style="max-width:760px">
+        <div class="auth-card__heading">
+          <h1>${escapeHtml(document.title || 'Документ')}</h1>
+          <p>Версия ${escapeHtml(document.version || 1)} · документ необходимо принять до создания Profile.</p>
+        </div>
+        <div style="max-height:48vh;overflow:auto;white-space:pre-wrap;line-height:1.55;padding:14px 0;border-top:1px solid #e5ddd7;border-bottom:1px solid #e5ddd7">${escapeHtml(document.content || '')}</div>
+        <label style="display:flex;align-items:flex-start;gap:10px;margin:18px 0;font-size:14px">
+          <input type="checkbox" data-profile-document-accept style="width:18px;height:18px;margin-top:2px">
+          <span>Принимаю актуальную версию документа и разрешаю создать мой Profile.</span>
+        </label>
+        <p class="auth-error" data-profile-document-error role="alert"></p>
+        <button class="ui-button" type="button" data-profile-document-submit>Продолжить</button>
+      </section>
+    </main>`;
+
+  const checkbox = app.querySelector('[data-profile-document-accept]');
+  const submit = app.querySelector('[data-profile-document-submit]');
+  const error = app.querySelector('[data-profile-document-error]');
+  submit?.addEventListener('click', async () => {
+    if (!checkbox?.checked) {
+      error.textContent = 'Подтвердите принятие документа.';
+      return;
+    }
+    submit.disabled = true;
+    error.textContent = '';
+    try {
+      await acceptProfileCreationDocument();
+      await renderAuthenticated();
+    } catch (acceptError) {
+      error.textContent = acceptError instanceof Error ? acceptError.message : 'Не удалось зафиксировать принятие документа';
+      submit.disabled = false;
+    }
+  });
+  syncViewport();
+}
+
 function renderServerStatePending() {
   app.classList.remove('app-shell--booking');
   workspaceReady = false;
@@ -292,6 +353,10 @@ async function renderAuthenticated(account = authenticatedAccount) {
 
   try {
     const profileResult = await initializeProfileWorkplaces(authenticatedAccount);
+    if (profileResult?.source === 'profile-creation-document') {
+      renderProfileCreationDocument(profileResult.requirement);
+      return;
+    }
     if (!profileResult?.verified) throw new Error('profile state not verified');
   } catch (error) {
     await reportStartupFailure('profile', error);
