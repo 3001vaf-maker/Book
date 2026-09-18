@@ -1,5 +1,5 @@
 // Company-side root catalog for Book documents.
-// This catalog is owned by Admin/Documents.
+// This catalog is owned by Admin/Document Registry.
 // It does not contain user-side document history or any access/readiness rules.
 
 export const BOOK_USER_DOCUMENT_KEYS = [
@@ -83,19 +83,19 @@ export const DOCUMENT_CATALOG = [
   },
 ];
 
-export function getBookUserDocuments() {
+export function getRegistryBookUserDocuments() {
   return BOOK_USER_DOCUMENT_KEYS
     .map((key) => DOCUMENT_CATALOG.find((item) => item.key === key))
     .filter(Boolean);
 }
 
-export function getUserDocumentBases() {
+export function getRegistryUserDocumentBases() {
   return USER_DOCUMENT_BASE_KEYS
     .map((key) => DOCUMENT_CATALOG.find((item) => item.key === key))
     .filter(Boolean);
 }
 
-export function getAdminDocument(key) {
+export function getRegistryDocument(key) {
   return DOCUMENT_CATALOG.find((item) => item.key === key) || null;
 }
 
