@@ -49,9 +49,8 @@ export class SaasAccessService {
     });
 
     if (!access) return this.deniedValue(capability.key, capability.valueType, 'MISSING_ACCESS');
-    if (access.status === TenantAccessStatus.SUSPENDED) return this.deniedValue(capability.key, capability.valueType, 'SUSPENDED');
-
     if (access.isOwnerBook) return this.ownerValue(capability.key, capability.valueType);
+    if (access.status === TenantAccessStatus.SUSPENDED) return this.deniedValue(capability.key, capability.valueType, 'SUSPENDED');
 
     const override = access.overrides[0];
     const planValue = access.plan?.capabilityValues[0];
@@ -69,7 +68,6 @@ export class SaasAccessService {
     if (override) {
       return { key: capability.key, valueType: capability.valueType, enabled: null, limit: override.limit, source: 'TENANT_OVERRIDE' };
     }
-    if (access.isOwnerBook && !access.plan) return this.ownerValue(capability.key, capability.valueType);
     if (planValue) {
       return { key: capability.key, valueType: capability.valueType, enabled: null, limit: planValue.limit, source: 'PLAN' };
     }
@@ -101,10 +99,10 @@ export class SaasAccessService {
     const overrides = new Map(access.overrides.map((value) => [value.capabilityId, value]));
 
     const resolved = capabilities.map<ResolvedCapability>((capability) => {
+      if (access.isOwnerBook) return this.ownerValue(capability.key, capability.valueType);
       if (access.status === TenantAccessStatus.SUSPENDED) {
         return this.deniedValue(capability.key, capability.valueType, 'SUSPENDED');
       }
-      if (access.isOwnerBook) return this.ownerValue(capability.key, capability.valueType);
 
       const override = overrides.get(capability.id);
       const planValue = planValues.get(capability.id);
@@ -112,7 +110,7 @@ export class SaasAccessService {
         if (override && override.enabled !== null) {
           return { key: capability.key, valueType: capability.valueType, enabled: override.enabled, limit: null, source: 'TENANT_OVERRIDE' };
         }
-          if (planValue && planValue.enabled !== null) {
+        if (planValue && planValue.enabled !== null) {
           return { key: capability.key, valueType: capability.valueType, enabled: planValue.enabled, limit: null, source: 'PLAN' };
         }
         return { key: capability.key, valueType: capability.valueType, enabled: capability.defaultEnabled, limit: null, source: 'DEFAULT' };
