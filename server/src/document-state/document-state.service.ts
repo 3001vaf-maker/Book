@@ -1,5 +1,4 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 
@@ -21,7 +20,7 @@ type ConsentEventRow = {
   createdAt: Date;
 };
 
-const DATASETS = new Set(['documents', 'consents', 'history']);
+const MUTABLE_DATASETS = new Set(['documents', 'history']);
 
 function objectValue(value: unknown): JsonObject {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonObject : {};
@@ -93,16 +92,8 @@ export class DocumentStateService {
     const state = await this.prisma.businessDocumentState.findUnique({ where: { tenantId } });
     const data = normalize(state?.data || {});
 
-    if (state?.migrationVerifiedAt) {
-      const canonicalEvents = await this.canonicalConsentEvents(tenantId);
-      const migratedLegacyIds = new Set(
-        canonicalEvents.map((item) => String(item.migratedFromEventId || '')).filter(Boolean),
-      );
-      const legacyEvents = data.consents.filter(
-        (item: any) => !migratedLegacyIds.has(String(item?.id || '')),
-      );
-      data.consents = [...legacyEvents, ...canonicalEvents];
-    }
+    if (state?.migrationVerifiedAt) data.consents = await this.canonicalConsentEvents(tenantId);
+    else data.consents = [];
 
     return {
       migrated: Boolean(state),
@@ -143,7 +134,7 @@ export class DocumentStateService {
   }
 
   async updateDataset(tenantId: string, dataset: string, body: unknown) {
-    if (!DATASETS.has(dataset)) throw new BadRequestException('Неизвестный раздел документов');
+    if (!MUTABLE_DATASETS.has(dataset)) throw new BadRequestException('Неизвестный раздел Архива документов');
     const state = await this.prisma.businessDocumentState.findUnique({ where: { tenantId } });
     if (!state?.migrationVerifiedAt) throw new ConflictException('Перенос документов ещё не подтверждён');
     const current = normalize(state.data);
@@ -158,41 +149,6 @@ export class DocumentStateService {
     const state = await this.prisma.businessDocumentState.findUnique({ where: { tenantId } });
     if (!state?.migrationVerifiedAt) throw new ConflictException('Документы для онлайн-записи ещё не готовы');
     return normalize(state.data).documents;
-  }
-
-  async recordAcceptedConsents(tenantId: string, clientId: string, facts: unknown) {
-    const id = String(clientId || '').trim();
-    if (!id) return [];
-    const state = await this.prisma.businessDocumentState.findUnique({ where: { tenantId } });
-    if (!state?.migrationVerifiedAt) throw new ConflictException('Документы для онлайн-записи ещё не готовы');
-    const current = normalize(state.data);
-    const accepted = (Array.isArray(facts) ? facts : []).filter((item: any) => Boolean(item?.accepted) && String(item?.documentId || '').trim());
-    if (!accepted.length) return current.consents;
-    const next = [...current.consents];
-    for (const fact of accepted as any[]) {
-      const documentId = String(fact.documentId || '').trim();
-      const documentVersion = Math.max(1, Number(fact.documentVersion || 1));
-      const exists = next.some((item: any) => String(item?.clientId || '') === id
-        && String(item?.documentId || '') === documentId
-        && Number(item?.documentVersion || 1) === documentVersion
-        && String(item?.status || 'accepted') === 'accepted');
-      if (exists) continue;
-      const now = new Date().toISOString();
-      next.push({
-        id: randomUUID(),
-        clientId: id,
-        documentId,
-        documentVersion,
-        status: 'accepted',
-        acceptedAt: String(fact.acceptedAt || now),
-        revokedAt: '',
-        source: 'online-booking-account',
-        createdAt: now,
-      });
-    }
-    current.consents = next;
-    await this.prisma.businessDocumentState.update({ where: { tenantId }, data: { data: json(current) } });
-    return next;
   }
 
 }
