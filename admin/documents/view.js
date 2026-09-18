@@ -1,18 +1,18 @@
-import {
-  getAdminDocument,
-  getBookUserDocuments,
-  getUserDocumentBases,
-} from './catalog.js';
-import { getCompanyDocumentHistory } from './history.js';
-
 let activeView = 'documents';
+let documents = [];
+let history = [];
+
+function formatMoment(value) {
+  const date = new Date(value || '');
+  return Number.isFinite(date.getTime()) ? date.toLocaleString('ru-RU') : String(value || '');
+}
 
 function documentRows(items, escapeHtml, group) {
   return items.map((item) => `
     <button type="button" class="admin-document-row" data-admin-document="${escapeHtml(item.key)}" data-admin-document-group="${escapeHtml(group)}">
       <span>
         <strong>${escapeHtml(item.title)}</strong>
-        <small>${escapeHtml(item.type || '')}</small>
+        <small>Версия ${escapeHtml(item.version || 1)}</small>
       </span>
       <span class="admin-document-open">Открыть</span>
     </button>
@@ -28,7 +28,7 @@ function openDocument(item, group, escapeHtml) {
       <div class="admin-drawer-head">
         <div>
           <h3>${escapeHtml(item.title)}</h3>
-          <p>${escapeHtml(group)}</p>
+          <p>${escapeHtml(group)} · версия ${escapeHtml(item.version || 1)}</p>
         </div>
         <button class="admin-close" type="button" data-close aria-label="Закрыть">×</button>
       </div>
@@ -43,8 +43,8 @@ function openDocument(item, group, escapeHtml) {
 }
 
 function documentsMarkup(escapeHtml) {
-  const bookDocuments = getBookUserDocuments();
-  const userBases = getUserDocumentBases();
+  const bookDocuments = documents.filter((item) => item.type !== 'USER_DOCUMENT_BASE');
+  const userBases = documents.filter((item) => item.type === 'USER_DOCUMENT_BASE');
   return `
     <section class="admin-card admin-documents-card">
       <div class="admin-documents-head">
@@ -63,7 +63,7 @@ function documentsMarkup(escapeHtml) {
       <div class="admin-documents-head">
         <div>
           <h3>Основы документов пользователя</h3>
-          <p>Шаблоны Book, из которых позже формируются собственные документы пользователя с его данными.</p>
+          <p>Единые шаблоны Book, из которых формируются документы каждого отдельного Book.</p>
         </div>
         <span class="admin-count">${userBases.length}</span>
       </div>
@@ -75,30 +75,38 @@ function documentsMarkup(escapeHtml) {
 }
 
 function historyMarkup(escapeHtml) {
-  const history = getCompanyDocumentHistory();
   if (!history.length) {
     return `
       <section class="admin-card admin-documents-card">
         <div class="admin-documents-head">
           <div>
             <h3>История Book</h3>
-            <p>Здесь будет храниться только история действий компании Book с корневыми документами и шаблонами. История пользователя с его клиентами сюда не попадает.</p>
+            <p>История компании Book по документам Book ↔ пользователь. История клиентов конкретного Book сюда не попадает.</p>
           </div>
         </div>
-        <div class="admin-history-empty">История пока пуста.</div>
+        <div class="admin-history-empty">В базе пока нет событий Book ↔ пользователь.</div>
       </section>
     `;
   }
 
   return `
     <section class="admin-card admin-documents-card">
-      <div class="admin-documents-head"><div><h3>История Book</h3></div></div>
+      <div class="admin-documents-head">
+        <div>
+          <h3>История Book</h3>
+          <p>События подписания и согласий пользователей с документами компании Book.</p>
+        </div>
+        <span class="admin-count">${history.length}</span>
+      </div>
       <div class="admin-document-list">
         ${history.map((item) => `
           <div class="admin-history-row">
-            <strong>${escapeHtml(item.documentTitle || item.documentKey || 'Документ')}</strong>
-            <span>${escapeHtml(item.action || item.status || '')}</span>
-            <span>${escapeHtml(item.createdAt || '')}</span>
+            <div>
+              <strong>${escapeHtml(item.documentTitle || item.documentKey || 'Документ')}</strong>
+              <small>${escapeHtml(item.userEmail || '')} · версия ${escapeHtml(item.documentVersion || 1)}</small>
+            </div>
+            <span>${escapeHtml(item.action || '')}</span>
+            <span>${escapeHtml(formatMoment(item.occurredAt))}</span>
           </div>
         `).join('')}
       </div>
@@ -106,16 +114,29 @@ function historyMarkup(escapeHtml) {
   `;
 }
 
-export function renderAdminDocuments(root, { escapeHtml, setTitle }) {
+export async function renderAdminDocuments(root, { escapeHtml, setTitle, loadDocuments, loadHistory }) {
   if (!root) return;
   setTitle?.('Документы');
+  root.innerHTML = '<div class="admin-card admin-history-empty">Загружаем документы…</div>';
+
+  try {
+    const [documentRowsValue, historyRowsValue] = await Promise.all([
+      loadDocuments?.() || [],
+      loadHistory?.() || [],
+    ]);
+    documents = Array.isArray(documentRowsValue) ? documentRowsValue : [];
+    history = Array.isArray(historyRowsValue) ? historyRowsValue : [];
+  } catch (error) {
+    root.innerHTML = `<div class="admin-card admin-history-empty">Не удалось загрузить документы: ${escapeHtml(error instanceof Error ? error.message : 'Ошибка')}</div>`;
+    return;
+  }
 
   const render = () => {
     root.innerHTML = `
       <div class="admin-heading">
         <div>
           <h2>Документы</h2>
-          <p>Корень документов Book. Внутренняя история документов конкретного пользователя остаётся внутри его Book.</p>
+          <p>Корень документов Book. Каждый подключённый Book хранит свои сформированные документы и свою историю отдельно по tenant.</p>
         </div>
       </div>
       <div class="admin-documents-tabs" role="tablist" aria-label="Раздел документов">
@@ -134,7 +155,7 @@ export function renderAdminDocuments(root, { escapeHtml, setTitle }) {
 
     root.querySelectorAll('[data-admin-document]').forEach((button) => {
       button.addEventListener('click', () => {
-        const item = getAdminDocument(button.dataset.adminDocument);
+        const item = documents.find((document) => document.key === button.dataset.adminDocument);
         openDocument(item, button.dataset.adminDocumentGroup || '', escapeHtml);
       });
     });
