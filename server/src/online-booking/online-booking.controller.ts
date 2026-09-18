@@ -113,12 +113,6 @@ export class OnlineBookingController {
   }
 
   @UseGuards(BookingPublicationGuard)
-  @Get(':tenantId/legal-documents')
-  legalDocuments(@Param('tenantId') tenantId: string) {
-    return this.legal.publicTenantDocuments(tenantId);
-  }
-
-  @UseGuards(BookingPublicationGuard)
   @Post(':tenantId/account/prepare')
   prepareAccount(@Param('tenantId') tenantId: string, @Body() body: { email?: string }) {
     return this.booking.prepareAccount(tenantId, body?.email || '');
