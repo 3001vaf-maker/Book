@@ -359,10 +359,6 @@ export class MasterInvitationService {
       role: result.membership.role,
     });
 
-    if (input?.dpaAccepted === true) {
-      await this.legal.updateTenantChecklist(invitation.tenantId, result.user.id, { dpaAccepted: true });
-    }
-
     await this.legal.audit(invitation.tenantId, result.user.id, 'MASTER_REGISTRATION_ACCEPTED', 'REGISTRATION', 'SUCCESS', {
       invitationId: invitation.id,
       operationMode: 'DEMO',
