@@ -75,7 +75,7 @@ function acceptanceActionLabel(action) {
 function masterLegalAcceptanceHtml(master) {
   const items = Array.isArray(master?.legalAcceptances) ? master.legalAcceptances : [];
   if (!master?.master) {
-    return '<p style="margin:0;color:#817a74">Мастер ещё не завершил регистрацию.</p>';
+    return '<p style="margin:0;color:#817a74">Пользователь ещё не завершил регистрацию.</p>';
   }
   if (!items.length) {
     return '<p style="margin:0;color:#a33d32">Нет зафиксированных акцептов регистрационных документов.</p>';
@@ -128,7 +128,7 @@ function renderLogin(message = '') {
     <main class="admin-login">
       <section class="admin-login-card">
         <h1>Book Admin</h1>
-        <p>Управление персональными Book мастеров</p>
+        <p>Управление пользователями и их Book</p>
         <form class="admin-form" data-login-form>
           <label class="admin-field"><span>Email</span><input name="email" type="email" autocomplete="username" required></label>
           <label class="admin-field"><span>Пароль</span><input name="password" type="password" autocomplete="current-password" required></label>
@@ -184,13 +184,13 @@ function renderShell() {
           <button data-section="overview">Обзор</button>
           <button data-section="legal">Документы</button>
           <button data-section="owner" class="owner-link">Мой Book</button>
-          <button data-section="masters">Мастера</button>
+          <button data-section="masters">Пользователи</button>
           <button data-section="capabilities">Возможности</button>
         </nav>
         <div class="admin-sidebar-foot">SaaS Control Plane</div>
       </aside>
       <header class="admin-toolbar">
-        <h1 data-toolbar-title>Мастера</h1>
+        <h1 data-toolbar-title>Пользователи</h1>
         <div class="admin-toolbar-user"><span>${escapeHtml(state.admin?.user?.email || '')}</span><button class="admin-button secondary" data-logout>Выйти</button></div>
       </header>
       <main class="admin-main"><div class="admin-content" data-content></div></main>
@@ -236,8 +236,8 @@ function renderOverview() {
   content.innerHTML = `
     <div class="admin-heading"><div><h2>Обзор</h2><p>Состояние персональных Book</p></div></div>
     <div class="admin-stats">
-      <div class="admin-stat"><strong>${regular.length}</strong><span>создано Book мастеров</span></div>
-      <div class="admin-stat"><strong>${active}</strong><span>активных мастеров</span></div>
+      <div class="admin-stat"><strong>${regular.length}</strong><span>создано пользователей</span></div>
+      <div class="admin-stat"><strong>${active}</strong><span>активных пользователей</span></div>
       <div class="admin-stat"><strong>${pending}</strong><span>ожидают принятия приглашения</span></div>
     </div>`;
 }
@@ -251,7 +251,7 @@ function renderOwnerBook() {
     return;
   }
   content.innerHTML = `
-    <div class="admin-heading"><div><h2>Мой Book</h2><p>Ваш первый персональный Book остаётся отдельным от списка мастеров.</p></div></div>
+    <div class="admin-heading"><div><h2>Мой Book</h2><p>Ваш Book остаётся отдельным от списка пользователей.</p></div></div>
     <div class="admin-card" style="padding:20px">
       <strong>${escapeHtml(owner.master?.name || owner.tenantName)}</strong>
       <p style="color:#817a74">${escapeHtml(owner.master?.email || '')}</p>
@@ -261,20 +261,20 @@ function renderOwnerBook() {
 }
 
 function renderMasters() {
-  setActiveSection('Мастера');
+  setActiveSection('Пользователи');
   const content = app.querySelector('[data-content]');
   const masters = state.masters.filter((item) => !item.isOwnerBook);
   const legalReady = state.platformLegal?.state?.status === 'LEGAL_READY';
   content.innerHTML = `
-    <div class="admin-heading"><div><h2>Мастера</h2><p>Каждый мастер работает только в своём персональном Book.</p></div></div>
-    ${legalReady ? '' : '<div class="admin-card" style="padding:16px;margin-bottom:14px"><strong>Регистрация реальных мастеров закрыта.</strong><p style="margin:6px 0 0;color:#817a74">Сначала завершите раздел «Документы».</p></div>'}
+    <div class="admin-heading"><div><h2>Пользователи</h2><p>Каждый мастер работает только в своём персональном Book.</p></div></div>
+    ${legalReady ? '' : '<div class="admin-card" style="padding:16px;margin-bottom:14px"><strong>Регистрация пользователей закрыта.</strong><p style="margin:6px 0 0;color:#817a74">Сначала завершите раздел «Документы».</p></div>'}
     <section class="admin-invite-panel">
       <div class="admin-invite-head">
-        <h3>Пригласить мастера</h3>
+        <h3>Пригласить пользователя</h3>
         <button class="admin-button secondary" type="button" data-create-invite-link>Создать ссылку</button>
       </div>
       <form class="admin-invite-grid" data-invite-form>
-        <label class="admin-field"><span>Имя</span><input name="name" placeholder="Имя мастера"></label>
+        <label class="admin-field"><span>Имя</span><input name="name" placeholder="Имя пользователя"></label>
         <label class="admin-field"><span>Email</span><input name="email" type="email" placeholder="name@example.com" required></label>
         <button class="admin-button" type="submit" ${legalReady ? '' : 'disabled'}>Отправить приглашение</button>
       </form>
@@ -289,8 +289,8 @@ function renderMasters() {
     </section>
     <div class="admin-card">
       <table class="admin-table">
-        <thead><tr><th>Мастер</th><th>Email</th><th>Состояние</th></tr></thead>
-        <tbody>${masters.map(masterRow).join('') || '<tr><td colspan="3">Пока нет приглашённых мастеров.</td></tr>'}</tbody>
+        <thead><tr><th>Пользователь</th><th>Email</th><th>Состояние</th></tr></thead>
+        <tbody>${masters.map(masterRow).join('') || '<tr><td colspan="3">Пока нет приглашённых пользователей.</td></tr>'}</tbody>
       </table>
     </div>`;
 
