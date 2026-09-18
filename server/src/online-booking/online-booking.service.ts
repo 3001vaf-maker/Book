@@ -181,9 +181,9 @@ export class OnlineBookingService {
   private async isOwnerWorkspace(tenantId: string) {
     const access = await this.prisma.tenantAccess.findUnique({
       where: { tenantId },
-      select: { isOwnerBook: true },
+      select: { isPlatformOwnerWorkspace: true },
     });
-    return access?.isOwnerBook === true;
+    return access?.isPlatformOwnerWorkspace === true;
   }
 
   private async ensureOwnerRuntimeReady(tenantId: string) {
