@@ -86,7 +86,6 @@ const TENANT_CHECKLIST_KEYS = [
 
 const PLATFORM_REQUIRED_DOCUMENT_KEYS = ['privacy-policy', 'saas-agreement', 'dpa', 'master-pd-consent'] as const;
 const TENANT_REQUIRED_LIVE_DOCUMENT_KEYS = ['privacy-policy', 'client-pd-consent', 'service-offer'] as const;
-const MARKETING_DOCUMENT_KEY = 'marketing-consent';
 
 function text(value: unknown) {
   return String(value ?? '').trim();
@@ -934,32 +933,33 @@ export class LegalRuntimeService implements OnModuleInit {
     return rows[0] || null;
   }
 
-  private async assertPublicBookingDocuments(tenantId: string, actorUserId: string) {
-    const docs = await this.publicTenantDocuments(tenantId);
-    if (!docs.some((item) => item.key === 'privacy-policy')) {
-      await this.audit(tenantId, actorUserId, 'POLICY_DENY', 'PUBLIC_BOOKING_DOCUMENTS', 'DENIED', { reason: 'tenant-privacy-policy-missing' });
-      throw new ForbiddenException('Не опубликована актуальная политика Tenant для публичной записи');
-    }
-    return docs;
-  }
-
   private async hasCurrentMarketingConsent(tenantId: string, channel: string, destination: string) {
     const contact = contactPoint(channel, destination);
     if (!contact.subjectKey) return false;
-    const documents = await this.listDocuments('TENANT', tenantId);
-    const marketing = documents.find((item) => item.key === MARKETING_DOCUMENT_KEY && item.currentVersion);
-    if (!marketing?.currentVersion) return false;
+
+    const state = await this.prisma.businessDocumentState.findUnique({
+      where: { tenantId },
+      select: { data: true, migrationVerifiedAt: true },
+    });
+    if (!state?.migrationVerifiedAt) return false;
+    const data = objectValue(state.data);
+    const documents = Array.isArray(data.documents) ? data.documents.map((item) => objectValue(item)) : [];
+    const marketing = documents.find((item) => text(item.id) === 'messages-consent');
+    if (!marketing) return false;
+    const version = Math.max(1, Number(marketing.version || 1));
+
     const rows = await this.prisma.$queryRaw<Array<{ status: string; documentVersion: number }>>`
       SELECT "status", "documentVersion"
       FROM "ConsentEvent"
       WHERE "tenantId" = ${tenantId}
         AND "subjectType" = 'CONTACT_POINT'
         AND "subjectKey" = ${contact.subjectKey}
-        AND "documentId" = ${MARKETING_DOCUMENT_KEY}
+        AND "documentId" = 'messages-consent'
       ORDER BY "occurredAt" DESC, "createdAt" DESC, "id" DESC
       LIMIT 1
     `;
     const latest = rows[0];
-    return Boolean(latest && latest.status === 'accepted' && Number(latest.documentVersion) === Number(marketing.currentVersion.version));
+    return Boolean(latest && latest.status === 'accepted' && Number(latest.documentVersion) === version);
   }
+
 }
