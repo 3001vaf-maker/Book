@@ -74,7 +74,7 @@ function sameDocument(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
-function syncAdminTemplates(bundle, templates, account = {}) {
+export function syncAdminTemplates(bundle, templates, account = {}) {
   const source = normalizeBundle(bundle?.data || bundle);
   const identity = operatorIdentity(account);
   const documents = [...source.documents];
