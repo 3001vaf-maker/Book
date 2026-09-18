@@ -62,6 +62,54 @@ jobs:
           done
           docker compose -f docker-compose.staging.yml logs db backend
           exit 1
+      - name: Verify all four production domains
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          expect_status() {
+            local host="$1"
+            local path="$2"
+            local expected="$3"
+            local actual
+            actual=$(curl -sS -o /tmp/domain-response -w '%{http_code}' -H "Host: $host" "http://localhost:3000$path")
+            if [ "$actual" != "$expected" ]; then
+              echo "$host$path: expected HTTP $expected, got $actual"
+              cat /tmp/domain-response || true
+              docker compose -f docker-compose.staging.yml logs backend
+              exit 1
+            fi
+          }
+
+          expect_contains() {
+            local host="$1"
+            local path="$2"
+            local needle="$3"
+            curl -fsS -H "Host: $host" "http://localhost:3000$path" | grep -Fq "$needle" || {
+              echo "$host$path: response does not contain expected marker: $needle"
+              docker compose -f docker-compose.staging.yml logs backend
+              exit 1
+            }
+          }
+
+          expect_status "api.va-tools.ru" "/health" "200"
+
+          expect_status "admin.va-tools.ru" "/" "302"
+          expect_status "admin.va-tools.ru" "/admin/" "200"
+          expect_status "admin.va-tools.ru" "/admin/admin.js" "200"
+          expect_contains "admin.va-tools.ru" "/admin/" "Book Admin"
+          expect_contains "admin.va-tools.ru" "/admin/admin.js" "admin-app"
+
+          expect_status "book.va-tools.ru" "/" "200"
+          expect_status "book.va-tools.ru" "/core.js" "200"
+          expect_contains "book.va-tools.ru" "/" "<title>Book</title>"
+          expect_contains "book.va-tools.ru" "/core.js" "app-content"
+
+          expect_status "client.va-tools.ru" "/" "200"
+          expect_status "client.va-tools.ru" "/online-booking/booking.js" "200"
+          expect_contains "client.va-tools.ru" "/" "<title>Book</title>"
+          expect_contains "client.va-tools.ru" "/online-booking/booking.js" "renderOnlineBooking"
+
       - name: Start and verify staging frontend
         shell: bash
         run: |
