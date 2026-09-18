@@ -15,7 +15,7 @@ export type ResolvedCapability = {
 export type ResolvedTenantAccess = {
   tenantId: string;
   status: TenantAccessStatus | 'MISSING_ACCESS';
-  isOwnerBook: boolean;
+  isPlatformOwnerWorkspace: boolean;
   plan: { id: string; key: string; name: string } | null;
   capabilities: ResolvedCapability[];
 };
@@ -49,7 +49,7 @@ export class SaasAccessService {
     });
 
     if (!access) return this.deniedValue(capability.key, capability.valueType, 'MISSING_ACCESS');
-    if (access.isOwnerBook) return this.ownerValue(capability.key, capability.valueType);
+    if (access.isPlatformOwnerWorkspace) return this.ownerValue(capability.key, capability.valueType);
     if (access.status === TenantAccessStatus.SUSPENDED) return this.deniedValue(capability.key, capability.valueType, 'SUSPENDED');
 
     const override = access.overrides[0];
@@ -89,7 +89,7 @@ export class SaasAccessService {
       return {
         tenantId,
         status: 'MISSING_ACCESS',
-        isOwnerBook: false,
+        isPlatformOwnerWorkspace: false,
         plan: null,
         capabilities: capabilities.map((capability) => this.deniedValue(capability.key, capability.valueType, 'MISSING_ACCESS')),
       };
@@ -99,7 +99,7 @@ export class SaasAccessService {
     const overrides = new Map(access.overrides.map((value) => [value.capabilityId, value]));
 
     const resolved = capabilities.map<ResolvedCapability>((capability) => {
-      if (access.isOwnerBook) return this.ownerValue(capability.key, capability.valueType);
+      if (access.isPlatformOwnerWorkspace) return this.ownerValue(capability.key, capability.valueType);
       if (access.status === TenantAccessStatus.SUSPENDED) {
         return this.deniedValue(capability.key, capability.valueType, 'SUSPENDED');
       }
@@ -128,7 +128,7 @@ export class SaasAccessService {
     return {
       tenantId,
       status: access.status,
-      isOwnerBook: access.isOwnerBook,
+      isPlatformOwnerWorkspace: access.isPlatformOwnerWorkspace,
       plan: access.plan ? { id: access.plan.id, key: access.plan.key, name: access.plan.name } : null,
       capabilities: resolved,
     };
@@ -137,9 +137,9 @@ export class SaasAccessService {
   async pendingCapabilityChanges(tenantId: string) {
     const access = await this.prisma.tenantAccess.findUnique({
       where: { tenantId },
-      select: { isOwnerBook: true },
+      select: { isPlatformOwnerWorkspace: true },
     });
-    if (access?.isOwnerBook) return { summaries: [], introductions: [] };
+    if (access?.isPlatformOwnerWorkspace) return { summaries: [], introductions: [] };
 
     const events = await this.prisma.capabilityAccessEvent.findMany({
       where: {
