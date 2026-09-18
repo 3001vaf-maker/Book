@@ -487,7 +487,7 @@ export class LegalRuntimeService implements OnModuleInit {
   }
 
   async assertTenantActive(tenantId: string, actorUserId = '', purpose = 'TENANT_ACCESS') {
-    const access = await this.prisma.tenantAccess.findUnique({ where: { tenantId }, select: { status: true } });
+    const access = await this.prisma.tenantAccess.findUnique({ where: { tenantId }, select: { status: true, isOwnerBook: true } });
     if (!access || String(access.status) !== 'ACTIVE') {
       await this.audit(tenantId, actorUserId, 'POLICY_DENY', purpose, 'DENIED', { access: access?.status || 'MISSING' });
       throw new ForbiddenException('Tenant недоступен');
@@ -497,7 +497,14 @@ export class LegalRuntimeService implements OnModuleInit {
 
   async assertTenantLive(tenantId: string, actorUserId = '', purpose = 'REAL_OPERATION') {
     await this.assertPlatformLegalReady(actorUserId);
-    await this.assertTenantActive(tenantId, actorUserId, purpose);
+    const access = await this.assertTenantActive(tenantId, actorUserId, purpose);
+    if (access.isOwnerBook) {
+      return {
+        tenantId,
+        operationMode: 'LIVE' as const,
+        ownerWorkspace: true,
+      };
+    }
     const state = await this.tenantState(tenantId);
     if (!state || state.operationMode !== 'LIVE') {
       await this.audit(tenantId, actorUserId, 'POLICY_DENY', purpose, 'DENIED', { operationMode: state?.operationMode || 'MISSING' });
