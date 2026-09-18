@@ -135,6 +135,12 @@ export class SaasAccessService {
   }
 
   async pendingCapabilityChanges(tenantId: string) {
+    const access = await this.prisma.tenantAccess.findUnique({
+      where: { tenantId },
+      select: { isOwnerBook: true },
+    });
+    if (access?.isOwnerBook) return { summaries: [], introductions: [] };
+
     const events = await this.prisma.capabilityAccessEvent.findMany({
       where: {
         tenantId,
