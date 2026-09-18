@@ -10,7 +10,7 @@ import {
   MembershipRole,
   TenantAccessStatus,
 } from '@prisma/client';
-import { createHash, randomBytes, randomUUID } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import { hash as hashPassword } from 'bcryptjs';
 import { PrismaService } from '../prisma.service';
 import { MasterInvitationService } from '../master-invitation/master-invitation.service';
@@ -108,25 +108,10 @@ export class ManualInvitationService {
 
   async inspect(tokenValue: unknown) {
     const invitation = await this.findManualInvitation(text(tokenValue));
-    const documents = await this.legal.listDocuments('PLATFORM', null);
-    const published = documents.filter((item) => item.currentVersion).map((item) => ({
-      key: item.key,
-      type: item.type,
-      title: item.title,
-      requiredForRegistration: item.requiredForRegistration,
-      version: item.currentVersion!.version,
-      content: item.currentVersion!.contentSnapshot,
-      contentHash: item.currentVersion!.contentHash,
-      operatorIdentity: item.currentVersion!.operatorIdentitySnapshot,
-      publishedAt: item.currentVersion!.publishedAt,
-    }));
+    const documents = await this.publishedPlatformDocuments();
     return {
       expiresAt: invitation.expiresAt,
-      legal: {
-        required: published.filter((item) => item.requiredForRegistration).map((item) => ({ key: item.key, version: item.version })),
-        marketingOptional: true,
-      },
-      documents: published,
+      documents,
     };
   }
 
@@ -157,22 +142,6 @@ export class ManualInvitationService {
     if (!email || !email.includes('@')) throw new BadRequestException('Укажите корректный email');
     if (password.length < 10) throw new BadRequestException('Пароль должен содержать минимум 10 символов');
     const invitation = await this.findManualInvitation(token);
-    const legalDocuments = await this.legal.listDocuments('PLATFORM', null);
-    const requiredDocuments = legalDocuments.filter((item) => item.requiredForRegistration && item.currentVersion);
-    const fact = (key: string) => {
-      if (key === 'saas-agreement') return { accepted: input?.saasAgreementAccepted === true, action: 'ACCEPTED' };
-      if (key === 'dpa') return { accepted: input?.dpaAccepted === true, action: 'ACCEPTED' };
-      if (key === 'privacy-policy') return { accepted: input?.privacyAcknowledged === true, action: 'ACKNOWLEDGED' };
-      if (key === 'master-pd-consent') return { accepted: input?.pdConsentAccepted === true, action: 'CONSENTED' };
-      if (key === 'marketing-consent') return { accepted: input?.marketingConsentAccepted === true, action: 'CONSENTED' };
-      return { accepted: false, action: 'ACKNOWLEDGED' };
-    };
-    for (const document of requiredDocuments) {
-      if (!fact(document.key).accepted) {
-        throw new BadRequestException(`Не подтверждён обязательный юридический факт: ${document.key}`);
-      }
-    }
-
     const existingUser = await this.prisma.user.findUnique({ where: { email } });
     if (existingUser) throw new ConflictException('Пользователь с таким email уже зарегистрирован');
 
@@ -232,18 +201,6 @@ export class ManualInvitationService {
       const evidence = input?.technicalEvidence && typeof input.technicalEvidence === 'object' && !Array.isArray(input.technicalEvidence)
         ? input.technicalEvidence as Record<string, unknown>
         : {};
-      for (const document of legalDocuments.filter((item) => item.currentVersion)) {
-        const acceptance = fact(document.key);
-        if (!acceptance.accepted) continue;
-        await tx.$executeRaw`
-          INSERT INTO "LegalAcceptanceEvent" (
-            "id", "tenantId", "userId", "documentVersionId", "action", "source", "technicalEvidence", "occurredAt"
-          ) VALUES (
-            ${randomUUID()}, ${invitation.tenantId}, ${user.id}, ${document.currentVersion!.id}, ${acceptance.action},
-            'manual-master-registration', ${JSON.stringify(evidence)}::jsonb, CURRENT_TIMESTAMP
-          )
-        `;
-      }
       return { user, membership };
     });
 
@@ -264,6 +221,30 @@ export class ManualInvitationService {
       tenant: { id: invitation.tenantId, name: fullName },
       role: result.membership.role,
     };
+  }
+
+  private async publishedPlatformDocuments() {
+    return this.prisma.$queryRaw<Array<{
+      key: string;
+      type: string;
+      title: string;
+      version: number;
+      content: string;
+      contentHash: string;
+      operatorIdentity: unknown;
+      publishedAt: Date;
+    }>>`
+      SELECT d."key", d."type", d."title", v."version",
+             v."contentSnapshot" AS "content", v."contentHash",
+             v."operatorIdentitySnapshot" AS "operatorIdentity", v."publishedAt"
+      FROM "LegalDocument" d
+      JOIN "LegalDocumentVersion" v
+        ON v."documentId" = d."id" AND v."supersededAt" IS NULL
+      WHERE d."scope" = 'PLATFORM'
+        AND d."tenantId" IS NULL
+        AND d."isActive" = true
+      ORDER BY d."createdAt" ASC, d."key" ASC
+    `;
   }
 
   private async findManualInvitation(token: string) {
