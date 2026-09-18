@@ -10,7 +10,6 @@ export {
 export {
   cancelRecord,
   checkRecordTime,
-  completeRecord,
   createRecord,
   deleteRecord,
   moveRecord,

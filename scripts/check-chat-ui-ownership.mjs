@@ -14,18 +14,18 @@ expect(masterChat.includes('appShell,'), 'Master chat must import the shared Boo
 expect(masterChat.includes("className = ''") && masterChat.includes("root.innerHTML = appShell({ header, body, media: '', className });"), 'Master chat must render through the shared Book shell.');
 expect(masterChat.includes("'app-view-shell--chat'"), 'Master thread/composer view must use the canonical Book chat shell class.');
 expect(masterChat.includes('messageThread(') && masterChat.includes('messageComposer('), 'Master chat must use the shared message thread and composer.');
-expect(masterChat.includes("messageComposer({ placeholder: 'Написать сообщение...', attachments: true, rich: true })"), 'Master direct thread must expose the shared Book Chat paperclip and rich composer.');
-expect(masterChat.includes('bindMessageAttachments(form)') && masterChat.includes('content: value.content, attachments'), 'Master direct thread must send selected media attachments and structured content.');
+expect(masterChat.includes("messageComposer({ placeholder: 'Написать сообщение...', attachments: true })"), 'Master direct thread must expose the shared Book Chat paperclip.');
+expect(masterChat.includes('bindMessageAttachments(form)') && masterChat.includes('body, attachments'), 'Master direct thread must send selected media attachments.');
 expect(!masterChat.includes('root.innerHTML = `${header}<div class="form-grid">'), 'Master chat must not keep the legacy local chat screen wrapper.');
 expect(!masterChat.includes('<style>') && !masterChat.includes("document.createElement('style')"), 'Master chat must not own local styles.');
 
 expect(clientChat.includes("className: 'app-view-shell--chat'"), 'Client chat must use the canonical Book chat shell class.');
-expect(clientChat.includes('messageThread(messages') && clientChat.includes('messageComposer({ attachments: true, rich: true })'), 'Client chat must use the shared message thread and rich composer with attachments.');
+expect(clientChat.includes('messageThread(messages') && clientChat.includes('messageComposer({ attachments: true })'), 'Client chat must use the shared message thread and composer with attachments.');
 expect(!clientChat.includes('<style>') && !clientChat.includes("document.createElement('style')"), 'Client chat must not own local styles.');
 
-expect(chatApi.includes('attachments = []') && chatApi.includes('content = null') && chatApi.includes('content, attachments'), 'Master communication API must carry structured content and attachments.');
-expect(controller.includes('content?: unknown') && controller.includes('attachments?: unknown'), 'Master chat controller must accept structured content and attachments.');
-expect(dispatch.includes('Array.isArray(input?.attachments)') && dispatch.includes("channel: 'IN_APP'") && dispatch.includes('content: input?.content') && dispatch.includes('attachments,'), 'Master media/rich messages must be persisted into the shared Book chat thread.');
+expect(chatApi.includes('attachments = []') && chatApi.includes('body, attachments'), 'Master communication API must carry attachments.');
+expect(controller.includes('attachments?: unknown'), 'Master chat controller must accept attachments.');
+expect(dispatch.includes('Array.isArray(input?.attachments)') && dispatch.includes("channel: 'IN_APP'") && dispatch.includes('attachments,'), 'Master media messages must be persisted into the shared Book chat thread.');
 
 expect(shellCss.includes('.app-content.app-content--shell{padding:0}'), 'Shared shell CSS must neutralize outer master page padding for Book shell views.');
 expect(shellCss.includes('.app-view-shell--chat') && shellCss.includes('.message-composer{position:fixed'), 'Shared shell CSS must remain the single geometry owner for Book Chat.');

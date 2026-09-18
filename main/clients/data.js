@@ -1,9 +1,8 @@
 import { normalizePhoneForStorage, phonesMatch } from '../../core/phone/index.js';
-import { assertNoNewClientContactConflicts } from '../../core/client-contact/index.js';
 import { getMembers, getUEI } from '../../core/uei.js';
 import { queuePersonDelete, queuePersonUpsert } from '../../core/business-persistence.js';
 import { getTags } from '../../settings/tags/data.js';
-import { getLatestAccountConsent, getLatestContactConsent } from '../../settings/documents/consents.js';
+import { getLatestClientConsent, migrateLegacyConsents } from '../../settings/documents/consents.js';
 
 let peopleState = [];
 
@@ -46,10 +45,9 @@ export function normalizeClient(person = {}) {
     gender: String(person.gender || ''),
     birthDate: String(person.birthDate || ''),
     phones: normalizePhones(person.phones),
-    telegrams: normalizeStrings(person.telegrams),
-    emails: normalizeStrings(person.emails).map((value) => value.toLowerCase()),
+    telegrams: Array.isArray(person.telegrams) ? person.telegrams : [],
+    emails: normalizeStrings(person.emails),
     accounts: normalizeStrings(person.accounts),
-    contactViaUei: String(person.contactViaUei || '').trim().toUpperCase(),
     links: Array.isArray(person.links) ? person.links : [],
     tags: normalizeTagAssignments(person.tags),
     discountPercent: normalizeDiscount(person),
@@ -74,48 +72,17 @@ function accepted(fact) {
   return Boolean(fact && fact.status === 'accepted');
 }
 
-function personKeyFromUEIMember(member) {
-  const value = String(member || '');
-  if (value.startsWith('person:')) return value.slice(7);
-  if (!value.includes(':')) return value;
-  return '';
-}
-
-function identityPeopleFor(person, people) {
-  const uei = getUEI('person', person.key) || '';
-  if (!uei) return [person];
-  const keys = new Set(getMembers(uei).map(personKeyFromUEIMember).filter(Boolean));
-  keys.add(person.key);
-  const members = people.filter((item) => keys.has(item.key));
-  return members.length ? members : [person];
-}
-
-function accountConsentAccepted(people, documentId) {
-  return people.some((person) => (person.accounts || []).some((accountId) => accepted(getLatestAccountConsent(accountId, documentId))));
-}
-
-function messageConsentAccepted(people) {
-  for (const person of people) {
-    if ((person.phones || []).some((value) => accepted(getLatestContactConsent('PHONE', value, 'messages-consent')))) return true;
-    if ((person.emails || []).some((value) => accepted(getLatestContactConsent('EMAIL', value, 'messages-consent')))) return true;
-    if ((person.telegrams || []).some((value) => accepted(getLatestContactConsent('TELEGRAM', value, 'messages-consent')))) return true;
-  }
-  return false;
-}
-
 export function getAllClients() {
   const stored = clone(peopleState).map(normalizeClient).filter((person) => person.key);
-  return stored.map((person) => {
-    const members = identityPeopleFor(person, stored);
-    return {
-      ...person,
-      agreements: {
-        personalData: accountConsentAccepted(members, 'pdn-consent'),
-        mailings: messageConsentAccepted(members),
-      },
-      uei: getUEI('person', person.key) || '',
-    };
-  });
+  migrateLegacyConsents(stored);
+  return stored.map((person) => ({
+    ...person,
+    agreements: {
+      personalData: accepted(getLatestClientConsent(person.key, 'pdn-consent')),
+      mailings: accepted(getLatestClientConsent(person.key, 'messages-consent')),
+    },
+    uei: getUEI('person', person.key) || '',
+  }));
 }
 
 export function getClients() {
@@ -131,6 +98,13 @@ export function getClients() {
   }
 
   return people.filter((person) => !linkedSecondary.has(person.key));
+}
+
+function personKeyFromUEIMember(member) {
+  const value = String(member || '');
+  if (value.startsWith('person:')) return value.slice(7);
+  if (!value.includes(':')) return value;
+  return '';
 }
 
 function identityKeysForUEI(uei, people = []) {
@@ -185,8 +159,6 @@ export function getClientCount() {
 
 export function saveClients(people = []) {
   const normalized = (Array.isArray(people) ? people : []).map(normalizeClient).filter((person) => person.key);
-  const validationPeople = normalized.map((person) => ({ ...person, uei: getUEI('person', person.key) || '' }));
-  assertNoNewClientContactConflicts(peopleState, validationPeople);
   const previous = peopleState;
   const previousByKey = new Map(previous.map((person, position) => [person.key, { person, position }]));
   const nextByKey = new Map(normalized.map((person, position) => [person.key, { person, position }]));
@@ -237,7 +209,6 @@ export function upsertPersonFromBookingAccount(account = {}) {
     telegrams: telegramId ? [...(previous?.telegrams || []), telegramId] : previous?.telegrams || [],
     emails: email ? [...(previous?.emails || []), email] : previous?.emails || [],
     accounts: [...(previous?.accounts || []), accountId],
-    contactViaUei: previous?.contactViaUei || '',
     programs: previous?.programs || [],
     createdAt: previous?.createdAt || new Date().toISOString(),
   });

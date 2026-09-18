@@ -2,7 +2,6 @@ import { Body, Controller, Delete, Get, Param, Post, Put, Req, UseGuards } from 
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ProfileService } from './profile.service';
-import { TenantTimeZoneService } from './tenant-time-zone.service';
 import { WorkplaceLimitGuard } from './workplace-limit.guard';
 
 type AuthenticatedRequest = Request & { auth?: { userId: string; tenantId: string; role: string } };
@@ -10,10 +9,7 @@ type AuthenticatedRequest = Request & { auth?: { userId: string; tenantId: strin
 @Controller('profile')
 @UseGuards(JwtAuthGuard)
 export class ProfileController {
-  constructor(
-    private readonly profile: ProfileService,
-    private readonly timeZones: TenantTimeZoneService,
-  ) {}
+  constructor(private readonly profile: ProfileService) {}
 
   @Get()
   getProfile(@Req() request: AuthenticatedRequest) {
@@ -31,12 +27,7 @@ export class ProfileController {
   }
 
   @Post('bootstrap')
-  async bootstrap(
-    @Req() request: AuthenticatedRequest,
-    @Body() body: { timeZone?: unknown } = {},
-  ) {
-    await this.profile.get(request.auth!.tenantId, request.auth!.userId);
-    await this.timeZones.captureOnRegistration(request.auth!.tenantId, body?.timeZone);
+  bootstrap(@Req() request: AuthenticatedRequest) {
     return this.profile.bootstrap(request.auth!.tenantId, request.auth!.userId);
   }
 

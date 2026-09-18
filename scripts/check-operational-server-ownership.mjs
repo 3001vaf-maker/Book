@@ -12,9 +12,7 @@ const migration = read('operational-migration.js');
 const server = read('server/src/business-state/business-state.service.ts');
 const schema = read('server/prisma/schema.prisma');
 
-const operationalStartup = core.includes('await initializeOperationalState(authenticatedAccount)')
-  || core.includes("['operational', () => initializeOperationalState(authenticatedAccount)]");
-if (!operationalStartup) failures.push('Book must hydrate operational booking facts before rendering.');
+if (!core.includes('await initializeOperationalState(authenticatedAccount)')) failures.push('Book must hydrate operational booking facts before rendering.');
 if (!day.includes('hydrateDaysFromServer') || !day.includes("queueOperationalDataset('days'")) failures.push('Day must become server-owned after migration.');
 if (!breaks.includes('hydrateBreaksFromServer') || !breaks.includes('configureBreakPersistence') || !migration.includes("queueOperationalDataset('breaks'")) failures.push('Break must become server-owned after migration.');
 if (!procedures.includes('hydrateProceduresFromServer') || !procedures.includes("queueOperationalDataset('procedures'")) failures.push('Procedures must become server-owned after migration.');

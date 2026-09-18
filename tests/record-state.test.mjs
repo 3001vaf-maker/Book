@@ -19,10 +19,7 @@ assert.equal(recordVisualState({ ...record, status: 'cancelled', attendance: 'no
 
 const end = recordAppointmentTime(record, 'to');
 assert.equal(isRecordCompletedSide(record, { now: end - 1 }), false);
-assert.equal(isRecordCompletedSide(record, { now: end }), false);
-assert.equal(isRecordCompletedSide(record, { now: end + 60_000 }), false);
-assert.equal(isRecordCompletedSide({ ...record, completed: true }), true);
-assert.equal(isRecordCompletedSide(record, { paid: true }), true);
+assert.equal(isRecordCompletedSide(record, { now: end }), true);
 assert.equal(recordActivityTime(record, null, { completed: true }), end);
 assert.equal(recordActivityTime(record), Date.parse(record.updatedAt));
 

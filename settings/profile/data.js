@@ -74,7 +74,6 @@ export async function saveProfile(profile) {
   });
   const payload = await responseJson(response, 'Не удалось сохранить профиль');
   hydrateProfileFromServer(payload.profile, payload.customProfessions);
-  window.dispatchEvent(new CustomEvent('book:profile-context-updated', { detail: { source: 'profile' } }));
   return getProfile();
 }
 

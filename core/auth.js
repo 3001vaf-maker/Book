@@ -1,26 +1,21 @@
 import { API_BASE } from './environment.js';
 
-const runtimePath = typeof globalThis.location?.pathname === 'string' ? globalThis.location.pathname : '';
-const TOKEN_KEY = runtimePath.includes('/admin/') ? 'book.admin.auth.token' : 'book.auth.token';
-let activeToken = '';
+const TOKEN_KEY = 'book.auth.token';
 
 export function getAuthToken() {
-  return activeToken || localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY) || '';
+  return sessionStorage.getItem(TOKEN_KEY) || '';
 }
 
-export function setAuthToken(token, remember = false) {
+export function setAuthToken(token) {
   const value = String(token || '').trim();
-  activeToken = value;
-  localStorage.setItem(TOKEN_KEY, '');
-  sessionStorage.removeItem(TOKEN_KEY);
-  if (!value) return;
-  const storage = remember ? localStorage : sessionStorage;
-  storage.setItem(TOKEN_KEY, value);
+  if (!value) {
+    sessionStorage.removeItem(TOKEN_KEY);
+    return;
+  }
+  sessionStorage.setItem(TOKEN_KEY, value);
 }
 
 export function clearAuthToken() {
-  activeToken = '';
-  localStorage.setItem(TOKEN_KEY, '');
   sessionStorage.removeItem(TOKEN_KEY);
 }
 
@@ -32,7 +27,7 @@ export async function apiRequest(path, options = {}) {
   return fetch(`${API_BASE}${path}`, { ...options, headers });
 }
 
-export async function login(email, password, remember = false) {
+export async function login(email, password) {
   const response = await fetch(`${API_BASE}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -44,7 +39,7 @@ export async function login(email, password, remember = false) {
     throw new Error(payload?.message || 'Не удалось войти');
   }
 
-  setAuthToken(payload.accessToken, remember);
+  setAuthToken(payload.accessToken);
   return payload;
 }
 

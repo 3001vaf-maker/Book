@@ -37,7 +37,7 @@ function hydrate(value) {
   hydrateBookingSettingsFromServer(bundle.bookingSettings);
 }
 
-export async function initializeOperationalState() {
+export async function initializeOperationalState(account = {}) {
   const response = await apiRequest('/business-state/operational');
   const remote = await responseJson(response, 'Не удалось загрузить График, процедуры и настройки онлайн-записи');
 
@@ -46,9 +46,13 @@ export async function initializeOperationalState() {
     return { source: 'server', verified: true };
   }
 
+  if (remote?.migrated || account?.user?.workspaceUnlocked) {
+    return { source: 'server-awaiting-verification', verified: false };
+  }
+
   const bootstrapResponse = await apiRequest('/business-state/operational/bootstrap', { method: 'POST' });
-  const bootstrapped = await responseJson(bootstrapResponse, 'Не удалось подтвердить серверное хранилище Графика и онлайн-записи');
+  const bootstrapped = await responseJson(bootstrapResponse, 'Не удалось создать серверное хранилище Графика и онлайн-записи');
   if (!bootstrapped?.verified) throw new Error('Серверное хранилище Графика и онлайн-записи не подтверждено');
   hydrate(bootstrapped);
-  return { source: remote?.migrated ? 'server-reverified' : 'server-bootstrap', verified: true };
+  return { source: 'server-bootstrap', verified: true };
 }

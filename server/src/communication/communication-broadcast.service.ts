@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { BusinessStateService } from '../business-state/business-state.service';
 import { ConsentPolicyService } from '../document-state/consent-policy.service';
 import { PrismaService } from '../prisma.service';
-import { CommunicationChannelResolverService } from './communication-channel-resolver.service';
+import { CommunicationService } from './communication.service';
 import { CommunicationDispatchService } from './communication-dispatch.service';
 
 type TemplateRow = { id: string; tenantId: string; name: string; body: string; createdAt: Date; updatedAt: Date };
@@ -28,7 +28,7 @@ export class CommunicationBroadcastService {
     private readonly prisma: PrismaService,
     private readonly businessState: BusinessStateService,
     private readonly documents: ConsentPolicyService,
-    private readonly channels: CommunicationChannelResolverService,
+    private readonly communications: CommunicationService,
     private readonly dispatch: CommunicationDispatchService,
   ) {}
 
@@ -191,7 +191,7 @@ export class CommunicationBroadcastService {
           phone: (Array.isArray(person.phones) ? person.phones : []).map(canonicalPhone).find(Boolean) || '',
           email: (Array.isArray(person.emails) ? person.emails : []).map(canonicalEmail).find(Boolean) || '',
         };
-      }).filter((person) => person.personKey);
+      }).filter((person) => person.personKey && person.phone);
   }
 
   private async requestedPeople(tenantId: string, people: Awaited<ReturnType<CommunicationBroadcastService['people']>>, input: { all?: unknown; phones?: unknown; personKeys?: unknown; groupId?: unknown }) {
@@ -203,7 +203,7 @@ export class CommunicationBroadcastService {
     if (!all && !phones.length && !personKeys.length) throw new BadRequestException('Выберите клиентов, группу или явно укажите «все клиенты»');
 
     if (all) return [...people];
-    const selected = people.filter((person) => personKeys.includes(person.personKey) || (person.phone && phones.includes(person.phone)));
+    const selected = people.filter((person) => personKeys.includes(person.personKey) || phones.includes(person.phone));
     const seen = new Set<string>();
     return selected.filter((person) => {
       const key = person.personKey || `${person.uei}|${person.phone}`;
@@ -213,9 +213,9 @@ export class CommunicationBroadcastService {
     });
   }
 
-  private async channelDestination(tenantId: string, channel: string, person: { personKey: string; phone: string; uei: string; email: string }) {
+  private async channelDestination(tenantId: string, channel: string, person: { phone: string; uei: string; email: string }) {
     if (channel === 'TELEGRAM') {
-      const identity = await this.channels.resolveTelegramIdentity(tenantId, { profileKey: person.personKey, phone: person.phone, uei: person.uei });
+      const identity = await this.communications.telegramIdentity(tenantId, { phone: person.phone, uei: person.uei });
       return text(identity?.externalUserId);
     }
     return '';
@@ -263,7 +263,7 @@ export class CommunicationBroadcastService {
     for (const recipient of preview.audience) {
       try {
         const renderedBody = this.renderTemplate(body, recipient);
-        await this.dispatch.send(tenantId, { profileKey: recipient.personKey, phone: recipient.phone, uei: recipient.uei, channel: preview.channel, body: renderedBody });
+        await this.dispatch.send(tenantId, { phone: recipient.phone, uei: recipient.uei, channel: preview.channel, body: renderedBody });
         sentCount += 1;
       } catch (error) {
         failedCount += 1;

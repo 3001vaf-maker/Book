@@ -9,7 +9,6 @@ const consentSettings = fs.readFileSync('online-booking/consent-settings.js', 'u
 const bookingSettingsUi = fs.readFileSync('settings/online-booking/online-booking.js', 'utf8');
 const bookingAccountApi = fs.readFileSync('core/booking-account/index.js', 'utf8');
 const onlineBookingController = fs.readFileSync('server/src/online-booking/online-booking.controller.ts', 'utf8');
-const bookingChatController = fs.readFileSync('server/src/online-booking/booking-chat.controller.ts', 'utf8');
 const accountSettingsController = fs.readFileSync('server/src/online-booking/booking-account-settings.controller.ts', 'utf8');
 const onlineBookingService = fs.readFileSync('server/src/online-booking/online-booking.service.ts', 'utf8');
 const communicationService = fs.readFileSync('server/src/communication/communication.service.ts', 'utf8');
@@ -95,15 +94,14 @@ assert.match(accountShell, /readOnlyReceipt\(/);
 assert.match(accountShell, /label: 'Повторить запись'/);
 assert.doesNotMatch(accountShell, /label: 'Повторить процедуру'/);
 assert.match(accountShell, /action: \{ label: 'Записаться'/);
-assert.match(accountShell, /messageComposer\(\{ attachments: true, rich: true \}\)/);
-assert.match(accountShell, /bindRichTextEditor\(form\)/);
+assert.match(accountShell, /messageComposer\(\{ attachments: true \}\)/);
 assert.match(accountShell, /data-message-attachment/);
-assert.match(accountShell, /sendBookingChatMessage\(state\.tenantId, \{ body: value\.body, content: value\.content, attachments \}\)/);
+assert.match(accountShell, /sendBookingChatMessage\(state\.tenantId, body, attachments\)/);
 assert.match(accountShell, /className: 'app-view-shell--chat'/);
 assert.match(accountShell, /getBookingRequests\(state\.tenantId\)\.catch\(\(\) => \[\]\)/);
 assert.match(accountShell, /data-client-chat-settings/);
 assert.match(accountShell, /getBookingChatSettings\(state\.tenantId\)/);
-assert.match(accountShell, /setBookingTelegramChatEnabled\(state\.tenantId, !telegram\.enabled\)/);
+assert.match(accountShell, /setBookingTelegramConsent\(state\.tenantId, !telegram\.enabled\)/);
 assert.match(accountShell, /label: 'Telegram'.*checked: Boolean\(telegram\.enabled\).*disabled: !telegram\.linked/s);
 assert.doesNotMatch(accountShell, /Promise\.allSettled\(unread/);
 assert.doesNotMatch(accountShell, /markBookingNotificationRead\(state\.tenantId, item\.notificationId\)/);
@@ -178,25 +176,25 @@ assert.match(bookingSettingsUi, /BOOKING_SLOT_STEPS\.map/);
 assert.doesNotMatch(bookingSettingsUi, /Сохранить оформление/);
 assert.match(indexHtml, /settings\/online-booking\/online-booking\.css/);
 
-// Chat channel preference is separate from marketing consent.
+// Chat consent remains exact Contact Point policy.
 assert.match(bookingAccountApi, /account\/chat\/settings/);
-assert.match(bookingAccountApi, /account\/chat\/telegram-channel/);
-assert.match(onlineBookingController, /CommunicationHistoryService/);
-assert.match(onlineBookingController, /preferredChannels\.includes\('TELEGRAM'\)/);
-assert.doesNotMatch(onlineBookingController, /messages-consent|acceptContactPointConsent|revokeContactPointConsent|contactPointConsentState/);
+assert.match(bookingAccountApi, /account\/chat\/telegram-consent/);
+assert.match(onlineBookingController, /contactPointConsentState\([\s\S]*?'TELEGRAM'[\s\S]*?identity\.externalUserId[\s\S]*?'messages-consent'/);
+assert.match(onlineBookingController, /acceptContactPointConsent\([\s\S]*?'TELEGRAM'[\s\S]*?identity\.externalUserId[\s\S]*?'client-chat-settings'/);
+assert.match(onlineBookingController, /revokeContactPointConsent\([\s\S]*?'TELEGRAM'[\s\S]*?identity\.externalUserId[\s\S]*?'client-chat-settings'/);
 assert.match(consentPolicy, /async canSendMessages\(tenantId: string, typeValue: unknown, value: unknown\)/);
-assert.doesNotMatch(telegramBot, /canSendMessages\(tenantId/);
+assert.match(telegramBot, /canSendMessages\(tenantId, 'TELEGRAM', identity\.externalUserId\)/);
+assert.doesNotMatch(telegramBot, /canSendMessages\(tenantId, personKey/);
 
-// Media and rich content are real persisted message properties, not decorative controls.
-assert.match(bookingAccountApi, /sendBookingChatMessage\(tenantId, value, legacyAttachments = \[\]\)/);
-assert.match(bookingChatController, /@Body\(\) body: \{ body\?: unknown; content\?: unknown; attachments\?: unknown \}/);
-assert.match(bookingChatController, /attachments: body\?\.attachments/);
+// Media is a real persisted message property, not a decorative paperclip.
+assert.match(bookingAccountApi, /sendBookingChatMessage\(tenantId, body, attachments = \[\]\)/);
+assert.match(onlineBookingController, /@Body\(\) body: \{ body\?: unknown; attachments\?: unknown \}/);
+assert.match(onlineBookingController, /attachments,/);
 assert.match(communicationService, /function normalizeAttachments/);
-assert.match(communicationService, /function normalizeRichContent/);
 assert.match(communicationService, /"attachments"/);
 assert.match(communicationService, /\$\{attachmentsJson\}::jsonb/);
-assert.match(communicationHistory, /return this\.communications\.listThread\(tenantId, input \|\| \{\}, limit\)/);
-assert.match(communicationHistory, /return this\.communications\.listThreads\(tenantId, limit\)/);
+assert.match(communicationHistory, /m\."attachments"/);
+assert.match(communicationHistory, /'\[\]'::jsonb AS "attachments"/);
 assert.match(messageAttachmentMigration, /ADD COLUMN "attachments" JSONB NOT NULL DEFAULT '\[\]'::jsonb/);
 
 // Shared shell owns adaptive A/J/B/C roles and compact mobile geometry.

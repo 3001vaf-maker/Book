@@ -31,11 +31,9 @@ function dataPatchFrom(patch = {}) {
     'status',
     'confirmed',
     'attendance',
-    'completed',
     'confirmedAt',
     'attendanceAt',
     'cancelledAt',
-    'completedAt',
     'lifecycleUpdatedAt',
   ]);
   return Object.fromEntries(Object.entries(patch).filter(([key]) => !lifecycleKeys.has(key)));
@@ -183,16 +181,6 @@ export function setRecordConfirmed(id, confirmed) {
 export function setRecordAttendance(id, attendance) {
   const value = attendance === 'arrived' || attendance === 'no-show' ? attendance : '';
   return updateRecord(id, { attendance: value });
-}
-
-export function completeRecord(id, { at = '' } = {}) {
-  const current = getRecord(id);
-  if (!current || current.status === 'cancelled' || current.attendance === 'no-show' || current.completed) return current;
-  const event = appendRecordEvent(id, RECORD_EVENT_TYPES.COMPLETED, { at });
-  if (!event) return getRecord(id);
-  const completed = getRecord(id);
-  notify('book:records-changed', { action: 'complete', recordId: id });
-  return completed;
 }
 
 export function cancelRecord(id) {

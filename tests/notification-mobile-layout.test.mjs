@@ -14,8 +14,7 @@ assert.match(shell, /\.message-composer__attach\{[^}]*width:44px[^}]*height:44px
 assert.match(shell, /\.message-bubble\{[^}]*max-width:82%/s);
 assert.match(shell, /\.app-header\{[^}]*grid-template-columns:auto minmax\(0,1fr\) auto auto/s);
 assert.match(shell, /\.app-header__slot\.is-empty\{[^}]*width:0/s);
-assert.match(account, /messageComposer\(\{ attachments: true, rich: true \}\)/);
-assert.match(account, /bindRichTextEditor\(form\)/);
+assert.match(account, /messageComposer\(\{ attachments: true \}\)/);
 assert.match(account, /data-message-attachment/);
 assert.match(account, /settingsPanel\(/);
 assert.doesNotMatch(account, /createElement\('style'\)|<style>/);
