@@ -6,6 +6,7 @@ const state = {
   admin: null,
   masters: [],
   capabilities: [],
+  platformDocuments: null,
   section: 'masters',
 };
 
@@ -19,6 +20,13 @@ async function adminRequest(path, options = {}) {
   const response = await apiRequest(`/saas-admin${path}`, options);
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload?.message || 'Ошибка панели управления');
+  return payload;
+}
+
+async function platformDocumentsRequest() {
+  const response = await apiRequest('/platform-documents');
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.message || 'Не удалось загрузить документы');
   return payload;
 }
 
@@ -78,6 +86,7 @@ function renderShell() {
         <nav class="admin-nav">
           <button data-section="overview">Обзор</button>
           <button data-section="owner" class="owner-link">Мой Book</button>
+          <button data-section="documents">Документы</button>
           <button data-section="masters">Мастера</button>
           <button data-section="capabilities">Возможности</button>
         </nav>
@@ -115,6 +124,7 @@ function setActiveSection(title) {
 function renderCurrentSection() {
   if (state.section === 'overview') return renderOverview();
   if (state.section === 'owner') return renderOwnerBook();
+  if (state.section === 'documents') return void renderPlatformDocuments();
   if (state.section === 'capabilities') return renderCapabilities();
   return renderMasters();
 }
@@ -147,9 +157,16 @@ function renderOwnerBook() {
     <div class="admin-card" style="padding:20px">
       <strong>${escapeHtml(owner.master?.name || owner.tenantName)}</strong>
       <p style="color:#817a74">${escapeHtml(owner.master?.email || '')}</p>
-      <button class="admin-button" data-edit-owner>Настроить доступы</button>
+      <div class="admin-actions" style="justify-content:flex-start;margin-top:14px">
+        <button class="admin-button" data-edit-owner>Настроить доступы</button>
+        <button class="admin-button secondary" data-open-platform-documents>Документы Book</button>
+      </div>
     </div>`;
   content.querySelector('[data-edit-owner]').addEventListener('click', () => openAccessDrawer(owner.tenantId));
+  content.querySelector('[data-open-platform-documents]').addEventListener('click', () => {
+    state.section = 'documents';
+    renderCurrentSection();
+  });
 }
 
 function renderMasters() {
@@ -229,6 +246,92 @@ function masterRow(item) {
   const statusLabel = item.status === 'SUSPENDED' ? 'Отключён' : pending ? 'Ждёт входа' : item.master ? 'Активен' : 'Создан';
   const resend = pending ? `<button class="admin-button secondary" data-resend="${escapeHtml(item.invitation.id)}">Повторить email</button>` : '';
   return `<tr data-tenant="${escapeHtml(item.tenantId)}"><td><strong>${escapeHtml(name)}</strong></td><td>${escapeHtml(email)}</td><td><span class="admin-pill ${statusClass}">${statusLabel}</span> ${resend}</td><td>${escapeHtml(item.plan?.name || 'Индивидуальный')}</td></tr>`;
+}
+
+
+function platformDocumentRows(items = [], groupLabel = '') {
+  return items.map((item) => `
+    <div class="admin-document-row">
+      <div>
+        <strong>${escapeHtml(item.title)}</strong>
+        <small>${escapeHtml(groupLabel)}</small>
+      </div>
+      <button class="admin-button secondary" data-platform-document-key="${escapeHtml(item.key)}">Открыть</button>
+    </div>`).join('');
+}
+
+function openPlatformDocument(item, groupLabel) {
+  if (!item) return;
+  const backdrop = document.createElement('div');
+  backdrop.className = 'admin-drawer-backdrop';
+  backdrop.innerHTML = `
+    <aside class="admin-drawer admin-document-drawer">
+      <div class="admin-drawer-head">
+        <div><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(groupLabel)}</p></div>
+        <button class="admin-close" data-close aria-label="Закрыть">×</button>
+      </div>
+      <div class="admin-document-content">${escapeHtml(item.content || '')}</div>
+    </aside>`;
+  backdrop.querySelector('[data-close]').addEventListener('click', () => backdrop.remove());
+  backdrop.addEventListener('click', (event) => {
+    if (event.target === backdrop) backdrop.remove();
+  });
+  document.body.append(backdrop);
+}
+
+async function renderPlatformDocuments() {
+  setActiveSection('Документы');
+  const content = app.querySelector('[data-content]');
+  content.innerHTML = `
+    <div class="admin-heading"><div><h2>Документы</h2><p>Документы восстановлены отдельно от правил входа и ограничений Book.</p></div></div>
+    <div class="admin-card" style="padding:20px">Загрузка документов…</div>`;
+
+  try {
+    state.platformDocuments = await platformDocumentsRequest();
+  } catch (error) {
+    content.innerHTML = `
+      <div class="admin-heading"><div><h2>Документы</h2><p>Документы не влияют на запуск Book.</p></div></div>
+      <div class="admin-card" style="padding:20px;color:#a33d32">${escapeHtml(error instanceof Error ? error.message : 'Не удалось загрузить документы')}</div>`;
+    return;
+  }
+
+  const bookUserDocuments = Array.isArray(state.platformDocuments?.bookUserDocuments)
+    ? state.platformDocuments.bookUserDocuments : [];
+  const userDocumentBases = Array.isArray(state.platformDocuments?.userDocumentBases)
+    ? state.platformDocuments.userDocumentBases : [];
+
+  content.innerHTML = `
+    <div class="admin-heading"><div><h2>Документы</h2><p>Сейчас это только каталог документов. Он не управляет входом, DEMO/LIVE или доступами.</p></div></div>
+    <section class="admin-card admin-documents-card">
+      <div class="admin-documents-head">
+        <div><h3>Book ↔ пользователь</h3><p>Шесть документов отношений между Book и пользователем.</p></div>
+        <span class="admin-count">${bookUserDocuments.length}</span>
+      </div>
+      <div class="admin-document-list">${platformDocumentRows(bookUserDocuments, 'Book ↔ пользователь')}</div>
+    </section>
+    <section class="admin-card admin-documents-card">
+      <div class="admin-documents-head">
+        <div><h3>Основы документов пользователя</h3><p>Три основы, из которых позже формируются документы пользователя с его собственными данными.</p></div>
+        <span class="admin-count">${userDocumentBases.length}</span>
+      </div>
+      <div class="admin-document-list">${platformDocumentRows(userDocumentBases, 'Основа документа пользователя')}</div>
+    </section>
+    <section class="admin-card admin-documents-card">
+      <div class="admin-documents-head">
+        <div><h3>История подписаний</h3><p>Пока не подключена. Подписание и правила будут добавлены отдельным следующим слоем.</p></div>
+      </div>
+    </section>`;
+
+  const all = [...bookUserDocuments, ...userDocumentBases];
+  content.querySelectorAll('[data-platform-document-key]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const item = all.find((document) => document.key === button.dataset.platformDocumentKey);
+      const groupLabel = bookUserDocuments.some((document) => document.key === button.dataset.platformDocumentKey)
+        ? 'Book ↔ пользователь'
+        : 'Основа документа пользователя';
+      openPlatformDocument(item, groupLabel);
+    });
+  });
 }
 
 function renderCapabilities() {
