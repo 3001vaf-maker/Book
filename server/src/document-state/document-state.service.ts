@@ -1,10 +1,33 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 
 type JsonObject = Record<string, any>;
-const DATASETS = new Set(['documents', 'consents', 'history']);
+type ConsentEventRow = {
+  id: string;
+  subjectType: string;
+  subjectKey: string;
+  contactType: string;
+  contactValue: string;
+  documentId: string;
+  documentVersion: number;
+  status: string;
+  acceptedAt: Date | null;
+  revokedAt: Date | null;
+  source: string;
+  occurredAt: Date;
+  migratedFromEventId: string;
+  createdAt: Date;
+};
+
+const MUTABLE_DATASETS = new Set(['documents', 'history']);
+
+const USER_DOCUMENT_BASE_KEYS = [
+  { key: 'user-document-pdn-policy', documentId: 'pdn-agreement' },
+  { key: 'user-document-pdn-consent', documentId: 'pdn-consent' },
+  { key: 'user-document-messages-consent', documentId: 'messages-consent' },
+] as const;
+
 
 function objectValue(value: unknown): JsonObject {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonObject : {};
@@ -37,23 +60,98 @@ function json(value: unknown): Prisma.InputJsonValue {
   return clone(value) as Prisma.InputJsonValue;
 }
 
+function publicConsentEvent(row: ConsentEventRow) {
+  return {
+    id: row.id,
+    subjectType: row.subjectType,
+    subjectKey: row.subjectKey,
+    contactType: row.contactType,
+    contactValue: row.contactValue,
+    documentId: row.documentId,
+    documentVersion: row.documentVersion,
+    status: row.status,
+    acceptedAt: row.acceptedAt?.toISOString() || '',
+    revokedAt: row.revokedAt?.toISOString() || '',
+    source: row.source,
+    eventAt: row.occurredAt.toISOString(),
+    createdAt: row.createdAt.toISOString(),
+    migratedFromEventId: row.migratedFromEventId,
+  };
+}
+
 @Injectable()
 export class DocumentStateService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private async canonicalConsentEvents(tenantId: string) {
+    const rows = await this.prisma.$queryRaw<ConsentEventRow[]>`
+      SELECT "id", "subjectType", "subjectKey", "contactType", "contactValue", "documentId",
+             "documentVersion", "status", "acceptedAt", "revokedAt", "source", "occurredAt",
+             "migratedFromEventId", "createdAt"
+      FROM "ConsentEvent"
+      WHERE "tenantId" = ${tenantId}
+      ORDER BY "occurredAt" ASC, "createdAt" ASC, "id" ASC
+    `;
+    return rows.map(publicConsentEvent);
+  }
+
   private async snapshot(tenantId: string) {
     const state = await this.prisma.businessDocumentState.findUnique({ where: { tenantId } });
+    const data = normalize(state?.data || {});
+    if (state?.migrationVerifiedAt) data.consents = await this.canonicalConsentEvents(tenantId);
+    else data.consents = [];
     return {
       migrated: Boolean(state),
       verified: Boolean(state?.migrationVerifiedAt),
       migrationVerifiedAt: state?.migrationVerifiedAt || null,
-      data: normalize(state?.data || {}),
+      data,
     };
   }
 
   get(tenantId: string) {
     return this.snapshot(tenantId);
   }
+
+  async userDocumentBases() {
+    const rows = await this.prisma.$queryRaw<Array<{
+      key: string;
+      title: string;
+      version: number;
+      contentSnapshot: string;
+      publishedAt: Date;
+    }>>`
+      SELECT d."key", d."title", v."version", v."contentSnapshot", v."publishedAt"
+      FROM "LegalDocument" d
+      JOIN "LegalDocumentVersion" v
+        ON v."documentId" = d."id"
+       AND v."supersededAt" IS NULL
+      WHERE d."scope" = 'PLATFORM'
+        AND d."tenantId" IS NULL
+        AND d."key" IN (
+          'user-document-pdn-policy',
+          'user-document-pdn-consent',
+          'user-document-messages-consent'
+        )
+        AND d."isActive" = true
+      ORDER BY d."key" ASC
+    `;
+    const byKey = new Map(rows.map((row) => [row.key, row]));
+    return USER_DOCUMENT_BASE_KEYS
+      .map((item) => {
+        const row = byKey.get(item.key);
+        if (!row) return null;
+        return {
+          key: item.key,
+          documentId: item.documentId,
+          title: row.title,
+          version: Number(row.version || 1),
+          text: String(row.contentSnapshot || ''),
+          publishedAt: row.publishedAt,
+        };
+      })
+      .filter(Boolean);
+  }
+
 
   async migrate(tenantId: string, body: unknown) {
     const existing = await this.prisma.businessDocumentState.findUnique({ where: { tenantId } });
@@ -77,20 +175,28 @@ export class DocumentStateService {
       await this.prisma.businessDocumentState.create({
         data: { tenantId, data: json(normalize(body)), migrationVerifiedAt: new Date() },
       });
+    } else if (!existing.migrationVerifiedAt) {
+      await this.prisma.businessDocumentState.update({
+        where: { tenantId },
+        data: { migrationVerifiedAt: new Date() },
+      });
     }
     return this.snapshot(tenantId);
   }
 
   async updateDataset(tenantId: string, dataset: string, body: unknown) {
-    if (!DATASETS.has(dataset)) throw new BadRequestException('Неизвестный раздел документов');
+    if (dataset === 'consents') {
+      throw new BadRequestException('Согласия являются append-only событиями Documents и не заменяются набором');
+    }
+    if (!MUTABLE_DATASETS.has(dataset)) throw new BadRequestException('Неизвестный раздел документов');
     const state = await this.prisma.businessDocumentState.findUnique({ where: { tenantId } });
     if (!state?.migrationVerifiedAt) throw new ConflictException('Перенос документов ещё не подтверждён');
     const current = normalize(state.data);
     const source = objectValue(body);
     const value = source.value;
-    current[dataset as keyof typeof current] = Array.isArray(value) ? clone(value) : [];
+    current[dataset as 'documents' | 'history'] = Array.isArray(value) ? clone(value) : [];
     await this.prisma.businessDocumentState.update({ where: { tenantId }, data: { data: json(current) } });
-    return { dataset, value: current[dataset as keyof typeof current] };
+    return { dataset, value: current[dataset as 'documents' | 'history'] };
   }
 
   async publicDocuments(tenantId: string) {
@@ -98,40 +204,4 @@ export class DocumentStateService {
     if (!state?.migrationVerifiedAt) throw new ConflictException('Документы для онлайн-записи ещё не готовы');
     return normalize(state.data).documents;
   }
-
-  async recordAcceptedConsents(tenantId: string, clientId: string, facts: unknown) {
-    const id = String(clientId || '').trim();
-    if (!id) return [];
-    const state = await this.prisma.businessDocumentState.findUnique({ where: { tenantId } });
-    if (!state?.migrationVerifiedAt) throw new ConflictException('Документы для онлайн-записи ещё не готовы');
-    const current = normalize(state.data);
-    const accepted = (Array.isArray(facts) ? facts : []).filter((item: any) => Boolean(item?.accepted) && String(item?.documentId || '').trim());
-    if (!accepted.length) return current.consents;
-    const next = [...current.consents];
-    for (const fact of accepted as any[]) {
-      const documentId = String(fact.documentId || '').trim();
-      const documentVersion = Math.max(1, Number(fact.documentVersion || 1));
-      const exists = next.some((item: any) => String(item?.clientId || '') === id
-        && String(item?.documentId || '') === documentId
-        && Number(item?.documentVersion || 1) === documentVersion
-        && String(item?.status || 'accepted') === 'accepted');
-      if (exists) continue;
-      const now = new Date().toISOString();
-      next.push({
-        id: randomUUID(),
-        clientId: id,
-        documentId,
-        documentVersion,
-        status: 'accepted',
-        acceptedAt: String(fact.acceptedAt || now),
-        revokedAt: '',
-        source: 'online-booking-account',
-        createdAt: now,
-      });
-    }
-    current.consents = next;
-    await this.prisma.businessDocumentState.update({ where: { tenantId }, data: { data: json(current) } });
-    return next;
-  }
-
 }
