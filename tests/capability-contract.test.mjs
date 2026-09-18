@@ -6,6 +6,7 @@ const serverCatalog = readFileSync(new URL('../server/src/master-invitation/mast
 const accessRuntime = readFileSync(new URL('../core/access-runtime.js', import.meta.url), 'utf8');
 const accessClient = readFileSync(new URL('../core/access.js', import.meta.url), 'utf8');
 const accessController = readFileSync(new URL('../server/src/saas-access/saas-access.controller.ts', import.meta.url), 'utf8');
+const accessService = readFileSync(new URL('../server/src/saas-access/saas-access.service.ts', import.meta.url), 'utf8');
 const adminService = readFileSync(new URL('../server/src/saas-admin/saas-admin.service.ts', import.meta.url), 'utf8');
 const prismaSchema = readFileSync(new URL('../server/prisma/schema.prisma', import.meta.url), 'utf8');
 const bootstrap = readFileSync(new URL('../core/bootstrap.js', import.meta.url), 'utf8');
@@ -50,6 +51,11 @@ assert.match(prismaSchema, /summaryAcknowledgedAt\s+DateTime\?/);
 assert.match(prismaSchema, /detailAcknowledgedAt\s+DateTime\?/);
 assert.match(prismaSchema, /cancelledAt\s+DateTime\?/);
 assert.match(accessController, /@Get\('changes'\)/);
+const capabilityResolveBlock = accessService.slice(accessService.indexOf('async resolveCapability'), accessService.indexOf('async resolveTenantAccess'));
+assert.ok(
+  capabilityResolveBlock.indexOf('access.isOwnerBook') < capabilityResolveBlock.indexOf('TenantAccessStatus.SUSPENDED'),
+  'platform owner capability access must win before suspended, plan and override logic',
+);
 assert.match(accessController, /ack-summary/);
 assert.match(accessController, /ack-detail/);
 assert.match(adminService, /capabilityAccessEvent\.create/);
