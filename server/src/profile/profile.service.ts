@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { UserInvitationStatus, Prisma, Workplace as WorkplaceRow } from '@prisma/client';
+import { MasterInvitationStatus, Prisma, Workplace as WorkplaceRow } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 
 type ProfileInput = {
@@ -233,11 +233,11 @@ export class ProfileService {
     });
     if (!user) return;
 
-    const acceptedInvitation = await this.prisma.userInvitation.findFirst({
+    const acceptedInvitation = await this.prisma.masterInvitation.findFirst({
       where: {
         tenantId,
         email: user.email,
-        status: UserInvitationStatus.ACCEPTED,
+        status: MasterInvitationStatus.ACCEPTED,
       },
       select: { id: true },
     });
@@ -310,6 +310,11 @@ export class ProfileService {
           ...profileData(empty, []),
           migrationVerifiedAt: new Date(),
         },
+      });
+    } else if (!existing.migrationVerifiedAt) {
+      await this.prisma.profile.update({
+        where: { tenantId_userId: { tenantId, userId } },
+        data: { migrationVerifiedAt: new Date() },
       });
     }
     return this.bundle(tenantId, userId);

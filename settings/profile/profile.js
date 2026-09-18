@@ -1,5 +1,5 @@
 import { accordion, actionBlock, button, collectRepeatedField, entityCard, escapeHtml, field, folderList, initAccordions, initPhotoField, initRepeatedFields, modal, mountModal, page, photoField, repeatedField, select, textareaField, workplaceAddButton, workplaceCountText } from '../../ui/ui.js';
-import { getLimit } from '../../core/access.js';
+import { getBookLimit } from '../../core/access.js';
 import { addCustomProfession, getCustomProfessions, getProfile, saveProfile as saveProfileData } from './data.js';
 import { getWorkplaces } from './workplaces/data.js';
 import { initWorkplaceListDeletion, openWorkplaceModal, renderWorkplace, workplaceList } from './workplaces/workplaces.js';
@@ -29,6 +29,18 @@ function profileCard(p){
     metricsLayout:'end',
     className:'entity-card--hero entity-card--top-light'
   });
+}
+
+let demoProfileGuideShown = false;
+
+function maybeShowDemoProfileGuide(options={}) {
+  if (!options.demoGuide || demoProfileGuideShown) return;
+  const profile=getProfile();
+  const phones=Array.isArray(profile.phones)?profile.phones:[];
+  if(profile.name&&phones.length&&profile.profession&&profile.profession!=='Другая'&&getWorkplaces().length)return;
+  demoProfileGuideShown=true;
+  const m=mountModal(document.body,modal(`<div class="modal-title"><h2>Заполните профиль</h2><p>Book использует данные профиля для вашего рабочего пространства и автоматически формирует документы для клиентов только после того, как профиль готов.</p></div><div class="demo-help-note"><strong>Что заполнить</strong><p>Имя и контакт · профессию · хотя бы одно рабочее место. После сохранения Book сам подготовит документы — отдельного юридического экрана не будет.</p></div>${actionBlock(button('Понятно',{data:'data-profile-guide-done'}))}`,{variant:'medium',surface:'app'}));
+  m?.querySelector('[data-profile-guide-done]')?.addEventListener('click',()=>m.remove());
 }
 
 function showProfileError(message){
@@ -110,7 +122,7 @@ export async function saveOnboardingProfile(root){
   }
 }
 
-function renderProfile(root,navigateBack,options={}){
+function renderProfile(root,navigateBack,options={}){queueMicrotask(()=>maybeShowDemoProfileGuide(options));
   const p=getProfile(),profession=p.profession||'';
   const emails=p.emails?.length?p.emails:(options.accountEmail?[options.accountEmail]:[]);
   const items=[
@@ -136,7 +148,7 @@ function renderProfile(root,navigateBack,options={}){
     if(options.onboarding){
       try{await persistDraft(root)}catch(error){showProfileError(error instanceof Error?error.message:'Не удалось сохранить профиль');return}
     }
-    const workplaceLimit=getLimit('workplaces.max');
+    const workplaceLimit=getBookLimit('workplaces.max');
     if(workplaceLimit!==null&&getWorkplaces().length>=workplaceLimit){
       openWorkplaceLimitModal(root,workplaceLimit);
       return;

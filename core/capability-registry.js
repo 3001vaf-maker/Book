@@ -1,10 +1,10 @@
 const CAPABILITIES = [
   {
-    key: 'profile.access', title: 'Профиль', description: 'Данные пользователя и рабочего профиля.', placement: 'settings', owner: 'settings/settings.js',
-    entrySelector: '[data-settings-open="profile"]', introTitle: 'Профиль открыт', introBody: 'Теперь доступен раздел профиля. Здесь настраиваются данные пользователя и его рабочего профиля.', introAction: 'Открыть профиль',
+    key: 'profile.access', title: 'Профиль', description: 'Данные мастера и основная информация Book.', placement: 'settings', owner: 'settings/settings.js',
+    entrySelector: '[data-settings-open="profile"]', introTitle: 'Профиль открыт', introBody: 'Теперь доступен раздел профиля. Здесь настраиваются данные мастера и его Book.', introAction: 'Открыть профиль',
   },
   {
-    key: 'services.access', title: 'Услуги', description: 'Настройка услуг и процедур.', placement: 'settings', owner: 'settings/settings.js',
+    key: 'services.access', title: 'Услуги', description: 'Настройка услуг и процедур мастера.', placement: 'settings', owner: 'settings/settings.js',
     entrySelector: '[data-settings-open="service"]', introTitle: 'Услуги открыты', introBody: 'Теперь доступен раздел услуг. Здесь можно настроить услуги и процедуры.', introAction: 'Открыть услуги',
   },
   {
@@ -21,7 +21,7 @@ const CAPABILITIES = [
     entrySelector: '[data-nav="journal"]', introTitle: 'Журнал открыт', introBody: 'Теперь можно вести записи, рабочий день и историю работы.', introAction: 'Открыть журнал',
   },
   {
-    key: 'online_booking.access', title: 'Онлайн-запись', description: 'Доступна публичная онлайн-запись.', placement: 'settings', owner: 'settings/settings.js',
+    key: 'online_booking.access', title: 'Онлайн-запись', description: 'Клиенты смогут записываться к мастеру онлайн.', placement: 'settings', owner: 'settings/settings.js',
     entrySelector: '[data-settings-open="online-booking"]', introTitle: 'Онлайн-запись открыта', introBody: 'Теперь доступна онлайн-запись и ссылка для записи клиентов.', introAction: 'Настроить онлайн-запись',
   },
   {
@@ -41,8 +41,8 @@ const CAPABILITIES = [
     entrySelector: '[data-settings-open="communications"]', introTitle: 'Уведомления открыты', introBody: 'Теперь можно настраивать уведомления и сообщения.', introAction: 'Открыть уведомления',
   },
   {
-    key: 'integrations.access', title: 'Интеграции', description: 'Подключение внешних сервисов.', placement: 'settings', owner: 'settings/settings.js',
-    entrySelector: '[data-settings-open="integrations"]', introTitle: 'Интеграции открыты', introBody: 'Теперь доступно подключение внешних сервисов.', introAction: 'Открыть интеграции',
+    key: 'integrations.access', title: 'Интеграции', description: 'Подключение внешних сервисов Book.', placement: 'settings', owner: 'settings/settings.js',
+    entrySelector: '[data-settings-open="integrations"]', introTitle: 'Интеграции открыты', introBody: 'Теперь доступно подключение внешних сервисов Book.', introAction: 'Открыть интеграции',
   },
   {
     key: 'documents.access', title: 'Документы', description: 'Документы, согласия и история документов.', placement: 'settings', owner: 'settings/settings.js',
@@ -54,10 +54,10 @@ const CAPABILITIES = [
   },
 ];
 
-export const CAPABILITY_REGISTRY = Object.freeze(Object.fromEntries(CAPABILITIES.map((item) => [item.key, Object.freeze({ ...item })])));
+export const BOOK_CAPABILITIES = Object.freeze(Object.fromEntries(CAPABILITIES.map((item) => [item.key, Object.freeze({ ...item })])));
 
 export function getCapabilityMeta(key) {
-  return CAPABILITY_REGISTRY[String(key || '').trim()] || null;
+  return BOOK_CAPABILITIES[String(key || '').trim()] || null;
 }
 
 export function getCapabilityTitle(key) {

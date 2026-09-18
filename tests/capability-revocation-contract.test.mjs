@@ -7,7 +7,7 @@ const admin = readFileSync(new URL('../server/src/saas-admin/saas-admin.service.
 
 assert.match(admin, /CapabilityAccessChangeType\.DISABLED/);
 assert.match(runtime, /Больше недоступны/);
-assert.match(core, /workspace:access-updated/);
+assert.match(core, /book:access-updated/);
 assert.match(core, /renderWorkspace\(\)/);
 assert.doesNotMatch(runtime, /location\.reload/);
 

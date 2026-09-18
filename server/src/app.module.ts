@@ -11,9 +11,10 @@ import { AuxiliaryStateModule } from './auxiliary-state/auxiliary-state.module';
 import { NotificationModule } from './notification/notification.module';
 import { CommunicationModule } from './communication/communication.module';
 import { SaasAccessModule } from './saas-access/saas-access.module';
-import { UserInvitationModule } from './user-invitation/user-invitation.module';
+import { MasterInvitationModule } from './master-invitation/master-invitation.module';
 import { SaasAdminModule } from './saas-admin/saas-admin.module';
 import { ManualInvitationModule } from './manual-invitation/manual-invitation.module';
+import { LegalRuntimeModule } from './legal-runtime/legal-runtime.module';
 
 @Module({
   imports: [
@@ -27,7 +28,8 @@ import { ManualInvitationModule } from './manual-invitation/manual-invitation.mo
     CommunicationModule,
     OnlineBookingModule,
     SaasAccessModule,
-    UserInvitationModule,
+    LegalRuntimeModule,
+    MasterInvitationModule,
     ManualInvitationModule,
     SaasAdminModule,
   ],
