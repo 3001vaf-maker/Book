@@ -128,6 +128,10 @@ assert.equal(tenantChecklist.includes('dpaAccepted'), false, 'legacy tenant chec
 const legacyTenantDocs = Number(sql(`SELECT COUNT(*) FROM "LegalDocument" WHERE "scope"='TENANT' AND "tenantId"=${sqlLiteral(tenantId)};`) || 0);
 assert.equal(legacyTenantDocs, 0, 'new master path must not create legacy TENANT legal documents');
 
+const accessAfterRegistration = await request('/saas-access/me', { token });
+assert.equal(accessAfterRegistration.status, 'ACTIVE');
+assert.equal(accessAfterRegistration.isOwnerBook, false);
+
 const readiness = await request('/legal/readiness', { token });
 assert.equal(readiness.state?.operationMode, 'DEMO');
 assert.equal(readiness.state?.filingStatus, 'NOT_PREPARED');
@@ -166,6 +170,13 @@ assert.equal(healedProfile.profile?.name, 'Unified', 'profile self-heal must pre
 assert.equal(healedProfile.profile?.surname, 'Master');
 assert.equal(healedProfile.profile?.phone, phone);
 
+// Mirror the exact authenticated startup sequence used by core.js after registration.
+const startupAccess = await request('/saas-access/me', { token });
+assert.equal(startupAccess.status, 'ACTIVE');
+const startupLegal = await request('/legal/readiness', { token });
+assert.equal(startupLegal.state?.operationMode, 'DEMO');
+assert.equal((await request('/profile', { token })).verified, true);
+
 await request('/business-state/bootstrap', { token, method: 'POST', body: {} });
 sql(`
   UPDATE "BusinessStateMeta" SET "migrationVerifiedAt"=NULL WHERE "tenantId"=${sqlLiteral(tenantId)};
@@ -190,6 +201,8 @@ sql(`
 `);
 const healedOperational = await request('/business-state/operational/bootstrap', { token, method: 'POST', body: {} });
 assert.equal(healedOperational.verified, true);
+assert.equal((await request('/business-state', { token })).verified, true);
+assert.equal((await request('/business-state/operational', { token })).verified, true);
 assert.equal(
   sql(`SELECT "data"->'days'->0->>'key' FROM "BusinessOperationalState" WHERE "tenantId"=${sqlLiteral(tenantId)};`),
   'self-heal-day',
@@ -210,6 +223,7 @@ sql(`
 `);
 const healedAuxiliary = await request('/auxiliary-state/bootstrap', { token, method: 'POST', body: {} });
 assert.equal(healedAuxiliary.verified, true);
+assert.equal((await request('/auxiliary-state', { token })).verified, true);
 assert.equal(
   sql(`SELECT "data"->'tags'->0->>'key' FROM "BusinessAuxiliaryState" WHERE "tenantId"=${sqlLiteral(tenantId)};`),
   'self-heal-tag',
