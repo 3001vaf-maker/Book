@@ -265,10 +265,6 @@ export class MasterInvitationService {
       name: invitation.name,
       expiresAt: invitation.expiresAt,
       tenant: { id: invitation.tenant.id, name: invitation.tenant.name },
-      legal: {
-        required: legalDocuments.filter((item) => item.requiredForRegistration).map((item) => ({ key: item.key, version: item.version })),
-        marketingOptional: true,
-      },
     };
   }
 
@@ -290,7 +286,6 @@ export class MasterInvitationService {
     const existingUser = await this.prisma.user.findUnique({ where: { email: invitation.email } });
     if (existingUser) throw new ConflictException('Пользователь с таким email уже зарегистрирован');
 
-    const legalDocuments = await this.registrationDocuments();
     const passwordHash = await hashPassword(password, 12);
     const fullName = `${name} ${surname}`.trim();
     const result = await this.prisma.$transaction(async (tx) => {
@@ -361,6 +356,31 @@ export class MasterInvitationService {
       tenant: { id: invitation.tenant.id, name: fullName },
       role: result.membership.role,
     };
+  }
+
+  async publishedPlatformDocuments() {
+    return this.prisma.$queryRaw<Array<{
+      key: string;
+      type: string;
+      title: string;
+      requiredForRegistration: boolean;
+      version: number;
+      content: string;
+      contentHash: string;
+      operatorIdentity: unknown;
+      publishedAt: Date;
+    }>>`
+      SELECT d."key", d."type", d."title", d."requiredForRegistration",
+             v."version", v."contentSnapshot" AS "content", v."contentHash",
+             v."operatorIdentitySnapshot" AS "operatorIdentity", v."publishedAt"
+      FROM "LegalDocument" d
+      JOIN "LegalDocumentVersion" v
+        ON v."documentId" = d."id" AND v."supersededAt" IS NULL
+      WHERE d."scope" = 'PLATFORM'
+        AND d."tenantId" IS NULL
+        AND d."isActive" = true
+      ORDER BY d."createdAt" ASC, d."key" ASC
+    `;
   }
 
   async listInvitations(adminId: string) {
