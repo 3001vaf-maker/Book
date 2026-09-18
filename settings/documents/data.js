@@ -74,6 +74,7 @@ function normalize(item = {}) {
     availableBasePublishedAt: String(item.availableBasePublishedAt || ''),
     availableBookText: String(item.availableBookText || ''),
     profileUpdateAvailable: Boolean(item.profileUpdateAvailable),
+    dismissedBaseVersion: Math.max(0, Number(item.dismissedBaseVersion || 0)),
   };
 }
 
@@ -83,19 +84,13 @@ function missingValue() {
 
 function bookContextValues() {
   const profile = bookContextState.profile || {};
-  const workplaces = Array.isArray(bookContextState.workplaces) ? bookContextState.workplaces : [];
   const fullName = [profile.name, profile.surname].map((value) => String(value || '').trim()).filter(Boolean).join(' ');
   const emails = Array.isArray(profile.emails) ? profile.emails : [];
   const phones = Array.isArray(profile.phones) ? profile.phones : [];
   const contact = String(emails[0] || phones[0] || profile.email || profile.phone || '').trim();
-  const workplace = workplaces.find((item) => String(item?.address || '').trim())
-    || workplaces.find((item) => String(item?.city || '').trim())
-    || null;
-  const place = String(workplace?.address || workplace?.city || '').trim();
   return {
     '[ФИО пользователя]': fullName || missingValue(),
     '[Контакт пользователя]': contact || missingValue(),
-    '[Место деятельности]': place || missingValue(),
   };
 }
 
@@ -227,14 +222,14 @@ export function reconcileBookDocuments(items = [], history = []) {
     });
 
     if (item.sourceMode === 'BOOK') {
-      item.availableBaseVersion = base.version > Number(item.baseVersion || 0) ? base.version : 0;
+      item.availableBaseVersion = base.version > Math.max(Number(item.baseVersion || 0), Number(item.dismissedBaseVersion || 0)) ? base.version : 0;
       item.availableBasePublishedAt = item.availableBaseVersion ? base.publishedAt : '';
       item.availableBookText = (item.availableBaseVersion || rendered !== item.text) ? rendered : '';
       item.profileUpdateAvailable = !item.availableBaseVersion && rendered !== item.text;
     } else {
-      item.availableBaseVersion = base.version;
-      item.availableBasePublishedAt = base.publishedAt;
-      item.availableBookText = rendered;
+      item.availableBaseVersion = base.version > Number(item.dismissedBaseVersion || 0) ? base.version : 0;
+      item.availableBasePublishedAt = item.availableBaseVersion ? base.publishedAt : '';
+      item.availableBookText = item.availableBaseVersion ? rendered : '';
       item.profileUpdateAvailable = false;
     }
     current[index] = normalize(item);
@@ -345,7 +340,27 @@ export function useBookBase(documentId) {
     availableBasePublishedAt: '',
     availableBookText: '',
     profileUpdateAvailable: false,
+    dismissedBaseVersion: 0,
   });
+}
+
+export function dismissBookBase(documentId) {
+  const current = getDocuments().find((item) => item.id === documentId);
+  const base = baseForDocument(documentId);
+  if (!current || !base) return null;
+  const next = normalize({
+    ...current,
+    dismissedBaseVersion: base.version,
+    availableBaseVersion: 0,
+    availableBasePublishedAt: '',
+    availableBookText: '',
+    profileUpdateAvailable: false,
+  });
+  const items = getDocuments();
+  const index = items.findIndex((item) => item.id === documentId);
+  if (index >= 0) items[index] = next;
+  saveDocuments(items);
+  return next;
 }
 
 export function saveCustomDocument(document, { title, text } = {}) {
