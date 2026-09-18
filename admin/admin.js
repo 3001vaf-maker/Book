@@ -1,4 +1,5 @@
 import { apiRequest, clearAuthToken, getCurrentUser, login } from '../core/auth.js';
+import { renderAdminDocuments } from './documents/view.js';
 
 const app = document.querySelector('#admin-app');
 const state = {
@@ -78,6 +79,7 @@ function renderShell() {
         <nav class="admin-nav">
           <button data-section="overview">Обзор</button>
           <button data-section="owner" class="owner-link">Мой Book</button>
+          <button data-section="documents">Документы</button>
           <button data-section="masters">Мастера</button>
           <button data-section="capabilities">Возможности</button>
         </nav>
@@ -115,6 +117,9 @@ function setActiveSection(title) {
 function renderCurrentSection() {
   if (state.section === 'overview') return renderOverview();
   if (state.section === 'owner') return renderOwnerBook();
+  if (state.section === 'documents') {
+    return renderAdminDocuments(app.querySelector('[data-content]'), { escapeHtml, setTitle: setActiveSection });
+  }
   if (state.section === 'capabilities') return renderCapabilities();
   return renderMasters();
 }
