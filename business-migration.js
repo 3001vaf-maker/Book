@@ -49,14 +49,9 @@ export async function initializeBusinessState() {
     return { source: 'server', verified: true };
   }
 
-  if (!remote?.migrated) {
-    const bootstrapResponse = await apiRequest('/business-state/bootstrap', { method: 'POST' });
-    const bootstrapped = await responseJson(bootstrapResponse, 'Не удалось создать пустое серверное хранилище Клиентов, UEI и Записей');
-    if (!bootstrapped?.verified) throw new Error('Пустое серверное хранилище Клиентов, UEI и Записей не подтверждено');
-    hydrate(bootstrapped, true);
-    return { source: 'server-bootstrap', verified: true };
-  }
-
-  hydrate(remote, false);
-  return { source: 'server-unverified', verified: false };
+  const bootstrapResponse = await apiRequest('/business-state/bootstrap', { method: 'POST' });
+  const bootstrapped = await responseJson(bootstrapResponse, 'Не удалось подтвердить серверное хранилище Клиентов, UEI и Записей');
+  if (!bootstrapped?.verified) throw new Error('Серверное хранилище Клиентов, UEI и Записей не подтверждено');
+  hydrate(bootstrapped, true);
+  return { source: remote?.migrated ? 'server-reverified' : 'server-bootstrap', verified: true };
 }

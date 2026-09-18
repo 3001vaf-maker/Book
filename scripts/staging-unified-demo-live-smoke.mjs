@@ -111,10 +111,26 @@ assert.ok(account.accessToken);
 assert.equal(account.legal?.operationMode, 'DEMO');
 const token = account.accessToken;
 
+const adminMasters = await request('/saas-admin/masters', { token: ownerToken });
+const registeredMaster = (adminMasters || []).find((item) => item.tenantId === tenantId);
+assert.ok(registeredMaster?.master, 'registered master must be visible in Admin');
+const acceptanceByKey = new Map((registeredMaster.legalAcceptances || []).map((item) => [item.documentKey, item]));
+for (const key of ['privacy-policy', 'saas-agreement', 'dpa', 'master-pd-consent']) {
+  const event = acceptanceByKey.get(key);
+  assert.ok(event, `Admin must show acceptance for ${key}`);
+  assert.ok(Number(event.documentVersion) >= 1, `Admin acceptance must include document version for ${key}`);
+  assert.ok(event.occurredAt, `Admin acceptance must include timestamp for ${key}`);
+}
+assert.equal(acceptanceByKey.has('marketing-consent'), false, 'declined optional marketing consent must not appear as accepted');
+
 const tenantChecklist = sql(`SELECT COALESCE("checklist"::text,'{}') FROM "TenantLegalState" WHERE "tenantId"=${sqlLiteral(tenantId)};`);
 assert.equal(tenantChecklist.includes('dpaAccepted'), false, 'legacy tenant checklist must not be recreated');
 const legacyTenantDocs = Number(sql(`SELECT COUNT(*) FROM "LegalDocument" WHERE "scope"='TENANT' AND "tenantId"=${sqlLiteral(tenantId)};`) || 0);
 assert.equal(legacyTenantDocs, 0, 'new master path must not create legacy TENANT legal documents');
+
+const accessAfterRegistration = await request('/saas-access/me', { token });
+assert.equal(accessAfterRegistration.status, 'ACTIVE');
+assert.equal(accessAfterRegistration.isOwnerBook, false);
 
 const readiness = await request('/legal/readiness', { token });
 assert.equal(readiness.state?.operationMode, 'DEMO');
@@ -141,6 +157,84 @@ assert.deepEqual(registeredProfile.profile?.emails || [], [email]);
 assert.equal(registeredProfile.profile?.profession || '', '', 'profession must still be completed inside DEMO');
 assert.deepEqual(registeredProfile.workplaces || [], [], 'workplace must still be completed inside DEMO');
 
+// Reproduce the production failure mode: server rows exist, but old migration verification is missing.
+// Bootstrap must now self-heal these rows without replacing their server-owned data.
+sql(`UPDATE "Profile" SET "migrationVerifiedAt"=NULL WHERE "tenantId"=${sqlLiteral(tenantId)} AND "userId"=${sqlLiteral(account.user.id)};`);
+const healedProfile = await request('/profile/bootstrap', {
+  token,
+  method: 'POST',
+  body: { timeZone: 'Europe/Moscow' },
+});
+assert.equal(healedProfile.verified, true);
+assert.equal(healedProfile.profile?.name, 'Unified', 'profile self-heal must preserve registration data');
+assert.equal(healedProfile.profile?.surname, 'Master');
+assert.equal(healedProfile.profile?.phone, phone);
+
+// Mirror the exact authenticated startup sequence used by core.js after registration.
+const startupAccess = await request('/saas-access/me', { token });
+assert.equal(startupAccess.status, 'ACTIVE');
+const startupLegal = await request('/legal/readiness', { token });
+assert.equal(startupLegal.state?.operationMode, 'DEMO');
+assert.equal((await request('/profile', { token })).verified, true);
+
+await request('/business-state/bootstrap', { token, method: 'POST', body: {} });
+sql(`
+  UPDATE "BusinessStateMeta" SET "migrationVerifiedAt"=NULL WHERE "tenantId"=${sqlLiteral(tenantId)};
+  UPDATE "BusinessIdentityState"
+  SET "data"='{"entities":{"self-heal-marker":{"kind":"KEEP"}},"relations":{},"revoked":[]}'::jsonb
+  WHERE "tenantId"=${sqlLiteral(tenantId)};
+`);
+const healedBusiness = await request('/business-state/bootstrap', { token, method: 'POST', body: {} });
+assert.equal(healedBusiness.verified, true);
+assert.equal(
+  sql(`SELECT "data"->'entities'->'self-heal-marker'->>'kind' FROM "BusinessIdentityState" WHERE "tenantId"=${sqlLiteral(tenantId)};`),
+  'KEEP',
+  'business self-heal must preserve server data',
+);
+
+await request('/business-state/operational/bootstrap', { token, method: 'POST', body: {} });
+sql(`
+  UPDATE "BusinessOperationalState"
+  SET "migrationVerifiedAt"=NULL,
+      "data"='{"days":[{"key":"self-heal-day"}],"breaks":[],"procedures":[],"procedureHistory":[],"bookingSettings":null}'::jsonb
+  WHERE "tenantId"=${sqlLiteral(tenantId)};
+`);
+const healedOperational = await request('/business-state/operational/bootstrap', { token, method: 'POST', body: {} });
+assert.equal(healedOperational.verified, true);
+assert.equal((await request('/business-state', { token })).verified, true);
+assert.equal((await request('/business-state/operational', { token })).verified, true);
+assert.equal(
+  sql(`SELECT "data"->'days'->0->>'key' FROM "BusinessOperationalState" WHERE "tenantId"=${sqlLiteral(tenantId)};`),
+  'self-heal-day',
+  'operational self-heal must preserve server data',
+);
+sql(`
+  UPDATE "BusinessOperationalState"
+  SET "data"='{"days":[],"breaks":[],"procedures":[],"procedureHistory":[],"bookingSettings":null}'::jsonb
+  WHERE "tenantId"=${sqlLiteral(tenantId)};
+`);
+
+await request('/auxiliary-state/bootstrap', { token, method: 'POST', body: {} });
+sql(`
+  UPDATE "BusinessAuxiliaryState"
+  SET "migrationVerifiedAt"=NULL,
+      "data"='{"finance":null,"wallets":[],"tags":[{"key":"self-heal-tag"}],"products":[],"productHistory":[]}'::jsonb
+  WHERE "tenantId"=${sqlLiteral(tenantId)};
+`);
+const healedAuxiliary = await request('/auxiliary-state/bootstrap', { token, method: 'POST', body: {} });
+assert.equal(healedAuxiliary.verified, true);
+assert.equal((await request('/auxiliary-state', { token })).verified, true);
+assert.equal(
+  sql(`SELECT "data"->'tags'->0->>'key' FROM "BusinessAuxiliaryState" WHERE "tenantId"=${sqlLiteral(tenantId)};`),
+  'self-heal-tag',
+  'auxiliary self-heal must preserve server data',
+);
+sql(`
+  UPDATE "BusinessAuxiliaryState"
+  SET "data"='{"finance":null,"wallets":[],"tags":[],"products":[],"productHistory":[]}'::jsonb
+  WHERE "tenantId"=${sqlLiteral(tenantId)};
+`);
+
 const emptyDocumentState = await request('/document-state', { token });
 if (!emptyDocumentState.migrated) {
   await request('/document-state/bootstrap', {
@@ -149,6 +243,28 @@ if (!emptyDocumentState.migrated) {
     body: { documents: [], consents: [], history: [] },
   });
 }
+sql(`
+  UPDATE "BusinessDocumentState"
+  SET "migrationVerifiedAt"=NULL,
+      "data"='{"documents":[],"consents":[],"history":[{"id":"self-heal-document-history"}]}'::jsonb
+  WHERE "tenantId"=${sqlLiteral(tenantId)};
+`);
+const healedDocuments = await request('/document-state/bootstrap', {
+  token,
+  method: 'POST',
+  body: { documents: [], consents: [], history: [] },
+});
+assert.equal(healedDocuments.verified, true);
+assert.equal(
+  sql(`SELECT "data"->'history'->0->>'id' FROM "BusinessDocumentState" WHERE "tenantId"=${sqlLiteral(tenantId)};`),
+  'self-heal-document-history',
+  'document self-heal must preserve server data',
+);
+sql(`
+  UPDATE "BusinessDocumentState"
+  SET "data"='{"documents":[],"consents":[],"history":[]}'::jsonb
+  WHERE "tenantId"=${sqlLiteral(tenantId)};
+`);
 let documentsState = await request('/document-state', { token });
 assert.equal(documentsState.verified, true);
 assert.deepEqual(documentsState.data?.documents || [], [], 'no master documents before completed profile');

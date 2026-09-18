@@ -231,6 +231,14 @@ export class BusinessStateService {
         await tx.businessStateMeta.create({ data: { tenantId, migrationVerifiedAt: new Date() } });
         await tx.businessIdentityState.create({ data: { tenantId, data: json(normalizeUEI({})) } });
       });
+    } else if (!existing.migrationVerifiedAt) {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.businessStateMeta.update({ where: { tenantId }, data: { migrationVerifiedAt: new Date() } });
+        const identity = await tx.businessIdentityState.findUnique({ where: { tenantId } });
+        if (!identity) {
+          await tx.businessIdentityState.create({ data: { tenantId, data: json(normalizeUEI({})) } });
+        }
+      });
     }
     return this.bundle(tenantId);
   }
@@ -364,6 +372,11 @@ export class BusinessStateService {
     if (!existing) {
       await this.prisma.businessOperationalState.create({
         data: { tenantId, data: json(normalizeOperational({})), migrationVerifiedAt: new Date() },
+      });
+    } else if (!existing.migrationVerifiedAt) {
+      await this.prisma.businessOperationalState.update({
+        where: { tenantId },
+        data: { migrationVerifiedAt: new Date() },
       });
     }
     return this.operationalBundle(tenantId);

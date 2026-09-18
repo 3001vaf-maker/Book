@@ -46,14 +46,9 @@ export async function initializeProfileWorkplaces() {
     return { source: 'server', verified: true };
   }
 
-  if (!remote?.migrated) {
-    const bootstrapResponse = await bootstrapProfile();
-    const bootstrapped = await responseJson(bootstrapResponse, 'Не удалось создать пустой серверный профиль');
-    if (!bootstrapped?.verified) throw new Error('Пустой серверный профиль не подтверждён');
-    hydrate(bootstrapped, true);
-    return { source: 'server-bootstrap', verified: true };
-  }
-
-  hydrate(remote, false);
-  return { source: 'server-unverified', verified: false };
+  const bootstrapResponse = await bootstrapProfile();
+  const bootstrapped = await responseJson(bootstrapResponse, 'Не удалось подтвердить серверный профиль');
+  if (!bootstrapped?.verified) throw new Error('Серверный профиль не подтверждён');
+  hydrate(bootstrapped, true);
+  return { source: remote?.migrated ? 'server-reverified' : 'server-bootstrap', verified: true };
 }

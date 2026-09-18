@@ -83,17 +83,13 @@ export async function initializeDocumentState() {
     return { source: 'server', verified: true };
   }
 
-  if (!remote?.migrated) {
-    const defaults = normalizeBundle({ documents: buildBookDocuments(), consents: [], history: [] });
-    const bootstrapResponse = await apiRequest('/document-state/bootstrap', {
-      method: 'POST',
-      body: JSON.stringify(defaults),
-    });
-    const bootstrapped = await responseJson(bootstrapResponse, 'Не удалось создать серверное хранилище документов');
-    if (!bootstrapped?.verified) throw new Error('Серверное хранилище документов не подтверждено');
-    hydrate(bootstrapped);
-    return { source: 'server-bootstrap', verified: true };
-  }
-
-  return { source: 'server-unverified', verified: false };
+  const defaults = normalizeBundle({ documents: buildBookDocuments(), consents: [], history: [] });
+  const bootstrapResponse = await apiRequest('/document-state/bootstrap', {
+    method: 'POST',
+    body: JSON.stringify(defaults),
+  });
+  const bootstrapped = await responseJson(bootstrapResponse, 'Не удалось подтвердить серверное хранилище документов');
+  if (!bootstrapped?.verified) throw new Error('Серверное хранилище документов не подтверждено');
+  hydrate(bootstrapped);
+  return { source: remote?.migrated ? 'server-reverified' : 'server-bootstrap', verified: true };
 }

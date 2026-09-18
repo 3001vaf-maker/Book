@@ -46,13 +46,9 @@ export async function initializeOperationalState() {
     return { source: 'server', verified: true };
   }
 
-  if (!remote?.migrated) {
-    const bootstrapResponse = await apiRequest('/business-state/operational/bootstrap', { method: 'POST' });
-    const bootstrapped = await responseJson(bootstrapResponse, 'Не удалось создать пустое серверное хранилище Графика и онлайн-записи');
-    if (!bootstrapped?.verified) throw new Error('Пустое серверное хранилище Графика и онлайн-записи не подтверждено');
-    hydrate(bootstrapped);
-    return { source: 'server-bootstrap', verified: true };
-  }
-
-  return { source: 'server-unverified', verified: false };
+  const bootstrapResponse = await apiRequest('/business-state/operational/bootstrap', { method: 'POST' });
+  const bootstrapped = await responseJson(bootstrapResponse, 'Не удалось подтвердить серверное хранилище Графика и онлайн-записи');
+  if (!bootstrapped?.verified) throw new Error('Серверное хранилище Графика и онлайн-записи не подтверждено');
+  hydrate(bootstrapped);
+  return { source: remote?.migrated ? 'server-reverified' : 'server-bootstrap', verified: true };
 }
