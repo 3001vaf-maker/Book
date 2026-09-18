@@ -248,7 +248,7 @@ async function main() {
         userId: owner.id,
         key: profileKey,
         name: 'Тестовый',
-        surname: 'Мастер',
+        surname: 'Пользователь',
         phone: '+79990000001',
         phones: json(['+79990000001']),
         telegrams: json([]),
