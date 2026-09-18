@@ -14,14 +14,23 @@ const dispatchService = readFileSync('server/src/communication/communication-dis
 const marketingConsentService = readFileSync('server/src/legal-runtime/marketing-consent.service.ts', 'utf8');
 const telegramBotService = readFileSync('server/src/communication/telegram-bot.service.ts', 'utf8');
 const bookingController = readFileSync('server/src/online-booking/online-booking.controller.ts', 'utf8');
+const manualInvitationService = readFileSync('server/src/manual-invitation/manual-invitation.service.ts', 'utf8');
+const masterInvitationService = readFileSync('server/src/master-invitation/master-invitation.service.ts', 'utf8');
 
 assert.match(registration, /Добро пожаловать в Book/);
 assert.match(registration, /Условия работы с Book/);
 assert.match(registration, /<h1>Регистрация<\/h1>/);
 assert.match(registration, /Документы ваших клиентов будут сформированы отдельно после настройки профиля в DEMO/);
-assert.match(registration, /Имя, телефон, профессию и рабочее место вы заполните следующим шагом уже внутри DEMO/);
+assert.match(registration, /После входа они уже будут в профиле/);
+assert.match(registration, /name="name"/);
+assert.match(registration, /name="surname"/);
+assert.match(registration, /name="phone"/);
 assert.match(registration, /name="email"/);
-assert.doesNotMatch(registration, /name="name"|name="surname"|name="phone"|collectIdentity|repair-profile/);
+assert.doesNotMatch(registration, /repair-profile/);
+assert.match(manualInvitationService, /tx\.profile\.create/);
+assert.match(masterInvitationService, /tx\.profile\.create/);
+assert.match(manualInvitationService, /profession: ''/);
+assert.match(masterInvitationService, /profession: ''/);
 
 assert.match(core, /data-demo-banner/);
 assert.match(core, /Я уже могу работать с персональными данными/);
