@@ -364,14 +364,18 @@ export function dismissBookBase(documentId) {
 }
 
 export function saveCustomDocument(document, { title, text } = {}) {
+  const base = baseForDocument(document?.id);
+  const offeredVersion = base && Number(base.version || 0) > Number(document?.dismissedBaseVersion || 0)
+    ? Number(base.version || 0)
+    : 0;
   return saveDocument({
     ...document,
     title: String(title || document?.title || 'Документ'),
     text: String(text ?? document?.text ?? ''),
     sourceMode: 'CUSTOM',
-    availableBaseVersion: baseForDocument(document?.id)?.version || 0,
-    availableBasePublishedAt: baseForDocument(document?.id)?.publishedAt || '',
-    availableBookText: baseForDocument(document?.id) ? renderBookBaseText(baseForDocument(document.id)) : '',
+    availableBaseVersion: offeredVersion,
+    availableBasePublishedAt: offeredVersion ? base?.publishedAt || '' : '',
+    availableBookText: offeredVersion && base ? renderBookBaseText(base) : '',
     profileUpdateAvailable: false,
   });
 }
