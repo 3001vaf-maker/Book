@@ -72,6 +72,33 @@ function acceptanceActionLabel(action) {
   return String(action || 'Зафиксировано');
 }
 
+function startupStateLabel(value) {
+  if (value === 'READY' || value === 'ACTIVE' || value === 'DEMO' || value === 'LIVE') return 'готово';
+  if (value === 'UNVERIFIED') return 'нужно подтвердить';
+  if (value === 'MISSING' || !value) return 'нет состояния';
+  return String(value).toLowerCase();
+}
+
+function masterStartupStateHtml(master) {
+  const state = master?.startupState || {};
+  const rows = [
+    ['Доступ', state.access],
+    ['Режим', state.legal],
+    ['Профиль', state.profile],
+    ['Клиенты и записи', state.business],
+    ['График и работа', state.operational],
+    ['Документы', state.documents],
+    ['Дополнительные данные', state.auxiliary],
+  ];
+  return `<div class="admin-document-list">${rows.map(([label, value]) => {
+    const ok = value === 'READY' || value === 'ACTIVE' || value === 'DEMO' || value === 'LIVE';
+    return `<div class="admin-document-row">
+      <div><strong>${escapeHtml(label)}</strong><small>${escapeHtml(String(value || 'MISSING'))}</small></div>
+      <span class="admin-pill ${ok ? 'active' : ''}">${escapeHtml(startupStateLabel(value))}</span>
+    </div>`;
+  }).join('')}</div>`;
+}
+
 function masterLegalAcceptanceHtml(master) {
   const items = Array.isArray(master?.legalAcceptances) ? master.legalAcceptances : [];
   if (!master?.master) {
@@ -659,6 +686,10 @@ function openAccessDrawer(tenantId) {
         <div><h3>${escapeHtml(master.isOwnerBook ? 'Мой Book' : (master.master?.name || master.invitation?.name || master.tenantName))}</h3><p>${escapeHtml(master.master?.email || master.invitation?.email || '')}</p></div>
         <button class="admin-close" data-close aria-label="Закрыть">×</button>
       </div>
+      <section class="admin-section">
+        <h4>Запуск Book</h4>
+        ${masterStartupStateHtml(master)}
+      </section>
       <section class="admin-section">
         <h4>Соглашения при регистрации</h4>
         ${masterLegalAcceptanceHtml(master)}
