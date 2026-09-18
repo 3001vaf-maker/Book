@@ -59,8 +59,12 @@ assert.equal(history[0].snapshot.text, 'Именно этот полный те�
 
 const server = readFileSync(new URL('../server/src/document-state/document-state.service.ts', import.meta.url), 'utf8');
 assert.match(server, /FROM "ConsentEvent"/);
-assert.match(server, /migratedLegacyIds/);
-assert.match(server, /!migratedLegacyIds\.has/);
+assert.match(server, /data\.consents = await this\.canonicalConsentEvents\(tenantId\)/);
+assert.doesNotMatch(server, /migratedLegacyIds/);
+
+const policy = readFileSync(new URL('../server/src/document-state/consent-policy.service.ts', import.meta.url), 'utf8');
+assert.match(policy, /ensureCanonicalConsentEvents/);
+assert.match(policy, /migratedFromEventId/);
 
 const ui = readFileSync(new URL('../settings/documents/documents.js', import.meta.url), 'utf8');
 assert.match(ui, /signedDocumentSnapshot/);
