@@ -266,7 +266,7 @@ function renderMasters() {
   const masters = state.masters.filter((item) => !item.isOwnerBook);
   const legalReady = state.platformLegal?.state?.status === 'LEGAL_READY';
   content.innerHTML = `
-    <div class="admin-heading"><div><h2>Пользователи</h2><p>Каждый мастер работает только в своём персональном Book.</p></div></div>
+    <div class="admin-heading"><div><h2>Пользователи</h2><p>Каждый пользователь получает свой Book и доступные ему возможности.</p></div></div>
     ${legalReady ? '' : '<div class="admin-card" style="padding:16px;margin-bottom:14px"><strong>Регистрация пользователей закрыта.</strong><p style="margin:6px 0 0;color:#817a74">Сначала завершите раздел «Документы».</p></div>'}
     <section class="admin-invite-panel">
       <div class="admin-invite-head">
