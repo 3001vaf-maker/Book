@@ -1,7 +1,7 @@
 import { BadRequestException, Body, Controller, Get, Param, Put, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { CommunicationService } from '../communication/communication.service';
-import { MarketingConsentService } from '../legal-runtime/marketing-consent.service';
+import { MarketingConsentService } from '../document-state/marketing-consent.service';
 import { BookingAccountGuard } from './booking-account.guard';
 import { OnlineBookingService } from './online-booking.service';
 
