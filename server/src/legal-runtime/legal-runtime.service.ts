@@ -301,7 +301,7 @@ export class LegalRuntimeService implements OnModuleInit {
   }
 
   async tenantReadiness(tenantId: string) {
-    const state = await this.tenantState(tenantId);
+    const state = await this.ensureTenantDemoState(tenantId, '', 'readiness-self-heal');
     const evidence = objectValue(state?.evidenceMetadata);
     return {
       state,
