@@ -21,6 +21,15 @@ export class BookingRequiredConsentGuard implements CanActivate {
     const auth = request.bookingAccountAuth;
     if (!auth) throw new ForbiddenException('Не определён аккаунт онлайн-записи');
 
+    const access = await this.prisma.tenantAccess.findUnique({
+      where: { tenantId: auth.tenantId },
+      select: { isOwnerBook: true },
+    });
+    if (access?.isOwnerBook) {
+      request.bookingConsentAccess = { allowed: true, consents: [], runtimeChecksDisabled: true };
+      return true;
+    }
+
     const state = await this.consentPolicy.requiredConsentState(auth.tenantId, auth.accountId);
     request.bookingConsentAccess = state;
     if (!state.allowed) {
