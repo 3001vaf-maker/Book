@@ -12,7 +12,6 @@ import {
 } from '@prisma/client';
 import { createHash, randomBytes, randomUUID } from 'crypto';
 import { hash as hashPassword } from 'bcryptjs';
-import { LegalRuntimeService } from '../legal-runtime/legal-runtime.service';
 import { PrismaService } from '../prisma.service';
 import { MasterInvitationService } from '../master-invitation/master-invitation.service';
 
@@ -59,7 +58,6 @@ export class ManualInvitationService {
     private readonly prisma: PrismaService,
     private readonly invitations: MasterInvitationService,
     private readonly jwt: JwtService,
-    private readonly legal: LegalRuntimeService,
   ) {}
 
   async create(adminId: string) {
@@ -68,7 +66,6 @@ export class ManualInvitationService {
       select: { userId: true },
     });
     if (!admin?.userId) throw new NotFoundException('Администратор Book не найден');
-    await this.legal.assertPlatformLegalReady(admin.userId);
 
     const plan = await this.invitations.ensureStarterPlan();
     const token = createToken();
@@ -86,10 +83,6 @@ export class ManualInvitationService {
           isOwnerBook: false,
         },
       });
-      await tx.$executeRaw`
-        INSERT INTO "TenantLegalState" ("tenantId", "operationMode", "filingStatus", "updatedAt")
-        VALUES (${tenant.id}, 'DEMO', 'NOT_PREPARED', CURRENT_TIMESTAMP)
-      `;
       const invitation = await tx.masterInvitation.create({
         data: {
           tenantId: tenant.id,
@@ -103,11 +96,6 @@ export class ManualInvitationService {
       return { tenant, invitation };
     });
 
-    await this.legal.audit(created.tenant.id, admin.userId, 'MANUAL_MASTER_INVITATION_CREATED', 'REGISTRATION', 'SUCCESS', {
-      invitationId: created.invitation.id,
-      operationMode: 'DEMO',
-    });
-
     const origin = bookAppOrigin();
 
     return {
@@ -119,7 +107,6 @@ export class ManualInvitationService {
   }
 
   async inspect(tokenValue: unknown) {
-    await this.legal.assertPlatformLegalReady('');
     const invitation = await this.findManualInvitation(text(tokenValue));
     const documents = await this.legal.listDocuments('PLATFORM', null);
     const published = documents.filter((item) => item.currentVersion).map((item) => ({
@@ -169,8 +156,6 @@ export class ManualInvitationService {
     if (!phone) throw new BadRequestException('Укажите телефон');
     if (!email || !email.includes('@')) throw new BadRequestException('Укажите корректный email');
     if (password.length < 10) throw new BadRequestException('Пароль должен содержать минимум 10 символов');
-
-    await this.legal.assertPlatformLegalReady('');
     const invitation = await this.findManualInvitation(token);
     const legalDocuments = await this.legal.listDocuments('PLATFORM', null);
     const requiredDocuments = legalDocuments.filter((item) => item.requiredForRegistration && item.currentVersion);
@@ -267,11 +252,6 @@ export class ManualInvitationService {
       tenantId: invitation.tenantId,
       role: result.membership.role,
     });
-    await this.legal.audit(invitation.tenantId, result.user.id, 'MANUAL_MASTER_REGISTRATION_ACCEPTED', 'REGISTRATION', 'SUCCESS', {
-      operationMode: 'DEMO',
-      filingStatus: 'NOT_PREPARED',
-      marketingConsent: input?.marketingConsentAccepted === true,
-    });
 
     return {
       accessToken,
@@ -283,7 +263,6 @@ export class ManualInvitationService {
       },
       tenant: { id: invitation.tenantId, name: fullName },
       role: result.membership.role,
-      legal: { operationMode: 'DEMO', filingStatus: 'NOT_PREPARED' },
     };
   }
 
