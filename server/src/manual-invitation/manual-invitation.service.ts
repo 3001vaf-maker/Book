@@ -19,10 +19,22 @@ import { MasterInvitationService } from '../master-invitation/master-invitation.
 const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const MANUAL_EMAIL_PREFIX = 'manual+';
 const MANUAL_EMAIL_SUFFIX = '@book.invalid';
-const DEFAULT_CLIENT_APP_URL = 'https://3001vaf-maker.github.io/Book';
+const DEFAULT_BOOK_APP_URL = 'https://book.va-tools.ru';
 
 function text(value: unknown) {
   return String(value || '').trim();
+}
+
+function bookAppOrigin() {
+  const configured = text(process.env.BOOK_APP_URL);
+  if (configured) return configured.replace(/\/+$/, '');
+
+  if (process.env.NODE_ENV !== 'production') {
+    const stagingOrigin = text(process.env.CLIENT_APP_URL || process.env.FRONTEND_ORIGIN);
+    if (stagingOrigin) return stagingOrigin.replace(/\/+$/, '');
+  }
+
+  return DEFAULT_BOOK_APP_URL;
 }
 
 function normalizeEmail(value: unknown) {
@@ -96,9 +108,7 @@ export class ManualInvitationService {
       operationMode: 'DEMO',
     });
 
-    const origin = String(
-      process.env.CLIENT_APP_URL || DEFAULT_CLIENT_APP_URL,
-    ).trim().replace(/\/+$/, '');
+    const origin = bookAppOrigin();
 
     return {
       id: created.invitation.id,
