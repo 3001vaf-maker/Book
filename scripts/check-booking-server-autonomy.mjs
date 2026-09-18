@@ -15,7 +15,8 @@ assert(!contextBlock.includes('this.publication('), 'public booking context must
 const requestBlock = service.slice(service.indexOf('async createRequest('), service.indexOf('async getMyRequests('));
 assert(requestBlock.includes('createOnlineBookingRecord'), 'online booking must create canonical Record on the server');
 assert(requestBlock.includes('BookingRequestStatus.IMPORTED'), 'server-created booking request must be finalized without browser import');
-assert(service.includes('recordAcceptedConsents'), 'online consent facts must be written to canonical Documents state');
+assert(service.includes('acceptAccountConsents'), 'online consent facts must be written to canonical ConsentEvent archive');
+assert(!service.includes('recordAcceptedConsents'), 'online booking must not write legacy consent JSON');
 assert(business.includes('publicBookingOccupancy'), 'availability must consume canonical server Records');
 assert(business.includes('upsertBookingPersonFromAccount'), 'online Account must create/update canonical Person on the server');
 assert(!sync.includes('/online-booking/owner/publication'), 'browser sync must not publish booking context');
