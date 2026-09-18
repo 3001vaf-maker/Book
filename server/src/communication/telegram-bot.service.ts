@@ -9,7 +9,6 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from 'node:crypto';
-import { LegalRuntimeService } from '../legal-runtime/legal-runtime.service';
 import { NotificationService } from '../notification/notification.service';
 import { PrismaService } from '../prisma.service';
 import { CommunicationService } from './communication.service';
@@ -38,7 +37,6 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly communications: CommunicationService,
     private readonly notifications: NotificationService,
-    private readonly legal: LegalRuntimeService,
   ) {}
 
   onModuleInit() {
@@ -153,12 +151,12 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     if (!bot?.id || !bot?.is_bot) throw new BadRequestException('Токен не принадлежит Telegram-боту');
     const botId = String(bot.id); const botUsername = telegramUsername(bot.username);
     const ownership = await this.prisma.$queryRaw<Array<{ tenantId: string }>>`SELECT "tenantId" FROM "TelegramBotConnection" WHERE "botId" = ${botId} LIMIT 1`;
-    if (ownership[0] && ownership[0].tenantId !== tenantId) throw new ConflictException('Этот Telegram-бот уже подключён к другому аккаунту Book');
+    if (ownership[0] && ownership[0].tenantId !== tenantId) throw new ConflictException('Этот Telegram-бот уже подключён к другому рабочему пространству');
     const encrypted = this.encryptToken(token); const webhookKey = randomBytes(24).toString('base64url'); const webhookSecret = randomBytes(24).toString('base64url');
     const webhookUrl = `${publicApiUrl}/communications/telegram/webhook/${webhookKey}`;
     await this.telegramApi(token, 'setWebhook', { url: webhookUrl, secret_token: webhookSecret, allowed_updates: ['message'], drop_pending_updates: false });
     const webhookInfo = await this.telegramApi(token, 'getWebhookInfo');
-    if (text(webhookInfo?.url) !== webhookUrl) throw new ServiceUnavailableException('Telegram не подтвердил webhook Book');
+    if (text(webhookInfo?.url) !== webhookUrl) throw new ServiceUnavailableException('Telegram не подтвердил webhook');
     const status = 'active';
     await this.prisma.$executeRaw`
       INSERT INTO "TelegramBotConnection" ("id", "tenantId", "botId", "botUsername", "encryptedToken", "tokenIv", "tokenTag", "webhookKey", "webhookSecretHash", "status", "connectedAt", "updatedAt")
@@ -177,7 +175,6 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
   }
 
   async sendMessage(tenantId: string, telegramUserId: string, body: string) {
-    await this.legal.assertTenantLive(tenantId, '', 'TELEGRAM_DIRECT_SEND');
     const row = await this.rowForTenant(tenantId); if (!row) throw new NotFoundException('Telegram-бот не подключён');
     return this.telegramApi(this.decryptToken(row), 'sendMessage', { chat_id: telegramUserId, text: body });
   }
@@ -185,11 +182,6 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
   async sendChatMessage(tenantId: string, input: { phone?: unknown; uei?: unknown; body?: unknown }) {
     const body = text(input?.body); if (!body) throw new BadRequestException('Пустое сообщение');
     const identity = await this.communications.telegramIdentity(tenantId, input || {}); if (!identity) throw new NotFoundException('Telegram у клиента не подключён');
-    await this.legal.assertExternalCommunication(tenantId, {
-      purpose: 'DIALOG',
-      channel: 'TELEGRAM',
-      destination: identity.externalUserId,
-    });
     try {
       const result = await this.sendMessage(tenantId, identity.externalUserId, body);
       return this.communications.recordMessage(tenantId, { phone: identity.cardPhone, uei: identity.uei, direction: 'outbound', kind: 'message', channel: 'TELEGRAM', body, externalMessageId: String(result?.message_id || ''), externalThreadId: String(result?.chat?.id || identity.externalUserId), status: 'sent' });
@@ -211,7 +203,6 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       const token = this.decryptToken(connection); const deliveries = await this.notifications.pendingTelegramDeliveries(tenantId, limit);
       for (const delivery of deliveries) {
         try {
-          await this.legal.assertTenantLive(tenantId, '', 'TELEGRAM_NOTIFICATION_DELIVERY');
           const allowed = await this.notifications.canSendTelegramDelivery(tenantId, delivery.notificationId);
           if (!allowed) { await this.notifications.markTelegramFailed(tenantId, delivery.deliveryId, 'Сервисное уведомление отклонено политикой доставки'); failed += 1; continue; }
           await this.telegramApi(token, 'sendMessage', { chat_id: delivery.recipientKey, text: delivery.body || delivery.title });
@@ -230,7 +221,6 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     const connection = rows[0]; if (!connection) throw new NotFoundException('Telegram webhook не найден');
     if (sha256(text(secretToken)) !== connection.webhookSecretHash) throw new UnauthorizedException('Некорректный Telegram webhook secret');
     try {
-      await this.legal.assertTenantLive(connection.tenantId, '', 'TELEGRAM_WEBHOOK');
     } catch {
       return { ok: true, ignored: true };
     }
@@ -248,9 +238,9 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       if (clientAppUrl) {
         const url = new URL(clientAppUrl); url.searchParams.set('booking', connection.tenantId); url.searchParams.set('tg_entry', entry.token);
         const launchButton = message.chat.type === 'private'
-          ? { text: 'Открыть Book', web_app: { url: url.toString() } }
-          : { text: 'Открыть Book', url: url.toString() };
-        await this.telegramApi(this.decryptToken(connection), 'sendMessage', { chat_id: message.chat.id, text: 'Откройте Book, чтобы продолжить.', reply_markup: { inline_keyboard: [[launchButton]] } });
+          ? { text: 'Открыть', web_app: { url: url.toString() } }
+          : { text: 'Открыть', url: url.toString() };
+        await this.telegramApi(this.decryptToken(connection), 'sendMessage', { chat_id: message.chat.id, text: 'Откройте приложение, чтобы продолжить.', reply_markup: { inline_keyboard: [[launchButton]] } });
       }
       if (!identity) return { ok: true, linked: false };
     }
