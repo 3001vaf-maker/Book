@@ -37,7 +37,7 @@ assert.match(serverService, /ConflictException\('Проверка перенос
 assert.match(authGuard, /MembershipRole\.OWNER/);
 assert.match(authGuard, /platformAdmin\.findUnique/);
 assert.match(authGuard, /tenantAccess\.upsert/);
-assert.match(authGuard, /isOwnerBook:\s*true/);
+assert.match(authGuard, /isPlatformOwnerWorkspace:\s*true/);
 assert.match(authGuard, /planId:\s*null/);
 assert.ok(
   authGuard.indexOf('membership.role === MembershipRole.OWNER') < authGuard.indexOf('Рабочее пространство недоступно'),
