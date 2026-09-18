@@ -19,6 +19,21 @@ import { TransactionalEmailService } from '../transactional-email/transactional-
 
 const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const STARTER_PLAN_KEY = 'starter-clients';
+const DEFAULT_BOOK_APP_URL = 'https://book.va-tools.ru';
+
+function bookAppOrigin() {
+  const configured = String(process.env.BOOK_APP_URL || '').trim();
+  if (configured) return configured.replace(/\/+$/, '');
+
+  if (process.env.NODE_ENV !== 'production') {
+    const stagingOrigin = String(
+      process.env.FRONTEND_ORIGIN || process.env.CLIENT_APP_URL || '',
+    ).trim();
+    if (stagingOrigin) return stagingOrigin.replace(/\/+$/, '');
+  }
+
+  return DEFAULT_BOOK_APP_URL;
+}
 
 const CAPABILITY_CATALOG: Array<{
   key: string;
@@ -433,8 +448,7 @@ export class MasterInvitationService {
   }
 
   private async sendInvitationEmail(input: { email: string; name: string; token: string }) {
-    const origin = String(process.env.FRONTEND_ORIGIN || '').trim().replace(/\/+$/, '');
-    if (!origin) throw new BadRequestException('FRONTEND_ORIGIN не настроен');
+    const origin = bookAppOrigin();
     const url = `${origin}/invite/?token=${encodeURIComponent(input.token)}`;
     const safeName = escapeHtml(input.name || '');
     const greeting = safeName ? `Здравствуйте, ${safeName}.` : 'Здравствуйте.';

@@ -13,6 +13,7 @@ import { getJournalTimeUsages, releaseJournalSoftTimeUsages } from './journal/ti
 import { configureWorkplaceSource } from './core/workplace-time.js';
 import { configureTimeUsageSource, configureSoftTimeUsageReleaseSource } from './core/time/index.js';
 import { apiRequest, getCurrentUser, login } from './core/auth.js';
+import { BOOK_APP_ORIGIN, CLIENT_APP_ORIGIN } from './core/environment.js';
 import { canUseBookCapability, getBookAccess, loadBookAccess } from './core/access.js';
 import { isOnboardingComplete, renderOnboarding } from './onboarding/onboarding.js';
 import { startServerBookingSync } from './online-booking/server-sync.js';
@@ -74,6 +75,42 @@ function renderPublicBooking(route) {
   app.innerHTML = '<main class="booking-content" id="app-content"></main>';
   void renderOnlineBooking(document.querySelector('#app-content'), route);
   syncViewport();
+}
+
+function runtimeHostname() {
+  return String(location.hostname || '').trim().toLowerCase();
+}
+
+function isLocalBookingHost() {
+  const host = runtimeHostname();
+  return host === 'localhost'
+    || host === '127.0.0.1'
+    || host === '::1'
+    || host.endsWith('.app.github.dev');
+}
+
+function renderClientLinkMissing() {
+  workspaceReady = false;
+  disposeView();
+  disposeView = () => {};
+  app.classList.add('app-shell--booking');
+  app.innerHTML = `
+    <main class="auth-view">
+      <section class="auth-card">
+        <div class="auth-card__heading">
+          <h1>Book</h1>
+          <p>Ссылка клиента неполная или недействительна.</p>
+        </div>
+      </section>
+    </main>`;
+  syncViewport();
+}
+
+function redirectBookingToClient() {
+  const target = new URL(CLIENT_APP_ORIGIN);
+  target.search = location.search;
+  target.hash = location.hash;
+  location.replace(target.toString());
 }
 
 function ensureServerBookingSync() {
@@ -525,7 +562,16 @@ document.addEventListener('focusin', (event) => {
 syncViewport();
 
 const publicBooking = bookingRoute();
-if (publicBooking) {
+const host = runtimeHostname();
+const bookHost = new URL(BOOK_APP_ORIGIN).hostname;
+const clientHost = new URL(CLIENT_APP_ORIGIN).hostname;
+
+if (host === clientHost) {
+  if (publicBooking) renderPublicBooking(publicBooking);
+  else renderClientLinkMissing();
+} else if (host === bookHost && publicBooking) {
+  redirectBookingToClient();
+} else if (isLocalBookingHost() && publicBooking) {
   renderPublicBooking(publicBooking);
 } else {
   try {
