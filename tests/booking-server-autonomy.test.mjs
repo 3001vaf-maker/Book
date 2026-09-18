@@ -22,6 +22,13 @@ assert.match(business, /payment:\s*\{\s*state:\s*due <= 0\.009 \? 'paid' : paid 
 
 assert.match(publicationGuard, /bookingPublication\.findUnique/);
 assert.match(publicationGuard, /Онлайн-запись ещё не опубликована/);
+assert.match(publicationGuard, /owner-runtime-self-heal/);
+assert.match(publicationGuard, /isOwnerBook/);
+assert.match(service, /ensureOwnerRuntimeReady/);
+assert.match(service, /businessState\.bootstrap\(tenantId\)/);
+assert.match(service, /businessState\.bootstrapOperational\(tenantId\)/);
+assert.match(service, /documentState\.bootstrap\(tenantId/);
+assert.match(service, /profile\.bootstrap\(tenantId, membership\.userId\)/);
 assert.match(bookingModule, /BookingPublicationGuard/);
 assert.match(controller, /@UseGuards\(BookingPublicationGuard\)\s*@Get\(':tenantId\/context'\)/s);
 assert.match(controller, /@UseGuards\(BookingPublicationGuard\)\s*@Post\(':tenantId\/account\/prepare'\)/s);
