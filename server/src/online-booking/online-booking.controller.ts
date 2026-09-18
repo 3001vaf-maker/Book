@@ -40,12 +40,6 @@ export class OnlineBookingController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
-  @Put('owner/publication')
-  async publish(@Req() request: OwnerRequest, @Body() body: { data?: unknown }) {
-    const result = await this.booking.publish(request.auth!.tenantId, body?.data || {});
-    return result;
-  }
 
   @UseGuards(JwtAuthGuard)
   @Get('owner/accounts')
