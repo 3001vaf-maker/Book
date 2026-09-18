@@ -177,6 +177,20 @@ function renderWorkspace() {
   syncViewport();
 }
 
+
+async function reportStartupFailure(stage, error) {
+  const message = error instanceof Error ? error.message : String(error || 'unknown');
+  console.error(`[Book startup] ${stage} failed`, error);
+  try {
+    await apiRequest('/auth/startup-diagnostic', {
+      method: 'POST',
+      body: JSON.stringify({ stage, message }),
+    });
+  } catch {
+    // Diagnostics must never block Book or replace the original startup error.
+  }
+}
+
 function renderServerStatePending() {
   app.classList.remove('app-shell--booking');
   workspaceReady = false;
@@ -579,7 +593,7 @@ async function renderAuthenticated(account = authenticatedAccount) {
   try {
     access = await loadBookAccess();
   } catch (error) {
-    console.error('[Book startup] access failed', error);
+    await reportStartupFailure('access', error);
     renderServerStatePending();
     return;
   }
@@ -593,7 +607,7 @@ async function renderAuthenticated(account = authenticatedAccount) {
     try {
       tenantRuntime = await tenantLegalRequest('/readiness');
     } catch (error) {
-      console.error('[Book startup] legal readiness failed', error);
+      await reportStartupFailure('legal', error);
       renderServerStatePending();
       return;
     }
@@ -601,21 +615,22 @@ async function renderAuthenticated(account = authenticatedAccount) {
     tenantRuntime = { state: { operationMode: 'LIVE' } };
   }
 
-  try {
-    const migration = await initializeProfileWorkplaces(authenticatedAccount);
-    if (!migration.verified) throw new Error('Profile + Workplaces not verified');
-    const businessMigration = await initializeBusinessState(authenticatedAccount);
-    if (!businessMigration.verified) throw new Error('Business state not verified');
-    const operationalMigration = await initializeOperationalState(authenticatedAccount);
-    if (!operationalMigration.verified) throw new Error('Operational state not verified');
-    const documentMigration = await initializeDocumentState(authenticatedAccount);
-    if (!documentMigration.verified) throw new Error('Document state not verified');
-    const auxiliaryMigration = await initializeAuxiliaryState(authenticatedAccount);
-    if (!auxiliaryMigration.verified) throw new Error('Auxiliary state not verified');
-  } catch (error) {
-    console.error('[Book startup] server state initialization failed', error);
-    renderServerStatePending();
-    return;
+  const startupStages = [
+    ['profile', () => initializeProfileWorkplaces(authenticatedAccount)],
+    ['business', () => initializeBusinessState(authenticatedAccount)],
+    ['operational', () => initializeOperationalState(authenticatedAccount)],
+    ['documents', () => initializeDocumentState(authenticatedAccount)],
+    ['auxiliary', () => initializeAuxiliaryState(authenticatedAccount)],
+  ];
+  for (const [stage, run] of startupStages) {
+    try {
+      const result = await run();
+      if (!result?.verified) throw new Error(`${stage} state not verified`);
+    } catch (error) {
+      await reportStartupFailure(stage, error);
+      renderServerStatePending();
+      return;
+    }
   }
   clearLegacyBusinessStorage();
   ensureServerBookingSync();
