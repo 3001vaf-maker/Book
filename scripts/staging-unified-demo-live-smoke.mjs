@@ -141,6 +141,74 @@ assert.deepEqual(registeredProfile.profile?.emails || [], [email]);
 assert.equal(registeredProfile.profile?.profession || '', '', 'profession must still be completed inside DEMO');
 assert.deepEqual(registeredProfile.workplaces || [], [], 'workplace must still be completed inside DEMO');
 
+// Reproduce the production failure mode: server rows exist, but old migration verification is missing.
+// Bootstrap must now self-heal these rows without replacing their server-owned data.
+sql(`UPDATE "Profile" SET "migrationVerifiedAt"=NULL WHERE "tenantId"=${sqlLiteral(tenantId)} AND "userId"=${sqlLiteral(account.user.id)};`);
+const healedProfile = await request('/profile/bootstrap', {
+  token,
+  method: 'POST',
+  body: { timeZone: 'Europe/Moscow' },
+});
+assert.equal(healedProfile.verified, true);
+assert.equal(healedProfile.profile?.name, 'Unified', 'profile self-heal must preserve registration data');
+assert.equal(healedProfile.profile?.surname, 'Master');
+assert.equal(healedProfile.profile?.phone, phone);
+
+await request('/business-state/bootstrap', { token, method: 'POST', body: {} });
+sql(`
+  UPDATE "BusinessStateMeta" SET "migrationVerifiedAt"=NULL WHERE "tenantId"=${sqlLiteral(tenantId)};
+  UPDATE "BusinessIdentityState"
+  SET "data"='{"entities":{"self-heal-marker":{"kind":"KEEP"}},"relations":{},"revoked":[]}'::jsonb
+  WHERE "tenantId"=${sqlLiteral(tenantId)};
+`);
+const healedBusiness = await request('/business-state/bootstrap', { token, method: 'POST', body: {} });
+assert.equal(healedBusiness.verified, true);
+assert.equal(
+  sql(`SELECT "data"->'entities'->'self-heal-marker'->>'kind' FROM "BusinessIdentityState" WHERE "tenantId"=${sqlLiteral(tenantId)};`),
+  'KEEP',
+  'business self-heal must preserve server data',
+);
+
+await request('/business-state/operational/bootstrap', { token, method: 'POST', body: {} });
+sql(`
+  UPDATE "BusinessOperationalState"
+  SET "migrationVerifiedAt"=NULL,
+      "data"='{"days":[{"key":"self-heal-day"}],"breaks":[],"procedures":[],"procedureHistory":[],"bookingSettings":null}'::jsonb
+  WHERE "tenantId"=${sqlLiteral(tenantId)};
+`);
+const healedOperational = await request('/business-state/operational/bootstrap', { token, method: 'POST', body: {} });
+assert.equal(healedOperational.verified, true);
+assert.equal(
+  sql(`SELECT "data"->'days'->0->>'key' FROM "BusinessOperationalState" WHERE "tenantId"=${sqlLiteral(tenantId)};`),
+  'self-heal-day',
+  'operational self-heal must preserve server data',
+);
+sql(`
+  UPDATE "BusinessOperationalState"
+  SET "data"='{"days":[],"breaks":[],"procedures":[],"procedureHistory":[],"bookingSettings":null}'::jsonb
+  WHERE "tenantId"=${sqlLiteral(tenantId)};
+`);
+
+await request('/auxiliary-state/bootstrap', { token, method: 'POST', body: {} });
+sql(`
+  UPDATE "BusinessAuxiliaryState"
+  SET "migrationVerifiedAt"=NULL,
+      "data"='{"finance":null,"wallets":[],"tags":[{"key":"self-heal-tag"}],"products":[],"productHistory":[]}'::jsonb
+  WHERE "tenantId"=${sqlLiteral(tenantId)};
+`);
+const healedAuxiliary = await request('/auxiliary-state/bootstrap', { token, method: 'POST', body: {} });
+assert.equal(healedAuxiliary.verified, true);
+assert.equal(
+  sql(`SELECT "data"->'tags'->0->>'key' FROM "BusinessAuxiliaryState" WHERE "tenantId"=${sqlLiteral(tenantId)};`),
+  'self-heal-tag',
+  'auxiliary self-heal must preserve server data',
+);
+sql(`
+  UPDATE "BusinessAuxiliaryState"
+  SET "data"='{"finance":null,"wallets":[],"tags":[],"products":[],"productHistory":[]}'::jsonb
+  WHERE "tenantId"=${sqlLiteral(tenantId)};
+`);
+
 const emptyDocumentState = await request('/document-state', { token });
 if (!emptyDocumentState.migrated) {
   await request('/document-state/bootstrap', {
