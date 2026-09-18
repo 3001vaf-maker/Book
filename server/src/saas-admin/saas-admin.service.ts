@@ -86,7 +86,7 @@ export class SaasAdminService {
         ? row.tenant.profiles.find((item) => item.userId === membership.userId) || null
         : null;
       const invitation = row.tenant.userInvitations[0] || null;
-      const legalAcceptances = membership
+      const documentAcceptances = membership
         ? await this.prisma.$queryRaw<Array<{
             id: string;
             documentKey: string;
@@ -95,7 +95,6 @@ export class SaasAdminService {
             action: string;
             source: string;
             occurredAt: Date;
-            requiredForRegistration: boolean;
           }>>`
             SELECT
               e."id",
@@ -104,8 +103,7 @@ export class SaasAdminService {
               v."version" AS "documentVersion",
               e."action",
               e."source",
-              e."occurredAt",
-              d."requiredForRegistration"
+              e."occurredAt"
             FROM "LegalAcceptanceEvent" e
             JOIN "LegalDocumentVersion" v ON v."id" = e."documentVersionId"
             JOIN "LegalDocument" d ON d."id" = v."documentId"
@@ -164,7 +162,7 @@ export class SaasAdminService {
           registeredAt: membership.user.createdAt,
         } : null,
         invitation,
-        legalAcceptances,
+        documentAcceptances,
         startupState,
         startupReady,
         access: resolved,
