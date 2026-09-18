@@ -15,10 +15,28 @@ export class BookingPublicationGuard implements CanActivate {
     const tenantId = String(request.params?.tenantId || '').trim();
     if (!tenantId) throw new NotFoundException('Онлайн-запись не найдена');
 
-    const publication = await this.prisma.bookingPublication.findUnique({
+    let publication = await this.prisma.bookingPublication.findUnique({
       where: { tenantId },
       select: { id: true },
     });
+
+    if (!publication) {
+      const access = await this.prisma.tenantAccess.findUnique({
+        where: { tenantId },
+        select: { isOwnerBook: true },
+      });
+      if (access?.isOwnerBook) {
+        publication = await this.prisma.bookingPublication.create({
+          data: {
+            tenantId,
+            revision: 1,
+            data: { source: 'owner-runtime-self-heal' },
+          },
+          select: { id: true },
+        });
+      }
+    }
+
     if (!publication) throw new NotFoundException('Онлайн-запись ещё не опубликована');
 
     await this.legal.assertPublicBooking(tenantId);
