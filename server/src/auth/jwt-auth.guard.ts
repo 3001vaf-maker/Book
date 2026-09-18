@@ -1,6 +1,7 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
+import { MembershipRole, TenantAccessStatus } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 
 @Injectable()
@@ -36,8 +37,34 @@ export class JwtAuthGuard implements CanActivate {
       }),
     ]);
 
-    if (!user || !membership) throw new UnauthorizedException('Доступ пользователя к Tenant прекращён');
-    if (!access || String(access.status) !== 'ACTIVE') throw new ForbiddenException('Tenant недоступен');
+    if (!user || !membership) throw new UnauthorizedException('Доступ пользователя к рабочему пространству прекращён');
+
+    let effectiveAccess = access;
+    if (!effectiveAccess && membership.role === MembershipRole.OWNER) {
+      const platformOwner = await this.prisma.platformAdmin.findUnique({
+        where: { userId: user.id },
+        select: { id: true },
+      });
+      if (platformOwner) {
+        effectiveAccess = await this.prisma.tenantAccess.upsert({
+          where: { tenantId: payload.tenantId },
+          create: {
+            tenantId: payload.tenantId,
+            status: TenantAccessStatus.ACTIVE,
+            isOwnerBook: true,
+          },
+          update: {
+            status: TenantAccessStatus.ACTIVE,
+            isOwnerBook: true,
+          },
+          select: { status: true },
+        });
+      }
+    }
+
+    if (!effectiveAccess || effectiveAccess.status !== TenantAccessStatus.ACTIVE) {
+      throw new ForbiddenException('Рабочее пространство недоступно');
+    }
 
     request.auth = {
       userId: user.id,
