@@ -463,8 +463,8 @@ export class MasterInvitationService {
       toName: input.name,
       subject: 'Приглашение в Book',
       tag: 'master-invitation',
-      text: `${input.name ? `Здравствуйте, ${input.name}.` : 'Здравствуйте.'}\n\nВам открыт персональный Book в режиме DEMO. Создайте пароль и начните настройку рабочего пространства:\n${url}\n\nСсылка действует 7 дней.`,
-      html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#292522"><h2>Book</h2><p>${greeting}</p><p>Вам открыт персональный Book в режиме DEMO. Создайте пароль и начните настройку своего рабочего пространства.</p><p style="margin:28px 0"><a href="${url}" style="background:#292522;color:#fff;text-decoration:none;padding:14px 20px;border-radius:12px;display:inline-block">Создать пароль и войти</a></p><p style="color:#817a74;font-size:14px">Ссылка действует 7 дней.</p></div>`,
+      text: `${input.name ? `Здравствуйте, ${input.name}.` : 'Здравствуйте.'}\n\nВам открыт доступ к рабочему пространству. Создайте пароль и начните настройку:\n${url}\n\nСсылка действует 7 дней.`,
+      html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#292522"><h2>Book</h2><p>${greeting}</p><p>Вам открыт доступ к рабочему пространству. Создайте пароль и начните настройку.</p><p style="margin:28px 0"><a href="${url}" style="background:#292522;color:#fff;text-decoration:none;padding:14px 20px;border-radius:12px;display:inline-block">Создать пароль и войти</a></p><p style="color:#817a74;font-size:14px">Ссылка действует 7 дней.</p></div>`,
     });
   }
 
