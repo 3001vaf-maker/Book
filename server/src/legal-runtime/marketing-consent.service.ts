@@ -16,7 +16,7 @@ export class MarketingConsentService {
       where: { tenantId },
       select: { data: true, migrationVerifiedAt: true },
     });
-    if (!state?.migrationVerifiedAt) throw new ConflictException('Документы мастера ещё не готовы');
+    if (!state?.migrationVerifiedAt) throw new ConflictException('Документы пользователя ещё не готовы');
     const data = objectValue(state.data);
     const documents = Array.isArray(data.documents) ? data.documents.map((item) => objectValue(item)) : [];
     const current = documents.find((item) => text(item.id) === 'messages-consent');
