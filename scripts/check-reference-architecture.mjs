@@ -167,8 +167,8 @@ for (const file of allFiles) {
   if (rel(file) !== workplaceOwner) report(file, 'book.workplaces may only be accessed by the Workplace data owner');
 }
 
-const clientsUi = join(root, 'main/clients/clients.js');
-if (/\blocalStorage\b/.test(text(clientsUi))) report(clientsUi, 'Clients screen must use data/view-state owners instead of direct localStorage');
+const peopleUi = join(root, 'main/people/people.js');
+if (/\blocalStorage\b/.test(text(peopleUi))) report(peopleUi, 'People screen must use data/view-state owners instead of direct localStorage');
 
 if (/\blocalStorage\b/.test(text(timetableController))) {
   report(timetableController, 'Graph controller must use the canonical data owner instead of direct localStorage');
