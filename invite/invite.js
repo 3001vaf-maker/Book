@@ -1,6 +1,6 @@
 import { setAuthToken } from '../core/auth.js';
 import { API_BASE } from '../core/environment.js';
-import { startRegistrationFlow } from '../registration/registration-flow.js';
+import { startRegistrationFlow } from '../ui/auth/registration-flow.js';
 
 const state = document.querySelector('#invite-state');
 const token = new URLSearchParams(location.search).get('token') || '';
