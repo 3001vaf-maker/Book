@@ -1,5 +1,5 @@
 import { accordion, actionBlock, button, collectRepeatedField, entityCard, escapeHtml, field, folderList, initAccordions, initPhotoField, initRepeatedFields, modal, mountModal, page, photoField, repeatedField, select, textareaField, workplaceAddButton, workplaceCountText } from '../../ui/ui.js';
-import { getBookLimit } from '../../core/access.js';
+import { getLimit } from '../../core/access.js';
 import { addCustomProfession, getCustomProfessions, getProfile, saveProfile as saveProfileData } from './data.js';
 import { getWorkplaces } from './workplaces/data.js';
 import { initWorkplaceListDeletion, openWorkplaceModal, renderWorkplace, workplaceList } from './workplaces/workplaces.js';
@@ -136,7 +136,7 @@ function renderProfile(root,navigateBack,options={}){
     if(options.onboarding){
       try{await persistDraft(root)}catch(error){showProfileError(error instanceof Error?error.message:'Не удалось сохранить профиль');return}
     }
-    const workplaceLimit=getBookLimit('workplaces.max');
+    const workplaceLimit=getLimit('workplaces.max');
     if(workplaceLimit!==null&&getWorkplaces().length>=workplaceLimit){
       openWorkplaceLimitModal(root,workplaceLimit);
       return;

@@ -15,7 +15,7 @@ export type ResolvedCapability = {
 export type ResolvedTenantAccess = {
   tenantId: string;
   status: TenantAccessStatus | 'LEGACY_COMPAT';
-  isOwnerBook: boolean;
+  isPlatformOwnerWorkspace: boolean;
   plan: { id: string; key: string; name: string } | null;
   capabilities: ResolvedCapability[];
 };
@@ -30,7 +30,7 @@ export class SaasAccessService {
     });
 
     if (!capability || !capability.isActive) {
-      throw new NotFoundException(`Неизвестная возможность Book: ${capabilityKey}`);
+      throw new NotFoundException(`Неизвестная возможность: ${capabilityKey}`);
     }
 
     const access = await this.prisma.tenantAccess.findUnique({
@@ -73,7 +73,7 @@ export class SaasAccessService {
         };
       }
 
-      if (access.isOwnerBook && !access.plan) {
+      if (access.isPlatformOwnerWorkspace && !access.plan) {
         return this.legacyCompatibilityValue(capability.key, capability.valueType);
       }
 
@@ -106,7 +106,7 @@ export class SaasAccessService {
       };
     }
 
-    if (access.isOwnerBook && !access.plan) {
+    if (access.isPlatformOwnerWorkspace && !access.plan) {
       return this.legacyCompatibilityValue(capability.key, capability.valueType);
     }
 
@@ -151,7 +151,7 @@ export class SaasAccessService {
       return {
         tenantId,
         status: 'LEGACY_COMPAT',
-        isOwnerBook: false,
+        isPlatformOwnerWorkspace: false,
         plan: null,
         capabilities: capabilities.map((capability) =>
           this.legacyCompatibilityValue(capability.key, capability.valueType),
@@ -180,7 +180,7 @@ export class SaasAccessService {
             source: 'TENANT_OVERRIDE',
           };
         }
-        if (access.isOwnerBook && !access.plan) {
+        if (access.isPlatformOwnerWorkspace && !access.plan) {
           return this.legacyCompatibilityValue(capability.key, capability.valueType);
         }
         if (planValue && planValue.enabled !== null) {
@@ -210,7 +210,7 @@ export class SaasAccessService {
           source: 'TENANT_OVERRIDE',
         };
       }
-      if (access.isOwnerBook && !access.plan) {
+      if (access.isPlatformOwnerWorkspace && !access.plan) {
         return this.legacyCompatibilityValue(capability.key, capability.valueType);
       }
       if (planValue) {
@@ -234,7 +234,7 @@ export class SaasAccessService {
     return {
       tenantId,
       status: access.status,
-      isOwnerBook: access.isOwnerBook,
+      isPlatformOwnerWorkspace: access.isPlatformOwnerWorkspace,
       plan: access.plan ? { id: access.plan.id, key: access.plan.key, name: access.plan.name } : null,
       capabilities: resolved,
     };

@@ -3,7 +3,25 @@ import { join, relative } from 'node:path';
 
 const root = process.cwd();
 const out = join(root, '_site');
-const excluded = new Set(['.git', 'node_modules', '_site']);
+const excluded = new Set([
+  '.git',
+  '.github',
+  'node_modules',
+  '_site',
+  'server',
+  'tests',
+  'scripts',
+  'docs',
+]);
+const excludedRootFiles = new Set([
+  '.dockerignore',
+  'Dockerfile',
+  'README.md',
+  'amvera.yml',
+  'docker-compose.staging.yml',
+  'package.json',
+  'package-lock.json',
+]);
 const rawToken = String(process.env.GITHUB_SHA || Date.now());
 const buildToken = rawToken.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40) || 'build';
 
@@ -13,6 +31,7 @@ mkdirSync(out, { recursive: true });
 function copyTree(source, target) {
   for (const name of readdirSync(source)) {
     if (excluded.has(name)) continue;
+    if (source === root && excludedRootFiles.has(name)) continue;
     const from = join(source, name);
     const to = join(target, name);
     const stat = statSync(from);
