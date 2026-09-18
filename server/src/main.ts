@@ -56,11 +56,7 @@ async function bootstrap() {
     if (!['GET', 'HEAD'].includes(request.method)) return next();
 
     const host = requestHost(request);
-    if (host === API_HOST) {
-      if (request.path === '/') return response.redirect(302, '/admin/');
-      if (!request.path.startsWith('/admin/') && !request.path.startsWith('/core/')) return next();
-      return staticSite(request, response, next);
-    }
+    if (host === API_HOST) return next();
 
     if (host === BOOK_HOST || host === CLIENT_HOST) {
       return staticSite(request, response, () => response.status(404).send('Not Found'));
