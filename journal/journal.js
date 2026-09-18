@@ -4,6 +4,7 @@ import { getWorkplaces } from '../core/workplace-time.js';
 import { getActiveDayWorkplaces } from '../core/day/index.js';
 import { recordPlanTotal } from '../core/finance/index.js';
 import { openTimetableDayEditor } from '../timetable/day-editor.js';
+import { canUseBookCapability } from '../core/access.js';
 import { getActiveRecordCountForDay, getRecordsForDay } from '../core/record/index.js';
 import { openJournalWorkplaceControl } from './workplace-control.js';
 import { renderJournalDay } from './день.js';
@@ -71,7 +72,10 @@ export function renderJournal(root) {
     });
   };
 
+  const canEditTimetable = canUseBookCapability('timetable.access');
+
   const openDayTime = (workplaceId = '') => {
+    if (!canEditTimetable) return;
     openTimetableDayEditor({
       date: selectedDate,
       focusWorkplaceId: workplaceId,
@@ -139,7 +143,8 @@ export function renderJournal(root) {
       renderJournalDay(viewRoot, {
         date: selectedDate,
         workplaceId: selectedWorkplaceId,
-        onWorkplaceFieldClick: openDayTime,
+        onWorkplaceFieldClick: canEditTimetable ? openDayTime : null,
+        workFieldsInteractive: canEditTimetable,
         onChange: (nextDate) => {
           selectedDate = nextDate;
           setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: selectedDate, scope: JOURNAL_CONTEXT_SCOPE });
