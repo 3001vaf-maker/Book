@@ -1,6 +1,6 @@
 import { apiRequest } from './core/auth.js';
 import { queueDocumentDataset } from './core/business-persistence.js';
-import { getBookDocumentBases } from './admin/documents/catalog.js';
+import { getBookDocumentBases } from './admin/document-registry/catalog.js';
 import {
   configureConsentPersistence,
   hydrateConsentsFromServer,
