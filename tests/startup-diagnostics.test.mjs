@@ -13,6 +13,23 @@ for (const stage of ['access', 'legal', 'profile', 'business', 'operational', 'd
 }
 assert.match(core, /auth\/startup-diagnostic/);
 assert.match(core, /reportStartupFailure/);
+
+const authenticatedStart = core.indexOf('async function renderAuthenticated');
+const profileInit = core.indexOf('initializeProfileWorkplaces(authenticatedAccount)', authenticatedStart);
+const workspaceOpen = core.indexOf('renderWorkspace();', authenticatedStart);
+const backgroundHydration = core.indexOf('void hydrateWorkspaceDataAfterOpen();', authenticatedStart);
+assert.ok(authenticatedStart >= 0 && profileInit > authenticatedStart, 'authenticated startup must verify the profile');
+assert.ok(workspaceOpen > profileInit, 'workspace must open after the profile is verified');
+assert.ok(backgroundHydration > workspaceOpen, 'non-profile datasets must hydrate only after the workspace is open');
+
+const backgroundStart = core.indexOf('async function hydrateWorkspaceDataAfterOpen');
+const backgroundEnd = core.indexOf('async function renderAuthenticated', backgroundStart);
+const backgroundSource = core.slice(backgroundStart, backgroundEnd);
+assert.match(backgroundSource, /initializeBusinessState/);
+assert.match(backgroundSource, /initializeOperationalState/);
+assert.match(backgroundSource, /initializeDocumentState/);
+assert.match(backgroundSource, /initializeAuxiliaryState/);
+assert.doesNotMatch(backgroundSource, /renderServerStatePending\(/, 'optional dataset failures must not close the application');
 assert.match(authController, /@Post\('startup-diagnostic'\)/);
 assert.match(authService, /Book startup failed/);
 
