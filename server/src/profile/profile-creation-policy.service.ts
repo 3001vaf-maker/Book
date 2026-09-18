@@ -2,7 +2,7 @@ import { ConflictException, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma.service';
 
-const PROFILE_CREATION_DOCUMENT_KEY = 'user-pd-consent';
+const PROFILE_CREATION_DOCUMENT_KEY = 'user-document-pdn-consent';
 
 type CurrentDocument = {
   id: string;
