@@ -103,11 +103,6 @@ export class AuxiliaryStateService {
       await this.prisma.businessAuxiliaryState.create({
         data: { tenantId, data: json(normalize({})), migrationVerifiedAt: new Date() },
       });
-    } else if (!existing.migrationVerifiedAt) {
-      await this.prisma.businessAuxiliaryState.update({
-        where: { tenantId },
-        data: { migrationVerifiedAt: new Date() },
-      });
     }
     return this.bundle(tenantId);
   }

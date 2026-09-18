@@ -15,25 +15,19 @@ function availableFolders() {
   return folders.filter((folder) => canUseBookCapability(folder[4]));
 }
 
-async function openFolder(root, key, options = {}) {
-  const visible = availableFolders();
-  const folder = visible.find(([folderKey]) => folderKey === key);
-  if (!folder) return false;
-  const { render } = await folder[3]();
-  render(root, () => renderRows(root, options), { demoGuide: Boolean(options.demo) });
-  return true;
-}
-
-function renderRows(root, options = {}) {
+function renderRows(root) {
   const visible = availableFolders();
   root.innerHTML = `${pageHeader('Настройки')}${folderList(visible.map(([key, label]) => ({ title: label, data: `data-settings-open="${key}"` })))}`;
   root.querySelectorAll('[data-settings-open]').forEach((element) => {
-    element.addEventListener('click', () => void openFolder(root, element.dataset.settingsOpen, options));
+    element.addEventListener('click', async () => {
+      const folder = visible.find(([key]) => key === element.dataset.settingsOpen);
+      if (!folder) return;
+      const { render } = await folder[3]();
+      render(root, () => renderRows(root));
+    });
   });
 }
 
-export function renderSettings(root, options = {}) {
-  renderRows(root, options);
-  const requested = String(options?.openFolder || '').trim();
-  if (requested) queueMicrotask(() => void openFolder(root, requested, options));
+export function renderSettings(root) {
+  renderRows(root);
 }

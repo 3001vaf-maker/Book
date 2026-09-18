@@ -1,24 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { CapabilityAccessChangeType, CapabilityValueType, TenantAccessStatus } from '@prisma/client';
-import { randomUUID } from 'node:crypto';
+import { CapabilityValueType, TenantAccessStatus } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { SaasAccessService } from '../saas-access/saas-access.service';
 import { MasterInvitationService } from '../master-invitation/master-invitation.service';
-
-type ValidatedCapabilityUpdate = {
-  key: string;
-  capabilityId: string;
-  valueType: CapabilityValueType;
-  defaultEnabled: boolean;
-  inherit: boolean;
-  enabled: boolean | null;
-  limit: number | null;
-};
-
-type CapabilityStateChange = {
-  capabilityId: string;
-  changeType: CapabilityAccessChangeType;
-};
 
 @Injectable()
 export class SaasAdminService {
@@ -67,7 +51,7 @@ export class SaasAdminService {
               orderBy: { createdAt: 'asc' },
             },
             profiles: {
-              select: { userId: true, name: true, surname: true, profession: true, migrationVerifiedAt: true },
+              select: { userId: true, name: true, surname: true, profession: true },
             },
             masterInvitations: {
               orderBy: { createdAt: 'desc' },
@@ -86,78 +70,7 @@ export class SaasAdminService {
         ? row.tenant.profiles.find((item) => item.userId === membership.userId) || null
         : null;
       const invitation = row.tenant.masterInvitations[0] || null;
-      const legalAcceptances = membership
-        ? await this.prisma.$queryRaw<Array<{
-            id: string;
-            documentKey: string;
-            title: string;
-            documentVersion: number;
-            action: string;
-            source: string;
-            occurredAt: Date;
-            requiredForRegistration: boolean;
-          }>>`
-            SELECT
-              e."id",
-              d."key" AS "documentKey",
-              d."title",
-              v."version" AS "documentVersion",
-              e."action",
-              e."source",
-              e."occurredAt",
-              d."requiredForRegistration"
-            FROM "LegalAcceptanceEvent" e
-            JOIN "LegalDocumentVersion" v ON v."id" = e."documentVersionId"
-            JOIN "LegalDocument" d ON d."id" = v."documentId"
-            WHERE e."tenantId" = ${row.tenantId}
-              AND e."userId" = ${membership.userId}
-            ORDER BY e."occurredAt" ASC, e."id" ASC
-          `
-        : [];
-      const [businessMeta, operationalState, documentState, auxiliaryState, legalRows] = await Promise.all([
-        this.prisma.businessStateMeta.findUnique({
-          where: { tenantId: row.tenantId },
-          select: { migrationVerifiedAt: true },
-        }),
-        this.prisma.businessOperationalState.findUnique({
-          where: { tenantId: row.tenantId },
-          select: { migrationVerifiedAt: true },
-        }),
-        this.prisma.businessDocumentState.findUnique({
-          where: { tenantId: row.tenantId },
-          select: { migrationVerifiedAt: true },
-        }),
-        this.prisma.businessAuxiliaryState.findUnique({
-          where: { tenantId: row.tenantId },
-          select: { migrationVerifiedAt: true },
-        }),
-        this.prisma.$queryRaw<Array<{ operationMode: string; filingStatus: string }>>`
-          SELECT "operationMode", "filingStatus"
-          FROM "TenantLegalState"
-          WHERE "tenantId" = ${row.tenantId}
-          LIMIT 1
-        `,
-      ]);
-      const stateStatus = (value: { migrationVerifiedAt: Date | null } | null) => (
-        !value ? 'MISSING' : value.migrationVerifiedAt ? 'READY' : 'UNVERIFIED'
-      );
       const resolved = await this.access.resolveTenantAccess(row.tenantId);
-      const startupState = {
-        access: resolved.status,
-        legal: legalRows[0]?.operationMode || 'MISSING',
-        profile: !profile ? 'MISSING' : profile.migrationVerifiedAt ? 'READY' : 'UNVERIFIED',
-        business: stateStatus(businessMeta),
-        operational: stateStatus(operationalState),
-        documents: stateStatus(documentState),
-        auxiliary: stateStatus(auxiliaryState),
-      };
-      const startupReady = startupState.access === 'ACTIVE'
-        && startupState.legal !== 'MISSING'
-        && startupState.profile === 'READY'
-        && startupState.business === 'READY'
-        && startupState.operational === 'READY'
-        && startupState.documents === 'READY'
-        && startupState.auxiliary === 'READY';
       return {
         tenantId: row.tenantId,
         tenantName: row.tenant.name,
@@ -172,110 +85,9 @@ export class SaasAdminService {
           registeredAt: membership.user.createdAt,
         } : null,
         invitation,
-        legalAcceptances,
-        startupState,
-        startupReady,
         access: resolved,
       };
     }));
-  }
-
-  private async validateCapabilityUpdates(rawValues: unknown[]): Promise<ValidatedCapabilityUpdate[]> {
-    const updates: ValidatedCapabilityUpdate[] = [];
-
-    for (const raw of rawValues) {
-      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
-      const value = raw as Record<string, unknown>;
-      const key = String(value.key || '').trim();
-      if (!key) continue;
-      const capability = await this.prisma.capability.findUnique({ where: { key } });
-      if (!capability || !capability.isActive) throw new BadRequestException(`Неизвестная возможность: ${key}`);
-
-      if (value.inherit === true) {
-        updates.push({
-          key,
-          capabilityId: capability.id,
-          valueType: capability.valueType,
-          defaultEnabled: capability.defaultEnabled,
-          inherit: true,
-          enabled: null,
-          limit: null,
-        });
-        continue;
-      }
-
-      if (capability.valueType === CapabilityValueType.BOOLEAN) {
-        if (typeof value.enabled !== 'boolean') throw new BadRequestException(`Для ${key} требуется ON/OFF`);
-        updates.push({
-          key,
-          capabilityId: capability.id,
-          valueType: capability.valueType,
-          defaultEnabled: capability.defaultEnabled,
-          inherit: false,
-          enabled: value.enabled,
-          limit: null,
-        });
-        continue;
-      }
-
-      const limit = value.limit === null ? null : Number(value.limit);
-      if (limit !== null && (!Number.isInteger(limit) || limit < 0)) {
-        throw new BadRequestException(`Для ${key} требуется целый лимит или без ограничения`);
-      }
-      updates.push({
-        key,
-        capabilityId: capability.id,
-        valueType: capability.valueType,
-        defaultEnabled: capability.defaultEnabled,
-        inherit: false,
-        enabled: null,
-        limit,
-      });
-    }
-
-    return updates;
-  }
-
-  private async inheritedBooleanValue(tenantId: string, update: ValidatedCapabilityUpdate) {
-    const access = await this.prisma.tenantAccess.findUnique({
-      where: { tenantId },
-      include: {
-        plan: {
-          include: {
-            capabilityValues: {
-              where: { capabilityId: update.capabilityId },
-              take: 1,
-            },
-          },
-        },
-      },
-    });
-    if (!access || access.status !== TenantAccessStatus.ACTIVE) return false;
-    if (access.isOwnerBook && !access.plan) return true;
-    const planValue = access.plan?.capabilityValues[0];
-    if (planValue && planValue.enabled !== null) return planValue.enabled;
-    return update.defaultEnabled;
-  }
-
-  private async capabilityStateChanges(tenantId: string, updates: ValidatedCapabilityUpdate[]) {
-    const before = await this.access.resolveTenantAccess(tenantId);
-    const beforeMap = new Map(before.capabilities.map((item) => [item.key, item]));
-    const changes: CapabilityStateChange[] = [];
-
-    for (const update of updates) {
-      if (update.valueType !== CapabilityValueType.BOOLEAN) continue;
-      const previous = beforeMap.get(update.key)?.enabled;
-      const next = update.inherit
-        ? await this.inheritedBooleanValue(tenantId, update)
-        : update.enabled;
-      if (typeof next !== 'boolean' || previous === next) continue;
-      changes.push({
-        capabilityId: update.capabilityId,
-        changeType: next ? CapabilityAccessChangeType.ENABLED : CapabilityAccessChangeType.DISABLED,
-      });
-    }
-
-    return changes;
   }
 
   async updateTenantAccess(tenantId: string, input: {
@@ -286,77 +98,52 @@ export class SaasAdminService {
     if (!tenantAccess) throw new NotFoundException('Book не найден');
 
     const statusText = String(input?.status || '').trim().toUpperCase();
-    let nextStatus: TenantAccessStatus | null = null;
     if (statusText) {
       if (!Object.values(TenantAccessStatus).includes(statusText as TenantAccessStatus)) {
         throw new BadRequestException('Неизвестный статус Book');
       }
-      nextStatus = statusText as TenantAccessStatus;
+      await this.prisma.tenantAccess.update({
+        where: { tenantId },
+        data: { status: statusText as TenantAccessStatus },
+      });
     }
 
-    const rawValues = Array.isArray(input?.capabilities) ? input.capabilities : [];
-    const updates = await this.validateCapabilityUpdates(rawValues);
-    const stateChanges = await this.capabilityStateChanges(tenantId, updates);
-    const batchId = stateChanges.length ? randomUUID() : '';
-    const changedAt = new Date();
+    const values = Array.isArray(input?.capabilities) ? input.capabilities : [];
+    for (const raw of values) {
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
+      const value = raw as Record<string, unknown>;
+      const key = String(value.key || '').trim();
+      if (!key) continue;
+      const capability = await this.prisma.capability.findUnique({ where: { key } });
+      if (!capability || !capability.isActive) throw new BadRequestException(`Неизвестная возможность: ${key}`);
 
-    await this.prisma.$transaction(async (tx) => {
-      if (nextStatus) {
-        await tx.tenantAccess.update({
-          where: { tenantId },
-          data: { status: nextStatus },
+      if (value.inherit === true) {
+        await this.prisma.tenantCapabilityOverride.deleteMany({
+          where: { tenantId, capabilityId: capability.id },
         });
+        continue;
       }
 
-      for (const update of updates) {
-        if (update.inherit) {
-          await tx.tenantCapabilityOverride.deleteMany({
-            where: { tenantId, capabilityId: update.capabilityId },
-          });
-          continue;
-        }
-
-        await tx.tenantCapabilityOverride.upsert({
-          where: { tenantId_capabilityId: { tenantId, capabilityId: update.capabilityId } },
-          create: {
-            tenantId,
-            capabilityId: update.capabilityId,
-            enabled: update.valueType === CapabilityValueType.BOOLEAN ? update.enabled : null,
-            limit: update.valueType === CapabilityValueType.LIMIT ? update.limit : null,
-          },
-          update: {
-            enabled: update.valueType === CapabilityValueType.BOOLEAN ? update.enabled : null,
-            limit: update.valueType === CapabilityValueType.LIMIT ? update.limit : null,
-          },
+      if (capability.valueType === CapabilityValueType.BOOLEAN) {
+        if (typeof value.enabled !== 'boolean') throw new BadRequestException(`Для ${key} требуется ON/OFF`);
+        await this.prisma.tenantCapabilityOverride.upsert({
+          where: { tenantId_capabilityId: { tenantId, capabilityId: capability.id } },
+          create: { tenantId, capabilityId: capability.id, enabled: value.enabled, limit: null },
+          update: { enabled: value.enabled, limit: null },
         });
+        continue;
       }
 
-      for (const change of stateChanges) {
-        await tx.capabilityAccessEvent.updateMany({
-          where: {
-            tenantId,
-            capabilityId: change.capabilityId,
-            cancelledAt: null,
-            OR: [
-              { summaryAcknowledgedAt: null },
-              {
-                changeType: CapabilityAccessChangeType.ENABLED,
-                detailAcknowledgedAt: null,
-              },
-            ],
-          },
-          data: { cancelledAt: changedAt },
-        });
-        await tx.capabilityAccessEvent.create({
-          data: {
-            tenantId,
-            capabilityId: change.capabilityId,
-            batchId,
-            changeType: change.changeType,
-          },
-        });
+      const limit = value.limit === null ? null : Number(value.limit);
+      if (limit !== null && (!Number.isInteger(limit) || limit < 0)) {
+        throw new BadRequestException(`Для ${key} требуется целый лимит или без ограничения`);
       }
-    });
+      await this.prisma.tenantCapabilityOverride.upsert({
+        where: { tenantId_capabilityId: { tenantId, capabilityId: capability.id } },
+        create: { tenantId, capabilityId: capability.id, enabled: null, limit },
+        update: { enabled: null, limit },
+      });
+    }
 
     return this.access.resolveTenantAccess(tenantId);
   }

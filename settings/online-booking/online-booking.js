@@ -1,5 +1,4 @@
 import { buildBookingLink } from '../../core/booking-link/index.js';
-import { CLIENT_APP_ORIGIN } from '../../core/environment.js';
 import { getCurrentUser } from '../../core/auth.js';
 import {
   BOOKING_CHOICE_STYLES,
@@ -37,8 +36,8 @@ const APPEARANCE_INFO = 'Вы задаёте настроение страниц
 
 function bookingLink(tenantId, workplaceKey = '') {
   return buildBookingLink({
-    origin: CLIENT_APP_ORIGIN,
-    pathname: '/',
+    origin: window.location.origin,
+    pathname: window.location.pathname,
     tenantId,
     workplaceKey,
   });

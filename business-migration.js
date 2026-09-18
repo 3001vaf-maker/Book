@@ -39,7 +39,7 @@ function hydrate(bundle, ready) {
   setBusinessServerReady(ready);
 }
 
-export async function initializeBusinessState() {
+export async function initializeBusinessState(account = {}) {
   setBusinessServerReady(false);
   const remoteResponse = await apiRequest('/business-state');
   const remote = await responseJson(remoteResponse, 'Не удалось загрузить Клиентов, UEI и Записи');
@@ -49,9 +49,14 @@ export async function initializeBusinessState() {
     return { source: 'server', verified: true };
   }
 
+  if (remote?.migrated || account?.user?.workspaceUnlocked) {
+    hydrate(remote, false);
+    return { source: 'server-awaiting-verification', verified: false };
+  }
+
   const bootstrapResponse = await apiRequest('/business-state/bootstrap', { method: 'POST' });
-  const bootstrapped = await responseJson(bootstrapResponse, 'Не удалось подтвердить серверное хранилище Клиентов, UEI и Записей');
+  const bootstrapped = await responseJson(bootstrapResponse, 'Не удалось создать серверное хранилище Клиентов, UEI и Записей');
   if (!bootstrapped?.verified) throw new Error('Серверное хранилище Клиентов, UEI и Записей не подтверждено');
   hydrate(bootstrapped, true);
-  return { source: remote?.migrated ? 'server-reverified' : 'server-bootstrap', verified: true };
+  return { source: 'server-bootstrap', verified: true };
 }

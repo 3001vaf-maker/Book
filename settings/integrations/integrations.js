@@ -4,30 +4,18 @@ import { actionBlock, button, emptyState, field, folderList, pageHeader } from '
 function renderTelegramForm(root, navigateBack, state = {}) {
   const connected = Boolean(state?.connected);
   const bot = String(state?.botUsername || '').trim();
-  const configuration = state?.configuration || {};
   const statusText = connected
-    ? `${bot || 'Telegram-бот'} подключён — webhook ${state?.webhookActive ? 'активен' : 'не подтверждён'}`
+    ? `${bot || 'Telegram-бот'} подключён${state?.webhookActive ? '' : ' — webhook активируется на сервере'}`
     : 'Telegram-бот не подключён.';
-  const serverText = `Сервер: ключ ${configuration.credentialsKeyConfigured ? '✓' : '—'} · API ${configuration.publicApiUrlConfigured ? '✓' : '—'} · Book ${configuration.clientAppUrlConfigured ? '✓' : '—'}`;
-  const webhookError = String(state?.webhookError || '').trim();
-  const pendingUpdates = Math.max(0, Number(state?.webhookPendingUpdateCount || 0));
-  const webhookDiagnostics = connected
-    ? `Telegram: ${webhookError ? `ошибка — ${webhookError}` : 'ошибок нет'} · очередь обновлений: ${pendingUpdates}`
-    : '';
 
   root.innerHTML = `${pageHeader('Telegram')}
     <form class="form-grid" data-telegram-integration-form>
       <div class="section-heading"><h2>${connected ? 'Подключённый бот' : 'Подключить бота'}</h2></div>
       <div class="muted">${statusText}</div>
-      <div class="muted">${serverText}</div>
-      ${connected ? '<div class="muted" data-telegram-webhook-diagnostics></div>' : ''}
       ${field({ label: connected ? 'Новый токен бота' : 'Токен бота', name: 'telegramBotToken', type: 'password', placeholder: connected ? 'Вставьте токен только для замены' : 'Вставьте токен из BotFather' })}
       <div class="muted" data-telegram-integration-status aria-live="polite"></div>
       ${actionBlock(`${button(connected ? 'Заменить токен' : 'Подключить', { type: 'submit' })}${connected ? button('Отключить', { variant: 'secondary', data: 'data-telegram-disconnect' }) : ''}${button('Назад', { variant: 'secondary', data: 'data-telegram-back' })}`)}
     </form>`;
-
-  const diagnostics = root.querySelector('[data-telegram-webhook-diagnostics]');
-  if (diagnostics) diagnostics.textContent = webhookDiagnostics;
 
   root.querySelector('[data-telegram-back]')?.addEventListener('click', navigateBack);
   root.querySelector('[data-telegram-integration-form]')?.addEventListener('submit', async (event) => {

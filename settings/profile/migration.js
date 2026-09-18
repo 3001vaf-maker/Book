@@ -15,40 +15,26 @@ function hydrate(bundle, ready) {
   setWorkplacesServerReady(ready);
 }
 
-function deviceTimeZone() {
-  try {
-    return String(Intl.DateTimeFormat().resolvedOptions().timeZone || '').trim();
-  } catch {
-    return '';
-  }
-}
-
-async function bootstrapProfile() {
-  return apiRequest('/profile/bootstrap', {
-    method: 'POST',
-    body: JSON.stringify({ timeZone: deviceTimeZone() }),
-  });
-}
-
-async function loadRemoteProfile() {
-  const response = await apiRequest('/profile');
-  return responseJson(response, 'Не удалось загрузить Profile + Workplaces');
-}
-
-export async function initializeProfileWorkplaces() {
+export async function initializeProfileWorkplaces(account = {}) {
   setProfileServerReady(false);
   setWorkplacesServerReady(false);
 
-  const remote = await loadRemoteProfile();
+  const remoteResponse = await apiRequest('/profile');
+  const remote = await responseJson(remoteResponse, 'Не удалось загрузить Profile + Workplaces');
 
   if (remote?.verified) {
     hydrate(remote, true);
     return { source: 'server', verified: true };
   }
 
-  const bootstrapResponse = await bootstrapProfile();
-  const bootstrapped = await responseJson(bootstrapResponse, 'Не удалось подтвердить серверный профиль');
+  if (remote?.migrated || account?.user?.workspaceUnlocked) {
+    hydrate(remote, false);
+    return { source: 'server-awaiting-verification', verified: false };
+  }
+
+  const bootstrapResponse = await apiRequest('/profile/bootstrap', { method: 'POST' });
+  const bootstrapped = await responseJson(bootstrapResponse, 'Не удалось создать серверный профиль');
   if (!bootstrapped?.verified) throw new Error('Серверный профиль не подтверждён');
   hydrate(bootstrapped, true);
-  return { source: remote?.migrated ? 'server-reverified' : 'server-bootstrap', verified: true };
+  return { source: 'server-bootstrap', verified: true };
 }

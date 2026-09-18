@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { MasterInvitationStatus, Prisma, Workplace as WorkplaceRow } from '@prisma/client';
+import { Prisma, Workplace as WorkplaceRow } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 
 type ProfileInput = {
@@ -18,6 +18,7 @@ type ProfileInput = {
 };
 
 type LinkInput = { type: string; url: string };
+
 type WorkplaceInput = {
   key: string;
   profileId: string;
@@ -220,37 +221,7 @@ export class ProfileService {
     };
   }
 
-  private async repairAcceptedInvitationProfile(tenantId: string, userId: string) {
-    const profile = await this.prisma.profile.findUnique({
-      where: { tenantId_userId: { tenantId, userId } },
-      select: { migrationVerifiedAt: true },
-    });
-    if (!profile || profile.migrationVerifiedAt) return;
-
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { email: true },
-    });
-    if (!user) return;
-
-    const acceptedInvitation = await this.prisma.masterInvitation.findFirst({
-      where: {
-        tenantId,
-        email: user.email,
-        status: MasterInvitationStatus.ACCEPTED,
-      },
-      select: { id: true },
-    });
-    if (!acceptedInvitation) return;
-
-    await this.prisma.profile.update({
-      where: { tenantId_userId: { tenantId, userId } },
-      data: { migrationVerifiedAt: new Date() },
-    });
-  }
-
-  async get(tenantId: string, userId: string) {
-    await this.repairAcceptedInvitationProfile(tenantId, userId);
+  get(tenantId: string, userId: string) {
     return this.bundle(tenantId, userId);
   }
 
@@ -310,11 +281,6 @@ export class ProfileService {
           ...profileData(empty, []),
           migrationVerifiedAt: new Date(),
         },
-      });
-    } else if (!existing.migrationVerifiedAt) {
-      await this.prisma.profile.update({
-        where: { tenantId_userId: { tenantId, userId } },
-        data: { migrationVerifiedAt: new Date() },
       });
     }
     return this.bundle(tenantId, userId);

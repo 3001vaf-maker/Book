@@ -20,7 +20,6 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      NODE_ENV: staging
       DATABASE_URL: postgresql://book:book_staging_local@db:5432/book_staging?schema=public
       JWT_SECRET: book-staging-local-only-change-before-remote-use
       OWNER_EMAIL: staging@book.local
@@ -29,12 +28,11 @@ services:
       FRONTEND_ORIGIN: http://localhost:8080
       PUBLIC_API_URL: http://localhost:3000
       CLIENT_APP_URL: http://localhost:8080
-      TRANSACTIONAL_EMAIL_PROVIDER: staging-memory
       WEB_PUSH_VAPID_PUBLIC_KEY: BHiWL1O1iVRVOfjqlev6lQZc-bDwmzpb1EI5mMpPsFgshXHKikRBwr4PkBOAHmzijHJtILulRxHjZxEUERP73Gs
       WEB_PUSH_VAPID_PRIVATE_KEY: gxC9jcEI6J7exbNd0NA-KlF3w1ZfhIKyXnmEPCvyiig
       WEB_PUSH_VAPID_SUBJECT: mailto:staging@book.local
       PORT: 3000
-    command: ["sh", "-c", "npx prisma migrate deploy && npm run seed:owner && npm run seed:staging && npx ts-node prisma/seed-staging-publication.ts && node dist/main.js"]
+    command: ["sh", "-c", "npx prisma migrate deploy && npm run seed:owner && npm run seed:staging && node dist/main.js"]
     ports:
       - "3000:3000"
     depends_on:

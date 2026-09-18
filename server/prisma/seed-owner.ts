@@ -1,4 +1,4 @@
-import { PrismaClient, MembershipRole, TenantAccessStatus } from '@prisma/client';
+import { PrismaClient, MembershipRole } from '@prisma/client';
 import { hash } from 'bcryptjs';
 
 const prisma = new PrismaClient();
@@ -13,33 +13,8 @@ async function main() {
   }
 
   const existing = await prisma.user.findUnique({ where: { email } });
+
   if (existing) {
-    const membership = await prisma.membership.findFirst({
-      where: { userId: existing.id, role: MembershipRole.OWNER },
-      orderBy: { createdAt: 'asc' },
-    });
-    if (!membership) {
-      throw new Error('Configured OWNER_EMAIL exists but has no OWNER membership; refusing implicit platform-admin promotion');
-    }
-    await prisma.$transaction(async (tx) => {
-      await tx.tenantAccess.upsert({
-        where: { tenantId: membership.tenantId },
-        create: {
-          tenantId: membership.tenantId,
-          status: TenantAccessStatus.ACTIVE,
-          isOwnerBook: true,
-        },
-        update: {
-          status: TenantAccessStatus.ACTIVE,
-          isOwnerBook: true,
-        },
-      });
-      await tx.platformAdmin.upsert({
-        where: { userId: existing.id },
-        create: { userId: existing.id },
-        update: {},
-      });
-    });
     return;
   }
 
@@ -53,14 +28,6 @@ async function main() {
     await tx.membership.create({
       data: { tenantId: tenant.id, userId: user.id, role: MembershipRole.OWNER },
     });
-    await tx.tenantAccess.create({
-      data: {
-        tenantId: tenant.id,
-        status: TenantAccessStatus.ACTIVE,
-        isOwnerBook: true,
-      },
-    });
-    await tx.platformAdmin.create({ data: { userId: user.id } });
   });
 }
 
