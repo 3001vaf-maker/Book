@@ -19,6 +19,11 @@ export class DocumentStateController {
     return this.documents.get(request.auth!.tenantId);
   }
 
+  @Get('templates')
+  templates() {
+    return this.documents.userDocumentBases();
+  }
+
   @Get('consents/report')
   consentReport(@Req() request: AuthenticatedRequest) {
     return this.consentPolicy.consentReport(request.auth!.tenantId);
