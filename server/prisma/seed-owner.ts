@@ -27,11 +27,11 @@ async function main() {
         create: {
           tenantId: membership.tenantId,
           status: TenantAccessStatus.ACTIVE,
-          isOwnerBook: true,
+          isPlatformOwnerWorkspace: true,
         },
         update: {
           status: TenantAccessStatus.ACTIVE,
-          isOwnerBook: true,
+          isPlatformOwnerWorkspace: true,
         },
       });
       await tx.platformAdmin.upsert({
@@ -57,7 +57,7 @@ async function main() {
       data: {
         tenantId: tenant.id,
         status: TenantAccessStatus.ACTIVE,
-        isOwnerBook: true,
+        isPlatformOwnerWorkspace: true,
       },
     });
     await tx.platformAdmin.create({ data: { userId: user.id } });
