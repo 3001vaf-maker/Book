@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { getBookDocumentBases } from '../admin/documents/catalog.js';
+import { getBookDocumentBases } from '../admin/document-registry/catalog.js';
 import {
   buildBookDocuments,
   configureBookDocumentBases,
@@ -17,7 +17,7 @@ assert.doesNotMatch(activeData, /Состав данных, цели, дейст
 assert.doesNotMatch(activeData, /Я согласен\(на\) получать информационные сообщения/);
 
 assert.match(migration, /getBookDocumentBases/);
-assert.match(migration, /\.\/admin\/documents\/catalog\.js/);
+assert.match(migration, /\.\/admin\/document-registry\/catalog\.js/);
 assert.doesNotMatch(migration, /getDefaultDocuments/);
 
 const bases = getBookDocumentBases();
