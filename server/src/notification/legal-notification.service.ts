@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { BusinessStateService } from '../business-state/business-state.service';
-import { ConsentPolicyService } from '../document-state/consent-policy.service';
 import { LegalRuntimeService } from '../legal-runtime/legal-runtime.service';
 import { PrismaService } from '../prisma.service';
 import { SaasAccessService } from '../saas-access/saas-access.service';
@@ -24,12 +23,11 @@ export class LegalNotificationService extends NotificationService {
   constructor(
     prisma: PrismaService,
     businessState: BusinessStateService,
-    documents: ConsentPolicyService,
     webPush: WebPushService,
     private readonly legal: LegalRuntimeService,
     private readonly access: SaasAccessService,
   ) {
-    super(prisma, businessState, documents, webPush);
+    super(prisma, businessState, webPush);
     this.prismaRef = prisma;
   }
 
@@ -86,12 +84,10 @@ export class LegalNotificationService extends NotificationService {
   }
 
   override async canSendEmailDelivery(tenantId: string, notificationId: string) {
-    if (!(await this.assertExternalDelivery(tenantId, notificationId, 'EMAIL'))) return false;
-    return super.canSendEmailDelivery(tenantId, notificationId);
+    return this.assertExternalDelivery(tenantId, notificationId, 'EMAIL');
   }
 
   override async canSendTelegramDelivery(tenantId: string, notificationId: string) {
-    if (!(await this.assertExternalDelivery(tenantId, notificationId, 'TELEGRAM'))) return false;
-    return super.canSendTelegramDelivery(tenantId, notificationId);
+    return this.assertExternalDelivery(tenantId, notificationId, 'TELEGRAM');
   }
 }

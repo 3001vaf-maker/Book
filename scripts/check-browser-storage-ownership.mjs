@@ -12,7 +12,6 @@ const TECHNICAL_STORAGE_OWNERS = new Set([
   'core/booking-account/index.js',
   'core/workplace-context.js',
   'main/clients/view-state.js',
-  'onboarding/onboarding.js',
 ]);
 
 const CLEANUP_OWNER = 'core/legacy-browser-business.js';

@@ -31,6 +31,18 @@ function profileCard(p){
   });
 }
 
+let demoProfileGuideShown = false;
+
+function maybeShowDemoProfileGuide(options={}) {
+  if (!options.demoGuide || demoProfileGuideShown) return;
+  const profile=getProfile();
+  const phones=Array.isArray(profile.phones)?profile.phones:[];
+  if(profile.name&&phones.length&&profile.profession&&profile.profession!=='Другая'&&getWorkplaces().length)return;
+  demoProfileGuideShown=true;
+  const m=mountModal(document.body,modal(`<div class="modal-title"><h2>Заполните профиль</h2><p>Book использует данные профиля для вашего рабочего пространства и автоматически формирует документы для клиентов только после того, как профиль готов.</p></div><div class="demo-help-note"><strong>Что заполнить</strong><p>Имя и контакт · профессию · хотя бы одно рабочее место. После сохранения Book сам подготовит документы — отдельного юридического экрана не будет.</p></div>${actionBlock(button('Понятно',{data:'data-profile-guide-done'}))}`,{variant:'medium',surface:'app'}));
+  m?.querySelector('[data-profile-guide-done]')?.addEventListener('click',()=>m.remove());
+}
+
 function showProfileError(message){
   mountModal(document.body,modal(`<div class="modal-title"><h2>Не удалось сохранить</h2><p>${escapeHtml(message||'Ошибка сервера')}</p></div>`,{variant:'compact'}));
 }
@@ -110,7 +122,7 @@ export async function saveOnboardingProfile(root){
   }
 }
 
-function renderProfile(root,navigateBack,options={}){
+function renderProfile(root,navigateBack,options={}){queueMicrotask(()=>maybeShowDemoProfileGuide(options));
   const p=getProfile(),profession=p.profession||'';
   const emails=p.emails?.length?p.emails:(options.accountEmail?[options.accountEmail]:[]);
   const items=[

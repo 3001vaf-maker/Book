@@ -4,6 +4,9 @@ import { renderTimetable } from './timetable/timetable.js';
 import { renderSettings } from './settings/settings.js';
 import { renderChat } from './chat/chat.js';
 import { getWorkplaces as getWorkplaceEntities } from './settings/profile/workplaces/data.js';
+import { getProfile } from './settings/profile/data.js';
+import { getProcedures } from './settings/service/procedures/data.js';
+import { getDays } from './core/day/index.js';
 import { initializeProfileWorkplaces } from './settings/profile/migration.js';
 import { initializeBusinessState } from './business-migration.js';
 import { initializeOperationalState } from './operational-migration.js';
@@ -15,11 +18,10 @@ import { configureTimeUsageSource, configureSoftTimeUsageReleaseSource } from '.
 import { apiRequest, getCurrentUser, login } from './core/auth.js';
 import { BOOK_APP_ORIGIN, CLIENT_APP_ORIGIN } from './core/environment.js';
 import { canUseBookCapability, getBookAccess, loadBookAccess } from './core/access.js';
-import { isOnboardingComplete, renderOnboarding } from './onboarding/onboarding.js';
 import { startServerBookingSync } from './online-booking/server-sync.js';
 import { renderOnlineBooking } from './online-booking/booking.js';
 import { startBookingClientRuntime } from './online-booking/client-runtime.js';
-import { bottomNavigation } from './ui/ui.js';
+import { bottomNavigation, modal, mountModal, button, actionBlock, escapeHtml } from './ui/ui.js';
 import { clearLegacyBusinessStorage } from './core/legacy-browser-business.js';
 
 configureWorkplaceSource(getWorkplaceEntities);
@@ -46,6 +48,12 @@ let disposeView = () => {};
 let workspaceReady = false;
 let authenticatedAccount = null;
 let serverBookingSyncStarted = false;
+let tenantRuntime = { state: { operationMode: 'LIVE' } };
+let pendingSettingsFolder = '';
+let documentSyncRunning = false;
+let documentSyncPending = false;
+
+const RKN_NOTIFICATION_URL = 'https://pd.rkn.gov.ru/operators-registry/notification/form/';
 
 function syncViewport() {
   const vv = window.visualViewport;
@@ -143,6 +151,10 @@ function navigate(section) {
   history.replaceState({}, '', `#${section}`);
 }
 
+function isDemoMode() {
+  return getBookAccess().isOwnerBook !== true && tenantRuntime?.state?.operationMode !== 'LIVE';
+}
+
 function renderWorkspace() {
   app.classList.remove('app-shell--booking');
   workspaceReady = true;
@@ -150,11 +162,17 @@ function renderWorkspace() {
   disposeView = () => {};
   if (!sectionAllowed(state.activeSection)) state.activeSection = defaultSection();
   const view = routes[state.activeSection];
-  app.innerHTML = `<main class="app-content" id="app-content"></main>${bottomNavigation(state.activeSection, allowedSections())}`;
-  const nextDispose = view(document.querySelector('#app-content'), { navigate });
+  const demoBanner = isDemoMode()
+    ? '<button class="demo-mode-banner" type="button" data-demo-banner><strong>DEMO</strong><span>Режим настройки · перейти к LIVE</span><b>›</b></button>'
+    : '';
+  app.innerHTML = `${demoBanner}<main class="app-content ${isDemoMode() ? 'app-content--with-demo-banner' : ''}" id="app-content"></main>${bottomNavigation(state.activeSection, allowedSections())}`;
+  const requestedFolder = state.activeSection === 'settings' ? pendingSettingsFolder : '';
+  pendingSettingsFolder = '';
+  const nextDispose = view(document.querySelector('#app-content'), { navigate, openFolder: requestedFolder, demo: isDemoMode() });
   if (typeof nextDispose === 'function') disposeView = nextDispose;
-  app.querySelectorAll('[data-nav]').forEach((button) => {
-    button.addEventListener('click', () => navigate(button.dataset.nav));
+  app.querySelector('[data-demo-banner]')?.addEventListener('click', openDemoHub);
+  app.querySelectorAll('[data-nav]').forEach((navButton) => {
+    navButton.addEventListener('click', () => navigate(navButton.dataset.nav));
   });
   syncViewport();
 }
@@ -194,193 +212,315 @@ function renderSuspended() {
 }
 
 
-const MASTER_LEGAL_DOCUMENTS = [
-  { key: 'privacy-policy', type: 'PRIVACY_POLICY', title: 'Политика обработки персональных данных мастера', requiredForLive: true, requiredForPublicBooking: true },
-  { key: 'client-pd-consent', type: 'CLIENT_PD_CONSENT', title: 'Согласие клиента на обработку персональных данных', requiredForLive: true, requiredForPublicBooking: true },
-  { key: 'service-offer', type: 'SERVICE_OFFER', title: 'Условия оказания услуг / договор-оферта мастера', requiredForLive: true, requiredForPublicBooking: true },
-  { key: 'marketing-consent', type: 'MARKETING_CONSENT', title: 'Согласие клиента на рекламные и маркетинговые сообщения', requiredForLive: false, requiredForPublicBooking: true },
-];
-
-const MASTER_LEGAL_CHECKLIST_LABELS = {
-  operatorIdentityConfigured: 'Реквизиты оператора зафиксированы',
-  privacyPolicyPublished: 'Политика обработки ПД опубликована',
-  clientDocumentsPrepared: 'Документы для клиентов подготовлены',
-  dpaAccepted: 'Поручение Book на обработку ПД (DPA) принято',
-};
-
-async function tenantLegalRequest(path, options = {}) {
-  const response = await apiRequest(`/legal${path}`, options);
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload?.message || 'Ошибка юридической подготовки');
-  return payload;
+function profileSetupReady() {
+  const profile = getProfile();
+  const phones = Array.isArray(profile.phones) ? profile.phones : [];
+  return Boolean(String(profile.name || '').trim()
+    && String(profile.profession || '').trim()
+    && phones.length
+    && getWorkplaceEntities().length);
 }
 
-function masterLegalDocumentByKey(readiness, key) {
-  return (Array.isArray(readiness?.documents) ? readiness.documents : []).find((item) => item.key === key) || null;
+function openSettingsTarget(folder) {
+  state.activeSection = 'settings';
+  pendingSettingsFolder = folder;
+  renderWorkspace();
+  history.replaceState({}, '', '#settings');
 }
 
-function masterLegalIdentity(readiness) {
-  for (const document of Array.isArray(readiness?.documents) ? readiness.documents : []) {
-    const identity = document?.currentVersion?.operatorIdentitySnapshot;
-    if (identity && typeof identity === 'object' && Object.keys(identity).length) return identity;
-  }
-  return {};
+function closeModal(node) {
+  node?.closest('.modal-backdrop')?.remove();
 }
 
-async function syncMasterLegalChecklist(readiness) {
-  const documents = Array.isArray(readiness?.documents) ? readiness.documents : [];
-  const keys = new Set(documents.filter((item) => item.currentVersion).map((item) => item.key));
-  const identity = masterLegalIdentity(readiness);
-  const patch = {
-    operatorIdentityConfigured: Boolean(String(identity.name || '').trim()),
-    privacyPolicyPublished: keys.has('privacy-policy'),
-    clientDocumentsPrepared: ['privacy-policy', 'client-pd-consent', 'service-offer'].every((key) => keys.has(key)),
-  };
-  const current = readiness?.state?.checklist || {};
-  const changed = Object.entries(patch).some(([key, value]) => current[key] !== value);
-  return changed ? tenantLegalRequest('/checklist', { method: 'PUT', body: JSON.stringify({ checklist: patch }) }) : readiness;
+function setupRow(label, ready, target) {
+  return `<button class="demo-setup-row" type="button" data-demo-target="${escapeHtml(target)}">
+    <span>${ready ? '✓' : '○'}</span><strong>${escapeHtml(label)}</strong><b>›</b>
+  </button>`;
 }
 
-function renderMasterLegalSetup(account, readiness) {
-  workspaceReady = false;
-  disposeView();
-  disposeView = () => {};
-  app.classList.remove('app-shell--booking');
-  const legalState = readiness?.state || {};
-  const checklist = legalState.checklist && typeof legalState.checklist === 'object' ? legalState.checklist : {};
-  const documents = Array.isArray(readiness?.documents) ? readiness.documents : [];
-  const identity = masterLegalIdentity(readiness);
-  const filing = legalState.filingStatus || 'NOT_PREPARED';
+function openDemoHub() {
+  const rows = [
+    setupRow('Профиль и рабочее место', profileSetupReady(), 'profile'),
+    canUseBookCapability('services.access') ? setupRow('Услуги и цены', getProcedures().length > 0, 'service') : '',
+    canUseBookCapability('timetable.access') ? setupRow('График работы', getDays().length > 0, 'timetable') : '',
+    canUseBookCapability('documents.access') ? setupRow('Документы для клиентов', profileSetupReady(), 'documents') : '',
+  ].filter(Boolean).join('');
 
-  app.innerHTML = `
-    <main class="auth-view" style="align-items:flex-start;padding:24px 12px;overflow:auto">
-      <section class="auth-card" style="width:min(760px,100%);max-width:760px">
-        <div class="auth-card__heading">
-          <h1>Юридическая готовность Book</h1>
-          <p>Режим: <strong>${escapeHtmlText(legalState.operationMode || 'DEMO')}</strong>. До LIVE рабочая часть Book закрыта.</p>
-        </div>
+  const m = mountModal(document.body, modal(`
+    <div class="modal-title">
+      <h2>Book работает в DEMO</h2>
+      <p>Настраивайте приложение и знакомьтесь с доступными разделами. Реальные клиентские операции откроются после перехода в LIVE.</p>
+    </div>
+    <div class="demo-setup-list">${rows}</div>
+    ${actionBlock(button('Перейти к LIVE', { data: 'data-demo-go-live' }))}
+  `, { variant: 'medium', surface: 'app' }));
+  if (!m) return;
 
-        <section style="display:grid;gap:10px;margin-top:18px">
-          <h2 style="font-size:18px;margin:0">1. Реквизиты оператора</h2>
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px">
-            <label class="field"><span>Оператор / ИП</span><input data-legal-identity="name" value="${escapeHtmlText(identity.name || '')}"></label>
-            <label class="field"><span>ИНН</span><input data-legal-identity="inn" value="${escapeHtmlText(identity.inn || '')}"></label>
-            <label class="field"><span>ОГРНИП</span><input data-legal-identity="ogrnip" value="${escapeHtmlText(identity.ogrnip || '')}"></label>
-            <label class="field"><span>Email</span><input data-legal-identity="email" type="email" value="${escapeHtmlText(identity.email || account?.user?.email || '')}"></label>
-            <label class="field"><span>Телефон</span><input data-legal-identity="phone" value="${escapeHtmlText(identity.phone || '')}"></label>
-            <label class="field"><span>Адрес</span><input data-legal-identity="address" value="${escapeHtmlText(identity.address || '')}"></label>
-          </div>
-        </section>
-
-        <section style="display:grid;gap:10px;margin-top:22px">
-          <h2 style="font-size:18px;margin:0">2. Документы мастера</h2>
-          ${MASTER_LEGAL_DOCUMENTS.map((preset) => {
-            const document = masterLegalDocumentByKey(readiness, preset.key);
-            const version = document?.currentVersion;
-            return `<button class="ui-button" style="justify-content:space-between" data-master-legal-doc="${escapeHtmlText(preset.key)}"><span>${escapeHtmlText(preset.title)}</span><span>${version ? `v${Number(version.version || 1)}` : 'добавить'}</span></button>`;
-          }).join('')}
-          <div data-master-legal-editor></div>
-        </section>
-
-        <section style="display:grid;gap:8px;margin-top:22px">
-          <h2 style="font-size:18px;margin:0">3. Готовность</h2>
-          ${(readiness?.checklistKeys || []).map((key) => `<label style="display:flex;gap:9px;align-items:center"><input type="checkbox" data-master-check="${escapeHtmlText(key)}" ${checklist[key] === true ? 'checked' : ''} disabled><span>${escapeHtmlText(MASTER_LEGAL_CHECKLIST_LABELS[key] || key)}</span></label>`).join('')}
-          <p class="auth-error" data-master-legal-message></p>
-        </section>
-
-        <section style="display:grid;gap:10px;margin-top:22px">
-          <h2 style="font-size:18px;margin:0">4. Роскомнадзор</h2>
-          ${filing === 'SUBMITTED'
-            ? `<p style="margin:0">Подача зафиксирована: ${escapeHtmlText(legalState.submissionReference || '—')}</p>`
-            : `<form data-master-submitted-form style="display:grid;gap:10px">
-                <label class="field"><span>Регистрационный номер / подтверждение подачи</span><input name="submissionReference" required></label>
-                <button class="ui-button" type="submit">Сохранить и начать работу</button>
-              </form>`}
-        </section>
-      </section>
-    </main>`;
-
-  app.querySelectorAll('[data-master-legal-doc]').forEach((button) => {
-    button.addEventListener('click', () => renderMasterLegalDocumentEditor(account, readiness, button.dataset.masterLegalDoc));
-  });
-
-  app.querySelector('[data-master-submitted-form]')?.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const message = app.querySelector('[data-master-legal-message]');
-    const data = new FormData(event.currentTarget);
-    try {
-      const next = await tenantLegalRequest('/filing/submitted', {
-        method: 'POST',
-        body: JSON.stringify({
-          submissionReference: String(data.get('submissionReference') || '').trim(),
-          evidenceMetadata: { source: 'user-rkn-entry' },
-        }),
-      });
-      if (next?.state?.operationMode !== 'LIVE') throw new Error('После данных Роскомнадзора рабочий режим не включился');
-      await renderAuthenticated(account);
-    } catch (error) {
-      message.textContent = error instanceof Error ? error.message : 'Не удалось завершить подготовку';
-    }
-  });
-
-  syncViewport();
-}
-
-function escapeHtmlText(value) {
-  return String(value ?? '').replace(/[&<>"']/g, (char) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;',
-  })[char]);
-}
-
-function renderMasterLegalDocumentEditor(account, readiness, key) {
-  const preset = MASTER_LEGAL_DOCUMENTS.find((item) => item.key === key);
-  if (!preset) return;
-  const document = masterLegalDocumentByKey(readiness, key);
-  const current = document?.currentVersion || null;
-  const editor = app.querySelector('[data-master-legal-editor]');
-  if (!editor) return;
-  editor.innerHTML = `
-    <form data-master-document-form style="display:grid;gap:10px;padding:14px;border:1px solid #ddd;border-radius:12px">
-      <strong>${escapeHtmlText(preset.title)}</strong>
-      <label class="field"><span>Название</span><input name="title" value="${escapeHtmlText(document?.title || preset.title)}" required></label>
-      <label class="field"><span>Текст документа</span><textarea name="content" rows="16" required>${escapeHtmlText(current?.contentSnapshot || '')}</textarea></label>
-      <p class="auth-error" data-master-document-message></p>
-      <button class="ui-button" type="submit">Опубликовать версию</button>
-    </form>`;
-  const form = editor.querySelector('[data-master-document-form]');
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const message = form.querySelector('[data-master-document-message]');
-    const data = new FormData(form);
-    const identity = {};
-    app.querySelectorAll('[data-legal-identity]').forEach((input) => {
-      identity[input.dataset.legalIdentity] = String(input.value || '').trim();
+  m.querySelectorAll('[data-demo-target]').forEach((row) => {
+    row.addEventListener('click', () => {
+      const target = row.dataset.demoTarget;
+      m.remove();
+      if (target === 'timetable') {
+        navigate('timetable');
+        return;
+      }
+      openSettingsTarget(target);
     });
-    if (!String(identity.name || '').trim()) {
-      message.textContent = 'Укажите оператора / ИП.';
+  });
+  m.querySelector('[data-demo-go-live]')?.addEventListener('click', () => {
+    m.remove();
+    openLiveChoice();
+  });
+}
+
+function openLiveChoice() {
+  const m = mountModal(document.body, modal(`
+    <div class="modal-title">
+      <h2>Переход в LIVE</h2>
+      <p>В LIVE Book позволяет работать с реальными клиентами и их персональными данными. Book помогает подготовиться, но не определяет за вас ваши правовые основания и не заменяет юридическую консультацию.</p>
+    </div>
+    <div class="demo-choice-list">
+      <button class="demo-choice" type="button" data-live-ready>
+        <strong>Я уже могу работать с персональными данными</strong>
+        <span>Я сам проверил свои основания и принимаю ответственность за свою работу с данными клиентов.</span>
+      </button>
+      <button class="demo-choice" type="button" data-live-help>
+        <strong>Мне нужна помощь</strong>
+        <span>Book покажет, как подготовиться и где подать уведомление в Роскомнадзор.</span>
+      </button>
+    </div>
+  `, { variant: 'medium', surface: 'app' }));
+  if (!m) return;
+  m.querySelector('[data-live-ready]')?.addEventListener('click', () => {
+    m.remove();
+    openReadyConfirmation();
+  });
+  m.querySelector('[data-live-help]')?.addEventListener('click', () => {
+    m.remove();
+    openRknHelp();
+  });
+}
+
+function responsibilityCheck(label) {
+  return `<label class="demo-responsibility"><input type="checkbox" data-responsibility><span>${escapeHtml(label)}</span></label>`;
+}
+
+function openReadyConfirmation() {
+  const m = mountModal(document.body, modal(`
+    <div class="modal-title">
+      <h2>Подтвердите решение</h2>
+      <p>Book не просит загружать ИНН, ОГРНИП, паспорт или документы Роскомнадзора. Мы фиксируем только ваше решение перейти к работе.</p>
+    </div>
+    ${responsibilityCheck('Я понимаю, что сам отвечаю за наличие правовых оснований, уведомления и соблюдение требований при работе с персональными данными клиентов.')}
+    <p class="form-error" data-live-error></p>
+    ${actionBlock(button('Включить LIVE', { data: 'data-confirm-live' }))}
+  `, { variant: 'medium', surface: 'app' }));
+  if (!m) return;
+  m.querySelector('[data-confirm-live]')?.addEventListener('click', async () => {
+    if (!m.querySelector('[data-responsibility]')?.checked) {
+      m.querySelector('[data-live-error]').textContent = 'Подтвердите, что решение принимаете вы.';
       return;
     }
-    try {
-      await tenantLegalRequest('/documents', {
-        method: 'POST',
-        body: JSON.stringify({
-          key: preset.key,
-          type: preset.type,
-          title: String(data.get('title') || preset.title),
-          content: String(data.get('content') || ''),
-          operatorIdentity: identity,
-          requiredForRegistration: false,
-          requiredForLive: preset.requiredForLive,
-          requiredForPublicBooking: preset.requiredForPublicBooking,
-        }),
-      });
-      let next = await tenantLegalRequest('/readiness');
-      next = await syncMasterLegalChecklist(next);
-      renderMasterLegalSetup(account, next);
-    } catch (error) {
-      message.textContent = error instanceof Error ? error.message : 'Не удалось опубликовать документ';
-    }
+    await activateLive(m, {
+      decision: 'READY',
+      rknStatus: 'UNKNOWN',
+      responsibilityAcknowledged: true,
+    });
   });
+}
+
+function printableRknGuide() {
+  const profile = getProfile();
+  const workplaces = getWorkplaceEntities();
+  const fullName = [profile.name, profile.surname].filter(Boolean).join(' ') || 'Пользователь Book';
+  const contact = (profile.emails || [])[0] || (profile.phones || [])[0] || '';
+  const work = workplaces[0] || {};
+  const win = window.open('', '_blank');
+  if (!win) return;
+  const safe = (value) => escapeHtml(String(value || '—'));
+  win.document.write(`<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Помощник РКН · Book</title>
+    <style>body{font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;max-width:760px;margin:40px auto;padding:0 24px;color:#292522}h1{font-size:30px}h2{margin-top:30px;font-size:21px}.card{padding:16px;border:1px solid #ddd;border-radius:14px;margin:12px 0}a{color:#292522;font-weight:700}button{padding:12px 18px;border:0;border-radius:12px;background:#292522;color:white;font-weight:700}@media print{button{display:none}}</style>
+    </head><body>
+    <h1>Помощник по уведомлению Роскомнадзора</h1>
+    <p>Эта памятка помогает пройти подачу самостоятельно. Она не является подтверждением обязанности или освобождения от неё.</p>
+    <h2>Данные, которые уже есть в вашем Book</h2>
+    <div class="card"><b>Имя:</b> ${safe(fullName)}<br><b>Контакт:</b> ${safe(contact)}<br><b>Рабочее место:</b> ${safe([work.city, work.address].filter(Boolean).join(', '))}</div>
+    <h2>Шаг 1. Откройте форму Роскомнадзора</h2>
+    <p><a href="${RKN_NOTIFICATION_URL}" target="_blank" rel="noopener">Открыть официальную форму уведомления</a></p>
+    <h2>Шаг 2. Заполняйте сведения о своей работе</h2>
+    <p>Указывайте только сведения, относящиеся к вашей деятельности. Не передавайте Book паспорт, ИНН, ОГРНИП, сканы заявления или иные лишние документы.</p>
+    <h2>Шаг 3. После подачи</h2>
+    <p>Сохраните подтверждение подачи у себя. В Book достаточно отметить, что вы подали уведомление; номер можно указать добровольно.</p>
+    <h2>Ответственность</h2>
+    <p>За полноту, правильность и своевременность сведений, которые вы подаёте в Роскомнадзор, отвечаете вы как оператор своих клиентских данных.</p>
+    <button onclick="window.print()">Печать / сохранить как PDF</button>
+    </body></html>`);
+  win.document.close();
+}
+
+function openRknHelp() {
+  const m = mountModal(document.body, modal(`
+    <div class="modal-title">
+      <h2>Помощник по персональным данным</h2>
+      <p>Если вы ещё не подготовились к работе с персональными данными, Book поможет пройти путь без лишней юридической терминологии.</p>
+    </div>
+    <div class="demo-help-note">
+      <strong>Что сделать</strong>
+      <p>Проверьте, требуется ли вам уведомление Роскомнадзора, и при необходимости подайте его до начала обработки. Book не просит присылать нам заявление или ваши дополнительные реквизиты.</p>
+    </div>
+    <div class="modal-actions">
+      <button class="ui-button ui-button--secondary" type="button" data-rkn-open>Открыть Роскомнадзор</button>
+      <button class="ui-button ui-button--secondary" type="button" data-rkn-guide>Инструкция · сохранить PDF</button>
+    </div>
+    <label class="field" style="margin-top:14px"><span>Номер подачи / регистрации — необязательно</span><input data-rkn-reference></label>
+    ${responsibilityCheck('Я понимаю, что Book помогает с процессом, но я сам отвечаю за правильность и своевременность своих действий.')}
+    <p class="form-error" data-live-error></p>
+    <div class="modal-actions">
+      <button class="ui-button" type="button" data-rkn-submitted>Я подал уведомление · включить LIVE</button>
+      <button class="ui-button ui-button--secondary" type="button" data-rkn-skip>Продолжить без подтверждения</button>
+    </div>
+  `, { variant: 'medium', surface: 'app' }));
+  if (!m) return;
+
+  m.querySelector('[data-rkn-open]')?.addEventListener('click', () => window.open(RKN_NOTIFICATION_URL, '_blank', 'noopener'));
+  m.querySelector('[data-rkn-guide]')?.addEventListener('click', printableRknGuide);
+  m.querySelector('[data-rkn-submitted]')?.addEventListener('click', async () => {
+    if (!m.querySelector('[data-responsibility]')?.checked) {
+      m.querySelector('[data-live-error]').textContent = 'Подтвердите, что решение принимаете вы.';
+      return;
+    }
+    await activateLive(m, {
+      decision: 'GUIDED_SUBMITTED',
+      rknStatus: 'SUBMITTED',
+      submissionReference: String(m.querySelector('[data-rkn-reference]')?.value || '').trim(),
+      responsibilityAcknowledged: true,
+    });
+  });
+  m.querySelector('[data-rkn-skip]')?.addEventListener('click', () => {
+    m.remove();
+    openSkipWarning();
+  });
+}
+
+function openSkipWarning() {
+  const m = mountModal(document.body, modal(`
+    <div class="modal-title">
+      <h2>Продолжить без подтверждения?</h2>
+      <p>Book не будет блокировать вашу работу. При этом Book не подтверждает, что ваши обязанности по персональным данным выполнены. До начала работы с реальными данными вы самостоятельно оцениваете и выполняете требования закона.</p>
+    </div>
+    ${responsibilityCheck('Я прочитал предупреждение и самостоятельно принимаю решение перейти в LIVE.')}
+    <p class="form-error" data-live-error></p>
+    ${actionBlock(button('Всё равно включить LIVE', { data: 'data-skip-confirm' }))}
+  `, { variant: 'medium', surface: 'app' }));
+  if (!m) return;
+  m.querySelector('[data-skip-confirm]')?.addEventListener('click', async () => {
+    if (!m.querySelector('[data-responsibility]')?.checked) {
+      m.querySelector('[data-live-error]').textContent = 'Подтвердите своё решение.';
+      return;
+    }
+    await activateLive(m, {
+      decision: 'CONTINUE_WITHOUT_CONFIRMATION',
+      rknStatus: 'NOT_SUBMITTED',
+      responsibilityAcknowledged: true,
+    });
+  });
+}
+
+async function activateLive(modalNode, payload) {
+  const error = modalNode.querySelector('[data-live-error]');
+  try {
+    const next = await tenantLegalRequest('/live', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    tenantRuntime = next;
+    if (canUseBookCapability('online_booking.access')) {
+      await apiRequest('/online-booking/owner/publication', {
+        method: 'PUT',
+        body: JSON.stringify({ data: { source: 'live-activation' } }),
+      }).catch(() => null);
+    }
+    modalNode.remove();
+    renderWorkspace();
+    const done = mountModal(document.body, modal(`
+      <div class="modal-title"><h2>LIVE включён</h2><p>Теперь Book работает с реальными данными в рамках доступных вам функций.</p></div>
+      ${actionBlock(button('Продолжить', { data: 'data-live-done' }))}
+    `, { variant: 'compact', surface: 'app' }));
+    done?.querySelector('[data-live-done]')?.addEventListener('click', () => done.remove());
+  } catch (activateError) {
+    if (error) error.textContent = activateError instanceof Error ? activateError.message : 'Не удалось включить LIVE';
+  }
+}
+
+function maybeShowDemoWelcome() {
+  if (!isDemoMode() || !authenticatedAccount?.tenant?.id) return;
+  if (Number(authenticatedAccount?.user?.onboardingStep || 0) >= 1) return;
+  const m = mountModal(document.body, modal(`
+    <div class="modal-title">
+      <h2>Вы в DEMO</h2>
+      <p>Это настоящий Book в режиме настройки. Можно свободно изучать доступные разделы. Начать удобнее с профиля — после его заполнения Book автоматически подготовит документы для клиентов.</p>
+    </div>
+    <div class="modal-actions">
+      <button class="ui-button" type="button" data-demo-profile>Заполнить профиль</button>
+      <button class="ui-button ui-button--secondary" type="button" data-demo-later>Позже</button>
+    </div>
+  `, { variant: 'medium', surface: 'app' }));
+  const acknowledge = async () => {
+    try {
+      const response = await apiRequest('/auth/onboarding-step', {
+        method: 'POST',
+        body: JSON.stringify({ step: 1 }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (response.ok && payload?.user && authenticatedAccount?.user) {
+        authenticatedAccount.user.onboardingStep = Number(payload.user.onboardingStep || 1);
+      }
+    } catch {
+      // The guide may be shown again next time if the acknowledgement could not be saved.
+    }
+  };
+  m?.querySelector('[data-demo-profile]')?.addEventListener('click', async () => {
+    await acknowledge();
+    m.remove();
+    openSettingsTarget('profile');
+  });
+  m?.querySelector('[data-demo-later]')?.addEventListener('click', async () => {
+    await acknowledge();
+    m.remove();
+  });
+}
+
+async function syncDocumentsFromProfileContext() {
+  if (!authenticatedAccount) return;
+  if (documentSyncRunning) {
+    documentSyncPending = true;
+    return;
+  }
+  documentSyncRunning = true;
+  try {
+    const result = await initializeDocumentState(authenticatedAccount);
+    if (result?.source === 'server-reconciled') {
+      if (tenantRuntime?.state?.operationMode === 'LIVE' && canUseBookCapability('online_booking.access')) {
+        await apiRequest('/online-booking/owner/publication', {
+          method: 'PUT',
+          body: JSON.stringify({ data: { source: 'document-auto-refresh' } }),
+        }).catch(() => null);
+      }
+      const notice = mountModal(document.body, modal(`
+        <div class="modal-title"><h2>Документы обновлены</h2><p>Book автоматически сформировал актуальную версию документов из данных вашего профиля.</p></div>
+        ${actionBlock(button('Понятно', { data: 'data-doc-sync-done' }))}
+      `, { variant: 'compact', surface: 'app' }));
+      notice?.querySelector('[data-doc-sync-done]')?.addEventListener('click', () => notice.remove());
+    }
+  } catch {
+    // Profile saving must not be rolled back by a temporary document refresh error.
+  } finally {
+    documentSyncRunning = false;
+    if (documentSyncPending) {
+      documentSyncPending = false;
+      queueMicrotask(() => void syncDocumentsFromProfileContext());
+    }
+  }
 }
 
 async function renderAuthenticated(account = authenticatedAccount) {
@@ -401,16 +541,13 @@ async function renderAuthenticated(account = authenticatedAccount) {
 
   if (access.isOwnerBook !== true) {
     try {
-      let legalReadiness = await tenantLegalRequest('/readiness');
-      legalReadiness = await syncMasterLegalChecklist(legalReadiness);
-      if (legalReadiness?.state?.operationMode !== 'LIVE') {
-        renderMasterLegalSetup(authenticatedAccount, legalReadiness);
-        return;
-      }
+      tenantRuntime = await tenantLegalRequest('/readiness');
     } catch {
       renderServerStatePending();
       return;
     }
+  } else {
+    tenantRuntime = { state: { operationMode: 'LIVE' } };
   }
 
   const migration = await initializeProfileWorkplaces(authenticatedAccount);
@@ -441,26 +578,11 @@ async function renderAuthenticated(account = authenticatedAccount) {
   clearLegacyBusinessStorage();
   ensureServerBookingSync();
 
-  const serverWorkspaceUnlocked = Boolean(authenticatedAccount?.user?.workspaceUnlocked);
-  if (access.isOwnerBook !== true && !serverWorkspaceUnlocked && !isOnboardingComplete()) {
-    workspaceReady = false;
-    history.replaceState({}, '', location.pathname);
-    await renderOnboarding(app, {
-      accountEmail: authenticatedAccount?.user?.email || '',
-      onComplete: () => {
-        state.activeSection = defaultSection();
-        history.replaceState({}, '', `#${state.activeSection}`);
-        renderWorkspace();
-      },
-    });
-    syncViewport();
-    return;
-  }
-
   const requested = location.hash.slice(1);
   state.activeSection = sectionAllowed(requested) ? requested : defaultSection();
   history.replaceState({}, '', `#${state.activeSection}`);
   renderWorkspace();
+  if (isDemoMode()) queueMicrotask(maybeShowDemoWelcome);
 }
 
 function renderLogin(message = '') {
@@ -526,6 +648,10 @@ function renderLogin(message = '') {
 
   syncViewport();
 }
+
+window.addEventListener('book:profile-context-updated', () => {
+  void syncDocumentsFromProfileContext();
+});
 
 window.addEventListener('book:access-updated', (event) => {
   if (!workspaceReady || !event?.detail?.changed) return;

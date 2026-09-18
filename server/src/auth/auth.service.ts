@@ -60,4 +60,15 @@ export class AuthService {
       role: membership.role,
     };
   }
+  async setOnboardingStep(userId: string, stepValue: unknown) {
+    const parsed = Number(stepValue);
+    const step = Number.isInteger(parsed) ? Math.max(0, Math.min(20, parsed)) : 0;
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: { onboardingStep: step },
+      select: { id: true, email: true, onboardingStep: true, workspaceUnlocked: true },
+    });
+    return { user };
+  }
+
 }
