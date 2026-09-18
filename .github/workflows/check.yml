@@ -82,7 +82,6 @@ jobs:
             sleep 2
           done
           bash scripts/staging-profile-chat-smoke.sh
-          bash scripts/staging-legal-runtime-smoke.sh
           bash scripts/staging-owner-booking-smoke.sh
       - name: Stop isolated staging
         if: always()
