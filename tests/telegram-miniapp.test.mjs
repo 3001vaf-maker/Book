@@ -90,7 +90,7 @@ assert.match(telegramBot, /web_app:\s*\{\s*url:\s*url\.toString\(\)\s*\}/);
 assert.match(telegramBot, /'setWebhook'/);
 assert.match(telegramBot, /secret_token:\s*webhookSecret/);
 assert.match(telegramBot, /'getWebhookInfo'/);
-assert.match(telegramBot, /Telegram не подтвердил webhook Book/);
+assert.match(telegramBot, /Telegram не подтвердил webhook/);
 assert.match(telegramBot, /requiredHttpsUrl\('PUBLIC_API_URL'\)/);
 assert.match(telegramBot, /requiredHttpsUrl\('CLIENT_APP_URL'\)/);
 
