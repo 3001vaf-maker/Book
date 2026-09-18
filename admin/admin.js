@@ -236,13 +236,22 @@ function renderMasters() {
     <div class="admin-heading"><div><h2>Мастера</h2><p>Каждый мастер работает только в своём персональном Book.</p></div></div>
     ${legalReady ? '' : '<div class="admin-card" style="padding:16px;margin-bottom:14px"><strong>Регистрация реальных мастеров закрыта.</strong><p style="margin:6px 0 0;color:#817a74">Сначала завершите раздел «Документы».</p></div>'}
     <section class="admin-invite-panel">
-      <h3>Пригласить мастера</h3>
+      <div class="admin-invite-head">
+        <h3>Пригласить мастера</h3>
+        <button class="admin-button secondary" type="button" data-create-invite-link>Создать ссылку</button>
+      </div>
       <form class="admin-invite-grid" data-invite-form>
-
         <label class="admin-field"><span>Имя</span><input name="name" placeholder="Имя мастера"></label>
         <label class="admin-field"><span>Email</span><input name="email" type="email" placeholder="name@example.com" required></label>
         <button class="admin-button" type="submit" ${legalReady ? '' : 'disabled'}>Отправить приглашение</button>
       </form>
+      <div class="admin-invite-link" data-invite-link hidden>
+        <label class="admin-field">
+          <span>Ссылка для регистрации</span>
+          <input type="text" readonly data-invite-link-value>
+        </label>
+        <button class="admin-button secondary" type="button" data-copy-invite-link>Копировать</button>
+      </div>
       <p class="admin-inline-message" data-invite-message></p>
     </section>
     <div class="admin-card">
@@ -254,6 +263,52 @@ function renderMasters() {
 
   const form = content.querySelector('[data-invite-form]');
   const message = content.querySelector('[data-invite-message]');
+  const createLinkButton = content.querySelector('[data-create-invite-link]');
+  const inviteLinkBox = content.querySelector('[data-invite-link]');
+  const inviteLinkInput = content.querySelector('[data-invite-link-value]');
+  const copyLinkButton = content.querySelector('[data-copy-invite-link]');
+
+  createLinkButton?.addEventListener('click', async () => {
+    message.textContent = '';
+    message.classList.remove('error');
+    createLinkButton.disabled = true;
+    createLinkButton.textContent = 'Создаём…';
+    try {
+      const result = await adminRequest('/manual-invitations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      const url = String(result?.url || '').trim();
+      if (!url) throw new Error('Ссылка не получена');
+      inviteLinkInput.value = url;
+      inviteLinkBox.hidden = false;
+      message.textContent = 'Ссылка создана. Она действует 7 дней и используется один раз.';
+      await refreshData();
+    } catch (error) {
+      message.textContent = error instanceof Error ? error.message : 'Не удалось создать ссылку';
+      message.classList.add('error');
+    } finally {
+      createLinkButton.disabled = false;
+      createLinkButton.textContent = 'Создать ссылку';
+    }
+  });
+
+  copyLinkButton?.addEventListener('click', async () => {
+    const url = String(inviteLinkInput?.value || '').trim();
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      copyLinkButton.textContent = 'Скопировано';
+      window.setTimeout(() => { copyLinkButton.textContent = 'Копировать'; }, 1200);
+    } catch {
+      inviteLinkInput.focus();
+      inviteLinkInput.select();
+      document.execCommand('copy');
+      copyLinkButton.textContent = 'Скопировано';
+      window.setTimeout(() => { copyLinkButton.textContent = 'Копировать'; }, 1200);
+    }
+  });
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     message.textContent = '';
