@@ -111,7 +111,7 @@ function workplaceName(state, request = {}) {
 
 function masterName(state) {
   const profile = state.context?.profile || {};
-  return [profile.name, profile.surname].filter(Boolean).join(' ').trim() || 'Мастер';
+  return [profile.name, profile.surname].filter(Boolean).join(' ').trim() || 'Book';
 }
 
 function mediaItems(state) {
@@ -528,7 +528,7 @@ async function renderMessages(root, state, handlers) {
     back: { data: 'data-client-chat-back', aria: 'К списку диалогов' },
     action: { label: 'Записаться', data: 'data-client-chat-booking' },
     settings: { data: 'data-client-chat-settings', aria: 'Настройки чата' },
-    body: `${messages.length ? messageThread(messages, { viewer: 'client', actions: true }) : emptyState('Сообщений пока нет', 'Напишите мастеру первое сообщение.')}${messageComposer({ attachments: true, rich: true })}<div class="muted" data-client-chat-status aria-live="polite"></div>`,
+    body: `${messages.length ? messageThread(messages, { viewer: 'client', actions: true }) : emptyState('Сообщений пока нет', 'Напишите первое сообщение.')}${messageComposer({ attachments: true, rich: true })}<div class="muted" data-client-chat-status aria-live="polite"></div>`,
     media: '',
     className: 'app-view-shell--chat',
   });
