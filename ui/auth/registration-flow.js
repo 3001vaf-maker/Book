@@ -94,8 +94,11 @@ export function startRegistrationFlow({
     const initialEmail = String(initial.email || '').trim();
     root.innerHTML = `
       <h1>Регистрация</h1>
-      <p>Создайте вход в Book. Имя, телефон, профессию и рабочее место вы заполните следующим шагом уже внутри DEMO.</p>
+      <p>Укажите базовые данные для аккаунта. После входа они уже будут в профиле, а профессию, рабочее место и остальные настройки вы дозаполните внутри DEMO.</p>
       <form class="invite-form" data-form>
+        <label class="invite-field"><span>Имя</span><input name="name" autocomplete="given-name" value="${escapeHtml(initial.name || '')}" required></label>
+        <label class="invite-field"><span>Фамилия</span><input name="surname" autocomplete="family-name" value="${escapeHtml(initial.surname || '')}" required></label>
+        <label class="invite-field"><span>Телефон</span><input name="phone" type="tel" autocomplete="tel" value="${escapeHtml(initial.phone || '')}" required></label>
         <label class="invite-field">
           <span>Email</span>
           <input name="email" type="email" autocomplete="email" value="${escapeHtml(initialEmail)}" ${emailLocked ? 'readonly' : ''} required>
@@ -124,8 +127,18 @@ export function startRegistrationFlow({
       const error = form.querySelector('[data-error]');
       error.textContent = '';
       const data = new FormData(form);
-      const email = String(data.get('email') || '').trim().toLowerCase();
+      const identity = {
+        name: String(data.get('name') || '').trim(),
+        surname: String(data.get('surname') || '').trim(),
+        phone: String(data.get('phone') || '').trim(),
+        email: String(data.get('email') || '').trim().toLowerCase(),
+      };
+      const email = identity.email;
       const passwordValue = String(data.get('password') || '');
+      if (!identity.name || !identity.surname || !identity.phone) {
+        error.textContent = 'Заполните имя, фамилию и телефон.';
+        return;
+      }
       if (!email || !email.includes('@')) {
         error.textContent = 'Укажите корректный email.';
         return;
@@ -143,7 +156,7 @@ export function startRegistrationFlow({
       submit.textContent = 'Создаём Book…';
       try {
         await onSubmit({
-          email,
+          identity,
           password: passwordValue,
           facts: { ...facts },
         });
