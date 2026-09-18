@@ -52,6 +52,21 @@ let tenantRuntime = { state: { operationMode: 'LIVE' } };
 let pendingSettingsFolder = '';
 let documentSyncRunning = false;
 let documentSyncPending = false;
+let workspaceRenderVersion = 0;
+let legacyBusinessStorageCleared = false;
+
+const domainRuntime = new Map([
+  ['business', { status: 'idle', promise: null, error: null }],
+  ['operational', { status: 'idle', promise: null, error: null }],
+  ['documents', { status: 'idle', promise: null, error: null }],
+  ['auxiliary', { status: 'idle', promise: null, error: null }],
+]);
+
+const sectionDomains = {
+  timetable: ['operational'],
+  journal: ['business', 'operational'],
+  chat: ['business', 'documents'],
+};
 
 const RKN_NOTIFICATION_URL = 'https://pd.rkn.gov.ru/operators-registry/notification/form/';
 
@@ -155,6 +170,99 @@ function isDemoMode() {
   return getBookAccess().isOwnerBook !== true && tenantRuntime?.state?.operationMode !== 'LIVE';
 }
 
+function domainReady(name) {
+  return domainRuntime.get(name)?.status === 'ready';
+}
+
+function markDomainReady(name) {
+  const slot = domainRuntime.get(name);
+  if (!slot) return;
+  slot.status = 'ready';
+  slot.error = null;
+  maybeFinalizeOptionalRuntime();
+}
+
+function maybeFinalizeOptionalRuntime() {
+  if (domainReady('business') && domainReady('documents')) ensureServerBookingSync();
+  if (!legacyBusinessStorageCleared && [...domainRuntime.keys()].every(domainReady)) {
+    clearLegacyBusinessStorage();
+    legacyBusinessStorageCleared = true;
+  }
+}
+
+async function ensureDomain(name) {
+  const slot = domainRuntime.get(name);
+  if (!slot) return { verified: true };
+  if (slot.status === 'ready') return { verified: true };
+  if (slot.promise) return slot.promise;
+
+  const initializer = {
+    business: initializeBusinessState,
+    operational: initializeOperationalState,
+    documents: initializeDocumentState,
+    auxiliary: initializeAuxiliaryState,
+  }[name];
+  if (!initializer) return { verified: true };
+
+  slot.status = 'loading';
+  slot.promise = (async () => {
+    try {
+      const result = await initializer(authenticatedAccount);
+      if (!result?.verified) throw new Error(`${name} state not verified`);
+      slot.status = 'ready';
+      slot.error = null;
+      maybeFinalizeOptionalRuntime();
+      return result;
+    } catch (error) {
+      slot.status = 'error';
+      slot.error = error;
+      await reportStartupFailure(`module:${name}`, error);
+      throw error;
+    } finally {
+      slot.promise = null;
+    }
+  })();
+  return slot.promise;
+}
+
+async function ensureDomains(names = []) {
+  await Promise.all([...new Set(names)].map((name) => ensureDomain(name)));
+}
+
+function showModuleError(error) {
+  const message = error instanceof Error ? error.message : 'Не удалось загрузить раздел';
+  const m = mountModal(document.body, modal(`
+    <div class="modal-title">
+      <h2>Раздел временно не загрузился</h2>
+      <p>Book уже открыт. Попробуйте открыть этот раздел ещё раз.</p>
+    </div>
+    <p class="form-error">${escapeHtml(message)}</p>
+    ${actionBlock(button('Понятно', { data: 'data-module-error-close' }))}
+  `, { variant: 'compact', surface: 'app' }));
+  m?.querySelector('[data-module-error-close]')?.addEventListener('click', () => m.remove());
+}
+
+function renderSectionLoading(root) {
+  root.innerHTML = '<section class="auth-card"><div class="auth-card__heading"><h2>Загрузка раздела…</h2><p>Сам Book уже открыт.</p></div></section>';
+}
+
+async function renderActiveView(view, root, options, domains, version) {
+  try {
+    if (domains.length) {
+      renderSectionLoading(root);
+      await ensureDomains(domains);
+    }
+    if (version !== workspaceRenderVersion) return;
+    const nextDispose = view(root, options);
+    if (typeof nextDispose === 'function') disposeView = nextDispose;
+  } catch (error) {
+    if (version !== workspaceRenderVersion) return;
+    root.innerHTML = '<section class="auth-card"><div class="auth-card__heading"><h2>Раздел временно не загрузился</h2><p>Другие разделы Book продолжают работать.</p></div><button class="ui-button" type="button" data-retry-module>Повторить</button></section>';
+    root.querySelector('[data-retry-module]')?.addEventListener('click', () => renderWorkspace());
+    showModuleError(error);
+  }
+}
+
 function renderWorkspace() {
   app.classList.remove('app-shell--booking');
   workspaceReady = true;
@@ -166,10 +274,19 @@ function renderWorkspace() {
     ? '<button class="demo-mode-banner" type="button" data-demo-banner><strong>DEMO</strong><span>Помощник настройки · переход к LIVE</span><b>›</b></button>'
     : '';
   app.innerHTML = `${demoBanner}<main class="app-content ${isDemoMode() ? 'app-content--with-demo-banner' : ''}" id="app-content"></main>${bottomNavigation(state.activeSection, allowedSections())}`;
+  const root = document.querySelector('#app-content');
   const requestedFolder = state.activeSection === 'settings' ? pendingSettingsFolder : '';
   pendingSettingsFolder = '';
-  const nextDispose = view(document.querySelector('#app-content'), { navigate, openFolder: requestedFolder, demo: isDemoMode() });
-  if (typeof nextDispose === 'function') disposeView = nextDispose;
+  const version = ++workspaceRenderVersion;
+  const options = {
+    navigate,
+    openFolder: requestedFolder,
+    demo: isDemoMode(),
+    ensureDomains,
+    domainReady,
+    onDomainError: showModuleError,
+  };
+  void renderActiveView(view, root, options, sectionDomains[state.activeSection] || [], version);
   app.querySelector('[data-demo-banner]')?.addEventListener('click', openDemoHub);
   app.querySelectorAll('[data-nav]').forEach((navButton) => {
     navButton.addEventListener('click', () => navigate(navButton.dataset.nav));
@@ -562,6 +679,7 @@ async function syncDocumentsFromProfileContext() {
   documentSyncRunning = true;
   try {
     const result = await initializeDocumentState(authenticatedAccount);
+    if (result?.verified) markDomainReady('documents');
     if (result?.source === 'server-reconciled') {
       if (tenantRuntime?.state?.operationMode === 'LIVE' && canUseBookCapability('online_booking.access')) {
         await apiRequest('/online-booking/owner/publication', {
@@ -615,25 +733,14 @@ async function renderAuthenticated(account = authenticatedAccount) {
     tenantRuntime = { state: { operationMode: 'LIVE' } };
   }
 
-  const startupStages = [
-    ['profile', () => initializeProfileWorkplaces(authenticatedAccount)],
-    ['business', () => initializeBusinessState(authenticatedAccount)],
-    ['operational', () => initializeOperationalState(authenticatedAccount)],
-    ['documents', () => initializeDocumentState(authenticatedAccount)],
-    ['auxiliary', () => initializeAuxiliaryState(authenticatedAccount)],
-  ];
-  for (const [stage, run] of startupStages) {
-    try {
-      const result = await run();
-      if (!result?.verified) throw new Error(`${stage} state not verified`);
-    } catch (error) {
-      await reportStartupFailure(stage, error);
-      renderServerStatePending();
-      return;
-    }
+  try {
+    const profileState = await initializeProfileWorkplaces(authenticatedAccount);
+    if (!profileState?.verified) throw new Error('profile state not verified');
+  } catch (error) {
+    await reportStartupFailure('profile', error);
+    renderServerStatePending();
+    return;
   }
-  clearLegacyBusinessStorage();
-  ensureServerBookingSync();
 
   const requested = location.hash.slice(1);
   state.activeSection = sectionAllowed(requested) ? requested : defaultSection();
