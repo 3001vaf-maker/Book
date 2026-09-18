@@ -118,7 +118,12 @@ function renderCurrentSection() {
   if (state.section === 'overview') return renderOverview();
   if (state.section === 'owner') return renderOwnerBook();
   if (state.section === 'documents') {
-    return renderAdminDocuments(app.querySelector('[data-content]'), { escapeHtml, setTitle: setActiveSection });
+    return renderAdminDocuments(app.querySelector('[data-content]'), {
+      escapeHtml,
+      setTitle: setActiveSection,
+      loadDocuments: () => adminRequest('/documents'),
+      loadHistory: () => adminRequest('/documents/history'),
+    });
   }
   if (state.section === 'capabilities') return renderCapabilities();
   return renderMasters();
