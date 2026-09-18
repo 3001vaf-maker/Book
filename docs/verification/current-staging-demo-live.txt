@@ -1,0 +1,1 @@
+Verification-only marker. This file is excluded from the runtime/static artifact and exists only to trigger a full PR staging smoke for the exact current staging tree.
