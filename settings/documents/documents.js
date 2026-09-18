@@ -21,6 +21,9 @@ function actionText(action) {
   if (action === 'created') return 'Создан';
   if (action === 'version-created') return 'Новая версия';
   if (action === 'renamed') return 'Переименован';
+  if (action === 'template-created') return 'Создан из шаблона Book';
+  if (action === 'legacy-template-replaced') return 'Обновлён из шаблона Book';
+  if (action === 'template-synced') return 'Обновлён из шаблона Book';
   return 'Изменён';
 }
 
@@ -124,7 +127,9 @@ function documentHistoryMarkup() {
 function signatureHistoryMarkup() {
   const documents = new Map(getDocuments().map((item) => [item.id, item]));
   const clients = new Map(getAllClients().map((item) => [item.key, item]));
-  const items = [...getConsents()].sort((a, b) => Date.parse(b.createdAt || 0) - Date.parse(a.createdAt || 0));
+  const items = getConsents()
+    .filter((item) => !item.contactType)
+    .sort((a, b) => Date.parse(b.createdAt || 0) - Date.parse(a.createdAt || 0));
   return list({
     items: items.map((item) => {
       const document = documents.get(item.documentId);
