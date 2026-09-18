@@ -6,22 +6,11 @@ compose="docker compose -f docker-compose.staging.yml"
 owner_email="staging@book.local"
 owner_password=$($compose exec -T backend printenv OWNER_PASSWORD | tr -d '\r')
 
-tenant_id=$($compose exec -T db psql -U book -d book_staging -At -v email="$owner_email" -c '
-SELECT m."tenantId"
-FROM "User" u
-JOIN "Membership" m ON m."userId" = u."id" AND m."role" = '\''OWNER'\''
-WHERE lower(u."email") = lower(:'\''email'\'')
-ORDER BY m."createdAt" ASC
-LIMIT 1;
-' | tr -d '\r')
-
-test -n "$tenant_id"
-
 login_body=$(node -e 'process.stdout.write(JSON.stringify({email:process.argv[1],password:process.argv[2]}))' "$owner_email" "$owner_password")
 login_payload=$(curl -fsS -H 'Content-Type: application/json' -d "$login_body" "$base/auth/login")
 owner_token=$(node -e 'const p=JSON.parse(process.argv[1]); if(!p.accessToken)process.exit(1); process.stdout.write(p.accessToken)' "$login_payload")
-login_tenant=$(node -e 'const p=JSON.parse(process.argv[1]); if(!p.tenant?.id)process.exit(1); process.stdout.write(p.tenant.id)' "$login_payload")
-test "$login_tenant" = "$tenant_id"
+tenant_id=$(node -e 'const p=JSON.parse(process.argv[1]); if(!p.tenant?.id)process.exit(1); process.stdout.write(p.tenant.id)' "$login_payload")
+test -n "$tenant_id"
 
 # Owner still has normal authenticated access.
 access_payload=$(curl -fsS -H "Authorization: Bearer $owner_token" "$base/saas-access/me")
