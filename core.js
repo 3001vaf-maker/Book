@@ -212,13 +212,17 @@ function renderSuspended() {
 }
 
 
-function profileSetupReady() {
+function profileIdentityReady() {
   const profile = getProfile();
   const phones = Array.isArray(profile.phones) ? profile.phones : [];
+  const emails = Array.isArray(profile.emails) ? profile.emails : [];
   return Boolean(String(profile.name || '').trim()
     && String(profile.profession || '').trim()
-    && phones.length
-    && getWorkplaceEntities().length);
+    && (phones.length || emails.length));
+}
+
+function profileSetupReady() {
+  return profileIdentityReady() && getWorkplaceEntities().length > 0;
 }
 
 function openSettingsTarget(folder) {
@@ -265,7 +269,7 @@ function openDemoHub() {
     'Этап 1 — Профиль',
     'Проверьте данные из регистрации и дозаполните профиль.',
     [
-      setupRow('Профиль и рабочее место', profileSetupReady(), 'profile', 'Имя и контакты уже подставлены из регистрации'),
+      setupRow('Профиль', profileIdentityReady(), 'profile', 'Имя и контакты уже подставлены из регистрации'),
     ],
   );
 
@@ -273,6 +277,7 @@ function openDemoHub() {
     'Этап 2 — Работа',
     'Подготовьте ежедневную работу. Можно заполнять в удобном порядке.',
     [
+      setupRow('Рабочее место', getWorkplaceEntities().length > 0, 'profile'),
       canUseBookCapability('services.access') ? setupRow('Услуги и цены', getProcedures().length > 0, 'service') : '',
       canUseBookCapability('timetable.access') ? setupRow('График работы', getDays().length > 0, 'timetable') : '',
       canUseBookCapability('journal.access') ? setupRow('Журнал', false, 'journal') : '',
