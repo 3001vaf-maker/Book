@@ -3,7 +3,7 @@ import { apiRequest } from './auth.js';
 let currentAccess = {
   tenantId: '',
   status: 'LEGACY_COMPAT',
-  isOwnerBook: false,
+  isPlatformOwnerWorkspace: false,
   plan: null,
   capabilities: [],
 };
@@ -34,7 +34,7 @@ function enabledBooleanKeys(value) {
 
 function publishAccessChange() {
   if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function' || typeof CustomEvent === 'undefined') return;
-  window.dispatchEvent(new CustomEvent('book:access-updated', {
+  window.dispatchEvent(new CustomEvent('workspace:access-updated', {
     detail: {
       access: currentAccess,
       changed: lastAccessChange.changed,
@@ -68,20 +68,20 @@ function applyAccess(value) {
 async function requestJson(path, options = {}) {
   const response = await apiRequest(path, { cache: 'no-store', ...options });
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload?.message || 'Не удалось обновить доступы Book');
+  if (!response.ok) throw new Error(payload?.message || 'Не удалось обновить доступы рабочего пространства');
   return payload;
 }
 
-async function fetchBookAccess() {
+async function fetchAccess() {
   return requestJson('/saas-access/me');
 }
 
-export async function loadBookAccess() {
-  return applyAccess(await fetchBookAccess());
+export async function loadAccess() {
+  return applyAccess(await fetchAccess());
 }
 
-export async function refreshBookAccess() {
-  const access = await loadBookAccess();
+export async function refreshAccess() {
+  const access = await loadAccess();
   return { access, ...lastAccessChange };
 }
 
@@ -97,7 +97,7 @@ export async function acknowledgeCapabilityIntroduction(eventId) {
   return requestJson(`/saas-access/changes/events/${encodeURIComponent(eventId)}/ack-detail`, { method: 'POST' });
 }
 
-export function getLastBookAccessChange() {
+export function getLastAccessChange() {
   return {
     changed: lastAccessChange.changed,
     newlyEnabled: [...lastAccessChange.newlyEnabled],
@@ -105,25 +105,25 @@ export function getLastBookAccessChange() {
   };
 }
 
-export function getBookAccess() {
+export function getAccess() {
   return currentAccess;
 }
 
-export function getBookCapability(key) {
+export function getCapability(key) {
   return capabilityMap.get(String(key || '').trim()) || null;
 }
 
-export function canUseBookCapability(key) {
+export function canUseCapability(key) {
   if (currentAccess.status === 'SUSPENDED') return false;
-  const capability = getBookCapability(key);
-  if (!capability) return currentAccess.status === 'LEGACY_COMPAT' || currentAccess.isOwnerBook === true;
+  const capability = getCapability(key);
+  if (!capability) return currentAccess.status === 'LEGACY_COMPAT' || currentAccess.isPlatformOwnerWorkspace === true;
   if (capability.valueType !== 'BOOLEAN') return true;
   return capability.enabled === true;
 }
 
-export function getBookLimit(key) {
+export function getLimit(key) {
   if (currentAccess.status === 'SUSPENDED') return 0;
-  const capability = getBookCapability(key);
+  const capability = getCapability(key);
   if (!capability) return null;
   return capability.valueType === 'LIMIT' ? capability.limit : null;
 }
