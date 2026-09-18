@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { UserInvitationStatus, Prisma, Workplace as WorkplaceRow } from '@prisma/client';
+import { Prisma, Workplace as WorkplaceRow } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
+import { ProfileCreationPolicyService } from './profile-creation-policy.service';
 
 type ProfileInput = {
   key: string;
@@ -177,7 +178,10 @@ function canonical(value: ProfileBundleInput) {
 
 @Injectable()
 export class ProfileService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly creationPolicy: ProfileCreationPolicyService,
+  ) {}
 
   private async bundle(tenantId: string, userId: string) {
     const row = await this.prisma.profile.findUnique({
@@ -220,37 +224,7 @@ export class ProfileService {
     };
   }
 
-  private async repairAcceptedInvitationProfile(tenantId: string, userId: string) {
-    const profile = await this.prisma.profile.findUnique({
-      where: { tenantId_userId: { tenantId, userId } },
-      select: { migrationVerifiedAt: true },
-    });
-    if (!profile || profile.migrationVerifiedAt) return;
-
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { email: true },
-    });
-    if (!user) return;
-
-    const acceptedInvitation = await this.prisma.userInvitation.findFirst({
-      where: {
-        tenantId,
-        email: user.email,
-        status: UserInvitationStatus.ACCEPTED,
-      },
-      select: { id: true },
-    });
-    if (!acceptedInvitation) return;
-
-    await this.prisma.profile.update({
-      where: { tenantId_userId: { tenantId, userId } },
-      data: { migrationVerifiedAt: new Date() },
-    });
-  }
-
   async get(tenantId: string, userId: string) {
-    await this.repairAcceptedInvitationProfile(tenantId, userId);
     return this.bundle(tenantId, userId);
   }
 
@@ -258,6 +232,7 @@ export class ProfileService {
     const expected = normalizeBundle(body);
     const existing = await this.prisma.profile.findUnique({ where: { tenantId_userId: { tenantId, userId } } });
     if (existing) return this.bundle(tenantId, userId);
+    await this.creationPolicy.assertAccepted(userId);
 
     await this.prisma.$transaction(async (tx) => {
       const profile = await tx.profile.create({
@@ -301,6 +276,7 @@ export class ProfileService {
   async bootstrap(tenantId: string, userId: string) {
     const existing = await this.prisma.profile.findUnique({ where: { tenantId_userId: { tenantId, userId } } });
     if (!existing) {
+      await this.creationPolicy.assertAccepted(userId);
       const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
       const empty = normalizeProfile({ emails: user?.email ? [user.email] : [] });
       await this.prisma.profile.create({
@@ -318,6 +294,44 @@ export class ProfileService {
       });
     }
     return this.bundle(tenantId, userId);
+  }
+
+  async creationRequirement(tenantId: string, userId: string) {
+    const existing = await this.prisma.profile.findUnique({
+      where: { tenantId_userId: { tenantId, userId } },
+      select: { id: true },
+    });
+    if (existing) {
+      return {
+        required: false,
+        configured: true,
+        accepted: true,
+        document: null,
+      };
+    }
+    return {
+      required: true,
+      ...(await this.creationPolicy.requirement(userId)),
+    };
+  }
+
+  async acceptCreationDocument(tenantId: string, userId: string) {
+    const existing = await this.prisma.profile.findUnique({
+      where: { tenantId_userId: { tenantId, userId } },
+      select: { id: true },
+    });
+    if (existing) {
+      return {
+        required: false,
+        configured: true,
+        accepted: true,
+        document: null,
+      };
+    }
+    return {
+      required: true,
+      ...(await this.creationPolicy.accept(tenantId, userId)),
+    };
   }
 
   async updateProfile(tenantId: string, userId: string, body: unknown) {
