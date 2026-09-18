@@ -293,7 +293,7 @@ export class MasterInvitationService {
       email: invitation.email,
       name: invitation.name,
       expiresAt: invitation.expiresAt,
-      tenant: { id: invitation.tenant.id, name: fullName },
+      tenant: { id: invitation.tenant.id, name: invitation.tenant.name },
       legal: {
         required: legalDocuments.filter((item) => item.requiredForRegistration).map((item) => ({ key: item.key, version: item.version })),
         marketingOptional: true,
@@ -412,7 +412,7 @@ export class MasterInvitationService {
         onboardingStep: result.user.onboardingStep,
         workspaceUnlocked: result.user.workspaceUnlocked,
       },
-      tenant: { id: invitation.tenant.id, name: invitation.tenant.name },
+      tenant: { id: invitation.tenant.id, name: fullName },
       role: result.membership.role,
       legal: { operationMode: 'DEMO', filingStatus: 'NOT_PREPARED' },
     };
