@@ -1,10 +1,10 @@
 import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { PlatformAdminGuard } from '../saas-admin/platform-admin.guard';
+import { PlatformOwnerGuard } from '../auth/platform-owner.guard';
 import { PlatformDocumentsService } from './platform-documents.service';
 
 @Controller('platform-documents')
-@UseGuards(JwtAuthGuard, PlatformAdminGuard)
+@UseGuards(JwtAuthGuard, PlatformOwnerGuard)
 export class PlatformDocumentsController {
   constructor(private readonly documents: PlatformDocumentsService) {}
 
