@@ -40,6 +40,12 @@ const PRIMARY_DOCUMENT_KEYS = [
   'dpa',
 ];
 
+const USER_DOCUMENT_BASE_KEYS = [
+  'user-document-pdn-policy',
+  'user-document-pdn-consent',
+  'user-document-messages-consent',
+];
+
 function documentSortIndex(key) {
   const index = PRIMARY_DOCUMENT_KEYS.indexOf(key);
   return index === -1 ? PRIMARY_DOCUMENT_KEYS.length + 1 : index;
@@ -431,9 +437,14 @@ function renderLegal() {
   const content = app.querySelector('[data-content]');
   const readiness = state.platformLegal || {};
   const legalState = readiness.state || {};
-  const documents = (Array.isArray(readiness.documents) ? readiness.documents : [])
-    .filter((item) => item.currentVersion)
+  const allDocuments = (Array.isArray(readiness.documents) ? readiness.documents : [])
+    .filter((item) => item.currentVersion);
+  const documents = allDocuments
+    .filter((item) => !USER_DOCUMENT_BASE_KEYS.includes(item.key))
     .sort((a, b) => documentSortIndex(a.key) - documentSortIndex(b.key) || String(a.title).localeCompare(String(b.title), 'ru'));
+  const userDocumentBases = allDocuments
+    .filter((item) => USER_DOCUMENT_BASE_KEYS.includes(item.key))
+    .sort((a, b) => USER_DOCUMENT_BASE_KEYS.indexOf(a.key) - USER_DOCUMENT_BASE_KEYS.indexOf(b.key));
   const history = Array.isArray(state.documentHistory) ? state.documentHistory : [];
   const evidence = legalState.evidenceMetadata && typeof legalState.evidenceMetadata === 'object'
     ? legalState.evidenceMetadata
@@ -483,6 +494,25 @@ function renderLegal() {
       </div>
     </section>
 
+    <section class="admin-card admin-documents-card">
+      <div class="admin-section-head">
+        <div>
+          <h3>Для пользователей</h3>
+          <p>Основы документов, которые Book передаёт в персональные документы пользователей.</p>
+        </div>
+      </div>
+      <div class="admin-document-list">
+        ${userDocumentBases.map((item) => `
+          <div class="admin-document-row">
+            <div>
+              <strong>${escapeHtml(item.title)}</strong>
+              <small>Основа Book · версия ${Number(item.currentVersion?.version || 1)} · ${formatDate(item.currentVersion?.publishedAt)}</small>
+            </div>
+            <button class="admin-button secondary" data-open-document="${escapeHtml(item.key)}">Открыть</button>
+          </div>`).join('') || '<div class="admin-empty">Основы документов ещё не загружены.</div>'}
+      </div>
+    </section>
+
     <div data-legal-editor></div>
 
     <section class="admin-card admin-history-card">
@@ -505,7 +535,7 @@ function renderLegal() {
 
   content.querySelectorAll('[data-open-document]').forEach((button) => {
     button.addEventListener('click', () => {
-      const item = documents.find((document) => document.key === button.dataset.openDocument);
+      const item = allDocuments.find((document) => document.key === button.dataset.openDocument);
       openLegalDocument(item);
     });
   });
