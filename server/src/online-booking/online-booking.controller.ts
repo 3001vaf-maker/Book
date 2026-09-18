@@ -4,7 +4,6 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ClientContactRouteService } from '../communication/client-contact-route.service';
 import { CommunicationService } from '../communication/communication.service';
 import { CommunicationHistoryService } from '../communication/communication-history.service';
-import { ConsentPolicyService } from '../document-state/consent-policy.service';
 import { LegalRuntimeService } from '../legal-runtime/legal-runtime.service';
 import { NotificationService } from '../notification/notification.service';
 import { bookingTemplateValues, NotificationTemplateService } from '../notification/notification-template.service';
@@ -27,7 +26,6 @@ export class OnlineBookingController {
     private readonly communications: CommunicationService,
     private readonly communicationHistory: CommunicationHistoryService,
     private readonly contactRoutes: ClientContactRouteService,
-    private readonly consents: ConsentPolicyService,
     private readonly webPush: WebPushService,
     private readonly clientCards: ClientCardLinkService,
     private readonly legal: LegalRuntimeService,
