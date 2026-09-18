@@ -145,9 +145,6 @@ export class ManualInvitationService {
 
   async accept(input: {
     token?: unknown;
-    name?: unknown;
-    surname?: unknown;
-    phone?: unknown;
     email?: unknown;
     password?: unknown;
     saasAgreementAccepted?: unknown;
@@ -158,15 +155,9 @@ export class ManualInvitationService {
     technicalEvidence?: unknown;
   }) {
     const token = text(input?.token);
-    const name = text(input?.name);
-    const surname = text(input?.surname);
-    const phone = text(input?.phone);
     const email = normalizeEmail(input?.email);
     const password = String(input?.password || '');
 
-    if (!name) throw new BadRequestException('Укажите имя');
-    if (!surname) throw new BadRequestException('Укажите фамилию');
-    if (!phone) throw new BadRequestException('Укажите телефон');
     if (!email || !email.includes('@')) throw new BadRequestException('Укажите корректный email');
     if (password.length < 10) throw new BadRequestException('Пароль должен содержать минимум 10 символов');
 
@@ -192,7 +183,6 @@ export class ManualInvitationService {
     if (existingUser) throw new ConflictException('Пользователь с таким email уже зарегистрирован');
 
     const passwordHash = await hashPassword(password, 12);
-    const fullName = `${name} ${surname}`.trim();
 
     const result = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
@@ -210,35 +200,10 @@ export class ManualInvitationService {
           role: MembershipRole.OWNER,
         },
       });
-      await tx.profile.create({
-        data: {
-          tenantId: invitation.tenantId,
-          userId: user.id,
-          key: 'profile',
-          name,
-          surname,
-          phone,
-          phones: [phone],
-          telegrams: [],
-          emails: [email],
-          about: '',
-          photo: '',
-          profession: '',
-          experience: '',
-          professionAbout: '',
-          customProfessions: [],
-          migrationVerifiedAt: new Date(),
-        },
-      });
-      await tx.tenant.update({
-        where: { id: invitation.tenantId },
-        data: { name: fullName },
-      });
       await tx.masterInvitation.update({
         where: { id: invitation.id },
         data: {
           email,
-          name: fullName,
           status: MasterInvitationStatus.ACCEPTED,
           acceptedAt: new Date(),
         },
@@ -281,42 +246,10 @@ export class ManualInvitationService {
         onboardingStep: result.user.onboardingStep,
         workspaceUnlocked: result.user.workspaceUnlocked,
       },
-      tenant: { id: invitation.tenantId, name: fullName },
+      tenant: { id: invitation.tenantId, name: invitation.tenant.name },
       role: result.membership.role,
       legal: { operationMode: 'DEMO', filingStatus: 'NOT_PREPARED' },
     };
-  }
-
-  async repairProfile(userId: string, tenantId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { email: true },
-    });
-    if (!user) throw new NotFoundException('Пользователь не найден');
-
-    const profile = await this.prisma.profile.findUnique({
-      where: { tenantId_userId: { tenantId, userId } },
-      select: { migrationVerifiedAt: true },
-    });
-    if (!profile || profile.migrationVerifiedAt) {
-      return { repaired: false, verified: Boolean(profile?.migrationVerifiedAt) };
-    }
-
-    const invitation = await this.prisma.masterInvitation.findFirst({
-      where: {
-        tenantId,
-        email: user.email,
-        status: MasterInvitationStatus.ACCEPTED,
-      },
-      select: { id: true },
-    });
-    if (!invitation) return { repaired: false, verified: false };
-
-    await this.prisma.profile.update({
-      where: { tenantId_userId: { tenantId, userId } },
-      data: { migrationVerifiedAt: new Date() },
-    });
-    return { repaired: true, verified: true };
   }
 
   private async findManualInvitation(token: string) {
