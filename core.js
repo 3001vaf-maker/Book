@@ -13,13 +13,14 @@ import { getJournalTimeUsages, releaseJournalSoftTimeUsages } from './journal/ti
 import { configureWorkplaceSource } from './core/workplace-time.js';
 import { configureTimeUsageSource, configureSoftTimeUsageReleaseSource } from './core/time/index.js';
 import { getCurrentUser, login } from './core/auth.js';
-import { canUseBookCapability, getBookAccess, loadBookAccess } from './core/access.js';
+import { canUseCapability, getAccess, loadAccess } from './core/access.js';
 import { isOnboardingComplete, renderOnboarding } from './onboarding/onboarding.js';
 import { startServerBookingSync } from './online-booking/server-sync.js';
 import { renderOnlineBooking } from './online-booking/booking.js';
 import { startBookingClientRuntime } from './online-booking/client-runtime.js';
 import { bottomNavigation } from './ui/ui.js';
 import { clearLegacyBusinessStorage } from './core/legacy-browser-business.js';
+import { PUBLIC_APP_ORIGIN, WORKSPACE_APP_ORIGIN } from './core/environment.js';
 
 configureWorkplaceSource(getWorkplaceEntities);
 configureTimeUsageSource(getJournalTimeUsages);
@@ -76,8 +77,44 @@ function renderPublicBooking(route) {
   syncViewport();
 }
 
+function runtimeHostname() {
+  return String(location.hostname || '').trim().toLowerCase();
+}
+
+function isLocalBookingHost() {
+  const host = runtimeHostname();
+  return host === 'localhost'
+    || host === '127.0.0.1'
+    || host === '::1'
+    || host.endsWith('.app.github.dev');
+}
+
+function renderPublicLinkMissing() {
+  workspaceReady = false;
+  disposeView();
+  disposeView = () => {};
+  app.classList.add('app-shell--booking');
+  app.innerHTML = `
+    <main class="auth-view">
+      <section class="auth-card">
+        <div class="auth-card__heading">
+          <h1>Онлайн-запись</h1>
+          <p>Ссылка неполная или недействительна.</p>
+        </div>
+      </section>
+    </main>`;
+  syncViewport();
+}
+
+function redirectBookingToPublicApp() {
+  const target = new URL(PUBLIC_APP_ORIGIN);
+  target.search = location.search;
+  target.hash = location.hash;
+  location.replace(target.toString());
+}
+
 function ensureServerBookingSync() {
-  if (serverBookingSyncStarted || !canUseBookCapability('online_booking.access')) return;
+  if (serverBookingSyncStarted || !canUseCapability('online_booking.access')) return;
   serverBookingSyncStarted = true;
   startServerBookingSync();
 }
@@ -85,7 +122,7 @@ function ensureServerBookingSync() {
 function sectionAllowed(section) {
   if (!routes[section]) return false;
   const capability = sectionCapabilities[section];
-  return capability ? canUseBookCapability(capability) : true;
+  return capability ? canUseCapability(capability) : true;
 }
 
 function allowedSections() {
@@ -184,8 +221,8 @@ async function renderAuthenticated(account = authenticatedAccount) {
     return;
   }
   clearLegacyBusinessStorage();
-  await loadBookAccess();
-  if (getBookAccess().status === 'SUSPENDED') {
+  await loadAccess();
+  if (getAccess().status === 'SUSPENDED') {
     renderSuspended();
     return;
   }
@@ -277,9 +314,9 @@ function renderLogin(message = '') {
   syncViewport();
 }
 
-window.addEventListener('book:access-updated', (event) => {
+window.addEventListener('workspace:access-updated', (event) => {
   if (!workspaceReady || !event?.detail?.changed) return;
-  if (getBookAccess().status === 'SUSPENDED') {
+  if (getAccess().status === 'SUSPENDED') {
     renderSuspended();
     return;
   }
@@ -312,7 +349,16 @@ document.addEventListener('focusin', (event) => {
 syncViewport();
 
 const publicBooking = bookingRoute();
-if (publicBooking) {
+const host = runtimeHostname();
+const workspaceHost = new URL(WORKSPACE_APP_ORIGIN).hostname;
+const publicHost = new URL(PUBLIC_APP_ORIGIN).hostname;
+
+if (host === publicHost) {
+  if (publicBooking) renderPublicBooking(publicBooking);
+  else renderPublicLinkMissing();
+} else if (host === workspaceHost && publicBooking) {
+  redirectBookingToPublicApp();
+} else if (isLocalBookingHost() && publicBooking) {
   renderPublicBooking(publicBooking);
 } else {
   try {

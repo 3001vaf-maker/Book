@@ -32,8 +32,8 @@ function showModal(url) {
   modal.id = MODAL_ID;
   modal.innerHTML = `
     <section class="manual-card">
-      <h3>Бесплатная ссылка мастеру</h3>
-      <p>Ссылка одноразовая и действует 7 дней. Отправьте её мастеру в Telegram или WhatsApp.</p>
+      <h3>Ссылка пользователю</h3>
+      <p>Ссылка одноразовая и действует 7 дней. Отправьте её пользователю.</p>
       <input data-link readonly>
       <div class="manual-actions">
         <button class="secondary" data-close>Закрыть</button>

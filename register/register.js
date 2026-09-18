@@ -22,7 +22,7 @@ function renderError(message) {
 
 function renderForm() {
   state.innerHTML = `
-    <h1>Создайте свой Book</h1>
+    <h1>Создайте рабочее пространство</h1>
     <p>Заполните основные данные и придумайте пароль.</p>
     <form class="invite-form" data-form>
       <label class="invite-field"><span>Имя</span><input name="name" autocomplete="given-name" required></label>
@@ -34,7 +34,7 @@ function renderForm() {
       <label style="display:flex;align-items:center;gap:9px;font-size:14px;font-weight:600"><input name="showPassword" type="checkbox" style="width:18px;height:18px">Показать пароли</label>
       <label style="display:flex;align-items:center;gap:9px;font-size:14px;font-weight:600"><input name="remember" type="checkbox" checked style="width:18px;height:18px">Запомнить меня на этом устройстве</label>
       <p class="invite-error" data-form-error role="alert"></p>
-      <button class="invite-button" type="submit">Создать Book и войти</button>
+      <button class="invite-button" type="submit">Создать Workspace и войти</button>
     </form>`;
 
   const form = state.querySelector('[data-form]');
@@ -66,7 +66,7 @@ function renderForm() {
     }
 
     button.disabled = true;
-    button.textContent = 'Создаём Book…';
+    button.textContent = 'Создаём Workspace…';
     try {
       const account = await post('/manual-invitations/accept', {
         token,
@@ -77,12 +77,12 @@ function renderForm() {
         password,
       });
       setAuthToken(account.accessToken, data.get('remember') === 'on');
-      state.innerHTML = '<h1>Book создан</h1><p class="invite-success">Открываем ваше рабочее пространство…</p>';
+      state.innerHTML = '<h1>Workspace создан</h1><p class="invite-success">Открываем ваше рабочее пространство…</p>';
       window.setTimeout(() => location.replace('../'), 350);
     } catch (submitError) {
       error.textContent = submitError instanceof Error ? submitError.message : 'Не удалось зарегистрироваться';
       button.disabled = false;
-      button.textContent = 'Создать Book и войти';
+      button.textContent = 'Создать Workspace и войти';
     }
   });
 }
