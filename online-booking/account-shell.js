@@ -9,7 +9,7 @@ import {
   getBookingRequests,
   markBookingNotificationRead,
   sendBookingChatMessage,
-  setBookingTelegramChatEnabled,
+  setBookingTelegramConsent,
 } from '../core/booking-account/index.js';
 import { formatPhone } from '../core/phone/index.js';
 import { disableWebPush, enableWebPush, getWebPushState } from '../core/notifications/web-push.js';
@@ -346,7 +346,7 @@ async function openChatSettings(state) {
     });
     layer?.querySelector('[data-chat-telegram]')?.addEventListener('click', async () => {
       if (!telegram.linked) return;
-      const next = await setBookingTelegramChatEnabled(state.tenantId, !telegram.enabled).catch(() => null);
+      const next = await setBookingTelegramConsent(state.tenantId, !telegram.enabled).catch(() => null);
       if (next?.telegram) telegram = next.telegram;
       redraw();
     });

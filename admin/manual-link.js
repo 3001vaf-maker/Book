@@ -2,25 +2,6 @@ import { apiRequest, getAuthToken } from '../core/auth.js';
 
 const BUTTON_ID = 'manual-invite-button';
 const MODAL_ID = 'manual-invite-modal';
-let legalReady = false;
-let legalChecked = false;
-let legalChecking = false;
-
-async function checkLegalReady() {
-  if (legalChecking || legalChecked || !getAuthToken()) return;
-  legalChecking = true;
-  try {
-    const response = await apiRequest('/platform/legal/readiness');
-    const payload = await response.json().catch(() => ({}));
-    legalReady = response.ok && payload?.state?.status === 'LEGAL_READY';
-  } catch {
-    legalReady = false;
-  } finally {
-    legalChecked = true;
-    legalChecking = false;
-    ensureButton();
-  }
-}
 
 function installStyles() {
   if (document.querySelector('#manual-invite-styles')) return;
@@ -51,8 +32,8 @@ function showModal(url) {
   modal.id = MODAL_ID;
   modal.innerHTML = `
     <section class="manual-card">
-      <h3>Бесплатная ссылка мастеру</h3>
-      <p>Ссылка одноразовая и действует 7 дней. Отправьте её мастеру в Telegram или WhatsApp.</p>
+      <h3>Ссылка пользователю</h3>
+      <p>Ссылка одноразовая и действует 7 дней. Отправьте её пользователю.</p>
       <input data-link readonly>
       <div class="manual-actions">
         <button class="secondary" data-close>Закрыть</button>
@@ -97,15 +78,6 @@ async function createManualInvitation(button) {
 
 function ensureButton() {
   if (!getAuthToken()) {
-    document.querySelector(`#${BUTTON_ID}`)?.remove();
-    return;
-  }
-  if (!legalChecked) {
-    document.querySelector(`#${BUTTON_ID}`)?.remove();
-    void checkLegalReady();
-    return;
-  }
-  if (!legalReady) {
     document.querySelector(`#${BUTTON_ID}`)?.remove();
     return;
   }

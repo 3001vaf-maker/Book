@@ -82,7 +82,6 @@ export async function saveWorkplaces(values) {
     const payload = await responseJson(response, 'Не удалось сохранить рабочее место');
     hydrateWorkplacesFromServer(payload.workplaces);
   }
-  window.dispatchEvent(new CustomEvent('book:profile-context-updated', { detail: { source: 'workplaces' } }));
   return getWorkplaces();
 }
 
@@ -96,7 +95,6 @@ export async function upsertWorkplace(workplace) {
   });
   const payload = await responseJson(response, 'Не удалось сохранить рабочее место');
   hydrateWorkplacesFromServer(payload.workplaces);
-  window.dispatchEvent(new CustomEvent('book:profile-context-updated', { detail: { source: 'workplace' } }));
   return getWorkplaces().find((value) => value.key === item.key) || null;
 }
 
@@ -108,6 +106,5 @@ export async function deleteWorkplace(key) {
   if (response.status === 404) return false;
   const payload = await responseJson(response, 'Не удалось удалить рабочее место');
   hydrateWorkplacesFromServer(payload.workplaces);
-  window.dispatchEvent(new CustomEvent('book:profile-context-updated', { detail: { source: 'workplace-delete' } }));
   return true;
 }

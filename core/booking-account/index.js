@@ -237,9 +237,9 @@ export async function getBookingChatSettings(tenantId) {
   );
 }
 
-export async function setBookingTelegramChatEnabled(tenantId, enabled) {
+export async function setBookingTelegramConsent(tenantId, enabled) {
   return jsonResponse(
-    await request(`/online-booking/${encodeURIComponent(tenantId)}/account/chat/telegram-channel`, {
+    await request(`/online-booking/${encodeURIComponent(tenantId)}/account/chat/telegram-consent`, {
       tenantId,
       auth: true,
       method: 'PUT',

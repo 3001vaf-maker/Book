@@ -5,6 +5,7 @@ import { PlatformAdminGuard } from '../saas-admin/platform-admin.guard';
 import { ManualInvitationService } from './manual-invitation.service';
 
 type AdminRequest = Request & { platformAdminId?: string };
+type AuthRequest = Request & { auth?: { userId: string; tenantId: string; role: string } };
 
 @Controller('saas-admin/manual-invitations')
 @UseGuards(JwtAuthGuard, PlatformAdminGuard)
@@ -27,29 +28,20 @@ export class ManualInvitationController {
   }
 
   @Post('accept')
-  accept(
-    @Req() request: Request,
-    @Body() body: {
-      token?: unknown;
-      name?: unknown;
-      surname?: unknown;
-      phone?: unknown;
-      email?: unknown;
-      password?: unknown;
-      saasAgreementAccepted?: unknown;
-      dpaAccepted?: unknown;
-      privacyAcknowledged?: unknown;
-      pdConsentAccepted?: unknown;
-      marketingConsentAccepted?: unknown;
-    },
-  ) {
-    return this.manualInvitations.accept({
-      ...(body || {}),
-      technicalEvidence: {
-        ip: request.ip || '',
-        userAgent: request.headers['user-agent'] || '',
-      },
-    });
+  accept(@Body() body: {
+    token?: unknown;
+    name?: unknown;
+    surname?: unknown;
+    phone?: unknown;
+    email?: unknown;
+    password?: unknown;
+  }) {
+    return this.manualInvitations.accept(body || {});
   }
 
+  @Post('repair-profile')
+  @UseGuards(JwtAuthGuard)
+  repairProfile(@Req() request: AuthRequest) {
+    return this.manualInvitations.repairProfile(request.auth!.userId, request.auth!.tenantId);
+  }
 }

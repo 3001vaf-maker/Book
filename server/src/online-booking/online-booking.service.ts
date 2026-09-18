@@ -228,11 +228,6 @@ export class OnlineBookingService {
   }
 
   async publish(tenantId: string, data: unknown) {
-    const documents = await this.documentState.publicDocuments(tenantId);
-    const requiredClientDocuments = arrayValue(documents).filter((item) => Boolean(item?.clientConsent) && Boolean(item?.required));
-    if (!requiredClientDocuments.length) {
-      throw new ConflictException('Сначала заполните профиль: Book автоматически подготовит документы для клиентов');
-    }
     const normalized = objectValue(data);
     return this.prisma.bookingPublication.upsert({
       where: { tenantId },

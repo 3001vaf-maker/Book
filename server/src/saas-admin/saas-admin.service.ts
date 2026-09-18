@@ -3,7 +3,7 @@ import { CapabilityAccessChangeType, CapabilityValueType, TenantAccessStatus } f
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma.service';
 import { SaasAccessService } from '../saas-access/saas-access.service';
-import { MasterInvitationService } from '../master-invitation/master-invitation.service';
+import { UserInvitationService } from '../user-invitation/user-invitation.service';
 
 type ValidatedCapabilityUpdate = {
   key: string;
@@ -25,7 +25,7 @@ export class SaasAdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: SaasAccessService,
-    private readonly invitations: MasterInvitationService,
+    private readonly invitations: UserInvitationService,
   ) {}
 
   async me(adminId: string, userId: string) {
@@ -56,7 +56,7 @@ export class SaasAdminService {
     });
   }
 
-  async masters() {
+  async users() {
     const rows = await this.prisma.tenantAccess.findMany({
       include: {
         plan: { select: { id: true, key: true, name: true } },
@@ -67,9 +67,9 @@ export class SaasAdminService {
               orderBy: { createdAt: 'asc' },
             },
             profiles: {
-              select: { userId: true, name: true, surname: true, profession: true, migrationVerifiedAt: true },
+              select: { userId: true, name: true, surname: true, profession: true },
             },
-            masterInvitations: {
+            userInvitations: {
               orderBy: { createdAt: 'desc' },
               take: 1,
               select: { id: true, email: true, name: true, status: true, createdAt: true, expiresAt: true },
@@ -77,7 +77,7 @@ export class SaasAdminService {
           },
         },
       },
-      orderBy: [{ isOwnerBook: 'desc' }, { createdAt: 'asc' }],
+      orderBy: [{ isPlatformOwnerWorkspace: 'desc' }, { createdAt: 'asc' }],
     });
 
     return Promise.all(rows.map(async (row) => {
@@ -85,86 +85,15 @@ export class SaasAdminService {
       const profile = membership
         ? row.tenant.profiles.find((item) => item.userId === membership.userId) || null
         : null;
-      const invitation = row.tenant.masterInvitations[0] || null;
-      const legalAcceptances = membership
-        ? await this.prisma.$queryRaw<Array<{
-            id: string;
-            documentKey: string;
-            title: string;
-            documentVersion: number;
-            action: string;
-            source: string;
-            occurredAt: Date;
-            requiredForRegistration: boolean;
-          }>>`
-            SELECT
-              e."id",
-              d."key" AS "documentKey",
-              d."title",
-              v."version" AS "documentVersion",
-              e."action",
-              e."source",
-              e."occurredAt",
-              d."requiredForRegistration"
-            FROM "LegalAcceptanceEvent" e
-            JOIN "LegalDocumentVersion" v ON v."id" = e."documentVersionId"
-            JOIN "LegalDocument" d ON d."id" = v."documentId"
-            WHERE e."tenantId" = ${row.tenantId}
-              AND e."userId" = ${membership.userId}
-            ORDER BY e."occurredAt" ASC, e."id" ASC
-          `
-        : [];
-      const [businessMeta, operationalState, documentState, auxiliaryState, legalRows] = await Promise.all([
-        this.prisma.businessStateMeta.findUnique({
-          where: { tenantId: row.tenantId },
-          select: { migrationVerifiedAt: true },
-        }),
-        this.prisma.businessOperationalState.findUnique({
-          where: { tenantId: row.tenantId },
-          select: { migrationVerifiedAt: true },
-        }),
-        this.prisma.businessDocumentState.findUnique({
-          where: { tenantId: row.tenantId },
-          select: { migrationVerifiedAt: true },
-        }),
-        this.prisma.businessAuxiliaryState.findUnique({
-          where: { tenantId: row.tenantId },
-          select: { migrationVerifiedAt: true },
-        }),
-        this.prisma.$queryRaw<Array<{ operationMode: string; filingStatus: string }>>`
-          SELECT "operationMode", "filingStatus"
-          FROM "TenantLegalState"
-          WHERE "tenantId" = ${row.tenantId}
-          LIMIT 1
-        `,
-      ]);
-      const stateStatus = (value: { migrationVerifiedAt: Date | null } | null) => (
-        !value ? 'MISSING' : value.migrationVerifiedAt ? 'READY' : 'UNVERIFIED'
-      );
+      const invitation = row.tenant.userInvitations[0] || null;
       const resolved = await this.access.resolveTenantAccess(row.tenantId);
-      const startupState = {
-        access: resolved.status,
-        legal: legalRows[0]?.operationMode || 'MISSING',
-        profile: !profile ? 'MISSING' : profile.migrationVerifiedAt ? 'READY' : 'UNVERIFIED',
-        business: stateStatus(businessMeta),
-        operational: stateStatus(operationalState),
-        documents: stateStatus(documentState),
-        auxiliary: stateStatus(auxiliaryState),
-      };
-      const startupReady = startupState.access === 'ACTIVE'
-        && startupState.legal !== 'MISSING'
-        && startupState.profile === 'READY'
-        && startupState.business === 'READY'
-        && startupState.operational === 'READY'
-        && startupState.documents === 'READY'
-        && startupState.auxiliary === 'READY';
       return {
         tenantId: row.tenantId,
         tenantName: row.tenant.name,
         status: row.status,
-        isOwnerBook: row.isOwnerBook,
+        isPlatformOwnerWorkspace: row.isPlatformOwnerWorkspace,
         plan: row.plan,
-        master: membership ? {
+        user: membership ? {
           userId: membership.user.id,
           email: membership.user.email,
           name: [profile?.name, profile?.surname].filter(Boolean).join(' ') || invitation?.name || row.tenant.name,
@@ -172,9 +101,6 @@ export class SaasAdminService {
           registeredAt: membership.user.createdAt,
         } : null,
         invitation,
-        legalAcceptances,
-        startupState,
-        startupReady,
         access: resolved,
       };
     }));
@@ -250,8 +176,8 @@ export class SaasAdminService {
         },
       },
     });
-    if (!access || access.status !== TenantAccessStatus.ACTIVE) return false;
-    if (access.isOwnerBook && !access.plan) return true;
+    if (!access) return true;
+    if (access.isPlatformOwnerWorkspace && !access.plan) return true;
     const planValue = access.plan?.capabilityValues[0];
     if (planValue && planValue.enabled !== null) return planValue.enabled;
     return update.defaultEnabled;
@@ -283,13 +209,13 @@ export class SaasAdminService {
     capabilities?: unknown;
   }) {
     const tenantAccess = await this.prisma.tenantAccess.findUnique({ where: { tenantId } });
-    if (!tenantAccess) throw new NotFoundException('Book не найден');
+    if (!tenantAccess) throw new NotFoundException('Рабочее пространство не найдено');
 
     const statusText = String(input?.status || '').trim().toUpperCase();
     let nextStatus: TenantAccessStatus | null = null;
     if (statusText) {
       if (!Object.values(TenantAccessStatus).includes(statusText as TenantAccessStatus)) {
-        throw new BadRequestException('Неизвестный статус Book');
+        throw new BadRequestException('Неизвестный статус рабочего пространства');
       }
       nextStatus = statusText as TenantAccessStatus;
     }
