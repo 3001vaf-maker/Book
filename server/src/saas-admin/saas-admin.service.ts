@@ -67,7 +67,7 @@ export class SaasAdminService {
               orderBy: { createdAt: 'asc' },
             },
             profiles: {
-              select: { userId: true, name: true, surname: true, profession: true },
+              select: { userId: true, name: true, surname: true, profession: true, migrationVerifiedAt: true },
             },
             masterInvitations: {
               orderBy: { createdAt: 'desc' },
@@ -114,7 +114,50 @@ export class SaasAdminService {
             ORDER BY e."occurredAt" ASC, e."id" ASC
           `
         : [];
+      const [businessMeta, operationalState, documentState, auxiliaryState, legalRows] = await Promise.all([
+        this.prisma.businessStateMeta.findUnique({
+          where: { tenantId: row.tenantId },
+          select: { migrationVerifiedAt: true },
+        }),
+        this.prisma.businessOperationalState.findUnique({
+          where: { tenantId: row.tenantId },
+          select: { migrationVerifiedAt: true },
+        }),
+        this.prisma.businessDocumentState.findUnique({
+          where: { tenantId: row.tenantId },
+          select: { migrationVerifiedAt: true },
+        }),
+        this.prisma.businessAuxiliaryState.findUnique({
+          where: { tenantId: row.tenantId },
+          select: { migrationVerifiedAt: true },
+        }),
+        this.prisma.$queryRaw<Array<{ operationMode: string; filingStatus: string }>>`
+          SELECT "operationMode", "filingStatus"
+          FROM "TenantLegalState"
+          WHERE "tenantId" = ${row.tenantId}
+          LIMIT 1
+        `,
+      ]);
+      const stateStatus = (value: { migrationVerifiedAt: Date | null } | null) => (
+        !value ? 'MISSING' : value.migrationVerifiedAt ? 'READY' : 'UNVERIFIED'
+      );
       const resolved = await this.access.resolveTenantAccess(row.tenantId);
+      const startupState = {
+        access: resolved.status,
+        legal: legalRows[0]?.operationMode || 'MISSING',
+        profile: !profile ? 'MISSING' : profile.migrationVerifiedAt ? 'READY' : 'UNVERIFIED',
+        business: stateStatus(businessMeta),
+        operational: stateStatus(operationalState),
+        documents: stateStatus(documentState),
+        auxiliary: stateStatus(auxiliaryState),
+      };
+      const startupReady = startupState.access === 'ACTIVE'
+        && startupState.legal !== 'MISSING'
+        && startupState.profile === 'READY'
+        && startupState.business === 'READY'
+        && startupState.operational === 'READY'
+        && startupState.documents === 'READY'
+        && startupState.auxiliary === 'READY';
       return {
         tenantId: row.tenantId,
         tenantName: row.tenant.name,
@@ -130,6 +173,8 @@ export class SaasAdminService {
         } : null,
         invitation,
         legalAcceptances,
+        startupState,
+        startupReady,
         access: resolved,
       };
     }));
