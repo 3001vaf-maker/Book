@@ -1,9 +1,9 @@
 import {
   acknowledgeCapabilityIntroduction,
   acknowledgeCapabilitySummary,
-  canUseBookCapability,
+  canUseCapability,
   getPendingCapabilityChanges,
-  refreshBookAccess,
+  refreshAccess,
 } from './access.js';
 import { getAuthToken } from './auth.js';
 import {
@@ -34,7 +34,7 @@ function summaryMessage(summaries) {
   const parts = [];
   if (enabled.length) parts.push(`Открыты новые возможности: ${enabled.map(getCapabilityTitle).join(', ')}.`);
   if (disabled.length) parts.push(`Больше недоступны: ${disabled.map(getCapabilityTitle).join(', ')}.`);
-  if (enabled.length) parts.push('При первом открытии каждого нового раздела Book отдельно покажет, для чего он нужен и что делать дальше.');
+  if (enabled.length) parts.push('При первом открытии каждого нового раздела система отдельно покажет, для чего он нужен и что делать дальше.');
   return parts.join(' ');
 }
 
@@ -48,7 +48,7 @@ async function refreshRuntimeState() {
   if (refreshInFlight) return refreshInFlight;
   refreshInFlight = (async () => {
     await reloadPendingState();
-    if (pendingState.summaries.length) await refreshBookAccess();
+    if (pendingState.summaries.length) await refreshAccess();
     showPendingSummary();
     return pendingState;
   })().finally(() => {
@@ -69,7 +69,7 @@ function replayQueuedEntry() {
   const queued = queuedEntry;
   queuedEntry = null;
   if (!queued?.element?.isConnected) return;
-  if (!canUseBookCapability(queued.meta.key)) return;
+  if (!canUseCapability(queued.meta.key)) return;
   const introduction = pendingState.introductions.find((item) => item.key === queued.meta.key);
   if (introduction) {
     showCapabilityIntroduction(queued.meta, introduction, queued.element);
@@ -91,10 +91,10 @@ function showPendingSummary() {
   const hasEnabled = changes.some((item) => item?.changeType === 'ENABLED');
   const hasDisabled = changes.some((item) => item?.changeType === 'DISABLED');
   const title = hasEnabled && !hasDisabled
-    ? 'В Book появились новые возможности'
+    ? 'Появились новые возможности'
     : hasDisabled && !hasEnabled
-      ? 'Доступ Book изменился'
-      : 'Возможности Book изменились';
+      ? 'Доступ изменился'
+      : 'Возможности изменились';
 
   summaryModal = openBlockingNotice({
     title,
@@ -117,14 +117,14 @@ function showCapabilityIntroduction(meta, introduction, element) {
     action: copy?.action || 'Продолжить',
     onConfirm: async () => {
       pendingState = normalizedPending(await acknowledgeCapabilityIntroduction(introduction.eventId));
-      await refreshBookAccess();
+      await refreshAccess();
       introModal = null;
       if (pendingState.summaries.length) {
         queuedEntry = null;
         window.setTimeout(showPendingSummary, 0);
         return;
       }
-      if (!element?.isConnected || !canUseBookCapability(meta.key)) return;
+      if (!element?.isConnected || !canUseCapability(meta.key)) return;
       replayingEntry = true;
       try {
         element.click();
@@ -184,7 +184,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') activityRefresh();
 });
 
-window.addEventListener('book:access-updated', () => {
+window.addEventListener('workspace:access-updated', () => {
   if (!getAuthToken() || refreshInFlight || summaryModal?.isConnected || introModal?.isConnected) return;
   void reloadPendingState().then(showPendingSummary).catch(() => {});
 });
