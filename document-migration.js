@@ -1,13 +1,18 @@
 import { apiRequest } from './core/auth.js';
 import { queueDocumentDataset } from './core/business-persistence.js';
+import { getBookDocumentBases } from './admin/documents/catalog.js';
 import {
   configureConsentPersistence,
   hydrateConsentsFromServer,
 } from './settings/documents/consents.js';
+import { getProfile } from './settings/profile/data.js';
+import { getWorkplaces } from './settings/profile/workplaces/data.js';
 import {
+  buildBookDocuments,
+  configureBookDocumentBases,
   configureDocumentPersistence,
-  getDefaultDocuments,
   hydrateDocumentsFromServer,
+  reconcileBookDocuments,
 } from './settings/documents/data.js';
 import {
   configureDocumentHistoryPersistence,
@@ -43,20 +48,51 @@ function hydrate(bundle) {
   hydrateDocumentHistoryFromServer(normalized.history);
 }
 
-export async function initializeDocumentState(account = {}) {
+async function persistReconciled(value) {
+  const documentsResponse = await apiRequest('/document-state/documents', {
+    method: 'PUT',
+    body: JSON.stringify({ value: value.documents }),
+  });
+  await responseJson(documentsResponse, 'Не удалось обновить документы');
+
+  const historyResponse = await apiRequest('/document-state/history', {
+    method: 'PUT',
+    body: JSON.stringify({ value: value.history }),
+  });
+  await responseJson(historyResponse, 'Не удалось обновить историю документов');
+}
+
+export async function initializeDocumentState() {
+  configureBookDocumentBases(getBookDocumentBases(), {
+    profile: getProfile(),
+    workplaces: getWorkplaces(),
+  });
+
   const remoteResponse = await apiRequest('/document-state');
   const remote = await responseJson(remoteResponse, 'Не удалось загрузить документы');
 
   if (remote?.verified) {
+    const current = normalizeBundle(remote?.data || remote);
+    const reconciled = reconcileBookDocuments(current.documents, current.history);
+    if (reconciled.changed) {
+      const next = {
+        documents: reconciled.documents,
+        consents: current.consents,
+        history: reconciled.history,
+      };
+      await persistReconciled(next);
+      hydrate({ data: next });
+      return { source: 'server-admin-template-reconciled', verified: true };
+    }
     hydrate(remote);
     return { source: 'server', verified: true };
   }
 
-  if (remote?.migrated || account?.user?.workspaceUnlocked) {
-    return { source: 'server-awaiting-verification', verified: false };
-  }
-
-  const defaults = normalizeBundle({ documents: getDefaultDocuments(), consents: [], history: [] });
+  const defaults = normalizeBundle({
+    documents: buildBookDocuments(),
+    consents: [],
+    history: [],
+  });
   const bootstrapResponse = await apiRequest('/document-state/bootstrap', {
     method: 'POST',
     body: JSON.stringify(defaults),
@@ -64,5 +100,5 @@ export async function initializeDocumentState(account = {}) {
   const bootstrapped = await responseJson(bootstrapResponse, 'Не удалось создать серверное хранилище документов');
   if (!bootstrapped?.verified) throw new Error('Серверное хранилище документов не подтверждено');
   hydrate(bootstrapped);
-  return { source: 'server-bootstrap', verified: true };
+  return { source: 'server-bootstrap-admin-template', verified: true };
 }
