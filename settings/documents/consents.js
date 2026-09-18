@@ -9,6 +9,8 @@ function normalize(item = {}) {
   return {
     id: String(item.id || crypto.randomUUID()),
     clientId: String(item.clientId || ''),
+    contactType: String(item.contactType || ''),
+    contactValue: String(item.contactValue || ''),
     documentId: String(item.documentId || ''),
     documentVersion: Number(item.documentVersion || 1),
     status: item.status === 'revoked' ? 'revoked' : item.status === 'declined' ? 'declined' : 'accepted',
