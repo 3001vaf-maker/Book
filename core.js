@@ -51,6 +51,7 @@ let serverBookingSyncStarted = false;
 let tenantRuntime = { state: { operationMode: 'LIVE' } };
 let pendingSettingsFolder = '';
 let documentSyncRunning = false;
+let documentSyncPending = false;
 
 const RKN_NOTIFICATION_URL = 'https://pd.rkn.gov.ru/operators-registry/notification/form/';
 
@@ -474,11 +475,21 @@ function maybeShowDemoWelcome() {
 }
 
 async function syncDocumentsFromProfileContext() {
-  if (!authenticatedAccount || documentSyncRunning) return;
+  if (!authenticatedAccount) return;
+  if (documentSyncRunning) {
+    documentSyncPending = true;
+    return;
+  }
   documentSyncRunning = true;
   try {
     const result = await initializeDocumentState(authenticatedAccount);
     if (result?.source === 'server-reconciled') {
+      if (tenantRuntime?.state?.operationMode === 'LIVE' && canUseBookCapability('online_booking.access')) {
+        await apiRequest('/online-booking/owner/publication', {
+          method: 'PUT',
+          body: JSON.stringify({ data: { source: 'document-auto-refresh' } }),
+        }).catch(() => null);
+      }
       const notice = mountModal(document.body, modal(`
         <div class="modal-title"><h2>Документы обновлены</h2><p>Book автоматически сформировал актуальную версию документов из данных вашего профиля.</p></div>
         ${actionBlock(button('Понятно', { data: 'data-doc-sync-done' }))}
@@ -489,6 +500,10 @@ async function syncDocumentsFromProfileContext() {
     // Profile saving must not be rolled back by a temporary document refresh error.
   } finally {
     documentSyncRunning = false;
+    if (documentSyncPending) {
+      documentSyncPending = false;
+      queueMicrotask(() => void syncDocumentsFromProfileContext());
+    }
   }
 }
 
