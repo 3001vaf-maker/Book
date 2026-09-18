@@ -217,6 +217,28 @@ if (!emptyDocumentState.migrated) {
     body: { documents: [], consents: [], history: [] },
   });
 }
+sql(`
+  UPDATE "BusinessDocumentState"
+  SET "migrationVerifiedAt"=NULL,
+      "data"='{"documents":[],"consents":[],"history":[{"id":"self-heal-document-history"}]}'::jsonb
+  WHERE "tenantId"=${sqlLiteral(tenantId)};
+`);
+const healedDocuments = await request('/document-state/bootstrap', {
+  token,
+  method: 'POST',
+  body: { documents: [], consents: [], history: [] },
+});
+assert.equal(healedDocuments.verified, true);
+assert.equal(
+  sql(`SELECT "data"->'history'->0->>'id' FROM "BusinessDocumentState" WHERE "tenantId"=${sqlLiteral(tenantId)};`),
+  'self-heal-document-history',
+  'document self-heal must preserve server data',
+);
+sql(`
+  UPDATE "BusinessDocumentState"
+  SET "data"='{"documents":[],"consents":[],"history":[]}'::jsonb
+  WHERE "tenantId"=${sqlLiteral(tenantId)};
+`);
 let documentsState = await request('/document-state', { token });
 assert.equal(documentsState.verified, true);
 assert.deepEqual(documentsState.data?.documents || [], [], 'no master documents before completed profile');
