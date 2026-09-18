@@ -4,13 +4,14 @@ import { PrismaService } from '../prisma.service';
 import { SaasAccessModule } from '../saas-access/saas-access.module';
 import { ProfileController } from './profile.controller';
 import { ProfileService } from './profile.service';
+import { ProfileCreationPolicyService } from './profile-creation-policy.service';
 import { TenantTimeZoneService } from './tenant-time-zone.service';
 import { WorkplaceLimitGuard } from './workplace-limit.guard';
 
 @Module({
   imports: [AuthModule, SaasAccessModule],
   controllers: [ProfileController],
-  providers: [ProfileService, TenantTimeZoneService, WorkplaceLimitGuard, PrismaService],
-  exports: [ProfileService, TenantTimeZoneService],
+  providers: [ProfileService, ProfileCreationPolicyService, TenantTimeZoneService, WorkplaceLimitGuard, PrismaService],
+  exports: [ProfileService, ProfileCreationPolicyService, TenantTimeZoneService],
 })
 export class ProfileModule {}
