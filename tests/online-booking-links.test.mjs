@@ -23,12 +23,8 @@ assert.match(bookingSource, /Ссылка рабочего пространст�
 assert.match(bookingSource, /copyIconButton/);
 assert.match(bookingSource, /copyTextToClipboard/);
 assert.match(bookingSource, /function selectedWorkplaceLink\(/);
-assert.match(bookingSource, /apiRequest\('\/online-booking\/owner\/publication'/);
-assert.match(bookingSource, /ensureBookingPublication/);
-assert.ok(
-  bookingSource.indexOf('ensureBookingPublication()') < bookingSource.indexOf('renderReady(root, navigateBack, tenantId)'),
-  'public link must only be shown after publication succeeds',
-);
+assert.doesNotMatch(bookingSource, /owner\/publication|ensureBookingPublication/);
+assert.match(bookingSource, /renderReady\(root, navigateBack, tenantId\)/);
 assert.doesNotMatch(bookingSource, /workplaces\.map\(\s*\(item\)\s*=>\s*copyLinkField/);
 assert.match(buttonsSource, /export function copyIconButton/);
 assert.match(buttonsSource, /<svg viewBox="0 0 24 24"/);
