@@ -213,7 +213,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
         try {
           await this.legal.assertTenantLive(tenantId, '', 'TELEGRAM_NOTIFICATION_DELIVERY');
           const allowed = await this.notifications.canSendTelegramDelivery(tenantId, delivery.notificationId);
-          if (!allowed) { await this.notifications.markTelegramFailed(tenantId, delivery.deliveryId, 'messages-consent отсутствует или отозван'); failed += 1; continue; }
+          if (!allowed) { await this.notifications.markTelegramFailed(tenantId, delivery.deliveryId, 'Сервисное уведомление отклонено политикой доставки'); failed += 1; continue; }
           await this.telegramApi(token, 'sendMessage', { chat_id: delivery.recipientKey, text: delivery.body || delivery.title });
           await this.notifications.markTelegramSent(tenantId, delivery.deliveryId); sent += 1;
         } catch (error) { await this.notifications.markTelegramFailed(tenantId, delivery.deliveryId, error instanceof Error ? error.message : String(error)); failed += 1; }
