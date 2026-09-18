@@ -182,7 +182,7 @@ export function getBookDocumentBases() {
 }
 
 export function buildBookDocuments() {
-  if (!bookBasesState.length) return getDefaultDocuments();
+  if (!bookBasesState.length) return [];
   if (!bookContextReady()) return [];
   return BOOK_DOCUMENT_IDS
     .map((id) => baseForDocument(id))
@@ -298,12 +298,12 @@ export function getDefaultDocuments() {
 }
 
 export function hydrateDocumentsFromServer(items = []) {
-  documentsState = (Array.isArray(items) && items.length ? items : LEGACY_DEFAULT_DOCUMENTS).map(normalize);
+  documentsState = (Array.isArray(items) ? items : []).map(normalize);
   return getDocuments();
 }
 
 export function getDocuments() {
-  return clone(documentsState === null ? LEGACY_DEFAULT_DOCUMENTS : documentsState).map(normalize);
+  return clone(documentsState === null ? [] : documentsState).map(normalize);
 }
 
 export function saveDocuments(items = []) {
