@@ -25,6 +25,6 @@ assert(tags.includes('hydrateTagsFromServer') && tags.includes("queueAuxiliaryDa
 assert(products.includes('hydrateProductsFromServer') && products.includes("queueAuxiliaryDataset('products'") && products.includes("queueAuxiliaryDataset('productHistory'"), 'Products and product history must use server-hydrated runtime state and server writes.');
 assert(schema.includes('model BusinessAuxiliaryState'), 'Server must own a dedicated auxiliary business state.');
 assert(/imports:\s*\[\s*AuthModule\b/.test(moduleFile), 'AuxiliaryStateModule must provide JwtService to JwtAuthGuard through AuthModule.');
-assert(moduleFile.includes('LegalRuntimeModule'), 'AuxiliaryStateModule must wire the central legal runtime policy.');
-assert(controllerFile.includes("dataset || '').trim() === 'finance'") && controllerFile.includes("'FINANCE_MUTATION'"), 'Finance writes must be fail-closed outside LIVE through the legal runtime policy.');
+assert(!moduleFile.includes('LegalRuntimeModule'), 'AuxiliaryStateModule must not depend on the removed legacy runtime layer.');
+assert(!controllerFile.includes('FINANCE_MUTATION') && !controllerFile.includes('assertTenantLive'), 'Finance writes must not depend on removed DEMO/LIVE runtime gates.');
 console.log('auxiliary server ownership check: OK');
