@@ -3,39 +3,6 @@ import { recordDocumentHistory } from './history.js';
 let documentsState = null;
 let persistDocuments = null;
 
-const DEFAULT_DOCUMENTS = [
-  {
-    id: 'pdn-agreement',
-    system: true,
-    kind: 'agreement',
-    title: 'Соглашение об обработке персональных данных',
-    clientConsent: false,
-    required: false,
-    version: 1,
-    text: 'Шаблон для адаптации под вашу работу. Укажите сведения об операторе, цели и правила обработки персональных данных, категории данных, сроки хранения, порядок отзыва и контакты для обращений. Перед использованием рекомендуется проверить документ с юристом.'
-  },
-  {
-    id: 'pdn-consent',
-    system: true,
-    kind: 'consent',
-    title: 'Согласие на обработку персональных данных',
-    clientConsent: true,
-    required: true,
-    version: 1,
-    text: 'Я даю согласие на обработку персональных данных, необходимых для записи и оказания услуг, связи со мной и ведения истории записей. Состав данных, цели, действия с данными, срок действия согласия и способ его отзыва должны быть уточнены оператором перед использованием этого шаблона.'
-  },
-  {
-    id: 'messages-consent',
-    system: true,
-    kind: 'consent',
-    title: 'Согласие на информационные сообщения',
-    clientConsent: true,
-    required: false,
-    version: 1,
-    text: 'Я согласен(на) получать информационные сообщения, связанные с записью, изменением или отменой визита, а также иные сообщения, на которые я отдельно согласился(ась). Это согласие является необязательным и может быть отозвано.'
-  }
-];
-
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -49,7 +16,11 @@ function normalize(item = {}) {
     clientConsent: Boolean(item.clientConsent),
     required: Boolean(item.required),
     version: Math.max(1, Number(item.version || 1)),
-    text: String(item.text || '')
+    text: String(item.text || ''),
+    templateKey: String(item.templateKey || ''),
+    templateVersion: Math.max(0, Number(item.templateVersion || 0)),
+    templatePublishedAt: String(item.templatePublishedAt || ''),
+    customized: Boolean(item.customized),
   };
 }
 
@@ -57,17 +28,13 @@ export function configureDocumentPersistence(handler = null) {
   persistDocuments = typeof handler === 'function' ? handler : null;
 }
 
-export function getDefaultDocuments() {
-  return clone(DEFAULT_DOCUMENTS).map(normalize);
-}
-
 export function hydrateDocumentsFromServer(items = []) {
-  documentsState = (Array.isArray(items) && items.length ? items : DEFAULT_DOCUMENTS).map(normalize);
+  documentsState = (Array.isArray(items) ? items : []).map(normalize);
   return getDocuments();
 }
 
 export function getDocuments() {
-  return clone(documentsState === null ? DEFAULT_DOCUMENTS : documentsState).map(normalize);
+  return clone(documentsState === null ? [] : documentsState).map(normalize);
 }
 
 export function saveDocuments(items = []) {
@@ -83,6 +50,7 @@ export function saveDocument(document) {
   const changedTitle = previous && String(previous.title || '') !== String(document?.title || '');
   const next = normalize({
     ...document,
+    customized: previous?.system ? true : Boolean(document?.customized),
     version: changedText ? Number(previous.version || 1) + 1 : Number(document?.version || previous?.version || 1),
   });
   const index = items.findIndex((item) => item.id === next.id);
@@ -108,10 +76,7 @@ export function createDocument({ title = 'Новый документ', text = '
     clientConsent: false,
     required: false,
     version: 1,
-    text
+    text,
+    customized: true,
   });
-}
-
-export function resetDocumentTemplates() {
-  return saveDocuments(getDefaultDocuments());
 }
