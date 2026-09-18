@@ -21,6 +21,8 @@ function actionText(action) {
   if (action === 'created') return 'Создан';
   if (action === 'version-created') return 'Новая версия';
   if (action === 'renamed') return 'Переименован';
+  if (action === 'template-created') return 'Создан из шаблона Book';
+  if (action === 'template-synced') return 'Обновлён из шаблона Book';
   return 'Изменён';
 }
 
@@ -124,15 +126,16 @@ function documentHistoryMarkup() {
 function signatureHistoryMarkup() {
   const documents = new Map(getDocuments().map((item) => [item.id, item]));
   const clients = new Map(getAllClients().map((item) => [item.key, item]));
-  const items = [...getConsents()].sort((a, b) => Date.parse(b.createdAt || 0) - Date.parse(a.createdAt || 0));
+  const items = [...getConsents()].sort((a, b) => Date.parse(b.eventAt || b.createdAt || 0) - Date.parse(a.eventAt || a.createdAt || 0));
   return list({
     items: items.map((item) => {
       const document = documents.get(item.documentId);
-      const client = clients.get(item.clientId);
-      const clientName = client ? [client.name, client.surname].filter(Boolean).join(' ') : 'Клиент';
+      const legacyClient = clients.get(item.clientId);
+      const legacyName = legacyClient ? [legacyClient.name, legacyClient.surname].filter(Boolean).join(' ') : '';
+      const subject = item.subjectLabel || item.contactValue || legacyName || 'Клиент';
       return {
         title: document?.title || item.documentId,
-        secondary: [`${clientName} · ${consentStateText(item.status)}`, `Версия ${item.documentVersion} · ${formatMoment(item.acceptedAt || item.revokedAt || item.createdAt)}`],
+        secondary: [`${subject} · ${consentStateText(item.status)}`, `Версия ${item.documentVersion} · ${formatMoment(item.acceptedAt || item.revokedAt || item.eventAt || item.createdAt)}`],
       };
     })
   });
