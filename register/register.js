@@ -29,15 +29,15 @@ if (!token) {
     startRegistrationFlow({
       root: state,
       documents: Array.isArray(payload?.documents) ? payload.documents : [],
-      collectIdentity: true,
-      onSubmit: async ({ identity, password, remember, facts }) => {
+      emailLocked: false,
+      onSubmit: async ({ email, password, facts }) => {
         const account = await post('/manual-invitations/accept', {
           token,
-          ...identity,
+          email,
           password,
           ...facts,
         });
-        setAuthToken(account.accessToken, remember);
+        setAuthToken(account.accessToken, false);
         state.innerHTML = '<h1>Book создан</h1><p class="invite-success">Открываем ваш Book в режиме DEMO…</p>';
         window.setTimeout(() => location.replace('../'), 350);
       },
