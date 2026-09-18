@@ -46,12 +46,12 @@ function hydrate(bundle) {
 export async function initializeDocumentState() {
   const [remoteResponse, basesResponse] = await Promise.all([
     apiRequest('/document-state'),
-    apiRequest('/document-state/bases'),
+    apiRequest('/document-state/bases').catch(() => null),
   ]);
   const remote = await responseJson(remoteResponse, 'Не удалось загрузить документы');
-  const bases = await responseJson(basesResponse, 'Не удалось загрузить основы документов');
+  const bases = basesResponse?.ok ? await basesResponse.json().catch(() => []) : [];
 
-  configureBookDocumentBases(bases, {
+  configureBookDocumentBases(Array.isArray(bases) ? bases : [], {
     profile: getProfile(),
     workplaces: getWorkplaces(),
   });
