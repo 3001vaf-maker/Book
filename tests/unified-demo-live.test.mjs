@@ -77,10 +77,10 @@ assert.match(liveBlock, /responsibilityAcknowledged/);
 assert.doesNotMatch(liveBlock, /canBecomeLive|missingLiveDocuments|TENANT_CHECKLIST_KEYS/);
 
 const tenantLiveBlock = legalService.slice(legalService.indexOf('async assertTenantLive'), legalService.indexOf('async assertRealClientMutation'));
-assert.match(tenantLiveBlock, /access\.isOwnerBook/);
+assert.match(tenantLiveBlock, /access\?\.isOwnerBook/);
 assert.match(tenantLiveBlock, /operationMode: 'LIVE'/);
 assert.ok(
-  tenantLiveBlock.indexOf('access.isOwnerBook') < tenantLiveBlock.indexOf('tenantState(tenantId)'),
+  tenantLiveBlock.indexOf('access?.isOwnerBook') < tenantLiveBlock.indexOf('tenantState(tenantId)'),
   'platform owner workspace must not depend on tenant DEMO/LIVE state',
 );
 
