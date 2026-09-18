@@ -363,14 +363,13 @@ export class UserInvitationService {
       key: string;
       type: string;
       title: string;
-      requiredForRegistration: boolean;
       version: number;
       content: string;
       contentHash: string;
       operatorIdentity: unknown;
       publishedAt: Date;
     }>>`
-      SELECT d."key", d."type", d."title", d."requiredForRegistration",
+      SELECT d."key", d."type", d."title",
              v."version", v."contentSnapshot" AS "content", v."contentHash",
              v."operatorIdentitySnapshot" AS "operatorIdentity", v."publishedAt"
       FROM "LegalDocument" d
