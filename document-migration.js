@@ -20,7 +20,7 @@ import {
 } from './settings/documents/history.js';
 
 configureDocumentPersistence((value) => queueDocumentDataset('documents', value));
-configureConsentPersistence((value) => queueDocumentDataset('consents', value));
+configureConsentPersistence(null);
 configureDocumentHistoryPersistence((value) => queueDocumentDataset('history', value));
 
 function clone(value) {

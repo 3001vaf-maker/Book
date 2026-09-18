@@ -149,7 +149,6 @@ export class OnlineBookingController {
     if (body?.enabled === true) {
       await this.consents.acceptContactPointConsent(
         tenantId,
-        accountId,
         'TELEGRAM',
         identity.externalUserId,
         'messages-consent',
@@ -158,7 +157,6 @@ export class OnlineBookingController {
     } else {
       await this.consents.revokeContactPointConsent(
         tenantId,
-        accountId,
         'TELEGRAM',
         identity.externalUserId,
         'messages-consent',

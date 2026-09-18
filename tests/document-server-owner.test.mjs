@@ -39,7 +39,7 @@ history.recordDocumentHistory({ documentId: 'pdn-consent', documentTitle: 'PDN 2
 await persistence.flushBusinessPersistence();
 
 assert.ok(calls.some((call) => call.url.endsWith('/document-state/documents') && call.method === 'PUT'));
-assert.ok(calls.some((call) => call.url.endsWith('/document-state/consents') && call.method === 'PUT'));
+assert.equal(calls.some((call) => call.url.endsWith('/document-state/consents') && call.method === 'PUT'), false);
 assert.ok(calls.some((call) => call.url.endsWith('/document-state/history') && call.method === 'PUT'));
 assert.equal(JSON.parse(storage.get('book.documents.templates.v1') || 'null'), null);
 console.log('document server owner tests: OK');

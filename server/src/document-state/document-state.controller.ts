@@ -15,7 +15,8 @@ export class DocumentStateController {
   ) {}
 
   @Get()
-  get(@Req() request: AuthenticatedRequest) {
+  async get(@Req() request: AuthenticatedRequest) {
+    await this.consentPolicy.ensureCanonicalConsentEvents(request.auth!.tenantId);
     return this.documents.get(request.auth!.tenantId);
   }
 
@@ -24,18 +25,18 @@ export class DocumentStateController {
     return this.consentPolicy.consentReport(request.auth!.tenantId);
   }
 
-  @Get('consents/client/:clientId')
-  clientConsents(@Req() request: AuthenticatedRequest, @Param('clientId') clientId: string) {
-    return this.consentPolicy.clientConsentProjection(request.auth!.tenantId, clientId);
+  @Get('consents/account/:accountId')
+  accountConsents(@Req() request: AuthenticatedRequest, @Param('accountId') accountId: string) {
+    return this.consentPolicy.accountConsentProjection(request.auth!.tenantId, accountId);
   }
 
-  @Post('consents/client/:clientId/:documentId/revoke')
-  revokeConsent(
+  @Post('consents/account/:accountId/:documentId/revoke')
+  revokeAccountConsent(
     @Req() request: AuthenticatedRequest,
-    @Param('clientId') clientId: string,
+    @Param('accountId') accountId: string,
     @Param('documentId') documentId: string,
   ) {
-    return this.consentPolicy.revokeConsent(request.auth!.tenantId, clientId, documentId, 'owner');
+    return this.consentPolicy.revokeAccountConsent(request.auth!.tenantId, accountId, documentId, 'owner');
   }
 
   @Post('migrate')
