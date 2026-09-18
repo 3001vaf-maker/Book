@@ -17,7 +17,7 @@ import { configureWorkplaceSource } from './core/workplace-time.js';
 import { configureTimeUsageSource, configureSoftTimeUsageReleaseSource } from './core/time/index.js';
 import { apiRequest, getCurrentUser, login } from './core/auth.js';
 import { BOOK_APP_ORIGIN, CLIENT_APP_ORIGIN } from './core/environment.js';
-import { canUseBookCapability, getBookAccess, loadBookAccess } from './core/access.js';
+import { canUseCapability, getAccess, loadAccess } from './core/access.js';
 import { startServerBookingSync } from './online-booking/server-sync.js';
 import { renderOnlineBooking } from './online-booking/booking.js';
 import { startBookingClientRuntime } from './online-booking/client-runtime.js';
@@ -122,7 +122,7 @@ function redirectBookingToClient() {
 }
 
 function ensureServerBookingSync() {
-  if (serverBookingSyncStarted || !canUseBookCapability('online_booking.access')) return;
+  if (serverBookingSyncStarted || !canUseCapability('online_booking.access')) return;
   serverBookingSyncStarted = true;
   startServerBookingSync();
 }
@@ -130,7 +130,7 @@ function ensureServerBookingSync() {
 function sectionAllowed(section) {
   if (!routes[section]) return false;
   const capability = sectionCapabilities[section];
-  return capability ? canUseBookCapability(capability) : true;
+  return capability ? canUseCapability(capability) : true;
 }
 
 function allowedSections() {
@@ -152,7 +152,7 @@ function navigate(section) {
 }
 
 function isDemoMode() {
-  return getBookAccess().isOwnerBook !== true && tenantRuntime?.state?.operationMode !== 'LIVE';
+  return getAccess().isPlatformOwnerWorkspace !== true && tenantRuntime?.state?.operationMode !== 'LIVE';
 }
 
 function renderWorkspace() {
@@ -294,9 +294,9 @@ function openDemoHub() {
     'Подготовьте ежедневную работу. Можно заполнять в удобном порядке.',
     [
       setupRow('Рабочее место', getWorkplaceEntities().length > 0, 'profile'),
-      canUseBookCapability('services.access') ? setupRow('Услуги и цены', getProcedures().length > 0, 'service') : '',
-      canUseBookCapability('timetable.access') ? setupRow('График работы', getDays().length > 0, 'timetable') : '',
-      canUseBookCapability('journal.access') ? setupRow('Журнал', false, 'journal') : '',
+      canUseCapability('services.access') ? setupRow('Услуги и цены', getProcedures().length > 0, 'service') : '',
+      canUseCapability('timetable.access') ? setupRow('График работы', getDays().length > 0, 'timetable') : '',
+      canUseCapability('journal.access') ? setupRow('Журнал', false, 'journal') : '',
     ],
   );
 
@@ -304,12 +304,12 @@ function openDemoHub() {
     'Этап 3 — Возможности Book',
     'Здесь только те разделы, которые открыты вашему Book.',
     [
-      canUseBookCapability('online_booking.access') ? setupRow('Онлайн-запись', tenantRuntime?.state?.operationMode === 'LIVE', 'online-booking') : '',
-      canUseBookCapability('notifications.access') ? setupRow('Уведомления', false, 'communications') : '',
-      canUseBookCapability('chat.access') ? setupRow('Чат', false, 'chat') : '',
-      canUseBookCapability('integrations.access') ? setupRow('Интеграции', false, 'integrations') : '',
-      canUseBookCapability('documents.access') ? setupRow('Документы для клиентов', profileSetupReady(), 'documents', 'Формируются автоматически после готового профиля') : '',
-      canUseBookCapability('tags.access') ? setupRow('Ярлыки', false, 'tags') : '',
+      canUseCapability('online_booking.access') ? setupRow('Онлайн-запись', tenantRuntime?.state?.operationMode === 'LIVE', 'online-booking') : '',
+      canUseCapability('notifications.access') ? setupRow('Уведомления', false, 'communications') : '',
+      canUseCapability('chat.access') ? setupRow('Чат', false, 'chat') : '',
+      canUseCapability('integrations.access') ? setupRow('Интеграции', false, 'integrations') : '',
+      canUseCapability('documents.access') ? setupRow('Документы для клиентов', profileSetupReady(), 'documents', 'Формируются автоматически после готового профиля') : '',
+      canUseCapability('tags.access') ? setupRow('Ярлыки', false, 'tags') : '',
     ],
   );
 
@@ -497,7 +497,7 @@ async function activateLive(modalNode, payload) {
       body: JSON.stringify(payload),
     });
     tenantRuntime = next;
-    if (canUseBookCapability('online_booking.access')) {
+    if (canUseCapability('online_booking.access')) {
       await apiRequest('/online-booking/owner/publication', {
         method: 'PUT',
         body: JSON.stringify({ data: { source: 'live-activation' } }),
@@ -563,7 +563,7 @@ async function syncDocumentsFromProfileContext() {
   try {
     const result = await initializeDocumentState(authenticatedAccount);
     if (result?.source === 'server-reconciled') {
-      if (tenantRuntime?.state?.operationMode === 'LIVE' && canUseBookCapability('online_booking.access')) {
+      if (tenantRuntime?.state?.operationMode === 'LIVE' && canUseCapability('online_booking.access')) {
         await apiRequest('/online-booking/owner/publication', {
           method: 'PUT',
           body: JSON.stringify({ data: { source: 'document-auto-refresh' } }),
@@ -613,7 +613,7 @@ async function renderAuthenticated(account = authenticatedAccount) {
 
   let access;
   try {
-    access = await loadBookAccess();
+    access = await loadAccess();
   } catch (error) {
     await reportStartupFailure('access', error);
     renderServerStatePending();
@@ -715,9 +715,9 @@ window.addEventListener('book:profile-context-updated', () => {
   void syncDocumentsFromProfileContext();
 });
 
-window.addEventListener('book:access-updated', (event) => {
+window.addEventListener('workspace:access-updated', (event) => {
   if (!workspaceReady || !event?.detail?.changed) return;
-  if (getBookAccess().status === 'SUSPENDED') {
+  if (getAccess().status === 'SUSPENDED') {
     renderSuspended();
     return;
   }
