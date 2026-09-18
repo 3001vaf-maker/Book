@@ -191,7 +191,7 @@ export class MasterInvitationService {
 
     const email = normalizeEmail(input?.email);
     const name = normalizeName(input?.name);
-    if (!email || !email.includes('@')) throw new BadRequestException('Укажите корректный email мастера');
+    if (!email || !email.includes('@')) throw new BadRequestException('Укажите корректный email пользователя');
 
     const existingUser = await this.prisma.user.findUnique({ where: { email } });
     if (existingUser) throw new ConflictException('Пользователь с таким email уже зарегистрирован');
