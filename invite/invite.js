@@ -33,12 +33,14 @@ if (!token) {
       root: state,
       documents: Array.isArray(documents) ? documents : [],
       initial: {
+        name: invitation?.name || '',
         email: invitation?.email || '',
       },
       emailLocked: true,
-      onSubmit: async ({ password, facts }) => {
+      onSubmit: async ({ identity, password, facts }) => {
         const account = await post('/master-invitations/accept', {
           token,
+          ...identity,
           password,
           ...facts,
         });
