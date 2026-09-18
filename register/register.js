@@ -30,10 +30,10 @@ if (!token) {
       root: state,
       documents: Array.isArray(payload?.documents) ? payload.documents : [],
       emailLocked: false,
-      onSubmit: async ({ email, password, facts }) => {
+      onSubmit: async ({ identity, password, facts }) => {
         const account = await post('/manual-invitations/accept', {
           token,
-          email,
+          ...identity,
           password,
           ...facts,
         });
