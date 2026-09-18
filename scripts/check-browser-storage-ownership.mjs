@@ -11,7 +11,7 @@ const TECHNICAL_STORAGE_OWNERS = new Set([
   'core/access.js',
   'core/booking-account/index.js',
   'core/workplace-context.js',
-  'main/clients/view-state.js',
+  'main/people/view-state.js',
   'onboarding/onboarding.js',
 ]);
 
