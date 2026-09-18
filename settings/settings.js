@@ -1,4 +1,4 @@
-import { canUseCapability } from '../core/access.js';
+import { canUseBookCapability } from '../core/access.js';
 import { folderList, pageHeader } from '../ui/ui.js';
 
 const folders = [
@@ -12,22 +12,28 @@ const folders = [
 ];
 
 function availableFolders() {
-  return folders.filter((folder) => canUseCapability(folder[4]));
+  return folders.filter((folder) => canUseBookCapability(folder[4]));
 }
 
-function renderRows(root) {
+async function openFolder(root, key, options = {}) {
+  const visible = availableFolders();
+  const folder = visible.find(([folderKey]) => folderKey === key);
+  if (!folder) return false;
+  const { render } = await folder[3]();
+  render(root, () => renderRows(root, options), { demoGuide: Boolean(options.demo) });
+  return true;
+}
+
+function renderRows(root, options = {}) {
   const visible = availableFolders();
   root.innerHTML = `${pageHeader('Настройки')}${folderList(visible.map(([key, label]) => ({ title: label, data: `data-settings-open="${key}"` })))}`;
   root.querySelectorAll('[data-settings-open]').forEach((element) => {
-    element.addEventListener('click', async () => {
-      const folder = visible.find(([key]) => key === element.dataset.settingsOpen);
-      if (!folder) return;
-      const { render } = await folder[3]();
-      render(root, () => renderRows(root));
-    });
+    element.addEventListener('click', () => void openFolder(root, element.dataset.settingsOpen, options));
   });
 }
 
-export function renderSettings(root) {
-  renderRows(root);
+export function renderSettings(root, options = {}) {
+  renderRows(root, options);
+  const requested = String(options?.openFolder || '').trim();
+  if (requested) queueMicrotask(() => void openFolder(root, requested, options));
 }

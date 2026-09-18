@@ -32,7 +32,7 @@ function hydrate(value) {
   hydrateProductsFromServer({ products: bundle.products, productHistory: bundle.productHistory });
 }
 
-export async function initializeAuxiliaryState(account = {}) {
+export async function initializeAuxiliaryState() {
   const response = await apiRequest('/auxiliary-state');
   const remote = await responseJson(response, 'Не удалось загрузить Финансы и связанные данные');
 
@@ -41,13 +41,9 @@ export async function initializeAuxiliaryState(account = {}) {
     return { source: 'server', verified: true };
   }
 
-  if (remote?.migrated || account?.user?.workspaceUnlocked) {
-    return { source: 'server-awaiting-verification', verified: false };
-  }
-
   const bootstrapResponse = await apiRequest('/auxiliary-state/bootstrap', { method: 'POST' });
-  const bootstrapped = await responseJson(bootstrapResponse, 'Не удалось создать серверное хранилище Финансов');
+  const bootstrapped = await responseJson(bootstrapResponse, 'Не удалось подтвердить серверное хранилище Финансов');
   if (!bootstrapped?.verified) throw new Error('Серверное хранилище Финансов не подтверждено');
   hydrate(bootstrapped);
-  return { source: 'server-bootstrap', verified: true };
+  return { source: remote?.migrated ? 'server-reverified' : 'server-bootstrap', verified: true };
 }

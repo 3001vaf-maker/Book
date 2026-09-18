@@ -1,10 +1,12 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { compare } from 'bcryptjs';
 import { PrismaService } from '../prisma.service';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
@@ -60,4 +62,22 @@ export class AuthService {
       role: membership.role,
     };
   }
+  async setOnboardingStep(userId: string, stepValue: unknown) {
+    const parsed = Number(stepValue);
+    const step = Number.isInteger(parsed) ? Math.max(0, Math.min(20, parsed)) : 0;
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: { onboardingStep: step },
+      select: { id: true, email: true, onboardingStep: true, workspaceUnlocked: true },
+    });
+    return { user };
+  }
+
+  startupDiagnostic(userId: string, tenantId: string, stageValue: unknown, messageValue: unknown) {
+    const stage = String(stageValue || 'unknown').trim().slice(0, 80) || 'unknown';
+    const message = String(messageValue || '').replace(/\s+/g, ' ').trim().slice(0, 500);
+    this.logger.warn(`Book startup failed tenant=${tenantId} user=${userId} stage=${stage} message=${message || 'unknown'}`);
+    return { received: true };
+  }
+
 }

@@ -13,7 +13,9 @@ const online = read('server/src/online-booking/online-booking.service.ts');
 const app = read('server/src/app.module.ts');
 const schema = read('server/prisma/schema.prisma');
 
-if (!core.includes('await initializeBusinessState(authenticatedAccount)')) failures.push('Authenticated Book must hydrate Clients/UEI/Record from server before rendering.');
+const businessStartup = core.includes('await initializeBusinessState(authenticatedAccount)')
+  || core.includes("['business', () => initializeBusinessState(authenticatedAccount)]");
+if (!businessStartup) failures.push('Authenticated Book must hydrate Clients/UEI/Record from server before rendering.');
 if (!clients.includes('hydrateClientsFromServer') || !clients.includes('queuePersonUpsert')) failures.push('Person owner must use server-hydrated runtime state and server writes.');
 if (!uei.includes('hydrateUEIFromServer') || !uei.includes('queueUEIStore')) failures.push('UEI owner must use server-hydrated runtime state and server writes.');
 if (!records.includes('hydrateRecordStateFromServer') || !records.includes('queueRecordUpsert') || !records.includes('queueRecordEventUpsert')) failures.push('Record persistence gateway must use server-hydrated rows and server writes.');

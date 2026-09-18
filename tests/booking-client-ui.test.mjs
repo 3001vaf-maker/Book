@@ -103,7 +103,7 @@ assert.match(accountShell, /className: 'app-view-shell--chat'/);
 assert.match(accountShell, /getBookingRequests\(state\.tenantId\)\.catch\(\(\) => \[\]\)/);
 assert.match(accountShell, /data-client-chat-settings/);
 assert.match(accountShell, /getBookingChatSettings\(state\.tenantId\)/);
-assert.match(accountShell, /setBookingTelegramConsent\(state\.tenantId, !telegram\.enabled\)/);
+assert.match(accountShell, /setBookingTelegramChatEnabled\(state\.tenantId, !telegram\.enabled\)/);
 assert.match(accountShell, /label: 'Telegram'.*checked: Boolean\(telegram\.enabled\).*disabled: !telegram\.linked/s);
 assert.doesNotMatch(accountShell, /Promise\.allSettled\(unread/);
 assert.doesNotMatch(accountShell, /markBookingNotificationRead\(state\.tenantId, item\.notificationId\)/);
@@ -178,15 +178,14 @@ assert.match(bookingSettingsUi, /BOOKING_SLOT_STEPS\.map/);
 assert.doesNotMatch(bookingSettingsUi, /Сохранить оформление/);
 assert.match(indexHtml, /settings\/online-booking\/online-booking\.css/);
 
-// Chat consent remains exact Contact Point policy for Telegram; IN_APP is separate.
+// Chat channel preference is separate from marketing consent.
 assert.match(bookingAccountApi, /account\/chat\/settings/);
-assert.match(bookingAccountApi, /account\/chat\/telegram-consent/);
-assert.match(onlineBookingController, /contactPointConsentState\([\s\S]*?'TELEGRAM'[\s\S]*?identity\.externalUserId[\s\S]*?'messages-consent'/);
-assert.match(onlineBookingController, /acceptContactPointConsent\([\s\S]*?'TELEGRAM'[\s\S]*?identity\.externalUserId[\s\S]*?'client-chat-settings'/);
-assert.match(onlineBookingController, /revokeContactPointConsent\([\s\S]*?'TELEGRAM'[\s\S]*?identity\.externalUserId[\s\S]*?'client-chat-settings'/);
+assert.match(bookingAccountApi, /account\/chat\/telegram-channel/);
+assert.match(onlineBookingController, /CommunicationHistoryService/);
+assert.match(onlineBookingController, /preferredChannels\.includes\('TELEGRAM'\)/);
+assert.doesNotMatch(onlineBookingController, /messages-consent|acceptContactPointConsent|revokeContactPointConsent|contactPointConsentState/);
 assert.match(consentPolicy, /async canSendMessages\(tenantId: string, typeValue: unknown, value: unknown\)/);
-assert.match(telegramBot, /canSendMessages\(tenantId, 'TELEGRAM', identity\.externalUserId\)/);
-assert.doesNotMatch(telegramBot, /canSendMessages\(tenantId, personKey/);
+assert.doesNotMatch(telegramBot, /canSendMessages\(tenantId/);
 
 // Media and rich content are real persisted message properties, not decorative controls.
 assert.match(bookingAccountApi, /sendBookingChatMessage\(tenantId, value, legacyAttachments = \[\]\)/);

@@ -6,8 +6,8 @@ import { AppModule } from './app.module';
 
 const API_HOST = 'api.va-tools.ru';
 const ADMIN_HOST = 'admin.va-tools.ru';
-const WORKSPACE_HOST = 'book.va-tools.ru';
-const PUBLIC_HOST = 'client.va-tools.ru';
+const BOOK_HOST = 'book.va-tools.ru';
+const CLIENT_HOST = 'client.va-tools.ru';
 
 function normalizeOrigin(value: string) {
   try {
@@ -27,8 +27,8 @@ function allowedOrigins() {
   if (process.env.NODE_ENV === 'production') {
     return [
       `https://${ADMIN_HOST}`,
-      `https://${WORKSPACE_HOST}`,
-      `https://${PUBLIC_HOST}`,
+      `https://${BOOK_HOST}`,
+      `https://${CLIENT_HOST}`,
       `https://${API_HOST}`,
     ];
   }
@@ -59,6 +59,12 @@ async function bootstrap() {
 
     const host = requestHost(request);
 
+    if (host === API_HOST) {
+      if (request.path === '/') return response.redirect(302, '/admin/');
+      if (!request.path.startsWith('/admin/') && !request.path.startsWith('/core/')) return next();
+      return staticSite(request, response, next);
+    }
+
     if (host === ADMIN_HOST) {
       if (request.path === '/') return response.redirect(302, '/admin/');
       if (request.path.startsWith('/admin/') || request.path.startsWith('/core/')) {
@@ -67,9 +73,7 @@ async function bootstrap() {
       return response.status(404).send('Not Found');
     }
 
-    if (host === API_HOST) return next();
-
-    if (host === WORKSPACE_HOST || host === PUBLIC_HOST) {
+    if (host === BOOK_HOST || host === CLIENT_HOST) {
       return staticSite(request, response, () => response.status(404).send('Not Found'));
     }
 
