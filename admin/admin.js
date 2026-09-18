@@ -4,9 +4,9 @@ const app = document.querySelector('#admin-app');
 const state = {
   account: null,
   admin: null,
-  masters: [],
+  users: [],
   capabilities: [],
-  section: 'masters',
+  section: 'users',
 };
 
 function escapeHtml(value) {
@@ -26,8 +26,8 @@ function renderLogin(message = '') {
   app.innerHTML = `
     <main class="admin-login">
       <section class="admin-login-card">
-        <h1>Book Admin</h1>
-        <p>Управление персональными Book мастеров</p>
+        <h1>Platform Owner</h1>
+        <p>Управление рабочими пространствами пользователей</p>
         <form class="admin-form" data-login-form>
           <label class="admin-field"><span>Email</span><input name="email" type="email" autocomplete="username" required></label>
           <label class="admin-field"><span>Пароль</span><input name="password" type="password" autocomplete="current-password" required></label>
@@ -62,11 +62,11 @@ async function loadAdmin() {
 }
 
 async function refreshData() {
-  const [masters, capabilities] = await Promise.all([
-    adminRequest('/masters'),
+  const [users, capabilities] = await Promise.all([
+    adminRequest('/users'),
     adminRequest('/capabilities'),
   ]);
-  state.masters = Array.isArray(masters) ? masters : [];
+  state.users = Array.isArray(users) ? users : [];
   state.capabilities = Array.isArray(capabilities) ? capabilities : [];
 }
 
@@ -74,17 +74,17 @@ function renderShell() {
   app.innerHTML = `
     <div class="admin-shell">
       <aside class="admin-sidebar">
-        <div class="admin-brand">Book <span>Admin</span></div>
+        <div class="admin-brand">Platform <span>Owner</span></div>
         <nav class="admin-nav">
           <button data-section="overview">Обзор</button>
-          <button data-section="owner" class="owner-link">Мой Book</button>
-          <button data-section="masters">Мастера</button>
+          <button data-section="owner" class="owner-link">Мой Workspace</button>
+          <button data-section="users">Пользователи</button>
           <button data-section="capabilities">Возможности</button>
         </nav>
         <div class="admin-sidebar-foot">SaaS Control Plane</div>
       </aside>
       <header class="admin-toolbar">
-        <h1 data-toolbar-title>Мастера</h1>
+        <h1 data-toolbar-title>Пользователи</h1>
         <div class="admin-toolbar-user"><span>${escapeHtml(state.admin?.user?.email || '')}</span><button class="admin-button secondary" data-logout>Выйти</button></div>
       </header>
       <main class="admin-main"><div class="admin-content" data-content></div></main>
@@ -114,54 +114,54 @@ function setActiveSection(title) {
 
 function renderCurrentSection() {
   if (state.section === 'overview') return renderOverview();
-  if (state.section === 'owner') return renderOwnerBook();
+  if (state.section === 'owner') return renderOwnerWorkspace();
   if (state.section === 'capabilities') return renderCapabilities();
-  return renderMasters();
+  return renderUsers();
 }
 
 function renderOverview() {
   setActiveSection('Обзор');
   const content = app.querySelector('[data-content]');
-  const regular = state.masters.filter((item) => !item.isOwnerBook);
-  const active = regular.filter((item) => item.status === 'ACTIVE' && item.master).length;
-  const pending = regular.filter((item) => !item.master && item.invitation?.status === 'PENDING').length;
+  const regular = state.users.filter((item) => !item.isPlatformOwnerWorkspace);
+  const active = regular.filter((item) => item.status === 'ACTIVE' && item.user).length;
+  const pending = regular.filter((item) => !item.user && item.invitation?.status === 'PENDING').length;
   content.innerHTML = `
-    <div class="admin-heading"><div><h2>Обзор</h2><p>Состояние персональных Book</p></div></div>
+    <div class="admin-heading"><div><h2>Обзор</h2><p>Состояние рабочих пространств</p></div></div>
     <div class="admin-stats">
-      <div class="admin-stat"><strong>${regular.length}</strong><span>создано Book мастеров</span></div>
-      <div class="admin-stat"><strong>${active}</strong><span>активных мастеров</span></div>
+      <div class="admin-stat"><strong>${regular.length}</strong><span>создано рабочих пространств</span></div>
+      <div class="admin-stat"><strong>${active}</strong><span>активных пользователей</span></div>
       <div class="admin-stat"><strong>${pending}</strong><span>ожидают принятия приглашения</span></div>
     </div>`;
 }
 
-function renderOwnerBook() {
-  setActiveSection('Мой Book');
-  const owner = state.masters.find((item) => item.isOwnerBook);
+function renderOwnerWorkspace() {
+  setActiveSection('Мой Workspace');
+  const owner = state.users.find((item) => item.isPlatformOwnerWorkspace);
   const content = app.querySelector('[data-content]');
   if (!owner) {
-    content.innerHTML = '<div class="admin-card" style="padding:20px">Мой Book пока не определён.</div>';
+    content.innerHTML = '<div class="admin-card" style="padding:20px">Мой Workspace пока не определён.</div>';
     return;
   }
   content.innerHTML = `
-    <div class="admin-heading"><div><h2>Мой Book</h2><p>Ваш первый персональный Book остаётся отдельным от списка мастеров.</p></div></div>
+    <div class="admin-heading"><div><h2>Мой Workspace</h2><p>Ваше рабочее пространство остаётся отдельным от списка пользователей.</p></div></div>
     <div class="admin-card" style="padding:20px">
-      <strong>${escapeHtml(owner.master?.name || owner.tenantName)}</strong>
-      <p style="color:#817a74">${escapeHtml(owner.master?.email || '')}</p>
+      <strong>${escapeHtml(owner.user?.name || owner.tenantName)}</strong>
+      <p style="color:#817a74">${escapeHtml(owner.user?.email || '')}</p>
       <button class="admin-button" data-edit-owner>Настроить доступы</button>
     </div>`;
   content.querySelector('[data-edit-owner]').addEventListener('click', () => openAccessDrawer(owner.tenantId));
 }
 
-function renderMasters() {
-  setActiveSection('Мастера');
+function renderUsers() {
+  setActiveSection('Пользователи');
   const content = app.querySelector('[data-content]');
-  const masters = state.masters.filter((item) => !item.isOwnerBook);
+  const users = state.users.filter((item) => !item.isPlatformOwnerWorkspace);
   content.innerHTML = `
-    <div class="admin-heading"><div><h2>Мастера</h2><p>Каждый мастер работает только в своём персональном Book.</p></div></div>
+    <div class="admin-heading"><div><h2>Пользователи</h2><p>Каждый пользователь работает только в своём рабочем пространстве.</p></div></div>
     <section class="admin-invite-panel">
-      <h3>Пригласить мастера</h3>
+      <h3>Пригласить пользователя</h3>
       <form class="admin-invite-grid" data-invite-form>
-        <label class="admin-field"><span>Имя</span><input name="name" placeholder="Имя мастера"></label>
+        <label class="admin-field"><span>Имя</span><input name="name" placeholder="Имя пользователя"></label>
         <label class="admin-field"><span>Email</span><input name="email" type="email" placeholder="name@example.com" required></label>
         <button class="admin-button" type="submit">Отправить приглашение</button>
       </form>
@@ -169,8 +169,8 @@ function renderMasters() {
     </section>
     <div class="admin-card">
       <table class="admin-table">
-        <thead><tr><th>Мастер</th><th>Email</th><th>Состояние</th><th>Набор</th></tr></thead>
-        <tbody>${masters.map(masterRow).join('') || '<tr><td colspan="4">Пока нет приглашённых мастеров.</td></tr>'}</tbody>
+        <thead><tr><th>Пользователь</th><th>Email</th><th>Состояние</th><th>Набор</th></tr></thead>
+        <tbody>${users.map(userRow).join('') || '<tr><td colspan="4">Пока нет приглашённых пользователей.</td></tr>'}</tbody>
       </table>
     </div>`;
 
@@ -193,7 +193,7 @@ function renderMasters() {
       form.reset();
       message.textContent = 'Приглашение отправлено по email.';
       await refreshData();
-      window.setTimeout(renderMasters, 350);
+      window.setTimeout(renderUsers, 350);
     } catch (error) {
       message.textContent = error instanceof Error ? error.message : 'Не удалось отправить приглашение';
       message.classList.add('error');
@@ -221,12 +221,12 @@ function renderMasters() {
   });
 }
 
-function masterRow(item) {
-  const pending = !item.master && item.invitation?.status === 'PENDING';
-  const name = item.master?.name || item.invitation?.name || item.tenantName;
-  const email = item.master?.email || item.invitation?.email || '';
+function userRow(item) {
+  const pending = !item.user && item.invitation?.status === 'PENDING';
+  const name = item.user?.name || item.invitation?.name || item.tenantName;
+  const email = item.user?.email || item.invitation?.email || '';
   const statusClass = item.status === 'SUSPENDED' ? 'suspended' : pending ? 'pending' : 'active';
-  const statusLabel = item.status === 'SUSPENDED' ? 'Отключён' : pending ? 'Ждёт входа' : item.master ? 'Активен' : 'Создан';
+  const statusLabel = item.status === 'SUSPENDED' ? 'Отключён' : pending ? 'Ждёт входа' : item.user ? 'Активен' : 'Создан';
   const resend = pending ? `<button class="admin-button secondary" data-resend="${escapeHtml(item.invitation.id)}">Повторить email</button>` : '';
   return `<tr data-tenant="${escapeHtml(item.tenantId)}"><td><strong>${escapeHtml(name)}</strong></td><td>${escapeHtml(email)}</td><td><span class="admin-pill ${statusClass}">${statusLabel}</span> ${resend}</td><td>${escapeHtml(item.plan?.name || 'Индивидуальный')}</td></tr>`;
 }
@@ -240,29 +240,29 @@ function renderCapabilities() {
     groups.get(item.groupKey).push(item);
   });
   content.innerHTML = `
-    <div class="admin-heading"><div><h2>Возможности Book</h2><p>Единый каталог функций, которые можно выдавать каждому Book.</p></div></div>
+    <div class="admin-heading"><div><h2>Возможности</h2><p>Единый каталог функций рабочего пространства.</p></div></div>
     ${[...groups.entries()].map(([group, items]) => `<section class="admin-card" style="padding:18px;margin-bottom:14px"><strong>${escapeHtml(group)}</strong>${items.map((item) => `<div class="admin-capability"><div>${escapeHtml(item.name)}<small>${escapeHtml(item.key)}</small></div><span>${item.valueType === 'LIMIT' ? 'лимит' : 'ON / OFF'}</span></div>`).join('')}</section>`).join('')}`;
 }
 
 function openAccessDrawer(tenantId) {
-  const master = state.masters.find((item) => item.tenantId === tenantId);
-  if (!master) return;
-  const resolved = new Map((master.access?.capabilities || []).map((item) => [item.key, item]));
+  const entry = state.users.find((item) => item.tenantId === tenantId);
+  if (!entry) return;
+  const resolved = new Map((entry.access?.capabilities || []).map((item) => [item.key, item]));
   const backdrop = document.createElement('div');
   backdrop.className = 'admin-drawer-backdrop';
   backdrop.innerHTML = `
     <aside class="admin-drawer">
       <div class="admin-drawer-head">
-        <div><h3>${escapeHtml(master.isOwnerBook ? 'Мой Book' : (master.master?.name || master.invitation?.name || master.tenantName))}</h3><p>${escapeHtml(master.master?.email || master.invitation?.email || '')}</p></div>
+        <div><h3>${escapeHtml(entry.isPlatformOwnerWorkspace ? 'Мой Workspace' : (entry.user?.name || entry.invitation?.name || entry.tenantName))}</h3><p>${escapeHtml(entry.user?.email || entry.invitation?.email || '')}</p></div>
         <button class="admin-close" data-close aria-label="Закрыть">×</button>
       </div>
       <section class="admin-section">
-        <h4>Доступ Book</h4>
+        <h4>Доступ</h4>
         ${state.capabilities.map((capability) => capabilityEditor(capability, resolved.get(capability.key))).join('')}
       </section>
       <section class="admin-section">
         <h4>Состояние</h4>
-        <button class="admin-button ${master.status === 'SUSPENDED' ? '' : 'danger'}" data-status>${master.status === 'SUSPENDED' ? 'Включить Book' : 'Отключить Book'}</button>
+        <button class="admin-button ${entry.status === 'SUSPENDED' ? '' : 'danger'}" data-status>${entry.status === 'SUSPENDED' ? 'Включить Workspace' : 'Отключить Workspace'}</button>
       </section>
       <div class="admin-actions"><button class="admin-button secondary" data-close>Закрыть</button><button class="admin-button" data-save>Сохранить доступы</button></div>
       <p class="admin-inline-message" data-save-message></p>
@@ -279,7 +279,7 @@ function openAccessDrawer(tenantId) {
   });
 
   backdrop.querySelector('[data-status]').addEventListener('click', async () => {
-    const next = master.status === 'SUSPENDED' ? 'ACTIVE' : 'SUSPENDED';
+    const next = entry.status === 'SUSPENDED' ? 'ACTIVE' : 'SUSPENDED';
     try {
       await adminRequest(`/tenants/${encodeURIComponent(tenantId)}/access`, {
         method: 'PUT',

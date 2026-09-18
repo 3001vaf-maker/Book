@@ -1,5 +1,5 @@
 import { normalizePhoneForStorage, phonesMatch } from '../../core/phone/index.js';
-import { assertNoNewClientContactConflicts } from '../../core/client-contact/index.js';
+import { assertNoNewPersonContactConflicts } from '../../core/person-contact/index.js';
 import { getMembers, getUEI } from '../../core/uei.js';
 import { queuePersonDelete, queuePersonUpsert } from '../../core/business-persistence.js';
 import { getTags } from '../../settings/tags/data.js';
@@ -36,7 +36,7 @@ function normalizeStrings(values = []) {
   return [...new Set((Array.isArray(values) ? values : []).map((value) => String(value || '').trim()).filter(Boolean))];
 }
 
-export function normalizeClient(person = {}) {
+export function normalizePerson(person = {}) {
   return {
     key: String(person.key || ''),
     id: String(person.id || ''),
@@ -65,8 +65,8 @@ export function normalizeClient(person = {}) {
   };
 }
 
-export function hydrateClientsFromServer(people = []) {
-  peopleState = (Array.isArray(people) ? people : []).map(normalizeClient).filter((person) => person.key);
+export function hydratePeopleFromServer(people = []) {
+  peopleState = (Array.isArray(people) ? people : []).map(normalizePerson).filter((person) => person.key);
   return clone(peopleState);
 }
 
@@ -103,8 +103,8 @@ function messageConsentAccepted(people) {
   return false;
 }
 
-export function getAllClients() {
-  const stored = clone(peopleState).map(normalizeClient).filter((person) => person.key);
+export function getAllPeople() {
+  const stored = clone(peopleState).map(normalizePerson).filter((person) => person.key);
   return stored.map((person) => {
     const members = identityPeopleFor(person, stored);
     return {
@@ -118,8 +118,8 @@ export function getAllClients() {
   });
 }
 
-export function getClients() {
-  const people = getAllClients();
+export function getPeople() {
+  const people = getAllPeople();
   const linkedSecondary = new Set();
 
   for (const person of people) {
@@ -144,7 +144,7 @@ function identityKeysForUEI(uei, people = []) {
 export function getIdentityMemberKeys(key) {
   const target = String(key || '').trim();
   if (!target) return [];
-  const people = getAllClients();
+  const people = getAllPeople();
   const person = people.find((item) => item.key === target);
   if (!person) return [target];
   if (!person.uei) return [target];
@@ -155,7 +155,7 @@ export function getIdentityMemberKeys(key) {
 export function getIdentityPeople(key) {
   const keys = new Set(getIdentityMemberKeys(key));
   if (!keys.size) return [];
-  return getAllClients().filter((person) => keys.has(person.key));
+  return getAllPeople().filter((person) => keys.has(person.key));
 }
 
 export function getIdentityOwner(key) {
@@ -170,23 +170,23 @@ export function findIdentityOwnerByAccountId(accountId) {
 export function findPeopleByPhone(phone) {
   const target = String(phone || '').trim();
   if (!target) return [];
-  return getAllClients().filter((person) => (person.phones || []).some((value) => phonesMatch(value, target)));
+  return getAllPeople().filter((person) => (person.phones || []).some((value) => phonesMatch(value, target)));
 }
 
 export function findPersonByAccountId(accountId) {
   const id = String(accountId || '').trim();
   if (!id) return null;
-  return getAllClients().find((person) => (person.accounts || []).includes(id)) || null;
+  return getAllPeople().find((person) => (person.accounts || []).includes(id)) || null;
 }
 
-export function getClientCount() {
-  return getClients().length;
+export function getPeopleCount() {
+  return getPeople().length;
 }
 
-export function saveClients(people = []) {
-  const normalized = (Array.isArray(people) ? people : []).map(normalizeClient).filter((person) => person.key);
+export function savePeople(people = []) {
+  const normalized = (Array.isArray(people) ? people : []).map(normalizePerson).filter((person) => person.key);
   const validationPeople = normalized.map((person) => ({ ...person, uei: getUEI('person', person.key) || '' }));
-  assertNoNewClientContactConflicts(peopleState, validationPeople);
+  assertNoNewPersonContactConflicts(peopleState, validationPeople);
   const previous = peopleState;
   const previousByKey = new Map(previous.map((person, position) => [person.key, { person, position }]));
   const nextByKey = new Map(normalized.map((person, position) => [person.key, { person, position }]));
@@ -203,9 +203,9 @@ export function saveClients(people = []) {
   }
 }
 
-export function createClient(name, surname, phone = '') {
+export function createPerson(name, surname, phone = '') {
   const normalizedPhone = normalizePhoneForStorage(phone);
-  return normalizeClient({
+  return normalizePerson({
     key: crypto.randomUUID(),
     name,
     surname,
@@ -217,7 +217,7 @@ export function createClient(name, surname, phone = '') {
 export function upsertPersonFromBookingAccount(account = {}) {
   const accountId = String(account.id || '').trim();
   if (!accountId) return null;
-  const people = getAllClients();
+  const people = getAllPeople();
   const existingIndex = people.findIndex((person) => (person.accounts || []).includes(accountId));
   const previous = existingIndex >= 0 ? people[existingIndex] : null;
   const phone = normalizePhoneForStorage(account.phone);
@@ -226,7 +226,7 @@ export function upsertPersonFromBookingAccount(account = {}) {
   const profileData = account.profileData && typeof account.profileData === 'object' ? account.profileData : {};
   const incomingGender = String(profileData.gender || '').trim();
   const incomingBirthDate = String(profileData.birthDate || '').trim();
-  const person = normalizeClient({
+  const person = normalizePerson({
     ...(previous || {}),
     key: previous?.key || `account-${accountId}`,
     name: String(account.name || previous?.name || ''),
@@ -243,6 +243,6 @@ export function upsertPersonFromBookingAccount(account = {}) {
   });
   if (existingIndex >= 0) people[existingIndex] = person;
   else people.push(person);
-  saveClients(people);
-  return getAllClients().find((item) => item.key === person.key) || person;
+  savePeople(people);
+  return getAllPeople().find((item) => item.key === person.key) || person;
 }

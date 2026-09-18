@@ -11,7 +11,7 @@ import { BookingAccountSettingsController } from './booking-account-settings.con
 import { BookingChatController } from './booking-chat.controller';
 import { BookingConsentController } from './booking-consent.controller';
 import { BookingRequiredConsentGuard } from './booking-required-consent.guard';
-import { ClientCardLinkService } from './client-card-link.service';
+import { PersonCardLinkService } from './person-card-link.service';
 import { OnlineBookingController } from './online-booking.controller';
 import { OnlineBookingService } from './online-booking.service';
 import { TelegramBookingAuthController } from './telegram-booking-auth.controller';
@@ -21,6 +21,6 @@ import { TelegramWebAppAuthService } from './telegram-webapp-auth.service';
 @Module({
   imports: [AuthModule, BusinessStateModule, CommunicationModule, DocumentStateModule, NotificationModule, ProfileModule],
   controllers: [OnlineBookingController, BookingChatController, BookingConsentController, BookingAccountSettingsController, TelegramBookingAuthController],
-  providers: [OnlineBookingService, TelegramBookingAuthService, TelegramWebAppAuthService, BookingAccountGuard, BookingRequiredConsentGuard, ClientCardLinkService, PrismaService],
+  providers: [OnlineBookingService, TelegramBookingAuthService, TelegramWebAppAuthService, BookingAccountGuard, BookingRequiredConsentGuard, PersonCardLinkService, PrismaService],
 })
 export class OnlineBookingModule {}

@@ -1,3 +1,4 @@
+import { PUBLIC_APP_ORIGIN } from '../../core/environment.js';
 import { buildBookingLink } from '../../core/booking-link/index.js';
 import { getCurrentUser } from '../../core/auth.js';
 import {
@@ -36,8 +37,8 @@ const APPEARANCE_INFO = 'Вы задаёте настроение страниц
 
 function bookingLink(tenantId, workplaceKey = '') {
   return buildBookingLink({
-    origin: window.location.origin,
-    pathname: window.location.pathname,
+    origin: PUBLIC_APP_ORIGIN,
+    pathname: '/',
     tenantId,
     workplaceKey,
   });

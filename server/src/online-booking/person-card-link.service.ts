@@ -51,7 +51,7 @@ type ClientCardBinding = {
 };
 
 @Injectable()
-export class ClientCardLinkService {
+export class PersonCardLinkService {
   constructor(
     private readonly businessState: BusinessStateService,
     private readonly clientContactRules: ClientContactRulesService,
@@ -66,7 +66,7 @@ export class ClientCardLinkService {
     return { business, people, members, owner: members[0] || null };
   }
 
-  private assertUnambiguousPhone(card: Awaited<ReturnType<ClientCardLinkService['cardState']>>) {
+  private assertUnambiguousPhone(card: Awaited<ReturnType<PersonCardLinkService['cardState']>>) {
     if (card.members.length <= 1) return;
     throw new ConflictException('Этот телефон уже указан у нескольких клиентов. Мастер должен сначала разобрать старый дубль.');
   }

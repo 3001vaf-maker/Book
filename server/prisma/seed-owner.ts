@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 async function main() {
   const email = String(process.env.OWNER_EMAIL || '').trim().toLowerCase();
   const password = String(process.env.OWNER_PASSWORD || '');
-  const tenantName = String(process.env.OWNER_TENANT_NAME || 'Book').trim() || 'Book';
+  const tenantName = String(process.env.OWNER_TENANT_NAME || 'Workspace').trim() || 'Workspace';
 
   if (!email || password.length < 10) {
     throw new Error('OWNER_EMAIL and OWNER_PASSWORD (minimum 10 characters) are required');

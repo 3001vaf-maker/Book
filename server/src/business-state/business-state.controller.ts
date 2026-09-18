@@ -3,7 +3,7 @@ import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { BookingLifecycleNotificationService } from '../notification/booking-lifecycle-notification.service';
 import { BusinessStateService } from './business-state.service';
-import { ClientContactRulesService } from './client-contact-rules.service';
+import { PersonContactRulesService } from './person-contact-rules.service';
 
 type AuthenticatedRequest = Request & { auth?: { userId: string; tenantId: string; role: string } };
 
@@ -12,7 +12,7 @@ type AuthenticatedRequest = Request & { auth?: { userId: string; tenantId: strin
 export class BusinessStateController {
   constructor(
     private readonly businessState: BusinessStateService,
-    private readonly clientContactRules: ClientContactRulesService,
+    private readonly personContactRules: PersonContactRulesService,
     private readonly bookingNotifications: BookingLifecycleNotificationService,
   ) {}
 
@@ -38,7 +38,7 @@ export class BusinessStateController {
 
   @Put('people/:key')
   async upsertPerson(@Req() request: AuthenticatedRequest, @Param('key') key: string, @Body() body: unknown) {
-    await this.clientContactRules.validatePersonUpsert(request.auth!.tenantId, key, body);
+    await this.personContactRules.validatePersonUpsert(request.auth!.tenantId, key, body);
     return this.businessState.upsertPerson(request.auth!.tenantId, key, body);
   }
 
@@ -49,7 +49,7 @@ export class BusinessStateController {
 
   @Put('uei')
   async updateUEI(@Req() request: AuthenticatedRequest, @Body() body: unknown) {
-    await this.clientContactRules.validateUeiUpdate(request.auth!.tenantId, body);
+    await this.personContactRules.validateUeiUpdate(request.auth!.tenantId, body);
     return this.businessState.updateUEI(request.auth!.tenantId, body);
   }
 

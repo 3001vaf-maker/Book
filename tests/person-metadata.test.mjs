@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { calculateFinancialPlan, hydrateFinanceFromServer, recordPaymentIncome } from '../core/finance/index.js';
 import { hydrateRecordStateFromServer } from '../core/record/index.js';
-import { getClientMetadata } from '../main/clients/metadata.js';
+import { getPersonMetadata } from '../main/people/metadata.js';
 
 hydrateRecordStateFromServer({
   records: [
@@ -30,7 +30,7 @@ const payment = recordPaymentIncome({
 });
 assert.ok(payment);
 
-const metadata = getClientMetadata('c1');
+const metadata = getPersonMetadata('c1');
 
 assert.equal(metadata.recordCount, 2);
 assert.equal(metadata.paidTotal, 5000);

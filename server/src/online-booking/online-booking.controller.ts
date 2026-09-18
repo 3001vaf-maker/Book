@@ -1,7 +1,7 @@
 import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { ClientContactRouteService } from '../communication/client-contact-route.service';
+import { PersonContactRouteService } from '../communication/person-contact-route.service';
 import { CommunicationService } from '../communication/communication.service';
 import { ConsentPolicyService } from '../document-state/consent-policy.service';
 import { NotificationService } from '../notification/notification.service';
@@ -9,7 +9,7 @@ import { bookingTemplateValues, NotificationTemplateService } from '../notificat
 import { WebPushService } from '../notification/web-push.service';
 import { BookingAccountGuard } from './booking-account.guard';
 import { BookingRequiredConsentGuard } from './booking-required-consent.guard';
-import { ClientCardLinkService } from './client-card-link.service';
+import { PersonCardLinkService } from './person-card-link.service';
 import { OnlineBookingService } from './online-booking.service';
 
 type OwnerRequest = Request & { auth?: { userId: string; tenantId: string; role: string } };
@@ -22,10 +22,10 @@ export class OnlineBookingController {
     private readonly notifications: NotificationService,
     private readonly templates: NotificationTemplateService,
     private readonly communications: CommunicationService,
-    private readonly contactRoutes: ClientContactRouteService,
+    private readonly contactRoutes: PersonContactRouteService,
     private readonly consents: ConsentPolicyService,
     private readonly webPush: WebPushService,
-    private readonly clientCards: ClientCardLinkService,
+    private readonly personCards: PersonCardLinkService,
   ) {}
 
   private async accountTelegramSettings(tenantId: string, accountId: string) {
@@ -66,9 +66,9 @@ export class OnlineBookingController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Post('owner/reconcile-legacy-client-cards')
+  @Post('owner/reconcile-legacy-person-cards')
   reconcileLegacyClientCards(@Req() request: OwnerRequest) {
-    return this.clientCards.reconcileLegacyAccountDuplicates(request.auth!.tenantId);
+    return this.personCards.reconcileLegacyAccountDuplicates(request.auth!.tenantId);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -107,7 +107,7 @@ export class OnlineBookingController {
 
   @Post(':tenantId/account/register')
   async registerAccount(@Param('tenantId') tenantId: string, @Body() body: Record<string, any>) {
-    await this.clientCards.validateNewAccountContacts(tenantId, body || {});
+    await this.personCards.validateNewAccountContacts(tenantId, body || {});
     return this.booking.registerAccount(tenantId, body || {});
   }
 
@@ -126,7 +126,7 @@ export class OnlineBookingController {
   @Put(':tenantId/account/me')
   async updateAccount(@Param('tenantId') tenantId: string, @Req() request: AccountRequest, @Body() body: Record<string, any>) {
     const accountId = request.bookingAccountAuth!.accountId;
-    await this.clientCards.validateAccountContactUpdate(tenantId, accountId, body || {});
+    await this.personCards.validateAccountContactUpdate(tenantId, accountId, body || {});
     return this.booking.updateAccount(tenantId, accountId, body || {});
   }
 
@@ -176,7 +176,7 @@ export class OnlineBookingController {
         'TELEGRAM',
         identity.externalUserId,
         'messages-consent',
-        'client-chat-settings',
+        'public-chat-settings',
       );
     } else {
       await this.consents.revokeContactPointConsent(
@@ -184,7 +184,7 @@ export class OnlineBookingController {
         'TELEGRAM',
         identity.externalUserId,
         'messages-consent',
-        'client-chat-settings',
+        'public-chat-settings',
       );
     }
     return this.accountTelegramSettings(tenantId, accountId);
@@ -299,7 +299,7 @@ export class OnlineBookingController {
       to: createdValue?.to,
       services: procedureNames.join(', '),
     });
-    const [ownerTemplate, clientTemplate] = await Promise.all([
+    const [ownerTemplate, publicTemplate] = await Promise.all([
       this.templates.render(tenantId, 'owner.booking.created', values),
       this.templates.render(tenantId, 'booking.created', values),
     ]);
@@ -315,11 +315,11 @@ export class OnlineBookingController {
         status: 'delivered',
       }).catch(() => null);
     }
-    if (clientTemplate.enabled) {
+    if (publicTemplate.enabled) {
       await this.notifications.createForAccount(tenantId, accountId, {
         type: 'booking.created',
-        title: clientTemplate.title,
-        body: clientTemplate.body,
+        title: publicTemplate.title,
+        body: publicTemplate.body,
         entityType: 'booking-request',
         entityId: String(createdValue?.id || ''),
       }).catch(() => null);

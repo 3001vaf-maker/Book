@@ -10,7 +10,7 @@ function initializeTelegramMiniApp() {
   }
 }
 
-export function startBookingClientRuntime({ tenantId = '' } = {}) {
+export function startBookingPublicRuntime({ tenantId = '' } = {}) {
   if (!String(tenantId || '').trim()) return () => {};
   initializeTelegramMiniApp();
   return () => {};

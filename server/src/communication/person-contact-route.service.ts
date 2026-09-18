@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { BusinessStateService } from '../business-state/business-state.service';
-import { ClientProfileThread, ClientProfileThreadService } from './client-profile-thread.service';
+import { PersonProfileThread, PersonProfileThreadService } from './person-profile-thread.service';
 
 function text(value: unknown) {
   return String(value ?? '').trim();
@@ -11,13 +11,13 @@ function objectValue(value: unknown): Record<string, any> {
 }
 
 @Injectable()
-export class ClientContactRouteService {
+export class PersonContactRouteService {
   constructor(
     private readonly businessState: BusinessStateService,
-    private readonly profiles: ClientProfileThreadService,
+    private readonly profiles: PersonProfileThreadService,
   ) {}
 
-  private contactViaForProfile(profile: ClientProfileThread, peopleByKey: Map<string, Record<string, any>>) {
+  private contactViaForProfile(profile: PersonProfileThread, peopleByKey: Map<string, Record<string, any>>) {
     const orderedKeys = [profile.profileKey, ...profile.memberKeys.filter((key) => key !== profile.profileKey)];
     for (const key of orderedKeys) {
       const value = text(peopleByKey.get(key)?.contactViaUei).toUpperCase();
@@ -26,7 +26,7 @@ export class ClientContactRouteService {
     return '';
   }
 
-  async resolve(tenantId: string, source: ClientProfileThread) {
+  async resolve(tenantId: string, source: PersonProfileThread) {
     const business = await this.businessState.get(tenantId);
     const people = (Array.isArray(business.people) ? business.people : []).map((value) => objectValue(value));
     const peopleByKey = new Map<string, Record<string, any>>();
@@ -75,11 +75,11 @@ export class ClientContactRouteService {
       .map((value) => text(objectValue(value).key))
       .filter(Boolean);
     const canonical = await this.profiles.canonicalizeProfileKeys(tenantId, keys);
-    const candidates = new Map<string, ClientProfileThread>();
+    const candidates = new Map<string, PersonProfileThread>();
     candidates.set(own.profileKey, own);
     for (const profile of canonical.values()) candidates.set(profile.profileKey, profile);
 
-    const accessible = new Map<string, ClientProfileThread>();
+    const accessible = new Map<string, PersonProfileThread>();
     for (const source of candidates.values()) {
       const route = await this.resolve(tenantId, source);
       if (route.delivery.profileKey === own.profileKey) accessible.set(source.profileKey, source);

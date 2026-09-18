@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { BusinessStateService } from '../business-state/business-state.service';
 import { PrismaService } from '../prisma.service';
-import { ClientProfileThreadService } from './client-profile-thread.service';
+import { PersonProfileThreadService } from './person-profile-thread.service';
 
 type TelegramEntryRow = {
   id: string;
@@ -137,7 +137,7 @@ export class CommunicationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly businessState: BusinessStateService,
-    private readonly profiles: ClientProfileThreadService,
+    private readonly profiles: PersonProfileThreadService,
   ) {}
 
   async createTelegramEntry(tenantId: string, input: { telegramUserId?: unknown; username?: unknown }) {
@@ -343,7 +343,7 @@ export class CommunicationService {
     const explicitActorAccountId = text(input?.actorAccountId);
     const accountAnchorId = explicitActorAccountId || legacyAccountId;
     const account = accountAnchorId ? await this.ensureBookingAccount(tenantId, accountAnchorId) : null;
-    let profile = null as Awaited<ReturnType<ClientProfileThreadService['byProfileKey']>> | null;
+    let profile = null as Awaited<ReturnType<PersonProfileThreadService['byProfileKey']>> | null;
     const requestedProfileKey = text(input?.profileKey);
     if (requestedProfileKey) profile = await this.profiles.byProfileKey(tenantId, requestedProfileKey);
     else if (accountAnchorId) profile = await this.profiles.byAccount(tenantId, accountAnchorId).catch(() => null);
@@ -446,7 +446,7 @@ export class CommunicationService {
   async listThread(tenantId: string, input: { profileKey?: unknown; bookingAccountId?: unknown; phone?: unknown; uei?: unknown }, limit = 300) {
     const requestedProfileKey = text(input?.profileKey);
     const accountId = text(input?.bookingAccountId);
-    let profile = null as Awaited<ReturnType<ClientProfileThreadService['byProfileKey']>> | null;
+    let profile = null as Awaited<ReturnType<PersonProfileThreadService['byProfileKey']>> | null;
     if (requestedProfileKey) profile = await this.profiles.byProfileKey(tenantId, requestedProfileKey);
     else if (accountId) profile = await this.profiles.byAccount(tenantId, accountId);
     else profile = await this.profiles.byLegacy(tenantId, { phone: input?.phone, uei: input?.uei });
