@@ -23,7 +23,6 @@ import { renderOnlineBooking } from './online-booking/booking.js';
 import { startBookingClientRuntime } from './online-booking/client-runtime.js';
 import { bottomNavigation, modal, mountModal, button, actionBlock, escapeHtml } from './ui/ui.js';
 import { clearLegacyBusinessStorage } from './core/legacy-browser-business.js';
-import { hasUiPreference, setUiPreference } from './core/ui-preferences.js';
 
 configureWorkplaceSource(getWorkplaceEntities);
 configureTimeUsageSource(getJournalTimeUsages);
@@ -455,9 +454,7 @@ async function activateLive(modalNode, payload) {
 
 function maybeShowDemoWelcome() {
   if (!isDemoMode() || !authenticatedAccount?.tenant?.id) return;
-  const key = `book.demo.welcome.v1.${authenticatedAccount.tenant.id}`;
-  if (hasUiPreference(key)) return;
-  setUiPreference(key);
+  if (Number(authenticatedAccount?.user?.onboardingStep || 0) >= 1) return;
   const m = mountModal(document.body, modal(`
     <div class="modal-title">
       <h2>Вы в DEMO</h2>
@@ -468,11 +465,29 @@ function maybeShowDemoWelcome() {
       <button class="ui-button ui-button--secondary" type="button" data-demo-later>Позже</button>
     </div>
   `, { variant: 'medium', surface: 'app' }));
-  m?.querySelector('[data-demo-profile]')?.addEventListener('click', () => {
+  const acknowledge = async () => {
+    try {
+      const response = await apiRequest('/auth/onboarding-step', {
+        method: 'POST',
+        body: JSON.stringify({ step: 1 }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (response.ok && payload?.user && authenticatedAccount?.user) {
+        authenticatedAccount.user.onboardingStep = Number(payload.user.onboardingStep || 1);
+      }
+    } catch {
+      // The guide may be shown again next time if the acknowledgement could not be saved.
+    }
+  };
+  m?.querySelector('[data-demo-profile]')?.addEventListener('click', async () => {
+    await acknowledge();
     m.remove();
     openSettingsTarget('profile');
   });
-  m?.querySelector('[data-demo-later]')?.addEventListener('click', () => m.remove());
+  m?.querySelector('[data-demo-later]')?.addEventListener('click', async () => {
+    await acknowledge();
+    m.remove();
+  });
 }
 
 async function syncDocumentsFromProfileContext() {
