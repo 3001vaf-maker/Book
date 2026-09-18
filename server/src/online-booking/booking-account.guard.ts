@@ -1,7 +1,6 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
-import { LegalRuntimeService } from '../legal-runtime/legal-runtime.service';
 import { PrismaService } from '../prisma.service';
 
 type BookingAccountToken = {
@@ -15,7 +14,6 @@ export class BookingAccountGuard implements CanActivate {
   constructor(
     private readonly jwt: JwtService,
     private readonly prisma: PrismaService,
-    private readonly legal: LegalRuntimeService,
   ) {}
 
   async canActivate(context: ExecutionContext) {
@@ -35,14 +33,12 @@ export class BookingAccountGuard implements CanActivate {
     }
 
     const routeTenantId = String(request.params?.tenantId || '').trim();
-    if (routeTenantId && routeTenantId !== payload.tenantId) throw new UnauthorizedException('Аккаунт относится к другому Book');
-
-    await this.legal.assertPublicBooking(payload.tenantId);
+    if (routeTenantId && routeTenantId !== payload.tenantId) throw new UnauthorizedException('Аккаунт относится к другому рабочему пространству');
     const account = await this.prisma.bookingAccount.findFirst({
       where: { id: payload.sub, tenantId: payload.tenantId },
       select: { id: true },
     });
-    if (!account) throw new UnauthorizedException('Аккаунт клиента больше недоступен');
+    if (!account) throw new UnauthorizedException('Аккаунт больше недоступен');
 
     request.bookingAccountAuth = { accountId: payload.sub, tenantId: payload.tenantId };
     return true;
