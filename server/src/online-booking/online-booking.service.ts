@@ -6,7 +6,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { BookingRequestStatus, Prisma } from '@prisma/client';
+import { BookingRequestStatus, MembershipRole, Prisma } from '@prisma/client';
 import { compare, hash } from 'bcryptjs';
 import { PrismaService } from '../prisma.service';
 import { BusinessStateService } from '../business-state/business-state.service';
@@ -178,6 +178,31 @@ export class OnlineBookingService {
     private readonly clientCards: ClientCardLinkService,
   ) {}
 
+  private async isOwnerWorkspace(tenantId: string) {
+    const access = await this.prisma.tenantAccess.findUnique({
+      where: { tenantId },
+      select: { isOwnerBook: true },
+    });
+    return access?.isOwnerBook === true;
+  }
+
+  private async ensureOwnerRuntimeReady(tenantId: string) {
+    if (!(await this.isOwnerWorkspace(tenantId))) return;
+
+    const membership = await this.prisma.membership.findFirst({
+      where: { tenantId, role: MembershipRole.OWNER },
+      orderBy: { createdAt: 'asc' },
+      select: { userId: true },
+    });
+
+    await Promise.all([
+      this.businessState.bootstrap(tenantId),
+      this.businessState.bootstrapOperational(tenantId),
+      this.documentState.bootstrap(tenantId, { documents: [], consents: [], history: [] }),
+      membership?.userId ? this.profile.bootstrap(tenantId, membership.userId) : Promise.resolve(null),
+    ]);
+  }
+
   private async publication(tenantId: string) {
     const publication = await this.prisma.bookingPublication.findUnique({ where: { tenantId } });
     if (!publication) throw new NotFoundException('Онлайн-запись ещё не опубликована');
@@ -185,6 +210,7 @@ export class OnlineBookingService {
   }
 
   private async bookingSource(tenantId: string) {
+    await this.ensureOwnerRuntimeReady(tenantId);
     const [profile, operational, documents] = await Promise.all([
       this.profile.publicBookingBundle(tenantId),
       this.businessState.publicOperational(tenantId),
@@ -228,11 +254,9 @@ export class OnlineBookingService {
   }
 
   async publish(tenantId: string, data: unknown) {
-    const access = await this.prisma.tenantAccess.findUnique({
-      where: { tenantId },
-      select: { isOwnerBook: true },
-    });
-    if (!access?.isOwnerBook) {
+    const ownerWorkspace = await this.isOwnerWorkspace(tenantId);
+    if (ownerWorkspace) await this.ensureOwnerRuntimeReady(tenantId);
+    if (!ownerWorkspace) {
       const documents = await this.documentState.publicDocuments(tenantId);
       const requiredClientDocuments = arrayValue(documents).filter((item) => Boolean(item?.clientConsent) && Boolean(item?.required));
       if (!requiredClientDocuments.length) {
