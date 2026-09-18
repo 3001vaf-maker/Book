@@ -186,11 +186,13 @@ function renderServerStatePending() {
     <main class="auth-view">
       <section class="auth-card">
         <div class="auth-card__heading">
-          <h1>Book</h1>
-          <p>Серверное состояние Book не подтверждено. Данные из браузера не используются.</p>
+          <h1>Book временно не загрузился</h1>
+          <p>Не удалось получить данные Book с сервера. Подождите несколько секунд и попробуйте ещё раз.</p>
         </div>
+        <button class="ui-button" type="button" data-retry-server-state>Повторить</button>
       </section>
     </main>`;
+  app.querySelector('[data-retry-server-state]')?.addEventListener('click', () => void renderAuthenticated());
   syncViewport();
 }
 
