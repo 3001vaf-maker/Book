@@ -11,7 +11,7 @@ import {
   MembershipRole,
   TenantAccessStatus,
 } from '@prisma/client';
-import { createHash, randomBytes, randomUUID } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import { hash as hashPassword } from 'bcryptjs';
 import { PrismaService } from '../prisma.service';
 import { TransactionalEmailService } from '../transactional-email/transactional-email.service';
@@ -85,9 +85,6 @@ function escapeHtml(value: string) {
   })[char] || char);
 }
 
-function json(value: unknown) {
-  return JSON.stringify(value ?? {});
-}
 
 type RegistrationInput = {
   token?: unknown;
@@ -104,12 +101,6 @@ type RegistrationInput = {
   technicalEvidence?: unknown;
 };
 
-type RegistrationDocument = {
-  key: string;
-  requiredForRegistration: boolean;
-  versionId: string;
-  version: number;
-};
 
 @Injectable()
 export class MasterInvitationService {
@@ -184,7 +175,7 @@ export class MasterInvitationService {
   }
 
   async createInvitation(adminId: string, input: { email?: unknown; name?: unknown }) {
-    const actorUserId = await this.platformAdminUserId(adminId);
+    await this.platformAdminUserId(adminId);
 
     const email = normalizeEmail(input?.email);
     const name = normalizeName(input?.name);
@@ -269,7 +260,6 @@ export class MasterInvitationService {
 
   async inspect(tokenValue: unknown) {
     const invitation = await this.findActiveInvitation(String(tokenValue || ''));
-    const legalDocuments = await this.registrationDocuments();
     return {
       email: invitation.email,
       name: invitation.name,
@@ -303,10 +293,6 @@ export class MasterInvitationService {
     const legalDocuments = await this.registrationDocuments();
     const passwordHash = await hashPassword(password, 12);
     const fullName = `${name} ${surname}`.trim();
-    const evidence = input?.technicalEvidence && typeof input.technicalEvidence === 'object' && !Array.isArray(input.technicalEvidence)
-      ? input.technicalEvidence as Record<string, unknown>
-      : {};
-
     const result = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
@@ -355,18 +341,6 @@ export class MasterInvitationService {
         },
       });
 
-      for (const document of legalDocuments) {
-        const fact = this.registrationFact(document.key, input);
-        if (!fact.accepted) continue;
-        await tx.$executeRaw`
-          INSERT INTO "LegalAcceptanceEvent" (
-            "id", "tenantId", "userId", "documentVersionId", "action", "source", "technicalEvidence", "occurredAt"
-          ) VALUES (
-            ${randomUUID()}, ${invitation.tenantId}, ${user.id}, ${document.versionId}, ${fact.action},
-            'master-registration', ${json(evidence)}::jsonb, CURRENT_TIMESTAMP
-          )
-        `;
-      }
       return { user, membership };
     });
 
@@ -408,36 +382,6 @@ export class MasterInvitationService {
     });
     if (!admin?.userId) throw new NotFoundException('Администратор Book не найден');
     return admin.userId;
-  }
-
-  private async registrationDocuments() {
-    return this.prisma.$queryRaw<RegistrationDocument[]>`
-      SELECT d."key", d."requiredForRegistration", v."id" AS "versionId", v."version"
-      FROM "LegalDocument" d
-      JOIN "LegalDocumentVersion" v ON v."documentId" = d."id" AND v."supersededAt" IS NULL
-      WHERE d."scope" = 'PLATFORM' AND d."tenantId" IS NULL AND d."isActive" = true
-      ORDER BY d."createdAt" ASC, d."key" ASC
-    `;
-  }
-
-  private registrationFact(key: string, input: RegistrationInput) {
-    if (key === 'saas-agreement') return { accepted: input?.saasAgreementAccepted === true, action: 'ACCEPTED' };
-    if (key === 'dpa') return { accepted: input?.dpaAccepted === true, action: 'ACCEPTED' };
-    if (key === 'privacy-policy') return { accepted: input?.privacyAcknowledged === true, action: 'ACKNOWLEDGED' };
-    if (key === 'master-pd-consent') return { accepted: input?.pdConsentAccepted === true, action: 'CONSENTED' };
-    if (key === 'marketing-consent') return { accepted: input?.marketingConsentAccepted === true, action: 'CONSENTED' };
-    return { accepted: false, action: 'ACKNOWLEDGED' };
-  }
-
-  private assertRegistrationFacts(documents: RegistrationDocument[], input: RegistrationInput) {
-    for (const document of documents.filter((item) => item.requiredForRegistration)) {
-      if (!this.registrationFact(document.key, input).accepted) {
-        throw new BadRequestException(`Не подтверждён обязательный юридический факт: ${document.key}`);
-      }
-    }
-    if (input?.marketingConsentAccepted !== true && input?.marketingConsentAccepted !== false && input?.marketingConsentAccepted !== undefined) {
-      throw new BadRequestException('Некорректное значение marketing consent');
-    }
   }
 
   private async findActiveInvitation(token: string) {
