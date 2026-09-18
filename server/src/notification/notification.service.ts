@@ -512,7 +512,7 @@ export class NotificationService {
     return this.markDeliveryFailed(tenantId, deliveryId, 'TELEGRAM', error);
   }
 
-  async canSendMessagesForAccount(tenantId: string, accountId: string, channel: 'PUSH' | 'EMAIL' | 'TELEGRAM') {
+  async canSendServiceForAccount(tenantId: string, accountId: string, channel: 'PUSH' | 'EMAIL' | 'TELEGRAM') {
     const identity = await this.accountIdentity(tenantId, accountId);
     return this.externalAllowed(tenantId, identity, channel);
   }
