@@ -14,6 +14,7 @@ function normalize(item = {}) {
     action: String(item.action || 'updated'),
     createdAt: String(item.createdAt || new Date().toISOString()),
     source: String(item.source || 'manual'),
+    snapshot: item.snapshot && typeof item.snapshot === 'object' ? clone(item.snapshot) : null,
   };
 }
 
@@ -40,9 +41,9 @@ export function getDocumentHistory() {
   return read().sort((a, b) => Date.parse(b.createdAt || 0) - Date.parse(a.createdAt || 0));
 }
 
-export function recordDocumentHistory({ documentId, documentTitle, documentVersion = 1, action = 'updated', source = 'manual' } = {}) {
+export function recordDocumentHistory({ documentId, documentTitle, documentVersion = 1, action = 'updated', source = 'manual', snapshot = null } = {}) {
   if (!documentId) return null;
-  const item = normalize({ documentId, documentTitle, documentVersion, action, source, createdAt: new Date().toISOString() });
+  const item = normalize({ documentId, documentTitle, documentVersion, action, source, snapshot, createdAt: new Date().toISOString() });
   const items = read();
   items.push(item);
   writeItems(items);
