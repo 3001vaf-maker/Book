@@ -167,7 +167,7 @@ function renderWorkspace() {
   app.innerHTML = `${demoBanner}<main class="app-content ${isDemoMode() ? 'app-content--with-demo-banner' : ''}" id="app-content"></main>${bottomNavigation(state.activeSection, allowedSections())}`;
   const requestedFolder = state.activeSection === 'settings' ? pendingSettingsFolder : '';
   pendingSettingsFolder = '';
-  const nextDispose = view(document.querySelector('#app-content'), { navigate, openFolder: requestedFolder });
+  const nextDispose = view(document.querySelector('#app-content'), { navigate, openFolder: requestedFolder, demo: isDemoMode() });
   if (typeof nextDispose === 'function') disposeView = nextDispose;
   app.querySelector('[data-demo-banner]')?.addEventListener('click', openDemoHub);
   app.querySelectorAll('[data-nav]').forEach((navButton) => {
