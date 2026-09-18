@@ -76,6 +76,14 @@ assert.match(liveBlock, /CONTINUE_WITHOUT_CONFIRMATION/);
 assert.match(liveBlock, /responsibilityAcknowledged/);
 assert.doesNotMatch(liveBlock, /canBecomeLive|missingLiveDocuments|TENANT_CHECKLIST_KEYS/);
 
+const tenantLiveBlock = legalService.slice(legalService.indexOf('async assertTenantLive'), legalService.indexOf('async assertRealClientMutation'));
+assert.match(tenantLiveBlock, /access\.isOwnerBook/);
+assert.match(tenantLiveBlock, /operationMode: 'LIVE'/);
+assert.ok(
+  tenantLiveBlock.indexOf('access.isOwnerBook') < tenantLiveBlock.indexOf('tenantState(tenantId)'),
+  'platform owner workspace must not depend on tenant DEMO/LIVE state',
+);
+
 assert.match(documentData, /function bookContextReady/);
 assert.match(documentData, /if \(!bookContextReady\(\)\) return \[\]/);
 assert.match(documentData, /book-auto-refresh/);
