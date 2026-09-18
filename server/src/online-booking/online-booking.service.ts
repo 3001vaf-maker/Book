@@ -242,36 +242,6 @@ export class OnlineBookingService {
     }, { expiresIn: '30d' });
   }
 
-  private ensureRequiredConsents(publicationData: Record<string, any>, consents: any[]) {
-    const documents = arrayValue(publicationData.documents);
-    const required = documents.filter((item) => Boolean(item?.clientConsent) && Boolean(item?.required));
-    for (const document of required) {
-      const accepted = consents.some((item) => item.documentId === text(document.id)
-        && Number(item.documentVersion) === Math.max(1, Number(document.version || 1))
-        && item.accepted);
-      if (!accepted) throw new BadRequestException(`Необходимо согласие: ${text(document.title) || 'обязательный документ'}`);
-    }
-  }
-
-  async publish(tenantId: string, data: unknown) {
-    const ownerWorkspace = await this.isOwnerWorkspace(tenantId);
-    if (ownerWorkspace) await this.ensureOwnerRuntimeReady(tenantId);
-    if (!ownerWorkspace) {
-      const documents = await this.documentState.publicDocuments(tenantId);
-      const requiredClientDocuments = arrayValue(documents).filter((item) => Boolean(item?.clientConsent) && Boolean(item?.required));
-      if (!requiredClientDocuments.length) {
-        throw new ConflictException('Сначала заполните профиль: система автоматически подготовит необходимые документы');
-      }
-    }
-    const normalized = objectValue(data);
-    return this.prisma.bookingPublication.upsert({
-      where: { tenantId },
-      create: { tenantId, data: normalized as Prisma.InputJsonValue, revision: 1 },
-      update: { data: normalized as Prisma.InputJsonValue, revision: { increment: 1 } },
-      select: { revision: true, updatedAt: true },
-    });
-  }
-
   async getContext(tenantId: string, workplaceKey = '') {
     const data = await this.bookingSource(tenantId);
     const allWorkplaces = arrayValue(data.workplaces);
@@ -338,7 +308,6 @@ export class OnlineBookingService {
   }
 
   async registerAccount(tenantId: string, body: Record<string, any>) {
-    const documents = await this.documentState.publicDocuments(tenantId);
     const email = emailValue(body.email);
     const password = text(body.password);
     const name = text(body.name);
@@ -348,9 +317,6 @@ export class OnlineBookingService {
     if (password.length < 6) throw new BadRequestException('Пароль должен содержать не менее 6 символов');
     if (!name) throw new BadRequestException('Введите имя');
     if (!/^\+\d{8,15}$/.test(phone)) throw new BadRequestException('Введите телефон полностью');
-    if (!(await this.isOwnerWorkspace(tenantId))) {
-      this.ensureRequiredConsents({ documents }, consents);
-    }
 
     const exists = await this.prisma.bookingAccount.findUnique({ where: { tenantId_email: { tenantId, email } } });
     if (exists) throw new ConflictException('Аккаунт с этим email уже существует');
@@ -454,10 +420,6 @@ export class OnlineBookingService {
     const account = await this.prisma.bookingAccount.findFirst({ where: { id: accountId, tenantId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
     const data = await this.bookingSource(tenantId);
-    if (!(await this.isOwnerWorkspace(tenantId))) {
-      const consentState = await this.consentPolicy.requiredConsentState(tenantId, accountId);
-      if (!consentState.allowed) throw new ConflictException('Необходимо заново подтвердить обязательные документы');
-    }
     const workplaceKey = text(body.workplaceKey);
     const date = dateValue(body.date);
     const from = text(body.from);
