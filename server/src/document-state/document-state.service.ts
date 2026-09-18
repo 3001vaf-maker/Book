@@ -175,6 +175,11 @@ export class DocumentStateService {
       await this.prisma.businessDocumentState.create({
         data: { tenantId, data: json(normalize(body)), migrationVerifiedAt: new Date() },
       });
+    } else if (!existing.migrationVerifiedAt) {
+      await this.prisma.businessDocumentState.update({
+        where: { tenantId },
+        data: { migrationVerifiedAt: new Date() },
+      });
     }
     return this.snapshot(tenantId);
   }

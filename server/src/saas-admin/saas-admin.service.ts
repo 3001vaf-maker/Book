@@ -86,6 +86,34 @@ export class SaasAdminService {
         ? row.tenant.profiles.find((item) => item.userId === membership.userId) || null
         : null;
       const invitation = row.tenant.masterInvitations[0] || null;
+      const legalAcceptances = membership
+        ? await this.prisma.$queryRaw<Array<{
+            id: string;
+            documentKey: string;
+            title: string;
+            documentVersion: number;
+            action: string;
+            source: string;
+            occurredAt: Date;
+            requiredForRegistration: boolean;
+          }>>`
+            SELECT
+              e."id",
+              d."key" AS "documentKey",
+              d."title",
+              v."version" AS "documentVersion",
+              e."action",
+              e."source",
+              e."occurredAt",
+              d."requiredForRegistration"
+            FROM "LegalAcceptanceEvent" e
+            JOIN "LegalDocumentVersion" v ON v."id" = e."documentVersionId"
+            JOIN "LegalDocument" d ON d."id" = v."documentId"
+            WHERE e."tenantId" = ${row.tenantId}
+              AND e."userId" = ${membership.userId}
+            ORDER BY e."occurredAt" ASC, e."id" ASC
+          `
+        : [];
       const resolved = await this.access.resolveTenantAccess(row.tenantId);
       return {
         tenantId: row.tenantId,
@@ -101,6 +129,7 @@ export class SaasAdminService {
           registeredAt: membership.user.createdAt,
         } : null,
         invitation,
+        legalAcceptances,
         access: resolved,
       };
     }));

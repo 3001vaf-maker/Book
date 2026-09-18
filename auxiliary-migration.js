@@ -41,13 +41,9 @@ export async function initializeAuxiliaryState() {
     return { source: 'server', verified: true };
   }
 
-  if (!remote?.migrated) {
-    const bootstrapResponse = await apiRequest('/auxiliary-state/bootstrap', { method: 'POST' });
-    const bootstrapped = await responseJson(bootstrapResponse, 'Не удалось создать пустое серверное хранилище Финансов');
-    if (!bootstrapped?.verified) throw new Error('Пустое серверное хранилище Финансов не подтверждено');
-    hydrate(bootstrapped);
-    return { source: 'server-bootstrap', verified: true };
-  }
-
-  return { source: 'server-unverified', verified: false };
+  const bootstrapResponse = await apiRequest('/auxiliary-state/bootstrap', { method: 'POST' });
+  const bootstrapped = await responseJson(bootstrapResponse, 'Не удалось подтвердить серверное хранилище Финансов');
+  if (!bootstrapped?.verified) throw new Error('Серверное хранилище Финансов не подтверждено');
+  hydrate(bootstrapped);
+  return { source: remote?.migrated ? 'server-reverified' : 'server-bootstrap', verified: true };
 }

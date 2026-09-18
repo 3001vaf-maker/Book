@@ -311,6 +311,11 @@ export class ProfileService {
           migrationVerifiedAt: new Date(),
         },
       });
+    } else if (!existing.migrationVerifiedAt) {
+      await this.prisma.profile.update({
+        where: { tenantId_userId: { tenantId, userId } },
+        data: { migrationVerifiedAt: new Date() },
+      });
     }
     return this.bundle(tenantId, userId);
   }

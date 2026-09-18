@@ -14,6 +14,17 @@ const dispatchService = readFileSync('server/src/communication/communication-dis
 const marketingConsentService = readFileSync('server/src/legal-runtime/marketing-consent.service.ts', 'utf8');
 const telegramBotService = readFileSync('server/src/communication/telegram-bot.service.ts', 'utf8');
 const bookingController = readFileSync('server/src/online-booking/online-booking.controller.ts', 'utf8');
+const profileMigration = readFileSync('settings/profile/migration.js', 'utf8');
+const businessMigration = readFileSync('business-migration.js', 'utf8');
+const operationalMigration = readFileSync('operational-migration.js', 'utf8');
+const documentMigration = readFileSync('document-migration.js', 'utf8');
+const auxiliaryMigration = readFileSync('auxiliary-migration.js', 'utf8');
+const profileService = readFileSync('server/src/profile/profile.service.ts', 'utf8');
+const businessStateService = readFileSync('server/src/business-state/business-state.service.ts', 'utf8');
+const documentStateService = readFileSync('server/src/document-state/document-state.service.ts', 'utf8');
+const auxiliaryStateService = readFileSync('server/src/auxiliary-state/auxiliary-state.service.ts', 'utf8');
+const saasAdminService = readFileSync('server/src/saas-admin/saas-admin.service.ts', 'utf8');
+const adminUi = readFileSync('admin/admin.js', 'utf8');
 const manualInvitationService = readFileSync('server/src/manual-invitation/manual-invitation.service.ts', 'utf8');
 const masterInvitationService = readFileSync('server/src/master-invitation/master-invitation.service.ts', 'utf8');
 
@@ -90,6 +101,26 @@ assert.match(telegramBotService, /purpose: 'DIALOG'/);
 assert.doesNotMatch(telegramBotService, /canSendMessages\(tenantId/);
 
 assert.doesNotMatch(core, /localStorage|sessionStorage/);
+assert.doesNotMatch(core, /Серверное состояние Book не подтверждено/);
+assert.match(core, /Book временно не загрузился/);
+assert.match(core, /data-retry-server-state/);
+
+for (const source of [profileMigration, businessMigration, operationalMigration, documentMigration, auxiliaryMigration]) {
+  assert.doesNotMatch(source, /server-unverified/);
+  assert.match(source, /server-reverified/);
+}
+assert.match(profileService, /else if \(!existing\.migrationVerifiedAt\)/);
+assert.match(businessStateService, /else if \(!existing\.migrationVerifiedAt\)/);
+assert.match(documentStateService, /else if \(!existing\.migrationVerifiedAt\)/);
+assert.match(auxiliaryStateService, /else if \(!existing\.migrationVerifiedAt\)/);
+assert.match(saasAdminService, /FROM "LegalAcceptanceEvent" e/);
+assert.match(saasAdminService, /documentKey/);
+assert.match(saasAdminService, /documentVersion/);
+assert.match(saasAdminService, /occurredAt/);
+assert.match(adminUi, /Соглашения при регистрации/);
+assert.match(adminUi, /masterLegalAcceptanceHtml/);
+assert.match(adminUi, /версия/);
+assert.match(adminUi, /Согласие дано/);
 assert.doesNotMatch(registration, /localStorage|sessionStorage/);
 
 console.log('unified DEMO to LIVE journey tests: OK');

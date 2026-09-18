@@ -186,11 +186,13 @@ function renderServerStatePending() {
     <main class="auth-view">
       <section class="auth-card">
         <div class="auth-card__heading">
-          <h1>Book</h1>
-          <p>Серверное состояние Book не подтверждено. Данные из браузера не используются.</p>
+          <h1>Book временно не загрузился</h1>
+          <p>Не удалось получить данные Book с сервера. Подождите несколько секунд и попробуйте ещё раз.</p>
         </div>
+        <button class="ui-button" type="button" data-retry-server-state>Повторить</button>
       </section>
     </main>`;
+  app.querySelector('[data-retry-server-state]')?.addEventListener('click', () => void renderAuthenticated());
   syncViewport();
 }
 
@@ -576,7 +578,8 @@ async function renderAuthenticated(account = authenticatedAccount) {
   let access;
   try {
     access = await loadBookAccess();
-  } catch {
+  } catch (error) {
+    console.error('[Book startup] access failed', error);
     renderServerStatePending();
     return;
   }
@@ -589,7 +592,8 @@ async function renderAuthenticated(account = authenticatedAccount) {
   if (access.isOwnerBook !== true) {
     try {
       tenantRuntime = await tenantLegalRequest('/readiness');
-    } catch {
+    } catch (error) {
+      console.error('[Book startup] legal readiness failed', error);
       renderServerStatePending();
       return;
     }
@@ -597,28 +601,19 @@ async function renderAuthenticated(account = authenticatedAccount) {
     tenantRuntime = { state: { operationMode: 'LIVE' } };
   }
 
-  const migration = await initializeProfileWorkplaces(authenticatedAccount);
-  if (!migration.verified) {
-    renderServerStatePending();
-    return;
-  }
-  const businessMigration = await initializeBusinessState(authenticatedAccount);
-  if (!businessMigration.verified) {
-    renderServerStatePending();
-    return;
-  }
-  const operationalMigration = await initializeOperationalState(authenticatedAccount);
-  if (!operationalMigration.verified) {
-    renderServerStatePending();
-    return;
-  }
-  const documentMigration = await initializeDocumentState(authenticatedAccount);
-  if (!documentMigration.verified) {
-    renderServerStatePending();
-    return;
-  }
-  const auxiliaryMigration = await initializeAuxiliaryState(authenticatedAccount);
-  if (!auxiliaryMigration.verified) {
+  try {
+    const migration = await initializeProfileWorkplaces(authenticatedAccount);
+    if (!migration.verified) throw new Error('Profile + Workplaces not verified');
+    const businessMigration = await initializeBusinessState(authenticatedAccount);
+    if (!businessMigration.verified) throw new Error('Business state not verified');
+    const operationalMigration = await initializeOperationalState(authenticatedAccount);
+    if (!operationalMigration.verified) throw new Error('Operational state not verified');
+    const documentMigration = await initializeDocumentState(authenticatedAccount);
+    if (!documentMigration.verified) throw new Error('Document state not verified');
+    const auxiliaryMigration = await initializeAuxiliaryState(authenticatedAccount);
+    if (!auxiliaryMigration.verified) throw new Error('Auxiliary state not verified');
+  } catch (error) {
+    console.error('[Book startup] server state initialization failed', error);
     renderServerStatePending();
     return;
   }
