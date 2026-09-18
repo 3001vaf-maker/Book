@@ -669,6 +669,58 @@ export class LegalRuntimeService implements OnModuleInit {
     }));
   }
 
+  async createDataSubjectRequest(tenantId: string, actorUserId: string, input: { subjectKey?: unknown; requestType?: unknown; details?: unknown }) {
+    const subjectKey = text(input?.subjectKey);
+    const requestType = text(input?.requestType).toUpperCase();
+    if (!subjectKey || !['EXPORT', 'CORRECTION', 'WITHDRAW_CONSENT', 'DELETE_OR_BLOCK', 'STOP_MARKETING'].includes(requestType)) {
+      throw new BadRequestException('Некорректный запрос субъекта');
+    }
+    const id = randomUUID();
+    await this.prisma.$executeRaw`
+      INSERT INTO "DataSubjectRequest" ("id", "tenantId", "subjectKey", "requestType", "details", "createdAt", "updatedAt")
+      VALUES (${id}, ${tenantId}, ${subjectKey}, ${requestType}, ${json(objectValue(input?.details))}::jsonb, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    `;
+    await this.audit(tenantId, actorUserId, 'DATA_SUBJECT_REQUEST_CREATED', requestType, 'SUCCESS', { id, subjectKey });
+    return { id, tenantId, subjectKey, requestType, status: 'OPEN' };
+  }
+
+  async listDataSubjectRequests(tenantId: string) {
+    return this.prisma.$queryRaw<any[]>`
+      SELECT "id", "tenantId", "subjectKey", "requestType", "status", "details", "result", "createdAt", "updatedAt", "resolvedAt"
+      FROM "DataSubjectRequest" WHERE "tenantId" = ${tenantId} ORDER BY "createdAt" DESC
+    `;
+  }
+
+  async saveRetentionPolicy(actorUserId: string, input: { scope?: unknown; tenantId?: unknown; dataType?: unknown; legalBasis?: unknown; policy?: unknown }) {
+    const scope = text(input?.scope).toUpperCase();
+    const tenantId = scope === 'TENANT' ? text(input?.tenantId) : '';
+    const dataType = text(input?.dataType);
+    const legalBasis = text(input?.legalBasis);
+    const policy = objectValue(input?.policy);
+    if (!['PLATFORM', 'TENANT'].includes(scope) || !dataType || !legalBasis || (scope === 'TENANT' && !tenantId)) {
+      throw new BadRequestException('Некорректная retention policy');
+    }
+    const existing = await this.prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT "id" FROM "RetentionPolicy"
+      WHERE "scope" = ${scope} AND COALESCE("tenantId", '') = ${tenantId} AND "dataType" = ${dataType} AND "legalBasis" = ${legalBasis}
+      LIMIT 1
+    `;
+    const id = existing[0]?.id || randomUUID();
+    if (existing[0]) {
+      await this.prisma.$executeRaw`
+        UPDATE "RetentionPolicy" SET "policy" = ${json(policy)}::jsonb, "isActive" = true, "updatedAt" = CURRENT_TIMESTAMP
+        WHERE "id" = ${id}
+      `;
+    } else {
+      await this.prisma.$executeRaw`
+        INSERT INTO "RetentionPolicy" ("id", "scope", "tenantId", "dataType", "legalBasis", "policy", "isActive", "createdAt", "updatedAt")
+        VALUES (${id}, ${scope}, ${tenantId || null}, ${dataType}, ${legalBasis}, ${json(policy)}::jsonb, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `;
+    }
+    await this.audit(tenantId || null, actorUserId, 'RETENTION_POLICY_SAVED', dataType, 'SUCCESS', { scope, legalBasis });
+    return { id, scope, tenantId: tenantId || null, dataType, legalBasis, policy };
+  }
+
   async legalEvents(scopeValue: unknown, tenantIdValue: unknown) {
     const scope = text(scopeValue).toUpperCase();
     const tenantId = text(tenantIdValue);
