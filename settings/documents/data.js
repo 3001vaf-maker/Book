@@ -102,6 +102,21 @@ export function renderBookBaseText(base) {
   return text;
 }
 
+function bookContextReady() {
+  const profile = bookContextState.profile || {};
+  const workplaces = Array.isArray(bookContextState.workplaces) ? bookContextState.workplaces : [];
+  const contacts = [
+    ...(Array.isArray(profile.emails) ? profile.emails : []),
+    ...(Array.isArray(profile.phones) ? profile.phones : []),
+    profile.email,
+    profile.phone,
+  ].map((value) => String(value || '').trim()).filter(Boolean);
+  return Boolean(String(profile.name || '').trim()
+    && String(profile.profession || '').trim()
+    && contacts.length
+    && workplaces.length);
+}
+
 function documentConfig(documentId) {
   if (documentId === 'pdn-agreement') return { kind: 'agreement', clientConsent: false, required: false };
   if (documentId === 'pdn-consent') return { kind: 'consent', clientConsent: true, required: true };
@@ -168,6 +183,7 @@ export function getBookDocumentBases() {
 
 export function buildBookDocuments() {
   if (!bookBasesState.length) return getDefaultDocuments();
+  if (!bookContextReady()) return [];
   return BOOK_DOCUMENT_IDS
     .map((id) => baseForDocument(id))
     .filter(Boolean)
@@ -178,6 +194,10 @@ export function reconcileBookDocuments(items = [], history = []) {
   const current = (Array.isArray(items) ? items : []).map(normalize);
   const nextHistory = Array.isArray(history) ? clone(history) : [];
   let changed = false;
+
+  if (!bookContextReady()) {
+    return { documents: current.map(normalize), history: nextHistory, changed: false };
+  }
 
   for (const documentId of BOOK_DOCUMENT_IDS) {
     const base = baseForDocument(documentId);
@@ -222,10 +242,33 @@ export function reconcileBookDocuments(items = [], history = []) {
     });
 
     if (item.sourceMode === 'BOOK') {
-      item.availableBaseVersion = base.version > Math.max(Number(item.baseVersion || 0), Number(item.dismissedBaseVersion || 0)) ? base.version : 0;
-      item.availableBasePublishedAt = item.availableBaseVersion ? base.publishedAt : '';
-      item.availableBookText = (item.availableBaseVersion || rendered !== item.text) ? rendered : '';
-      item.profileUpdateAvailable = !item.availableBaseVersion && rendered !== item.text;
+      const needsRefresh = base.version > Number(item.baseVersion || 0) || rendered !== item.text;
+      if (needsRefresh) {
+        const previous = clone(item);
+        const refreshed = normalize({
+          ...item,
+          title: base.title,
+          text: rendered,
+          version: Number(item.version || 1) + 1,
+          baseKey: base.key,
+          baseVersion: base.version,
+          basePublishedAt: base.publishedAt,
+          availableBaseVersion: 0,
+          availableBasePublishedAt: '',
+          availableBookText: '',
+          profileUpdateAvailable: false,
+          dismissedBaseVersion: 0,
+        });
+        current[index] = refreshed;
+        nextHistory.push(historyEntry(previous, 'superseded', 'book-auto-refresh'));
+        nextHistory.push(historyEntry(refreshed, 'version-created', 'book-auto-refresh'));
+        changed = true;
+        continue;
+      }
+      item.availableBaseVersion = 0;
+      item.availableBasePublishedAt = '';
+      item.availableBookText = '';
+      item.profileUpdateAvailable = false;
     } else {
       item.availableBaseVersion = base.version > Number(item.dismissedBaseVersion || 0) ? base.version : 0;
       item.availableBasePublishedAt = item.availableBaseVersion ? base.publishedAt : '';
