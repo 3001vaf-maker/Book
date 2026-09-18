@@ -1,13 +1,10 @@
 import assert from 'node:assert/strict';
 import {
   configureBookDocumentBases,
-  dismissBookBase,
-  getDefaultDocuments,
-  hydrateDocumentsFromServer,
   getDocuments,
+  hydrateDocumentsFromServer,
   reconcileBookDocuments,
   saveCustomDocument,
-  useBookBase,
 } from '../settings/documents/data.js';
 
 const basesV1 = [
@@ -38,71 +35,71 @@ const basesV1 = [
 ];
 
 configureBookDocumentBases(basesV1, {
-  profile: { name: 'Александр', surname: 'Волоковых', emails: ['a@example.test'], phones: [] },
-  workplaces: [{ address: 'Москва' }],
+  profile: { name: 'Александр', surname: 'Волоковых', emails: ['a@example.test'], phones: [], profession: '' },
+  workplaces: [],
 });
+let reconciled = reconcileBookDocuments([], []);
+assert.equal(reconciled.changed, false, 'до заполненного профиля документы мастера не создаются');
+assert.equal(reconciled.documents.length, 0);
 
-const reconciled = reconcileBookDocuments(getDefaultDocuments(), []);
+configureBookDocumentBases(basesV1, {
+  profile: { name: 'Александр', surname: 'Волоковых', emails: ['a@example.test'], phones: [], profession: 'Парикмахер' },
+  workplaces: [{ key: 'studio', address: 'Москва' }],
+});
+reconciled = reconcileBookDocuments([], []);
 assert.equal(reconciled.changed, true);
-assert.deepEqual(
-  reconciled.documents.filter((item) => ['pdn-agreement', 'pdn-consent', 'messages-consent'].includes(item.id)).map((item) => item.id),
-  ['pdn-agreement', 'pdn-consent', 'messages-consent'],
-);
+assert.deepEqual(reconciled.documents.map((item) => item.id), ['pdn-agreement', 'pdn-consent', 'messages-consent']);
 for (const item of reconciled.documents) {
   assert.equal(item.sourceMode, 'BOOK');
-  assert.equal(item.version, 2);
+  assert.equal(item.version, 1);
   assert.match(item.text, /Александр Волоковых/);
-  assert.doesNotMatch(item.text, /обратиться к юристу|Шаблон для адаптации/i);
+  assert.doesNotMatch(item.text, /\[ФИО пользователя\]|________________/);
 }
-assert.ok(reconciled.history.some((item) => item.action === 'superseded' && item.snapshot?.id === 'pdn-consent'));
 
 hydrateDocumentsFromServer(reconciled.documents);
-const beforeCustom = getDocuments().find((item) => item.id === 'pdn-consent');
-const custom = saveCustomDocument(beforeCustom, { title: beforeCustom.title, text: 'Мой собственный документ' });
-assert.equal(custom.id, 'pdn-consent');
+configureBookDocumentBases(basesV1, {
+  profile: { name: 'Александр', surname: 'Волоковых', emails: ['new@example.test'], phones: [], profession: 'Парикмахер' },
+  workplaces: [{ key: 'studio', address: 'Москва' }],
+});
+const profileRefresh = reconcileBookDocuments(getDocuments(), reconciled.history);
+assert.equal(profileRefresh.changed, true);
+for (const item of profileRefresh.documents) {
+  assert.equal(item.version, 2, 'изменение профильных данных автоматически создаёт новую версию');
+  assert.match(item.text, /new@example\.test/);
+  assert.equal(item.profileUpdateAvailable, false);
+}
+assert.ok(profileRefresh.history.some((item) => item.action === 'superseded' && item.source === 'book-auto-refresh'));
+
+hydrateDocumentsFromServer(profileRefresh.documents);
+const basesV2 = basesV1.map((item) => ({
+  ...item,
+  version: 2,
+  text: item.text + '\nРедакция Book v2.',
+  publishedAt: '2026-09-19T00:00:00.000Z',
+}));
+configureBookDocumentBases(basesV2, {
+  profile: { name: 'Александр', surname: 'Волоковых', emails: ['new@example.test'], phones: [], profession: 'Парикмахер' },
+  workplaces: [{ key: 'studio', address: 'Москва' }],
+});
+const baseRefresh = reconcileBookDocuments(getDocuments(), profileRefresh.history);
+for (const item of baseRefresh.documents) {
+  assert.equal(item.version, 3, 'новая основа Book автоматически становится новой рабочей версией');
+  assert.equal(item.baseVersion, 2);
+  assert.match(item.text, /Редакция Book v2/);
+}
+
+hydrateDocumentsFromServer(baseRefresh.documents);
+const consent = getDocuments().find((item) => item.id === 'pdn-consent');
+const custom = saveCustomDocument(consent, { title: consent.title, text: 'Мой собственный документ' });
 assert.equal(custom.sourceMode, 'CUSTOM');
-assert.equal(custom.version, 3);
 
-const backToBook = useBookBase('pdn-consent');
-assert.equal(backToBook.id, 'pdn-consent');
-assert.equal(backToBook.sourceMode, 'BOOK');
-assert.equal(backToBook.version, 4);
-assert.equal(backToBook.baseVersion, 1);
-
-configureBookDocumentBases(
-  basesV1.map((item) => item.documentId === 'pdn-consent'
-    ? { ...item, version: 2, text: item.text + '\nНовая редакция Book.', publishedAt: '2026-09-19T00:00:00.000Z' }
-    : item),
-  {
-    profile: { name: 'Александр', surname: 'Волоковых', emails: ['a@example.test'], phones: [] },
-    workplaces: [{ address: 'Москва' }],
-  },
-);
-
-const updateAvailable = reconcileBookDocuments(getDocuments(), []);
-const currentConsent = updateAvailable.documents.find((item) => item.id === 'pdn-consent');
-assert.equal(currentConsent.version, 4, 'новая основа Book не должна применяться без выбора пользователя');
-assert.equal(currentConsent.baseVersion, 1);
-assert.equal(currentConsent.availableBaseVersion, 2);
-assert.match(currentConsent.availableBookText, /Новая редакция Book/);
-
-hydrateDocumentsFromServer(updateAvailable.documents);
-const dismissed = dismissBookBase('pdn-consent');
-assert.equal(dismissed.version, 4, 'отказ от предложенной основы не создаёт новую версию документа');
-assert.equal(dismissed.dismissedBaseVersion, 2);
-const afterDismiss = reconcileBookDocuments(getDocuments(), []);
-assert.equal(afterDismiss.documents.find((item) => item.id === 'pdn-consent').availableBaseVersion, 0, 'отклонённая редакция не должна предлагаться снова');
-
-configureBookDocumentBases(
-  basesV1.map((item) => item.documentId === 'pdn-consent'
-    ? { ...item, version: 3, text: item.text + '\nЕщё одна редакция Book.', publishedAt: '2026-09-20T00:00:00.000Z' }
-    : item),
-  {
-    profile: { name: 'Александр', surname: 'Волоковых', emails: ['a@example.test'], phones: [] },
-    workplaces: [{ address: 'Москва' }],
-  },
-);
-const nextOffer = reconcileBookDocuments(getDocuments(), []);
-assert.equal(nextOffer.documents.find((item) => item.id === 'pdn-consent').availableBaseVersion, 3, 'новая следующая редакция снова должна быть предложена');
+configureBookDocumentBases(basesV2.map((item) => item.documentId === 'pdn-consent' ? { ...item, version: 3 } : item), {
+  profile: { name: 'Александр', surname: 'Волоковых', emails: ['new@example.test'], phones: [], profession: 'Парикмахер' },
+  workplaces: [{ key: 'studio', address: 'Москва' }],
+});
+const customOffer = reconcileBookDocuments(getDocuments(), baseRefresh.history);
+const customConsent = customOffer.documents.find((item) => item.id === 'pdn-consent');
+assert.equal(customConsent.sourceMode, 'CUSTOM');
+assert.equal(customConsent.availableBaseVersion, 3, 'свой документ не перезаписывается автоматически');
 
 console.log('document base chain: ok');
