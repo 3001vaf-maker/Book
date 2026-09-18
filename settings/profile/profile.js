@@ -1,5 +1,6 @@
 import { accordion, actionBlock, button, collectRepeatedField, entityCard, escapeHtml, field, folderList, initAccordions, initPhotoField, initRepeatedFields, modal, mountModal, page, photoField, repeatedField, select, textareaField, workplaceAddButton, workplaceCountText } from '../../ui/ui.js';
 import { getBookLimit } from '../../core/access.js';
+import { hasUiPreference, setUiPreference } from '../../core/ui-preferences.js';
 import { addCustomProfession, getCustomProfessions, getProfile, saveProfile as saveProfileData } from './data.js';
 import { getWorkplaces } from './workplaces/data.js';
 import { initWorkplaceListDeletion, openWorkplaceModal, renderWorkplace, workplaceList } from './workplaces/workplaces.js';
@@ -34,8 +35,8 @@ function profileCard(p){
 function maybeShowDemoProfileGuide(options={}) {
   if (!options.demoGuide) return;
   const key='book.demo.profile-guide.v1';
-  if (localStorage.getItem(key)==='1') return;
-  localStorage.setItem(key,'1');
+  if (hasUiPreference(key)) return;
+  setUiPreference(key);
   const m=mountModal(document.body,modal(`<div class="modal-title"><h2>Заполните профиль</h2><p>Book использует данные профиля для вашего рабочего пространства и автоматически формирует документы для клиентов только после того, как профиль готов.</p></div><div class="demo-help-note"><strong>Что заполнить</strong><p>Имя и контакт · профессию · хотя бы одно рабочее место. После сохранения Book сам подготовит документы — отдельного юридического экрана не будет.</p></div>${actionBlock(button('Понятно',{data:'data-profile-guide-done'}))}`,{variant:'medium',surface:'app'}));
   m?.querySelector('[data-profile-guide-done]')?.addEventListener('click',()=>m.remove());
 }
