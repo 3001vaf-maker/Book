@@ -169,7 +169,6 @@ const MASTER_LEGAL_CHECKLIST_LABELS = {
   privacyPolicyPublished: 'Политика обработки ПД опубликована',
   clientDocumentsPrepared: 'Документы для клиентов подготовлены',
   dpaAccepted: 'Поручение Book на обработку ПД (DPA) принято',
-  rknFilingPrepared: 'Уведомление Роскомнадзора подготовлено',
 };
 
 async function tenantLegalRequest(path, options = {}) {
@@ -248,54 +247,24 @@ function renderMasterLegalSetup(account, readiness) {
 
         <section style="display:grid;gap:8px;margin-top:22px">
           <h2 style="font-size:18px;margin:0">3. Готовность</h2>
-          ${(readiness?.checklistKeys || []).map((key) => {
-            const locked = key !== 'rknFilingPrepared';
-            return `<label style="display:flex;gap:9px;align-items:center"><input type="checkbox" data-master-check="${escapeHtmlText(key)}" ${checklist[key] === true ? 'checked' : ''} ${locked ? 'disabled' : ''}><span>${escapeHtmlText(MASTER_LEGAL_CHECKLIST_LABELS[key] || key)}</span></label>`;
-          }).join('')}
+          ${(readiness?.checklistKeys || []).map((key) => `<label style="display:flex;gap:9px;align-items:center"><input type="checkbox" data-master-check="${escapeHtmlText(key)}" ${checklist[key] === true ? 'checked' : ''} disabled><span>${escapeHtmlText(MASTER_LEGAL_CHECKLIST_LABELS[key] || key)}</span></label>`).join('')}
           <p class="auth-error" data-master-legal-message></p>
         </section>
 
         <section style="display:grid;gap:10px;margin-top:22px">
-          <h2 style="font-size:18px;margin:0">4. Роскомнадзор и LIVE</h2>
-          <p style="margin:0">Статус подачи: <strong>${escapeHtmlText(filing)}</strong></p>
-          ${filing === 'NOT_PREPARED' ? '<button class="ui-button" data-master-prepared>Подготовка завершена → PREPARED</button>' : ''}
-          ${filing === 'PREPARED' ? `
-            <form data-master-submitted-form style="display:grid;gap:10px">
-              <label class="field"><span>Регистрационный номер / подтверждение подачи</span><input name="submissionReference" required></label>
-              <button class="ui-button" type="submit">Зафиксировать SUBMITTED</button>
-            </form>` : ''}
-          ${filing === 'SUBMITTED' ? `<p style="margin:0">Подача зафиксирована: ${escapeHtmlText(legalState.submissionReference || '—')}</p>` : ''}
-          <button class="ui-button" data-master-live ${readiness?.canBecomeLive ? '' : 'disabled'}>Перейти в LIVE</button>
+          <h2 style="font-size:18px;margin:0">4. Роскомнадзор</h2>
+          ${filing === 'SUBMITTED'
+            ? `<p style="margin:0">Подача зафиксирована: ${escapeHtmlText(legalState.submissionReference || '—')}</p>`
+            : `<form data-master-submitted-form style="display:grid;gap:10px">
+                <label class="field"><span>Регистрационный номер / подтверждение подачи</span><input name="submissionReference" required></label>
+                <button class="ui-button" type="submit">Сохранить и начать работу</button>
+              </form>`}
         </section>
       </section>
     </main>`;
 
   app.querySelectorAll('[data-master-legal-doc]').forEach((button) => {
     button.addEventListener('click', () => renderMasterLegalDocumentEditor(account, readiness, button.dataset.masterLegalDoc));
-  });
-
-  app.querySelector('[data-master-check="rknFilingPrepared"]')?.addEventListener('change', async (event) => {
-    const message = app.querySelector('[data-master-legal-message]');
-    try {
-      const next = await tenantLegalRequest('/checklist', {
-        method: 'PUT',
-        body: JSON.stringify({ checklist: { rknFilingPrepared: event.currentTarget.checked } }),
-      });
-      renderMasterLegalSetup(account, next);
-    } catch (error) {
-      message.textContent = error instanceof Error ? error.message : 'Не удалось сохранить';
-      event.currentTarget.checked = !event.currentTarget.checked;
-    }
-  });
-
-  app.querySelector('[data-master-prepared]')?.addEventListener('click', async () => {
-    const message = app.querySelector('[data-master-legal-message]');
-    try {
-      const next = await tenantLegalRequest('/filing/prepared', { method: 'POST', body: '{}' });
-      renderMasterLegalSetup(account, next);
-    } catch (error) {
-      message.textContent = error instanceof Error ? error.message : 'Подготовка ещё не завершена';
-    }
   });
 
   app.querySelector('[data-master-submitted-form]')?.addEventListener('submit', async (event) => {
@@ -307,23 +276,13 @@ function renderMasterLegalSetup(account, readiness) {
         method: 'POST',
         body: JSON.stringify({
           submissionReference: String(data.get('submissionReference') || '').trim(),
-          evidenceMetadata: { source: 'master-legal-entry' },
+          evidenceMetadata: { source: 'user-rkn-entry' },
         }),
       });
-      renderMasterLegalSetup(account, next);
-    } catch (error) {
-      message.textContent = error instanceof Error ? error.message : 'Не удалось зафиксировать подачу';
-    }
-  });
-
-  app.querySelector('[data-master-live]')?.addEventListener('click', async () => {
-    const message = app.querySelector('[data-master-legal-message]');
-    try {
-      const next = await tenantLegalRequest('/live', { method: 'POST', body: '{}' });
-      if (next?.state?.operationMode !== 'LIVE') throw new Error('LIVE не включён');
+      if (next?.state?.operationMode !== 'LIVE') throw new Error('После данных Роскомнадзора рабочий режим не включился');
       await renderAuthenticated(account);
     } catch (error) {
-      message.textContent = error instanceof Error ? error.message : 'Book пока не готов к LIVE';
+      message.textContent = error instanceof Error ? error.message : 'Не удалось завершить подготовку';
     }
   });
 

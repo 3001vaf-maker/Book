@@ -75,7 +75,6 @@ const PLATFORM_CHECKLIST_KEYS = [
   'dpaPublished',
   'operatorIdentityConfigured',
   'rknFilingConfirmed',
-  'productionInfrastructureChecked',
 ] as const;
 
 const TENANT_CHECKLIST_KEYS = [
@@ -83,7 +82,6 @@ const TENANT_CHECKLIST_KEYS = [
   'privacyPolicyPublished',
   'clientDocumentsPrepared',
   'dpaAccepted',
-  'rknFilingPrepared',
 ] as const;
 
 const PLATFORM_REQUIRED_DOCUMENT_KEYS = ['privacy-policy', 'saas-agreement', 'dpa', 'master-pd-consent'] as const;
@@ -215,6 +213,7 @@ export class LegalRuntimeService implements OnModuleInit {
           "updatedAt" = CURRENT_TIMESTAMP
       WHERE "id" = 'platform'
     `;
+    await this.promotePlatformIfReady('');
   }
 
   async platformState() {
@@ -371,21 +370,34 @@ export class LegalRuntimeService implements OnModuleInit {
       submissionReference, evidenceMetadata: evidence,
       reason: 'Book records the administrator confirmation of filing; this is not government approval.',
     });
-    return this.platformReadiness();
+    return this.promotePlatformIfReady(actorUserId);
   }
 
-  async markPlatformLegalReady(actorUserId: string) {
+  private async promotePlatformIfReady(actorUserId: string) {
     const readiness = await this.platformReadiness();
-    if (!readiness.canBecomeLegalReady) throw new ConflictException('Платформа не прошла обязательную юридическую готовность');
-    const before = readiness.state!;
+    const before = readiness.state;
+    if (!before || before.status === 'LEGAL_READY' || !readiness.canBecomeLegalReady) return readiness;
     await this.prisma.$executeRaw`
       UPDATE "PlatformLegalState"
       SET "status" = 'LEGAL_READY', "legalReadyAt" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP
       WHERE "id" = 'platform'
     `;
     const after = await this.requirePlatformState();
-    await this.transition({ scope: 'PLATFORM', actorUserId, changeType: 'PLATFORM_LEGAL_READY', oldState: before, newState: after });
+    await this.transition({
+      scope: 'PLATFORM',
+      actorUserId,
+      changeType: 'PLATFORM_LEGAL_READY',
+      oldState: before,
+      newState: after,
+      reason: 'Required platform documents are current and RKN filing is recorded.',
+    });
     return this.platformReadiness();
+  }
+
+  async markPlatformLegalReady(actorUserId: string) {
+    const readiness = await this.promotePlatformIfReady(actorUserId);
+    if (readiness.state?.status !== 'LEGAL_READY') throw new ConflictException('Платформа не прошла обязательную юридическую готовность');
+    return readiness;
   }
 
   async markPlatformPreLaunch(actorUserId: string, reasonValue: unknown) {
@@ -435,15 +447,25 @@ export class LegalRuntimeService implements OnModuleInit {
   }
 
   async confirmTenantSubmitted(tenantId: string, actorUserId: string, input: { submissionReference?: unknown; evidenceMetadata?: unknown }) {
+    await this.assertPlatformLegalReady(actorUserId);
+    await this.assertTenantActive(tenantId, actorUserId, 'TENANT_RKN_SUBMITTED');
+    const readiness = await this.tenantReadiness(tenantId);
     const before = await this.requireTenantState(tenantId);
-    if (before.filingStatus !== 'PREPARED') throw new ConflictException('Подачу можно подтвердить только после статуса PREPARED');
+    if (before.operationMode !== 'DEMO') return readiness;
+    if (before.filingStatus === 'SUBMITTED') return this.activateTenantLive(tenantId, actorUserId);
+    if (!allTrue(objectValue(readiness.state?.checklist), TENANT_CHECKLIST_KEYS) || (readiness.missingLiveDocuments || []).length) {
+      throw new ConflictException('Сначала должны быть готовы документы и обязательные согласия пользователя');
+    }
     const submissionReference = text(input?.submissionReference);
-    if (!submissionReference) throw new BadRequestException('Зафиксируйте reference/основание подтверждения подачи');
+    if (!submissionReference) throw new BadRequestException('Укажите регистрационный номер / подтверждение подачи в Роскомнадзор');
     const evidence = objectValue(input?.evidenceMetadata);
     await this.prisma.$executeRaw`
       UPDATE "TenantLegalState"
-      SET "filingStatus" = 'SUBMITTED', "submittedAt" = CURRENT_TIMESTAMP,
-          "submissionReference" = ${submissionReference}, "evidenceMetadata" = ${json(evidence)}::jsonb,
+      SET "filingStatus" = 'SUBMITTED',
+          "preparedAt" = COALESCE("preparedAt", CURRENT_TIMESTAMP),
+          "submittedAt" = CURRENT_TIMESTAMP,
+          "submissionReference" = ${submissionReference},
+          "evidenceMetadata" = ${json(evidence)}::jsonb,
           "updatedAt" = CURRENT_TIMESTAMP
       WHERE "tenantId" = ${tenantId}
     `;
@@ -453,7 +475,7 @@ export class LegalRuntimeService implements OnModuleInit {
       submissionReference, evidenceMetadata: evidence,
       reason: 'Book records the user confirmation of filing; this is not government approval.',
     });
-    return this.tenantReadiness(tenantId);
+    return this.activateTenantLive(tenantId, actorUserId);
   }
 
   async activateTenantLive(tenantId: string, actorUserId: string) {
