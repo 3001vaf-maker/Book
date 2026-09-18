@@ -7,7 +7,6 @@ const policy = read('server/src/document-state/consent-policy.service.ts');
 const documentService = read('server/src/document-state/document-state.service.ts');
 const documentController = read('server/src/document-state/document-state.controller.ts');
 const bookingController = read('server/src/online-booking/booking-consent.controller.ts');
-const bookingGuard = read('server/src/online-booking/booking-required-consent.guard.ts');
 const bookingService = read('server/src/online-booking/online-booking.service.ts');
 const clientProjection = read('main/clients/data.js');
 const browserConsents = read('settings/documents/consents.js');
@@ -26,7 +25,6 @@ if (migrationStart < 0 || activeStart < 0 || activeStart <= migrationStart) {
 for (const [name, source] of [
   ['DocumentStateController', documentController],
   ['BookingConsentController', bookingController],
-  ['BookingRequiredConsentGuard', bookingGuard],
   ['OnlineBookingService', bookingService],
   ['browser consent projection', browserConsents],
 ]) {
