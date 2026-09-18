@@ -163,23 +163,44 @@ export class LegalRuntimeService implements OnModuleInit {
       const documentId = existing[0]?.id;
       if (!documentId) continue;
 
-      const versions = await this.prisma.$queryRaw<Array<{ id: string }>>`
-        SELECT "id" FROM "LegalDocumentVersion"
-        WHERE "documentId" = ${documentId}
+      const versions = await this.prisma.$queryRaw<Array<{ id: string; version: number; contentHash: string }>>`
+        SELECT "id", "version", "contentHash" FROM "LegalDocumentVersion"
+        WHERE "documentId" = ${documentId} AND "supersededAt" IS NULL
+        ORDER BY "version" DESC
         LIMIT 1
       `;
-      if (!versions[0]) {
+      const current = versions[0];
+      const nextHash = contentHash(item.content);
+      if (!current) {
         await this.prisma.$executeRaw`
           INSERT INTO "LegalDocumentVersion" (
             "id", "documentId", "version", "contentSnapshot", "contentHash",
             "operatorIdentitySnapshot", "publishedAt", "supersededAt"
           ) VALUES (
-            ${randomUUID()}, ${documentId}, 1, ${item.content}, ${contentHash(item.content)},
+            ${randomUUID()}, ${documentId}, 1, ${item.content}, ${nextHash},
             ${json(PLATFORM_OPERATOR_IDENTITY)}::jsonb,
             CURRENT_TIMESTAMP, NULL
           )
           ON CONFLICT DO NOTHING
         `;
+      } else if (current.contentHash !== nextHash) {
+        await this.prisma.$transaction(async (tx) => {
+          await tx.$executeRaw`
+            UPDATE "LegalDocumentVersion"
+            SET "supersededAt" = CURRENT_TIMESTAMP
+            WHERE "id" = ${current.id} AND "supersededAt" IS NULL
+          `;
+          await tx.$executeRaw`
+            INSERT INTO "LegalDocumentVersion" (
+              "id", "documentId", "version", "contentSnapshot", "contentHash",
+              "operatorIdentitySnapshot", "publishedAt", "supersededAt"
+            ) VALUES (
+              ${randomUUID()}, ${documentId}, ${current.version + 1}, ${item.content}, ${nextHash},
+              ${json(PLATFORM_OPERATOR_IDENTITY)}::jsonb,
+              CURRENT_TIMESTAMP, NULL
+            )
+          `;
+        });
       }
     }
 
