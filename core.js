@@ -586,6 +586,28 @@ async function syncDocumentsFromProfileContext() {
   }
 }
 
+async function hydrateWorkspaceDataAfterOpen() {
+  const stages = [
+    ['business', () => initializeBusinessState(authenticatedAccount)],
+    ['operational', () => initializeOperationalState(authenticatedAccount)],
+    ['documents', () => initializeDocumentState(authenticatedAccount)],
+    ['auxiliary', () => initializeAuxiliaryState(authenticatedAccount)],
+  ];
+
+  let hydrated = false;
+  for (const [stage, run] of stages) {
+    try {
+      const result = await run();
+      if (!result?.verified) throw new Error(`${stage} state not verified`);
+      hydrated = true;
+    } catch (error) {
+      await reportStartupFailure(stage, error);
+    }
+  }
+
+  if (workspaceReady && hydrated) renderWorkspace();
+}
+
 async function renderAuthenticated(account = authenticatedAccount) {
   authenticatedAccount = account || authenticatedAccount;
 
@@ -615,30 +637,23 @@ async function renderAuthenticated(account = authenticatedAccount) {
     tenantRuntime = { state: { operationMode: 'LIVE' } };
   }
 
-  const startupStages = [
-    ['profile', () => initializeProfileWorkplaces(authenticatedAccount)],
-    ['business', () => initializeBusinessState(authenticatedAccount)],
-    ['operational', () => initializeOperationalState(authenticatedAccount)],
-    ['documents', () => initializeDocumentState(authenticatedAccount)],
-    ['auxiliary', () => initializeAuxiliaryState(authenticatedAccount)],
-  ];
-  for (const [stage, run] of startupStages) {
-    try {
-      const result = await run();
-      if (!result?.verified) throw new Error(`${stage} state not verified`);
-    } catch (error) {
-      await reportStartupFailure(stage, error);
-      renderServerStatePending();
-      return;
-    }
+  try {
+    const profileResult = await initializeProfileWorkplaces(authenticatedAccount);
+    if (!profileResult?.verified) throw new Error('profile state not verified');
+  } catch (error) {
+    await reportStartupFailure('profile', error);
+    renderServerStatePending();
+    return;
   }
+
   clearLegacyBusinessStorage();
-  ensureServerBookingSync();
 
   const requested = location.hash.slice(1);
   state.activeSection = sectionAllowed(requested) ? requested : defaultSection();
   history.replaceState({}, '', `#${state.activeSection}`);
   renderWorkspace();
+  ensureServerBookingSync();
+  void hydrateWorkspaceDataAfterOpen();
   if (isDemoMode()) queueMicrotask(maybeShowDemoWelcome);
 }
 
