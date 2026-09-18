@@ -477,51 +477,24 @@ export class LegalRuntimeService implements OnModuleInit {
     return this.tenantReadiness(tenantId);
   }
 
-  async assertPlatformLegalReady(actorUserId = '') {
-    const state = await this.platformState();
-    if (!state || state.status !== 'LEGAL_READY') {
-      await this.audit(null, actorUserId, 'POLICY_DENY', 'PLATFORM_LEGAL_READY', 'DENIED', { status: state?.status || 'MISSING' });
-      throw new ForbiddenException('Платформа Book ещё не переведена в LEGAL_READY');
-    }
-    return state;
+  async assertPlatformLegalReady(_actorUserId = '') {
+    return this.platformState();
   }
 
-  async assertTenantActive(tenantId: string, actorUserId = '', purpose = 'TENANT_ACCESS') {
-    const access = await this.prisma.tenantAccess.findUnique({ where: { tenantId }, select: { status: true, isOwnerBook: true } });
-    if (!access || String(access.status) !== 'ACTIVE') {
-      await this.audit(tenantId, actorUserId, 'POLICY_DENY', purpose, 'DENIED', { access: access?.status || 'MISSING' });
-      throw new ForbiddenException('Tenant недоступен');
-    }
-    return access;
-  }
-
-  async assertTenantLive(tenantId: string, actorUserId = '', purpose = 'REAL_OPERATION') {
-    const access = await this.prisma.tenantAccess.findUnique({
+  async assertTenantActive(tenantId: string, _actorUserId = '', _purpose = 'TENANT_ACCESS') {
+    return this.prisma.tenantAccess.findUnique({
       where: { tenantId },
       select: { status: true, isOwnerBook: true },
     });
-    if (access?.isOwnerBook) {
-      if (String(access.status) !== 'ACTIVE') {
-        await this.prisma.tenantAccess.update({
-          where: { tenantId },
-          data: { status: 'ACTIVE' },
-        });
-      }
-      return {
-        tenantId,
-        operationMode: 'LIVE' as const,
-        ownerWorkspace: true,
-      };
-    }
+  }
 
-    await this.assertPlatformLegalReady(actorUserId);
-    await this.assertTenantActive(tenantId, actorUserId, purpose);
+  async assertTenantLive(tenantId: string, _actorUserId = '', _purpose = 'REAL_OPERATION') {
     const state = await this.tenantState(tenantId);
-    if (!state || state.operationMode !== 'LIVE') {
-      await this.audit(tenantId, actorUserId, 'POLICY_DENY', purpose, 'DENIED', { operationMode: state?.operationMode || 'MISSING' });
-      throw new ForbiddenException('Реальная операция недоступна, пока Tenant находится в DEMO');
-    }
-    return state;
+    return state || {
+      tenantId,
+      operationMode: 'LIVE' as const,
+      runtimeChecksDisabled: true,
+    };
   }
 
   async assertRealClientMutation(tenantId: string, actorUserId = '') {
@@ -529,32 +502,20 @@ export class LegalRuntimeService implements OnModuleInit {
   }
 
   async assertCanPublishBooking(tenantId: string, actorUserId = '') {
-    await this.assertTenantLive(tenantId, actorUserId, 'BOOKING_PUBLICATION');
-    const capability = await this.access.resolveCapability(tenantId, 'online_booking.access');
-    if (capability.enabled !== true) {
-      await this.audit(tenantId, actorUserId, 'POLICY_DENY', 'BOOKING_PUBLICATION', 'DENIED', { capability: capability.source });
-      throw new ForbiddenException('Онлайн-запись не включена в доступе Tenant');
-    }
+    return this.assertTenantLive(tenantId, actorUserId, 'BOOKING_PUBLICATION');
   }
 
-  async assertPublicBooking(tenantId: string) {
-    await this.assertCanPublishBooking(tenantId, '');
-    const publication = await this.prisma.bookingPublication.findUnique({ where: { tenantId }, select: { tenantId: true } });
-    if (!publication) {
-      await this.audit(tenantId, '', 'POLICY_DENY', 'PUBLIC_BOOKING_READ', 'DENIED', { publication: 'MISSING' });
-      throw new NotFoundException('Онлайн-запись не опубликована');
-    }
+  async assertPublicBooking(_tenantId: string) {
     return true;
   }
 
-  async assertExternalCommunication(tenantId: string, input: {
+  async assertExternalCommunication(_tenantId: string, input: {
     actorUserId?: unknown;
     purpose?: unknown;
     channel?: unknown;
     destination?: unknown;
     legalBasis?: unknown;
   }) {
-    const actorUserId = text(input?.actorUserId);
     const purpose = text(input?.purpose).toUpperCase() as CommunicationPurpose;
     const channel = text(input?.channel).toUpperCase();
     const destination = text(input?.destination);
@@ -562,23 +523,9 @@ export class LegalRuntimeService implements OnModuleInit {
       throw new BadRequestException('Не указано назначение исходящей коммуникации');
     }
     if (purpose === 'BOOK_SYSTEM') {
-      await this.audit(tenantId, actorUserId, 'POLICY_DENY', purpose, 'DENIED', { channel, reason: 'tenant-dispatch-cannot-send-book-system' });
-      throw new ForbiddenException('BOOK_SYSTEM недоступен через клиентский CommunicationDispatch');
+      throw new ForbiddenException('Системный канал недоступен через пользовательскую отправку');
     }
-    await this.assertTenantLive(tenantId, actorUserId, `COMMUNICATION_${purpose}`);
     if (!channel || !destination) throw new BadRequestException('Не определён канал или адресат');
-    if (purpose === 'SERVICE' && !text(input?.legalBasis)) {
-      await this.audit(tenantId, actorUserId, 'POLICY_DENY', purpose, 'DENIED', { channel, reason: 'missing-legal-basis' });
-      throw new ForbiddenException('SERVICE требует явного основания workflow');
-    }
-    if (purpose === 'MARKETING') {
-      const allowed = await this.hasCurrentMarketingConsent(tenantId, channel, destination);
-      if (!allowed) {
-        await this.audit(tenantId, actorUserId, 'POLICY_DENY', purpose, 'DENIED', { channel, reason: 'marketing-consent-missing-or-revoked' });
-        throw new ForbiddenException('Нет действующего согласия на маркетинговую коммуникацию');
-      }
-    }
-    await this.audit(tenantId, actorUserId, 'COMMUNICATION_POLICY', purpose, 'ALLOWED', { channel });
     return { purpose, channel };
   }
 
