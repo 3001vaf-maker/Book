@@ -30,8 +30,13 @@ assert.doesNotMatch(backgroundSource, /renderServerStatePending\(/, 'optional da
 assert.match(authController, /@Post\('startup-diagnostic'\)/);
 assert.match(authService, /Workspace startup failed/);
 assert.equal(existsSync('server/src/saas-admin/saas-admin.service.ts'), false);
-assert.equal(existsSync('admin/admin.js'), false);
-
+assert.equal(existsSync('admin/admin.js'), true);
+const ownerAdmin = readFileSync('admin/admin.js', 'utf8');
+assert.match(ownerAdmin, /Документы/);
+assert.match(ownerAdmin, /Пользователи/);
+assert.match(ownerAdmin, /Возможности/);
+assert.equal(existsSync('server/src/user-invitation/user-invitation.module.ts'), false);
+assert.equal(existsSync('server/src/manual-invitation/manual-invitation.module.ts'), false);
 
 assert.equal(existsSync('server/src/legal-runtime/legal-runtime.service.ts'), false);
 assert.doesNotMatch(core, /tenantLegalRequest\('\/readiness'\)/);
