@@ -2,45 +2,30 @@ import { recordDocumentHistory } from './history.js';
 
 let documentsState = null;
 let persistDocuments = null;
+let bookBasesState = [];
+let bookContextState = { profile: {}, workplaces: [] };
 
-const DEFAULT_DOCUMENTS = [
-  {
-    id: 'pdn-agreement',
-    system: true,
-    kind: 'agreement',
-    title: 'Соглашение об обработке персональных данных',
-    clientConsent: false,
-    required: false,
-    version: 1,
-    text: 'Шаблон для адаптации под вашу работу. Укажите сведения об операторе, цели и правила обработки персональных данных, категории данных, сроки хранения, порядок отзыва и контакты для обращений. Перед использованием рекомендуется проверить документ с юристом.'
-  },
-  {
-    id: 'pdn-consent',
-    system: true,
-    kind: 'consent',
-    title: 'Согласие на обработку персональных данных',
-    clientConsent: true,
-    required: true,
-    version: 1,
-    text: 'Я даю согласие на обработку персональных данных, необходимых для записи и оказания услуг, связи со мной и ведения истории записей. Состав данных, цели, действия с данными, срок действия согласия и способ его отзыва должны быть уточнены оператором перед использованием этого шаблона.'
-  },
-  {
-    id: 'messages-consent',
-    system: true,
-    kind: 'consent',
-    title: 'Согласие на информационные сообщения',
-    clientConsent: true,
-    required: false,
-    version: 1,
-    text: 'Я согласен(на) получать информационные сообщения, связанные с записью, изменением или отменой визита, а также иные сообщения, на которые я отдельно согласился(ась). Это согласие является необязательным и может быть отозвано.'
-  }
-];
+const BOOK_DOCUMENT_IDS = ['pdn-agreement', 'pdn-consent', 'messages-consent'];
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function normalizeBase(item = {}) {
+  return {
+    key: String(item.key || ''),
+    documentId: String(item.documentId || ''),
+    kind: item.kind === 'consent' ? 'consent' : 'agreement',
+    clientConsent: Boolean(item.clientConsent),
+    required: Boolean(item.required),
+    title: String(item.title || 'Документ'),
+    version: Math.max(1, Number(item.version || 1)),
+    content: String(item.content || ''),
+  };
+}
+
 function normalize(item = {}) {
+  const sourceMode = String(item.sourceMode || '').toUpperCase();
   return {
     id: String(item.id || `document-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`),
     system: Boolean(item.system),
@@ -49,25 +34,188 @@ function normalize(item = {}) {
     clientConsent: Boolean(item.clientConsent),
     required: Boolean(item.required),
     version: Math.max(1, Number(item.version || 1)),
-    text: String(item.text || '')
+    text: String(item.text || ''),
+    sourceMode: sourceMode === 'BOOK' ? 'BOOK' : sourceMode === 'CUSTOM' ? 'CUSTOM' : '',
+    baseKey: String(item.baseKey || ''),
+    baseVersion: Math.max(0, Number(item.baseVersion || 0)),
+    availableBaseVersion: Math.max(0, Number(item.availableBaseVersion || 0)),
+    availableBookText: String(item.availableBookText || ''),
   };
+}
+
+function contextValues() {
+  const profile = bookContextState.profile || {};
+  const fullName = [profile.name, profile.surname]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .join(' ');
+  const emails = Array.isArray(profile.emails) ? profile.emails : [];
+  const phones = Array.isArray(profile.phones) ? profile.phones : [];
+  const contact = String(emails[0] || phones[0] || profile.email || profile.phone || '').trim();
+  return {
+    '[ФИО пользователя]': fullName,
+    '[Контакт пользователя]': contact,
+  };
+}
+
+function contextReady() {
+  const values = contextValues();
+  return Boolean(values['[ФИО пользователя]'] && values['[Контакт пользователя]']);
+}
+
+export function renderBookBaseText(base) {
+  let text = String(base?.content || '');
+  for (const [placeholder, value] of Object.entries(contextValues())) {
+    text = text.split(placeholder).join(value || '________________');
+  }
+  return text;
+}
+
+function baseForDocument(documentId) {
+  return bookBasesState.find((item) => item.documentId === documentId) || null;
+}
+
+function makeBookDocument(base, version = 1) {
+  return normalize({
+    id: base.documentId,
+    system: true,
+    kind: base.kind,
+    title: base.title,
+    clientConsent: base.clientConsent,
+    required: base.required,
+    version,
+    text: renderBookBaseText(base),
+    sourceMode: 'BOOK',
+    baseKey: base.key,
+    baseVersion: base.version,
+  });
+}
+
+function historyEntry(document, action, source) {
+  return {
+    id: crypto.randomUUID(),
+    documentId: document.id,
+    documentTitle: document.title,
+    documentVersion: Math.max(1, Number(document.version || 1)),
+    action,
+    createdAt: new Date().toISOString(),
+    source,
+    snapshot: clone(document),
+  };
+}
+
+export function configureBookDocumentBases(bases = [], context = {}) {
+  bookBasesState = (Array.isArray(bases) ? bases : [])
+    .map(normalizeBase)
+    .filter((item) => item.key && item.documentId && item.content);
+  bookContextState = {
+    profile: context?.profile && typeof context.profile === 'object' ? clone(context.profile) : {},
+    workplaces: Array.isArray(context?.workplaces) ? clone(context.workplaces) : [],
+  };
+}
+
+export function getBookDocumentBases() {
+  return clone(bookBasesState);
+}
+
+export function buildBookDocuments() {
+  if (!bookBasesState.length || !contextReady()) return [];
+  return BOOK_DOCUMENT_IDS
+    .map((id) => baseForDocument(id))
+    .filter(Boolean)
+    .map((base) => makeBookDocument(base, 1));
+}
+
+export function reconcileBookDocuments(items = [], history = []) {
+  const current = (Array.isArray(items) ? items : []).map(normalize);
+  const nextHistory = Array.isArray(history) ? clone(history) : [];
+  let changed = false;
+
+  if (!bookBasesState.length || !contextReady()) {
+    return { documents: current, history: nextHistory, changed: false };
+  }
+
+  for (const documentId of BOOK_DOCUMENT_IDS) {
+    const base = baseForDocument(documentId);
+    if (!base) continue;
+    const rendered = renderBookBaseText(base);
+    const index = current.findIndex((item) => item.id === documentId);
+
+    if (index < 0) {
+      const created = makeBookDocument(base, 1);
+      current.push(created);
+      nextHistory.push(historyEntry(created, 'created', 'admin-template'));
+      changed = true;
+      continue;
+    }
+
+    const item = current[index];
+
+    // Existing real documents are never overwritten merely because this connection is new.
+    if (!item.sourceMode) {
+      const exactAdminDocument = item.title === base.title && item.text === rendered;
+      current[index] = normalize({
+        ...item,
+        sourceMode: exactAdminDocument ? 'BOOK' : 'CUSTOM',
+        baseKey: base.key,
+        baseVersion: exactAdminDocument ? base.version : 0,
+        availableBaseVersion: exactAdminDocument ? 0 : base.version,
+        availableBookText: exactAdminDocument ? '' : rendered,
+      });
+      changed = true;
+      continue;
+    }
+
+    if (item.sourceMode === 'BOOK') {
+      if (item.text !== rendered || item.title !== base.title || item.baseVersion !== base.version) {
+        const previous = clone(item);
+        const refreshed = normalize({
+          ...item,
+          title: base.title,
+          text: rendered,
+          version: Number(item.version || 1) + 1,
+          baseKey: base.key,
+          baseVersion: base.version,
+          availableBaseVersion: 0,
+          availableBookText: '',
+        });
+        current[index] = refreshed;
+        nextHistory.push(historyEntry(previous, 'superseded', 'admin-template'));
+        nextHistory.push(historyEntry(refreshed, 'version-created', 'admin-template'));
+        changed = true;
+      }
+      continue;
+    }
+
+    const nextAvailable = item.text === rendered && item.title === base.title ? 0 : base.version;
+    const nextText = nextAvailable ? rendered : '';
+    if (item.baseKey !== base.key
+      || item.availableBaseVersion !== nextAvailable
+      || item.availableBookText !== nextText) {
+      current[index] = normalize({
+        ...item,
+        baseKey: base.key,
+        availableBaseVersion: nextAvailable,
+        availableBookText: nextText,
+      });
+      changed = true;
+    }
+  }
+
+  return { documents: current.map(normalize), history: nextHistory, changed };
 }
 
 export function configureDocumentPersistence(handler = null) {
   persistDocuments = typeof handler === 'function' ? handler : null;
 }
 
-export function getDefaultDocuments() {
-  return clone(DEFAULT_DOCUMENTS).map(normalize);
-}
-
 export function hydrateDocumentsFromServer(items = []) {
-  documentsState = (Array.isArray(items) && items.length ? items : DEFAULT_DOCUMENTS).map(normalize);
+  documentsState = (Array.isArray(items) ? items : []).map(normalize);
   return getDocuments();
 }
 
 export function getDocuments() {
-  return clone(documentsState === null ? DEFAULT_DOCUMENTS : documentsState).map(normalize);
+  return clone(documentsState === null ? [] : documentsState).map(normalize);
 }
 
 export function saveDocuments(items = []) {
@@ -83,6 +231,7 @@ export function saveDocument(document) {
   const changedTitle = previous && String(previous.title || '') !== String(document?.title || '');
   const next = normalize({
     ...document,
+    sourceMode: previous?.sourceMode || document?.sourceMode || 'CUSTOM',
     version: changedText ? Number(previous.version || 1) + 1 : Number(document?.version || previous?.version || 1),
   });
   const index = items.findIndex((item) => item.id === next.id);
@@ -91,9 +240,23 @@ export function saveDocument(document) {
   saveDocuments(items);
 
   if (!previous) {
-    recordDocumentHistory({ documentId: next.id, documentTitle: next.title, documentVersion: next.version, action: 'created' });
+    recordDocumentHistory({
+      documentId: next.id,
+      documentTitle: next.title,
+      documentVersion: next.version,
+      action: 'created',
+      source: next.sourceMode === 'BOOK' ? 'admin-template' : 'custom',
+      snapshot: next,
+    });
   } else if (changedText || changedTitle) {
-    recordDocumentHistory({ documentId: next.id, documentTitle: next.title, documentVersion: next.version, action: changedText ? 'version-created' : 'renamed' });
+    recordDocumentHistory({
+      documentId: next.id,
+      documentTitle: next.title,
+      documentVersion: next.version,
+      action: changedText ? 'version-created' : 'renamed',
+      source: next.sourceMode === 'BOOK' ? 'admin-template' : 'custom',
+      snapshot: next,
+    });
   }
 
   return next;
@@ -108,10 +271,11 @@ export function createDocument({ title = 'Новый документ', text = '
     clientConsent: false,
     required: false,
     version: 1,
-    text
+    text,
+    sourceMode: 'CUSTOM',
   });
 }
 
 export function resetDocumentTemplates() {
-  return saveDocuments(getDefaultDocuments());
+  return saveDocuments(buildBookDocuments());
 }

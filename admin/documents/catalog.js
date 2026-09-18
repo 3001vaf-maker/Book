@@ -98,3 +98,45 @@ export function getUserDocumentBases() {
 export function getAdminDocument(key) {
   return DOCUMENT_CATALOG.find((item) => item.key === key) || null;
 }
+
+
+const BOOK_DOCUMENT_BASE_MAPPING = {
+  'user-document-pdn-policy': {
+    documentId: 'pdn-agreement',
+    kind: 'agreement',
+    clientConsent: false,
+    required: false,
+  },
+  'user-document-pdn-consent': {
+    documentId: 'pdn-consent',
+    kind: 'consent',
+    clientConsent: true,
+    required: true,
+  },
+  'user-document-messages-consent': {
+    documentId: 'messages-consent',
+    kind: 'consent',
+    clientConsent: true,
+    required: false,
+  },
+};
+
+export function getBookDocumentBases() {
+  return USER_DOCUMENT_BASE_KEYS
+    .map((key) => {
+      const item = DOCUMENT_CATALOG.find((document) => document.key === key);
+      const config = BOOK_DOCUMENT_BASE_MAPPING[key];
+      if (!item || !config) return null;
+      return {
+        key,
+        documentId: config.documentId,
+        kind: config.kind,
+        clientConsent: config.clientConsent,
+        required: config.required,
+        title: item.title,
+        version: 1,
+        content: item.content,
+      };
+    })
+    .filter(Boolean);
+}
