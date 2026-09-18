@@ -1,15 +1,15 @@
 const CAPABILITIES = [
   {
-    key: 'profile.access', title: 'Профиль', description: 'Данные мастера и основная информация Book.', placement: 'settings', owner: 'settings/settings.js',
-    entrySelector: '[data-settings-open="profile"]', introTitle: 'Профиль открыт', introBody: 'Теперь доступен раздел профиля. Здесь настраиваются данные мастера и его Book.', introAction: 'Открыть профиль',
+    key: 'profile.access', title: 'Профиль', description: 'Данные пользователя и рабочего профиля.', placement: 'settings', owner: 'settings/settings.js',
+    entrySelector: '[data-settings-open="profile"]', introTitle: 'Профиль открыт', introBody: 'Теперь доступен раздел профиля. Здесь настраиваются данные пользователя и его рабочего профиля.', introAction: 'Открыть профиль',
   },
   {
-    key: 'services.access', title: 'Услуги', description: 'Настройка услуг и процедур мастера.', placement: 'settings', owner: 'settings/settings.js',
+    key: 'services.access', title: 'Услуги', description: 'Настройка услуг и процедур.', placement: 'settings', owner: 'settings/settings.js',
     entrySelector: '[data-settings-open="service"]', introTitle: 'Услуги открыты', introBody: 'Теперь доступен раздел услуг. Здесь можно настроить услуги и процедуры.', introAction: 'Открыть услуги',
   },
   {
-    key: 'clients.access', title: 'Клиенты', description: 'Клиентская база и работа с карточками клиентов.', placement: 'main', owner: 'main/main.js',
-    entrySelector: '[data-open-clients]', introTitle: 'Клиенты открыты', introBody: 'Теперь доступна клиентская база и работа с карточками клиентов.', introAction: 'Открыть клиентов',
+    key: 'people.access', title: 'Люди', description: 'Рабочая база людей и их карточки.', placement: 'main', owner: 'main/main.js',
+    entrySelector: '[data-open-people]', introTitle: 'Люди открыты', introBody: 'Теперь доступна рабочая база людей и их карточки.', introAction: 'Открыть людей',
   },
   { key: 'workplaces.max', title: 'Рабочие пространства', description: 'Количество доступных рабочих пространств.', placement: 'limit', owner: 'server/src/profile/workplace-limit.guard.ts' },
   {
@@ -21,8 +21,8 @@ const CAPABILITIES = [
     entrySelector: '[data-nav="journal"]', introTitle: 'Журнал открыт', introBody: 'Теперь можно вести записи, рабочий день и историю работы.', introAction: 'Открыть журнал',
   },
   {
-    key: 'online_booking.access', title: 'Онлайн-запись', description: 'Клиенты смогут записываться к мастеру онлайн.', placement: 'settings', owner: 'settings/settings.js',
-    entrySelector: '[data-settings-open="online-booking"]', introTitle: 'Онлайн-запись открыта', introBody: 'Теперь доступна онлайн-запись и ссылка для записи клиентов.', introAction: 'Настроить онлайн-запись',
+    key: 'online_booking.access', title: 'Онлайн-запись', description: 'Доступна публичная онлайн-запись.', placement: 'settings', owner: 'settings/settings.js',
+    entrySelector: '[data-settings-open="online-booking"]', introTitle: 'Онлайн-запись открыта', introBody: 'Теперь доступна онлайн-запись и публичная ссылка.', introAction: 'Настроить онлайн-запись',
   },
   {
     key: 'payments.access', title: 'Оплаты', description: 'Оплата и расчёты внутри записей и процедур.', placement: 'embedded', owner: 'journal/record-payment.js',
@@ -34,15 +34,15 @@ const CAPABILITIES = [
   },
   {
     key: 'chat.access', title: 'Чат', description: 'Рабочий чат и коммуникация.', placement: 'navigation', section: 'chat', owner: 'core.js',
-    entrySelector: '[data-nav="chat"]', introTitle: 'Чат открыт', introBody: 'Теперь доступен рабочий чат для коммуникации с клиентами.', introAction: 'Открыть чат',
+    entrySelector: '[data-nav="chat"]', introTitle: 'Чат открыт', introBody: 'Теперь доступен рабочий чат для коммуникации.', introAction: 'Открыть чат',
   },
   {
     key: 'notifications.access', title: 'Уведомления', description: 'Настройки уведомлений и сообщений.', placement: 'settings', owner: 'settings/settings.js',
     entrySelector: '[data-settings-open="communications"]', introTitle: 'Уведомления открыты', introBody: 'Теперь можно настраивать уведомления и сообщения.', introAction: 'Открыть уведомления',
   },
   {
-    key: 'integrations.access', title: 'Интеграции', description: 'Подключение внешних сервисов Book.', placement: 'settings', owner: 'settings/settings.js',
-    entrySelector: '[data-settings-open="integrations"]', introTitle: 'Интеграции открыты', introBody: 'Теперь доступно подключение внешних сервисов Book.', introAction: 'Открыть интеграции',
+    key: 'integrations.access', title: 'Интеграции', description: 'Подключение внешних сервисов.', placement: 'settings', owner: 'settings/settings.js',
+    entrySelector: '[data-settings-open="integrations"]', introTitle: 'Интеграции открыты', introBody: 'Теперь доступно подключение внешних сервисов.', introAction: 'Открыть интеграции',
   },
   {
     key: 'documents.access', title: 'Документы', description: 'Документы, согласия и история документов.', placement: 'settings', owner: 'settings/settings.js',
@@ -54,10 +54,10 @@ const CAPABILITIES = [
   },
 ];
 
-export const BOOK_CAPABILITIES = Object.freeze(Object.fromEntries(CAPABILITIES.map((item) => [item.key, Object.freeze({ ...item })])));
+export const CAPABILITY_REGISTRY = Object.freeze(Object.fromEntries(CAPABILITIES.map((item) => [item.key, Object.freeze({ ...item })])));
 
 export function getCapabilityMeta(key) {
-  return BOOK_CAPABILITIES[String(key || '').trim()] || null;
+  return CAPABILITY_REGISTRY[String(key || '').trim()] || null;
 }
 
 export function getCapabilityTitle(key) {

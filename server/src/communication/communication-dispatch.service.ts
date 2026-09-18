@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { ClientProfileThreadService } from './client-profile-thread.service';
+import { PersonProfileThreadService } from './person-profile-thread.service';
 import { CommunicationChannelResolverService } from './communication-channel-resolver.service';
 import { CommunicationService } from './communication.service';
 import { CommunicationHistoryService } from './communication-history.service';
@@ -13,7 +13,7 @@ export class CommunicationDispatchService {
     private readonly communications: CommunicationService,
     private readonly history: CommunicationHistoryService,
     private readonly channels: CommunicationChannelResolverService,
-    private readonly profiles: ClientProfileThreadService,
+    private readonly profiles: PersonProfileThreadService,
     private readonly profilePush: InAppProfilePushService,
   ) {}
 

@@ -51,10 +51,10 @@ function personLabel(person = {}) {
   const code = text(person.uei);
   if (code) return code;
   const fullName = [text(person.name), text(person.surname)].filter(Boolean).join(' ');
-  return fullName || 'другому клиенту';
+  return fullName || 'другому человеку';
 }
 
-export function assertNoNewClientContactConflicts(previousPeople = [], nextPeople = []) {
+export function assertNoNewPersonContactConflicts(previousPeople = [], nextPeople = []) {
   const previous = ownersByContact(previousPeople);
   const next = ownersByContact(nextPeople);
 
@@ -67,14 +67,14 @@ export function assertNoNewClientContactConflicts(previousPeople = [], nextPeopl
     if (!introduced) continue;
 
     const other = uniqueOwners.find((item) => item.personKey !== introduced.personKey) || uniqueOwners[0];
-    throw new Error(`${introduced.contact.type} уже принадлежит клиенту ${personLabel(other.person)}.`);
+    throw new Error(`${introduced.contact.type} уже принадлежит человеку ${personLabel(other.person)}.`);
   }
 }
 
-export function normalizeClientEmail(value) {
+export function normalizePersonEmail(value) {
   return canonicalEmail(value);
 }
 
-export function normalizeClientTelegram(value) {
+export function normalizePersonTelegram(value) {
   return canonicalTelegram(value);
 }

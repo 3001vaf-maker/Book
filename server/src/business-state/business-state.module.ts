@@ -4,12 +4,12 @@ import { NotificationModule } from '../notification/notification.module';
 import { PrismaService } from '../prisma.service';
 import { BusinessStateController } from './business-state.controller';
 import { BusinessStateService } from './business-state.service';
-import { ClientContactRulesService } from './client-contact-rules.service';
+import { PersonContactRulesService } from './person-contact-rules.service';
 
 @Module({
   imports: [AuthModule, forwardRef(() => NotificationModule)],
   controllers: [BusinessStateController],
-  providers: [BusinessStateService, ClientContactRulesService, PrismaService],
-  exports: [BusinessStateService, ClientContactRulesService],
+  providers: [BusinessStateService, PersonContactRulesService, PrismaService],
+  exports: [BusinessStateService, PersonContactRulesService],
 })
 export class BusinessStateModule {}

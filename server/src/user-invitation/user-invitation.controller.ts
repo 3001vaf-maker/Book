@@ -1,9 +1,9 @@
 import { Body, Controller, Post } from '@nestjs/common';
-import { MasterInvitationService } from './master-invitation.service';
+import { UserInvitationService } from './user-invitation.service';
 
-@Controller('master-invitations')
-export class MasterInvitationController {
-  constructor(private readonly invitations: MasterInvitationService) {}
+@Controller('user-invitations')
+export class UserInvitationController {
+  constructor(private readonly invitations: UserInvitationService) {}
 
   @Post('inspect')
   inspect(@Body() body: { token?: unknown }) {

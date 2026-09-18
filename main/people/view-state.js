@@ -1,13 +1,13 @@
-const SORT_KEY = 'book.people.sort';
+const SORT_KEY = 'workspace.people.sort';
 const DEFAULT_SORT = 'ueiAsc';
 const SORT_MODES = new Set(['ueiAsc', 'ueiDesc', 'nameAsc', 'nameDesc', 'lastAsc', 'lastDesc']);
 
-export function getClientSortMode() {
+export function getPersonSortMode() {
   const value = localStorage.getItem(SORT_KEY) || DEFAULT_SORT;
   return SORT_MODES.has(value) ? value : DEFAULT_SORT;
 }
 
-export function setClientSortMode(value) {
+export function setPersonSortMode(value) {
   const mode = SORT_MODES.has(value) ? value : DEFAULT_SORT;
   localStorage.setItem(SORT_KEY, mode);
   return mode;

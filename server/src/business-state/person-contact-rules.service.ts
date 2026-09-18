@@ -53,7 +53,7 @@ function personMemberKeys(entity: Record<string, any>) {
 }
 
 @Injectable()
-export class ClientContactRulesService {
+export class PersonContactRulesService {
   constructor(private readonly businessState: BusinessStateService) {}
 
   async validatePersonUpsert(tenantId: string, personKeyValue: unknown, body: unknown) {

@@ -6,7 +6,7 @@ function enhanceDrawer(drawer) {
   if (!statusSection) return;
   const help = document.createElement('p');
   help.className = 'admin-access-help';
-  help.textContent = 'Статус «Активен» означает только, что Book не отключён. Новые возможности применяются отдельно кнопкой «Сохранить доступы».';
+  help.textContent = 'Статус «Активен» означает только, что рабочее пространство не отключено. Новые возможности применяются отдельно кнопкой «Сохранить доступы».';
   statusSection.querySelector('h4')?.insertAdjacentElement('afterend', help);
 }
 

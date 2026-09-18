@@ -32,7 +32,7 @@ function personHasPhone(person: JsonObject, phone: string) {
   return (Array.isArray(person.phones) ? person.phones : []).some((value) => canonicalPhone(value) === phone);
 }
 
-export type ClientProfileThread = {
+export type PersonProfileThread = {
   profileKey: string;
   profileName: string;
   profileUei: string;
@@ -44,7 +44,7 @@ export type ClientProfileThread = {
 };
 
 @Injectable()
-export class ClientProfileThreadService {
+export class PersonProfileThreadService {
   constructor(
     private readonly businessState: BusinessStateService,
     private readonly prisma: PrismaService,
@@ -70,7 +70,7 @@ export class ClientProfileThreadService {
     };
   }
 
-  private build(state: ProfileState, source: JsonObject): ClientProfileThread {
+  private build(state: ProfileState, source: JsonObject): PersonProfileThread {
     const sourceKey = text(source.key);
     if (!sourceKey) throw new NotFoundException('Профиль клиента не найден');
     const uei = text(state.relations[`person:${sourceKey}`]);
@@ -144,7 +144,7 @@ export class ClientProfileThreadService {
 
   async canonicalizeProfileKeys(tenantId: string, storedKeys: unknown[]) {
     const state = await this.state(tenantId);
-    const result = new Map<string, ClientProfileThread>();
+    const result = new Map<string, PersonProfileThread>();
     for (const rawKey of storedKeys) {
       const key = text(rawKey);
       if (!key || result.has(key)) continue;

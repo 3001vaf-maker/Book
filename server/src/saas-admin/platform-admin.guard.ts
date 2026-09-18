@@ -30,8 +30,8 @@ export class PlatformAdminGuard implements CanActivate {
       const admin = await this.prisma.platformAdmin.create({ data: { userId } });
       await this.prisma.tenantAccess.upsert({
         where: { tenantId },
-        create: { tenantId, isOwnerBook: true },
-        update: { isOwnerBook: true },
+        create: { tenantId, isPlatformOwnerWorkspace: true },
+        update: { isPlatformOwnerWorkspace: true },
       });
       request.platformAdminId = admin.id;
       return true;
@@ -49,8 +49,8 @@ export class PlatformAdminGuard implements CanActivate {
         const admin = await this.prisma.platformAdmin.create({ data: { userId } });
         await this.prisma.tenantAccess.upsert({
           where: { tenantId },
-          create: { tenantId, isOwnerBook: true },
-          update: { isOwnerBook: true },
+          create: { tenantId, isPlatformOwnerWorkspace: true },
+          update: { isPlatformOwnerWorkspace: true },
         });
         request.platformAdminId = admin.id;
         return true;
