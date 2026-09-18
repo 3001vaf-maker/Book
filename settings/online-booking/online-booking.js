@@ -1,6 +1,6 @@
 import { buildBookingLink } from '../../core/booking-link/index.js';
 import { CLIENT_APP_ORIGIN } from '../../core/environment.js';
-import { apiRequest, getCurrentUser } from '../../core/auth.js';
+import { getCurrentUser } from '../../core/auth.js';
 import {
   BOOKING_CHOICE_STYLES,
   BOOKING_SHAPES,
@@ -34,16 +34,6 @@ import {
 import { getWorkplaces } from '../profile/workplaces/data.js';
 
 const APPEARANCE_INFO = 'Вы задаёте настроение страницы. Расстановка экранов, календарь и логика записи остаются едиными. Карточка рабочего пространства берётся из заполненной карточки рабочего пространства.';
-
-async function ensureBookingPublication() {
-  const response = await apiRequest('/online-booking/owner/publication', {
-    method: 'PUT',
-    body: JSON.stringify({ data: { source: 'online-booking-settings' } }),
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload?.message || 'Не удалось опубликовать онлайн-запись');
-  return payload;
-}
 
 function bookingLink(tenantId, workplaceKey = '') {
   return buildBookingLink({
@@ -391,13 +381,12 @@ export function render(root, navigateBack = () => {}) {
         renderUnavailable(root, navigateBack, 'Ссылка недоступна', 'Не удалось определить рабочее пространство аккаунта.');
         return;
       }
-      return ensureBookingPublication()
-        .then(() => renderReady(root, navigateBack, tenantId));
+      renderReady(root, navigateBack, tenantId);
     })
-    .catch((error) => renderUnavailable(
+    .catch(() => renderUnavailable(
       root,
       navigateBack,
       'Ссылка недоступна',
-      error instanceof Error ? error.message : 'Не удалось опубликовать онлайн-запись.',
+      'Не удалось получить данные аккаунта.',
     ));
 }
