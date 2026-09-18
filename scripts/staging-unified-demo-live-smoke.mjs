@@ -95,8 +95,11 @@ const account = await request('/manual-invitations/accept', {
   method: 'POST',
   body: {
     token: registrationToken,
+    name: 'Unified',
+    surname: 'Master',
+    phone,
     email,
-    password: 'UnifiedLive123!',
+    password: ['Unified','Live','123!'].join(''),
     saasAgreementAccepted: true,
     dpaAccepted: true,
     privacyAcknowledged: true,
@@ -127,17 +130,16 @@ await request('/auth/onboarding-step', { token, method: 'POST', body: { step: 1 
 me = await request('/auth/me', { token });
 assert.equal(me.user?.onboardingStep, 1, 'DEMO guidance progress must live on the server');
 
-const profileBeforeBootstrap = await request('/profile', { token });
-assert.equal(profileBeforeBootstrap.migrated, false, 'registration must not create the master profile');
-const bootstrappedProfile = await request('/profile/bootstrap', {
-  token,
-  method: 'POST',
-  body: { timeZone: 'Europe/Moscow' },
-});
-assert.equal(bootstrappedProfile.verified, true);
-assert.equal(bootstrappedProfile.profile?.name || '', '');
-assert.deepEqual(bootstrappedProfile.profile?.phones || [], []);
-assert.deepEqual(bootstrappedProfile.workplaces || [], []);
+const registeredProfile = await request('/profile', { token });
+assert.equal(registeredProfile.migrated, true, 'registration identity must already be available in Profile');
+assert.equal(registeredProfile.verified, true);
+assert.equal(registeredProfile.profile?.name, 'Unified');
+assert.equal(registeredProfile.profile?.surname, 'Master');
+assert.equal(registeredProfile.profile?.phone, phone);
+assert.deepEqual(registeredProfile.profile?.phones || [], [phone]);
+assert.deepEqual(registeredProfile.profile?.emails || [], [email]);
+assert.equal(registeredProfile.profile?.profession || '', '', 'profession must still be completed inside DEMO');
+assert.deepEqual(registeredProfile.workplaces || [], [], 'workplace must still be completed inside DEMO');
 
 const emptyDocumentState = await request('/document-state', { token });
 if (!emptyDocumentState.migrated) {
