@@ -2,11 +2,15 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const core = readFileSync('core.js', 'utf8');
-const registration = readFileSync('registration/registration-flow.js', 'utf8');
+const registration = readFileSync('ui/auth/registration-flow.js', 'utf8');
 const tenantController = readFileSync('server/src/legal-runtime/tenant-legal.controller.ts', 'utf8');
 const legalService = readFileSync('server/src/legal-runtime/legal-runtime.service.ts', 'utf8');
 const documentData = readFileSync('settings/documents/data.js', 'utf8');
 const bookingService = readFileSync('server/src/online-booking/online-booking.service.ts', 'utf8');
+const notificationService = readFileSync('server/src/notification/notification.service.ts', 'utf8');
+const legalNotificationService = readFileSync('server/src/notification/legal-notification.service.ts', 'utf8');
+const broadcastService = readFileSync('server/src/communication/communication-broadcast.service.ts', 'utf8');
+const dispatchService = readFileSync('server/src/communication/communication-dispatch.service.ts', 'utf8');
 
 assert.match(registration, /Добро пожаловать в Book/);
 assert.match(registration, /Условия работы с Book/);
@@ -40,5 +44,16 @@ assert.match(bookingService, /documentState\.publicDocuments\(tenantId\)/);
 assert.match(bookingService, /requiredClientDocuments/);
 assert.match(legalService, /businessDocumentState\.findUnique/);
 assert.match(legalService, /documentId" = 'messages-consent'/);
+
+assert.doesNotMatch(notificationService, /canSendMessages|ConsentPolicyService/);
+assert.match(legalNotificationService, /purpose: 'SERVICE'/);
+assert.match(legalNotificationService, /approved-notification-template:/);
+assert.match(broadcastService, /canSendMessages/);
+assert.match(dispatchService, /const purpose = .*\|\| 'MARKETING'/);
+assert.match(legalService, /purpose === 'MARKETING'/);
+assert.match(legalService, /hasCurrentMarketingConsent/);
+
+assert.doesNotMatch(core, /localStorage|sessionStorage/);
+assert.doesNotMatch(registration, /localStorage|sessionStorage/);
 
 console.log('unified DEMO to LIVE journey tests: OK');
