@@ -3,6 +3,7 @@ import { CapabilityValueType, TenantAccessStatus } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { SaasAccessService } from '../saas-access/saas-access.service';
 import { MasterInvitationService } from '../master-invitation/master-invitation.service';
+import { DocumentRegistryService } from '../document-registry/document-registry.service';
 
 @Injectable()
 export class SaasAdminService {
@@ -10,6 +11,7 @@ export class SaasAdminService {
     private readonly prisma: PrismaService,
     private readonly access: SaasAccessService,
     private readonly invitations: MasterInvitationService,
+    private readonly documentRegistry: DocumentRegistryService,
   ) {}
 
   async me(adminId: string, userId: string) {
@@ -19,6 +21,10 @@ export class SaasAdminService {
     });
     if (!admin || admin.userId !== userId) throw new NotFoundException('Администратор не найден');
     return { id: admin.id, user: admin.user };
+  }
+
+  documentRegistryHistory() {
+    return this.documentRegistry.history();
   }
 
   async capabilities() {
