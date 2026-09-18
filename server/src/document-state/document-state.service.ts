@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
+import { PlatformDocumentsService } from '../platform-documents/platform-documents.service';
 
 type JsonObject = Record<string, any>;
 type ConsentEventRow = {
@@ -18,15 +19,12 @@ type ConsentEventRow = {
   occurredAt: Date;
   migratedFromEventId: string;
   createdAt: Date;
+  subjectLabel: string;
 };
 
 const MUTABLE_DATASETS = new Set(['documents', 'history']);
 
-const USER_DOCUMENT_BASE_KEYS = [
-  { key: 'user-document-pdn-policy', documentId: 'pdn-agreement' },
-  { key: 'user-document-pdn-consent', documentId: 'pdn-consent' },
-  { key: 'user-document-messages-consent', documentId: 'messages-consent' },
-] as const;
+
 
 
 function objectValue(value: unknown): JsonObject {
@@ -76,21 +74,39 @@ function publicConsentEvent(row: ConsentEventRow) {
     eventAt: row.occurredAt.toISOString(),
     createdAt: row.createdAt.toISOString(),
     migratedFromEventId: row.migratedFromEventId,
+    subjectLabel: row.subjectLabel,
   };
 }
 
 @Injectable()
 export class DocumentStateService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly platformDocuments: PlatformDocumentsService,
+  ) {}
 
   private async canonicalConsentEvents(tenantId: string) {
     const rows = await this.prisma.$queryRaw<ConsentEventRow[]>`
-      SELECT "id", "subjectType", "subjectKey", "contactType", "contactValue", "documentId",
-             "documentVersion", "status", "acceptedAt", "revokedAt", "source", "occurredAt",
-             "migratedFromEventId", "createdAt"
-      FROM "ConsentEvent"
-      WHERE "tenantId" = ${tenantId}
-      ORDER BY "occurredAt" ASC, "createdAt" ASC, "id" ASC
+      SELECT e."id", e."subjectType", e."subjectKey", e."contactType", e."contactValue", e."documentId",
+             e."documentVersion", e."status", e."acceptedAt", e."revokedAt", e."source", e."occurredAt",
+             e."migratedFromEventId", e."createdAt",
+             CASE
+               WHEN e."subjectType" = 'BOOKING_ACCOUNT' THEN COALESCE(
+                 NULLIF(TRIM(CONCAT(COALESCE(a."name", ''), ' ', COALESCE(a."surname", ''))), ''),
+                 NULLIF(a."email", ''),
+                 NULLIF(a."phone", ''),
+                 e."subjectKey"
+               )
+               WHEN e."contactValue" <> '' THEN e."contactValue"
+               ELSE e."subjectKey"
+             END AS "subjectLabel"
+      FROM "ConsentEvent" e
+      LEFT JOIN "BookingAccount" a
+        ON e."subjectType" = 'BOOKING_ACCOUNT'
+       AND a."tenantId" = e."tenantId"
+       AND a."id" = e."subjectKey"
+      WHERE e."tenantId" = ${tenantId}
+      ORDER BY e."occurredAt" ASC, e."createdAt" ASC, e."id" ASC
     `;
     return rows.map(publicConsentEvent);
   }
@@ -112,44 +128,8 @@ export class DocumentStateService {
     return this.snapshot(tenantId);
   }
 
-  async userDocumentBases() {
-    const rows = await this.prisma.$queryRaw<Array<{
-      key: string;
-      title: string;
-      version: number;
-      contentSnapshot: string;
-      publishedAt: Date;
-    }>>`
-      SELECT d."key", d."title", v."version", v."contentSnapshot", v."publishedAt"
-      FROM "LegalDocument" d
-      JOIN "LegalDocumentVersion" v
-        ON v."documentId" = d."id"
-       AND v."supersededAt" IS NULL
-      WHERE d."scope" = 'PLATFORM'
-        AND d."tenantId" IS NULL
-        AND d."key" IN (
-          'user-document-pdn-policy',
-          'user-document-pdn-consent',
-          'user-document-messages-consent'
-        )
-        AND d."isActive" = true
-      ORDER BY d."key" ASC
-    `;
-    const byKey = new Map(rows.map((row) => [row.key, row]));
-    return USER_DOCUMENT_BASE_KEYS
-      .map((item) => {
-        const row = byKey.get(item.key);
-        if (!row) return null;
-        return {
-          key: item.key,
-          documentId: item.documentId,
-          title: row.title,
-          version: Number(row.version || 1),
-          text: String(row.contentSnapshot || ''),
-          publishedAt: row.publishedAt,
-        };
-      })
-      .filter(Boolean);
+  userDocumentBases() {
+    return this.platformDocuments.userDocumentBases();
   }
 
 
