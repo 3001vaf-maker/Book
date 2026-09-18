@@ -45,11 +45,16 @@ if (fs.existsSync(path.join(ROOT, 'core/workspace-sync.js'))) {
 }
 
 const core = source(path.join(ROOT, 'core.js'));
-const auxiliaryCheck = core.indexOf('if (!auxiliaryMigration.verified)');
+const legacyAuxiliaryCheck = core.indexOf('if (!auxiliaryMigration.verified)');
+const stagedAuxiliary = core.indexOf("['auxiliary', () => initializeAuxiliaryState");
+const stagedVerifiedGuard = core.indexOf('if (!result?.verified)');
+const verificationPoint = legacyAuxiliaryCheck >= 0
+  ? legacyAuxiliaryCheck
+  : (stagedAuxiliary >= 0 && stagedVerifiedGuard > stagedAuxiliary ? stagedVerifiedGuard : -1);
 const cleanupCall = core.indexOf('clearLegacyBusinessStorage();');
 const workspaceRender = core.indexOf('ensureServerBookingSync();');
 if (cleanupCall < 0) violations.push('core.js: verified server startup must purge stale legacy business storage');
-if (!(auxiliaryCheck >= 0 && cleanupCall > auxiliaryCheck && workspaceRender > cleanupCall)) {
+if (!(verificationPoint >= 0 && cleanupCall > verificationPoint && workspaceRender > cleanupCall)) {
   violations.push('core.js: stale legacy business storage may only be purged after every server domain is verified and before workspace runtime starts');
 }
 
