@@ -115,7 +115,7 @@ export async function prepareTelegramEntryAuth() {
       const entry = await createTelegramMainAppEntry(mainAppBot, initData);
       tenantId = String(entry?.tenantId || '').trim();
       entryToken = String(entry?.token || '').trim();
-      if (!tenantId || !entryToken) throw new Error('Telegram Mini App не определил аккаунт мастера');
+      if (!tenantId || !entryToken) throw new Error('Telegram Mini App не определил аккаунт пользователя');
       replaceTelegramRoute({ tenantId, entryToken, removeBot: true });
     } catch (error) {
       renderStatus(
