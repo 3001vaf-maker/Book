@@ -1,7 +1,7 @@
 import { actionBlock, button, escapeHtml, field, folderList, iconButton, initViewNavigation, list, modal, mountModal, page, pageHeader, shortDateTime, textareaField, viewNavigation } from '../../ui/ui.js';
 import { phonesMatch } from '../../core/phone/index.js';
 import { getAllClients } from '../../main/clients/data.js';
-import { createDocument, getDocuments, saveDocument } from './data.js';
+import { createDocument, getDocuments, saveCustomDocument, useBookBase } from './data.js';
 import { getConsents } from './consents.js';
 import { getDocumentHistory } from './history.js';
 
@@ -14,13 +14,15 @@ let currentSection = 'root';
 let currentHistoryView = 'documents';
 
 function statusText(item) {
-  if (!item.clientConsent) return 'Документ';
-  return item.required ? 'Обязательное согласие' : 'Необязательное согласие';
+  const source = item.sourceMode === 'BOOK' ? 'Основа Book' : 'Свой документ';
+  if (!item.clientConsent) return source;
+  return `${source} · ${item.required ? 'обязательное согласие' : 'необязательное согласие'}`;
 }
 
 function actionText(action) {
   if (action === 'created') return 'Создан';
   if (action === 'version-created') return 'Новая версия';
+  if (action === 'superseded') return 'Предыдущая версия';
   if (action === 'renamed') return 'Переименован';
   return 'Изменён';
 }
@@ -35,42 +37,92 @@ function formatMoment(value) {
   return shortDateTime(value, 'Дата не зафиксирована');
 }
 
-function legalNotice() {
-  return `<div class="modal-title"><h2>О шаблоне</h2><p>Для обработки персональных данных необходимо законное основание. Book даёт общий шаблон, но не гарантирует его соответствие именно вашей ситуации. Перед использованием рекомендуется обратиться к юристу.</p></div>`;
+function documentTextMarkup(text) {
+  return `<div style="white-space:pre-wrap;line-height:1.55;padding:14px 0">${escapeHtml(text || '')}</div>`;
 }
 
-function openDocumentEditor(item, onSaved) {
+function openOwnDocumentEditor(item, onSaved) {
   const html = `<form data-document-form>
-    <div class="modal-title"><h2>${escapeHtml(item.title)}</h2><p>${escapeHtml(statusText(item))} · версия ${escapeHtml(item.version || 1)}</p></div>
+    <div class="modal-title"><h2>${escapeHtml(item.title)}</h2><p>Свой документ · текущая версия ${escapeHtml(item.version || 1)}</p></div>
     <div class="compact-form">
       ${field({ label: 'Название', name: 'documentTitle', value: item.title, required: true })}
-      ${textareaField({ label: 'Текст документа', name: 'documentText', value: item.text || '', placeholder: 'Введите текст документа' })}
-      <div class="modal-actions">${button('Сохранить', { type: 'submit' })}${button('О шаблоне', { type: 'button', className: 'ui-button--secondary', data: 'data-document-info' })}</div>
+      ${textareaField({ label: 'Текст документа', name: 'documentText', value: item.text || '', placeholder: 'Текст документа' })}
+      <div class="modal-actions">
+        ${button('Сохранить новую версию', { type: 'submit' })}
+        ${item.baseKey ? button('Использовать основу Book', { type: 'button', className: 'ui-button--secondary', data: 'data-use-book-base' }) : ''}
+      </div>
     </div>
   </form>`;
   const m = mountModal(document.body, modal(html, { title: item.title, variant: 'large', surface: 'app' }));
   if (!m) return;
-  m.querySelector('[data-document-info]')?.addEventListener('click', () => mountModal(document.body, modal(legalNotice(), { title: 'О шаблоне', variant: 'medium', surface: 'app' })));
+
+  m.querySelector('[data-use-book-base]')?.addEventListener('click', () => {
+    useBookBase(item.id);
+    m.remove();
+    onSaved?.();
+  });
+
   m.querySelector('[data-document-form]')?.addEventListener('submit', (event) => {
     event.preventDefault();
     const title = m.querySelector('[name="documentTitle"]')?.value.trim() || '';
     if (!title) return;
-    saveDocument({ ...item, title, text: m.querySelector('[name="documentText"]')?.value.trim() || '' });
+    saveCustomDocument(item, {
+      title,
+      text: m.querySelector('[name="documentText"]')?.value.trim() || '',
+    });
     m.remove();
     onSaved?.();
   });
 }
 
+function openDocumentEditor(item, onSaved) {
+  if (item.sourceMode !== 'BOOK') {
+    openOwnDocumentEditor(item, onSaved);
+    return;
+  }
+
+  const updateAvailable = Number(item.availableBaseVersion || 0) > Number(item.baseVersion || 0);
+  const profileUpdate = Boolean(item.profileUpdateAvailable);
+  const updateLabel = updateAvailable
+    ? `Перейти на основу Book v${Number(item.availableBaseVersion)}`
+    : profileUpdate
+      ? 'Обновить данные документа'
+      : '';
+
+  const html = `
+    <div class="modal-title">
+      <h2>${escapeHtml(item.title)}</h2>
+      <p>Основа Book · документ версия ${escapeHtml(item.version || 1)} · основа v${escapeHtml(item.baseVersion || 1)}</p>
+    </div>
+    ${documentTextMarkup(item.text)}
+    <div class="modal-actions">
+      ${updateLabel ? button(updateLabel, { type: 'button', data: 'data-update-book-base' }) : ''}
+      ${button('Использовать свой документ', { type: 'button', className: 'ui-button--secondary', data: 'data-use-own-document' })}
+    </div>`;
+  const m = mountModal(document.body, modal(html, { title: item.title, variant: 'large', surface: 'app' }));
+  if (!m) return;
+
+  m.querySelector('[data-update-book-base]')?.addEventListener('click', () => {
+    useBookBase(item.id);
+    m.remove();
+    onSaved?.();
+  });
+  m.querySelector('[data-use-own-document]')?.addEventListener('click', () => {
+    m.remove();
+    openOwnDocumentEditor(item, onSaved);
+  });
+}
+
 function openCreateDocument(onCreated) {
   const html = `<form data-document-create>
-    <div class="modal-title"><h2>Новый шаблон</h2></div>
+    <div class="modal-title"><h2>Новый документ</h2></div>
     <div class="compact-form">
       ${field({ label: 'Название', name: 'documentTitle', placeholder: 'Название документа', required: true })}
-      ${textareaField({ label: 'Текст документа', name: 'documentText', placeholder: 'Текст можно добавить сейчас или позже' })}
+      ${textareaField({ label: 'Текст документа', name: 'documentText', placeholder: 'Текст документа' })}
       <div class="modal-actions">${button('Создать', { type: 'submit' })}</div>
     </div>
   </form>`;
-  const m = mountModal(document.body, modal(html, { title: 'Новый шаблон', variant: 'medium', surface: 'app' }));
+  const m = mountModal(document.body, modal(html, { title: 'Новый документ', variant: 'medium', surface: 'app' }));
   if (!m) return;
   m.querySelector('[data-document-create]')?.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -82,11 +134,23 @@ function openCreateDocument(onCreated) {
   });
 }
 
+function openHistorySnapshot(item) {
+  if (!item?.snapshot) return;
+  const snapshot = item.snapshot;
+  const html = `
+    <div class="modal-title">
+      <h2>${escapeHtml(snapshot.title || item.documentTitle)}</h2>
+      <p>Версия ${escapeHtml(item.documentVersion || 1)} · ${escapeHtml(snapshot.sourceMode === 'BOOK' ? 'Основа Book' : 'Свой документ')}</p>
+    </div>
+    ${documentTextMarkup(snapshot.text || '')}`;
+  mountModal(document.body, modal(html, { title: snapshot.title || item.documentTitle, variant: 'large', surface: 'app' }));
+}
+
 function rootMarkup() {
   return page([
     pageHeader('Документы'),
     folderList([
-      { title: 'Шаблоны', data: 'data-documents-section="templates"', aria: 'Открыть шаблоны документов' },
+      { title: 'Документы', data: 'data-documents-section="templates"', aria: 'Открыть документы' },
       { title: 'История', data: 'data-documents-section="history"', aria: 'Открыть историю документов' },
     ]),
     actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-documents-back' }))
@@ -96,17 +160,24 @@ function rootMarkup() {
 function templatesMarkup() {
   const documents = getDocuments();
   const rows = list({
-    items: documents.map((item) => ({
-      title: item.title,
-      secondary: `Версия ${item.version || 1}`,
-      interactive: true,
-      data: `data-document-id="${escapeHtml(item.id)}"`,
-      aria: `Открыть документ ${item.title}`
-    }))
+    items: documents.map((item) => {
+      const update = Number(item.availableBaseVersion || 0) > Number(item.baseVersion || 0)
+        ? ` · доступна основа Book v${Number(item.availableBaseVersion)}`
+        : item.profileUpdateAvailable
+          ? ' · данные профиля изменились'
+          : '';
+      return {
+        title: item.title,
+        secondary: `Версия ${item.version || 1} · ${item.sourceMode === 'BOOK' ? 'Основа Book' : 'Свой документ'}${update}`,
+        interactive: true,
+        data: `data-document-id="${escapeHtml(item.id)}"`,
+        aria: `Открыть документ ${item.title}`
+      };
+    })
   });
 
   return page([
-    `<div class="entity-page-header">${pageHeader('Шаблоны')}<div class="page-header-action">${iconButton('+', { className: 'icon-button--primary', data: 'data-add-document', aria: 'Добавить шаблон' })}</div></div>`,
+    `<div class="entity-page-header">${pageHeader('Документы')}<div class="page-header-action">${iconButton('+', { className: 'icon-button--primary', data: 'data-add-document', aria: 'Добавить документ' })}</div></div>`,
     rows,
     actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-documents-root' }))
   ]);
@@ -118,6 +189,9 @@ function documentHistoryMarkup() {
     items: items.map((item) => ({
       title: item.documentTitle,
       secondary: [`${actionText(item.action)} · версия ${item.documentVersion}`, formatMoment(item.createdAt)],
+      interactive: Boolean(item.snapshot),
+      data: item.snapshot ? `data-document-history-id="${escapeHtml(item.id)}"` : '',
+      aria: item.snapshot ? `Открыть версию ${item.documentVersion} документа ${item.documentTitle}` : '',
     }))
   });
 }
@@ -190,6 +264,10 @@ function bind(root, navigateBack) {
   root.querySelectorAll('[data-document-id]').forEach((row) => row.addEventListener('click', () => {
     const item = getDocuments().find((document) => document.id === row.dataset.documentId);
     if (item) openDocumentEditor(item, () => render(root, navigateBack));
+  }));
+  root.querySelectorAll('[data-document-history-id]').forEach((row) => row.addEventListener('click', () => {
+    const item = getDocumentHistory().find((historyItem) => historyItem.id === row.dataset.documentHistoryId);
+    if (item) openHistorySnapshot(item);
   }));
   if (currentSection === 'history') {
     initViewNavigation(root, {
