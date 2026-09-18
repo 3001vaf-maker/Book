@@ -212,6 +212,7 @@ for (const key of ['online_booking.access', 'documents.access', 'timetable.acces
 }
 
 await request('/business-state/bootstrap', { token, method: 'POST', body: {} });
+await request('/business-state/operational/bootstrap', { token, method: 'POST', body: {} });
 await expectStatus('/business-state/people/real-client', 403, {
   token,
   method: 'PUT',
