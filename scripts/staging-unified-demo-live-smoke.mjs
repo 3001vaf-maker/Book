@@ -95,9 +95,6 @@ const account = await request('/manual-invitations/accept', {
   method: 'POST',
   body: {
     token: registrationToken,
-    name: 'Unified',
-    surname: 'Master',
-    phone,
     email,
     password: 'UnifiedLive123!',
     saasAgreementAccepted: true,
@@ -129,6 +126,18 @@ assert.equal(me.user?.onboardingStep, 0);
 await request('/auth/onboarding-step', { token, method: 'POST', body: { step: 1 } });
 me = await request('/auth/me', { token });
 assert.equal(me.user?.onboardingStep, 1, 'DEMO guidance progress must live on the server');
+
+const profileBeforeBootstrap = await request('/profile', { token });
+assert.equal(profileBeforeBootstrap.migrated, false, 'registration must not create the master profile');
+const bootstrappedProfile = await request('/profile/bootstrap', {
+  token,
+  method: 'POST',
+  body: { timeZone: 'Europe/Moscow' },
+});
+assert.equal(bootstrappedProfile.verified, true);
+assert.equal(bootstrappedProfile.profile?.name || '', '');
+assert.deepEqual(bootstrappedProfile.profile?.phones || [], []);
+assert.deepEqual(bootstrappedProfile.workplaces || [], []);
 
 const emptyDocumentState = await request('/document-state', { token });
 if (!emptyDocumentState.migrated) {
