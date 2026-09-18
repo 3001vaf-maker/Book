@@ -111,6 +111,18 @@ assert.ok(account.accessToken);
 assert.equal(account.legal?.operationMode, 'DEMO');
 const token = account.accessToken;
 
+const adminMasters = await request('/saas-admin/masters', { token: ownerToken });
+const registeredMaster = (adminMasters || []).find((item) => item.tenantId === tenantId);
+assert.ok(registeredMaster?.master, 'registered master must be visible in Admin');
+const acceptanceByKey = new Map((registeredMaster.legalAcceptances || []).map((item) => [item.documentKey, item]));
+for (const key of ['privacy-policy', 'saas-agreement', 'dpa', 'master-pd-consent']) {
+  const event = acceptanceByKey.get(key);
+  assert.ok(event, `Admin must show acceptance for ${key}`);
+  assert.ok(Number(event.documentVersion) >= 1, `Admin acceptance must include document version for ${key}`);
+  assert.ok(event.occurredAt, `Admin acceptance must include timestamp for ${key}`);
+}
+assert.equal(acceptanceByKey.has('marketing-consent'), false, 'declined optional marketing consent must not appear as accepted');
+
 const tenantChecklist = sql(`SELECT COALESCE("checklist"::text,'{}') FROM "TenantLegalState" WHERE "tenantId"=${sqlLiteral(tenantId)};`);
 assert.equal(tenantChecklist.includes('dpaAccepted'), false, 'legacy tenant checklist must not be recreated');
 const legacyTenantDocs = Number(sql(`SELECT COUNT(*) FROM "LegalDocument" WHERE "scope"='TENANT' AND "tenantId"=${sqlLiteral(tenantId)};`) || 0);
