@@ -6,16 +6,26 @@ function clone(value) {
 }
 
 function normalize(item = {}) {
+  const subjectType = String(item.subjectType || '').trim().toUpperCase();
+  const contactTypeRaw = String(item.contactType || '').trim().toUpperCase();
+  const contactType = contactTypeRaw === 'SMS' || contactTypeRaw === 'WHATSAPP' ? 'PHONE' : contactTypeRaw;
+  const contactValue = String(item.contactValue || '').trim();
   return {
     id: String(item.id || crypto.randomUUID()),
     clientId: String(item.clientId || ''),
+    subjectType,
+    subjectKey: String(item.subjectKey || ''),
+    contactType,
+    contactValue,
     documentId: String(item.documentId || ''),
     documentVersion: Number(item.documentVersion || 1),
     status: item.status === 'revoked' ? 'revoked' : item.status === 'declined' ? 'declined' : 'accepted',
     acceptedAt: String(item.acceptedAt || ''),
     revokedAt: String(item.revokedAt || ''),
     source: String(item.source || 'manual'),
-    createdAt: String(item.createdAt || new Date().toISOString()),
+    eventAt: String(item.eventAt || item.revokedAt || item.acceptedAt || item.createdAt || ''),
+    createdAt: String(item.createdAt || item.eventAt || new Date().toISOString()),
+    migratedFromEventId: String(item.migratedFromEventId || ''),
   };
 }
 
@@ -24,7 +34,9 @@ function read() {
 }
 
 function writeItems(items) {
-  consentState = (Array.isArray(items) ? items : []).map(normalize).filter((item) => item.clientId && item.documentId);
+  consentState = (Array.isArray(items) ? items : []).map(normalize).filter((item) =>
+    item.documentId && (item.clientId || item.subjectKey || item.contactValue)
+  );
   if (typeof persistConsents === 'function') void persistConsents(clone(consentState));
   return clone(consentState);
 }
@@ -34,7 +46,9 @@ export function configureConsentPersistence(handler = null) {
 }
 
 export function hydrateConsentsFromServer(items = []) {
-  consentState = (Array.isArray(items) ? items : []).map(normalize).filter((item) => item.clientId && item.documentId);
+  consentState = (Array.isArray(items) ? items : []).map(normalize).filter((item) =>
+    item.documentId && (item.clientId || item.subjectKey || item.contactValue)
+  );
   return getConsents();
 }
 
