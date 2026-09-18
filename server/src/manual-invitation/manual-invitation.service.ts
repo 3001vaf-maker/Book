@@ -267,10 +267,6 @@ export class ManualInvitationService {
       tenantId: invitation.tenantId,
       role: result.membership.role,
     });
-
-    if (input?.dpaAccepted === true) {
-      await this.legal.updateTenantChecklist(invitation.tenantId, result.user.id, { dpaAccepted: true });
-    }
     await this.legal.audit(invitation.tenantId, result.user.id, 'MANUAL_MASTER_REGISTRATION_ACCEPTED', 'REGISTRATION', 'SUCCESS', {
       operationMode: 'DEMO',
       filingStatus: 'NOT_PREPARED',
@@ -289,38 +285,6 @@ export class ManualInvitationService {
       role: result.membership.role,
       legal: { operationMode: 'DEMO', filingStatus: 'NOT_PREPARED' },
     };
-  }
-
-  async repairProfile(userId: string, tenantId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { email: true },
-    });
-    if (!user) throw new NotFoundException('Пользователь не найден');
-
-    const profile = await this.prisma.profile.findUnique({
-      where: { tenantId_userId: { tenantId, userId } },
-      select: { migrationVerifiedAt: true },
-    });
-    if (!profile || profile.migrationVerifiedAt) {
-      return { repaired: false, verified: Boolean(profile?.migrationVerifiedAt) };
-    }
-
-    const invitation = await this.prisma.masterInvitation.findFirst({
-      where: {
-        tenantId,
-        email: user.email,
-        status: MasterInvitationStatus.ACCEPTED,
-      },
-      select: { id: true },
-    });
-    if (!invitation) return { repaired: false, verified: false };
-
-    await this.prisma.profile.update({
-      where: { tenantId_userId: { tenantId, userId } },
-      data: { migrationVerifiedAt: new Date() },
-    });
-    return { repaired: true, verified: true };
   }
 
   private async findManualInvitation(token: string) {

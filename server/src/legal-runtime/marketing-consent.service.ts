@@ -3,25 +3,25 @@ import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma.service';
 
 function text(value: unknown) { return String(value ?? '').trim(); }
+function objectValue(value: unknown): Record<string, any> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : {};
+}
 
 @Injectable()
 export class MarketingConsentService {
   constructor(private readonly prisma: PrismaService) {}
 
   private async currentDocument(tenantId: string) {
-    const rows = await this.prisma.$queryRaw<Array<{ documentId: string; versionId: string; version: number }>>`
-      SELECT d."id" AS "documentId", v."id" AS "versionId", v."version"
-      FROM "LegalDocument" d
-      JOIN "LegalDocumentVersion" v ON v."documentId" = d."id" AND v."supersededAt" IS NULL
-      WHERE d."scope" = 'TENANT'
-        AND d."tenantId" = ${tenantId}
-        AND d."key" = 'marketing-consent'
-        AND d."isActive" = true
-      LIMIT 1
-    `;
-    const current = rows[0];
-    if (!current) throw new ConflictException('Актуальная версия согласия на маркетинг не опубликована');
-    return current;
+    const state = await this.prisma.businessDocumentState.findUnique({
+      where: { tenantId },
+      select: { data: true, migrationVerifiedAt: true },
+    });
+    if (!state?.migrationVerifiedAt) throw new ConflictException('Документы мастера ещё не готовы');
+    const data = objectValue(state.data);
+    const documents = Array.isArray(data.documents) ? data.documents.map((item) => objectValue(item)) : [];
+    const current = documents.find((item) => text(item.id) === 'messages-consent');
+    if (!current) throw new ConflictException('Актуальное согласие на рекламные и маркетинговые сообщения не сформировано');
+    return { version: Math.max(1, Number(current.version || 1)) };
   }
 
   async state(tenantId: string, telegramUserIdValue: unknown) {
@@ -41,7 +41,7 @@ export class MarketingConsentService {
       WHERE "tenantId" = ${tenantId}
         AND "subjectType" = 'CONTACT_POINT'
         AND "subjectKey" = ${subjectKey}
-        AND "documentId" = 'marketing-consent'
+        AND "documentId" = 'messages-consent'
       ORDER BY "occurredAt" DESC, "createdAt" DESC, "id" DESC
       LIMIT 1
     `;
@@ -77,7 +77,7 @@ export class MarketingConsentService {
         "occurredAt", "migratedFromEventId", "createdAt"
       ) VALUES (
         ${randomUUID()}, ${tenantId}, 'CONTACT_POINT', ${subjectKey}, 'TELEGRAM', ${telegramUserId},
-        'marketing-consent', ${current.version}, ${nextStatus},
+        'messages-consent', ${current.version}, ${nextStatus},
         ${accepted ? now : null}, ${accepted ? null : now}, ${text(sourceValue) || 'client-marketing-settings'},
         ${now}, NULL, CURRENT_TIMESTAMP
       )

@@ -1,4 +1,4 @@
-import { Body, Controller, ConflictException, ForbiddenException, Get, Post, Put, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Post, Put, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { LegalRuntimeService } from './legal-runtime.service';
@@ -11,7 +11,7 @@ export class TenantLegalController {
   constructor(private readonly legal: LegalRuntimeService) {}
 
   private owner(request: AuthRequest) {
-    if (request.auth?.role !== 'OWNER') throw new ForbiddenException('Юридические настройки доступны владельцу Tenant');
+    if (request.auth?.role !== 'OWNER') throw new ForbiddenException('Настройки владельца доступны только владельцу Book');
     return request.auth;
   }
 
@@ -20,49 +20,16 @@ export class TenantLegalController {
     return this.legal.tenantReadiness(request.auth!.tenantId);
   }
 
-  @Put('checklist')
-  checklist(@Req() request: AuthRequest, @Body() body: { checklist?: unknown }) {
-    const auth = this.owner(request);
-    return this.legal.updateTenantChecklist(auth.tenantId, auth.userId, body?.checklist || {});
-  }
-
-  @Post('filing/prepared')
-  prepared(@Req() request: AuthRequest) {
-    const auth = this.owner(request);
-    return this.legal.markTenantPrepared(auth.tenantId, auth.userId);
-  }
-
-  @Post('filing/submitted')
-  submitted(@Req() request: AuthRequest, @Body() body: { submissionReference?: unknown; evidenceMetadata?: unknown }) {
-    const auth = this.owner(request);
-    return this.legal.confirmTenantSubmitted(auth.tenantId, auth.userId, body || {});
-  }
-
   @Post('live')
-  live(@Req() request: AuthRequest) {
+  live(@Req() request: AuthRequest, @Body() body: Record<string, unknown>) {
     const auth = this.owner(request);
-    return this.legal.activateTenantLive(auth.tenantId, auth.userId);
+    return this.legal.activateTenantLive(auth.tenantId, auth.userId, body || {});
   }
 
   @Post('demo')
   demo(@Req() request: AuthRequest, @Body() body: { reason?: unknown }) {
     const auth = this.owner(request);
     return this.legal.returnTenantToDemo(auth.tenantId, auth.userId, body?.reason);
-  }
-
-  @Get('documents')
-  documents(@Req() request: AuthRequest) {
-    return this.legal.listDocuments('TENANT', request.auth!.tenantId);
-  }
-
-  @Post('documents')
-  async publishDocument(@Req() request: AuthRequest, @Body() body: Record<string, unknown>) {
-    const auth = this.owner(request);
-    const state = await this.legal.tenantState(auth.tenantId);
-    if (!state || state.operationMode !== 'DEMO') {
-      throw new ConflictException('Новые версии юридических документов мастера публикуются только в DEMO');
-    }
-    return this.legal.publishDocument(auth.userId, { ...body, scope: 'TENANT', tenantId: auth.tenantId });
   }
 
   @Get('events')

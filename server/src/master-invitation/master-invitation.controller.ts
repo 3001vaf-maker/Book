@@ -37,6 +37,10 @@ export class MasterInvitationController {
     @Req() request: Request,
     @Body() body: {
       token?: unknown;
+      name?: unknown;
+      surname?: unknown;
+      phone?: unknown;
+      email?: unknown;
       password?: unknown;
       saasAgreementAccepted?: unknown;
       dpaAccepted?: unknown;

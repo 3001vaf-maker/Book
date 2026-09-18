@@ -77,16 +77,7 @@ const PLATFORM_CHECKLIST_KEYS = [
   'rknFilingConfirmed',
 ] as const;
 
-const TENANT_CHECKLIST_KEYS = [
-  'operatorIdentityConfigured',
-  'privacyPolicyPublished',
-  'clientDocumentsPrepared',
-  'dpaAccepted',
-] as const;
-
 const PLATFORM_REQUIRED_DOCUMENT_KEYS = ['privacy-policy', 'saas-agreement', 'dpa', 'master-pd-consent'] as const;
-const TENANT_REQUIRED_LIVE_DOCUMENT_KEYS = ['privacy-policy', 'client-pd-consent', 'service-offer'] as const;
-const MARKETING_DOCUMENT_KEY = 'marketing-consent';
 
 function text(value: unknown) {
   return String(value ?? '').trim();
@@ -172,23 +163,44 @@ export class LegalRuntimeService implements OnModuleInit {
       const documentId = existing[0]?.id;
       if (!documentId) continue;
 
-      const versions = await this.prisma.$queryRaw<Array<{ id: string }>>`
-        SELECT "id" FROM "LegalDocumentVersion"
-        WHERE "documentId" = ${documentId}
+      const versions = await this.prisma.$queryRaw<Array<{ id: string; version: number; contentHash: string }>>`
+        SELECT "id", "version", "contentHash" FROM "LegalDocumentVersion"
+        WHERE "documentId" = ${documentId} AND "supersededAt" IS NULL
+        ORDER BY "version" DESC
         LIMIT 1
       `;
-      if (!versions[0]) {
+      const current = versions[0];
+      const nextHash = contentHash(item.content);
+      if (!current) {
         await this.prisma.$executeRaw`
           INSERT INTO "LegalDocumentVersion" (
             "id", "documentId", "version", "contentSnapshot", "contentHash",
             "operatorIdentitySnapshot", "publishedAt", "supersededAt"
           ) VALUES (
-            ${randomUUID()}, ${documentId}, 1, ${item.content}, ${contentHash(item.content)},
+            ${randomUUID()}, ${documentId}, 1, ${item.content}, ${nextHash},
             ${json(PLATFORM_OPERATOR_IDENTITY)}::jsonb,
             CURRENT_TIMESTAMP, NULL
           )
           ON CONFLICT DO NOTHING
         `;
+      } else if (current.contentHash !== nextHash) {
+        await this.prisma.$transaction(async (tx) => {
+          await tx.$executeRaw`
+            UPDATE "LegalDocumentVersion"
+            SET "supersededAt" = CURRENT_TIMESTAMP
+            WHERE "id" = ${current.id} AND "supersededAt" IS NULL
+          `;
+          await tx.$executeRaw`
+            INSERT INTO "LegalDocumentVersion" (
+              "id", "documentId", "version", "contentSnapshot", "contentHash",
+              "operatorIdentitySnapshot", "publishedAt", "supersededAt"
+            ) VALUES (
+              ${randomUUID()}, ${documentId}, ${current.version + 1}, ${item.content}, ${nextHash},
+              ${json(PLATFORM_OPERATOR_IDENTITY)}::jsonb,
+              CURRENT_TIMESTAMP, NULL
+            )
+          `;
+        });
       }
     }
 
@@ -290,35 +302,12 @@ export class LegalRuntimeService implements OnModuleInit {
 
   async tenantReadiness(tenantId: string) {
     const state = await this.tenantState(tenantId);
-    const documents = await this.listDocuments('TENANT', tenantId);
-    const currentDocuments = documents.filter((item) => item.currentVersion);
-    const currentKeys = new Set(currentDocuments.map((item) => item.key));
-    const missingLiveDocuments = TENANT_REQUIRED_LIVE_DOCUMENT_KEYS.filter((key) => !currentKeys.has(key));
-    const storedChecklist = objectValue(state?.checklist);
-    const operatorIdentityConfigured = currentDocuments.some((item) => {
-      const identity = objectValue(item.currentVersion?.operatorIdentitySnapshot);
-      return Boolean(text(identity.name));
-    });
-    const checklist = {
-      ...storedChecklist,
-      operatorIdentityConfigured,
-      privacyPolicyPublished: currentKeys.has('privacy-policy'),
-      clientDocumentsPrepared: missingLiveDocuments.length === 0,
-    };
+    const evidence = objectValue(state?.evidenceMetadata);
     return {
-      state: state ? { ...state, checklist } : state,
-      checklistKeys: TENANT_CHECKLIST_KEYS,
-      checklistComplete: allTrue(checklist, TENANT_CHECKLIST_KEYS),
-      privacyPublished: currentKeys.has('privacy-policy'),
-      missingLiveDocuments,
-      requiredLiveDocuments: documents.filter((item) => TENANT_REQUIRED_LIVE_DOCUMENT_KEYS.includes(item.key as any)),
-      documents,
-      canBecomeLive: Boolean(
-        state
-        && state.filingStatus === 'SUBMITTED'
-        && allTrue(checklist, TENANT_CHECKLIST_KEYS)
-        && missingLiveDocuments.length === 0
-      ),
+      state,
+      liveDecision: text(evidence.liveDecision),
+      rknStatus: text(evidence.rknStatus) || (state?.filingStatus === 'SUBMITTED' ? 'SUBMITTED' : 'UNKNOWN'),
+      canBecomeLive: Boolean(state && state.operationMode === 'DEMO'),
     };
   }
 
@@ -413,85 +402,64 @@ export class LegalRuntimeService implements OnModuleInit {
     return this.platformReadiness();
   }
 
-  async updateTenantChecklist(tenantId: string, actorUserId: string, patchValue: unknown) {
-    const state = await this.requireTenantState(tenantId);
-    if (state.operationMode === 'LIVE') throw new ConflictException('Checklist LIVE Tenant нельзя менять без возврата в DEMO');
-    const merged = { ...objectValue(state.checklist), ...booleanPatch(patchValue, TENANT_CHECKLIST_KEYS) };
-    await this.prisma.$executeRaw`
-      UPDATE "TenantLegalState" SET "checklist" = ${json(merged)}::jsonb, "updatedAt" = CURRENT_TIMESTAMP
-      WHERE "tenantId" = ${tenantId}
-    `;
-    const after = await this.requireTenantState(tenantId);
-    await this.transition({ scope: 'TENANT', tenantId, actorUserId, changeType: 'TENANT_CHECKLIST_UPDATED', oldState: state, newState: after });
-    return this.tenantReadiness(tenantId);
-  }
-
-  async markTenantPrepared(tenantId: string, actorUserId: string) {
-    const readiness = await this.tenantReadiness(tenantId);
-    const before = await this.requireTenantState(tenantId);
-    if (before.operationMode !== 'DEMO') throw new ConflictException('Подготовка выполняется только в DEMO');
-    if (!allTrue(objectValue(readiness.state?.checklist), TENANT_CHECKLIST_KEYS)) {
-      throw new ConflictException('Сначала завершите юридический checklist мастера');
-    }
-    if ((readiness.missingLiveDocuments || []).length) {
-      throw new ConflictException('Сначала опубликуйте обязательные документы мастера');
-    }
-    await this.prisma.$executeRaw`
-      UPDATE "TenantLegalState"
-      SET "filingStatus" = 'PREPARED', "preparedAt" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP
-      WHERE "tenantId" = ${tenantId}
-    `;
-    const after = await this.requireTenantState(tenantId);
-    await this.transition({ scope: 'TENANT', tenantId, actorUserId, changeType: 'TENANT_FILING_PREPARED', oldState: before, newState: after });
-    return this.tenantReadiness(tenantId);
-  }
-
-  async confirmTenantSubmitted(tenantId: string, actorUserId: string, input: { submissionReference?: unknown; evidenceMetadata?: unknown }) {
+  async activateTenantLive(tenantId: string, actorUserId: string, input: Record<string, unknown> = {}) {
     await this.assertPlatformLegalReady(actorUserId);
-    await this.assertTenantActive(tenantId, actorUserId, 'TENANT_RKN_SUBMITTED');
-    const readiness = await this.tenantReadiness(tenantId);
+    await this.assertTenantActive(tenantId, actorUserId, 'TENANT_GO_LIVE');
     const before = await this.requireTenantState(tenantId);
-    if (before.operationMode !== 'DEMO') return readiness;
-    if (before.filingStatus === 'SUBMITTED') return this.activateTenantLive(tenantId, actorUserId);
-    if (!allTrue(objectValue(readiness.state?.checklist), TENANT_CHECKLIST_KEYS) || (readiness.missingLiveDocuments || []).length) {
-      throw new ConflictException('Сначала должны быть готовы документы и обязательные согласия пользователя');
+    if (before.operationMode === 'LIVE') return this.tenantReadiness(tenantId);
+
+    const source = objectValue(input);
+    const decision = text(source.decision).toUpperCase();
+    const allowedDecisions = new Set(['READY', 'GUIDED_SUBMITTED', 'CONTINUE_WITHOUT_CONFIRMATION']);
+    if (!allowedDecisions.has(decision)) {
+      throw new BadRequestException('Подтвердите выбранный путь перехода в LIVE');
     }
-    const submissionReference = text(input?.submissionReference);
-    if (!submissionReference) throw new BadRequestException('Укажите регистрационный номер / подтверждение подачи в Роскомнадзор');
-    const evidence = objectValue(input?.evidenceMetadata);
+    if (source.responsibilityAcknowledged !== true) {
+      throw new BadRequestException('Подтвердите, что решение о законности обработки данных принимаете вы');
+    }
+
+    const declaredRknStatus = text(source.rknStatus).toUpperCase();
+    const rknStatus = declaredRknStatus === 'SUBMITTED'
+      ? 'SUBMITTED'
+      : declaredRknStatus === 'NOT_SUBMITTED'
+        ? 'NOT_SUBMITTED'
+        : 'UNKNOWN';
+    const submissionReference = text(source.submissionReference);
+    const evidenceMetadata = {
+      ...objectValue(before.evidenceMetadata),
+      liveDecision: decision,
+      rknStatus,
+      responsibilityAcknowledged: true,
+      declaredAt: new Date().toISOString(),
+      source: 'book-live-assistant',
+    };
+    const filingStatus: LegalFilingStatus = rknStatus === 'SUBMITTED' ? 'SUBMITTED' : before.filingStatus;
+    const submittedAt = rknStatus === 'SUBMITTED' ? new Date() : before.submittedAt;
+    const nextSubmissionReference = submissionReference || before.submissionReference;
+
     await this.prisma.$executeRaw`
       UPDATE "TenantLegalState"
-      SET "filingStatus" = 'SUBMITTED',
-          "preparedAt" = COALESCE("preparedAt", CURRENT_TIMESTAMP),
-          "submittedAt" = CURRENT_TIMESTAMP,
-          "submissionReference" = ${submissionReference},
-          "evidenceMetadata" = ${json(evidence)}::jsonb,
+      SET "operationMode" = 'LIVE',
+          "filingStatus" = ${filingStatus},
+          "submittedAt" = ${submittedAt},
+          "submissionReference" = ${nextSubmissionReference},
+          "evidenceMetadata" = ${json(evidenceMetadata)}::jsonb,
+          "liveAt" = CURRENT_TIMESTAMP,
           "updatedAt" = CURRENT_TIMESTAMP
       WHERE "tenantId" = ${tenantId}
     `;
     const after = await this.requireTenantState(tenantId);
     await this.transition({
-      scope: 'TENANT', tenantId, actorUserId, changeType: 'TENANT_FILING_SUBMITTED', oldState: before, newState: after,
-      submissionReference, evidenceMetadata: evidence,
-      reason: 'Book records the user confirmation of filing; this is not government approval.',
+      scope: 'TENANT',
+      tenantId,
+      actorUserId,
+      changeType: 'TENANT_LIVE',
+      oldState: before,
+      newState: after,
+      reason: 'User explicitly chose to enter LIVE after Book explained the personal-data responsibility boundary.',
+      evidenceMetadata,
+      submissionReference: nextSubmissionReference,
     });
-    return this.activateTenantLive(tenantId, actorUserId);
-  }
-
-  async activateTenantLive(tenantId: string, actorUserId: string) {
-    await this.assertPlatformLegalReady(actorUserId);
-    await this.assertTenantActive(tenantId, actorUserId, 'TENANT_GO_LIVE');
-    const readiness = await this.tenantReadiness(tenantId);
-    if (!readiness.canBecomeLive) throw new ConflictException('Tenant не выполнил обязательные условия LIVE');
-    const before = readiness.state!;
-    if (before.operationMode === 'LIVE') return readiness;
-    await this.prisma.$executeRaw`
-      UPDATE "TenantLegalState"
-      SET "operationMode" = 'LIVE', "liveAt" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP
-      WHERE "tenantId" = ${tenantId}
-    `;
-    const after = await this.requireTenantState(tenantId);
-    await this.transition({ scope: 'TENANT', tenantId, actorUserId, changeType: 'TENANT_LIVE', oldState: before, newState: after });
     return this.tenantReadiness(tenantId);
   }
 
@@ -549,7 +517,6 @@ export class LegalRuntimeService implements OnModuleInit {
       await this.audit(tenantId, actorUserId, 'POLICY_DENY', 'BOOKING_PUBLICATION', 'DENIED', { capability: capability.source });
       throw new ForbiddenException('Онлайн-запись не включена в доступе Tenant');
     }
-    await this.assertPublicBookingDocuments(tenantId, actorUserId);
   }
 
   async assertPublicBooking(tenantId: string) {
@@ -700,64 +667,6 @@ export class LegalRuntimeService implements OnModuleInit {
       const current = await this.currentVersion(document.id);
       return { ...document, currentVersion: current };
     }));
-  }
-
-  async publicTenantDocuments(tenantId: string) {
-    const documents = await this.listDocuments('TENANT', tenantId);
-    return documents
-      .filter((document) => document.requiredForPublicBooking && document.currentVersion)
-      .map((document) => ({
-        id: document.id,
-        key: document.key,
-        type: document.type,
-        title: document.title,
-        version: document.currentVersion!.version,
-        content: document.currentVersion!.contentSnapshot,
-        contentHash: document.currentVersion!.contentHash,
-        operatorIdentity: document.currentVersion!.operatorIdentitySnapshot,
-        publishedAt: document.currentVersion!.publishedAt,
-      }));
-  }
-
-  async recordRegistrationFacts(userId: string, tenantId: string, input: {
-    saasAgreementAccepted?: unknown;
-    dpaAccepted?: unknown;
-    privacyAcknowledged?: unknown;
-    pdConsentAccepted?: unknown;
-    marketingConsentAccepted?: unknown;
-    source?: unknown;
-    technicalEvidence?: unknown;
-  }) {
-    const source = text(input?.source) || 'master-registration';
-    const evidence = objectValue(input?.technicalEvidence);
-    const documents = await this.listDocuments('PLATFORM', null);
-    const current = new Map(documents.filter((item) => item.currentVersion).map((item) => [item.key, item]));
-    const required = documents.filter((item) => item.requiredForRegistration && item.currentVersion);
-    const factByKey: Record<string, { accepted: boolean; action: string }> = {
-      'saas-agreement': { accepted: input?.saasAgreementAccepted === true, action: 'ACCEPTED' },
-      'privacy-policy': { accepted: input?.privacyAcknowledged === true, action: 'ACKNOWLEDGED' },
-      'master-pd-consent': { accepted: input?.pdConsentAccepted === true, action: 'CONSENTED' },
-      'marketing-consent': { accepted: input?.marketingConsentAccepted === true, action: 'CONSENTED' },
-      'dpa': { accepted: input?.dpaAccepted === true, action: 'ACCEPTED' },
-    };
-    for (const document of required) {
-      const fact = factByKey[document.key];
-      if (!fact?.accepted) throw new BadRequestException(`Не зафиксирован обязательный юридический факт: ${document.key}`);
-    }
-    for (const [key, fact] of Object.entries(factByKey)) {
-      if (!fact.accepted) continue;
-      const document = current.get(key);
-      if (!document?.currentVersion) continue;
-      await this.prisma.$executeRaw`
-        INSERT INTO "LegalAcceptanceEvent" (
-          "id", "tenantId", "userId", "documentVersionId", "action", "source", "technicalEvidence", "occurredAt"
-        ) VALUES (
-          ${randomUUID()}, ${tenantId}, ${userId}, ${document.currentVersion.id}, ${fact.action}, ${source},
-          ${json(evidence)}::jsonb, CURRENT_TIMESTAMP
-        )
-      `;
-    }
-    return { recorded: true };
   }
 
   async createDataSubjectRequest(tenantId: string, actorUserId: string, input: { subjectKey?: unknown; requestType?: unknown; details?: unknown }) {
@@ -914,32 +823,33 @@ export class LegalRuntimeService implements OnModuleInit {
     return rows[0] || null;
   }
 
-  private async assertPublicBookingDocuments(tenantId: string, actorUserId: string) {
-    const docs = await this.publicTenantDocuments(tenantId);
-    if (!docs.some((item) => item.key === 'privacy-policy')) {
-      await this.audit(tenantId, actorUserId, 'POLICY_DENY', 'PUBLIC_BOOKING_DOCUMENTS', 'DENIED', { reason: 'tenant-privacy-policy-missing' });
-      throw new ForbiddenException('Не опубликована актуальная политика Tenant для публичной записи');
-    }
-    return docs;
-  }
-
   private async hasCurrentMarketingConsent(tenantId: string, channel: string, destination: string) {
     const contact = contactPoint(channel, destination);
     if (!contact.subjectKey) return false;
-    const documents = await this.listDocuments('TENANT', tenantId);
-    const marketing = documents.find((item) => item.key === MARKETING_DOCUMENT_KEY && item.currentVersion);
-    if (!marketing?.currentVersion) return false;
+
+    const state = await this.prisma.businessDocumentState.findUnique({
+      where: { tenantId },
+      select: { data: true, migrationVerifiedAt: true },
+    });
+    if (!state?.migrationVerifiedAt) return false;
+    const data = objectValue(state.data);
+    const documents = Array.isArray(data.documents) ? data.documents.map((item) => objectValue(item)) : [];
+    const marketing = documents.find((item) => text(item.id) === 'messages-consent');
+    if (!marketing) return false;
+    const version = Math.max(1, Number(marketing.version || 1));
+
     const rows = await this.prisma.$queryRaw<Array<{ status: string; documentVersion: number }>>`
       SELECT "status", "documentVersion"
       FROM "ConsentEvent"
       WHERE "tenantId" = ${tenantId}
         AND "subjectType" = 'CONTACT_POINT'
         AND "subjectKey" = ${contact.subjectKey}
-        AND "documentId" = ${MARKETING_DOCUMENT_KEY}
+        AND "documentId" = 'messages-consent'
       ORDER BY "occurredAt" DESC, "createdAt" DESC, "id" DESC
       LIMIT 1
     `;
     const latest = rows[0];
-    return Boolean(latest && latest.status === 'accepted' && Number(latest.documentVersion) === Number(marketing.currentVersion.version));
+    return Boolean(latest && latest.status === 'accepted' && Number(latest.documentVersion) === version);
   }
+
 }
