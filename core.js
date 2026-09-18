@@ -625,17 +625,7 @@ async function renderAuthenticated(account = authenticatedAccount) {
     return;
   }
 
-  if (access.isOwnerBook !== true) {
-    try {
-      tenantRuntime = await tenantLegalRequest('/readiness');
-    } catch (error) {
-      await reportStartupFailure('legal', error);
-      renderServerStatePending();
-      return;
-    }
-  } else {
-    tenantRuntime = { state: { operationMode: 'LIVE' } };
-  }
+  tenantRuntime = { state: { operationMode: 'LIVE' } };
 
   try {
     const profileResult = await initializeProfileWorkplaces(authenticatedAccount);
