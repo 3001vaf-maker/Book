@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const core = readFileSync('core.js', 'utf8');
-const registration = readFileSync('ui/auth/registration-flow.js', 'utf8');
+const registration = readFileSync('core/registration-flow.js', 'utf8');
 const tenantController = readFileSync('server/src/legal-runtime/tenant-legal.controller.ts', 'utf8');
 const legalService = readFileSync('server/src/legal-runtime/legal-runtime.service.ts', 'utf8');
 const documentData = readFileSync('settings/documents/data.js', 'utf8');
