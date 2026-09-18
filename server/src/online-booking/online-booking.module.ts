@@ -14,7 +14,7 @@ import { BookingMarketingConsentController } from './booking-marketing-consent.c
 import { ClientCardLinkService } from './client-card-link.service';
 import { OnlineBookingController } from './online-booking.controller';
 import { OnlineBookingService } from './online-booking.service';
-import { MarketingConsentService } from '../legal-runtime/marketing-consent.service';
+import { MarketingConsentService } from '../document-state/marketing-consent.service';
 import { TelegramBookingAuthController } from './telegram-booking-auth.controller';
 import { TelegramBookingAuthService } from './telegram-booking-auth.service';
 import { TelegramWebAppAuthService } from './telegram-webapp-auth.service';
