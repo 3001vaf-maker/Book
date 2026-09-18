@@ -60,17 +60,15 @@ export async function initializeDocumentState() {
     const current = normalizeBundle(remote?.data || remote);
     const reconciled = reconcileBookDocuments(current.documents, current.history);
     if (reconciled.changed) {
-      const [documentsResponse, historyResponse] = await Promise.all([
-        apiRequest('/document-state/documents', {
-          method: 'PUT',
-          body: JSON.stringify({ value: reconciled.documents }),
-        }),
-        apiRequest('/document-state/history', {
-          method: 'PUT',
-          body: JSON.stringify({ value: reconciled.history }),
-        }),
-      ]);
+      const documentsResponse = await apiRequest('/document-state/documents', {
+        method: 'PUT',
+        body: JSON.stringify({ value: reconciled.documents }),
+      });
       await responseJson(documentsResponse, 'Не удалось обновить документы');
+      const historyResponse = await apiRequest('/document-state/history', {
+        method: 'PUT',
+        body: JSON.stringify({ value: reconciled.history }),
+      });
       await responseJson(historyResponse, 'Не удалось обновить историю документов');
       hydrate({
         data: {
