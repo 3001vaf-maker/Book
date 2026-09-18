@@ -33,6 +33,11 @@ export class SaasAdminController {
     return this.admin.capabilities();
   }
 
+  @Get('document-registry/history')
+  documentRegistryHistory() {
+    return this.admin.documentRegistryHistory();
+  }
+
   @Get('invitations')
   listInvitations(@Req() request: AdminRequest) {
     return this.invitations.listInvitations(request.platformAdminId!);
