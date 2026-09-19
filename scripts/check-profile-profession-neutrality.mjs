@@ -64,17 +64,9 @@ function isProfessionDataLiteral(line, term) {
   return normalizedLine.includes(`profession: '${term}'`)
     || normalizedLine.includes(`profession: "${term}"`);
 }
-const literalViolations = [];
-const structuralViolations = [];');
-}
 
-function isProfessionDataLiteral(line, term) {
-  const pattern = new RegExp('\\bprofession\\s*:\\s*[\\\'"]' + escapeRegex(term) + '[\\\'"]', 'iu');
-  return pattern.test(line);
-}
 const literalViolations = [];
 const structuralViolations = [];
-
 for (const path of walk(root)) {
   const lines = readFileSync(resolve(root, path), 'utf8').split('\n');
 
