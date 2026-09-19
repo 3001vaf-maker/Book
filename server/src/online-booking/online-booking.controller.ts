@@ -6,7 +6,7 @@ import { NotificationService } from '../notification/notification.service';
 import { WebPushService } from '../notification/web-push.service';
 import { AccountGuard } from './account.guard';
 import { BookingPdnConsentGuard } from './booking-pdn-consent.guard';
-import { ClientCardLinkService } from './client-card-link.service';
+import { PersonIdentityService } from './person-identity.service';
 import { OnlineBookingService } from './online-booking.service';
 
 type OwnerRequest = Request & { auth?: { platformAccountId: string; tenantId: string; role: string } };
@@ -19,7 +19,7 @@ export class OnlineBookingController {
     private readonly notifications: NotificationService,
     private readonly communications: CommunicationService,
     private readonly webPush: WebPushService,
-    private readonly clientCards: ClientCardLinkService,
+    private readonly personIdentity: PersonIdentityService,
   ) {}
 
   private async accountTelegramSettings(tenantId: string, accountId: string) {
@@ -54,9 +54,9 @@ export class OnlineBookingController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Post('owner/reconcile-legacy-client-cards')
-  reconcileLegacyClientCards(@Req() request: OwnerRequest) {
-    return this.clientCards.reconcileLegacyAccountDuplicates(request.auth!.tenantId);
+  @Post('owner/reconcile-legacy-people')
+  reconcileLegacyPeople(@Req() request: OwnerRequest) {
+    return this.personIdentity.reconcileLegacyAccountDuplicates(request.auth!.tenantId);
   }
 
   @UseGuards(JwtAuthGuard)
