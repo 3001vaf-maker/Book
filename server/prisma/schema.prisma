@@ -43,7 +43,7 @@ model Tenant {
   workspaceStates          WorkspaceState[]
   profiles                 Profile[]
   bookingPublication       BookingPublication?
-  bookingAccounts          BookingAccount[]
+  accounts                 Account[]
   bookingRequests          BookingRequest[]
   businessStateMeta        BusinessStateMeta?
   businessPeople           BusinessPerson[]
@@ -173,7 +173,7 @@ model BookingPublication {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
 
-model BookingAccount {
+model Account {
   id              String   @id @default(cuid())
   tenantId        String
   email           String
@@ -215,7 +215,7 @@ model BookingRequest {
   updatedAt        DateTime             @updatedAt
 
   tenant  Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  account BookingAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, status])
   @@index([tenantId, workplaceKey, date])
