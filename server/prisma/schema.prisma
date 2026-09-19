@@ -183,7 +183,6 @@ model BookingAccount {
   phone           String   @default("")
   telegramId      String   @default("")
   profileData     Json     @default("{}")
-  uei             String   @default("")
   discountPercent Float    @default(0)
   visits          Int      @default(0)
   totalSpent      Float    @default(0)
