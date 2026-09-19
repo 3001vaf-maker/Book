@@ -8,7 +8,7 @@ const personKey = (value) => String(value || '');
 function personRecords(key) {
   const identityKeys = new Set(getIdentityMemberKeys(key).map(personKey).filter(Boolean));
   if (!identityKeys.size) return [];
-  return getRecords().filter((record) => record?.status !== 'cancelled' && identityKeys.has(personKey(record?.client?.key)));
+  return getRecords().filter((record) => record?.status !== 'cancelled' && identityKeys.has(personKey(record?.person?.key)));
 }
 
 export function getPersonMetadata(key) {
