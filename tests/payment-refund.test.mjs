@@ -63,7 +63,7 @@ const finance = calculateFinancialPlan([{ sourceId: 'procedure-1', name: 'Стр
 const completed = recordPaymentIncome({
   source: { type: 'record', id: 'record-1' },
   workplace: 'workplace-1',
-  client: { key: 'client-1' },
+  person: { key: 'person-1' },
   finance,
   maxAmount: 5000,
   serviceAmount: 5000,
@@ -83,14 +83,14 @@ assert.equal(getPaymentRemaining(completed.id), 5000);
 
 // Refund reopens the amount due.
 const refundAt = new Date('2026-09-10T10:00:00.000Z');
-const refunded = recordRefundExpense(completed.id, { reason: 'Возврат клиенту', now: refundAt });
+const refunded = recordRefundExpense(completed.id, { reason: 'Возврат человеку', now: refundAt });
 assert.equal(refunded.status, 'refund');
 assert.equal(refunded.movementType, 'expense');
 assert.equal(refunded.expenseType, 'refund');
 assert.equal(refunded.serviceAmount, 5000);
 assert.equal(refunded.tips, 0);
 assert.equal(refunded.refundedAt, refundAt.toISOString());
-assert.equal(refunded.reason, 'Возврат клиенту');
+assert.equal(refunded.reason, 'Возврат человеку');
 assert.equal(getDDSExpenses().length, 1);
 assert.equal(getWalletDDSMovements('cash').reduce((sum, item) => sum + Number(item.total || 0), 0), 0);
 assert.equal(getRefundsForPayment(completed.id).length, 1);
@@ -240,7 +240,7 @@ const splitFinance = calculateFinancialPlan([{ sourceId: 'procedure-2', name: '�
 const split = recordPaymentIncome({
   source: { type: 'record', id: 'record-2' },
   workplace: 'workplace-1',
-  client: { key: 'client-2' },
+  person: { key: 'person-2' },
   finance: splitFinance,
   maxAmount: 6000,
   serviceAmount: 6000,
