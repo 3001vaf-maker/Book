@@ -9,8 +9,6 @@ datasource db {
 
 enum MembershipRole {
   OWNER
-  ADMIN
-  MASTER
 }
 
 enum BookingRequestStatus {
