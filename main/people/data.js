@@ -139,7 +139,7 @@ export function findPersonByAccountId(accountId) {
   return getAllPeople().find((person) => (person.accounts || []).includes(id)) || null;
 }
 
-export function getPersonCount() {
+export function getPeopleCount() {
   return getPeople().length;
 }
 
