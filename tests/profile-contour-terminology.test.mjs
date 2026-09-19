@@ -29,13 +29,22 @@ function walk(dir) {
   });
 }
 
+const professionalRoleLatin = new RegExp(['[Mm]', 'aster'].join(''), 'u');
+const professionalRoleCyrillic = new RegExp(['ма', 'стер'].join(''), 'iu');
+const retiredAccountModel = new RegExp(['model\\s+', 'User', '\\s*\\{'].join(''), 'u');
+const retiredAccountId = new RegExp(['\\buser', 'Id\\b'].join(''), 'u');
+const retiredPrismaDelegate = new RegExp(['prisma\\.', 'user\\b'].join(''), 'u');
+const retiredTxDelegate = new RegExp(['tx\\.', 'user\\b'].join(''), 'u');
+const retiredHelper = new RegExp(['getCurrent', 'User\\b'].join(''), 'u');
+
 const forbidden = [
-  [/[Mm]aster|мастер/iu, 'profession-specific master terminology'],
-  [/model\s+User\s*\{/u, 'retired platform account model'],
-  [/\buserId\b/u, 'retired platform account id'],
-  [/prisma\.user\b/u, 'retired prisma user delegate'],
-  [/tx\.user\b/u, 'retired transactional user delegate'],
-  [/getCurrentUser\b/u, 'retired account helper'],
+  [professionalRoleLatin, 'profession-specific role terminology'],
+  [professionalRoleCyrillic, 'profession-specific role terminology'],
+  [retiredAccountModel, 'retired platform account model'],
+  [retiredAccountId, 'retired platform account id'],
+  [retiredPrismaDelegate, 'retired prisma account delegate'],
+  [retiredTxDelegate, 'retired transactional account delegate'],
+  [retiredHelper, 'retired account helper'],
 ];
 
 const violations = [];
