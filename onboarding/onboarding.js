@@ -2,7 +2,7 @@ import { canUseBookCapability } from '../core/access.js';
 import { getWorkplaces } from '../settings/profile/workplaces/data.js';
 import { getProcedures } from '../settings/service/procedures/data.js';
 import { getDays } from '../core/day/index.js';
-import { getClientCount } from '../main/clients/data.js';
+import { getPeopleCount } from '../main/people/data.js';
 import { actionBlock, button, escapeHtml, modal, mountModal } from '../ui/ui.js';
 
 const COMPLETE_KEY = 'book.onboarding.complete.v2';
@@ -73,13 +73,13 @@ const allStages = [
   },
   {
     id: 'clients',
-    capability: 'clients.access',
-    load: () => import('../main/clients/clients.js'),
+    capability: 'people.access',
+    load: () => import('../main/people/people.js'),
     render(module, root) {
-      module.renderClients(root);
+      module.renderPeople(root);
       queueMicrotask(() => infoModal('Клиенты', 'Соберите свою текущую базу клиентов. Одного клиента можно создать кнопкой «+», список — загрузить через Excel. Первая задача — увидеть реальное количество клиентов, с которыми вы работаете.', 'medium'));
     },
-    ready: () => getClientCount() > 0,
+    ready: () => getPeopleCount() > 0,
   },
 ];
 
