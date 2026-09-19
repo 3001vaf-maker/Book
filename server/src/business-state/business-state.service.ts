@@ -107,6 +107,23 @@ function accountIdsFromPerson(person: JsonObject) {
   return uniqueStrings(Array.isArray(person.accounts) ? person.accounts : []);
 }
 
+function phoneDigits(value: unknown) {
+  return text(value).replace(/\D/g, '');
+}
+
+function phonesMatch(left: unknown, right: unknown) {
+  const a = phoneDigits(left);
+  const b = phoneDigits(right);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  return a.length === 11 && b.length === 11 && a.slice(1) === b.slice(1)
+    && ((a.startsWith('7') && b.startsWith('8')) || (a.startsWith('8') && b.startsWith('7')));
+}
+
+function personHasPhone(person: JsonObject, phone: unknown) {
+  return (Array.isArray(person.phones) ? person.phones : []).some((value) => phonesMatch(value, phone));
+}
+
 function bookingFinance(procedures: JsonObject[], discountValue: unknown) {
   const discountPercent = Math.max(0, Math.min(100, Number(discountValue || 0) || 0));
   const items = procedures.map((item) => {
@@ -419,6 +436,48 @@ export class BusinessStateService {
       memberPeople: memberPeople.map(({ person }) => person),
       accountIds: accountIds.length ? accountIds : [id],
     };
+  }
+
+  async accountIdsForIdentity(tenantId: string, phoneValue: unknown, ueiValue: unknown) {
+    await this.requireVerified(tenantId);
+    const phone = text(phoneValue);
+    const requestedUei = text(ueiValue);
+    if (!phone && !requestedUei) return [];
+
+    const [rows, identityRow] = await Promise.all([
+      this.prisma.businessPerson.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
+      this.prisma.businessIdentityState.findUnique({ where: { tenantId } }),
+    ]);
+    const people = rows.map((row) => ({ row, person: objectValue(row.data) }));
+    const identity = normalizeUEI(identityRow?.data || {});
+    const memberKeys = new Set<string>();
+
+    const addUeiMembers = (uei: string) => {
+      const entity = objectValue(identity.entities[uei]);
+      for (const member of Array.isArray(entity.members) ? entity.members : []) {
+        const value = text(member);
+        if (value.startsWith('person:')) memberKeys.add(value.slice(7));
+      }
+    };
+
+    if (requestedUei) addUeiMembers(requestedUei);
+
+    if (phone) {
+      for (const { row, person } of people) {
+        if (!personHasPhone(person, phone)) continue;
+        const key = text(person.key || row.key);
+        if (!key) continue;
+        memberKeys.add(key);
+        const linkedUei = text(identity.relations[`person:${key}`]);
+        if (linkedUei) addUeiMembers(linkedUei);
+      }
+    }
+
+    return uniqueStrings(
+      people
+        .filter(({ row, person }) => memberKeys.has(text(person.key || row.key)))
+        .flatMap(({ person }) => accountIdsFromPerson(person)),
+    );
   }
 
   async upsertBookingPersonFromAccount(tenantId: string, account: JsonObject) {
