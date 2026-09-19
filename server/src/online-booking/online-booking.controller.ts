@@ -245,6 +245,7 @@ export class OnlineBookingController {
       uei: account.uei,
       direction: 'inbound',
       kind: attachments.length ? 'media' : 'message',
+      purpose: 'DIRECT',
       channel: 'IN_APP',
       body: message,
       attachments,
@@ -258,6 +259,7 @@ export class OnlineBookingController {
     const accountId = request.bookingAccountAuth!.accountId;
     const created = await this.booking.createRequest(tenantId, accountId, body || {});
     await this.notifications.createForAccount(tenantId, accountId, {
+      purpose: 'SERVICE',
       type: 'booking.created',
       title: 'Запись создана',
       body: 'Новая запись добавлена в ваш клиентский аккаунт.',
