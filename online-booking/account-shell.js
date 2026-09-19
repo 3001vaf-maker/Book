@@ -7,7 +7,6 @@ import {
   getBookingRequests,
   markBookingNotificationRead,
   sendBookingChatMessage,
-  setBookingTelegramConsent,
 } from '../core/booking-account/index.js';
 import { formatPhone } from '../core/phone/index.js';
 import { disableWebPush, enableWebPush, getWebPushState } from '../core/notifications/web-push.js';
@@ -316,10 +315,10 @@ async function openChatSettings(state) {
     getBookingChatSettings(state.tenantId).catch(() => ({ telegram: { linked: false, enabled: false, username: '' } })),
   ]);
   let push = pushState;
-  let telegram = chatSettings?.telegram || { linked: false, enabled: false, username: '' };
+  const telegram = chatSettings?.telegram || { linked: false, enabled: false, username: '' };
   const render = () => settingsPanel([
     { type: 'toggle', label: 'Push', checked: Boolean(push.subscribed), data: 'data-chat-push', disabled: !push.supported || !push.enabled || push.permission === 'denied' },
-    { type: 'toggle', label: 'Telegram', checked: Boolean(telegram.enabled), data: 'data-chat-telegram', disabled: !telegram.linked },
+    { label: telegram.linked ? `Telegram: ${telegram.username || 'подключён'}` : 'Telegram не подключён' },
     { label: 'Согласия', data: 'data-chat-consents' },
   ]);
   const layer = mountModal(document.body, modal(render(), { variant: 'medium', surface: 'app', title: 'Настройки чата' }));
@@ -331,12 +330,6 @@ async function openChatSettings(state) {
   const bind = () => {
     layer?.querySelector('[data-chat-push]')?.addEventListener('click', async () => {
       push = push.subscribed ? await disableWebPush(state.tenantId) : await enableWebPush(state.tenantId);
-      redraw();
-    });
-    layer?.querySelector('[data-chat-telegram]')?.addEventListener('click', async () => {
-      if (!telegram.linked) return;
-      const next = await setBookingTelegramConsent(state.tenantId, !telegram.enabled).catch(() => null);
-      if (next?.telegram) telegram = next.telegram;
       redraw();
     });
     layer?.querySelector('[data-chat-consents]')?.addEventListener('click', () => {

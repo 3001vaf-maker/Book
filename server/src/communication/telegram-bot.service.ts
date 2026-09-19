@@ -137,7 +137,9 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     const body = text(input?.body); if (!body) throw new BadRequestException('Пустое сообщение');
     const purpose = normalizeMessagePurpose(input?.purpose); if (!purpose) throw new BadRequestException('Не указан purpose сообщения');
     const identity = await this.communications.telegramIdentity(tenantId, input || {}); if (!identity) throw new NotFoundException('Telegram у клиента не подключён');
-    if (!(await this.consentPolicy.canSendMessages(tenantId, 'TELEGRAM', identity.externalUserId))) throw new BadRequestException('Нет действующего согласия на этот Telegram Contact Point');
+    if (purpose === 'MARKETING' && !(await this.consentPolicy.canSendMarketing(tenantId, 'TELEGRAM', identity.externalUserId))) {
+      throw new BadRequestException('Нет действующего рекламного согласия для Telegram');
+    }
     try {
       const result = await this.sendMessage(tenantId, identity.externalUserId, body);
       return this.communications.recordMessage(tenantId, { phone: identity.cardPhone, uei: identity.uei, direction: 'outbound', kind: 'message', purpose, channel: 'TELEGRAM', body, externalMessageId: String(result?.message_id || ''), externalThreadId: String(result?.chat?.id || identity.externalUserId), status: 'sent' });
@@ -160,7 +162,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       for (const delivery of deliveries) {
         try {
           const allowed = await this.notifications.canSendTelegramDelivery(tenantId, delivery.notificationId);
-          if (!allowed) { await this.notifications.markTelegramFailed(tenantId, delivery.deliveryId, 'messages-consent отсутствует или отозван'); failed += 1; continue; }
+          if (!allowed) { await this.notifications.markTelegramFailed(tenantId, delivery.deliveryId, 'Отправка запрещена для purpose/канала'); failed += 1; continue; }
           await this.telegramApi(token, 'sendMessage', { chat_id: delivery.recipientKey, text: delivery.body || delivery.title });
           await this.notifications.markTelegramSent(tenantId, delivery.deliveryId); sent += 1;
         } catch (error) { await this.notifications.markTelegramFailed(tenantId, delivery.deliveryId, error instanceof Error ? error.message : String(error)); failed += 1; }

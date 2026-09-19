@@ -58,12 +58,12 @@ This relation allows a later UI action to open the relevant record without putti
 
 The internal authenticated account feed is not an outbound mailing channel.
 
-Before any outbound Push, Email, SMS or Telegram delivery governed by messaging consent, Notifications must ask `Documents` for the current permission at send time. It must not trust a cached flag in Clients, BookingAccount or a delivery record.
+Before outbound delivery, Notifications must evaluate the persisted message `purpose`. `SYSTEM`, `SERVICE` and `DIRECT` are not governed by the advertising consent. `MARKETING` must ask Documents for the current advertising permission at send time. It must not trust a cached flag in Clients, BookingAccount or a delivery record.
 
 Canonical dependency:
 
 ```text
-Notifications → Documents.canSendMessages(...)
+Notifications[MARKETING] → Documents.canSendMarketing(...)
 ```
 
 If the permission is absent or revoked, the outbound delivery is not sent.

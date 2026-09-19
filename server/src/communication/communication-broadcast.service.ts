@@ -230,7 +230,7 @@ export class CommunicationBroadcastService {
     for (const person of requested) {
       const destination = await this.channelDestination(tenantId, channel, person);
       if (!destination) { excluded.push({ personKey: person.personKey, phone: person.phone, reason: 'no-channel' }); continue; }
-      if (!(await this.documents.canSendMessages(tenantId, channel, destination))) { excluded.push({ personKey: person.personKey, phone: person.phone, reason: 'no-consent' }); continue; }
+      if (!(await this.documents.canSendMarketing(tenantId, channel, destination))) { excluded.push({ personKey: person.personKey, phone: person.phone, reason: 'no-consent' }); continue; }
       audience.push(person);
     }
     return { channel, requestedCount: requested.length, eligibleCount: audience.length, excludedCount: excluded.length, audience, excluded };

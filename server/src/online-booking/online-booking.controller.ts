@@ -2,7 +2,6 @@ import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Put, Q
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CommunicationService } from '../communication/communication.service';
-import { ConsentPolicyService } from '../document-state/consent-policy.service';
 import { NotificationService } from '../notification/notification.service';
 import { WebPushService } from '../notification/web-push.service';
 import { BookingAccountGuard } from './booking-account.guard';
@@ -19,7 +18,6 @@ export class OnlineBookingController {
     private readonly booking: OnlineBookingService,
     private readonly notifications: NotificationService,
     private readonly communications: CommunicationService,
-    private readonly consents: ConsentPolicyService,
     private readonly webPush: WebPushService,
     private readonly clientCards: ClientCardLinkService,
   ) {}
@@ -28,16 +26,10 @@ export class OnlineBookingController {
     const account = await this.booking.getAccount(tenantId, accountId);
     const identity = await this.communications.telegramIdentity(tenantId, { phone: account.phone, uei: account.uei });
     if (!identity) return { telegram: { linked: false, enabled: false, username: '' } };
-    const consent = await this.consents.contactPointConsentState(
-      tenantId,
-      'TELEGRAM',
-      identity.externalUserId,
-      'messages-consent',
-    );
     return {
       telegram: {
         linked: true,
-        enabled: Boolean(consent.allowed),
+        enabled: true,
         username: identity.display || '',
       },
     };
@@ -133,37 +125,6 @@ export class OnlineBookingController {
   @Get(':tenantId/account/chat/settings')
   chatSettings(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
     return this.accountTelegramSettings(tenantId, request.bookingAccountAuth!.accountId);
-  }
-
-  @UseGuards(BookingAccountGuard)
-  @Put(':tenantId/account/chat/telegram-consent')
-  async updateTelegramConsent(
-    @Param('tenantId') tenantId: string,
-    @Req() request: AccountRequest,
-    @Body() body: { enabled?: unknown },
-  ) {
-    const accountId = request.bookingAccountAuth!.accountId;
-    const account = await this.booking.getAccount(tenantId, accountId);
-    const identity = await this.communications.telegramIdentity(tenantId, { phone: account.phone, uei: account.uei });
-    if (!identity) throw new BadRequestException('Telegram не привязан');
-    if (body?.enabled === true) {
-      await this.consents.acceptContactPointConsent(
-        tenantId,
-        'TELEGRAM',
-        identity.externalUserId,
-        'messages-consent',
-        'client-chat-settings',
-      );
-    } else {
-      await this.consents.revokeContactPointConsent(
-        tenantId,
-        'TELEGRAM',
-        identity.externalUserId,
-        'messages-consent',
-        'client-chat-settings',
-      );
-    }
-    return this.accountTelegramSettings(tenantId, accountId);
   }
 
   @UseGuards(BookingAccountGuard)

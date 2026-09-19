@@ -101,8 +101,10 @@ assert.match(accountShell, /className: 'app-view-shell--chat'/);
 assert.match(accountShell, /getBookingRequests\(state\.tenantId\)\.catch\(\(\) => \[\]\)/);
 assert.match(accountShell, /data-client-chat-settings/);
 assert.match(accountShell, /getBookingChatSettings\(state\.tenantId\)/);
-assert.match(accountShell, /setBookingTelegramConsent\(state\.tenantId, !telegram\.enabled\)/);
-assert.match(accountShell, /label: 'Telegram'.*checked: Boolean\(telegram\.enabled\).*disabled: !telegram\.linked/s);
+assert.doesNotMatch(accountShell, /setBookingTelegramConsent/);
+assert.doesNotMatch(accountShell, /data-chat-telegram/);
+assert.match(accountShell, /Telegram: \$\{telegram\.username \|\| 'подключён'\}/);
+assert.match(accountShell, /data-chat-consents/);
 assert.doesNotMatch(accountShell, /Promise\.allSettled\(unread/);
 assert.doesNotMatch(accountShell, /markBookingNotificationRead\(state\.tenantId, item\.notificationId\)/);
 assert.match(accountShell, /markBookingNotificationRead\(state\.tenantId, message\.notificationId\)/);
@@ -176,15 +178,17 @@ assert.match(bookingSettingsUi, /BOOKING_SLOT_STEPS\.map/);
 assert.doesNotMatch(bookingSettingsUi, /Сохранить оформление/);
 assert.match(indexHtml, /settings\/online-booking\/online-booking\.css/);
 
-// Chat consent remains exact Contact Point policy.
+// Mini App owns legal consent management; Chat settings must not mutate advertising consent.
+assert.match(bookingAccountApi, /account\/consents/);
+assert.match(bookingAccountApi, /account\/consents\/\$\{encodeURIComponent\(documentId\)\}\/revoke/);
 assert.match(bookingAccountApi, /account\/chat\/settings/);
-assert.match(bookingAccountApi, /account\/chat\/telegram-consent/);
-assert.match(onlineBookingController, /contactPointConsentState\([\s\S]*?'TELEGRAM'[\s\S]*?identity\.externalUserId[\s\S]*?'messages-consent'/);
-assert.match(onlineBookingController, /acceptContactPointConsent\([\s\S]*?'TELEGRAM'[\s\S]*?identity\.externalUserId[\s\S]*?'client-chat-settings'/);
-assert.match(onlineBookingController, /revokeContactPointConsent\([\s\S]*?'TELEGRAM'[\s\S]*?identity\.externalUserId[\s\S]*?'client-chat-settings'/);
-assert.match(consentPolicy, /async canSendMessages\(tenantId: string, typeValue: unknown, value: unknown\)/);
-assert.match(telegramBot, /canSendMessages\(tenantId, 'TELEGRAM', identity\.externalUserId\)/);
-assert.doesNotMatch(telegramBot, /canSendMessages\(tenantId, personKey/);
+assert.doesNotMatch(bookingAccountApi, /account\/chat\/telegram-consent/);
+assert.doesNotMatch(bookingAccountApi, /setBookingTelegramConsent/);
+assert.doesNotMatch(onlineBookingController, /messages-consent/);
+assert.doesNotMatch(onlineBookingController, /telegram-consent/);
+assert.doesNotMatch(consentPolicy, /async canSendMessages\(/);
+assert.match(consentPolicy, /async canSendMarketing\(/);
+assert.match(telegramBot, /purpose === 'MARKETING'[\s\S]*canSendMarketing\(tenantId, 'TELEGRAM', identity\.externalUserId\)/);
 
 // Media is a real persisted message property, not a decorative paperclip.
 assert.match(bookingAccountApi, /sendBookingChatMessage\(tenantId, body, attachments = \[\]\)/);
