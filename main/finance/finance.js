@@ -39,12 +39,12 @@ function walletText(item) {
   return item?.walletName || '';
 }
 
-function clientText(item) {
-  return String(item?.client?.name || '').trim();
+function personText(item) {
+  return String(item?.person?.name || '').trim();
 }
 
 function operationDetails(item) {
-  const details = [clientText(item), item?.workplace || '', walletText(item)].filter(Boolean);
+  const details = [personText(item), item?.workplace || '', walletText(item)].filter(Boolean);
   if (Number(item?.tips || 0) > 0) details.push(`Чаевые ${formatMoney(item.tips)}`);
   return details.join(' · ');
 }
@@ -64,11 +64,11 @@ function csvCell(value) {
 }
 
 function downloadDDS(movements) {
-  const headers = ['Дата и время', 'Операция', 'Клиент', 'Рабочее место', 'Кошелёк', 'Сумма', 'Статус', 'Чаевые'];
+  const headers = ['Дата и время', 'Операция', 'Человек', 'Рабочее место', 'Кошелёк', 'Сумма', 'Статус', 'Чаевые'];
   const rows = movements.map((item) => [
     operationMoment(item),
     operationName(item).replace(' · Отменена', ''),
-    clientText(item),
+    personText(item),
     item?.workplace || '',
     walletText(item),
     operationAmount(item),
