@@ -6,7 +6,7 @@ import { PlatformAdminGuard } from './platform-admin.guard';
 import { SaasAdminService } from './saas-admin.service';
 
 type AdminRequest = Request & {
-  auth?: { userId: string; tenantId: string; role: string };
+  auth?: { platformAccountId: string; tenantId: string; role: string };
   platformAdminId?: string;
 };
 
@@ -20,7 +20,7 @@ export class SaasAdminController {
 
   @Get('me')
   me(@Req() request: AdminRequest) {
-    return this.admin.me(request.platformAdminId!, request.auth!.userId);
+    return this.admin.me(request.platformAdminId!, request.auth!.platformAccountId);
   }
 
   @Get('profiles')
