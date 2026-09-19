@@ -40,7 +40,7 @@ assert.match(bookingConsent, /acceptAccountConsents\(auth\.tenantId, auth\.accou
 assert.match(bookingPdnGuard, /requiredConsentState\(auth\.tenantId, auth\.accountId\)/);
 assert.match(bookingPdnGuard, /hasActivePdnConsent\(auth\.tenantId, auth\.accountId\)/);
 
-assert.match(migration, /configureConsentPersistence\(null\)/);
+assert.doesNotMatch(migration, /configureConsentPersistence/);
 assert.doesNotMatch(migration, /queueDocumentDataset\('consents'/);
 
 console.log('Document Archive single consent store tests: OK');
