@@ -252,7 +252,7 @@ export class NotificationService {
   ) {
     const purpose = normalizeMessagePurpose(purposeValue);
     if (!purpose) return false;
-    if (purpose !== 'DIRECT' && !(await this.documents.hasActivePdnConsent(tenantId, identity.accountId))) return false;
+    if (!(await this.documents.hasActivePdnConsent(tenantId, identity.accountId))) return false;
     if (purpose !== 'MARKETING') return true;
     if (channel === 'PUSH') return false;
     const recipient = this.recipientForChannel(identity, channel);
@@ -302,7 +302,7 @@ export class NotificationService {
     const now = new Date();
     const purpose = normalizeMessagePurpose(input.purpose);
     if (!purpose) throw new BadRequestException('Не указан purpose уведомления');
-    if (purpose !== 'DIRECT' && !(await this.documents.hasActivePdnConsent(tenantId, accountId))) {
+    if (!(await this.documents.hasActivePdnConsent(tenantId, accountId))) {
       return { notification: null, routed: [], blocked: 'PDN_CONSENT_REQUIRED' };
     }
     const type = text(input.type) || 'message';
