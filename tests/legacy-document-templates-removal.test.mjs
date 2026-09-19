@@ -8,7 +8,7 @@ import {
 } from '../settings/documents/data.js';
 
 const activeData = readFileSync(new URL('../settings/documents/data.js', import.meta.url), 'utf8');
-const migration = readFileSync(new URL('../document-migration.js', import.meta.url), 'utf8');
+const migration = readFileSync(new URL('../tenant-document-archive.js', import.meta.url), 'utf8');
 
 assert.doesNotMatch(activeData, /DEFAULT_DOCUMENTS/);
 assert.doesNotMatch(activeData, /getDefaultDocuments/);
