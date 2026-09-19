@@ -19,7 +19,7 @@ if (!uei.includes('hydrateUEIFromServer') || !uei.includes('queueUEIStore')) fai
 if (!records.includes('hydrateRecordStateFromServer') || !records.includes('queueRecordUpsert') || !records.includes('queueRecordEventUpsert')) failures.push('Record persistence gateway must use server-hydrated rows and server writes.');
 if (!online.includes('upsertBookingPersonFromAccount') || !online.includes('createOnlineBookingRecord')) failures.push('Online booking must write canonical Person/Record facts directly on the server.');
 if (!app.includes('BusinessStateModule')) failures.push('Nest application must register BusinessStateModule.');
-for (const model of ['BusinessStateMeta', 'BusinessPerson', 'BusinessIdentityState', 'BusinessRecord', 'BusinessRecordEvent']) {
+for (const model of ['BusinessStateMeta', 'Person', 'UeiState', 'BusinessRecord', 'BusinessRecordEvent']) {
   if (!schema.includes(`model ${model}`)) failures.push(`Prisma schema is missing ${model}.`);
 }
 
