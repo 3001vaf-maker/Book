@@ -45,16 +45,19 @@ If the current required consent is absent or revoked:
 
 Changing a required document version may require a new consent according to the document rule; an old-version acceptance must not silently satisfy a new required version.
 
-## 4. Messaging consent
+## 4. Marketing consent and message purpose
 
-`messages-consent` is independent from the required access consent.
+`messages-consent` is the current technical id of the advertising/marketing consent. It applies only to messages whose persisted `purpose` is `MARKETING`.
 
-If the current messaging consent is not `accepted`:
-- no SMS or other outbound client notifications are sent through channels governed by this consent;
-- revocation stops future sends immediately;
-- client access itself is not blocked solely because messaging consent is absent or revoked.
+Client-facing message purposes are independent of delivery channel:
+- `SYSTEM` — account, security and technical access/linking;
+- `SERVICE` — booking/service execution and operational notifications;
+- `DIRECT` — person-to-person chat between the business and the client;
+- `MARKETING` — advertising, promotions, free slots and broadcasts.
 
-Before every send, the messaging/notification subsystem must query the current consent projection from Documents. It must not trust cached flags in Client or BookingAccount.
+`SYSTEM`, `SERVICE` and `DIRECT` must never be blocked by `messages-consent`.
+
+Before every `MARKETING` send, the communication subsystem must query the current advertising consent for the target contact/channel. Revocation stops subsequent `MARKETING` sends for that target. Cached flags in Client or BookingAccount are not the source of truth.
 
 ## 5. Client projection
 
@@ -92,6 +95,6 @@ For scale and auditability, consent history must behave as append-only business 
 
 `Clients / People` may request Documents for projections, but it does not own consent history.
 
-`Notifications / SMS / Telegram` must request Documents for the current messaging permission before sending.
+`Notifications / SMS / Telegram` must evaluate the persisted message `purpose`. Only `MARKETING` requests the advertising consent represented by `messages-consent`; `SYSTEM`, `SERVICE` and `DIRECT` do not.
 
 One domain owner: **Documents**.
