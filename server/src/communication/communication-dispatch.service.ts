@@ -26,13 +26,13 @@ export class CommunicationDispatchService {
     const requested = text(input?.channel).toUpperCase();
     const available = await this.availableChannels(tenantId, input || {});
     if (requested) {
-      if (!available.includes(requested)) throw new NotFoundException(`Канал ${requested} у клиента недоступен`);
+      if (!available.includes(requested)) throw new NotFoundException(`Канал ${requested} у человека недоступен`);
       return requested;
     }
     const preferences = await this.history.getPreferences(tenantId, input || {});
     const preferred = preferences.preferredChannels.find((channel) => available.includes(channel));
     const selected = preferred || available[0] || '';
-    if (!selected) throw new NotFoundException('У клиента нет доступного двустороннего канала');
+    if (!selected) throw new NotFoundException('У человека нет доступного двустороннего канала');
     return selected;
   }
 
