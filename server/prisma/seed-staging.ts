@@ -24,7 +24,7 @@ async function main() {
   }
 
   const tenantId = owner.memberships[0].tenantId;
-  const marker = await prisma.businessPerson.findUnique({
+  const marker = await prisma.person.findUnique({
     where: { tenantId_key: { tenantId, key: 'staging-client-anna' } },
   });
   if (marker) {
@@ -330,7 +330,7 @@ async function main() {
     });
 
     for (const [position, person] of people.entries()) {
-      await tx.businessPerson.upsert({
+      await tx.person.upsert({
         where: { tenantId_key: { tenantId, key: person.key } },
         create: { tenantId, key: person.key, position, data: json(person) },
         update: { position, data: json(person) },
