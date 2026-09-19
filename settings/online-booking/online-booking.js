@@ -346,7 +346,7 @@ function renderTime(root, navigateBack, tenantId) {
         value: String(saved.slotStep),
         options: BOOKING_SLOT_STEPS.map((value) => ({ value: String(value), label: value === 60 ? '1 час' : `${value} минут` })),
       })}
-      <div class="muted">Шаг определяет, как часто клиенту показываются возможные начала записи. Длительность процедур при этом не меняется.</div>
+      <div class="muted">Шаг определяет, как часто человеку показываются возможные начала записи. Длительность процедур при этом не меняется.</div>
     </form>`,
   });
 
