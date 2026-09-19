@@ -4,14 +4,14 @@ import { hydrateRecordStateFromServer } from '../core/record/index.js';
 import { createUEI, detachUEI, hydrateUEIFromServer, linkUEI } from '../core/uei.js';
 import {
   findIdentityOwnerByAccountId,
-  getClients,
+  getPeople,
   getIdentityMemberKeys,
   getIdentityOwner,
-  hydrateClientsFromServer,
-} from '../main/clients/data.js';
-import { getClientMetadata } from '../main/clients/metadata.js';
+  hydratePeopleFromServer,
+} from '../main/people/data.js';
+import { getPersonMetadata } from '../main/people/metadata.js';
 
-hydrateClientsFromServer([
+hydratePeopleFromServer([
   { key: 'p1', name: 'Александр', phones: ['+79030000001'], accounts: ['a1'], discountPercent: 15, programs: [{ name: 'VIP' }] },
   { key: 'p2', name: 'Александр', phones: ['+79030000002'], accounts: ['a2'] },
   { key: 'p3', name: 'Александр', phones: ['+79030000003'], accounts: ['a3'] },
@@ -49,27 +49,27 @@ createUEI({ entityType: 'person', entityId: 'p1', value: 'A1', identifiers: ['+7
 linkUEI({ entityType: 'person', entityId: 'p2', value: '00A1', identifiers: ['+79030000002'] });
 linkUEI({ entityType: 'person', entityId: 'p3', value: '00A1', identifiers: ['+79030000003'] });
 
-assert.deepEqual(getClients().map((person) => person.key), ['p1', 'p4']);
+assert.deepEqual(getPeople().map((person) => person.key), ['p1', 'p4']);
 assert.deepEqual(getIdentityMemberKeys('p2'), ['p1', 'p2', 'p3']);
 assert.equal(getIdentityOwner('p3')?.key, 'p1');
 assert.equal(findIdentityOwnerByAccountId('a2')?.key, 'p1');
 
-const merged = getClientMetadata('p2');
+const merged = getPersonMetadata('p2');
 assert.equal(merged.recordCount, 3);
 assert.equal(merged.paidTotal, 6000);
 assert.equal(merged.lastVisit, '2026-09-03');
 
 detachUEI({ entityType: 'person', entityId: 'p3', uei: '00A1', explicit: true });
-assert.deepEqual(getClients().map((person) => person.key), ['p1', 'p3', 'p4']);
+assert.deepEqual(getPeople().map((person) => person.key), ['p1', 'p3', 'p4']);
 assert.deepEqual(getIdentityMemberKeys('p1'), ['p1', 'p2']);
 assert.equal(findIdentityOwnerByAccountId('a3')?.key, 'p3');
 
-const remaining = getClientMetadata('p1');
+const remaining = getPersonMetadata('p1');
 assert.equal(remaining.recordCount, 2);
 assert.equal(remaining.paidTotal, 3000);
 assert.equal(remaining.lastVisit, '2026-09-02');
 
-const detached = getClientMetadata('p3');
+const detached = getPersonMetadata('p3');
 assert.equal(detached.recordCount, 1);
 assert.equal(detached.paidTotal, 3000);
 assert.equal(detached.lastVisit, '2026-09-03');
