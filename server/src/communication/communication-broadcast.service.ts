@@ -263,7 +263,7 @@ export class CommunicationBroadcastService {
     for (const recipient of preview.audience) {
       try {
         const renderedBody = this.renderTemplate(body, recipient);
-        await this.dispatch.send(tenantId, { phone: recipient.phone, uei: recipient.uei, channel: preview.channel, body: renderedBody });
+        await this.dispatch.send(tenantId, { phone: recipient.phone, uei: recipient.uei, channel: preview.channel, body: renderedBody, purpose: 'MARKETING' });
         sentCount += 1;
       } catch (error) {
         failedCount += 1;
