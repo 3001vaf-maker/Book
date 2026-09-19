@@ -118,10 +118,19 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     return this.telegramApi(this.decryptToken(row), 'sendMessage', { chat_id: telegramUserId, text: body });
   }
 
-  private async sendSystemMessage(connection: TelegramBotRow, chatId: string | number, body: string) {
+  private async sendSystemMessage(
+    connection: TelegramBotRow,
+    chatId: string | number,
+    body: string,
+    replyMarkup: Record<string, any> | null = null,
+  ) {
     const purpose: MessagePurpose = 'SYSTEM';
     if (!normalizeMessagePurpose(purpose)) throw new BadRequestException('Некорректный purpose системного сообщения');
-    return this.telegramApi(this.decryptToken(connection), 'sendMessage', { chat_id: chatId, text: body });
+    return this.telegramApi(this.decryptToken(connection), 'sendMessage', {
+      chat_id: chatId,
+      text: body,
+      ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+    });
   }
 
   async sendChatMessage(tenantId: string, input: { phone?: unknown; uei?: unknown; body?: unknown; purpose?: unknown }) {
@@ -179,7 +188,12 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       const clientAppUrl = text(process.env.CLIENT_APP_URL).replace(/\/$/, '');
       if (clientAppUrl) {
         const url = new URL(clientAppUrl); url.searchParams.set('booking', connection.tenantId); url.searchParams.set('tg_entry', entry.token);
-        await this.telegramApi(this.decryptToken(connection), 'sendMessage', { chat_id: message.chat.id, text: 'Откройте Book, чтобы продолжить.', reply_markup: { inline_keyboard: [[{ text: 'Открыть Book', url: url.toString() }]] } }); // SYSTEM
+        await this.sendSystemMessage(
+          connection,
+          message.chat.id,
+          'Откройте Book, чтобы продолжить.',
+          { inline_keyboard: [[{ text: 'Открыть Book', url: url.toString() }]] },
+        );
       }
       if (!identity) return { ok: true, linked: false };
     }
