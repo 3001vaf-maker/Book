@@ -72,7 +72,7 @@ const allStages = [
     ready: () => getDays().length > 0,
   },
   {
-    id: 'clients',
+    id: 'people',
     capability: 'people.access',
     load: () => import('../main/people/people.js'),
     render(module, root) {
