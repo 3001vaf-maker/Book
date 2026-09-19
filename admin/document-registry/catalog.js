@@ -1,6 +1,5 @@
-// Company-side root catalog for Book documents.
-// This catalog is owned by Admin/Document Registry.
-// It does not contain user-side document history or any access/readiness rules.
+// PlatformDocumentArchive catalog shown in Admin / Document Registry.
+// USER_DOCUMENT_BASE_KEYS are templates only; tenant document instances and tenant history live only in TenantDocumentArchive.
 
 export const BOOK_USER_DOCUMENT_KEYS = [
   'privacy-policy',
