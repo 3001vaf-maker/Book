@@ -4,8 +4,10 @@ import { BusinessStateService } from '../business-state/business-state.service';
 import { ConsentPolicyService } from '../document-state/consent-policy.service';
 import { PrismaService } from '../prisma.service';
 import { WebPushService } from './web-push.service';
+import { normalizeMessagePurpose, type MessagePurpose } from '../communication/message-purpose';
 
 type NotificationInput = {
+  purpose: MessagePurpose;
   type?: string;
   title?: string;
   body?: string;
@@ -20,6 +22,7 @@ type NotificationRow = {
   cardPhone: string;
   uei: string;
   type: string;
+  purpose: MessagePurpose | null;
   title: string;
   body: string;
   entityType: string;
@@ -43,6 +46,7 @@ type ExternalDeliveryRow = {
   title: string;
   body: string;
   type: string;
+  purpose: MessagePurpose | null;
   entityType: string;
   entityId: string;
   cardPhone: string;
@@ -152,6 +156,7 @@ export class NotificationService {
     return {
       id: row.id,
       type: row.type,
+      purpose: row.purpose,
       title: row.title,
       body: row.body,
       entityType: row.entityType,
@@ -285,6 +290,8 @@ export class NotificationService {
     const notificationId = randomUUID();
     const inAppDeliveryId = randomUUID();
     const now = new Date();
+    const purpose = normalizeMessagePurpose(input.purpose);
+    if (!purpose) throw new BadRequestException('Не указан purpose уведомления');
     const type = text(input.type) || 'message';
     const title = text(input.title) || 'Уведомление';
     const body = text(input.body);
@@ -295,9 +302,9 @@ export class NotificationService {
     await this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`
         INSERT INTO "Notification" (
-          "id", "tenantId", "cardPhone", "uei", "type", "title", "body", "entityType", "entityId", "createdAt"
+          "id", "tenantId", "cardPhone", "uei", "type", "purpose", "title", "body", "entityType", "entityId", "createdAt"
         ) VALUES (
-          ${notificationId}, ${tenantId}, ${identity.cardPhone}, ${uei}, ${type}, ${title}, ${body}, ${entityType}, ${entityId}, ${now}
+          ${notificationId}, ${tenantId}, ${identity.cardPhone}, ${uei}, ${type}, ${purpose}, ${title}, ${body}, ${entityType}, ${entityId}, ${now}
         )
       `;
       await tx.$executeRaw`
@@ -329,7 +336,7 @@ export class NotificationService {
     const { cardPhone } = await this.accountIdentity(tenantId, accountId);
     const rows = await this.prisma.$queryRaw<NotificationRow[]>`
       SELECT
-        n."id", n."tenantId", n."cardPhone", n."uei", n."type", n."title", n."body",
+        n."id", n."tenantId", n."cardPhone", n."uei", n."type", n."purpose", n."title", n."body",
         n."entityType", n."entityId", n."createdAt",
         d."status" AS "deliveryStatus", d."createdAt" AS "deliveryCreatedAt",
         d."sentAt", d."deliveredAt", d."readAt", d."failedAt", d."error"
@@ -352,7 +359,7 @@ export class NotificationService {
     const { cardPhone } = await this.accountIdentity(tenantId, accountId);
     const rows = await this.prisma.$queryRaw<NotificationRow[]>`
       SELECT
-        n."id", n."tenantId", n."cardPhone", n."uei", n."type", n."title", n."body",
+        n."id", n."tenantId", n."cardPhone", n."uei", n."type", n."purpose", n."title", n."body",
         n."entityType", n."entityId", n."createdAt",
         d."status" AS "deliveryStatus", d."createdAt" AS "deliveryCreatedAt",
         d."sentAt", d."deliveredAt", d."readAt", d."failedAt", d."error"
@@ -395,7 +402,7 @@ export class NotificationService {
       SELECT
         d."id" AS "deliveryId", d."notificationId", d."tenantId", d."recipientKey", d."status",
         d."createdAt", d."sentAt", d."deliveredAt", d."failedAt", d."error",
-        n."title", n."body", n."type", n."entityType", n."entityId", n."cardPhone", n."uei"
+        n."title", n."body", n."type", n."purpose", n."entityType", n."entityId", n."cardPhone", n."uei"
       FROM "NotificationDelivery" d
       INNER JOIN "Notification" n
         ON n."id" = d."notificationId"
