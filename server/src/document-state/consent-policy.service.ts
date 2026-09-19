@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma.service';
 import { DocumentStateService } from './document-state.service';
 
@@ -21,30 +21,15 @@ type ConsentEventRow = {
   revokedAt: Date | null;
   source: string;
   occurredAt: Date;
-  migratedFromEventId: string;
   createdAt: Date;
-};
-
-type LegacyCommunicationIdentity = {
-  cardPhone: string;
-  uei: string;
-  externalUserId: string;
 };
 
 function text(value: unknown) {
   return String(value ?? '').trim();
 }
 
-function objectValue(value: unknown): Record<string, any> {
-  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : {};
-}
-
 function arrayValue(value: unknown): any[] {
   return Array.isArray(value) ? value : [];
-}
-
-function uniqueStrings(values: unknown[]) {
-  return [...new Set(values.map((value) => text(value)).filter(Boolean))];
 }
 
 function canonicalPhone(value: unknown) {
@@ -78,19 +63,9 @@ function contactSubjectKey(typeValue: unknown, value: unknown) {
   return type && normalized ? `${type}:${normalized}` : '';
 }
 
-function validStatus(value: unknown): ConsentStatus {
-  const status = text(value).toLowerCase();
-  if (status === 'revoked' || status === 'declined') return status;
-  return 'accepted';
-}
-
 function asDate(value: unknown, fallback: Date) {
   const parsed = new Date(text(value));
   return Number.isFinite(parsed.getTime()) ? parsed : fallback;
-}
-
-function eventMoment(event: any) {
-  return text(event?.revokedAt || event?.acceptedAt || event?.createdAt);
 }
 
 function publicEvent(row: ConsentEventRow) {
@@ -108,7 +83,6 @@ function publicEvent(row: ConsentEventRow) {
     source: row.source,
     eventAt: row.occurredAt.toISOString(),
     createdAt: row.createdAt.toISOString(),
-    migratedFromEventId: row.migratedFromEventId,
   };
 }
 
@@ -123,7 +97,7 @@ export class ConsentPolicyService {
     return this.prisma.$queryRaw<ConsentEventRow[]>`
       SELECT "id", "tenantId", "subjectType", "subjectKey", "contactType", "contactValue",
              "documentId", "documentVersion", "status", "acceptedAt", "revokedAt", "source",
-             "occurredAt", "migratedFromEventId", "createdAt"
+             "occurredAt", "createdAt"
       FROM "ConsentEvent"
       WHERE "tenantId" = ${tenantId}
       ORDER BY "occurredAt" ASC, "createdAt" ASC, "id" ASC
@@ -139,7 +113,7 @@ export class ConsentPolicyService {
     const rows = await this.prisma.$queryRaw<ConsentEventRow[]>`
       SELECT "id", "tenantId", "subjectType", "subjectKey", "contactType", "contactValue",
              "documentId", "documentVersion", "status", "acceptedAt", "revokedAt", "source",
-             "occurredAt", "migratedFromEventId", "createdAt"
+             "occurredAt", "createdAt"
       FROM "ConsentEvent"
       WHERE "tenantId" = ${tenantId}
         AND "subjectType" = ${subjectType}
@@ -164,7 +138,6 @@ export class ConsentPolicyService {
     revokedAt?: Date | null;
     source?: string;
     occurredAt: Date;
-    migratedFromEventId?: string;
     id?: string;
   }) {
     const id = input.id || randomUUID();
@@ -174,187 +147,18 @@ export class ConsentPolicyService {
       INSERT INTO "ConsentEvent" (
         "id", "tenantId", "subjectType", "subjectKey", "contactType", "contactValue",
         "documentId", "documentVersion", "status", "acceptedAt", "revokedAt", "source",
-        "occurredAt", "migratedFromEventId", "createdAt"
+        "occurredAt", "createdAt"
       ) VALUES (
         ${id}, ${input.tenantId}, ${input.subjectType}, ${input.subjectKey}, ${contactType}, ${contactValue},
         ${input.documentId}, ${input.documentVersion}, ${input.status}, ${input.acceptedAt || null},
-        ${input.revokedAt || null}, ${text(input.source)}, ${input.occurredAt}, ${text(input.migratedFromEventId)}, CURRENT_TIMESTAMP
+        ${input.revokedAt || null}, ${text(input.source)}, ${input.occurredAt}, CURRENT_TIMESTAMP
       )
       ON CONFLICT ("id") DO NOTHING
     `;
     return this.latestEvent(input.tenantId, input.subjectType, input.subjectKey, input.documentId);
   }
 
-  private migratedId(tenantId: string, legacyId: string, subjectType: ConsentSubjectType, subjectKey: string, documentId: string, status: string, moment: string) {
-    return `legacy-${createHash('sha256').update([tenantId, legacyId, subjectType, subjectKey, documentId, status, moment].join('|')).digest('hex').slice(0, 40)}`;
-  }
-
-  /**
-   * One-time conversion of historical JSON consent facts into the canonical append-only ConsentEvent store.
-   * Historical clientId is read only here as migration input. It is never a consent subject or permission key.
-   */
-  async ensureCanonicalConsentEvents(tenantId: string) {
-    const state = await this.prisma.businessDocumentState.findUnique({ where: { tenantId } });
-    if (!state?.migrationVerifiedAt || (state as any).consentMigratedAt) return;
-
-    await this.prisma.$transaction(async (tx) => {
-      const locked = await tx.$queryRaw<Array<{ data: any; migrationVerifiedAt: Date | null; consentMigratedAt: Date | null }>>`
-        SELECT "data", "migrationVerifiedAt", "consentMigratedAt"
-        FROM "BusinessDocumentState"
-        WHERE "tenantId" = ${tenantId}
-        FOR UPDATE
-      `;
-      const row = locked[0];
-      if (!row?.migrationVerifiedAt || row.consentMigratedAt) return;
-
-      const legacyEvents = arrayValue(objectValue(row.data).consents);
-      const [peopleRows, identityRow, accounts, telegramIdentities] = await Promise.all([
-        tx.businessPerson.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
-        tx.businessIdentityState.findUnique({ where: { tenantId } }),
-        tx.bookingAccount.findMany({ where: { tenantId }, select: { id: true, phone: true, email: true } }),
-        tx.$queryRaw<LegacyCommunicationIdentity[]>`
-          SELECT "cardPhone", "uei", "externalUserId"
-          FROM "CommunicationIdentity"
-          WHERE "tenantId" = ${tenantId} AND "channel" = 'TELEGRAM' AND "verifiedAt" IS NOT NULL
-        `,
-      ]);
-
-      const people = peopleRows.map((record) => ({ key: text(record.key), data: objectValue(record.data) }));
-      const peopleByKey = new Map(people.map((item) => [item.key, item.data]));
-      const identity = objectValue(identityRow?.data);
-      const relations = objectValue(identity.relations);
-      const entities = objectValue(identity.entities);
-      const accountsById = new Map(accounts.map((account) => [account.id, account]));
-      const rowsToInsert: Array<{
-        id: string; subjectType: ConsentSubjectType; subjectKey: string; contactType: string; contactValue: string;
-        documentId: string; documentVersion: number; status: ConsentStatus; acceptedAt: Date | null; revokedAt: Date | null;
-        source: string; occurredAt: Date; migratedFromEventId: string;
-      }> = [];
-
-      const addTarget = (legacy: any, legacyId: string, subjectType: ConsentSubjectType, subjectKey: string, contactType = '', contactValue = '') => {
-        const documentId = text(legacy?.documentId);
-        if (!documentId || !subjectKey) return;
-        const status = validStatus(legacy?.status);
-        const now = new Date();
-        const momentText = eventMoment(legacy) || now.toISOString();
-        const occurredAt = asDate(momentText, now);
-        const acceptedAt = status === 'accepted' ? asDate(legacy?.acceptedAt || momentText, occurredAt) : null;
-        const revokedAt = status === 'revoked' ? asDate(legacy?.revokedAt || momentText, occurredAt) : null;
-        rowsToInsert.push({
-          id: this.migratedId(tenantId, legacyId, subjectType, subjectKey, documentId, status, occurredAt.toISOString()),
-          subjectType,
-          subjectKey,
-          contactType: contactPointType(contactType),
-          contactValue: contactPointValue(contactType, contactValue),
-          documentId,
-          documentVersion: Math.max(1, Number(legacy?.documentVersion || 1)),
-          status,
-          acceptedAt,
-          revokedAt,
-          source: text(legacy?.source) || 'legacy-consent-migration',
-          occurredAt,
-          migratedFromEventId: legacyId,
-        });
-      };
-
-      for (const [index, legacy] of legacyEvents.entries()) {
-        const documentId = text(legacy?.documentId);
-        if (!documentId) continue;
-        const legacyId = text(legacy?.id) || `legacy-index-${index}`;
-        const existingSubjectType = text(legacy?.subjectType).toUpperCase() as ConsentSubjectType;
-        const existingSubjectKey = text(legacy?.subjectKey);
-        if ((existingSubjectType === 'BOOKING_ACCOUNT' || existingSubjectType === 'CONTACT_POINT') && existingSubjectKey) {
-          addTarget(legacy, legacyId, existingSubjectType, existingSubjectKey, legacy?.contactType, legacy?.contactValue);
-          continue;
-        }
-
-        const directType = contactPointType(legacy?.contactType);
-        const directValue = contactPointValue(directType, legacy?.contactValue);
-        if (directType && directValue) {
-          addTarget(legacy, legacyId, 'CONTACT_POINT', contactSubjectKey(directType, directValue), directType, directValue);
-          continue;
-        }
-
-        const historicalPersonKey = text(legacy?.clientId);
-        if (!historicalPersonKey) continue;
-        const uei = text(relations[`person:${historicalPersonKey}`]);
-        const entity = objectValue(entities[uei]);
-        const memberKeys = uei
-          ? uniqueStrings([
-              ...arrayValue(entity.members)
-                .map((member) => text(member))
-                .filter((member) => member.startsWith('person:'))
-                .map((member) => member.slice(7)),
-              ...Object.entries(relations)
-                .filter(([key, value]) => key.startsWith('person:') && text(value) === uei)
-                .map(([key]) => key.slice(7)),
-              historicalPersonKey,
-            ])
-          : [historicalPersonKey];
-        const memberPeople = memberKeys.map((key) => peopleByKey.get(key)).filter(Boolean) as Record<string, any>[];
-        const accountIds = uniqueStrings([
-          ...memberPeople.flatMap((person) => arrayValue(person.accounts)),
-          historicalPersonKey.startsWith('account-') ? historicalPersonKey.slice(8) : '',
-        ]).filter((accountId) => accountsById.has(accountId));
-
-        if (documentId !== 'messages-consent') {
-          for (const accountId of accountIds) addTarget(legacy, legacyId, 'BOOKING_ACCOUNT', accountId);
-          continue;
-        }
-
-        const phones = new Set<string>();
-        const emails = new Set<string>();
-        for (const person of memberPeople) {
-          for (const phone of arrayValue(person.phones)) {
-            const normalized = canonicalPhone(phone);
-            if (normalized) phones.add(normalized);
-          }
-          for (const email of arrayValue(person.emails)) {
-            const normalized = canonicalEmail(email);
-            if (normalized) emails.add(normalized);
-          }
-        }
-        for (const accountId of accountIds) {
-          const account = accountsById.get(accountId);
-          const phone = canonicalPhone(account?.phone);
-          const email = canonicalEmail(account?.email);
-          if (phone) phones.add(phone);
-          if (email) emails.add(email);
-        }
-        for (const phone of phones) addTarget(legacy, legacyId, 'CONTACT_POINT', contactSubjectKey('PHONE', phone), 'PHONE', phone);
-        for (const email of emails) addTarget(legacy, legacyId, 'CONTACT_POINT', contactSubjectKey('EMAIL', email), 'EMAIL', email);
-        for (const telegram of telegramIdentities) {
-          const phoneMatches = phones.has(canonicalPhone(telegram.cardPhone));
-          const ueiMatches = Boolean(uei && text(telegram.uei) === uei);
-          if (!phoneMatches && !ueiMatches) continue;
-          const telegramId = text(telegram.externalUserId);
-          if (telegramId) addTarget(legacy, legacyId, 'CONTACT_POINT', contactSubjectKey('TELEGRAM', telegramId), 'TELEGRAM', telegramId);
-        }
-      }
-
-      for (const event of rowsToInsert) {
-        await tx.$executeRaw`
-          INSERT INTO "ConsentEvent" (
-            "id", "tenantId", "subjectType", "subjectKey", "contactType", "contactValue",
-            "documentId", "documentVersion", "status", "acceptedAt", "revokedAt", "source",
-            "occurredAt", "migratedFromEventId", "createdAt"
-          ) VALUES (
-            ${event.id}, ${tenantId}, ${event.subjectType}, ${event.subjectKey}, ${event.contactType}, ${event.contactValue},
-            ${event.documentId}, ${event.documentVersion}, ${event.status}, ${event.acceptedAt}, ${event.revokedAt}, ${event.source},
-            ${event.occurredAt}, ${event.migratedFromEventId}, CURRENT_TIMESTAMP
-          )
-          ON CONFLICT ("id") DO NOTHING
-        `;
-      }
-
-      await tx.$executeRaw`
-        UPDATE "BusinessDocumentState" SET "consentMigratedAt" = CURRENT_TIMESTAMP WHERE "tenantId" = ${tenantId}
-      `;
-    });
-  }
-
   private async state(tenantId: string) {
-    await this.ensureCanonicalConsentEvents(tenantId);
     const snapshot = await this.documents.get(tenantId);
     if (!snapshot?.verified) throw new ConflictException('Документы ещё не готовы');
     const data = snapshot.data || {};
@@ -364,7 +168,6 @@ export class ConsentPolicyService {
   }
 
   async acceptAccountConsents(tenantId: string, accountIdValue: unknown, facts: unknown, source = 'online-booking-account') {
-    await this.ensureCanonicalConsentEvents(tenantId);
     const accountId = text(accountIdValue);
     if (!accountId) throw new BadRequestException('Не указан аккаунт клиента');
     const current = await this.state(tenantId);
@@ -399,7 +202,6 @@ export class ConsentPolicyService {
     documentId: string,
     source = 'manual',
   ) {
-    await this.ensureCanonicalConsentEvents(tenantId);
     const type = contactPointType(typeValue);
     const normalizedValue = contactPointValue(type, value);
     const subjectKey = contactSubjectKey(type, normalizedValue);
@@ -437,7 +239,6 @@ export class ConsentPolicyService {
     documentId: string,
     source = 'manual',
   ) {
-    await this.ensureCanonicalConsentEvents(tenantId);
     const type = contactPointType(typeValue);
     const normalizedValue = contactPointValue(type, value);
     const subjectKey = contactSubjectKey(type, normalizedValue);
@@ -467,7 +268,6 @@ export class ConsentPolicyService {
   }
 
   async contactPointConsentState(tenantId: string, typeValue: unknown, value: unknown, documentId: string) {
-    await this.ensureCanonicalConsentEvents(tenantId);
     const type = contactPointType(typeValue);
     const normalizedValue = contactPointValue(type, value);
     const subjectKey = contactSubjectKey(type, normalizedValue);
@@ -484,7 +284,6 @@ export class ConsentPolicyService {
   }
 
   async revokeAccountConsent(tenantId: string, accountIdValue: unknown, documentIdValue: unknown, source = 'manual') {
-    await this.ensureCanonicalConsentEvents(tenantId);
     const accountId = text(accountIdValue);
     const documentId = text(documentIdValue);
     if (!accountId || !documentId) throw new BadRequestException('Не указан аккаунт или документ');
@@ -509,13 +308,12 @@ export class ConsentPolicyService {
   }
 
   async accountConsentProjection(tenantId: string, accountIdValue: unknown) {
-    await this.ensureCanonicalConsentEvents(tenantId);
     const accountId = text(accountIdValue);
     const current = await this.state(tenantId);
     const rows = accountId ? await this.prisma.$queryRaw<ConsentEventRow[]>`
       SELECT "id", "tenantId", "subjectType", "subjectKey", "contactType", "contactValue",
              "documentId", "documentVersion", "status", "acceptedAt", "revokedAt", "source",
-             "occurredAt", "migratedFromEventId", "createdAt"
+             "occurredAt", "createdAt"
       FROM "ConsentEvent"
       WHERE "tenantId" = ${tenantId} AND "subjectType" = 'BOOKING_ACCOUNT' AND "subjectKey" = ${accountId}
       ORDER BY "occurredAt" DESC, "createdAt" DESC, "id" DESC
@@ -614,7 +412,6 @@ export class ConsentPolicyService {
   }
 
   async consentReport(tenantId: string) {
-    await this.ensureCanonicalConsentEvents(tenantId);
     const current = await this.state(tenantId);
     const titles = new Map(current.documents.map((document: any) => [text(document?.id), text(document?.title) || 'Документ']));
     const rows = await this.consentRows(tenantId);
