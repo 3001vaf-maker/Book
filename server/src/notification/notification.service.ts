@@ -115,7 +115,7 @@ export class NotificationService {
     const [account, identity] = await Promise.all([
       this.prisma.bookingAccount.findFirst({
         where: { id: accountId, tenantId },
-        select: { phone: true, uei: true, email: true },
+        select: { phone: true, email: true },
       }),
       this.businessState.bookingIdentityForAccount(tenantId, accountId),
     ]);
@@ -123,7 +123,7 @@ export class NotificationService {
     const cardPhone = canonicalPhone(account.phone);
     if (!cardPhone) throw new NotFoundException('У клиентской карты не определён номер телефона');
     const personKey = text(identity?.person?.key || identity?.matchedPerson?.key);
-    const uei = text(identity?.uei || account.uei);
+    const uei = text(identity?.uei);
     const telegramRows = await this.prisma.$queryRaw<Array<{ externalUserId: string }>>`
       SELECT "externalUserId"
       FROM "CommunicationIdentity"
