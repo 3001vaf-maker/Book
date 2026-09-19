@@ -12,15 +12,15 @@ const documentMigration = read('tenant-document-archive.js');
 const schema = read('server/prisma/schema.prisma');
 const dropMigration = read('server/prisma/migrations/20260919132000_drop_booking_account_consents/migration.sql');
 
-// BookingAccount consent JSON is no longer a runtime source or mirror.
+// Account consent JSON is no longer a runtime source or mirror.
 assert.doesNotMatch(bookingService, /consents:\s*arrayValue\(account\.consents\)/);
 assert.doesNotMatch(bookingService, /consents:\s*true/);
 assert.doesNotMatch(pdnGuard, /derivedConsents/);
-assert.doesNotMatch(pdnGuard, /bookingAccount\.updateMany/);
+assert.doesNotMatch(pdnGuard, /account\.updateMany/);
 assert.doesNotMatch(pdnGuard, /PrismaService/);
 assert.doesNotMatch(bookingUi, /account\.consents/);
 assert.doesNotMatch(bookingUi, /state\.account\?\.consents/);
-assert.doesNotMatch(bookingUi, /updateBookingAccount\(state\.tenantId, \{ consents \}\)/);
+assert.doesNotMatch(bookingUi, /updateAccount\(state\.tenantId, \{ consents \}\)/);
 
 // Registration still writes canonical ConsentEvent facts.
 assert.match(bookingService, /acceptAccountConsents\(tenantId, account\.id, consents, 'online-booking-registration'\)/);
@@ -36,9 +36,9 @@ assert.match(dropMigration, /ALTER TABLE "BookingAccount" DROP COLUMN "consents"
 assert.match(documentMigration, /hydrateConsentsFromServer\(normalized\.consents\)/);
 assert.match(consentCache, /export function getConsents\(\)/);
 assert.match(peopleUi, /getConsents/);
-assert.match(peopleUi, /fact\.subjectType==='BOOKING_ACCOUNT'/);
+assert.match(peopleUi, /fact\.subjectType==='ACCOUNT'/);
 assert.match(peopleUi, /fact\.subjectType!=='CONTACT_POINT'/);
 assert.doesNotMatch(peopleUi, /p\.agreements/);
 assert.doesNotMatch(peopleUi, /account\.consents/);
 
-console.log('BookingAccount consent snapshot cleanup tests: OK');
+console.log('Account consent snapshot cleanup tests: OK');
