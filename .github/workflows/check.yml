@@ -159,7 +159,7 @@ jobs:
 
           booking_payload=$(curl -fsS \
             -H 'Content-Type: application/json' \
-            -d '{"email":"push-smoke@book.local","password":"BookPush-2026!","name":"Push","phone":"+79990000999","consents":[]}' \
+            -d '{"email":"push-smoke@book.local","password":"BookPush-2026!","name":"Push","phone":"+79990000999","consents":[{"documentId":"pdn-consent","documentVersion":1,"accepted":true}]}' \
             "http://localhost:8080/api/online-booking/$tenant_id/account/register")
           booking_token=$(node -e "const p=JSON.parse(process.argv[1]); if(!p.accessToken) process.exit(1); process.stdout.write(p.accessToken)" "$booking_payload")
 
