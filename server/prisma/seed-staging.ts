@@ -291,7 +291,7 @@ async function main() {
         customProfessions: json([]),
         migrationVerifiedAt: now,
       },
-      update: { data: json({ documents, consents: [], history: [] }), migrationVerifiedAt: now },
+      update: { migrationVerifiedAt: now },
     });
 
     await tx.workplace.upsert({
