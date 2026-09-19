@@ -176,15 +176,17 @@ assert.match(bookingSettingsUi, /BOOKING_SLOT_STEPS\.map/);
 assert.doesNotMatch(bookingSettingsUi, /Сохранить оформление/);
 assert.match(indexHtml, /settings\/online-booking\/online-booking\.css/);
 
-// Chat consent remains exact Contact Point policy.
+// Mini App owns legal consent management; Chat settings must not mutate advertising consent.
+assert.match(bookingAccountApi, /account\/consents/);
+assert.match(bookingAccountApi, /account\/consents\/\$\{encodeURIComponent\(documentId\)\}\/revoke/);
 assert.match(bookingAccountApi, /account\/chat\/settings/);
-assert.match(bookingAccountApi, /account\/chat\/telegram-consent/);
-assert.match(onlineBookingController, /contactPointConsentState\([\s\S]*?'TELEGRAM'[\s\S]*?identity\.externalUserId[\s\S]*?'messages-consent'/);
-assert.match(onlineBookingController, /acceptContactPointConsent\([\s\S]*?'TELEGRAM'[\s\S]*?identity\.externalUserId[\s\S]*?'client-chat-settings'/);
-assert.match(onlineBookingController, /revokeContactPointConsent\([\s\S]*?'TELEGRAM'[\s\S]*?identity\.externalUserId[\s\S]*?'client-chat-settings'/);
-assert.match(consentPolicy, /async canSendMessages\(tenantId: string, typeValue: unknown, value: unknown\)/);
-assert.match(telegramBot, /canSendMessages\(tenantId, 'TELEGRAM', identity\.externalUserId\)/);
-assert.doesNotMatch(telegramBot, /canSendMessages\(tenantId, personKey/);
+assert.doesNotMatch(bookingAccountApi, /account\/chat\/telegram-consent/);
+assert.doesNotMatch(bookingAccountApi, /setBookingTelegramConsent/);
+assert.doesNotMatch(onlineBookingController, /messages-consent/);
+assert.doesNotMatch(onlineBookingController, /telegram-consent/);
+assert.doesNotMatch(consentPolicy, /async canSendMessages\(/);
+assert.match(consentPolicy, /async canSendMarketing\(/);
+assert.match(telegramBot, /purpose === 'MARKETING'[\s\S]*canSendMarketing\(tenantId, 'TELEGRAM', identity\.externalUserId\)/);
 
 // Media is a real persisted message property, not a decorative paperclip.
 assert.match(bookingAccountApi, /sendBookingChatMessage\(tenantId, body, attachments = \[\]\)/);
