@@ -1,6 +1,6 @@
 import { actionBlock, button, escapeHtml, field, folderList, iconButton, initViewNavigation, list, modal, mountModal, page, pageHeader, shortDateTime, textareaField, viewNavigation } from '../../ui/ui.js';
 import { phonesMatch } from '../../core/phone/index.js';
-import { getAllClients } from '../../main/clients/data.js';
+import { getAllPeople } from '../../main/people/data.js';
 import { createDocument, getDocuments, saveDocument } from './data.js';
 import { getConsents } from './consents.js';
 import { getDocumentHistory } from './history.js';
@@ -171,7 +171,7 @@ function openSignedDocument(item) {
 }
 
 function signatureHistoryMarkup() {
-  const clients = getAllClients();
+  const clients = getAllPeople();
   const items = [...getConsents()].sort((a, b) => Date.parse(b.eventAt || b.createdAt || 0) - Date.parse(a.eventAt || a.createdAt || 0));
   return list({
     items: items.map((item) => {
