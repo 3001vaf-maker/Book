@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { BusinessStateService } from '../business-state/business-state.service';
-import { ConsentPolicyService } from '../document-state/consent-policy.service';
+import { ConsentPolicyService } from '../document-archive/consent-policy.service';
 import { PrismaService } from '../prisma.service';
 import { WebPushService } from './web-push.service';
 import { normalizeMessagePurpose, type MessagePurpose } from '../communication/message-purpose';
