@@ -5,6 +5,8 @@ const schema = readFileSync(new URL('../server/prisma/schema.prisma', import.met
 const profileService = readFileSync(new URL('../server/src/profile/profile.service.ts', import.meta.url), 'utf8');
 const invitationService = readFileSync(new URL('../server/src/tenant-invitation/tenant-invitation.service.ts', import.meta.url), 'utf8');
 const workspaceService = readFileSync(new URL('../server/src/workspace/workspace.service.ts', import.meta.url), 'utf8');
+const adminService = readFileSync(new URL('../server/src/saas-admin/saas-admin.service.ts', import.meta.url), 'utf8');
+const adminController = readFileSync(new URL('../server/src/saas-admin/saas-admin.controller.ts', import.meta.url), 'utf8');
 
 function modelBlock(name) {
   const marker = `model ${name} {`;
@@ -69,6 +71,13 @@ assert.doesNotMatch(invitationService, /tx\.profile\.create/);
 // Profile bootstrap is idempotent for the current Tenant + login identity.
 assert.match(profileService, /where: \{ tenantId_userId: \{ tenantId, userId \} \}/);
 assert.match(profileService, /await this\.prisma\.profile\.create/);
+
+// Platform admin manages Tenant containers and exposes the owner's Profile separately.
+assert.match(adminController, /@Get\('tenants'\)/);
+assert.match(adminService, /async tenants\(\)/);
+assert.match(adminService, /ownerProfile: membership \? \{/);
+assert.match(invitationService, /TenantInvitationStatus/);
+assert.match(invitationService, /prisma\.tenantInvitation/);
 
 // Workspace state follows Tenant + login identity and is not the Profile itself.
 assert.match(workspaceService, /tenantId_userId/);
