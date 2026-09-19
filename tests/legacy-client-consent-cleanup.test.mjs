@@ -3,23 +3,23 @@ import { readFileSync } from 'node:fs';
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
-const clientData = read('main/clients/data.js');
-const clientUi = read('main/clients/clients.js');
+const peopleData = read('main/people/data.js');
+const peopleUi = read('main/people/people.js');
 const browserConsents = read('settings/documents/consents.js');
 const businessState = read('server/src/business-state/business-state.service.ts');
 const migration = read('tenant-document-archive.js');
 const policy = read('server/src/tenant-document-archive/consent-policy.service.ts');
 const cleanupMigration = read('server/prisma/migrations/20260919124500_remove_legacy_business_person_agreements/migration.sql');
 
-assert.doesNotMatch(clientData, /migrateLegacyConsents/);
-assert.doesNotMatch(clientData, /getLatestClientConsent/);
-assert.doesNotMatch(clientData, /agreements\s*:/);
-assert.doesNotMatch(clientData, /person\.agreements/);
-assert.doesNotMatch(clientUi, /getLatestClientConsent/);
-assert.doesNotMatch(clientUi, /p\.agreements/);
-assert.match(clientUi, /getConsents/);
-assert.match(clientUi, /BOOKING_ACCOUNT/);
-assert.match(clientUi, /CONTACT_POINT/);
+assert.doesNotMatch(peopleData, /migrateLegacyConsents/);
+assert.doesNotMatch(peopleData, /getLatestClientConsent/);
+assert.doesNotMatch(peopleData, /agreements\s*:/);
+assert.doesNotMatch(peopleData, /person\.agreements/);
+assert.doesNotMatch(peopleUi, /getLatestClientConsent/);
+assert.doesNotMatch(peopleUi, /p\.agreements/);
+assert.match(peopleUi, /getConsents/);
+assert.match(peopleUi, /BOOKING_ACCOUNT/);
+assert.match(peopleUi, /CONTACT_POINT/);
 
 assert.match(browserConsents, /hydrateConsentsFromServer/);
 assert.match(browserConsents, /subjectType/);
