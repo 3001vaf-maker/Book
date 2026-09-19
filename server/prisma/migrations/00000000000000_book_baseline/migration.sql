@@ -612,4 +612,199 @@ CREATE TABLE public."TelegramBotConnection" (
     "encryptedToken" text NOT NULL,
     "tokenIv" text NOT NULL,
     "tokenTag" text NOT NULL,
-    "webhookKey" text NOT NUL
+    "webhookKey" text NOT NULL,
+    "webhookSecretHash" text NOT NULL,
+    status text DEFAULT 'connected'::text NOT NULL,
+    "connectedAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "updatedAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
+-- Name: TelegramEntryTicket; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."TelegramEntryTicket" (
+    id text NOT NULL,
+    "tenantId" text NOT NULL,
+    "tokenHash" text NOT NULL,
+    "telegramUserId" text NOT NULL,
+    username text DEFAULT ''::text NOT NULL,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "expiresAt" timestamp(3) without time zone NOT NULL,
+    "usedAt" timestamp(3) without time zone
+);
+
+
+--
+-- Name: Tenant; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."Tenant" (
+    id text NOT NULL,
+    name text NOT NULL,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "updatedAt" timestamp(3) without time zone NOT NULL
+);
+
+
+--
+-- Name: TenantAccess; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."TenantAccess" (
+    "tenantId" text NOT NULL,
+    "planId" text,
+    status public."TenantAccessStatus" DEFAULT 'ACTIVE'::public."TenantAccessStatus" NOT NULL,
+    "isOwnerBook" boolean DEFAULT false NOT NULL,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "updatedAt" timestamp(3) without time zone NOT NULL
+);
+
+
+--
+-- Name: TenantCapabilityOverride; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."TenantCapabilityOverride" (
+    id text NOT NULL,
+    "tenantId" text NOT NULL,
+    "capabilityId" text NOT NULL,
+    enabled boolean,
+    "limit" integer,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "updatedAt" timestamp(3) without time zone NOT NULL
+);
+
+
+--
+-- Name: TenantConsentEvent; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."TenantConsentEvent" (
+    id text NOT NULL,
+    "tenantId" text NOT NULL,
+    "subjectType" text NOT NULL,
+    "subjectKey" text NOT NULL,
+    "contactType" text DEFAULT ''::text NOT NULL,
+    "contactValue" text DEFAULT ''::text NOT NULL,
+    "documentId" text NOT NULL,
+    "documentVersion" integer DEFAULT 1 NOT NULL,
+    status text NOT NULL,
+    "acceptedAt" timestamp(3) without time zone,
+    "revokedAt" timestamp(3) without time zone,
+    source text DEFAULT ''::text NOT NULL,
+    "occurredAt" timestamp(3) without time zone NOT NULL,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT "TenantConsentEvent_status_check" CHECK ((status = ANY (ARRAY['accepted'::text, 'revoked'::text, 'declined'::text]))),
+    CONSTRAINT "TenantConsentEvent_subjectType_check" CHECK (("subjectType" = ANY (ARRAY['BOOKING_ACCOUNT'::text, 'CONTACT_POINT'::text])))
+);
+
+
+--
+-- Name: TenantDocumentArchive; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."TenantDocumentArchive" (
+    id text NOT NULL,
+    "tenantId" text NOT NULL,
+    data jsonb NOT NULL,
+    "migrationVerifiedAt" timestamp(3) without time zone,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "updatedAt" timestamp(3) without time zone NOT NULL
+);
+
+
+--
+-- Name: User; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."User" (
+    id text NOT NULL,
+    email text NOT NULL,
+    "passwordHash" text NOT NULL,
+    "onboardingStep" integer DEFAULT 0 NOT NULL,
+    "workspaceUnlocked" boolean DEFAULT false NOT NULL,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "updatedAt" timestamp(3) without time zone NOT NULL
+);
+
+
+--
+-- Name: WebPushSubscription; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."WebPushSubscription" (
+    id text NOT NULL,
+    "tenantId" text NOT NULL,
+    "accountId" text NOT NULL,
+    endpoint text NOT NULL,
+    p256dh text NOT NULL,
+    auth text NOT NULL,
+    "userAgent" text DEFAULT ''::text NOT NULL,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "updatedAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
+-- Name: Workplace; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."Workplace" (
+    id text NOT NULL,
+    "tenantId" text NOT NULL,
+    "profileId" text NOT NULL,
+    key text NOT NULL,
+    "position" integer DEFAULT 0 NOT NULL,
+    photo text DEFAULT ''::text NOT NULL,
+    name text DEFAULT ''::text NOT NULL,
+    color text DEFAULT ''::text NOT NULL,
+    city text DEFAULT ''::text NOT NULL,
+    address text DEFAULT ''::text NOT NULL,
+    phone text DEFAULT ''::text NOT NULL,
+    currency text DEFAULT 'RUB'::text NOT NULL,
+    "from" text DEFAULT '09:00'::text NOT NULL,
+    "to" text DEFAULT '18:00'::text NOT NULL,
+    links jsonb NOT NULL,
+    about text DEFAULT ''::text NOT NULL,
+    "sourceCreatedAt" text DEFAULT ''::text NOT NULL,
+    "sourceUpdatedAt" text DEFAULT ''::text NOT NULL,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "updatedAt" timestamp(3) without time zone NOT NULL
+);
+
+
+--
+-- Name: WorkspaceState; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."WorkspaceState" (
+    id text NOT NULL,
+    "tenantId" text NOT NULL,
+    "userId" text NOT NULL,
+    data jsonb NOT NULL,
+    revision integer DEFAULT 1 NOT NULL,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "updatedAt" timestamp(3) without time zone NOT NULL
+);
+
+
+--
+-- Name: BookingAccount BookingAccount_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."BookingAccount"
+    ADD CONSTRAINT "BookingAccount_pkey" PRIMARY KEY (id);
+
+
+--
+-- Name: BookingPublication BookingPublication_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."BookingPublication"
+    ADD CONSTRAINT "BookingPublication_pkey" PRIMARY KEY (id);
+
+
+--
+-- Name: BookingRequest BookingRequest_
