@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma.service';
-import { DocumentArchiveService } from './document-archive.service';
+import { TenantDocumentArchiveService } from './tenant-document-archive.service';
 
 type ConsentSubjectType = 'BOOKING_ACCOUNT' | 'CONTACT_POINT';
 type ConsentStatus = 'accepted' | 'revoked' | 'declined';
@@ -89,7 +89,7 @@ function publicEvent(row: TenantConsentEventRow) {
 @Injectable()
 export class ConsentPolicyService {
   constructor(
-    private readonly documents: DocumentArchiveService,
+    private readonly documents: TenantDocumentArchiveService,
     private readonly prisma: PrismaService,
   ) {}
 

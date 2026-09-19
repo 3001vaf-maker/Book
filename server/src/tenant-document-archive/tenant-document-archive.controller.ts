@@ -2,15 +2,15 @@ import { Body, Controller, Get, Param, Post, Put, Req, UseGuards } from '@nestjs
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ConsentPolicyService } from './consent-policy.service';
-import { DocumentArchiveService } from './document-archive.service';
+import { TenantDocumentArchiveService } from './tenant-document-archive.service';
 
 type AuthenticatedRequest = Request & { auth?: { userId: string; tenantId: string; role: string } };
 
-@Controller('document-archive')
+@Controller('tenant-document-archive')
 @UseGuards(JwtAuthGuard)
-export class DocumentArchiveController {
+export class TenantDocumentArchiveController {
   constructor(
-    private readonly documents: DocumentArchiveService,
+    private readonly documents: TenantDocumentArchiveService,
     private readonly consentPolicy: ConsentPolicyService,
   ) {}
 

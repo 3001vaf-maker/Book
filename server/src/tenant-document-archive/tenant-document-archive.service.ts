@@ -70,7 +70,7 @@ function publicConsentEvent(row: TenantConsentEventRow) {
 }
 
 @Injectable()
-export class DocumentArchiveService {
+export class TenantDocumentArchiveService {
   constructor(private readonly prisma: PrismaService) {}
 
   private async canonicalConsentEvents(tenantId: string) {

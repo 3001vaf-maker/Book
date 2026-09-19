@@ -1,0 +1,14 @@
+import { Module } from '@nestjs/common';
+import { AuthModule } from '../auth/auth.module';
+import { PrismaService } from '../prisma.service';
+import { ConsentPolicyService } from './consent-policy.service';
+import { TenantDocumentArchiveController } from './tenant-document-archive.controller';
+import { TenantDocumentArchiveService } from './tenant-document-archive.service';
+
+@Module({
+  imports: [AuthModule],
+  controllers: [TenantDocumentArchiveController],
+  providers: [PrismaService, TenantDocumentArchiveService, ConsentPolicyService],
+  exports: [TenantDocumentArchiveService, ConsentPolicyService],
+})
+export class TenantDocumentArchiveModule {}
