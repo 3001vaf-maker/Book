@@ -273,7 +273,7 @@ export class ProfileService {
     const existing = await this.prisma.profile.findUnique({ where: { tenantId_platformAccountId: { tenantId, platformAccountId } } });
     if (!existing) {
       const account = await this.prisma.platformAccount.findUnique({ where: { id: platformAccountId }, select: { email: true } });
-      const empty = normalizeProfile({ emails: account?.email ? [user.email] : [] });
+      const empty = normalizeProfile({ emails: account?.email ? [account.email] : [] });
       await this.prisma.profile.create({
         data: {
           tenantId,
