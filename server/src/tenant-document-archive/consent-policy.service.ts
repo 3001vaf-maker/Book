@@ -321,7 +321,7 @@ export class ConsentPolicyService {
       ORDER BY "occurredAt" DESC, "createdAt" DESC, "id" DESC
     ` : [];
     return current.documents
-      .filter((document: any) => Boolean(document?.clientConsent))
+      .filter((document: any) => Boolean(document?.personConsent))
       .map((document: any) => {
         const documentId = text(document?.id);
         const documentVersion = Math.max(1, Number(document?.version || 1));
