@@ -132,7 +132,7 @@ export class CommunicationService {
 
   async bindTelegramEntry(tenantId: string, accountId: string, entryToken: unknown) {
     const ticket = await this.telegramEntry(tenantId, entryToken);
-    const account = await this.prisma.bookingAccount.findFirst({ where: { id: accountId, tenantId }, select: { phone: true } });
+    const account = await this.prisma.account.findFirst({ where: { id: accountId, tenantId }, select: { phone: true } });
     if (!account) throw new NotFoundException('Клиентский аккаунт не найден');
     const cardPhone = canonicalPhone(account.phone);
     if (!cardPhone) throw new BadRequestException('У клиента не определён телефон');
