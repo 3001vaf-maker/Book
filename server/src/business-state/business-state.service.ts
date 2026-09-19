@@ -59,7 +59,7 @@ function normalizeUEI(value: unknown) {
 function normalizeBundle(value: unknown): BusinessBundle {
   const source = objectValue(value);
   return {
-    people: normalizeRows(source.people, 'key', 'Клиенты'),
+    people: normalizeRows(source.people, 'key', 'Люди'),
     uei: normalizeUEI(source.uei),
     records: normalizeRows(source.records, 'id', 'Записи'),
     recordEvents: normalizeRows(source.recordEvents, 'id', 'История записей'),
@@ -179,8 +179,8 @@ export class BusinessStateService {
   private async bundle(tenantId: string) {
     const [meta, people, identity, records, recordEvents] = await Promise.all([
       this.prisma.businessStateMeta.findUnique({ where: { tenantId } }),
-      this.prisma.businessPerson.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
-      this.prisma.businessIdentityState.findUnique({ where: { tenantId } }),
+      this.prisma.person.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
+      this.prisma.ueiState.findUnique({ where: { tenantId } }),
       this.prisma.businessRecord.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
       this.prisma.businessRecordEvent.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
     ]);
@@ -202,7 +202,7 @@ export class BusinessStateService {
 
   private async requireVerified(tenantId: string) {
     const meta = await this.prisma.businessStateMeta.findUnique({ where: { tenantId } });
-    if (!meta?.migrationVerifiedAt) throw new ConflictException('Перенос Клиентов, UEI и Записей ещё не подтверждён');
+    if (!meta?.migrationVerifiedAt) throw new ConflictException('Перенос People, UEI и Записей ещё не подтверждён');
   }
 
   async migrate(tenantId: string, body: unknown) {
@@ -212,9 +212,9 @@ export class BusinessStateService {
 
     await this.prisma.$transaction(async (tx) => {
       await tx.businessStateMeta.create({ data: { tenantId } });
-      await tx.businessIdentityState.create({ data: { tenantId, data: json(expected.uei) } });
+      await tx.ueiState.create({ data: { tenantId, data: json(expected.uei) } });
       for (const [position, person] of expected.people.entries()) {
-        await tx.businessPerson.create({ data: { tenantId, key: text(person.key), position, data: json(person) } });
+        await tx.person.create({ data: { tenantId, key: text(person.key), position, data: json(person) } });
       }
       for (const [position, record] of expected.records.entries()) {
         await tx.businessRecord.create({ data: { tenantId, recordId: text(record.id), position, data: json(record) } });
@@ -232,10 +232,10 @@ export class BusinessStateService {
   async verifyMigration(tenantId: string, body: unknown) {
     const expected = normalizeBundle(body);
     const current = await this.bundle(tenantId);
-    if (!current.migrated) throw new ConflictException('Клиенты, UEI и Записи ещё не перенесены');
+    if (!current.migrated) throw new ConflictException('People, UEI и Записи ещё не перенесены');
     const actual = normalizeBundle(current);
     if (canonical(actual) !== canonical(expected)) {
-      throw new ConflictException('Проверка переноса Клиентов, UEI и Записей не пройдена');
+      throw new ConflictException('Проверка переноса People, UEI и Записей не пройдена');
     }
     await this.prisma.businessStateMeta.update({ where: { tenantId }, data: { migrationVerifiedAt: new Date() } });
     return this.bundle(tenantId);
@@ -246,7 +246,7 @@ export class BusinessStateService {
     if (!existing) {
       await this.prisma.$transaction(async (tx) => {
         await tx.businessStateMeta.create({ data: { tenantId, migrationVerifiedAt: new Date() } });
-        await tx.businessIdentityState.create({ data: { tenantId, data: json(normalizeUEI({})) } });
+        await tx.ueiState.create({ data: { tenantId, data: json(normalizeUEI({})) } });
       });
     }
     return this.bundle(tenantId);
@@ -257,9 +257,9 @@ export class BusinessStateService {
     const source = objectValue(body);
     const person = clone(objectValue(source.person ?? source));
     const normalizedKey = text(key);
-    if (!normalizedKey) throw new BadRequestException('У клиента отсутствует key');
+    if (!normalizedKey) throw new BadRequestException('У Person отсутствует key');
     person.key = normalizedKey;
-    await this.prisma.businessPerson.upsert({
+    await this.prisma.person.upsert({
       where: { tenantId_key: { tenantId, key: normalizedKey } },
       create: { tenantId, key: normalizedKey, position: positionValue(source.position), data: json(person) },
       update: { position: positionValue(source.position), data: json(person) },
@@ -270,7 +270,7 @@ export class BusinessStateService {
   async deletePerson(tenantId: string, key: string) {
     await this.requireVerified(tenantId);
     const normalizedKey = text(key);
-    const result = await this.prisma.businessPerson.deleteMany({ where: { tenantId, key: normalizedKey } });
+    const result = await this.prisma.person.deleteMany({ where: { tenantId, key: normalizedKey } });
     return { deleted: result.count };
   }
 
@@ -278,7 +278,7 @@ export class BusinessStateService {
     await this.requireVerified(tenantId);
     const source = objectValue(body);
     const uei = normalizeUEI(source.uei ?? source);
-    await this.prisma.businessIdentityState.upsert({
+    await this.prisma.ueiState.upsert({
       where: { tenantId },
       create: { tenantId, data: json(uei) },
       update: { data: json(uei) },
@@ -408,8 +408,8 @@ export class BusinessStateService {
     await this.requireVerified(tenantId);
     const id = text(accountId);
     const [rows, identityRow] = await Promise.all([
-      this.prisma.businessPerson.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
-      this.prisma.businessIdentityState.findUnique({ where: { tenantId } }),
+      this.prisma.person.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
+      this.prisma.ueiState.findUnique({ where: { tenantId } }),
     ]);
     const people = rows.map((row) => ({ row, person: objectValue(row.data) }));
     const matched = people.find(({ person }) => accountIdsFromPerson(person).includes(id)) || null;
@@ -445,8 +445,8 @@ export class BusinessStateService {
     if (!phone && !requestedUei) return [];
 
     const [rows, identityRow] = await Promise.all([
-      this.prisma.businessPerson.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
-      this.prisma.businessIdentityState.findUnique({ where: { tenantId } }),
+      this.prisma.person.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
+      this.prisma.ueiState.findUnique({ where: { tenantId } }),
     ]);
     const people = rows.map((row) => ({ row, person: objectValue(row.data) }));
     const identity = normalizeUEI(identityRow?.data || {});
@@ -484,7 +484,7 @@ export class BusinessStateService {
     await this.requireVerified(tenantId);
     const accountId = text(account.id);
     if (!accountId) throw new BadRequestException('У аккаунта онлайн-записи отсутствует id');
-    const rows = await this.prisma.businessPerson.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] });
+    const rows = await this.prisma.person.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] });
     const found = rows.find((row) => accountIdsFromPerson(objectValue(row.data)).includes(accountId)) || null;
     const previous = objectValue(found?.data || {});
     const profileData = objectValue(account.profileData);
@@ -512,7 +512,7 @@ export class BusinessStateService {
       createdAt: text(previous.createdAt) || now,
     };
     const position = found ? found.position : rows.reduce((max, row) => Math.max(max, row.position), -1) + 1;
-    await this.prisma.businessPerson.upsert({
+    await this.prisma.person.upsert({
       where: { tenantId_key: { tenantId, key: person.key } },
       create: { tenantId, key: person.key, position, data: json(person) },
       update: { position, data: json(person) },
