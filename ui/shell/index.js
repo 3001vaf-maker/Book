@@ -48,9 +48,9 @@ export function mediaRail(items = []) {
   }).join('')}</div>`;
 }
 
-export function clientBottomNavigation(active = 'profile') {
+export function accountBottomNavigation(active = 'profile') {
   return navigationBar(CLIENT_NAV_ITEMS, active, {
-    className: 'bottom-nav--client',
+    className: 'bottom-nav--account',
     aria: 'Клиентская навигация',
     dataAttribute: 'data-client-nav',
   });
