@@ -1,0 +1,17 @@
+import { Body, Controller, Post } from '@nestjs/common';
+import { TenantInvitationService } from './tenant-invitation.service';
+
+@Controller('tenant-invitations')
+export class TenantInvitationController {
+  constructor(private readonly invitations: TenantInvitationService) {}
+
+  @Post('inspect')
+  inspect(@Body() body: { token?: unknown }) {
+    return this.invitations.inspect(body?.token);
+  }
+
+  @Post('accept')
+  accept(@Body() body: { token?: unknown; password?: unknown }) {
+    return this.invitations.accept(body || {});
+  }
+}
