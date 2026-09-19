@@ -22,7 +22,7 @@ const recordService = read('core/record/service.js');
 const recordEvents = read('core/record/events.js');
 const recordState = read('core/record/state.js');
 
-if (/availability|financial-model|getAllClients|record-events|record-state|status\s*=|attendance|confirmed|cancelRecord|createRecord|updateRecord|moveRecord/.test(recordData)) {
+if (/availability|financial-model|getAllPeople|record-events|record-state|status\s*=|attendance|confirmed|cancelRecord|createRecord|updateRecord|moveRecord/.test(recordData)) {
   errors.push('core/record/data.js: Record data must remain persistence-only');
 }
 if (!/getRecordRows/.test(recordData)
