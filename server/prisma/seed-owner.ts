@@ -12,7 +12,7 @@ async function main() {
     throw new Error('OWNER_EMAIL and OWNER_PASSWORD (minimum 10 characters) are required');
   }
 
-  const existing = await prisma.user.findUnique({ where: { email } });
+  const existing = await prisma.platformAccount.findUnique({ where: { email } });
 
   if (existing) {
     return;
@@ -22,11 +22,11 @@ async function main() {
 
   await prisma.$transaction(async (tx) => {
     const tenant = await tx.tenant.create({ data: { name: tenantName } });
-    const user = await tx.user.create({
+    const account = await tx.platformAccount.create({
       data: { email, passwordHash, workspaceUnlocked: true },
     });
     await tx.membership.create({
-      data: { tenantId: tenant.id, userId: user.id, role: MembershipRole.OWNER },
+      data: { tenantId: tenant.id, platformAccountId: account.id, role: MembershipRole.OWNER },
     });
   });
 }
