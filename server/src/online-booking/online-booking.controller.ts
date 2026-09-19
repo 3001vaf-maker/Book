@@ -223,7 +223,7 @@ export class OnlineBookingController {
       purpose: 'SERVICE',
       type: 'booking.created',
       title: 'Запись создана',
-      body: 'Новая запись добавлена в ваш клиентский аккаунт.',
+      body: 'Новая запись добавлена в ваш аккаунт.',
       entityType: 'booking-request',
       entityId: String((created as any)?.id || ''),
     });
