@@ -113,7 +113,7 @@ export class NotificationService {
 
   private async accountIdentity(tenantId: string, accountId: string) {
     const [account, identity] = await Promise.all([
-      this.prisma.bookingAccount.findFirst({
+      this.prisma.account.findFirst({
         where: { id: accountId, tenantId },
         select: { phone: true, email: true },
       }),
@@ -144,7 +144,7 @@ export class NotificationService {
   }
 
   private async accountIdentityByPhone(tenantId: string, cardPhone: string) {
-    const accounts = await this.prisma.bookingAccount.findMany({
+    const accounts = await this.prisma.account.findMany({
       where: { tenantId },
       select: { id: true, phone: true },
     });
