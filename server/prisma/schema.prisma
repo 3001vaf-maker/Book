@@ -30,7 +30,7 @@ enum TenantAccessStatus {
   SUSPENDED
 }
 
-enum MasterInvitationStatus {
+enum InvitationStatus {
   PENDING
   ACCEPTED
   REVOKED
@@ -56,7 +56,7 @@ model Tenant {
   documentArchive          TenantDocumentArchive?
   businessAuxiliaryState   BusinessAuxiliaryState?
   saasAccess               TenantAccess?
-  masterInvitations        MasterInvitation[]
+  invitations              Invitation[]
 }
 
 model User {
@@ -332,7 +332,7 @@ model PlatformAdmin {
   updatedAt DateTime @updatedAt
 
   user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdInvitations MasterInvitation[]
+  createdInvitations Invitation[]
 }
 
 model Capability {
@@ -417,14 +417,14 @@ model TenantCapabilityOverride {
   @@index([capabilityId])
 }
 
-model MasterInvitation {
+model Invitation {
   id               String                 @id @default(cuid())
   tenantId         String
   createdByAdminId String
   email            String
   name             String                 @default("")
   tokenHash        String                 @unique
-  status           MasterInvitationStatus @default(PENDING)
+  status           InvitationStatus @default(PENDING)
   expiresAt        DateTime
   acceptedAt       DateTime?
   revokedAt        DateTime?
