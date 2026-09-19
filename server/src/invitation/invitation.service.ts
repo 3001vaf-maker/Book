@@ -147,8 +147,8 @@ export class InvitationService {
     const name = normalizeName(input?.name);
     if (!email || !email.includes('@')) throw new BadRequestException('Укажите корректный email');
 
-    const existingUser = await this.prisma.user.findUnique({ where: { email } });
-    if (existingUser) throw new ConflictException('Пользователь с таким email уже зарегистрирован');
+    const existingAccount = await this.prisma.platformAccount.findUnique({ where: { email } });
+    if (existingAccount) throw new ConflictException('Учётная запись с таким email уже зарегистрирована');
 
     const existingInvitation = await this.prisma.invitation.findFirst({
       where: { email, status: InvitationStatus.PENDING },
@@ -240,12 +240,12 @@ export class InvitationService {
     if (password.length < 10) throw new BadRequestException('Пароль должен содержать минимум 10 символов');
 
     const invitation = await this.findActiveInvitation(token);
-    const existingUser = await this.prisma.user.findUnique({ where: { email: invitation.email } });
-    if (existingUser) throw new ConflictException('Пользователь с таким email уже зарегистрирован');
+    const existingAccount = await this.prisma.platformAccount.findUnique({ where: { email: invitation.email } });
+    if (existingAccount) throw new ConflictException('Учётная запись с таким email уже зарегистрирована');
 
     const passwordHash = await hashPassword(password, 12);
     const result = await this.prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({
+      const account = await tx.platformAccount.create({
         data: {
           email: invitation.email,
           passwordHash,
@@ -256,7 +256,7 @@ export class InvitationService {
       const membership = await tx.membership.create({
         data: {
           tenantId: invitation.tenantId,
-          userId: user.id,
+          platformAccountId: account.id,
           role: MembershipRole.OWNER,
         },
       });
@@ -267,22 +267,22 @@ export class InvitationService {
           acceptedAt: new Date(),
         },
       });
-      return { user, membership };
+      return { account, membership };
     });
 
     const accessToken = await this.jwt.signAsync({
-      sub: result.user.id,
+      sub: result.account.id,
       tenantId: invitation.tenantId,
       role: result.membership.role,
     });
 
     return {
       accessToken,
-      user: {
-        id: result.user.id,
-        email: result.user.email,
-        onboardingStep: result.user.onboardingStep,
-        workspaceUnlocked: result.user.workspaceUnlocked,
+      account: {
+        id: result.account.id,
+        email: result.account.email,
+        onboardingStep: result.account.onboardingStep,
+        workspaceUnlocked: result.account.workspaceUnlocked,
       },
       tenant: { id: invitation.tenant.id, name: invitation.tenant.name },
       role: result.membership.role,
