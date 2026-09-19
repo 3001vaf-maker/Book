@@ -125,7 +125,7 @@ jobs:
         run: |
           set -euo pipefail
           docker compose -f docker-compose.staging.yml exec -T db psql -U book -d book_staging -v ON_ERROR_STOP=1 <<'SQL'
-          DO $
+          DO $profile_check$
           BEGIN
             IF (SELECT COUNT(*) FROM "PlatformAccount" WHERE "id" = 'upgrade-user') <> 1 THEN
               RAISE EXCEPTION 'PlatformAccount row was not preserved';
@@ -166,7 +166,7 @@ jobs:
               RAISE EXCEPTION 'PlatformConsentEvent account column was not renamed';
             END IF;
           END
-          $;
+          $profile_check$;
           SQL
       - name: Stop isolated database
         if: always()
