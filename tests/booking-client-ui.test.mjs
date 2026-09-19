@@ -64,7 +64,8 @@ assert.doesNotMatch(booking, /personalDataAccordion/);
 assert.doesNotMatch(booking, /type:\s*'date'/);
 assert.match(booking, /getBookingConsentState/);
 assert.match(booking, /async function refreshAccountConsentState/);
-assert.match(booking, /if \(consentState\.allowed\) \{[\s\S]*?nextBookingStep\(root, state\)/);
+assert.match(booking, /if \(consentState\.pdnActive\) \{[\s\S]*?nextBookingStep\(root, state\)/);
+assert.doesNotMatch(booking, /consentState\.allowed/);
 assert.match(booking, /state\.registrationMode = 'repair'/);
 
 // Client profile/account stays on canonical shared primitives.
