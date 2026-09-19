@@ -122,7 +122,7 @@ function historyMarkup(escapeHtml) {
           <button type="button" class="admin-history-row" data-registry-history="${escapeHtml(item.id)}">
             <span>
               <strong>${escapeHtml(item.documentTitle || item.documentKey || 'Документ')}</strong>
-              <small>${escapeHtml(item.userEmail || item.tenantName || 'Пользователь')} · версия ${escapeHtml(item.documentVersion)}</small>
+              <small>${escapeHtml(item.accountEmail || item.tenantName || 'Пользователь')} · версия ${escapeHtml(item.documentVersion)}</small>
             </span>
             <span>${escapeHtml(actionLabel(item.action))}</span>
             <span>${escapeHtml(formatMoment(item.occurredAt))}</span>
@@ -183,7 +183,7 @@ export async function renderDocumentRegistry(root, { escapeHtml, setTitle, loadH
           item,
           'Подписанная версия',
           escapeHtml,
-          `${item.userEmail || item.tenantName || 'Пользователь'} · версия ${item.documentVersion} · ${formatMoment(item.occurredAt)}`,
+          `${item.accountEmail || item.tenantName || 'Пользователь'} · версия ${item.documentVersion} · ${formatMoment(item.occurredAt)}`,
         );
       });
     });
