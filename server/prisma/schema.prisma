@@ -184,7 +184,6 @@ model BookingAccount {
   surname         String   @default("")
   phone           String   @default("")
   telegramId      String   @default("")
-  consents        Json
   profileData     Json     @default("{}")
   uei             String   @default("")
   discountPercent Float    @default(0)
