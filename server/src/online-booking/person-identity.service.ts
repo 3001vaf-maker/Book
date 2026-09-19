@@ -106,7 +106,7 @@ export class PersonIdentityService {
   async bindFirstAccess(tenantId: string, account: Record<string, any>): Promise<PersonBinding> {
     const existing = await this.findOrAttachExistingPerson(tenantId, account);
     if (existing) return existing;
-    const person = objectValue(await this.businessState.upsertBookingPersonFromAccount(tenantId, account));
+    const person = objectValue(await this.businessState.upsertPersonFromAccount(tenantId, account));
     return { person, personExisted: false };
   }
 
