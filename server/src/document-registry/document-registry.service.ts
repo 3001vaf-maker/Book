@@ -36,11 +36,10 @@ export class DocumentRegistryService {
         e."technicalEvidence",
         e."occurredAt"
       FROM "PlatformConsentEvent" e
-      JOIN "LegalDocumentVersion" v ON v."id" = e."documentVersionId"
-      JOIN "LegalDocument" d ON d."id" = v."documentId"
+      JOIN "PlatformDocumentVersion" v ON v."id" = e."documentVersionId"
+      JOIN "PlatformDocument" d ON d."id" = v."documentId"
       JOIN "User" u ON u."id" = e."userId"
       LEFT JOIN "Tenant" t ON t."id" = e."tenantId"
-      WHERE d."scope" = 'PLATFORM'
       ORDER BY e."occurredAt" DESC, e."id" DESC
     `;
   }
