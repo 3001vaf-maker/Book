@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { CapabilityValueType, TenantAccessStatus } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { SaasAccessService } from '../saas-access/saas-access.service';
-import { MasterInvitationService } from '../master-invitation/master-invitation.service';
+import { InvitationService } from '../invitation/invitation.service';
 import { DocumentRegistryService } from '../document-registry/document-registry.service';
 
 @Injectable()
@@ -10,7 +10,7 @@ export class SaasAdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: SaasAccessService,
-    private readonly invitations: MasterInvitationService,
+    private readonly invitations: InvitationService,
     private readonly documentRegistry: DocumentRegistryService,
   ) {}
 
@@ -59,7 +59,7 @@ export class SaasAdminService {
             profiles: {
               select: { userId: true, name: true, surname: true, profession: true },
             },
-            masterInvitations: {
+            invitations: {
               orderBy: { createdAt: 'desc' },
               take: 1,
               select: { id: true, email: true, name: true, status: true, createdAt: true, expiresAt: true },
@@ -75,7 +75,7 @@ export class SaasAdminService {
       const profile = membership
         ? row.tenant.profiles.find((item) => item.userId === membership.userId) || null
         : null;
-      const invitation = row.tenant.masterInvitations[0] || null;
+      const invitation = row.tenant.invitations[0] || null;
       const resolved = await this.access.resolveTenantAccess(row.tenantId);
       return {
         tenantId: row.tenantId,
