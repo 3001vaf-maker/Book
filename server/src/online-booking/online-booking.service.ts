@@ -13,7 +13,7 @@ import { BusinessStateService } from '../business-state/business-state.service';
 import { ConsentPolicyService } from '../tenant-document-archive/consent-policy.service';
 import { TenantDocumentArchiveService } from '../tenant-document-archive/tenant-document-archive.service';
 import { ProfileService } from '../profile/profile.service';
-import { ClientCardLinkService } from './client-card-link.service';
+import { PersonIdentityService } from './person-identity.service';
 
 function objectValue(value: unknown): Record<string, any> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : {};
@@ -174,7 +174,7 @@ export class OnlineBookingService {
     private readonly tenantDocumentArchive: TenantDocumentArchiveService,
     private readonly consentPolicy: ConsentPolicyService,
     private readonly profile: ProfileService,
-    private readonly clientCards: ClientCardLinkService,
+    private readonly personIdentity: PersonIdentityService,
   ) {}
 
   private async publication(tenantId: string) {
@@ -195,14 +195,14 @@ export class OnlineBookingService {
   private async accountView(tenantId: string, account: any) {
     const identity = await this.businessState.bookingIdentityForAccount(tenantId, account.id);
     const person = identity?.person || {};
-    const cardStats = await this.clientCards.cardStats(tenantId, account);
+    const personStats = await this.personIdentity.personStats(tenantId, account);
     return publicAccount({
       ...account,
       uei: identity?.uei || '',
       discountPercent: person.discountPercent ?? account.discountPercent,
-      visits: cardStats?.visits ?? person.visits ?? account.visits,
-      totalSpent: cardStats?.totalSpent ?? person.totalSpent ?? account.totalSpent,
-      lastVisit: cardStats?.lastVisit || person.lastVisit || account.lastVisit,
+      visits: personStats?.visits ?? person.visits ?? account.visits,
+      totalSpent: personStats?.totalSpent ?? person.totalSpent ?? account.totalSpent,
+      lastVisit: personStats?.lastVisit || person.lastVisit || account.lastVisit,
       programs: Array.isArray(person.programs) ? person.programs : account.programs,
     });
   }
@@ -328,12 +328,12 @@ export class OnlineBookingService {
         profileData: normalizeProfileData(body.profileData) as Prisma.InputJsonValue,
       },
     });
-    const card = await this.clientCards.cardState(tenantId, account.phone);
-    const binding = card.owner
-      ? await this.clientCards.bindFirstAccess(tenantId, account as any)
+    const personState = await this.personIdentity.personState(tenantId, account.phone);
+    const binding = personState.owner
+      ? await this.personIdentity.bindFirstAccess(tenantId, account as any)
       : {
-          person: await this.businessState.upsertBookingPersonFromAccount(tenantId, account as any),
-          clientCardExisted: false,
+          person: await this.businessState.upsertPersonFromAccount(tenantId, account as any),
+          personExisted: false,
         };
     await this.consentPolicy.acceptAccountConsents(tenantId, account.id, consents, 'online-booking-registration');
     if (consents.some((item) => item.documentId === 'messages-consent' && item.accepted)) {
@@ -343,7 +343,7 @@ export class OnlineBookingService {
     return {
       accessToken: await this.issueAccountToken(account),
       account: await this.accountView(tenantId, account),
-      clientCardExisted: binding.clientCardExisted,
+      personExisted: binding.personExisted,
     };
   }
 
@@ -355,18 +355,18 @@ export class OnlineBookingService {
     if (!account || !(await compare(text(password), account.passwordHash))) {
       throw new UnauthorizedException('Неверный email или пароль');
     }
-    const binding = await this.clientCards.bindFirstAccess(tenantId, account as any);
+    const binding = await this.personIdentity.bindFirstAccess(tenantId, account as any);
     return {
       accessToken: await this.issueAccountToken(account),
       account: await this.accountView(tenantId, account),
-      clientCardExisted: binding.clientCardExisted,
+      personExisted: binding.personExisted,
     };
   }
 
   async getAccount(tenantId: string, accountId: string) {
     const account = await this.prisma.account.findFirst({ where: { id: accountId, tenantId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
-    await this.clientCards.bindFirstAccess(tenantId, account as any);
+    await this.personIdentity.bindFirstAccess(tenantId, account as any);
     return this.accountView(tenantId, account);
   }
 
@@ -389,7 +389,7 @@ export class OnlineBookingService {
         profileData: profileData as Prisma.InputJsonValue,
       },
     });
-    await this.clientCards.bindFirstAccess(tenantId, updated as any);
+    await this.personIdentity.bindFirstAccess(tenantId, updated as any);
     return this.accountView(tenantId, updated);
   }
 
@@ -463,7 +463,7 @@ export class OnlineBookingService {
       duration: Math.max(0, Number(procedure?.duration || 0)),
       cost: procedureCost(procedure, workplaceKey),
     }));
-    const binding = await this.clientCards.bindFirstAccess(tenantId, account as any);
+    const binding = await this.personIdentity.bindFirstAccess(tenantId, account as any);
     const person = binding.person;
     const identity = await this.businessState.bookingIdentityForAccount(tenantId, account.id);
     const pricingPerson = identity?.person || person;
@@ -521,7 +521,7 @@ export class OnlineBookingService {
   async getMyRequests(tenantId: string, accountId: string) {
     const account = await this.prisma.account.findFirst({ where: { id: accountId, tenantId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
-    await this.clientCards.bindFirstAccess(tenantId, account as any);
+    await this.personIdentity.bindFirstAccess(tenantId, account as any);
     const identity = await this.businessState.bookingIdentityForAccount(tenantId, accountId);
     const accountIds = identity?.accountIds?.length ? identity.accountIds : [account.id];
     const requests = await this.prisma.bookingRequest.findMany({
@@ -539,7 +539,7 @@ export class OnlineBookingService {
         : request.recordSnapshot,
     })));
     const importedRecordIds = new Set(requests.map((request) => text(request.importedRecordId)).filter(Boolean));
-    const manualViews = await this.clientCards.manualRecordViews(tenantId, account as any, importedRecordIds);
+    const manualViews = await this.personIdentity.manualRecordViews(tenantId, account as any, importedRecordIds);
     return [...requestViews, ...manualViews].sort((left, right) => {
       const a = `${dateValue((left as any).date)}T${text((left as any).from)}`;
       const b = `${dateValue((right as any).date)}T${text((right as any).from)}`;
