@@ -171,7 +171,7 @@ export class ConsentPolicyService {
 
   async acceptAccountConsents(tenantId: string, accountIdValue: unknown, facts: unknown, source = 'online-booking-account') {
     const accountId = text(accountIdValue);
-    if (!accountId) throw new BadRequestException('Не указан аккаунт клиента');
+    if (!accountId) throw new BadRequestException('Не указан аккаунт');
     const current = await this.state(tenantId);
     const accepted = arrayValue(facts).filter((item) => Boolean(item?.accepted) && text(item?.documentId));
     for (const fact of accepted) {
