@@ -2,7 +2,7 @@ import { apiRequest } from '../core/auth.js';
 import { flushBusinessPersistence } from '../core/business-persistence.js';
 import { hydrateRecordStateFromServer } from '../core/record/index.js';
 import { hydrateUEIFromServer } from '../core/uei.js';
-import { hydrateClientsFromServer } from '../main/clients/data.js';
+import { hydratePeopleFromServer } from '../main/people/data.js';
 import { hydrateConsentsFromServer } from '../settings/documents/consents.js';
 import { hydrateDocumentsFromServer } from '../settings/documents/data.js';
 import { hydrateDocumentHistoryFromServer } from '../settings/documents/history.js';
@@ -40,12 +40,12 @@ async function pull() {
     });
     if (business.verified && businessSnapshot !== lastBusiness) {
       lastBusiness = businessSnapshot;
-      hydrateClientsFromServer(business.people || []);
+      hydratePeopleFromServer(business.people || []);
       hydrateUEIFromServer(business.uei || {});
       hydrateRecordStateFromServer({ records: business.records || [], recordEvents: business.recordEvents || [] });
       window.dispatchEvent(new CustomEvent('book:records-changed', { detail: { action: 'server-refresh' } }));
       window.dispatchEvent(new CustomEvent('book:time-usage-changed', { detail: { action: 'server-refresh' } }));
-      window.dispatchEvent(new CustomEvent('book:clients-changed', { detail: { action: 'server-refresh' } }));
+      window.dispatchEvent(new CustomEvent('book:people-changed', { detail: { action: 'server-refresh' } }));
     }
 
     const documentData = documents?.data || {};
