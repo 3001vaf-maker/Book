@@ -6,7 +6,7 @@ import { WorkspaceModule } from './workspace/workspace.module';
 import { ProfileModule } from './profile/profile.module';
 import { OnlineBookingModule } from './online-booking/online-booking.module';
 import { BusinessStateModule } from './business-state/business-state.module';
-import { DocumentStateModule } from './document-state/document-state.module';
+import { DocumentArchiveModule } from './document-archive/document-archive.module';
 import { AuxiliaryStateModule } from './auxiliary-state/auxiliary-state.module';
 import { NotificationModule } from './notification/notification.module';
 import { CommunicationModule } from './communication/communication.module';
@@ -20,7 +20,7 @@ import { SaasAdminModule } from './saas-admin/saas-admin.module';
     WorkspaceModule,
     ProfileModule,
     BusinessStateModule,
-    DocumentStateModule,
+    DocumentArchiveModule,
     AuxiliaryStateModule,
     NotificationModule,
     CommunicationModule,

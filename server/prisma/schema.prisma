@@ -53,7 +53,7 @@ model Tenant {
   businessRecords          BusinessRecord[]
   businessRecordEvents     BusinessRecordEvent[]
   businessOperationalState BusinessOperationalState?
-  businessDocuments        BusinessDocumentState?
+  documentArchive          TenantDocumentArchive?
   businessAuxiliaryState   BusinessAuxiliaryState?
   saasAccess               TenantAccess?
   masterInvitations        MasterInvitation[]
@@ -303,7 +303,7 @@ model BusinessOperationalState {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
 
-model BusinessDocumentState {
+model TenantDocumentArchive {
   id                  String   @id @default(cuid())
   tenantId            String   @unique
   data                Json
