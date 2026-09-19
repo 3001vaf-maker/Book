@@ -10,7 +10,7 @@ function removeTelegramEntryFromUrl() {
   history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
 }
 
-export function startBookingAccountRuntime({ tenantId = '', telegramEntry = '' } = {}) {
+export function startAccountRuntime({ tenantId = '', telegramEntry = '' } = {}) {
   const tenant = String(tenantId || '').trim();
   const entry = String(telegramEntry || '').trim();
   if (!tenant) return () => {};
