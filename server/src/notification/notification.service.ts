@@ -244,23 +244,32 @@ export class NotificationService {
     return true;
   }
 
-  private async externalAllowed(tenantId: string, identity: Awaited<ReturnType<NotificationService['accountIdentity']>>, channel: string) {
-    if (channel === 'PUSH') return true;
+  private async externalAllowed(
+    tenantId: string,
+    identity: Awaited<ReturnType<NotificationService['accountIdentity']>>,
+    channel: string,
+    purposeValue: unknown,
+  ) {
+    const purpose = normalizeMessagePurpose(purposeValue);
+    if (!purpose) return false;
+    if (purpose !== 'MARKETING') return true;
+    if (channel === 'PUSH') return false;
     const recipient = this.recipientForChannel(identity, channel);
     if (!recipient) return false;
-    return this.documents.canSendMessages(tenantId, channel, recipient);
+    return this.documents.canSendMarketing(tenantId, channel, recipient);
   }
 
   private async queueExternalByPolicy(
     tenantId: string,
     notificationId: string,
     eventType: string,
+    purpose: MessagePurpose,
     identity: Awaited<ReturnType<NotificationService['accountIdentity']>>,
   ) {
     const policy = await this.getRoutingPolicy(tenantId, eventType);
     const routed: Array<{ channel: string; recipient: string }> = [];
 
-    if (policy.channels.includes('PUSH')) {
+    if (policy.channels.includes('PUSH') && await this.externalAllowed(tenantId, identity, 'PUSH', purpose)) {
       const endpoints = await this.webPush.listAccountEndpoints(tenantId, identity.accountId);
       for (const endpoint of endpoints) {
         await this.queueDelivery(tenantId, notificationId, 'PUSH', endpoint);
@@ -272,7 +281,7 @@ export class NotificationService {
     const available: Array<{ channel: string; recipient: string }> = [];
     for (const channel of configured) {
       const recipient = this.recipientForChannel(identity, channel);
-      if (!recipient || !(await this.externalAllowed(tenantId, identity, channel))) continue;
+      if (!recipient || !(await this.externalAllowed(tenantId, identity, channel, purpose))) continue;
       available.push({ channel, recipient });
     }
     const selected = policy.mode === 'fallback' ? available.slice(0, 1) : available;
@@ -316,7 +325,7 @@ export class NotificationService {
       `;
     });
 
-    const routed = routeExternal ? await this.queueExternalByPolicy(tenantId, notificationId, type, identity) : [];
+    const routed = routeExternal ? await this.queueExternalByPolicy(tenantId, notificationId, type, purpose, identity) : [];
     if (routeExternal && routed.some((item) => item.channel === 'PUSH')) {
       await this.webPush.dispatchNotification(tenantId, notificationId);
     }
@@ -424,8 +433,8 @@ export class NotificationService {
   }
 
   private async canSendDelivery(tenantId: string, notificationId: string, channel: 'EMAIL' | 'TELEGRAM') {
-    const rows = await this.prisma.$queryRaw<Array<{ cardPhone: string }>>`
-      SELECT n."cardPhone"
+    const rows = await this.prisma.$queryRaw<Array<{ cardPhone: string; purpose: string | null }>>`
+      SELECT n."cardPhone", n."purpose"
       FROM "Notification" n
       INNER JOIN "NotificationDelivery" d
         ON d."notificationId" = n."id"
@@ -436,7 +445,7 @@ export class NotificationService {
       LIMIT 1
     `;
     const identity = rows[0]?.cardPhone ? await this.accountIdentityByPhone(tenantId, rows[0].cardPhone) : null;
-    return Boolean(identity && await this.externalAllowed(tenantId, identity, channel));
+    return Boolean(identity && await this.externalAllowed(tenantId, identity, channel, rows[0]?.purpose));
   }
 
   async canSendEmailDelivery(tenantId: string, notificationId: string) {
@@ -468,8 +477,8 @@ export class NotificationService {
   }
 
   private async markDeliveryFailed(tenantId: string, deliveryId: string, channel: 'EMAIL' | 'TELEGRAM', error: unknown) {
-    const rows = await this.prisma.$queryRaw<Array<{ notificationId: string; channel: string; cardPhone: string; type: string }>>`
-      SELECT d."notificationId", d."channel", n."cardPhone", n."type"
+    const rows = await this.prisma.$queryRaw<Array<{ notificationId: string; channel: string; cardPhone: string; type: string; purpose: string | null }>>`
+      SELECT d."notificationId", d."channel", n."cardPhone", n."type", n."purpose"
       FROM "NotificationDelivery" d
       INNER JOIN "Notification" n ON n."id" = d."notificationId" AND n."tenantId" = d."tenantId"
       WHERE d."tenantId" = ${tenantId} AND d."id" = ${deliveryId} AND d."channel" = ${channel}
@@ -494,7 +503,7 @@ export class NotificationService {
           for (const nextChannel of nextChannels) {
             if (!ACTIVE_EXTERNAL_CHANNELS.has(nextChannel)) continue;
             const recipient = this.recipientForChannel(identity, nextChannel);
-            if (!recipient || !(await this.externalAllowed(tenantId, identity, nextChannel))) continue;
+            if (!recipient || !(await this.externalAllowed(tenantId, identity, nextChannel, current.purpose))) continue;
             await this.queueDelivery(tenantId, current.notificationId, nextChannel, recipient);
             break;
           }
@@ -523,8 +532,4 @@ export class NotificationService {
     return this.markDeliveryFailed(tenantId, deliveryId, 'TELEGRAM', error);
   }
 
-  async canSendMessagesForAccount(tenantId: string, accountId: string, channel: 'PUSH' | 'EMAIL' | 'TELEGRAM') {
-    const identity = await this.accountIdentity(tenantId, accountId);
-    return this.externalAllowed(tenantId, identity, channel);
-  }
 }
