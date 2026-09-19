@@ -523,7 +523,7 @@ async function renderMessages(root, state, handlers) {
   });
 }
 
-export async function renderAccountAccount(root, state, callbacks = {}) {
+export async function renderAccount(root, state, callbacks = {}) {
   state.accountTab ||= 'profile';
   state.accountChatOpen = Boolean(state.accountChatOpen);
   try {
@@ -539,15 +539,15 @@ export async function renderAccountAccount(root, state, callbacks = {}) {
   }
 
   const handlers = {
-    render: () => renderAccountAccount(root, state, callbacks),
+    render: () => renderAccount(root, state, callbacks),
     onStartBooking: callbacks.onStartBooking || (() => {}),
     onRepeat: callbacks.onRepeat || (() => {}),
     onPersonalData: () => openAccountPersonalData(state, {
-      onSaved: () => renderAccountAccount(root, state, callbacks),
+      onSaved: () => renderAccount(root, state, callbacks),
     }),
     onPassword: () => openAccountPasswordSettings(state),
     onConsents: () => openAccountConsentSettings(state, {
-      onChanged: () => renderAccountAccount(root, state, callbacks),
+      onChanged: () => renderAccount(root, state, callbacks),
     }),
     onLogout: callbacks.onLogout || (() => {
       clearAccount(state.tenantId);
