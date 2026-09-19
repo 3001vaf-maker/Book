@@ -1,8 +1,6 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 import type { Request } from 'express';
 import { ConsentPolicyService } from '../document-state/consent-policy.service';
-import { PrismaService } from '../prisma.service';
 
 type AccountRequest = Request & {
   bookingAccountAuth?: { accountId: string; tenantId: string };
@@ -11,10 +9,7 @@ type AccountRequest = Request & {
 
 @Injectable()
 export class BookingPdnConsentGuard implements CanActivate {
-  constructor(
-    private readonly consentPolicy: ConsentPolicyService,
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly consentPolicy: ConsentPolicyService) {}
 
   async canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest<AccountRequest>();
@@ -34,19 +29,6 @@ export class BookingPdnConsentGuard implements CanActivate {
         ...state,
       });
     }
-
-    const derivedConsents = state.consents.map((item) => ({
-      documentId: item.documentId,
-      documentVersion: item.documentVersion,
-      accepted: Boolean(item.accepted),
-      acceptedAt: item.accepted ? item.eventAt : '',
-      status: item.status,
-    })) as Prisma.InputJsonValue;
-
-    await this.prisma.bookingAccount.updateMany({
-      where: { id: auth.accountId, tenantId: auth.tenantId },
-      data: { consents: derivedConsents },
-    });
 
     return true;
   }
