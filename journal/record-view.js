@@ -42,11 +42,11 @@ const workplaceName = (id) => {
   const workplace = getWorkplaces().find((item) => String(item?.key ?? item?.id ?? '') === String(id || ''));
   return workplace?.name || workplace?.title || 'Рабочее пространство';
 };
-const findClient = (record) => {
-  const client = record?.client || {};
-  return people().find((item) => String(item.key ?? '') === String(client.key ?? ''))
-    || people().find((item) => String(item.id ?? '') === String(client.id ?? ''))
-    || client;
+const findPerson = (record) => {
+  const person = record?.person || {};
+  return people().find((item) => String(item.key ?? '') === String(person.key ?? ''))
+    || people().find((item) => String(item.id ?? '') === String(person.id ?? ''))
+    || person;
 };
 const procedureTotalDuration = (items = []) => items.reduce((sum, item) => sum + (Number(item?.duration) || 0), 0);
 const normalizedAttendance = (value) => value === 'arrived' || value === 'no-show' ? value : '';
@@ -66,7 +66,7 @@ const stateSnapshot = (state) => JSON.stringify({
   workplaceId: String(state.workplaceId || ''),
   from: String(state.from || ''),
   to: String(state.to || ''),
-  client: state.client || null,
+  person: state.person || null,
   procedures: Array.isArray(state.procedures) ? state.procedures : [],
   products: Array.isArray(state.products) ? state.products : [],
   confirmed: Boolean(state.confirmed),
@@ -77,7 +77,7 @@ const stateFromRecord = (record, { paid = false } = {}) => ({
   workplaceId: record.workplaceId,
   from: record.from,
   to: record.to,
-  client: record.client ? { ...record.client } : null,
+  person: record.person ? { ...record.person } : null,
   procedures: Array.isArray(record.procedures) ? record.procedures.map((item) => ({ ...item })) : [],
   products: Array.isArray(record.products) ? record.products.map((item) => ({ ...item })) : [],
   finance: record.finance ? {
@@ -177,8 +177,8 @@ function openTimePicker(state, record, onSelected) {
   }));
 }
 
-function openClientPicker(state, onSelected) {
-  const content = `<div class="record-editor-screen record-editor-screen--clients"><div class="record-client-toolbar"><input class="record-client-search" type="search" placeholder="Поиск клиента" data-record-view-client-search></div><div class="record-client-list" data-record-view-client-list></div></div>`;
+function openPersonPicker(state, onSelected) {
+  const content = `<div class="record-editor-screen record-editor-screen--people"><div class="record-person-toolbar"><input class="record-person-search" type="search" placeholder="Поиск человека" data-record-view-person-search></div><div class="record-person-list" data-record-view-person-list></div></div>`;
   const m = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app', className: 'record-editor-modal' }));
   if (!m) return;
   const render = (query = '') => {
@@ -187,21 +187,21 @@ function openClientPicker(state, onSelected) {
       const display = personDisplay(person);
       return !normalized || `${display.uei} ${display.name} ${display.phone}`.toLowerCase().includes(normalized);
     });
-    const listRoot = m.querySelector('[data-record-view-client-list]');
+    const listRoot = m.querySelector('[data-record-view-person-list]');
     if (!listRoot) return;
     listRoot.innerHTML = matches.map((person) => {
       const display = personDisplay(person);
-      return `<button type="button" class="entity-card entity-card--compact${String(person.key || '') === String(state.client?.key || '') ? ' is-selected' : ''}" data-record-view-client="${escapeHtml(person.key || '')}"><span>${escapeHtml(display.uei)}</span><strong>${escapeHtml(display.name)}</strong><small>${escapeHtml(display.phone)}</small></button>`;
-    }).join('') || '<div class="muted">Клиенты не найдены.</div>';
-    listRoot.querySelectorAll('[data-record-view-client]').forEach((node) => node.addEventListener('click', () => {
-      const person = people().find((item) => String(item.key || '') === String(node.dataset.recordViewClient || ''));
+      return `<button type="button" class="entity-card entity-card--compact${String(person.key || '') === String(state.person?.key || '') ? ' is-selected' : ''}" data-record-view-person="${escapeHtml(person.key || '')}"><span>${escapeHtml(display.uei)}</span><strong>${escapeHtml(display.name)}</strong><small>${escapeHtml(display.phone)}</small></button>`;
+    }).join('') || '<div class="muted">Люди не найдены.</div>';
+    listRoot.querySelectorAll('[data-record-view-person]').forEach((node) => node.addEventListener('click', () => {
+      const person = people().find((item) => String(item.key || '') === String(node.dataset.recordViewPerson || ''));
       if (!person) return;
       m.remove();
       const display = personDisplay(person);
       onSelected?.({ key: person.key, id: person.id, uei: display.uei, name: person.name, surname: person.surname, phone: display.phone, discountPercent: Number(person.discountPercent) || 0 });
     }));
   };
-  const search = m.querySelector('[data-record-view-client-search]');
+  const search = m.querySelector('[data-record-view-person-search]');
   search?.addEventListener('input', () => render(search.value));
   render();
 }
@@ -434,7 +434,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       workplaceId: String(state.workplaceId || ''),
       from: state.from,
       to: state.to,
-      client: state.client,
+      person: state.person,
       procedures: state.procedures,
       products: state.products,
       confirmed: Boolean(state.confirmed),
@@ -465,11 +465,11 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
   const render = () => {
     scheduleStartRender();
     const paid = isPaid();
-    const clientSource = state.client || findClient(record) || {};
-    const currentPerson = clientSource?.key
-      ? people().find((person) => String(person.key) === String(clientSource.key)) || clientSource
-      : clientSource;
-    const client = personDisplay(currentPerson);
+    const personSource = state.person || findPerson(record) || {};
+    const currentPerson = personSource?.key
+      ? people().find((person) => String(person.key) === String(personSource.key)) || personSource
+      : personSource;
+    const person = personDisplay(currentPerson);
     const workplace = workplaceName(state.workplaceId);
     const totalDuration = state.procedures.length ? procedureTotalDuration(state.procedures) : 30;
     const finance = repriceFinancialPlan(recordFinancialItems(state), state.finance);
@@ -498,15 +498,15 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       })),
     ];
     const card = entityCard({
-      id: client.uei,
-      title: client.name,
-      subtitle: client.phone,
-      idData: client.uei && currentPerson?.key ? 'data-record-view-client-profile' : '',
-      idAria: client.uei ? `Открыть профиль клиента ${client.name}` : '',
-      titleData: currentPerson?.key ? 'data-record-view-client-profile' : '',
-      titleAria: `Открыть профиль клиента ${client.name}`,
-      subtitleData: client.phone ? 'data-record-view-phone' : '',
-      subtitleAria: client.phone ? `Действия с телефоном ${client.phone}` : '',
+      id: person.uei,
+      title: person.name,
+      subtitle: person.phone,
+      idData: person.uei && currentPerson?.key ? 'data-record-view-person-profile' : '',
+      idAria: person.uei ? `Открыть человека ${person.name}` : '',
+      titleData: currentPerson?.key ? 'data-record-view-person-profile' : '',
+      titleAria: `Открыть человека ${person.name}`,
+      subtitleData: person.phone ? 'data-record-view-phone' : '',
+      subtitleAria: person.phone ? `Действия с телефоном ${person.phone}` : '',
       topMeta: [{
         value: workplace,
         row: 1,
@@ -564,11 +564,11 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       if (isPaid()) return;
       startRecordTimeEdit();
     });
-    root.querySelectorAll('[data-record-view-client-profile]').forEach((node) => node.addEventListener('click', () => {
+    root.querySelectorAll('[data-record-view-person-profile]').forEach((node) => node.addEventListener('click', () => {
       if (!currentPerson?.key) return;
       openPerson({ root: document.body, key: currentPerson.key, onClose: render });
     }));
-    root.querySelector('[data-record-view-phone]')?.addEventListener('click', () => openPhoneActions(client.phone));
+    root.querySelector('[data-record-view-phone]')?.addEventListener('click', () => openPhoneActions(person.phone));
     root.querySelectorAll('[data-record-view-procedure-edit]').forEach((node) => node.addEventListener('click', () => {
       if (isPaid()) return;
       const index = Number(node.dataset.recordViewProcedureEdit);
