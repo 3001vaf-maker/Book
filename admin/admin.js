@@ -168,9 +168,9 @@ function renderProfiles() {
   content.innerHTML = `
     <div class="admin-heading"><div><h2>Профили</h2><p>Каждый профиль работает только в своём персональном Book.</p></div></div>
     <section class="admin-invite-panel">
-      <h3>Пригласить профиля</h3>
+      <h3>Пригласить в Book</h3>
       <form class="admin-invite-grid" data-invite-form>
-        <label class="admin-field"><span>Имя</span><input name="name" placeholder="Имя профиля"></label>
+        <label class="admin-field"><span>Имя</span><input name="name" placeholder="Имя"></label>
         <label class="admin-field"><span>Email</span><input name="email" type="email" placeholder="name@example.com" required></label>
         <button class="admin-button" type="submit">Отправить приглашение</button>
       </form>
