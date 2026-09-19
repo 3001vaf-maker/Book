@@ -18,7 +18,7 @@ function modelBlock(name) {
 }
 
 const tenantModel = modelBlock('Tenant');
-const userModel = modelBlock('User');
+const platformAccountModel = modelBlock('PlatformAccount');
 const membershipModel = modelBlock('Membership');
 const profileModel = modelBlock('Profile');
 
@@ -38,21 +38,21 @@ assert.match(tenantModel, /businessPeople\s+BusinessPerson\[\]/);
 assert.match(tenantModel, /memberships\s+Membership\[\]/);
 
 // Login identity is separate from Profile.
-assert.match(userModel, /email\s+String\s+@unique/);
-assert.match(userModel, /passwordHash\s+String/);
-assert.match(userModel, /memberships\s+Membership\[\]/);
-assert.match(userModel, /profiles\s+Profile\[\]/);
+assert.match(platformAccountModel, /email\s+String\s+@unique/);
+assert.match(platformAccountModel, /passwordHash\s+String/);
+assert.match(platformAccountModel, /memberships\s+Membership\[\]/);
+assert.match(platformAccountModel, /profiles\s+Profile\[\]/);
 
 // Membership links the login identity to Tenant.
 assert.match(membershipModel, /tenantId\s+String/);
-assert.match(membershipModel, /userId\s+String/);
-assert.match(membershipModel, /@@unique\(\[tenantId, userId\]\)/);
+assert.match(membershipModel, /platformAccountId\s+String/);
+assert.match(membershipModel, /@@unique\(\[tenantId, platformAccountId\]\)/);
 
 // Profile belongs to Tenant + login identity.
 // Profile has no nested/sub-profile relation.
 assert.match(profileModel, /tenantId\s+String/);
-assert.match(profileModel, /userId\s+String/);
-assert.match(profileModel, /@@unique\(\[tenantId, userId\]\)/);
+assert.match(profileModel, /platformAccountId\s+String/);
+assert.match(profileModel, /@@unique\(\[tenantId, platformAccountId\]\)/);
 assert.doesNotMatch(profileModel, /profiles\s+Profile\[\]/);
 assert.doesNotMatch(profileModel, /parentProfileId|childProfileId/);
 
@@ -70,13 +70,13 @@ assert.doesNotMatch(businessPersonModel, /profile\s+Profile\s+@relation/);
 // Current PRIVATE provisioning path creates one Tenant and one OWNER membership.
 // It does not create nested/additional Profiles during invitation acceptance.
 assert.equal((invitationService.match(/tx\.tenant\.create/g) || []).length, 1);
-assert.equal((invitationService.match(/tx\.user\.create/g) || []).length, 1);
+assert.equal((invitationService.match(/tx\.platformAccount\.create/g) || []).length, 1);
 assert.equal((invitationService.match(/tx\.membership\.create/g) || []).length, 1);
 assert.match(invitationService, /role: MembershipRole\.OWNER/);
 assert.doesNotMatch(invitationService, /tx\.profile\.create/);
 
 // Profile bootstrap is idempotent for the current Tenant + login identity.
-assert.match(profileService, /where: \{ tenantId_userId: \{ tenantId, userId \} \}/);
+assert.match(profileService, /where: \{ tenantId_platformAccountId: \{ tenantId, platformAccountId \} \}/);
 assert.match(profileService, /await this\.prisma\.profile\.create/);
 
 // Platform admin manages Tenant containers and exposes the owner's Profile separately.
@@ -87,7 +87,7 @@ assert.match(invitationService, /TenantInvitationStatus/);
 assert.match(invitationService, /prisma\.tenantInvitation/);
 
 // Workspace state follows Tenant + login identity and is not the Profile itself.
-assert.match(workspaceService, /tenantId_userId/);
-assert.match(workspaceService, /create: \{ tenantId, userId, data, revision: 1 \}/);
+assert.match(workspaceService, /tenantId_platformAccountId/);
+assert.match(workspaceService, /create: \{ tenantId, platformAccountId, data, revision: 1 \}/);
 
 console.log('Profile identity boundary tests: OK');
