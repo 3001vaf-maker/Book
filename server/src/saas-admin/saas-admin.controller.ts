@@ -23,9 +23,9 @@ export class SaasAdminController {
     return this.admin.me(request.platformAdminId!, request.auth!.userId);
   }
 
-  @Get('masters')
-  masters() {
-    return this.admin.masters();
+  @Get('profiles')
+  profiles() {
+    return this.admin.profiles();
   }
 
   @Get('capabilities')
