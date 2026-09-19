@@ -480,7 +480,7 @@ export class BusinessStateService {
     );
   }
 
-  async upsertBookingPersonFromAccount(tenantId: string, account: JsonObject) {
+  async upsertPersonFromAccount(tenantId: string, account: JsonObject) {
     await this.requireVerified(tenantId);
     const accountId = text(account.id);
     if (!accountId) throw new BadRequestException('У аккаунта онлайн-записи отсутствует id');
