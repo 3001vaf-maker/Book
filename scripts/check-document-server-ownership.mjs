@@ -16,7 +16,7 @@ if (/localStorage|readLegacy|\/tenant-document-archive\/migrate/.test(migration)
 if (!documents.includes('hydrateDocumentsFromServer') || !documents.includes('configureDocumentPersistence')) failures.push('Document templates must be server-owned.');
 if (!consents.includes('hydrateConsentsFromServer') || consents.includes('configureConsentPersistence') || consents.includes('recordConsent')) failures.push('Consent facts must be read-only in the browser and server-owned.');
 if (!history.includes('hydrateDocumentHistoryFromServer') || !history.includes('configureDocumentHistoryPersistence')) failures.push('Document history must be server-owned.');
-if (!moduleSource.includes("import { AuthModule } from '../auth/auth.module';") || !moduleSource.includes('imports: [AuthModule]')) failures.push('TenantDocumentArchiveModule must import AuthModule for JwtAuthGuard/JwtService runtime wiring.');
+if (!moduleSource.includes("import { AuthModule } from '../auth/auth.module';") || !moduleSource.includes('imports: [AuthModule')) failures.push('TenantDocumentArchiveModule must import AuthModule for JwtAuthGuard/JwtService runtime wiring.');
 if (!schema.includes('model TenantDocumentArchive')) failures.push('Server must own a dedicated Tenant Document Archive.');
 
 if (failures.length) {
