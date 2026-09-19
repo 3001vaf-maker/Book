@@ -78,7 +78,7 @@ export function normalizeRecordFinance(value = null) {
 export function hydrateRecordFinance(record = null) {
   if (!record?.id) return record;
   const discountPercent = record?.personDiscountPercent == null
-    ? recordPersonDiscount(record?.client)
+    ? recordPersonDiscount(record?.person)
     : clampFinancialPercent(record.personDiscountPercent);
   const { personDiscountPercent: _legacyDiscount, ...cleanRecord } = record;
   const normalizedRecord = {
