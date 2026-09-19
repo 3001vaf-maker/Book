@@ -417,8 +417,9 @@ export class OnlineBookingService {
     const account = await this.prisma.bookingAccount.findFirst({ where: { id: accountId, tenantId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
     const data = await this.bookingSource(tenantId);
-    const consentState = await this.consentPolicy.requiredConsentState(tenantId, accountId);
-    if (!consentState.allowed) throw new ConflictException('Необходимо заново подтвердить обязательные документы');
+    if (!(await this.consentPolicy.hasActivePdnConsent(tenantId, accountId))) {
+      throw new ConflictException('Необходимо подтвердить согласие на обработку персональных данных');
+    }
     const workplaceKey = text(body.workplaceKey);
     const date = dateValue(body.date);
     const from = text(body.from);
