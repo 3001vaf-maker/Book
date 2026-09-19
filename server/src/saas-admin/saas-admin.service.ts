@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { CapabilityValueType, TenantAccessStatus } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { SaasAccessService } from '../saas-access/saas-access.service';
-import { MasterInvitationService } from '../master-invitation/master-invitation.service';
+import { TenantInvitationService } from '../tenant-invitation/tenant-invitation.service';
 import { DocumentRegistryService } from '../document-registry/document-registry.service';
 
 @Injectable()
@@ -10,7 +10,7 @@ export class SaasAdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: SaasAccessService,
-    private readonly invitations: MasterInvitationService,
+    private readonly invitations: TenantInvitationService,
     private readonly documentRegistry: DocumentRegistryService,
   ) {}
 
@@ -46,7 +46,7 @@ export class SaasAdminService {
     });
   }
 
-  async masters() {
+  async tenants() {
     const rows = await this.prisma.tenantAccess.findMany({
       include: {
         plan: { select: { id: true, key: true, name: true } },
@@ -59,7 +59,7 @@ export class SaasAdminService {
             profiles: {
               select: { userId: true, name: true, surname: true, profession: true },
             },
-            masterInvitations: {
+            tenantInvitations: {
               orderBy: { createdAt: 'desc' },
               take: 1,
               select: { id: true, email: true, name: true, status: true, createdAt: true, expiresAt: true },
@@ -75,7 +75,7 @@ export class SaasAdminService {
       const profile = membership
         ? row.tenant.profiles.find((item) => item.userId === membership.userId) || null
         : null;
-      const invitation = row.tenant.masterInvitations[0] || null;
+      const invitation = row.tenant.tenantInvitations[0] || null;
       const resolved = await this.access.resolveTenantAccess(row.tenantId);
       return {
         tenantId: row.tenantId,
@@ -83,7 +83,7 @@ export class SaasAdminService {
         status: row.status,
         isOwnerBook: row.isOwnerBook,
         plan: row.plan,
-        master: membership ? {
+        ownerProfile: membership ? {
           userId: membership.user.id,
           email: membership.user.email,
           name: [profile?.name, profile?.surname].filter(Boolean).join(' ') || invitation?.name || row.tenant.name,
