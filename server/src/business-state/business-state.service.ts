@@ -446,7 +446,6 @@ export class BusinessStateService {
       links: Array.isArray(previous.links) ? previous.links : [],
       tags: Array.isArray(previous.tags) ? previous.tags : [],
       discountPercent: Math.max(0, Math.min(100, Number(previous.discountPercent || 0) || 0)),
-      agreements: objectValue(previous.agreements),
       visits: Math.max(0, Number(previous.visits || 0)),
       totalSpent: Math.max(0, Number(previous.totalSpent || 0)),
       lastVisit: text(previous.lastVisit),
