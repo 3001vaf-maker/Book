@@ -56,7 +56,7 @@ hydrateDocumentHistoryFromServer([
 const history = getDocumentHistory();
 assert.equal(history[0].snapshot.text, 'Именно этот полный текст был показан и подписан.');
 
-const server = readFileSync(new URL('../server/src/tenant-document-archive/document-archive.service.ts', import.meta.url), 'utf8');
+const server = readFileSync(new URL('../server/src/tenant-document-archive/tenant-document-archive.service.ts', import.meta.url), 'utf8');
 assert.match(server, /FROM "TenantConsentEvent"/);
 assert.match(server, /const consents = state\?\.migrationVerifiedAt \? await this\.canonicalConsentEvents\(tenantId\) : \[\]/);
 assert.match(server, /data: \{ \.\.\.stored, consents \}/);
