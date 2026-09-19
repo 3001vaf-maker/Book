@@ -20,6 +20,10 @@ assert.match(consentPolicy, /async hasActivePdnConsentForIdentity\(/);
 assert.match(pdnGuard, /class BookingPdnConsentGuard/);
 assert.match(pdnGuard, /hasActivePdnConsent\(auth\.tenantId, auth\.accountId\)/);
 assert.match(pdnGuard, /code: 'PDN_CONSENT_REQUIRED'/);
+assert.match(pdnGuard, /accountConsentState\(auth\.tenantId, auth\.accountId\)/);
+assert.match(pdnGuard, /if \(!state\.pdnActive\)/);
+assert.doesNotMatch(pdnGuard, /requiredConsentState/);
+assert.doesNotMatch(consentPolicy, /async requiredConsentState\(/);
 
 assert.match(bookingController, /@UseGuards\(BookingAccountGuard\)\s+@Get\(':tenantId\/account\/requests'\)/);
 assert.match(bookingController, /@UseGuards\(BookingAccountGuard\)\s+@Get\(':tenantId\/account\/notifications'\)/);
