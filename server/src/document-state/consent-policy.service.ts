@@ -557,6 +557,24 @@ export class ConsentPolicyService {
     return Boolean(pdn?.accepted);
   }
 
+  async hasActivePdnConsentForIdentity(tenantId: string, phoneValue: unknown, ueiValue: unknown) {
+    const phone = canonicalPhone(phoneValue);
+    const uei = text(ueiValue);
+    if (!phone && !uei) return false;
+
+    const accounts = await this.prisma.bookingAccount.findMany({
+      where: { tenantId },
+      select: { id: true, phone: true, uei: true },
+    });
+    const candidates = accounts.filter((account) =>
+      (phone && canonicalPhone(account.phone) === phone) || (uei && text(account.uei) === uei)
+    );
+    for (const account of candidates) {
+      if (await this.hasActivePdnConsent(tenantId, account.id)) return true;
+    }
+    return false;
+  }
+
   async hasActivePdnConsentForContact(tenantId: string, typeValue: unknown, value: unknown) {
     const type = contactPointType(typeValue);
     const normalizedValue = contactPointValue(type, value);
