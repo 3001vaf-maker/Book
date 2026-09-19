@@ -37,6 +37,142 @@ jobs:
       - name: Build server
         run: npm run build --prefix server
 
+
+  profile-migration-upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install server dependencies
+        run: npm install --prefix server
+      - name: Start isolated database
+        run: |
+          docker compose -f docker-compose.staging.yml up -d db
+          for attempt in $(seq 1 30); do
+            if docker compose -f docker-compose.staging.yml exec -T db pg_isready -U book -d book_staging >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose -f docker-compose.staging.yml logs db
+          exit 1
+      - name: Apply pre-PROFILE migration chain
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/profile-migrations
+          mv server/prisma/migrations/20260919183000_tenant_invitation_naming /tmp/profile-migrations/
+          mv server/prisma/migrations/20260919184000_owner_membership_role /tmp/profile-migrations/
+          mv server/prisma/migrations/20260919185000_platform_account_naming /tmp/profile-migrations/
+          (
+            cd server
+            DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' npx prisma migrate deploy
+          )
+      - name: Seed representative pre-PROFILE rows
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.staging.yml exec -T db psql -U book -d book_staging <<'SQL'
+          INSERT INTO "Tenant" ("id","name","updatedAt")
+          VALUES ('upgrade-tenant','Upgrade Tenant',CURRENT_TIMESTAMP);
+
+          INSERT INTO "User" ("id","email","passwordHash","onboardingStep","workspaceUnlocked","updatedAt")
+          VALUES ('upgrade-user','upgrade@example.invalid','hash',3,true,CURRENT_TIMESTAMP);
+
+          INSERT INTO "Membership" ("id","tenantId","userId","role")
+          VALUES ('upgrade-membership','upgrade-tenant','upgrade-user','OWNER');
+
+          INSERT INTO "WorkspaceState" ("id","tenantId","userId","data","revision","updatedAt")
+          VALUES ('upgrade-workspace','upgrade-tenant','upgrade-user','{"kept":true}'::jsonb,7,CURRENT_TIMESTAMP);
+
+          INSERT INTO "Profile" (
+            "id","tenantId","userId","name","phones","telegrams","emails","customProfessions","updatedAt"
+          )
+          VALUES (
+            'upgrade-profile','upgrade-tenant','upgrade-user','Upgrade Profile',
+            '[]'::jsonb,'[]'::jsonb,'["upgrade@example.invalid"]'::jsonb,'[]'::jsonb,CURRENT_TIMESTAMP
+          );
+
+          INSERT INTO "PlatformAdmin" ("id","userId","updatedAt")
+          VALUES ('upgrade-admin','upgrade-user',CURRENT_TIMESTAMP);
+
+          INSERT INTO "MasterInvitation" (
+            "id","tenantId","createdByAdminId","email","name","tokenHash","status","expiresAt","updatedAt"
+          )
+          VALUES (
+            'upgrade-invitation','upgrade-tenant','upgrade-admin','invite@example.invalid','Invite',
+            'upgrade-token-hash','PENDING',CURRENT_TIMESTAMP + INTERVAL '7 days',CURRENT_TIMESTAMP
+          );
+          SQL
+      - name: Apply PROFILE migrations
+        shell: bash
+        run: |
+          set -euo pipefail
+          mv /tmp/profile-migrations/20260919183000_tenant_invitation_naming server/prisma/migrations/
+          mv /tmp/profile-migrations/20260919184000_owner_membership_role server/prisma/migrations/
+          mv /tmp/profile-migrations/20260919185000_platform_account_naming server/prisma/migrations/
+          (
+            cd server
+            DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' npx prisma migrate deploy
+          )
+      - name: Verify PROFILE migration preserves rows and names
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.staging.yml exec -T db psql -U book -d book_staging -v ON_ERROR_STOP=1 <<'SQL'
+          DO $
+          BEGIN
+            IF (SELECT COUNT(*) FROM "PlatformAccount" WHERE "id" = 'upgrade-user') <> 1 THEN
+              RAISE EXCEPTION 'PlatformAccount row was not preserved';
+            END IF;
+            IF (SELECT COUNT(*) FROM "Membership" WHERE "id" = 'upgrade-membership' AND "platformAccountId" = 'upgrade-user' AND "role"::text = 'OWNER') <> 1 THEN
+              RAISE EXCEPTION 'Membership row was not preserved';
+            END IF;
+            IF (SELECT COUNT(*) FROM "WorkspaceState" WHERE "id" = 'upgrade-workspace' AND "platformAccountId" = 'upgrade-user' AND "revision" = 7) <> 1 THEN
+              RAISE EXCEPTION 'WorkspaceState row was not preserved';
+            END IF;
+            IF (SELECT COUNT(*) FROM "Profile" WHERE "id" = 'upgrade-profile' AND "platformAccountId" = 'upgrade-user' AND "name" = 'Upgrade Profile') <> 1 THEN
+              RAISE EXCEPTION 'Profile row was not preserved';
+            END IF;
+            IF (SELECT COUNT(*) FROM "PlatformAdmin" WHERE "id" = 'upgrade-admin' AND "platformAccountId" = 'upgrade-user') <> 1 THEN
+              RAISE EXCEPTION 'PlatformAdmin row was not preserved';
+            END IF;
+            IF (SELECT COUNT(*) FROM "TenantInvitation" WHERE "id" = 'upgrade-invitation' AND "tenantId" = 'upgrade-tenant') <> 1 THEN
+              RAISE EXCEPTION 'TenantInvitation row was not preserved';
+            END IF;
+            IF to_regclass('"User"') IS NOT NULL THEN
+              RAISE EXCEPTION 'Retired account table still exists';
+            END IF;
+            IF to_regclass('"MasterInvitation"') IS NOT NULL THEN
+              RAISE EXCEPTION 'Retired invitation table still exists';
+            END IF;
+            IF EXISTS (
+              SELECT 1
+              FROM pg_enum e
+              JOIN pg_type t ON t.oid = e.enumtypid
+              WHERE t.typname = 'MembershipRole' AND e.enumlabel <> 'OWNER'
+            ) THEN
+              RAISE EXCEPTION 'Inactive MembershipRole value still exists';
+            END IF;
+            IF NOT EXISTS (
+              SELECT 1 FROM information_schema.columns
+              WHERE table_name = 'PlatformConsentEvent' AND column_name = 'platformAccountId'
+            ) THEN
+              RAISE EXCEPTION 'PlatformConsentEvent account column was not renamed';
+            END IF;
+          END
+          $;
+          SQL
+      - name: Stop isolated database
+        if: always()
+        run: docker compose -f docker-compose.staging.yml down -v
+
+
   staging-smoke:
     if: github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/main' || github.base_ref == 'staging' || github.base_ref == 'main'
     runs-on: ubuntu-latest
