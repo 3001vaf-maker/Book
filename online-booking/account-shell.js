@@ -15,7 +15,7 @@ import {
   appShell,
   bookingThemeStyle,
   button,
-  clientBottomNavigation,
+  accountBottomNavigation,
   emptyState,
   entityCard,
   escapeHtml,
@@ -29,9 +29,9 @@ import {
   readOnlyReceipt,
   settingsPanel,
 } from '../ui/ui.js';
-import { openClientConsentSettings } from './consent-settings.js';
-import { openClientPasswordSettings } from './password-settings.js';
-import { openClientPersonalData } from './personal-data.js';
+import { openAccountConsentSettings } from './consent-settings.js';
+import { openAccountPasswordSettings } from './password-settings.js';
+import { openAccountPersonalData } from './personal-data.js';
 
 function money(value) {
   const number = Number(value || 0);
@@ -181,7 +181,7 @@ function historyEntry(request, index) {
         { value: finance.extra, strong: true },
       ],
     ],
-    data: `data-client-history="${index}"`,
+    data: `data-account-history="${index}"`,
     aria: `Открыть запись ${formatDate(request.date)} ${request.from || ''}`,
   });
 }
@@ -281,11 +281,11 @@ async function loadMessages(state) {
 }
 
 function bindBottomNavigation(root, state, handlers) {
-  root.querySelectorAll('[data-client-nav]').forEach((node) => node.addEventListener('click', () => {
-    const next = String(node.dataset.clientNav || '');
-    if (!next || next === state.clientTab) return;
-    state.clientTab = next;
-    state.clientChatOpen = false;
+  root.querySelectorAll('[data-account-nav]').forEach((node) => node.addEventListener('click', () => {
+    const next = String(node.dataset.accountNav || '');
+    if (!next || next === state.accountTab) return;
+    state.accountTab = next;
+    state.accountChatOpen = false;
     void handlers.render();
   }));
 }
@@ -294,7 +294,7 @@ function accountThemeClasses(state) {
   const theme = state.settings?.theme && typeof state.settings.theme === 'object' ? state.settings.theme : {};
   const shape = ['soft', 'round', 'straight', 'cut'].includes(theme.shape) ? theme.shape : 'soft';
   const choiceStyle = ['cards', 'compact', 'list'].includes(theme.choiceStyle) ? theme.choiceStyle : 'cards';
-  return `booking-client booking-client--account booking-shape--${shape} booking-choice-style--${choiceStyle}`;
+  return `booking-account booking-account--account booking-shape--${shape} booking-choice-style--${choiceStyle}`;
 }
 
 function renderShell(root, state, { title, back = null, action = null, settings = null, body = '', primaryAction = '', className = '', media = null } = {}) {
@@ -303,7 +303,7 @@ function renderShell(root, state, { title, back = null, action = null, settings 
     media: media === null ? mediaRail(mediaItems(state)) : media,
     body,
     primaryAction,
-    bottomNavigation: clientBottomNavigation(state.clientTab || 'profile'),
+    bottomNavigation: accountBottomNavigation(state.accountTab || 'profile'),
     className,
   });
   root.innerHTML = `<section class="${accountThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${shell}</section>`;
@@ -334,7 +334,7 @@ async function openChatSettings(state) {
     });
     layer?.querySelector('[data-chat-consents]')?.addEventListener('click', () => {
       layer.remove();
-      void openClientConsentSettings(state);
+      void openAccountConsentSettings(state);
     });
   };
   bind();
@@ -342,31 +342,31 @@ async function openChatSettings(state) {
 
 function openProfileSettings(state, { onPersonalData, onPassword, onConsents, onLogout }) {
   const layer = mountModal(document.body, modal(settingsPanel([
-    { label: 'Личные данные', data: 'data-client-personal-data' },
-    { label: 'Изменить пароль', data: 'data-client-change-password' },
-    { label: 'Согласия', data: 'data-client-consents' },
-    { label: 'Выход', data: 'data-client-logout', variant: 'danger' },
+    { label: 'Личные данные', data: 'data-account-personal-data' },
+    { label: 'Изменить пароль', data: 'data-account-change-password' },
+    { label: 'Согласия', data: 'data-account-consents' },
+    { label: 'Выход', data: 'data-account-logout', variant: 'danger' },
   ]), { variant: 'medium', surface: 'app', title: 'Настройки профиля' }));
-  layer?.querySelector('[data-client-personal-data]')?.addEventListener('click', () => {
+  layer?.querySelector('[data-account-personal-data]')?.addEventListener('click', () => {
     layer.remove();
     onPersonalData?.();
   });
-  layer?.querySelector('[data-client-change-password]')?.addEventListener('click', () => {
+  layer?.querySelector('[data-account-change-password]')?.addEventListener('click', () => {
     layer.remove();
     onPassword?.();
   });
-  layer?.querySelector('[data-client-consents]')?.addEventListener('click', () => {
+  layer?.querySelector('[data-account-consents]')?.addEventListener('click', () => {
     layer.remove();
     onConsents?.();
   });
-  layer?.querySelector('[data-client-logout]')?.addEventListener('click', () => {
+  layer?.querySelector('[data-account-logout]')?.addEventListener('click', () => {
     layer.remove();
     onLogout?.();
   });
 }
 
 async function renderProfile(root, state, handlers) {
-  const requests = state.clientRequests || [];
+  const requests = state.accountRequests || [];
   const account = state.account || {};
   const profile = account.profileData && typeof account.profileData === 'object' ? account.profileData : {};
   const visit = nearestVisit(requests);
@@ -398,7 +398,7 @@ async function renderProfile(root, state, handlers) {
     detailRows: rows.map((row, index) => ({
       left: row.label,
       right: row.value,
-      data: `data-client-program="${index}"`,
+      data: `data-account-program="${index}"`,
       aria: `Открыть программу ${row.label}`,
     })),
     className: 'entity-card--hero',
@@ -406,32 +406,32 @@ async function renderProfile(root, state, handlers) {
   const profileMedia = mediaRail(mediaItems(state)) || '<div class="app-media-rail app-media-rail--placeholder" aria-hidden="true"></div>';
   renderShell(root, state, {
     title: 'Профиль',
-    settings: { data: 'data-client-profile-settings', aria: 'Настройки профиля' },
+    settings: { data: 'data-account-profile-settings', aria: 'Настройки профиля' },
     body: card,
     media: profileMedia,
-    primaryAction: button('Записаться', { data: 'data-client-booking' }),
+    primaryAction: button('Записаться', { data: 'data-account-booking' }),
     className: 'app-view-shell--profile',
   });
   bindBottomNavigation(root, state, handlers);
-  root.querySelector('[data-client-booking]')?.addEventListener('click', handlers.onStartBooking);
-  root.querySelector('[data-client-profile-settings]')?.addEventListener('click', () => openProfileSettings(state, {
+  root.querySelector('[data-account-booking]')?.addEventListener('click', handlers.onStartBooking);
+  root.querySelector('[data-account-profile-settings]')?.addEventListener('click', () => openProfileSettings(state, {
     onPersonalData: handlers.onPersonalData,
     onPassword: handlers.onPassword,
     onConsents: handlers.onConsents,
     onLogout: handlers.onLogout,
   }));
-  root.querySelectorAll('[data-client-program]').forEach((node) => node.addEventListener('click', () => openProgram(rows[Number(node.dataset.clientProgram)])));
+  root.querySelectorAll('[data-account-program]').forEach((node) => node.addEventListener('click', () => openProgram(rows[Number(node.dataset.accountProgram)])));
 }
 
 async function renderHistory(root, state, handlers) {
-  const requests = state.clientRequests || [];
+  const requests = state.accountRequests || [];
   const body = requests.length
     ? listEntries(requests.map((request, index) => historyEntry(request, index)))
     : emptyState('История пока пустая', 'Здесь появятся ваши записи и визиты.');
   renderShell(root, state, { title: 'История', body });
   bindBottomNavigation(root, state, handlers);
-  root.querySelectorAll('[data-client-history]').forEach((node) => node.addEventListener('click', () => {
-    const request = requests[Number(node.dataset.clientHistory)];
+  root.querySelectorAll('[data-account-history]').forEach((node) => node.addEventListener('click', () => {
+    const request = requests[Number(node.dataset.accountHistory)];
     if (request) openHistoryDetail(state, request, handlers.onRepeat);
   }));
 }
@@ -439,20 +439,20 @@ async function renderHistory(root, state, handlers) {
 async function renderMessages(root, state, handlers) {
   const messages = await loadMessages(state);
   const profileName = profileDisplayName(state);
-  if (!state.clientChatOpen) {
+  if (!state.accountChatOpen) {
     const last = messages[messages.length - 1];
     const lastLabel = last?.body ? String(last.body).split('\n')[0] : Array.isArray(last?.attachments) && last.attachments.length ? 'Медиа' : 'Открыть диалог';
     const body = listEntries([listEntry({
       title: profileName,
       subtitle: lastLabel,
       rightTop: last?.time || '',
-      data: 'data-client-open-chat',
+      data: 'data-account-open-chat',
       aria: `Открыть диалог с ${profileName}`,
     })]);
     renderShell(root, state, { title: 'Сообщения', body, media: '' });
     bindBottomNavigation(root, state, handlers);
-    root.querySelector('[data-client-open-chat]')?.addEventListener('click', () => {
-      state.clientChatOpen = true;
+    root.querySelector('[data-account-open-chat]')?.addEventListener('click', () => {
+      state.accountChatOpen = true;
       void handlers.render();
     });
     return;
@@ -460,20 +460,20 @@ async function renderMessages(root, state, handlers) {
 
   renderShell(root, state, {
     title: profileName,
-    back: { data: 'data-client-chat-back', aria: 'К списку диалогов' },
-    action: { label: 'Записаться', data: 'data-client-chat-booking' },
-    settings: { data: 'data-client-chat-settings', aria: 'Настройки чата' },
-    body: `${messages.length ? messageThread(messages, { viewer: 'client' }) : emptyState('Сообщений пока нет', 'Напишите первое сообщение.')}${messageComposer({ attachments: true })}`,
+    back: { data: 'data-account-chat-back', aria: 'К списку диалогов' },
+    action: { label: 'Записаться', data: 'data-account-chat-booking' },
+    settings: { data: 'data-account-chat-settings', aria: 'Настройки чата' },
+    body: `${messages.length ? messageThread(messages, { viewer: 'account' }) : emptyState('Сообщений пока нет', 'Напишите первое сообщение.')}${messageComposer({ attachments: true })}`,
     media: '',
     className: 'app-view-shell--chat',
   });
   bindBottomNavigation(root, state, handlers);
-  root.querySelector('[data-client-chat-back]')?.addEventListener('click', () => {
-    state.clientChatOpen = false;
+  root.querySelector('[data-account-chat-back]')?.addEventListener('click', () => {
+    state.accountChatOpen = false;
     void handlers.render();
   });
-  root.querySelector('[data-client-chat-booking]')?.addEventListener('click', handlers.onStartBooking);
-  root.querySelector('[data-client-chat-settings]')?.addEventListener('click', () => void openChatSettings(state));
+  root.querySelector('[data-account-chat-booking]')?.addEventListener('click', handlers.onStartBooking);
+  root.querySelector('[data-account-chat-settings]')?.addEventListener('click', () => void openChatSettings(state));
   root.querySelectorAll('[data-message-id]').forEach((node) => {
     const message = messages.find((item) => String(item?.id || '') === String(node.dataset.messageId || ''));
     if (!message?.notificationId || !message.unread) return;
@@ -523,15 +523,15 @@ async function renderMessages(root, state, handlers) {
   });
 }
 
-export async function renderClientAccount(root, state, callbacks = {}) {
-  state.clientTab ||= 'profile';
-  state.clientChatOpen = Boolean(state.clientChatOpen);
+export async function renderAccountAccount(root, state, callbacks = {}) {
+  state.accountTab ||= 'profile';
+  state.accountChatOpen = Boolean(state.accountChatOpen);
   try {
     const [requests, account] = await Promise.all([
       getAccountRequests(state.tenantId).catch(() => []),
       getAccount(state.tenantId),
     ]);
-    state.clientRequests = Array.isArray(requests) ? requests : [];
+    state.accountRequests = Array.isArray(requests) ? requests : [];
     if (account) state.account = account;
     state.error = '';
   } catch (error) {
@@ -539,15 +539,15 @@ export async function renderClientAccount(root, state, callbacks = {}) {
   }
 
   const handlers = {
-    render: () => renderClientAccount(root, state, callbacks),
+    render: () => renderAccountAccount(root, state, callbacks),
     onStartBooking: callbacks.onStartBooking || (() => {}),
     onRepeat: callbacks.onRepeat || (() => {}),
-    onPersonalData: () => openClientPersonalData(state, {
-      onSaved: () => renderClientAccount(root, state, callbacks),
+    onPersonalData: () => openAccountPersonalData(state, {
+      onSaved: () => renderAccountAccount(root, state, callbacks),
     }),
-    onPassword: () => openClientPasswordSettings(state),
-    onConsents: () => openClientConsentSettings(state, {
-      onChanged: () => renderClientAccount(root, state, callbacks),
+    onPassword: () => openAccountPasswordSettings(state),
+    onConsents: () => openAccountConsentSettings(state, {
+      onChanged: () => renderAccountAccount(root, state, callbacks),
     }),
     onLogout: callbacks.onLogout || (() => {
       clearAccount(state.tenantId);
@@ -560,7 +560,7 @@ export async function renderClientAccount(root, state, callbacks = {}) {
     return;
   }
 
-  if (state.clientTab === 'messages') return renderMessages(root, state, handlers);
-  if (state.clientTab === 'history') return renderHistory(root, state, handlers);
+  if (state.accountTab === 'messages') return renderMessages(root, state, handlers);
+  if (state.accountTab === 'history') return renderHistory(root, state, handlers);
   return renderProfile(root, state, handlers);
 }
