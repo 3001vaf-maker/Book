@@ -57,7 +57,7 @@ model Tenant {
   invitations              Invitation[]
 }
 
-model User {
+model PlatformAccount {
   id                String           @id @default(cuid())
   email             String           @unique
   passwordHash      String
@@ -74,38 +74,38 @@ model User {
 model Membership {
   id        String         @id @default(cuid())
   tenantId  String
-  userId    String
+  platformAccountId    String
   role      MembershipRole @default(OWNER)
   createdAt DateTime       @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account PlatformAccount   @relation(fields: [platformAccountId], references: [id], onDelete: Cascade)
 
-  @@unique([tenantId, userId])
-  @@index([userId])
+  @@unique([tenantId, platformAccountId])
+  @@index([platformAccountId])
 }
 
 model WorkspaceState {
   id        String   @id @default(cuid())
   tenantId  String
-  userId    String
+  platformAccountId    String
   data      Json
   revision  Int      @default(1)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account PlatformAccount   @relation(fields: [platformAccountId], references: [id], onDelete: Cascade)
 
-  @@unique([tenantId, userId])
+  @@unique([tenantId, platformAccountId])
   @@index([tenantId])
-  @@index([userId])
+  @@index([platformAccountId])
 }
 
 model Profile {
   id                  String      @id @default(cuid())
   tenantId            String
-  userId              String
+  platformAccountId              String
   key                 String      @default("profile")
   name                String      @default("")
   surname             String      @default("")
@@ -124,13 +124,13 @@ model Profile {
   updatedAt           DateTime    @updatedAt
 
   tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account    PlatformAccount        @relation(fields: [platformAccountId], references: [id], onDelete: Cascade)
   workplaces Workplace[]
 
-  @@unique([tenantId, userId])
+  @@unique([tenantId, platformAccountId])
   @@unique([id, tenantId])
   @@index([tenantId])
-  @@index([userId])
+  @@index([platformAccountId])
 }
 
 model Workplace {
@@ -325,11 +325,11 @@ model BusinessAuxiliaryState {
 
 model PlatformAdmin {
   id        String   @id @default(cuid())
-  userId    String   @unique
+  platformAccountId    String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account            PlatformAccount               @relation(fields: [platformAccountId], references: [id], onDelete: Cascade)
   createdInvitations Invitation[]
 }
 
