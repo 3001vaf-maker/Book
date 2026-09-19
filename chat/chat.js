@@ -139,25 +139,25 @@ async function renderCompose(root, state, recipient) {
   const allowsAttachments = recipient.mode === 'one';
   screen(root, appHeader({
     title: 'Новое сообщение',
-    back: { data: 'data-master-compose-back', aria: 'К диалогам' },
+    back: { data: 'data-profile-compose-back', aria: 'К диалогам' },
   }), `
     <div class="action-block"><strong>Кому: ${recipientLabel(recipient)}</strong></div>
-    ${button('Выбрать шаблон', { variant: 'secondary', data: 'data-master-template-choose' })}
+    ${button('Выбрать шаблон', { variant: 'secondary', data: 'data-profile-template-choose' })}
     ${messageComposer({ placeholder: 'Написать сообщение...', attachments: allowsAttachments })}
-    <div class="muted" data-master-compose-status aria-live="polite"></div>
+    <div class="muted" data-profile-compose-status aria-live="polite"></div>
   `, 'app-view-shell--chat');
-  root.querySelector('[data-master-compose-back]')?.addEventListener('click', () => void renderThreads(root, state));
+  root.querySelector('[data-profile-compose-back]')?.addEventListener('click', () => void renderThreads(root, state));
   const form = root.querySelector('[data-message-composer]');
   const input = form?.querySelector('[name="message"]');
   const getAttachments = allowsAttachments ? bindMessageAttachments(form) : () => [];
-  root.querySelector('[data-master-template-choose]')?.addEventListener('click', () => void chooseTemplate(input));
+  root.querySelector('[data-profile-template-choose]')?.addEventListener('click', () => void chooseTemplate(input));
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const body = String(input?.value || '').trim();
     const attachments = getAttachments();
     if (!body && !attachments.length) return;
     const submit = form.querySelector('button[type="submit"]');
-    const status = root.querySelector('[data-master-compose-status]');
+    const status = root.querySelector('[data-profile-compose-status]');
     if (submit) submit.disabled = true;
     if (status) status.textContent = 'Отправляем…';
     try {
@@ -314,7 +314,7 @@ async function manageTemplates() {
   }));
 }
 
-function openMasterChatSettings() {
+function openProfileChatSettings() {
   const layer = mountModal(document.body, modal(settingsPanel([
     { label: 'Группы клиентов', data: 'data-chat-groups' },
     { label: 'Шаблоны сообщений', data: 'data-chat-templates' },
@@ -331,7 +331,7 @@ async function openThread(root, state, thread) {
   screen(root, appHeader({ title: clientName(phone, uei), back: { data: 'data-chat-back', aria: 'К диалогам' } }), emptyState('Загрузка', 'Получаем переписку.'), 'app-view-shell--chat');
   try {
     const messages = withTimes(await getCommunicationThread({ phone, uei }));
-    screen(root, appHeader({ title: clientName(phone, uei), back: { data: 'data-chat-back', aria: 'К диалогам' } }), `${messages.length ? messageThread(messages, { viewer: 'master' }) : emptyState('Сообщений пока нет', 'Напишите клиенту первое сообщение.')}${messageComposer({ placeholder: 'Написать сообщение...', attachments: true })}<div class="muted" data-chat-status aria-live="polite"></div>`, 'app-view-shell--chat');
+    screen(root, appHeader({ title: clientName(phone, uei), back: { data: 'data-chat-back', aria: 'К диалогам' } }), `${messages.length ? messageThread(messages, { viewer: 'profile' }) : emptyState('Сообщений пока нет', 'Напишите клиенту первое сообщение.')}${messageComposer({ placeholder: 'Написать сообщение...', attachments: true })}<div class="muted" data-chat-status aria-live="polite"></div>`, 'app-view-shell--chat');
     root.querySelector('[data-chat-back]')?.addEventListener('click', () => void renderThreads(root, state));
     const form = root.querySelector('[data-message-composer]');
     const getAttachments = bindMessageAttachments(form);
@@ -373,7 +373,7 @@ async function renderThreads(root, state) {
     }));
     screen(root, appHeader({ title: 'Сообщения', action: { label: 'Новое', data: 'data-chat-new' }, settings: { data: 'data-chat-settings', aria: 'Настройки сообщений' } }), items.length ? listEntries(items) : emptyState('Чат пока пуст', 'Сообщения и системные уведомления клиентов появятся здесь.'));
     root.querySelector('[data-chat-new]')?.addEventListener('click', () => recipientOptions(root, state));
-    root.querySelector('[data-chat-settings]')?.addEventListener('click', openMasterChatSettings);
+    root.querySelector('[data-chat-settings]')?.addEventListener('click', openProfileChatSettings);
     root.querySelectorAll('[data-chat-thread]').forEach((element) => element.addEventListener('click', () => {
       const thread = threads[Number(element.dataset.chatThread)];
       if (thread) void openThread(root, state, thread);
@@ -381,7 +381,7 @@ async function renderThreads(root, state) {
   } catch (error) {
     screen(root, appHeader({ title: 'Сообщения', action: { label: 'Новое', data: 'data-chat-new' }, settings: { data: 'data-chat-settings', aria: 'Настройки сообщений' } }), emptyState('Чат недоступен', error instanceof Error ? error.message : 'Не удалось загрузить диалоги'));
     root.querySelector('[data-chat-new]')?.addEventListener('click', () => recipientOptions(root, state));
-    root.querySelector('[data-chat-settings]')?.addEventListener('click', openMasterChatSettings);
+    root.querySelector('[data-chat-settings]')?.addEventListener('click', openProfileChatSettings);
   }
 }
 
