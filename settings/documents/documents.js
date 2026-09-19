@@ -14,7 +14,7 @@ let currentSection = 'root';
 let currentHistoryView = 'documents';
 
 function statusText(item) {
-  if (!item.clientConsent) return 'Документ';
+  if (!item.personConsent) return 'Документ';
   return item.required ? 'Обязательное согласие' : 'Необязательное согласие';
 }
 
