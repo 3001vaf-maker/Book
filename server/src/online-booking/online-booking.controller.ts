@@ -183,14 +183,14 @@ export class OnlineBookingController {
     return this.notifications.markReadForAccount(tenantId, request.bookingAccountAuth!.accountId, notificationId);
   }
 
-  @UseGuards(BookingAccountGuard)
+  @UseGuards(BookingAccountGuard, BookingRequiredConsentGuard)
   @Get(':tenantId/account/chat')
   async accountChat(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
     const account = await this.booking.getAccount(tenantId, request.bookingAccountAuth!.accountId);
     return this.communications.listThread(tenantId, { phone: account.phone, uei: account.uei }, 500);
   }
 
-  @UseGuards(BookingAccountGuard)
+  @UseGuards(BookingAccountGuard, BookingRequiredConsentGuard)
   @Post(':tenantId/account/chat/messages')
   async sendAccountChatMessage(
     @Param('tenantId') tenantId: string,
