@@ -3,16 +3,22 @@ import { readFileSync } from 'node:fs';
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
-const clients = read('main/clients/data.js');
+const clientData = read('main/clients/data.js');
+const clientUi = read('main/clients/clients.js');
 const browserConsents = read('settings/documents/consents.js');
 const businessState = read('server/src/business-state/business-state.service.ts');
 const migration = read('document-migration.js');
 const policy = read('server/src/document-state/consent-policy.service.ts');
 
-assert.doesNotMatch(clients, /migrateLegacyConsents/);
-assert.doesNotMatch(clients, /getLatestClientConsent/);
-assert.doesNotMatch(clients, /agreements\s*:/);
-assert.doesNotMatch(clients, /person\.agreements/);
+assert.doesNotMatch(clientData, /migrateLegacyConsents/);
+assert.doesNotMatch(clientData, /getLatestClientConsent/);
+assert.doesNotMatch(clientData, /agreements\s*:/);
+assert.doesNotMatch(clientData, /person\.agreements/);
+assert.doesNotMatch(clientUi, /getLatestClientConsent/);
+assert.doesNotMatch(clientUi, /p\.agreements/);
+assert.match(clientUi, /getConsents/);
+assert.match(clientUi, /BOOKING_ACCOUNT/);
+assert.match(clientUi, /CONTACT_POINT/);
 
 assert.match(browserConsents, /hydrateConsentsFromServer/);
 assert.match(browserConsents, /subjectType/);
