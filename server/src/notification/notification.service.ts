@@ -121,7 +121,7 @@ export class NotificationService {
     ]);
     if (!account) throw new NotFoundException('Аккаунт не найден');
     const personPhone = canonicalPhone(account.phone);
-    if (!personPhone) throw new NotFoundException('У Person не определён номер телефона');
+    if (!personPhone) throw new NotFoundException('У человека не определён номер телефона');
     const personKey = text(identity?.person?.key || identity?.matchedPerson?.key);
     const uei = text(identity?.uei);
     const telegramRows = await this.prisma.$queryRaw<Array<{ externalUserId: string }>>`
