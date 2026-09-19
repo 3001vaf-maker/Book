@@ -59,8 +59,12 @@ function walk(dir) {
   });
 }
 
-function escapeRegex(value) {
-  return value.replace(/[.*+?^\${}()|[\]\\]/g, '\\const literalViolations = [];
+function isProfessionDataLiteral(line, term) {
+  const normalizedLine = line.toLocaleLowerCase('ru-RU').replace(/\s+/g, ' ');
+  return normalizedLine.includes(`profession: '${term}'`)
+    || normalizedLine.includes(`profession: "${term}"`);
+}
+const literalViolations = [];
 const structuralViolations = [];');
 }
 
