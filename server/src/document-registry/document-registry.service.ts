@@ -10,7 +10,7 @@ export class DocumentRegistryService {
       id: string;
       tenantId: string | null;
       tenantName: string | null;
-      userId: string;
+      platformAccountId: string;
       userEmail: string;
       documentKey: string;
       documentTitle: string;
@@ -25,7 +25,7 @@ export class DocumentRegistryService {
         e."id",
         e."tenantId",
         t."name" AS "tenantName",
-        e."userId",
+        e."platformAccountId",
         u."email" AS "userEmail",
         d."key" AS "documentKey",
         d."title" AS "documentTitle",
@@ -38,7 +38,7 @@ export class DocumentRegistryService {
       FROM "PlatformConsentEvent" e
       JOIN "PlatformDocumentVersion" v ON v."id" = e."documentVersionId"
       JOIN "PlatformDocument" d ON d."id" = v."documentId"
-      JOIN "User" u ON u."id" = e."userId"
+      JOIN "PlatformAccount" a ON a."id" = e."platformAccountId"
       LEFT JOIN "Tenant" t ON t."id" = e."tenantId"
       ORDER BY e."occurredAt" DESC, e."id" DESC
     `;
