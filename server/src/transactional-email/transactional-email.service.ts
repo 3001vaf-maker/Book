@@ -1,4 +1,5 @@
 import { BadGatewayException, Injectable, ServiceUnavailableException } from '@nestjs/common';
+import * as nodemailer from 'nodemailer';
 
 type TransactionalEmailInput = {
   to: string;
@@ -9,49 +10,71 @@ type TransactionalEmailInput = {
   tag?: string;
 };
 
-type BrevoResponse = {
-  messageId?: string;
-  message?: string;
-  code?: string;
-};
+const DEFAULT_CLIENT_APP_URL = 'https://3001vaf-maker.github.io/Book';
+const DEFAULT_SMTP_HOST = 'postbox.cloud.yandex.net';
+const DEFAULT_SMTP_PORT = 465;
 
 @Injectable()
 export class TransactionalEmailService {
   async send(input: TransactionalEmailInput) {
-    const provider = String(process.env.TRANSACTIONAL_EMAIL_PROVIDER || 'brevo').trim().toLowerCase();
-    if (provider !== 'brevo') {
+    const provider = String(process.env.TRANSACTIONAL_EMAIL_PROVIDER || 'yandex-postbox').trim().toLowerCase();
+    if (provider !== 'yandex-postbox') {
       throw new ServiceUnavailableException(`Неподдерживаемый провайдер транзакционной почты: ${provider}`);
     }
 
-    const apiKey = String(process.env.BREVO_API_KEY || '').trim();
     const fromEmail = String(process.env.TRANSACTIONAL_EMAIL_FROM_EMAIL || '').trim().toLowerCase();
     const fromName = String(process.env.TRANSACTIONAL_EMAIL_FROM_NAME || 'Book').trim() || 'Book';
-    if (!apiKey || !fromEmail) {
+    const smtpUser = String(process.env.YANDEX_POSTBOX_SMTP_USER || '').trim();
+    const smtpPassword = String(process.env.YANDEX_POSTBOX_SMTP_PASSWORD || '').trim();
+    const smtpHost = String(process.env.YANDEX_POSTBOX_SMTP_HOST || DEFAULT_SMTP_HOST).trim();
+    const smtpPort = Number(process.env.YANDEX_POSTBOX_SMTP_PORT || DEFAULT_SMTP_PORT);
+
+    if (!fromEmail || !smtpUser || !smtpPassword || !smtpHost || !Number.isInteger(smtpPort) || smtpPort <= 0) {
       throw new ServiceUnavailableException('Транзакционная почта Book ещё не настроена');
     }
 
-    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: {
-        accept: 'application/json',
-        'api-key': apiKey,
-        'content-type': 'application/json',
+    const clientAppUrl = String(process.env.CLIENT_APP_URL || DEFAULT_CLIENT_APP_URL).trim().replace(/\/+$/, '');
+    const frontendOrigin = String(process.env.FRONTEND_ORIGIN || '').trim().replace(/\/+$/, '');
+    const inviteSource = frontendOrigin ? `${frontendOrigin}/invite/` : '';
+    const inviteTarget = `${clientAppUrl}/invite/`;
+    const html = input.tag === 'master-invitation' && inviteSource
+      ? input.html.split(inviteSource).join(inviteTarget)
+      : input.html;
+    const text = input.tag === 'master-invitation' && input.text && inviteSource
+      ? input.text.split(inviteSource).join(inviteTarget)
+      : input.text;
+
+    const transport = nodemailer.createTransport({
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpPort === 465,
+      auth: {
+        user: smtpUser,
+        pass: smtpPassword,
       },
-      body: JSON.stringify({
-        sender: { email: fromEmail, name: fromName },
-        to: [{ email: String(input.to || '').trim().toLowerCase(), name: String(input.toName || '').trim() }],
-        subject: input.subject,
-        htmlContent: input.html,
-        textContent: input.text || undefined,
-        tags: input.tag ? [input.tag] : undefined,
-      }),
+      tls: {
+        minVersion: 'TLSv1.2',
+      },
     });
 
-    const payload = await response.json().catch(() => ({})) as BrevoResponse;
-    if (!response.ok || !payload.messageId) {
-      throw new BadGatewayException(payload.message || 'Провайдер не отправил письмо');
-    }
+    try {
+      const result = await transport.sendMail({
+        from: { address: fromEmail, name: fromName },
+        to: [{ address: String(input.to || '').trim().toLowerCase(), name: String(input.toName || '').trim() }],
+        subject: input.subject,
+        html,
+        text: text || undefined,
+        headers: input.tag ? { 'X-Book-Tag': input.tag } : undefined,
+      });
 
-    return { provider: 'brevo', messageId: payload.messageId };
+      if (!result.messageId) {
+        throw new Error('SMTP-сервер не вернул идентификатор письма');
+      }
+
+      return { provider: 'yandex-postbox', messageId: result.messageId };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Почтовый сервис не отправил письмо';
+      throw new BadGatewayException(message);
+    }
   }
 }
