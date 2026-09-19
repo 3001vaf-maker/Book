@@ -2,7 +2,7 @@ import { button } from '../buttons/index.js';
 import { navigationBar } from '../navigation/navigation.js';
 import { escapeHtml } from '../utils/escape-html.js';
 
-const CLIENT_NAV_ITEMS = [
+const ACCOUNT_NAV_ITEMS = [
   { id: 'profile', label: 'Профиль', icon: '◉' },
   { id: 'messages', label: 'Сообщения', icon: '💬' },
   { id: 'history', label: 'История', icon: '▤' },
@@ -49,9 +49,9 @@ export function mediaRail(items = []) {
 }
 
 export function accountBottomNavigation(active = 'profile') {
-  return navigationBar(CLIENT_NAV_ITEMS, active, {
+  return navigationBar(ACCOUNT_NAV_ITEMS, active, {
     className: 'bottom-nav--account',
-    aria: 'Клиентская навигация',
+    aria: 'Навигация аккаунта',
     dataAttribute: 'data-account-nav',
   });
 }
