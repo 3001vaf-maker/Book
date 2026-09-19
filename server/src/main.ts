@@ -7,7 +7,7 @@ import { AppModule } from './app.module';
 const API_HOST = 'api.va-tools.ru';
 const ADMIN_HOST = 'admin.va-tools.ru';
 const BOOK_HOST = 'book.va-tools.ru';
-const CLIENT_HOST = 'client.va-tools.ru';
+const ACCOUNT_HOST = 'client.va-tools.ru';
 
 function normalizeOrigin(value: string) {
   try {
@@ -28,7 +28,7 @@ function allowedOrigins() {
     return [
       `https://${ADMIN_HOST}`,
       `https://${BOOK_HOST}`,
-      `https://${CLIENT_HOST}`,
+      `https://${ACCOUNT_HOST}`,
       `https://${API_HOST}`,
     ];
   }
@@ -73,7 +73,7 @@ async function bootstrap() {
       return response.status(404).send('Not Found');
     }
 
-    if (host === BOOK_HOST || host === CLIENT_HOST) {
+    if (host === BOOK_HOST || host === ACCOUNT_HOST) {
       return staticSite(request, response, () => response.status(404).send('Not Found'));
     }
 
