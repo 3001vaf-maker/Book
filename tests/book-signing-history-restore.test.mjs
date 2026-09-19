@@ -27,7 +27,6 @@ hydrateConsentsFromServer([
     status: 'accepted',
     acceptedAt: '2026-09-18T12:00:00.000Z',
     eventAt: '2026-09-18T12:00:00.000Z',
-    migratedFromEventId: 'legacy-event',
   },
 ]);
 
@@ -36,7 +35,6 @@ assert.equal(consents.length, 1, 'Frontend must consume canonical consent events
 assert.equal(consents[0].subjectType, 'BOOKING_ACCOUNT');
 assert.equal(consents[0].subjectKey, 'account-1');
 assert.equal(consents[0].documentVersion, 2);
-assert.equal(consents[0].migratedFromEventId, 'legacy-event');
 
 hydrateDocumentHistoryFromServer([
   {
@@ -60,12 +58,14 @@ assert.equal(history[0].snapshot.text, 'Именно этот полный те�
 
 const server = readFileSync(new URL('../server/src/document-state/document-state.service.ts', import.meta.url), 'utf8');
 assert.match(server, /FROM "ConsentEvent"/);
-assert.match(server, /data\.consents = await this\.canonicalConsentEvents\(tenantId\)/);
-assert.doesNotMatch(server, /migratedLegacyIds/);
+assert.match(server, /const consents = state\?\.migrationVerifiedAt \? await this\.canonicalConsentEvents\(tenantId\) : \[\]/);
+assert.match(server, /data: \{ \.\.\.stored, consents \}/);
+assert.doesNotMatch(server, /source\.consents/);
+assert.doesNotMatch(server, /migratedFromEventId/);
 
 const policy = readFileSync(new URL('../server/src/document-state/consent-policy.service.ts', import.meta.url), 'utf8');
-assert.match(policy, /ensureCanonicalConsentEvents/);
-assert.match(policy, /migratedFromEventId/);
+assert.doesNotMatch(policy, /ensureCanonicalConsentEvents/);
+assert.doesNotMatch(policy, /migratedFromEventId/);
 
 const ui = readFileSync(new URL('../settings/documents/documents.js', import.meta.url), 'utf8');
 assert.match(ui, /signedDocumentSnapshot/);
