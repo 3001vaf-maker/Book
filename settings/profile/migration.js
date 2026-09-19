@@ -27,7 +27,7 @@ export async function initializeProfileWorkplaces(account = {}) {
     return { source: 'server', verified: true };
   }
 
-  if (remote?.migrated || account?.user?.workspaceUnlocked) {
+  if (remote?.migrated || account?.account?.workspaceUnlocked) {
     hydrate(remote, false);
     return { source: 'server-awaiting-verification', verified: false };
   }
