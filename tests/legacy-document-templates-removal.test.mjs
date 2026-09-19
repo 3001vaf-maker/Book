@@ -15,9 +15,11 @@ assert.doesNotMatch(activeData, /getDefaultDocuments/);
 assert.doesNotMatch(activeData, /Шаблон для адаптации под вашу работу/);
 assert.doesNotMatch(activeData, /Состав данных, цели, действия с данными, срок действия согласия/);
 assert.doesNotMatch(activeData, /Я согласен\(на\) получать информационные сообщения/);
+assert.doesNotMatch(activeData, /getBookDocumentBases|configureBookDocumentBases|buildBookDocuments|reconcileBookDocuments/);
 
 assert.match(migration, /getPlatformDocumentBases/);
 assert.doesNotMatch(migration, /getWorkplaces|workplaces/);
+assert.doesNotMatch(migration, /getBookDocumentBases|configureBookDocumentBases|buildBookDocuments|reconcileBookDocuments/);
 assert.match(migration, /\.\/admin\/document-registry\/catalog\.js/);
 assert.doesNotMatch(migration, /getDefaultDocuments/);
 
