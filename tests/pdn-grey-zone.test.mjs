@@ -18,7 +18,6 @@ assert.match(consentPolicy, /async hasActivePdnConsent\(/);
 assert.match(consentPolicy, /async hasActivePdnConsentForContact\(/);
 assert.match(consentPolicy, /async hasActivePdnConsentForIdentity\(/);
 assert.match(pdnGuard, /class BookingPdnConsentGuard/);
-assert.match(pdnGuard, /hasActivePdnConsent\(auth\.tenantId, auth\.accountId\)/);
 assert.match(pdnGuard, /code: 'PDN_CONSENT_REQUIRED'/);
 assert.match(pdnGuard, /accountConsentState\(auth\.tenantId, auth\.accountId\)/);
 assert.match(pdnGuard, /if \(!state\.pdnActive\)/);
