@@ -3,13 +3,13 @@ import { readFileSync } from 'node:fs';
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
-const state = read('server/src/document-archive/document-archive.service.ts');
-const policy = read('server/src/document-archive/consent-policy.service.ts');
-const controller = read('server/src/document-archive/document-archive.controller.ts');
+const state = read('server/src/tenant-document-archive/document-archive.service.ts');
+const policy = read('server/src/tenant-document-archive/consent-policy.service.ts');
+const controller = read('server/src/tenant-document-archive/document-archive.controller.ts');
 const booking = read('server/src/online-booking/online-booking.service.ts');
 const bookingConsent = read('server/src/online-booking/booking-consent.controller.ts');
 const bookingPdnGuard = read('server/src/online-booking/booking-pdn-consent.guard.ts');
-const migration = read('document-migration.js');
+const migration = read('tenant-document-archive.js');
 const schema = read('server/prisma/schema.prisma');
 const consentMigration = read('server/prisma/migrations/20260915130000_canonical_consent_subjects/migration.sql');
 const retirementMigration = read('server/prisma/migrations/20260919143000_retire_legacy_consent_migration/migration.sql');

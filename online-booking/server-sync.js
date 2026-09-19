@@ -27,7 +27,7 @@ async function pull() {
     await flushBusinessPersistence();
     const [businessResponse, documentResponse] = await Promise.all([
       apiRequest('/business-state'),
-      apiRequest('/document-archive'),
+      apiRequest('/tenant-document-archive'),
     ]);
     const business = await responseJson(businessResponse, 'Не удалось обновить рабочие данные');
     const documents = await responseJson(documentResponse, 'Не удалось обновить документы');

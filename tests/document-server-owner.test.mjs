@@ -25,7 +25,7 @@ const persistence = await import('../core/business-persistence.js');
 const data = await import('../settings/documents/data.js');
 const consents = await import('../settings/documents/consents.js');
 const history = await import('../settings/documents/history.js');
-const migration = await import('../document-migration.js');
+const migration = await import('../tenant-document-archive.js');
 void migration;
 
 persistence.setBusinessServerReady(true);
@@ -49,10 +49,10 @@ data.saveDocument({ id: 'pdn-consent', system: true, kind: 'consent', title: 'PD
 history.recordDocumentHistory({ documentId: 'pdn-consent', documentTitle: 'PDN 2', documentVersion: 1, action: 'renamed' });
 await persistence.flushBusinessPersistence();
 
-assert.ok(calls.some((call) => call.url.endsWith('/document-archive/documents') && call.method === 'PUT'));
+assert.ok(calls.some((call) => call.url.endsWith('/tenant-document-archive/documents') && call.method === 'PUT'));
 assert.equal(typeof consents.recordConsent, 'undefined');
 assert.equal(typeof consents.migrateLegacyConsents, 'undefined');
-assert.equal(calls.some((call) => call.url.endsWith('/document-archive/consents') && call.method === 'PUT'), false);
-assert.ok(calls.some((call) => call.url.endsWith('/document-archive/history') && call.method === 'PUT'));
+assert.equal(calls.some((call) => call.url.endsWith('/tenant-document-archive/consents') && call.method === 'PUT'), false);
+assert.ok(calls.some((call) => call.url.endsWith('/tenant-document-archive/history') && call.method === 'PUT'));
 assert.equal(JSON.parse(storage.get('book.documents.templates.v1') || 'null'), null);
 console.log('document server owner tests: OK');

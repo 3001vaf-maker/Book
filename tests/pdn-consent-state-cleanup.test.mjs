@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
-const policy = read('server/src/document-archive/consent-policy.service.ts');
+const policy = read('server/src/tenant-document-archive/consent-policy.service.ts');
 const controller = read('server/src/online-booking/booking-consent.controller.ts');
 const guard = read('server/src/online-booking/booking-pdn-consent.guard.ts');
 const service = read('server/src/online-booking/online-booking.service.ts');

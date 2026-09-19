@@ -7,7 +7,7 @@ import { getWorkplaces as getWorkplaceEntities } from './settings/profile/workpl
 import { initializeProfileWorkplaces } from './settings/profile/migration.js';
 import { initializeBusinessState } from './business-migration.js';
 import { initializeOperationalState } from './operational-migration.js';
-import { initializeDocumentArchive } from './document-migration.js';
+import { initializeTenantDocumentArchive } from './tenant-document-archive.js';
 import { initializeAuxiliaryState } from './auxiliary-migration.js';
 import { getJournalTimeUsages, releaseJournalSoftTimeUsages } from './journal/time-usage-source.js';
 import { configureWorkplaceSource } from './core/workplace-time.js';
@@ -173,7 +173,7 @@ async function renderAuthenticated(account = authenticatedAccount) {
     renderMigrationPending();
     return;
   }
-  const documentMigration = await initializeDocumentArchive(authenticatedAccount);
+  const documentMigration = await initializeTenantDocumentArchive(authenticatedAccount);
   if (!documentMigration.verified) {
     renderMigrationPending();
     return;

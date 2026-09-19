@@ -3,7 +3,7 @@ import fs from 'node:fs';
 
 const service = fs.readFileSync('server/src/online-booking/online-booking.service.ts', 'utf8');
 const business = fs.readFileSync('server/src/business-state/business-state.service.ts', 'utf8');
-const consentPolicy = fs.readFileSync('server/src/document-archive/consent-policy.service.ts', 'utf8');
+const consentPolicy = fs.readFileSync('server/src/tenant-document-archive/consent-policy.service.ts', 'utf8');
 
 const request = service.slice(service.indexOf('async createRequest('), service.indexOf('async getMyRequests('));
 assert.match(request, /createOnlineBookingRecord/);

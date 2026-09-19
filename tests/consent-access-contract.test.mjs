@@ -4,7 +4,7 @@ import { getBookDocumentBases } from '../admin/document-registry/catalog.js';
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
-const policy = read('server/src/document-archive/consent-policy.service.ts');
+const policy = read('server/src/tenant-document-archive/consent-policy.service.ts');
 const guard = read('server/src/online-booking/booking-pdn-consent.guard.ts');
 const booking = read('server/src/online-booking/online-booking.service.ts');
 const notification = read('server/src/notification/notification.service.ts');
