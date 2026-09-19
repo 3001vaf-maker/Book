@@ -3,7 +3,7 @@ import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { BusinessStateService } from './business-state.service';
 
-type AuthenticatedRequest = Request & { auth?: { userId: string; tenantId: string; role: string } };
+type AuthenticatedRequest = Request & { auth?: { platformAccountId: string; tenantId: string; role: string } };
 
 @Controller('business-state')
 @UseGuards(JwtAuthGuard)
