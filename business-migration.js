@@ -2,7 +2,7 @@ import { apiRequest } from './core/auth.js';
 import { setBusinessServerReady } from './core/business-persistence.js';
 import { hydrateUEIFromServer } from './core/uei.js';
 import { hydrateRecordStateFromServer } from './core/record/index.js';
-import { hydrateClientsFromServer } from './main/clients/data.js';
+import { hydratePeopleFromServer } from './main/people/data.js';
 
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
@@ -33,7 +33,7 @@ async function responseJson(response, fallbackMessage) {
 
 function hydrate(bundle, ready) {
   const normalized = normalizeBundle(bundle);
-  hydrateClientsFromServer(normalized.people);
+  hydratePeopleFromServer(normalized.people);
   hydrateUEIFromServer(normalized.uei);
   hydrateRecordStateFromServer({ records: normalized.records, recordEvents: normalized.recordEvents });
   setBusinessServerReady(ready);
