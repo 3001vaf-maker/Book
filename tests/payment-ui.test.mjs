@@ -130,7 +130,7 @@ assert.match(recordPaymentSource, /getRecordPaymentState/);
 assert.match(recordPaymentSource, /modal-bottom-action--partial/);
 assert.match(recordPaymentSource, /paymentReceipt\(/);
 assert.match(recordPaymentSource, /receivedTotal/);
-assert.match(recordPaymentSource, /person:\s*latest\?\.client/);
+assert.match(recordPaymentSource, /person:\s*latest\?\.person/);
 assert.match(recordPaymentSource, /workplace:\s*latest\?\.workplace/);
 assert.match(recordPaymentSource, /Действия с оплатой',\s*\{\s*variant:\s*'secondary'/);
 assert.match(recordPaymentSource, /Отменить операцию',\s*\{\s*variant:\s*'secondary'/);
