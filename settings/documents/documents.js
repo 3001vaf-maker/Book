@@ -123,7 +123,7 @@ function documentHistoryMarkup() {
 }
 
 function consentPerson(item, people) {
-  if (item.subjectType === 'BOOKING_ACCOUNT') {
+  if (item.subjectType === 'ACCOUNT') {
     return people.find((person) => (person.accounts || []).includes(item.subjectKey)) || null;
   }
   if (item.subjectType !== 'CONTACT_POINT') return null;
