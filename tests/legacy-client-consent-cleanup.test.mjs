@@ -9,6 +9,7 @@ const browserConsents = read('settings/documents/consents.js');
 const businessState = read('server/src/business-state/business-state.service.ts');
 const migration = read('document-migration.js');
 const policy = read('server/src/document-state/consent-policy.service.ts');
+const cleanupMigration = read('server/prisma/migrations/20260919124500_remove_legacy_business_person_agreements/migration.sql');
 
 assert.doesNotMatch(clientData, /migrateLegacyConsents/);
 assert.doesNotMatch(clientData, /getLatestClientConsent/);
@@ -35,6 +36,8 @@ assert.doesNotMatch(browserConsents, /persistConsents/);
 
 assert.doesNotMatch(businessState, /agreements:\s*objectValue\(previous\.agreements\)/);
 assert.doesNotMatch(migration, /configureConsentPersistence/);
+assert.match(cleanupMigration, /UPDATE \"BusinessPerson\"/);
+assert.match(cleanupMigration, /\"data\" = \"data\" - 'agreements'/);
 
 // Historical clientId remains legal only inside the one-time server migration until that migration is retired.
 assert.match(policy, /const historicalPersonKey = text\(legacy\?\.clientId\)/);
