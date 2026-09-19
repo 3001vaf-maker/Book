@@ -358,7 +358,7 @@ async function main() {
       create: { tenantId, data: json(operational), migrationVerifiedAt: now },
       update: { data: json(operational), migrationVerifiedAt: now },
     });
-    await tx.businessDocumentState.upsert({
+    await tx.tenantDocumentArchive.upsert({
       where: { tenantId },
       create: { tenantId, data: json({ documents, history: [] }), migrationVerifiedAt: now },
       update: { data: json({ documents, history: [] }), migrationVerifiedAt: now },

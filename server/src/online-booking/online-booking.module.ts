@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { BusinessStateModule } from '../business-state/business-state.module';
 import { CommunicationModule } from '../communication/communication.module';
-import { DocumentStateModule } from '../document-state/document-state.module';
+import { DocumentArchiveModule } from '../document-archive/document-archive.module';
 import { NotificationModule } from '../notification/notification.module';
 import { ProfileModule } from '../profile/profile.module';
 import { PrismaService } from '../prisma.service';
@@ -15,7 +15,7 @@ import { OnlineBookingController } from './online-booking.controller';
 import { OnlineBookingService } from './online-booking.service';
 
 @Module({
-  imports: [AuthModule, BusinessStateModule, CommunicationModule, DocumentStateModule, NotificationModule, ProfileModule],
+  imports: [AuthModule, BusinessStateModule, CommunicationModule, DocumentArchiveModule, NotificationModule, ProfileModule],
   controllers: [OnlineBookingController, BookingConsentController, BookingAccountSettingsController],
   providers: [OnlineBookingService, BookingAccountGuard, BookingPdnConsentGuard, ClientCardLinkService, PrismaService],
 })
