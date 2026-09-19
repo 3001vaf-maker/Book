@@ -46,8 +46,8 @@ model Tenant {
   accounts                 Account[]
   bookingRequests          BookingRequest[]
   businessStateMeta        BusinessStateMeta?
-  businessPeople           BusinessPerson[]
-  businessIdentity         BusinessIdentityState?
+  people                   Person[]
+  ueiState                 UeiState?
   businessRecords          BusinessRecord[]
   businessRecordEvents     BusinessRecordEvent[]
   businessOperationalState BusinessOperationalState?
@@ -232,7 +232,7 @@ model BusinessStateMeta {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
 
-model BusinessPerson {
+model Person {
   id        String   @id @default(cuid())
   tenantId  String
   key       String
@@ -247,7 +247,7 @@ model BusinessPerson {
   @@index([tenantId, position])
 }
 
-model BusinessIdentityState {
+model UeiState {
   id        String   @id @default(cuid())
   tenantId  String   @unique
   data      Json
