@@ -10,13 +10,13 @@ import { AccountGuard } from './account.guard';
 import { AccountSettingsController } from './account-settings.controller';
 import { BookingConsentController } from './booking-consent.controller';
 import { BookingPdnConsentGuard } from './booking-pdn-consent.guard';
-import { ClientCardLinkService } from './client-card-link.service';
+import { PersonIdentityService } from './person-identity.service';
 import { OnlineBookingController } from './online-booking.controller';
 import { OnlineBookingService } from './online-booking.service';
 
 @Module({
   imports: [AuthModule, BusinessStateModule, CommunicationModule, TenantDocumentArchiveModule, NotificationModule, ProfileModule],
   controllers: [OnlineBookingController, BookingConsentController, AccountSettingsController],
-  providers: [OnlineBookingService, AccountGuard, BookingPdnConsentGuard, ClientCardLinkService, PrismaService],
+  providers: [OnlineBookingService, AccountGuard, BookingPdnConsentGuard, PersonIdentityService, PrismaService],
 })
 export class OnlineBookingModule {}
