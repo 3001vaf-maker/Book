@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { CommunicationService } from '../communication/communication.service';
-import { ConsentPolicyService } from '../document-state/consent-policy.service';
+import { ConsentPolicyService } from '../document-archive/consent-policy.service';
 import { PrismaService } from '../prisma.service';
 import { BookingAccountGuard } from './booking-account.guard';
 
