@@ -356,7 +356,6 @@ export class OnlineBookingService {
       throw new UnauthorizedException('Неверный email или пароль');
     }
     const binding = await this.clientCards.bindFirstAccess(tenantId, account as any);
-    await this.consentPolicy.ensureCanonicalConsentEvents(tenantId);
     return {
       accessToken: await this.issueAccountToken(account),
       account: await this.accountView(tenantId, account),
@@ -368,7 +367,6 @@ export class OnlineBookingService {
     const account = await this.prisma.bookingAccount.findFirst({ where: { id: accountId, tenantId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
     await this.clientCards.bindFirstAccess(tenantId, account as any);
-    await this.consentPolicy.ensureCanonicalConsentEvents(tenantId);
     return this.accountView(tenantId, account);
   }
 
