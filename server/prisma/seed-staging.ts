@@ -361,7 +361,7 @@ async function main() {
     await tx.businessDocumentState.upsert({
       where: { tenantId },
       create: { tenantId, data: json({ documents, consents: [], history: [] }), migrationVerifiedAt: now },
-      update: { migrationVerifiedAt: now },
+      update: { data: json({ documents, consents: [], history: [] }), migrationVerifiedAt: now },
     });
     await tx.businessAuxiliaryState.upsert({
       where: { tenantId },
