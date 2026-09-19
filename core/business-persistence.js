@@ -87,13 +87,13 @@ export function queuePersonUpsert(person, position = 0) {
   return enqueue(`/business-state/people/${encodeURIComponent(key)}`, {
     method: 'PUT',
     body: JSON.stringify({ person, position }),
-  }, 'Не удалось сохранить клиента на сервере');
+  }, 'Не удалось сохранить человека на сервере');
 }
 
 export function queuePersonDelete(key) {
   const id = String(key || '').trim();
   if (!id) return Promise.resolve();
-  return enqueue(`/business-state/people/${encodeURIComponent(id)}`, { method: 'DELETE' }, 'Не удалось удалить клиента на сервере');
+  return enqueue(`/business-state/people/${encodeURIComponent(id)}`, { method: 'DELETE' }, 'Не удалось удалить человека на сервере');
 }
 
 export function queueUEIStore(uei) {
