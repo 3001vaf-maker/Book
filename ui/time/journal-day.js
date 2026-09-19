@@ -4,12 +4,12 @@ const escape = (value) => String(value ?? '').replaceAll('&', '&amp;').replaceAl
 const moneyText = (value) => `${Math.max(0, Number(value) || 0).toLocaleString('ru-RU')} ₽`;
 
 function recordMarkup(usage, { interactive = true } = {}) {
-  const client = usage?.client || {};
-  const name = [client.name, client.surname].filter(Boolean).join(' ') || 'Без имени';
-  const id = String(client.uei || client.id || '').trim();
+  const person = usage?.person || {};
+  const name = [person.name, person.surname].filter(Boolean).join(' ') || 'Без имени';
+  const id = String(person.uei || person.id || '').trim();
   const identity = id ? `${escape(id)} - ${escape(name)}` : escape(name);
   const total = moneyText(usage?.financialTotal ?? usage?.finance?.planTotal ?? usage?.finance?.dueTotal ?? 0);
-  const phone = client.phone ? `<span class="journal-record__phone">${escape(client.phone)}</span>` : '';
+  const phone = person.phone ? `<span class="journal-record__phone">${escape(person.phone)}</span>` : '';
   const services = (usage.procedures || []).map((item) => `<span class="journal-record__service">${escape(item.name)}</span>`).join('');
   const statusClass = usage?.paid ? ' journal-record--paid' : usage?.attendance === 'no-show' ? ' journal-record--no-show' : '';
   const content = `<span class="journal-record__head"><strong class="journal-record__identity">${identity}</strong><strong class="journal-record__total">${escape(total)}</strong></span>${phone}${services}`;
