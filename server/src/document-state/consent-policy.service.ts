@@ -5,6 +5,7 @@ import { DocumentStateService } from './document-state.service';
 
 type ConsentSubjectType = 'BOOKING_ACCOUNT' | 'CONTACT_POINT';
 type ConsentStatus = 'accepted' | 'revoked' | 'declined';
+const PDN_CONSENT_DOCUMENT_ID = 'pdn-consent';
 const MARKETING_CONSENT_DOCUMENT_ID = 'messages-consent';
 type ConsentEventRow = {
   id: string;
@@ -546,6 +547,52 @@ export class ConsentPolicyService {
     const required = consents.filter((item) => item.required);
     const missing = required.filter((item) => !item.accepted);
     return { allowed: missing.length === 0, required, missing, consents };
+  }
+
+  async hasActivePdnConsent(tenantId: string, accountIdValue: unknown) {
+    const accountId = text(accountIdValue);
+    if (!accountId) return false;
+    const consents = await this.accountConsentProjection(tenantId, accountId);
+    const pdn = consents.find((item) => item.documentId === PDN_CONSENT_DOCUMENT_ID);
+    return Boolean(pdn?.accepted);
+  }
+
+  async hasActivePdnConsentForContact(tenantId: string, typeValue: unknown, value: unknown) {
+    const type = contactPointType(typeValue);
+    const normalizedValue = contactPointValue(type, value);
+    if (!type || !normalizedValue) return false;
+
+    const accounts = await this.prisma.bookingAccount.findMany({
+      where: { tenantId },
+      select: { id: true, phone: true, email: true, uei: true },
+    });
+
+    let candidates = accounts.filter((account) => {
+      if (type === 'PHONE') return canonicalPhone(account.phone) === normalizedValue;
+      if (type === 'EMAIL') return canonicalEmail(account.email) === normalizedValue;
+      return false;
+    });
+
+    if (type === 'TELEGRAM') {
+      const identities = await this.prisma.$queryRaw<Array<{ cardPhone: string; uei: string }>>`
+        SELECT "cardPhone", "uei"
+        FROM "CommunicationIdentity"
+        WHERE "tenantId" = ${tenantId}
+          AND "channel" = 'TELEGRAM'
+          AND "externalUserId" = ${normalizedValue}
+        ORDER BY "verifiedAt" DESC NULLS LAST, "updatedAt" DESC
+      `;
+      const phones = new Set(identities.map((item) => canonicalPhone(item.cardPhone)).filter(Boolean));
+      const ueis = new Set(identities.map((item) => text(item.uei)).filter(Boolean));
+      candidates = accounts.filter((account) =>
+        phones.has(canonicalPhone(account.phone)) || (text(account.uei) && ueis.has(text(account.uei)))
+      );
+    }
+
+    for (const account of candidates) {
+      if (await this.hasActivePdnConsent(tenantId, account.id)) return true;
+    }
+    return false;
   }
 
   async canSendMarketing(tenantId: string, typeValue: unknown, value: unknown) {
