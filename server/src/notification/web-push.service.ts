@@ -76,7 +76,7 @@ export class WebPushService {
       where: { id: accountId, tenantId },
       select: { id: true },
     });
-    if (!account) throw new NotFoundException('Клиентский аккаунт не найден');
+    if (!account) throw new NotFoundException('Аккаунт не найден');
     return account;
   }
 
@@ -136,7 +136,7 @@ export class WebPushService {
   }
 
   private targetUrl(tenantId: string) {
-    const base = text(process.env.CLIENT_APP_URL).replace(/\/$/, '');
+    const base = text(process.env.ACCOUNT_APP_URL).replace(/\/$/, '');
     if (!base) return `/?booking=${encodeURIComponent(tenantId)}`;
     const url = new URL(base);
     url.searchParams.set('booking', tenantId);
