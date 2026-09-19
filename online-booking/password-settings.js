@@ -1,4 +1,4 @@
-import { changeBookingPassword } from '../core/booking-account/index.js';
+import { changeAccountPassword } from '../core/account/index.js';
 import { button, field, modal, mountModal, openNotice } from '../ui/ui.js';
 
 export function openClientPasswordSettings(state) {
@@ -31,7 +31,7 @@ export function openClientPasswordSettings(state) {
     if (submit) submit.disabled = true;
     if (errorNode) errorNode.textContent = '';
     try {
-      await changeBookingPassword(state.tenantId, currentPassword, newPassword);
+      await changeAccountPassword(state.tenantId, currentPassword, newPassword);
       layer.remove();
       openNotice({ title: 'Пароль изменён', message: 'Новый пароль сохранён.' });
     } catch (error) {
