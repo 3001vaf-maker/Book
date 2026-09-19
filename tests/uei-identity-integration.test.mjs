@@ -20,10 +20,10 @@ hydratePeopleFromServer([
 hydrateUEIFromServer({ entities: {}, relations: {}, revoked: [] });
 hydrateRecordStateFromServer({
   records: [
-    { id: 'r1', date: '2026-09-01', client: { key: 'p1' }, procedures: [], products: [] },
-    { id: 'r2', date: '2026-09-02', client: { key: 'p2' }, procedures: [], products: [] },
-    { id: 'r3', date: '2026-09-03', client: { key: 'p3' }, procedures: [], products: [] },
-    { id: 'r4', date: '2026-09-04', client: { key: 'p4' }, procedures: [], products: [] },
+    { id: 'r1', date: '2026-09-01', person: { key: 'p1' }, procedures: [], products: [] },
+    { id: 'r2', date: '2026-09-02', person: { key: 'p2' }, procedures: [], products: [] },
+    { id: 'r3', date: '2026-09-03', person: { key: 'p3' }, procedures: [], products: [] },
+    { id: 'r4', date: '2026-09-04', person: { key: 'p4' }, procedures: [], products: [] },
   ],
   recordEvents: [],
 });
