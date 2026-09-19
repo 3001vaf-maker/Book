@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { getBookDocumentBases } from '../admin/document-registry/catalog.js';
+import { getPlatformDocumentBases } from '../admin/document-registry/catalog.js';
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
@@ -11,7 +11,7 @@ const notification = read('server/src/notification/notification.service.ts');
 const telegram = read('server/src/communication/telegram-bot.service.ts');
 const broadcast = read('server/src/communication/communication-broadcast.service.ts');
 
-const bases = getBookDocumentBases();
+const bases = getPlatformDocumentBases();
 const pdn = bases.find((item) => item.documentId === 'pdn-consent');
 const marketing = bases.find((item) => item.documentId === 'messages-consent');
 

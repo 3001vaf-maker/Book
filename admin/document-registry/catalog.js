@@ -99,7 +99,7 @@ export function getRegistryDocument(key) {
 }
 
 
-const BOOK_DOCUMENT_BASE_MAPPING = {
+const PLATFORM_DOCUMENT_BASE_MAPPING = {
   'user-document-pdn-policy': {
     documentId: 'pdn-agreement',
     kind: 'agreement',
@@ -120,11 +120,11 @@ const BOOK_DOCUMENT_BASE_MAPPING = {
   },
 };
 
-export function getBookDocumentBases() {
+export function getPlatformDocumentBases() {
   return USER_DOCUMENT_BASE_KEYS
     .map((key) => {
       const item = DOCUMENT_CATALOG.find((document) => document.key === key);
-      const config = BOOK_DOCUMENT_BASE_MAPPING[key];
+      const config = PLATFORM_DOCUMENT_BASE_MAPPING[key];
       if (!item || !config) return null;
       return {
         key,

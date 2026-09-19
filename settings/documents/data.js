@@ -2,10 +2,10 @@ import { recordDocumentHistory } from './history.js';
 
 let documentsState = null;
 let persistDocuments = null;
-let bookBasesState = [];
-let bookContextState = { profile: {}, workplaces: [] };
+let platformBasesState = [];
+let platformContextState = { profile: {} };
 
-const BOOK_DOCUMENT_IDS = ['pdn-agreement', 'pdn-consent', 'messages-consent'];
+const PLATFORM_DOCUMENT_IDS = ['pdn-agreement', 'pdn-consent', 'messages-consent'];
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -44,7 +44,7 @@ function normalize(item = {}) {
 }
 
 function contextValues() {
-  const profile = bookContextState.profile || {};
+  const profile = platformContextState.profile || {};
   const fullName = [profile.name, profile.surname]
     .map((value) => String(value || '').trim())
     .filter(Boolean)
@@ -63,7 +63,7 @@ function contextReady() {
   return Boolean(values['[ФИО пользователя]'] && values['[Контакт пользователя]']);
 }
 
-export function renderBookBaseText(base) {
+export function renderPlatformBaseText(base) {
   let text = String(base?.content || '');
   for (const [placeholder, value] of Object.entries(contextValues())) {
     text = text.split(placeholder).join(value || '________________');
@@ -72,10 +72,10 @@ export function renderBookBaseText(base) {
 }
 
 function baseForDocument(documentId) {
-  return bookBasesState.find((item) => item.documentId === documentId) || null;
+  return platformBasesState.find((item) => item.documentId === documentId) || null;
 }
 
-function makeBookDocument(base, version = 1) {
+function makeDocumentFromPlatformBase(base, version = 1) {
   return normalize({
     id: base.documentId,
     system: true,
@@ -84,7 +84,7 @@ function makeBookDocument(base, version = 1) {
     clientConsent: base.clientConsent,
     required: base.required,
     version,
-    text: renderBookBaseText(base),
+    text: renderPlatformBaseText(base),
     sourceMode: 'BOOK',
     baseKey: base.key,
     baseVersion: base.version,
@@ -104,45 +104,44 @@ function historyEntry(document, action, source) {
   };
 }
 
-export function configureBookDocumentBases(bases = [], context = {}) {
-  bookBasesState = (Array.isArray(bases) ? bases : [])
+export function configurePlatformDocumentBases(bases = [], context = {}) {
+  platformBasesState = (Array.isArray(bases) ? bases : [])
     .map(normalizeBase)
     .filter((item) => item.key && item.documentId && item.content);
-  bookContextState = {
+  platformContextState = {
     profile: context?.profile && typeof context.profile === 'object' ? clone(context.profile) : {},
-    workplaces: Array.isArray(context?.workplaces) ? clone(context.workplaces) : [],
   };
 }
 
-export function getBookDocumentBases() {
-  return clone(bookBasesState);
+export function getPlatformDocumentBases() {
+  return clone(platformBasesState);
 }
 
-export function buildBookDocuments() {
-  if (!bookBasesState.length || !contextReady()) return [];
-  return BOOK_DOCUMENT_IDS
+export function buildTenantDocumentsFromPlatformBases() {
+  if (!platformBasesState.length || !contextReady()) return [];
+  return PLATFORM_DOCUMENT_IDS
     .map((id) => baseForDocument(id))
     .filter(Boolean)
-    .map((base) => makeBookDocument(base, 1));
+    .map((base) => makeDocumentFromPlatformBase(base, 1));
 }
 
-export function reconcileBookDocuments(items = [], history = []) {
+export function reconcileTenantDocumentsWithPlatformBases(items = [], history = []) {
   const current = (Array.isArray(items) ? items : []).map(normalize);
   const nextHistory = Array.isArray(history) ? clone(history) : [];
   let changed = false;
 
-  if (!bookBasesState.length || !contextReady()) {
+  if (!platformBasesState.length || !contextReady()) {
     return { documents: current, history: nextHistory, changed: false };
   }
 
-  for (const documentId of BOOK_DOCUMENT_IDS) {
+  for (const documentId of PLATFORM_DOCUMENT_IDS) {
     const base = baseForDocument(documentId);
     if (!base) continue;
-    const rendered = renderBookBaseText(base);
+    const rendered = renderPlatformBaseText(base);
     const index = current.findIndex((item) => item.id === documentId);
 
     if (index < 0) {
-      const created = makeBookDocument(base, 1);
+      const created = makeDocumentFromPlatformBase(base, 1);
       current.push(created);
       nextHistory.push(historyEntry(created, 'created', 'admin-template'));
       changed = true;
@@ -277,5 +276,5 @@ export function createDocument({ title = 'Новый документ', text = '
 }
 
 export function resetDocumentTemplates() {
-  return saveDocuments(buildBookDocuments());
+  return saveDocuments(buildTenantDocumentsFromPlatformBases());
 }
