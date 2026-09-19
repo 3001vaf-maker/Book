@@ -200,7 +200,7 @@ async function main() {
     {
       id: 'pdn-agreement',
       kind: 'agreement',
-      clientConsent: false,
+      personConsent: false,
       required: false,
       title: 'Политика обработки персональных данных',
       version: 1,
@@ -209,7 +209,7 @@ async function main() {
     {
       id: 'pdn-consent',
       kind: 'consent',
-      clientConsent: true,
+      personConsent: true,
       required: true,
       title: 'Согласие на обработку персональных данных',
       version: 1,
@@ -218,7 +218,7 @@ async function main() {
     {
       id: 'messages-consent',
       kind: 'consent',
-      clientConsent: true,
+      personConsent: true,
       required: false,
       title: 'Согласие на рекламные и маркетинговые сообщения',
       version: 1,
