@@ -467,7 +467,7 @@ export class OnlineBookingService {
     const person = binding.person;
     const identity = await this.businessState.bookingIdentityForAccount(tenantId, account.id);
     const pricingPerson = identity?.person || person;
-    const client = {
+    const personSnapshot = {
       key: text(person.key),
       id: text(person.id),
       accountId: account.id,
@@ -478,7 +478,7 @@ export class OnlineBookingService {
       telegramId: text(account.telegramId),
       discountPercent: percent(pricingPerson?.discountPercent),
     };
-    const recordSnapshot = initialRequestSnapshot(procedures, { discountPercent: client.discountPercent });
+    const recordSnapshot = initialRequestSnapshot(procedures, { discountPercent: personSnapshot.discountPercent });
     const request = await this.prisma.bookingRequest.create({
       data: {
         tenantId,
@@ -498,7 +498,7 @@ export class OnlineBookingService {
         workplaceId: workplaceKey,
         from,
         to,
-        client,
+        person: personSnapshot,
         procedures,
         sourceRequestId: request.id,
       });
