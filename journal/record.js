@@ -1,10 +1,10 @@
 import { button, durationPicker, durationText, entityCard, escapeHtml, iconButton, list, listEntry, stateView, initStateView, initCalendar, mountModal, modal, openNotice, initDurationPickers, initMultiSelect, viewNavigation, initViewNavigation } from '../ui/ui.js';
 import { createRecord } from '../core/record/index.js';
 import { createJournalBreak } from './break-service.js';
-import { getClients } from '../main/clients/data.js';
-import { clientDisplay } from '../main/clients/presentation.js';
-import { openClientCreate } from '../main/clients/create.js';
-import { openClientProfile } from '../main/clients/clients.js';
+import { getPeople } from '../main/people/data.js';
+import { personDisplay } from '../main/people/presentation.js';
+import { openPersonCreate } from '../main/people/create.js';
+import { openPerson } from '../main/people/people.js';
 import { getProcedures } from '../settings/service/procedures/data.js';
 import { openProcedureForm } from '../settings/service/procedures/form.js';
 import { assignProceduresToWorkplace } from '../settings/service/procedures/service.js';
@@ -17,9 +17,9 @@ const RECORD_MODES = [
   { id: 'block', label: 'Занять время' },
 ];
 
-const people = () => getClients();
+const people = () => getPeople();
 const procedures = () => getProcedures();
-const clientName = (person) => clientDisplay(person).name;
+const clientName = (person) => personDisplay(person).name;
 
 function dateKey(date) {
   const d = date instanceof Date ? date : new Date(date);
@@ -324,7 +324,7 @@ function renderClientStep(modalRoot, { date, workplaceId, from, to, procedures: 
     if (!listHost) return;
     listHost.innerHTML = list({
       items: filtered.map((person) => {
-        const display = clientDisplay(person);
+        const display = personDisplay(person);
         return {
           overline: display.uei,
           title: display.name,
@@ -345,13 +345,13 @@ function renderClientStep(modalRoot, { date, workplaceId, from, to, procedures: 
   host.querySelector('[data-record-client-search]')?.addEventListener('input', (event) => {
     const q = event.target.value.trim().toLocaleLowerCase('ru');
     filtered = all.filter((person) => {
-      const display = clientDisplay(person);
+      const display = personDisplay(person);
       return display.name.toLocaleLowerCase('ru').includes(q) || display.phone.includes(q) || display.uei.toLocaleLowerCase('ru').includes(q);
     });
     render();
   });
   host.querySelector('[data-record-add-client]')?.addEventListener('click', () => {
-    openClientCreate({
+    openPersonCreate({
       root: document.body,
       variant: 'large',
       surface: 'app',
@@ -564,7 +564,7 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
   const openClient = () => {
     const key = currentClient?.key;
     if (!key) return;
-    openClientProfile({
+    openPerson({
       root: document.body,
       key,
       onClose: () => {
@@ -578,7 +578,7 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
   const render = () => {
     const host = flowHost(modalRoot);
     if (!host) return;
-    const client = clientDisplay(currentClient);
+    const client = personDisplay(currentClient);
     const workplace = findWorkplaceName(currentWorkplaceId);
     const formattedDate = formatConfirmationDate(currentDate);
     const total = totalCost();
