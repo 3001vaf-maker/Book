@@ -8,7 +8,7 @@ import {
   saveCommunicationGroup,
   sendBroadcast,
 } from '../core/communications/broadcasts.js';
-import { findPeopleByPhone, getAllClients } from '../main/clients/data.js';
+import { findPeopleByPhone, getAllPeople } from '../main/people/data.js';
 import {
   appHeader,
   appShell,
@@ -101,7 +101,7 @@ function bindMessageAttachments(form) {
 }
 
 function peopleList() {
-  return getAllClients().filter((person) => person.key && phoneOf(person));
+  return getAllPeople().filter((person) => person.key && phoneOf(person));
 }
 
 function personByKey(key) {
