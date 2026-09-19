@@ -5,6 +5,7 @@ import { DocumentStateService } from './document-state.service';
 
 type ConsentSubjectType = 'BOOKING_ACCOUNT' | 'CONTACT_POINT';
 type ConsentStatus = 'accepted' | 'revoked' | 'declined';
+const MARKETING_CONSENT_DOCUMENT_ID = 'messages-consent';
 type ConsentEventRow = {
   id: string;
   tenantId: string;
@@ -394,7 +395,7 @@ export class ConsentPolicyService {
     tenantId: string,
     typeValue: unknown,
     value: unknown,
-    documentId = 'messages-consent',
+    documentId: string,
     source = 'manual',
   ) {
     await this.ensureCanonicalConsentEvents(tenantId);
@@ -432,7 +433,7 @@ export class ConsentPolicyService {
     tenantId: string,
     typeValue: unknown,
     value: unknown,
-    documentId = 'messages-consent',
+    documentId: string,
     source = 'manual',
   ) {
     await this.ensureCanonicalConsentEvents(tenantId);
@@ -464,7 +465,7 @@ export class ConsentPolicyService {
     return event ? publicEvent(event) : null;
   }
 
-  async contactPointConsentState(tenantId: string, typeValue: unknown, value: unknown, documentId = 'messages-consent') {
+  async contactPointConsentState(tenantId: string, typeValue: unknown, value: unknown, documentId: string) {
     await this.ensureCanonicalConsentEvents(tenantId);
     const type = contactPointType(typeValue);
     const normalizedValue = contactPointValue(type, value);
@@ -547,8 +548,8 @@ export class ConsentPolicyService {
     return { allowed: missing.length === 0, required, missing, consents };
   }
 
-  async canSendMessages(tenantId: string, typeValue: unknown, value: unknown) {
-    return (await this.contactPointConsentState(tenantId, typeValue, value, 'messages-consent')).allowed;
+  async canSendMarketing(tenantId: string, typeValue: unknown, value: unknown) {
+    return (await this.contactPointConsentState(tenantId, typeValue, value, MARKETING_CONSENT_DOCUMENT_ID)).allowed;
   }
 
   async consentReport(tenantId: string) {
