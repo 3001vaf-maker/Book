@@ -177,3 +177,41 @@ jobs:
       - name: Stop isolated staging
         if: always()
         run: docker compose -f docker-compose.staging.yml down -v
+
+
+  baseline-export:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build staging backend image
+        run: docker compose -f docker-compose.staging.yml build backend
+      - name: Start isolated database and backend
+        run: |
+          docker compose -f docker-compose.staging.yml up -d db
+          docker compose -f docker-compose.staging.yml up -d backend
+      - name: Wait for migrated backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://localhost:3000/health >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose -f docker-compose.staging.yml logs db backend
+          exit 1
+      - name: Export final PostgreSQL schema
+        run: |
+          docker compose -f docker-compose.staging.yml exec -T db             pg_dump -U book -d book_staging             --schema-only --no-owner --no-privileges             --exclude-table=_prisma_migrations             > book-final-schema.sql
+      - name: Upload schema artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: book-final-schema
+          path: book-final-schema.sql
+      - name: Stop isolated staging
+        if: always()
+        run: docker compose -f docker-compose.staging.yml down -v
