@@ -19,7 +19,7 @@ const RECORD_MODES = [
 
 const people = () => getPeople();
 const procedures = () => getProcedures();
-const clientName = (person) => personDisplay(person).name;
+const personName = (person) => personDisplay(person).name;
 
 function dateKey(date) {
   const d = date instanceof Date ? date : new Date(date);
@@ -188,7 +188,7 @@ function renderProceduresStep(modalRoot, { date, workplaceId, from, to, onCreate
         openRecordTimeNotice('Запись не может быть создана: выбранным процедурам не хватает свободного времени. Скорректируйте время записи.');
         return;
       }
-      renderClientStep(modalRoot, {
+      renderPersonStep(modalRoot, {
         date,
         workplaceId,
         from,
@@ -294,18 +294,18 @@ function openProcedureSettings({ procedure, current, onSave, onAdd }) {
   });
 }
 
-function renderClientStep(modalRoot, { date, workplaceId, from, to, procedures: selectedProcedures, onCreated, onSelected }) {
+function renderPersonStep(modalRoot, { date, workplaceId, from, to, procedures: selectedProcedures, onCreated, onSelected }) {
   let all = people();
   let filtered = all;
-  let selectedClient = null;
-  const host = renderFlow(modalRoot, `<div class="record-screen record-screen--clients"><div class="record-client-toolbar"><input class="record-client-search" data-record-client-search placeholder="🔍 Найти клиента..." autocomplete="off">${iconButton('+', { className: 'icon-button--primary', data: 'data-record-add-client', aria: 'Добавить клиента' })}</div><div class="record-client-list" data-record-client-list></div></div>`);
+  let selectedPerson = null;
+  const host = renderFlow(modalRoot, `<div class="record-screen record-screen--people"><div class="record-person-toolbar"><input class="record-person-search" data-record-person-search placeholder="🔍 Найти человека..." autocomplete="off">${iconButton('+', { className: 'icon-button--primary', data: 'data-record-add-person', aria: 'Добавить человека' })}</div><div class="record-person-list" data-record-person-list></div></div>`);
   if (!host) return;
 
-  const openSelectedClient = (person) => {
-    selectedClient = person;
-    if (!selectedClient) return;
+  const openSelectedPerson = (person) => {
+    selectedPerson = person;
+    if (!selectedPerson) return;
     if (onSelected) {
-      onSelected(selectedClient);
+      onSelected(selectedPerson);
       return;
     }
     renderConfirmationStep(modalRoot, {
@@ -313,14 +313,14 @@ function renderClientStep(modalRoot, { date, workplaceId, from, to, procedures: 
       workplaceId,
       from,
       to,
-      selectedClient,
+      selectedPerson,
       selectedProcedures,
       onCreated,
     });
   };
 
   const render = () => {
-    const listHost = host.querySelector('[data-record-client-list]');
+    const listHost = host.querySelector('[data-record-person-list]');
     if (!listHost) return;
     listHost.innerHTML = list({
       items: filtered.map((person) => {
@@ -330,19 +330,19 @@ function renderClientStep(modalRoot, { date, workplaceId, from, to, procedures: 
           title: display.name,
           secondary: display.phone,
           interactive: true,
-          data: `data-record-client="${escapeHtml(person.key)}"`,
-          selected: selectedClient?.key === person.key,
-          aria: `Выбрать клиента ${display.name}`,
+          data: `data-record-person="${escapeHtml(person.key)}"`,
+          selected: selectedPerson?.key === person.key,
+          aria: `Выбрать человека ${display.name}`,
         };
       }),
-    }) || '<div class="muted">Клиенты не найдены.</div>';
+    }) || '<div class="muted">Люди не найдены.</div>';
 
-    listHost.querySelectorAll('[data-record-client]').forEach((row) => row.addEventListener('click', () => {
-      openSelectedClient(all.find((person) => person.key === row.dataset.recordClient) || null);
+    listHost.querySelectorAll('[data-record-person]').forEach((row) => row.addEventListener('click', () => {
+      openSelectedPerson(all.find((person) => person.key === row.dataset.recordPerson) || null);
     }));
   };
 
-  host.querySelector('[data-record-client-search]')?.addEventListener('input', (event) => {
+  host.querySelector('[data-record-person-search]')?.addEventListener('input', (event) => {
     const q = event.target.value.trim().toLocaleLowerCase('ru');
     filtered = all.filter((person) => {
       const display = personDisplay(person);
@@ -350,7 +350,7 @@ function renderClientStep(modalRoot, { date, workplaceId, from, to, procedures: 
     });
     render();
   });
-  host.querySelector('[data-record-add-client]')?.addEventListener('click', () => {
+  host.querySelector('[data-record-add-person]')?.addEventListener('click', () => {
     openPersonCreate({
       root: document.body,
       variant: 'large',
@@ -358,7 +358,7 @@ function renderClientStep(modalRoot, { date, workplaceId, from, to, procedures: 
       onCreated: (person) => {
         all = people();
         filtered = all;
-        openSelectedClient(all.find((item) => item.key === person.key) || person);
+        openSelectedPerson(all.find((item) => item.key === person.key) || person);
       },
     });
   });
@@ -470,12 +470,12 @@ function openConfirmationProcedurePicker({ workplaceId, selectedProcedures, onSe
   }));
 }
 
-function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, selectedClient, selectedProcedures, onCreated }) {
+function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, selectedPerson, selectedProcedures, onCreated }) {
   let currentDate = dateKey(date);
   let currentWorkplaceId = workplaceId;
   let currentFrom = from;
   let currentTo = to;
-  let currentClient = selectedClient;
+  let currentPerson = selectedPerson;
 
   const duration = () => selectedProcedures.reduce((sum, entry) => sum + (Number(entry.duration) || 0), 0);
   const totalCost = () => selectedProcedures.reduce((sum, entry) => {
@@ -561,15 +561,15 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
     },
   });
 
-  const openClient = () => {
-    const key = currentClient?.key;
+  const openPerson = () => {
+    const key = currentPerson?.key;
     if (!key) return;
     openPerson({
       root: document.body,
       key,
       onClose: () => {
         const updated = people().find((person) => person.key === key);
-        if (updated) currentClient = updated;
+        if (updated) currentPerson = updated;
         render();
       },
     });
@@ -578,7 +578,7 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
   const render = () => {
     const host = flowHost(modalRoot);
     if (!host) return;
-    const client = personDisplay(currentClient);
+    const person = personDisplay(currentPerson);
     const workplace = findWorkplaceName(currentWorkplaceId);
     const formattedDate = formatConfirmationDate(currentDate);
     const total = totalCost();
@@ -592,15 +592,15 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
       })),
     ];
     const card = entityCard({
-      id: client.uei,
-      title: client.name,
-      subtitle: client.phone,
-      idData: client.uei ? 'data-record-confirm-client-profile' : '',
-      idAria: client.uei ? `Открыть профиль клиента ${client.name}` : '',
-      titleData: 'data-record-confirm-client-profile',
-      titleAria: `Открыть профиль клиента ${client.name}`,
-      subtitleData: client.phone ? 'data-record-confirm-phone' : '',
-      subtitleAria: client.phone ? `Действия с телефоном ${client.phone}` : '',
+      id: person.uei,
+      title: person.name,
+      subtitle: person.phone,
+      idData: person.uei ? 'data-record-confirm-person-profile' : '',
+      idAria: person.uei ? `Открыть человека ${person.name}` : '',
+      titleData: 'data-record-confirm-person-profile',
+      titleAria: `Открыть человека ${person.name}`,
+      subtitleData: person.phone ? 'data-record-confirm-phone' : '',
+      subtitleAria: person.phone ? `Действия с телефоном ${person.phone}` : '',
       topMeta: [{ value: workplace, row: 1, data: 'data-record-confirm-workplace', aria: `Изменить рабочее пространство ${workplace}` }],
       topRightMeta: [
         { value: formattedDate, row: 2, data: 'data-record-confirm-date', aria: `Изменить дату ${formattedDate}` },
@@ -617,8 +617,8 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
     });
     host.querySelector('[data-record-confirm-date]')?.addEventListener('click', chooseDate);
     host.querySelector('[data-record-confirm-time]')?.addEventListener('click', chooseTime);
-    host.querySelectorAll('[data-record-confirm-client-profile]').forEach((node) => node.addEventListener('click', openClient));
-    host.querySelector('[data-record-confirm-phone]')?.addEventListener('click', () => openPhoneActions(client.phone));
+    host.querySelectorAll('[data-record-confirm-person-profile]').forEach((node) => node.addEventListener('click', openPerson));
+    host.querySelector('[data-record-confirm-phone]')?.addEventListener('click', () => openPhoneActions(person.phone));
     host.querySelectorAll('[data-record-confirm-procedure]').forEach((node) => node.addEventListener('click', () => {
       const index = Number(node.dataset.recordConfirmProcedure);
       const item = selectedProcedures[index];
@@ -656,13 +656,13 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
         workplaceId: currentWorkplaceId,
         from: currentFrom,
         to: currentTo,
-        client: {
-          key: currentClient.key,
-          id: currentClient.id || '',
-          name: currentClient.name || '',
-          surname: currentClient.surname || '',
-          phone: currentClient.phones?.[0] || '',
-          discountPercent: Number(currentClient.discountPercent) || 0,
+        person: {
+          key: currentPerson.key,
+          id: currentPerson.id || '',
+          name: currentPerson.name || '',
+          surname: currentPerson.surname || '',
+          phone: currentPerson.phones?.[0] || '',
+          discountPercent: Number(currentPerson.discountPercent) || 0,
         },
         procedures: selectedProcedures.map(({ procedure, cost, duration: itemDuration }) => ({
           id: procedure.id,
