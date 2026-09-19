@@ -43,7 +43,7 @@ export async function login(email, password) {
   return payload;
 }
 
-export async function getCurrentUser() {
+export async function getCurrentAccount() {
   const token = getAuthToken();
   if (!token) return null;
 
