@@ -34,7 +34,8 @@ assert.doesNotMatch(controller, /consents\/client\/:clientId/);
 
 assert.doesNotMatch(booking, /recordAcceptedConsents/);
 assert.match(booking, /acceptAccountConsents/);
-assert.match(booking, /requiredConsentState\(tenantId, accountId\)/);
+assert.match(booking, /hasActivePdnConsent\(tenantId, accountId\)/);
+assert.doesNotMatch(booking, /requiredConsentState\(tenantId, accountId\)/);
 assert.match(bookingConsent, /acceptAccountConsents\(auth\.tenantId, auth\.accountId/);
 assert.match(bookingPdnGuard, /requiredConsentState\(auth\.tenantId, auth\.accountId\)/);
 assert.match(bookingPdnGuard, /hasActivePdnConsent\(auth\.tenantId, auth\.accountId\)/);
