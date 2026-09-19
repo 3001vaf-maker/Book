@@ -267,6 +267,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          trap 'docker compose -f docker-compose.staging.yml logs frontend backend || true' ERR
           docker compose -f docker-compose.staging.yml up -d frontend
           for attempt in $(seq 1 30); do
             if curl -fsS http://localhost:8080/ >/dev/null 2>&1 \
