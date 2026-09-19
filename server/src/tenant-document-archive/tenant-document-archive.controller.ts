@@ -4,7 +4,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ConsentPolicyService } from './consent-policy.service';
 import { TenantDocumentArchiveService } from './tenant-document-archive.service';
 
-type AuthenticatedRequest = Request & { auth?: { userId: string; tenantId: string; role: string } };
+type AuthenticatedRequest = Request & { auth?: { platformAccountId: string; tenantId: string; role: string } };
 
 @Controller('tenant-document-archive')
 @UseGuards(JwtAuthGuard)
