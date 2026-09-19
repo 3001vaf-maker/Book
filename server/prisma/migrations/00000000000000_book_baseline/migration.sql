@@ -233,4 +233,192 @@ CREATE TABLE public."BusinessRecordEvent" (
     "recordId" text NOT NULL,
     "position" integer DEFAULT 0 NOT NULL,
     data jsonb NOT NULL,
-    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP 
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "updatedAt" timestamp(3) without time zone NOT NULL
+);
+
+
+--
+-- Name: BusinessStateMeta; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."BusinessStateMeta" (
+    id text NOT NULL,
+    "tenantId" text NOT NULL,
+    "migrationVerifiedAt" timestamp(3) without time zone,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "updatedAt" timestamp(3) without time zone NOT NULL
+);
+
+
+--
+-- Name: Capability; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."Capability" (
+    id text NOT NULL,
+    key text NOT NULL,
+    "groupKey" text NOT NULL,
+    name text NOT NULL,
+    description text DEFAULT ''::text NOT NULL,
+    "valueType" public."CapabilityValueType" NOT NULL,
+    "defaultEnabled" boolean DEFAULT false NOT NULL,
+    "defaultLimit" integer,
+    "position" integer DEFAULT 0 NOT NULL,
+    "isActive" boolean DEFAULT true NOT NULL,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "updatedAt" timestamp(3) without time zone NOT NULL
+);
+
+
+--
+-- Name: CommunicationBroadcastRun; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."CommunicationBroadcastRun" (
+    id text NOT NULL,
+    "tenantId" text NOT NULL,
+    channel text NOT NULL,
+    "requestedCount" integer DEFAULT 0 NOT NULL,
+    "eligibleCount" integer DEFAULT 0 NOT NULL,
+    "sentCount" integer DEFAULT 0 NOT NULL,
+    "failedCount" integer DEFAULT 0 NOT NULL,
+    status text DEFAULT 'created'::text NOT NULL,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "finishedAt" timestamp(3) without time zone,
+    name text DEFAULT ''::text NOT NULL,
+    body text DEFAULT ''::text NOT NULL
+);
+
+
+--
+-- Name: CommunicationGroup; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."CommunicationGroup" (
+    id text NOT NULL,
+    "tenantId" text NOT NULL,
+    name text NOT NULL,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "updatedAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
+-- Name: CommunicationGroupMember; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."CommunicationGroupMember" (
+    "groupId" text NOT NULL,
+    "tenantId" text NOT NULL,
+    "personKey" text NOT NULL,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
+-- Name: CommunicationIdentity; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."CommunicationIdentity" (
+    id text NOT NULL,
+    "tenantId" text NOT NULL,
+    "cardPhone" text NOT NULL,
+    uei text DEFAULT ''::text NOT NULL,
+    channel text NOT NULL,
+    "externalUserId" text NOT NULL,
+    display text DEFAULT ''::text NOT NULL,
+    "verifiedAt" timestamp(3) without time zone,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "updatedAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
+-- Name: CommunicationMessage; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."CommunicationMessage" (
+    id text NOT NULL,
+    "tenantId" text NOT NULL,
+    "cardPhone" text NOT NULL,
+    uei text DEFAULT ''::text NOT NULL,
+    direction text NOT NULL,
+    kind text DEFAULT 'message'::text NOT NULL,
+    channel text NOT NULL,
+    body text DEFAULT ''::text NOT NULL,
+    "externalMessageId" text DEFAULT ''::text NOT NULL,
+    "externalThreadId" text DEFAULT ''::text NOT NULL,
+    status text DEFAULT 'created'::text NOT NULL,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "sentAt" timestamp(3) without time zone,
+    "deliveredAt" timestamp(3) without time zone,
+    "readAt" timestamp(3) without time zone,
+    "failedAt" timestamp(3) without time zone,
+    error text DEFAULT ''::text NOT NULL,
+    attachments jsonb DEFAULT '[]'::jsonb NOT NULL,
+    purpose text,
+    CONSTRAINT "CommunicationMessage_purpose_check" CHECK (((purpose IS NULL) OR (purpose = ANY (ARRAY['SYSTEM'::text, 'SERVICE'::text, 'DIRECT'::text, 'MARKETING'::text]))))
+);
+
+
+--
+-- Name: CommunicationPreference; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."CommunicationPreference" (
+    id text NOT NULL,
+    "tenantId" text NOT NULL,
+    "cardPhone" text NOT NULL,
+    uei text DEFAULT ''::text NOT NULL,
+    "preferredChannels" jsonb DEFAULT '[]'::jsonb NOT NULL,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "updatedAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
+-- Name: CommunicationTemplate; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."CommunicationTemplate" (
+    id text NOT NULL,
+    "tenantId" text NOT NULL,
+    name text NOT NULL,
+    body text NOT NULL,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "updatedAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
+-- Name: MasterInvitation; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."MasterInvitation" (
+    id text NOT NULL,
+    "tenantId" text NOT NULL,
+    "createdByAdminId" text NOT NULL,
+    email text NOT NULL,
+    name text DEFAULT ''::text NOT NULL,
+    "tokenHash" text NOT NULL,
+    status public."MasterInvitationStatus" DEFAULT 'PENDING'::public."MasterInvitationStatus" NOT NULL,
+    "expiresAt" timestamp(3) without time zone NOT NULL,
+    "acceptedAt" timestamp(3) without time zone,
+    "revokedAt" timestamp(3) without time zone,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "updatedAt" timestamp(3) without time zone NOT NULL
+);
+
+
+--
+-- Name: Membership; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."Membership" (
+    id text NOT NULL,
+    "tenantId" text NOT NULL,
+    "userId" text NOT NULL,
+    role public."MembershipRole" DEFAULT 'OWNER'::public."MembershipRole" NOT NULL,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
