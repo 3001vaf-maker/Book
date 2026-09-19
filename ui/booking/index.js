@@ -24,13 +24,13 @@ export function bookingThemeStyle(settings = {}) {
 export function bookingScreen(blocks = [], { settings = {}, mode = 'center', className = '' } = {}) {
   const theme = safeTheme(settings);
   const classes = [
-    'booking-client',
-    `booking-client--${mode === 'account' ? 'account' : 'center'}`,
+    'booking-account',
+    `booking-account--${mode === 'account' ? 'account' : 'center'}`,
     `booking-shape--${theme.shape}`,
     `booking-choice-style--${theme.choiceStyle}`,
     className,
   ].filter(Boolean).join(' ');
-  return `<section class="${classes}" style="${bookingThemeStyle(settings)}"><div class="booking-client__frame"><div class="booking-client__panel">${blocks.filter(Boolean).join('')}</div></div></section>`;
+  return `<section class="${classes}" style="${bookingThemeStyle(settings)}"><div class="booking-account__frame"><div class="booking-account__panel">${blocks.filter(Boolean).join('')}</div></div></section>`;
 }
 
 export function bookingHeading(title = '', subtitle = '') {
