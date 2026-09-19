@@ -117,7 +117,7 @@ export function getPlatformDocumentBases() {
   return clone(platformBasesState);
 }
 
-export function buildBookDocuments() {
+export function buildTenantDocumentsFromPlatformBases() {
   if (!platformBasesState.length || !contextReady()) return [];
   return PLATFORM_DOCUMENT_IDS
     .map((id) => baseForDocument(id))
@@ -125,7 +125,7 @@ export function buildBookDocuments() {
     .map((base) => makeDocumentFromPlatformBase(base, 1));
 }
 
-export function reconcileBookDocuments(items = [], history = []) {
+export function reconcileTenantDocumentsWithPlatformBases(items = [], history = []) {
   const current = (Array.isArray(items) ? items : []).map(normalize);
   const nextHistory = Array.isArray(history) ? clone(history) : [];
   let changed = false;
@@ -276,5 +276,5 @@ export function createDocument({ title = 'Новый документ', text = '
 }
 
 export function resetDocumentTemplates() {
-  return saveDocuments(buildBookDocuments());
+  return saveDocuments(buildTenantDocumentsFromPlatformBases());
 }
