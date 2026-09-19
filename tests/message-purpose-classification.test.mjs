@@ -12,7 +12,7 @@ const broadcast = read('server/src/communication/communication-broadcast.service
 const telegram = read('server/src/communication/telegram-bot.service.ts');
 const notification = read('server/src/notification/notification.service.ts');
 const booking = read('server/src/online-booking/online-booking.controller.ts');
-const consentPolicy = read('server/src/document-state/consent-policy.service.ts');
+const consentPolicy = read('server/src/document-archive/consent-policy.service.ts');
 
 assert.match(purpose, /\['SYSTEM', 'SERVICE', 'DIRECT', 'MARKETING'\]/);
 assert.match(purpose, /export type MessagePurpose/);

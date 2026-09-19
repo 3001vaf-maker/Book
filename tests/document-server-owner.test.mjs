@@ -49,10 +49,10 @@ data.saveDocument({ id: 'pdn-consent', system: true, kind: 'consent', title: 'PD
 history.recordDocumentHistory({ documentId: 'pdn-consent', documentTitle: 'PDN 2', documentVersion: 1, action: 'renamed' });
 await persistence.flushBusinessPersistence();
 
-assert.ok(calls.some((call) => call.url.endsWith('/document-state/documents') && call.method === 'PUT'));
+assert.ok(calls.some((call) => call.url.endsWith('/document-archive/documents') && call.method === 'PUT'));
 assert.equal(typeof consents.recordConsent, 'undefined');
 assert.equal(typeof consents.migrateLegacyConsents, 'undefined');
-assert.equal(calls.some((call) => call.url.endsWith('/document-state/consents') && call.method === 'PUT'), false);
-assert.ok(calls.some((call) => call.url.endsWith('/document-state/history') && call.method === 'PUT'));
+assert.equal(calls.some((call) => call.url.endsWith('/document-archive/consents') && call.method === 'PUT'), false);
+assert.ok(calls.some((call) => call.url.endsWith('/document-archive/history') && call.method === 'PUT'));
 assert.equal(JSON.parse(storage.get('book.documents.templates.v1') || 'null'), null);
 console.log('document server owner tests: OK');
