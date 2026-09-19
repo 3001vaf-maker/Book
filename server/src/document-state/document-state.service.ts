@@ -16,7 +16,6 @@ type ConsentEventRow = {
   revokedAt: Date | null;
   source: string;
   occurredAt: Date;
-  migratedFromEventId: string;
   createdAt: Date;
 };
 
@@ -34,7 +33,6 @@ function normalize(value: unknown) {
   const source = objectValue(value);
   return {
     documents: Array.isArray(source.documents) ? clone(source.documents) : [],
-    consents: Array.isArray(source.consents) ? clone(source.consents) : [],
     history: Array.isArray(source.history) ? clone(source.history) : [],
   };
 }
@@ -68,7 +66,6 @@ function publicConsentEvent(row: ConsentEventRow) {
     source: row.source,
     eventAt: row.occurredAt.toISOString(),
     createdAt: row.createdAt.toISOString(),
-    migratedFromEventId: row.migratedFromEventId,
   };
 }
 
@@ -80,7 +77,7 @@ export class DocumentStateService {
     const rows = await this.prisma.$queryRaw<ConsentEventRow[]>`
       SELECT "id", "subjectType", "subjectKey", "contactType", "contactValue", "documentId",
              "documentVersion", "status", "acceptedAt", "revokedAt", "source", "occurredAt",
-             "migratedFromEventId", "createdAt"
+             "createdAt"
       FROM "ConsentEvent"
       WHERE "tenantId" = ${tenantId}
       ORDER BY "occurredAt" ASC, "createdAt" ASC, "id" ASC
@@ -90,16 +87,14 @@ export class DocumentStateService {
 
   private async snapshot(tenantId: string) {
     const state = await this.prisma.businessDocumentState.findUnique({ where: { tenantId } });
-    const data = normalize(state?.data || {});
-
-    if (state?.migrationVerifiedAt) data.consents = await this.canonicalConsentEvents(tenantId);
-    else data.consents = [];
+    const stored = normalize(state?.data || {});
+    const consents = state?.migrationVerifiedAt ? await this.canonicalConsentEvents(tenantId) : [];
 
     return {
       migrated: Boolean(state),
       verified: Boolean(state?.migrationVerifiedAt),
       migrationVerifiedAt: state?.migrationVerifiedAt || null,
-      data,
+      data: { ...stored, consents },
     };
   }
 
