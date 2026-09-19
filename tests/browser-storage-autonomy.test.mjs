@@ -40,8 +40,8 @@ const businessKeys = [
 for (const key of businessKeys) localStorage.setItem(key, `legacy:${key}`);
 
 const technical = new Map([
-  ['book.booking-account.token.tenant-a', 'public-session-token'],
-  ['book.booking-account.email.tenant-a', 'client@example.com'],
+  ['book.account.token.tenant-a', 'public-session-token'],
+  ['book.account.email.tenant-a', 'person@example.com'],
   ['book.people.sort', 'lastDesc'],
   ['book.onboarding.step.v3', '3'],
   ['book:workplace-context:journal', '{"workplaceId":"wp-1"}'],
