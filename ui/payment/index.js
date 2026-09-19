@@ -26,7 +26,7 @@ const discountOptions = [
   ...Array.from({ length: 100 }, (_, index) => ({ value: String(index + 1), label: `${index + 1}%` })),
 ];
 
-export function paymentForm({ workplace = '', date = '', time = '', client = {}, procedures = [], total = 0 } = {}) {
+export function paymentForm({ workplace = '', date = '', time = '', person = {}, procedures = [], total = 0 } = {}) {
   const procedureBlocks = (Array.isArray(procedures) ? procedures : []).map((procedure, index) => {
     const price = Math.max(0, numberValue(procedure?.cost));
     const percent = Math.max(0, Math.min(100, numberValue(procedure?.discountPercent)));
@@ -50,13 +50,13 @@ export function paymentForm({ workplace = '', date = '', time = '', client = {},
     </section>`;
   }).join('');
 
-  const uei = client?.uei ? `<span class="payment-client-uei">${escapeHtml(client.uei)}</span>` : '';
-  const name = escapeHtml(client?.name || '');
+  const uei = person?.uei ? `<span class="payment-person-uei">${escapeHtml(person.uei)}</span>` : '';
+  const name = escapeHtml(person?.name || '');
 
   return `<div class="payment-ui" data-payment-ui>
     <div class="payment-readonly-block"><strong>${escapeHtml(workplace)}</strong></div>
     <div class="payment-readonly-block"><span>${escapeHtml(date)}</span><span>${escapeHtml(time)}</span></div>
-    <div class="payment-readonly-block payment-readonly-block--client">${uei}<strong>${name}</strong></div>
+    <div class="payment-readonly-block payment-readonly-block--person">${uei}<strong>${name}</strong></div>
     <div class="payment-procedures">${procedureBlocks}</div>
     <div class="payment-total"><span>Итого</span><strong data-payment-total>${escapeHtml(moneyDisplay(total))}</strong></div>
     <div class="payment-actions">${button('Сохранить', { data: 'data-payment-save', variant: 'secondary' })}${button('Оплатить', { data: 'data-payment-submit' })}</div>
