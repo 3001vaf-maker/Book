@@ -212,18 +212,6 @@ export async function getBookingChatSettings(tenantId) {
   );
 }
 
-export async function setBookingTelegramConsent(tenantId, enabled) {
-  return jsonResponse(
-    await request(`/online-booking/${encodeURIComponent(tenantId)}/account/chat/telegram-consent`, {
-      tenantId,
-      auth: true,
-      method: 'PUT',
-      body: JSON.stringify({ enabled: Boolean(enabled) }),
-    }),
-    'Не удалось изменить Telegram',
-  );
-}
-
 export async function sendBookingChatMessage(tenantId, body, attachments = []) {
   return jsonResponse(
     await request(`/online-booking/${encodeURIComponent(tenantId)}/account/chat/messages`, {
