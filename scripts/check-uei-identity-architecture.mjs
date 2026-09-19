@@ -10,7 +10,7 @@ const metadata = read('main/people/metadata.js');
 const business = read('server/src/business-state/business-state.service.ts');
 const server = read('server/src/online-booking/online-booking.service.ts');
 
-if (!journal.includes("import { getPeople } from '../main/clients/data.js';") || journal.includes('getAllPeople')) {
+if (!journal.includes("import { getPeople } from '../main/people/data.js';") || journal.includes('getAllPeople')) {
   failures.push('Journal must select the canonical visible People projection, not raw UEI members.');
 }
 if (!metadata.includes('getIdentityMemberKeys') || !metadata.includes('identityKeys.has')) {
