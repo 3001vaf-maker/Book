@@ -38,7 +38,7 @@ const membershipRoleEnum = schema.slice(
 // Tenant is the persistent business/data boundary.
 // It owns Profile rows and People rows, but they are different concepts.
 assert.match(tenantModel, /profiles\s+Profile\[\]/);
-assert.match(tenantModel, /people\\s+Person\\[\\]/);
+assert.match(tenantModel, /people\s+Person\[\]/);
 assert.match(tenantModel, /memberships\s+Membership\[\]/);
 
 // Login identity is separate from Profile.
