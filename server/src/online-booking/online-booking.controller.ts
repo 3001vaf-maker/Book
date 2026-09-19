@@ -161,19 +161,19 @@ export class OnlineBookingController {
     return this.webPush.deleteSubscription(tenantId, request.bookingAccountAuth!.accountId, body?.endpoint);
   }
 
-  @UseGuards(BookingAccountGuard, BookingRequiredConsentGuard)
+  @UseGuards(BookingAccountGuard)
   @Get(':tenantId/account/requests')
   myRequests(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
     return this.booking.getMyRequests(tenantId, request.bookingAccountAuth!.accountId);
   }
 
-  @UseGuards(BookingAccountGuard, BookingRequiredConsentGuard)
+  @UseGuards(BookingAccountGuard)
   @Get(':tenantId/account/notifications')
   notificationsFeed(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
     return this.notifications.listForAccount(tenantId, request.bookingAccountAuth!.accountId);
   }
 
-  @UseGuards(BookingAccountGuard, BookingRequiredConsentGuard)
+  @UseGuards(BookingAccountGuard)
   @Post(':tenantId/account/notifications/:notificationId/read')
   markNotificationRead(
     @Param('tenantId') tenantId: string,
