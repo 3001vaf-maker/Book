@@ -3,9 +3,9 @@ import type { Request } from 'express';
 import { CommunicationService } from '../communication/communication.service';
 import { ConsentPolicyService } from '../tenant-document-archive/consent-policy.service';
 import { PrismaService } from '../prisma.service';
-import { BookingAccountGuard } from './booking-account.guard';
+import { AccountGuard } from './account.guard';
 
-type AccountRequest = Request & { bookingAccountAuth?: { accountId: string; tenantId: string } };
+type AccountRequest = Request & { accountAuth?: { accountId: string; tenantId: string } };
 
 function acceptedMessages(value: unknown) {
   return (Array.isArray(value) ? value : []).some((item: any) => String(item?.documentId || '').trim() === 'messages-consent' && Boolean(item?.accepted));
@@ -20,13 +20,13 @@ export class BookingConsentController {
   ) {}
 
   private async currentContactPoints(request: AccountRequest) {
-    const auth = request.bookingAccountAuth!;
-    const account = await this.prisma.bookingAccount.findFirst({
+    const auth = request.accountAuth!;
+    const account = await this.prisma.account.findFirst({
       where: { id: auth.accountId, tenantId: auth.tenantId },
-      select: { phone: true, email: true, uei: true },
+      select: { phone: true, email: true },
     });
     if (!account) return [];
-    const telegram = await this.communications.telegramIdentity(auth.tenantId, { phone: account.phone, uei: account.uei });
+    const telegram = await this.communications.telegramIdentity(auth.tenantId, { phone: account.phone });
     return [
       { type: 'PHONE', value: account.phone },
       { type: 'EMAIL', value: account.email },
@@ -34,17 +34,17 @@ export class BookingConsentController {
     ].filter((item) => String(item.value || '').trim());
   }
 
-  @UseGuards(BookingAccountGuard)
+  @UseGuards(AccountGuard)
   @Get(':tenantId/account/consent-state')
   async state(@Req() request: AccountRequest) {
-    const auth = request.bookingAccountAuth!;
+    const auth = request.accountAuth!;
     return this.consentPolicy.accountConsentState(auth.tenantId, auth.accountId);
   }
 
-  @UseGuards(BookingAccountGuard)
+  @UseGuards(AccountGuard)
   @Post(':tenantId/account/consents')
   async accept(@Req() request: AccountRequest, @Body() body: { consents?: unknown }) {
-    const auth = request.bookingAccountAuth!;
+    const auth = request.accountAuth!;
     await this.consentPolicy.acceptAccountConsents(auth.tenantId, auth.accountId, body?.consents || [], 'online-booking-account');
     if (acceptedMessages(body?.consents)) {
       const contacts = await this.currentContactPoints(request);
@@ -55,13 +55,13 @@ export class BookingConsentController {
     return this.consentPolicy.accountConsentState(auth.tenantId, auth.accountId);
   }
 
-  @UseGuards(BookingAccountGuard)
+  @UseGuards(AccountGuard)
   @Post(':tenantId/account/consents/:documentId/revoke')
   async revoke(
     @Req() request: AccountRequest,
     @Param('documentId') documentId: string,
   ) {
-    const auth = request.bookingAccountAuth!;
+    const auth = request.accountAuth!;
     await this.consentPolicy.revokeAccountConsent(auth.tenantId, auth.accountId, documentId, 'online-booking');
     if (documentId === 'messages-consent') {
       const contacts = await this.currentContactPoints(request);

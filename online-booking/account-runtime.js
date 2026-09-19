@@ -1,7 +1,7 @@
 import {
-  bindBookingTelegramEntry,
-  getBookingAccountToken,
-} from '../core/booking-account/index.js';
+  bindAccountTelegramEntry,
+  getAccountToken,
+} from '../core/account/index.js';
 
 function removeTelegramEntryFromUrl() {
   const url = new URL(location.href);
@@ -10,7 +10,7 @@ function removeTelegramEntryFromUrl() {
   history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
 }
 
-export function startBookingClientRuntime({ tenantId = '', telegramEntry = '' } = {}) {
+export function startAccountRuntime({ tenantId = '', telegramEntry = '' } = {}) {
   const tenant = String(tenantId || '').trim();
   const entry = String(telegramEntry || '').trim();
   if (!tenant) return () => {};
@@ -19,10 +19,10 @@ export function startBookingClientRuntime({ tenantId = '', telegramEntry = '' } 
   let disposed = false;
 
   async function bindTelegramWhenAuthenticated() {
-    if (disposed || telegramAttempted || !getBookingAccountToken(tenant)) return;
+    if (disposed || telegramAttempted || !getAccountToken(tenant)) return;
     telegramAttempted = true;
     try {
-      await bindBookingTelegramEntry(tenant, entry);
+      await bindAccountTelegramEntry(tenant, entry);
       removeTelegramEntryFromUrl();
     } catch {
       // Keep the one-time token in the URL so a fresh page load can retry after an interrupted login.

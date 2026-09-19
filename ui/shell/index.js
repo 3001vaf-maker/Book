@@ -2,7 +2,7 @@ import { button } from '../buttons/index.js';
 import { navigationBar } from '../navigation/navigation.js';
 import { escapeHtml } from '../utils/escape-html.js';
 
-const CLIENT_NAV_ITEMS = [
+const ACCOUNT_NAV_ITEMS = [
   { id: 'profile', label: 'Профиль', icon: '◉' },
   { id: 'messages', label: 'Сообщения', icon: '💬' },
   { id: 'history', label: 'История', icon: '▤' },
@@ -48,11 +48,11 @@ export function mediaRail(items = []) {
   }).join('')}</div>`;
 }
 
-export function clientBottomNavigation(active = 'profile') {
-  return navigationBar(CLIENT_NAV_ITEMS, active, {
-    className: 'bottom-nav--client',
-    aria: 'Клиентская навигация',
-    dataAttribute: 'data-client-nav',
+export function accountBottomNavigation(active = 'profile') {
+  return navigationBar(ACCOUNT_NAV_ITEMS, active, {
+    className: 'bottom-nav--account',
+    aria: 'Навигация аккаунта',
+    dataAttribute: 'data-account-nav',
   });
 }
 
@@ -74,7 +74,7 @@ export function appShell({
   </section>`;
 }
 
-export function clientProfileCard({
+export function personSummaryCard({
   workplace = '',
   visitLabel = 'Последний визит',
   date = '',
@@ -88,21 +88,21 @@ export function clientProfileCard({
 } = {}) {
   const finance = (Array.isArray(financial) ? financial : []).slice(0, 3);
   const details = Array.isArray(rows) ? rows : [];
-  return `<article class="client-profile-card" data-client-profile-card>
-    <div class="client-profile-card__visit">
-      <strong class="client-profile-card__workplace">${text(workplace)}</strong>
-      <span class="client-profile-card__visit-label">${text(visitLabel)}</span>
-      <strong class="client-profile-card__visit-date">${text(date)}</strong>
-      <strong class="client-profile-card__visit-time">${text(time)}</strong>
+  return `<article class="person-summary-card" data-person-summary-card>
+    <div class="person-summary-card__visit">
+      <strong class="person-summary-card__workplace">${text(workplace)}</strong>
+      <span class="person-summary-card__visit-label">${text(visitLabel)}</span>
+      <strong class="person-summary-card__visit-date">${text(date)}</strong>
+      <strong class="person-summary-card__visit-time">${text(time)}</strong>
     </div>
-    <div class="client-profile-card__identity">
-      <strong class="client-profile-card__uei">${uei ? `UEI ${text(uei)}` : ''}</strong>
-      <strong class="client-profile-card__discount">${Number(discount) > 0 ? `${text(discount)}%` : ''}</strong>
-      <strong class="client-profile-card__name">${text(name)}</strong>
-      <span class="client-profile-card__phone">${text(phone)}</span>
+    <div class="person-summary-card__identity">
+      <strong class="person-summary-card__uei">${uei ? `UEI ${text(uei)}` : ''}</strong>
+      <strong class="person-summary-card__discount">${Number(discount) > 0 ? `${text(discount)}%` : ''}</strong>
+      <strong class="person-summary-card__name">${text(name)}</strong>
+      <span class="person-summary-card__phone">${text(phone)}</span>
     </div>
-    <div class="client-profile-card__finance">${finance.map((item) => `<div class="client-profile-card__metric"><strong>${text(item.value)}</strong><span>${text(item.label)}</span></div>`).join('')}</div>
-    <div class="client-profile-card__rows">${details.map((item, index) => `<button type="button" class="client-profile-card__row"${item.data ? ` ${item.data}` : ''} data-profile-row="${index}"><span>${text(item.label)}</span><strong>${text(item.value)}</strong></button>`).join('')}</div>
+    <div class="person-summary-card__finance">${finance.map((item) => `<div class="person-summary-card__metric"><strong>${text(item.value)}</strong><span>${text(item.label)}</span></div>`).join('')}</div>
+    <div class="person-summary-card__rows">${details.map((item, index) => `<button type="button" class="person-summary-card__row"${item.data ? ` ${item.data}` : ''} data-profile-row="${index}"><span>${text(item.label)}</span><strong>${text(item.value)}</strong></button>`).join('')}</div>
   </article>`;
 }
 
@@ -119,7 +119,7 @@ function attachmentMarkup(attachment = {}) {
   return '';
 }
 
-export function messageBubble(message = {}, { viewer = 'client' } = {}) {
+export function messageBubble(message = {}, { viewer = 'account' } = {}) {
   const direction = String(message.direction || '').toLowerCase();
   const system = direction === 'system' || String(message.kind || '').toLowerCase() === 'system';
   const outgoing = viewer === 'profile' ? direction === 'outbound' : direction === 'inbound';

@@ -1,0 +1,1 @@
+ALTER TABLE "BookingAccount" DROP COLUMN IF EXISTS "uei";

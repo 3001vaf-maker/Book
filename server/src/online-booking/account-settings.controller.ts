@@ -1,15 +1,15 @@
 import { Body, Controller, Param, Put, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
-import { BookingAccountGuard } from './booking-account.guard';
+import { AccountGuard } from './account.guard';
 import { OnlineBookingService } from './online-booking.service';
 
-type AccountRequest = Request & { bookingAccountAuth?: { accountId: string; tenantId: string } };
+type AccountRequest = Request & { accountAuth?: { accountId: string; tenantId: string } };
 
 @Controller('online-booking')
-export class BookingAccountSettingsController {
+export class AccountSettingsController {
   constructor(private readonly booking: OnlineBookingService) {}
 
-  @UseGuards(BookingAccountGuard)
+  @UseGuards(AccountGuard)
   @Put(':tenantId/account/password')
   changePassword(
     @Param('tenantId') tenantId: string,
@@ -18,7 +18,7 @@ export class BookingAccountSettingsController {
   ) {
     return this.booking.changeAccountPassword(
       tenantId,
-      request.bookingAccountAuth!.accountId,
+      request.accountAuth!.accountId,
       body?.currentPassword,
       body?.newPassword,
     );

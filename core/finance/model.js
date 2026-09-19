@@ -57,8 +57,8 @@ export function recordPlanTotal(record = null) {
   return resolveRecordFinancialPlan(record).planTotal;
 }
 
-export function recordClientDiscount(client = null) {
-  return clampFinancialPercent(client?.discountPercent ?? 0);
+export function recordPersonDiscount(person = null) {
+  return clampFinancialPercent(person?.discountPercent ?? 0);
 }
 
 export function normalizeRecordFinance(value = null) {
@@ -77,10 +77,10 @@ export function normalizeRecordFinance(value = null) {
 
 export function hydrateRecordFinance(record = null) {
   if (!record?.id) return record;
-  const discountPercent = record?.clientDiscountPercent == null
-    ? recordClientDiscount(record?.client)
-    : clampFinancialPercent(record.clientDiscountPercent);
-  const { clientDiscountPercent: _legacyDiscount, ...cleanRecord } = record;
+  const discountPercent = record?.personDiscountPercent == null
+    ? recordPersonDiscount(record?.person)
+    : clampFinancialPercent(record.personDiscountPercent);
+  const { personDiscountPercent: _legacyDiscount, ...cleanRecord } = record;
   const normalizedRecord = {
     ...cleanRecord,
     procedures: Array.isArray(cleanRecord.procedures) ? cleanRecord.procedures : [],

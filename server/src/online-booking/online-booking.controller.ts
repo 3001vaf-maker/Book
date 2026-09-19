@@ -4,13 +4,13 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CommunicationService } from '../communication/communication.service';
 import { NotificationService } from '../notification/notification.service';
 import { WebPushService } from '../notification/web-push.service';
-import { BookingAccountGuard } from './booking-account.guard';
+import { AccountGuard } from './account.guard';
 import { BookingPdnConsentGuard } from './booking-pdn-consent.guard';
-import { ClientCardLinkService } from './client-card-link.service';
+import { PersonIdentityService } from './person-identity.service';
 import { OnlineBookingService } from './online-booking.service';
 
 type OwnerRequest = Request & { auth?: { platformAccountId: string; tenantId: string; role: string } };
-type AccountRequest = Request & { bookingAccountAuth?: { accountId: string; tenantId: string } };
+type AccountRequest = Request & { accountAuth?: { accountId: string; tenantId: string } };
 
 @Controller('online-booking')
 export class OnlineBookingController {
@@ -19,7 +19,7 @@ export class OnlineBookingController {
     private readonly notifications: NotificationService,
     private readonly communications: CommunicationService,
     private readonly webPush: WebPushService,
-    private readonly clientCards: ClientCardLinkService,
+    private readonly personIdentity: PersonIdentityService,
   ) {}
 
   private async accountTelegramSettings(tenantId: string, accountId: string) {
@@ -54,9 +54,9 @@ export class OnlineBookingController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Post('owner/reconcile-legacy-client-cards')
-  reconcileLegacyClientCards(@Req() request: OwnerRequest) {
-    return this.clientCards.reconcileLegacyAccountDuplicates(request.auth!.tenantId);
+  @Post('owner/reconcile-legacy-people')
+  reconcileLegacyPeople(@Req() request: OwnerRequest) {
+    return this.personIdentity.reconcileLegacyAccountDuplicates(request.auth!.tenantId);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -103,37 +103,37 @@ export class OnlineBookingController {
     return this.booking.loginAccount(tenantId, body?.email || '', body?.password || '');
   }
 
-  @UseGuards(BookingAccountGuard)
+  @UseGuards(AccountGuard)
   @Get(':tenantId/account/me')
   account(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
-    return this.booking.getAccount(tenantId, request.bookingAccountAuth!.accountId);
+    return this.booking.getAccount(tenantId, request.accountAuth!.accountId);
   }
 
-  @UseGuards(BookingAccountGuard)
+  @UseGuards(AccountGuard)
   @Put(':tenantId/account/me')
   updateAccount(@Param('tenantId') tenantId: string, @Req() request: AccountRequest, @Body() body: Record<string, any>) {
-    return this.booking.updateAccount(tenantId, request.bookingAccountAuth!.accountId, body || {});
+    return this.booking.updateAccount(tenantId, request.accountAuth!.accountId, body || {});
   }
 
-  @UseGuards(BookingAccountGuard)
+  @UseGuards(AccountGuard)
   @Post(':tenantId/account/telegram-entry')
   bindTelegramEntry(@Param('tenantId') tenantId: string, @Req() request: AccountRequest, @Body() body: { token?: unknown }) {
-    return this.communications.bindTelegramEntry(tenantId, request.bookingAccountAuth!.accountId, body?.token);
+    return this.communications.bindTelegramEntry(tenantId, request.accountAuth!.accountId, body?.token);
   }
 
-  @UseGuards(BookingAccountGuard)
+  @UseGuards(AccountGuard)
   @Get(':tenantId/account/chat/settings')
   chatSettings(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
-    return this.accountTelegramSettings(tenantId, request.bookingAccountAuth!.accountId);
+    return this.accountTelegramSettings(tenantId, request.accountAuth!.accountId);
   }
 
-  @UseGuards(BookingAccountGuard)
+  @UseGuards(AccountGuard)
   @Get(':tenantId/account/push/config')
   pushConfiguration() {
     return this.webPush.configuration();
   }
 
-  @UseGuards(BookingAccountGuard)
+  @UseGuards(AccountGuard)
   @Put(':tenantId/account/push/subscription')
   savePushSubscription(
     @Param('tenantId') tenantId: string,
@@ -145,52 +145,52 @@ export class OnlineBookingController {
       : request.headers['user-agent'] || '';
     return this.webPush.saveSubscription(
       tenantId,
-      request.bookingAccountAuth!.accountId,
+      request.accountAuth!.accountId,
       body?.subscription,
       userAgent,
     );
   }
 
-  @UseGuards(BookingAccountGuard)
+  @UseGuards(AccountGuard)
   @Delete(':tenantId/account/push/subscription')
   deletePushSubscription(
     @Param('tenantId') tenantId: string,
     @Req() request: AccountRequest,
     @Body() body: { endpoint?: unknown },
   ) {
-    return this.webPush.deleteSubscription(tenantId, request.bookingAccountAuth!.accountId, body?.endpoint);
+    return this.webPush.deleteSubscription(tenantId, request.accountAuth!.accountId, body?.endpoint);
   }
 
-  @UseGuards(BookingAccountGuard)
+  @UseGuards(AccountGuard)
   @Get(':tenantId/account/requests')
   myRequests(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
-    return this.booking.getMyRequests(tenantId, request.bookingAccountAuth!.accountId);
+    return this.booking.getMyRequests(tenantId, request.accountAuth!.accountId);
   }
 
-  @UseGuards(BookingAccountGuard)
+  @UseGuards(AccountGuard)
   @Get(':tenantId/account/notifications')
   notificationsFeed(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
-    return this.notifications.listForAccount(tenantId, request.bookingAccountAuth!.accountId);
+    return this.notifications.listForAccount(tenantId, request.accountAuth!.accountId);
   }
 
-  @UseGuards(BookingAccountGuard)
+  @UseGuards(AccountGuard)
   @Post(':tenantId/account/notifications/:notificationId/read')
   markNotificationRead(
     @Param('tenantId') tenantId: string,
     @Param('notificationId') notificationId: string,
     @Req() request: AccountRequest,
   ) {
-    return this.notifications.markReadForAccount(tenantId, request.bookingAccountAuth!.accountId, notificationId);
+    return this.notifications.markReadForAccount(tenantId, request.accountAuth!.accountId, notificationId);
   }
 
-  @UseGuards(BookingAccountGuard, BookingPdnConsentGuard)
+  @UseGuards(AccountGuard, BookingPdnConsentGuard)
   @Get(':tenantId/account/chat')
   async accountChat(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
-    const account = await this.booking.getAccount(tenantId, request.bookingAccountAuth!.accountId);
+    const account = await this.booking.getAccount(tenantId, request.accountAuth!.accountId);
     return this.communications.listThread(tenantId, { phone: account.phone, uei: account.uei }, 500);
   }
 
-  @UseGuards(BookingAccountGuard, BookingPdnConsentGuard)
+  @UseGuards(AccountGuard, BookingPdnConsentGuard)
   @Post(':tenantId/account/chat/messages')
   async sendAccountChatMessage(
     @Param('tenantId') tenantId: string,
@@ -200,7 +200,7 @@ export class OnlineBookingController {
     const message = String(body?.body ?? '').trim();
     const attachments = Array.isArray(body?.attachments) ? body.attachments : [];
     if (!message && !attachments.length) throw new BadRequestException('Пустое сообщение');
-    const account = await this.booking.getAccount(tenantId, request.bookingAccountAuth!.accountId);
+    const account = await this.booking.getAccount(tenantId, request.accountAuth!.accountId);
     return this.communications.recordMessage(tenantId, {
       phone: account.phone,
       uei: account.uei,
@@ -214,16 +214,16 @@ export class OnlineBookingController {
     });
   }
 
-  @UseGuards(BookingAccountGuard, BookingPdnConsentGuard)
+  @UseGuards(AccountGuard, BookingPdnConsentGuard)
   @Post(':tenantId/requests')
   async createRequest(@Param('tenantId') tenantId: string, @Req() request: AccountRequest, @Body() body: Record<string, any>) {
-    const accountId = request.bookingAccountAuth!.accountId;
+    const accountId = request.accountAuth!.accountId;
     const created = await this.booking.createRequest(tenantId, accountId, body || {});
     await this.notifications.createForAccount(tenantId, accountId, {
       purpose: 'SERVICE',
       type: 'booking.created',
       title: 'Запись создана',
-      body: 'Новая запись добавлена в ваш клиентский аккаунт.',
+      body: 'Новая запись добавлена в ваш аккаунт.',
       entityType: 'booking-request',
       entityId: String((created as any)?.id || ''),
     });

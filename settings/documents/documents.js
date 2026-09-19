@@ -1,6 +1,6 @@
 import { actionBlock, button, escapeHtml, field, folderList, iconButton, initViewNavigation, list, modal, mountModal, page, pageHeader, shortDateTime, textareaField, viewNavigation } from '../../ui/ui.js';
 import { phonesMatch } from '../../core/phone/index.js';
-import { getAllClients } from '../../main/clients/data.js';
+import { getAllPeople } from '../../main/people/data.js';
 import { createDocument, getDocuments, saveDocument } from './data.js';
 import { getConsents } from './consents.js';
 import { getDocumentHistory } from './history.js';
@@ -14,7 +14,7 @@ let currentSection = 'root';
 let currentHistoryView = 'documents';
 
 function statusText(item) {
-  if (!item.clientConsent) return 'Документ';
+  if (!item.personConsent) return 'Документ';
   return item.required ? 'Обязательное согласие' : 'Необязательное согласие';
 }
 
@@ -122,32 +122,30 @@ function documentHistoryMarkup() {
   });
 }
 
-function consentClient(item, clients) {
-  if (item.subjectType === 'BOOKING_ACCOUNT') {
-    return clients.find((client) => (client.accounts || []).includes(item.subjectKey)) || null;
+function consentPerson(item, people) {
+  if (item.subjectType === 'ACCOUNT') {
+    return people.find((person) => (person.accounts || []).includes(item.subjectKey)) || null;
   }
-  if (item.subjectType !== 'CONTACT_POINT') {
-    return clients.find((client) => client.key === item.clientId) || null;
-  }
+  if (item.subjectType !== 'CONTACT_POINT') return null;
   if (item.contactType === 'PHONE') {
-    return clients.find((client) => (client.phones || []).some((value) => phonesMatch(value, item.contactValue))) || null;
+    return people.find((person) => (person.phones || []).some((value) => phonesMatch(value, item.contactValue))) || null;
   }
   if (item.contactType === 'EMAIL') {
     const target = String(item.contactValue || '').trim().toLowerCase();
-    return clients.find((client) => (client.emails || []).some((value) => String(value || '').trim().toLowerCase() === target)) || null;
+    return people.find((person) => (person.emails || []).some((value) => String(value || '').trim().toLowerCase() === target)) || null;
   }
   if (item.contactType === 'TELEGRAM') {
     const target = String(item.contactValue || '').trim();
-    return clients.find((client) => (client.telegrams || []).some((value) => String(value || '').trim() === target)) || null;
+    return people.find((person) => (person.telegrams || []).some((value) => String(value || '').trim() === target)) || null;
   }
   return null;
 }
 
-function consentSubjectLabel(item, clients) {
-  const client = consentClient(item, clients);
-  if (client) return [client.name, client.surname].filter(Boolean).join(' ') || client.phones?.[0] || 'Клиент';
+function consentSubjectLabel(item, people) {
+  const person = consentPerson(item, people);
+  if (person) return [person.name, person.surname].filter(Boolean).join(' ') || person.phones?.[0] || 'Человек';
   if (item.subjectType === 'CONTACT_POINT') return item.contactValue || 'Contact Point';
-  return 'Клиент';
+  return 'Человек';
 }
 
 function signedDocumentSnapshot(item) {
@@ -171,12 +169,12 @@ function openSignedDocument(item) {
 }
 
 function signatureHistoryMarkup() {
-  const clients = getAllClients();
+  const people = getAllPeople();
   const items = [...getConsents()].sort((a, b) => Date.parse(b.eventAt || b.createdAt || 0) - Date.parse(a.eventAt || a.createdAt || 0));
   return list({
     items: items.map((item) => {
       const snapshot = signedDocumentSnapshot(item);
-      const subject = consentSubjectLabel(item, clients);
+      const subject = consentSubjectLabel(item, people);
       return {
         title: snapshot?.title || item.documentId,
         secondary: [`${subject} · ${consentStateText(item.status)}`, `Версия ${item.documentVersion} · ${formatMoment(item.eventAt || item.acceptedAt || item.revokedAt || item.createdAt)}`],

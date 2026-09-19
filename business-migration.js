@@ -2,7 +2,7 @@ import { apiRequest } from './core/auth.js';
 import { setBusinessServerReady } from './core/business-persistence.js';
 import { hydrateUEIFromServer } from './core/uei.js';
 import { hydrateRecordStateFromServer } from './core/record/index.js';
-import { hydrateClientsFromServer } from './main/clients/data.js';
+import { hydratePeopleFromServer } from './main/people/data.js';
 
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
@@ -33,7 +33,7 @@ async function responseJson(response, fallbackMessage) {
 
 function hydrate(bundle, ready) {
   const normalized = normalizeBundle(bundle);
-  hydrateClientsFromServer(normalized.people);
+  hydratePeopleFromServer(normalized.people);
   hydrateUEIFromServer(normalized.uei);
   hydrateRecordStateFromServer({ records: normalized.records, recordEvents: normalized.recordEvents });
   setBusinessServerReady(ready);
@@ -42,7 +42,7 @@ function hydrate(bundle, ready) {
 export async function initializeBusinessState(account = {}) {
   setBusinessServerReady(false);
   const remoteResponse = await apiRequest('/business-state');
-  const remote = await responseJson(remoteResponse, 'Не удалось загрузить Клиентов, UEI и Записи');
+  const remote = await responseJson(remoteResponse, 'Не удалось загрузить People, UEI и Записи');
 
   if (remote?.verified) {
     hydrate(remote, true);

@@ -18,7 +18,7 @@ assert(requestBlock.includes('BookingRequestStatus.IMPORTED'), 'server-created b
 assert(service.includes('acceptAccountConsents'), 'online consent facts must be written to canonical ConsentEvent archive');
 assert(!service.includes('recordAcceptedConsents'), 'online booking must not write legacy consent JSON');
 assert(business.includes('publicBookingOccupancy'), 'availability must consume canonical server Records');
-assert(business.includes('upsertBookingPersonFromAccount'), 'online Account must create/update canonical Person on the server');
+assert(business.includes('upsertPersonFromAccount'), 'online Account must create/update canonical Person on the server');
 assert(!sync.includes('/online-booking/owner/publication'), 'browser sync must not publish booking context');
 assert(!sync.includes('/online-booking/owner/requests'), 'browser sync must not import booking requests');
 console.log('booking server autonomy check: OK');

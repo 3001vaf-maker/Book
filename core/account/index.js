@@ -1,29 +1,29 @@
 import { API_BASE } from '../environment.js';
 
 function tokenKey(tenantId) {
-  return `book.booking-account.token.${String(tenantId || '')}`;
+  return `book.account.token.${String(tenantId || '')}`;
 }
 
 function emailKey(tenantId) {
-  return `book.booking-account.email.${String(tenantId || '')}`;
+  return `book.account.email.${String(tenantId || '')}`;
 }
 
-export function getBookingAccountToken(tenantId) {
+export function getAccountToken(tenantId) {
   return localStorage.getItem(tokenKey(tenantId)) || '';
 }
 
-export function getRememberedBookingEmail(tenantId) {
+export function getRememberedAccountEmail(tenantId) {
   return localStorage.getItem(emailKey(tenantId)) || '';
 }
 
-export function clearBookingAccount(tenantId) {
+export function clearAccount(tenantId) {
   localStorage.removeItem(tokenKey(tenantId));
 }
 
 async function request(path, { tenantId = '', auth = false, ...options } = {}) {
   const headers = new Headers(options.headers || {});
   if (auth) {
-    const token = getBookingAccountToken(tenantId);
+    const token = getAccountToken(tenantId);
     if (token) headers.set('Authorization', `Bearer ${token}`);
   }
   if (options.body != null && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
@@ -52,7 +52,7 @@ export async function getBookingContext(tenantId, workplaceKey = '') {
   );
 }
 
-export async function prepareBookingAccount(tenantId, email) {
+export async function prepareAccount(tenantId, email) {
   return jsonResponse(
     await request(`/online-booking/${encodeURIComponent(tenantId)}/account/prepare`, {
       method: 'POST',
@@ -62,7 +62,7 @@ export async function prepareBookingAccount(tenantId, email) {
   );
 }
 
-export async function registerBookingAccount(tenantId, data) {
+export async function registerAccount(tenantId, data) {
   const payload = await jsonResponse(
     await request(`/online-booking/${encodeURIComponent(tenantId)}/account/register`, {
       method: 'POST',
@@ -73,7 +73,7 @@ export async function registerBookingAccount(tenantId, data) {
   return storeSession(tenantId, payload);
 }
 
-export async function loginBookingAccount(tenantId, email, password) {
+export async function loginAccount(tenantId, email, password) {
   const payload = await jsonResponse(
     await request(`/online-booking/${encodeURIComponent(tenantId)}/account/login`, {
       method: 'POST',
@@ -84,18 +84,18 @@ export async function loginBookingAccount(tenantId, email, password) {
   return storeSession(tenantId, payload);
 }
 
-export async function getBookingAccount(tenantId) {
-  const token = getBookingAccountToken(tenantId);
+export async function getAccount(tenantId) {
+  const token = getAccountToken(tenantId);
   if (!token) return null;
   const response = await request(`/online-booking/${encodeURIComponent(tenantId)}/account/me`, { tenantId, auth: true });
   if (response.status === 401) {
-    clearBookingAccount(tenantId);
+    clearAccount(tenantId);
     return null;
   }
   return jsonResponse(response, 'Не удалось открыть аккаунт');
 }
 
-export async function updateBookingAccount(tenantId, data) {
+export async function updateAccount(tenantId, data) {
   return jsonResponse(
     await request(`/online-booking/${encodeURIComponent(tenantId)}/account/me`, {
       tenantId,
@@ -107,7 +107,7 @@ export async function updateBookingAccount(tenantId, data) {
   );
 }
 
-export async function changeBookingPassword(tenantId, currentPassword, newPassword) {
+export async function changeAccountPassword(tenantId, currentPassword, newPassword) {
   return jsonResponse(
     await request(`/online-booking/${encodeURIComponent(tenantId)}/account/password`, {
       tenantId,
@@ -131,21 +131,21 @@ export async function createBookingRequest(tenantId, data) {
   );
 }
 
-export async function getBookingRequests(tenantId) {
+export async function getAccountRequests(tenantId) {
   return jsonResponse(
     await request(`/online-booking/${encodeURIComponent(tenantId)}/account/requests`, { tenantId, auth: true }),
     'Не удалось загрузить записи аккаунта',
   );
 }
 
-export async function getBookingConsentState(tenantId) {
+export async function getAccountConsentState(tenantId) {
   return jsonResponse(
     await request(`/online-booking/${encodeURIComponent(tenantId)}/account/consent-state`, { tenantId, auth: true }),
     'Не удалось проверить согласия',
   );
 }
 
-export async function submitBookingConsents(tenantId, consents = []) {
+export async function submitAccountConsents(tenantId, consents = []) {
   return jsonResponse(
     await request(`/online-booking/${encodeURIComponent(tenantId)}/account/consents`, {
       tenantId,
@@ -157,7 +157,7 @@ export async function submitBookingConsents(tenantId, consents = []) {
   );
 }
 
-export async function revokeBookingConsent(tenantId, documentId) {
+export async function revokeAccountConsent(tenantId, documentId) {
   return jsonResponse(
     await request(`/online-booking/${encodeURIComponent(tenantId)}/account/consents/${encodeURIComponent(documentId)}/revoke`, {
       tenantId,
@@ -168,7 +168,7 @@ export async function revokeBookingConsent(tenantId, documentId) {
   );
 }
 
-export async function bindBookingTelegramEntry(tenantId, token) {
+export async function bindAccountTelegramEntry(tenantId, token) {
   return jsonResponse(
     await request(`/online-booking/${encodeURIComponent(tenantId)}/account/telegram-entry`, {
       tenantId,
@@ -180,14 +180,14 @@ export async function bindBookingTelegramEntry(tenantId, token) {
   );
 }
 
-export async function getBookingNotifications(tenantId) {
+export async function getAccountNotifications(tenantId) {
   return jsonResponse(
     await request(`/online-booking/${encodeURIComponent(tenantId)}/account/notifications`, { tenantId, auth: true }),
     'Не удалось загрузить уведомления',
   );
 }
 
-export async function markBookingNotificationRead(tenantId, notificationId) {
+export async function markAccountNotificationRead(tenantId, notificationId) {
   return jsonResponse(
     await request(`/online-booking/${encodeURIComponent(tenantId)}/account/notifications/${encodeURIComponent(notificationId)}/read`, {
       tenantId,
@@ -198,21 +198,21 @@ export async function markBookingNotificationRead(tenantId, notificationId) {
   );
 }
 
-export async function getBookingChat(tenantId) {
+export async function getAccountChat(tenantId) {
   return jsonResponse(
     await request(`/online-booking/${encodeURIComponent(tenantId)}/account/chat`, { tenantId, auth: true }),
     'Не удалось загрузить чат',
   );
 }
 
-export async function getBookingChatSettings(tenantId) {
+export async function getAccountChatSettings(tenantId) {
   return jsonResponse(
     await request(`/online-booking/${encodeURIComponent(tenantId)}/account/chat/settings`, { tenantId, auth: true }),
     'Не удалось загрузить настройки чата',
   );
 }
 
-export async function sendBookingChatMessage(tenantId, body, attachments = []) {
+export async function sendAccountChatMessage(tenantId, body, attachments = []) {
   return jsonResponse(
     await request(`/online-booking/${encodeURIComponent(tenantId)}/account/chat/messages`, {
       tenantId,

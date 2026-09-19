@@ -19,7 +19,7 @@ type NotificationInput = {
 type NotificationRow = {
   id: string;
   tenantId: string;
-  cardPhone: string;
+  personPhone: string;
   uei: string;
   type: string;
   purpose: MessagePurpose | null;
@@ -49,7 +49,7 @@ type ExternalDeliveryRow = {
   purpose: MessagePurpose | null;
   entityType: string;
   entityId: string;
-  cardPhone: string;
+  personPhone: string;
   uei: string;
   createdAt: Date;
   sentAt: Date | null;
@@ -113,29 +113,29 @@ export class NotificationService {
 
   private async accountIdentity(tenantId: string, accountId: string) {
     const [account, identity] = await Promise.all([
-      this.prisma.bookingAccount.findFirst({
+      this.prisma.account.findFirst({
         where: { id: accountId, tenantId },
-        select: { phone: true, uei: true, email: true },
+        select: { phone: true, email: true },
       }),
       this.businessState.bookingIdentityForAccount(tenantId, accountId),
     ]);
-    if (!account) throw new NotFoundException('Клиентский аккаунт не найден');
-    const cardPhone = canonicalPhone(account.phone);
-    if (!cardPhone) throw new NotFoundException('У клиентской карты не определён номер телефона');
+    if (!account) throw new NotFoundException('Аккаунт не найден');
+    const personPhone = canonicalPhone(account.phone);
+    if (!personPhone) throw new NotFoundException('У человека не определён номер телефона');
     const personKey = text(identity?.person?.key || identity?.matchedPerson?.key);
-    const uei = text(identity?.uei || account.uei);
+    const uei = text(identity?.uei);
     const telegramRows = await this.prisma.$queryRaw<Array<{ externalUserId: string }>>`
       SELECT "externalUserId"
       FROM "CommunicationIdentity"
       WHERE "tenantId" = ${tenantId}
         AND "channel" = 'TELEGRAM'
-        AND ("cardPhone" = ${cardPhone} OR (${uei} <> '' AND "uei" = ${uei}))
+        AND ("personPhone" = ${personPhone} OR (${uei} <> '' AND "uei" = ${uei}))
       ORDER BY "verifiedAt" DESC NULLS LAST, "updatedAt" DESC
       LIMIT 1
     `;
     return {
       accountId,
-      cardPhone,
+      personPhone,
       personKey,
       uei,
       email: canonicalEmail(account.email),
@@ -143,12 +143,12 @@ export class NotificationService {
     };
   }
 
-  private async accountIdentityByPhone(tenantId: string, cardPhone: string) {
-    const accounts = await this.prisma.bookingAccount.findMany({
+  private async accountIdentityByPhone(tenantId: string, personPhone: string) {
+    const accounts = await this.prisma.account.findMany({
       where: { tenantId },
       select: { id: true, phone: true },
     });
-    const match = accounts.find((account) => canonicalPhone(account.phone) === canonicalPhone(cardPhone));
+    const match = accounts.find((account) => canonicalPhone(account.phone) === canonicalPhone(personPhone));
     return match ? this.accountIdentity(tenantId, match.id) : null;
   }
 
@@ -315,16 +315,16 @@ export class NotificationService {
     await this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`
         INSERT INTO "Notification" (
-          "id", "tenantId", "cardPhone", "uei", "type", "purpose", "title", "body", "entityType", "entityId", "createdAt"
+          "id", "tenantId", "personPhone", "uei", "type", "purpose", "title", "body", "entityType", "entityId", "createdAt"
         ) VALUES (
-          ${notificationId}, ${tenantId}, ${identity.cardPhone}, ${uei}, ${type}, ${purpose}, ${title}, ${body}, ${entityType}, ${entityId}, ${now}
+          ${notificationId}, ${tenantId}, ${identity.personPhone}, ${uei}, ${type}, ${purpose}, ${title}, ${body}, ${entityType}, ${entityId}, ${now}
         )
       `;
       await tx.$executeRaw`
         INSERT INTO "NotificationDelivery" (
           "id", "tenantId", "notificationId", "channel", "recipientKey", "status", "createdAt", "deliveredAt", "error"
         ) VALUES (
-          ${inAppDeliveryId}, ${tenantId}, ${notificationId}, 'IN_APP', ${identity.cardPhone}, 'delivered', ${now}, ${now}, ''
+          ${inAppDeliveryId}, ${tenantId}, ${notificationId}, 'IN_APP', ${identity.personPhone}, 'delivered', ${now}, ${now}, ''
         )
       `;
     });
@@ -346,10 +346,10 @@ export class NotificationService {
   }
 
   async listForAccount(tenantId: string, accountId: string) {
-    const { cardPhone } = await this.accountIdentity(tenantId, accountId);
+    const { personPhone } = await this.accountIdentity(tenantId, accountId);
     const rows = await this.prisma.$queryRaw<NotificationRow[]>`
       SELECT
-        n."id", n."tenantId", n."cardPhone", n."uei", n."type", n."purpose", n."title", n."body",
+        n."id", n."tenantId", n."personPhone", n."uei", n."type", n."purpose", n."title", n."body",
         n."entityType", n."entityId", n."createdAt",
         d."status" AS "deliveryStatus", d."createdAt" AS "deliveryCreatedAt",
         d."sentAt", d."deliveredAt", d."readAt", d."failedAt", d."error"
@@ -358,9 +358,9 @@ export class NotificationService {
         ON d."notificationId" = n."id"
        AND d."tenantId" = n."tenantId"
        AND d."channel" = 'IN_APP'
-       AND d."recipientKey" = ${cardPhone}
+       AND d."recipientKey" = ${personPhone}
       WHERE n."tenantId" = ${tenantId}
-        AND n."cardPhone" = ${cardPhone}
+        AND n."personPhone" = ${personPhone}
       ORDER BY n."createdAt" DESC, n."id" DESC
       LIMIT 200
     `;
@@ -369,10 +369,10 @@ export class NotificationService {
   }
 
   async getForAccount(tenantId: string, accountId: string, notificationId: string) {
-    const { cardPhone } = await this.accountIdentity(tenantId, accountId);
+    const { personPhone } = await this.accountIdentity(tenantId, accountId);
     const rows = await this.prisma.$queryRaw<NotificationRow[]>`
       SELECT
-        n."id", n."tenantId", n."cardPhone", n."uei", n."type", n."purpose", n."title", n."body",
+        n."id", n."tenantId", n."personPhone", n."uei", n."type", n."purpose", n."title", n."body",
         n."entityType", n."entityId", n."createdAt",
         d."status" AS "deliveryStatus", d."createdAt" AS "deliveryCreatedAt",
         d."sentAt", d."deliveredAt", d."readAt", d."failedAt", d."error"
@@ -381,9 +381,9 @@ export class NotificationService {
         ON d."notificationId" = n."id"
        AND d."tenantId" = n."tenantId"
        AND d."channel" = 'IN_APP'
-       AND d."recipientKey" = ${cardPhone}
+       AND d."recipientKey" = ${personPhone}
       WHERE n."tenantId" = ${tenantId}
-        AND n."cardPhone" = ${cardPhone}
+        AND n."personPhone" = ${personPhone}
         AND n."id" = ${notificationId}
       LIMIT 1
     `;
@@ -393,7 +393,7 @@ export class NotificationService {
   }
 
   async markReadForAccount(tenantId: string, accountId: string, notificationId: string) {
-    const { cardPhone } = await this.accountIdentity(tenantId, accountId);
+    const { personPhone } = await this.accountIdentity(tenantId, accountId);
     const current = await this.getForAccount(tenantId, accountId, notificationId);
     if (!current.read) {
       const now = new Date();
@@ -403,7 +403,7 @@ export class NotificationService {
         WHERE "tenantId" = ${tenantId}
           AND "notificationId" = ${notificationId}
           AND "channel" = 'IN_APP'
-          AND "recipientKey" = ${cardPhone}
+          AND "recipientKey" = ${personPhone}
       `;
     }
     return this.getForAccount(tenantId, accountId, notificationId);
@@ -415,7 +415,7 @@ export class NotificationService {
       SELECT
         d."id" AS "deliveryId", d."notificationId", d."tenantId", d."recipientKey", d."status",
         d."createdAt", d."sentAt", d."deliveredAt", d."failedAt", d."error",
-        n."title", n."body", n."type", n."purpose", n."entityType", n."entityId", n."cardPhone", n."uei"
+        n."title", n."body", n."type", n."purpose", n."entityType", n."entityId", n."personPhone", n."uei"
       FROM "NotificationDelivery" d
       INNER JOIN "Notification" n
         ON n."id" = d."notificationId"
@@ -437,8 +437,8 @@ export class NotificationService {
   }
 
   private async canSendDelivery(tenantId: string, notificationId: string, channel: 'EMAIL' | 'TELEGRAM') {
-    const rows = await this.prisma.$queryRaw<Array<{ cardPhone: string; purpose: string | null }>>`
-      SELECT n."cardPhone", n."purpose"
+    const rows = await this.prisma.$queryRaw<Array<{ personPhone: string; purpose: string | null }>>`
+      SELECT n."personPhone", n."purpose"
       FROM "Notification" n
       INNER JOIN "NotificationDelivery" d
         ON d."notificationId" = n."id"
@@ -448,7 +448,7 @@ export class NotificationService {
         AND n."id" = ${notificationId}
       LIMIT 1
     `;
-    const identity = rows[0]?.cardPhone ? await this.accountIdentityByPhone(tenantId, rows[0].cardPhone) : null;
+    const identity = rows[0]?.personPhone ? await this.accountIdentityByPhone(tenantId, rows[0].personPhone) : null;
     return Boolean(identity && await this.externalAllowed(tenantId, identity, channel, rows[0]?.purpose));
   }
 
@@ -481,8 +481,8 @@ export class NotificationService {
   }
 
   private async markDeliveryFailed(tenantId: string, deliveryId: string, channel: 'EMAIL' | 'TELEGRAM', error: unknown) {
-    const rows = await this.prisma.$queryRaw<Array<{ notificationId: string; channel: string; cardPhone: string; type: string; purpose: string | null }>>`
-      SELECT d."notificationId", d."channel", n."cardPhone", n."type", n."purpose"
+    const rows = await this.prisma.$queryRaw<Array<{ notificationId: string; channel: string; personPhone: string; type: string; purpose: string | null }>>`
+      SELECT d."notificationId", d."channel", n."personPhone", n."type", n."purpose"
       FROM "NotificationDelivery" d
       INNER JOIN "Notification" n ON n."id" = d."notificationId" AND n."tenantId" = d."tenantId"
       WHERE d."tenantId" = ${tenantId} AND d."id" = ${deliveryId} AND d."channel" = ${channel}
@@ -502,7 +502,7 @@ export class NotificationService {
       if (policy.mode === 'fallback') {
         const failedIndex = policy.channels.indexOf(current.channel);
         const nextChannels = failedIndex >= 0 ? policy.channels.slice(failedIndex + 1) : [];
-        const identity = await this.accountIdentityByPhone(tenantId, current.cardPhone);
+        const identity = await this.accountIdentityByPhone(tenantId, current.personPhone);
         if (identity) {
           for (const nextChannel of nextChannels) {
             if (!ACTIVE_EXTERNAL_CHANNELS.has(nextChannel)) continue;

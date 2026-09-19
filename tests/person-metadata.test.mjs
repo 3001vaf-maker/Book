@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import { calculateFinancialPlan, hydrateFinanceFromServer, recordPaymentIncome } from '../core/finance/index.js';
 import { hydrateRecordStateFromServer } from '../core/record/index.js';
-import { getClientMetadata } from '../main/clients/metadata.js';
+import { getPersonMetadata } from '../main/people/metadata.js';
 
 hydrateRecordStateFromServer({
   records: [
-    { id: 'r1', date: '2026-09-01', client: { key: 'c1' }, procedures: [], products: [] },
-    { id: 'r2', date: '2026-09-05', client: { key: 'c1' }, procedures: [], products: [] },
-    { id: 'r3', date: '2026-09-09', client: { key: 'c1' }, procedures: [], products: [] },
+    { id: 'r1', date: '2026-09-01', person: { key: 'c1' }, procedures: [], products: [] },
+    { id: 'r2', date: '2026-09-05', person: { key: 'c1' }, procedures: [], products: [] },
+    { id: 'r3', date: '2026-09-09', person: { key: 'c1' }, procedures: [], products: [] },
   ],
   recordEvents: [
     { id: 'r1-created', recordId: 'r1', type: 'created', at: '2026-09-01T09:00:00.000Z', payload: {} },
@@ -30,10 +30,10 @@ const payment = recordPaymentIncome({
 });
 assert.ok(payment);
 
-const metadata = getClientMetadata('c1');
+const metadata = getPersonMetadata('c1');
 
 assert.equal(metadata.recordCount, 2);
 assert.equal(metadata.paidTotal, 5000);
 assert.equal(metadata.lastVisit, '2026-09-05');
 
-console.log('client metadata tests: OK');
+console.log('person metadata tests: OK');

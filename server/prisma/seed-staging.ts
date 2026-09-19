@@ -24,8 +24,8 @@ async function main() {
   }
 
   const tenantId = owner.memberships[0].tenantId;
-  const marker = await prisma.businessPerson.findUnique({
-    where: { tenantId_key: { tenantId, key: 'staging-client-anna' } },
+  const marker = await prisma.person.findUnique({
+    where: { tenantId_key: { tenantId, key: 'staging-person-anna' } },
   });
   if (marker) {
     console.log('Staging fixtures already exist; preserving current test data.');
@@ -41,7 +41,7 @@ async function main() {
 
   const people = [
     {
-      key: 'staging-client-anna',
+      key: 'staging-person-anna',
       id: 'STG-001',
       name: 'Анна',
       surname: 'Тест',
@@ -54,7 +54,6 @@ async function main() {
       links: [],
       tags: ['tag-vip'],
       discountPercent: 10,
-      agreements: {},
       visits: 1,
       totalSpent: 4500,
       lastVisit: today,
@@ -62,7 +61,7 @@ async function main() {
       createdAt: nowIso,
     },
     {
-      key: 'staging-client-irina',
+      key: 'staging-person-irina',
       id: 'STG-002',
       name: 'Ирина',
       surname: 'Демо',
@@ -75,7 +74,6 @@ async function main() {
       links: [],
       tags: [],
       discountPercent: 0,
-      agreements: {},
       visits: 0,
       totalSpent: 0,
       lastVisit: '',
@@ -125,8 +123,8 @@ async function main() {
       workplaceId: workplaceKey,
       from: '10:00',
       to: '11:00',
-      client: {
-        key: 'staging-client-anna',
+      person: {
+        key: 'staging-person-anna',
         name: 'Анна',
         surname: 'Тест',
         phone: '+79990000101',
@@ -145,8 +143,8 @@ async function main() {
       workplaceId: workplaceKey,
       from: '15:00',
       to: '16:30',
-      client: {
-        key: 'staging-client-irina',
+      person: {
+        key: 'staging-person-irina',
         name: 'Ирина',
         surname: 'Демо',
         phone: '+79990000102',
@@ -202,7 +200,7 @@ async function main() {
     {
       id: 'pdn-agreement',
       kind: 'agreement',
-      clientConsent: false,
+      personConsent: false,
       required: false,
       title: 'Политика обработки персональных данных',
       version: 1,
@@ -211,7 +209,7 @@ async function main() {
     {
       id: 'pdn-consent',
       kind: 'consent',
-      clientConsent: true,
+      personConsent: true,
       required: true,
       title: 'Согласие на обработку персональных данных',
       version: 1,
@@ -220,7 +218,7 @@ async function main() {
     {
       id: 'messages-consent',
       kind: 'consent',
-      clientConsent: true,
+      personConsent: true,
       required: false,
       title: 'Согласие на рекламные и маркетинговые сообщения',
       version: 1,
@@ -238,7 +236,7 @@ async function main() {
         incomeType: 'payment',
         source: { type: 'record', id: 'staging-record-paid' },
         workplace: 'Тестовая студия',
-        client: { key: 'staging-client-anna', name: 'Анна Тест' },
+        person: { key: 'staging-person-anna', name: 'Анна Тест' },
         allocations: [{
           id: 'staging-allocation-1',
           walletId: 'cashless',
@@ -323,14 +321,14 @@ async function main() {
       create: { tenantId, migrationVerifiedAt: now },
       update: { migrationVerifiedAt: now },
     });
-    await tx.businessIdentityState.upsert({
+    await tx.ueiState.upsert({
       where: { tenantId },
       create: { tenantId, data: json({ entities: {}, relations: {}, revoked: [] }) },
       update: { data: json({ entities: {}, relations: {}, revoked: [] }) },
     });
 
     for (const [position, person] of people.entries()) {
-      await tx.businessPerson.upsert({
+      await tx.person.upsert({
         where: { tenantId_key: { tenantId, key: person.key } },
         create: { tenantId, key: person.key, position, data: json(person) },
         update: { position, data: json(person) },
@@ -370,7 +368,7 @@ async function main() {
     });
   });
 
-  console.log('Staging fixtures created: profile, workplace, clients, records, payment and wallets.');
+  console.log('Staging fixtures created: profile, workplace, people, records, payment and wallets.');
 }
 
 main()

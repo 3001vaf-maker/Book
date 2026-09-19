@@ -3,16 +3,16 @@ import { getFinancialFactForRecords } from '../../core/finance/index.js';
 import { getRecords } from '../../core/record/index.js';
 import { getIdentityMemberKeys } from './data.js';
 
-const clientKey = (value) => String(value || '');
+const personKey = (value) => String(value || '');
 
-function clientRecords(key) {
-  const identityKeys = new Set(getIdentityMemberKeys(key).map(clientKey).filter(Boolean));
+function personRecords(key) {
+  const identityKeys = new Set(getIdentityMemberKeys(key).map(personKey).filter(Boolean));
   if (!identityKeys.size) return [];
-  return getRecords().filter((record) => record?.status !== 'cancelled' && identityKeys.has(clientKey(record?.client?.key)));
+  return getRecords().filter((record) => record?.status !== 'cancelled' && identityKeys.has(personKey(record?.person?.key)));
 }
 
-export function getClientMetadata(key) {
-  const records = clientRecords(key);
+export function getPersonMetadata(key) {
+  const records = personRecords(key);
   const fact = getFinancialFactForRecords(records.map((record) => record?.id));
   const dated = records
     .filter((record) => record?.date)
@@ -25,6 +25,6 @@ export function getClientMetadata(key) {
   };
 }
 
-export function formatClientVisitDate(value) {
+export function formatPersonVisitDate(value) {
   return shortDate(value, '—');
 }

@@ -99,7 +99,7 @@ export function getBookingSlots(context = {}, { workplaceKey = '', date = '', pr
 }
 
 export function requiredBookingDocuments(context = {}) {
-  return (Array.isArray(context.documents) ? context.documents : []).filter((document) => Boolean(document?.clientConsent));
+  return (Array.isArray(context.documents) ? context.documents : []).filter((document) => Boolean(document?.personConsent));
 }
 
 export function hasRequiredBookingConsents(context = {}, consents = []) {

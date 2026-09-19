@@ -1,18 +1,18 @@
-import { changeBookingPassword } from '../core/booking-account/index.js';
+import { changeAccountPassword } from '../core/account/index.js';
 import { button, field, modal, mountModal, openNotice } from '../ui/ui.js';
 
-export function openClientPasswordSettings(state) {
-  const content = `<form class="form-grid" data-client-password-form>
+export function openAccountPasswordSettings(state) {
+  const content = `<form class="form-grid" data-account-password-form>
     ${field({ label: 'Текущий пароль', name: 'currentPassword', type: 'password', required: true, autocomplete: 'current-password' })}
     ${field({ label: 'Новый пароль', name: 'newPassword', type: 'password', required: true, autocomplete: 'new-password' })}
     ${field({ label: 'Повторите новый пароль', name: 'repeatPassword', type: 'password', required: true, autocomplete: 'new-password' })}
-    <div class="form-error" data-client-password-error role="alert"></div>
+    <div class="form-error" data-account-password-error role="alert"></div>
     ${button('Сохранить пароль', { type: 'submit' })}
   </form>`;
   const layer = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app', title: 'Изменить пароль' }));
   if (!layer) return null;
-  const form = layer.querySelector('[data-client-password-form]');
-  const errorNode = layer.querySelector('[data-client-password-error]');
+  const form = layer.querySelector('[data-account-password-form]');
+  const errorNode = layer.querySelector('[data-account-password-error]');
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const data = new FormData(form);
@@ -31,7 +31,7 @@ export function openClientPasswordSettings(state) {
     if (submit) submit.disabled = true;
     if (errorNode) errorNode.textContent = '';
     try {
-      await changeBookingPassword(state.tenantId, currentPassword, newPassword);
+      await changeAccountPassword(state.tenantId, currentPassword, newPassword);
       layer.remove();
       openNotice({ title: 'Пароль изменён', message: 'Новый пароль сохранён.' });
     } catch (error) {

@@ -29,7 +29,7 @@ const migration = await import('../tenant-document-archive.js');
 void migration;
 
 persistence.setBusinessServerReady(true);
-data.hydrateDocumentsFromServer([{ id: 'pdn-consent', system: true, kind: 'consent', title: 'PDN', clientConsent: true, required: true, version: 1, text: 'x' }]);
+data.hydrateDocumentsFromServer([{ id: 'pdn-consent', system: true, kind: 'consent', title: 'PDN', personConsent: true, required: true, version: 1, text: 'x' }]);
 consents.hydrateConsentsFromServer([{
   id: 'consent-event-1',
   subjectType: 'BOOKING_ACCOUNT',
@@ -45,7 +45,7 @@ consents.hydrateConsentsFromServer([{
 }]);
 history.hydrateDocumentHistoryFromServer([]);
 
-data.saveDocument({ id: 'pdn-consent', system: true, kind: 'consent', title: 'PDN 2', clientConsent: true, required: true, version: 1, text: 'x' });
+data.saveDocument({ id: 'pdn-consent', system: true, kind: 'consent', title: 'PDN 2', personConsent: true, required: true, version: 1, text: 'x' });
 history.recordDocumentHistory({ documentId: 'pdn-consent', documentTitle: 'PDN 2', documentVersion: 1, action: 'renamed' });
 await persistence.flushBusinessPersistence();
 

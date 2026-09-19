@@ -1,0 +1,128 @@
+.booking-account--account{
+  --text:var(--booking-dark);
+  --button-secondary:var(--booking-light);
+  --active:var(--booking-light);
+  width:100%;
+  min-height:var(--visual-vh,100dvh);
+  background:linear-gradient(145deg,var(--booking-bg-start),var(--booking-bg-end));
+}
+
+.booking-account--account.booking-shape--soft{
+  --radius-control:18px;
+  --radius-card:22px;
+  --radius-panel:22px;
+}
+.booking-account--account.booking-shape--round{
+  --radius-control:999px;
+  --radius-card:28px;
+  --radius-panel:28px;
+}
+.booking-account--account.booking-shape--straight{
+  --radius-control:4px;
+  --radius-card:4px;
+  --radius-panel:4px;
+}
+.booking-account--account.booking-shape--cut{
+  --radius-control:0;
+  --radius-card:0;
+  --radius-panel:0;
+}
+
+.booking-account--account .app-view-shell{
+  background:transparent;
+  color:var(--text);
+}
+.booking-account--account .app-header{
+  background:color-mix(in srgb,var(--booking-bg-start) 88%,#fff);
+}
+.booking-account--account .bottom-nav.bottom-nav--account{
+  background:color-mix(in srgb,var(--booking-bg-start) 90%,#fff);
+}
+.booking-account--account .nav-item.is-active{
+  background:var(--booking-light);
+  color:var(--booking-dark);
+}
+.booking-account--account .ui-button{
+  border-radius:var(--radius-control);
+  background:var(--booking-dark);
+  color:#fff;
+}
+.booking-account--account .ui-button--secondary{
+  background:var(--booking-light);
+  color:var(--booking-dark);
+}
+.booking-account--account .ui-button:disabled{
+  opacity:.42;
+}
+.booking-account--account .app-header .ui-button.app-header__control{
+  border-radius:var(--radius-control);
+}
+.booking-account--account .list-entry,
+.booking-account--account .app-setting-toggle,
+.booking-account--account .message-composer__input{
+  border-radius:var(--radius-card);
+}
+.booking-account--account .message-bubble{
+  border-radius:var(--radius-control);
+}
+.booking-account--account .message-bubble--incoming{
+  border-bottom-left-radius:max(4px,calc(var(--radius-control) / 3));
+}
+.booking-account--account .message-bubble--outgoing{
+  border-bottom-right-radius:max(4px,calc(var(--radius-control) / 3));
+}
+.booking-account--account .app-setting-toggle__switch{
+  background:color-mix(in srgb,var(--booking-dark) 35%,var(--booking-light));
+}
+.booking-account--account .app-setting-toggle.is-on .app-setting-toggle__switch{
+  background:var(--booking-dark);
+}
+
+.booking-account--account .app-view-shell--booking-flow{
+  min-height:var(--visual-vh,100dvh);
+  padding-bottom:calc(24px + env(safe-area-inset-bottom));
+}
+.booking-account--account .app-view-shell--booking-flow .app-view-shell__screen{
+  width:100%;
+  max-width:100%;
+  padding-top:18px;
+  padding-bottom:24px;
+}
+.booking-account--account .app-view-shell--booking-flow-center .app-view-shell__screen{
+  min-height:calc(var(--visual-vh,100dvh) - 64px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  align-content:center;
+}
+
+.booking-account--account .app-view-shell--profile{
+  display:grid;
+  grid-template-rows:auto auto minmax(0,1fr);
+  min-height:var(--visual-vh,100dvh);
+}
+.booking-account--account .app-view-shell--profile .app-view-shell__media{
+  min-height:64px;
+}
+.booking-account--account .app-view-shell--profile .app-media-rail--placeholder{
+  min-height:58px;
+}
+.booking-account--account .app-view-shell--profile .app-view-shell__screen{
+  min-height:0;
+  align-content:center;
+  place-items:center;
+  padding-top:12px;
+  padding-bottom:12px;
+}
+.booking-account--account .app-view-shell--profile .entity-card--hero{
+  width:100%;
+  margin:0;
+}
+
+.booking-account--account.booking-shape--cut .entity-card,
+.booking-account--account.booking-shape--cut .list-entry,
+.booking-account--account.booking-shape--cut .ui-button,
+.booking-account--account.booking-shape--cut .message-bubble,
+.booking-account--account.booking-shape--cut .message-composer__input,
+.booking-account--account.booking-shape--cut .message-composer__attach,
+.booking-account--account.booking-shape--cut .app-setting-toggle,
+.booking-account--account.booking-shape--cut .nav-item.is-active{
+  clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);
+}

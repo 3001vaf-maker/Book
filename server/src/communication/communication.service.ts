@@ -15,7 +15,7 @@ type TelegramEntryRow = {
 
 type TelegramIdentityRow = {
   id: string;
-  cardPhone: string;
+  personPhone: string;
   uei: string;
   externalUserId: string;
   display: string;
@@ -24,7 +24,7 @@ type TelegramIdentityRow = {
 type CommunicationMessageRow = {
   id: string;
   tenantId: string;
-  cardPhone: string;
+  personPhone: string;
   uei: string;
   direction: string;
   kind: string;
@@ -132,33 +132,33 @@ export class CommunicationService {
 
   async bindTelegramEntry(tenantId: string, accountId: string, entryToken: unknown) {
     const ticket = await this.telegramEntry(tenantId, entryToken);
-    const account = await this.prisma.bookingAccount.findFirst({ where: { id: accountId, tenantId }, select: { phone: true } });
-    if (!account) throw new NotFoundException('Клиентский аккаунт не найден');
-    const cardPhone = canonicalPhone(account.phone);
-    if (!cardPhone) throw new BadRequestException('У клиента не определён телефон');
+    const account = await this.prisma.account.findFirst({ where: { id: accountId, tenantId }, select: { phone: true } });
+    if (!account) throw new NotFoundException('Аккаунт не найден');
+    const personPhone = canonicalPhone(account.phone);
+    if (!personPhone) throw new BadRequestException('У человека не определён телефон');
 
     const telegramRows = await this.prisma.$queryRaw<TelegramIdentityRow[]>`
-      SELECT "id", "cardPhone", "uei", "externalUserId", "display"
+      SELECT "id", "personPhone", "uei", "externalUserId", "display"
       FROM "CommunicationIdentity"
       WHERE "tenantId" = ${tenantId} AND "channel" = 'TELEGRAM' AND "externalUserId" = ${ticket.telegramUserId}
       LIMIT 1
     `;
     const existingTelegram = telegramRows[0] || null;
-    const samePhone = Boolean(existingTelegram && canonicalPhone(existingTelegram.cardPhone) === cardPhone);
+    const samePhone = Boolean(existingTelegram && canonicalPhone(existingTelegram.personPhone) === personPhone);
 
     const business = await this.businessState.get(tenantId);
     const phoneMatch = (Array.isArray(business.people) ? business.people : [])
-      .map((value) => objectValue(value)).find((person) => personHasPhone(person, cardPhone)) || null;
+      .map((value) => objectValue(value)).find((person) => personHasPhone(person, personPhone)) || null;
     const match = samePhone ? 'phone+telegram' : phoneMatch ? 'phone' : 'new';
 
     const identity = await this.businessState.bookingIdentityForAccount(tenantId, accountId);
     const personKey = text(identity?.person?.key || identity?.matchedPerson?.key);
-    if (!personKey) throw new NotFoundException('Клиентская карта не найдена');
+    if (!personKey) throw new NotFoundException('Человекская карта не найдена');
     const uei = text(identity?.uei);
     const display = telegramUsername(ticket.username);
 
     if (existingTelegram) {
-      if (!samePhone) throw new ConflictException('Этот Telegram уже связан с другой клиентской картой');
+      if (!samePhone) throw new ConflictException('Этот Telegram уже связан с другой Person');
       if (existingTelegram.uei && uei && existingTelegram.uei !== uei) {
         throw new ConflictException('Этот Telegram уже связан с другим UEI');
       }
@@ -177,9 +177,9 @@ export class CommunicationService {
 
       await tx.$executeRaw`
         INSERT INTO "CommunicationIdentity" (
-          "id", "tenantId", "cardPhone", "uei", "channel", "externalUserId", "display", "verifiedAt", "createdAt", "updatedAt"
+          "id", "tenantId", "personPhone", "uei", "channel", "externalUserId", "display", "verifiedAt", "createdAt", "updatedAt"
         ) VALUES (
-          ${randomUUID()}, ${tenantId}, ${cardPhone}, ${resolvedUei}, 'TELEGRAM', ${ticket.telegramUserId}, ${display}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+          ${randomUUID()}, ${tenantId}, ${personPhone}, ${resolvedUei}, 'TELEGRAM', ${ticket.telegramUserId}, ${display}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
         )
         ON CONFLICT ("tenantId", "channel", "externalUserId") DO UPDATE
         SET "display" = EXCLUDED."display",
@@ -192,14 +192,14 @@ export class CommunicationService {
   }
 
   async telegramIdentity(tenantId: string, input: { phone?: unknown; uei?: unknown }) {
-    const cardPhone = canonicalPhone(input?.phone);
+    const personPhone = canonicalPhone(input?.phone);
     const uei = text(input?.uei);
-    if (!cardPhone && !uei) throw new BadRequestException('Не указан клиент');
+    if (!personPhone && !uei) throw new BadRequestException('Не указан человек');
     const rows = await this.prisma.$queryRaw<TelegramIdentityRow[]>`
-      SELECT "id", "cardPhone", "uei", "externalUserId", "display"
+      SELECT "id", "personPhone", "uei", "externalUserId", "display"
       FROM "CommunicationIdentity"
       WHERE "tenantId" = ${tenantId} AND "channel" = 'TELEGRAM'
-        AND ((${cardPhone} <> '' AND "cardPhone" = ${cardPhone}) OR (${uei} <> '' AND "uei" = ${uei}))
+        AND ((${personPhone} <> '' AND "personPhone" = ${personPhone}) OR (${uei} <> '' AND "uei" = ${uei}))
       ORDER BY "verifiedAt" DESC NULLS LAST, "updatedAt" DESC LIMIT 1
     `;
     return rows[0] || null;
@@ -209,7 +209,7 @@ export class CommunicationService {
     phone?: unknown; uei?: unknown; direction?: unknown; kind?: unknown; purpose?: unknown; channel?: unknown; body?: unknown; attachments?: unknown;
     externalMessageId?: unknown; externalThreadId?: unknown; status?: unknown; error?: unknown;
   }) {
-    const cardPhone = canonicalPhone(input?.phone);
+    const personPhone = canonicalPhone(input?.phone);
     const uei = text(input?.uei);
     const direction = text(input?.direction).toLowerCase() || 'system';
     const kind = text(input?.kind).toLowerCase() || 'message';
@@ -223,34 +223,34 @@ export class CommunicationService {
     const externalMessageId = text(input?.externalMessageId);
     const externalThreadId = text(input?.externalThreadId);
     const error = text(input?.error).slice(0, 2000);
-    if (!cardPhone && !uei) throw new BadRequestException('Не указан клиент');
+    if (!personPhone && !uei) throw new BadRequestException('Не указан человек');
     if (!body && !attachments.length) throw new BadRequestException('Пустое сообщение');
     const id = randomUUID();
     const now = new Date();
     await this.prisma.$executeRaw`
       INSERT INTO "CommunicationMessage" (
-        "id", "tenantId", "cardPhone", "uei", "direction", "kind", "purpose", "channel", "body", "attachments",
+        "id", "tenantId", "personPhone", "uei", "direction", "kind", "purpose", "channel", "body", "attachments",
         "externalMessageId", "externalThreadId", "status", "createdAt", "sentAt", "deliveredAt", "failedAt", "error"
       ) VALUES (
-        ${id}, ${tenantId}, ${cardPhone}, ${uei}, ${direction}, ${kind}, ${purpose}, ${channel}, ${body}, ${attachmentsJson}::jsonb,
+        ${id}, ${tenantId}, ${personPhone}, ${uei}, ${direction}, ${kind}, ${purpose}, ${channel}, ${body}, ${attachmentsJson}::jsonb,
         ${externalMessageId}, ${externalThreadId}, ${status}, ${now},
         ${status === 'sent' ? now : null}, ${status === 'delivered' ? now : null}, ${status === 'failed' ? now : null}, ${error}
       ) ON CONFLICT DO NOTHING
     `;
-    return { id, tenantId, cardPhone, uei, direction, kind, purpose, channel, body, attachments, externalMessageId, externalThreadId, status, createdAt: now, error };
+    return { id, tenantId, personPhone, uei, direction, kind, purpose, channel, body, attachments, externalMessageId, externalThreadId, status, createdAt: now, error };
   }
 
   async listThread(tenantId: string, input: { phone?: unknown; uei?: unknown }, limit = 300) {
-    const cardPhone = canonicalPhone(input?.phone);
+    const personPhone = canonicalPhone(input?.phone);
     const uei = text(input?.uei);
-    if (!cardPhone && !uei) throw new BadRequestException('Не указан клиент');
+    if (!personPhone && !uei) throw new BadRequestException('Не указан человек');
     const safeLimit = Math.max(1, Math.min(1000, Math.floor(Number(limit) || 300)));
     return this.prisma.$queryRaw<CommunicationMessageRow[]>`
-      SELECT "id", "tenantId", "cardPhone", "uei", "direction", "kind", "purpose", "channel", "body", "attachments",
+      SELECT "id", "tenantId", "personPhone", "uei", "direction", "kind", "purpose", "channel", "body", "attachments",
              "externalMessageId", "externalThreadId", "status", "createdAt", "sentAt", "deliveredAt", "readAt", "failedAt", "error"
       FROM "CommunicationMessage"
       WHERE "tenantId" = ${tenantId}
-        AND ((${cardPhone} <> '' AND "cardPhone" = ${cardPhone}) OR (${uei} <> '' AND "uei" = ${uei}))
+        AND ((${personPhone} <> '' AND "personPhone" = ${personPhone}) OR (${uei} <> '' AND "uei" = ${uei}))
       ORDER BY "createdAt" ASC, "id" ASC LIMIT ${safeLimit}
     `;
   }
@@ -258,12 +258,12 @@ export class CommunicationService {
   async listThreads(tenantId: string, limit = 200) {
     const safeLimit = Math.max(1, Math.min(500, Math.floor(Number(limit) || 200)));
     return this.prisma.$queryRaw<CommunicationMessageRow[]>`
-      SELECT DISTINCT ON (COALESCE(NULLIF("uei", ''), "cardPhone"))
-             "id", "tenantId", "cardPhone", "uei", "direction", "kind", "purpose", "channel", "body", "attachments",
+      SELECT DISTINCT ON (COALESCE(NULLIF("uei", ''), "personPhone"))
+             "id", "tenantId", "personPhone", "uei", "direction", "kind", "purpose", "channel", "body", "attachments",
              "externalMessageId", "externalThreadId", "status", "createdAt", "sentAt", "deliveredAt", "readAt", "failedAt", "error"
       FROM "CommunicationMessage"
       WHERE "tenantId" = ${tenantId}
-      ORDER BY COALESCE(NULLIF("uei", ''), "cardPhone"), "createdAt" DESC, "id" DESC
+      ORDER BY COALESCE(NULLIF("uei", ''), "personPhone"), "createdAt" DESC, "id" DESC
       LIMIT ${safeLimit}
     `;
   }

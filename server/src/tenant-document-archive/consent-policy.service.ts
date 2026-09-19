@@ -1,9 +1,10 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma.service';
+import { BusinessStateService } from '../business-state/business-state.service';
 import { TenantDocumentArchiveService } from './tenant-document-archive.service';
 
-type ConsentSubjectType = 'BOOKING_ACCOUNT' | 'CONTACT_POINT';
+type ConsentSubjectType = 'ACCOUNT' | 'CONTACT_POINT';
 type ConsentStatus = 'accepted' | 'revoked' | 'declined';
 const PDN_CONSENT_DOCUMENT_ID = 'pdn-consent';
 const MARKETING_CONSENT_DOCUMENT_ID = 'messages-consent';
@@ -91,6 +92,7 @@ export class ConsentPolicyService {
   constructor(
     private readonly documents: TenantDocumentArchiveService,
     private readonly prisma: PrismaService,
+    private readonly businessState: BusinessStateService,
   ) {}
 
   private async consentRows(tenantId: string) {
@@ -169,7 +171,7 @@ export class ConsentPolicyService {
 
   async acceptAccountConsents(tenantId: string, accountIdValue: unknown, facts: unknown, source = 'online-booking-account') {
     const accountId = text(accountIdValue);
-    if (!accountId) throw new BadRequestException('Не указан аккаунт клиента');
+    if (!accountId) throw new BadRequestException('Не указан аккаунт');
     const current = await this.state(tenantId);
     const accepted = arrayValue(facts).filter((item) => Boolean(item?.accepted) && text(item?.documentId));
     for (const fact of accepted) {
@@ -177,12 +179,12 @@ export class ConsentPolicyService {
       const document = current.documents.find((item: any) => text(item?.id) === documentId);
       if (!document) continue;
       const documentVersion = Math.max(1, Number(fact?.documentVersion || document?.version || 1));
-      const latest = await this.latestEvent(tenantId, 'BOOKING_ACCOUNT', accountId, documentId);
+      const latest = await this.latestEvent(tenantId, 'ACCOUNT', accountId, documentId);
       if (latest?.status === 'accepted' && latest.documentVersion === documentVersion) continue;
       const occurredAt = asDate(fact?.acceptedAt, new Date());
       await this.insertEvent({
         tenantId,
-        subjectType: 'BOOKING_ACCOUNT',
+        subjectType: 'ACCOUNT',
         subjectKey: accountId,
         documentId,
         documentVersion,
@@ -290,12 +292,12 @@ export class ConsentPolicyService {
     const current = await this.state(tenantId);
     const document = current.documents.find((item: any) => text(item?.id) === documentId);
     if (!document) throw new BadRequestException('Документ не найден');
-    const latest = await this.latestEvent(tenantId, 'BOOKING_ACCOUNT', accountId, documentId);
+    const latest = await this.latestEvent(tenantId, 'ACCOUNT', accountId, documentId);
     if (latest?.status === 'revoked') return publicEvent(latest);
     const now = new Date();
     const event = await this.insertEvent({
       tenantId,
-      subjectType: 'BOOKING_ACCOUNT',
+      subjectType: 'ACCOUNT',
       subjectKey: accountId,
       documentId,
       documentVersion: Math.max(1, Number(document.version || 1)),
@@ -315,11 +317,11 @@ export class ConsentPolicyService {
              "documentId", "documentVersion", "status", "acceptedAt", "revokedAt", "source",
              "occurredAt", "createdAt"
       FROM "TenantConsentEvent"
-      WHERE "tenantId" = ${tenantId} AND "subjectType" = 'BOOKING_ACCOUNT' AND "subjectKey" = ${accountId}
+      WHERE "tenantId" = ${tenantId} AND "subjectType" = 'ACCOUNT' AND "subjectKey" = ${accountId}
       ORDER BY "occurredAt" DESC, "createdAt" DESC, "id" DESC
     ` : [];
     return current.documents
-      .filter((document: any) => Boolean(document?.clientConsent))
+      .filter((document: any) => Boolean(document?.personConsent))
       .map((document: any) => {
         const documentId = text(document?.id);
         const documentVersion = Math.max(1, Number(document?.version || 1));
@@ -352,19 +354,9 @@ export class ConsentPolicyService {
   }
 
   async hasActivePdnConsentForIdentity(tenantId: string, phoneValue: unknown, ueiValue: unknown) {
-    const phone = canonicalPhone(phoneValue);
-    const uei = text(ueiValue);
-    if (!phone && !uei) return false;
-
-    const accounts = await this.prisma.bookingAccount.findMany({
-      where: { tenantId },
-      select: { id: true, phone: true, uei: true },
-    });
-    const candidates = accounts.filter((account) =>
-      (phone && canonicalPhone(account.phone) === phone) || (uei && text(account.uei) === uei)
-    );
-    for (const account of candidates) {
-      if (await this.hasActivePdnConsent(tenantId, account.id)) return true;
+    const accountIds = await this.businessState.accountIdsForIdentity(tenantId, phoneValue, ueiValue);
+    for (const accountId of accountIds) {
+      if (await this.hasActivePdnConsent(tenantId, accountId)) return true;
     }
     return false;
   }
@@ -374,35 +366,38 @@ export class ConsentPolicyService {
     const normalizedValue = contactPointValue(type, value);
     if (!type || !normalizedValue) return false;
 
-    const accounts = await this.prisma.bookingAccount.findMany({
-      where: { tenantId },
-      select: { id: true, phone: true, email: true, uei: true },
-    });
-
-    let candidates = accounts.filter((account) => {
-      if (type === 'PHONE') return canonicalPhone(account.phone) === normalizedValue;
-      if (type === 'EMAIL') return canonicalEmail(account.email) === normalizedValue;
-      return false;
-    });
-
-    if (type === 'TELEGRAM') {
-      const identities = await this.prisma.$queryRaw<Array<{ cardPhone: string; uei: string }>>`
-        SELECT "cardPhone", "uei"
-        FROM "CommunicationIdentity"
-        WHERE "tenantId" = ${tenantId}
-          AND "channel" = 'TELEGRAM'
-          AND "externalUserId" = ${normalizedValue}
-        ORDER BY "verifiedAt" DESC NULLS LAST, "updatedAt" DESC
-      `;
-      const phones = new Set(identities.map((item) => canonicalPhone(item.cardPhone)).filter(Boolean));
-      const ueis = new Set(identities.map((item) => text(item.uei)).filter(Boolean));
-      candidates = accounts.filter((account) =>
-        phones.has(canonicalPhone(account.phone)) || (text(account.uei) && ueis.has(text(account.uei)))
+    if (type === 'PHONE' || type === 'EMAIL') {
+      const accounts = await this.prisma.account.findMany({
+        where: { tenantId },
+        select: { id: true, phone: true, email: true },
+      });
+      const candidates = accounts.filter((account) =>
+        type === 'PHONE'
+          ? canonicalPhone(account.phone) === normalizedValue
+          : canonicalEmail(account.email) === normalizedValue
       );
+      for (const account of candidates) {
+        if (await this.hasActivePdnConsent(tenantId, account.id)) return true;
+      }
+      return false;
     }
 
-    for (const account of candidates) {
-      if (await this.hasActivePdnConsent(tenantId, account.id)) return true;
+    const identities = await this.prisma.$queryRaw<Array<{ cardPhone: string; uei: string }>>`
+      SELECT "cardPhone", "uei"
+      FROM "CommunicationIdentity"
+      WHERE "tenantId" = ${tenantId}
+        AND "channel" = 'TELEGRAM'
+        AND "externalUserId" = ${normalizedValue}
+      ORDER BY "verifiedAt" DESC NULLS LAST, "updatedAt" DESC
+    `;
+    const accountIds = new Set<string>();
+    for (const identity of identities) {
+      for (const accountId of await this.businessState.accountIdsForIdentity(tenantId, identity.cardPhone, identity.uei)) {
+        accountIds.add(accountId);
+      }
+    }
+    for (const accountId of accountIds) {
+      if (await this.hasActivePdnConsent(tenantId, accountId)) return true;
     }
     return false;
   }

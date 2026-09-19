@@ -29,7 +29,7 @@ const record = createRecord({
   workplaceId: 'studio',
   from: '10:00',
   to: '11:00',
-  client: { name: 'Тест' },
+  person: { name: 'Тест' },
 });
 assert.ok(record);
 assert.equal(getRecordEvents(record.id)[0]?.type, RECORD_EVENT_TYPES.CREATED);

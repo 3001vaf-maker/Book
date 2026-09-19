@@ -29,7 +29,7 @@ assert.deepEqual(
   ['OWNER'],
 );
 const workplaceModel = modelBlock('Workplace');
-const businessPersonModel = modelBlock('BusinessPerson');
+const personModel = modelBlock('Person');
 const membershipRoleEnum = schema.slice(
   schema.indexOf('enum MembershipRole {'),
   schema.indexOf('\n}', schema.indexOf('enum MembershipRole {')) + 2,
@@ -38,7 +38,7 @@ const membershipRoleEnum = schema.slice(
 // Tenant is the persistent business/data boundary.
 // It owns Profile rows and People rows, but they are different concepts.
 assert.match(tenantModel, /profiles\s+Profile\[\]/);
-assert.match(tenantModel, /businessPeople\s+BusinessPerson\[\]/);
+assert.match(tenantModel, /people\s+Person\[\]/);
 assert.match(tenantModel, /memberships\s+Membership\[\]/);
 
 // Login identity is separate from Profile.
@@ -71,10 +71,10 @@ assert.match(workplaceModel, /profileId\s+String/);
 assert.match(workplaceModel, /profile\s+Profile\s+@relation/);
 
 // People belong to Tenant, not directly to Profile.
-assert.match(businessPersonModel, /tenantId\s+String/);
-assert.match(businessPersonModel, /tenant\s+Tenant\s+@relation/);
-assert.doesNotMatch(businessPersonModel, /profileId\s+String/);
-assert.doesNotMatch(businessPersonModel, /profile\s+Profile\s+@relation/);
+assert.match(personModel, /tenantId\s+String/);
+assert.match(personModel, /tenant\s+Tenant\s+@relation/);
+assert.doesNotMatch(personModel, /profileId\s+String/);
+assert.doesNotMatch(personModel, /profile\s+Profile\s+@relation/);
 
 // Current PRIVATE provisioning path creates one Tenant and one OWNER membership.
 // It does not create nested/additional Profiles during invitation acceptance.

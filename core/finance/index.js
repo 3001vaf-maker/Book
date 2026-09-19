@@ -21,7 +21,7 @@ export {
   getRecordPaymentState,
   hydrateRecordFinance,
   normalizeRecordFinance,
-  recordClientDiscount,
+  recordPersonDiscount,
   recordPlanTotal,
   resolveRecordFinancialPlan,
 } from './model.js';

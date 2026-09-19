@@ -12,7 +12,7 @@ import {
 hydrateConsentsFromServer([
   {
     id: 'legacy-event',
-    clientId: 'client-1',
+    legacySubjectKey: 'legacy-1',
     documentId: 'pdn-consent',
     documentVersion: 1,
     status: 'accepted',
@@ -20,7 +20,7 @@ hydrateConsentsFromServer([
   },
   {
     id: 'canonical-event',
-    subjectType: 'BOOKING_ACCOUNT',
+    subjectType: 'ACCOUNT',
     subjectKey: 'account-1',
     documentId: 'pdn-consent',
     documentVersion: 2,
@@ -32,7 +32,7 @@ hydrateConsentsFromServer([
 
 const consents = getConsents();
 assert.equal(consents.length, 1, 'Frontend must consume canonical consent events only');
-assert.equal(consents[0].subjectType, 'BOOKING_ACCOUNT');
+assert.equal(consents[0].subjectType, 'ACCOUNT');
 assert.equal(consents[0].subjectKey, 'account-1');
 assert.equal(consents[0].documentVersion, 2);
 

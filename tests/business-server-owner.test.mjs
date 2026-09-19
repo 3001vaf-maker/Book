@@ -28,12 +28,12 @@ globalThis.fetch = async (url, options = {}) => {
   return { ok: true, status: 200, json: async () => ({}) };
 };
 
-const clients = await import('../main/clients/data.js');
+const peopleOwner = await import('../main/people/data.js');
 const uei = await import('../core/uei.js');
 const record = await import('../core/record/index.js');
 const persistence = await import('../core/business-persistence.js');
 
-clients.hydrateClientsFromServer([{ key: 'server-person', name: 'Server', phones: ['+79030000000'], tags: ['future-tag'] }]);
+peopleOwner.hydratePeopleFromServer([{ key: 'server-person', name: 'Server', phones: ['+79030000000'], tags: ['future-tag'] }]);
 uei.hydrateUEIFromServer({ entities: {}, relations: {}, revoked: [] });
 record.hydrateRecordStateFromServer({
   records: [{ id: 'server-record', date: '2026-09-12', from: '10:00', to: '11:00' }],
@@ -41,14 +41,14 @@ record.hydrateRecordStateFromServer({
 });
 persistence.setBusinessServerReady(true);
 
-assert.deepEqual(clients.getAllClients().map((person) => person.key), ['server-person']);
+assert.deepEqual(peopleOwner.getAllPeople().map((person) => person.key), ['server-person']);
 assert.deepEqual(record.getRecords().map((item) => item.id), ['server-record']);
 assert.deepEqual(uei.listUEIs(), []);
-assert.deepEqual(clients.getAllClients()[0].tags, ['future-tag'], 'unknown tag ids must survive until Tags owner moves server-side');
+assert.deepEqual(peopleOwner.getAllPeople()[0].tags, ['future-tag'], 'unknown tag ids must survive until Tags owner moves server-side');
 
-const people = clients.getAllClients();
+const people = peopleOwner.getAllPeople();
 people[0].surname = 'Updated';
-clients.saveClients(people);
+peopleOwner.savePeople(people);
 uei.createUEI({ entityType: 'person', entityId: 'server-person', value: 'A1' });
 
 await persistence.flushBusinessPersistence({ timeoutMs: 2000 });

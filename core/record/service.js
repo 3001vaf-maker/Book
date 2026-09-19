@@ -2,7 +2,7 @@ import { checkTimeAvailability } from '../time/index.js';
 import {
   calculateFinancialPlan,
   normalizeRecordFinance,
-  recordClientDiscount,
+  recordPersonDiscount,
   recordFinancialItems,
   repriceFinancialPlan,
 } from '../finance/index.js';
@@ -69,7 +69,7 @@ export function createRecord({
   workplaceId,
   from,
   to,
-  client,
+  person,
   procedures = [],
   products = [],
   source = 'manual',
@@ -85,7 +85,7 @@ export function createRecord({
     products: Array.isArray(products) ? products : [],
   };
   const finance = calculateFinancialPlan(recordFinancialItems(sourceRecord), {
-    discountPercent: recordClientDiscount(client),
+    discountPercent: recordPersonDiscount(person),
   });
   const row = {
     id: crypto.randomUUID(),
@@ -93,7 +93,7 @@ export function createRecord({
     workplaceId: normalizedWorkplaceId,
     from: String(from || ''),
     to: String(to || ''),
-    client: client || null,
+    person: person || null,
     procedures: sourceRecord.procedures,
     products: sourceRecord.products,
     source: String(source || 'manual'),
@@ -144,13 +144,13 @@ export function updateRecord(id, patch = {}) {
   const hasExplicitFinance = hasOwn(nextDataPatch, 'finance');
   const serviceChanged = hasOwn(nextDataPatch, 'procedures');
   const productChanged = hasOwn(nextDataPatch, 'products');
-  const clientChanged = hasOwn(nextDataPatch, 'client');
+  const personChanged = hasOwn(nextDataPatch, 'person');
 
   if (hasExplicitFinance) {
     nextDataPatch.finance = normalizeRecordFinance(nextDataPatch.finance);
-  } else if (clientChanged) {
+  } else if (personChanged) {
     nextDataPatch.finance = calculateFinancialPlan(recordFinancialItems(next), {
-      discountPercent: recordClientDiscount(next.client),
+      discountPercent: recordPersonDiscount(next.person),
     });
   } else if (serviceChanged || productChanged) {
     nextDataPatch.finance = repriceFinancialPlan(recordFinancialItems(next), current.finance);

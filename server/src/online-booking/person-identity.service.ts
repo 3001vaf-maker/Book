@@ -44,16 +44,16 @@ function dateValue(value: unknown) {
   return /^\d{4}-\d{2}-\d{2}$/.test(result) ? result : '';
 }
 
-type ClientCardBinding = {
+type PersonBinding = {
   person: Record<string, any>;
-  clientCardExisted: boolean;
+  personExisted: boolean;
 };
 
 @Injectable()
-export class ClientCardLinkService {
+export class PersonIdentityService {
   constructor(private readonly businessState: BusinessStateService) {}
 
-  async cardState(tenantId: string, phone: unknown) {
+  async personState(tenantId: string, phone: unknown) {
     const business = await this.businessState.get(tenantId);
     const people = arrayValue(business.people).map((value) => objectValue(value));
     const members = people
@@ -81,39 +81,39 @@ export class ClientCardLinkService {
     return { repaired: 0, candidates, requiresManualReview: candidates > 0 };
   }
 
-  async findOrAttachExistingCard(tenantId: string, account: Record<string, any>): Promise<ClientCardBinding | null> {
+  async findOrAttachExistingPerson(tenantId: string, account: Record<string, any>): Promise<PersonBinding | null> {
     const accountId = text(account?.id);
     if (!accountId) throw new BadRequestException('У аккаунта онлайн-записи отсутствует id');
 
     const existingIdentity = await this.businessState.bookingIdentityForAccount(tenantId, accountId);
     if (existingIdentity?.person?.key) {
-      return { person: objectValue(existingIdentity.person), clientCardExisted: true };
+      return { person: objectValue(existingIdentity.person), personExisted: true };
     }
 
-    const card = await this.cardState(tenantId, account.phone);
-    if (!card.owner) return null;
+    const personState = await this.personState(tenantId, account.phone);
+    if (!personState.owner) return null;
 
     const owner: Record<string, any> = {
-      ...objectValue(card.owner.person),
-      accounts: uniqueStrings([...accountIds(card.owner.person), accountId]),
-      phones: uniqueStrings([...arrayValue(card.owner.person.phones), account.phone]),
-      emails: uniqueStrings([...arrayValue(card.owner.person.emails), text(account.email).toLowerCase()]),
+      ...objectValue(personState.owner.person),
+      accounts: uniqueStrings([...accountIds(personState.owner.person), accountId]),
+      phones: uniqueStrings([...arrayValue(personState.owner.person.phones), account.phone]),
+      emails: uniqueStrings([...arrayValue(personState.owner.person.emails), text(account.email).toLowerCase()]),
     };
-    await this.businessState.upsertPerson(tenantId, text(owner.key), { person: owner, position: card.owner.position });
-    return { person: owner, clientCardExisted: true };
+    await this.businessState.upsertPerson(tenantId, text(owner.key), { person: owner, position: personState.owner.position });
+    return { person: owner, personExisted: true };
   }
 
-  async bindFirstAccess(tenantId: string, account: Record<string, any>): Promise<ClientCardBinding> {
-    const existing = await this.findOrAttachExistingCard(tenantId, account);
+  async bindFirstAccess(tenantId: string, account: Record<string, any>): Promise<PersonBinding> {
+    const existing = await this.findOrAttachExistingPerson(tenantId, account);
     if (existing) return existing;
-    const person = objectValue(await this.businessState.upsertBookingPersonFromAccount(tenantId, account));
-    return { person, clientCardExisted: false };
+    const person = objectValue(await this.businessState.upsertPersonFromAccount(tenantId, account));
+    return { person, personExisted: false };
   }
 
-  async cardStats(tenantId: string, account: Record<string, any>) {
-    const card = await this.cardState(tenantId, account.phone);
-    if (!card.members.length) return null;
-    const members = card.members.map(({ person }) => person);
+  async personStats(tenantId: string, account: Record<string, any>) {
+    const personState = await this.personState(tenantId, account.phone);
+    if (!personState.members.length) return null;
+    const members = personState.members.map(({ person }) => person);
     return {
       visits: members.reduce((sum, person) => sum + Math.max(0, Number(person.visits || 0)), 0),
       totalSpent: members.reduce((sum, person) => sum + Math.max(0, Number(person.totalSpent || 0)), 0),
@@ -122,21 +122,21 @@ export class ClientCardLinkService {
   }
 
   async manualRecordViews(tenantId: string, account: Record<string, any>, importedRecordIds: Set<string>) {
-    const card = await this.cardState(tenantId, account.phone);
-    const memberKeys = new Set(card.members.map(({ person }) => text(person.key)).filter(Boolean));
+    const personState = await this.personState(tenantId, account.phone);
+    const memberKeys = new Set(personState.members.map(({ person }) => text(person.key)).filter(Boolean));
     if (!memberKeys.size) return [];
 
-    const cancelled = new Set(arrayValue(card.business.recordEvents)
+    const cancelled = new Set(arrayValue(personState.business.recordEvents)
       .filter((event) => text(event?.type) === 'cancelled')
       .map((event) => text(event?.recordId))
       .filter(Boolean));
 
-    const records = arrayValue(card.business.records).filter((value) => {
+    const records = arrayValue(personState.business.records).filter((value) => {
       const record = objectValue(value);
       const recordId = text(record.id);
       if (!recordId || importedRecordIds.has(recordId) || cancelled.has(recordId) || text(record.status) === 'cancelled') return false;
-      const client = objectValue(record.client);
-      return memberKeys.has(text(client.key)) || phonesMatch(client.phone, account.phone);
+      const person = objectValue(record.person);
+      return memberKeys.has(text(person.key)) || phonesMatch(person.phone, account.phone);
     });
 
     return Promise.all(records.map(async (value) => {

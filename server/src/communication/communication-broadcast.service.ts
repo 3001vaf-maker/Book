@@ -40,11 +40,11 @@ export class CommunicationBroadcastService {
 
   private renderTemplate(body: string, person: { name: string; surname: string; phone: string; email: string; code: string }) {
     return body
-      .replaceAll('{{client.name}}', person.name)
-      .replaceAll('{{client.surname}}', person.surname)
-      .replaceAll('{{client.phone}}', person.phone)
-      .replaceAll('{{client.email}}', person.email)
-      .replaceAll('{{client.code}}', person.code);
+      .replaceAll('{{person.name}}', person.name)
+      .replaceAll('{{person.surname}}', person.surname)
+      .replaceAll('{{person.phone}}', person.phone)
+      .replaceAll('{{person.email}}', person.email)
+      .replaceAll('{{person.code}}', person.code);
   }
 
   async listTemplates(tenantId: string) {
@@ -122,7 +122,7 @@ export class CommunicationBroadcastService {
     if (!name) throw new BadRequestException('Введите название группы');
     const known = await this.knownPersonKeys(tenantId);
     const personKeys = [...new Set((Array.isArray(input?.personKeys) ? input.personKeys : []).map(text).filter((key) => key && known.has(key)))];
-    if (!personKeys.length) throw new BadRequestException('Выберите хотя бы одного клиента');
+    if (!personKeys.length) throw new BadRequestException('Выберите хотя бы одного человека');
     const groupId = id || randomUUID();
     try {
       await this.prisma.$transaction(async (tx) => {
@@ -200,7 +200,7 @@ export class CommunicationBroadcastService {
     const explicitKeys = [...new Set((Array.isArray(input?.personKeys) ? input.personKeys : []).map(text).filter(Boolean))];
     const groupKeys = await this.groupPersonKeys(tenantId, input?.groupId);
     const personKeys = [...new Set([...explicitKeys, ...groupKeys])];
-    if (!all && !phones.length && !personKeys.length) throw new BadRequestException('Выберите клиентов, группу или явно укажите «все клиенты»');
+    if (!all && !phones.length && !personKeys.length) throw new BadRequestException('Выберите людей, группу или явно укажите «все человекы»');
 
     if (all) return [...people];
     const selected = people.filter((person) => personKeys.includes(person.personKey) || phones.includes(person.phone));
@@ -258,7 +258,7 @@ export class CommunicationBroadcastService {
     const name = text(input?.name) || 'Сообщение'; const body = text(input?.body);
     if (!body) throw new BadRequestException('Введите текст сообщения');
     const preview = await this.preview(tenantId, input || {});
-    if (!preview.eligibleCount) throw new BadRequestException('Нет клиентов, которым можно отправить сообщение');
+    if (!preview.eligibleCount) throw new BadRequestException('Нет людей, которым можно отправить сообщение');
     if (preview.channel !== 'TELEGRAM') throw new BadRequestException(`Транспорт ${preview.channel} пока не подключён к массовой отправке`);
     await this.ensureRateLimit(tenantId, preview.eligibleCount);
     const runId = randomUUID();

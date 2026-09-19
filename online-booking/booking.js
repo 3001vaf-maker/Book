@@ -1,15 +1,15 @@
 import {
-  clearBookingAccount,
+  clearAccount,
   createBookingRequest,
-  getBookingAccount,
-  getBookingConsentState,
+  getAccount,
+  getAccountConsentState,
   getBookingContext,
-  getRememberedBookingEmail,
-  loginBookingAccount,
-  prepareBookingAccount,
-  registerBookingAccount,
-  submitBookingConsents,
-} from '../core/booking-account/index.js';
+  getRememberedAccountEmail,
+  loginAccount,
+  prepareAccount,
+  registerAccount,
+  submitAccountConsents,
+} from '../core/account/index.js';
 import { normalizeBookingSettings } from '../core/booking-settings/index.js';
 import { formatPhone } from '../core/phone/index.js';
 import {
@@ -40,7 +40,7 @@ import {
   getBookingWorkplace,
   requiredBookingDocuments,
 } from './model.js';
-import { renderClientAccount } from './account-shell.js';
+import { renderAccount } from './account-shell.js';
 
 function localDateKey(value = new Date()) {
   const date = value instanceof Date ? value : new Date(value);
@@ -102,14 +102,14 @@ function seedConsents(state, facts = []) {
 }
 
 async function refreshAccountConsentState(state) {
-  const consentState = await getBookingConsentState(state.tenantId);
+  const consentState = await getAccountConsentState(state.tenantId);
   seedConsents(state, consentState?.consents || []);
   return consentState || { pdnActive: false, consents: [] };
 }
 
 async function saveRegistrationConsents(state) {
   const consents = currentConsentFacts(state);
-  const consentState = await submitBookingConsents(state.tenantId, consents);
+  const consentState = await submitAccountConsents(state.tenantId, consents);
   seedConsents(state, consentState?.consents || consents);
 }
 
@@ -127,7 +127,7 @@ function flowThemeClasses(state) {
   const theme = state.settings?.theme && typeof state.settings.theme === 'object' ? state.settings.theme : {};
   const shape = ['soft', 'round', 'straight', 'cut'].includes(theme.shape) ? theme.shape : 'soft';
   const choiceStyle = ['cards', 'compact', 'list'].includes(theme.choiceStyle) ? theme.choiceStyle : 'cards';
-  return `booking-client booking-client--account booking-shape--${shape} booking-choice-style--${choiceStyle}`;
+  return `booking-account booking-account--account booking-shape--${shape} booking-choice-style--${choiceStyle}`;
 }
 
 function subtitleBlock(value = '') {
@@ -237,7 +237,7 @@ function renderRegistrationAgreements(root, state) {
   })));
   renderFlowPage(root, state, {
     title: 'Соглашения',
-    subtitle: 'Согласия относятся к регистрации и аккаунту клиента',
+    subtitle: 'Согласия относятся к регистрации и аккаунту',
     back: { data: 'data-booking-agreements-back', aria: 'Назад' },
     action: { label: 'Далее', data: 'data-booking-agreements-next', disabled: !canContinue },
     body: `${documents.length ? cards : emptyState('Документов нет', 'Для регистрации не настроены документы согласия.')}${errorBlock(state.error)}`,
@@ -272,7 +272,7 @@ function renderRegistrationAgreements(root, state) {
 }
 
 function renderAccountEntry(root, state) {
-  const rememberedEmail = state.accountDraft?.email || getRememberedBookingEmail(state.tenantId) || '';
+  const rememberedEmail = state.accountDraft?.email || getRememberedAccountEmail(state.tenantId) || '';
   renderFlowPage(root, state, {
     title: 'Регистрация',
     subtitle: 'Введите email. Если аккаунт уже существует, откроется вход.',
@@ -294,7 +294,7 @@ function renderAccountEntry(root, state) {
     const submit = root.querySelector('[data-booking-entry-submit]');
     if (submit) submit.disabled = true;
     try {
-      const prepared = await prepareBookingAccount(state.tenantId, email);
+      const prepared = await prepareAccount(state.tenantId, email);
       state.passwordMode = prepared.exists ? 'login' : 'register';
       state.error = '';
       if (prepared.exists) renderPassword(root, state);
@@ -365,7 +365,7 @@ function renderPassword(root, state) {
     if (submit) submit.disabled = true;
     try {
       if (register) {
-        const payload = await registerBookingAccount(state.tenantId, {
+        const payload = await registerAccount(state.tenantId, {
           ...state.accountDraft,
           password,
           consents: currentConsentFacts(state),
@@ -373,8 +373,8 @@ function renderPassword(root, state) {
         state.account = payload.account;
         state.error = '';
         seedConsents(state, currentConsentFacts(state));
-        if (payload.clientCardExisted) {
-          state.clientTab = 'profile';
+        if (payload.personExisted) {
+          state.accountTab = 'profile';
           await renderAccountHome(root, state);
         } else {
           nextBookingStep(root, state);
@@ -382,11 +382,11 @@ function renderPassword(root, state) {
         return;
       }
 
-      const payload = await loginBookingAccount(state.tenantId, state.accountDraft.email, password);
+      const payload = await loginAccount(state.tenantId, state.accountDraft.email, password);
       state.account = payload.account;
       state.error = '';
       await saveRegistrationConsents(state);
-      state.clientTab = 'profile';
+      state.accountTab = 'profile';
       await renderAccountHome(root, state);
     } catch (error) {
       state.error = error instanceof Error ? error.message : 'Не удалось войти';
@@ -564,7 +564,7 @@ function renderConfirmation(root, state) {
       state.notice = 'Запись отправлена в журнал.';
       state.error = '';
       await refreshContext(state);
-      state.clientTab = 'profile';
+      state.accountTab = 'profile';
       await renderAccountHome(root, state);
     } catch (error) {
       state.error = error instanceof Error ? error.message : 'Не удалось подтвердить запись';
@@ -617,15 +617,15 @@ async function repeatBooking(root, state, request) {
 }
 
 async function renderAccountHome(root, state) {
-  await renderClientAccount(root, state, {
+  await renderAccount(root, state, {
     onStartBooking: () => void startBookingFromAccount(root, state),
     onRepeat: (request) => void repeatBooking(root, state, request),
     onLogout: () => {
-      clearBookingAccount(state.tenantId);
+      clearAccount(state.tenantId);
       state.account = null;
       state.error = '';
-      state.clientTab = 'profile';
-      state.clientChatOpen = false;
+      state.accountTab = 'profile';
+      state.accountChatOpen = false;
       state.registrationMode = 'initial';
       seedConsents(state, []);
       renderWelcome(root, state);
@@ -658,9 +658,9 @@ export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = 
     lastRequest: null,
     repeatSelection: null,
     registrationMode: 'initial',
-    clientTab: 'profile',
-    clientChatOpen: false,
-    clientRequests: [],
+    accountTab: 'profile',
+    accountChatOpen: false,
+    accountRequests: [],
   };
 
   renderFlowPage(root, state, { title: 'Онлайн-запись', subtitle: 'Загрузка…', center: true });
@@ -671,7 +671,7 @@ export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = 
 
   try {
     await refreshContext(state);
-    const account = await getBookingAccount(state.tenantId);
+    const account = await getAccount(state.tenantId);
     if (account) {
       state.account = account;
       await renderAccountHome(root, state);

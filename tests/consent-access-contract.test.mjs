@@ -16,17 +16,17 @@ const pdn = bases.find((item) => item.documentId === 'pdn-consent');
 const marketing = bases.find((item) => item.documentId === 'messages-consent');
 
 assert.ok(pdn, 'PDN consent base must exist');
-assert.equal(pdn.clientConsent, true);
+assert.equal(pdn.personConsent, true);
 assert.equal(pdn.required, true, 'PDN consent must remain mandatory');
 
 assert.ok(marketing, 'Marketing consent base must exist');
-assert.equal(marketing.clientConsent, true);
+assert.equal(marketing.personConsent, true);
 assert.equal(marketing.required, false, 'Marketing consent must remain optional');
 
 assert.match(policy, /const PDN_CONSENT_DOCUMENT_ID = 'pdn-consent'/);
 assert.match(policy, /const MARKETING_CONSENT_DOCUMENT_ID = 'messages-consent'/);
 assert.match(policy, /async hasActivePdnConsent\(/);
-assert.match(policy, /FROM "TenantConsentEvent"[\s\S]*"subjectType" = 'BOOKING_ACCOUNT'/);
+assert.match(policy, /FROM "TenantConsentEvent"[\s\S]*"subjectType" = 'ACCOUNT'/);
 assert.match(policy, /async canSendMarketing\([\s\S]*MARKETING_CONSENT_DOCUMENT_ID/);
 
 assert.match(policy, /async accountConsentState\(/);

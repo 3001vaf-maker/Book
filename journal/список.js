@@ -10,8 +10,8 @@ function formatMoney(value = 0) {
   return `${amount.toLocaleString('ru-RU').replaceAll('\u00a0', ' ')} ₽`;
 }
 
-function clientName(client = {}) {
-  return [client?.name, client?.surname].filter(Boolean).join(' ').trim() || 'Клиент';
+function personName(person = {}) {
+  return [person?.name, person?.surname].filter(Boolean).join(' ').trim() || 'Человек';
 }
 
 function workplaceName(workplaces, workplaceId) {
@@ -37,15 +37,15 @@ function recordEntry(record, workplaces, { focus = false, payment = null } = {})
   const id = recordId(record);
   return listEntry({
     overline: workplaceName(workplaces, record?.workplaceId),
-    title: clientName(record?.client),
-    subtitle: record?.client?.phone || '',
+    title: personName(record?.person),
+    subtitle: record?.person?.phone || '',
     rightTop: [shortDate(record?.date), String(record?.from || '')].filter(Boolean).join(' · '),
     rightBottom: formatMoney(recordPlanTotal(record)),
     interactive: Boolean(id),
     data: id ? `data-journal-list-record="${escapeHtml(id)}"` : '',
-    aria: id ? `Открыть запись ${clientName(record?.client)}` : '',
+    aria: id ? `Открыть запись ${personName(record?.person)}` : '',
     className: classes,
-    initial: (clientName(record?.client) || '?').slice(0, 1).toUpperCase(),
+    initial: (personName(record?.person) || '?').slice(0, 1).toUpperCase(),
   });
 }
 
@@ -57,8 +57,8 @@ function scrollToFocus(root, selector) {
   requestAnimationFrame(() => {
     const node = root.querySelector(selector);
     if (!node) return;
-    const rootTop = root.getBoundingClientRect().top;
-    const nodeTop = node.getBoundingClientRect().top;
+    const rootTop = root.getBoundingPersonRect().top;
+    const nodeTop = node.getBoundingPersonRect().top;
     root.scrollTop += nodeTop - rootTop;
   });
 }

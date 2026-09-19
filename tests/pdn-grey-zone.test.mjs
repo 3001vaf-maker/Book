@@ -24,12 +24,12 @@ assert.match(pdnGuard, /if \(!state\.pdnActive\)/);
 assert.doesNotMatch(pdnGuard, /requiredConsentState/);
 assert.doesNotMatch(consentPolicy, /async requiredConsentState\(/);
 
-assert.match(bookingController, /@UseGuards\(BookingAccountGuard\)\s+@Get\(':tenantId\/account\/requests'\)/);
-assert.match(bookingController, /@UseGuards\(BookingAccountGuard\)\s+@Get\(':tenantId\/account\/notifications'\)/);
-assert.match(bookingController, /@UseGuards\(BookingAccountGuard\)\s+@Post\(':tenantId\/account\/notifications\/:notificationId\/read'\)/);
-assert.match(bookingController, /@UseGuards\(BookingAccountGuard, BookingPdnConsentGuard\)\s+@Get\(':tenantId\/account\/chat'\)/);
-assert.match(bookingController, /@UseGuards\(BookingAccountGuard, BookingPdnConsentGuard\)\s+@Post\(':tenantId\/account\/chat\/messages'\)/);
-assert.match(bookingController, /@UseGuards\(BookingAccountGuard, BookingPdnConsentGuard\)\s+@Post\(':tenantId\/requests'\)/);
+assert.match(bookingController, /@UseGuards\(AccountGuard\)\s+@Get\(':tenantId\/account\/requests'\)/);
+assert.match(bookingController, /@UseGuards\(AccountGuard\)\s+@Get\(':tenantId\/account\/notifications'\)/);
+assert.match(bookingController, /@UseGuards\(AccountGuard\)\s+@Post\(':tenantId\/account\/notifications\/:notificationId\/read'\)/);
+assert.match(bookingController, /@UseGuards\(AccountGuard, BookingPdnConsentGuard\)\s+@Get\(':tenantId\/account\/chat'\)/);
+assert.match(bookingController, /@UseGuards\(AccountGuard, BookingPdnConsentGuard\)\s+@Post\(':tenantId\/account\/chat\/messages'\)/);
+assert.match(bookingController, /@UseGuards\(AccountGuard, BookingPdnConsentGuard\)\s+@Post\(':tenantId\/requests'\)/);
 assert.match(bookingService, /async createRequest[\s\S]*hasActivePdnConsent\(tenantId, accountId\)/);
 assert.doesNotMatch(bookingService, /async createRequest[\s\S]*requiredConsentState\(tenantId, accountId\)/);
 

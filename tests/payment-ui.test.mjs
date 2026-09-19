@@ -10,12 +10,12 @@ const html = paymentForm({
   workplace: 'Бьюти тория',
   date: '11.09.26',
   time: '02:09',
-  client: { uei: '0278', name: 'Наталья Гусева' },
+  person: { uei: '0278', name: 'Наталья Гусева' },
   procedures: [{ id: 'p1', name: 'Стрижка - Женская', cost: 7000, discountPercent: 0, discountMoney: 0 }],
   total: 7000,
 });
 
-assert.match(html, /class="payment-client-uei">0278</);
+assert.match(html, /class="payment-person-uei">0278</);
 assert.match(html, /data-payment-save/);
 assert.match(html, /ui-button--secondary/);
 assert.match(html, /data-payment-submit/);
@@ -48,7 +48,7 @@ const receipt = paymentReceipt({
   workplace: 'Бьюти тория',
   date: '11.09.26',
   time: '02:41',
-  client: { uei: '0278', name: 'Наталья Гусева', phone: '+7 999 000-00-00' },
+  person: { uei: '0278', name: 'Наталья Гусева', phone: '+7 999 000-00-00' },
   amount: '7 000 ₽',
   wallet: 'СберБанк',
   tips: '400 ₽',
@@ -89,10 +89,10 @@ const paymentCss = readFileSync(new URL('../ui/payment/payment.css', import.meta
 const recordViewSource = readFileSync(new URL('../journal/record-view.js', import.meta.url), 'utf8');
 const recordPaymentSource = readFileSync(new URL('../journal/record-payment.js', import.meta.url), 'utf8');
 const journalListSource = readFileSync(new URL('../journal/список.js', import.meta.url), 'utf8');
-const clientMetadataSource = readFileSync(new URL('../main/clients/metadata.js', import.meta.url), 'utf8');
+const personMetadataSource = readFileSync(new URL('../main/people/metadata.js', import.meta.url), 'utf8');
 const walletSource = readFileSync(new URL('../settings/wallets/wallets.js', import.meta.url), 'utf8');
 const documentsSource = readFileSync(new URL('../settings/documents/documents.js', import.meta.url), 'utf8');
-const clientsSource = readFileSync(new URL('../main/clients/clients.js', import.meta.url), 'utf8');
+const peopleSource = readFileSync(new URL('../main/people/people.js', import.meta.url), 'utf8');
 
 assert.doesNotMatch(modalSource, /querySelector\(['"]input,select,textarea/);
 assert.match(modalSource, /data-modal-autofocus/);
@@ -105,7 +105,7 @@ assert.doesNotMatch(paymentSource, /singlePaymentMarkup|splitPaymentMarkup|data-
 assert.doesNotMatch(paymentCss, /payment-procedure__remove[^}]*font-size/);
 assert.match(paymentCss, /payment-receipt\{/);
 assert.match(receiptSource, /payment-receipt__workplace/);
-assert.match(receiptSource, /payment-receipt__client/);
+assert.match(receiptSource, /payment-receipt__person/);
 assert.doesNotMatch(receiptSource, /phone/);
 assert.match(methodsSource, /data-payment-allocation-row="\$\{index\}"/);
 assert.match(methodsSource, /data-payment-remaining/);
@@ -114,7 +114,7 @@ assert.match(methodsSource, /const applied = Math\.min\(Math\.max\(0, total\), r
 assert.match(methodsSource, /const tips = Math\.max\(0, received - applied\)/);
 assert.match(methodsSource, /remaining = Math\.max\(0, total - applied\)/);
 assert.doesNotMatch(methodsSource, /tipsInput|data-payment-tips[^\n]*input/);
-assert.match(paymentCss, /payment-client-uei[^}]*font-size:16px/);
+assert.match(paymentCss, /payment-person-uei[^}]*font-size:16px/);
 assert.match(paymentCss, /ui-select__value[^}]*font-size:16px/);
 assert.match(inputCss, /input\[type="number"\]::-webkit-outer-spin-button/);
 assert.match(inputCss, /-moz-appearance:textfield/);
@@ -130,7 +130,7 @@ assert.match(recordPaymentSource, /getRecordPaymentState/);
 assert.match(recordPaymentSource, /modal-bottom-action--partial/);
 assert.match(recordPaymentSource, /paymentReceipt\(/);
 assert.match(recordPaymentSource, /receivedTotal/);
-assert.match(recordPaymentSource, /client:\s*latest\?\.client/);
+assert.match(recordPaymentSource, /person:\s*latest\?\.person/);
 assert.match(recordPaymentSource, /workplace:\s*latest\?\.workplace/);
 assert.match(recordPaymentSource, /Действия с оплатой',\s*\{\s*variant:\s*'secondary'/);
 assert.match(recordPaymentSource, /Отменить операцию',\s*\{\s*variant:\s*'secondary'/);
@@ -139,10 +139,10 @@ assert.match(recordPaymentSource, /Подтвердить возврат',[\s\S]
 assert.match(recordPaymentSource, /flatMap/);
 assert.doesNotMatch(recordPaymentSource, /toLocaleDateString/);
 assert.match(journalListSource, /shortDate\(record\?\.date\)/);
-assert.match(clientMetadataSource, /shortDate\(value,\s*'—'\)/);
+assert.match(personMetadataSource, /shortDate\(value,\s*'—'\)/);
 assert.match(walletSource, /shortDateTime\(raw,\s*fallback\)/);
 assert.match(documentsSource, /shortDateTime\(value,\s*'Дата не зафиксирована'\)/);
-assert.match(clientsSource, /shortDateTime\(value,'—'\)/);
+assert.match(peopleSource, /shortDateTime\(value,'—'\)/);
 assert.equal(existsSync(new URL('../ui/payment/single.js', import.meta.url)), false);
 assert.equal(existsSync(new URL('../ui/payment/split.js', import.meta.url)), false);
 

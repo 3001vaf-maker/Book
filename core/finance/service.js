@@ -22,7 +22,7 @@ function notifyFinanceChanged(detail = {}) {
   window.dispatchEvent(new CustomEvent('book:dds-changed', { detail }));
 }
 
-export function recordPaymentIncome({ source = null, workplace = '', client = null, finance = null, allocations = [], maxAmount = null, serviceAmount = null, tips = 0, now = new Date() } = {}) {
+export function recordPaymentIncome({ source = null, workplace = '', person = null, finance = null, allocations = [], maxAmount = null, serviceAmount = null, tips = 0, now = new Date() } = {}) {
   if (!source?.type || !source?.id) return null;
   const snapshot = normalizeFinancialSnapshot(finance);
   if (!snapshot || maxAmount == null) return null;
@@ -50,7 +50,7 @@ export function recordPaymentIncome({ source = null, workplace = '', client = nu
     incomeType: 'payment',
     source: { type: String(source.type), id: String(source.id) },
     workplace: String(workplace || ''),
-    client: client ? { ...client } : null,
+    person: person ? { ...person } : null,
     allocations: preparedAllocations,
     walletId: preparedAllocations.length === 1 ? preparedAllocations[0].walletId : '',
     walletName: preparedAllocations.length === 1 ? preparedAllocations[0].walletName : '',
@@ -122,7 +122,7 @@ export function recordRefundExpense(paymentId, { reason = '', amount = null, wal
     originalPaymentId: original.id,
     source: original.source || null,
     workplace: original.workplace || '',
-    client: original.client || null,
+    person: original.person || null,
     walletId: resolvedWalletId,
     walletName: resolvedWalletName,
     total: split.total,

@@ -9,7 +9,7 @@ const bookingUi = fs.readFileSync('ui/booking/index.js', 'utf8');
 const shellUi = fs.readFileSync('ui/shell/index.js', 'utf8');
 const shellCss = fs.readFileSync('ui/shell/shell.css', 'utf8');
 const styleCss = fs.readFileSync('css/style.css', 'utf8');
-const clientMobileCss = fs.readFileSync('ui/shell/client-mobile.css', 'utf8');
+const accountMobileCss = fs.readFileSync('ui/shell/account-mobile.css', 'utf8');
 const navigationUi = fs.readFileSync('ui/navigation/navigation.js', 'utf8');
 const navigationCss = fs.readFileSync('ui/navigation/navigation.css', 'utf8');
 const referenceUi = fs.readFileSync('ui/reference/reference.js', 'utf8');
@@ -31,10 +31,10 @@ expect(booking.includes('initCalendar('), 'Public booking date must use the shar
 expect(!booking.includes("type: 'date'"), 'Public booking must not use native technical date controls.');
 
 expect(booking.includes('renderRegistrationAgreements') && booking.includes('renderAccountEntry') && booking.includes('renderAccountDetails') && booking.includes('renderPassword'), 'Registration must own agreements, account lookup, details and password.');
-expect(booking.includes("subtitle: 'Согласия относятся к регистрации и аккаунту клиента'"), 'Consent UI must be explicitly registration/account scoped.');
-expect(booking.includes('if (prepared.exists) renderPassword(root, state);') && booking.includes('else renderAccountDetails(root, state);'), 'Registration must branch between an existing account and a new client.');
-expect(booking.includes('if (payload.clientCardExisted)') && booking.includes("state.clientTab = 'profile'"), 'Known clients must land on the personal page after registration.');
-expect(booking.includes('else {\n          nextBookingStep(root, state);'), 'New clients without an existing card must continue into booking after registration.');
+expect(booking.includes("subtitle: 'Согласия относятся к регистрации и аккаунту'"), 'Consent UI must be explicitly registration/account scoped.');
+expect(booking.includes('if (prepared.exists) renderPassword(root, state);') && booking.includes('else renderAccountDetails(root, state);'), 'Registration must branch between an existing account and a new account.');
+expect(booking.includes('if (payload.personExisted)') && booking.includes("state.accountTab = 'profile'"), 'Known accounts must land on the personal page after registration.');
+expect(booking.includes('else {\n          nextBookingStep(root, state);'), 'New accounts without an existing card must continue into booking after registration.');
 
 expect(booking.includes('renderWorkplaces') && booking.includes('renderProcedures') && booking.includes('renderDates') && booking.includes('renderTimes') && booking.includes('renderConfirmation'), 'Booking itself must preserve workplace -> procedures -> date -> time -> confirmation.');
 expect(booking.includes("root.querySelector('[data-booking-workplaces-back]')?.addEventListener('click', () => backFromFirstBookingStep(root, state));"), 'Back from the first booking step must leave booking, not return to registration.');
@@ -44,7 +44,7 @@ expect(booking.includes("root.querySelector('[data-booking-times-back]')?.addEve
 expect(booking.includes("root.querySelector('[data-booking-confirm-back]')?.addEventListener('click'"), 'Confirmation must have a back control.');
 expect(booking.includes('function backFromFirstBookingStep') && booking.includes('renderAccountHome(root, state)'), 'The booking back boundary must return to the personal page.');
 
-expect(booking.includes('renderClientAccount'), 'Authenticated client account must use the unified client shell.');
+expect(booking.includes('renderAccount('), 'Authenticated account account must use the unified account shell.');
 expect(!booking.includes('step: 15'), 'Public booking must not hardcode a 15 minute slot step.');
 expect(settings.includes("from '../../core/booking-settings/index.js'"), 'Online booking settings must use canonical booking settings owner.');
 expect(settings.includes('appShell({') && settings.includes('appHeader({'), 'Online booking settings must use the shared Book shell instead of a local page header.');
@@ -58,7 +58,7 @@ expect(settings.includes('BOOKING_SLOT_STEPS.map') && settings.includes("value =
 expect(serverSync.includes("apiRequest('/business-state')"), 'Open Book must refresh from canonical server business state.');
 expect(shellUi.includes('appHeader'), 'Shared UI must own stable A/title/B/C header.');
 expect(shellUi.includes("variant: 'secondary'"), 'Shared header secondary controls must use the canonical light button role.');
-expect(shellUi.includes('clientBottomNavigation'), 'Shared UI must own client bottom navigation.');
+expect(shellUi.includes('accountBottomNavigation'), 'Shared UI must own account bottom navigation.');
 expect(shellUi.includes('messageComposer'), 'Shared UI must own messenger composer.');
 expect(shellUi.includes('message-composer--plain') && shellUi.includes('message-composer--with-attachments'), 'Shared messenger composer must own both profile/plain and attachment layouts.');
 expect(shellUi.includes('readOnlyReceipt'), 'Shared UI must own read-only receipt sheet.');
@@ -66,14 +66,14 @@ expect(shellUi.includes('app-view-shell--has-media'), 'Shared shell must know wh
 expect(shellCss.includes('--shell-icon-slot'), 'Shared shell CSS must own stable header control sizing.');
 expect(shellCss.includes('grid-template-columns:auto minmax(0,1fr) auto auto'), 'Shared A/J/B/C header must redistribute unused space instead of reserving empty fixed columns.');
 expect(shellCss.includes('.app-view-shell--chat') && shellCss.includes('.message-composer{position:fixed'), 'Shared shell CSS must keep chat composer fixed while the thread scrolls.');
-expect(styleCss.includes('--app-max-width:390px'), 'Book must use one shared 390px application width for profile and client surfaces.');
-expect(!clientMobileCss.includes('--app-max-width:'), 'Client shell must inherit the shared Book application width instead of redefining it.');
-expect(!clientMobileCss.includes('max-width:none'), 'Client application must never disable its phone-width limit.');
-expect(!accountShell.includes("document.createElement('style')") && !accountShell.includes('<style>'), 'Client features must not own local CSS.');
-expect(accountShell.includes("messageComposer({ attachments: true })"), 'Client chat must use the shared composer with media attachment control.');
-expect(accountShell.includes("label: 'Повторить запись'"), 'Client history must use the agreed repeat-booking action.');
-expect(accountShell.includes("label: 'Согласия'"), 'Client account and chat settings must expose consent controls.');
-expect(consentSettings.includes('revokeBookingConsent'), 'Client consent settings must use the canonical server-backed revoke flow.');
+expect(styleCss.includes('--app-max-width:390px'), 'Book must use one shared 390px application width for profile and account surfaces.');
+expect(!accountMobileCss.includes('--app-max-width:'), 'Account shell must inherit the shared Book application width instead of redefining it.');
+expect(!accountMobileCss.includes('max-width:none'), 'Account application must never disable its phone-width limit.');
+expect(!accountShell.includes("document.createElement('style')") && !accountShell.includes('<style>'), 'Account features must not own local CSS.');
+expect(accountShell.includes("messageComposer({ attachments: true })"), 'Account chat must use the shared composer with media attachment control.');
+expect(accountShell.includes("label: 'Повторить запись'"), 'Account history must use the agreed repeat-booking action.');
+expect(accountShell.includes("label: 'Согласия'"), 'Account account and chat settings must expose consent controls.');
+expect(consentSettings.includes('revokeAccountConsent'), 'Account consent settings must use the canonical server-backed revoke flow.');
 expect(bookingUi.includes('bookingChoiceCards'), 'Shared booking UI must continue to own booking choice controls.');
 
 expect(navigationUi.includes("{ id: 'main', label: 'Главная'") && navigationUi.includes("{ id: 'timetable', label: 'График'") && navigationUi.includes("{ id: 'journal', label: 'Журнал'") && navigationUi.includes("{ id: 'chat', label: 'Чат'") && navigationUi.includes("{ id: 'settings', label: 'Настройки'"), 'Book bottom navigation must keep the canonical five destinations.');
@@ -98,7 +98,7 @@ expect(referenceUi.includes("button('Личные данные', { variant: 'out
 expect(!referenceUi.includes('apiRequest(') && !referenceUi.includes('fetch(') && !referenceUi.includes('localStorage') && !referenceUi.includes('sessionStorage') && !referenceUi.includes("from '../../core/") && !referenceUi.includes("from '../core/"), 'Reference must remain free of API, persistence and business-layer dependencies.');
 
 if (failures.length) {
-  failures.forEach((message) => console.error(`booking client architecture: ${message}`));
+  failures.forEach((message) => console.error(`booking account architecture: ${message}`));
   process.exit(1);
 }
-console.log('booking client architecture check: OK');
+console.log('booking account architecture check: OK');

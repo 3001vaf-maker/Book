@@ -4,8 +4,8 @@ import { hydrateDaysFromServer } from '../core/day/index.js';
 import { calculateFinancialPlan, getFinancialItemFact, hydrateFinanceFromServer, recordPaymentIncome, recordRefundExpense } from '../core/finance/index.js';
 import { createRecord, getRecords, hydrateRecordStateFromServer, moveRecord, recordVisualState, updateRecord } from '../core/record/index.js';
 import { renderJournalList } from '../journal/список.js';
-import { hydrateClientsFromServer } from '../main/clients/data.js';
-import { getClientMetadata } from '../main/clients/metadata.js';
+import { hydratePeopleFromServer } from '../main/people/data.js';
+import { getPersonMetadata } from '../main/people/metadata.js';
 import { getWalletBalance, hydrateWalletsFromServer } from '../settings/wallets/data.js';
 
 globalThis.requestAnimationFrame = (callback) => callback();
@@ -14,9 +14,9 @@ hydrateDaysFromServer([
   { date: '2026-09-10', workplaceId: 'studio', from: '09:00', to: '18:00' },
   { date: '2026-09-11', workplaceId: 'studio', from: '09:00', to: '18:00' },
 ]);
-hydrateClientsFromServer([
-  { key: 'client-1', name: 'Анна', surname: 'Тест', phones: ['+70000000000'], discountPercent: 20 },
-  { key: 'client-2', name: 'Ирина', surname: 'БезСкидки', phones: ['+71111111111'], discountPercent: 0 },
+hydratePeopleFromServer([
+  { key: 'person-1', name: 'Анна', surname: 'Тест', phones: ['+70000000000'], discountPercent: 20 },
+  { key: 'person-2', name: 'Ирина', surname: 'БезСкидки', phones: ['+71111111111'], discountPercent: 0 },
 ]);
 hydrateRecordStateFromServer({ records: [], recordEvents: [] });
 hydrateFinanceFromServer({ version: 5, income: [], expense: [] });
@@ -27,7 +27,7 @@ const record = createRecord({
   workplaceId: 'studio',
   from: '10:00',
   to: '11:00',
-  client: { key: 'client-1', name: 'Анна', surname: 'Тест', phone: '+70000000000', discountPercent: 20 },
+  person: { key: 'person-1', name: 'Анна', surname: 'Тест', phone: '+70000000000', discountPercent: 20 },
   procedures: [{ id: 'procedure-1', name: 'Стрижка', cost: 5000, duration: 60 }],
 });
 assert.ok(record);
@@ -57,7 +57,7 @@ assert.equal(recordVisualState(noShow), 'no-show');
 const payment = recordPaymentIncome({
   source: { type: 'record', id: record.id },
   workplace: 'Студия',
-  client: { key: 'client-1', name: 'Анна Тест' },
+  person: { key: 'person-1', name: 'Анна Тест' },
   finance: noShow.finance,
   maxAmount: 6400,
   serviceAmount: 6400,
@@ -76,7 +76,7 @@ assert.equal(attended?.finance?.factTotal, 6400);
 assert.equal(getRecords()[0]?.procedures?.[0]?.cost, 8000);
 assert.equal(getRecords()[0]?.finance?.planTotal, 6400);
 
-const metadata = getClientMetadata('client-1');
+const metadata = getPersonMetadata('person-1');
 assert.equal(metadata.recordCount, 1);
 assert.equal(metadata.paidTotal, 6400);
 assert.equal(metadata.lastVisit, '2026-09-11');
@@ -97,7 +97,7 @@ const paymentStageRecord = createRecord({
   workplaceId: 'studio',
   from: '14:00',
   to: '15:00',
-  client: { key: 'client-2', name: 'Ирина', surname: 'БезСкидки', phone: '+71111111111' },
+  person: { key: 'person-2', name: 'Ирина', surname: 'БезСкидки', phone: '+71111111111' },
   procedures: [{ id: 'procedure-2', name: 'Окрашивание', cost: 8000, duration: 60 }],
 });
 assert.ok(paymentStageRecord);
@@ -122,7 +122,7 @@ assert.equal(paymentStageUpdated.finance.items[0].discountMode, 'percent');
 const paymentStageIncome = recordPaymentIncome({
   source: { type: 'record', id: paymentStageRecord.id },
   workplace: 'Студия',
-  client: { key: 'client-2', name: 'Ирина БезСкидки' },
+  person: { key: 'person-2', name: 'Ирина БезСкидки' },
   finance: paymentStageUpdated.finance,
   maxAmount: 6400,
   serviceAmount: 6400,
@@ -135,13 +135,13 @@ assert.equal(paymentStageIncome.finance.discountTotal, 1600);
 
 const paymentStageAttended = updateRecord(paymentStageRecord.id, { attendance: 'arrived' });
 assert.equal(paymentStageAttended.finance.factTotal, 6400);
-assert.equal(getClientMetadata('client-2').paidTotal, 6400);
+assert.equal(getPersonMetadata('person-2').paidTotal, 6400);
 assert.equal(getFinancialItemFact('procedure', 'procedure-2').factTotal, 6400);
 assert.equal(getWalletBalance('cash'), 12800);
 
-const returned = recordRefundExpense(paymentStageIncome.id, { reason: 'Возврат клиенту' });
+const returned = recordRefundExpense(paymentStageIncome.id, { reason: 'Возврат человеку' });
 assert.ok(returned);
-assert.equal(getClientMetadata('client-2').paidTotal, 0);
+assert.equal(getPersonMetadata('person-2').paidTotal, 0);
 assert.equal(getFinancialItemFact('procedure', 'procedure-2').factTotal, 0);
 assert.equal(getWalletBalance('cash'), 6400);
 
@@ -157,7 +157,7 @@ const historicalPlan = calculateFinancialPlan([{
 const historicalIncome = recordPaymentIncome({
   source: { type: 'record', id: 'record-history' },
   workplace: 'Студия',
-  client: { key: 'client-history', name: 'История' },
+  person: { key: 'person-history', name: 'История' },
   finance: historicalPlan,
   maxAmount: 6400,
   serviceAmount: 6400,
@@ -171,7 +171,7 @@ hydrateRecordStateFromServer({
     workplaceId: 'studio',
     from: '09:00',
     to: '10:00',
-    client: { key: 'client-history', name: 'История' },
+    person: { key: 'person-history', name: 'История' },
     procedures: [{ id: 'procedure-history', name: 'Историческая услуга', cost: 8000, duration: 60 }],
     products: [],
     createdAt: '2026-09-01T08:00:00.000Z',
