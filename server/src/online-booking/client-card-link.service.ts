@@ -77,7 +77,7 @@ export class ClientCardLinkService {
     }).length;
 
     // A shared phone or matching name is not proof that two Person records are one human.
-    // Legacy duplicates are therefore reported for explicit master review and never merged into UEI automatically.
+    // Legacy duplicates are therefore reported for explicit review and never merged into UEI automatically.
     return { repaired: 0, candidates, requiresManualReview: candidates > 0 };
   }
 
