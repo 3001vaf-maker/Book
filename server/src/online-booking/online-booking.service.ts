@@ -211,7 +211,7 @@ export class OnlineBookingService {
     return this.jwt.signAsync({
       sub: account.id,
       tenantId: account.tenantId,
-      kind: 'booking-account',
+      kind: 'account',
     }, { expiresIn: '30d' });
   }
 
