@@ -1,10 +1,7 @@
 import { apiRequest } from './core/auth.js';
 import { queueDocumentDataset } from './core/business-persistence.js';
 import { getBookDocumentBases } from './admin/document-registry/catalog.js';
-import {
-  configureConsentPersistence,
-  hydrateConsentsFromServer,
-} from './settings/documents/consents.js';
+import { hydrateConsentsFromServer } from './settings/documents/consents.js';
 import { getProfile } from './settings/profile/data.js';
 import { getWorkplaces } from './settings/profile/workplaces/data.js';
 import {
@@ -20,7 +17,6 @@ import {
 } from './settings/documents/history.js';
 
 configureDocumentPersistence((value) => queueDocumentDataset('documents', value));
-configureConsentPersistence(null);
 configureDocumentHistoryPersistence((value) => queueDocumentDataset('history', value));
 
 function clone(value) {
