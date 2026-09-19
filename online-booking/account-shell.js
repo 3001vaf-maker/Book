@@ -5,7 +5,7 @@ import {
   getAccountChatSettings,
   getAccountNotifications,
   getAccountRequests,
-  markBookingNotificationRead,
+  markAccountNotificationRead,
   sendAccountChatMessage,
 } from '../core/account/index.js';
 import { formatPhone } from '../core/phone/index.js';
@@ -483,7 +483,7 @@ async function renderMessages(root, state, handlers) {
     const openNotification = async () => {
       if (!message.unread) return;
       try {
-        await markBookingNotificationRead(state.tenantId, message.notificationId);
+        await markAccountNotificationRead(state.tenantId, message.notificationId);
         message.unread = false;
         node.removeAttribute('tabindex');
         node.removeAttribute('role');
