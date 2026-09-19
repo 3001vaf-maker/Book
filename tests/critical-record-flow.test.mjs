@@ -4,8 +4,8 @@ import { hydrateDaysFromServer } from '../core/day/index.js';
 import { calculateFinancialPlan, getFinancialItemFact, hydrateFinanceFromServer, recordPaymentIncome, recordRefundExpense } from '../core/finance/index.js';
 import { createRecord, getRecords, hydrateRecordStateFromServer, moveRecord, recordVisualState, updateRecord } from '../core/record/index.js';
 import { renderJournalList } from '../journal/список.js';
-import { hydrateClientsFromServer } from '../main/clients/data.js';
-import { getClientMetadata } from '../main/clients/metadata.js';
+import { hydratePeopleFromServer } from '../main/people/data.js';
+import { getPersonMetadata } from '../main/people/metadata.js';
 import { getWalletBalance, hydrateWalletsFromServer } from '../settings/wallets/data.js';
 
 globalThis.requestAnimationFrame = (callback) => callback();
@@ -14,7 +14,7 @@ hydrateDaysFromServer([
   { date: '2026-09-10', workplaceId: 'studio', from: '09:00', to: '18:00' },
   { date: '2026-09-11', workplaceId: 'studio', from: '09:00', to: '18:00' },
 ]);
-hydrateClientsFromServer([
+hydratePeopleFromServer([
   { key: 'client-1', name: 'Анна', surname: 'Тест', phones: ['+70000000000'], discountPercent: 20 },
   { key: 'client-2', name: 'Ирина', surname: 'БезСкидки', phones: ['+71111111111'], discountPercent: 0 },
 ]);
@@ -76,7 +76,7 @@ assert.equal(attended?.finance?.factTotal, 6400);
 assert.equal(getRecords()[0]?.procedures?.[0]?.cost, 8000);
 assert.equal(getRecords()[0]?.finance?.planTotal, 6400);
 
-const metadata = getClientMetadata('client-1');
+const metadata = getPersonMetadata('client-1');
 assert.equal(metadata.recordCount, 1);
 assert.equal(metadata.paidTotal, 6400);
 assert.equal(metadata.lastVisit, '2026-09-11');
@@ -135,13 +135,13 @@ assert.equal(paymentStageIncome.finance.discountTotal, 1600);
 
 const paymentStageAttended = updateRecord(paymentStageRecord.id, { attendance: 'arrived' });
 assert.equal(paymentStageAttended.finance.factTotal, 6400);
-assert.equal(getClientMetadata('client-2').paidTotal, 6400);
+assert.equal(getPersonMetadata('client-2').paidTotal, 6400);
 assert.equal(getFinancialItemFact('procedure', 'procedure-2').factTotal, 6400);
 assert.equal(getWalletBalance('cash'), 12800);
 
 const returned = recordRefundExpense(paymentStageIncome.id, { reason: 'Возврат клиенту' });
 assert.ok(returned);
-assert.equal(getClientMetadata('client-2').paidTotal, 0);
+assert.equal(getPersonMetadata('client-2').paidTotal, 0);
 assert.equal(getFinancialItemFact('procedure', 'procedure-2').factTotal, 0);
 assert.equal(getWalletBalance('cash'), 6400);
 
