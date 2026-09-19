@@ -27,8 +27,8 @@ const context = {
     { id: 'r2', workplaceId: 'moscow', date: '2026-09-20', from: '10:00', to: '11:00' },
   ],
   documents: [
-    { id: 'pdn-consent', version: 2, clientConsent: true, required: true },
-    { id: 'messages-consent', version: 1, clientConsent: true, required: false },
+    { id: 'pdn-consent', version: 2, personConsent: true, required: true },
+    { id: 'messages-consent', version: 1, personConsent: true, required: false },
   ],
 };
 
