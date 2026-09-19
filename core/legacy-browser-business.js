@@ -9,8 +9,8 @@ function isBookNamespace(key) {
 
 function isTechnicalBrowserState(key) {
   return key === 'book.people.sort'
-    || key.startsWith('book.booking-account.token.')
-    || key.startsWith('book.booking-account.email.')
+    || key.startsWith('book.account.token.')
+    || key.startsWith('book.account.email.')
     || key.startsWith('book.onboarding.')
     || key === 'book:workplace-context'
     || key.startsWith('book:workplace-context:');
