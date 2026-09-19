@@ -172,7 +172,7 @@ export function createPerson(name, surname, phone = '') {
   });
 }
 
-export function upsertPersonFromBookingAccount(account = {}) {
+export function upsertPersonFromAccount(account = {}) {
   const accountId = String(account.id || '').trim();
   if (!accountId) return null;
   const people = getAllPeople();
