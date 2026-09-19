@@ -32,10 +32,11 @@ hydrateConsentsFromServer([
 ]);
 
 const consents = getConsents();
-assert.equal(consents.length, 2, 'Frontend must understand both legacy and canonical consent event shapes');
-assert.equal(consents[1].subjectType, 'BOOKING_ACCOUNT');
-assert.equal(consents[1].subjectKey, 'account-1');
-assert.equal(consents[1].documentVersion, 2);
+assert.equal(consents.length, 1, 'Frontend must consume canonical consent events only');
+assert.equal(consents[0].subjectType, 'BOOKING_ACCOUNT');
+assert.equal(consents[0].subjectKey, 'account-1');
+assert.equal(consents[0].documentVersion, 2);
+assert.equal(consents[0].migratedFromEventId, 'legacy-event');
 
 hydrateDocumentHistoryFromServer([
   {
