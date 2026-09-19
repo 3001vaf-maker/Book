@@ -38,7 +38,7 @@ export class BookingConsentController {
   @Get(':tenantId/account/consent-state')
   async state(@Req() request: AccountRequest) {
     const auth = request.bookingAccountAuth!;
-    return this.consentPolicy.requiredConsentState(auth.tenantId, auth.accountId);
+    return this.consentPolicy.accountConsentState(auth.tenantId, auth.accountId);
   }
 
   @UseGuards(BookingAccountGuard)
@@ -52,7 +52,7 @@ export class BookingConsentController {
         await this.consentPolicy.acceptContactPointConsent(auth.tenantId, contact.type, contact.value, 'messages-consent', 'online-booking-account');
       }
     }
-    return this.consentPolicy.requiredConsentState(auth.tenantId, auth.accountId);
+    return this.consentPolicy.accountConsentState(auth.tenantId, auth.accountId);
   }
 
   @UseGuards(BookingAccountGuard)
@@ -69,6 +69,6 @@ export class BookingConsentController {
         await this.consentPolicy.revokeContactPointConsent(auth.tenantId, contact.type, contact.value, documentId, 'online-booking');
       }
     }
-    return this.consentPolicy.requiredConsentState(auth.tenantId, auth.accountId);
+    return this.consentPolicy.accountConsentState(auth.tenantId, auth.accountId);
   }
 }
