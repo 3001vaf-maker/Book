@@ -103,7 +103,7 @@ assert.match(accountShell, /data-client-chat-settings/);
 assert.match(accountShell, /getBookingChatSettings\(state\.tenantId\)/);
 assert.doesNotMatch(accountShell, /setBookingTelegramConsent/);
 assert.doesNotMatch(accountShell, /data-chat-telegram/);
-assert.match(accountShell, /Telegram: \\${telegram\.username \|\| 'подключён'}/);
+assert.match(accountShell, /Telegram: \$\{telegram\.username \|\| 'подключён'\}/);
 assert.match(accountShell, /data-chat-consents/);
 assert.doesNotMatch(accountShell, /Promise\.allSettled\(unread/);
 assert.doesNotMatch(accountShell, /markBookingNotificationRead\(state\.tenantId, item\.notificationId\)/);
