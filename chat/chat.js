@@ -326,7 +326,7 @@ function openProfileChatSettings() {
 async function openThread(root, state, thread) {
   state.view = 'thread';
   state.thread = thread;
-  const phone = String(thread?.cardPhone || '').trim();
+  const phone = String(thread?.personPhone || '').trim();
   const uei = String(thread?.uei || '').trim();
   screen(root, appHeader({ title: personName(phone, uei), back: { data: 'data-chat-back', aria: 'К диалогам' } }), emptyState('Загрузка', 'Получаем переписку.'), 'app-view-shell--chat');
   try {
@@ -365,11 +365,11 @@ async function renderThreads(root, state) {
   try {
     const threads = await getCommunicationThreads();
     const items = threads.map((thread, index) => listEntry({
-      title: personName(thread.cardPhone, thread.uei),
+      title: personName(thread.personPhone, thread.uei),
       subtitle: thread.body || (Array.isArray(thread.attachments) && thread.attachments.length ? 'Медиа' : 'Открыть диалог'),
       rightTop: messageTime(thread.createdAt),
       data: `data-chat-thread="${index}"`,
-      aria: `Открыть диалог с ${personName(thread.cardPhone, thread.uei)}`,
+      aria: `Открыть диалог с ${personName(thread.personPhone, thread.uei)}`,
     }));
     screen(root, appHeader({ title: 'Сообщения', action: { label: 'Новое', data: 'data-chat-new' }, settings: { data: 'data-chat-settings', aria: 'Настройки сообщений' } }), items.length ? listEntries(items) : emptyState('Чат пока пуст', 'Сообщения и системные уведомления людей появятся здесь.'));
     root.querySelector('[data-chat-new]')?.addEventListener('click', () => recipientOptions(root, state));
