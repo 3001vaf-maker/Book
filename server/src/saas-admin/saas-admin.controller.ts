@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Post, Put, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { MasterInvitationService } from '../master-invitation/master-invitation.service';
+import { InvitationService } from '../invitation/invitation.service';
 import { PlatformAdminGuard } from './platform-admin.guard';
 import { SaasAdminService } from './saas-admin.service';
 
@@ -15,7 +15,7 @@ type AdminRequest = Request & {
 export class SaasAdminController {
   constructor(
     private readonly admin: SaasAdminService,
-    private readonly invitations: MasterInvitationService,
+    private readonly invitations: InvitationService,
   ) {}
 
   @Get('me')
