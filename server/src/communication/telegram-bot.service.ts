@@ -13,6 +13,7 @@ import { ConsentPolicyService } from '../document-state/consent-policy.service';
 import { NotificationService } from '../notification/notification.service';
 import { PrismaService } from '../prisma.service';
 import { CommunicationService } from './communication.service';
+import { normalizeMessagePurpose, type MessagePurpose } from './message-purpose';
 
 type TelegramBotRow = {
   id: string; tenantId: string; botId: string; botUsername: string; encryptedToken: string; tokenIv: string; tokenTag: string;
@@ -117,15 +118,31 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     return this.telegramApi(this.decryptToken(row), 'sendMessage', { chat_id: telegramUserId, text: body });
   }
 
-  async sendChatMessage(tenantId: string, input: { phone?: unknown; uei?: unknown; body?: unknown }) {
+  private async sendSystemMessage(
+    connection: TelegramBotRow,
+    chatId: string | number,
+    body: string,
+    replyMarkup: Record<string, any> | null = null,
+  ) {
+    const purpose: MessagePurpose = 'SYSTEM';
+    if (!normalizeMessagePurpose(purpose)) throw new BadRequestException('Некорректный purpose системного сообщения');
+    return this.telegramApi(this.decryptToken(connection), 'sendMessage', {
+      chat_id: chatId,
+      text: body,
+      ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+    });
+  }
+
+  async sendChatMessage(tenantId: string, input: { phone?: unknown; uei?: unknown; body?: unknown; purpose?: unknown }) {
     const body = text(input?.body); if (!body) throw new BadRequestException('Пустое сообщение');
+    const purpose = normalizeMessagePurpose(input?.purpose); if (!purpose) throw new BadRequestException('Не указан purpose сообщения');
     const identity = await this.communications.telegramIdentity(tenantId, input || {}); if (!identity) throw new NotFoundException('Telegram у клиента не подключён');
     if (!(await this.consentPolicy.canSendMessages(tenantId, 'TELEGRAM', identity.externalUserId))) throw new BadRequestException('Нет действующего согласия на этот Telegram Contact Point');
     try {
       const result = await this.sendMessage(tenantId, identity.externalUserId, body);
-      return this.communications.recordMessage(tenantId, { phone: identity.cardPhone, uei: identity.uei, direction: 'outbound', kind: 'message', channel: 'TELEGRAM', body, externalMessageId: String(result?.message_id || ''), externalThreadId: String(result?.chat?.id || identity.externalUserId), status: 'sent' });
+      return this.communications.recordMessage(tenantId, { phone: identity.cardPhone, uei: identity.uei, direction: 'outbound', kind: 'message', purpose, channel: 'TELEGRAM', body, externalMessageId: String(result?.message_id || ''), externalThreadId: String(result?.chat?.id || identity.externalUserId), status: 'sent' });
     } catch (error) {
-      await this.communications.recordMessage(tenantId, { phone: identity.cardPhone, uei: identity.uei, direction: 'outbound', kind: 'message', channel: 'TELEGRAM', body, status: 'failed', error: error instanceof Error ? error.message : String(error) });
+      await this.communications.recordMessage(tenantId, { phone: identity.cardPhone, uei: identity.uei, direction: 'outbound', kind: 'message', purpose, channel: 'TELEGRAM', body, status: 'failed', error: error instanceof Error ? error.message : String(error) });
       throw error;
     }
   }
@@ -171,12 +188,17 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       const clientAppUrl = text(process.env.CLIENT_APP_URL).replace(/\/$/, '');
       if (clientAppUrl) {
         const url = new URL(clientAppUrl); url.searchParams.set('booking', connection.tenantId); url.searchParams.set('tg_entry', entry.token);
-        await this.telegramApi(this.decryptToken(connection), 'sendMessage', { chat_id: message.chat.id, text: 'Откройте Book, чтобы продолжить.', reply_markup: { inline_keyboard: [[{ text: 'Открыть Book', url: url.toString() }]] } });
+        await this.sendSystemMessage(
+          connection,
+          message.chat.id,
+          'Откройте Book, чтобы продолжить.',
+          { inline_keyboard: [[{ text: 'Открыть Book', url: url.toString() }]] },
+        );
       }
       if (!identity) return { ok: true, linked: false };
     }
     if (messageBody && messageBody !== '/start') {
-      await this.communications.recordMessage(connection.tenantId, { phone: identity.cardPhone, uei: identity.uei, direction: 'inbound', kind: 'message', channel: 'TELEGRAM', body: messageBody, externalMessageId: String(message.message_id || ''), externalThreadId: String(message.chat.id), status: 'delivered' });
+      await this.communications.recordMessage(connection.tenantId, { phone: identity.cardPhone, uei: identity.uei, direction: 'inbound', kind: 'message', purpose: 'DIRECT', channel: 'TELEGRAM', body: messageBody, externalMessageId: String(message.message_id || ''), externalThreadId: String(message.chat.id), status: 'delivered' });
     }
     return { ok: true, linked: true };
   }

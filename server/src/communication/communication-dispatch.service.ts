@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { CommunicationService } from './communication.service';
 import { CommunicationHistoryService } from './communication-history.service';
 import { TelegramBotService } from './telegram-bot.service';
+import type { MessagePurpose } from './message-purpose';
 
 function text(value: unknown) { return String(value ?? '').trim(); }
 
@@ -33,7 +34,7 @@ export class CommunicationDispatchService {
     return selected;
   }
 
-  async send(tenantId: string, input: { phone?: unknown; uei?: unknown; channel?: unknown; body?: unknown; attachments?: unknown }) {
+  async send(tenantId: string, input: { phone?: unknown; uei?: unknown; channel?: unknown; body?: unknown; attachments?: unknown; purpose: MessagePurpose }) {
     const body = text(input?.body);
     const attachments = Array.isArray(input?.attachments) ? input.attachments : [];
     if (!body && !attachments.length) throw new BadRequestException('Пустое сообщение');
@@ -44,6 +45,7 @@ export class CommunicationDispatchService {
         uei: input?.uei,
         direction: 'outbound',
         kind: 'media',
+        purpose: input.purpose,
         channel: 'IN_APP',
         body,
         attachments,
@@ -52,7 +54,7 @@ export class CommunicationDispatchService {
     }
 
     const channel = await this.resolveChannel(tenantId, input || {});
-    if (channel === 'TELEGRAM') return this.telegram.sendChatMessage(tenantId, { phone: input?.phone, uei: input?.uei, body });
+    if (channel === 'TELEGRAM') return this.telegram.sendChatMessage(tenantId, { phone: input?.phone, uei: input?.uei, body, purpose: input.purpose });
     throw new BadRequestException('Канал пока не подключён к двустороннему Chat');
   }
 }

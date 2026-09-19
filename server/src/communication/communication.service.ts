@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { BusinessStateService } from '../business-state/business-state.service';
 import { PrismaService } from '../prisma.service';
+import { normalizeMessagePurpose, type MessagePurpose } from './message-purpose';
 
 type TelegramEntryRow = {
   id: string;
@@ -27,6 +28,7 @@ type CommunicationMessageRow = {
   uei: string;
   direction: string;
   kind: string;
+  purpose: MessagePurpose | null;
   channel: string;
   body: string;
   attachments: unknown;
@@ -204,13 +206,15 @@ export class CommunicationService {
   }
 
   async recordMessage(tenantId: string, input: {
-    phone?: unknown; uei?: unknown; direction?: unknown; kind?: unknown; channel?: unknown; body?: unknown; attachments?: unknown;
+    phone?: unknown; uei?: unknown; direction?: unknown; kind?: unknown; purpose?: unknown; channel?: unknown; body?: unknown; attachments?: unknown;
     externalMessageId?: unknown; externalThreadId?: unknown; status?: unknown; error?: unknown;
   }) {
     const cardPhone = canonicalPhone(input?.phone);
     const uei = text(input?.uei);
     const direction = text(input?.direction).toLowerCase() || 'system';
     const kind = text(input?.kind).toLowerCase() || 'message';
+    const purpose = normalizeMessagePurpose(input?.purpose);
+    if (!purpose) throw new BadRequestException('Не указан purpose сообщения');
     const channel = text(input?.channel).toUpperCase() || 'IN_APP';
     const body = text(input?.body);
     const attachments = normalizeAttachments(input?.attachments);
@@ -225,15 +229,15 @@ export class CommunicationService {
     const now = new Date();
     await this.prisma.$executeRaw`
       INSERT INTO "CommunicationMessage" (
-        "id", "tenantId", "cardPhone", "uei", "direction", "kind", "channel", "body", "attachments",
+        "id", "tenantId", "cardPhone", "uei", "direction", "kind", "purpose", "channel", "body", "attachments",
         "externalMessageId", "externalThreadId", "status", "createdAt", "sentAt", "deliveredAt", "failedAt", "error"
       ) VALUES (
-        ${id}, ${tenantId}, ${cardPhone}, ${uei}, ${direction}, ${kind}, ${channel}, ${body}, ${attachmentsJson}::jsonb,
+        ${id}, ${tenantId}, ${cardPhone}, ${uei}, ${direction}, ${kind}, ${purpose}, ${channel}, ${body}, ${attachmentsJson}::jsonb,
         ${externalMessageId}, ${externalThreadId}, ${status}, ${now},
         ${status === 'sent' ? now : null}, ${status === 'delivered' ? now : null}, ${status === 'failed' ? now : null}, ${error}
       ) ON CONFLICT DO NOTHING
     `;
-    return { id, tenantId, cardPhone, uei, direction, kind, channel, body, attachments, externalMessageId, externalThreadId, status, createdAt: now, error };
+    return { id, tenantId, cardPhone, uei, direction, kind, purpose, channel, body, attachments, externalMessageId, externalThreadId, status, createdAt: now, error };
   }
 
   async listThread(tenantId: string, input: { phone?: unknown; uei?: unknown }, limit = 300) {
@@ -242,7 +246,7 @@ export class CommunicationService {
     if (!cardPhone && !uei) throw new BadRequestException('Не указан клиент');
     const safeLimit = Math.max(1, Math.min(1000, Math.floor(Number(limit) || 300)));
     return this.prisma.$queryRaw<CommunicationMessageRow[]>`
-      SELECT "id", "tenantId", "cardPhone", "uei", "direction", "kind", "channel", "body", "attachments",
+      SELECT "id", "tenantId", "cardPhone", "uei", "direction", "kind", "purpose", "channel", "body", "attachments",
              "externalMessageId", "externalThreadId", "status", "createdAt", "sentAt", "deliveredAt", "readAt", "failedAt", "error"
       FROM "CommunicationMessage"
       WHERE "tenantId" = ${tenantId}
@@ -255,7 +259,7 @@ export class CommunicationService {
     const safeLimit = Math.max(1, Math.min(500, Math.floor(Number(limit) || 200)));
     return this.prisma.$queryRaw<CommunicationMessageRow[]>`
       SELECT DISTINCT ON (COALESCE(NULLIF("uei", ''), "cardPhone"))
-             "id", "tenantId", "cardPhone", "uei", "direction", "kind", "channel", "body", "attachments",
+             "id", "tenantId", "cardPhone", "uei", "direction", "kind", "purpose", "channel", "body", "attachments",
              "externalMessageId", "externalThreadId", "status", "createdAt", "sentAt", "deliveredAt", "readAt", "failedAt", "error"
       FROM "CommunicationMessage"
       WHERE "tenantId" = ${tenantId}
