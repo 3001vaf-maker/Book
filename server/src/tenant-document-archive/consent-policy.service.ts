@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma.service';
 import { BusinessStateService } from '../business-state/business-state.service';
 import { TenantDocumentArchiveService } from './tenant-document-archive.service';
 
-type ConsentSubjectType = 'BOOKING_ACCOUNT' | 'CONTACT_POINT';
+type ConsentSubjectType = 'ACCOUNT' | 'CONTACT_POINT';
 type ConsentStatus = 'accepted' | 'revoked' | 'declined';
 const PDN_CONSENT_DOCUMENT_ID = 'pdn-consent';
 const MARKETING_CONSENT_DOCUMENT_ID = 'messages-consent';
@@ -179,12 +179,12 @@ export class ConsentPolicyService {
       const document = current.documents.find((item: any) => text(item?.id) === documentId);
       if (!document) continue;
       const documentVersion = Math.max(1, Number(fact?.documentVersion || document?.version || 1));
-      const latest = await this.latestEvent(tenantId, 'BOOKING_ACCOUNT', accountId, documentId);
+      const latest = await this.latestEvent(tenantId, 'ACCOUNT', accountId, documentId);
       if (latest?.status === 'accepted' && latest.documentVersion === documentVersion) continue;
       const occurredAt = asDate(fact?.acceptedAt, new Date());
       await this.insertEvent({
         tenantId,
-        subjectType: 'BOOKING_ACCOUNT',
+        subjectType: 'ACCOUNT',
         subjectKey: accountId,
         documentId,
         documentVersion,
@@ -292,12 +292,12 @@ export class ConsentPolicyService {
     const current = await this.state(tenantId);
     const document = current.documents.find((item: any) => text(item?.id) === documentId);
     if (!document) throw new BadRequestException('Документ не найден');
-    const latest = await this.latestEvent(tenantId, 'BOOKING_ACCOUNT', accountId, documentId);
+    const latest = await this.latestEvent(tenantId, 'ACCOUNT', accountId, documentId);
     if (latest?.status === 'revoked') return publicEvent(latest);
     const now = new Date();
     const event = await this.insertEvent({
       tenantId,
-      subjectType: 'BOOKING_ACCOUNT',
+      subjectType: 'ACCOUNT',
       subjectKey: accountId,
       documentId,
       documentVersion: Math.max(1, Number(document.version || 1)),
@@ -317,7 +317,7 @@ export class ConsentPolicyService {
              "documentId", "documentVersion", "status", "acceptedAt", "revokedAt", "source",
              "occurredAt", "createdAt"
       FROM "TenantConsentEvent"
-      WHERE "tenantId" = ${tenantId} AND "subjectType" = 'BOOKING_ACCOUNT' AND "subjectKey" = ${accountId}
+      WHERE "tenantId" = ${tenantId} AND "subjectType" = 'ACCOUNT' AND "subjectKey" = ${accountId}
       ORDER BY "occurredAt" DESC, "createdAt" DESC, "id" DESC
     ` : [];
     return current.documents
@@ -367,7 +367,7 @@ export class ConsentPolicyService {
     if (!type || !normalizedValue) return false;
 
     if (type === 'PHONE' || type === 'EMAIL') {
-      const accounts = await this.prisma.bookingAccount.findMany({
+      const accounts = await this.prisma.account.findMany({
         where: { tenantId },
         select: { id: true, phone: true, email: true },
       });
