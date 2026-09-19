@@ -1,0 +1,42 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+
+const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+
+const bookingService = read('server/src/online-booking/online-booking.service.ts');
+const pdnGuard = read('server/src/online-booking/booking-pdn-consent.guard.ts');
+const bookingUi = read('online-booking/booking.js');
+const clientUi = read('main/clients/clients.js');
+const consentCache = read('settings/documents/consents.js');
+const documentMigration = read('document-migration.js');
+const schema = read('server/prisma/schema.prisma');
+
+// BookingAccount consent JSON is no longer a runtime source or mirror.
+assert.doesNotMatch(bookingService, /consents:\s*arrayValue\(account\.consents\)/);
+assert.doesNotMatch(bookingService, /consents:\s*true/);
+assert.doesNotMatch(pdnGuard, /derivedConsents/);
+assert.doesNotMatch(pdnGuard, /bookingAccount\.updateMany/);
+assert.doesNotMatch(pdnGuard, /PrismaService/);
+assert.doesNotMatch(bookingUi, /account\.consents/);
+assert.doesNotMatch(bookingUi, /state\.account\?\.consents/);
+assert.doesNotMatch(bookingUi, /updateBookingAccount\(state\.tenantId, \{ consents \}\)/);
+
+// Registration still writes canonical ConsentEvent facts.
+assert.match(bookingService, /acceptAccountConsents\(tenantId, account\.id, consents, 'online-booking-registration'\)/);
+assert.match(bookingService, /acceptContactPointConsent\(tenantId, 'PHONE'/);
+assert.match(bookingService, /acceptContactPointConsent\(tenantId, 'EMAIL'/);
+
+// The legacy DB column still exists only until step 3B removes it physically.
+assert.match(schema, /consents\s+Json/);
+assert.match(bookingService, /consents:\s*\[\]\s+as Prisma\.InputJsonValue/);
+
+// Master client-card consent markers must be projected from canonical server ConsentEvent data.
+assert.match(documentMigration, /hydrateConsentsFromServer\(normalized\.consents\)/);
+assert.match(consentCache, /export function getConsents\(\)/);
+assert.match(clientUi, /getConsents/);
+assert.match(clientUi, /fact\.subjectType==='BOOKING_ACCOUNT'/);
+assert.match(clientUi, /fact\.subjectType!=='CONTACT_POINT'/);
+assert.doesNotMatch(clientUi, /p\.agreements/);
+assert.doesNotMatch(clientUi, /account\.consents/);
+
+console.log('BookingAccount consent snapshot cleanup tests: OK');
