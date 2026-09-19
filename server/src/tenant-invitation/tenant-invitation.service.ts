@@ -17,7 +17,7 @@ import { PrismaService } from '../prisma.service';
 import { TransactionalEmailService } from '../transactional-email/transactional-email.service';
 
 const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-const STARTER_PLAN_KEY = 'starter-clients';
+const STARTER_PLAN_KEY = 'starter-people';
 
 const CAPABILITY_CATALOG: Array<{
   key: string;
@@ -30,7 +30,7 @@ const CAPABILITY_CATALOG: Array<{
 }> = [
   { key: 'profile.access', groupKey: 'start', name: 'Профиль', valueType: CapabilityValueType.BOOLEAN, position: 10, starterEnabled: true },
   { key: 'services.access', groupKey: 'start', name: 'Услуги', valueType: CapabilityValueType.BOOLEAN, position: 20, starterEnabled: true },
-  { key: 'clients.access', groupKey: 'clients', name: 'Клиенты', valueType: CapabilityValueType.BOOLEAN, position: 30, starterEnabled: true },
+  { key: 'people.access', groupKey: 'people', name: 'Люди', valueType: CapabilityValueType.BOOLEAN, position: 30, starterEnabled: true },
   { key: 'workplaces.max', groupKey: 'start', name: 'Количество рабочих пространств', valueType: CapabilityValueType.LIMIT, position: 40, starterLimit: 1 },
   { key: 'timetable.access', groupKey: 'work', name: 'График', valueType: CapabilityValueType.BOOLEAN, position: 50, starterEnabled: false },
   { key: 'journal.access', groupKey: 'work', name: 'Журнал', valueType: CapabilityValueType.BOOLEAN, position: 60, starterEnabled: false },
@@ -109,14 +109,14 @@ export class TenantInvitationService {
       where: { key: STARTER_PLAN_KEY },
       create: {
         key: STARTER_PLAN_KEY,
-        name: 'Старт: Клиенты',
-        description: 'Профиль, услуги, клиенты и одно рабочее пространство',
+        name: 'Старт',
+        description: 'Профиль, услуги, люди и одно рабочее пространство',
         position: 10,
         isActive: true,
       },
       update: {
-        name: 'Старт: Клиенты',
-        description: 'Профиль, услуги, клиенты и одно рабочее пространство',
+        name: 'Старт',
+        description: 'Профиль, услуги, люди и одно рабочее пространство',
         position: 10,
         isActive: true,
       },
