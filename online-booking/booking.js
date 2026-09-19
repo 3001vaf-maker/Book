@@ -1,15 +1,15 @@
 import {
-  clearBookingAccount,
+  clearAccount,
   createBookingRequest,
-  getBookingAccount,
-  getBookingConsentState,
+  getAccount,
+  getAccountConsentState,
   getBookingContext,
-  getRememberedBookingEmail,
-  loginBookingAccount,
-  prepareBookingAccount,
-  registerBookingAccount,
-  submitBookingConsents,
-} from '../core/booking-account/index.js';
+  getRememberedAccountEmail,
+  loginAccount,
+  prepareAccount,
+  registerAccount,
+  submitAccountConsents,
+} from '../core/account/index.js';
 import { normalizeBookingSettings } from '../core/booking-settings/index.js';
 import { formatPhone } from '../core/phone/index.js';
 import {
@@ -102,14 +102,14 @@ function seedConsents(state, facts = []) {
 }
 
 async function refreshAccountConsentState(state) {
-  const consentState = await getBookingConsentState(state.tenantId);
+  const consentState = await getAccountConsentState(state.tenantId);
   seedConsents(state, consentState?.consents || []);
   return consentState || { pdnActive: false, consents: [] };
 }
 
 async function saveRegistrationConsents(state) {
   const consents = currentConsentFacts(state);
-  const consentState = await submitBookingConsents(state.tenantId, consents);
+  const consentState = await submitAccountConsents(state.tenantId, consents);
   seedConsents(state, consentState?.consents || consents);
 }
 
@@ -272,7 +272,7 @@ function renderRegistrationAgreements(root, state) {
 }
 
 function renderAccountEntry(root, state) {
-  const rememberedEmail = state.accountDraft?.email || getRememberedBookingEmail(state.tenantId) || '';
+  const rememberedEmail = state.accountDraft?.email || getRememberedAccountEmail(state.tenantId) || '';
   renderFlowPage(root, state, {
     title: 'Регистрация',
     subtitle: 'Введите email. Если аккаунт уже существует, откроется вход.',
@@ -294,7 +294,7 @@ function renderAccountEntry(root, state) {
     const submit = root.querySelector('[data-booking-entry-submit]');
     if (submit) submit.disabled = true;
     try {
-      const prepared = await prepareBookingAccount(state.tenantId, email);
+      const prepared = await prepareAccount(state.tenantId, email);
       state.passwordMode = prepared.exists ? 'login' : 'register';
       state.error = '';
       if (prepared.exists) renderPassword(root, state);
@@ -365,7 +365,7 @@ function renderPassword(root, state) {
     if (submit) submit.disabled = true;
     try {
       if (register) {
-        const payload = await registerBookingAccount(state.tenantId, {
+        const payload = await registerAccount(state.tenantId, {
           ...state.accountDraft,
           password,
           consents: currentConsentFacts(state),
@@ -382,7 +382,7 @@ function renderPassword(root, state) {
         return;
       }
 
-      const payload = await loginBookingAccount(state.tenantId, state.accountDraft.email, password);
+      const payload = await loginAccount(state.tenantId, state.accountDraft.email, password);
       state.account = payload.account;
       state.error = '';
       await saveRegistrationConsents(state);
@@ -621,7 +621,7 @@ async function renderAccountHome(root, state) {
     onStartBooking: () => void startBookingFromAccount(root, state),
     onRepeat: (request) => void repeatBooking(root, state, request),
     onLogout: () => {
-      clearBookingAccount(state.tenantId);
+      clearAccount(state.tenantId);
       state.account = null;
       state.error = '';
       state.clientTab = 'profile';
@@ -671,7 +671,7 @@ export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = 
 
   try {
     await refreshContext(state);
-    const account = await getBookingAccount(state.tenantId);
+    const account = await getAccount(state.tenantId);
     if (account) {
       state.account = account;
       await renderAccountHome(root, state);
