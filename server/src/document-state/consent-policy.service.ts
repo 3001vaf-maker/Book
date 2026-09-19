@@ -542,19 +542,15 @@ export class ConsentPolicyService {
       });
   }
 
-  async requiredConsentState(tenantId: string, accountId: string) {
-    const consents = await this.accountConsentProjection(tenantId, accountId);
-    const required = consents.filter((item) => item.required);
-    const missing = required.filter((item) => !item.accepted);
-    return { allowed: missing.length === 0, required, missing, consents };
+  async accountConsentState(tenantId: string, accountIdValue: unknown) {
+    const accountId = text(accountIdValue);
+    const consents = accountId ? await this.accountConsentProjection(tenantId, accountId) : [];
+    const pdn = consents.find((item) => item.documentId === PDN_CONSENT_DOCUMENT_ID);
+    return { pdnActive: Boolean(pdn?.accepted), consents };
   }
 
   async hasActivePdnConsent(tenantId: string, accountIdValue: unknown) {
-    const accountId = text(accountIdValue);
-    if (!accountId) return false;
-    const consents = await this.accountConsentProjection(tenantId, accountId);
-    const pdn = consents.find((item) => item.documentId === PDN_CONSENT_DOCUMENT_ID);
-    return Boolean(pdn?.accepted);
+    return (await this.accountConsentState(tenantId, accountIdValue)).pdnActive;
   }
 
   async hasActivePdnConsentForIdentity(tenantId: string, phoneValue: unknown, ueiValue: unknown) {
