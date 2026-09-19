@@ -14,13 +14,13 @@ export class SaasAdminService {
     private readonly documentRegistry: DocumentRegistryService,
   ) {}
 
-  async me(adminId: string, userId: string) {
+  async me(adminId: string, platformAccountId: string) {
     const admin = await this.prisma.platformAdmin.findUnique({
       where: { id: adminId },
-      include: { user: { select: { id: true, email: true } } },
+      include: { account: { select: { id: true, email: true } } },
     });
-    if (!admin || admin.userId !== userId) throw new NotFoundException('Администратор не найден');
-    return { id: admin.id, user: admin.user };
+    if (!admin || admin.platformAccountId !== platformAccountId) throw new NotFoundException('Администратор не найден');
+    return { id: admin.id, account: admin.account };
   }
 
   documentRegistryHistory() {
@@ -53,11 +53,11 @@ export class SaasAdminService {
         tenant: {
           include: {
             memberships: {
-              include: { user: { select: { id: true, email: true, createdAt: true } } },
+              include: { account: { select: { id: true, email: true, createdAt: true } } },
               orderBy: { createdAt: 'asc' },
             },
             profiles: {
-              select: { userId: true, name: true, surname: true, profession: true },
+              select: { platformAccountId: true, name: true, surname: true, profession: true },
             },
             tenantInvitations: {
               orderBy: { createdAt: 'desc' },
@@ -73,7 +73,7 @@ export class SaasAdminService {
     return Promise.all(rows.map(async (row) => {
       const membership = row.tenant.memberships[0] || null;
       const profile = membership
-        ? row.tenant.profiles.find((item) => item.userId === membership.userId) || null
+        ? row.tenant.profiles.find((item) => item.platformAccountId === membership.platformAccountId) || null
         : null;
       const invitation = row.tenant.tenantInvitations[0] || null;
       const resolved = await this.access.resolveTenantAccess(row.tenantId);
@@ -84,11 +84,11 @@ export class SaasAdminService {
         isOwnerBook: row.isOwnerBook,
         plan: row.plan,
         ownerProfile: membership ? {
-          userId: membership.user.id,
-          email: membership.user.email,
+          platformAccountId: membership.account.id,
+          email: membership.account.email,
           name: [profile?.name, profile?.surname].filter(Boolean).join(' ') || invitation?.name || row.tenant.name,
           profession: profile?.profession || '',
-          registeredAt: membership.user.createdAt,
+          registeredAt: membership.account.createdAt,
         } : null,
         invitation,
         access: resolved,
