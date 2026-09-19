@@ -174,7 +174,7 @@ function chatScreen() {
   return {
     className: 'app-view-shell--chat',
     media: '',
-    body: `${messageThread(messages, { viewer: 'master' })}${messageComposer({ attachments: state.chatAttachments })}`,
+    body: `${messageThread(messages, { viewer: 'profile' })}${messageComposer({ attachments: state.chatAttachments })}`,
   };
 }
 
