@@ -17,15 +17,15 @@ import { getRecordPaymentState, recordFinancialItems, repriceFinancialPlan } fro
 import { listAvailableStartTimes } from '../core/time/index.js';
 import { getWorkplaces, getWorkplaceWorkingDates } from '../core/workplace-time.js';
 import { timeToMinutes, minutesToTime } from '../core/time/index.js';
-import { getAllClients } from '../main/clients/data.js';
-import { clientDisplay } from '../main/clients/presentation.js';
-import { openClientProfile } from '../main/clients/clients.js';
+import { getAllPeople } from '../main/people/data.js';
+import { personDisplay } from '../main/people/presentation.js';
+import { openPerson } from '../main/people/people.js';
 import { getProcedures } from '../settings/service/procedures/data.js';
 import { getProducts } from '../settings/service/products/data.js';
 import { getRecords } from '../core/record/index.js';
 import { updateRecord, cancelRecord, checkRecordTime } from '../core/record/index.js';
 
-const people = () => getAllClients();
+const people = () => getAllPeople();
 const procedures = () => getProcedures();
 const products = () => getProducts();
 const dateKey = (value) => {
@@ -184,20 +184,20 @@ function openClientPicker(state, onSelected) {
   const render = (query = '') => {
     const normalized = String(query || '').trim().toLowerCase();
     const matches = people().filter((person) => {
-      const display = clientDisplay(person);
+      const display = personDisplay(person);
       return !normalized || `${display.uei} ${display.name} ${display.phone}`.toLowerCase().includes(normalized);
     });
     const listRoot = m.querySelector('[data-record-view-client-list]');
     if (!listRoot) return;
     listRoot.innerHTML = matches.map((person) => {
-      const display = clientDisplay(person);
+      const display = personDisplay(person);
       return `<button type="button" class="entity-card entity-card--compact${String(person.key || '') === String(state.client?.key || '') ? ' is-selected' : ''}" data-record-view-client="${escapeHtml(person.key || '')}"><span>${escapeHtml(display.uei)}</span><strong>${escapeHtml(display.name)}</strong><small>${escapeHtml(display.phone)}</small></button>`;
     }).join('') || '<div class="muted">Клиенты не найдены.</div>';
     listRoot.querySelectorAll('[data-record-view-client]').forEach((node) => node.addEventListener('click', () => {
       const person = people().find((item) => String(item.key || '') === String(node.dataset.recordViewClient || ''));
       if (!person) return;
       m.remove();
-      const display = clientDisplay(person);
+      const display = personDisplay(person);
       onSelected?.({ key: person.key, id: person.id, uei: display.uei, name: person.name, surname: person.surname, phone: display.phone, discountPercent: Number(person.discountPercent) || 0 });
     }));
   };
@@ -469,7 +469,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     const currentPerson = clientSource?.key
       ? people().find((person) => String(person.key) === String(clientSource.key)) || clientSource
       : clientSource;
-    const client = clientDisplay(currentPerson);
+    const client = personDisplay(currentPerson);
     const workplace = workplaceName(state.workplaceId);
     const totalDuration = state.procedures.length ? procedureTotalDuration(state.procedures) : 30;
     const finance = repriceFinancialPlan(recordFinancialItems(state), state.finance);
@@ -566,7 +566,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     });
     root.querySelectorAll('[data-record-view-client-profile]').forEach((node) => node.addEventListener('click', () => {
       if (!currentPerson?.key) return;
-      openClientProfile({ root: document.body, key: currentPerson.key, onClose: render });
+      openPerson({ root: document.body, key: currentPerson.key, onClose: render });
     }));
     root.querySelector('[data-record-view-phone]')?.addEventListener('click', () => openPhoneActions(client.phone));
     root.querySelectorAll('[data-record-view-procedure-edit]').forEach((node) => node.addEventListener('click', () => {
