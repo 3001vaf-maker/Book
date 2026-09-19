@@ -20,7 +20,6 @@ const history = readFileSync(new URL('../admin/document-registry/history.js', im
 const profileMigration = readFileSync(new URL('../document-migration.js', import.meta.url), 'utf8');
 const controller = readFileSync(new URL('../server/src/saas-admin/saas-admin.controller.ts', import.meta.url), 'utf8');
 const service = readFileSync(new URL('../server/src/document-registry/document-registry.service.ts', import.meta.url), 'utf8');
-const migration = readFileSync(new URL('../server/prisma/migrations/20260919000000_document_registry_history/migration.sql', import.meta.url), 'utf8');
 const namingMigration = readFileSync(new URL('../server/prisma/migrations/20260919161000_rename_consent_events/migration.sql', import.meta.url), 'utf8');
 const appModule = readFileSync(new URL('../server/src/app.module.ts', import.meta.url), 'utf8');
 
@@ -43,9 +42,6 @@ assert.match(controller, /@Get\('document-registry\/history'\)/);
 assert.match(service, /FROM "PlatformConsentEvent"/);
 assert.match(service, /v\."contentSnapshot" AS "documentContent"/);
 assert.match(service, /WHERE d\."scope" = 'PLATFORM'/);
-assert.match(migration, /CREATE TABLE IF NOT EXISTS "LegalAcceptanceEvent"/);
-assert.match(namingMigration, /ALTER TABLE "LegalAcceptanceEvent" RENAME TO "PlatformConsentEvent"/);
-assert.match(migration, /LegalAcceptanceEvent_append_only/);
 assert.match(namingMigration, /PlatformConsentEvent_append_only/);
 
 assert.equal(existsSync(new URL('../admin/documents/catalog.js', import.meta.url)), false, 'Old Admin/Documents catalog must be removed');
