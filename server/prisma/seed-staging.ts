@@ -198,6 +198,36 @@ async function main() {
     bookingSettings: null,
   };
 
+  const documents = [
+    {
+      id: 'pdn-agreement',
+      kind: 'agreement',
+      clientConsent: false,
+      required: false,
+      title: 'Политика обработки персональных данных',
+      version: 1,
+      content: 'Staging: политика обработки персональных данных',
+    },
+    {
+      id: 'pdn-consent',
+      kind: 'consent',
+      clientConsent: true,
+      required: true,
+      title: 'Согласие на обработку персональных данных',
+      version: 1,
+      content: 'Staging: согласие на обработку персональных данных',
+    },
+    {
+      id: 'messages-consent',
+      kind: 'consent',
+      clientConsent: true,
+      required: false,
+      title: 'Согласие на рекламные и маркетинговые сообщения',
+      version: 1,
+      content: 'Staging: согласие на рекламные и маркетинговые сообщения',
+    },
+  ];
+
   const auxiliary = {
     finance: {
       version: 5,
@@ -330,8 +360,8 @@ async function main() {
     });
     await tx.businessDocumentState.upsert({
       where: { tenantId },
-      create: { tenantId, data: json({ documents: [], consents: [], history: [] }), migrationVerifiedAt: now },
-      update: { migrationVerifiedAt: now },
+      create: { tenantId, data: json({ documents, history: [] }), migrationVerifiedAt: now },
+      update: { data: json({ documents, history: [] }), migrationVerifiedAt: now },
     });
     await tx.businessAuxiliaryState.upsert({
       where: { tenantId },

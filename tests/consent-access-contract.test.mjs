@@ -29,9 +29,11 @@ assert.match(policy, /async hasActivePdnConsent\(/);
 assert.match(policy, /FROM "ConsentEvent"[\s\S]*"subjectType" = 'BOOKING_ACCOUNT'/);
 assert.match(policy, /async canSendMarketing\([\s\S]*MARKETING_CONSENT_DOCUMENT_ID/);
 
-assert.match(guard, /hasActivePdnConsent\(auth\.tenantId, auth\.accountId\)/);
-assert.match(guard, /if \(!pdnAllowed\)/);
-assert.doesNotMatch(guard, /if \(!state\.allowed\)/);
+assert.match(policy, /async accountConsentState\(/);
+assert.doesNotMatch(policy, /async requiredConsentState\(/);
+assert.match(guard, /accountConsentState\(auth\.tenantId, auth\.accountId\)/);
+assert.match(guard, /if \(!state\.pdnActive\)/);
+assert.doesNotMatch(guard, /state\.allowed/);
 
 assert.match(booking, /async createRequest[\s\S]*hasActivePdnConsent\(tenantId, accountId\)/);
 assert.doesNotMatch(booking, /async createRequest[\s\S]*requiredConsentState\(tenantId, accountId\)/);

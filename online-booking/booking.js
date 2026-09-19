@@ -104,7 +104,7 @@ function seedConsents(state, facts = []) {
 async function refreshAccountConsentState(state) {
   const consentState = await getBookingConsentState(state.tenantId);
   seedConsents(state, consentState?.consents || []);
-  return consentState || { allowed: false, consents: [] };
+  return consentState || { pdnActive: false, consents: [] };
 }
 
 async function saveRegistrationConsents(state) {
@@ -577,7 +577,7 @@ async function startBookingFromAccount(root, state) {
   resetBookingChoice(state);
   try {
     const consentState = await refreshAccountConsentState(state);
-    if (consentState.allowed) {
+    if (consentState.pdnActive) {
       nextBookingStep(root, state);
       return;
     }
@@ -601,7 +601,7 @@ async function repeatBooking(root, state, request) {
   state.to = '';
   try {
     const consentState = await refreshAccountConsentState(state);
-    if (consentState.allowed) {
+    if (consentState.pdnActive) {
       continueRepeat(root, state);
       return;
     }

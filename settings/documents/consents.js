@@ -23,7 +23,6 @@ function normalize(item = {}) {
     source: String(item.source || 'manual'),
     eventAt: String(item.eventAt || item.revokedAt || item.acceptedAt || item.createdAt || ''),
     createdAt: String(item.createdAt || item.eventAt || new Date().toISOString()),
-    migratedFromEventId: String(item.migratedFromEventId || ''),
   };
 }
 

@@ -215,15 +215,14 @@ export class OnlineBookingService {
     }, { expiresIn: '30d' });
   }
 
-  private ensureRequiredConsents(publicationData: Record<string, any>, consents: any[]) {
+  private ensurePdnConsent(publicationData: Record<string, any>, consents: any[]) {
     const documents = arrayValue(publicationData.documents);
-    const required = documents.filter((item) => Boolean(item?.clientConsent) && Boolean(item?.required));
-    for (const document of required) {
-      const accepted = consents.some((item) => item.documentId === text(document.id)
-        && Number(item.documentVersion) === Math.max(1, Number(document.version || 1))
-        && item.accepted);
-      if (!accepted) throw new BadRequestException(`Необходимо согласие: ${text(document.title) || 'обязательный документ'}`);
-    }
+    const document = documents.find((item) => Boolean(item?.clientConsent) && text(item?.id) === 'pdn-consent');
+    if (!document) throw new BadRequestException('Согласие на обработку персональных данных недоступно');
+    const accepted = consents.some((item) => item.documentId === 'pdn-consent'
+      && Number(item.documentVersion) === Math.max(1, Number(document.version || 1))
+      && item.accepted);
+    if (!accepted) throw new BadRequestException(`Необходимо согласие: ${text(document.title) || 'Согласие на обработку персональных данных'}`);
   }
 
   async publish(tenantId: string, data: unknown) {
@@ -312,7 +311,7 @@ export class OnlineBookingService {
     if (password.length < 6) throw new BadRequestException('Пароль должен содержать не менее 6 символов');
     if (!name) throw new BadRequestException('Введите имя');
     if (!/^\+\d{8,15}$/.test(phone)) throw new BadRequestException('Введите телефон полностью');
-    this.ensureRequiredConsents({ documents }, consents);
+    this.ensurePdnConsent({ documents }, consents);
 
     const exists = await this.prisma.bookingAccount.findUnique({ where: { tenantId_email: { tenantId, email } } });
     if (exists) throw new ConflictException('Аккаунт с этим email уже существует');
@@ -357,7 +356,6 @@ export class OnlineBookingService {
       throw new UnauthorizedException('Неверный email или пароль');
     }
     const binding = await this.clientCards.bindFirstAccess(tenantId, account as any);
-    await this.consentPolicy.ensureCanonicalConsentEvents(tenantId);
     return {
       accessToken: await this.issueAccountToken(account),
       account: await this.accountView(tenantId, account),
@@ -369,7 +367,6 @@ export class OnlineBookingService {
     const account = await this.prisma.bookingAccount.findFirst({ where: { id: accountId, tenantId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
     await this.clientCards.bindFirstAccess(tenantId, account as any);
-    await this.consentPolicy.ensureCanonicalConsentEvents(tenantId);
     return this.accountView(tenantId, account);
   }
 

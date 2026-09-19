@@ -15,8 +15,7 @@ export class DocumentStateController {
   ) {}
 
   @Get()
-  async get(@Req() request: AuthenticatedRequest) {
-    await this.consentPolicy.ensureCanonicalConsentEvents(request.auth!.tenantId);
+  get(@Req() request: AuthenticatedRequest) {
     return this.documents.get(request.auth!.tenantId);
   }
 

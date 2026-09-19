@@ -4,7 +4,6 @@ import { ConsentPolicyService } from '../document-state/consent-policy.service';
 
 type AccountRequest = Request & {
   bookingAccountAuth?: { accountId: string; tenantId: string };
-  bookingConsentAccess?: unknown;
 };
 
 @Injectable()
@@ -16,13 +15,8 @@ export class BookingPdnConsentGuard implements CanActivate {
     const auth = request.bookingAccountAuth;
     if (!auth) throw new ForbiddenException('Не определён аккаунт онлайн-записи');
 
-    const [pdnAllowed, state] = await Promise.all([
-      this.consentPolicy.hasActivePdnConsent(auth.tenantId, auth.accountId),
-      this.consentPolicy.requiredConsentState(auth.tenantId, auth.accountId),
-    ]);
-    request.bookingConsentAccess = state;
-
-    if (!pdnAllowed) {
+    const state = await this.consentPolicy.accountConsentState(auth.tenantId, auth.accountId);
+    if (!state.pdnActive) {
       throw new ForbiddenException({
         code: 'PDN_CONSENT_REQUIRED',
         message: 'Необходимо подтвердить согласие на обработку персональных данных',

@@ -12,23 +12,28 @@ const bookingPdnGuard = read('server/src/online-booking/booking-pdn-consent.guar
 const migration = read('document-migration.js');
 const schema = read('server/prisma/schema.prisma');
 const consentMigration = read('server/prisma/migrations/20260915130000_canonical_consent_subjects/migration.sql');
+const retirementMigration = read('server/prisma/migrations/20260919143000_retire_legacy_consent_migration/migration.sql');
 
 assert.match(schema, /model BusinessDocumentState/);
-assert.match(schema, /consentMigratedAt\s+DateTime\?/);
+assert.doesNotMatch(schema, /consentMigratedAt/);
 assert.match(consentMigration, /CREATE TABLE "ConsentEvent"/);
+assert.match(retirementMigration, /"data" = "data" - 'consents'/);
+assert.match(retirementMigration, /DROP COLUMN IF EXISTS "consentMigratedAt"/);
+assert.match(retirementMigration, /DROP COLUMN IF EXISTS "migratedFromEventId"/);
 
 assert.match(state, /MUTABLE_DATASETS = new Set\(\['documents', 'history'\]\)/);
 assert.doesNotMatch(state, /recordAcceptedConsents/);
 assert.doesNotMatch(state, /'documents', 'consents', 'history'/);
 assert.match(state, /FROM "ConsentEvent"/);
 
-assert.match(policy, /ensureCanonicalConsentEvents/);
+assert.doesNotMatch(policy, /ensureCanonicalConsentEvents/);
 assert.match(policy, /INSERT INTO "ConsentEvent"/);
-assert.match(policy, /consentMigratedAt/);
+assert.doesNotMatch(policy, /consentMigratedAt/);
+assert.doesNotMatch(policy, /migratedFromEventId/);
 assert.match(policy, /ON CONFLICT \("id"\) DO NOTHING/);
 assert.doesNotMatch(policy, /updateDataset\(tenantId, 'consents'/);
 
-assert.match(controller, /await this\.consentPolicy\.ensureCanonicalConsentEvents/);
+assert.doesNotMatch(controller, /ensureCanonicalConsentEvents/);
 assert.match(controller, /consents\/account\/:accountId/);
 assert.doesNotMatch(controller, /consents\/client\/:clientId/);
 
@@ -37,8 +42,9 @@ assert.match(booking, /acceptAccountConsents/);
 assert.match(booking, /hasActivePdnConsent\(tenantId, accountId\)/);
 assert.doesNotMatch(booking, /requiredConsentState\(tenantId, accountId\)/);
 assert.match(bookingConsent, /acceptAccountConsents\(auth\.tenantId, auth\.accountId/);
-assert.match(bookingPdnGuard, /requiredConsentState\(auth\.tenantId, auth\.accountId\)/);
-assert.match(bookingPdnGuard, /hasActivePdnConsent\(auth\.tenantId, auth\.accountId\)/);
+assert.match(bookingPdnGuard, /accountConsentState\(auth\.tenantId, auth\.accountId\)/);
+assert.match(bookingPdnGuard, /if \(!state\.pdnActive\)/);
+assert.doesNotMatch(bookingPdnGuard, /requiredConsentState/);
 
 assert.doesNotMatch(migration, /configureConsentPersistence/);
 assert.doesNotMatch(migration, /queueDocumentDataset\('consents'/);
