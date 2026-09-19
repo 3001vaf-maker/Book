@@ -40,6 +40,8 @@ Manifestation/UI folders do not own domain persistence or business rules.
 
 One entity / one owner / one implementation. Shared UI stays shared; no local workaround for Core/UI ownership problems.
 
+Profile is profession-neutral. Profession exists only as Profile.profession data and must never become a system entity, role, route, identifier, generic screen/header/title, or architecture branch. Ambiguous profession-based product wording must be clarified before implementation.
+
 ## Server-owned business state
 
 Server ownership is active for the production business contour, including:
