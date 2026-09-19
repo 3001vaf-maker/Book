@@ -44,8 +44,8 @@ for (const file of walk(root)) {
 }
 
 const ownershipRules = [
-  ['core/finance/data.js', /from\s+['"][^'"]*(?:financial-model|wallet|record|client|ui)[^'"]*['"]/, 'DDS must not depend on Financial Model, Wallet, Record, Client or UI'],
-  ['core/finance/rules.js', /from\s+['"][^'"]*(?:wallet|journal|record-data|client|ui)[^'"]*['"]/, 'Financial Model must not depend on manifestations/data owners'],
+  ['core/finance/data.js', /from\s+['"][^'"]*(?:financial-model|wallet|record|people|person|ui)[^'"]*['"]/, 'DDS must not depend on Financial Model, Wallet, Record, People or UI'],
+  ['core/finance/rules.js', /from\s+['"][^'"]*(?:wallet|journal|record-data|people|person|ui)[^'"]*['"]/, 'Financial Model must not depend on manifestations/data owners'],
   ['journal/record-data.js', /core\/dds\.js/, 'Record data must not own/read money movements directly; fact comes through Financial Model'],
   ['main/people/metadata.js', /core\/dds\.js/, 'Person metrics must read financial fact through Financial Model'],
   ['settings/service/procedures/procedures.js', /core\/dds\.js/, 'Procedure metrics must read financial fact through Financial Model'],
