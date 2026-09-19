@@ -217,7 +217,7 @@ export class OnlineBookingService {
 
   private ensurePdnConsent(publicationData: Record<string, any>, consents: any[]) {
     const documents = arrayValue(publicationData.documents);
-    const document = documents.find((item) => Boolean(item?.clientConsent) && text(item?.id) === 'pdn-consent');
+    const document = documents.find((item) => Boolean(item?.personConsent) && text(item?.id) === 'pdn-consent');
     if (!document) throw new BadRequestException('Согласие на обработку персональных данных недоступно');
     const accepted = consents.some((item) => item.documentId === 'pdn-consent'
       && Number(item.documentVersion) === Math.max(1, Number(document.version || 1))
@@ -275,7 +275,7 @@ export class OnlineBookingService {
       workplaces,
       procedures,
       days,
-      documents: arrayValue(data.documents).filter((item) => Boolean(item?.clientConsent)),
+      documents: arrayValue(data.documents).filter((item) => Boolean(item?.personConsent)),
       occupancy: [
         ...occupancy,
         ...pending.map((item) => ({
