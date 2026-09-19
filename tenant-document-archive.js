@@ -1,12 +1,11 @@
 import { apiRequest } from './core/auth.js';
 import { queueDocumentDataset } from './core/business-persistence.js';
-import { getBookDocumentBases } from './admin/document-registry/catalog.js';
+import { getPlatformDocumentBases } from './admin/document-registry/catalog.js';
 import { hydrateConsentsFromServer } from './settings/documents/consents.js';
 import { getProfile } from './settings/profile/data.js';
-import { getWorkplaces } from './settings/profile/workplaces/data.js';
 import {
   buildBookDocuments,
-  configureBookDocumentBases,
+  configurePlatformDocumentBases,
   configureDocumentPersistence,
   hydrateDocumentsFromServer,
   reconcileBookDocuments,
@@ -59,9 +58,8 @@ async function persistReconciled(value) {
 }
 
 export async function initializeTenantDocumentArchive() {
-  configureBookDocumentBases(getBookDocumentBases(), {
+  configurePlatformDocumentBases(getPlatformDocumentBases(), {
     profile: getProfile(),
-    workplaces: getWorkplaces(),
   });
 
   const remoteResponse = await apiRequest('/tenant-document-archive');
@@ -85,7 +83,7 @@ export async function initializeTenantDocumentArchive() {
   }
 
   const defaults = normalizeBundle({
-    documents: buildBookDocuments(),
+    documents: buildPlatformDocuments(),
     consents: [],
     history: [],
   });
