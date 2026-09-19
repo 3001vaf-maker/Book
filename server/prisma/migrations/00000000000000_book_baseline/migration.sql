@@ -422,3 +422,194 @@ CREATE TABLE public."Membership" (
     role public."MembershipRole" DEFAULT 'OWNER'::public."MembershipRole" NOT NULL,
     "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
+
+--
+-- Name: Notification; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."Notification" (
+    id text NOT NULL,
+    "tenantId" text NOT NULL,
+    "cardPhone" text NOT NULL,
+    uei text DEFAULT ''::text NOT NULL,
+    type text NOT NULL,
+    title text NOT NULL,
+    body text DEFAULT ''::text NOT NULL,
+    "entityType" text DEFAULT ''::text NOT NULL,
+    "entityId" text DEFAULT ''::text NOT NULL,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    purpose text,
+    CONSTRAINT "Notification_purpose_check" CHECK (((purpose IS NULL) OR (purpose = ANY (ARRAY['SYSTEM'::text, 'SERVICE'::text, 'DIRECT'::text, 'MARKETING'::text]))))
+);
+
+
+--
+-- Name: NotificationDelivery; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."NotificationDelivery" (
+    id text NOT NULL,
+    "tenantId" text NOT NULL,
+    "notificationId" text NOT NULL,
+    channel text NOT NULL,
+    "recipientKey" text NOT NULL,
+    status text DEFAULT 'created'::text NOT NULL,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "sentAt" timestamp(3) without time zone,
+    "deliveredAt" timestamp(3) without time zone,
+    "readAt" timestamp(3) without time zone,
+    "failedAt" timestamp(3) without time zone,
+    error text DEFAULT ''::text NOT NULL
+);
+
+
+--
+-- Name: NotificationRoutingPolicy; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."NotificationRoutingPolicy" (
+    id text NOT NULL,
+    "tenantId" text NOT NULL,
+    "eventType" text NOT NULL,
+    mode text DEFAULT 'always'::text NOT NULL,
+    channels jsonb DEFAULT '[]'::jsonb NOT NULL,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "updatedAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
+-- Name: Plan; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."Plan" (
+    id text NOT NULL,
+    key text NOT NULL,
+    name text NOT NULL,
+    description text DEFAULT ''::text NOT NULL,
+    "position" integer DEFAULT 0 NOT NULL,
+    "isActive" boolean DEFAULT true NOT NULL,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "updatedAt" timestamp(3) without time zone NOT NULL
+);
+
+
+--
+-- Name: PlanCapability; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."PlanCapability" (
+    id text NOT NULL,
+    "planId" text NOT NULL,
+    "capabilityId" text NOT NULL,
+    enabled boolean,
+    "limit" integer,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "updatedAt" timestamp(3) without time zone NOT NULL
+);
+
+
+--
+-- Name: PlatformAdmin; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."PlatformAdmin" (
+    id text NOT NULL,
+    "userId" text NOT NULL,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "updatedAt" timestamp(3) without time zone NOT NULL
+);
+
+
+--
+-- Name: PlatformConsentEvent; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."PlatformConsentEvent" (
+    id text NOT NULL,
+    "tenantId" text,
+    "userId" text NOT NULL,
+    "documentVersionId" text NOT NULL,
+    action text NOT NULL,
+    source text DEFAULT ''::text NOT NULL,
+    "technicalEvidence" jsonb DEFAULT '{}'::jsonb NOT NULL,
+    "occurredAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT "PlatformConsentEvent_action_check" CHECK ((action = ANY (ARRAY['ACCEPTED'::text, 'ACKNOWLEDGED'::text, 'CONSENTED'::text, 'REVOKED'::text, 'DECLINED'::text])))
+);
+
+
+--
+-- Name: PlatformDocument; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."PlatformDocument" (
+    id text NOT NULL,
+    key text NOT NULL,
+    type text NOT NULL,
+    title text NOT NULL,
+    "requiredForRegistration" boolean DEFAULT false NOT NULL,
+    "requiredForLive" boolean DEFAULT false NOT NULL,
+    "requiredForPublicBooking" boolean DEFAULT false NOT NULL,
+    "isActive" boolean DEFAULT true NOT NULL,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "updatedAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
+-- Name: PlatformDocumentVersion; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."PlatformDocumentVersion" (
+    id text NOT NULL,
+    "documentId" text NOT NULL,
+    version integer NOT NULL,
+    "contentSnapshot" text NOT NULL,
+    "contentHash" text NOT NULL,
+    "operatorIdentitySnapshot" jsonb DEFAULT '{}'::jsonb NOT NULL,
+    "publishedAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "supersededAt" timestamp(3) without time zone,
+    CONSTRAINT "PlatformDocumentVersion_version_check" CHECK ((version > 0))
+);
+
+
+--
+-- Name: Profile; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."Profile" (
+    id text NOT NULL,
+    "tenantId" text NOT NULL,
+    "userId" text NOT NULL,
+    key text DEFAULT 'profile'::text NOT NULL,
+    name text DEFAULT ''::text NOT NULL,
+    surname text DEFAULT ''::text NOT NULL,
+    phone text DEFAULT ''::text NOT NULL,
+    phones jsonb NOT NULL,
+    telegrams jsonb NOT NULL,
+    emails jsonb NOT NULL,
+    about text DEFAULT ''::text NOT NULL,
+    photo text DEFAULT ''::text NOT NULL,
+    profession text DEFAULT ''::text NOT NULL,
+    experience text DEFAULT ''::text NOT NULL,
+    "professionAbout" text DEFAULT ''::text NOT NULL,
+    "customProfessions" jsonb NOT NULL,
+    "migrationVerifiedAt" timestamp(3) without time zone,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "updatedAt" timestamp(3) without time zone NOT NULL
+);
+
+
+--
+-- Name: TelegramBotConnection; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."TelegramBotConnection" (
+    id text NOT NULL,
+    "tenantId" text NOT NULL,
+    "botId" text NOT NULL,
+    "botUsername" text DEFAULT ''::text NOT NULL,
+    "encryptedToken" text NOT NULL,
+    "tokenIv" text NOT NULL,
+    "tokenTag" text NOT NULL,
+    "webhookKey" text NOT NUL
