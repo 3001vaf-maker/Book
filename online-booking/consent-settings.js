@@ -14,7 +14,7 @@ function consentRows(consents = []) {
     title: item?.title || item?.documentId || 'Согласие',
     subtitle: item?.accepted ? 'Дано' : item?.status === 'revoked' ? 'Отозвано' : 'Не дано',
     rightTop: item?.required ? 'Обязательное' : '',
-    data: item?.accepted ? `data-client-consent-revoke="${index}"` : '',
+    data: item?.accepted ? `data-account-consent-revoke="${index}"` : '',
     aria: item?.accepted ? `Отозвать согласие ${item?.title || item?.documentId || ''}` : '',
   }));
 }
@@ -40,7 +40,7 @@ function confirmRevoke(consent, onConfirm) {
   });
 }
 
-export async function openClientConsentSettings(state, { onChanged } = {}) {
+export async function openAccountConsentSettings(state, { onChanged } = {}) {
   let consentState;
   try {
     consentState = await getAccountConsentState(state.tenantId);
@@ -54,14 +54,14 @@ export async function openClientConsentSettings(state, { onChanged } = {}) {
     : emptyState('Согласий пока нет', 'Здесь появятся согласия, которые вы давали в Book.');
   const layer = mountModal(document.body, modal(content, { variant: 'large', surface: 'app', title: 'Согласия' }));
 
-  layer?.querySelectorAll('[data-client-consent-revoke]').forEach((node) => node.addEventListener('click', () => {
-    const consent = consents[Number(node.dataset.clientConsentRevoke)];
+  layer?.querySelectorAll('[data-account-consent-revoke]').forEach((node) => node.addEventListener('click', () => {
+    const consent = consents[Number(node.dataset.accountConsentRevoke)];
     if (!consent?.accepted || !consent?.documentId) return;
     confirmRevoke(consent, async () => {
       await revokeAccountConsent(state.tenantId, consent.documentId);
       layer.remove();
       await onChanged?.(consent.documentId);
-      await openClientConsentSettings(state, { onChanged });
+      await openAccountConsentSettings(state, { onChanged });
     });
   }));
   return layer;
