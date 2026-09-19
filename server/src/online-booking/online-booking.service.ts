@@ -326,7 +326,6 @@ export class OnlineBookingService {
         surname: text(body.surname),
         phone,
         telegramId: text(body.telegramId),
-        consents: [] as Prisma.InputJsonValue,
         profileData: normalizeProfileData(body.profileData) as Prisma.InputJsonValue,
       },
     });

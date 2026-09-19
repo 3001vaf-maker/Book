@@ -10,6 +10,7 @@ const clientUi = read('main/clients/clients.js');
 const consentCache = read('settings/documents/consents.js');
 const documentMigration = read('document-migration.js');
 const schema = read('server/prisma/schema.prisma');
+const dropMigration = read('server/prisma/migrations/20260919132000_drop_booking_account_consents/migration.sql');
 
 // BookingAccount consent JSON is no longer a runtime source or mirror.
 assert.doesNotMatch(bookingService, /consents:\s*arrayValue\(account\.consents\)/);
@@ -26,9 +27,10 @@ assert.match(bookingService, /acceptAccountConsents\(tenantId, account\.id, cons
 assert.match(bookingService, /acceptContactPointConsent\(tenantId, 'PHONE'/);
 assert.match(bookingService, /acceptContactPointConsent\(tenantId, 'EMAIL'/);
 
-// The legacy DB column still exists only until step 3B removes it physically.
-assert.match(schema, /consents\s+Json/);
-assert.match(bookingService, /consents:\s*\[\]\s+as Prisma\.InputJsonValue/);
+// The legacy DB column is physically removed; ConsentEvent is the only persisted consent store.
+assert.doesNotMatch(schema, /consents\s+Json/);
+assert.doesNotMatch(bookingService, /consents:\s*\[\]\s+as Prisma\.InputJsonValue/);
+assert.match(dropMigration, /ALTER TABLE "BookingAccount" DROP COLUMN "consents"/);
 
 // Master client-card consent markers must be projected from canonical server ConsentEvent data.
 assert.match(documentMigration, /hydrateConsentsFromServer\(normalized\.consents\)/);
