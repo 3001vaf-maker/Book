@@ -6,7 +6,7 @@ import { CommunicationDispatchService } from './communication-dispatch.service';
 import { CommunicationHistoryService } from './communication-history.service';
 import { TelegramBotService } from './telegram-bot.service';
 
-type OwnerRequest = Request & { auth?: { userId: string; tenantId: string; role: string } };
+type OwnerRequest = Request & { auth?: { platformAccountId: string; tenantId: string; role: string } };
 
 @Controller('communications')
 export class CommunicationController {
