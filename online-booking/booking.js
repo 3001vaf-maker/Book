@@ -373,7 +373,7 @@ function renderPassword(root, state) {
         state.account = payload.account;
         state.error = '';
         seedConsents(state, currentConsentFacts(state));
-        if (payload.clientCardExisted) {
+        if (payload.personExisted) {
           state.clientTab = 'profile';
           await renderAccountHome(root, state);
         } else {
