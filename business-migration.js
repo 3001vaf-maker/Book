@@ -42,7 +42,7 @@ function hydrate(bundle, ready) {
 export async function initializeBusinessState(account = {}) {
   setBusinessServerReady(false);
   const remoteResponse = await apiRequest('/business-state');
-  const remote = await responseJson(remoteResponse, 'Не удалось загрузить Клиентов, UEI и Записи');
+  const remote = await responseJson(remoteResponse, 'Не удалось загрузить People, UEI и Записи');
 
   if (remote?.verified) {
     hydrate(remote, true);
