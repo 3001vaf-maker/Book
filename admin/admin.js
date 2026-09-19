@@ -1,4 +1,4 @@
-import { apiRequest, clearAuthToken, getCurrentUser, login } from '../core/auth.js';
+import { apiRequest, clearAuthToken, getCurrentAccount, login } from '../core/auth.js';
 import { renderDocumentRegistry } from './document-registry/view.js';
 
 const app = document.querySelector('#admin-app');
@@ -87,7 +87,7 @@ function renderShell() {
       </aside>
       <header class="admin-toolbar">
         <h1 data-toolbar-title>Профили</h1>
-        <div class="admin-toolbar-user"><span>${escapeHtml(state.admin?.user?.email || '')}</span><button class="admin-button secondary" data-logout>Выйти</button></div>
+        <div class="admin-toolbar-user"><span>${escapeHtml(state.admin?.account?.email || '')}</span><button class="admin-button secondary" data-logout>Выйти</button></div>
       </header>
       <main class="admin-main"><div class="admin-content" data-content></div></main>
     </div>`;
@@ -353,7 +353,7 @@ function capabilityEditor(capability, resolved) {
 }
 
 try {
-  state.account = await getCurrentUser();
+  state.account = await getCurrentAccount();
   if (!state.account) {
     renderLogin();
   } else {
