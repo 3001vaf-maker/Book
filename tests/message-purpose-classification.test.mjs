@@ -12,6 +12,7 @@ const broadcast = read('server/src/communication/communication-broadcast.service
 const telegram = read('server/src/communication/telegram-bot.service.ts');
 const notification = read('server/src/notification/notification.service.ts');
 const booking = read('server/src/online-booking/online-booking.controller.ts');
+const consentPolicy = read('server/src/document-state/consent-policy.service.ts');
 
 assert.match(purpose, /\['SYSTEM', 'SERVICE', 'DIRECT', 'MARKETING'\]/);
 assert.match(purpose, /export type MessagePurpose/);
@@ -39,9 +40,21 @@ assert.match(notification, /purpose: MessagePurpose/);
 assert.match(notification, /normalizeMessagePurpose\(input\.purpose\)/);
 assert.match(notification, /"type", "purpose", "title"/);
 
-// This step only classifies messages. Old consent routing stays in place until the next dedicated step.
-assert.match(notification, /canSendMessages\(tenantId, channel, recipient\)/);
-assert.match(telegram, /consentPolicy\.canSendMessages/);
-assert.match(broadcast, /documents\.canSendMessages/);
+// Marketing consent is now purpose-specific. It must not gate SYSTEM, SERVICE or DIRECT.
+assert.doesNotMatch(consentPolicy, /async canSendMessages\(/);
+assert.match(consentPolicy, /async canSendMarketing\(/);
+assert.match(consentPolicy, /MARKETING_CONSENT_DOCUMENT_ID = 'messages-consent'/);
+
+assert.doesNotMatch(notification, /canSendMessages\(/);
+assert.match(notification, /purpose !== 'MARKETING'/);
+assert.match(notification, /canSendMarketing\(tenantId, channel, recipient\)/);
+
+assert.doesNotMatch(telegram, /consentPolicy\.canSendMessages/);
+assert.match(telegram, /purpose === 'MARKETING'[\s\S]*consentPolicy\.canSendMarketing/);
+assert.match(broadcast, /documents\.canSendMarketing/);
+
+assert.doesNotMatch(booking, /messages-consent/);
+assert.doesNotMatch(booking, /telegram-consent/);
+assert.doesNotMatch(booking, /ConsentPolicyService/);
 
 console.log('Message purpose classification tests: OK');
