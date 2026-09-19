@@ -137,6 +137,9 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     const body = text(input?.body); if (!body) throw new BadRequestException('Пустое сообщение');
     const purpose = normalizeMessagePurpose(input?.purpose); if (!purpose) throw new BadRequestException('Не указан purpose сообщения');
     const identity = await this.communications.telegramIdentity(tenantId, input || {}); if (!identity) throw new NotFoundException('Telegram у клиента не подключён');
+    if (purpose !== 'DIRECT' && !(await this.consentPolicy.hasActivePdnConsentForContact(tenantId, 'TELEGRAM', identity.externalUserId))) {
+      throw new BadRequestException('Нет действующего согласия на обработку ПДН');
+    }
     if (purpose === 'MARKETING' && !(await this.consentPolicy.canSendMarketing(tenantId, 'TELEGRAM', identity.externalUserId))) {
       throw new BadRequestException('Нет действующего рекламного согласия для Telegram');
     }
