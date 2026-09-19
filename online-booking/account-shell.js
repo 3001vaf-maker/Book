@@ -1,13 +1,13 @@
 import {
-  clearBookingAccount,
-  getBookingAccount,
-  getBookingChat,
-  getBookingChatSettings,
-  getBookingNotifications,
-  getBookingRequests,
+  clearAccount,
+  getAccount,
+  getAccountChat,
+  getAccountChatSettings,
+  getAccountNotifications,
+  getAccountRequests,
   markBookingNotificationRead,
-  sendBookingChatMessage,
-} from '../core/booking-account/index.js';
+  sendAccountChatMessage,
+} from '../core/account/index.js';
 import { formatPhone } from '../core/phone/index.js';
 import { disableWebPush, enableWebPush, getWebPushState } from '../core/notifications/web-push.js';
 import {
@@ -272,8 +272,8 @@ function bindMessageAttachments(form) {
 
 async function loadMessages(state) {
   const [messages, feed] = await Promise.all([
-    getBookingChat(state.tenantId).catch(() => []),
-    getBookingNotifications(state.tenantId).catch(() => ({ items: [], unreadCount: 0 })),
+    getAccountChat(state.tenantId).catch(() => []),
+    getAccountNotifications(state.tenantId).catch(() => ({ items: [], unreadCount: 0 })),
   ]);
   return [...(Array.isArray(messages) ? messages : []), ...notificationMessages(feed)]
     .sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime())
@@ -312,7 +312,7 @@ function renderShell(root, state, { title, back = null, action = null, settings 
 async function openChatSettings(state) {
   const [pushState, chatSettings] = await Promise.all([
     getWebPushState(state.tenantId).catch(() => ({ supported: false, enabled: false, subscribed: false, permission: 'unsupported' })),
-    getBookingChatSettings(state.tenantId).catch(() => ({ telegram: { linked: false, enabled: false, username: '' } })),
+    getAccountChatSettings(state.tenantId).catch(() => ({ telegram: { linked: false, enabled: false, username: '' } })),
   ]);
   let push = pushState;
   const telegram = chatSettings?.telegram || { linked: false, enabled: false, username: '' };
@@ -508,7 +508,7 @@ async function renderMessages(root, state, handlers) {
     const submit = form.querySelector('button[type="submit"]');
     if (submit) submit.disabled = true;
     try {
-      await sendBookingChatMessage(state.tenantId, body, attachments);
+      await sendAccountChatMessage(state.tenantId, body, attachments);
       await handlers.render();
     } catch (error) {
       if (submit) submit.disabled = false;
@@ -528,8 +528,8 @@ export async function renderClientAccount(root, state, callbacks = {}) {
   state.clientChatOpen = Boolean(state.clientChatOpen);
   try {
     const [requests, account] = await Promise.all([
-      getBookingRequests(state.tenantId).catch(() => []),
-      getBookingAccount(state.tenantId),
+      getAccountRequests(state.tenantId).catch(() => []),
+      getAccount(state.tenantId),
     ]);
     state.clientRequests = Array.isArray(requests) ? requests : [];
     if (account) state.account = account;
@@ -550,7 +550,7 @@ export async function renderClientAccount(root, state, callbacks = {}) {
       onChanged: () => renderClientAccount(root, state, callbacks),
     }),
     onLogout: callbacks.onLogout || (() => {
-      clearBookingAccount(state.tenantId);
+      clearAccount(state.tenantId);
     }),
   };
 
