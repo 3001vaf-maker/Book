@@ -1,8 +1,8 @@
-# Book — Documents / Consents architecture
+# Book — Document Archive / Consents architecture
 
 ## 1. Owner
 
-`Documents` is the only owner of documents, document versions, consent events and consent reporting.
+`DocumentArchive` is the common document archive concept. `TenantDocumentArchive` is the archive of one tenant. `DocumentRegistry` owns the document catalog and versions. `ConsentEvent` is the common event concept: `PlatformConsentEvent` records Book ↔ profile events, and `TenantConsentEvent` records profile ↔ people events.
 
 The `Clients / People` domain does **not** own consent state. A client card may only display a projection calculated from Documents.
 
@@ -104,4 +104,4 @@ For scale and auditability, consent history must behave as append-only business 
 
 `Notifications / SMS / Telegram` must first require active `pdn-consent` for every new `SYSTEM`, `SERVICE`, `DIRECT` or `MARKETING` communication. Only `MARKETING` additionally requests the advertising consent represented by `messages-consent`.
 
-One domain owner: **Documents**.
+Canonical names: **DocumentArchive → DocumentRegistry / TenantDocumentArchive → PlatformConsentEvent / TenantConsentEvent**.

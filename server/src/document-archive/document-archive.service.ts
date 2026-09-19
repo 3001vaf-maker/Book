@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 
 type JsonObject = Record<string, any>;
-type ConsentEventRow = {
+type TenantConsentEventRow = {
   id: string;
   subjectType: string;
   subjectKey: string;
@@ -51,7 +51,7 @@ function json(value: unknown): Prisma.InputJsonValue {
   return clone(value) as Prisma.InputJsonValue;
 }
 
-function publicConsentEvent(row: ConsentEventRow) {
+function publicConsentEvent(row: TenantConsentEventRow) {
   return {
     id: row.id,
     subjectType: row.subjectType,
@@ -74,11 +74,11 @@ export class DocumentArchiveService {
   constructor(private readonly prisma: PrismaService) {}
 
   private async canonicalConsentEvents(tenantId: string) {
-    const rows = await this.prisma.$queryRaw<ConsentEventRow[]>`
+    const rows = await this.prisma.$queryRaw<TenantConsentEventRow[]>`
       SELECT "id", "subjectType", "subjectKey", "contactType", "contactValue", "documentId",
              "documentVersion", "status", "acceptedAt", "revokedAt", "source", "occurredAt",
              "createdAt"
-      FROM "ConsentEvent"
+      FROM "TenantConsentEvent"
       WHERE "tenantId" = ${tenantId}
       ORDER BY "occurredAt" ASC, "createdAt" ASC, "id" ASC
     `;
