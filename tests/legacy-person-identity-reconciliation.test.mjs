@@ -9,8 +9,8 @@ const sync = await readFile(new URL('../online-booking/server-sync.js', import.m
 assert.match(service, /reconcileLegacyAccountDuplicates\(tenantId: string\)/, 'Legacy review service must remain available for historical data inspection');
 assert.match(service, /requiresManualReview:\s*candidates > 0/, 'Legacy account-* candidates must be surfaced for explicit review');
 assert.match(service, /return \{ repaired: 0, candidates, requiresManualReview: candidates > 0 \}/, 'Legacy review must never report an automatic repair');
-assert.match(service, /\.filter\(\(\{ person \}\) => personHasPhone\(person, phone\)\)/, 'Same normalized phone must resolve to the existing Person');
-assert.doesNotMatch(service, /sameNamedPerson\(/, 'Matching names alone must not be used as an automatic Person/UEI identity rule');
+assert.doesNotMatch(service, /peopleSharePhone\(/, 'Shared phone must not be used as an automatic Person/UEI merge rule');
+assert.doesNotMatch(service, /sameNamedPerson\(/, 'Matching names must not be used as an automatic Person/UEI merge rule');
 assert.doesNotMatch(service, /identity\.relations\[relationKey\]\s*=\s*uei/, 'Code must not assign a legacy Person to a UEI by inference');
 assert.doesNotMatch(service, /await this\.reconcileLegacyAccountDuplicates\(tenantId\)/, 'Account login/access must not run identity reconciliation automatically');
 
