@@ -190,9 +190,9 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     const identity = identities[0] || null;
     if (!identity || messageBody === '/start') {
       const entry = await this.communications.createTelegramEntry(connection.tenantId, { telegramUserId, username });
-      const clientAppUrl = text(process.env.ACCOUNT_APP_URL).replace(/\/$/, '');
-      if (clientAppUrl) {
-        const url = new URL(clientAppUrl); url.searchParams.set('booking', connection.tenantId); url.searchParams.set('tg_entry', entry.token);
+      const accountAppUrl = text(process.env.ACCOUNT_APP_URL).replace(/\/$/, '');
+      if (accountAppUrl) {
+        const url = new URL(accountAppUrl); url.searchParams.set('booking', connection.tenantId); url.searchParams.set('tg_entry', entry.token);
         await this.sendSystemMessage(
           connection,
           message.chat.id,
