@@ -37,8 +37,9 @@ assert.match(booking, /acceptAccountConsents/);
 assert.match(booking, /hasActivePdnConsent\(tenantId, accountId\)/);
 assert.doesNotMatch(booking, /requiredConsentState\(tenantId, accountId\)/);
 assert.match(bookingConsent, /acceptAccountConsents\(auth\.tenantId, auth\.accountId/);
-assert.match(bookingPdnGuard, /requiredConsentState\(auth\.tenantId, auth\.accountId\)/);
-assert.match(bookingPdnGuard, /hasActivePdnConsent\(auth\.tenantId, auth\.accountId\)/);
+assert.match(bookingPdnGuard, /accountConsentState\(auth\.tenantId, auth\.accountId\)/);
+assert.match(bookingPdnGuard, /if \(!state\.pdnActive\)/);
+assert.doesNotMatch(bookingPdnGuard, /requiredConsentState/);
 
 assert.doesNotMatch(migration, /configureConsentPersistence/);
 assert.doesNotMatch(migration, /queueDocumentDataset\('consents'/);
