@@ -1,4 +1,4 @@
-import { getBookingConsentState, revokeBookingConsent } from '../core/booking-account/index.js';
+import { getAccountConsentState, revokeAccountConsent } from '../core/account/index.js';
 import {
   button,
   emptyState,
@@ -43,7 +43,7 @@ function confirmRevoke(consent, onConfirm) {
 export async function openClientConsentSettings(state, { onChanged } = {}) {
   let consentState;
   try {
-    consentState = await getBookingConsentState(state.tenantId);
+    consentState = await getAccountConsentState(state.tenantId);
   } catch (error) {
     return mountModal(document.body, modal(emptyState('Согласия недоступны', error instanceof Error ? error.message : 'Не удалось загрузить согласия'), { variant: 'medium', surface: 'app', title: 'Согласия' }));
   }
@@ -58,7 +58,7 @@ export async function openClientConsentSettings(state, { onChanged } = {}) {
     const consent = consents[Number(node.dataset.clientConsentRevoke)];
     if (!consent?.accepted || !consent?.documentId) return;
     confirmRevoke(consent, async () => {
-      await revokeBookingConsent(state.tenantId, consent.documentId);
+      await revokeAccountConsent(state.tenantId, consent.documentId);
       layer.remove();
       await onChanged?.(consent.documentId);
       await openClientConsentSettings(state, { onChanged });
