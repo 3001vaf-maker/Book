@@ -10,6 +10,8 @@ const booking = read('server/src/online-booking/online-booking.service.ts');
 const notification = read('server/src/notification/notification.service.ts');
 const telegram = read('server/src/communication/telegram-bot.service.ts');
 const broadcast = read('server/src/communication/communication-broadcast.service.ts');
+const prepareAccountConsentSubject = read('server/prisma/migrations/20260919191500_prepare_account_consent_subject/migration.sql');
+const finalizeAccountConsentSubject = read('server/prisma/migrations/20260919200500_finalize_account_consent_subject/migration.sql');
 
 const bases = getPlatformDocumentBases();
 const pdn = bases.find((item) => item.documentId === 'pdn-consent');
@@ -28,6 +30,10 @@ assert.match(policy, /const MARKETING_CONSENT_DOCUMENT_ID = 'messages-consent'/)
 assert.match(policy, /async hasActivePdnConsent\(/);
 assert.match(policy, /FROM "TenantConsentEvent"[\s\S]*"subjectType" = 'ACCOUNT'/);
 assert.match(policy, /async canSendMarketing\([\s\S]*MARKETING_CONSENT_DOCUMENT_ID/);
+assert.match(prepareAccountConsentSubject, /BOOKING_ACCOUNT[\s\S]*ACCOUNT[\s\S]*CONTACT_POINT/);
+assert.match(finalizeAccountConsentSubject, /SET "subjectType" = 'ACCOUNT'[\s\S]*WHERE "subjectType" = 'BOOKING_ACCOUNT'/);
+assert.match(finalizeAccountConsentSubject, /CHECK \("subjectType" IN \('ACCOUNT', 'CONTACT_POINT'\)\)/);
+assert.doesNotMatch(finalizeAccountConsentSubject, /CHECK \("subjectType" IN \([^)]*BOOKING_ACCOUNT/);
 
 assert.match(policy, /async accountConsentState\(/);
 assert.doesNotMatch(policy, /async requiredConsentState\(/);
