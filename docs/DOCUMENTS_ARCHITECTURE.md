@@ -44,7 +44,8 @@ When the current `pdn-consent` is absent or revoked:
 - booking/request history created before revocation remains readable;
 - notifications created before revocation remain readable and may be marked read;
 - creating a new booking/request is blocked;
-- new `SYSTEM`, `SERVICE` and `MARKETING` deliveries are blocked at send time;
+- Chat is unavailable: no new `DIRECT` messages are read, written or delivered;
+- new `SYSTEM`, `SERVICE`, `DIRECT` and `MARKETING` deliveries are blocked at send time;
 - `MARKETING` additionally requires its own advertising consent.
 
 Re-accepting the current `pdn-consent` returns the account to active cooperation. Changing the PDN document version requires acceptance of the current version before active cooperation resumes.
@@ -101,6 +102,6 @@ For scale and auditability, consent history must behave as append-only business 
 
 `Clients / People` may request Documents for projections, but it does not own consent history.
 
-`Notifications / SMS / Telegram` must evaluate the persisted message `purpose`. Only `MARKETING` requests the advertising consent represented by `messages-consent`; `SYSTEM`, `SERVICE` and `DIRECT` do not.
+`Notifications / SMS / Telegram` must first require active `pdn-consent` for every new `SYSTEM`, `SERVICE`, `DIRECT` or `MARKETING` communication. Only `MARKETING` additionally requests the advertising consent represented by `messages-consent`.
 
 One domain owner: **Documents**.
