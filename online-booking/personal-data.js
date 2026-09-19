@@ -45,7 +45,7 @@ function birthDateLabel(value = '') {
 }
 
 function birthDateField(value = '') {
-  return `<label class="field" data-client-birth-date><span>Дата рождения</span><button type="button" class="ui-select__control" data-client-birth-open><span class="ui-select__value">${escapeHtml(birthDateLabel(value))}</span><span class="ui-select__chevron" aria-hidden="true">⌄</span></button><input type="hidden" name="birthDate" value="${escapeHtml(String(value || ''))}" data-client-birth-value></label>`;
+  return `<label class="field" data-account-birth-date><span>Дата рождения</span><button type="button" class="ui-select__control" data-account-birth-open><span class="ui-select__value">${escapeHtml(birthDateLabel(value))}</span><span class="ui-select__chevron" aria-hidden="true">⌄</span></button><input type="hidden" name="birthDate" value="${escapeHtml(String(value || ''))}" data-account-birth-value></label>`;
 }
 
 function yearOptions() {
@@ -57,28 +57,28 @@ function yearOptions() {
 }
 
 function openBirthDatePicker(host) {
-  const hidden = host?.querySelector('[data-client-birth-value]');
+  const hidden = host?.querySelector('[data-account-birth-value]');
   if (!hidden) return;
   const current = dateParts(hidden.value);
   const today = new Date();
   let displayed = current?.date || new Date(today.getFullYear() - 30, today.getMonth(), 1);
   let selectedValue = current ? hidden.value : '';
-  const content = `<div class="form-grid"><div data-client-birth-year></div><div data-client-birth-calendar></div>${selectedValue ? button('Очистить дату', { variant: 'secondary', data: 'data-client-birth-clear' }) : ''}</div>`;
+  const content = `<div class="form-grid"><div data-account-birth-year></div><div data-account-birth-calendar></div>${selectedValue ? button('Очистить дату', { variant: 'secondary', data: 'data-account-birth-clear' }) : ''}</div>`;
   const layer = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app', title: 'Дата рождения' }));
   if (!layer) return;
-  const yearHost = layer.querySelector('[data-client-birth-year]');
-  const calendarHost = layer.querySelector('[data-client-birth-calendar]');
+  const yearHost = layer.querySelector('[data-account-birth-year]');
+  const calendarHost = layer.querySelector('[data-account-birth-calendar]');
   if (!yearHost || !calendarHost) return;
 
   const setYearControl = () => {
     yearHost.innerHTML = select({
       label: 'Год',
-      name: 'clientBirthYear',
+      name: 'accountBirthYear',
       value: String(displayed.getFullYear()),
       options: yearOptions(),
       aria: 'Год рождения',
     });
-    yearHost.querySelector('[name="clientBirthYear"]')?.addEventListener('change', (event) => {
+    yearHost.querySelector('[name="accountBirthYear"]')?.addEventListener('change', (event) => {
       const year = Number(event.target.value);
       if (!Number.isInteger(year)) return;
       displayed = new Date(year, displayed.getMonth(), 1);
@@ -113,7 +113,7 @@ function openBirthDatePicker(host) {
 
   setYearControl();
   mountCalendar();
-  layer.querySelector('[data-client-birth-clear]')?.addEventListener('click', () => {
+  layer.querySelector('[data-account-birth-clear]')?.addEventListener('click', () => {
     hidden.value = '';
     const visible = host.querySelector('.ui-select__value');
     if (visible) visible.textContent = 'Выберите дату';
@@ -124,14 +124,14 @@ function openBirthDatePicker(host) {
 }
 
 function initBirthDate(root) {
-  root.querySelectorAll('[data-client-birth-date]').forEach((host) => {
-    host.querySelector('[data-client-birth-open]')?.addEventListener('click', () => openBirthDatePicker(host));
+  root.querySelectorAll('[data-account-birth-date]').forEach((host) => {
+    host.querySelector('[data-account-birth-open]')?.addEventListener('click', () => openBirthDatePicker(host));
   });
 }
 
 function editorMarkup(account = {}) {
   const profile = profileData(account);
-  return `<form data-client-personal-form>
+  return `<form data-account-personal-form>
     ${accordion([{
       title: 'Личные данные',
       content: `<div class="form-grid">
@@ -154,15 +154,15 @@ function editorMarkup(account = {}) {
           ],
         })}
         ${birthDateField(profile.birthDate || '')}
-        <div class="array-group"><span class="array-label">Ссылки</span>${links({ links: Array.isArray(profile.links) ? profile.links : [], name: 'clientProfileLinks' })}</div>
+        <div class="array-group"><span class="array-label">Ссылки</span>${links({ links: Array.isArray(profile.links) ? profile.links : [], name: 'accountProfileLinks' })}</div>
       </div>`,
     }], { openFirst: true })}
-    <div class="form-error" data-client-personal-error role="alert"></div>
+    <div class="form-error" data-account-personal-error role="alert"></div>
     ${button('Сохранить', { type: 'submit' })}
   </form>`;
 }
 
-export function openClientPersonalData(state, { onSaved } = {}) {
+export function openAccountPersonalData(state, { onSaved } = {}) {
   const layer = mountModal(document.body, modal(editorMarkup(state.account || {}), { variant: 'medium', surface: 'app', title: 'Личные данные' }));
   if (!layer) return null;
   initAccordions(layer);
@@ -171,8 +171,8 @@ export function openClientPersonalData(state, { onSaved } = {}) {
   initLinks(layer);
   initBirthDate(layer);
 
-  const form = layer.querySelector('[data-client-personal-form]');
-  const errorNode = layer.querySelector('[data-client-personal-error]');
+  const form = layer.querySelector('[data-account-personal-form]');
+  const errorNode = layer.querySelector('[data-account-personal-error]');
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const data = new FormData(form);
@@ -193,7 +193,7 @@ export function openClientPersonalData(state, { onSaved } = {}) {
           telegram: String(data.get('telegram') || '').trim(),
           gender: String(data.get('gender') || ''),
           birthDate: String(data.get('birthDate') || ''),
-          links: collectLinks(form, 'clientProfileLinks').slice(0, 8),
+          links: collectLinks(form, 'accountProfileLinks').slice(0, 8),
         },
       });
       state.account = account;
