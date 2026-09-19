@@ -6,8 +6,8 @@ import { TenantDocumentArchiveModule } from '../tenant-document-archive/tenant-d
 import { NotificationModule } from '../notification/notification.module';
 import { ProfileModule } from '../profile/profile.module';
 import { PrismaService } from '../prisma.service';
-import { BookingAccountGuard } from './booking-account.guard';
-import { BookingAccountSettingsController } from './booking-account-settings.controller';
+import { AccountGuard } from './account.guard';
+import { AccountSettingsController } from './account-settings.controller';
 import { BookingConsentController } from './booking-consent.controller';
 import { BookingPdnConsentGuard } from './booking-pdn-consent.guard';
 import { ClientCardLinkService } from './client-card-link.service';
@@ -16,7 +16,7 @@ import { OnlineBookingService } from './online-booking.service';
 
 @Module({
   imports: [AuthModule, BusinessStateModule, CommunicationModule, TenantDocumentArchiveModule, NotificationModule, ProfileModule],
-  controllers: [OnlineBookingController, BookingConsentController, BookingAccountSettingsController],
-  providers: [OnlineBookingService, BookingAccountGuard, BookingPdnConsentGuard, ClientCardLinkService, PrismaService],
+  controllers: [OnlineBookingController, BookingConsentController, AccountSettingsController],
+  providers: [OnlineBookingService, AccountGuard, BookingPdnConsentGuard, ClientCardLinkService, PrismaService],
 })
 export class OnlineBookingModule {}
