@@ -2,7 +2,6 @@ import { normalizePhoneForStorage, phonesMatch } from '../../core/phone/index.js
 import { getMembers, getUEI } from '../../core/uei.js';
 import { queuePersonDelete, queuePersonUpsert } from '../../core/business-persistence.js';
 import { getTags } from '../../settings/tags/data.js';
-import { getLatestClientConsent, migrateLegacyConsents } from '../../settings/documents/consents.js';
 
 let peopleState = [];
 
@@ -51,10 +50,6 @@ export function normalizeClient(person = {}) {
     links: Array.isArray(person.links) ? person.links : [],
     tags: normalizeTagAssignments(person.tags),
     discountPercent: normalizeDiscount(person),
-    agreements: {
-      personalData: Boolean(person.agreements?.personalData),
-      mailings: Boolean(person.agreements?.mailings),
-    },
     visits: Number(person.visits || 0),
     totalSpent: Number(person.totalSpent || 0),
     lastVisit: String(person.lastVisit || ''),
@@ -68,19 +63,10 @@ export function hydrateClientsFromServer(people = []) {
   return clone(peopleState);
 }
 
-function accepted(fact) {
-  return Boolean(fact && fact.status === 'accepted');
-}
-
 export function getAllClients() {
   const stored = clone(peopleState).map(normalizeClient).filter((person) => person.key);
-  migrateLegacyConsents(stored);
   return stored.map((person) => ({
     ...person,
-    agreements: {
-      personalData: accepted(getLatestClientConsent(person.key, 'pdn-consent')),
-      mailings: accepted(getLatestClientConsent(person.key, 'messages-consent')),
-    },
     uei: getUEI('person', person.key) || '',
   }));
 }
