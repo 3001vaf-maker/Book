@@ -21,6 +21,13 @@ const tenantModel = modelBlock('Tenant');
 const userModel = modelBlock('User');
 const membershipModel = modelBlock('Membership');
 const profileModel = modelBlock('Profile');
+
+const membershipRoleMatch = schema.match(/enum MembershipRole \{([\s\S]*?)\n\}/);
+assert.ok(membershipRoleMatch, 'Missing MembershipRole enum');
+assert.deepEqual(
+  membershipRoleMatch[1].split('\n').map((line) => line.trim()).filter(Boolean),
+  ['OWNER'],
+);
 const workplaceModel = modelBlock('Workplace');
 const businessPersonModel = modelBlock('BusinessPerson');
 
