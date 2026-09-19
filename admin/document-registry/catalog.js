@@ -103,19 +103,19 @@ const PLATFORM_DOCUMENT_BASE_MAPPING = {
   'user-document-pdn-policy': {
     documentId: 'pdn-agreement',
     kind: 'agreement',
-    clientConsent: false,
+    personConsent: false,
     required: false,
   },
   'user-document-pdn-consent': {
     documentId: 'pdn-consent',
     kind: 'consent',
-    clientConsent: true,
+    personConsent: true,
     required: true,
   },
   'user-document-messages-consent': {
     documentId: 'messages-consent',
     kind: 'consent',
-    clientConsent: true,
+    personConsent: true,
     required: false,
   },
 };
@@ -130,7 +130,7 @@ export function getPlatformDocumentBases() {
         key,
         documentId: config.documentId,
         kind: config.kind,
-        clientConsent: config.clientConsent,
+        personConsent: config.personConsent,
         required: config.required,
         title: item.title,
         version: 1,
