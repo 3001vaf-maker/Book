@@ -29,7 +29,7 @@ import {
   textareaField,
 } from '../ui/ui.js';
 
-function personName(phone, uei = '') {
+function personNameByPhone(phone, uei = '') {
   const people = findPeopleByPhone(phone);
   const person = people.find((item) => !uei || String(item.uei || '') === String(uei)) || people[0];
   const name = [person?.name, person?.surname].filter(Boolean).join(' ').trim();
@@ -328,10 +328,10 @@ async function openThread(root, state, thread) {
   state.thread = thread;
   const phone = String(thread?.personPhone || '').trim();
   const uei = String(thread?.uei || '').trim();
-  screen(root, appHeader({ title: personName(phone, uei), back: { data: 'data-chat-back', aria: 'К диалогам' } }), emptyState('Загрузка', 'Получаем переписку.'), 'app-view-shell--chat');
+  screen(root, appHeader({ title: personNameByPhone(phone, uei), back: { data: 'data-chat-back', aria: 'К диалогам' } }), emptyState('Загрузка', 'Получаем переписку.'), 'app-view-shell--chat');
   try {
     const messages = withTimes(await getCommunicationThread({ phone, uei }));
-    screen(root, appHeader({ title: personName(phone, uei), back: { data: 'data-chat-back', aria: 'К диалогам' } }), `${messages.length ? messageThread(messages, { viewer: 'profile' }) : emptyState('Сообщений пока нет', 'Напишите человеку первое сообщение.')}${messageComposer({ placeholder: 'Написать сообщение...', attachments: true })}<div class="muted" data-chat-status aria-live="polite"></div>`, 'app-view-shell--chat');
+    screen(root, appHeader({ title: personNameByPhone(phone, uei), back: { data: 'data-chat-back', aria: 'К диалогам' } }), `${messages.length ? messageThread(messages, { viewer: 'profile' }) : emptyState('Сообщений пока нет', 'Напишите человеку первое сообщение.')}${messageComposer({ placeholder: 'Написать сообщение...', attachments: true })}<div class="muted" data-chat-status aria-live="polite"></div>`, 'app-view-shell--chat');
     root.querySelector('[data-chat-back]')?.addEventListener('click', () => void renderThreads(root, state));
     const form = root.querySelector('[data-message-composer]');
     const getAttachments = bindMessageAttachments(form);
@@ -353,7 +353,7 @@ async function openThread(root, state, thread) {
       }
     });
   } catch (error) {
-    screen(root, appHeader({ title: personName(phone, uei), back: { data: 'data-chat-back', aria: 'К диалогам' } }), emptyState('Чат недоступен', error instanceof Error ? error.message : 'Не удалось загрузить переписку'), 'app-view-shell--chat');
+    screen(root, appHeader({ title: personNameByPhone(phone, uei), back: { data: 'data-chat-back', aria: 'К диалогам' } }), emptyState('Чат недоступен', error instanceof Error ? error.message : 'Не удалось загрузить переписку'), 'app-view-shell--chat');
     root.querySelector('[data-chat-back]')?.addEventListener('click', () => void renderThreads(root, state));
   }
 }
@@ -365,11 +365,11 @@ async function renderThreads(root, state) {
   try {
     const threads = await getCommunicationThreads();
     const items = threads.map((thread, index) => listEntry({
-      title: personName(thread.personPhone, thread.uei),
+      title: personNameByPhone(thread.personPhone, thread.uei),
       subtitle: thread.body || (Array.isArray(thread.attachments) && thread.attachments.length ? 'Медиа' : 'Открыть диалог'),
       rightTop: messageTime(thread.createdAt),
       data: `data-chat-thread="${index}"`,
-      aria: `Открыть диалог с ${personName(thread.personPhone, thread.uei)}`,
+      aria: `Открыть диалог с ${personNameByPhone(thread.personPhone, thread.uei)}`,
     }));
     screen(root, appHeader({ title: 'Сообщения', action: { label: 'Новое', data: 'data-chat-new' }, settings: { data: 'data-chat-settings', aria: 'Настройки сообщений' } }), items.length ? listEntries(items) : emptyState('Чат пока пуст', 'Сообщения и системные уведомления людей появятся здесь.'));
     root.querySelector('[data-chat-new]')?.addEventListener('click', () => recipientOptions(root, state));
