@@ -39,8 +39,8 @@ assert.doesNotMatch(migration, /configureConsentPersistence/);
 assert.match(cleanupMigration, /UPDATE \"BusinessPerson\"/);
 assert.match(cleanupMigration, /\"data\" = \"data\" - 'agreements'/);
 
-// Historical clientId remains legal only inside the one-time server migration until that migration is retired.
-assert.match(policy, /const historicalPersonKey = text\(legacy\?\.clientId\)/);
-assert.match(policy, /ensureCanonicalConsentEvents/);
+assert.doesNotMatch(policy, /legacy\?\.clientId/);
+assert.doesNotMatch(policy, /ensureCanonicalConsentEvents/);
+assert.doesNotMatch(policy, /legacy-consent-migration/);
 
 console.log('Legacy client consent cleanup tests: OK');
