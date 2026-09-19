@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 const schema = readFileSync(new URL('../server/prisma/schema.prisma', import.meta.url), 'utf8');
 const profileService = readFileSync(new URL('../server/src/profile/profile.service.ts', import.meta.url), 'utf8');
 const authService = readFileSync(new URL('../server/src/auth/auth.service.ts', import.meta.url), 'utf8');
-const invitationService = readFileSync(new URL('../server/src/master-invitation/master-invitation.service.ts', import.meta.url), 'utf8');
+const invitationService = readFileSync(new URL('../server/src/invitation/invitation.service.ts', import.meta.url), 'utf8');
 const workspaceService = readFileSync(new URL('../server/src/workspace/workspace.service.ts', import.meta.url), 'utf8');
 const saasAdminService = readFileSync(new URL('../server/src/saas-admin/saas-admin.service.ts', import.meta.url), 'utf8');
 const platformAdminGuard = readFileSync(new URL('../server/src/saas-admin/platform-admin.guard.ts', import.meta.url), 'utf8');
