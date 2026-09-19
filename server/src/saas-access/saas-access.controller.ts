@@ -4,7 +4,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { SaasAccessService } from './saas-access.service';
 
 type AuthenticatedRequest = Request & {
-  auth?: { userId: string; tenantId: string; role: string };
+  auth?: { platformAccountId: string; tenantId: string; role: string };
 };
 
 @Controller('saas-access')
