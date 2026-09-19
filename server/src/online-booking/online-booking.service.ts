@@ -10,8 +10,8 @@ import { BookingRequestStatus, Prisma } from '@prisma/client';
 import { compare, hash } from 'bcryptjs';
 import { PrismaService } from '../prisma.service';
 import { BusinessStateService } from '../business-state/business-state.service';
-import { ConsentPolicyService } from '../document-state/consent-policy.service';
-import { DocumentStateService } from '../document-state/document-state.service';
+import { ConsentPolicyService } from '../document-archive/consent-policy.service';
+import { DocumentArchiveService } from '../document-archive/document-archive.service';
 import { ProfileService } from '../profile/profile.service';
 import { ClientCardLinkService } from './client-card-link.service';
 
@@ -171,7 +171,7 @@ export class OnlineBookingService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly businessState: BusinessStateService,
-    private readonly documentState: DocumentStateService,
+    private readonly documentArchive: DocumentArchiveService,
     private readonly consentPolicy: ConsentPolicyService,
     private readonly profile: ProfileService,
     private readonly clientCards: ClientCardLinkService,
@@ -187,7 +187,7 @@ export class OnlineBookingService {
     const [profile, operational, documents] = await Promise.all([
       this.profile.publicBookingBundle(tenantId),
       this.businessState.publicOperational(tenantId),
-      this.documentState.publicDocuments(tenantId),
+      this.documentArchive.publicDocuments(tenantId),
     ]);
     return { ...profile, ...operational, documents };
   }
@@ -301,7 +301,7 @@ export class OnlineBookingService {
   }
 
   async registerAccount(tenantId: string, body: Record<string, any>) {
-    const documents = await this.documentState.publicDocuments(tenantId);
+    const documents = await this.documentArchive.publicDocuments(tenantId);
     const email = emailValue(body.email);
     const password = text(body.password);
     const name = text(body.name);
