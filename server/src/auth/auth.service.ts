@@ -12,49 +12,49 @@ export class AuthService {
 
   async login(email: string, password: string) {
     const normalizedEmail = String(email || '').trim().toLowerCase();
-    const user = await this.prisma.user.findUnique({
+    const account = await this.prisma.platformAccount.findUnique({
       where: { email: normalizedEmail },
       include: { memberships: { include: { tenant: true } } },
     });
-    if (!user || !(await compare(String(password || ''), user.passwordHash))) {
+    if (!account || !(await compare(String(password || ''), account.passwordHash))) {
       throw new UnauthorizedException('Неверный email или пароль');
     }
 
-    const membership = user.memberships[0];
-    if (!membership) throw new UnauthorizedException('Пользователь не привязан к бизнесу');
+    const membership = account.memberships[0];
+    if (!membership) throw new UnauthorizedException('Учётная запись не привязана к пространству');
 
     const accessToken = await this.jwt.signAsync({
-      sub: user.id,
+      sub: account.id,
       tenantId: membership.tenantId,
       role: membership.role,
     });
 
     return {
       accessToken,
-      user: {
-        id: user.id,
-        email: user.email,
-        onboardingStep: user.onboardingStep,
-        workspaceUnlocked: user.workspaceUnlocked,
+      account: {
+        id: account.id,
+        email: account.email,
+        onboardingStep: account.onboardingStep,
+        workspaceUnlocked: account.workspaceUnlocked,
       },
       tenant: { id: membership.tenant.id, name: membership.tenant.name },
       role: membership.role,
     };
   }
 
-  async me(userId: string, tenantId: string) {
+  async me(platformAccountId: string, tenantId: string) {
     const membership = await this.prisma.membership.findUnique({
-      where: { tenantId_userId: { tenantId, userId } },
-      include: { user: true, tenant: true },
+      where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
+      include: { account: true, tenant: true },
     });
     if (!membership) throw new UnauthorizedException();
 
     return {
-      user: {
-        id: membership.user.id,
-        email: membership.user.email,
-        onboardingStep: membership.user.onboardingStep,
-        workspaceUnlocked: membership.user.workspaceUnlocked,
+      account: {
+        id: membership.account.id,
+        email: membership.account.email,
+        onboardingStep: membership.account.onboardingStep,
+        workspaceUnlocked: membership.account.workspaceUnlocked,
       },
       tenant: { id: membership.tenant.id, name: membership.tenant.name },
       role: membership.role,
