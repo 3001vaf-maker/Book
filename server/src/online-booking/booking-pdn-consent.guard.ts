@@ -3,7 +3,7 @@ import type { Request } from 'express';
 import { ConsentPolicyService } from '../tenant-document-archive/consent-policy.service';
 
 type AccountRequest = Request & {
-  bookingAccountAuth?: { accountId: string; tenantId: string };
+  accountAuth?: { accountId: string; tenantId: string };
 };
 
 @Injectable()
@@ -12,7 +12,7 @@ export class BookingPdnConsentGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest<AccountRequest>();
-    const auth = request.bookingAccountAuth;
+    const auth = request.accountAuth;
     if (!auth) throw new ForbiddenException('Не определён аккаунт онлайн-записи');
 
     const state = await this.consentPolicy.accountConsentState(auth.tenantId, auth.accountId);
