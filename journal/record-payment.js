@@ -2,8 +2,8 @@ import { button, details, initPaymentForm, initPaymentMethods, modal, mountModal
 import { calculateFinancialPlan, getRecordPaymentState, recordFinancialItems } from '../core/finance/index.js';
 import { cancelPaymentOperation, getRefundsForPayment, recordPaymentIncome, recordRefundExpense } from '../core/finance/index.js';
 import { getWorkplaces } from '../core/workplace-time.js';
-import { getAllClients } from '../main/clients/data.js';
-import { clientDisplay } from '../main/clients/presentation.js';
+import { getAllPeople } from '../main/people/data.js';
+import { personDisplay } from '../main/people/presentation.js';
 import { getWallets } from '../settings/wallets/data.js';
 import { getRecord } from '../core/record/index.js';
 import { setRecordAttendance, updateRecord } from '../core/record/index.js';
@@ -12,7 +12,7 @@ const money = (value) => `${new Intl.NumberFormat('ru-RU', { maximumFractionDigi
 
 function clientForRecord(record) {
   const source = record?.client || {};
-  const people = getAllClients();
+  const people = getAllPeople();
   return people.find((item) => String(item?.key ?? '') === String(source?.key ?? ''))
     || people.find((item) => String(item?.id ?? '') === String(source?.id ?? ''))
     || source;
@@ -60,7 +60,7 @@ function workplaceName(id) {
 
 function recordClient(record) {
   const current = clientForRecord(record);
-  const display = clientDisplay(current);
+  const display = personDisplay(current);
   return {
     uei: display.uei || '',
     name: display.name || '',
