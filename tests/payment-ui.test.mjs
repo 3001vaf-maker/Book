@@ -89,10 +89,10 @@ const paymentCss = readFileSync(new URL('../ui/payment/payment.css', import.meta
 const recordViewSource = readFileSync(new URL('../journal/record-view.js', import.meta.url), 'utf8');
 const recordPaymentSource = readFileSync(new URL('../journal/record-payment.js', import.meta.url), 'utf8');
 const journalListSource = readFileSync(new URL('../journal/список.js', import.meta.url), 'utf8');
-const clientMetadataSource = readFileSync(new URL('../main/clients/metadata.js', import.meta.url), 'utf8');
+const personMetadataSource = readFileSync(new URL('../main/people/metadata.js', import.meta.url), 'utf8');
 const walletSource = readFileSync(new URL('../settings/wallets/wallets.js', import.meta.url), 'utf8');
 const documentsSource = readFileSync(new URL('../settings/documents/documents.js', import.meta.url), 'utf8');
-const clientsSource = readFileSync(new URL('../main/clients/clients.js', import.meta.url), 'utf8');
+const peopleSource = readFileSync(new URL('../main/people/people.js', import.meta.url), 'utf8');
 
 assert.doesNotMatch(modalSource, /querySelector\(['"]input,select,textarea/);
 assert.match(modalSource, /data-modal-autofocus/);
@@ -139,10 +139,10 @@ assert.match(recordPaymentSource, /Подтвердить возврат',[\s\S]
 assert.match(recordPaymentSource, /flatMap/);
 assert.doesNotMatch(recordPaymentSource, /toLocaleDateString/);
 assert.match(journalListSource, /shortDate\(record\?\.date\)/);
-assert.match(clientMetadataSource, /shortDate\(value,\s*'—'\)/);
+assert.match(personMetadataSource, /shortDate\(value,\s*'—'\)/);
 assert.match(walletSource, /shortDateTime\(raw,\s*fallback\)/);
 assert.match(documentsSource, /shortDateTime\(value,\s*'Дата не зафиксирована'\)/);
-assert.match(clientsSource, /shortDateTime\(value,'—'\)/);
+assert.match(peopleSource, /shortDateTime\(value,'—'\)/);
 assert.equal(existsSync(new URL('../ui/payment/single.js', import.meta.url)), false);
 assert.equal(existsSync(new URL('../ui/payment/split.js', import.meta.url)), false);
 
