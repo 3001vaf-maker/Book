@@ -32,7 +32,7 @@ assert.doesNotMatch(schema, /consents\s+Json/);
 assert.doesNotMatch(bookingService, /consents:\s*\[\]\s+as Prisma\.InputJsonValue/);
 assert.match(dropMigration, /ALTER TABLE "BookingAccount" DROP COLUMN "consents"/);
 
-// Master client-card consent markers must be projected from canonical server ConsentEvent data.
+// Profile-side client-card consent markers must be projected from canonical server ConsentEvent data.
 assert.match(documentMigration, /hydrateConsentsFromServer\(normalized\.consents\)/);
 assert.match(consentCache, /export function getConsents\(\)/);
 assert.match(clientUi, /getConsents/);
