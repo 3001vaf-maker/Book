@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 
 const profileChat = fs.readFileSync('chat/chat.js', 'utf8');
-const clientChat = fs.readFileSync('online-booking/account-shell.js', 'utf8');
+const accountChat = fs.readFileSync('online-booking/account-shell.js', 'utf8');
 const chatApi = fs.readFileSync('core/communications/chat.js', 'utf8');
 const controller = fs.readFileSync('server/src/communication/communication.controller.ts', 'utf8');
 const dispatch = fs.readFileSync('server/src/communication/communication-dispatch.service.ts', 'utf8');
@@ -19,9 +19,9 @@ expect(profileChat.includes('bindMessageAttachments(form)') && profileChat.inclu
 expect(!profileChat.includes('root.innerHTML = `${header}<div class="form-grid">'), 'Profile chat must not keep the legacy local chat screen wrapper.');
 expect(!profileChat.includes('<style>') && !profileChat.includes("document.createElement('style')"), 'Profile chat must not own local styles.');
 
-expect(clientChat.includes("className: 'app-view-shell--chat'"), 'Client chat must use the canonical Book chat shell class.');
-expect(clientChat.includes('messageThread(messages') && clientChat.includes('messageComposer({ attachments: true })'), 'Client chat must use the shared message thread and composer with attachments.');
-expect(!clientChat.includes('<style>') && !clientChat.includes("document.createElement('style')"), 'Client chat must not own local styles.');
+expect(accountChat.includes("className: 'app-view-shell--chat'"), 'Account chat must use the canonical Book chat shell class.');
+expect(accountChat.includes('messageThread(messages') && accountChat.includes('messageComposer({ attachments: true })'), 'Account chat must use the shared message thread and composer with attachments.');
+expect(!accountChat.includes('<style>') && !accountChat.includes("document.createElement('style')"), 'Account chat must not own local styles.');
 
 expect(chatApi.includes('attachments = []') && chatApi.includes('body, attachments'), 'Profile communication API must carry attachments.');
 expect(controller.includes('attachments?: unknown'), 'Profile chat controller must accept attachments.');
