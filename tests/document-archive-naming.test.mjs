@@ -20,8 +20,8 @@ const oldPatterns = [
   ['LegalAcceptanceEvent', /LegalAcceptanceEvent/],
   ['LegalDocument', /LegalDocument/],
   ['generic-document-archive-route', /\/document-archive(?:\/|['"])/],
-  ['generic-DocumentArchiveService', /DocumentArchiveService/],
-  ['generic-DocumentArchiveModule', /DocumentArchiveModule/],
+  ['generic-DocumentArchiveService', /\bDocumentArchiveService\b/],
+  ['generic-DocumentArchiveModule', /\bDocumentArchiveModule\b/],
   ['old-document-migration-file', /document-migration\.js/],
   ['old-document-archive-source', /server\/src\/document-archive/],
 ];
