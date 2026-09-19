@@ -46,7 +46,7 @@ export class SaasAdminService {
     });
   }
 
-  async masters() {
+  async profiles() {
     const rows = await this.prisma.tenantAccess.findMany({
       include: {
         plan: { select: { id: true, key: true, name: true } },
@@ -83,7 +83,7 @@ export class SaasAdminService {
         status: row.status,
         isOwnerBook: row.isOwnerBook,
         plan: row.plan,
-        master: membership ? {
+        profile: membership ? {
           userId: membership.user.id,
           email: membership.user.email,
           name: [profile?.name, profile?.surname].filter(Boolean).join(' ') || invitation?.name || row.tenant.name,
