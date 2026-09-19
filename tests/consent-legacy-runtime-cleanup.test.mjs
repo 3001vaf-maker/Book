@@ -4,7 +4,7 @@ import { join, relative } from 'node:path';
 
 const root = new URL('../', import.meta.url);
 const roots = ['server/src', 'online-booking', 'main', 'settings', 'core'];
-const extraFiles = ['core.js', 'document-migration.js'];
+const extraFiles = ['core.js', 'tenant-document-archive.js'];
 const forbidden = [
   'migrateLegacyConsents',
   'agreements.personalData',
