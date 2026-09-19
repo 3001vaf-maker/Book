@@ -237,7 +237,7 @@ function renderRegistrationAgreements(root, state) {
   })));
   renderFlowPage(root, state, {
     title: 'Соглашения',
-    subtitle: 'Согласия относятся к регистрации и аккаунту клиента',
+    subtitle: 'Согласия относятся к регистрации и аккаунту',
     back: { data: 'data-booking-agreements-back', aria: 'Назад' },
     action: { label: 'Далее', data: 'data-booking-agreements-next', disabled: !canContinue },
     body: `${documents.length ? cards : emptyState('Документов нет', 'Для регистрации не настроены документы согласия.')}${errorBlock(state.error)}`,
