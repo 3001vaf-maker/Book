@@ -18,6 +18,12 @@ const oldPatterns = [
   ['document-state', /document-state/],
   ['DocumentState', /DocumentState/],
   ['LegalAcceptanceEvent', /LegalAcceptanceEvent/],
+  ['LegalDocument', /LegalDocument/],
+  ['generic-document-archive-route', /\/document-archive(?:\/|['"])/],
+  ['generic-DocumentArchiveService', /DocumentArchiveService/],
+  ['generic-DocumentArchiveModule', /DocumentArchiveModule/],
+  ['old-document-migration-file', /document-migration\.js/],
+  ['old-document-archive-source', /server\/src\/document-archive/],
 ];
 
 function extension(path) {
@@ -49,14 +55,24 @@ for (const item of walk(rootPath)) {
 assert.deepEqual(failures, [], failures.join('\n'));
 
 const schema = readFileSync(new URL('../server/prisma/schema.prisma', import.meta.url), 'utf8');
-const archiveService = readFileSync(new URL('../server/src/document-archive/document-archive.service.ts', import.meta.url), 'utf8');
-const consentPolicy = readFileSync(new URL('../server/src/document-archive/consent-policy.service.ts', import.meta.url), 'utf8');
+const archiveService = readFileSync(new URL('../server/src/tenant-document-archive/tenant-document-archive.service.ts', import.meta.url), 'utf8');
+const consentPolicy = readFileSync(new URL('../server/src/tenant-document-archive/consent-policy.service.ts', import.meta.url), 'utf8');
 const registry = readFileSync(new URL('../server/src/document-registry/document-registry.service.ts', import.meta.url), 'utf8');
+const architecture = readFileSync(new URL('../docs/DOCUMENTS_ARCHITECTURE.md', import.meta.url), 'utf8');
+const platformMigration = readFileSync(new URL('../server/prisma/migrations/20260919162000_platform_document_archive/migration.sql', import.meta.url), 'utf8');
 
-assert.match(schema, /model TenantDocumentArchive/);
+assert.equal((schema.match(/model TenantDocumentArchive/g) || []).length, 1);
 assert.match(archiveService, /tenantDocumentArchive/);
 assert.match(archiveService, /FROM "TenantConsentEvent"/);
 assert.match(consentPolicy, /INSERT INTO "TenantConsentEvent"/);
 assert.match(registry, /FROM "PlatformConsentEvent"/);
+assert.match(registry, /JOIN "PlatformDocumentVersion"/);
+assert.match(registry, /JOIN "PlatformDocument"/);
+assert.doesNotMatch(registry, /"scope"/);
+assert.match(architecture, /`PlatformDocumentArchive`/);
+assert.match(architecture, /`TenantDocumentArchive`/);
+assert.match(platformMigration, /WHERE "scope" <> 'PLATFORM' OR "tenantId" IS NOT NULL/);
+assert.match(platformMigration, /DROP COLUMN "scope"/);
+assert.match(platformMigration, /DROP COLUMN "tenantId"/);
 
 console.log('Document Archive naming tests: OK');
