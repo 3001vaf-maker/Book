@@ -135,8 +135,8 @@ export class PersonIdentityService {
       const record = objectValue(value);
       const recordId = text(record.id);
       if (!recordId || importedRecordIds.has(recordId) || cancelled.has(recordId) || text(record.status) === 'cancelled') return false;
-      const client = objectValue(record.client);
-      return memberKeys.has(text(client.key)) || phonesMatch(client.phone, account.phone);
+      const person = objectValue(record.person);
+      return memberKeys.has(text(person.key)) || phonesMatch(person.phone, account.phone);
     });
 
     return Promise.all(records.map(async (value) => {
