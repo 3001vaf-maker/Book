@@ -33,7 +33,7 @@ expect(!booking.includes("type: 'date'"), 'Public booking must not use native te
 expect(booking.includes('renderRegistrationAgreements') && booking.includes('renderAccountEntry') && booking.includes('renderAccountDetails') && booking.includes('renderPassword'), 'Registration must own agreements, account lookup, details and password.');
 expect(booking.includes("subtitle: 'Согласия относятся к регистрации и аккаунту'"), 'Consent UI must be explicitly registration/account scoped.');
 expect(booking.includes('if (prepared.exists) renderPassword(root, state);') && booking.includes('else renderAccountDetails(root, state);'), 'Registration must branch between an existing account and a new account.');
-expect(booking.includes('if (payload.accountCardExisted)') && booking.includes("state.accountTab = 'profile'"), 'Known accounts must land on the personal page after registration.');
+expect(booking.includes('if (payload.personExisted)') && booking.includes("state.accountTab = 'profile'"), 'Known accounts must land on the personal page after registration.');
 expect(booking.includes('else {\n          nextBookingStep(root, state);'), 'New accounts without an existing card must continue into booking after registration.');
 
 expect(booking.includes('renderWorkplaces') && booking.includes('renderProcedures') && booking.includes('renderDates') && booking.includes('renderTimes') && booking.includes('renderConfirmation'), 'Booking itself must preserve workplace -> procedures -> date -> time -> confirmation.');
@@ -44,7 +44,7 @@ expect(booking.includes("root.querySelector('[data-booking-times-back]')?.addEve
 expect(booking.includes("root.querySelector('[data-booking-confirm-back]')?.addEventListener('click'"), 'Confirmation must have a back control.');
 expect(booking.includes('function backFromFirstBookingStep') && booking.includes('renderAccountHome(root, state)'), 'The booking back boundary must return to the personal page.');
 
-expect(booking.includes('renderAccountAccount'), 'Authenticated account account must use the unified account shell.');
+expect(booking.includes('renderAccount('), 'Authenticated account account must use the unified account shell.');
 expect(!booking.includes('step: 15'), 'Public booking must not hardcode a 15 minute slot step.');
 expect(settings.includes("from '../../core/booking-settings/index.js'"), 'Online booking settings must use canonical booking settings owner.');
 expect(settings.includes('appShell({') && settings.includes('appHeader({'), 'Online booking settings must use the shared Book shell instead of a local page header.');
@@ -73,7 +73,7 @@ expect(!accountShell.includes("document.createElement('style')") && !accountShel
 expect(accountShell.includes("messageComposer({ attachments: true })"), 'Account chat must use the shared composer with media attachment control.');
 expect(accountShell.includes("label: 'Повторить запись'"), 'Account history must use the agreed repeat-booking action.');
 expect(accountShell.includes("label: 'Согласия'"), 'Account account and chat settings must expose consent controls.');
-expect(consentSettings.includes('revokeBookingConsent'), 'Account consent settings must use the canonical server-backed revoke flow.');
+expect(consentSettings.includes('revokeAccountConsent'), 'Account consent settings must use the canonical server-backed revoke flow.');
 expect(bookingUi.includes('bookingChoiceCards'), 'Shared booking UI must continue to own booking choice controls.');
 
 expect(navigationUi.includes("{ id: 'main', label: 'Главная'") && navigationUi.includes("{ id: 'timetable', label: 'График'") && navigationUi.includes("{ id: 'journal', label: 'Журнал'") && navigationUi.includes("{ id: 'chat', label: 'Чат'") && navigationUi.includes("{ id: 'settings', label: 'Настройки'"), 'Book bottom navigation must keep the canonical five destinations.');
