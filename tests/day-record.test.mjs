@@ -25,7 +25,7 @@ assert.equal(conflicts[0].workplaceId, 'romashka');
 assert.equal(conflicts[0].from, '12:00');
 assert.equal(conflicts[0].to, '16:00');
 
-const record = createRecord({ date: '2026-09-15', workplaceId: 'romashka', from: '12:00', to: '13:00', client: { name: 'Тест' } });
+const record = createRecord({ date: '2026-09-15', workplaceId: 'romashka', from: '12:00', to: '13:00', person: { name: 'Тест' } });
 assert.ok(record);
 assert.equal(createRecord({ date: '2026-09-15', workplaceId: 'romashka', from: '12:30', to: '13:30' }), null);
 assert.equal(createRecord({ date: '2026-09-15', workplaceId: 'romashka', from: '15:55', to: '16:05' }), null);
