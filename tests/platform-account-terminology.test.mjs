@@ -7,14 +7,22 @@ const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const self = relative(root, fileURLToPath(import.meta.url)).replaceAll('\\', '/');
 const extensions = new Set(['.js', '.mjs', '.ts', '.prisma']);
 const excludedPrefixes = ['node_modules/', '.git/', 'server/prisma/migrations/'];
+const retiredModel = new RegExp(['model ', 'User', ' \\{'].join(''));
+const retiredId = new RegExp(['\\buser', 'Id\\b'].join(''));
+const retiredPrisma = new RegExp(['prisma\\.', 'user\\b'].join(''));
+const retiredTx = new RegExp(['tx\\.', 'user\\b'].join(''));
+const retiredCurrentHelper = new RegExp(['getCurrent', 'User\\b'].join(''));
+const retiredMembershipRelation = new RegExp(['membership\\.', 'user\\b'].join(''));
+const retiredAdminRelation = new RegExp(['admin\\.', 'user\\b'].join(''));
+
 const forbidden = [
-  [/model User \{/, 'Prisma model User'],
-  [/\buserId\b/, 'userId'],
-  [/prisma\.user\b/, 'prisma.user'],
-  [/tx\.user\b/, 'tx.user'],
-  [/getCurrentUser\b/, 'getCurrentUser'],
-  [/membership\.user\b/, 'membership.user'],
-  [/admin\.user\b/, 'admin.user'],
+  [retiredModel, 'retired platform account model'],
+  [retiredId, 'retired platform account id'],
+  [retiredPrisma, 'retired prisma account delegate'],
+  [retiredTx, 'retired transactional account delegate'],
+  [retiredCurrentHelper, 'retired account helper'],
+  [retiredMembershipRelation, 'retired membership account relation'],
+  [retiredAdminRelation, 'retired admin account relation'],
 ];
 
 function ext(path) {
