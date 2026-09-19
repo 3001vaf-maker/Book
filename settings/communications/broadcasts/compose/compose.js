@@ -2,11 +2,11 @@ import { getBroadcastTemplates, previewBroadcast, sendBroadcast } from '../../..
 import { actionBlock, button, emptyState, escapeHtml, field, pageHeader, select, textareaField } from '../../../../ui/ui.js';
 
 const VARIABLES = [
-  { token: '{{client.name}}', label: 'Имя', sample: 'Александр' },
-  { token: '{{client.surname}}', label: 'Фамилия', sample: 'Петров' },
-  { token: '{{client.code}}', label: 'Код клиента', sample: 'UEI-00123' },
-  { token: '{{client.phone}}', label: 'Телефон', sample: '+7 999 000-00-00' },
-  { token: '{{client.email}}', label: 'Email', sample: 'client@example.com' },
+  { token: '{{person.name}}', label: 'Имя', sample: 'Александр' },
+  { token: '{{person.surname}}', label: 'Фамилия', sample: 'Петров' },
+  { token: '{{person.code}}', label: 'Код', sample: 'UEI-00123' },
+  { token: '{{person.phone}}', label: 'Телефон', sample: '+7 999 000-00-00' },
+  { token: '{{person.email}}', label: 'Email', sample: 'person@example.com' },
 ];
 
 function phonesFrom(value) { return [...new Set(String(value || '').split(/[\n,;]+/).map((item) => item.trim()).filter(Boolean))]; }
@@ -29,12 +29,12 @@ function renderForm(root, navigateBack, templates = []) {
       ${field({ label: 'Название рассылки', name: 'name', placeholder: 'Например: Свободное окно 15 сентября' })}
       ${select({ label: 'Шаблон', name: 'template', value: '', options: templateOptions })}
       <div class="action-block"><strong>Доставка</strong><div>Push — по умолчанию.</div><div class="muted">Telegram — внешний канал этой рассылки.</div></div>
-      ${select({ label: 'Аудитория', name: 'audience', value: 'selected', options: [{ value: 'selected', label: 'Выбранные клиенты' }, { value: 'all', label: 'Все клиенты' }] })}
-      ${textareaField({ label: 'Телефоны выбранных клиентов', name: 'phones', placeholder: 'По одному номеру в строке' })}
+      ${select({ label: 'Аудитория', name: 'audience', value: 'selected', options: [{ value: 'selected', label: 'Выбранные люди' }, { value: 'all', label: 'Все люди' }] })}
+      ${textareaField({ label: 'Телефоны выбранных людей', name: 'phones', placeholder: 'По одному номеру в строке' })}
       <div class="action-block"><strong>Конструктор сообщения</strong><div class="muted">Временный рабочий конструктор. Финальный UI будет собран штатными элементами Book.</div><div class="modal-actions">${variableButtons}</div></div>
-      <label class="form-field"><span>Текст</span><textarea name="body" rows="8" placeholder="Например: Здравствуйте, {{client.name}}!"></textarea></label>
-      <div class="action-block"><strong>Как увидит клиент</strong><div class="muted" data-broadcast-message-preview>Начните вводить текст.</div></div>
-      <div class="muted">Перед отправкой Book проверит согласие и доступность Telegram у каждого клиента.</div>
+      <label class="form-field"><span>Текст</span><textarea name="body" rows="8" placeholder="Например: Здравствуйте, {{person.name}}!"></textarea></label>
+      <div class="action-block"><strong>Как увидит человек</strong><div class="muted" data-broadcast-message-preview>Начните вводить текст.</div></div>
+      <div class="muted">Перед отправкой Book проверит согласие и доступность Telegram у каждого человека.</div>
       <div class="muted" data-broadcast-result aria-live="polite"></div>
       ${actionBlock(`${button('Проверить аудиторию', { type: 'submit' })}${button('Отправить', { type: 'button', variant: 'secondary', data: 'data-broadcast-send' })}${button('Назад', { type: 'button', variant: 'secondary', data: 'data-broadcast-back' })}`)}
     </form>`;
