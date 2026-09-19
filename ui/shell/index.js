@@ -122,7 +122,7 @@ function attachmentMarkup(attachment = {}) {
 export function messageBubble(message = {}, { viewer = 'client' } = {}) {
   const direction = String(message.direction || '').toLowerCase();
   const system = direction === 'system' || String(message.kind || '').toLowerCase() === 'system';
-  const outgoing = viewer === 'master' ? direction === 'outbound' : direction === 'inbound';
+  const outgoing = viewer === 'profile' ? direction === 'outbound' : direction === 'inbound';
   const classes = ['message-bubble', system ? 'message-bubble--system' : outgoing ? 'message-bubble--outgoing' : 'message-bubble--incoming'].join(' ');
   const time = message.time || message.createdAt || '';
   const attachments = (Array.isArray(message.attachments) ? message.attachments : []).map(attachmentMarkup).filter(Boolean).join('');
