@@ -142,7 +142,6 @@ function publicAccount(account: any) {
     surname: account.surname,
     phone: account.phone,
     telegramId: account.telegramId || '',
-    consents: arrayValue(account.consents),
     profileData: normalizeProfileData(account.profileData),
     uei: text(account.uei),
     discountPercent: percent(account.discountPercent),
@@ -327,7 +326,7 @@ export class OnlineBookingService {
         surname: text(body.surname),
         phone,
         telegramId: text(body.telegramId),
-        consents: consents as Prisma.InputJsonValue,
+        consents: [] as Prisma.InputJsonValue,
         profileData: normalizeProfileData(body.profileData) as Prisma.InputJsonValue,
       },
     });
@@ -590,7 +589,7 @@ export class OnlineBookingService {
       orderBy: { createdAt: 'asc' },
       include: {
         account: {
-          select: { id: true, email: true, name: true, surname: true, phone: true, telegramId: true, consents: true, profileData: true },
+          select: { id: true, email: true, name: true, surname: true, phone: true, telegramId: true, profileData: true },
         },
       },
     });
