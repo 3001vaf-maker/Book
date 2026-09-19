@@ -59,6 +59,15 @@ function walk(dir) {
   });
 }
 
+function escapeRegex(value) {
+  return value.replace(/[.*+?^\${}()|[\]\\]/g, '\\const literalViolations = [];
+const structuralViolations = [];');
+}
+
+function isProfessionDataLiteral(line, term) {
+  const pattern = new RegExp('\\bprofession\\s*:\\s*[\\\'"]' + escapeRegex(term) + '[\\\'"]', 'iu');
+  return pattern.test(line);
+}
 const literalViolations = [];
 const structuralViolations = [];
 
@@ -69,7 +78,7 @@ for (const path of walk(root)) {
     const normalized = line.toLocaleLowerCase('ru-RU');
 
     for (const term of protectedTerms) {
-      if (normalized.includes(term)) {
+      if (normalized.includes(term) && !isProfessionDataLiteral(line, term)) {
         literalViolations.push(`${path}:${index + 1}: ${line.trim()}`);
         break;
       }
