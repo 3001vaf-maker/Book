@@ -17,7 +17,7 @@ import { canUseBookCapability, getBookAccess, loadBookAccess } from './core/acce
 import { isOnboardingComplete, renderOnboarding } from './onboarding/onboarding.js';
 import { startServerBookingSync } from './online-booking/server-sync.js';
 import { renderOnlineBooking } from './online-booking/booking.js';
-import { startBookingClientRuntime } from './online-booking/client-runtime.js';
+import { startBookingAccountRuntime } from './online-booking/account-runtime.js';
 import { bottomNavigation } from './ui/ui.js';
 import { clearLegacyBusinessStorage } from './core/legacy-browser-business.js';
 
@@ -69,7 +69,7 @@ function bookingRoute() {
 function renderPublicBooking(route) {
   workspaceReady = false;
   disposeView();
-  disposeView = startBookingClientRuntime(route);
+  disposeView = startBookingAccountRuntime(route);
   app.classList.add('app-shell--booking');
   app.innerHTML = '<main class="booking-content" id="app-content"></main>';
   void renderOnlineBooking(document.querySelector('#app-content'), route);
