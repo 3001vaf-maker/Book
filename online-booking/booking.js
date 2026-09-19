@@ -40,7 +40,7 @@ import {
   getBookingWorkplace,
   requiredBookingDocuments,
 } from './model.js';
-import { renderClientAccount } from './account-shell.js';
+import { renderAccountAccount } from './account-shell.js';
 
 function localDateKey(value = new Date()) {
   const date = value instanceof Date ? value : new Date(value);
@@ -127,7 +127,7 @@ function flowThemeClasses(state) {
   const theme = state.settings?.theme && typeof state.settings.theme === 'object' ? state.settings.theme : {};
   const shape = ['soft', 'round', 'straight', 'cut'].includes(theme.shape) ? theme.shape : 'soft';
   const choiceStyle = ['cards', 'compact', 'list'].includes(theme.choiceStyle) ? theme.choiceStyle : 'cards';
-  return `booking-client booking-client--account booking-shape--${shape} booking-choice-style--${choiceStyle}`;
+  return `booking-account booking-account--account booking-shape--${shape} booking-choice-style--${choiceStyle}`;
 }
 
 function subtitleBlock(value = '') {
@@ -374,7 +374,7 @@ function renderPassword(root, state) {
         state.error = '';
         seedConsents(state, currentConsentFacts(state));
         if (payload.personExisted) {
-          state.clientTab = 'profile';
+          state.accountTab = 'profile';
           await renderAccountHome(root, state);
         } else {
           nextBookingStep(root, state);
@@ -386,7 +386,7 @@ function renderPassword(root, state) {
       state.account = payload.account;
       state.error = '';
       await saveRegistrationConsents(state);
-      state.clientTab = 'profile';
+      state.accountTab = 'profile';
       await renderAccountHome(root, state);
     } catch (error) {
       state.error = error instanceof Error ? error.message : 'Не удалось войти';
@@ -564,7 +564,7 @@ function renderConfirmation(root, state) {
       state.notice = 'Запись отправлена в журнал.';
       state.error = '';
       await refreshContext(state);
-      state.clientTab = 'profile';
+      state.accountTab = 'profile';
       await renderAccountHome(root, state);
     } catch (error) {
       state.error = error instanceof Error ? error.message : 'Не удалось подтвердить запись';
@@ -617,15 +617,15 @@ async function repeatBooking(root, state, request) {
 }
 
 async function renderAccountHome(root, state) {
-  await renderClientAccount(root, state, {
+  await renderAccountAccount(root, state, {
     onStartBooking: () => void startBookingFromAccount(root, state),
     onRepeat: (request) => void repeatBooking(root, state, request),
     onLogout: () => {
       clearAccount(state.tenantId);
       state.account = null;
       state.error = '';
-      state.clientTab = 'profile';
-      state.clientChatOpen = false;
+      state.accountTab = 'profile';
+      state.accountChatOpen = false;
       state.registrationMode = 'initial';
       seedConsents(state, []);
       renderWelcome(root, state);
@@ -658,9 +658,9 @@ export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = 
     lastRequest: null,
     repeatSelection: null,
     registrationMode: 'initial',
-    clientTab: 'profile',
-    clientChatOpen: false,
-    clientRequests: [],
+    accountTab: 'profile',
+    accountChatOpen: false,
+    accountRequests: [],
   };
 
   renderFlowPage(root, state, { title: 'Онлайн-запись', subtitle: 'Загрузка…', center: true });
