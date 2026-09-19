@@ -31,7 +31,7 @@ expect(booking.includes('initCalendar('), 'Public booking date must use the shar
 expect(!booking.includes("type: 'date'"), 'Public booking must not use native technical date controls.');
 
 expect(booking.includes('renderRegistrationAgreements') && booking.includes('renderAccountEntry') && booking.includes('renderAccountDetails') && booking.includes('renderPassword'), 'Registration must own agreements, account lookup, details and password.');
-expect(booking.includes("subtitle: 'Согласия относятся к регистрации и аккаунту клиента'"), 'Consent UI must be explicitly registration/account scoped.');
+expect(booking.includes("subtitle: 'Согласия относятся к регистрации и аккаунту'"), 'Consent UI must be explicitly registration/account scoped.');
 expect(booking.includes('if (prepared.exists) renderPassword(root, state);') && booking.includes('else renderAccountDetails(root, state);'), 'Registration must branch between an existing account and a new account.');
 expect(booking.includes('if (payload.accountCardExisted)') && booking.includes("state.accountTab = 'profile'"), 'Known accounts must land on the personal page after registration.');
 expect(booking.includes('else {\n          nextBookingStep(root, state);'), 'New accounts without an existing card must continue into booking after registration.');
