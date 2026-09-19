@@ -1,4 +1,4 @@
-import { updateBookingAccount } from '../core/booking-account/index.js';
+import { updateAccount } from '../core/account/index.js';
 import {
   accordion,
   button,
@@ -181,7 +181,7 @@ export function openClientPersonalData(state, { onSaved } = {}) {
     if (errorNode) errorNode.textContent = '';
     try {
       const currentProfile = profileData(state.account || {});
-      const account = await updateBookingAccount(state.tenantId, {
+      const account = await updateAccount(state.tenantId, {
         name: data.get('name'),
         surname: data.get('surname'),
         phone: data.get('phone'),
