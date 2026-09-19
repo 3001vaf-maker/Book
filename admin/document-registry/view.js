@@ -113,7 +113,7 @@ function historyMarkup(escapeHtml) {
       <div class="admin-documents-head">
         <div>
           <h3>История Book ↔ пользователь</h3>
-          <p>История читается из сохранённых событий LegalAcceptanceEvent.</p>
+          <p>История читается из сохранённых событий PlatformConsentEvent.</p>
         </div>
         <span class="admin-count">${history.length}</span>
       </div>

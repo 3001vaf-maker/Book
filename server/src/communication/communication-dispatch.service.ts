@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { ConsentPolicyService } from '../document-state/consent-policy.service';
+import { ConsentPolicyService } from '../tenant-document-archive/consent-policy.service';
 import { CommunicationService } from './communication.service';
 import { CommunicationHistoryService } from './communication-history.service';
 import { TelegramBotService } from './telegram-bot.service';

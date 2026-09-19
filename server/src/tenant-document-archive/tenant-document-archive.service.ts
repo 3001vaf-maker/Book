@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 
 type JsonObject = Record<string, any>;
-type ConsentEventRow = {
+type TenantConsentEventRow = {
   id: string;
   subjectType: string;
   subjectKey: string;
@@ -51,7 +51,7 @@ function json(value: unknown): Prisma.InputJsonValue {
   return clone(value) as Prisma.InputJsonValue;
 }
 
-function publicConsentEvent(row: ConsentEventRow) {
+function publicConsentEvent(row: TenantConsentEventRow) {
   return {
     id: row.id,
     subjectType: row.subjectType,
@@ -70,15 +70,15 @@ function publicConsentEvent(row: ConsentEventRow) {
 }
 
 @Injectable()
-export class DocumentStateService {
+export class TenantDocumentArchiveService {
   constructor(private readonly prisma: PrismaService) {}
 
   private async canonicalConsentEvents(tenantId: string) {
-    const rows = await this.prisma.$queryRaw<ConsentEventRow[]>`
+    const rows = await this.prisma.$queryRaw<TenantConsentEventRow[]>`
       SELECT "id", "subjectType", "subjectKey", "contactType", "contactValue", "documentId",
              "documentVersion", "status", "acceptedAt", "revokedAt", "source", "occurredAt",
              "createdAt"
-      FROM "ConsentEvent"
+      FROM "TenantConsentEvent"
       WHERE "tenantId" = ${tenantId}
       ORDER BY "occurredAt" ASC, "createdAt" ASC, "id" ASC
     `;
@@ -86,7 +86,7 @@ export class DocumentStateService {
   }
 
   private async snapshot(tenantId: string) {
-    const state = await this.prisma.businessDocumentState.findUnique({ where: { tenantId } });
+    const state = await this.prisma.tenantDocumentArchive.findUnique({ where: { tenantId } });
     const stored = normalize(state?.data || {});
     const consents = state?.migrationVerifiedAt ? await this.canonicalConsentEvents(tenantId) : [];
 
@@ -103,25 +103,25 @@ export class DocumentStateService {
   }
 
   async migrate(tenantId: string, body: unknown) {
-    const existing = await this.prisma.businessDocumentState.findUnique({ where: { tenantId } });
+    const existing = await this.prisma.tenantDocumentArchive.findUnique({ where: { tenantId } });
     if (!existing) {
-      await this.prisma.businessDocumentState.create({ data: { tenantId, data: json(normalize(body)) } });
+      await this.prisma.tenantDocumentArchive.create({ data: { tenantId, data: json(normalize(body)) } });
     }
     return this.snapshot(tenantId);
   }
 
   async verifyMigration(tenantId: string, body: unknown) {
-    const current = await this.prisma.businessDocumentState.findUnique({ where: { tenantId } });
+    const current = await this.prisma.tenantDocumentArchive.findUnique({ where: { tenantId } });
     if (!current) throw new ConflictException('Документы ещё не перенесены');
     if (canonical(current.data) !== canonical(body)) throw new ConflictException('Проверка переноса документов не пройдена');
-    await this.prisma.businessDocumentState.update({ where: { tenantId }, data: { migrationVerifiedAt: new Date() } });
+    await this.prisma.tenantDocumentArchive.update({ where: { tenantId }, data: { migrationVerifiedAt: new Date() } });
     return this.snapshot(tenantId);
   }
 
   async bootstrap(tenantId: string, body: unknown) {
-    const existing = await this.prisma.businessDocumentState.findUnique({ where: { tenantId } });
+    const existing = await this.prisma.tenantDocumentArchive.findUnique({ where: { tenantId } });
     if (!existing) {
-      await this.prisma.businessDocumentState.create({
+      await this.prisma.tenantDocumentArchive.create({
         data: { tenantId, data: json(normalize(body)), migrationVerifiedAt: new Date() },
       });
     }
@@ -130,18 +130,18 @@ export class DocumentStateService {
 
   async updateDataset(tenantId: string, dataset: string, body: unknown) {
     if (!MUTABLE_DATASETS.has(dataset)) throw new BadRequestException('Неизвестный раздел Архива документов');
-    const state = await this.prisma.businessDocumentState.findUnique({ where: { tenantId } });
+    const state = await this.prisma.tenantDocumentArchive.findUnique({ where: { tenantId } });
     if (!state?.migrationVerifiedAt) throw new ConflictException('Перенос документов ещё не подтверждён');
     const current = normalize(state.data);
     const source = objectValue(body);
     const value = source.value;
     current[dataset as keyof typeof current] = Array.isArray(value) ? clone(value) : [];
-    await this.prisma.businessDocumentState.update({ where: { tenantId }, data: { data: json(current) } });
+    await this.prisma.tenantDocumentArchive.update({ where: { tenantId }, data: { data: json(current) } });
     return { dataset, value: current[dataset as keyof typeof current] };
   }
 
   async publicDocuments(tenantId: string) {
-    const state = await this.prisma.businessDocumentState.findUnique({ where: { tenantId } });
+    const state = await this.prisma.tenantDocumentArchive.findUnique({ where: { tenantId } });
     if (!state?.migrationVerifiedAt) throw new ConflictException('Документы для онлайн-записи ещё не готовы');
     return normalize(state.data).documents;
   }

@@ -1,13 +1,13 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma.service';
-import { DocumentStateService } from './document-state.service';
+import { TenantDocumentArchiveService } from './tenant-document-archive.service';
 
 type ConsentSubjectType = 'BOOKING_ACCOUNT' | 'CONTACT_POINT';
 type ConsentStatus = 'accepted' | 'revoked' | 'declined';
 const PDN_CONSENT_DOCUMENT_ID = 'pdn-consent';
 const MARKETING_CONSENT_DOCUMENT_ID = 'messages-consent';
-type ConsentEventRow = {
+type TenantConsentEventRow = {
   id: string;
   tenantId: string;
   subjectType: ConsentSubjectType;
@@ -68,7 +68,7 @@ function asDate(value: unknown, fallback: Date) {
   return Number.isFinite(parsed.getTime()) ? parsed : fallback;
 }
 
-function publicEvent(row: ConsentEventRow) {
+function publicEvent(row: TenantConsentEventRow) {
   return {
     id: row.id,
     subjectType: row.subjectType,
@@ -89,16 +89,16 @@ function publicEvent(row: ConsentEventRow) {
 @Injectable()
 export class ConsentPolicyService {
   constructor(
-    private readonly documents: DocumentStateService,
+    private readonly documents: TenantDocumentArchiveService,
     private readonly prisma: PrismaService,
   ) {}
 
   private async consentRows(tenantId: string) {
-    return this.prisma.$queryRaw<ConsentEventRow[]>`
+    return this.prisma.$queryRaw<TenantConsentEventRow[]>`
       SELECT "id", "tenantId", "subjectType", "subjectKey", "contactType", "contactValue",
              "documentId", "documentVersion", "status", "acceptedAt", "revokedAt", "source",
              "occurredAt", "createdAt"
-      FROM "ConsentEvent"
+      FROM "TenantConsentEvent"
       WHERE "tenantId" = ${tenantId}
       ORDER BY "occurredAt" ASC, "createdAt" ASC, "id" ASC
     `;
@@ -110,11 +110,11 @@ export class ConsentPolicyService {
     subjectKey: string,
     documentId: string,
   ) {
-    const rows = await this.prisma.$queryRaw<ConsentEventRow[]>`
+    const rows = await this.prisma.$queryRaw<TenantConsentEventRow[]>`
       SELECT "id", "tenantId", "subjectType", "subjectKey", "contactType", "contactValue",
              "documentId", "documentVersion", "status", "acceptedAt", "revokedAt", "source",
              "occurredAt", "createdAt"
-      FROM "ConsentEvent"
+      FROM "TenantConsentEvent"
       WHERE "tenantId" = ${tenantId}
         AND "subjectType" = ${subjectType}
         AND "subjectKey" = ${subjectKey}
@@ -144,7 +144,7 @@ export class ConsentPolicyService {
     const contactType = contactPointType(input.contactType);
     const contactValue = contactPointValue(contactType, input.contactValue);
     await this.prisma.$executeRaw`
-      INSERT INTO "ConsentEvent" (
+      INSERT INTO "TenantConsentEvent" (
         "id", "tenantId", "subjectType", "subjectKey", "contactType", "contactValue",
         "documentId", "documentVersion", "status", "acceptedAt", "revokedAt", "source",
         "occurredAt", "createdAt"
@@ -310,11 +310,11 @@ export class ConsentPolicyService {
   async accountConsentProjection(tenantId: string, accountIdValue: unknown) {
     const accountId = text(accountIdValue);
     const current = await this.state(tenantId);
-    const rows = accountId ? await this.prisma.$queryRaw<ConsentEventRow[]>`
+    const rows = accountId ? await this.prisma.$queryRaw<TenantConsentEventRow[]>`
       SELECT "id", "tenantId", "subjectType", "subjectKey", "contactType", "contactValue",
              "documentId", "documentVersion", "status", "acceptedAt", "revokedAt", "source",
              "occurredAt", "createdAt"
-      FROM "ConsentEvent"
+      FROM "TenantConsentEvent"
       WHERE "tenantId" = ${tenantId} AND "subjectType" = 'BOOKING_ACCOUNT' AND "subjectKey" = ${accountId}
       ORDER BY "occurredAt" DESC, "createdAt" DESC, "id" DESC
     ` : [];

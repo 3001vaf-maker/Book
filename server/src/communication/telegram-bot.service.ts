@@ -9,7 +9,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from 'node:crypto';
-import { ConsentPolicyService } from '../document-state/consent-policy.service';
+import { ConsentPolicyService } from '../tenant-document-archive/consent-policy.service';
 import { NotificationService } from '../notification/notification.service';
 import { PrismaService } from '../prisma.service';
 import { CommunicationService } from './communication.service';

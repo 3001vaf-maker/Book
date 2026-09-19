@@ -4,7 +4,7 @@ import { getBookDocumentBases } from '../admin/document-registry/catalog.js';
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
-const policy = read('server/src/document-state/consent-policy.service.ts');
+const policy = read('server/src/tenant-document-archive/consent-policy.service.ts');
 const guard = read('server/src/online-booking/booking-pdn-consent.guard.ts');
 const booking = read('server/src/online-booking/online-booking.service.ts');
 const notification = read('server/src/notification/notification.service.ts');
@@ -26,7 +26,7 @@ assert.equal(marketing.required, false, 'Marketing consent must remain optional'
 assert.match(policy, /const PDN_CONSENT_DOCUMENT_ID = 'pdn-consent'/);
 assert.match(policy, /const MARKETING_CONSENT_DOCUMENT_ID = 'messages-consent'/);
 assert.match(policy, /async hasActivePdnConsent\(/);
-assert.match(policy, /FROM "ConsentEvent"[\s\S]*"subjectType" = 'BOOKING_ACCOUNT'/);
+assert.match(policy, /FROM "TenantConsentEvent"[\s\S]*"subjectType" = 'BOOKING_ACCOUNT'/);
 assert.match(policy, /async canSendMarketing\([\s\S]*MARKETING_CONSENT_DOCUMENT_ID/);
 
 assert.match(policy, /async accountConsentState\(/);

@@ -8,7 +8,7 @@ const pdnGuard = read('server/src/online-booking/booking-pdn-consent.guard.ts');
 const bookingUi = read('online-booking/booking.js');
 const clientUi = read('main/clients/clients.js');
 const consentCache = read('settings/documents/consents.js');
-const documentMigration = read('document-migration.js');
+const documentMigration = read('tenant-document-archive.js');
 const schema = read('server/prisma/schema.prisma');
 const dropMigration = read('server/prisma/migrations/20260919132000_drop_booking_account_consents/migration.sql');
 

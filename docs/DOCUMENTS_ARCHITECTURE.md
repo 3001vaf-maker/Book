@@ -1,8 +1,14 @@
-# Book — Documents / Consents architecture
+# Book — Document Archive / Consents architecture
 
 ## 1. Owner
 
-`Documents` is the only owner of documents, document versions, consent events and consent reporting.
+`DocumentArchive` is the umbrella name only; it is not an independent storage owner.
+
+`PlatformDocumentArchive` is the Book/platform archive. Its UI folder is `DocumentRegistry` («Реестр документов»). Platform document instances are stored as `PlatformDocument` + `PlatformDocumentVersion`; Book ↔ profile actions are stored as `PlatformConsentEvent`.
+
+`TenantDocumentArchive` is the archive of one tenant/profile. Its UI folder is `Documents` («Документы»). Tenant document instances and tenant document history live only here; profile ↔ people consent history is stored as `TenantConsentEvent`.
+
+Document Registry may contain reusable bases for tenant documents, but those bases are templates only. They are never a second tenant archive.
 
 The `Clients / People` domain does **not** own consent state. A client card may only display a projection calculated from Documents.
 
@@ -104,4 +110,4 @@ For scale and auditability, consent history must behave as append-only business 
 
 `Notifications / SMS / Telegram` must first require active `pdn-consent` for every new `SYSTEM`, `SERVICE`, `DIRECT` or `MARKETING` communication. Only `MARKETING` additionally requests the advertising consent represented by `messages-consent`.
 
-One domain owner: **Documents**.
+Canonical names: **DocumentArchive → PlatformDocumentArchive / TenantDocumentArchive; PlatformDocumentArchive → DocumentRegistry; TenantDocumentArchive → Documents; events → PlatformConsentEvent / TenantConsentEvent.**

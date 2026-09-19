@@ -45,26 +45,26 @@ function hydrate(bundle) {
 }
 
 async function persistReconciled(value) {
-  const documentsResponse = await apiRequest('/document-state/documents', {
+  const documentsResponse = await apiRequest('/tenant-document-archive/documents', {
     method: 'PUT',
     body: JSON.stringify({ value: value.documents }),
   });
   await responseJson(documentsResponse, 'Не удалось обновить документы');
 
-  const historyResponse = await apiRequest('/document-state/history', {
+  const historyResponse = await apiRequest('/tenant-document-archive/history', {
     method: 'PUT',
     body: JSON.stringify({ value: value.history }),
   });
   await responseJson(historyResponse, 'Не удалось обновить историю документов');
 }
 
-export async function initializeDocumentState() {
+export async function initializeTenantDocumentArchive() {
   configureBookDocumentBases(getBookDocumentBases(), {
     profile: getProfile(),
     workplaces: getWorkplaces(),
   });
 
-  const remoteResponse = await apiRequest('/document-state');
+  const remoteResponse = await apiRequest('/tenant-document-archive');
   const remote = await responseJson(remoteResponse, 'Не удалось загрузить документы');
 
   if (remote?.verified) {
@@ -89,7 +89,7 @@ export async function initializeDocumentState() {
     consents: [],
     history: [],
   });
-  const bootstrapResponse = await apiRequest('/document-state/bootstrap', {
+  const bootstrapResponse = await apiRequest('/tenant-document-archive/bootstrap', {
     method: 'POST',
     body: JSON.stringify(defaults),
   });

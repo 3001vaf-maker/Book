@@ -1,6 +1,6 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import type { Request } from 'express';
-import { ConsentPolicyService } from '../document-state/consent-policy.service';
+import { ConsentPolicyService } from '../tenant-document-archive/consent-policy.service';
 
 type AccountRequest = Request & {
   bookingAccountAuth?: { accountId: string; tenantId: string };

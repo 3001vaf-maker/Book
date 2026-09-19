@@ -7,8 +7,8 @@ const clientData = read('main/clients/data.js');
 const clientUi = read('main/clients/clients.js');
 const browserConsents = read('settings/documents/consents.js');
 const businessState = read('server/src/business-state/business-state.service.ts');
-const migration = read('document-migration.js');
-const policy = read('server/src/document-state/consent-policy.service.ts');
+const migration = read('tenant-document-archive.js');
+const policy = read('server/src/tenant-document-archive/consent-policy.service.ts');
 const cleanupMigration = read('server/prisma/migrations/20260919124500_remove_legacy_business_person_agreements/migration.sql');
 
 assert.doesNotMatch(clientData, /migrateLegacyConsents/);

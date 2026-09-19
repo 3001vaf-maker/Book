@@ -136,7 +136,7 @@ export function queueRecordEventsDelete(recordId) {
 export function queueDocumentDataset(dataset, value) {
   const name = String(dataset || '').trim();
   if (!name) return Promise.resolve();
-  return enqueue(`/document-state/${encodeURIComponent(name)}`, {
+  return enqueue(`/tenant-document-archive/${encodeURIComponent(name)}`, {
     method: 'PUT',
     body: JSON.stringify({ value }),
   }, 'Не удалось сохранить документы на сервере');
