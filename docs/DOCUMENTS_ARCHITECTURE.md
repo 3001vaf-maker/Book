@@ -34,16 +34,23 @@ Every action is an immutable event tied to:
 
 Revocation never deletes the earlier acceptance. Re-acceptance creates a new event. Current state is derived from the latest valid event for the relevant document/version.
 
-## 3. Required consent and access
+## 3. PDN consent and grey zone
 
-A document marked as required for client access is an access prerequisite.
+`pdn-consent` controls active cooperation with the profile. Revocation does not delete the account, client history, booking history, notifications or consent history.
 
-If the current required consent is absent or revoked:
-- credentials may be recognized, but the client area is not opened;
-- the user is sent to the required documents/consent step;
-- access resumes only after a new `accepted` event is recorded for the current required document version.
+When the current `pdn-consent` is absent or revoked:
+- login remains available;
+- consent documents and consent management remain available;
+- booking/request history created before revocation remains readable;
+- notifications created before revocation remain readable and may be marked read;
+- creating a new booking/request is blocked;
+- Chat is unavailable: no new `DIRECT` messages are read, written or delivered;
+- new `SYSTEM`, `SERVICE`, `DIRECT` and `MARKETING` deliveries are blocked at send time;
+- `MARKETING` additionally requires its own advertising consent.
 
-Changing a required document version may require a new consent according to the document rule; an old-version acceptance must not silently satisfy a new required version.
+Re-accepting the current `pdn-consent` returns the account to active cooperation. Changing the PDN document version requires acceptance of the current version before active cooperation resumes.
+
+Data deletion/anonymisation is a separate process and is not triggered by consent revocation.
 
 ## 4. Marketing consent and message purpose
 
@@ -95,6 +102,6 @@ For scale and auditability, consent history must behave as append-only business 
 
 `Clients / People` may request Documents for projections, but it does not own consent history.
 
-`Notifications / SMS / Telegram` must evaluate the persisted message `purpose`. Only `MARKETING` requests the advertising consent represented by `messages-consent`; `SYSTEM`, `SERVICE` and `DIRECT` do not.
+`Notifications / SMS / Telegram` must first require active `pdn-consent` for every new `SYSTEM`, `SERVICE`, `DIRECT` or `MARKETING` communication. Only `MARKETING` additionally requests the advertising consent represented by `messages-consent`.
 
 One domain owner: **Documents**.

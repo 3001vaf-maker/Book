@@ -10,7 +10,7 @@ type AccountRequest = Request & {
 };
 
 @Injectable()
-export class BookingRequiredConsentGuard implements CanActivate {
+export class BookingPdnConsentGuard implements CanActivate {
   constructor(
     private readonly consentPolicy: ConsentPolicyService,
     private readonly prisma: PrismaService,
@@ -21,12 +21,16 @@ export class BookingRequiredConsentGuard implements CanActivate {
     const auth = request.bookingAccountAuth;
     if (!auth) throw new ForbiddenException('Не определён аккаунт онлайн-записи');
 
-    const state = await this.consentPolicy.requiredConsentState(auth.tenantId, auth.accountId);
+    const [pdnAllowed, state] = await Promise.all([
+      this.consentPolicy.hasActivePdnConsent(auth.tenantId, auth.accountId),
+      this.consentPolicy.requiredConsentState(auth.tenantId, auth.accountId),
+    ]);
     request.bookingConsentAccess = state;
-    if (!state.allowed) {
+
+    if (!pdnAllowed) {
       throw new ForbiddenException({
-        code: 'CONSENT_REQUIRED',
-        message: 'Необходимо заново подтвердить обязательные документы',
+        code: 'PDN_CONSENT_REQUIRED',
+        message: 'Необходимо подтвердить согласие на обработку персональных данных',
         ...state,
       });
     }
@@ -38,6 +42,7 @@ export class BookingRequiredConsentGuard implements CanActivate {
       acceptedAt: item.accepted ? item.eventAt : '',
       status: item.status,
     })) as Prisma.InputJsonValue;
+
     await this.prisma.bookingAccount.updateMany({
       where: { id: auth.accountId, tenantId: auth.tenantId },
       data: { consents: derivedConsents },

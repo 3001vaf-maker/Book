@@ -8,7 +8,7 @@ const policy = read('server/src/document-state/consent-policy.service.ts');
 const controller = read('server/src/document-state/document-state.controller.ts');
 const booking = read('server/src/online-booking/online-booking.service.ts');
 const bookingConsent = read('server/src/online-booking/booking-consent.controller.ts');
-const bookingGuard = read('server/src/online-booking/booking-required-consent.guard.ts');
+const bookingPdnGuard = read('server/src/online-booking/booking-pdn-consent.guard.ts');
 const migration = read('document-migration.js');
 const schema = read('server/prisma/schema.prisma');
 const consentMigration = read('server/prisma/migrations/20260915130000_canonical_consent_subjects/migration.sql');
@@ -36,7 +36,8 @@ assert.doesNotMatch(booking, /recordAcceptedConsents/);
 assert.match(booking, /acceptAccountConsents/);
 assert.match(booking, /requiredConsentState\(tenantId, accountId\)/);
 assert.match(bookingConsent, /acceptAccountConsents\(auth\.tenantId, auth\.accountId/);
-assert.match(bookingGuard, /requiredConsentState\(auth\.tenantId, auth\.accountId\)/);
+assert.match(bookingPdnGuard, /requiredConsentState\(auth\.tenantId, auth\.accountId\)/);
+assert.match(bookingPdnGuard, /hasActivePdnConsent\(auth\.tenantId, auth\.accountId\)/);
 
 assert.match(migration, /configureConsentPersistence\(null\)/);
 assert.doesNotMatch(migration, /queueDocumentDataset\('consents'/);

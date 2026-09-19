@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConsentPolicyService } from '../document-state/consent-policy.service';
 import { CommunicationService } from './communication.service';
 import { CommunicationHistoryService } from './communication-history.service';
 import { TelegramBotService } from './telegram-bot.service';
@@ -10,6 +11,7 @@ function text(value: unknown) { return String(value ?? '').trim(); }
 export class CommunicationDispatchService {
   constructor(
     private readonly communications: CommunicationService,
+    private readonly consentPolicy: ConsentPolicyService,
     private readonly history: CommunicationHistoryService,
     private readonly telegram: TelegramBotService,
   ) {}
@@ -38,6 +40,9 @@ export class CommunicationDispatchService {
     const body = text(input?.body);
     const attachments = Array.isArray(input?.attachments) ? input.attachments : [];
     if (!body && !attachments.length) throw new BadRequestException('Пустое сообщение');
+    if (!(await this.consentPolicy.hasActivePdnConsentForIdentity(tenantId, input?.phone, input?.uei))) {
+      throw new BadRequestException('Нет действующего согласия на обработку ПДН');
+    }
 
     if (attachments.length) {
       return this.communications.recordMessage(tenantId, {

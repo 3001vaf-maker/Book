@@ -9,7 +9,7 @@ import { PrismaService } from '../prisma.service';
 import { BookingAccountGuard } from './booking-account.guard';
 import { BookingAccountSettingsController } from './booking-account-settings.controller';
 import { BookingConsentController } from './booking-consent.controller';
-import { BookingRequiredConsentGuard } from './booking-required-consent.guard';
+import { BookingPdnConsentGuard } from './booking-pdn-consent.guard';
 import { ClientCardLinkService } from './client-card-link.service';
 import { OnlineBookingController } from './online-booking.controller';
 import { OnlineBookingService } from './online-booking.service';
@@ -17,6 +17,6 @@ import { OnlineBookingService } from './online-booking.service';
 @Module({
   imports: [AuthModule, BusinessStateModule, CommunicationModule, DocumentStateModule, NotificationModule, ProfileModule],
   controllers: [OnlineBookingController, BookingConsentController, BookingAccountSettingsController],
-  providers: [OnlineBookingService, BookingAccountGuard, BookingRequiredConsentGuard, ClientCardLinkService, PrismaService],
+  providers: [OnlineBookingService, BookingAccountGuard, BookingPdnConsentGuard, ClientCardLinkService, PrismaService],
 })
 export class OnlineBookingModule {}

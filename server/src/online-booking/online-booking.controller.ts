@@ -5,7 +5,7 @@ import { CommunicationService } from '../communication/communication.service';
 import { NotificationService } from '../notification/notification.service';
 import { WebPushService } from '../notification/web-push.service';
 import { BookingAccountGuard } from './booking-account.guard';
-import { BookingRequiredConsentGuard } from './booking-required-consent.guard';
+import { BookingPdnConsentGuard } from './booking-pdn-consent.guard';
 import { ClientCardLinkService } from './client-card-link.service';
 import { OnlineBookingService } from './online-booking.service';
 
@@ -161,19 +161,19 @@ export class OnlineBookingController {
     return this.webPush.deleteSubscription(tenantId, request.bookingAccountAuth!.accountId, body?.endpoint);
   }
 
-  @UseGuards(BookingAccountGuard, BookingRequiredConsentGuard)
+  @UseGuards(BookingAccountGuard)
   @Get(':tenantId/account/requests')
   myRequests(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
     return this.booking.getMyRequests(tenantId, request.bookingAccountAuth!.accountId);
   }
 
-  @UseGuards(BookingAccountGuard, BookingRequiredConsentGuard)
+  @UseGuards(BookingAccountGuard)
   @Get(':tenantId/account/notifications')
   notificationsFeed(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
     return this.notifications.listForAccount(tenantId, request.bookingAccountAuth!.accountId);
   }
 
-  @UseGuards(BookingAccountGuard, BookingRequiredConsentGuard)
+  @UseGuards(BookingAccountGuard)
   @Post(':tenantId/account/notifications/:notificationId/read')
   markNotificationRead(
     @Param('tenantId') tenantId: string,
@@ -183,14 +183,14 @@ export class OnlineBookingController {
     return this.notifications.markReadForAccount(tenantId, request.bookingAccountAuth!.accountId, notificationId);
   }
 
-  @UseGuards(BookingAccountGuard)
+  @UseGuards(BookingAccountGuard, BookingPdnConsentGuard)
   @Get(':tenantId/account/chat')
   async accountChat(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
     const account = await this.booking.getAccount(tenantId, request.bookingAccountAuth!.accountId);
     return this.communications.listThread(tenantId, { phone: account.phone, uei: account.uei }, 500);
   }
 
-  @UseGuards(BookingAccountGuard)
+  @UseGuards(BookingAccountGuard, BookingPdnConsentGuard)
   @Post(':tenantId/account/chat/messages')
   async sendAccountChatMessage(
     @Param('tenantId') tenantId: string,
@@ -214,7 +214,7 @@ export class OnlineBookingController {
     });
   }
 
-  @UseGuards(BookingAccountGuard, BookingRequiredConsentGuard)
+  @UseGuards(BookingAccountGuard, BookingPdnConsentGuard)
   @Post(':tenantId/requests')
   async createRequest(@Param('tenantId') tenantId: string, @Req() request: AccountRequest, @Body() body: Record<string, any>) {
     const accountId = request.bookingAccountAuth!.accountId;
