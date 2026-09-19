@@ -30,6 +30,10 @@ assert.deepEqual(
 );
 const workplaceModel = modelBlock('Workplace');
 const businessPersonModel = modelBlock('BusinessPerson');
+const membershipRoleEnum = schema.slice(
+  schema.indexOf('enum MembershipRole {'),
+  schema.indexOf('\n}', schema.indexOf('enum MembershipRole {')) + 2,
+);
 
 // Tenant is the persistent business/data boundary.
 // It owns Profile rows and People rows, but they are different concepts.
@@ -47,6 +51,11 @@ assert.match(platformAccountModel, /profiles\s+Profile\[\]/);
 assert.match(membershipModel, /tenantId\s+String/);
 assert.match(membershipModel, /platformAccountId\s+String/);
 assert.match(membershipModel, /@@unique\(\[tenantId, platformAccountId\]\)/);
+
+// Membership role is intentionally OWNER-only in the current PRIVATE model.
+assert.match(membershipRoleEnum, /OWNER/);
+assert.doesNotMatch(membershipRoleEnum, /ADMIN/);
+assert.doesNotMatch(membershipRoleEnum, /MASTER/);
 
 // Profile belongs to Tenant + login identity.
 // Profile has no nested/sub-profile relation.
