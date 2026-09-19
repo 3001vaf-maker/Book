@@ -198,7 +198,7 @@ export class OnlineBookingService {
     const cardStats = await this.clientCards.cardStats(tenantId, account);
     return publicAccount({
       ...account,
-      uei: identity?.uei || account.uei,
+      uei: identity?.uei || '',
       discountPercent: person.discountPercent ?? account.discountPercent,
       visits: cardStats?.visits ?? person.visits ?? account.visits,
       totalSpent: cardStats?.totalSpent ?? person.totalSpent ?? account.totalSpent,
@@ -566,7 +566,6 @@ export class OnlineBookingService {
       await this.prisma.bookingAccount.update({
         where: { id: account.id },
         data: {
-          uei: text(item?.uei),
           discountPercent: percent(item?.discountPercent),
           visits: Math.max(0, Math.floor(numeric(item?.visits, 0))),
           totalSpent: Math.max(0, numeric(item?.totalSpent, 0)),
