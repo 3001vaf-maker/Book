@@ -29,15 +29,15 @@ import {
   textareaField,
 } from '../ui/ui.js';
 
-function clientName(phone, uei = '') {
+function personName(phone, uei = '') {
   const people = findPeopleByPhone(phone);
   const person = people.find((item) => !uei || String(item.uei || '') === String(uei)) || people[0];
   const name = [person?.name, person?.surname].filter(Boolean).join(' ').trim();
-  return name || String(phone || 'Клиент');
+  return name || String(phone || 'Человек');
 }
 
 function personName(person = {}) {
-  return [person.name, person.surname].filter(Boolean).join(' ').trim() || person.phones?.[0] || 'Клиент';
+  return [person.name, person.surname].filter(Boolean).join(' ').trim() || person.phones?.[0] || 'Человек';
 }
 
 function phoneOf(person = {}) {
@@ -112,7 +112,7 @@ function recipientLabel(recipient = {}) {
   if (recipient.mode === 'one') return personName(personByKey(recipient.personKeys?.[0]) || {});
   if (recipient.mode === 'many') return `Выбрано: ${recipient.personKeys?.length || 0}`;
   if (recipient.mode === 'group') return recipient.groupName || 'Группа';
-  if (recipient.mode === 'all') return 'Все клиенты';
+  if (recipient.mode === 'all') return 'Все люди';
   return 'Получатели';
 }
 
@@ -163,7 +163,7 @@ async function renderCompose(root, state, recipient) {
     try {
       if (recipient.mode === 'one') {
         const person = personByKey(recipient.personKeys?.[0]);
-        if (!person) throw new Error('Клиент не найден');
+        if (!person) throw new Error('Человек не найден');
         await sendCommunicationMessage({ phone: phoneOf(person), uei: person.uei || '', body, attachments });
       } else {
         await sendBroadcast({
@@ -185,10 +185,10 @@ async function renderCompose(root, state, recipient) {
 
 function recipientOptions(root, state) {
   const layer = mountModal(document.body, modal(settingsPanel([
-    { label: 'Один клиент', data: 'data-recipient-one' },
-    { label: 'Несколько клиентов', data: 'data-recipient-many' },
+    { label: 'Один человек', data: 'data-recipient-one' },
+    { label: 'Несколько людей', data: 'data-recipient-many' },
     { label: 'Группа', data: 'data-recipient-group' },
-    { label: 'Все клиенты', data: 'data-recipient-all' },
+    { label: 'Все люди', data: 'data-recipient-all' },
   ]), { title: 'Кому?', variant: 'medium', surface: 'app' }));
   layer?.querySelector('[data-recipient-one]')?.addEventListener('click', () => { layer.remove(); void chooseOne(root, state); });
   layer?.querySelector('[data-recipient-many]')?.addEventListener('click', () => { layer.remove(); void chooseMany(root, state); });
@@ -202,7 +202,7 @@ async function chooseOne(root, state) {
     title: personName(person),
     subtitle: phoneOf(person),
     data: `data-recipient-person="${index}"`,
-  }))) : emptyState('Клиентов нет', 'Некого выбрать для сообщения.'), { title: 'Клиент', variant: 'large', surface: 'app' }));
+  }))) : emptyState('Людей нет', 'Некого выбрать для сообщения.'), { title: 'Человек', variant: 'large', surface: 'app' }));
   layer?.querySelectorAll('[data-recipient-person]').forEach((node) => node.addEventListener('click', () => {
     const person = people[Number(node.dataset.recipientPerson)];
     if (!person) return;
@@ -214,7 +214,7 @@ async function chooseOne(root, state) {
 async function chooseMany(root, state) {
   const people = peopleList();
   const content = `<div class="form-grid">${checkList(people.map((person) => ({ value: person.key, label: personName(person), secondary: phoneOf(person) })))}${button('Далее', { data: 'data-recipient-many-next' })}</div>`;
-  const layer = mountModal(document.body, modal(content, { title: 'Несколько клиентов', variant: 'large', surface: 'app' }));
+  const layer = mountModal(document.body, modal(content, { title: 'Несколько людей', variant: 'large', surface: 'app' }));
   if (!layer) return;
   initCheckList(layer);
   layer.querySelector('[data-recipient-many-next]')?.addEventListener('click', () => {
@@ -229,7 +229,7 @@ async function chooseGroup(root, state) {
   const groups = await getCommunicationGroups();
   const layer = mountModal(document.body, modal(groups.length ? listEntries(groups.map((group, index) => listEntry({
     title: group.name,
-    subtitle: `${group.personKeys?.length || 0} клиентов`,
+    subtitle: `${group.personKeys?.length || 0} людей`,
     data: `data-recipient-group-choice="${index}"`,
   }))) : emptyState('Групп пока нет', 'Создайте группу в настройках чата.'), { title: 'Группа', variant: 'large', surface: 'app' }));
   layer?.querySelectorAll('[data-recipient-group-choice]').forEach((node) => node.addEventListener('click', () => {
@@ -269,7 +269,7 @@ async function editGroup(group = null) {
 
 async function manageGroups() {
   const groups = await getCommunicationGroups();
-  const content = `<div class="form-grid">${button('Новая группа', { data: 'data-group-new' })}${groups.length ? listEntries(groups.map((group, index) => listEntry({ title: group.name, subtitle: `${group.personKeys?.length || 0} клиентов`, data: `data-group-edit="${index}"` }))) : emptyState('Групп пока нет', 'Создайте первую группу клиентов.')}</div>`;
+  const content = `<div class="form-grid">${button('Новая группа', { data: 'data-group-new' })}${groups.length ? listEntries(groups.map((group, index) => listEntry({ title: group.name, subtitle: `${group.personKeys?.length || 0} людей`, data: `data-group-edit="${index}"` }))) : emptyState('Групп пока нет', 'Создайте первую группу людей.')}</div>`;
   const layer = mountModal(document.body, modal(content, { title: 'Группы', variant: 'large', surface: 'app' }));
   layer?.querySelector('[data-group-new]')?.addEventListener('click', () => { layer.remove(); void editGroup(); });
   layer?.querySelectorAll('[data-group-edit]').forEach((node) => node.addEventListener('click', () => {
@@ -316,7 +316,7 @@ async function manageTemplates() {
 
 function openProfileChatSettings() {
   const layer = mountModal(document.body, modal(settingsPanel([
-    { label: 'Группы клиентов', data: 'data-chat-groups' },
+    { label: 'Группы людей', data: 'data-chat-groups' },
     { label: 'Шаблоны сообщений', data: 'data-chat-templates' },
   ]), { title: 'Настройки сообщений', variant: 'medium', surface: 'app' }));
   layer?.querySelector('[data-chat-groups]')?.addEventListener('click', () => { layer.remove(); void manageGroups(); });
@@ -328,10 +328,10 @@ async function openThread(root, state, thread) {
   state.thread = thread;
   const phone = String(thread?.cardPhone || '').trim();
   const uei = String(thread?.uei || '').trim();
-  screen(root, appHeader({ title: clientName(phone, uei), back: { data: 'data-chat-back', aria: 'К диалогам' } }), emptyState('Загрузка', 'Получаем переписку.'), 'app-view-shell--chat');
+  screen(root, appHeader({ title: personName(phone, uei), back: { data: 'data-chat-back', aria: 'К диалогам' } }), emptyState('Загрузка', 'Получаем переписку.'), 'app-view-shell--chat');
   try {
     const messages = withTimes(await getCommunicationThread({ phone, uei }));
-    screen(root, appHeader({ title: clientName(phone, uei), back: { data: 'data-chat-back', aria: 'К диалогам' } }), `${messages.length ? messageThread(messages, { viewer: 'profile' }) : emptyState('Сообщений пока нет', 'Напишите клиенту первое сообщение.')}${messageComposer({ placeholder: 'Написать сообщение...', attachments: true })}<div class="muted" data-chat-status aria-live="polite"></div>`, 'app-view-shell--chat');
+    screen(root, appHeader({ title: personName(phone, uei), back: { data: 'data-chat-back', aria: 'К диалогам' } }), `${messages.length ? messageThread(messages, { viewer: 'profile' }) : emptyState('Сообщений пока нет', 'Напишите человеку первое сообщение.')}${messageComposer({ placeholder: 'Написать сообщение...', attachments: true })}<div class="muted" data-chat-status aria-live="polite"></div>`, 'app-view-shell--chat');
     root.querySelector('[data-chat-back]')?.addEventListener('click', () => void renderThreads(root, state));
     const form = root.querySelector('[data-message-composer]');
     const getAttachments = bindMessageAttachments(form);
@@ -353,7 +353,7 @@ async function openThread(root, state, thread) {
       }
     });
   } catch (error) {
-    screen(root, appHeader({ title: clientName(phone, uei), back: { data: 'data-chat-back', aria: 'К диалогам' } }), emptyState('Чат недоступен', error instanceof Error ? error.message : 'Не удалось загрузить переписку'), 'app-view-shell--chat');
+    screen(root, appHeader({ title: personName(phone, uei), back: { data: 'data-chat-back', aria: 'К диалогам' } }), emptyState('Чат недоступен', error instanceof Error ? error.message : 'Не удалось загрузить переписку'), 'app-view-shell--chat');
     root.querySelector('[data-chat-back]')?.addEventListener('click', () => void renderThreads(root, state));
   }
 }
@@ -365,13 +365,13 @@ async function renderThreads(root, state) {
   try {
     const threads = await getCommunicationThreads();
     const items = threads.map((thread, index) => listEntry({
-      title: clientName(thread.cardPhone, thread.uei),
+      title: personName(thread.cardPhone, thread.uei),
       subtitle: thread.body || (Array.isArray(thread.attachments) && thread.attachments.length ? 'Медиа' : 'Открыть диалог'),
       rightTop: messageTime(thread.createdAt),
       data: `data-chat-thread="${index}"`,
-      aria: `Открыть диалог с ${clientName(thread.cardPhone, thread.uei)}`,
+      aria: `Открыть диалог с ${personName(thread.cardPhone, thread.uei)}`,
     }));
-    screen(root, appHeader({ title: 'Сообщения', action: { label: 'Новое', data: 'data-chat-new' }, settings: { data: 'data-chat-settings', aria: 'Настройки сообщений' } }), items.length ? listEntries(items) : emptyState('Чат пока пуст', 'Сообщения и системные уведомления клиентов появятся здесь.'));
+    screen(root, appHeader({ title: 'Сообщения', action: { label: 'Новое', data: 'data-chat-new' }, settings: { data: 'data-chat-settings', aria: 'Настройки сообщений' } }), items.length ? listEntries(items) : emptyState('Чат пока пуст', 'Сообщения и системные уведомления людей появятся здесь.'));
     root.querySelector('[data-chat-new]')?.addEventListener('click', () => recipientOptions(root, state));
     root.querySelector('[data-chat-settings]')?.addEventListener('click', openProfileChatSettings);
     root.querySelectorAll('[data-chat-thread]').forEach((element) => element.addEventListener('click', () => {
