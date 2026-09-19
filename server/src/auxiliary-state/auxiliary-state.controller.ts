@@ -3,7 +3,7 @@ import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuxiliaryStateService } from './auxiliary-state.service';
 
-type AuthenticatedRequest = Request & { auth?: { userId: string; tenantId: string; role: string } };
+type AuthenticatedRequest = Request & { auth?: { platformAccountId: string; tenantId: string; role: string } };
 
 @Controller('auxiliary-state')
 @UseGuards(JwtAuthGuard)
