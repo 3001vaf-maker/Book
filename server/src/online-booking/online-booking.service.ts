@@ -293,7 +293,7 @@ export class OnlineBookingService {
   async prepareAccount(tenantId: string, email: unknown) {
     const normalizedEmail = emailValue(email);
     if (!normalizedEmail) throw new BadRequestException('Введите email');
-    const account = await this.prisma.bookingAccount.findUnique({
+    const account = await this.prisma.account.findUnique({
       where: { tenantId_email: { tenantId, email: normalizedEmail } },
       select: { id: true },
     });
@@ -313,10 +313,10 @@ export class OnlineBookingService {
     if (!/^\+\d{8,15}$/.test(phone)) throw new BadRequestException('Введите телефон полностью');
     this.ensurePdnConsent({ documents }, consents);
 
-    const exists = await this.prisma.bookingAccount.findUnique({ where: { tenantId_email: { tenantId, email } } });
+    const exists = await this.prisma.account.findUnique({ where: { tenantId_email: { tenantId, email } } });
     if (exists) throw new ConflictException('Аккаунт с этим email уже существует');
 
-    const account = await this.prisma.bookingAccount.create({
+    const account = await this.prisma.account.create({
       data: {
         tenantId,
         email,
@@ -349,7 +349,7 @@ export class OnlineBookingService {
 
   async loginAccount(tenantId: string, email: unknown, password: unknown) {
     const normalizedEmail = emailValue(email);
-    const account = await this.prisma.bookingAccount.findUnique({
+    const account = await this.prisma.account.findUnique({
       where: { tenantId_email: { tenantId, email: normalizedEmail } },
     });
     if (!account || !(await compare(text(password), account.passwordHash))) {
@@ -364,14 +364,14 @@ export class OnlineBookingService {
   }
 
   async getAccount(tenantId: string, accountId: string) {
-    const account = await this.prisma.bookingAccount.findFirst({ where: { id: accountId, tenantId } });
+    const account = await this.prisma.account.findFirst({ where: { id: accountId, tenantId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
     await this.clientCards.bindFirstAccess(tenantId, account as any);
     return this.accountView(tenantId, account);
   }
 
   async updateAccount(tenantId: string, accountId: string, body: Record<string, any>) {
-    const account = await this.prisma.bookingAccount.findFirst({ where: { id: accountId, tenantId } });
+    const account = await this.prisma.account.findFirst({ where: { id: accountId, tenantId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
 
     const phone = text(body.phone) || account.phone;
@@ -379,7 +379,7 @@ export class OnlineBookingService {
     const profileData = body.profileData == null
       ? normalizeProfileData(account.profileData)
       : normalizeProfileData({ ...objectValue(account.profileData), ...objectValue(body.profileData) });
-    const updated = await this.prisma.bookingAccount.update({
+    const updated = await this.prisma.account.update({
       where: { id: account.id },
       data: {
         name: text(body.name) || account.name,
@@ -397,11 +397,11 @@ export class OnlineBookingService {
     const current = String(currentPassword ?? '');
     const next = String(newPassword ?? '');
     if (next.length < 8) throw new BadRequestException('Новый пароль должен содержать минимум 8 символов');
-    const account = await this.prisma.bookingAccount.findFirst({ where: { id: accountId, tenantId } });
+    const account = await this.prisma.account.findFirst({ where: { id: accountId, tenantId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
     if (!(await compare(current, account.passwordHash))) throw new BadRequestException('Текущий пароль указан неверно');
     if (await compare(next, account.passwordHash)) throw new BadRequestException('Новый пароль должен отличаться от текущего');
-    await this.prisma.bookingAccount.update({
+    await this.prisma.account.update({
       where: { id: account.id },
       data: { passwordHash: await hash(next, 12) },
     });
@@ -409,7 +409,7 @@ export class OnlineBookingService {
   }
 
   async createRequest(tenantId: string, accountId: string, body: Record<string, any>) {
-    const account = await this.prisma.bookingAccount.findFirst({ where: { id: accountId, tenantId } });
+    const account = await this.prisma.account.findFirst({ where: { id: accountId, tenantId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
     const data = await this.bookingSource(tenantId);
     if (!(await this.consentPolicy.hasActivePdnConsent(tenantId, accountId))) {
@@ -519,7 +519,7 @@ export class OnlineBookingService {
   }
 
   async getMyRequests(tenantId: string, accountId: string) {
-    const account = await this.prisma.bookingAccount.findFirst({ where: { id: accountId, tenantId } });
+    const account = await this.prisma.account.findFirst({ where: { id: accountId, tenantId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
     await this.clientCards.bindFirstAccess(tenantId, account as any);
     const identity = await this.businessState.bookingIdentityForAccount(tenantId, accountId);
@@ -548,7 +548,7 @@ export class OnlineBookingService {
   }
 
   async ownerAccounts(tenantId: string) {
-    const accounts = await this.prisma.bookingAccount.findMany({
+    const accounts = await this.prisma.account.findMany({
       where: { tenantId },
       orderBy: { updatedAt: 'desc' },
     });
@@ -561,9 +561,9 @@ export class OnlineBookingService {
     for (const item of items) {
       const accountId = text(item?.accountId ?? item?.id);
       if (!accountId) continue;
-      const account = await this.prisma.bookingAccount.findFirst({ where: { id: accountId, tenantId } });
+      const account = await this.prisma.account.findFirst({ where: { id: accountId, tenantId } });
       if (!account) continue;
-      await this.prisma.bookingAccount.update({
+      await this.prisma.account.update({
         where: { id: account.id },
         data: {
           discountPercent: percent(item?.discountPercent),
