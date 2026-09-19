@@ -1,9 +1,9 @@
-import { getBookingAccountToken } from '../booking-account/index.js';
+import { getAccountToken } from '../account/index.js';
 import { API_BASE } from '../environment.js';
 
 async function request(tenantId, path, options = {}) {
   const headers = new Headers(options.headers || {});
-  const token = getBookingAccountToken(tenantId);
+  const token = getAccountToken(tenantId);
   if (token) headers.set('Authorization', `Bearer ${token}`);
   if (options.body != null && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   const response = await fetch(`${API_BASE}${path}`, { ...options, headers });
