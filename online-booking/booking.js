@@ -40,7 +40,7 @@ import {
   getBookingWorkplace,
   requiredBookingDocuments,
 } from './model.js';
-import { renderAccountAccount } from './account-shell.js';
+import { renderAccount } from './account-shell.js';
 
 function localDateKey(value = new Date()) {
   const date = value instanceof Date ? value : new Date(value);
@@ -617,7 +617,7 @@ async function repeatBooking(root, state, request) {
 }
 
 async function renderAccountHome(root, state) {
-  await renderAccountAccount(root, state, {
+  await renderAccount(root, state, {
     onStartBooking: () => void startBookingFromAccount(root, state),
     onRepeat: (request) => void repeatBooking(root, state, request),
     onLogout: () => {
