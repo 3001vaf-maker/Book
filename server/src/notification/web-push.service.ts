@@ -72,7 +72,7 @@ export class WebPushService {
   }
 
   private async ensureAccount(tenantId: string, accountId: string) {
-    const account = await this.prisma.bookingAccount.findFirst({
+    const account = await this.prisma.account.findFirst({
       where: { id: accountId, tenantId },
       select: { id: true },
     });
