@@ -23,10 +23,10 @@ export class BookingConsentController {
     const auth = request.bookingAccountAuth!;
     const account = await this.prisma.bookingAccount.findFirst({
       where: { id: auth.accountId, tenantId: auth.tenantId },
-      select: { phone: true, email: true, uei: true },
+      select: { phone: true, email: true },
     });
     if (!account) return [];
-    const telegram = await this.communications.telegramIdentity(auth.tenantId, { phone: account.phone, uei: account.uei });
+    const telegram = await this.communications.telegramIdentity(auth.tenantId, { phone: account.phone });
     return [
       { type: 'PHONE', value: account.phone },
       { type: 'EMAIL', value: account.email },
