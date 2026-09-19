@@ -11,7 +11,7 @@ export class DocumentRegistryService {
       tenantId: string | null;
       tenantName: string | null;
       platformAccountId: string;
-      userEmail: string;
+      accountEmail: string;
       documentKey: string;
       documentTitle: string;
       documentVersion: number;
@@ -26,7 +26,7 @@ export class DocumentRegistryService {
         e."tenantId",
         t."name" AS "tenantName",
         e."platformAccountId",
-        u."email" AS "userEmail",
+        a."email" AS "accountEmail",
         d."key" AS "documentKey",
         d."title" AS "documentTitle",
         v."version" AS "documentVersion",
