@@ -21,7 +21,7 @@ export class BookingConsentController {
 
   private async currentContactPoints(request: AccountRequest) {
     const auth = request.bookingAccountAuth!;
-    const account = await this.prisma.bookingAccount.findFirst({
+    const account = await this.prisma.account.findFirst({
       where: { id: auth.accountId, tenantId: auth.tenantId },
       select: { phone: true, email: true },
     });
