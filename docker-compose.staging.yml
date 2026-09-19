@@ -27,7 +27,7 @@ services:
       OWNER_TENANT_NAME: Book Staging
       FRONTEND_ORIGIN: http://localhost:8080
       PUBLIC_API_URL: http://localhost:3000
-      CLIENT_APP_URL: http://localhost:8080
+      ACCOUNT_APP_URL: http://localhost:8080
       WEB_PUSH_VAPID_PUBLIC_KEY: BHiWL1O1iVRVOfjqlev6lQZc-bDwmzpb1EI5mMpPsFgshXHKikRBwr4PkBOAHmzijHJtILulRxHjZxEUERP73Gs
       WEB_PUSH_VAPID_PRIVATE_KEY: gxC9jcEI6J7exbNd0NA-KlF3w1ZfhIKyXnmEPCvyiig
       WEB_PUSH_VAPID_SUBJECT: mailto:staging@book.local
