@@ -57,7 +57,7 @@ const current = [{
   system: true,
   kind: 'consent',
   title: 'Согласие на обработку персональных данных',
-  clientConsent: true,
+  personConsent: true,
   required: true,
   version: 3,
   text: existingFullText,
