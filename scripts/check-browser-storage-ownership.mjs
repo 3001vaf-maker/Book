@@ -8,7 +8,7 @@ const STORAGE_PATTERN = /\b(localStorage|sessionStorage|indexedDB|caches\b|Cache
 
 const TECHNICAL_STORAGE_OWNERS = new Set([
   'core/auth.js',
-  'core/booking-account/index.js',
+  'core/account/index.js',
   'core/workplace-context.js',
   'main/people/view-state.js',
   'onboarding/onboarding.js',
@@ -55,8 +55,8 @@ if (!(auxiliaryCheck >= 0 && cleanupCall > auxiliaryCheck && workspaceRender > c
 
 const cleanup = source(path.join(ROOT, CLEANUP_OWNER));
 for (const requiredTechnicalKey of [
-  'book.booking-account.token.',
-  'book.booking-account.email.',
+  'book.account.token.',
+  'book.account.email.',
   'book.people.sort',
   'book.onboarding.',
   'book:workplace-context',
