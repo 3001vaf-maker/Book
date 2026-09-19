@@ -9,7 +9,6 @@ import {
   prepareBookingAccount,
   registerBookingAccount,
   submitBookingConsents,
-  updateBookingAccount,
 } from '../core/booking-account/index.js';
 import { normalizeBookingSettings } from '../core/booking-settings/index.js';
 import { formatPhone } from '../core/phone/index.js';
@@ -110,9 +109,9 @@ async function refreshAccountConsentState(state) {
 
 async function saveRegistrationConsents(state) {
   const consents = currentConsentFacts(state);
-  state.account = await updateBookingAccount(state.tenantId, { consents });
-  await submitBookingConsents(state.tenantId, consents);
-  seedConsents(state, consents);
+  const consentState = await submitBookingConsents(state.tenantId, consents);
+  seedConsents(state, consentState?.consents || []);
+  return consentState;
 }
 
 function resetBookingChoice(state) {
@@ -374,7 +373,7 @@ function renderPassword(root, state) {
         });
         state.account = payload.account;
         state.error = '';
-        seedConsents(state, state.account?.consents || currentConsentFacts(state));
+        await refreshAccountConsentState(state);
         if (payload.clientCardExisted) {
           state.clientTab = 'profile';
           await renderAccountHome(root, state);
@@ -676,7 +675,7 @@ export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = 
     const account = await getBookingAccount(state.tenantId);
     if (account) {
       state.account = account;
-      seedConsents(state, account.consents || []);
+      await refreshAccountConsentState(state);
       await renderAccountHome(root, state);
       return;
     }
