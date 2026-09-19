@@ -5,6 +5,7 @@ const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf
 
 const consentPolicy = read('server/src/document-state/consent-policy.service.ts');
 const bookingController = read('server/src/online-booking/online-booking.controller.ts');
+const bookingService = read('server/src/online-booking/online-booking.service.ts');
 const pdnGuard = read('server/src/online-booking/booking-pdn-consent.guard.ts');
 const notification = read('server/src/notification/notification.service.ts');
 const dispatch = read('server/src/communication/communication-dispatch.service.ts');
@@ -26,6 +27,8 @@ assert.match(bookingController, /@UseGuards\(BookingAccountGuard\)\s+@Post\(':te
 assert.match(bookingController, /@UseGuards\(BookingAccountGuard, BookingPdnConsentGuard\)\s+@Get\(':tenantId\/account\/chat'\)/);
 assert.match(bookingController, /@UseGuards\(BookingAccountGuard, BookingPdnConsentGuard\)\s+@Post\(':tenantId\/account\/chat\/messages'\)/);
 assert.match(bookingController, /@UseGuards\(BookingAccountGuard, BookingPdnConsentGuard\)\s+@Post\(':tenantId\/requests'\)/);
+assert.match(bookingService, /async createRequest[\s\S]*hasActivePdnConsent\(tenantId, accountId\)/);
+assert.doesNotMatch(bookingService, /async createRequest[\s\S]*requiredConsentState\(tenantId, accountId\)/);
 
 assert.match(notification, /!\(await this\.documents\.hasActivePdnConsent\(tenantId, identity\.accountId\)\)/);
 assert.match(notification, /!\(await this\.documents\.hasActivePdnConsent\(tenantId, accountId\)\)/);
