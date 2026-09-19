@@ -12,6 +12,7 @@ const excluded = new Set([
   'tests',
   'scripts',
   'docs',
+  'archive',
 ]);
 const excludedRootFiles = new Set([
   '.dockerignore',
