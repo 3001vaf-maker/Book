@@ -158,7 +158,7 @@ function liveRecordSnapshot(record: JsonObject, fallback: unknown = null) {
     duration: Math.max(0, Number(item?.duration || 0)),
   }));
   const subtotal = Math.max(0, Number(finance.serviceTotal || 0));
-  const discountPercent = Math.max(0, Math.min(100, Number(finance.discountPercent ?? record?.client?.discountPercent ?? 0) || 0));
+  const discountPercent = Math.max(0, Math.min(100, Number(finance.discountPercent ?? record?.person?.discountPercent ?? 0) || 0));
   const total = Math.max(0, Number(finance.planTotal ?? subtotal * (1 - discountPercent / 100)) || 0);
   const previous = objectValue(objectValue(fallback).payment);
   const paid = Math.max(0, Number(previous.paid || 0));
@@ -550,19 +550,19 @@ export class BusinessStateService {
 
     const now = new Date().toISOString();
     const procedures = (Array.isArray(input.procedures) ? input.procedures : []).map((item) => clone(objectValue(item)));
-    const client = clone(objectValue(input.client));
+    const person = clone(objectValue(input.person));
     const record = {
       id: randomUUID(),
       date: text(input.date).slice(0, 10),
       workplaceId: text(input.workplaceId),
       from: text(input.from),
       to: text(input.to),
-      client,
+      person,
       procedures,
       products: [],
       source: 'online-booking',
       sourceRequestId: requestId,
-      finance: bookingFinance(procedures, client.discountPercent),
+      finance: bookingFinance(procedures, person.discountPercent),
       createdAt: now,
       updatedAt: now,
     };
