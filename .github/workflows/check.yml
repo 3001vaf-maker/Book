@@ -263,6 +263,9 @@ jobs:
           expect_contains "client.va-tools.ru" "/" "<title>Book</title>"
           expect_contains "client.va-tools.ru" "/online-booking/booking.js" "renderOnlineBooking"
 
+      - name: Verify public production domains externally
+        run: node scripts/verify-public-domains.mjs
+
       - name: Start and verify staging frontend
         shell: bash
         run: |
