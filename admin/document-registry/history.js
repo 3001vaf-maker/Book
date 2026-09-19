@@ -1,5 +1,5 @@
 // Company-side history belongs to Admin/Document Registry only.
-// It never contains the operational history of a user's Book with that user's clients.
+// It never contains the operational history of a user's Book with that user's people.
 
 let documentRegistryHistory = [];
 
