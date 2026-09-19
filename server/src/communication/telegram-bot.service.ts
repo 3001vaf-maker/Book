@@ -19,7 +19,7 @@ type TelegramBotRow = {
   id: string; tenantId: string; botId: string; botUsername: string; encryptedToken: string; tokenIv: string; tokenTag: string;
   webhookKey: string; webhookSecretHash: string; status: string; connectedAt: Date; updatedAt: Date;
 };
-type TelegramIdentityRow = { cardPhone: string; uei: string };
+type TelegramIdentityRow = { personPhone: string; uei: string };
 function text(value: unknown) { return String(value ?? '').trim(); }
 function canonicalPhone(value: unknown) {
   const digits = text(value).replace(/\D/g, '');
@@ -136,7 +136,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
   async sendChatMessage(tenantId: string, input: { phone?: unknown; uei?: unknown; body?: unknown; purpose?: unknown }) {
     const body = text(input?.body); if (!body) throw new BadRequestException('Пустое сообщение');
     const purpose = normalizeMessagePurpose(input?.purpose); if (!purpose) throw new BadRequestException('Не указан purpose сообщения');
-    const identity = await this.communications.telegramIdentity(tenantId, input || {}); if (!identity) throw new NotFoundException('Telegram у клиента не подключён');
+    const identity = await this.communications.telegramIdentity(tenantId, input || {}); if (!identity) throw new NotFoundException('Telegram у человека не подключён');
     if (!(await this.consentPolicy.hasActivePdnConsentForContact(tenantId, 'TELEGRAM', identity.externalUserId))) {
       throw new BadRequestException('Нет действующего согласия на обработку ПДН');
     }
@@ -145,9 +145,9 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     }
     try {
       const result = await this.sendMessage(tenantId, identity.externalUserId, body);
-      return this.communications.recordMessage(tenantId, { phone: identity.cardPhone, uei: identity.uei, direction: 'outbound', kind: 'message', purpose, channel: 'TELEGRAM', body, externalMessageId: String(result?.message_id || ''), externalThreadId: String(result?.chat?.id || identity.externalUserId), status: 'sent' });
+      return this.communications.recordMessage(tenantId, { phone: identity.personPhone, uei: identity.uei, direction: 'outbound', kind: 'message', purpose, channel: 'TELEGRAM', body, externalMessageId: String(result?.message_id || ''), externalThreadId: String(result?.chat?.id || identity.externalUserId), status: 'sent' });
     } catch (error) {
-      await this.communications.recordMessage(tenantId, { phone: identity.cardPhone, uei: identity.uei, direction: 'outbound', kind: 'message', purpose, channel: 'TELEGRAM', body, status: 'failed', error: error instanceof Error ? error.message : String(error) });
+      await this.communications.recordMessage(tenantId, { phone: identity.personPhone, uei: identity.uei, direction: 'outbound', kind: 'message', purpose, channel: 'TELEGRAM', body, status: 'failed', error: error instanceof Error ? error.message : String(error) });
       throw error;
     }
   }
@@ -184,7 +184,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     const message = update?.message; if (!message?.from?.id || !message?.chat?.id) return { ok: true };
     const telegramUserId = String(message.from.id); const username = telegramUsername(message.from.username); const messageBody = text(message.text || message.caption);
     const identities = await this.prisma.$queryRaw<TelegramIdentityRow[]>`
-      SELECT "cardPhone", "uei" FROM "CommunicationIdentity"
+      SELECT "personPhone", "uei" FROM "CommunicationIdentity"
       WHERE "tenantId" = ${connection.tenantId} AND "channel" = 'TELEGRAM' AND "externalUserId" = ${telegramUserId} LIMIT 1
     `;
     const identity = identities[0] || null;
@@ -205,7 +205,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     if (messageBody && messageBody !== '/start') {
       const pdnAllowed = await this.consentPolicy.hasActivePdnConsentForContact(connection.tenantId, 'TELEGRAM', telegramUserId);
       if (!pdnAllowed) return { ok: true, linked: true, blocked: 'PDN_CONSENT_REQUIRED' };
-      await this.communications.recordMessage(connection.tenantId, { phone: identity.cardPhone, uei: identity.uei, direction: 'inbound', kind: 'message', purpose: 'DIRECT', channel: 'TELEGRAM', body: messageBody, externalMessageId: String(message.message_id || ''), externalThreadId: String(message.chat.id), status: 'delivered' });
+      await this.communications.recordMessage(connection.tenantId, { phone: identity.personPhone, uei: identity.uei, direction: 'inbound', kind: 'message', purpose: 'DIRECT', channel: 'TELEGRAM', body: messageBody, externalMessageId: String(message.message_id || ''), externalThreadId: String(message.chat.id), status: 'delivered' });
     }
     return { ok: true, linked: true };
   }
