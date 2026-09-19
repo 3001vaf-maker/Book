@@ -36,9 +36,6 @@ for (const path of walk(root)) {
   lines.forEach((line, index) => {
     if (!/master|мастер/i.test(line)) return;
 
-    // Profession labels are data values inside Profile, not system terminology.
-    if (path === 'settings/profile/profile.js' && line.includes('const PROFESSIONS=')) return;
-
     violations.push(`${path}:${index + 1}: ${line.trim()}`);
   });
 }
