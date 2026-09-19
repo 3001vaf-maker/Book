@@ -76,9 +76,8 @@ export class PersonIdentityService {
         && !text(relations[`person:${key}`]);
     }).length;
 
-    // The same normalized phone represents the same logical Person.
-    // Multiple legacy rows with that phone are historical duplicates; review them explicitly
-    // so cleanup preserves Record, Finance, Communication and consent history.
+    // A shared phone or matching name is not proof that two Person records are one human.
+    // Legacy duplicates are therefore reported for explicit review and never merged into UEI automatically.
     return { repaired: 0, candidates, requiresManualReview: candidates > 0 };
   }
 
