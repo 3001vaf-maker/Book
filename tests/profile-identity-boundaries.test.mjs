@@ -6,6 +6,17 @@ const profileService = readFileSync(new URL('../server/src/profile/profile.servi
 const authService = readFileSync(new URL('../server/src/auth/auth.service.ts', import.meta.url), 'utf8');
 const invitationService = readFileSync(new URL('../server/src/master-invitation/master-invitation.service.ts', import.meta.url), 'utf8');
 const workspaceService = readFileSync(new URL('../server/src/workspace/workspace.service.ts', import.meta.url), 'utf8');
+function modelBlock(name) {
+  const match = schema.match(new RegExp(`model ${name} \\\{([\\s\\S]*?)\\n\\}`));
+  assert.ok(match, `Missing Prisma model: ${name}`);
+  return match[1];
+}
+
+const tenantModel = modelBlock('Tenant');
+const userModel = modelBlock('User');
+const membershipModel = modelBlock('Membership');
+const profileModel = modelBlock('Profile');
+
 const activeServerSources = [
   authService,
   invitationService,
