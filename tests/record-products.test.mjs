@@ -15,7 +15,7 @@ const record = createRecord({
   workplaceId: 'studio',
   from: '10:00',
   to: '11:00',
-  client: { key: 'client-products', name: 'Анна', surname: 'Товар' },
+  person: { key: 'person-products', name: 'Анна', surname: 'Товар' },
   procedures: [{ id: 'procedure-products', name: 'Стрижка', cost: 5000, duration: 60 }],
 });
 assert.ok(record);
@@ -43,7 +43,7 @@ assert.equal(corrected.finance.planTotal, 6800);
 const payment = recordPaymentIncome({
   source: { type: 'record', id: record.id },
   workplace: 'Студия',
-  client: { key: 'client-products' },
+  person: { key: 'person-products' },
   finance: corrected.finance,
   maxAmount: 6800,
   serviceAmount: 6800,
