@@ -180,9 +180,9 @@ function canonical(value: ProfileBundleInput) {
 export class ProfileService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private async bundle(tenantId: string, userId: string) {
+  private async bundle(tenantId: string, platformAccountId: string) {
     const row = await this.prisma.profile.findUnique({
-      where: { tenantId_userId: { tenantId, userId } },
+      where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
       include: { workplaces: { orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] } },
     });
     if (!row) {
@@ -221,18 +221,18 @@ export class ProfileService {
     };
   }
 
-  get(tenantId: string, userId: string) {
-    return this.bundle(tenantId, userId);
+  get(tenantId: string, platformAccountId: string) {
+    return this.bundle(tenantId, platformAccountId);
   }
 
-  async migrate(tenantId: string, userId: string, body: unknown) {
+  async migrate(tenantId: string, platformAccountId: string, body: unknown) {
     const expected = normalizeBundle(body);
-    const existing = await this.prisma.profile.findUnique({ where: { tenantId_userId: { tenantId, userId } } });
-    if (existing) return this.bundle(tenantId, userId);
+    const existing = await this.prisma.profile.findUnique({ where: { tenantId_platformAccountId: { tenantId, platformAccountId } } });
+    if (existing) return this.bundle(tenantId, platformAccountId);
 
     await this.prisma.$transaction(async (tx) => {
       const profile = await tx.profile.create({
-        data: { tenantId, userId, ...profileData(expected.profile, expected.customProfessions) },
+        data: { tenantId, platformAccountId, ...profileData(expected.profile, expected.customProfessions) },
       });
       if (expected.workplaces.length) {
         await tx.workplace.createMany({
@@ -245,12 +245,12 @@ export class ProfileService {
       }
     });
 
-    return this.bundle(tenantId, userId);
+    return this.bundle(tenantId, platformAccountId);
   }
 
-  async verifyMigration(tenantId: string, userId: string, body: unknown) {
+  async verifyMigration(tenantId: string, platformAccountId: string, body: unknown) {
     const expected = normalizeBundle(body);
-    const current = await this.bundle(tenantId, userId);
+    const current = await this.bundle(tenantId, platformAccountId);
     if (!current.migrated || !current.profile) throw new NotFoundException('Профиль ещё не перенесён');
 
     const actual = normalizeBundle({
@@ -263,31 +263,31 @@ export class ProfileService {
     }
 
     await this.prisma.profile.update({
-      where: { tenantId_userId: { tenantId, userId } },
+      where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
       data: { migrationVerifiedAt: new Date() },
     });
-    return this.bundle(tenantId, userId);
+    return this.bundle(tenantId, platformAccountId);
   }
 
-  async bootstrap(tenantId: string, userId: string) {
-    const existing = await this.prisma.profile.findUnique({ where: { tenantId_userId: { tenantId, userId } } });
+  async bootstrap(tenantId: string, platformAccountId: string) {
+    const existing = await this.prisma.profile.findUnique({ where: { tenantId_platformAccountId: { tenantId, platformAccountId } } });
     if (!existing) {
-      const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
-      const empty = normalizeProfile({ emails: user?.email ? [user.email] : [] });
+      const account = await this.prisma.platformAccount.findUnique({ where: { id: platformAccountId }, select: { email: true } });
+      const empty = normalizeProfile({ emails: account?.email ? [user.email] : [] });
       await this.prisma.profile.create({
         data: {
           tenantId,
-          userId,
+          platformAccountId,
           ...profileData(empty, []),
           migrationVerifiedAt: new Date(),
         },
       });
     }
-    return this.bundle(tenantId, userId);
+    return this.bundle(tenantId, platformAccountId);
   }
 
-  async updateProfile(tenantId: string, userId: string, body: unknown) {
-    const current = await this.prisma.profile.findUnique({ where: { tenantId_userId: { tenantId, userId } } });
+  async updateProfile(tenantId: string, platformAccountId: string, body: unknown) {
+    const current = await this.prisma.profile.findUnique({ where: { tenantId_platformAccountId: { tenantId, platformAccountId } } });
     if (!current?.migrationVerifiedAt) throw new ConflictException('Перенос Profile + Workplaces ещё не подтверждён');
     const source = body && typeof body === 'object' && !Array.isArray(body) ? body as Record<string, unknown> : {};
     const profile = normalizeProfile(source.profile ?? source);
@@ -295,15 +295,15 @@ export class ProfileService {
       ? stringList(current.customProfessions)
       : stringList(source.customProfessions);
     await this.prisma.profile.update({
-      where: { tenantId_userId: { tenantId, userId } },
+      where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
       data: profileData(profile, customProfessions),
     });
-    return this.bundle(tenantId, userId);
+    return this.bundle(tenantId, platformAccountId);
   }
 
-  async upsertWorkplace(tenantId: string, userId: string, key: string, body: unknown) {
+  async upsertWorkplace(tenantId: string, platformAccountId: string, key: string, body: unknown) {
     const profile = await this.prisma.profile.findUnique({
-      where: { tenantId_userId: { tenantId, userId } },
+      where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
       include: { workplaces: { select: { position: true } } },
     });
     if (!profile?.migrationVerifiedAt) throw new ConflictException('Перенос Profile + Workplaces ещё не подтверждён');
@@ -331,16 +331,16 @@ export class ProfileService {
       },
       update: workplaceData(normalized, position),
     });
-    return this.bundle(tenantId, userId);
+    return this.bundle(tenantId, platformAccountId);
   }
 
-  async deleteWorkplace(tenantId: string, userId: string, key: string) {
-    const profile = await this.prisma.profile.findUnique({ where: { tenantId_userId: { tenantId, userId } } });
+  async deleteWorkplace(tenantId: string, platformAccountId: string, key: string) {
+    const profile = await this.prisma.profile.findUnique({ where: { tenantId_platformAccountId: { tenantId, platformAccountId } } });
     if (!profile?.migrationVerifiedAt) throw new ConflictException('Перенос Profile + Workplaces ещё не подтверждён');
     const existing = await this.prisma.workplace.findUnique({ where: { tenantId_key: { tenantId, key } } });
     if (!existing || existing.profileId !== profile.id) throw new NotFoundException('Рабочее место не найдено');
     await this.prisma.workplace.delete({ where: { tenantId_key: { tenantId, key } } });
-    return this.bundle(tenantId, userId);
+    return this.bundle(tenantId, platformAccountId);
   }
 
   async publicBookingBundle(tenantId: string) {
