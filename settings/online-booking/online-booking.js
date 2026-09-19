@@ -1,5 +1,5 @@
 import { buildBookingLink } from '../../core/booking-link/index.js';
-import { getCurrentUser } from '../../core/auth.js';
+import { getCurrentAccount } from '../../core/auth.js';
 import {
   BOOKING_CHOICE_STYLES,
   BOOKING_SHAPES,
@@ -373,7 +373,7 @@ export function render(root, navigateBack = () => {}) {
     body: emptyState('Загрузка', 'Формируем ссылки онлайн-записи.'),
   });
 
-  void getCurrentUser()
+  void getCurrentAccount()
     .then((account) => {
       const tenantId = String(account?.tenant?.id || '');
       if (!tenantId) {

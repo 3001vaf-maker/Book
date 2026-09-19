@@ -13,7 +13,7 @@ assert.equal(existsSync(new URL('../archive/documents-20260918', import.meta.url
 for (const key of [
   'privacy-policy',
   'saas-agreement',
-  'master-pd-consent',
+  'platform-processor-consent',
   'marketing-consent',
   'public-profile-consent',
   'dpa',

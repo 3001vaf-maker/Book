@@ -91,7 +91,7 @@ assert.match(listRoot.innerHTML, /Анна Тест/);
 assert.match(listRoot.innerHTML, /6 400 ₽/);
 assert.equal(getRecords().length, 1);
 
-// Profile has no discount. Master assigns 20% at payment stage.
+// Profile has no discount. Profile assigns 20% at payment stage.
 const paymentStageRecord = createRecord({
   date: '2026-09-11',
   workplaceId: 'studio',

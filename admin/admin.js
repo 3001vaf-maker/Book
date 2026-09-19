@@ -1,13 +1,13 @@
-import { apiRequest, clearAuthToken, getCurrentUser, login } from '../core/auth.js';
+import { apiRequest, clearAuthToken, getCurrentAccount, login } from '../core/auth.js';
 import { renderDocumentRegistry } from './document-registry/view.js';
 
 const app = document.querySelector('#admin-app');
 const state = {
   account: null,
   admin: null,
-  masters: [],
+  tenants: [],
   capabilities: [],
-  section: 'masters',
+  section: 'tenants',
 };
 
 function escapeHtml(value) {
@@ -28,7 +28,7 @@ function renderLogin(message = '') {
     <main class="admin-login">
       <section class="admin-login-card">
         <h1>Book Admin</h1>
-        <p>Управление персональными Book мастеров</p>
+        <p>Управление профилями</p>
         <form class="admin-form" data-login-form>
           <label class="admin-field"><span>Email</span><input name="email" type="email" autocomplete="username" required></label>
           <label class="admin-field"><span>Пароль</span><input name="password" type="password" autocomplete="current-password" required></label>
@@ -63,11 +63,11 @@ async function loadAdmin() {
 }
 
 async function refreshData() {
-  const [masters, capabilities] = await Promise.all([
-    adminRequest('/masters'),
+  const [tenants, capabilities] = await Promise.all([
+    adminRequest('/tenants'),
     adminRequest('/capabilities'),
   ]);
-  state.masters = Array.isArray(masters) ? masters : [];
+  state.tenants = Array.isArray(tenants) ? tenants : [];
   state.capabilities = Array.isArray(capabilities) ? capabilities : [];
 }
 
@@ -80,14 +80,14 @@ function renderShell() {
           <button data-section="overview">Обзор</button>
           <button data-section="owner" class="owner-link">Мой Book</button>
           <button data-section="document-registry">Реестр документов</button>
-          <button data-section="masters">Мастера</button>
+          <button data-section="tenants">Профили</button>
           <button data-section="capabilities">Возможности</button>
         </nav>
         <div class="admin-sidebar-foot">SaaS Control Plane</div>
       </aside>
       <header class="admin-toolbar">
-        <h1 data-toolbar-title>Мастера</h1>
-        <div class="admin-toolbar-user"><span>${escapeHtml(state.admin?.user?.email || '')}</span><button class="admin-button secondary" data-logout>Выйти</button></div>
+        <h1 data-toolbar-title>Профили</h1>
+        <div class="admin-toolbar-user"><span>${escapeHtml(state.admin?.account?.email || '')}</span><button class="admin-button secondary" data-logout>Выйти</button></div>
       </header>
       <main class="admin-main"><div class="admin-content" data-content></div></main>
     </div>`;
@@ -125,52 +125,52 @@ function renderCurrentSection() {
     });
   }
   if (state.section === 'capabilities') return renderCapabilities();
-  return renderMasters();
+  return renderTenants();
 }
 
 function renderOverview() {
   setActiveSection('Обзор');
   const content = app.querySelector('[data-content]');
-  const regular = state.masters.filter((item) => !item.isOwnerBook);
-  const active = regular.filter((item) => item.status === 'ACTIVE' && item.master).length;
-  const pending = regular.filter((item) => !item.master && item.invitation?.status === 'PENDING').length;
+  const regular = state.tenants.filter((item) => !item.isOwnerBook);
+  const active = regular.filter((item) => item.status === 'ACTIVE' && item.ownerProfile).length;
+  const pending = regular.filter((item) => !item.ownerProfile && item.invitation?.status === 'PENDING').length;
   content.innerHTML = `
     <div class="admin-heading"><div><h2>Обзор</h2><p>Состояние персональных Book</p></div></div>
     <div class="admin-stats">
-      <div class="admin-stat"><strong>${regular.length}</strong><span>создано Book мастеров</span></div>
-      <div class="admin-stat"><strong>${active}</strong><span>активных мастеров</span></div>
+      <div class="admin-stat"><strong>${regular.length}</strong><span>создано профилей</span></div>
+      <div class="admin-stat"><strong>${active}</strong><span>активных профилей</span></div>
       <div class="admin-stat"><strong>${pending}</strong><span>ожидают принятия приглашения</span></div>
     </div>`;
 }
 
 function renderOwnerBook() {
   setActiveSection('Мой Book');
-  const owner = state.masters.find((item) => item.isOwnerBook);
+  const owner = state.tenants.find((item) => item.isOwnerBook);
   const content = app.querySelector('[data-content]');
   if (!owner) {
     content.innerHTML = '<div class="admin-card" style="padding:20px">Мой Book пока не определён.</div>';
     return;
   }
   content.innerHTML = `
-    <div class="admin-heading"><div><h2>Мой Book</h2><p>Ваш первый персональный Book остаётся отдельным от списка мастеров.</p></div></div>
+    <div class="admin-heading"><div><h2>Мой Book</h2><p>Ваш первый персональный Book остаётся отдельным от списка профилей.</p></div></div>
     <div class="admin-card" style="padding:20px">
-      <strong>${escapeHtml(owner.master?.name || owner.tenantName)}</strong>
-      <p style="color:#817a74">${escapeHtml(owner.master?.email || '')}</p>
+      <strong>${escapeHtml(owner.ownerProfile?.name || owner.tenantName)}</strong>
+      <p style="color:#817a74">${escapeHtml(owner.ownerProfile?.email || '')}</p>
       <button class="admin-button" data-edit-owner>Настроить доступы</button>
     </div>`;
   content.querySelector('[data-edit-owner]').addEventListener('click', () => openAccessDrawer(owner.tenantId));
 }
 
-function renderMasters() {
-  setActiveSection('Мастера');
+function renderTenants() {
+  setActiveSection('Профили');
   const content = app.querySelector('[data-content]');
-  const masters = state.masters.filter((item) => !item.isOwnerBook);
+  const tenants = state.tenants.filter((item) => !item.isOwnerBook);
   content.innerHTML = `
-    <div class="admin-heading"><div><h2>Мастера</h2><p>Каждый мастер работает только в своём персональном Book.</p></div></div>
+    <div class="admin-heading"><div><h2>Профили</h2><p>Каждый профиль работает в своём пространстве.</p></div></div>
     <section class="admin-invite-panel">
-      <h3>Пригласить мастера</h3>
+      <h3>Создать профиль</h3>
       <form class="admin-invite-grid" data-invite-form>
-        <label class="admin-field"><span>Имя</span><input name="name" placeholder="Имя мастера"></label>
+        <label class="admin-field"><span>Имя</span><input name="name" placeholder="Имя"></label>
         <label class="admin-field"><span>Email</span><input name="email" type="email" placeholder="name@example.com" required></label>
         <button class="admin-button" type="submit">Отправить приглашение</button>
       </form>
@@ -178,8 +178,8 @@ function renderMasters() {
     </section>
     <div class="admin-card">
       <table class="admin-table">
-        <thead><tr><th>Мастер</th><th>Email</th><th>Состояние</th><th>Набор</th></tr></thead>
-        <tbody>${masters.map(masterRow).join('') || '<tr><td colspan="4">Пока нет приглашённых мастеров.</td></tr>'}</tbody>
+        <thead><tr><th>Профиль</th><th>Email</th><th>Состояние</th><th>Набор</th></tr></thead>
+        <tbody>${tenants.map(tenantRow).join('') || '<tr><td colspan="4">Пока нет созданных профилей.</td></tr>'}</tbody>
       </table>
     </div>`;
 
@@ -202,7 +202,7 @@ function renderMasters() {
       form.reset();
       message.textContent = 'Приглашение отправлено по email.';
       await refreshData();
-      window.setTimeout(renderMasters, 350);
+      window.setTimeout(renderTenants, 350);
     } catch (error) {
       message.textContent = error instanceof Error ? error.message : 'Не удалось отправить приглашение';
       message.classList.add('error');
@@ -230,12 +230,12 @@ function renderMasters() {
   });
 }
 
-function masterRow(item) {
-  const pending = !item.master && item.invitation?.status === 'PENDING';
-  const name = item.master?.name || item.invitation?.name || item.tenantName;
-  const email = item.master?.email || item.invitation?.email || '';
+function tenantRow(item) {
+  const pending = !item.ownerProfile && item.invitation?.status === 'PENDING';
+  const name = item.ownerProfile?.name || item.invitation?.name || item.tenantName;
+  const email = item.ownerProfile?.email || item.invitation?.email || '';
   const statusClass = item.status === 'SUSPENDED' ? 'suspended' : pending ? 'pending' : 'active';
-  const statusLabel = item.status === 'SUSPENDED' ? 'Отключён' : pending ? 'Ждёт входа' : item.master ? 'Активен' : 'Создан';
+  const statusLabel = item.status === 'SUSPENDED' ? 'Отключён' : pending ? 'Ждёт входа' : item.ownerProfile ? 'Активен' : 'Создан';
   const resend = pending ? `<button class="admin-button secondary" data-resend="${escapeHtml(item.invitation.id)}">Повторить email</button>` : '';
   return `<tr data-tenant="${escapeHtml(item.tenantId)}"><td><strong>${escapeHtml(name)}</strong></td><td>${escapeHtml(email)}</td><td><span class="admin-pill ${statusClass}">${statusLabel}</span> ${resend}</td><td>${escapeHtml(item.plan?.name || 'Индивидуальный')}</td></tr>`;
 }
@@ -254,15 +254,15 @@ function renderCapabilities() {
 }
 
 function openAccessDrawer(tenantId) {
-  const master = state.masters.find((item) => item.tenantId === tenantId);
-  if (!master) return;
-  const resolved = new Map((master.access?.capabilities || []).map((item) => [item.key, item]));
+  const tenant = state.tenants.find((item) => item.tenantId === tenantId);
+  if (!tenant) return;
+  const resolved = new Map((tenant.access?.capabilities || []).map((item) => [item.key, item]));
   const backdrop = document.createElement('div');
   backdrop.className = 'admin-drawer-backdrop';
   backdrop.innerHTML = `
     <aside class="admin-drawer">
       <div class="admin-drawer-head">
-        <div><h3>${escapeHtml(master.isOwnerBook ? 'Мой Book' : (master.master?.name || master.invitation?.name || master.tenantName))}</h3><p>${escapeHtml(master.master?.email || master.invitation?.email || '')}</p></div>
+        <div><h3>${escapeHtml(tenant.isOwnerBook ? 'Мой Book' : (tenant.ownerProfile?.name || tenant.invitation?.name || tenant.tenantName))}</h3><p>${escapeHtml(tenant.ownerProfile?.email || tenant.invitation?.email || '')}</p></div>
         <button class="admin-close" data-close aria-label="Закрыть">×</button>
       </div>
       <section class="admin-section">
@@ -271,7 +271,7 @@ function openAccessDrawer(tenantId) {
       </section>
       <section class="admin-section">
         <h4>Состояние</h4>
-        <button class="admin-button ${master.status === 'SUSPENDED' ? '' : 'danger'}" data-status>${master.status === 'SUSPENDED' ? 'Включить Book' : 'Отключить Book'}</button>
+        <button class="admin-button ${tenant.status === 'SUSPENDED' ? '' : 'danger'}" data-status>${tenant.status === 'SUSPENDED' ? 'Включить Book' : 'Отключить Book'}</button>
       </section>
       <div class="admin-actions"><button class="admin-button secondary" data-close>Закрыть</button><button class="admin-button" data-save>Сохранить доступы</button></div>
       <p class="admin-inline-message" data-save-message></p>
@@ -288,7 +288,7 @@ function openAccessDrawer(tenantId) {
   });
 
   backdrop.querySelector('[data-status]').addEventListener('click', async () => {
-    const next = master.status === 'SUSPENDED' ? 'ACTIVE' : 'SUSPENDED';
+    const next = tenant.status === 'SUSPENDED' ? 'ACTIVE' : 'SUSPENDED';
     try {
       await adminRequest(`/tenants/${encodeURIComponent(tenantId)}/access`, {
         method: 'PUT',
@@ -353,7 +353,7 @@ function capabilityEditor(capability, resolved) {
 }
 
 try {
-  state.account = await getCurrentUser();
+  state.account = await getCurrentAccount();
   if (!state.account) {
     renderLogin();
   } else {

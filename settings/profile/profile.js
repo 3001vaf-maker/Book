@@ -4,7 +4,7 @@ import { addCustomProfession, getCustomProfessions, getProfile, saveProfile as s
 import { getWorkplaces } from './workplaces/data.js';
 import { initWorkplaceListDeletion, openWorkplaceModal, renderWorkplace, workplaceList } from './workplaces/workplaces.js';
 
-const PROFESSIONS=['Парикмахер','Колорист','Барбер','Визажист','Стилист','Мастер маникюра','Мастер педикюра','Бровист','Лэшмейкер','Косметолог','Массажист','Мастер по наращиванию волос','Мастер перманентного макияжа','Другая'];
+const PROFESSIONS=['Парикмахер','Колорист','Барбер','Визажист','Стилист','Маникюр','Педикюр','Бровист','Лэшмейкер','Косметолог','Массажист','Наращивание волос','Перманентный макияж','Другая'];
 const EXPERIENCES=['Без опыта','До 1 года','1–3 года','3–5 лет','5–10 лет','10–15 лет','15–20 лет','Более 20 лет'];
 const fullName=p=>[p.name,p.surname].filter(Boolean).join(' ')||'Ваш профиль';
 const initial=p=>fullName(p).slice(0,1).toUpperCase()||'?';

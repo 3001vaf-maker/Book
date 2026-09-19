@@ -66,7 +66,7 @@ function renderForm(invitation) {
     button.disabled = true;
     button.textContent = 'Создаём Book…';
     try {
-      const account = await post('/master-invitations/accept', { token, password });
+      const account = await post('/tenant-invitations/accept', { token, password });
       setAuthToken(account.accessToken);
       state.innerHTML = '<h1>Book создан</h1><p class="invite-success">Открываем ваше рабочее пространство…</p>';
       window.setTimeout(() => location.replace('../'), 350);
@@ -82,7 +82,7 @@ if (!token) {
   renderError('В ссылке отсутствует код приглашения.');
 } else {
   try {
-    const invitation = await post('/master-invitations/inspect', { token });
+    const invitation = await post('/tenant-invitations/inspect', { token });
     renderForm(invitation);
   } catch (error) {
     renderError(error instanceof Error ? error.message : 'Не удалось проверить приглашение');

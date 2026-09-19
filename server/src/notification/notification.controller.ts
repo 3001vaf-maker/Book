@@ -3,7 +3,7 @@ import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { NotificationService } from './notification.service';
 
-type OwnerRequest = Request & { auth?: { userId: string; tenantId: string; role: string } };
+type OwnerRequest = Request & { auth?: { platformAccountId: string; tenantId: string; role: string } };
 
 @Controller('notifications')
 @UseGuards(JwtAuthGuard)

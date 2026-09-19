@@ -9,7 +9,7 @@ import { BookingPdnConsentGuard } from './booking-pdn-consent.guard';
 import { ClientCardLinkService } from './client-card-link.service';
 import { OnlineBookingService } from './online-booking.service';
 
-type OwnerRequest = Request & { auth?: { userId: string; tenantId: string; role: string } };
+type OwnerRequest = Request & { auth?: { platformAccountId: string; tenantId: string; role: string } };
 type AccountRequest = Request & { bookingAccountAuth?: { accountId: string; tenantId: string } };
 
 @Controller('online-booking')

@@ -105,9 +105,9 @@ function workplaceName(state, request = {}) {
   return workplaces.find((item) => String(item?.key || '') === String(request.workplaceKey || ''))?.name || 'Пространство';
 }
 
-function masterName(state) {
+function profileDisplayName(state) {
   const profile = state.context?.profile || {};
-  return [profile.name, profile.surname].filter(Boolean).join(' ').trim() || 'Мастер';
+  return [profile.name, profile.surname].filter(Boolean).join(' ').trim() || 'Профиль';
 }
 
 function mediaItems(state) {
@@ -438,16 +438,16 @@ async function renderHistory(root, state, handlers) {
 
 async function renderMessages(root, state, handlers) {
   const messages = await loadMessages(state);
-  const master = masterName(state);
+  const profileName = profileDisplayName(state);
   if (!state.clientChatOpen) {
     const last = messages[messages.length - 1];
     const lastLabel = last?.body ? String(last.body).split('\n')[0] : Array.isArray(last?.attachments) && last.attachments.length ? 'Медиа' : 'Открыть диалог';
     const body = listEntries([listEntry({
-      title: master,
+      title: profileName,
       subtitle: lastLabel,
       rightTop: last?.time || '',
       data: 'data-client-open-chat',
-      aria: `Открыть диалог с ${master}`,
+      aria: `Открыть диалог с ${profileName}`,
     })]);
     renderShell(root, state, { title: 'Сообщения', body, media: '' });
     bindBottomNavigation(root, state, handlers);
@@ -459,11 +459,11 @@ async function renderMessages(root, state, handlers) {
   }
 
   renderShell(root, state, {
-    title: master,
+    title: profileName,
     back: { data: 'data-client-chat-back', aria: 'К списку диалогов' },
     action: { label: 'Записаться', data: 'data-client-chat-booking' },
     settings: { data: 'data-client-chat-settings', aria: 'Настройки чата' },
-    body: `${messages.length ? messageThread(messages, { viewer: 'client' }) : emptyState('Сообщений пока нет', 'Напишите мастеру первое сообщение.')}${messageComposer({ attachments: true })}`,
+    body: `${messages.length ? messageThread(messages, { viewer: 'client' }) : emptyState('Сообщений пока нет', 'Напишите первое сообщение.')}${messageComposer({ attachments: true })}`,
     media: '',
     className: 'app-view-shell--chat',
   });

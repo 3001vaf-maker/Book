@@ -12,7 +12,7 @@ import { initializeAuxiliaryState } from './auxiliary-migration.js';
 import { getJournalTimeUsages, releaseJournalSoftTimeUsages } from './journal/time-usage-source.js';
 import { configureWorkplaceSource } from './core/workplace-time.js';
 import { configureTimeUsageSource, configureSoftTimeUsageReleaseSource } from './core/time/index.js';
-import { getCurrentUser, login } from './core/auth.js';
+import { getCurrentAccount, login } from './core/auth.js';
 import { canUseBookCapability, getBookAccess, loadBookAccess } from './core/access.js';
 import { isOnboardingComplete, renderOnboarding } from './onboarding/onboarding.js';
 import { startServerBookingSync } from './online-booking/server-sync.js';
@@ -191,12 +191,12 @@ async function renderAuthenticated(account = authenticatedAccount) {
   }
   ensureServerBookingSync();
 
-  const serverWorkspaceUnlocked = Boolean(authenticatedAccount?.user?.workspaceUnlocked);
+  const serverWorkspaceUnlocked = Boolean(authenticatedAccount?.account?.workspaceUnlocked);
   if (!serverWorkspaceUnlocked && !isOnboardingComplete()) {
     workspaceReady = false;
     history.replaceState({}, '', location.pathname);
     await renderOnboarding(app, {
-      accountEmail: authenticatedAccount?.user?.email || '',
+      accountEmail: authenticatedAccount?.account?.email || '',
       onComplete: () => {
         state.activeSection = defaultSection();
         history.replaceState({}, '', `#${state.activeSection}`);
@@ -293,10 +293,10 @@ if (publicBooking) {
   renderPublicBooking(publicBooking);
 } else {
   try {
-    const currentUser = await getCurrentUser();
-    if (currentUser) {
-      authenticatedAccount = currentUser;
-      await renderAuthenticated(currentUser);
+    const currentAccount = await getCurrentAccount();
+    if (currentAccount) {
+      authenticatedAccount = currentAccount;
+      await renderAuthenticated(currentAccount);
     } else {
       renderLogin();
     }

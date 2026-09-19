@@ -6,17 +6,17 @@ import { Prisma } from '@prisma/client';
 export class WorkspaceService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async get(tenantId: string, userId: string) {
+  async get(tenantId: string, platformAccountId: string) {
     return this.prisma.workspaceState.findUnique({
-      where: { tenantId_userId: { tenantId, userId } },
+      where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
       select: { data: true, revision: true, updatedAt: true },
     });
   }
 
-  async save(tenantId: string, userId: string, data: Prisma.InputJsonValue) {
+  async save(tenantId: string, platformAccountId: string, data: Prisma.InputJsonValue) {
     return this.prisma.workspaceState.upsert({
-      where: { tenantId_userId: { tenantId, userId } },
-      create: { tenantId, userId, data, revision: 1 },
+      where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
+      create: { tenantId, platformAccountId, data, revision: 1 },
       update: { data, revision: { increment: 1 } },
       select: { data: true, revision: true, updatedAt: true },
     });

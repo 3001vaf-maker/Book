@@ -7,7 +7,7 @@ const controller = await readFile(new URL('../server/src/online-booking/online-b
 const sync = await readFile(new URL('../online-booking/server-sync.js', import.meta.url), 'utf8');
 
 assert.match(service, /reconcileLegacyAccountDuplicates\(tenantId: string\)/, 'Legacy review service must remain available for historical data inspection');
-assert.match(service, /requiresManualReview:\s*candidates > 0/, 'Legacy account-* candidates must be surfaced for explicit master review');
+assert.match(service, /requiresManualReview:\s*candidates > 0/, 'Legacy account-* candidates must be surfaced for explicit profile review');
 assert.match(service, /return \{ repaired: 0, candidates, requiresManualReview: candidates > 0 \}/, 'Legacy review must never report an automatic repair');
 assert.doesNotMatch(service, /peopleSharePhone\(/, 'Shared phone must not be used as an automatic Person/UEI merge rule');
 assert.doesNotMatch(service, /sameNamedPerson\(/, 'Matching names must not be used as an automatic Person/UEI merge rule');
@@ -23,10 +23,10 @@ assert.match(bindFirstAccess, /if \(existing\) return existing/, 'Existing known
 assert.match(bindFirstAccess, /upsertBookingPersonFromAccount/, 'Person creation remains available only after existing-card lookup returns null');
 
 const manualRecords = service.slice(service.indexOf('async manualRecordViews('));
-assert.match(manualRecords, /phonesMatch\(client\.phone, account\.phone\)/, 'Master-created records must remain discoverable by the registered contact phone');
+assert.match(manualRecords, /phonesMatch\(client\.phone, account\.phone\)/, 'Profile-created records must remain discoverable by the registered contact phone');
 const myRequests = onlineBooking.slice(onlineBooking.indexOf('async getMyRequests('), onlineBooking.indexOf('async ownerAccounts('));
-assert.match(myRequests, /manualRecordViews\(tenantId, account as any, importedRecordIds\)/, 'Account history must include master-created pre-login records');
-assert.match(myRequests, /return \[\.\.\.requestViews, \.\.\.manualViews\]/, 'Online and pre-existing master records must be returned in one client history');
+assert.match(myRequests, /manualRecordViews\(tenantId, account as any, importedRecordIds\)/, 'Account history must include profile-created pre-login records');
+assert.match(myRequests, /return \[\.\.\.requestViews, \.\.\.manualViews\]/, 'Online and pre-existing profile records must be returned in one client history');
 
 assert.match(controller, /owner\/reconcile-legacy-client-cards/, 'Owner-only legacy review route is retained for compatibility');
 assert.match(controller, /@UseGuards\(JwtAuthGuard\)[\s\S]*reconcileLegacyClientCards/, 'Legacy review route must require owner authentication');

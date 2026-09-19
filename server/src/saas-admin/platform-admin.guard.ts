@@ -4,7 +4,7 @@ import { MembershipRole } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 
 type AdminRequest = Request & {
-  auth?: { userId: string; tenantId: string; role: string };
+  auth?: { platformAccountId: string; tenantId: string; role: string };
   platformAdminId?: string;
 };
 
@@ -14,20 +14,20 @@ export class PlatformAdminGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest<AdminRequest>();
-    const userId = request.auth?.userId;
+    const platformAccountId = request.auth?.platformAccountId;
     const tenantId = request.auth?.tenantId;
-    if (!userId || !tenantId) throw new ForbiddenException('Нет доступа к панели управления');
+    if (!platformAccountId || !tenantId) throw new ForbiddenException('Нет доступа к панели управления');
 
-    const existing = await this.prisma.platformAdmin.findUnique({ where: { userId } });
+    const existing = await this.prisma.platformAdmin.findUnique({ where: { platformAccountId } });
     if (existing) {
       request.platformAdminId = existing.id;
       return true;
     }
 
-    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+    const account = await this.prisma.platformAccount.findUnique({ where: { id: platformAccountId }, select: { email: true } });
     const configuredEmail = String(process.env.PLATFORM_ADMIN_EMAIL || process.env.OWNER_EMAIL || '').trim().toLowerCase();
-    if (configuredEmail && user?.email.toLowerCase() === configuredEmail) {
-      const admin = await this.prisma.platformAdmin.create({ data: { userId } });
+    if (configuredEmail && account?.email.toLowerCase() === configuredEmail) {
+      const admin = await this.prisma.platformAdmin.create({ data: { platformAccountId } });
       await this.prisma.tenantAccess.upsert({
         where: { tenantId },
         create: { tenantId, isOwnerBook: true },
@@ -42,11 +42,11 @@ export class PlatformAdminGuard implements CanActivate {
       const firstTenant = await this.prisma.tenant.findFirst({ orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] });
       const membership = firstTenant
         ? await this.prisma.membership.findUnique({
-            where: { tenantId_userId: { tenantId: firstTenant.id, userId } },
+            where: { tenantId_platformAccountId: { tenantId: firstTenant.id, platformAccountId } },
           })
         : null;
       if (firstTenant?.id === tenantId && membership?.role === MembershipRole.OWNER) {
-        const admin = await this.prisma.platformAdmin.create({ data: { userId } });
+        const admin = await this.prisma.platformAdmin.create({ data: { platformAccountId } });
         await this.prisma.tenantAccess.upsert({
           where: { tenantId },
           create: { tenantId, isOwnerBook: true },

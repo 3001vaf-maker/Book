@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { CapabilityValueType, TenantAccessStatus } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { SaasAccessService } from '../saas-access/saas-access.service';
-import { MasterInvitationService } from '../master-invitation/master-invitation.service';
+import { TenantInvitationService } from '../tenant-invitation/tenant-invitation.service';
 import { DocumentRegistryService } from '../document-registry/document-registry.service';
 
 @Injectable()
@@ -10,17 +10,17 @@ export class SaasAdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: SaasAccessService,
-    private readonly invitations: MasterInvitationService,
+    private readonly invitations: TenantInvitationService,
     private readonly documentRegistry: DocumentRegistryService,
   ) {}
 
-  async me(adminId: string, userId: string) {
+  async me(adminId: string, platformAccountId: string) {
     const admin = await this.prisma.platformAdmin.findUnique({
       where: { id: adminId },
-      include: { user: { select: { id: true, email: true } } },
+      include: { account: { select: { id: true, email: true } } },
     });
-    if (!admin || admin.userId !== userId) throw new NotFoundException('Администратор не найден');
-    return { id: admin.id, user: admin.user };
+    if (!admin || admin.platformAccountId !== platformAccountId) throw new NotFoundException('Администратор не найден');
+    return { id: admin.id, account: admin.account };
   }
 
   documentRegistryHistory() {
@@ -46,20 +46,20 @@ export class SaasAdminService {
     });
   }
 
-  async masters() {
+  async tenants() {
     const rows = await this.prisma.tenantAccess.findMany({
       include: {
         plan: { select: { id: true, key: true, name: true } },
         tenant: {
           include: {
             memberships: {
-              include: { user: { select: { id: true, email: true, createdAt: true } } },
+              include: { account: { select: { id: true, email: true, createdAt: true } } },
               orderBy: { createdAt: 'asc' },
             },
             profiles: {
-              select: { userId: true, name: true, surname: true, profession: true },
+              select: { platformAccountId: true, name: true, surname: true, profession: true },
             },
-            masterInvitations: {
+            tenantInvitations: {
               orderBy: { createdAt: 'desc' },
               take: 1,
               select: { id: true, email: true, name: true, status: true, createdAt: true, expiresAt: true },
@@ -73,9 +73,9 @@ export class SaasAdminService {
     return Promise.all(rows.map(async (row) => {
       const membership = row.tenant.memberships[0] || null;
       const profile = membership
-        ? row.tenant.profiles.find((item) => item.userId === membership.userId) || null
+        ? row.tenant.profiles.find((item) => item.platformAccountId === membership.platformAccountId) || null
         : null;
-      const invitation = row.tenant.masterInvitations[0] || null;
+      const invitation = row.tenant.tenantInvitations[0] || null;
       const resolved = await this.access.resolveTenantAccess(row.tenantId);
       return {
         tenantId: row.tenantId,
@@ -83,12 +83,12 @@ export class SaasAdminService {
         status: row.status,
         isOwnerBook: row.isOwnerBook,
         plan: row.plan,
-        master: membership ? {
-          userId: membership.user.id,
-          email: membership.user.email,
+        ownerProfile: membership ? {
+          platformAccountId: membership.account.id,
+          email: membership.account.email,
           name: [profile?.name, profile?.surname].filter(Boolean).join(' ') || invitation?.name || row.tenant.name,
           profession: profile?.profession || '',
-          registeredAt: membership.user.createdAt,
+          registeredAt: membership.account.createdAt,
         } : null,
         invitation,
         access: resolved,

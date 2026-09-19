@@ -7,7 +7,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import {
   CapabilityValueType,
-  MasterInvitationStatus,
+  TenantInvitationStatus,
   MembershipRole,
   TenantAccessStatus,
 } from '@prisma/client';
@@ -71,7 +71,7 @@ function escapeHtml(value: string) {
 }
 
 @Injectable()
-export class MasterInvitationService {
+export class TenantInvitationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly email: TransactionalEmailService,
@@ -145,13 +145,13 @@ export class MasterInvitationService {
   async createInvitation(adminId: string, input: { email?: unknown; name?: unknown }) {
     const email = normalizeEmail(input?.email);
     const name = normalizeName(input?.name);
-    if (!email || !email.includes('@')) throw new BadRequestException('Укажите корректный email мастера');
+    if (!email || !email.includes('@')) throw new BadRequestException('Укажите корректный email');
 
-    const existingUser = await this.prisma.user.findUnique({ where: { email } });
-    if (existingUser) throw new ConflictException('Пользователь с таким email уже зарегистрирован');
+    const existingAccount = await this.prisma.platformAccount.findUnique({ where: { email } });
+    if (existingAccount) throw new ConflictException('Учётная запись с таким email уже зарегистрирована');
 
-    const existingInvitation = await this.prisma.masterInvitation.findFirst({
-      where: { email, status: MasterInvitationStatus.PENDING },
+    const existingInvitation = await this.prisma.tenantInvitation.findFirst({
+      where: { email, status: TenantInvitationStatus.PENDING },
       orderBy: { createdAt: 'desc' },
     });
     if (existingInvitation) throw new ConflictException('На этот email уже отправлено активное приглашение');
@@ -172,7 +172,7 @@ export class MasterInvitationService {
           isOwnerBook: false,
         },
       });
-      const invitation = await tx.masterInvitation.create({
+      const invitation = await tx.tenantInvitation.create({
         data: {
           tenantId: tenant.id,
           createdByAdminId: adminId,
@@ -196,9 +196,9 @@ export class MasterInvitationService {
   }
 
   async resendInvitation(adminId: string, invitationId: string) {
-    const invitation = await this.prisma.masterInvitation.findUnique({ where: { id: invitationId } });
+    const invitation = await this.prisma.tenantInvitation.findUnique({ where: { id: invitationId } });
     if (!invitation || invitation.createdByAdminId !== adminId) throw new NotFoundException('Приглашение не найдено');
-    if (invitation.status !== MasterInvitationStatus.PENDING) throw new ConflictException('Это приглашение уже не активно');
+    if (invitation.status !== TenantInvitationStatus.PENDING) throw new ConflictException('Это приглашение уже не активно');
 
     const oldTokenHash = invitation.tokenHash;
     const oldExpiresAt = invitation.expiresAt;
@@ -206,7 +206,7 @@ export class MasterInvitationService {
     const tokenHash = invitationHash(token);
     const expiresAt = new Date(Date.now() + INVITATION_TTL_MS);
 
-    const updated = await this.prisma.masterInvitation.update({
+    const updated = await this.prisma.tenantInvitation.update({
       where: { id: invitation.id },
       data: { tokenHash, expiresAt },
     });
@@ -214,7 +214,7 @@ export class MasterInvitationService {
     try {
       await this.sendInvitationEmail({ email: invitation.email, name: invitation.name, token });
     } catch (error) {
-      await this.prisma.masterInvitation.update({
+      await this.prisma.tenantInvitation.update({
         where: { id: invitation.id },
         data: { tokenHash: oldTokenHash, expiresAt: oldExpiresAt },
       }).catch(() => undefined);
@@ -240,12 +240,12 @@ export class MasterInvitationService {
     if (password.length < 10) throw new BadRequestException('Пароль должен содержать минимум 10 символов');
 
     const invitation = await this.findActiveInvitation(token);
-    const existingUser = await this.prisma.user.findUnique({ where: { email: invitation.email } });
-    if (existingUser) throw new ConflictException('Пользователь с таким email уже зарегистрирован');
+    const existingAccount = await this.prisma.platformAccount.findUnique({ where: { email: invitation.email } });
+    if (existingAccount) throw new ConflictException('Учётная запись с таким email уже зарегистрирована');
 
     const passwordHash = await hashPassword(password, 12);
     const result = await this.prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({
+      const account = await tx.platformAccount.create({
         data: {
           email: invitation.email,
           passwordHash,
@@ -256,33 +256,33 @@ export class MasterInvitationService {
       const membership = await tx.membership.create({
         data: {
           tenantId: invitation.tenantId,
-          userId: user.id,
+          platformAccountId: account.id,
           role: MembershipRole.OWNER,
         },
       });
-      await tx.masterInvitation.update({
+      await tx.tenantInvitation.update({
         where: { id: invitation.id },
         data: {
-          status: MasterInvitationStatus.ACCEPTED,
+          status: TenantInvitationStatus.ACCEPTED,
           acceptedAt: new Date(),
         },
       });
-      return { user, membership };
+      return { account, membership };
     });
 
     const accessToken = await this.jwt.signAsync({
-      sub: result.user.id,
+      sub: result.account.id,
       tenantId: invitation.tenantId,
       role: result.membership.role,
     });
 
     return {
       accessToken,
-      user: {
-        id: result.user.id,
-        email: result.user.email,
-        onboardingStep: result.user.onboardingStep,
-        workspaceUnlocked: result.user.workspaceUnlocked,
+      account: {
+        id: result.account.id,
+        email: result.account.email,
+        onboardingStep: result.account.onboardingStep,
+        workspaceUnlocked: result.account.workspaceUnlocked,
       },
       tenant: { id: invitation.tenant.id, name: invitation.tenant.name },
       role: result.membership.role,
@@ -290,7 +290,7 @@ export class MasterInvitationService {
   }
 
   async listInvitations(adminId: string) {
-    const rows = await this.prisma.masterInvitation.findMany({
+    const rows = await this.prisma.tenantInvitation.findMany({
       where: { createdByAdminId: adminId },
       include: { tenant: true },
       orderBy: { createdAt: 'desc' },
@@ -303,12 +303,12 @@ export class MasterInvitationService {
 
   private async findActiveInvitation(token: string) {
     if (!token) throw new BadRequestException('Приглашение отсутствует');
-    const invitation = await this.prisma.masterInvitation.findUnique({
+    const invitation = await this.prisma.tenantInvitation.findUnique({
       where: { tokenHash: invitationHash(token) },
       include: { tenant: true },
     });
     if (!invitation) throw new NotFoundException('Приглашение не найдено');
-    if (invitation.status !== MasterInvitationStatus.PENDING) throw new ConflictException('Приглашение уже использовано или отозвано');
+    if (invitation.status !== TenantInvitationStatus.PENDING) throw new ConflictException('Приглашение уже использовано или отозвано');
     if (invitation.expiresAt.getTime() <= Date.now()) throw new ConflictException('Срок действия приглашения истёк');
     return invitation;
   }
@@ -324,7 +324,7 @@ export class MasterInvitationService {
       to: input.email,
       toName: input.name,
       subject: 'Приглашение в Book',
-      tag: 'master-invitation',
+      tag: 'tenant-invitation',
       text: `${input.name ? `Здравствуйте, ${input.name}.` : 'Здравствуйте.'}\n\nВам открыт персональный Book. Создайте пароль и начните настройку рабочего пространства:\n${url}\n\nСсылка действует 7 дней.`,
       html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#292522"><h2>Book</h2><p>${greeting}</p><p>Вам открыт персональный Book. Создайте пароль и начните настройку своего рабочего пространства.</p><p style="margin:28px 0"><a href="${url}" style="background:#292522;color:#fff;text-decoration:none;padding:14px 20px;border-radius:12px;display:inline-block">Создать пароль и войти</a></p><p style="color:#817a74;font-size:14px">Ссылка действует 7 дней.</p></div>`,
     });
@@ -335,7 +335,7 @@ export class MasterInvitationService {
     tenantId: string;
     email: string;
     name: string;
-    status: MasterInvitationStatus;
+    status: TenantInvitationStatus;
     expiresAt: Date;
     acceptedAt: Date | null;
     revokedAt: Date | null;

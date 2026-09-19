@@ -3,11 +3,10 @@ import { readFileSync } from 'node:fs';
 
 const schema = readFileSync(new URL('../server/prisma/schema.prisma', import.meta.url), 'utf8');
 const profileService = readFileSync(new URL('../server/src/profile/profile.service.ts', import.meta.url), 'utf8');
-const authService = readFileSync(new URL('../server/src/auth/auth.service.ts', import.meta.url), 'utf8');
-const invitationService = readFileSync(new URL('../server/src/master-invitation/master-invitation.service.ts', import.meta.url), 'utf8');
+const invitationService = readFileSync(new URL('../server/src/tenant-invitation/tenant-invitation.service.ts', import.meta.url), 'utf8');
 const workspaceService = readFileSync(new URL('../server/src/workspace/workspace.service.ts', import.meta.url), 'utf8');
-const saasAdminService = readFileSync(new URL('../server/src/saas-admin/saas-admin.service.ts', import.meta.url), 'utf8');
-const platformAdminGuard = readFileSync(new URL('../server/src/saas-admin/platform-admin.guard.ts', import.meta.url), 'utf8');
+const adminService = readFileSync(new URL('../server/src/saas-admin/saas-admin.service.ts', import.meta.url), 'utf8');
+const adminController = readFileSync(new URL('../server/src/saas-admin/saas-admin.controller.ts', import.meta.url), 'utf8');
 
 function modelBlock(name) {
   const marker = `model ${name} {`;
@@ -19,61 +18,85 @@ function modelBlock(name) {
 }
 
 const tenantModel = modelBlock('Tenant');
-const userModel = modelBlock('User');
+const platformAccountModel = modelBlock('PlatformAccount');
 const membershipModel = modelBlock('Membership');
 const profileModel = modelBlock('Profile');
 
-const activeIdentitySources = [
-  authService,
-  invitationService,
-  profileService,
-  workspaceService,
-  saasAdminService,
-  platformAdminGuard,
-].join('\n');
+const membershipRoleMatch = schema.match(/enum MembershipRole \{([\s\S]*?)\n\}/);
+assert.ok(membershipRoleMatch, 'Missing MembershipRole enum');
+assert.deepEqual(
+  membershipRoleMatch[1].split('\n').map((line) => line.trim()).filter(Boolean),
+  ['OWNER'],
+);
+const workplaceModel = modelBlock('Workplace');
+const businessPersonModel = modelBlock('BusinessPerson');
+const membershipRoleEnum = schema.slice(
+  schema.indexOf('enum MembershipRole {'),
+  schema.indexOf('\n}', schema.indexOf('enum MembershipRole {')) + 2,
+);
 
-// Tenant is the isolated data boundary and is not a Profile alias.
-assert.match(tenantModel, /memberships\s+Membership\[\]/);
+// Tenant is the persistent business/data boundary.
+// It owns Profile rows and People rows, but they are different concepts.
 assert.match(tenantModel, /profiles\s+Profile\[\]/);
-assert.match(tenantModel, /documentArchive\s+TenantDocumentArchive\?/);
 assert.match(tenantModel, /businessPeople\s+BusinessPerson\[\]/);
+assert.match(tenantModel, /memberships\s+Membership\[\]/);
 
-// User currently represents the login account / authentication principal.
-assert.match(userModel, /email\s+String\s+@unique/);
-assert.match(userModel, /passwordHash\s+String/);
-assert.match(userModel, /memberships\s+Membership\[\]/);
-assert.match(userModel, /profiles\s+Profile\[\]/);
-assert.match(authService, /where: \{ email: normalizedEmail \}/);
-assert.match(authService, /sub: user\.id/);
+// Login identity is separate from Profile.
+assert.match(platformAccountModel, /email\s+String\s+@unique/);
+assert.match(platformAccountModel, /passwordHash\s+String/);
+assert.match(platformAccountModel, /memberships\s+Membership\[\]/);
+assert.match(platformAccountModel, /profiles\s+Profile\[\]/);
 
-// Membership is the explicit link between the login account and a Tenant.
+// Membership links the login identity to Tenant.
 assert.match(membershipModel, /tenantId\s+String/);
-assert.match(membershipModel, /userId\s+String/);
-assert.match(membershipModel, /tenant\s+Tenant\s+@relation/);
-assert.match(membershipModel, /user\s+User\s+@relation/);
-assert.match(membershipModel, /@@unique\(\[tenantId, userId\]\)/);
+assert.match(membershipModel, /platformAccountId\s+String/);
+assert.match(membershipModel, /@@unique\(\[tenantId, platformAccountId\]\)/);
 
-// Profile is a separate entity scoped by both Tenant and account.
+// Membership role is intentionally OWNER-only in the current PRIVATE model.
+assert.match(membershipRoleEnum, /OWNER/);
+assert.doesNotMatch(membershipRoleEnum, /ADMIN/);
+assert.ok(!membershipRoleEnum.includes(['MA', 'STER'].join('')));
+
+// Profile belongs to Tenant + login identity.
+// Profile has no nested/sub-profile relation.
 assert.match(profileModel, /tenantId\s+String/);
-assert.match(profileModel, /userId\s+String/);
-assert.match(profileModel, /tenant\s+Tenant\s+@relation/);
-assert.match(profileModel, /user\s+User\s+@relation/);
-assert.match(profileModel, /@@unique\(\[tenantId, userId\]\)/);
-assert.match(profileService, /where: \{ tenantId_userId: \{ tenantId, userId \} \}/);
+assert.match(profileModel, /platformAccountId\s+String/);
+assert.match(profileModel, /@@unique\(\[tenantId, platformAccountId\]\)/);
+assert.doesNotMatch(profileModel, /profiles\s+Profile\[\]/);
+assert.doesNotMatch(profileModel, /parentProfileId|childProfileId/);
 
-// Workspace state follows the same Tenant + account boundary and is not the Profile itself.
-assert.match(workspaceService, /tenantId_userId/);
-assert.match(workspaceService, /create: \{ tenantId, userId, data, revision: 1 \}/);
+// Workplaces belong to Profile, so one private Profile can have many workplaces.
+assert.match(profileModel, /workplaces\s+Workplace\[\]/);
+assert.match(workplaceModel, /profileId\s+String/);
+assert.match(workplaceModel, /profile\s+Profile\s+@relation/);
 
-// Current invitation semantics: provision a Tenant first, then connect the new login account as OWNER.
-// Naming can change later; this ownership behavior must not change accidentally.
-assert.match(invitationService, /const tenant = await tx\.tenant\.create/);
-assert.match(invitationService, /const user = await tx\.user\.create/);
-assert.match(invitationService, /await tx\.membership\.create/);
+// People belong to Tenant, not directly to Profile.
+assert.match(businessPersonModel, /tenantId\s+String/);
+assert.match(businessPersonModel, /tenant\s+Tenant\s+@relation/);
+assert.doesNotMatch(businessPersonModel, /profileId\s+String/);
+assert.doesNotMatch(businessPersonModel, /profile\s+Profile\s+@relation/);
+
+// Current PRIVATE provisioning path creates one Tenant and one OWNER membership.
+// It does not create nested/additional Profiles during invitation acceptance.
+assert.equal((invitationService.match(/tx\.tenant\.create/g) || []).length, 1);
+assert.equal((invitationService.match(/tx\.platformAccount\.create/g) || []).length, 1);
+assert.equal((invitationService.match(/tx\.membership\.create/g) || []).length, 1);
 assert.match(invitationService, /role: MembershipRole\.OWNER/);
+assert.doesNotMatch(invitationService, /tx\.profile\.create/);
 
-// Legacy tenant roles MASTER / ADMIN are not used by the checked active identity logic.
-assert.doesNotMatch(activeIdentitySources, /MembershipRole\.MASTER/);
-assert.doesNotMatch(activeIdentitySources, /MembershipRole\.ADMIN/);
+// Profile bootstrap is idempotent for the current Tenant + login identity.
+assert.match(profileService, /where: \{ tenantId_platformAccountId: \{ tenantId, platformAccountId \} \}/);
+assert.match(profileService, /await this\.prisma\.profile\.create/);
+
+// Platform admin manages Tenant containers and exposes the owner's Profile separately.
+assert.match(adminController, /@Get\('tenants'\)/);
+assert.match(adminService, /async tenants\(\)/);
+assert.match(adminService, /ownerProfile: membership \? \{/);
+assert.match(invitationService, /TenantInvitationStatus/);
+assert.match(invitationService, /prisma\.tenantInvitation/);
+
+// Workspace state follows Tenant + login identity and is not the Profile itself.
+assert.match(workspaceService, /tenantId_platformAccountId/);
+assert.match(workspaceService, /create: \{ tenantId, platformAccountId, data, revision: 1 \}/);
 
 console.log('Profile identity boundary tests: OK');

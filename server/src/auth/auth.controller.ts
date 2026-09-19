@@ -4,7 +4,7 @@ import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
 type LoginBody = { email?: string; password?: string };
-type AuthRequest = Request & { auth?: { userId: string; tenantId: string; role: string } };
+type AuthRequest = Request & { auth?: { platformAccountId: string; tenantId: string; role: string } };
 
 @Controller('auth')
 export class AuthController {
@@ -18,6 +18,6 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Get('me')
   me(@Req() request: AuthRequest) {
-    return this.auth.me(request.auth!.userId, request.auth!.tenantId);
+    return this.auth.me(request.auth!.platformAccountId, request.auth!.tenantId);
   }
 }

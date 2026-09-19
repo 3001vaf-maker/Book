@@ -15,7 +15,7 @@ function dateOffset(days: number) {
 
 async function main() {
   const email = String(process.env.OWNER_EMAIL || 'staging@book.local').trim().toLowerCase();
-  const owner = await prisma.user.findUnique({
+  const owner = await prisma.platformAccount.findUnique({
     where: { email },
     include: { memberships: true },
   });
@@ -266,19 +266,19 @@ async function main() {
   };
 
   await prisma.$transaction(async (tx) => {
-    await tx.user.update({
+    await tx.platformAccount.update({
       where: { id: owner.id },
       data: { workspaceUnlocked: true, onboardingStep: 99 },
     });
 
     const profile = await tx.profile.upsert({
-      where: { tenantId_userId: { tenantId, userId: owner.id } },
+      where: { tenantId_platformAccountId: { tenantId, platformAccountId: owner.id } },
       create: {
         tenantId,
-        userId: owner.id,
+        platformAccountId: owner.id,
         key: profileKey,
         name: 'Тестовый',
-        surname: 'Мастер',
+        surname: 'Тест',
         phone: '+79990000001',
         phones: json(['+79990000001']),
         telegrams: json([]),
