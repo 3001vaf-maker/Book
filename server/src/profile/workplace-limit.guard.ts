@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma.service';
 import { SaasAccessService } from '../saas-access/saas-access.service';
 
 type WorkplaceRequest = Request & {
-  auth?: { userId: string; tenantId: string; role: string };
+  auth?: { platformAccountId: string; tenantId: string; role: string };
   params: { key?: string };
 };
 
