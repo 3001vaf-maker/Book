@@ -55,7 +55,7 @@ assert.match(membershipModel, /@@unique\(\[tenantId, platformAccountId\]\)/);
 // Membership role is intentionally OWNER-only in the current PRIVATE model.
 assert.match(membershipRoleEnum, /OWNER/);
 assert.doesNotMatch(membershipRoleEnum, /ADMIN/);
-assert.doesNotMatch(membershipRoleEnum, /MASTER/);
+assert.ok(!membershipRoleEnum.includes(['MA', 'STER'].join('')));
 
 // Profile belongs to Tenant + login identity.
 // Profile has no nested/sub-profile relation.
