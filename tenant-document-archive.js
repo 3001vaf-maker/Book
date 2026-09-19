@@ -4,11 +4,11 @@ import { getPlatformDocumentBases } from './admin/document-registry/catalog.js';
 import { hydrateConsentsFromServer } from './settings/documents/consents.js';
 import { getProfile } from './settings/profile/data.js';
 import {
-  buildBookDocuments,
+  buildTenantDocumentsFromPlatformBases,
   configurePlatformDocumentBases,
   configureDocumentPersistence,
   hydrateDocumentsFromServer,
-  reconcileBookDocuments,
+  reconcileTenantDocumentsWithPlatformBases,
 } from './settings/documents/data.js';
 import {
   configureDocumentHistoryPersistence,
@@ -67,7 +67,7 @@ export async function initializeTenantDocumentArchive() {
 
   if (remote?.verified) {
     const current = normalizeBundle(remote?.data || remote);
-    const reconciled = reconcileBookDocuments(current.documents, current.history);
+    const reconciled = reconcileTenantDocumentsWithPlatformBases(current.documents, current.history);
     if (reconciled.changed) {
       const next = {
         documents: reconciled.documents,
@@ -83,7 +83,7 @@ export async function initializeTenantDocumentArchive() {
   }
 
   const defaults = normalizeBundle({
-    documents: buildPlatformDocuments(),
+    documents: buildTenantDocumentsFromPlatformBases(),
     consents: [],
     history: [],
   });
