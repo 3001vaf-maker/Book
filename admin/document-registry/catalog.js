@@ -120,7 +120,7 @@ const BOOK_DOCUMENT_BASE_MAPPING = {
   },
 };
 
-export function getBookDocumentBases() {
+export function getPlatformDocumentBases() {
   return USER_DOCUMENT_BASE_KEYS
     .map((key) => {
       const item = DOCUMENT_CATALOG.find((document) => document.key === key);
