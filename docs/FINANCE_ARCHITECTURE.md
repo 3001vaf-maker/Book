@@ -512,6 +512,37 @@ Compatibility intentionally retained for later stages:
 
 Those names are persistence compatibility only. They are not the future Financial Model. Removing their ownership/storage role belongs to F3-F5/F11.
 
+## F3-F5 implementation checkpoint
+
+F3-F5 are intentionally verified as one technical block because they form one ownership/storage migration:
+
+```text
+Record payment truth removed
+        ↓
+Finance-owned Settlement
+        ↓
+Operation
+        ↓
+flat Ledger / DDS
+```
+
+Current branch: `feature/finance-f3-record-decouple-20260921`.
+
+Key implemented changes:
+- new/updated Record rows no longer persist `finance` or `payment`;
+- legacy `record.finance` is captured during hydration, migrated into Finance settlements, then sanitized Record rows are queued back to the server;
+- payment-stage corrected source prices remain Record snapshots, while discount/amount-due stays Finance Settlement;
+- payment no longer mutates Record attendance as a side effect;
+- `core/record/state.js` no longer owns paid/debt/due;
+- Finance v7 canonical state is `settlements + operations + ledger`;
+- legacy `income[]/expense[]/allocations[]` payloads are migrated in memory to v7;
+- split-wallet payment is one Payment Operation with multiple flat Ledger rows;
+- Tips are separate Ledger components;
+- refund is a Refund Operation with OUT Ledger rows;
+- cancellation is a Cancellation Operation with reversal Ledger rows; original facts remain in history;
+- Wallet balance/history is derived from signed Ledger rows;
+- server read projections understand v7 Ledger/Operations while authoritative server writes remain scheduled for F11.
+
 ## Ordered rebuild checklist
 
 One step must be completed, tested and checked before the next step is marked complete.
@@ -541,23 +572,24 @@ One step must be completed, tested and checked before the next step is marked co
 - [x] F2 behavior/diff verification passed on Check Book #1974; this documentation-close head must also pass exact-head Check Book before merge to staging.
 
 ### F3 — Remove payment ownership from Record
-- [ ] Record remains owner of appointment and immutable source snapshots only.
-- [ ] Record does not create money movements.
-- [ ] Record does not persist payment truth as an independent source.
-- [ ] Journal/payment UI only starts Finance commands and displays Finance projections.
-- [ ] Paid/debt state is derived by Settlement from amount due + Ledger facts.
+- [x] Record remains owner of appointment and source snapshots only.
+- [x] Record does not create money movements.
+- [x] Record does not persist payment truth as an independent source.
+- [x] Journal/payment UI starts Finance commands and displays Finance projections.
+- [x] Paid/debt state is derived outside Record from Settlement + Ledger facts.
 
 ### F4 — Canonical Ledger / DDS
-- [ ] Define one flat Ledger-entry contract.
-- [ ] Every factual ruble IN/OUT has a timestamp, wallet, amount and economic classification.
-- [ ] Preserve immutable/cancel/refund audit history.
-- [ ] Migrate away from whole-Finance-JSON last-write ownership.
+- [x] Define one flat Ledger-entry contract.
+- [x] Every factual ruble IN/OUT has timestamp, wallet, amount, direction, component and economic classification.
+- [x] Preserve refund/cancel audit history; new cancellation uses reversal Ledger rows instead of mutating the original payment.
+- [ ] Migrate away from whole-Finance-JSON last-write server ownership. This physical server-write migration remains F11; F4 replaces the canonical in-domain shape now.
 
 ### F5 — Operation grouping
-- [ ] Introduce Operation identity.
-- [ ] One operation may create multiple Ledger rows.
-- [ ] Split-wallet payment remains one economic payment.
-- [ ] Detailed purchase may contain many lines without becoming unrelated expenses.
+- [x] Introduce explicit Operation identity.
+- [x] One Operation may create multiple Ledger rows.
+- [x] Split-wallet payment remains one economic payment with one operationId.
+- [x] Operation/Ledger contract supports multiple detailed rows without turning them into unrelated economic events.
+- [ ] Shared F3-F5 exact-head Check Book and PR-to-staging verification.
 
 ### F6 — Articles
 - [ ] Introduce user-extensible hierarchical article catalog.
