@@ -1,5 +1,5 @@
 import { BadGatewayException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
-import nodemailer from 'nodemailer';
+import * as nodemailer from 'nodemailer';
 
 type TransactionalEmailInput = {
   to: string;
