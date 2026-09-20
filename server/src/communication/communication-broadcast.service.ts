@@ -218,6 +218,7 @@ export class CommunicationBroadcastService {
       const identity = await this.communications.telegramIdentity(tenantId, { phone: person.phone, uei: person.uei });
       return text(identity?.externalUserId);
     }
+    if (channel === 'EMAIL') return canonicalEmail(person.email);
     return '';
   }
 
@@ -259,7 +260,7 @@ export class CommunicationBroadcastService {
     if (!body) throw new BadRequestException('Введите текст сообщения');
     const preview = await this.preview(tenantId, input || {});
     if (!preview.eligibleCount) throw new BadRequestException('Нет людей, которым можно отправить сообщение');
-    if (preview.channel !== 'TELEGRAM') throw new BadRequestException(`Транспорт ${preview.channel} пока не подключён к массовой отправке`);
+    if (!['TELEGRAM', 'EMAIL'].includes(preview.channel)) throw new BadRequestException(`Транспорт ${preview.channel} пока не подключён к массовой отправке`);
     await this.ensureRateLimit(tenantId, preview.eligibleCount);
     const runId = randomUUID();
     await this.prisma.$executeRaw`
@@ -270,7 +271,7 @@ export class CommunicationBroadcastService {
     for (const recipient of preview.audience) {
       try {
         const renderedBody = this.renderTemplate(body, recipient);
-        await this.dispatch.send(tenantId, { phone: recipient.phone, uei: recipient.uei, channel: preview.channel, body: renderedBody, purpose: 'MARKETING' });
+        await this.dispatch.send(tenantId, { phone: recipient.phone, uei: recipient.uei, channel: preview.channel, subject: name, body: renderedBody, purpose: 'MARKETING' });
         sentCount += 1;
       } catch (error) {
         failedCount += 1;
