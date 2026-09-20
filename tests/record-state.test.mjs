@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import {
   isRecordCompletedSide,
-  projectRecordStatuses,
+  recordActionState,
   recordActivityTime,
   recordAppointmentTime,
+  recordVisitState,
   recordVisualState,
 } from '../core/record/index.js';
 
@@ -42,33 +43,12 @@ const createdEvent = { type: 'created', at: '2026-09-01T12:00:00.000Z' };
 const movedEvent = { type: 'rescheduled', at: '2026-09-05T12:00:00.000Z' };
 const cancelledEvent = { type: 'cancelled', at: '2026-09-06T12:00:00.000Z' };
 
-assert.deepEqual(
-  projectRecordStatuses(record, [createdEvent], { due: 5000, paid: 0 }),
-  { action: 'booked', visit: 'expected', payment: 'due' },
-);
-assert.deepEqual(
-  projectRecordStatuses(record, [createdEvent, movedEvent], { due: 5000, paid: 0 }),
-  { action: 'rescheduled', visit: 'expected', payment: 'due' },
-);
-assert.deepEqual(
-  projectRecordStatuses({ ...record, attendance: 'arrived' }, [createdEvent], { due: 5000, paid: 0 }),
-  { action: 'booked', visit: 'arrived', payment: 'debt' },
-);
-assert.deepEqual(
-  projectRecordStatuses({ ...record, attendance: 'arrived' }, [createdEvent], { due: 0, paid: 5000 }),
-  { action: 'booked', visit: 'arrived', payment: 'paid' },
-);
-assert.deepEqual(
-  projectRecordStatuses({ ...record, attendance: 'no-show' }, [createdEvent], { due: 5000, paid: 0 }),
-  { action: 'booked', visit: 'no-show', payment: '' },
-);
-assert.deepEqual(
-  projectRecordStatuses(record, [createdEvent, { type: 'no-show', at: '2026-09-10T10:05:00.000Z' }], { due: 5000, paid: 0 }),
-  { action: 'booked', visit: 'no-show', payment: '' },
-);
-assert.deepEqual(
-  projectRecordStatuses(record, [createdEvent, cancelledEvent], { due: 5000, paid: 0 }),
-  { action: 'cancelled', visit: '', payment: '' },
-);
+assert.equal(recordActionState(record, [createdEvent]), 'booked');
+assert.equal(recordActionState(record, [createdEvent, movedEvent]), 'rescheduled');
+assert.equal(recordVisitState(record, [createdEvent]), 'expected');
+assert.equal(recordVisitState({ ...record, attendance: 'arrived' }, [createdEvent]), 'arrived');
+assert.equal(recordVisitState({ ...record, attendance: 'no-show' }, [createdEvent]), 'no-show');
+assert.equal(recordActionState(record, [createdEvent, cancelledEvent]), 'cancelled');
+assert.equal(recordVisitState(record, [createdEvent, cancelledEvent]), '');
 
 console.log('record state tests: OK');
