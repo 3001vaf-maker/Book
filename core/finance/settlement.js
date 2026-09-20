@@ -1,7 +1,8 @@
 // Settlement projects amount due, paid/refunded totals and outstanding amount for a concrete source.
 // This is operational calculation, NOT the reserved future Financial Model.
 // Low-level arithmetic lives in rules.js; money persistence lives in data/service.
-// Legacy record.finance and planTotal/fact* fields remain only as storage compatibility until later migration.
+// Canonical Settlement snapshots live in Finance. record.finance is read only as legacy compatibility during migration.
+import { getStoredSettlement } from './data.js';
 import { getActiveDDSMovements, getActiveDDSMovementsForSource } from './read.js';
 import {
   calculateSettlementTotals,
@@ -24,8 +25,12 @@ function latestHistoricalSettlementForSource(type, id) {
 }
 
 export function resolveRecordSettlement(record = null, { discountPercent = 0 } = {}) {
-  const stored = normalizeStoredSettlement(record?.finance);
-  if (stored) return stored;
+  if (record?.id) {
+    const owned = normalizeStoredSettlement(getStoredSettlement('record', record.id));
+    if (owned) return owned;
+  }
+  const legacyStored = normalizeStoredSettlement(record?.finance);
+  if (legacyStored) return legacyStored;
   if (record?.id) {
     const historical = latestHistoricalSettlementForSource('record', record.id);
     if (historical) return historical;
