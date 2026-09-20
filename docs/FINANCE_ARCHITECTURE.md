@@ -6,7 +6,7 @@ This file is the single canonical source of truth for the Finance ownership rebu
 
 Finance is under an ordered ownership migration. The target architecture below is canonical even while the current runtime still contains legacy names and storage that are explicitly listed in the checklist.
 
-Current migration branch: `feature/finance-ownership-rebuild-20260920`.
+Permanent integration branch: `staging`. The current feature branch for each stage is recorded in `docs/PROJECT_STATE.md`.
 
 Release rule:
 
@@ -237,6 +237,253 @@ These are not canonical architecture; they are migration debt:
 7. Current Finance architecture guard still contains legacy terminology and a wrong reservation for `core/business-model.js`.
 8. Payment is currently reachable through Record/Journal manifestation code; the migration must ensure the command owner is Finance, while Record only supplies source facts.
 
+## F1 verified inventory — current ownership before runtime migration
+
+Inventory source: `staging@522b593d9c5d1a1ea37b152b8f0802389eeb81e8`.
+
+F1 changes no runtime behavior. It records what the application actually does today so later steps cannot silently recreate a second owner.
+
+### Current physical storage
+
+Current Finance money facts are not a flat Ledger.
+
+`core/finance/data.js` owns an in-memory object:
+
+```text
+financeState
+├── version
+├── income[]
+└── expense[]
+```
+
+Each payment is one `income[]` object. A split-wallet payment stores nested `allocations[]` inside that one object. Wallet history later expands those allocations into virtual wallet rows.
+
+Each refund is an `expense[]` object linked by `originalPaymentId`.
+
+The whole Finance object is sent through:
+
+```text
+core/finance/data.js
+→ queueAuxiliaryDataset('finance', wholeFinanceState)
+→ PUT /auxiliary-state/finance
+→ BusinessAuxiliaryState.data.finance
+```
+
+`BusinessAuxiliaryState.data` also contains wallets, tags, products and productHistory. There is no Prisma Ledger/Operation/FinanceMovement row model.
+
+Consequences:
+- one unrelated payment write replaces the tenant's whole Finance dataset;
+- the browser queue serializes writes only inside one browser runtime, not across devices/users;
+- split-wallet facts are nested, not one factual row per wallet movement;
+- cancellation mutates existing payment/refund status inside the blob rather than appending a separate immutable server fact.
+
+### Current Record creation/update flow
+
+Browser:
+
+```text
+Record create/update
+→ core/record/service.js
+→ core/finance.calculateFinancialPlan / repriceFinancialPlan
+→ record.finance
+→ queueRecordUpsert
+```
+
+Server:
+
+```text
+PUT /business-state/records/:recordId
+→ RecordService
+→ FinanceService.calculatePlan
+→ record.data.finance
+→ Prisma Record.data JSON
+```
+
+Therefore Record currently owns and persists a Finance plan snapshot even though the target contract says Settlement owns amount-due/payment calculation.
+
+The browser and server also use different calculation implementations:
+- browser Finance supports per-item percent/money/none discounts;
+- server `FinanceService.calculatePlan()` applies one global percent to all items.
+
+### Confirmed payment-stage ownership conflict
+
+Current payment flow is:
+
+```text
+journal/record-payment.js
+→ payment UI edits price/discount
+→ browser calculateFinancialPlan()
+→ saveFinancialCorrection()
+→ updateRecord(... procedures/products + finance)
+→ Record PUT to server
+
+then
+
+ui/payment/methods.js
+→ derives received/applied/Tips from wallet allocations
+
+then
+
+core/finance/service.js::recordPaymentIncome()
+→ mutates browser financeState
+→ whole Finance JSON PUT to auxiliary-state
+
+then
+
+setRecordAttendance(... 'arrived')
+→ another Record PUT
+```
+
+This is not one atomic payment command. One user action can cause separate Record and Finance writes.
+
+Two concrete server conflicts are confirmed:
+
+1. **Discount-only correction can be discarded.**  
+   `RecordService.upsertFromOwner()` ignores incoming explicit `record.finance` when procedures/products/person did not change and keeps `current.finance`.
+
+2. **Procedure price correction can be canonicalized back to catalog price.**  
+   When procedures changed, server RecordService calls `ProcedureService.snapshots()`. That service reads the current catalog cost; RecordService preserves requested duration but not requested corrected cost, then recalculates `finance`.
+
+This directly contradicts the current guard that calls payment the single editable price-correction point.
+
+### Current read/projection flow
+
+Browser Record reads are also financially hydrated:
+
+```text
+core/record/read.js
+→ hydrateRecordFinance()
+→ resolve Record stored finance
+→ read DDS movements for recordId
+→ return Record with hydrated finance fact
+```
+
+So the runtime Record object currently carries both appointment facts and a Finance projection.
+
+Finance is also read directly by:
+- Journal Day/Month/List for paid state and displayed amount;
+- People metadata for paid total;
+- Procedure/Product cards for realized financial fact;
+- Wallet for balance/history;
+- Main/Finance for DDS and cash;
+- payment UI for payment/refund/cancel state.
+
+These read consumers are not necessarily ownership defects. They must consume the future canonical Finance/Settlement/Ledger read contract instead of inventing local calculations.
+
+### Current server Finance role
+
+`server/src/finance/` has a service/module but no payment command controller.
+
+Its current responsibilities are only:
+- duplicate `calculatePlan()`;
+- read `BusinessAuxiliaryState.data.finance`;
+- calculate Record payment state for server Record projections.
+
+Actual payment/refund/cancel commands are currently executed in browser `core/finance/service.js`, then the resulting whole JSON is uploaded.
+
+Target ownership requires the server to become authoritative for factual money writes.
+
+### Current ownership map
+
+| Concern | Current owner(s) | Target owner | Migration |
+|---|---|---|---|
+| Catalog procedure/product price | Procedure/Product | Procedure/Product | keep |
+| Record selected service/product snapshot | Record | Record | keep |
+| Default Person discount source | Person + copied Record/Finance data | Person fact read by Settlement | F2/F3 |
+| Amount due calculation | browser Finance rules/model + browser Record service + server FinanceService + server RecordService | Settlement | F2/F3 |
+| Per-item discount calculation | browser Finance rules | Settlement | F2 |
+| Server discount calculation | server FinanceService, different algorithm | same Settlement semantics | F2/F11 |
+| Stored `record.finance` plan | Record browser + Record server | not independent payment truth; Settlement projection/snapshot compatibility only during migration | F3 |
+| Hydrated payment fact inside runtime Record | Record read calls Finance | Settlement read projection consumed by Record UI | F3 |
+| Paid/partial/remaining calculation | browser Finance model/rules + server FinanceService | Settlement | F2/F3/F11 |
+| `due / debt / paid` label | `core/record/state.js` combines Record visit + payment due | Settlement monetary state; cross-domain display may read Record lifecycle without Record owning money | F3 |
+| Payment command | browser `core/finance/service.js` | Finance command → server Operation/Ledger transaction | F4/F11 |
+| Refund command | browser `core/finance/service.js` | Finance command → server Operation/Ledger transaction | F4/F11 |
+| Incorrect payment cancellation | browser mutation of income/refund statuses | auditable Finance/Operation/Ledger cancellation semantics | F4/F11 |
+| Money persistence | whole `finance` JSON in BusinessAuxiliaryState | independent append-oriented Ledger rows | F4/F11 |
+| IN/OUT representation | separate `income[]` / `expense[]` arrays | flat Ledger direction + economic character | F4 |
+| Split-wallet payment | one payment with nested `allocations[]` | one Operation + multiple Ledger rows | F5 |
+| Operation identity | payment id; refund links originalPaymentId | explicit Operation owner | F5 |
+| Articles | absent | user-extensible Articles hierarchy + system economic character | F6 |
+| Wallet metadata | `settings/wallets/data.js` + auxiliary JSON | Wallet | keep/F7 |
+| Wallet balance/history | projection of DDS | projection of Ledger | keep concept/F7 |
+| Manual income/expense | absent | Income/Expense command surface | F8 |
+| Loan/investment/returns/transfers | absent | explicit economic types/commands | F9 |
+| Z-report | absent; current UI only lists/exports DDS | Ledger report projection | F10 |
+| Payment allocation/Tips preview | UI derives applied amount and Tips | UI may preview; Finance/Settlement server validates/derives authority | F11 |
+| Person paid total | People metadata reads Finance | projection from Ledger/Settlement | adapt after F4 |
+| Procedure/Product realized revenue | cards read Finance allocation | projection from Ledger/Operation facts | adapt after F4/F5 |
+| Account finance display | Account shell re-parses server Record finance/payment DTO | consume canonical Settlement projection | F3/F11 |
+| Future Financial Model | name currently occupied by `core/finance/model.js`; real tool absent | RESERVED analytical layer | F2 reservation only |
+
+### Existing concepts that are already directionally correct
+
+Do not destroy these merely because storage/terminology changes:
+
+- Finance has one public browser contract: `core/finance/index.js`.
+- Record does not directly write Wallet.
+- Wallet balance is derived from money facts rather than stored as a second balance.
+- payment/refund/cancel are distinguished conceptually;
+- cancelled operations are excluded from active balance/payment projections;
+- Tips are separated from service revenue;
+- partial payments are supported;
+- one payment can currently be distributed across multiple wallets;
+- People, Procedure and Product financial metrics are projections rather than independent stores.
+
+### Gaps relative to the target model
+
+The current implementation has no canonical:
+- flat Ledger row;
+- explicit Operation aggregate;
+- Article tree;
+- economic character independent of IN/OUT;
+- generic manual income/expense command;
+- loan/investment/repayment/return/transfer commands;
+- Z-report projection;
+- server payment/refund/cancel endpoint;
+- database transaction covering payment and Ledger rows;
+- concurrency-safe independent money-row persistence;
+- actual future Financial Model.
+
+Money timestamps are also heterogeneous (`paidAt`, `refundedAt`, `createdAt`, plus legacy date/time fields). F4 must define one factual Ledger occurrence time while preserving original audit timestamps as needed.
+
+### Guards/docs/tests that currently protect legacy ownership
+
+These files must be migrated deliberately; a green check today does NOT mean the target Finance ownership already exists.
+
+| File | Legacy rule currently encoded | Target stage |
+|---|---|---|
+| `docs/DOMAIN_ARCHITECTURE_STANDARD.md` | calls Finance a “financial plan model” | F2 |
+| `docs/PROJECT_STATE.md` completed Record block | historical wording says Finance owns price-plan/payment state | F2/F3 clarification |
+| `scripts/check-finance-architecture.mjs` | says Financial Model owns plan/fact; reserves wrong `core/business-model.js`; requires current whole Finance state; requires correction persisted into Record | F2–F4 |
+| `scripts/check-record-ownership.mjs` | requires Record read to `hydrateRecordFinance`; requires server RecordService to call `finance.calculatePlan` | F2/F3 |
+| `scripts/check-booking-server-autonomy.mjs` | requires RecordService → FinanceService.calculatePlan and old server payment-state implementation | F2/F3/F11 |
+| `scripts/check-auxiliary-server-ownership.mjs` | requires Finance whole-dataset auxiliary persistence | F4/F11 |
+| `tests/critical-record-flow.test.mjs` | asserts `record.finance` as plan/fact owner and payment-stage finance written to Record | F2/F3 |
+| `tests/record-products.test.mjs` | asserts product discount plan persisted in Record finance | F2/F3 |
+| `tests/record-state.test.mjs` | Record State owns due/debt/paid projection | F3 |
+| `tests/booking-server-autonomy.test.mjs` | asserts duplicate server plan calculator and `unpaid/partial/paid` service | F2/F3/F11 |
+| `tests/payment-ui.test.mjs` | explicitly requires UI formula `tips = received - applied` | F11 |
+| `tests/payment-refund.test.mjs` | protects useful behavior but against old income/expense blob shape | F4/F5 migration |
+| `tests/payment-cancel.test.mjs` | protects useful cancel/refund semantics but against mutable blob storage | F4/F5 migration |
+| `tests/wallets.test.mjs` | protects useful derived balance but against nested payment allocation shape | F4/F5/F7 |
+| `tests/person-metadata.test.mjs` | reads paid totals through old Finance movement shape | F4 adaptation |
+| `server/prisma/seed-staging.ts` | seeds `record.finance` and `BusinessAuxiliaryState.finance.income/expense` old shape | F3/F4/F5 |
+
+### F1 migration constraints
+
+The inventory fixes these constraints for later steps:
+
+1. F2 is a terminology/responsibility migration first. It must not invent the future Financial Model.
+2. F3 must break Record payment ownership without deleting Record's legitimate appointment/source snapshots.
+3. A payment-stage corrected source price may update the Record source snapshot when that is the final factual service/product price, but discount/due/paid/debt must not become Record-owned truth.
+4. The current payment action must stop depending on multiple competing plan calculators.
+5. F4/F5 must preserve valid payment/refund/cancel history while converting nested Finance data to Ledger/Operation semantics.
+6. UI may calculate previews for responsiveness, but server Finance must validate and own the authoritative result.
+7. The final architecture must not have browser and server implementations that can produce different Settlement results from the same facts.
+8. Existing tests that protect correct business behavior should be rewritten around the new owners, not deleted merely because their old storage/terminology changes.
+9. No F1 runtime change is permitted. F1 only establishes the verified migration map.
+
 ## Ordered rebuild checklist
 
 One step must be completed, tested and checked before the next step is marked complete.
@@ -248,13 +495,14 @@ One step must be completed, tested and checked before the next step is marked co
 - [x] Record the product placement: Finance is a Main folder; Core is only the hidden technical owner.
 - [x] Keep future Financial Model UI placement undecided between Finance and future Analytics.
 - [x] Record the full ordered F0-F12 migration chain.
-- [x] Final F0 diff review and Check Book verification completed on run #1966; final documentation-close commit still requires exact-head green before merge to staging.
+- [x] F0 exact-head Check Book #1967 passed; after merge to staging, Check Book #1968 also passed all three jobs.
 
 ### F1 — Inventory all current Finance ownership
-- [ ] Map every Finance/Record/Wallet/payment/server/UI persistence and formula path.
-- [ ] Identify duplicate calculations and duplicate state owners.
-- [ ] Identify all docs/guards/tests that encode the old Financial Model meaning.
-- [ ] Produce explicit current-owner -> target-owner mapping before runtime changes.
+- [x] Map every Finance/Record/Wallet/payment/server/UI persistence and formula path.
+- [x] Identify duplicate calculations and duplicate state owners.
+- [x] Identify all docs/guards/tests that encode the old Financial Model meaning.
+- [x] Produce explicit current-owner -> target-owner mapping before runtime changes.
+- [x] F1 inventory/diff verified on Check Book #1969; final documentation-close head must also pass before merge to staging.
 
 ### F2 — Rename old “Financial Model” responsibility to Settlement
 - [ ] Rename internal responsibility without changing money behavior first.
