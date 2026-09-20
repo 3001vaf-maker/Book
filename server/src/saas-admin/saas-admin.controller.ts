@@ -51,9 +51,22 @@ export class SaasAdminController {
     return this.invitations.createInvitation(request.platformAdminId!, body || {});
   }
 
+  @Post('invitations/link')
+  createRegistrationLink(@Req() request: AdminRequest) {
+    return this.invitations.createRegistrationLink(request.platformAdminId!);
+  }
+
   @Post('invitations/:id/resend')
   resendInvitation(@Req() request: AdminRequest, @Param('id') id: string) {
     return this.invitations.resendInvitation(request.platformAdminId!, id);
+  }
+
+  @Post('tenants/:tenantId/technical-email')
+  sendTechnicalEmail(
+    @Param('tenantId') tenantId: string,
+    @Body() body: { subject?: unknown; body?: unknown },
+  ) {
+    return this.admin.sendTechnicalEmail(tenantId, body || {});
   }
 
   @Put('tenants/:tenantId/access')
