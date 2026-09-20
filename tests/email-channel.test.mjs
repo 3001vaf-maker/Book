@@ -33,6 +33,8 @@ assert.match(broadcast, /channel === 'EMAIL'/);
 assert.match(broadcast, /\['TELEGRAM', 'EMAIL'\]\.includes\(preview\.channel\)/);
 assert.match(compose, /value: 'EMAIL', label: 'Email'/);
 
+assert.match(transactional, /import \* as nodemailer from 'nodemailer'/);
+assert.doesNotMatch(transactional, /import nodemailer from 'nodemailer'/);
 assert.match(transactional, /postbox\.cloud\.yandex\.net/);
 assert.match(transactional, /port: 587/);
 assert.match(transactional, /secure: false/);
