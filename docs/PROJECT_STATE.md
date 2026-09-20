@@ -131,14 +131,15 @@ The previously queued Auth transactional communication block is paused.
 
 Source checkpoint: `staging@29999b2c67a4678ad9692c83aee8a246d505e4d4`.
 
-Working branch: `feature/finance-ownership-rebuild-20260920`.
+Working branch: `feature/finance-f1-inventory-20260920`.
 
 Continuity anchor: `docs/FINANCE_ARCHITECTURE.md`.
 
 Current status:
-- F0: DONE — canonical Finance ownership and ordered F0-F12 migration chain are documented. Check Book #1966 passed all three jobs on the pre-close head; the final documentation-close head must also be green before merge to staging.
-- F1-F12: NOT STARTED.
-- No Finance runtime behavior has been changed in F0.
+- F0: DONE — canonical Finance ownership and ordered F0-F12 migration chain are documented and merged to `staging` as `522b593d9c5d1a1ea37b152b8f0802389eeb81e8`; post-merge Check Book #1968 passed all three jobs.
+- F1: IN PROGRESS — verified current ownership/storage/formula map is recorded in `docs/FINANCE_ARCHITECTURE.md`; final exact-head Check Book/diff/PR-to-staging verification is pending.
+- F2-F12: NOT STARTED.
+- No Finance runtime behavior has been changed in F0 or F1.
 - `main` must not receive this rebuild until F0-F12 are complete and the exact staging release head is fully verified.
 
 Non-negotiable ownership:
