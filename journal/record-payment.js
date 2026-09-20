@@ -1,12 +1,12 @@
 import { button, details, initPaymentForm, initPaymentMethods, modal, mountModal, paymentForm, paymentMethods, paymentReceipt, select, shortDate, shortDateTimeParts, shortTime } from '../ui/ui.js';
-import { calculateSettlement, getRecordPaymentState, recordSettlementItems } from '../core/finance/index.js';
-import { cancelPaymentOperation, getRefundsForPayment, recordPaymentIncome, recordRefundExpense } from '../core/finance/index.js';
+import { calculateSettlement, getRecordPaymentState, getRecordSettlement, recordSettlementItems } from '../core/finance/index.js';
+import { cancelPaymentOperation, getRefundsForPayment, recordPaymentIncome, recordRefundExpense, saveRecordSettlement } from '../core/finance/index.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getAllPeople } from '../main/people/data.js';
 import { personDisplay } from '../main/people/presentation.js';
 import { getWallets } from '../settings/wallets/data.js';
 import { getRecord } from '../core/record/index.js';
-import { setRecordAttendance, updateRecord } from '../core/record/index.js';
+import { updateRecord } from '../core/record/index.js';
 import { journalRecordActionContext } from './record-action-context.js';
 
 const money = (value) => `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(Number(value || 0)).replaceAll('\u00a0', ' ')} ₽`;
@@ -20,7 +20,7 @@ function personForRecord(record) {
 }
 
 function settlementForRecord(record) {
-  return record?.finance || calculateSettlement(recordSettlementItems(record));
+  return getRecordSettlement(record);
 }
 
 function paymentStateForRecord(record) {
@@ -38,11 +38,13 @@ function sourcesFromSettlement(sources, settlement, type) {
 
 function saveSettlementCorrection(record, settlement) {
   const current = getRecord(record?.id) || record;
-  return updateRecord(current.id, {
+  const updated = updateRecord(current.id, {
     procedures: sourcesFromSettlement(current?.procedures, settlement, 'procedure'),
     products: sourcesFromSettlement(current?.products, settlement, 'product'),
-    finance: settlement,
   });
+  if (!updated) return null;
+  if (!saveRecordSettlement(updated.id, settlement)) return null;
+  return updated;
 }
 
 function paymentEntryContent(record) {
@@ -147,7 +149,8 @@ function sourcePaymentFactMarkup(state) {
 }
 
 function openPaymentMethodsModal(payment, paymentModal) {
-  const recordState = getRecordPaymentState({ id: payment?.source?.id || '', finance: payment?.settlement || null });
+  const record = getRecord(payment?.source?.id || '');
+  const recordState = record ? getRecordPaymentState(record) : { remaining: Number(payment?.settlement?.planTotal || 0) };
   const total = Number(recordState.remaining || 0);
   if (total <= 0.009) return;
   const content = `<div class="modal-title"><h2>Способ оплаты</h2></div>${paymentMethods({ wallets: getWallets(), total })}`;
@@ -156,9 +159,6 @@ function openPaymentMethodsModal(payment, paymentModal) {
 
   const finish = (completed) => {
     if (!completed) return;
-    if (completed?.source?.type === 'record' && completed?.source?.id) {
-      setRecordAttendance(completed.source.id, 'arrived', { actionContext: journalRecordActionContext() });
-    }
     methodsModal.remove();
     paymentModal?.remove();
   };
@@ -205,7 +205,7 @@ function openPaymentModal(record) {
     onPay: ({ settlement: updatedSettlement }) => {
       const updated = saveSettlementCorrection(current, updatedSettlement);
       if (!updated) return;
-      openPaymentMethodsModal({ ...paymentFromRecord(updated), settlement: updated.finance }, m);
+      openPaymentMethodsModal({ ...paymentFromRecord(updated), settlement: getRecordSettlement(updated) }, m);
     },
   });
 }
