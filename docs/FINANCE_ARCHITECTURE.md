@@ -248,7 +248,7 @@ One step must be completed, tested and checked before the next step is marked co
 - [x] Record the product placement: Finance is a Main folder; Core is only the hidden technical owner.
 - [x] Keep future Financial Model UI placement undecided between Finance and future Analytics.
 - [x] Record the full ordered F0-F12 migration chain.
-- [ ] Final F0 Check Book / diff review / PR-to-staging verification.
+- [x] Final F0 diff review and Check Book verification completed on run #1966; final documentation-close commit still requires exact-head green before merge to staging.
 
 ### F1 — Inventory all current Finance ownership
 - [ ] Map every Finance/Record/Wallet/payment/server/UI persistence and formula path.
