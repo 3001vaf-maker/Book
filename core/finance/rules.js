@@ -78,10 +78,10 @@ export function calculateSettlement(items = [], { discountPercent = 0 } = {}) {
   };
 }
 
-export function repriceSettlement(sources = [], currentFinance = null) {
-  const priorItems = Array.isArray(currentFinance?.items) ? currentFinance.items : [];
+export function repriceSettlement(sources = [], currentSettlement = null) {
+  const priorItems = Array.isArray(currentSettlement?.items) ? currentSettlement.items : [];
   const bySource = new Map(priorItems.map((item) => [sourceKey(item), item]));
-  const defaultDiscount = currentFinance?.discountPercent == null ? 0 : clampFinancialPercent(currentFinance.discountPercent);
+  const defaultDiscount = currentSettlement?.discountPercent == null ? 0 : clampFinancialPercent(currentSettlement.discountPercent);
   const items = (Array.isArray(sources) ? sources : []).map((source, index) => {
     const type = sourceType(source);
     const id = sourceId(source);
@@ -196,12 +196,12 @@ function itemSettlementAmount(item = null) {
 }
 
 function movementItemAmount(movement = null, sourceTypeValue = '', sourceIdValue = '') {
-  const finance = movement?.finance;
-  const items = Array.isArray(finance?.items) ? finance.items : [];
+  const settlementSnapshot = movement?.finance;
+  const items = Array.isArray(settlementSnapshot?.items) ? settlementSnapshot.items : [];
   const id = String(sourceIdValue || '');
   const type = String(sourceTypeValue || '');
   if (!id || !items.length) return 0;
-  const settlementTotal = Math.max(0, financialNumber(finance?.planTotal ?? finance?.dueTotal));
+  const settlementTotal = Math.max(0, financialNumber(settlementSnapshot?.planTotal ?? settlementSnapshot?.dueTotal));
   if (!settlementTotal) return 0;
   const settlementItemTotal = items
     .filter((item) => String(item?.sourceId || '') === id
