@@ -117,6 +117,7 @@ const serverFinance = source('server/src/finance/finance.service.ts');
 for (const token of [
   'ensureLegacyMigrated',
   'saveSettlementWith',
+  'repriceSettlement(',
   'createOperationWithEntries',
   'recordPayment(',
   'recordRefund(',
@@ -139,8 +140,10 @@ if (!/['"]finance['"]/.test(browserRecord) || !/dataPatchFrom/.test(browserRecor
 }
 
 const serverRecord = source('server/src/record/record.service.ts');
-if (!/this\.finance\.upsertSettlement/.test(serverRecord) || !/this\.finance\.settlementForSource/.test(serverRecord)) {
-  errors.push('Server Record must delegate Settlement ownership to Finance');
+if (!/this\.finance\.upsertSettlement/.test(serverRecord)
+  || !/this\.finance\.settlementForSource/.test(serverRecord)
+  || !/this\.finance\.repriceSettlement/.test(serverRecord)) {
+  errors.push('Server Record must delegate Settlement ownership and repricing to Finance');
 }
 if (!/const \{ finance: _legacyFinance, \.\.\.currentRecord \} = current/.test(serverRecord)) {
   errors.push('Server Record update must strip legacy finance before persisting Record');
@@ -171,6 +174,17 @@ if (!/getWalletDDSMovements/.test(walletData) || !/export function getWalletBala
 
 const financeUI = source('main/finance/finance.js');
 if (!/getLedgerEntries/.test(financeUI)) errors.push('DDS UI must render flat Ledger rows');
+
+
+const stagingSeed = source('server/prisma/seed-staging.ts');
+if (!/financeSettlement\.upsert/.test(stagingSeed)
+  || !/financeOperation\.upsert/.test(stagingSeed)
+  || !/financeLedgerEntry\.upsert/.test(stagingSeed)) {
+  errors.push('Staging fixtures must seed canonical Settlement, Operation and Ledger owners');
+}
+if (/version:\s*5[\s\S]*income:\s*\[/.test(stagingSeed)) {
+  errors.push('Staging fixtures must not recreate legacy auxiliary Finance income/expense storage');
+}
 
 const recordView = source('journal/record-view.js');
 if (/recordViewProcedureCost|data-record-view-procedure-cost/.test(recordView)) {
