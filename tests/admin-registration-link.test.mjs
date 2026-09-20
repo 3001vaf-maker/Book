@@ -3,32 +3,47 @@ import fs from 'node:fs';
 
 const admin = fs.readFileSync('admin/admin.js', 'utf8');
 const css = fs.readFileSync('admin/admin.css', 'utf8');
-const service = fs.readFileSync('server/src/tenant-invitation/tenant-invitation.service.ts', 'utf8');
-const controller = fs.readFileSync('server/src/tenant-invitation/tenant-invitation.controller.ts', 'utf8');
+const appModule = fs.readFileSync('server/src/app.module.ts', 'utf8');
+const manualController = fs.readFileSync('server/src/manual-invitation/manual-invitation.controller.ts', 'utf8');
+const manualModule = fs.readFileSync('server/src/manual-invitation/manual-invitation.module.ts', 'utf8');
+const manualService = fs.readFileSync('server/src/manual-invitation/manual-invitation.service.ts', 'utf8');
+const invitationService = fs.readFileSync('server/src/tenant-invitation/tenant-invitation.service.ts', 'utf8');
+const invitationController = fs.readFileSync('server/src/tenant-invitation/tenant-invitation.controller.ts', 'utf8');
+const adminController = fs.readFileSync('server/src/saas-admin/saas-admin.controller.ts', 'utf8');
 const registration = fs.readFileSync('register/register.js', 'utf8');
 
-assert.match(admin, /data-create-registration-link/);
-assert.match(admin, /\/registration-links/);
-assert.match(admin, /Создать ссылку без email/);
-assert.match(admin, /data-registration-link/);
+assert.match(admin, /data-create-invite-link/);
+assert.match(admin, /\/manual-invitations/);
+assert.match(admin, /Создать ссылку/);
+assert.match(admin, /data-invite-link/);
 assert.match(admin, /@registration\.invalid/);
+assert.doesNotMatch(admin, /\/registration-links/);
 
 assert.match(css, /\.admin-invite-head/);
 assert.match(css, /\.admin-invite-link/);
 assert.doesNotMatch(css, /manual-invite-button/);
 
-assert.match(service, /async createRegistrationLink\(/);
-assert.match(service, /REGISTRATION_LINK_EMAIL_SUFFIX = '@registration\.invalid'/);
-assert.match(service, /FRONTEND_ORIGIN/);
-assert.match(service, /async acceptRegistrationLink\(/);
-assert.match(service, /private async findActiveRegistrationLink\(/);
-assert.doesNotMatch(service, /@book\.invalid/i);
+assert.match(appModule, /ManualInvitationModule/);
+assert.match(manualModule, /TenantInvitationModule/);
+assert.match(manualController, /@Controller\('saas-admin\/manual-invitations'\)/);
+assert.match(manualController, /@Controller\('manual-invitations'\)/);
+assert.match(manualService, /createRegistrationLink/);
+assert.match(manualService, /inspectRegistrationLink/);
+assert.match(manualService, /acceptRegistrationLink/);
 
-assert.match(controller, /registration-link\/inspect/);
-assert.match(controller, /registration-link\/accept/);
-assert.match(registration, /tenant-invitations\/registration-link\/inspect/);
-assert.match(registration, /tenant-invitations\/registration-link\/accept/);
+assert.match(invitationService, /async createRegistrationLink\(/);
+assert.match(invitationService, /REGISTRATION_LINK_EMAIL_SUFFIX = '@registration\.invalid'/);
+assert.match(invitationService, /FRONTEND_ORIGIN/);
+assert.match(invitationService, /async acceptRegistrationLink\(/);
+assert.match(invitationService, /private async findActiveRegistrationLink\(/);
+assert.doesNotMatch(invitationService, /@book\.invalid/i);
+
+assert.doesNotMatch(invitationController, /registration-link\/inspect|registration-link\/accept/);
+assert.doesNotMatch(adminController, /@Post\('registration-links'\)/);
+assert.match(registration, /manual-invitations\/inspect/);
+assert.match(registration, /manual-invitations\/accept/);
+assert.doesNotMatch(registration, /tenant-invitations\/registration-link/);
 assert.match(registration, /name="email"/);
 assert.match(registration, /name="password"/);
 
-console.log('Admin registration link contract tests passed');
+console.log('Admin manual registration link restoration tests passed');
