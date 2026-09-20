@@ -138,7 +138,7 @@ Continuity anchor: `docs/FINANCE_ARCHITECTURE.md`.
 Current status:
 - F0: DONE — canonical Finance ownership and ordered F0-F12 migration chain are documented and merged to `staging` as `522b593d9c5d1a1ea37b152b8f0802389eeb81e8`; post-merge Check Book #1968 passed all three jobs.
 - F1: DONE — verified ownership/storage/formula inventory and current-owner -> target-owner migration map are recorded in `docs/FINANCE_ARCHITECTURE.md`; merged to `staging` as `02bd8e6b0ab82048335d1a29be8e9186a4b614bb`; post-merge Check Book #1972 passed all three jobs.
-- F2: IN PROGRESS — operational `Financial Model/FinancialPlan` naming is being replaced by `Settlement / Расчёт` without changing money/storage behavior.
+- F2: DONE IN BRANCH — legacy operational Financial Model/FinancialPlan naming is replaced by `Settlement / Расчёт`; `core/finance/model.js` is removed; guards block the old API and operational Financial Model dependencies. Check Book #1974 passed all three jobs; final documentation-close head must also be green before merge to staging.
 - F3-F12: NOT STARTED.
 - F0-F1 changed documentation only. F2 is a terminology/refactor step; no intended financial behavior or persisted data shape change.
 - `main` must not receive this rebuild until F0-F12 are complete and the exact staging release head is fully verified.
