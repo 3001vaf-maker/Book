@@ -15,6 +15,7 @@ import { TenantDocumentArchiveService } from '../tenant-document-archive/tenant-
 import { ProfileService } from '../profile/profile.service';
 import { PersonIdentityService } from './person-identity.service';
 import { TimeService } from '../time/time.service';
+import { RecordService } from '../record/record.service';
 
 function objectValue(value: unknown): Record<string, any> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : {};
@@ -50,20 +51,6 @@ function assignmentFor(procedure: any, workplaceKey: string) {
   return arrayValue(procedure?.workplaces).find((item) => text(item?.workplaceId ?? item?.key ?? item?.id) === workplaceKey) || null;
 }
 
-function procedureCost(procedure: any, workplaceKey: string) {
-  const assignment = assignmentFor(procedure, workplaceKey);
-  const assigned = assignment?.cost;
-  const base = procedure?.cost;
-  const hasAssigned = assigned && typeof assigned === 'object' && !assigned.free && (
-    assigned.amount !== '' && assigned.amount != null
-    || assigned.from !== '' && assigned.from != null
-    || assigned.to !== '' && assigned.to != null
-  );
-  const cost = hasAssigned ? assigned : base;
-  if (cost == null || cost?.free) return '';
-  if (typeof cost === 'number' || typeof cost === 'string') return cost;
-  return cost.amount ?? cost.from ?? '';
-}
 
 function normalizeConsents(value: unknown) {
   return arrayValue(value).map((item) => ({
@@ -121,17 +108,6 @@ function publicAccount(account: any) {
   };
 }
 
-function initialRequestSnapshot(procedures: any[], account: any) {
-  const subtotal = procedures.reduce((sum, item) => sum + Math.max(0, numeric(item?.cost, 0)), 0);
-  const discountPercent = percent(account?.discountPercent);
-  const total = Math.max(0, subtotal * (1 - discountPercent / 100));
-  return {
-    procedures,
-    pricing: { subtotal, discountPercent, total },
-    payment: { state: total <= 0.009 ? 'paid' : 'unpaid', paid: 0, due: total },
-    updatedAt: new Date().toISOString(),
-  };
-}
 
 @Injectable()
 export class OnlineBookingService {
@@ -144,6 +120,7 @@ export class OnlineBookingService {
     private readonly profile: ProfileService,
     private readonly personIdentity: PersonIdentityService,
     private readonly time: TimeService,
+    private readonly records: RecordService,
   ) {}
 
   private async publication(tenantId: string) {
@@ -434,12 +411,6 @@ export class OnlineBookingService {
       throw new ConflictException('Это время уже занято');
     }
 
-    const procedures = selected.map((procedure) => ({
-      id: text(procedure?.id),
-      name: text(procedure?.name),
-      duration: Math.max(0, Number(procedure?.duration || 0)),
-      cost: procedureCost(procedure, workplaceKey),
-    }));
     const binding = await this.personIdentity.bindFirstAccess(tenantId, account as any);
     const person = binding.person;
     const identity = await this.businessState.bookingIdentityForAccount(tenantId, account.id);
@@ -455,7 +426,6 @@ export class OnlineBookingService {
       telegramId: text(account.telegramId),
       discountPercent: percent(pricingPerson?.discountPercent),
     };
-    const recordSnapshot = initialRequestSnapshot(procedures, { discountPercent: personSnapshot.discountPercent });
     const request = await this.prisma.bookingRequest.create({
       data: {
         tenantId,
@@ -464,8 +434,7 @@ export class OnlineBookingService {
         date,
         from,
         to,
-        procedures: procedures as Prisma.InputJsonValue,
-        recordSnapshot: recordSnapshot as Prisma.InputJsonValue,
+        procedures: requestedIds.map((id) => ({ id })) as Prisma.InputJsonValue,
       },
     });
 
@@ -476,20 +445,18 @@ export class OnlineBookingService {
         from,
         to,
         person: personSnapshot,
-        procedures,
+        procedureIds: requestedIds,
         sourceRequestId: request.id,
         actor: { type: 'account', accountId: account.id, profileId: '' },
       });
-      const liveSnapshot = await this.businessState.bookingRecordSnapshot(tenantId, text(record.id), recordSnapshot);
       const imported = await this.prisma.bookingRequest.update({
         where: { id: request.id },
         data: {
           status: BookingRequestStatus.IMPORTED,
           importedRecordId: text(record.id),
-          recordSnapshot: liveSnapshot as Prisma.InputJsonValue,
         },
       });
-      return { ...imported, procedures, recordSnapshot: liveSnapshot };
+      return { ...imported, recordId: text(record.id) };
     } catch (error) {
       await this.prisma.bookingRequest.update({ where: { id: request.id }, data: { status: BookingRequestStatus.REJECTED } }).catch(() => null);
       throw error;
@@ -501,28 +468,10 @@ export class OnlineBookingService {
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
     await this.personIdentity.bindFirstAccess(tenantId, account as any);
     const identity = await this.businessState.bookingIdentityForAccount(tenantId, accountId);
-    const accountIds = identity?.accountIds?.length ? identity.accountIds : [account.id];
-    const requests = await this.prisma.bookingRequest.findMany({
-      where: {
-        tenantId,
-        accountId: { in: accountIds },
-        status: { not: BookingRequestStatus.CANCELLED },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-    const requestViews = await Promise.all(requests.map(async (request) => ({
-      ...request,
-      recordSnapshot: request.importedRecordId
-        ? await this.businessState.bookingRecordSnapshot(tenantId, request.importedRecordId, request.recordSnapshot)
-        : request.recordSnapshot,
-    })));
-    const importedRecordIds = new Set(requests.map((request) => text(request.importedRecordId)).filter(Boolean));
-    const manualViews = await this.personIdentity.manualRecordViews(tenantId, account as any, importedRecordIds);
-    return [...requestViews, ...manualViews].sort((left, right) => {
-      const a = `${dateValue((left as any).date)}T${text((left as any).from)}`;
-      const b = `${dateValue((right as any).date)}T${text((right as any).from)}`;
-      return b.localeCompare(a);
-    });
+    const people = identity?.memberPeople?.length
+      ? identity.memberPeople
+      : identity?.person ? [identity.person] : [];
+    return this.records.listForPeople(tenantId, people);
   }
 
   async ownerAccounts(tenantId: string) {
