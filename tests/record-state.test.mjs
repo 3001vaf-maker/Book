@@ -63,6 +63,10 @@ assert.deepEqual(
   { action: 'booked', visit: 'no-show', payment: '' },
 );
 assert.deepEqual(
+  projectRecordStatuses(record, [createdEvent, { type: 'no-show', at: '2026-09-10T10:05:00.000Z' }], { due: 5000, paid: 0 }),
+  { action: 'booked', visit: 'no-show', payment: '' },
+);
+assert.deepEqual(
   projectRecordStatuses(record, [createdEvent, cancelledEvent], { due: 5000, paid: 0 }),
   { action: 'cancelled', visit: '', payment: '' },
 );
