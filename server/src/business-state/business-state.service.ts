@@ -137,8 +137,8 @@ export class BusinessStateService {
       this.prisma.businessStateMeta.findUnique({ where: { tenantId } }),
       this.prisma.person.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
       this.prisma.ueiState.findUnique({ where: { tenantId } }),
-      this.prisma.businessRecord.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
-      this.prisma.businessRecordEvent.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
+      this.prisma.record.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
+      this.prisma.recordEvent.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
     ]);
 
     return {
@@ -252,15 +252,15 @@ export class BusinessStateService {
     await this.requireVerified(tenantId);
     const id = text(recordId);
     const [events, record] = await this.prisma.$transaction([
-      this.prisma.businessRecordEvent.deleteMany({ where: { tenantId, recordId: id } }),
-      this.prisma.businessRecord.deleteMany({ where: { tenantId, recordId: id } }),
+      this.prisma.recordEvent.deleteMany({ where: { tenantId, recordId: id } }),
+      this.prisma.record.deleteMany({ where: { tenantId, recordId: id } }),
     ]);
     return { deleted: record.count, deletedEvents: events.count };
   }
 
   async deleteRecordEvents(tenantId: string, recordId: string) {
     await this.requireVerified(tenantId);
-    const result = await this.prisma.businessRecordEvent.deleteMany({ where: { tenantId, recordId: text(recordId) } });
+    const result = await this.prisma.recordEvent.deleteMany({ where: { tenantId, recordId: text(recordId) } });
     return { deleted: result.count };
   }
 
@@ -273,7 +273,7 @@ export class BusinessStateService {
     if (!id || !recordId) throw new BadRequestException('У события записи отсутствует id или recordId');
     event.id = id;
     event.recordId = recordId;
-    await this.prisma.businessRecordEvent.upsert({
+    await this.prisma.recordEvent.upsert({
       where: { tenantId_eventId: { tenantId, eventId: id } },
       create: { tenantId, eventId: id, recordId, position: positionValue(source.position), data: json(event) },
       update: { recordId, position: positionValue(source.position), data: json(event) },
