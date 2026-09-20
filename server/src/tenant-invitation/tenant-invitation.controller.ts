@@ -14,4 +14,14 @@ export class TenantInvitationController {
   accept(@Body() body: { token?: unknown; password?: unknown }) {
     return this.invitations.accept(body || {});
   }
+
+  @Post('registration-link/inspect')
+  inspectRegistrationLink(@Body() body: { token?: unknown }) {
+    return this.invitations.inspectRegistrationLink(body?.token);
+  }
+
+  @Post('registration-link/accept')
+  acceptRegistrationLink(@Body() body: { token?: unknown; email?: unknown; password?: unknown }) {
+    return this.invitations.acceptRegistrationLink(body || {});
+  }
 }
