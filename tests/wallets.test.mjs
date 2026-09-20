@@ -34,6 +34,7 @@ const folderSource = readFileSync(new URL('../ui/cards/folder-card.js', import.m
 assert.match(mainSource, /title: 'Финансы'/);
 assert.match(mainSource, /\.\/finance\/finance\.js/);
 assert.match(financeSource, /getDDSMovements/);
+assert.match(financeSource, /operationId/);
 assert.match(financeSource, /getWalletTotalBalance/);
 assert.match(financeSource, /title: 'Касса'/);
 assert.match(financeSource, /title: 'ДДС'/);
