@@ -73,13 +73,19 @@ for (const [path, pattern, message] of ownershipRules) {
 }
 
 const financeData = source('core/finance/data.js');
-if (!/queueAuxiliaryDataset\(['"]finance['"]/.test(financeData) || !/let financeState = emptyState\(\)/.test(financeData)) {
-  errors.push('core/finance/data.js must own server-backed DDS movement persistence');
+if (!/queueAuxiliaryDataset\(['"]finance['"]/.test(financeData)
+  || !/let financeState = emptyState\(\)/.test(financeData)
+  || !/settlements:\s*\{\}/.test(financeData)
+  || !/readStoredSettlement/.test(financeData)) {
+  errors.push('core/finance/data.js must own server-backed Settlement and money persistence');
 }
 
 const financeService = source('core/finance/service.js');
-if (!/export function recordPaymentIncome/.test(financeService) || !/export function recordRefundExpense/.test(financeService) || !/export function cancelPaymentOperation/.test(financeService)) {
-  errors.push('core/finance/service.js must own payment income, refund expense and operation cancellation commands');
+if (!/export function recordPaymentIncome/.test(financeService)
+  || !/export function recordRefundExpense/.test(financeService)
+  || !/export function cancelPaymentOperation/.test(financeService)
+  || !/export function saveRecordSettlement/.test(financeService)) {
+  errors.push('core/finance/service.js must own Settlement plus payment/refund/cancel commands');
 }
 
 const financeRead = source('core/finance/read.js');
@@ -121,8 +127,13 @@ if (!/data-payment-price/.test(paymentUI) || /data-payment-price\s+readonly/.tes
 }
 
 const recordPayment = source('journal/record-payment.js');
-if (!/procedures:\s*sourcesFromSettlement/.test(recordPayment) || !/products:\s*sourcesFromSettlement/.test(recordPayment)) {
-  errors.push('Payment-stage price correction must be persisted back into Record procedures and products');
+if (!/procedures:\s*sourcesFromSettlement/.test(recordPayment)
+  || !/products:\s*sourcesFromSettlement/.test(recordPayment)
+  || !/saveRecordSettlement/.test(recordPayment)) {
+  errors.push('Payment-stage source-price correction belongs to Record snapshots while discount/amount-due belongs to Finance Settlement');
+}
+if (/finance:\s*settlement/.test(recordPayment) || /setRecordAttendance\(completed/.test(recordPayment)) {
+  errors.push('Payment UI must not persist Settlement into Record or mutate Record attendance as a payment side effect');
 }
 if (!/cancelPaymentOperation/.test(recordPayment) || !/data-payment-actions/.test(recordPayment)) {
   errors.push('Paid Record UI must route cancellation through Finance Core and keep it distinct from refund');
