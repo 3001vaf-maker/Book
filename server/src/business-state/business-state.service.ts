@@ -125,28 +125,6 @@ function personHasPhone(person: JsonObject, phone: unknown) {
   return (Array.isArray(person.phones) ? person.phones : []).some((value) => phonesMatch(value, phone));
 }
 
-function liveRecordSnapshot(record: JsonObject, fallback: unknown = null) {
-  const finance = objectValue(record.finance);
-  const procedures = (Array.isArray(record.procedures) ? record.procedures : []).map((item) => ({
-    id: text(item?.id),
-    name: text(item?.name),
-    cost: item?.cost ?? '',
-    duration: Math.max(0, Number(item?.duration || 0)),
-  }));
-  const subtotal = Math.max(0, Number(finance.serviceTotal || 0));
-  const discountPercent = Math.max(0, Math.min(100, Number(finance.discountPercent ?? record?.person?.discountPercent ?? 0) || 0));
-  const total = Math.max(0, Number(finance.planTotal ?? subtotal * (1 - discountPercent / 100)) || 0);
-  const previous = objectValue(objectValue(fallback).payment);
-  const paid = Math.max(0, Number(previous.paid || 0));
-  const due = Math.max(0, total - paid);
-  return {
-    recordId: text(record.id),
-    procedures,
-    pricing: { subtotal, discountPercent, total },
-    payment: { state: due <= 0.009 ? 'paid' : paid > 0 ? 'partial' : 'unpaid', paid, due },
-    updatedAt: text(record.updatedAt) || new Date().toISOString(),
-  };
-}
 
 @Injectable()
 export class BusinessStateService {
@@ -521,12 +499,5 @@ export class BusinessStateService {
     });
   }
 
-  async bookingRecordSnapshot(tenantId: string, recordId: string, fallback: unknown = null) {
-    const id = text(recordId);
-    if (!id) return fallback;
-    const row = await this.prisma.businessRecord.findUnique({ where: { tenantId_recordId: { tenantId, recordId: id } } });
-    if (!row) return fallback;
-    return liveRecordSnapshot(objectValue(row.data), fallback);
-  }
 
 }
