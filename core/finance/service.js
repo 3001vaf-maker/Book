@@ -6,7 +6,7 @@ import {
   splitRefund,
 } from './rules.js';
 
-function normalizeFinancialSnapshot(value = null) {
+function normalizeSettlementSnapshot(value = null) {
   if (!value || typeof value !== 'object') return null;
   return {
     items: Array.isArray(value.items) ? value.items.map((item) => ({ ...item })) : [],
@@ -24,7 +24,7 @@ function notifyFinanceChanged(detail = {}) {
 
 export function recordPaymentIncome({ source = null, workplace = '', person = null, finance = null, allocations = [], maxAmount = null, serviceAmount = null, tips = 0, now = new Date() } = {}) {
   if (!source?.type || !source?.id) return null;
-  const snapshot = normalizeFinancialSnapshot(finance);
+  const snapshot = normalizeSettlementSnapshot(finance);
   if (!snapshot || maxAmount == null) return null;
   const limit = Math.max(0, financialNumber(maxAmount));
   if (limit <= 0.009) return null;
