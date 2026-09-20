@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma.service';
 
 type ProfileInput = {
   id?: string;
+  platformAccountId?: string;
   key: string;
   name: string;
   surname: string;
@@ -199,6 +200,7 @@ export class ProfileService {
 
     const profile: ProfileInput = {
       id: row.id,
+      platformAccountId: row.platformAccountId,
       key: row.key,
       name: row.name,
       surname: row.surname,
