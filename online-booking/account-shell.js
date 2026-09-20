@@ -9,7 +9,7 @@ import {
   sendAccountChatMessage,
 } from '../core/account/index.js';
 import { formatPhone } from '../core/phone/index.js';
-import { projectRecordStatuses } from '../core/record/index.js';
+import { recordActionState, recordVisitState } from '../core/record/index.js';
 import { disableWebPush, enableWebPush, getWebPushState } from '../core/notifications/web-push.js';
 import {
   appHeader,
@@ -49,11 +49,11 @@ function requestProcedures(request = {}) {
 }
 
 function requestPricing(request = {}) {
-  const finance = request.finance && typeof request.finance === 'object' ? request.finance : {};
-  const subtotal = Math.max(0, Number(finance.serviceTotal || 0));
-  const discountPercent = Math.max(0, Math.min(100, Number(finance.discountPercent || 0)));
-  const discountAmount = Math.max(0, Number(finance.discountTotal || 0));
-  const total = Math.max(0, Number(finance.planTotal || 0));
+  const settlement = request.settlement && typeof request.settlement === 'object' ? request.settlement : {};
+  const subtotal = Math.max(0, Number(settlement.serviceTotal || 0));
+  const discountPercent = Math.max(0, Math.min(100, Number(settlement.discountPercent || 0)));
+  const discountAmount = Math.max(0, Number(settlement.discountTotal || 0));
+  const total = Math.max(0, Number(settlement.planTotal || 0));
   return { subtotal, discountPercent, total, discountAmount };
 }
 
@@ -94,7 +94,14 @@ const PAYMENT_STATUS_LABELS = Object.freeze({
 });
 
 function requestStatuses(request = {}) {
-  return projectRecordStatuses(request, request.history, requestPayment(request));
+  const action = recordActionState(request, request.history);
+  const visit = recordVisitState(request, request.history);
+  const payment = requestPayment(request);
+  let paymentStatus = '';
+  if (visit && visit !== 'no-show') {
+    paymentStatus = payment.due <= 0.009 ? 'paid' : (visit === 'arrived' ? 'debt' : 'due');
+  }
+  return { action, visit, payment: paymentStatus };
 }
 
 function actionStatus(request = {}) {
