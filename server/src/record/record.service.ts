@@ -183,7 +183,7 @@ export class RecordService {
 
     const products = arrayValue(input.products).map((item) => clone(objectValue(item)));
     const person = clone(objectValue(input.person));
-    const finance = this.finance.calculatePlan([
+    const finance = this.finance.calculateSettlement([
       ...procedureSnapshots.map((item) => ({ ...item, sourceType: 'procedure', sourceId: item.id })),
       ...products.map((item) => ({ ...item, sourceType: 'product', sourceId: text(item?.id) })),
     ], person?.discountPercent);
@@ -317,18 +317,18 @@ export class RecordService {
       if (!personKeys.has(text(person?.key)) && !personIds.has(text(person?.id))) continue;
       const events = byRecord.get(text(record.id)) || [];
       const lifecycle = this.projectLifecycle(record, events);
-      const storedPlan = objectValue(record.finance);
-      const plan = Object.keys(storedPlan).length
-        ? storedPlan
-        : this.finance.calculatePlan([
+      const storedSettlement = objectValue(record.finance);
+      const settlement = Object.keys(storedSettlement).length
+        ? storedSettlement
+        : this.finance.calculateSettlement([
             ...arrayValue(record.procedures).map((item) => ({ ...objectValue(item), sourceType: 'procedure', sourceId: text(item?.id) })),
             ...arrayValue(record.products).map((item) => ({ ...objectValue(item), sourceType: 'product', sourceId: text(item?.id) })),
           ], person?.discountPercent);
-      const payment = await this.finance.recordPaymentState(tenantId, text(record.id), plan);
+      const payment = await this.finance.recordSettlementPaymentState(tenantId, text(record.id), settlement);
       result.push({
         ...record,
         ...lifecycle,
-        finance: plan,
+        finance: settlement,
         payment,
         history: events,
       });
@@ -400,7 +400,7 @@ export class RecordService {
       : arrayValue(current.products).map((item) => clone(objectValue(item)));
     const person = personChanged ? clone(objectValue(incoming.person)) : clone(objectValue(current.person));
     const finance = (refreshProcedures || productsChanged || personChanged)
-      ? this.finance.calculatePlan([
+      ? this.finance.calculateSettlement([
           ...procedures.map((item) => ({ ...item, sourceType: 'procedure', sourceId: item.id })),
           ...products.map((item) => ({ ...item, sourceType: 'product', sourceId: text(item?.id) })),
         ], person?.discountPercent)
