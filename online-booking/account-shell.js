@@ -44,33 +44,25 @@ function formatDate(value) {
 }
 
 function requestProcedures(request = {}) {
-  const snapshot = request.recordSnapshot && typeof request.recordSnapshot === 'object' ? request.recordSnapshot : {};
-  return Array.isArray(snapshot.procedures) && snapshot.procedures.length
-    ? snapshot.procedures
-    : Array.isArray(request.procedures) ? request.procedures : [];
+  return Array.isArray(request.procedures) ? request.procedures : [];
 }
 
 function requestPricing(request = {}) {
-  const snapshot = request.recordSnapshot && typeof request.recordSnapshot === 'object' ? request.recordSnapshot : {};
-  const pricing = snapshot.pricing && typeof snapshot.pricing === 'object' ? snapshot.pricing : {};
-  const procedures = requestProcedures(request);
-  const subtotal = Number.isFinite(Number(pricing.subtotal))
-    ? Math.max(0, Number(pricing.subtotal))
-    : procedures.reduce((sum, item) => sum + Math.max(0, Number(item?.cost || 0)), 0);
-  const discountPercent = Math.max(0, Math.min(100, Number(pricing.discountPercent || 0)));
-  const total = Number.isFinite(Number(pricing.total))
-    ? Math.max(0, Number(pricing.total))
-    : Math.max(0, subtotal * (1 - discountPercent / 100));
-  return { subtotal, discountPercent, total, discountAmount: Math.max(0, subtotal - total) };
+  const finance = request.finance && typeof request.finance === 'object' ? request.finance : {};
+  const subtotal = Math.max(0, Number(finance.serviceTotal || 0));
+  const discountPercent = Math.max(0, Math.min(100, Number(finance.discountPercent || 0)));
+  const discountAmount = Math.max(0, Number(finance.discountTotal || 0));
+  const total = Math.max(0, Number(finance.planTotal || 0));
+  return { subtotal, discountPercent, total, discountAmount };
 }
 
 function requestPayment(request = {}) {
-  const snapshot = request.recordSnapshot && typeof request.recordSnapshot === 'object' ? request.recordSnapshot : {};
-  const payment = snapshot.payment && typeof snapshot.payment === 'object' ? snapshot.payment : {};
-  const pricing = requestPricing(request);
-  const due = Math.max(0, Number.isFinite(Number(payment.due)) ? Number(payment.due) : pricing.total);
-  const paid = Math.max(0, Number.isFinite(Number(payment.paid)) ? Number(payment.paid) : Math.max(0, pricing.total - due));
-  return { state: String(payment.state || ''), paid, due };
+  const payment = request.payment && typeof request.payment === 'object' ? request.payment : {};
+  return {
+    state: String(payment.state || 'unpaid'),
+    paid: Math.max(0, Number(payment.paid || 0)),
+    due: Math.max(0, Number(payment.due || 0)),
+  };
 }
 
 function requestMoment(request = {}) {
@@ -85,15 +77,18 @@ function nowMoment() {
 }
 
 function isCancelled(request = {}) {
-  return ['REJECTED', 'CANCELLED'].includes(String(request.status || '').toUpperCase());
+  return String(request.status || '').toLowerCase() === 'cancelled';
 }
 
 function lifecycleStatus(request = {}) {
   if (isCancelled(request)) return 'Отменена';
+  if (String(request.attendance || '') === 'no-show') return 'Не пришёл';
+  if (String(request.attendance || '') === 'arrived') return 'Пришёл';
   return requestMoment(request) >= nowMoment() ? 'Предстоящая' : 'Завершена';
 }
 
 function financeStatus(request = {}) {
+  if (isCancelled(request)) return { label: '', extra: '' };
   const payment = requestPayment(request);
   if (payment.due <= 0.009) return { label: 'Оплачено', extra: '' };
   if (requestMoment(request) >= nowMoment()) return { label: 'К оплате', extra: money(payment.due) };
@@ -102,7 +97,7 @@ function financeStatus(request = {}) {
 
 function workplaceName(state, request = {}) {
   const workplaces = Array.isArray(state.context?.workplaces) ? state.context.workplaces : [];
-  return workplaces.find((item) => String(item?.key || '') === String(request.workplaceKey || ''))?.name || 'Пространство';
+  return workplaces.find((item) => String(item?.key || '') === String(request.workplaceId || ''))?.name || 'Пространство';
 }
 
 function profileDisplayName(state) {
@@ -194,7 +189,7 @@ function openHistoryDetail(state, request, onRepeat) {
     { label: 'Скидка', value: money(pricing.discountAmount) },
     { label: 'Оплачено', value: money(payment.paid), strong: true },
   ];
-  if (payment.due > 0.009) totals.push({ label: requestMoment(request) < nowMoment() ? 'Задолженность' : 'К оплате', value: money(payment.due), strong: true });
+  if (!isCancelled(request) && payment.due > 0.009) totals.push({ label: requestMoment(request) < nowMoment() ? 'Задолженность' : 'К оплате', value: money(payment.due), strong: true });
   const procedures = requestProcedures(request);
   const layer = mountModal(document.body, modal(readOnlyReceipt({
     title: workplaceName(state, request),
