@@ -53,11 +53,6 @@ export class SaasAdminController {
     return this.communications.sendEmail(request.platformAdminId!, body || {});
   }
 
-  @Post('registration-links')
-  createRegistrationLink(@Req() request: AdminRequest) {
-    return this.invitations.createRegistrationLink(request.platformAdminId!);
-  }
-
   @Get('invitations')
   listInvitations(@Req() request: AdminRequest) {
     return this.invitations.listInvitations(request.platformAdminId!);
