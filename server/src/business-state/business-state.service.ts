@@ -273,10 +273,27 @@ export class BusinessStateService {
     if (!id || !recordId) throw new BadRequestException('У события записи отсутствует id или recordId');
     event.id = id;
     event.recordId = recordId;
-    await this.prisma.recordEvent.upsert({
+
+    const existing = await this.prisma.recordEvent.findUnique({
       where: { tenantId_eventId: { tenantId, eventId: id } },
-      create: { tenantId, eventId: id, recordId, position: positionValue(source.position), data: json(event) },
-      update: { recordId, position: positionValue(source.position), data: json(event) },
+    });
+    if (existing) {
+      const sameRecord = existing.recordId === recordId;
+      const sameData = canonical(objectValue(existing.data)) === canonical(event);
+      if (!sameRecord || !sameData) {
+        throw new ConflictException('Событие Record неизменяемо и не может быть переписано');
+      }
+      return clone(objectValue(existing.data));
+    }
+
+    await this.prisma.recordEvent.create({
+      data: {
+        tenantId,
+        eventId: id,
+        recordId,
+        position: positionValue(source.position),
+        data: json(event),
+      },
     });
     return event;
   }
