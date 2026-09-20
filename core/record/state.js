@@ -63,22 +63,6 @@ export function recordVisitState(record = {}, events = []) {
   return 'expected';
 }
 
-export function recordPaymentStatus(record = {}, events = [], payment = {}) {
-  const visit = recordVisitState(record, events);
-  if (!visit || visit === 'no-show') return '';
-  const dueValue = payment?.due ?? payment?.remaining ?? 0;
-  const due = Math.max(0, Number(dueValue) || 0);
-  if (due <= 0.009) return 'paid';
-  return visit === 'arrived' ? 'debt' : 'due';
-}
-
-export function projectRecordStatuses(record = {}, events = [], payment = {}) {
-  return {
-    action: recordActionState(record, events),
-    visit: recordVisitState(record, events),
-    payment: recordPaymentStatus(record, events, payment),
-  };
-}
 
 export function recordAppointmentTime(record, field = 'from') {
   const date = String(record?.date || '').slice(0, 10);
