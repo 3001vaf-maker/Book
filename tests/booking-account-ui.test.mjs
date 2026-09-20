@@ -99,7 +99,7 @@ assert.match(accountShell, /messageComposer\(\{ attachments: true \}\)/);
 assert.match(accountShell, /data-message-attachment/);
 assert.match(accountShell, /sendAccountChatMessage\(state\.tenantId, body, attachments\)/);
 assert.match(accountShell, /className: 'app-view-shell--chat'/);
-assert.match(accountShell, /getAccountRequests\(state\.tenantId\)\.catch\(\(\) => \[\]\)/);
+assert.match(accountShell, /getAccountRecords\(state\.tenantId\)\.catch\(\(\) => \[\]\)/);
 assert.match(accountShell, /data-account-chat-settings/);
 assert.match(accountShell, /getAccountChatSettings\(state\.tenantId\)/);
 assert.doesNotMatch(accountShell, /setBookingTelegramConsent/);

@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
+import { RecordService } from '../record/record.service';
 
 type JsonObject = Record<string, any>;
 type BusinessBundle = {
@@ -90,6 +90,10 @@ function canonical(value: BusinessBundle) {
   return JSON.stringify(stable(value));
 }
 
+function canonicalJson(value: unknown) {
+  return JSON.stringify(stable(value));
+}
+
 function canonicalOperational(value: OperationalBundle) {
   return JSON.stringify(stable(value));
 }
@@ -124,65 +128,21 @@ function personHasPhone(person: JsonObject, phone: unknown) {
   return (Array.isArray(person.phones) ? person.phones : []).some((value) => phonesMatch(value, phone));
 }
 
-function bookingFinance(procedures: JsonObject[], discountValue: unknown) {
-  const discountPercent = Math.max(0, Math.min(100, Number(discountValue || 0) || 0));
-  const items = procedures.map((item) => {
-    const price = Math.max(0, Number(String(item?.cost ?? item?.price ?? 0).replace(',', '.')) || 0);
-    const discountMoney = price * discountPercent / 100;
-    return {
-      sourceType: 'procedure',
-      sourceId: text(item?.id),
-      name: text(item?.name),
-      price,
-      discountMode: discountPercent > 0 ? 'percent' : 'none',
-      discountPercent,
-      discountMoney,
-      planAmount: Math.max(0, price - discountMoney),
-    };
-  });
-  return {
-    items,
-    serviceTotal: items.reduce((sum, item) => sum + item.price, 0),
-    discountPercent,
-    discountTotal: items.reduce((sum, item) => sum + item.discountMoney, 0),
-    planTotal: items.reduce((sum, item) => sum + item.planAmount, 0),
-  };
-}
-
-function liveRecordSnapshot(record: JsonObject, fallback: unknown = null) {
-  const finance = objectValue(record.finance);
-  const procedures = (Array.isArray(record.procedures) ? record.procedures : []).map((item) => ({
-    id: text(item?.id),
-    name: text(item?.name),
-    cost: item?.cost ?? '',
-    duration: Math.max(0, Number(item?.duration || 0)),
-  }));
-  const subtotal = Math.max(0, Number(finance.serviceTotal || 0));
-  const discountPercent = Math.max(0, Math.min(100, Number(finance.discountPercent ?? record?.person?.discountPercent ?? 0) || 0));
-  const total = Math.max(0, Number(finance.planTotal ?? subtotal * (1 - discountPercent / 100)) || 0);
-  const previous = objectValue(objectValue(fallback).payment);
-  const paid = Math.max(0, Number(previous.paid || 0));
-  const due = Math.max(0, total - paid);
-  return {
-    recordId: text(record.id),
-    procedures,
-    pricing: { subtotal, discountPercent, total },
-    payment: { state: due <= 0.009 ? 'paid' : paid > 0 ? 'partial' : 'unpaid', paid, due },
-    updatedAt: text(record.updatedAt) || new Date().toISOString(),
-  };
-}
 
 @Injectable()
 export class BusinessStateService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly records: RecordService,
+  ) {}
 
   private async bundle(tenantId: string) {
     const [meta, people, identity, records, recordEvents] = await Promise.all([
       this.prisma.businessStateMeta.findUnique({ where: { tenantId } }),
       this.prisma.person.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
       this.prisma.ueiState.findUnique({ where: { tenantId } }),
-      this.prisma.businessRecord.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
-      this.prisma.businessRecordEvent.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
+      this.prisma.record.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
+      this.prisma.recordEvent.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
     ]);
 
     return {
@@ -217,10 +177,10 @@ export class BusinessStateService {
         await tx.person.create({ data: { tenantId, key: text(person.key), position, data: json(person) } });
       }
       for (const [position, record] of expected.records.entries()) {
-        await tx.businessRecord.create({ data: { tenantId, recordId: text(record.id), position, data: json(record) } });
+        await tx.record.create({ data: { tenantId, recordId: text(record.id), position, data: json(record) } });
       }
       for (const [position, event] of expected.recordEvents.entries()) {
-        await tx.businessRecordEvent.create({
+        await tx.recordEvent.create({
           data: { tenantId, eventId: text(event.id), recordId: text(event.recordId), position, data: json(event) },
         });
       }
@@ -287,33 +247,24 @@ export class BusinessStateService {
   }
 
   async upsertRecord(tenantId: string, recordId: string, body: unknown) {
-    await this.requireVerified(tenantId);
-    const source = objectValue(body);
-    const record = clone(objectValue(source.record ?? source));
     const id = text(recordId);
     if (!id) throw new BadRequestException('У записи отсутствует id');
-    record.id = id;
-    await this.prisma.businessRecord.upsert({
-      where: { tenantId_recordId: { tenantId, recordId: id } },
-      create: { tenantId, recordId: id, position: positionValue(source.position), data: json(record) },
-      update: { position: positionValue(source.position), data: json(record) },
-    });
-    return record;
+    return this.records.upsertFromOwner(tenantId, id, body);
   }
 
   async deleteRecord(tenantId: string, recordId: string) {
     await this.requireVerified(tenantId);
     const id = text(recordId);
     const [events, record] = await this.prisma.$transaction([
-      this.prisma.businessRecordEvent.deleteMany({ where: { tenantId, recordId: id } }),
-      this.prisma.businessRecord.deleteMany({ where: { tenantId, recordId: id } }),
+      this.prisma.recordEvent.deleteMany({ where: { tenantId, recordId: id } }),
+      this.prisma.record.deleteMany({ where: { tenantId, recordId: id } }),
     ]);
     return { deleted: record.count, deletedEvents: events.count };
   }
 
   async deleteRecordEvents(tenantId: string, recordId: string) {
     await this.requireVerified(tenantId);
-    const result = await this.prisma.businessRecordEvent.deleteMany({ where: { tenantId, recordId: text(recordId) } });
+    const result = await this.prisma.recordEvent.deleteMany({ where: { tenantId, recordId: text(recordId) } });
     return { deleted: result.count };
   }
 
@@ -326,10 +277,33 @@ export class BusinessStateService {
     if (!id || !recordId) throw new BadRequestException('У события записи отсутствует id или recordId');
     event.id = id;
     event.recordId = recordId;
-    await this.prisma.businessRecordEvent.upsert({
+
+    const existing = await this.prisma.recordEvent.findUnique({
       where: { tenantId_eventId: { tenantId, eventId: id } },
-      create: { tenantId, eventId: id, recordId, position: positionValue(source.position), data: json(event) },
-      update: { recordId, position: positionValue(source.position), data: json(event) },
+    });
+    if (existing) {
+      const sameRecord = existing.recordId === recordId;
+      const sameData = canonicalJson(objectValue(existing.data)) === canonicalJson(event);
+      if (!sameRecord || !sameData) {
+        throw new ConflictException('Событие Record неизменяемо и не может быть переписано');
+      }
+      return clone(objectValue(existing.data));
+    }
+
+    if (text(event.type) === 'created') {
+      const recordEvents = await this.prisma.recordEvent.findMany({ where: { tenantId, recordId } });
+      const created = recordEvents.find((row) => text(objectValue(row.data).type) === 'created');
+      if (created) return clone(objectValue(created.data));
+    }
+
+    await this.prisma.recordEvent.create({
+      data: {
+        tenantId,
+        eventId: id,
+        recordId,
+        position: positionValue(source.position),
+        data: json(event),
+      },
     });
     return event;
   }
@@ -520,67 +494,7 @@ export class BusinessStateService {
     return person;
   }
 
-  async publicBookingOccupancy(tenantId: string) {
-    await this.requireVerified(tenantId);
-    const [records, events] = await Promise.all([
-      this.prisma.businessRecord.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
-      this.prisma.businessRecordEvent.findMany({ where: { tenantId } }),
-    ]);
-    const cancelled = new Set(events.filter((row) => text(objectValue(row.data).type) === 'cancelled').map((row) => row.recordId));
-    return records.map((row) => objectValue(row.data)).filter((record) => {
-      const id = text(record.id);
-      return id && text(record.status) !== 'cancelled' && !cancelled.has(id);
-    }).map((record) => ({
-      id: text(record.id),
-      type: 'record',
-      workplaceId: text(record.workplaceId),
-      date: text(record.date).slice(0, 10),
-      from: text(record.from),
-      to: text(record.to),
-    })).filter((item) => item.workplaceId && item.date && item.from && item.to);
-  }
 
-  async createOnlineBookingRecord(tenantId: string, input: JsonObject) {
-    await this.requireVerified(tenantId);
-    const requestId = text(input.sourceRequestId);
-    if (!requestId) throw new BadRequestException('У онлайн-записи отсутствует sourceRequestId');
-    const rows = await this.prisma.businessRecord.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] });
-    const existing = rows.find((row) => text(objectValue(row.data).sourceRequestId) === requestId);
-    if (existing) return objectValue(existing.data);
 
-    const now = new Date().toISOString();
-    const procedures = (Array.isArray(input.procedures) ? input.procedures : []).map((item) => clone(objectValue(item)));
-    const person = clone(objectValue(input.person));
-    const record = {
-      id: randomUUID(),
-      date: text(input.date).slice(0, 10),
-      workplaceId: text(input.workplaceId),
-      from: text(input.from),
-      to: text(input.to),
-      person,
-      procedures,
-      products: [],
-      source: 'online-booking',
-      sourceRequestId: requestId,
-      finance: bookingFinance(procedures, person.discountPercent),
-      createdAt: now,
-      updatedAt: now,
-    };
-    const position = rows.reduce((max, row) => Math.max(max, row.position), -1) + 1;
-    const event = { id: randomUUID(), recordId: record.id, type: 'created', at: now, payload: {} };
-    await this.prisma.$transaction([
-      this.prisma.businessRecord.create({ data: { tenantId, recordId: record.id, position, data: json(record) } }),
-      this.prisma.businessRecordEvent.create({ data: { tenantId, eventId: event.id, recordId: record.id, position: 0, data: json(event) } }),
-    ]);
-    return record;
-  }
-
-  async bookingRecordSnapshot(tenantId: string, recordId: string, fallback: unknown = null) {
-    const id = text(recordId);
-    if (!id) return fallback;
-    const row = await this.prisma.businessRecord.findUnique({ where: { tenantId_recordId: { tenantId, recordId: id } } });
-    if (!row) return fallback;
-    return liveRecordSnapshot(objectValue(row.data), fallback);
-  }
 
 }

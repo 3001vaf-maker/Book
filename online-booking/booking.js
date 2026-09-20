@@ -152,10 +152,7 @@ function renderFlowPage(root, state, {
 }
 
 function requestProcedures(request = {}) {
-  const snapshot = request.recordSnapshot && typeof request.recordSnapshot === 'object' ? request.recordSnapshot : {};
-  return Array.isArray(snapshot.procedures) && snapshot.procedures.length
-    ? snapshot.procedures
-    : Array.isArray(request.procedures) ? request.procedures : [];
+  return Array.isArray(request.procedures) ? request.procedures : [];
 }
 
 function continueRepeat(root, state) {
@@ -593,7 +590,7 @@ async function startBookingFromAccount(root, state) {
 async function repeatBooking(root, state, request) {
   const procedureIds = requestProcedures(request).map((item) => String(item?.id || '')).filter(Boolean);
   state.repeatSelection = {
-    workplaceKey: String(request?.workplaceKey || ''),
+    workplaceKey: String(request?.workplaceId || ''),
     procedureIds,
   };
   state.date = '';

@@ -18,6 +18,8 @@ function normalizePhones(values) {
 export function normalizeProfile(profile = {}) {
   const phones = normalizePhones(profile.phones?.length ? profile.phones : [profile.phone]);
   return {
+    id: String(profile.id || ''),
+    platformAccountId: String(profile.platformAccountId || ''),
     key: String(profile.key || 'profile'),
     name: String(profile.name || ''),
     surname: String(profile.surname || ''),

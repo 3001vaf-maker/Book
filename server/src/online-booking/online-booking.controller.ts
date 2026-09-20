@@ -59,30 +59,6 @@ export class OnlineBookingController {
     return this.personIdentity.reconcileLegacyAccountDuplicates(request.auth!.tenantId);
   }
 
-  @UseGuards(JwtAuthGuard)
-  @Get('owner/requests')
-  pendingRequests(@Req() request: OwnerRequest) {
-    return this.booking.pendingRequests(request.auth!.tenantId);
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Post('owner/requests/:requestId/imported')
-  markImported(@Req() request: OwnerRequest, @Param('requestId') requestId: string, @Body() body: { recordId?: string }) {
-    return this.booking.markImported(request.auth!.tenantId, requestId, body?.recordId || '');
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Put('owner/requests/:requestId/snapshot')
-  syncRequestSnapshot(@Req() request: OwnerRequest, @Param('requestId') requestId: string, @Body() body: { snapshot?: unknown }) {
-    return this.booking.syncRequestSnapshot(request.auth!.tenantId, requestId, body?.snapshot || {});
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Post('owner/requests/:requestId/rejected')
-  markRejected(@Req() request: OwnerRequest, @Param('requestId') requestId: string) {
-    return this.booking.markRejected(request.auth!.tenantId, requestId);
-  }
-
   @Get(':tenantId/context')
   context(@Param('tenantId') tenantId: string, @Query('workplace') workplace = '') {
     return this.booking.getContext(tenantId, workplace);
@@ -162,9 +138,9 @@ export class OnlineBookingController {
   }
 
   @UseGuards(AccountGuard)
-  @Get(':tenantId/account/requests')
-  myRequests(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
-    return this.booking.getMyRequests(tenantId, request.accountAuth!.accountId);
+  @Get(':tenantId/account/records')
+  myRecords(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
+    return this.booking.getMyRecords(tenantId, request.accountAuth!.accountId);
   }
 
   @UseGuards(AccountGuard)
@@ -224,8 +200,8 @@ export class OnlineBookingController {
       type: 'booking.created',
       title: 'Запись создана',
       body: 'Новая запись добавлена в ваш аккаунт.',
-      entityType: 'booking-request',
-      entityId: String((created as any)?.id || ''),
+      entityType: 'record',
+      entityId: String((created as any)?.recordId || ''),
     });
     return created;
   }

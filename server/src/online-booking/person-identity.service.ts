@@ -1,5 +1,4 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { BookingRequestStatus } from '@prisma/client';
 import { BusinessStateService } from '../business-state/business-state.service';
 
 function text(value: unknown) {
@@ -121,42 +120,5 @@ export class PersonIdentityService {
     };
   }
 
-  async manualRecordViews(tenantId: string, account: Record<string, any>, importedRecordIds: Set<string>) {
-    const personState = await this.personState(tenantId, account.phone);
-    const memberKeys = new Set(personState.members.map(({ person }) => text(person.key)).filter(Boolean));
-    if (!memberKeys.size) return [];
 
-    const cancelled = new Set(arrayValue(personState.business.recordEvents)
-      .filter((event) => text(event?.type) === 'cancelled')
-      .map((event) => text(event?.recordId))
-      .filter(Boolean));
-
-    const records = arrayValue(personState.business.records).filter((value) => {
-      const record = objectValue(value);
-      const recordId = text(record.id);
-      if (!recordId || importedRecordIds.has(recordId) || cancelled.has(recordId) || text(record.status) === 'cancelled') return false;
-      const person = objectValue(record.person);
-      return memberKeys.has(text(person.key)) || phonesMatch(person.phone, account.phone);
-    });
-
-    return Promise.all(records.map(async (value) => {
-      const record = objectValue(value);
-      const recordId = text(record.id);
-      return {
-        id: `record:${recordId}`,
-        tenantId,
-        accountId: text(account.id),
-        workplaceKey: text(record.workplaceId),
-        date: dateValue(record.date),
-        from: text(record.from),
-        to: text(record.to),
-        procedures: arrayValue(record.procedures),
-        status: BookingRequestStatus.IMPORTED,
-        importedRecordId: recordId,
-        recordSnapshot: await this.businessState.bookingRecordSnapshot(tenantId, recordId, null),
-        createdAt: text(record.createdAt),
-        updatedAt: text(record.updatedAt),
-      };
-    }));
-  }
 }

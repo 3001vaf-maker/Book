@@ -14,6 +14,9 @@ import { ConsentPolicyService } from '../tenant-document-archive/consent-policy.
 import { TenantDocumentArchiveService } from '../tenant-document-archive/tenant-document-archive.service';
 import { ProfileService } from '../profile/profile.service';
 import { PersonIdentityService } from './person-identity.service';
+import { TimeService } from '../time/time.service';
+import { RecordService } from '../record/record.service';
+import { ProcedureService } from '../procedure/procedure.service';
 
 function objectValue(value: unknown): Record<string, any> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : {};
@@ -43,58 +46,6 @@ function numeric(value: unknown, fallback = 0) {
 
 function percent(value: unknown) {
   return Math.max(0, Math.min(100, numeric(value, 0)));
-}
-
-function timeToMinutes(value: unknown) {
-  const match = text(value).match(/^(\d{1,2}):(\d{2})$/);
-  if (!match) return null;
-  const hour = Number(match[1]);
-  const minute = Number(match[2]);
-  if (!Number.isInteger(hour) || !Number.isInteger(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
-  return hour * 60 + minute;
-}
-
-function minutesToTime(value: number) {
-  if (!Number.isFinite(value) || value < 0 || value > 24 * 60) return '';
-  const hour = Math.floor(value / 60);
-  const minute = value % 60;
-  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-}
-
-function rangesOverlap(leftFrom: string, leftTo: string, rightFrom: string, rightTo: string) {
-  const a = timeToMinutes(leftFrom);
-  const b = timeToMinutes(leftTo);
-  const c = timeToMinutes(rightFrom);
-  const d = timeToMinutes(rightTo);
-  return a != null && b != null && c != null && d != null && a < d && c < b;
-}
-
-function containsRange(planFrom: string, planTo: string, from: string, to: string) {
-  const start = timeToMinutes(planFrom);
-  const end = timeToMinutes(planTo);
-  const candidateStart = timeToMinutes(from);
-  const candidateEnd = timeToMinutes(to);
-  return start != null && end != null && candidateStart != null && candidateEnd != null
-    && candidateEnd > candidateStart && start <= candidateStart && candidateEnd <= end;
-}
-
-function assignmentFor(procedure: any, workplaceKey: string) {
-  return arrayValue(procedure?.workplaces).find((item) => text(item?.workplaceId ?? item?.key ?? item?.id) === workplaceKey) || null;
-}
-
-function procedureCost(procedure: any, workplaceKey: string) {
-  const assignment = assignmentFor(procedure, workplaceKey);
-  const assigned = assignment?.cost;
-  const base = procedure?.cost;
-  const hasAssigned = assigned && typeof assigned === 'object' && !assigned.free && (
-    assigned.amount !== '' && assigned.amount != null
-    || assigned.from !== '' && assigned.from != null
-    || assigned.to !== '' && assigned.to != null
-  );
-  const cost = hasAssigned ? assigned : base;
-  if (cost == null || cost?.free) return '';
-  if (typeof cost === 'number' || typeof cost === 'string') return cost;
-  return cost.amount ?? cost.from ?? '';
 }
 
 function normalizeConsents(value: unknown) {
@@ -153,17 +104,6 @@ function publicAccount(account: any) {
   };
 }
 
-function initialRequestSnapshot(procedures: any[], account: any) {
-  const subtotal = procedures.reduce((sum, item) => sum + Math.max(0, numeric(item?.cost, 0)), 0);
-  const discountPercent = percent(account?.discountPercent);
-  const total = Math.max(0, subtotal * (1 - discountPercent / 100));
-  return {
-    procedures,
-    pricing: { subtotal, discountPercent, total },
-    payment: { state: total <= 0.009 ? 'paid' : 'unpaid', paid: 0, due: total },
-    updatedAt: new Date().toISOString(),
-  };
-}
 
 @Injectable()
 export class OnlineBookingService {
@@ -175,6 +115,9 @@ export class OnlineBookingService {
     private readonly consentPolicy: ConsentPolicyService,
     private readonly profile: ProfileService,
     private readonly personIdentity: PersonIdentityService,
+    private readonly time: TimeService,
+    private readonly records: RecordService,
+    private readonly procedures: ProcedureService,
   ) {}
 
   private async publication(tenantId: string) {
@@ -252,7 +195,7 @@ export class OnlineBookingService {
     });
     const days = arrayValue(data.days).filter((day) => allowedKeys.has(text(day?.workplaceId)));
     const [recordOccupancy, pending] = await Promise.all([
-      this.businessState.publicBookingOccupancy(tenantId),
+      this.records.publicOccupancy(tenantId),
       this.prisma.bookingRequest.findMany({
         where: {
           tenantId,
@@ -418,51 +361,19 @@ export class OnlineBookingService {
     const workplaceKey = text(body.workplaceKey);
     const date = dateValue(body.date);
     const from = text(body.from);
-    if (!workplaceKey || !date || timeToMinutes(from) == null) throw new BadRequestException('Не выбраны дата, время или рабочее пространство');
+    if (!workplaceKey || !date || this.time.timeToMinutes(from) == null) throw new BadRequestException('Не выбраны дата, время или рабочее пространство');
 
     const workplace = arrayValue(data.workplaces).find((item) => text(item?.key) === workplaceKey);
     if (!workplace) throw new BadRequestException('Рабочее пространство недоступно');
 
     const requestedIds = [...new Set(arrayValue(body.procedureIds).map((value) => text(value)).filter(Boolean))];
-    if (!requestedIds.length) throw new BadRequestException('Выберите хотя бы одну процедуру');
-    const catalog = arrayValue(data.procedures);
-    const selected = requestedIds.map((id) => catalog.find((procedure) => text(procedure?.id) === id)).filter(Boolean);
-    if (selected.length !== requestedIds.length || selected.some((procedure) => !assignmentFor(procedure, workplaceKey))) {
-      throw new BadRequestException('Одна из процедур недоступна в этом рабочем пространстве');
-    }
-
-    const duration = selected.reduce((sum, procedure) => sum + Math.max(0, Number(procedure?.duration || 0)), 0);
+    const procedureSnapshots = await this.procedures.snapshots(tenantId, workplaceKey, requestedIds);
+    const duration = procedureSnapshots.reduce((sum, procedure) => sum + Math.max(0, Number(procedure?.duration || 0)), 0);
     if (duration <= 0) throw new BadRequestException('Не удалось определить длительность процедур');
-    const start = timeToMinutes(from)!;
-    const to = minutesToTime(start + duration);
+    const start = this.time.timeToMinutes(from)!;
+    const to = this.time.minutesToTime(start + duration);
     if (!to) throw new BadRequestException('Выбранное время недоступно');
 
-    const day = arrayValue(data.days).find((item) => text(item?.workplaceId) === workplaceKey && dateValue(item?.date) === date);
-    if (!day) throw new ConflictException('Эта дата больше не доступна');
-    const planFrom = text(day?.from) || text(workplace?.from);
-    const planTo = text(day?.to) || text(workplace?.to);
-    if (!containsRange(planFrom, planTo, from, to)) throw new ConflictException('Время находится вне рабочего графика');
-
-    const [recordOccupancy, pending] = await Promise.all([
-      this.businessState.publicBookingOccupancy(tenantId),
-      this.prisma.bookingRequest.findMany({
-        where: { tenantId, workplaceKey, date, status: BookingRequestStatus.PENDING },
-        select: { from: true, to: true },
-      }),
-    ]);
-    const breaks = arrayValue(data.breaks).filter((item) => text(item?.workplaceId) === workplaceKey && dateValue(item?.date) === date);
-    const occupancy = [...recordOccupancy.filter((item) => text(item?.workplaceId) === workplaceKey && dateValue(item?.date) === date), ...breaks];
-    if (occupancy.some((item) => rangesOverlap(from, to, text(item?.from), text(item?.to)))
-      || pending.some((item) => rangesOverlap(from, to, item.from, item.to))) {
-      throw new ConflictException('Это время уже занято');
-    }
-
-    const procedures = selected.map((procedure) => ({
-      id: text(procedure?.id),
-      name: text(procedure?.name),
-      duration: Math.max(0, Number(procedure?.duration || 0)),
-      cost: procedureCost(procedure, workplaceKey),
-    }));
     const binding = await this.personIdentity.bindFirstAccess(tenantId, account as any);
     const person = binding.person;
     const identity = await this.businessState.bookingIdentityForAccount(tenantId, account.id);
@@ -478,7 +389,6 @@ export class OnlineBookingService {
       telegramId: text(account.telegramId),
       discountPercent: percent(pricingPerson?.discountPercent),
     };
-    const recordSnapshot = initialRequestSnapshot(procedures, { discountPercent: personSnapshot.discountPercent });
     const request = await this.prisma.bookingRequest.create({
       data: {
         tenantId,
@@ -487,64 +397,45 @@ export class OnlineBookingService {
         date,
         from,
         to,
-        procedures: procedures as Prisma.InputJsonValue,
-        recordSnapshot: recordSnapshot as Prisma.InputJsonValue,
+        procedures: requestedIds.map((id) => ({ id })) as Prisma.InputJsonValue,
       },
     });
 
     try {
-      const record = await this.businessState.createOnlineBookingRecord(tenantId, {
+      const record = await this.records.create(tenantId, {
         date,
         workplaceId: workplaceKey,
         from,
         to,
         person: personSnapshot,
-        procedures,
+        procedureIds: requestedIds,
+        source: 'online-booking',
         sourceRequestId: request.id,
+        createdBy: { type: 'account', accountId: account.id, profileId: '' },
       });
-      const liveSnapshot = await this.businessState.bookingRecordSnapshot(tenantId, text(record.id), recordSnapshot);
       const imported = await this.prisma.bookingRequest.update({
         where: { id: request.id },
         data: {
           status: BookingRequestStatus.IMPORTED,
           importedRecordId: text(record.id),
-          recordSnapshot: liveSnapshot as Prisma.InputJsonValue,
         },
       });
-      return { ...imported, procedures, recordSnapshot: liveSnapshot };
+      return { ...imported, recordId: text(record.id) };
     } catch (error) {
       await this.prisma.bookingRequest.update({ where: { id: request.id }, data: { status: BookingRequestStatus.REJECTED } }).catch(() => null);
       throw error;
     }
   }
 
-  async getMyRequests(tenantId: string, accountId: string) {
+  async getMyRecords(tenantId: string, accountId: string) {
     const account = await this.prisma.account.findFirst({ where: { id: accountId, tenantId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
     await this.personIdentity.bindFirstAccess(tenantId, account as any);
     const identity = await this.businessState.bookingIdentityForAccount(tenantId, accountId);
-    const accountIds = identity?.accountIds?.length ? identity.accountIds : [account.id];
-    const requests = await this.prisma.bookingRequest.findMany({
-      where: {
-        tenantId,
-        accountId: { in: accountIds },
-        status: { not: BookingRequestStatus.CANCELLED },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-    const requestViews = await Promise.all(requests.map(async (request) => ({
-      ...request,
-      recordSnapshot: request.importedRecordId
-        ? await this.businessState.bookingRecordSnapshot(tenantId, request.importedRecordId, request.recordSnapshot)
-        : request.recordSnapshot,
-    })));
-    const importedRecordIds = new Set(requests.map((request) => text(request.importedRecordId)).filter(Boolean));
-    const manualViews = await this.personIdentity.manualRecordViews(tenantId, account as any, importedRecordIds);
-    return [...requestViews, ...manualViews].sort((left, right) => {
-      const a = `${dateValue((left as any).date)}T${text((left as any).from)}`;
-      const b = `${dateValue((right as any).date)}T${text((right as any).from)}`;
-      return b.localeCompare(a);
-    });
+    const people = identity?.memberPeople?.length
+      ? identity.memberPeople
+      : identity?.person ? [identity.person] : [];
+    return this.records.listForPeople(tenantId, people);
   }
 
   async ownerAccounts(tenantId: string) {
@@ -578,44 +469,5 @@ export class OnlineBookingService {
     return { updated };
   }
 
-  async pendingRequests(tenantId: string) {
-    return this.prisma.bookingRequest.findMany({
-      where: { tenantId, status: BookingRequestStatus.PENDING },
-      orderBy: { createdAt: 'asc' },
-      include: {
-        account: {
-          select: { id: true, email: true, name: true, surname: true, phone: true, telegramId: true, profileData: true },
-        },
-      },
-    });
-  }
 
-  async markImported(tenantId: string, requestId: string, recordId: unknown) {
-    const request = await this.prisma.bookingRequest.findFirst({ where: { id: requestId, tenantId } });
-    if (!request) throw new NotFoundException('Запрос записи не найден');
-    return this.prisma.bookingRequest.update({
-      where: { id: request.id },
-      data: { status: BookingRequestStatus.IMPORTED, importedRecordId: text(recordId) },
-    });
-  }
-
-  async syncRequestSnapshot(tenantId: string, requestId: string, snapshot: unknown) {
-    const request = await this.prisma.bookingRequest.findFirst({ where: { id: requestId, tenantId } });
-    if (!request) throw new NotFoundException('Запрос записи не найден');
-    const normalized = objectValue(snapshot);
-    return this.prisma.bookingRequest.update({
-      where: { id: request.id },
-      data: { recordSnapshot: normalized as Prisma.InputJsonValue },
-      select: { id: true, updatedAt: true },
-    });
-  }
-
-  async markRejected(tenantId: string, requestId: string) {
-    const request = await this.prisma.bookingRequest.findFirst({ where: { id: requestId, tenantId } });
-    if (!request) throw new NotFoundException('Запрос записи не найден');
-    return this.prisma.bookingRequest.update({
-      where: { id: request.id },
-      data: { status: BookingRequestStatus.REJECTED },
-    });
-  }
 }

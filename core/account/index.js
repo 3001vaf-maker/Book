@@ -131,9 +131,9 @@ export async function createBookingRequest(tenantId, data) {
   );
 }
 
-export async function getAccountRequests(tenantId) {
+export async function getAccountRecords(tenantId) {
   return jsonResponse(
-    await request(`/online-booking/${encodeURIComponent(tenantId)}/account/requests`, { tenantId, auth: true }),
+    await request(`/online-booking/${encodeURIComponent(tenantId)}/account/records`, { tenantId, auth: true }),
     'Не удалось загрузить записи аккаунта',
   );
 }

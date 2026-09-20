@@ -19,8 +19,8 @@ if (!metadata.includes('getIdentityMemberKeys') || !metadata.includes('identityK
 if (!business.includes('bookingIdentityForAccount') || !business.includes('memberPeople') || !business.includes('accountIds')) {
   failures.push('Server BusinessState must resolve Account identity through canonical UEI members.');
 }
-if (!server.includes('const accountIds = identity?.accountIds') || !server.includes('accountId: { in: accountIds }')) {
-  failures.push('Booking Account history must resolve all Accounts from canonical UEI identity.');
+if (!server.includes('identity?.memberPeople') || !server.includes('this.records.listForPeople(tenantId, people)')) {
+  failures.push('Account Record history must resolve all canonical UEI member People before reading Records.');
 }
 
 if (failures.length) {

@@ -24,6 +24,7 @@ import { getProcedures } from '../settings/service/procedures/data.js';
 import { getProducts } from '../settings/service/products/data.js';
 import { getRecords } from '../core/record/index.js';
 import { updateRecord, cancelRecord, checkRecordTime } from '../core/record/index.js';
+import { journalRecordActionContext } from './record-action-context.js';
 
 const people = () => getAllPeople();
 const procedures = () => getProcedures();
@@ -338,7 +339,7 @@ function confirmCancel(record, onCancelled) {
   if (!m) return;
   m.querySelector('[data-record-cancel-no]')?.addEventListener('click', () => m.remove());
   m.querySelector('[data-record-cancel-yes]')?.addEventListener('click', () => {
-    if (!cancelRecord(record.id)) return;
+    if (!cancelRecord(record.id, { actionContext: journalRecordActionContext() })) return;
     m.remove();
     onCancelled?.();
   });
@@ -439,7 +440,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       products: state.products,
       confirmed: Boolean(state.confirmed),
       attendance: normalizedAttendance(state.attendance),
-    });
+    }, { actionContext: journalRecordActionContext() });
     updatingFromView = false;
     if (!updated) {
       openNotice({ title: 'Не удалось сохранить', message: 'Проверьте рабочий день и свободное время.' });

@@ -39,22 +39,58 @@ function dataPatchFrom(patch = {}) {
   return Object.fromEntries(Object.entries(patch).filter(([key]) => !lifecycleKeys.has(key)));
 }
 
-function scheduleChanged(patch = {}) {
-  return ['date', 'workplaceId', 'from', 'to'].some((key) => hasOwn(patch, key));
+function scheduleSnapshot(record = {}) {
+  return {
+    date: normalizeDate(record?.date),
+    workplaceId: normalizeId(record?.workplaceId),
+    from: String(record?.from || ''),
+    to: String(record?.to || ''),
+  };
 }
 
-function appendLifecyclePatch(record, patch = {}) {
-  if (!record?.id) return;
-  if (hasOwn(patch, 'confirmed') && Boolean(patch.confirmed) !== Boolean(record.confirmed)) {
-    appendRecordEvent(record.id, patch.confirmed ? RECORD_EVENT_TYPES.CONFIRMED : RECORD_EVENT_TYPES.UNCONFIRMED);
+function scheduleChanged(before = {}, after = {}) {
+  const left = scheduleSnapshot(before);
+  const right = scheduleSnapshot(after);
+  return ['date', 'workplaceId', 'from', 'to'].some((key) => left[key] !== right[key]);
+}
+
+function recordSubject(record = {}) {
+  const person = record?.person && typeof record.person === 'object' ? record.person : {};
+  return {
+    personId: String(person?.id || ''),
+    personKey: String(person?.key || ''),
+    name: String(person?.name || ''),
+    surname: String(person?.surname || ''),
+  };
+}
+
+function eventContext(record = {}, actionContext = null) {
+  const context = actionContext && typeof actionContext === 'object' ? actionContext : {};
+  const actor = context.actor && typeof context.actor === 'object' ? context.actor : {};
+  return {
+    source: String(context.source || record?.source || ''),
+    actor: {
+      type: String(actor.type || ''),
+      profileId: String(actor.profileId || ''),
+      accountId: String(actor.accountId || ''),
+    },
+    subject: recordSubject(record),
+  };
+}
+
+function appendLifecyclePatch(before, after, patch = {}, actionContext = null) {
+  if (!before?.id) return;
+  const context = eventContext(after || before, actionContext);
+  if (hasOwn(patch, 'confirmed') && Boolean(patch.confirmed) !== Boolean(before.confirmed)) {
+    appendRecordEvent(before.id, patch.confirmed ? RECORD_EVENT_TYPES.CONFIRMED : RECORD_EVENT_TYPES.UNCONFIRMED, context);
   }
 
   if (hasOwn(patch, 'attendance')) {
     const next = patch.attendance === 'arrived' || patch.attendance === 'no-show' ? patch.attendance : '';
-    if (next && next !== record.attendance) {
-      appendRecordEvent(record.id, next === 'arrived' ? RECORD_EVENT_TYPES.ARRIVED : RECORD_EVENT_TYPES.NO_SHOW);
-    } else if (!next && record.attendance) {
-      appendRecordEvent(record.id, RECORD_EVENT_TYPES.ATTENDANCE_CLEARED);
+    if (next && next !== before.attendance) {
+      appendRecordEvent(before.id, next === 'arrived' ? RECORD_EVENT_TYPES.ARRIVED : RECORD_EVENT_TYPES.NO_SHOW, context);
+    } else if (!next && before.attendance) {
+      appendRecordEvent(before.id, RECORD_EVENT_TYPES.ATTENDANCE_CLEARED, context);
     }
   }
 }
@@ -74,6 +110,7 @@ export function createRecord({
   products = [],
   source = 'manual',
   sourceRequestId = '',
+  actionContext = null,
 } = {}) {
   const normalizedDate = normalizeDate(date);
   const normalizedWorkplaceId = normalizeId(workplaceId);
@@ -98,6 +135,7 @@ export function createRecord({
     products: sourceRecord.products,
     source: String(source || 'manual'),
     sourceRequestId: String(sourceRequestId || ''),
+    createdBy: actionContext?.actor && typeof actionContext.actor === 'object' ? { ...actionContext.actor } : {},
     finance,
     createdAt: now,
     updatedAt: now,
@@ -105,7 +143,11 @@ export function createRecord({
 
   const stored = insertRecordRow(row);
   if (!stored) return null;
-  appendRecordEvent(stored.id, RECORD_EVENT_TYPES.CREATED, { at: now });
+  appendRecordEvent(stored.id, RECORD_EVENT_TYPES.CREATED, {
+    at: now,
+    ...eventContext(stored, actionContext),
+    payload: { appointment: scheduleSnapshot(stored) },
+  });
   const record = getRecord(stored.id);
   notify('book:records-changed', { action: 'create', recordId: stored.id });
   notify('book:time-usage-changed', {
@@ -120,7 +162,7 @@ export function createRecord({
   return record;
 }
 
-export function updateRecord(id, patch = {}) {
+export function updateRecord(id, patch = {}, { actionContext = null } = {}) {
   const current = getRecord(id);
   if (!current || current.status === 'cancelled') return null;
 
@@ -161,10 +203,20 @@ export function updateRecord(id, patch = {}) {
     if (!patchRecordRow(id, nextDataPatch)) return null;
   }
 
-  appendLifecyclePatch(current, patch);
+  const updatedData = getRecord(id);
+  if (scheduleChanged(current, updatedData)) {
+    appendRecordEvent(id, RECORD_EVENT_TYPES.RESCHEDULED, {
+      ...eventContext(updatedData, actionContext),
+      payload: {
+        before: scheduleSnapshot(current),
+        after: scheduleSnapshot(updatedData),
+      },
+    });
+  }
+  appendLifecyclePatch(current, updatedData, patch, actionContext);
   const updated = getRecord(id);
   notify('book:records-changed', { action: 'update', recordId: id });
-  if (scheduleChanged(nextDataPatch)) {
+  if (scheduleChanged(current, updated)) {
     notify('book:time-usage-changed', {
       action: 'change', usageId: id, sourceId: id,
       date: updated?.date, workplaceId: updated?.workplaceId,
@@ -174,19 +226,22 @@ export function updateRecord(id, patch = {}) {
   return updated;
 }
 
-export function setRecordConfirmed(id, confirmed) {
-  return updateRecord(id, { confirmed: Boolean(confirmed) });
+export function setRecordConfirmed(id, confirmed, options = {}) {
+  return updateRecord(id, { confirmed: Boolean(confirmed) }, options);
 }
 
-export function setRecordAttendance(id, attendance) {
+export function setRecordAttendance(id, attendance, options = {}) {
   const value = attendance === 'arrived' || attendance === 'no-show' ? attendance : '';
-  return updateRecord(id, { attendance: value });
+  return updateRecord(id, { attendance: value }, options);
 }
 
-export function cancelRecord(id) {
+export function cancelRecord(id, { actionContext = null } = {}) {
   const current = getRecord(id);
   if (!current || current.status === 'cancelled') return null;
-  appendRecordEvent(id, RECORD_EVENT_TYPES.CANCELLED);
+  appendRecordEvent(id, RECORD_EVENT_TYPES.CANCELLED, {
+    ...eventContext(current, actionContext),
+    payload: { appointment: scheduleSnapshot(current) },
+  });
   const cancelled = getRecord(id);
   notify('book:records-changed', { action: 'cancel', recordId: id });
   notify('book:time-usage-changed', {
@@ -213,15 +268,15 @@ export function deleteRecord(id) {
   return true;
 }
 
-export function moveRecord(id, { date, workplaceId, from, to } = {}) {
+export function moveRecord(id, { date, workplaceId, from, to } = {}, options = {}) {
   return updateRecord(id, {
     date: normalizeDate(date),
     workplaceId: normalizeId(workplaceId),
     from: String(from || ''),
     to: String(to || ''),
-  });
+  }, options);
 }
 
-export function removeRecord(id) {
-  return Boolean(cancelRecord(id));
+export function removeRecord(id, options = {}) {
+  return Boolean(cancelRecord(id, options));
 }

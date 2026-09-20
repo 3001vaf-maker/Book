@@ -24,7 +24,7 @@ assert.match(pdnGuard, /if \(!state\.pdnActive\)/);
 assert.doesNotMatch(pdnGuard, /requiredConsentState/);
 assert.doesNotMatch(consentPolicy, /async requiredConsentState\(/);
 
-assert.match(bookingController, /@UseGuards\(AccountGuard\)\s+@Get\(':tenantId\/account\/requests'\)/);
+assert.match(bookingController, /@UseGuards\(AccountGuard\)\s+@Get\(':tenantId\/account\/records'\)/);
 assert.match(bookingController, /@UseGuards\(AccountGuard\)\s+@Get\(':tenantId\/account\/notifications'\)/);
 assert.match(bookingController, /@UseGuards\(AccountGuard\)\s+@Post\(':tenantId\/account\/notifications\/:notificationId\/read'\)/);
 assert.match(bookingController, /@UseGuards\(AccountGuard, BookingPdnConsentGuard\)\s+@Get\(':tenantId\/account\/chat'\)/);
