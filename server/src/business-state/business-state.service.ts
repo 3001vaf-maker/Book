@@ -468,36 +468,7 @@ export class BusinessStateService {
     return person;
   }
 
-  async publicBookingOccupancy(tenantId: string) {
-    await this.requireVerified(tenantId);
-    const [records, events] = await Promise.all([
-      this.prisma.businessRecord.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
-      this.prisma.businessRecordEvent.findMany({ where: { tenantId } }),
-    ]);
-    const cancelled = new Set(events.filter((row) => text(objectValue(row.data).type) === 'cancelled').map((row) => row.recordId));
-    return records.map((row) => objectValue(row.data)).filter((record) => {
-      const id = text(record.id);
-      return id && text(record.status) !== 'cancelled' && !cancelled.has(id);
-    }).map((record) => ({
-      id: text(record.id),
-      type: 'record',
-      workplaceId: text(record.workplaceId),
-      date: text(record.date).slice(0, 10),
-      from: text(record.from),
-      to: text(record.to),
-    })).filter((item) => item.workplaceId && item.date && item.from && item.to);
-  }
 
-  async createOnlineBookingRecord(tenantId: string, input: JsonObject) {
-    const requestId = text(input.sourceRequestId);
-    if (!requestId) throw new BadRequestException('У онлайн-записи отсутствует sourceRequestId');
-    return this.records.create(tenantId, {
-      ...input,
-      source: 'online-booking',
-      sourceRequestId: requestId,
-      createdBy: objectValue(input.actor),
-    });
-  }
 
 
 }
