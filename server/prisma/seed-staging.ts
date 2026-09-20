@@ -336,7 +336,7 @@ async function main() {
     }
 
     for (const [position, record] of records.entries()) {
-      await tx.businessRecord.upsert({
+      await tx.record.upsert({
         where: { tenantId_recordId: { tenantId, recordId: record.id } },
         create: { tenantId, recordId: record.id, position, data: json(record) },
         update: { position, data: json(record) },
@@ -344,7 +344,7 @@ async function main() {
     }
 
     for (const [position, event] of recordEvents.entries()) {
-      await tx.businessRecordEvent.upsert({
+      await tx.recordEvent.upsert({
         where: { tenantId_eventId: { tenantId, eventId: event.id } },
         create: { tenantId, eventId: event.id, recordId: event.recordId, position, data: json(event) },
         update: { recordId: event.recordId, position, data: json(event) },
