@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { hydrateDaysFromServer } from '../core/day/index.js';
-import { calculateFinancialPlan, getFinancialItemFact, hydrateFinanceFromServer, recordPaymentIncome, recordRefundExpense } from '../core/finance/index.js';
+import { calculateSettlement, getSettlementItemTotals, hydrateFinanceFromServer, recordPaymentIncome, recordRefundExpense } from '../core/finance/index.js';
 import { createRecord, getRecords, hydrateRecordStateFromServer, moveRecord, recordVisualState, updateRecord } from '../core/record/index.js';
 import { renderJournalList } from '../journal/список.js';
 import { hydratePeopleFromServer } from '../main/people/data.js';
@@ -58,7 +58,7 @@ const payment = recordPaymentIncome({
   source: { type: 'record', id: record.id },
   workplace: 'Студия',
   person: { key: 'person-1', name: 'Анна Тест' },
-  finance: noShow.finance,
+  settlement: noShow.finance,
   maxAmount: 6400,
   serviceAmount: 6400,
   allocations: [{ walletId: 'cash', walletName: 'Наличные', amount: 6400 }],
@@ -105,13 +105,13 @@ assert.equal(paymentStageRecord.finance.serviceTotal, 8000);
 assert.equal(paymentStageRecord.finance.discountTotal, 0);
 assert.equal(paymentStageRecord.finance.planTotal, 8000);
 
-const paymentStagePlan = calculateFinancialPlan(paymentStageRecord.finance.items.map((item) => ({
+const paymentStageSettlement = calculateSettlement(paymentStageRecord.finance.items.map((item) => ({
   ...item,
   discountMode: 'percent',
   discountPercent: 20,
   discountMoney: '',
 })));
-const paymentStageUpdated = updateRecord(paymentStageRecord.id, { finance: paymentStagePlan });
+const paymentStageUpdated = updateRecord(paymentStageRecord.id, { finance: paymentStageSettlement });
 assert.equal(paymentStageUpdated.procedures[0].cost, 8000);
 assert.equal(paymentStageUpdated.finance.serviceTotal, 8000);
 assert.equal(paymentStageUpdated.finance.discountPercent, 20);
@@ -123,7 +123,7 @@ const paymentStageIncome = recordPaymentIncome({
   source: { type: 'record', id: paymentStageRecord.id },
   workplace: 'Студия',
   person: { key: 'person-2', name: 'Ирина БезСкидки' },
-  finance: paymentStageUpdated.finance,
+  settlement: paymentStageUpdated.finance,
   maxAmount: 6400,
   serviceAmount: 6400,
   allocations: [{ walletId: 'cash', walletName: 'Наличные', amount: 6400 }],
@@ -136,17 +136,17 @@ assert.equal(paymentStageIncome.finance.discountTotal, 1600);
 const paymentStageAttended = updateRecord(paymentStageRecord.id, { attendance: 'arrived' });
 assert.equal(paymentStageAttended.finance.factTotal, 6400);
 assert.equal(getPersonMetadata('person-2').paidTotal, 6400);
-assert.equal(getFinancialItemFact('procedure', 'procedure-2').factTotal, 6400);
+assert.equal(getSettlementItemTotals('procedure', 'procedure-2').factTotal, 6400);
 assert.equal(getWalletBalance('cash'), 12800);
 
 const returned = recordRefundExpense(paymentStageIncome.id, { reason: 'Возврат человеку' });
 assert.ok(returned);
 assert.equal(getPersonMetadata('person-2').paidTotal, 0);
-assert.equal(getFinancialItemFact('procedure', 'procedure-2').factTotal, 0);
+assert.equal(getSettlementItemTotals('procedure', 'procedure-2').factTotal, 0);
 assert.equal(getWalletBalance('cash'), 6400);
 
 // A record restored on another device comes from the server; Finance recovers the exact payment-stage snapshot.
-const historicalPlan = calculateFinancialPlan([{
+const historicalSettlement = calculateSettlement([{
   sourceType: 'procedure',
   sourceId: 'procedure-history',
   name: 'Историческая услуга',
@@ -158,7 +158,7 @@ const historicalIncome = recordPaymentIncome({
   source: { type: 'record', id: 'record-history' },
   workplace: 'Студия',
   person: { key: 'person-history', name: 'История' },
-  finance: historicalPlan,
+  settlement: historicalSettlement,
   maxAmount: 6400,
   serviceAmount: 6400,
   allocations: [{ walletId: 'cashless', walletName: 'Безналичные', amount: 6400 }],
