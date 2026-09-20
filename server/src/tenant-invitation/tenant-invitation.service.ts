@@ -18,6 +18,8 @@ import { TransactionalEmailService } from '../transactional-email/transactional-
 
 const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const STARTER_PLAN_KEY = 'starter-people';
+const REGISTRATION_LINK_EMAIL_PREFIX = 'registration+';
+const REGISTRATION_LINK_EMAIL_SUFFIX = '@registration.invalid';
 
 const CAPABILITY_CATALOG: Array<{
   key: string;
@@ -58,6 +60,10 @@ function invitationHash(token: string) {
 
 function createToken() {
   return randomBytes(32).toString('base64url');
+}
+
+function isRegistrationLinkEmail(email: string) {
+  return email.startsWith(REGISTRATION_LINK_EMAIL_PREFIX) && email.endsWith(REGISTRATION_LINK_EMAIL_SUFFIX);
 }
 
 function escapeHtml(value: string) {
@@ -142,6 +148,90 @@ export class TenantInvitationService {
     return plan;
   }
 
+  private async createPendingInvitation(adminId: string, input: {
+    email: string;
+    name: string;
+    tenantName: string;
+    tokenHash: string;
+    expiresAt: Date;
+  }) {
+    const plan = await this.ensureStarterPlan();
+    return this.prisma.$transaction(async (tx) => {
+      const tenant = await tx.tenant.create({ data: { name: input.tenantName } });
+      await tx.tenantAccess.create({
+        data: {
+          tenantId: tenant.id,
+          planId: plan.id,
+          status: TenantAccessStatus.ACTIVE,
+          isOwnerBook: false,
+        },
+      });
+      const invitation = await tx.tenantInvitation.create({
+        data: {
+          tenantId: tenant.id,
+          createdByAdminId: adminId,
+          email: input.email,
+          name: input.name,
+          tokenHash: input.tokenHash,
+          expiresAt: input.expiresAt,
+        },
+      });
+      return { tenant, invitation };
+    });
+  }
+
+  private async acceptPendingInvitation(
+    invitation: { id: string; tenantId: string; tenant: { id: string; name: string } },
+    email: string,
+    password: string,
+  ) {
+    const passwordHash = await hashPassword(password, 12);
+    const result = await this.prisma.$transaction(async (tx) => {
+      const account = await tx.platformAccount.create({
+        data: {
+          email,
+          passwordHash,
+          onboardingStep: 0,
+          workspaceUnlocked: false,
+        },
+      });
+      const membership = await tx.membership.create({
+        data: {
+          tenantId: invitation.tenantId,
+          platformAccountId: account.id,
+          role: MembershipRole.OWNER,
+        },
+      });
+      await tx.tenantInvitation.update({
+        where: { id: invitation.id },
+        data: {
+          email,
+          status: TenantInvitationStatus.ACCEPTED,
+          acceptedAt: new Date(),
+        },
+      });
+      return { account, membership };
+    });
+
+    const accessToken = await this.jwt.signAsync({
+      sub: result.account.id,
+      tenantId: invitation.tenantId,
+      role: result.membership.role,
+    });
+
+    return {
+      accessToken,
+      account: {
+        id: result.account.id,
+        email: result.account.email,
+        onboardingStep: result.account.onboardingStep,
+        workspaceUnlocked: result.account.workspaceUnlocked,
+      },
+      tenant: { id: invitation.tenant.id, name: invitation.tenant.name },
+      role: result.membership.role,
+    };
+  }
+
   async createInvitation(adminId: string, input: { email?: unknown; name?: unknown }) {
     const email = normalizeEmail(input?.email);
     const name = normalizeName(input?.name);
@@ -156,33 +246,17 @@ export class TenantInvitationService {
     });
     if (existingInvitation) throw new ConflictException('На этот email уже отправлено активное приглашение');
 
-    const plan = await this.ensureStarterPlan();
     const token = createToken();
     const tokenHash = invitationHash(token);
     const expiresAt = new Date(Date.now() + INVITATION_TTL_MS);
-    const tenantName = name || email.split('@')[0] || 'Book';
+    const tenantName = name || email.split('@')[0] || 'Профиль';
 
-    const created = await this.prisma.$transaction(async (tx) => {
-      const tenant = await tx.tenant.create({ data: { name: tenantName } });
-      await tx.tenantAccess.create({
-        data: {
-          tenantId: tenant.id,
-          planId: plan.id,
-          status: TenantAccessStatus.ACTIVE,
-          isOwnerBook: false,
-        },
-      });
-      const invitation = await tx.tenantInvitation.create({
-        data: {
-          tenantId: tenant.id,
-          createdByAdminId: adminId,
-          email,
-          name,
-          tokenHash,
-          expiresAt,
-        },
-      });
-      return { tenant, invitation };
+    const created = await this.createPendingInvitation(adminId, {
+      email,
+      name,
+      tenantName,
+      tokenHash,
+      expiresAt,
     });
 
     try {
@@ -195,10 +269,39 @@ export class TenantInvitationService {
     return this.invitationDto(created.invitation);
   }
 
+  async createRegistrationLink(adminId: string) {
+    const token = createToken();
+    const tokenHash = invitationHash(token);
+    const expiresAt = new Date(Date.now() + INVITATION_TTL_MS);
+    const email = `${REGISTRATION_LINK_EMAIL_PREFIX}${tokenHash.slice(0, 24)}${REGISTRATION_LINK_EMAIL_SUFFIX}`;
+
+    const created = await this.createPendingInvitation(adminId, {
+      email,
+      name: '',
+      tenantName: 'Новый профиль',
+      tokenHash,
+      expiresAt,
+    });
+
+    const origin = String(process.env.FRONTEND_ORIGIN || '').trim().replace(/\/+$/, '');
+    if (!origin) {
+      await this.prisma.tenant.delete({ where: { id: created.tenant.id } }).catch(() => undefined);
+      throw new BadRequestException('FRONTEND_ORIGIN не настроен');
+    }
+
+    return {
+      id: created.invitation.id,
+      tenantId: created.tenant.id,
+      url: `${origin}/invite/?token=${encodeURIComponent(token)}`,
+      expiresAt,
+    };
+  }
+
   async resendInvitation(adminId: string, invitationId: string) {
     const invitation = await this.prisma.tenantInvitation.findUnique({ where: { id: invitationId } });
     if (!invitation || invitation.createdByAdminId !== adminId) throw new NotFoundException('Приглашение не найдено');
     if (invitation.status !== TenantInvitationStatus.PENDING) throw new ConflictException('Это приглашение уже не активно');
+    if (isRegistrationLinkEmail(invitation.email)) throw new ConflictException('Эта ссылка не отправляется по email');
 
     const oldTokenHash = invitation.tokenHash;
     const oldExpiresAt = invitation.expiresAt;
@@ -226,67 +329,41 @@ export class TenantInvitationService {
 
   async inspect(tokenValue: unknown) {
     const invitation = await this.findActiveInvitation(String(tokenValue || ''));
+    const requiresEmail = isRegistrationLinkEmail(invitation.email);
     return {
-      email: invitation.email,
+      email: requiresEmail ? '' : invitation.email,
       name: invitation.name,
+      requiresEmail,
       expiresAt: invitation.expiresAt,
       tenant: { id: invitation.tenant.id, name: invitation.tenant.name },
     };
   }
 
-  async accept(input: { token?: unknown; password?: unknown }) {
+  async accept(input: { token?: unknown; password?: unknown; email?: unknown }) {
     const token = String(input?.token || '').trim();
     const password = String(input?.password || '');
     if (password.length < 10) throw new BadRequestException('Пароль должен содержать минимум 10 символов');
 
     const invitation = await this.findActiveInvitation(token);
-    const existingAccount = await this.prisma.platformAccount.findUnique({ where: { email: invitation.email } });
+    const email = isRegistrationLinkEmail(invitation.email)
+      ? normalizeEmail(input?.email)
+      : invitation.email;
+    if (!email || !email.includes('@')) throw new BadRequestException('Укажите корректный email');
+
+    const existingAccount = await this.prisma.platformAccount.findUnique({ where: { email } });
     if (existingAccount) throw new ConflictException('Учётная запись с таким email уже зарегистрирована');
 
-    const passwordHash = await hashPassword(password, 12);
-    const result = await this.prisma.$transaction(async (tx) => {
-      const account = await tx.platformAccount.create({
-        data: {
-          email: invitation.email,
-          passwordHash,
-          onboardingStep: 0,
-          workspaceUnlocked: false,
-        },
-      });
-      const membership = await tx.membership.create({
-        data: {
-          tenantId: invitation.tenantId,
-          platformAccountId: account.id,
-          role: MembershipRole.OWNER,
-        },
-      });
-      await tx.tenantInvitation.update({
-        where: { id: invitation.id },
-        data: {
-          status: TenantInvitationStatus.ACCEPTED,
-          acceptedAt: new Date(),
-        },
-      });
-      return { account, membership };
-    });
-
-    const accessToken = await this.jwt.signAsync({
-      sub: result.account.id,
-      tenantId: invitation.tenantId,
-      role: result.membership.role,
-    });
-
-    return {
-      accessToken,
-      account: {
-        id: result.account.id,
-        email: result.account.email,
-        onboardingStep: result.account.onboardingStep,
-        workspaceUnlocked: result.account.workspaceUnlocked,
+    const existingInvitation = await this.prisma.tenantInvitation.findFirst({
+      where: {
+        email,
+        status: TenantInvitationStatus.PENDING,
+        id: { not: invitation.id },
       },
-      tenant: { id: invitation.tenant.id, name: invitation.tenant.name },
-      role: result.membership.role,
-    };
+      select: { id: true },
+    });
+    if (existingInvitation) throw new ConflictException('На этот email уже создано другое активное приглашение');
+
+    return this.acceptPendingInvitation(invitation, email, password);
   }
 
   async listInvitations(adminId: string) {
@@ -342,10 +419,12 @@ export class TenantInvitationService {
     createdAt: Date;
     updatedAt: Date;
   }) {
+    const registrationLink = isRegistrationLinkEmail(invitation.email);
     return {
       id: invitation.id,
       tenantId: invitation.tenantId,
-      email: invitation.email,
+      email: registrationLink ? '' : invitation.email,
+      registrationLink,
       name: invitation.name,
       status: invitation.status,
       expiresAt: invitation.expiresAt,
