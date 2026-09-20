@@ -1,4 +1,4 @@
-import { BadGatewayException, Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { BadGatewayException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import nodemailer from 'nodemailer';
 
 type TransactionalEmailInput = {
@@ -12,6 +12,8 @@ type TransactionalEmailInput = {
 
 @Injectable()
 export class TransactionalEmailService {
+  private readonly logger = new Logger(TransactionalEmailService.name);
+
   private transporter() {
     const apiKeyId = String(process.env.POSTBOX_API_KEY_ID || '').trim();
     const apiKeySecret = String(process.env.POSTBOX_API_KEY_SECRET || '').trim();
@@ -24,6 +26,9 @@ export class TransactionalEmailService {
       port: 587,
       secure: false,
       requireTLS: true,
+      connectionTimeout: 8000,
+      greetingTimeout: 8000,
+      socketTimeout: 15000,
       auth: {
         user: apiKeyId,
         pass: apiKeySecret,
@@ -57,7 +62,21 @@ export class TransactionalEmailService {
       return { provider: 'yandex-postbox', messageId: result.messageId };
     } catch (error) {
       if (error instanceof BadGatewayException || error instanceof ServiceUnavailableException) throw error;
-      throw new BadGatewayException(error instanceof Error ? error.message : 'Cloud Postbox не отправил письмо');
+
+      const details = error && typeof error === 'object'
+        ? {
+            name: 'name' in error ? String(error.name || '') : '',
+            code: 'code' in error ? String(error.code || '') : '',
+            command: 'command' in error ? String(error.command || '') : '',
+            responseCode: 'responseCode' in error ? String(error.responseCode || '') : '',
+            response: 'response' in error ? String(error.response || '') : '',
+            message: 'message' in error ? String(error.message || '') : '',
+          }
+        : { message: String(error || '') };
+
+      this.logger.error(`Postbox send failed: ${JSON.stringify(details)}`);
+      const message = details.message || details.response || 'Cloud Postbox не отправил письмо';
+      throw new BadGatewayException(message);
     }
   }
 }
