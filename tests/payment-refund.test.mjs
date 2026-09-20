@@ -4,6 +4,7 @@ import {
   calculateSettlement,
   getDDSExpenses,
   getDDSIncome,
+  getDDSMovements,
   getPaymentRemaining,
   getRecordPaymentState,
   getRefundsForPayment,
@@ -20,7 +21,16 @@ assert.doesNotMatch(ddsSource, forbiddenEditPayment);
 assert.doesNotMatch(paymentUiSource, forbiddenEditPayment);
 
 function recordFor(id, settlement) {
-  return { id, finance: settlement, procedures: [] };
+  return {
+    id,
+    procedures: (settlement?.items || []).map((item) => ({
+      id: item.sourceId,
+      name: item.name,
+      cost: item.price,
+      duration: 60,
+    })),
+    products: [],
+  };
 }
 
 // Existing server DDS entries from an older payload shape are normalized in memory.
@@ -44,9 +54,9 @@ hydrateFinanceFromServer({
 });
 const migratedLegacy = getDDSIncome();
 assert.equal(migratedLegacy.length, 1);
-assert.equal(migratedLegacy[0].finance.serviceTotal, 8000);
-assert.equal(migratedLegacy[0].finance.discountTotal, 1600);
-assert.equal(migratedLegacy[0].finance.planTotal, 6400);
+assert.equal(migratedLegacy[0].settlement.serviceTotal, 8000);
+assert.equal(migratedLegacy[0].settlement.discountTotal, 1600);
+assert.equal(migratedLegacy[0].settlement.planTotal, 6400);
 assert.equal(migratedLegacy[0].serviceAmount, 6400);
 assert.equal(migratedLegacy[0].tips, 0);
 assert.equal(migratedLegacy[0].business, undefined);
@@ -190,6 +200,7 @@ assert.equal(tipsState.remaining, 0);
 assert.equal(tipsState.tipsTotal, 3000);
 assert.equal(tipsState.fullyPaid, true);
 assert.equal(getWalletDDSMovements('tips-cash').reduce((sum, item) => sum + Number(item.total || 0), 0), 10000);
+assert.equal(getDDSMovements().filter((item) => item.operationId === withTips.id && item.component === 'tips').length, 1);
 
 // Required discount example: 7,000 price - 1,400 discount = 5,600 service, 6,000 received -> 400 Tips.
 const discountTipsSettlement = calculateSettlement([{ sourceId: 'procedure-discount-tips', name: 'Стрижка', price: 7000, discountPercent: 20 }]);
@@ -251,6 +262,9 @@ const split = recordPaymentIncome({
 });
 assert.equal(split.status, 'completed');
 assert.equal(split.allocations.length, 2);
+const splitLedger = getDDSMovements().filter((item) => item.operationId === split.id);
+assert.equal(new Set(splitLedger.map((item) => item.operationId)).size, 1);
+assert.equal(splitLedger.filter((item) => item.component === 'service').length, 2);
 assert.equal(getWalletDDSMovements('split-cash').reduce((sum, item) => sum + Number(item.total || 0), 0), 2000);
 assert.equal(getWalletDDSMovements('split-card').reduce((sum, item) => sum + Number(item.total || 0), 0), 4000);
 
