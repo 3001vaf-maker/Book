@@ -23,7 +23,7 @@ function recordFor(id, settlement) {
   };
 }
 
-hydrateFinanceFromServer({ version: 5, income: [], expense: [] });
+hydrateFinanceFromServer({ version: 7, settlements: {}, operations: [], ledger: [] });
 const settlement = calculateSettlement([{ sourceId: 'procedure-cancel', name: 'Стрижка', price: 5000 }]);
 const payment = recordPaymentIncome({
   source: { type: 'record', id: 'record-cancel' },
@@ -58,7 +58,7 @@ assert.equal(state.hasPayments, false);
 assert.equal(cancelPaymentOperation(payment.id), null);
 
 // If an incorrect payment already has a refund, cancelling the payment cancels the whole erroneous chain.
-hydrateFinanceFromServer({ version: 5, income: [], expense: [] });
+hydrateFinanceFromServer({ version: 7, settlements: {}, operations: [], ledger: [] });
 const chainSettlement = calculateSettlement([{ sourceId: 'procedure-chain', name: 'Окрашивание', price: 5000 }]);
 const chainPayment = recordPaymentIncome({
   source: { type: 'record', id: 'record-chain' },
