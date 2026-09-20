@@ -33,8 +33,14 @@ assert.match(broadcast, /channel === 'EMAIL'/);
 assert.match(broadcast, /\['TELEGRAM', 'EMAIL'\]\.includes\(preview\.channel\)/);
 assert.match(compose, /value: 'EMAIL', label: 'Email'/);
 
-assert.match(transactional, /api\.brevo\.com\/v3\/smtp\/email/);
-assert.match(envExample, /BREVO_API_KEY=/);
+assert.match(transactional, /smtp\.yandex\.ru/);
+assert.match(transactional, /port: 465/);
+assert.match(transactional, /secure: true/);
+assert.match(transactional, /YANDEX_SMTP_APP_PASSWORD/);
+assert.doesNotMatch(transactional, /brevo|postbox\.cloud/i);
+assert.match(envExample, /TRANSACTIONAL_EMAIL_PROVIDER="yandex-mail"/);
+assert.match(envExample, /YANDEX_SMTP_USER=/);
+assert.match(envExample, /YANDEX_SMTP_APP_PASSWORD=/);
 assert.match(envExample, /TRANSACTIONAL_EMAIL_FROM_EMAIL=/);
 assert.match(envExample, /EMAIL_DELIVERY_POLL_MS=/);
 
