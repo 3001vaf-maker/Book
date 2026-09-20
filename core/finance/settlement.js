@@ -47,13 +47,13 @@ export function resolveRecordSettlement(record = null, { discountPercent = null 
   return calculateSettlement(items, { discountPercent: resolvedDiscount });
 }
 
-export function getRecordSettlement(record = null, { discountPercent = 0 } = {}) {
+export function getRecordSettlement(record = null, { discountPercent = null } = {}) {
   const settlement = resolveRecordSettlement(record, { discountPercent });
   if (!record?.id) return calculateSettlementTotals(settlement, []);
   return calculateSettlementTotals(settlement, getActiveDDSMovementsForSource('record', record.id));
 }
 
-export function getRecordPaymentState(record = null, { discountPercent = 0 } = {}) {
+export function getRecordPaymentState(record = null, { discountPercent = null } = {}) {
   const settlement = resolveRecordSettlement(record, { discountPercent });
   const movements = record?.id ? getActiveDDSMovementsForSource('record', record.id) : [];
   return calculateSettlementPaymentState(settlement, movements);
