@@ -121,7 +121,7 @@ export function createRecord({
     procedures: Array.isArray(procedures) ? procedures : [],
     products: Array.isArray(products) ? products : [],
   };
-  const finance = calculateSettlement(recordSettlementItems(sourceRecord), {
+  const settlement = calculateSettlement(recordSettlementItems(sourceRecord), {
     discountPercent: recordSettlementDiscountPercent(person),
   });
   const row = {
@@ -136,7 +136,7 @@ export function createRecord({
     source: String(source || 'manual'),
     sourceRequestId: String(sourceRequestId || ''),
     createdBy: actionContext?.actor && typeof actionContext.actor === 'object' ? { ...actionContext.actor } : {},
-    finance,
+    finance: settlement,
     createdAt: now,
     updatedAt: now,
   };
@@ -183,12 +183,12 @@ export function updateRecord(id, patch = {}, { actionContext = null } = {}) {
     excludeId: id,
   }).ok) return null;
 
-  const hasExplicitFinance = hasOwn(nextDataPatch, 'finance');
+  const hasExplicitSettlementSnapshot = hasOwn(nextDataPatch, 'finance');
   const serviceChanged = hasOwn(nextDataPatch, 'procedures');
   const productChanged = hasOwn(nextDataPatch, 'products');
   const personChanged = hasOwn(nextDataPatch, 'person');
 
-  if (hasExplicitFinance) {
+  if (hasExplicitSettlementSnapshot) {
     nextDataPatch.finance = normalizeRecordSettlement(nextDataPatch.finance);
   } else if (personChanged) {
     nextDataPatch.finance = calculateSettlement(recordSettlementItems(next), {
