@@ -45,6 +45,24 @@ const slots = getBookingSlots(context, {
 assert.equal(slots.some((slot) => slot.from === '10:00'), false, 'three-hour selection must not overlap the 12:00 booking');
 assert.equal(slots.some((slot) => slot.from === '13:00' && slot.to === '16:00'), true);
 
+const sameDaySlots = getBookingSlots(context, {
+  workplaceKey: 'moscow',
+  date: '2026-09-20',
+  procedureIds: ['other'],
+  step: 15,
+  notBefore: '11:10',
+});
+assert.equal(sameDaySlots[0]?.from, '11:15', 'same-day public booking must start at the next slot after the current time');
+assert.equal(sameDaySlots.some((slot) => slot.from === '10:00'), false, 'elapsed same-day slots must not be shown');
+
+const futureDaySlots = getBookingSlots(context, {
+  workplaceKey: 'spb',
+  date: '2026-09-21',
+  procedureIds: ['cut'],
+  step: 15,
+});
+assert.equal(futureDaySlots[0]?.from, '12:00', 'future dates must still start from the working plan');
+
 assert.equal(hasRequiredBookingConsents(context, []), false);
 assert.equal(hasRequiredBookingConsents(context, [{ documentId: 'pdn-consent', documentVersion: 1, accepted: true }]), false);
 assert.equal(hasRequiredBookingConsents(context, [{ documentId: 'pdn-consent', documentVersion: 2, accepted: true }]), true);
