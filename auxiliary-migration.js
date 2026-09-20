@@ -24,12 +24,17 @@ async function responseJson(response, fallback) {
   return payload;
 }
 
-function hydrate(value) {
+function hydrateAuxiliary(value) {
   const bundle = normalize(value);
-  hydrateFinanceFromServer(bundle.finance);
   hydrateWalletsFromServer(bundle.wallets);
   hydrateTagsFromServer(bundle.tags);
   hydrateProductsFromServer({ products: bundle.products, productHistory: bundle.productHistory });
+}
+
+async function hydrateCanonicalFinance() {
+  const response = await apiRequest('/finance');
+  const finance = await responseJson(response, 'Не удалось загрузить Финансы');
+  hydrateFinanceFromServer(finance);
 }
 
 export async function initializeAuxiliaryState(account = {}) {
@@ -37,7 +42,8 @@ export async function initializeAuxiliaryState(account = {}) {
   const remote = await responseJson(response, 'Не удалось загрузить Финансы и связанные данные');
 
   if (remote?.verified) {
-    hydrate(remote);
+    hydrateAuxiliary(remote);
+    await hydrateCanonicalFinance();
     return { source: 'server', verified: true };
   }
 
@@ -48,6 +54,7 @@ export async function initializeAuxiliaryState(account = {}) {
   const bootstrapResponse = await apiRequest('/auxiliary-state/bootstrap', { method: 'POST' });
   const bootstrapped = await responseJson(bootstrapResponse, 'Не удалось создать серверное хранилище Финансов');
   if (!bootstrapped?.verified) throw new Error('Серверное хранилище Финансов не подтверждено');
-  hydrate(bootstrapped);
+  hydrateAuxiliary(bootstrapped);
+  await hydrateCanonicalFinance();
   return { source: 'server-bootstrap', verified: true };
 }
