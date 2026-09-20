@@ -408,18 +408,22 @@ export class RecordService {
       ...arrayValue(current.procedures).map((item) => ({ ...objectValue(item), sourceType: 'procedure', sourceId: text(item?.id) })),
       ...arrayValue(current.products).map((item) => ({ ...objectValue(item), sourceType: 'product', sourceId: text(item?.id) })),
     ], objectValue(current.person)?.discountPercent);
-    await this.finance.settlementForSource(
+    const currentSettlement = await this.finance.settlementForSource(
       tenantId,
       'record',
       id,
       objectValue(current.finance).items ? current.finance : currentFallbackSettlement,
-    );
-    const settlement = (refreshProcedures || productsChanged || personChanged)
-      ? this.finance.calculateSettlement([
-          ...procedures.map((item) => ({ ...item, sourceType: 'procedure', sourceId: item.id })),
-          ...products.map((item) => ({ ...item, sourceType: 'product', sourceId: text(item?.id) })),
-        ], person?.discountPercent)
-      : null;
+    ) || currentFallbackSettlement;
+
+    const nextSettlementSources = [
+      ...procedures.map((item) => ({ ...item, sourceType: 'procedure', sourceId: item.id })),
+      ...products.map((item) => ({ ...item, sourceType: 'product', sourceId: text(item?.id) })),
+    ];
+    const settlement = personChanged
+      ? this.finance.calculateSettlement(nextSettlementSources, person?.discountPercent)
+      : (refreshProcedures || productsChanged)
+        ? this.finance.repriceSettlement(nextSettlementSources, currentSettlement, person?.discountPercent)
+        : null;
 
     const { finance: _legacyFinance, ...currentRecord } = current;
     const stored = {
