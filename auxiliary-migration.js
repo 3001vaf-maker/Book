@@ -1,5 +1,6 @@
 import { apiRequest } from './core/auth.js';
-import { hydrateFinanceFromServer } from './core/finance/index.js';
+import { hydrateFinanceFromServer, migrateLegacyRecordSettlements } from './core/finance/index.js';
+import { getLegacyRecordSettlementRows, persistSanitizedLegacyRecordRows } from './core/record/index.js';
 import { hydrateProductsFromServer } from './settings/service/products/data.js';
 import { hydrateTagsFromServer } from './settings/tags/data.js';
 import { hydrateWalletsFromServer } from './settings/wallets/data.js';
@@ -27,6 +28,11 @@ async function responseJson(response, fallback) {
 function hydrate(value) {
   const bundle = normalize(value);
   hydrateFinanceFromServer(bundle.finance);
+  const legacyRecordSettlements = getLegacyRecordSettlementRows();
+  if (legacyRecordSettlements.length) {
+    migrateLegacyRecordSettlements(legacyRecordSettlements);
+    persistSanitizedLegacyRecordRows();
+  }
   hydrateWalletsFromServer(bundle.wallets);
   hydrateTagsFromServer(bundle.tags);
   hydrateProductsFromServer({ products: bundle.products, productHistory: bundle.productHistory });
