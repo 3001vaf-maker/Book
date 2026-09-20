@@ -52,16 +52,15 @@ export class FinanceService {
   async recordPaymentState(tenantId: string, recordId: string, plan: JsonObject) {
     const row = await this.prisma.businessAuxiliaryState.findUnique({ where: { tenantId } });
     const finance = objectValue(objectValue(row?.data).finance);
-    const movements = [...arrayValue(finance.income), ...arrayValue(finance.expense)]
-      .filter((item) => item?.status !== 'cancelled'
-        && String(item?.source?.type || '') === 'record'
-        && String(item?.source?.id || '') === String(recordId || ''));
+    const belongsToRecord = (item: any) => item?.status !== 'cancelled'
+      && String(item?.source?.type || '') === 'record'
+      && String(item?.source?.id || '') === String(recordId || '');
 
-    const income = movements
-      .filter((item) => item?.movementType === 'income')
+    const income = arrayValue(finance.income)
+      .filter(belongsToRecord)
       .reduce((sum, item) => sum + Math.max(0, numberValue(item?.serviceAmount ?? item?.total)), 0);
-    const expense = movements
-      .filter((item) => item?.movementType === 'expense')
+    const expense = arrayValue(finance.expense)
+      .filter(belongsToRecord)
       .reduce((sum, item) => sum + Math.max(0, numberValue(item?.serviceAmount ?? item?.total)), 0);
     const paid = Math.max(0, income - expense);
     const total = Math.max(0, numberValue(plan?.planTotal));
