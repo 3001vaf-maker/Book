@@ -34,8 +34,9 @@ assert.match(broadcast, /\['TELEGRAM', 'EMAIL'\]\.includes\(preview\.channel\)/)
 assert.match(compose, /value: 'EMAIL', label: 'Email'/);
 
 assert.match(transactional, /postbox\.cloud\.yandex\.net/);
-assert.match(transactional, /port: 465/);
-assert.match(transactional, /secure: true/);
+assert.match(transactional, /port: 587/);
+assert.match(transactional, /secure: false/);
+assert.match(transactional, /requireTLS: true/);
 assert.match(transactional, /POSTBOX_API_KEY_ID/);
 assert.match(transactional, /POSTBOX_API_KEY_SECRET/);
 assert.match(transactional, /X-Message-Tag/);

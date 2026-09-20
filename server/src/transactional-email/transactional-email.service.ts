@@ -21,8 +21,9 @@ export class TransactionalEmailService {
 
     return nodemailer.createTransport({
       host: 'postbox.cloud.yandex.net',
-      port: 465,
-      secure: true,
+      port: 587,
+      secure: false,
+      requireTLS: true,
       auth: {
         user: apiKeyId,
         pass: apiKeySecret,
