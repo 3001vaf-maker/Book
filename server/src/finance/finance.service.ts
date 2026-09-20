@@ -172,9 +172,26 @@ export class FinanceService {
     return settlement;
   }
 
-  async saveSettlement(tenantId: string, sourceType: string, sourceId: string, value: unknown) {
+  async upsertSettlement(tenantId: string, sourceType: string, sourceId: string, value: unknown) {
     await this.ensureLegacyMigrated(tenantId);
-    await this.saveSettlementWith(this.prisma, tenantId, sourceType, sourceId, value);
+    return this.saveSettlementWith(this.prisma, tenantId, sourceType, sourceId, value);
+  }
+
+  async settlementForSource(tenantId: string, sourceType: string, sourceId: string, fallback: unknown = null) {
+    await this.ensureLegacyMigrated(tenantId);
+    const type = text(sourceType);
+    const id = text(sourceId);
+    const row = await this.prisma.financeSettlement.findUnique({
+      where: { tenantId_sourceType_sourceId: { tenantId, sourceType: type, sourceId: id } },
+    });
+    if (row) return normalizeSettlement(row.data);
+    const settlement = validSettlement(fallback);
+    if (!settlement) return null;
+    return this.saveSettlementWith(this.prisma, tenantId, type, id, settlement);
+  }
+
+  async saveSettlement(tenantId: string, sourceType: string, sourceId: string, value: unknown) {
+    await this.upsertSettlement(tenantId, sourceType, sourceId, value);
     return this.snapshot(tenantId, { skipMigration: true });
   }
 
