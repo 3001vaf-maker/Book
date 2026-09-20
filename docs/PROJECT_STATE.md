@@ -118,4 +118,120 @@ The isolated development contour now exists in code:
 - staging fixtures contain synthetic profile/workplace/client/record/payment data;
 - Check Book runs on pushes and PRs for both `staging` and `main`.
 
-The next functional block after infrastructure verification is Auth transactional communication: registration verification, password reset and security notifications. Real email/SMS providers must not be enabled in staging by default.
+The previously queued Auth transactional communication block is paused. The active functional block is the Record ownership cleanup below.
+
+## Active block — Record ownership cleanup (2026-09-20)
+
+Source checkpoint: `main@fcd7d748bfdd5bb01be832927c52237fb8816ad8`.
+
+Working branch: `feature/record-ownership-cleanup-20260920`.
+
+### Non-negotiable product model
+
+There is exactly one `Record` domain and one `recordId` for one appointment.
+
+Creation channel is not a Record type. A Record can originate from Journal, Online Booking, Telegram, API or another future entry point, but all entry points must call the same canonical Record command path.
+
+The subject and the actor are different facts:
+- Person = who is booked / who the appointment is for;
+- actor = who performed the action;
+- for owner-side Journal actions the actor must preserve the concrete Profile identity, not only a generic owner/master label;
+- source/origin preserves where the action came from, e.g. JOURNAL or ONLINE_BOOKING.
+
+UI is manifestation only. Journal/List and Account/History must read the same Record result and must never calculate separate lifecycle truth.
+
+### Flat result / deep history rule
+
+For export/reporting, one Record must be reducible to one wide result row containing its current/final facts: person, appointment date/time, selected service snapshots, total duration, financial result, lifecycle/attendance/payment state and relevant action metadata.
+
+Under the hood, history may be append-only: one immutable action/fact per history row. Those rows must be sufficient to explain how the final Record result was reached.
+
+Action, lifecycle status, attendance and payment are separate concepts and must not be collapsed into one field.
+
+### Canonical ownership target
+
+- Person: who is booked.
+- Service/Procedure: catalog source for current service identity, price and duration.
+- Record: appointment identity, person link/snapshot, appointment date/time, workplace, selected service snapshots and origin link.
+- Record History: who did what, when, through which source, and before/after values needed for audit/history.
+- Day: working date and working interval.
+- Time: the only availability/overlap/occupancy rules.
+- Finance: the only price-plan/discount/payment/refund calculations and money facts.
+- BookingRequest: pre-Record request/transport only; after successful creation it keeps the resulting `recordId` and must not own Record lifecycle, payment state or current appointment truth.
+- Journal/List: owner-side view only.
+- Account/History: person-side view only of the same Record projection.
+
+### Confirmed current defects
+
+1. Manual Record creation goes through `core/record/service.js::createRecord()`, but Online Booking has a separate Record constructor in `BusinessStateService.createOnlineBookingRecord()`.
+2. BookingRequest duplicates Record facts (`date/from/to/procedures/recordSnapshot/status`) and Account history uses that duplicate state after a real Record exists.
+3. `manualRecordViews()` reshapes real Records into BookingRequest-shaped objects for Account history.
+4. Record history has CREATED/CONFIRMED/UNCONFIRMED/ARRIVED/NO_SHOW/ATTENDANCE_CLEARED/CANCELLED, but move/reschedule overwrites Record date/time without an immutable RESCHEDULED fact.
+5. Current Record events do not consistently preserve actor Profile/Account/System identity or source channel.
+6. Browser Journal uses canonical `core/time/`, while server Online Booking reimplements time parsing/range/overlap and availability checks.
+7. Finance Core is canonical for normal Records, while Online Booking reimplements price/discount/plan calculations in `initialRequestSnapshot()` and `bookingFinance()`.
+8. Account UI independently derives lifecycle/payment labels from BookingRequest/date/snapshot, creating a second business-rule owner.
+9. Prisma persistence names `BusinessRecord` / `BusinessRecordEvent` are legacy BusinessState naming. Treat naming cleanup separately from behavioral cleanup so persistence is not destructively changed by accident.
+
+### Ordered cleanup chain
+
+**R0 — Freeze the contract**
+- Keep this section as the continuity anchor.
+- Do not modify `main` directly.
+- Do not rename persistence or delete compatibility paths before replacement behavior is verified.
+
+**R1 — Complete Record facts/history**
+- Define the canonical Record command/event contract.
+- Preserve Person (subject), actor identity, source/origin, action time and appointment time as distinct facts.
+- Add RESCHEDULED history with before/after date/time/workplace.
+- Ensure create/cancel/attendance/confirmation history has sufficient actor/source metadata.
+- Add tests for: create -> reschedule -> cancel and create -> arrived/no-show.
+- No Booking, Time or Finance redesign in this step.
+
+**R2 — Unify Time ownership**
+- Keep `Day` as owner of working date/interval.
+- Keep `core/time/` semantics as the canonical availability/overlap contract.
+- Remove parallel Online Booking time formulas by routing server validation through the same canonical rules/contract.
+- Preserve double validation (browser display + server authority), but never two different algorithms.
+- Test Journal and Online Booking against the same occupied/free scenarios.
+
+**R3 — Unify Finance ownership**
+- Service/Procedure supplies current catalog price/duration.
+- Record captures immutable service price/duration snapshots at booking time.
+- Finance alone calculates discount, plan/amount due, payment, refund and remaining balance.
+- Remove Online Booking mini-finance calculations.
+- Account must consume Finance result by `recordId`, not snapshot payment arithmetic.
+- Test later catalog price changes do not rewrite historical Record price.
+
+**R4 — One canonical Record creation path**
+- Replace separate manual vs online Record constructors with one canonical Record command path.
+- Journal, Booking and future Telegram/API are callers, not owners.
+- Journal-originated events preserve concrete Profile identity.
+- Online Booking-originated events preserve Account identity and source.
+- Keep one `recordId` regardless of source.
+
+**R5 — Reduce BookingRequest to pre-Record transport**
+- BookingRequest may hold temporary selection while the request is being validated/created.
+- On success it links to `recordId`.
+- After Record creation it must not determine Record lifecycle/current status/payment/current date/time.
+- Remove `recordSnapshot` as a post-create source of truth and retire manual Record-to-BookingRequest view adapters.
+
+**R6 — One Record read/projection**
+- Build one canonical Record result/projection from Record + Record History + Finance facts.
+- Journal/List and Account/History consume that same projection with different field visibility/filtering only.
+- Cancelled Record must be cancelled on both sides and must never become Account debt merely because appointment time passed.
+
+**R7 — Persistence/name cleanup**
+- Only after behavior is verified, clean legacy `BusinessRecord` / `BusinessRecordEvent` naming.
+- Prefer a non-destructive migration/mapping strategy where possible.
+- Do not create a second Record entity while renaming storage.
+
+**R8 — Guards, regression and release**
+- Strengthen Check Book so a second Record creator, Time algorithm, Finance calculator or Account lifecycle calculator cannot return.
+- Verify Record/History, Journal/List, Account/History, Time occupancy, Finance payment/refund and Online Booking.
+- Run full checks and staging verification.
+- Only after all checks pass: release through staging -> main -> production.
+
+### Stop rule
+
+At every step, finish tests and inspect the diff before moving to the next step. Do not combine later steps opportunistically. If an unexpected ownership dependency appears, document it here first, then decide which step owns it.
