@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, Workplace as WorkplaceRow } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
+import { resolveWorkplaceTimeZone } from '../time/workplace-time-zone';
 
 type ProfileInput = {
   id?: string;
@@ -31,6 +32,7 @@ type WorkplaceInput = {
   address: string;
   phone: string;
   currency: string;
+  timeZone: string;
   from: string;
   to: string;
   links: LinkInput[];
@@ -94,6 +96,7 @@ function normalizeWorkplace(value: unknown): WorkplaceInput {
     address: stringValue(source.address),
     phone: stringValue(source.phone),
     currency: stringValue(source.currency, 'RUB') || 'RUB',
+    timeZone: resolveWorkplaceTimeZone(source.city, source.timeZone),
     from: stringValue(source.from, '09:00') || '09:00',
     to: stringValue(source.to, '18:00') || '18:00',
     links: normalizeLinks(source.links),
@@ -145,6 +148,7 @@ function workplaceData(workplace: WorkplaceInput, position: number) {
     address: workplace.address,
     phone: workplace.phone,
     currency: workplace.currency,
+    timeZone: workplace.timeZone,
     from: workplace.from,
     to: workplace.to,
     links: workplace.links as Prisma.InputJsonValue,
@@ -165,6 +169,7 @@ function workplaceDto(workplace: WorkplaceRow): WorkplaceInput {
     address: workplace.address,
     phone: workplace.phone,
     currency: workplace.currency,
+    timeZone: workplace.timeZone,
     from: workplace.from,
     to: workplace.to,
     links: normalizeLinks(workplace.links),
