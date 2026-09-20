@@ -4,7 +4,7 @@ import { deleteWallet as deleteWalletData, getWalletBalance, getWalletHistory, g
 const formatMoney = (value) => `${(Number(value) || 0).toLocaleString('ru-RU')} ₽`;
 
 function operationMoment(payment) {
-  const raw = payment?.refundedAt || payment?.paidAt || payment?.createdAt || '';
+  const raw = payment?.occurredAt || payment?.refundedAt || payment?.paidAt || payment?.createdAt || '';
   const fallback = `${payment?.date || ''} ${payment?.time || ''}`.trim();
   return shortDateTime(raw, fallback);
 }
@@ -32,9 +32,12 @@ function renderRow(wallet) {
 }
 
 function renderPaymentRow(payment) {
-  const isRefund = payment?.ledgerType === 'refund' || payment?.expenseType === 'refund';
+  let title = payment?.direction === 'OUT' ? 'Расход' : 'Доход';
+  if (payment?.operationType === 'payment') title = payment?.component === 'tips' ? 'Tips' : 'Оплата';
+  else if (payment?.operationType === 'refund') title = payment?.component === 'tips' ? 'Возврат Tips' : 'Возврат';
+  else if (payment?.operationType === 'cancellation') title = 'Отмена операции';
   return listEntry({
-    title: isRefund ? 'Возврат' : 'Оплата',
+    title,
     subtitle: operationMoment(payment),
     rightTop: formatMoney(payment?.total),
     initial: '₽',
