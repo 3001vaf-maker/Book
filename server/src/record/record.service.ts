@@ -32,6 +32,17 @@ function json(value: unknown): Prisma.InputJsonValue {
   return clone(value) as Prisma.InputJsonValue;
 }
 
+function stable(value: any): any {
+  if (Array.isArray(value)) return value.map(stable);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(Object.keys(value).sort().map((key) => [key, stable(value[key])]));
+}
+
+function sameJson(left: unknown, right: unknown) {
+  return JSON.stringify(stable(left)) === JSON.stringify(stable(right));
+}
+
+
 @Injectable()
 export class RecordService {
   constructor(
@@ -327,27 +338,79 @@ export class RecordService {
   async upsertFromOwner(tenantId: string, recordId: string, body: unknown) {
     await this.requireVerified(tenantId);
     const source = objectValue(body);
-    const record = clone(objectValue(source.record ?? source));
+    const incoming = clone(objectValue(source.record ?? source));
     const id = text(recordId);
-    record.id = id;
+    incoming.id = id;
     const existing = await this.prisma.record.findUnique({ where: { tenantId_recordId: { tenantId, recordId: id } } });
-    if (!existing) return this.create(tenantId, record, Number(source.position), { createHistory: false });
+    if (!existing) return this.create(tenantId, incoming, Number(source.position), { createHistory: false });
 
     const current = objectValue(existing.data);
     const scheduleChanged = ['date', 'workplaceId', 'from', 'to']
-      .some((key) => text(current?.[key]) !== text(record?.[key]));
+      .some((key) => text(current?.[key]) !== text(incoming?.[key]));
+    const proceduresChanged = !sameJson(arrayValue(current.procedures), arrayValue(incoming.procedures));
+    const productsChanged = !sameJson(arrayValue(current.products), arrayValue(incoming.products));
+    const personChanged = !sameJson(objectValue(current.person), objectValue(incoming.person));
+
     if (scheduleChanged) {
       await this.validateAvailability(tenantId, {
-        date: dateValue(record.date),
-        workplaceId: text(record.workplaceId),
-        from: text(record.from),
-        to: text(record.to),
+        date: dateValue(incoming.date),
+        workplaceId: text(incoming.workplaceId),
+        from: text(incoming.from),
+        to: text(incoming.to),
       }, { excludeRecordId: id });
     }
+
+    let procedures = arrayValue(current.procedures).map((item) => clone(objectValue(item)));
+    if (proceduresChanged) {
+      const requested = arrayValue(incoming.procedures);
+      const ids = requested.map((item) => text(item?.id)).filter(Boolean);
+      const canonical = ids.length ? await this.procedures.snapshots(tenantId, text(incoming.workplaceId), ids) : [];
+      const requestedById = new Map(requested.map((item) => [text(item?.id), objectValue(item)]));
+      procedures = canonical.map((item) => {
+        const draft = requestedById.get(item.id);
+        const requestedDuration = Number(draft?.duration);
+        return {
+          ...item,
+          duration: Number.isFinite(requestedDuration) && requestedDuration > 0 ? requestedDuration : item.duration,
+        };
+      });
+    }
+
+    const products = productsChanged
+      ? arrayValue(incoming.products).map((item) => clone(objectValue(item)))
+      : arrayValue(current.products).map((item) => clone(objectValue(item)));
+    const person = personChanged ? clone(objectValue(incoming.person)) : clone(objectValue(current.person));
+    const finance = (proceduresChanged || productsChanged || personChanged)
+      ? this.finance.calculatePlan([
+          ...procedures.map((item) => ({ ...item, sourceType: 'procedure', sourceId: item.id })),
+          ...products.map((item) => ({ ...item, sourceType: 'product', sourceId: text(item?.id) })),
+        ], person?.discountPercent)
+      : clone(objectValue(current.finance));
+
+    const stored = {
+      ...current,
+      date: dateValue(incoming.date),
+      workplaceId: text(incoming.workplaceId),
+      from: text(incoming.from),
+      to: text(incoming.to),
+      person,
+      procedures,
+      products,
+      finance,
+      updatedAt: text(incoming.updatedAt) || new Date().toISOString(),
+      createdAt: text(current.createdAt),
+      createdBy: clone(objectValue(current.createdBy)),
+      source: text(current.source),
+      sourceRequestId: text(current.sourceRequestId),
+    };
+
     await this.prisma.record.update({
       where: { tenantId_recordId: { tenantId, recordId: id } },
-      data: { position: Number.isInteger(Number(source.position)) ? Number(source.position) : existing.position, data: json(record) },
+      data: {
+        position: Number.isInteger(Number(source.position)) ? Number(source.position) : existing.position,
+        data: json(stored),
+      },
     });
-    return record;
+    return stored;
   }
 }
