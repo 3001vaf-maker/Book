@@ -82,7 +82,7 @@ export function getBookingOccupancy(context = {}, workplaceKey = '', date = '') 
     }));
 }
 
-export function getBookingSlots(context = {}, { workplaceKey = '', date = '', procedureIds = [], step = 15 } = {}) {
+export function getBookingSlots(context = {}, { workplaceKey = '', date = '', procedureIds = [], step = 15, notBefore = '' } = {}) {
   const duration = bookingDuration(context, workplaceKey, procedureIds);
   const plan = getBookingDayPlan(context, workplaceKey, date);
   if (!plan || duration <= 0) return [];
@@ -92,7 +92,7 @@ export function getBookingSlots(context = {}, { workplaceKey = '', date = '', pr
     plan,
     usages: getBookingOccupancy(context, workplaceKey, date),
   });
-  return listTimeGridAvailableStarts(grid, { duration, step }).map((from) => ({
+  return listTimeGridAvailableStarts(grid, { duration, step, from: notBefore }).map((from) => ({
     from,
     to: minutesToTime((timeToMinutes(from) ?? 0) + duration),
   }));
