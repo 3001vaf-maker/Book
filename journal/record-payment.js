@@ -1,5 +1,5 @@
 import { button, details, initPaymentForm, initPaymentMethods, modal, mountModal, paymentForm, paymentMethods, paymentReceipt, select, shortDate, shortDateTimeParts, shortTime } from '../ui/ui.js';
-import { calculateFinancialPlan, getRecordPaymentState, recordFinancialItems } from '../core/finance/index.js';
+import { calculateSettlement, getRecordPaymentState, recordSettlementItems } from '../core/finance/index.js';
 import { cancelPaymentOperation, getRefundsForPayment, recordPaymentIncome, recordRefundExpense } from '../core/finance/index.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getAllPeople } from '../main/people/data.js';
@@ -19,29 +19,29 @@ function personForRecord(record) {
     || source;
 }
 
-function financeForRecord(record) {
-  return record?.finance || calculateFinancialPlan(recordFinancialItems(record));
+function settlementForRecord(record) {
+  return record?.finance || calculateSettlement(recordSettlementItems(record));
 }
 
 function paymentStateForRecord(record) {
   return getRecordPaymentState(record);
 }
 
-function sourcesFromFinance(sources, finance, type) {
-  const items = Array.isArray(finance?.items) ? finance.items : [];
+function sourcesFromSettlement(sources, settlement, type) {
+  const items = Array.isArray(settlement?.items) ? settlement.items : [];
   return (Array.isArray(sources) ? sources : []).flatMap((source) => {
-    const financialItem = items.find((item) => String(item?.sourceType || 'procedure') === type
+    const settlementItem = items.find((item) => String(item?.sourceType || 'procedure') === type
       && String(item?.sourceId || '') === String(source?.id || ''));
-    return financialItem ? [{ ...source, cost: financialItem.price }] : [];
+    return settlementItem ? [{ ...source, cost: settlementItem.price }] : [];
   });
 }
 
-function saveFinancialCorrection(record, finance) {
+function saveSettlementCorrection(record, settlement) {
   const current = getRecord(record?.id) || record;
   return updateRecord(current.id, {
-    procedures: sourcesFromFinance(current?.procedures, finance, 'procedure'),
-    products: sourcesFromFinance(current?.products, finance, 'product'),
-    finance,
+    procedures: sourcesFromSettlement(current?.procedures, settlement, 'procedure'),
+    products: sourcesFromSettlement(current?.products, settlement, 'product'),
+    finance: settlement,
   });
 }
 
@@ -83,7 +83,7 @@ function paymentFromRecord(record) {
     person: recordPerson(record),
     date: moment.date,
     time: moment.time,
-    finance: financeForRecord(record),
+    settlement: settlementForRecord(record),
   };
 }
 
@@ -147,7 +147,7 @@ function sourcePaymentFactMarkup(state) {
 }
 
 function openPaymentMethodsModal(payment, paymentModal) {
-  const recordState = getRecordPaymentState({ id: payment?.source?.id || '', finance: payment?.finance || null });
+  const recordState = getRecordPaymentState({ id: payment?.source?.id || '', finance: payment?.settlement || null });
   const total = Number(recordState.remaining || 0);
   if (total <= 0.009) return;
   const content = `<div class="modal-title"><h2>Способ оплаты</h2></div>${paymentMethods({ wallets: getWallets(), total })}`;
@@ -168,7 +168,7 @@ function openPaymentMethodsModal(payment, paymentModal) {
       source: payment.source,
       workplace: payment.workplace,
       person: payment.person,
-      finance: payment.finance,
+      settlement: payment.settlement,
       allocations,
       maxAmount: total,
       serviceAmount: appliedAmount,
@@ -181,31 +181,31 @@ function openPaymentModal(record) {
   if (paymentStateForRecord(record).fullyPaid) return;
   const current = getRecord(record?.id) || record;
   const payment = paymentFromRecord(current);
-  const finance = payment.finance;
+  const settlement = payment.settlement;
   const content = `<div class="modal-title"><h2>Оплата</h2></div>${paymentForm({
     workplace: payment.workplace,
     date: payment.date,
     time: payment.time,
     person: payment.person || {},
-    procedures: (finance?.items || []).map((item) => ({ sourceType: item.sourceType || 'procedure', id: item.sourceId, name: item.name, cost: item.price, discountMode: item.discountMode, discountPercent: item.discountPercent, discountMoney: item.discountMoney })),
-    total: finance?.planTotal || 0,
+    procedures: (settlement?.items || []).map((item) => ({ sourceType: item.sourceType || 'procedure', id: item.sourceId, name: item.name, cost: item.price, discountMode: item.discountMode, discountPercent: item.discountPercent, discountMoney: item.discountMoney })),
+    total: settlement?.planTotal || 0,
   })}`;
   const m = mountModal(document.body, modal(content, { variant: 'large', surface: 'app' }));
   if (!m) return;
   initPaymentForm(m.querySelector('[data-payment-ui]'), {
-    calculate: (items) => calculateFinancialPlan(items),
-    onRemove: ({ finance: updatedFinance }) => {
-      saveFinancialCorrection(current, updatedFinance);
+    calculate: (items) => calculateSettlement(items),
+    onRemove: ({ settlement: updatedSettlement }) => {
+      saveSettlementCorrection(current, updatedSettlement);
     },
-    onSave: ({ finance: updatedFinance }) => {
-      const updated = saveFinancialCorrection(current, updatedFinance);
+    onSave: ({ settlement: updatedSettlement }) => {
+      const updated = saveSettlementCorrection(current, updatedSettlement);
       if (!updated) return;
       m.remove();
     },
-    onPay: ({ finance: updatedFinance }) => {
-      const updated = saveFinancialCorrection(current, updatedFinance);
+    onPay: ({ settlement: updatedSettlement }) => {
+      const updated = saveSettlementCorrection(current, updatedSettlement);
       if (!updated) return;
-      openPaymentMethodsModal({ ...paymentFromRecord(updated), finance: updated.finance }, m);
+      openPaymentMethodsModal({ ...paymentFromRecord(updated), settlement: updated.finance }, m);
     },
   });
 }
