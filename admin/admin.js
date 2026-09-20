@@ -172,19 +172,19 @@ function renderTenants() {
     <section class="admin-invite-panel">
       <div class="admin-invite-head">
         <h3>Создать профиль</h3>
-        <button class="admin-button secondary" type="button" data-create-registration-link>Создать ссылку без email</button>
+        <button class="admin-button secondary" type="button" data-create-invite-link>Создать ссылку</button>
       </div>
       <form class="admin-invite-grid" data-invite-form>
         <label class="admin-field"><span>Имя</span><input name="name" placeholder="Имя"></label>
         <label class="admin-field"><span>Email</span><input name="email" type="email" placeholder="name@example.com" required></label>
         <button class="admin-button" type="submit">Отправить приглашение</button>
       </form>
-      <div class="admin-invite-link" data-registration-link hidden>
+      <div class="admin-invite-link" data-invite-link hidden>
         <label class="admin-field">
           <span>Ссылка для регистрации</span>
-          <input type="text" readonly data-registration-link-value>
+          <input type="text" readonly data-invite-link-value>
         </label>
-        <button class="admin-button secondary" type="button" data-copy-registration-link>Копировать</button>
+        <button class="admin-button secondary" type="button" data-copy-invite-link>Копировать</button>
       </div>
       <p class="admin-inline-message" data-invite-message></p>
     </section>
@@ -197,49 +197,49 @@ function renderTenants() {
 
   const form = content.querySelector('[data-invite-form]');
   const message = content.querySelector('[data-invite-message]');
-  const createRegistrationLink = content.querySelector('[data-create-registration-link]');
-  const registrationLink = content.querySelector('[data-registration-link]');
-  const registrationLinkValue = content.querySelector('[data-registration-link-value]');
-  const copyRegistrationLink = content.querySelector('[data-copy-registration-link]');
+  const createLinkButton = content.querySelector('[data-create-invite-link]');
+  const inviteLinkBox = content.querySelector('[data-invite-link]');
+  const inviteLinkInput = content.querySelector('[data-invite-link-value]');
+  const copyLinkButton = content.querySelector('[data-copy-invite-link]');
 
-  createRegistrationLink?.addEventListener('click', async () => {
+  createLinkButton?.addEventListener('click', async () => {
     message.textContent = '';
     message.classList.remove('error');
-    createRegistrationLink.disabled = true;
-    createRegistrationLink.textContent = 'Создаём…';
+    createLinkButton.disabled = true;
+    createLinkButton.textContent = 'Создаём…';
     try {
-      const result = await adminRequest('/registration-links', {
+      const result = await adminRequest('/manual-invitations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: '{}',
       });
       const url = String(result?.url || '').trim();
       if (!url) throw new Error('Ссылка не получена');
-      registrationLinkValue.value = url;
-      registrationLink.hidden = false;
+      inviteLinkInput.value = url;
+      inviteLinkBox.hidden = false;
       message.textContent = 'Ссылка создана. Она действует 7 дней и используется один раз.';
       await refreshData();
     } catch (error) {
       message.textContent = error instanceof Error ? error.message : 'Не удалось создать ссылку';
       message.classList.add('error');
     } finally {
-      createRegistrationLink.disabled = false;
-      createRegistrationLink.textContent = 'Создать ссылку без email';
+      createLinkButton.disabled = false;
+      createLinkButton.textContent = 'Создать ссылку';
     }
   });
 
-  copyRegistrationLink?.addEventListener('click', async () => {
-    const url = String(registrationLinkValue?.value || '').trim();
+  copyLinkButton?.addEventListener('click', async () => {
+    const url = String(inviteLinkInput?.value || '').trim();
     if (!url) return;
     try {
       await navigator.clipboard.writeText(url);
     } catch {
-      registrationLinkValue.focus();
-      registrationLinkValue.select();
+      inviteLinkInput.focus();
+      inviteLinkInput.select();
       document.execCommand('copy');
     }
-    copyRegistrationLink.textContent = 'Скопировано';
-    window.setTimeout(() => { copyRegistrationLink.textContent = 'Копировать'; }, 1200);
+    copyLinkButton.textContent = 'Скопировано';
+    window.setTimeout(() => { copyLinkButton.textContent = 'Копировать'; }, 1200);
   });
 
   form.addEventListener('submit', async (event) => {
@@ -290,20 +290,20 @@ function renderTenants() {
 function tenantRow(item) {
   const pending = !item.ownerProfile && item.invitation?.status === 'PENDING';
   const invitationEmail = String(item.invitation?.email || '');
-  const registrationLink = invitationEmail.endsWith('@registration.invalid');
+  const inviteLinkBox = invitationEmail.endsWith('@registration.invalid');
   const name = item.ownerProfile?.name || item.invitation?.name || item.tenantName;
-  const email = item.ownerProfile?.email || (registrationLink ? '' : invitationEmail);
+  const email = item.ownerProfile?.email || (inviteLinkBox ? '' : invitationEmail);
   const statusClass = item.status === 'SUSPENDED' ? 'suspended' : pending ? 'pending' : 'active';
   const statusLabel = item.status === 'SUSPENDED'
     ? 'Отключён'
-    : registrationLink && pending
+    : inviteLinkBox && pending
       ? 'Ждёт регистрации'
       : pending
         ? 'Ждёт входа'
         : item.ownerProfile
           ? 'Активен'
           : 'Создан';
-  const resend = pending && !registrationLink ? `<button class="admin-button secondary" data-resend="${escapeHtml(item.invitation.id)}">Повторить email</button>` : '';
+  const resend = pending && !inviteLinkBox ? `<button class="admin-button secondary" data-resend="${escapeHtml(item.invitation.id)}">Повторить email</button>` : '';
   return `<tr data-tenant="${escapeHtml(item.tenantId)}"><td><strong>${escapeHtml(name)}</strong></td><td>${email ? escapeHtml(email) : '—'}</td><td><span class="admin-pill ${statusClass}">${statusLabel}</span> ${resend}</td><td>${escapeHtml(item.plan?.name || 'Индивидуальный')}</td></tr>`;
 }
 
