@@ -1,6 +1,6 @@
 import { ALL_WORKPLACES_ID, emptyState, escapeHtml, listEntries, listEntry, shortDate } from '../ui/ui.js';
 import { getWorkplaces } from '../core/workplace-time.js';
-import { getRecordPaymentState, recordPlanTotal } from '../core/finance/index.js';
+import { getRecordPaymentState, recordAmountDue } from '../core/finance/index.js';
 import { getRecords } from '../core/record/index.js';
 import { isRecordCompletedSide, recordActivityTime, recordAppointmentTime, recordVisualState } from '../core/record/index.js';
 import { openRecordView } from './record-view.js';
@@ -40,7 +40,7 @@ function recordEntry(record, workplaces, { focus = false, payment = null } = {})
     title: personName(record?.person),
     subtitle: record?.person?.phone || '',
     rightTop: [shortDate(record?.date), String(record?.from || '')].filter(Boolean).join(' · '),
-    rightBottom: formatMoney(recordPlanTotal(record)),
+    rightBottom: formatMoney(recordAmountDue(record)),
     interactive: Boolean(id),
     data: id ? `data-journal-list-record="${escapeHtml(id)}"` : '',
     aria: id ? `Открыть запись ${personName(record?.person)}` : '',
