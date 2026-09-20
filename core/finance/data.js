@@ -1,7 +1,7 @@
 import { queueAuxiliaryDataset } from '../business-persistence.js';
 
 // Finance persistence only. Business meaning belongs to rules/settlement/service.
-const VERSION = 5;
+const VERSION = 6;
 let financeState = emptyState();
 
 function numberValue(value) {
@@ -19,7 +19,7 @@ function clone(value) {
 }
 
 function emptyState() {
-  return { version: VERSION, income: [], expense: [] };
+  return { version: VERSION, settlements: {}, income: [], expense: [] };
 }
 
 function normalizeSettlementSnapshot(value = null) {
@@ -76,9 +76,17 @@ function normalizeExpense(item = {}) {
   };
 }
 
+function normalizeSettlements(value = null) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value)
+    .map(([key, settlement]) => [String(key || ''), normalizeSettlementSnapshot(settlement)])
+    .filter(([key, settlement]) => key && settlement));
+}
+
 function normalizedState(value) {
   if (!value || typeof value !== 'object') return null;
   const legacyOperational = Array.isArray(value.operational) ? value.operational : [];
+  const settlements = normalizeSettlements(value.settlements);
   const income = Array.isArray(value.income) ? value.income.map(normalizeIncome) : [];
   const expense = Array.isArray(value.expense) ? value.expense.map(normalizeExpense) : [];
   if (legacyOperational.length) {
@@ -89,7 +97,7 @@ function normalizedState(value) {
       if (legacy) entry.finance = normalizeSettlementSnapshot(legacy);
     });
   }
-  return { version: VERSION, income, expense };
+  return { version: VERSION, settlements, income, expense };
 }
 
 export function hydrateFinanceFromServer(value = null) {
@@ -105,4 +113,44 @@ export function writeFinanceState(state) {
 
 export function readFinanceState() {
   return clone(financeState);
+}
+
+
+export function readStoredSettlement(source = null) {
+  const key = sourceKey(source);
+  if (!key || key === ':') return null;
+  return clone(financeState.settlements?.[key] || null);
+}
+
+export function storeSettlement(source = null, settlement = null, { persist = true } = {}) {
+  const key = sourceKey(source);
+  const snapshot = normalizeSettlementSnapshot(settlement);
+  if (!key || key === ':' || !snapshot) return null;
+  const next = normalizedState(financeState) || emptyState();
+  next.settlements[key] = snapshot;
+  financeState = next;
+  if (persist) void queueAuxiliaryDataset('finance', financeState);
+  return clone(snapshot);
+}
+
+export function migrateLegacyRecordSettlements(records = []) {
+  const rows = Array.isArray(records) ? records : [];
+  const next = normalizedState(financeState) || emptyState();
+  let changed = false;
+  rows.forEach((record) => {
+    const id = String(record?.id || '');
+    const snapshot = normalizeSettlementSnapshot(record?.finance);
+    if (!id || !snapshot) return;
+    const key = sourceKey({ type: 'record', id });
+    if (next.settlements[key]) return;
+    next.settlements[key] = snapshot;
+    changed = true;
+  });
+  if (!changed) return { changed: false, migrated: 0 };
+  financeState = next;
+  void queueAuxiliaryDataset('finance', financeState);
+  return {
+    changed: true,
+    migrated: rows.filter((record) => record?.id && record?.finance).length,
+  };
 }
