@@ -388,7 +388,7 @@ export class OnlineBookingService {
     const planFrom = text(day?.from) || text(workplace?.from);
     const planTo = text(day?.to) || text(workplace?.to);
     const [recordOccupancy, pending] = await Promise.all([
-      this.businessState.publicBookingOccupancy(tenantId),
+      this.records.publicOccupancy(tenantId),
       this.prisma.bookingRequest.findMany({
         where: { tenantId, workplaceKey, date, status: BookingRequestStatus.PENDING },
         select: { from: true, to: true },
