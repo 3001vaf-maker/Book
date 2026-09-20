@@ -6,7 +6,11 @@ const ignored = new Set(['.git', 'node_modules', '_site']);
 const errors = [];
 const thisCheck = 'scripts/check-finance-architecture.mjs';
 const obsoletePaymentModule = ['core', 'payment.js'].join('/');
-const reservedFutureModelModule = ['core', 'business-model.js'].join('/');
+const obsoleteFinanceModelAtom = ['core', 'finance', 'model.js'].join('/');
+const reservedFinancialModelPaths = [
+  ['core', 'financial-model.js'].join('/'),
+  ['core', 'finance', 'financial-model.js'].join('/'),
+];
 
 function walk(dir) {
   const files = [];
@@ -29,27 +33,36 @@ function source(path) {
 }
 
 if (existsSync(join(root, obsoletePaymentModule))) {
-  errors.push(`${obsoletePaymentModule} must not exist: DDS owns money movement; Financial Model owns plan/fact`);
+  errors.push(`${obsoletePaymentModule} must not exist: Finance owns payment commands`);
 }
-if (existsSync(join(root, reservedFutureModelModule))) {
-  errors.push(`${reservedFutureModelModule} is reserved for a separate future instrument and must not own finance`);
+if (existsSync(join(root, obsoleteFinanceModelAtom))) {
+  errors.push(`${obsoleteFinanceModelAtom} must not exist: operational Record calculation belongs to Settlement`);
+}
+for (const path of reservedFinancialModelPaths) {
+  if (existsSync(join(root, path))) {
+    errors.push(`${path} is reserved for the future analytical Financial Model and must not be implemented during operational Finance work`);
+  }
 }
 
+const obsoleteSettlementNames = /\b(?:calculateFinancialPlan|repriceFinancialPlan|getRecordFinancialPlanFact|resolveRecordFinancialPlan|recordPlanTotal|hydrateRecordFinance|normalizeRecordFinance|recordFinancialItems)\b/;
 for (const file of walk(root)) {
   const path = rel(file);
   if (path === thisCheck) continue;
   const text = readFileSync(file, 'utf8');
   if (text.includes(obsoletePaymentModule)) errors.push(`${path}: obsolete ${obsoletePaymentModule} dependency`);
-  if (text.includes(reservedFutureModelModule)) errors.push(`${path}: finance must use core/finance/index.js`);
+  if (obsoleteSettlementNames.test(text)) errors.push(`${path}: legacy Financial Model/plan API must use Settlement terminology`);
+  if (/from\s+['"][^'"]*financial-model[^'"]*['"]/.test(text)) {
+    errors.push(`${path}: Financial Model is reserved and cannot be an operational Finance dependency`);
+  }
 }
 
 const ownershipRules = [
-  ['core/finance/data.js', /from\s+['"][^'"]*(?:financial-model|wallet|record|people|person|ui)[^'"]*['"]/, 'DDS must not depend on Financial Model, Wallet, Record, People or UI'],
-  ['core/finance/rules.js', /from\s+['"][^'"]*(?:wallet|journal|record-data|people|person|ui)[^'"]*['"]/, 'Financial Model must not depend on manifestations/data owners'],
-  ['journal/record-data.js', /core\/dds\.js/, 'Record data must not own/read money movements directly; fact comes through Financial Model'],
-  ['main/people/metadata.js', /core\/dds\.js/, 'Person metrics must read financial fact through Financial Model'],
-  ['settings/service/procedures/procedures.js', /core\/dds\.js/, 'Procedure metrics must read financial fact through Financial Model'],
-  ['settings/service/products/products.js', /core\/dds\.js/, 'Product metrics must read financial fact through Financial Model'],
+  ['core/finance/data.js', /from\s+['"][^'"]*(?:financial-model|wallet|record|people|person|ui)[^'"]*['"]/, 'Finance persistence must not depend on Settlement projections, Wallet, Record, People or UI'],
+  ['core/finance/rules.js', /from\s+['"][^'"]*(?:wallet|journal|record-data|people|person|ui)[^'"]*['"]/, 'Settlement rules must not depend on manifestations/data owners'],
+  ['journal/record-data.js', /core\/dds\.js/, 'Record data must not own/read money movements directly; fact comes through Finance Settlement'],
+  ['main/people/metadata.js', /core\/dds\.js/, 'Person metrics must read financial fact through Finance Settlement'],
+  ['settings/service/procedures/procedures.js', /core\/dds\.js/, 'Procedure metrics must read financial fact through Finance Settlement'],
+  ['settings/service/products/products.js', /core\/dds\.js/, 'Product metrics must read financial fact through Finance Settlement'],
   ['settings/wallets/wallets.js', /core\/dds\.js/, 'Wallet UI must read its own Wallet data owner, not DDS directly'],
   ['ui/payment/index.js', /core\/(?:dds|financial-model)\.js/, 'Payment UI is input/display only and must not own finance logic'],
 ];
@@ -75,16 +88,16 @@ if (!/export function getActiveDDSMovements/.test(financeRead) || !/status\s*!==
 }
 
 const financeRules = source('core/finance/rules.js');
-if (!/export function calculateFinancialPlan/.test(financeRules) || !/export function calculateFinancialFact/.test(financeRules)) {
-  errors.push('core/finance/rules.js must own financial plan/fact calculations');
+if (!/export function calculateSettlement/.test(financeRules) || !/export function calculateSettlementTotals/.test(financeRules)) {
+  errors.push('core/finance/rules.js must own Settlement amount-due and paid/refunded calculations');
 }
-if (!/export function recordFinancialItems/.test(financeRules) || !/sourceType:\s*'product'/.test(financeRules)) {
+if (!/export function recordSettlementItems/.test(financeRules) || !/sourceType:\s*'product'/.test(financeRules)) {
   errors.push('Finance rules must assemble both procedure and product Record sources');
 }
 
 const financeIndex = source('core/finance/index.js');
-if (!/recordPaymentIncome/.test(financeIndex) || !/cancelPaymentOperation/.test(financeIndex) || !/calculateFinancialPlan/.test(financeIndex) || !/getRecordPaymentState/.test(financeIndex)) {
-  errors.push('core/finance/index.js must expose the complete public Finance contract');
+if (!/recordPaymentIncome/.test(financeIndex) || !/cancelPaymentOperation/.test(financeIndex) || !/calculateSettlement/.test(financeIndex) || !/getRecordPaymentState/.test(financeIndex)) {
+  errors.push('core/finance/index.js must expose the complete public Finance/Settlement contract');
 }
 
 const walletData = source('settings/wallets/data.js');
@@ -108,7 +121,7 @@ if (!/data-payment-price/.test(paymentUI) || /data-payment-price\s+readonly/.tes
 }
 
 const recordPayment = source('journal/record-payment.js');
-if (!/procedures:\s*sourcesFromFinance/.test(recordPayment) || !/products:\s*sourcesFromFinance/.test(recordPayment)) {
+if (!/procedures:\s*sourcesFromSettlement/.test(recordPayment) || !/products:\s*sourcesFromSettlement/.test(recordPayment)) {
   errors.push('Payment-stage price correction must be persisted back into Record procedures and products');
 }
 if (!/cancelPaymentOperation/.test(recordPayment) || !/data-payment-actions/.test(recordPayment)) {
