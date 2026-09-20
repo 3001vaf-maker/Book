@@ -49,6 +49,33 @@ export class FinanceService {
     };
   }
 
+
+  async recordSettlement(tenantId: string, record: JsonObject) {
+    const row = await this.prisma.businessAuxiliaryState.findUnique({ where: { tenantId } });
+    const finance = objectValue(objectValue(row?.data).finance);
+    const recordId = String(record?.id || '');
+    const key = `record:${recordId}`;
+    const stored = objectValue(objectValue(finance.settlements)[key]);
+    if (Object.keys(stored).length) return stored;
+
+    const belongsToRecord = (item: any) => String(item?.source?.type || '') === 'record'
+      && String(item?.source?.id || '') === recordId;
+    const historical = [
+      ...arrayValue(finance.income),
+      ...arrayValue(finance.expense),
+    ]
+      .filter((item) => belongsToRecord(item) && item?.finance && typeof item.finance === 'object')
+      .sort((left, right) => String(left?.createdAt || '').localeCompare(String(right?.createdAt || '')));
+    const latest = historical.length ? objectValue(historical[historical.length - 1]?.finance) : {};
+    if (Object.keys(latest).length) return latest;
+
+    const person = objectValue(record?.person);
+    return this.calculateSettlement([
+      ...arrayValue(record?.procedures).map((item) => ({ ...objectValue(item), sourceType: 'procedure', sourceId: String(item?.id || '') })),
+      ...arrayValue(record?.products).map((item) => ({ ...objectValue(item), sourceType: 'product', sourceId: String(item?.id || '') })),
+    ], person?.discountPercent);
+  }
+
   async recordSettlementPaymentState(tenantId: string, recordId: string, settlement: JsonObject) {
     const row = await this.prisma.businessAuxiliaryState.findUnique({ where: { tenantId } });
     const finance = objectValue(objectValue(row?.data).finance);
