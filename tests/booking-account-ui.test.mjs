@@ -110,6 +110,15 @@ assert.doesNotMatch(accountShell, /Promise\.allSettled\(unread/);
 assert.doesNotMatch(accountShell, /markAccountNotificationRead\(state\.tenantId, item\.notificationId\)/);
 assert.match(accountShell, /markAccountNotificationRead\(state\.tenantId, message\.notificationId\)/);
 assert.match(accountShell, /node\.addEventListener\('click', \(\) => void openNotification\(\)\)/);
+assert.match(accountShell, /projectRecordStatuses/);
+assert.match(accountShell, /booked: 'Записался'/);
+assert.match(accountShell, /rescheduled: 'Перенёс'/);
+assert.match(accountShell, /cancelled: 'Отменил'/);
+assert.match(accountShell, /due: 'К оплате'/);
+assert.match(accountShell, /paid: 'Оплачено'/);
+assert.match(accountShell, /debt: 'Задолженность'/);
+assert.match(accountShell, /\{ value: actionStatus\(request\), strong: true \}/);
+assert.doesNotMatch(accountShell, /requestMoment\(request\)\s*[<>]=?\s*nowMoment\(\)\s*\?\s*'Задолженность'/);
 
 // Personal-data modal uses the Book controls, including Book calendar.
 assert.match(personalData, /photoField\(\{ name: 'photo'/);

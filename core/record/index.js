@@ -31,7 +31,11 @@ export {
 export {
   isRecordCompletedSide,
   projectRecordLifecycle,
+  projectRecordStatuses,
+  recordActionState,
   recordActivityTime,
   recordAppointmentTime,
+  recordPaymentStatus,
+  recordVisitState,
   recordVisualState,
 } from './state.js';

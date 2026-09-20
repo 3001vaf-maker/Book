@@ -9,6 +9,7 @@ import {
   sendAccountChatMessage,
 } from '../core/account/index.js';
 import { formatPhone } from '../core/phone/index.js';
+import { projectRecordStatuses } from '../core/record/index.js';
 import { disableWebPush, enableWebPush, getWebPushState } from '../core/notifications/web-push.js';
 import {
   appHeader,
@@ -80,19 +81,34 @@ function isCancelled(request = {}) {
   return String(request.status || '').toLowerCase() === 'cancelled';
 }
 
-function lifecycleStatus(request = {}) {
-  if (isCancelled(request)) return 'Отменена';
-  if (String(request.attendance || '') === 'no-show') return 'Не пришёл';
-  if (String(request.attendance || '') === 'arrived') return 'Пришёл';
-  return requestMoment(request) >= nowMoment() ? 'Предстоящая' : 'Завершена';
+const ACTION_STATUS_LABELS = Object.freeze({
+  booked: 'Записался',
+  rescheduled: 'Перенёс',
+  cancelled: 'Отменил',
+});
+
+const PAYMENT_STATUS_LABELS = Object.freeze({
+  due: 'К оплате',
+  paid: 'Оплачено',
+  debt: 'Задолженность',
+});
+
+function requestStatuses(request = {}) {
+  return projectRecordStatuses(request, request.history, requestPayment(request));
+}
+
+function actionStatus(request = {}) {
+  const status = requestStatuses(request).action;
+  return ACTION_STATUS_LABELS[status] || '';
 }
 
 function financeStatus(request = {}) {
-  if (isCancelled(request)) return { label: '', extra: '' };
   const payment = requestPayment(request);
-  if (payment.due <= 0.009) return { label: 'Оплачено', extra: '' };
-  if (requestMoment(request) >= nowMoment()) return { label: 'К оплате', extra: money(payment.due) };
-  return { label: 'Задолженность', extra: money(payment.due) };
+  const status = requestStatuses(request).payment;
+  return {
+    label: PAYMENT_STATUS_LABELS[status] || '',
+    extra: status === 'due' || status === 'debt' ? money(payment.due) : '',
+  };
 }
 
 function workplaceName(state, request = {}) {
@@ -166,7 +182,7 @@ function historyEntry(request, index) {
     columns: [
       procedures,
       [
-        { value: lifecycleStatus(request), strong: true },
+        { value: actionStatus(request), strong: true },
         { value: formatDate(request.date), strong: true },
         { value: request.from || '', strong: true },
       ],
@@ -189,11 +205,14 @@ function openHistoryDetail(state, request, onRepeat) {
     { label: 'Скидка', value: money(pricing.discountAmount) },
     { label: 'Оплачено', value: money(payment.paid), strong: true },
   ];
-  if (!isCancelled(request) && payment.due > 0.009) totals.push({ label: requestMoment(request) < nowMoment() ? 'Задолженность' : 'К оплате', value: money(payment.due), strong: true });
+  const paymentStatus = requestStatuses(request).payment;
+  if ((paymentStatus === 'due' || paymentStatus === 'debt') && payment.due > 0.009) {
+    totals.push({ label: PAYMENT_STATUS_LABELS[paymentStatus], value: money(payment.due), strong: true });
+  }
   const procedures = requestProcedures(request);
   const layer = mountModal(document.body, modal(readOnlyReceipt({
     title: workplaceName(state, request),
-    status: lifecycleStatus(request),
+    status: actionStatus(request),
     date: formatDate(request.date),
     time: request.from || '',
     items: procedures.map((item) => ({ label: item?.name || 'Процедура', value: money(item?.cost || 0) })),
