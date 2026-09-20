@@ -60,14 +60,22 @@ export class FinanceService {
 
     const belongsToRecord = (item: any) => String(item?.source?.type || '') === 'record'
       && String(item?.source?.id || '') === recordId;
-    const historical = [
+    const operationHistory = arrayValue(finance.operations)
+      .filter((item) => belongsToRecord(item) && item?.settlement && typeof item.settlement === 'object')
+      .sort((left, right) => String(left?.createdAt || '').localeCompare(String(right?.createdAt || '')));
+    const latestOperationSettlement = operationHistory.length
+      ? objectValue(operationHistory[operationHistory.length - 1]?.settlement)
+      : {};
+    if (Object.keys(latestOperationSettlement).length) return latestOperationSettlement;
+
+    const legacyHistory = [
       ...arrayValue(finance.income),
       ...arrayValue(finance.expense),
     ]
       .filter((item) => belongsToRecord(item) && item?.finance && typeof item.finance === 'object')
       .sort((left, right) => String(left?.createdAt || '').localeCompare(String(right?.createdAt || '')));
-    const latest = historical.length ? objectValue(historical[historical.length - 1]?.finance) : {};
-    if (Object.keys(latest).length) return latest;
+    const latestLegacy = legacyHistory.length ? objectValue(legacyHistory[legacyHistory.length - 1]?.finance) : {};
+    if (Object.keys(latestLegacy).length) return latestLegacy;
 
     const person = objectValue(record?.person);
     return this.calculateSettlement([
@@ -79,17 +87,35 @@ export class FinanceService {
   async recordSettlementPaymentState(tenantId: string, recordId: string, settlement: JsonObject) {
     const row = await this.prisma.businessAuxiliaryState.findUnique({ where: { tenantId } });
     const finance = objectValue(objectValue(row?.data).finance);
-    const belongsToRecord = (item: any) => item?.status !== 'cancelled'
-      && String(item?.source?.type || '') === 'record'
-      && String(item?.source?.id || '') === String(recordId || '');
+    const operationMap = new Map(arrayValue(finance.operations).map((item) => [String(item?.id || ''), item]));
+    const ledger = arrayValue(finance.ledger);
 
-    const income = arrayValue(finance.income)
-      .filter(belongsToRecord)
-      .reduce((sum, item) => sum + Math.max(0, numberValue(item?.serviceAmount ?? item?.total)), 0);
-    const expense = arrayValue(finance.expense)
-      .filter(belongsToRecord)
-      .reduce((sum, item) => sum + Math.max(0, numberValue(item?.serviceAmount ?? item?.total)), 0);
-    const paid = Math.max(0, income - expense);
+    let paid = 0;
+    if (ledger.length) {
+      paid = Math.max(0, ledger
+        .filter((entry) => {
+          const operation = operationMap.get(String(entry?.operationId || ''));
+          return operation?.status !== 'cancelled'
+            && String(entry?.component || '') === 'service'
+            && String(entry?.source?.type || operation?.source?.type || '') === 'record'
+            && String(entry?.source?.id || operation?.source?.id || '') === String(recordId || '');
+        })
+        .reduce((sum, entry) => {
+          const amount = Math.max(0, numberValue(entry?.amount));
+          return sum + (String(entry?.direction || 'IN') === 'OUT' ? -amount : amount);
+        }, 0));
+    } else {
+      const belongsToRecord = (item: any) => item?.status !== 'cancelled'
+        && String(item?.source?.type || '') === 'record'
+        && String(item?.source?.id || '') === String(recordId || '');
+      const income = arrayValue(finance.income)
+        .filter(belongsToRecord)
+        .reduce((sum, item) => sum + Math.max(0, numberValue(item?.serviceAmount ?? item?.total)), 0);
+      const expense = arrayValue(finance.expense)
+        .filter(belongsToRecord)
+        .reduce((sum, item) => sum + Math.max(0, numberValue(item?.serviceAmount ?? item?.total)), 0);
+      paid = Math.max(0, income - expense);
+    }
     const total = Math.max(0, numberValue(settlement?.planTotal));
     const due = Math.max(0, total - paid);
     return {
