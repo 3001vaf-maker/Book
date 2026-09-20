@@ -160,7 +160,7 @@ export function paymentNet(payment, movements = []) {
   return Math.max(0, financialNumber(payment?.total) - refunded);
 }
 
-export function calculateSettlementPaymentState(settlement = null, movements = []) {
+export function calculateSettlementPaymentState(settlement = null, movements = [], paymentOperations = []) {
   const totals = calculateSettlementTotals(settlement, movements);
   const paidTotal = Math.max(0, financialNumber(totals.factTotal));
   const remaining = Math.max(0, financialNumber(settlement?.planTotal) - paidTotal);
@@ -171,8 +171,8 @@ export function calculateSettlementPaymentState(settlement = null, movements = [
     .filter((item) => item?.movementType === 'expense')
     .reduce((sum, item) => sum + Math.max(0, financialNumber(item?.tips)), 0);
   const tipsTotal = Math.max(0, tipsIncome - tipsExpense);
-  const payments = (Array.isArray(movements) ? movements : [])
-    .filter((item) => item?.movementType === 'income' && paymentNet(item, movements) > 0.009)
+  const payments = (Array.isArray(paymentOperations) ? paymentOperations : [])
+    .filter((item) => item?.status !== 'cancelled')
     .sort((a, b) => String(a?.createdAt || '').localeCompare(String(b?.createdAt || '')));
   const fullyPaid = financialNumber(settlement?.planTotal) > 0 && remaining <= 0.009;
   return {
@@ -196,7 +196,7 @@ function itemSettlementAmount(item = null) {
 }
 
 function movementItemAmount(movement = null, sourceTypeValue = '', sourceIdValue = '') {
-  const settlementSnapshot = movement?.finance;
+  const settlementSnapshot = movement?.settlement ?? movement?.finance;
   const items = Array.isArray(settlementSnapshot?.items) ? settlementSnapshot.items : [];
   const id = String(sourceIdValue || '');
   const type = String(sourceTypeValue || '');
