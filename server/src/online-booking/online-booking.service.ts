@@ -463,7 +463,7 @@ export class OnlineBookingService {
     }
   }
 
-  async getMyRequests(tenantId: string, accountId: string) {
+  async getMyRecords(tenantId: string, accountId: string) {
     const account = await this.prisma.account.findFirst({ where: { id: accountId, tenantId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
     await this.personIdentity.bindFirstAccess(tenantId, account as any);
