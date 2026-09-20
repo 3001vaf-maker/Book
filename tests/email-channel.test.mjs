@@ -33,15 +33,18 @@ assert.match(broadcast, /channel === 'EMAIL'/);
 assert.match(broadcast, /\['TELEGRAM', 'EMAIL'\]\.includes\(preview\.channel\)/);
 assert.match(compose, /value: 'EMAIL', label: 'Email'/);
 
-assert.match(transactional, /smtp\.yandex\.ru/);
+assert.match(transactional, /postbox\.cloud\.yandex\.net/);
 assert.match(transactional, /port: 465/);
 assert.match(transactional, /secure: true/);
-assert.match(transactional, /YANDEX_SMTP_APP_PASSWORD/);
-assert.doesNotMatch(transactional, /brevo|postbox\.cloud/i);
-assert.match(envExample, /TRANSACTIONAL_EMAIL_PROVIDER="yandex-mail"/);
-assert.match(envExample, /YANDEX_SMTP_USER=/);
-assert.match(envExample, /YANDEX_SMTP_APP_PASSWORD=/);
+assert.match(transactional, /POSTBOX_API_KEY_ID/);
+assert.match(transactional, /POSTBOX_API_KEY_SECRET/);
+assert.match(transactional, /X-Message-Tag/);
+assert.doesNotMatch(transactional, /smtp\.yandex\.ru|YANDEX_SMTP|X-Book-Tag/i);
+assert.match(envExample, /TRANSACTIONAL_EMAIL_PROVIDER="yandex-postbox"/);
+assert.match(envExample, /POSTBOX_API_KEY_ID=/);
+assert.match(envExample, /POSTBOX_API_KEY_SECRET=/);
 assert.match(envExample, /TRANSACTIONAL_EMAIL_FROM_EMAIL=/);
 assert.match(envExample, /EMAIL_DELIVERY_POLL_MS=/);
+assert.doesNotMatch(envExample, /YANDEX_SMTP/);
 
 console.log('Email channel contract tests passed');

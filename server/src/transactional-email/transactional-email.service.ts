@@ -13,48 +13,50 @@ type TransactionalEmailInput = {
 @Injectable()
 export class TransactionalEmailService {
   private transporter() {
-    const user = String(process.env.YANDEX_SMTP_USER || '').trim().toLowerCase();
-    const pass = String(process.env.YANDEX_SMTP_APP_PASSWORD || '').trim();
-    if (!user || !pass) {
-      throw new ServiceUnavailableException('Яндекс Почта Book ещё не настроена');
+    const apiKeyId = String(process.env.POSTBOX_API_KEY_ID || '').trim();
+    const apiKeySecret = String(process.env.POSTBOX_API_KEY_SECRET || '').trim();
+    if (!apiKeyId || !apiKeySecret) {
+      throw new ServiceUnavailableException('Почтовый канал ещё не настроен');
     }
 
     return nodemailer.createTransport({
-      host: 'smtp.yandex.ru',
+      host: 'postbox.cloud.yandex.net',
       port: 465,
       secure: true,
-      auth: { user, pass },
+      auth: {
+        user: apiKeyId,
+        pass: apiKeySecret,
+      },
     });
   }
 
   async send(input: TransactionalEmailInput) {
-    const provider = String(process.env.TRANSACTIONAL_EMAIL_PROVIDER || 'yandex-mail').trim().toLowerCase();
-    if (provider !== 'yandex-mail') {
+    const provider = String(process.env.TRANSACTIONAL_EMAIL_PROVIDER || 'yandex-postbox').trim().toLowerCase();
+    if (provider !== 'yandex-postbox') {
       throw new ServiceUnavailableException(`Неподдерживаемый провайдер транзакционной почты: ${provider}`);
     }
 
-    const smtpUser = String(process.env.YANDEX_SMTP_USER || '').trim().toLowerCase();
-    const fromEmail = String(process.env.TRANSACTIONAL_EMAIL_FROM_EMAIL || smtpUser).trim().toLowerCase();
-    const fromName = String(process.env.TRANSACTIONAL_EMAIL_FROM_NAME || 'Book').trim() || 'Book';
-    if (!fromEmail) throw new ServiceUnavailableException('Email отправителя Book ещё не настроен');
+    const fromEmail = String(process.env.TRANSACTIONAL_EMAIL_FROM_EMAIL || '').trim().toLowerCase();
+    const fromName = String(process.env.TRANSACTIONAL_EMAIL_FROM_NAME || '').trim();
+    if (!fromEmail) throw new ServiceUnavailableException('Email отправителя ещё не настроен');
 
     try {
       const result = await this.transporter().sendMail({
-        from: { address: fromEmail, name: fromName },
+        from: fromName ? { address: fromEmail, name: fromName } : fromEmail,
         to: input.toName
           ? { address: String(input.to || '').trim().toLowerCase(), name: input.toName }
           : String(input.to || '').trim().toLowerCase(),
         subject: input.subject,
         html: input.html,
         text: input.text,
-        headers: input.tag ? { 'X-Book-Tag': input.tag } : undefined,
+        headers: input.tag ? { 'X-Message-Tag': input.tag } : undefined,
       });
 
-      if (!result.messageId) throw new BadGatewayException('Яндекс Почта не вернула идентификатор письма');
-      return { provider: 'yandex-mail', messageId: result.messageId };
+      if (!result.messageId) throw new BadGatewayException('Cloud Postbox не вернул идентификатор письма');
+      return { provider: 'yandex-postbox', messageId: result.messageId };
     } catch (error) {
       if (error instanceof BadGatewayException || error instanceof ServiceUnavailableException) throw error;
-      throw new BadGatewayException(error instanceof Error ? error.message : 'Яндекс Почта не отправила письмо');
+      throw new BadGatewayException(error instanceof Error ? error.message : 'Cloud Postbox не отправил письмо');
     }
   }
 }
