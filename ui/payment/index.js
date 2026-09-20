@@ -90,7 +90,7 @@ function setPercentDisplay(input, value) {
   if (trigger) trigger.textContent = percent ? `${percent}%` : '—';
 }
 
-function financialInputs(root) {
+function settlementInputs(root) {
   return [...root.querySelectorAll('[data-payment-procedure]')].map((row) => {
     const values = rowValues(row);
     const mode = row.dataset.paymentDiscountMode || 'none';
@@ -106,8 +106,8 @@ function financialInputs(root) {
   });
 }
 
-function applyFinancialPlan(root, plan = null, { preserve = null } = {}) {
-  const items = Array.isArray(plan?.items) ? plan.items : [];
+function applySettlement(root, settlement = null, { preserve = null } = {}) {
+  const items = Array.isArray(settlement?.items) ? plan.items : [];
   [...root.querySelectorAll('[data-payment-procedure]')].forEach((row, index) => {
     const item = items[index];
     if (!item) return;
@@ -118,14 +118,14 @@ function applyFinancialPlan(root, plan = null, { preserve = null } = {}) {
     if (moneyInput && moneyInput !== preserve) moneyInput.value = item.discountMoney ? moneyText(item.discountMoney) : '';
   });
   const totalNode = root.querySelector('[data-payment-total]');
-  if (totalNode) totalNode.textContent = moneyDisplay(plan?.planTotal || 0);
+  if (totalNode) totalNode.textContent = moneyDisplay(settlement?.planTotal || 0);
 }
 
 function recalculate(root, calculate, { preserve = null } = {}) {
   if (typeof calculate !== 'function') return null;
-  const plan = calculate(financialInputs(root));
-  applyFinancialPlan(root, plan, { preserve });
-  return plan;
+  const settlement = calculate(settlementInputs(root));
+  applySettlement(root, settlement, { preserve });
+  return settlement;
 }
 
 function bindPaymentRow(root, row, calculate) {
@@ -153,19 +153,19 @@ export function initPaymentForm(root, { calculate = null, onSave = () => {}, onP
       name: row.dataset.paymentName || '',
     };
     row.remove();
-    const plan = recalculate(root, calculate);
-    if (!plan) return;
-    onRemove?.({ ...removed, finance: plan, items: plan.items, total: plan.planTotal });
+    const settlement = recalculate(root, calculate);
+    if (!settlement) return;
+    onRemove?.({ ...removed, settlement, items: settlement.items, total: settlement.planTotal });
   }));
   root.querySelector('[data-payment-save]')?.addEventListener('click', () => {
-    const plan = recalculate(root, calculate);
-    if (!plan) return;
-    onSave?.({ finance: plan, items: plan.items, total: plan.planTotal });
+    const settlement = recalculate(root, calculate);
+    if (!settlement) return;
+    onSave?.({ settlement, items: settlement.items, total: settlement.planTotal });
   });
   root.querySelector('[data-payment-submit]')?.addEventListener('click', () => {
-    const plan = recalculate(root, calculate);
-    if (!plan) return;
-    onPay?.({ finance: plan, items: plan.items, total: plan.planTotal });
+    const settlement = recalculate(root, calculate);
+    if (!settlement) return;
+    onPay?.({ settlement, items: settlement.items, total: settlement.planTotal });
   });
   recalculate(root, calculate);
 }
