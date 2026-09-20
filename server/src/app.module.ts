@@ -8,6 +8,7 @@ import { OnlineBookingModule } from './online-booking/online-booking.module';
 import { BusinessStateModule } from './business-state/business-state.module';
 import { TenantDocumentArchiveModule } from './tenant-document-archive/tenant-document-archive.module';
 import { AuxiliaryStateModule } from './auxiliary-state/auxiliary-state.module';
+import { FinanceModule } from './finance/finance.module';
 import { NotificationModule } from './notification/notification.module';
 import { CommunicationModule } from './communication/communication.module';
 import { SaasAccessModule } from './saas-access/saas-access.module';
@@ -22,6 +23,7 @@ import { SaasAdminModule } from './saas-admin/saas-admin.module';
     BusinessStateModule,
     TenantDocumentArchiveModule,
     AuxiliaryStateModule,
+    FinanceModule,
     NotificationModule,
     CommunicationModule,
     OnlineBookingModule,
