@@ -48,12 +48,17 @@ if (!/from '.\/data\.js'/.test(recordService)
   || !/checkTimeAvailability/.test(recordService)) {
   errors.push('core/record/service.js: command service must own Record mutations');
 }
-if (!/appendRecordEvent/.test(recordService) || !/RECORD_EVENT_TYPES\.CANCELLED/.test(recordService)) {
-  errors.push('core/record/service.js: lifecycle commands must append immutable Record events');
+if (!/appendRecordEvent/.test(recordService) || !/RECORD_EVENT_TYPES\.CANCELLED/.test(recordService) || !/RECORD_EVENT_TYPES\.RESCHEDULED/.test(recordService)) {
+  errors.push('core/record/service.js: Record commands must append immutable create/reschedule/cancel and lifecycle history facts');
+}
+if (!/actor:\s*\{/.test(recordService) || !/profileId/.test(recordService) || !/accountId/.test(recordService) || !/subject:\s*recordSubject/.test(recordService)) {
+  errors.push('core/record/service.js: Record history must preserve actor and Person subject context');
 }
 
 if (!/from '.\/data\.js'/.test(recordEvents)
   || !/appendRecordEvent/.test(recordEvents)
+  || !/RESCHEDULED:\s*'rescheduled'/.test(recordEvents)
+  || !/RECORD_EVENT_CATEGORIES/.test(recordEvents)
   || !/insertRecordEventRow/.test(recordEvents)
   || /localStorage/.test(recordEvents)) {
   errors.push('core/record/events.js: Record Events must own lifecycle meaning while persistence stays in core/record/data.js');
