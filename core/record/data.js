@@ -9,6 +9,7 @@ import {
 
 let recordRowsState = [];
 let eventRowsState = [];
+let legacySettlementRowsState = [];
 
 function clone(value) {
   if (value == null) return value;
@@ -19,8 +20,18 @@ function normalizeId(value) {
   return String(value || '');
 }
 
+function sanitizeRecordRow(row = null) {
+  if (!row || typeof row !== 'object') return row;
+  const { finance: _legacyFinance, payment: _legacyPayment, ...rest } = clone(row);
+  return rest;
+}
+
 export function hydrateRecordStateFromServer({ records = [], recordEvents = [] } = {}) {
-  recordRowsState = (Array.isArray(records) ? records : []).map((row) => clone(row));
+  const sourceRecords = Array.isArray(records) ? records : [];
+  legacySettlementRowsState = sourceRecords
+    .filter((row) => row?.id && row?.finance && typeof row.finance === 'object')
+    .map((row) => ({ id: String(row.id), finance: clone(row.finance) }));
+  recordRowsState = sourceRecords.map((row) => sanitizeRecordRow(row));
   eventRowsState = (Array.isArray(recordEvents) ? recordEvents : []).map((row) => clone(row));
   return { records: clone(recordRowsState), recordEvents: clone(eventRowsState) };
 }
@@ -37,7 +48,7 @@ export function getRecordRow(id) {
 
 export function insertRecordRow(row = null) {
   if (!row?.id || getRecordRow(row.id)) return null;
-  const stored = clone(row);
+  const stored = sanitizeRecordRow(row);
   recordRowsState.push(stored);
   void queueRecordUpsert(stored, recordRowsState.length - 1);
   return clone(stored);
@@ -47,7 +58,7 @@ export function patchRecordRow(id, patch = {}) {
   const recordId = normalizeId(id);
   const index = recordRowsState.findIndex((item) => normalizeId(item?.id) === recordId);
   if (index < 0) return null;
-  recordRowsState[index] = { ...recordRowsState[index], ...clone(patch) };
+  recordRowsState[index] = sanitizeRecordRow({ ...recordRowsState[index], ...clone(patch) });
   void queueRecordUpsert(recordRowsState[index], index);
   return clone(recordRowsState[index]);
 }
@@ -87,4 +98,21 @@ export function deleteRecordEventRows(recordId) {
     void queueRecordEventsDelete(id);
   }
   return removed;
+}
+
+
+export function getLegacyRecordSettlementRows() {
+  return clone(legacySettlementRowsState);
+}
+
+export function persistSanitizedLegacyRecordRows() {
+  const ids = new Set(legacySettlementRowsState.map((row) => normalizeId(row?.id)).filter(Boolean));
+  let queued = 0;
+  recordRowsState.forEach((row, index) => {
+    if (!ids.has(normalizeId(row?.id))) return;
+    void queueRecordUpsert(row, index);
+    queued += 1;
+  });
+  legacySettlementRowsState = [];
+  return queued;
 }
