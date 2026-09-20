@@ -3,6 +3,7 @@ import { ConsentPolicyService } from '../tenant-document-archive/consent-policy.
 import { CommunicationService } from './communication.service';
 import { CommunicationHistoryService } from './communication-history.service';
 import { TelegramBotService } from './telegram-bot.service';
+import { EmailChannelService } from './email-channel.service';
 import type { MessagePurpose } from './message-purpose';
 
 function text(value: unknown) { return String(value ?? '').trim(); }
@@ -14,11 +15,13 @@ export class CommunicationDispatchService {
     private readonly consentPolicy: ConsentPolicyService,
     private readonly history: CommunicationHistoryService,
     private readonly telegram: TelegramBotService,
+    private readonly email: EmailChannelService,
   ) {}
 
   private async availableChannels(tenantId: string, input: { phone?: unknown; uei?: unknown }) {
     const channels: string[] = [];
     if (await this.communications.telegramIdentity(tenantId, input || {})) channels.push('TELEGRAM');
+    if (await this.communications.emailIdentity(tenantId, input || {})) channels.push('EMAIL');
     return channels;
   }
 
@@ -36,7 +39,7 @@ export class CommunicationDispatchService {
     return selected;
   }
 
-  async send(tenantId: string, input: { phone?: unknown; uei?: unknown; channel?: unknown; body?: unknown; attachments?: unknown; purpose: MessagePurpose }) {
+  async send(tenantId: string, input: { phone?: unknown; uei?: unknown; channel?: unknown; subject?: unknown; body?: unknown; attachments?: unknown; purpose: MessagePurpose }) {
     const body = text(input?.body);
     const attachments = Array.isArray(input?.attachments) ? input.attachments : [];
     if (!body && !attachments.length) throw new BadRequestException('Пустое сообщение');
@@ -60,6 +63,7 @@ export class CommunicationDispatchService {
 
     const channel = await this.resolveChannel(tenantId, input || {});
     if (channel === 'TELEGRAM') return this.telegram.sendChatMessage(tenantId, { phone: input?.phone, uei: input?.uei, body, purpose: input.purpose });
-    throw new BadRequestException('Канал пока не подключён к двустороннему Chat');
+    if (channel === 'EMAIL') return this.email.sendMessage(tenantId, { phone: input?.phone, uei: input?.uei, subject: input?.subject, body, purpose: input.purpose });
+    throw new BadRequestException('Канал пока не подключён');
   }
 }
