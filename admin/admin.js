@@ -170,7 +170,7 @@ function renderTenants() {
     <section class="admin-invite-panel">
       <div class="admin-invite-head">
         <h3>Создать профиль</h3>
-        <button class="admin-button secondary" type="button" data-create-invite-link>Создать ссылку</button>
+        <button class="admin-button secondary" type="button" data-create-invite-link>Ссылка без email</button>
       </div>
       <form class="admin-invite-grid" data-invite-form>
         <label class="admin-field"><span>Имя</span><input name="name" placeholder="Имя"></label>
@@ -222,7 +222,7 @@ function renderTenants() {
       message.classList.add('error');
     } finally {
       createLinkButton.disabled = false;
-      createLinkButton.textContent = 'Создать ссылку';
+      createLinkButton.textContent = 'Ссылка без email';
     }
   });
 
@@ -267,6 +267,12 @@ function renderTenants() {
     }
   });
 
+  content.querySelectorAll('[data-email-tenant]').forEach((button) => {
+    button.addEventListener('click', (event) => {
+      event.stopPropagation();
+      openAccessDrawer(button.dataset.emailTenant);
+    });
+  });
   content.querySelectorAll('[data-tenant]').forEach((row) => {
     row.addEventListener('click', () => openAccessDrawer(row.dataset.tenant));
   });
@@ -294,7 +300,10 @@ function tenantRow(item) {
   const registrationLink = Boolean(item.invitation?.registrationLink);
   const resolvedStatusLabel = registrationLink && pending ? 'Ждёт регистрации' : statusLabel;
   const resend = pending && !registrationLink ? `<button class="admin-button secondary" data-resend="${escapeHtml(item.invitation.id)}">Повторить email</button>` : '';
-  return `<tr data-tenant="${escapeHtml(item.tenantId)}"><td><strong>${escapeHtml(name)}</strong></td><td>${email ? escapeHtml(email) : '—'}</td><td><span class="admin-pill ${statusClass}">${resolvedStatusLabel}</span> ${resend}</td><td>${escapeHtml(item.plan?.name || 'Индивидуальный')}</td></tr>`;
+  const technicalEmail = item.ownerProfile?.email
+    ? `<button class="admin-button secondary" data-email-tenant="${escapeHtml(item.tenantId)}">Письмо</button>`
+    : '';
+  return `<tr data-tenant="${escapeHtml(item.tenantId)}"><td><strong>${escapeHtml(name)}</strong></td><td>${email ? escapeHtml(email) : '—'}</td><td><span class="admin-pill ${statusClass}">${resolvedStatusLabel}</span> ${resend} ${technicalEmail}</td><td>${escapeHtml(item.plan?.name || 'Индивидуальный')}</td></tr>`;
 }
 
 function renderCapabilities() {
