@@ -48,8 +48,8 @@ model Tenant {
   businessStateMeta        BusinessStateMeta?
   people                   Person[]
   ueiState                 UeiState?
-  businessRecords          BusinessRecord[]
-  businessRecordEvents     BusinessRecordEvent[]
+  records                  Record[]
+  recordEvents             RecordEvent[]
   businessOperationalState BusinessOperationalState?
   documentArchive          TenantDocumentArchive?
   businessAuxiliaryState   BusinessAuxiliaryState?
@@ -257,7 +257,7 @@ model UeiState {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
 
-model BusinessRecord {
+model Record {
   id        String   @id @default(cuid())
   tenantId  String
   recordId  String
@@ -270,9 +270,10 @@ model BusinessRecord {
 
   @@unique([tenantId, recordId])
   @@index([tenantId, position])
+  @@map("BusinessRecord")
 }
 
-model BusinessRecordEvent {
+model RecordEvent {
   id        String   @id @default(cuid())
   tenantId  String
   eventId   String
@@ -287,6 +288,7 @@ model BusinessRecordEvent {
   @@unique([tenantId, eventId])
   @@index([tenantId, recordId])
   @@index([tenantId, position])
+  @@map("BusinessRecordEvent")
 }
 
 model BusinessOperationalState {
