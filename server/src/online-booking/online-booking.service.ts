@@ -505,44 +505,5 @@ export class OnlineBookingService {
     return { updated };
   }
 
-  async pendingRequests(tenantId: string) {
-    return this.prisma.bookingRequest.findMany({
-      where: { tenantId, status: BookingRequestStatus.PENDING },
-      orderBy: { createdAt: 'asc' },
-      include: {
-        account: {
-          select: { id: true, email: true, name: true, surname: true, phone: true, telegramId: true, profileData: true },
-        },
-      },
-    });
-  }
 
-  async markImported(tenantId: string, requestId: string, recordId: unknown) {
-    const request = await this.prisma.bookingRequest.findFirst({ where: { id: requestId, tenantId } });
-    if (!request) throw new NotFoundException('Запрос записи не найден');
-    return this.prisma.bookingRequest.update({
-      where: { id: request.id },
-      data: { status: BookingRequestStatus.IMPORTED, importedRecordId: text(recordId) },
-    });
-  }
-
-  async syncRequestSnapshot(tenantId: string, requestId: string, snapshot: unknown) {
-    const request = await this.prisma.bookingRequest.findFirst({ where: { id: requestId, tenantId } });
-    if (!request) throw new NotFoundException('Запрос записи не найден');
-    const normalized = objectValue(snapshot);
-    return this.prisma.bookingRequest.update({
-      where: { id: request.id },
-      data: { recordSnapshot: normalized as Prisma.InputJsonValue },
-      select: { id: true, updatedAt: true },
-    });
-  }
-
-  async markRejected(tenantId: string, requestId: string) {
-    const request = await this.prisma.bookingRequest.findFirst({ where: { id: requestId, tenantId } });
-    if (!request) throw new NotFoundException('Запрос записи не найден');
-    return this.prisma.bookingRequest.update({
-      where: { id: request.id },
-      data: { status: BookingRequestStatus.REJECTED },
-    });
-  }
 }
