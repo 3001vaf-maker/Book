@@ -16,6 +16,8 @@ assert.match(request, /source:\s*'online-booking'/);
 assert.match(request, /status:\s*BookingRequestStatus\.IMPORTED/);
 assert.match(request, /importedRecordId:\s*text\(record\.id\)/);
 assert.doesNotMatch(request, /recordSnapshot/);
+assert.match(request, /this\.time\.isPastZonedStart\(date, from, workplace\?\.timeZone\)/);
+assert.match(request, /Это время уже прошло/);
 
 assert.match(service, /this\.records\.publicOccupancy\(/);
 assert.doesNotMatch(service, /this\.time\.checkAvailability\(/);
@@ -30,6 +32,8 @@ assert.match(record, /this\.time\.checkAvailability\(/);
 assert.match(record, /async\s+listForPeople\(/);
 
 assert.match(time, /checkAvailability\(/);
+assert.match(time, /isPastZonedStart\(/);
+assert.match(time, /Intl\.DateTimeFormat/);
 assert.match(finance, /calculatePlan\(/);
 assert.match(finance, /recordPaymentState\(/);
 assert.match(finance, /state:\s*due <= 0\.009 \? 'paid' : paid > 0\.009 \? 'partial' : 'unpaid'/);
