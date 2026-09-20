@@ -8,6 +8,7 @@ const workplaceData = readFileSync(new URL('../settings/profile/workplaces/data.
 const migration = readFileSync(new URL('../settings/profile/migration.js', import.meta.url), 'utf8');
 const serverService = readFileSync(new URL('../server/src/profile/profile.service.ts', import.meta.url), 'utf8');
 const schema = readFileSync(new URL('../server/prisma/schema.prisma', import.meta.url), 'utf8');
+const workplaceTimeZoneMigration = readFileSync(new URL('../server/prisma/migrations/20260920113000_workplace_timezone/migration.sql', import.meta.url), 'utf8');
 
 assert.doesNotMatch(auth, /prepareProductionWorkspace|localStorage\.removeItem/);
 assert.doesNotMatch(core, /workspace-sync|syncWorkspaceBeforeRender|startWorkspaceSync/);
@@ -31,6 +32,11 @@ assert.doesNotMatch(migration, /localStorage|readLegacy|\/profile\/migrate/);
 
 assert.match(schema, /model Profile\s*\{/);
 assert.match(schema, /model Workplace\s*\{/);
+assert.match(schema, /timeZone\s+String\s+@default\("Europe\/Moscow"\)/);
+assert.match(workplaceData, /timeZone:\s*String\(workplace\.timeZone/);
+assert.match(serverService, /resolveWorkplaceTimeZone/);
+assert.match(workplaceTimeZoneMigration, /Asia\/Yekaterinburg/);
+assert.match(workplaceTimeZoneMigration, /Europe\/Kaliningrad/);
 assert.match(schema, /migrationVerifiedAt\s+DateTime\?/);
 assert.match(serverService, /migrationVerifiedAt/);
 assert.match(serverService, /id:\s*row\.id/);
