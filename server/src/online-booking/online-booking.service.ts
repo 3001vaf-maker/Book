@@ -14,6 +14,7 @@ import { ConsentPolicyService } from '../tenant-document-archive/consent-policy.
 import { TenantDocumentArchiveService } from '../tenant-document-archive/tenant-document-archive.service';
 import { ProfileService } from '../profile/profile.service';
 import { PersonIdentityService } from './person-identity.service';
+import { TimeService } from '../time/time.service';
 
 function objectValue(value: unknown): Record<string, any> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : {};
@@ -43,39 +44,6 @@ function numeric(value: unknown, fallback = 0) {
 
 function percent(value: unknown) {
   return Math.max(0, Math.min(100, numeric(value, 0)));
-}
-
-function timeToMinutes(value: unknown) {
-  const match = text(value).match(/^(\d{1,2}):(\d{2})$/);
-  if (!match) return null;
-  const hour = Number(match[1]);
-  const minute = Number(match[2]);
-  if (!Number.isInteger(hour) || !Number.isInteger(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
-  return hour * 60 + minute;
-}
-
-function minutesToTime(value: number) {
-  if (!Number.isFinite(value) || value < 0 || value > 24 * 60) return '';
-  const hour = Math.floor(value / 60);
-  const minute = value % 60;
-  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-}
-
-function rangesOverlap(leftFrom: string, leftTo: string, rightFrom: string, rightTo: string) {
-  const a = timeToMinutes(leftFrom);
-  const b = timeToMinutes(leftTo);
-  const c = timeToMinutes(rightFrom);
-  const d = timeToMinutes(rightTo);
-  return a != null && b != null && c != null && d != null && a < d && c < b;
-}
-
-function containsRange(planFrom: string, planTo: string, from: string, to: string) {
-  const start = timeToMinutes(planFrom);
-  const end = timeToMinutes(planTo);
-  const candidateStart = timeToMinutes(from);
-  const candidateEnd = timeToMinutes(to);
-  return start != null && end != null && candidateStart != null && candidateEnd != null
-    && candidateEnd > candidateStart && start <= candidateStart && candidateEnd <= end;
 }
 
 function assignmentFor(procedure: any, workplaceKey: string) {
@@ -175,6 +143,7 @@ export class OnlineBookingService {
     private readonly consentPolicy: ConsentPolicyService,
     private readonly profile: ProfileService,
     private readonly personIdentity: PersonIdentityService,
+    private readonly time: TimeService,
   ) {}
 
   private async publication(tenantId: string) {
@@ -418,7 +387,7 @@ export class OnlineBookingService {
     const workplaceKey = text(body.workplaceKey);
     const date = dateValue(body.date);
     const from = text(body.from);
-    if (!workplaceKey || !date || timeToMinutes(from) == null) throw new BadRequestException('Не выбраны дата, время или рабочее пространство');
+    if (!workplaceKey || !date || this.time.timeToMinutes(from) == null) throw new BadRequestException('Не выбраны дата, время или рабочее пространство');
 
     const workplace = arrayValue(data.workplaces).find((item) => text(item?.key) === workplaceKey);
     if (!workplace) throw new BadRequestException('Рабочее пространство недоступно');
@@ -433,16 +402,14 @@ export class OnlineBookingService {
 
     const duration = selected.reduce((sum, procedure) => sum + Math.max(0, Number(procedure?.duration || 0)), 0);
     if (duration <= 0) throw new BadRequestException('Не удалось определить длительность процедур');
-    const start = timeToMinutes(from)!;
-    const to = minutesToTime(start + duration);
+    const start = this.time.timeToMinutes(from)!;
+    const to = this.time.minutesToTime(start + duration);
     if (!to) throw new BadRequestException('Выбранное время недоступно');
 
     const day = arrayValue(data.days).find((item) => text(item?.workplaceId) === workplaceKey && dateValue(item?.date) === date);
     if (!day) throw new ConflictException('Эта дата больше не доступна');
     const planFrom = text(day?.from) || text(workplace?.from);
     const planTo = text(day?.to) || text(workplace?.to);
-    if (!containsRange(planFrom, planTo, from, to)) throw new ConflictException('Время находится вне рабочего графика');
-
     const [recordOccupancy, pending] = await Promise.all([
       this.businessState.publicBookingOccupancy(tenantId),
       this.prisma.bookingRequest.findMany({
@@ -452,8 +419,18 @@ export class OnlineBookingService {
     ]);
     const breaks = arrayValue(data.breaks).filter((item) => text(item?.workplaceId) === workplaceKey && dateValue(item?.date) === date);
     const occupancy = [...recordOccupancy.filter((item) => text(item?.workplaceId) === workplaceKey && dateValue(item?.date) === date), ...breaks];
-    if (occupancy.some((item) => rangesOverlap(from, to, text(item?.from), text(item?.to)))
-      || pending.some((item) => rangesOverlap(from, to, item.from, item.to))) {
+    const availability = this.time.checkAvailability({
+      planFrom,
+      planTo,
+      from,
+      to,
+      usages: [
+        ...occupancy.map((item) => ({ id: text(item?.id), from: text(item?.from), to: text(item?.to) })),
+        ...pending.map((item) => ({ from: item.from, to: item.to })),
+      ],
+    });
+    if (!availability.ok) {
+      if (availability.reason === 'outside-working-time') throw new ConflictException('Время находится вне рабочего графика');
       throw new ConflictException('Это время уже занято');
     }
 
