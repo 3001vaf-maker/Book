@@ -183,7 +183,7 @@ export class RecordService {
 
     const products = arrayValue(input.products).map((item) => clone(objectValue(item)));
     const person = clone(objectValue(input.person));
-    const finance = this.finance.calculateSettlement([
+    const settlement = this.finance.calculateSettlement([
       ...procedureSnapshots.map((item) => ({ ...item, sourceType: 'procedure', sourceId: item.id })),
       ...products.map((item) => ({ ...item, sourceType: 'product', sourceId: text(item?.id) })),
     ], person?.discountPercent);
@@ -203,7 +203,7 @@ export class RecordService {
       source: text(input.source) || 'manual',
       sourceRequestId,
       createdBy: actor,
-      finance,
+      finance: settlement,
       createdAt,
       updatedAt: text(input.updatedAt) || createdAt,
     };
@@ -399,7 +399,7 @@ export class RecordService {
       ? arrayValue(incoming.products).map((item) => clone(objectValue(item)))
       : arrayValue(current.products).map((item) => clone(objectValue(item)));
     const person = personChanged ? clone(objectValue(incoming.person)) : clone(objectValue(current.person));
-    const finance = (refreshProcedures || productsChanged || personChanged)
+    const settlement = (refreshProcedures || productsChanged || personChanged)
       ? this.finance.calculateSettlement([
           ...procedures.map((item) => ({ ...item, sourceType: 'procedure', sourceId: item.id })),
           ...products.map((item) => ({ ...item, sourceType: 'product', sourceId: text(item?.id) })),
@@ -415,7 +415,7 @@ export class RecordService {
       person,
       procedures,
       products,
-      finance,
+      finance: settlement,
       updatedAt: text(incoming.updatedAt) || new Date().toISOString(),
       createdAt: text(current.createdAt),
       createdBy: clone(objectValue(current.createdBy)),
