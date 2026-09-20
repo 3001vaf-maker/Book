@@ -11,6 +11,7 @@ import { assignProceduresToWorkplace } from '../settings/service/procedures/serv
 import { checkTimeAvailability, listAvailableEndTimes, listAvailableStartTimes } from '../core/time/index.js';
 import { timeToMinutes, minutesToTime } from '../core/time/index.js';
 import { getWorkplaces, getWorkplaceWorkingDates } from '../core/workplace-time.js';
+import { journalRecordActionContext } from './record-action-context.js';
 
 const RECORD_MODES = [
   { id: 'record', label: 'Создать запись' },
@@ -652,6 +653,8 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
         return;
       }
       createRecord({
+        source: 'journal',
+        actionContext: journalRecordActionContext(),
         date: dateKey(currentDate),
         workplaceId: currentWorkplaceId,
         from: currentFrom,
