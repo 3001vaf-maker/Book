@@ -29,6 +29,10 @@ function renderForm(invitation) {
       <span data-email></span>
     </div>
     <form class="invite-form" data-form>
+      ${invitation.requiresEmail ? `<label class="invite-field">
+        <span>Email</span>
+        <input name="email" type="email" autocomplete="email" required>
+      </label>` : ''}
       <label class="invite-field">
         <span>Пароль</span>
         <input name="password" type="password" minlength="10" autocomplete="new-password" required>
@@ -66,7 +70,11 @@ function renderForm(invitation) {
     button.disabled = true;
     button.textContent = 'Создаём Book…';
     try {
-      const account = await post('/tenant-invitations/accept', { token, password });
+      const account = await post('/tenant-invitations/accept', {
+        token,
+        password,
+        email: invitation.requiresEmail ? data.get('email') : undefined,
+      });
       setAuthToken(account.accessToken);
       state.innerHTML = '<h1>Book создан</h1><p class="invite-success">Открываем ваше рабочее пространство…</p>';
       window.setTimeout(() => location.replace('../'), 350);
