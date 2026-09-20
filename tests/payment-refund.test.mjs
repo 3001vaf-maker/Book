@@ -61,7 +61,7 @@ assert.equal(migratedLegacy[0].serviceAmount, 6400);
 assert.equal(migratedLegacy[0].tips, 0);
 assert.equal(migratedLegacy[0].business, undefined);
 
-hydrateFinanceFromServer({ version: 5, income: [], expense: [] });
+hydrateFinanceFromServer({ version: 7, settlements: {}, operations: [], ledger: [] });
 
 const discounted = calculateSettlement([{ sourceId: 'procedure-discount', name: 'Стрижка', price: 8000, discountPercent: 10 }]);
 assert.equal(discounted.serviceTotal, 8000);
