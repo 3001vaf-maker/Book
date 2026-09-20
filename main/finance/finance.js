@@ -11,31 +11,25 @@ function formatMoney(value = 0, { signed = false } = {}) {
 }
 
 function operationMoment(item) {
-  const raw = item?.refundedAt || item?.paidAt || item?.createdAt || '';
+  const raw = item?.occurredAt || item?.refundedAt || item?.paidAt || item?.createdAt || '';
   const fallback = `${item?.date || ''} ${item?.time || ''}`.trim();
   return shortDateTime(raw, fallback);
 }
 
 function operationName(item) {
-  let label = 'Операция';
-  if (item?.movementType === 'income' && item?.incomeType === 'payment') label = 'Оплата';
-  else if (item?.movementType === 'expense' && item?.expenseType === 'refund') label = 'Возврат';
-  else if (item?.movementType === 'income') label = 'Доход';
-  else if (item?.movementType === 'expense') label = 'Расход';
+  let label = item?.direction === 'OUT' ? 'Расход' : 'Доход';
+  if (item?.operationType === 'payment') label = item?.component === 'tips' ? 'Tips' : 'Оплата услуги';
+  else if (item?.operationType === 'refund') label = item?.component === 'tips' ? 'Возврат Tips' : 'Возврат';
+  else if (item?.operationType === 'cancellation') label = 'Отмена операции';
   return item?.status === 'cancelled' ? `${label} · Отменена` : label;
 }
 
 function operationAmount(item) {
-  const total = Math.max(0, Number(item?.total) || 0);
-  return item?.movementType === 'expense' ? -total : total;
+  const total = Math.max(0, Number(item?.amount ?? item?.total) || 0);
+  return item?.direction === 'OUT' ? -total : total;
 }
 
 function walletText(item) {
-  if (Array.isArray(item?.allocations) && item.allocations.length) {
-    return item.allocations
-      .map((allocation) => `${allocation?.walletName || 'Кошелёк'} ${formatMoney(allocation?.amount)}`)
-      .join(' · ');
-  }
   return item?.walletName || '';
 }
 
@@ -44,9 +38,7 @@ function personText(item) {
 }
 
 function operationDetails(item) {
-  const details = [personText(item), item?.workplace || '', walletText(item)].filter(Boolean);
-  if (Number(item?.tips || 0) > 0) details.push(`Чаевые ${formatMoney(item.tips)}`);
-  return details.join(' · ');
+  return [personText(item), item?.workplace || '', walletText(item), item?.economicType || ''].filter(Boolean).join(' · ');
 }
 
 function movementListItem(item) {
@@ -64,16 +56,17 @@ function csvCell(value) {
 }
 
 function downloadDDS(movements) {
-  const headers = ['Дата и время', 'Операция', 'Человек', 'Рабочее место', 'Кошелёк', 'Сумма', 'Статус', 'Чаевые'];
+  const headers = ['Дата и время', 'Операция', 'Экономический тип', 'Человек', 'Рабочее место', 'Кошелёк', 'Сумма', 'Статус', 'operationId'];
   const rows = movements.map((item) => [
     operationMoment(item),
     operationName(item).replace(' · Отменена', ''),
+    item?.economicType || '',
     personText(item),
     item?.workplace || '',
     walletText(item),
     operationAmount(item),
     item?.status === 'cancelled' ? 'Отменена' : 'Активна',
-    Number(item?.tips || 0),
+    item?.operationId || '',
   ]);
   const text = '\uFEFF' + [headers, ...rows].map((row) => row.map(csvCell).join(';')).join('\r\n');
   const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
