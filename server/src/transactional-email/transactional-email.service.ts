@@ -1,4 +1,5 @@
 import { BadGatewayException, Injectable, ServiceUnavailableException } from '@nestjs/common';
+import nodemailer from 'nodemailer';
 
 type TransactionalEmailInput = {
   to: string;
@@ -9,49 +10,51 @@ type TransactionalEmailInput = {
   tag?: string;
 };
 
-type BrevoResponse = {
-  messageId?: string;
-  message?: string;
-  code?: string;
-};
-
 @Injectable()
 export class TransactionalEmailService {
+  private transporter() {
+    const user = String(process.env.YANDEX_SMTP_USER || '').trim().toLowerCase();
+    const pass = String(process.env.YANDEX_SMTP_APP_PASSWORD || '').trim();
+    if (!user || !pass) {
+      throw new ServiceUnavailableException('Яндекс Почта Book ещё не настроена');
+    }
+
+    return nodemailer.createTransport({
+      host: 'smtp.yandex.ru',
+      port: 465,
+      secure: true,
+      auth: { user, pass },
+    });
+  }
+
   async send(input: TransactionalEmailInput) {
-    const provider = String(process.env.TRANSACTIONAL_EMAIL_PROVIDER || 'brevo').trim().toLowerCase();
-    if (provider !== 'brevo') {
+    const provider = String(process.env.TRANSACTIONAL_EMAIL_PROVIDER || 'yandex-mail').trim().toLowerCase();
+    if (provider !== 'yandex-mail') {
       throw new ServiceUnavailableException(`Неподдерживаемый провайдер транзакционной почты: ${provider}`);
     }
 
-    const apiKey = String(process.env.BREVO_API_KEY || '').trim();
-    const fromEmail = String(process.env.TRANSACTIONAL_EMAIL_FROM_EMAIL || '').trim().toLowerCase();
+    const smtpUser = String(process.env.YANDEX_SMTP_USER || '').trim().toLowerCase();
+    const fromEmail = String(process.env.TRANSACTIONAL_EMAIL_FROM_EMAIL || smtpUser).trim().toLowerCase();
     const fromName = String(process.env.TRANSACTIONAL_EMAIL_FROM_NAME || 'Book').trim() || 'Book';
-    if (!apiKey || !fromEmail) {
-      throw new ServiceUnavailableException('Транзакционная почта Book ещё не настроена');
-    }
+    if (!fromEmail) throw new ServiceUnavailableException('Email отправителя Book ещё не настроен');
 
-    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: {
-        accept: 'application/json',
-        'api-key': apiKey,
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        sender: { email: fromEmail, name: fromName },
-        to: [{ email: String(input.to || '').trim().toLowerCase(), name: String(input.toName || '').trim() }],
+    try {
+      const result = await this.transporter().sendMail({
+        from: { address: fromEmail, name: fromName },
+        to: input.toName
+          ? { address: String(input.to || '').trim().toLowerCase(), name: input.toName }
+          : String(input.to || '').trim().toLowerCase(),
         subject: input.subject,
-        htmlContent: input.html,
-        textContent: input.text || undefined,
-        tags: input.tag ? [input.tag] : undefined,
-      }),
-    });
+        html: input.html,
+        text: input.text,
+        headers: input.tag ? { 'X-Book-Tag': input.tag } : undefined,
+      });
 
-    const payload = await response.json().catch(() => ({})) as BrevoResponse;
-    if (!response.ok || !payload.messageId) {
-      throw new BadGatewayException(payload.message || 'Провайдер не отправил письмо');
+      if (!result.messageId) throw new BadGatewayException('Яндекс Почта не вернула идентификатор письма');
+      return { provider: 'yandex-mail', messageId: result.messageId };
+    } catch (error) {
+      if (error instanceof BadGatewayException || error instanceof ServiceUnavailableException) throw error;
+      throw new BadGatewayException(error instanceof Error ? error.message : 'Яндекс Почта не отправила письмо');
     }
-
-    return { provider: 'brevo', messageId: payload.messageId };
   }
 }

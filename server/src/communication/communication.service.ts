@@ -58,6 +58,11 @@ function canonicalPhone(value: unknown) {
   return digits;
 }
 
+function canonicalEmail(value: unknown) {
+  const email = text(value).toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : '';
+}
+
 function personHasPhone(person: Record<string, any>, phone: string) {
   const phones = Array.isArray(person.phones) ? person.phones : [];
   return phones.some((value) => canonicalPhone(value) === phone);
@@ -189,6 +194,37 @@ export class CommunicationService {
     });
 
     return { linked: true, channel: 'TELEGRAM', username: display, match };
+  }
+
+  async emailIdentity(tenantId: string, input: { phone?: unknown; uei?: unknown }) {
+    const personPhone = canonicalPhone(input?.phone);
+    const requestedUei = text(input?.uei);
+    if (!personPhone && !requestedUei) throw new BadRequestException('Не указан человек');
+
+    const business = await this.businessState.get(tenantId);
+    const relations = objectValue(objectValue(business.uei).relations);
+    const people = (Array.isArray(business.people) ? business.people : []).map((value) => objectValue(value));
+    const matches = people.filter((person) => {
+      const personKey = text(person.key);
+      const linkedUei = text(relations[`person:${personKey}`] || person.uei);
+      return (personPhone && personHasPhone(person, personPhone)) || (requestedUei && linkedUei === requestedUei);
+    });
+
+    for (const person of matches) {
+      const email = (Array.isArray(person.emails) ? person.emails : []).map(canonicalEmail).find(Boolean) || '';
+      if (!email) continue;
+      const resolvedPhone = (Array.isArray(person.phones) ? person.phones : []).map(canonicalPhone).find(Boolean) || personPhone;
+      const personKey = text(person.key);
+      const resolvedUei = text(relations[`person:${personKey}`] || person.uei || requestedUei);
+      return {
+        id: `email:${personKey || resolvedPhone || resolvedUei}`,
+        personPhone: resolvedPhone,
+        uei: resolvedUei,
+        externalUserId: email,
+        display: email,
+      };
+    }
+    return null;
   }
 
   async telegramIdentity(tenantId: string, input: { phone?: unknown; uei?: unknown }) {
