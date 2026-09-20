@@ -148,6 +148,31 @@ Under the hood, history may be append-only: one immutable action/fact per histor
 
 Action, lifecycle status, attendance and payment are separate concepts and must not be collapsed into one field.
 
+### Product stage invariant: one Profile now, scalable later
+
+Current implementation stage is the single-user/single-Profile product stage. System architecture and generic code must remain profession-neutral; do not encode profession names, salon names or role-specific labels into Record, routes, identifiers or generic UI.
+
+Current stage:
+- one Tenant / business container;
+- one PlatformAccount;
+- one Profile;
+- that Profile may work across multiple Workplaces;
+- Record actions are therefore currently performed by that one Profile, but must still store the concrete Profile/Account identity.
+
+Future business stage:
+- one Tenant / business container may have multiple PlatformAccounts and Profiles;
+- permissions decide which users may create, move, cancel or otherwise act on Records;
+- Workplaces become business-owned locations/resources rather than being conceptually owned by one individual Profile;
+- a business may have one or many Workplaces;
+- Profiles/users may be assigned access to one or more Workplaces.
+
+Record must not depend on which product stage is active. It must keep these independent references:
+- `workplaceId` = where the appointment happens;
+- `actorProfileId` / `actorAccountId` = who performed the action;
+- `personId` / Person reference = who the appointment is for.
+
+Therefore future changes to Workplace ownership or multi-user permissions must not require rewriting Record history.
+
 ### Canonical ownership target
 
 - Person: who is booked.
@@ -175,6 +200,7 @@ Action, lifecycle status, attendance and payment are separate concepts and must 
 7. Finance Core is canonical for normal Records, while Online Booking reimplements price/discount/plan calculations in `initialRequestSnapshot()` and `bookingFinance()`.
 8. Account UI independently derives lifecycle/payment labels from BookingRequest/date/snapshot, creating a second business-rule owner.
 9. Prisma persistence names `BusinessRecord` / `BusinessRecordEvent` are legacy BusinessState naming. Treat naming cleanup separately from behavioral cleanup so persistence is not destructively changed by accident.
+10. Current Workplace persistence is tied to Profile (`Workplace.profileId`). This is acceptable for the current single-Profile stage, but future business-stage ownership must be able to move to the Tenant/business container without changing Record semantics. Record must depend only on stable `workplaceId`, never on the assumption that Workplace belongs to the acting Profile.
 
 ### Ordered cleanup chain
 
