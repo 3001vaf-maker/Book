@@ -20,8 +20,6 @@ CREATE TABLE "PlatformCommunication" (
     FOREIGN KEY ("createdByAdminId") REFERENCES "PlatformAdmin"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT "PlatformCommunication_tenantId_fkey"
     FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "PlatformCommunication_recipientPlatformAccountId_fkey"
-    FOREIGN KEY ("recipientPlatformAccountId") REFERENCES "PlatformAccount"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT "PlatformCommunication_channel_check" CHECK ("channel" = 'EMAIL'),
   CONSTRAINT "PlatformCommunication_purpose_check" CHECK ("purpose" = 'SERVICE'),
   CONSTRAINT "PlatformCommunication_status_check" CHECK ("status" IN ('created', 'sent', 'failed'))
