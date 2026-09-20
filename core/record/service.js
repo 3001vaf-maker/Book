@@ -135,6 +135,7 @@ export function createRecord({
     products: sourceRecord.products,
     source: String(source || 'manual'),
     sourceRequestId: String(sourceRequestId || ''),
+    createdBy: actionContext?.actor && typeof actionContext.actor === 'object' ? { ...actionContext.actor } : {},
     finance,
     createdAt: now,
     updatedAt: now,
