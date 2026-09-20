@@ -286,6 +286,12 @@ export class BusinessStateService {
       return clone(objectValue(existing.data));
     }
 
+    if (text(event.type) === 'created') {
+      const recordEvents = await this.prisma.recordEvent.findMany({ where: { tenantId, recordId } });
+      const created = recordEvents.find((row) => text(objectValue(row.data).type) === 'created');
+      if (created) return clone(objectValue(created.data));
+    }
+
     await this.prisma.recordEvent.create({
       data: {
         tenantId,
