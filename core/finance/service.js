@@ -1,4 +1,4 @@
-import { readFinanceState, writeFinanceState } from './data.js';
+import { migrateLegacyRecordSettlements as migrateLegacySettlements, readFinanceState, storeSettlement, writeFinanceState } from './data.js';
 import { getRefundsForPayment } from './read.js';
 import {
   financialNumber,
@@ -62,6 +62,10 @@ export function recordPaymentIncome({ source = null, workplace = '', person = nu
     paidAt: now.toISOString(),
   };
   const state = readFinanceState();
+  if (source?.type === 'record' && snapshot) {
+    state.settlements = state.settlements && typeof state.settlements === 'object' ? state.settlements : {};
+    state.settlements[`record:${String(source.id || '')}`] = snapshot;
+  }
   state.income.push(payment);
   writeFinanceState(state);
   notifyFinanceChanged({ action: 'income', paymentId: payment.id, total: payment.total, serviceAmount: payment.serviceAmount, tips: payment.tips, source: payment.source });
@@ -145,4 +149,17 @@ export function recordRefundExpense(paymentId, { reason = '', amount = null, wal
     source: refund.source || null,
   });
   return { ...refund };
+}
+
+
+export function saveRecordSettlement(recordId, settlement) {
+  const id = String(recordId || '');
+  if (!id) return null;
+  const saved = storeSettlement({ type: 'record', id }, settlement);
+  if (saved) notifyFinanceChanged({ action: 'settlement', source: { type: 'record', id } });
+  return saved;
+}
+
+export function migrateLegacyRecordSettlements(records = []) {
+  return migrateLegacySettlements(records);
 }
