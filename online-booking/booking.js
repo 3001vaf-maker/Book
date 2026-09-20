@@ -47,6 +47,15 @@ function localDateKey(value = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
+function localNotBeforeTime(value = new Date()) {
+  const date = value instanceof Date ? value : new Date(value);
+  let minutes = date.getHours() * 60 + date.getMinutes();
+  if (date.getSeconds() > 0 || date.getMilliseconds() > 0) minutes += 1;
+  const hour = Math.floor(minutes / 60);
+  const minute = minutes % 60;
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
 function formatDate(value) {
   const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
   return match ? `${match[3]}.${match[2]}.${match[1].slice(-2)}` : String(value || '');
@@ -485,11 +494,13 @@ function renderDates(root, state) {
 }
 
 function renderTimes(root, state) {
+  const today = localDateKey();
   const slots = getBookingSlots(state.context, {
     workplaceKey: state.workplaceKey,
     date: state.date,
     procedureIds: state.procedureIds,
     step: state.settings.slotStep,
+    notBefore: state.date === today ? localNotBeforeTime() : '',
   });
   renderFlowPage(root, state, {
     title: 'Время',
