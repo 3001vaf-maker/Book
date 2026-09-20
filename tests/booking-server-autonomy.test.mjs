@@ -18,7 +18,7 @@ assert.match(request, /importedRecordId:\s*text\(record\.id\)/);
 assert.doesNotMatch(request, /recordSnapshot/);
 
 assert.match(service, /this\.records\.publicOccupancy\(/);
-assert.match(service, /this\.time\.checkAvailability\(/);
+assert.doesNotMatch(service, /this\.time\.checkAvailability\(/);
 assert.doesNotMatch(service, /function\s+timeToMinutes\(/);
 assert.doesNotMatch(service, /function\s+rangesOverlap\(/);
 assert.doesNotMatch(service, /function\s+procedureCost\(/);
