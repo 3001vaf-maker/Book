@@ -128,7 +128,7 @@ export class RecordService {
     }
   }
 
-  async create(tenantId: string, input: JsonObject, position?: number) {
+  async create(tenantId: string, input: JsonObject, position?: number, { createHistory = true } = {}) {
     await this.requireVerified(tenantId);
     const id = text(input.id) || randomUUID();
     const sourceRequestId = text(input.sourceRequestId);
@@ -205,10 +205,15 @@ export class RecordService {
     const resolvedPosition = Number.isInteger(position)
       ? Number(position)
       : (await this.prisma.record.count({ where: { tenantId } }));
-    await this.prisma.$transaction([
+    const operations = [
       this.prisma.record.create({ data: { tenantId, recordId: id, position: resolvedPosition, data: json(record) } }),
-      this.prisma.recordEvent.create({ data: { tenantId, eventId: event.id, recordId: id, position: 0, data: json(event) } }),
-    ]);
+    ];
+    if (createHistory) {
+      operations.push(
+        this.prisma.recordEvent.create({ data: { tenantId, eventId: event.id, recordId: id, position: 0, data: json(event) } }),
+      );
+    }
+    await this.prisma.$transaction(operations);
     return record;
   }
 
@@ -326,7 +331,7 @@ export class RecordService {
     const id = text(recordId);
     record.id = id;
     const existing = await this.prisma.record.findUnique({ where: { tenantId_recordId: { tenantId, recordId: id } } });
-    if (!existing) return this.create(tenantId, record, Number(source.position));
+    if (!existing) return this.create(tenantId, record, Number(source.position), { createHistory: false });
 
     const current = objectValue(existing.data);
     const scheduleChanged = ['date', 'workplaceId', 'from', 'to']
