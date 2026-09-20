@@ -5,7 +5,13 @@ import {
   getTimeGridRangeState,
   listTimeGridAvailableEnds,
   listTimeGridAvailableStarts,
+  zonedDateTimeParts,
 } from '../core/time/index.js';
+
+const sameInstant = new Date('2026-09-20T08:10:00Z');
+assert.equal(zonedDateTimeParts(sameInstant, 'Europe/Moscow').time, '11:10');
+assert.equal(zonedDateTimeParts(sameInstant, 'Asia/Yekaterinburg').time, '13:10');
+assert.equal(zonedDateTimeParts(sameInstant, 'Europe/Kaliningrad').time, '10:10');
 
 const grid = createTimeGrid({
   date: '2026-09-15',
