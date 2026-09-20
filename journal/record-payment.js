@@ -7,6 +7,7 @@ import { personDisplay } from '../main/people/presentation.js';
 import { getWallets } from '../settings/wallets/data.js';
 import { getRecord } from '../core/record/index.js';
 import { setRecordAttendance, updateRecord } from '../core/record/index.js';
+import { journalRecordActionContext } from './record-action-context.js';
 
 const money = (value) => `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(Number(value || 0)).replaceAll('\u00a0', ' ')} ₽`;
 
@@ -156,7 +157,7 @@ function openPaymentMethodsModal(payment, paymentModal) {
   const finish = (completed) => {
     if (!completed) return;
     if (completed?.source?.type === 'record' && completed?.source?.id) {
-      setRecordAttendance(completed.source.id, 'arrived');
+      setRecordAttendance(completed.source.id, 'arrived', { actionContext: journalRecordActionContext() });
     }
     methodsModal.remove();
     paymentModal?.remove();
