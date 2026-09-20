@@ -272,11 +272,26 @@ Therefore future changes to Workplace ownership or multi-user permissions must n
 - R5: DONE in branch — BookingRequest is transport/linkage only after creation; runtime recordSnapshot ownership, owner snapshot bridge and synthetic manualRecordViews adapter are removed.
 - R6: DONE in branch — Account history reads canonical Records by Person identity, including cancelled Records, and consumes Record lifecycle + Finance result rather than BookingRequest state.
 - R7: DONE in branch — Prisma model names are Record / RecordEvent while existing physical table names remain mapped with @@map, avoiding destructive DB migration.
-- R8: IN PROGRESS — PR #220 is draft; Check Book run #1893 started. Do not merge until CI and staging are green.
+- R8: DONE — PR #220 verification reached full green on Check Book run #1909 (`f03516bc09b1a2743b767cf26057a1b8fcf2186c`): `check`, `profile-migration-upgrade`, and `staging-smoke` all succeeded. Staging smoke successfully built the backend, started isolated PostgreSQL + backend, verified the backend, verified all four production-domain host routes, started and verified the staging frontend, and cleaned up.
 
 Important compatibility detail:
 - Browser Journal remains an optimistic client surface for the current product stage, but first persistence of a new row is canonicalized by server RecordService. Browser-created CREATED history is semantically deduplicated against the server-created CREATED fact.
 - Existing physical tables are intentionally retained during this cleanup. Product/domain naming is Record / RecordEvent.
+
+### Verified result
+
+The ownership cleanup is considered complete only when the final branch head is green. The last behavior-changing head verified green was `f03516bc09b1a2743b767cf26057a1b8fcf2186c` in Check Book run #1909. Any later documentation-only commit must still receive a final green PR check before merge.
+
+Resulting ownership:
+- one Record / one recordId per appointment;
+- one canonical server Record constructor;
+- Record History stores action facts with actor/source/subject context and reschedule before/after;
+- Time owns final availability;
+- Procedure owns service price/duration source; Record stores the booking-time snapshot;
+- Finance owns plan/payment/refund state;
+- BookingRequest is transport/linkage only after Record creation;
+- Account History reads canonical Records, not BookingRequest snapshots;
+- Prisma uses neutral Record / RecordEvent model names mapped to the existing physical tables.
 
 ### Stop rule
 
