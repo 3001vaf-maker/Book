@@ -44,7 +44,7 @@ for (const path of reservedFinancialModelPaths) {
   }
 }
 
-const obsoleteSettlementNames = /\b(?:calculateFinancialPlan|repriceFinancialPlan|getRecordFinancialPlanFact|resolveRecordFinancialPlan|recordPlanTotal|hydrateRecordFinance|normalizeRecordFinance|recordFinancialItems)\b/;
+const obsoleteSettlementNames = /\b(?:calculateFinancialPlan|repriceFinancialPlan|calculateFinancialFact|calculateFinancialItemFact|calculateRecordPaymentState|getFinancialFactForRecords|getFinancialItemFact|getRecordFinancialPlanFact|resolveRecordFinancialPlan|recordPlanTotal|hydrateRecordFinance|normalizeRecordFinance|recordFinancialItems|isStoredFinancialPlan|normalizeStoredFinancialPlan)\b/;
 for (const file of walk(root)) {
   const path = rel(file);
   if (path === thisCheck) continue;
