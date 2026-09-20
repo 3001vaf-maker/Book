@@ -24,28 +24,43 @@ hydrateDaysFromServer([
 hydrateRecordStateFromServer({ records: [], recordEvents: [] });
 configureTimeUsageSource(getJournalTimeUsages);
 
+const journalAction = {
+  source: 'journal',
+  actor: { type: 'profile', profileId: 'profile-1', accountId: 'account-1' },
+};
+
 const record = createRecord({
   date: '2026-09-20',
   workplaceId: 'studio',
   from: '10:00',
   to: '11:00',
-  person: { name: 'Тест' },
+  person: { id: 'person-1', key: 'person-key-1', name: 'Тест', surname: 'Человек' },
+  source: 'journal',
+  actionContext: journalAction,
 });
 assert.ok(record);
-assert.equal(getRecordEvents(record.id)[0]?.type, RECORD_EVENT_TYPES.CREATED);
+const createdEvent = getRecordEvents(record.id)[0];
+assert.equal(createdEvent?.type, RECORD_EVENT_TYPES.CREATED);
+assert.equal(createdEvent?.category, 'action');
+assert.equal(createdEvent?.source, 'journal');
+assert.equal(createdEvent?.actor?.profileId, 'profile-1');
+assert.equal(createdEvent?.actor?.accountId, 'account-1');
+assert.equal(createdEvent?.subject?.personId, 'person-1');
+assert.equal(createdEvent?.subject?.name, 'Тест');
+assert.deepEqual(createdEvent?.payload?.appointment, { date: '2026-09-20', workplaceId: 'studio', from: '10:00', to: '11:00' });
 assert.equal(getRecord(record.id)?.status, 'active');
 assert.equal(getRecord(record.id)?.confirmed, false);
 assert.equal(getRecord(record.id)?.attendance, '');
 
-const confirmed = setRecordConfirmed(record.id, true);
+const confirmed = setRecordConfirmed(record.id, true, { actionContext: journalAction });
 assert.equal(confirmed.confirmed, true);
 assert.equal(getRecordEvents(record.id).at(-1)?.type, RECORD_EVENT_TYPES.CONFIRMED);
 
-const unconfirmed = setRecordConfirmed(record.id, false);
+const unconfirmed = setRecordConfirmed(record.id, false, { actionContext: journalAction });
 assert.equal(unconfirmed.confirmed, false);
 assert.equal(getRecordEvents(record.id).at(-1)?.type, RECORD_EVENT_TYPES.UNCONFIRMED);
 
-const noShow = setRecordAttendance(record.id, 'no-show');
+const noShow = setRecordAttendance(record.id, 'no-show', { actionContext: journalAction });
 assert.equal(noShow.attendance, 'no-show');
 assert.equal(getRecordEvents(record.id).at(-1)?.type, RECORD_EVENT_TYPES.NO_SHOW);
 
@@ -54,21 +69,30 @@ const moved = moveRecord(record.id, {
   workplaceId: 'studio',
   from: '12:00',
   to: '13:00',
-});
+}, { actionContext: journalAction });
 assert.ok(moved);
 assert.equal(moved.attendance, 'no-show');
+const rescheduled = getRecordEvents(record.id).find((event) => event.type === RECORD_EVENT_TYPES.RESCHEDULED);
+assert.ok(rescheduled);
+assert.equal(rescheduled.category, 'action');
+assert.equal(rescheduled.actor.profileId, 'profile-1');
+assert.deepEqual(rescheduled.payload.before, { date: '2026-09-20', workplaceId: 'studio', from: '10:00', to: '11:00' });
+assert.deepEqual(rescheduled.payload.after, { date: '2026-09-21', workplaceId: 'studio', from: '12:00', to: '13:00' });
 
-const cleared = setRecordAttendance(record.id, '');
+const cleared = setRecordAttendance(record.id, '', { actionContext: journalAction });
 assert.equal(cleared.attendance, '');
 assert.equal(getRecordEvents(record.id).at(-1)?.type, RECORD_EVENT_TYPES.ATTENDANCE_CLEARED);
 
-const arrived = setRecordAttendance(record.id, 'arrived');
+const arrived = setRecordAttendance(record.id, 'arrived', { actionContext: journalAction });
 assert.equal(arrived.attendance, 'arrived');
 assert.equal(getRecordEvents(record.id).at(-1)?.type, RECORD_EVENT_TYPES.ARRIVED);
 
-const cancelled = cancelRecord(record.id);
+const cancelled = cancelRecord(record.id, { actionContext: journalAction });
 assert.equal(cancelled.status, 'cancelled');
-assert.equal(getRecordEvents(record.id).at(-1)?.type, RECORD_EVENT_TYPES.CANCELLED);
+const cancelledEvent = getRecordEvents(record.id).at(-1);
+assert.equal(cancelledEvent?.type, RECORD_EVENT_TYPES.CANCELLED);
+assert.equal(cancelledEvent?.actor?.profileId, 'profile-1');
+assert.equal(cancelledEvent?.source, 'journal');
 assert.equal(getJournalTimeUsages({ date: '2026-09-21', workplaceId: 'studio' }).some((usage) => usage.sourceId === record.id), false);
 
 console.log('record lifecycle tests: OK');
