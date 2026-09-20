@@ -146,6 +146,7 @@ model Workplace {
   address         String   @default("")
   phone           String   @default("")
   currency        String   @default("RUB")
+  timeZone        String   @default("Europe/Moscow")
   from            String   @default("09:00")
   to              String   @default("18:00")
   links           Json

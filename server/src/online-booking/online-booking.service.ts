@@ -365,6 +365,9 @@ export class OnlineBookingService {
 
     const workplace = arrayValue(data.workplaces).find((item) => text(item?.key) === workplaceKey);
     if (!workplace) throw new BadRequestException('Рабочее пространство недоступно');
+    if (this.time.isPastZonedStart(date, from, workplace?.timeZone)) {
+      throw new ConflictException('Это время уже прошло');
+    }
 
     const requestedIds = [...new Set(arrayValue(body.procedureIds).map((value) => text(value)).filter(Boolean))];
     const procedureSnapshots = await this.procedures.snapshots(tenantId, workplaceKey, requestedIds);

@@ -33,3 +33,8 @@ export {
   listAvailableEndTimes,
   listAvailableStartTimes,
 } from './availability.js';
+
+export {
+  normalizeWorkplaceTimeZone,
+  zonedDateTimeParts,
+} from './zone.js';

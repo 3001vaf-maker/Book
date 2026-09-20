@@ -9,18 +9,20 @@ import {
 
 const context = {
   workplaces: [
-    { key: 'moscow', name: 'Москва', from: '10:00', to: '18:00' },
-    { key: 'spb', name: 'Питер', from: '10:00', to: '18:00' },
+    { key: 'moscow', name: 'Москва', timeZone: 'Europe/Moscow', from: '10:00', to: '18:00' },
+    { key: 'spb', name: 'Питер', timeZone: 'Europe/Moscow', from: '10:00', to: '18:00' },
+    { key: 'ekb', name: 'Екатеринбург', timeZone: 'Asia/Yekaterinburg', from: '10:00', to: '18:00' },
   ],
   procedures: [
     { id: 'cut', name: 'Стрижка', duration: 60, workplaces: [{ workplaceId: 'spb' }] },
     { id: 'color', name: 'Окрашивание', duration: 120, workplaces: [{ workplaceId: 'spb' }] },
-    { id: 'other', name: 'Другая', duration: 30, workplaces: [{ workplaceId: 'moscow' }] },
+    { id: 'other', name: 'Другая', duration: 30, workplaces: [{ workplaceId: 'moscow' }, { workplaceId: 'ekb' }] },
   ],
   days: [
     { workplaceId: 'spb', date: '2026-09-20', from: '10:00', to: '18:00' },
     { workplaceId: 'spb', date: '2026-09-21', from: '12:00', to: '18:00' },
     { workplaceId: 'moscow', date: '2026-09-20', from: '09:00', to: '15:00' },
+    { workplaceId: 'ekb', date: '2026-09-20', from: '10:00', to: '18:00' },
   ],
   occupancy: [
     { id: 'r1', workplaceId: 'spb', date: '2026-09-20', from: '12:00', to: '13:00' },
@@ -41,6 +43,7 @@ const slots = getBookingSlots(context, {
   date: '2026-09-20',
   procedureIds: ['cut', 'color'],
   step: 15,
+  now: new Date('2026-09-20T05:00:00Z'),
 });
 assert.equal(slots.some((slot) => slot.from === '10:00'), false, 'three-hour selection must not overlap the 12:00 booking');
 assert.equal(slots.some((slot) => slot.from === '13:00' && slot.to === '16:00'), true);
@@ -50,9 +53,9 @@ const sameDaySlots = getBookingSlots(context, {
   date: '2026-09-20',
   procedureIds: ['other'],
   step: 15,
-  notBefore: '11:10',
+  now: new Date('2026-09-20T08:10:00Z'),
 });
-assert.equal(sameDaySlots[0]?.from, '11:15', 'same-day public booking must start at the next slot after the current time');
+assert.equal(sameDaySlots[0]?.from, '11:15', 'same-day public booking must start at the next slot in the Workplace timezone');
 assert.equal(sameDaySlots.some((slot) => slot.from === '10:00'), false, 'elapsed same-day slots must not be shown');
 
 const futureDaySlots = getBookingSlots(context, {
@@ -60,8 +63,18 @@ const futureDaySlots = getBookingSlots(context, {
   date: '2026-09-21',
   procedureIds: ['cut'],
   step: 15,
+  now: new Date('2026-09-20T08:10:00Z'),
 });
 assert.equal(futureDaySlots[0]?.from, '12:00', 'future dates must still start from the working plan');
+
+const ekbSlots = getBookingSlots(context, {
+  workplaceKey: 'ekb',
+  date: '2026-09-20',
+  procedureIds: ['other'],
+  step: 15,
+  now: new Date('2026-09-20T08:10:00Z'),
+});
+assert.equal(ekbSlots[0]?.from, '13:15', 'the same instant must use the selected Workplace timezone, not visitor or server time');
 
 assert.equal(hasRequiredBookingConsents(context, []), false);
 assert.equal(hasRequiredBookingConsents(context, [{ documentId: 'pdn-consent', documentVersion: 1, accepted: true }]), false);
