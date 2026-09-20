@@ -44,6 +44,40 @@ export function projectRecordLifecycle(record = {}, events = []) {
   return { ...record, status, confirmed, attendance, confirmedAt, attendanceAt, cancelledAt, lifecycleUpdatedAt };
 }
 
+export function recordActionState(record = {}, events = []) {
+  if (record?.status === 'cancelled') return 'cancelled';
+  let state = 'booked';
+  for (const event of orderedEvents(events)) {
+    if (event.type === RECORD_EVENT_TYPES.CREATED) state = 'booked';
+    else if (event.type === RECORD_EVENT_TYPES.RESCHEDULED) state = 'rescheduled';
+    else if (event.type === RECORD_EVENT_TYPES.CANCELLED) state = 'cancelled';
+  }
+  return state;
+}
+
+export function recordVisitState(record = {}, events = []) {
+  if (recordActionState(record, events) === 'cancelled') return '';
+  if (record?.attendance === 'arrived') return 'arrived';
+  if (record?.attendance === 'no-show') return 'no-show';
+  return 'expected';
+}
+
+export function recordPaymentStatus(record = {}, events = [], payment = {}) {
+  if (recordActionState(record, events) === 'cancelled' || record?.attendance === 'no-show') return '';
+  const dueValue = payment?.due ?? payment?.remaining ?? 0;
+  const due = Math.max(0, Number(dueValue) || 0);
+  if (due <= 0.009) return 'paid';
+  return record?.attendance === 'arrived' ? 'debt' : 'due';
+}
+
+export function projectRecordStatuses(record = {}, events = [], payment = {}) {
+  return {
+    action: recordActionState(record, events),
+    visit: recordVisitState(record, events),
+    payment: recordPaymentStatus(record, events, payment),
+  };
+}
+
 export function recordAppointmentTime(record, field = 'from') {
   const date = String(record?.date || '').slice(0, 10);
   const time = String(record?.[field] || '');
