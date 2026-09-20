@@ -37,7 +37,7 @@ hydratePeopleFromServer([
   { key: 'person-2', name: 'Ирина', surname: 'БезСкидки', phones: ['+71111111111'], discountPercent: 0 },
 ]);
 hydrateRecordStateFromServer({ records: [], recordEvents: [] });
-hydrateFinanceFromServer({ version: 6, settlements: {}, income: [], expense: [] });
+hydrateFinanceFromServer({ version: 7, settlements: {}, operations: [], ledger: [] });
 hydrateWalletsFromServer([]);
 
 const record = createRecord({
@@ -87,8 +87,8 @@ const payment = recordPaymentIncome({
   allocations: [{ walletId: 'cash', walletName: 'Наличные', amount: 6400 }],
 });
 assert.ok(payment);
-assert.equal(payment.finance.serviceTotal, 8000);
-assert.equal(payment.finance.discountTotal, 1600);
+assert.equal(payment.settlement.serviceTotal, 8000);
+assert.equal(payment.settlement.discountTotal, 1600);
 assert.equal(payment.total, 6400);
 assert.equal(getRecordPaymentState(noShow).fullyPaid, true);
 assert.equal(recordVisualState(noShow, { paid: true }), 'paid');
@@ -154,7 +154,7 @@ const paymentStageIncome = recordPaymentIncome({
 });
 assert.ok(paymentStageIncome);
 assert.equal(paymentStageIncome.total, 6400);
-assert.equal(paymentStageIncome.finance.discountTotal, 1600);
+assert.equal(paymentStageIncome.settlement.discountTotal, 1600);
 
 const paymentStageAttended = updateRecord(paymentStageRecord.id, { attendance: 'arrived' });
 assert.equal('finance' in paymentStageAttended, false);
