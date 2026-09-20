@@ -260,8 +260,12 @@ jobs:
 
           expect_status "client.va-tools.ru" "/" "200"
           expect_status "client.va-tools.ru" "/online-booking/booking.js" "200"
+          expect_status "client.va-tools.ru" "/online-booking/model.js" "200"
+          expect_status "client.va-tools.ru" "/core/time/zone.js" "200"
           expect_contains "client.va-tools.ru" "/" "<title>Book</title>"
           expect_contains "client.va-tools.ru" "/online-booking/booking.js" "renderOnlineBooking"
+          expect_contains "client.va-tools.ru" "/online-booking/model.js" "zonedDateTimeParts"
+          expect_contains "client.va-tools.ru" "/core/time/zone.js" "Intl.DateTimeFormat"
 
       - name: Start and verify staging frontend
         shell: bash
@@ -298,6 +302,25 @@ jobs:
             -d '{"email":"push-smoke@book.local","password":"BookPush-2026!","name":"Push","phone":"+79990000999","consents":[{"documentId":"pdn-consent","documentVersion":1,"accepted":true}]}' \
             "http://localhost:8080/api/online-booking/$tenant_id/account/register")
           booking_token=$(node -e "const p=JSON.parse(process.argv[1]); if(!p.accessToken) process.exit(1); process.stdout.write(p.accessToken)" "$booking_payload")
+
+          booking_context=$(curl -fsS "http://localhost:8080/api/online-booking/$tenant_id/context")
+          node -e "const p=JSON.parse(process.argv[1]); const w=(p.workplaces||[]).find((item)=>item.key==='studio-test'); if(!w || w.timeZone!=='Europe/Moscow') { console.error('Workplace timezone missing from public booking context'); process.exit(1); }" "$booking_context"
+
+          booking_today=$(node -e "const parts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Moscow',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()).filter((x)=>x.type!=='literal').map((x)=>[x.type,x.value])); process.stdout.write(parts.year+'-'+parts.month+'-'+parts.day)")
+          past_body=$(mktemp)
+          past_status=$(curl -sS -o "$past_body" -w '%{http_code}' \
+            -X POST \
+            -H "Authorization: Bearer $booking_token" \
+            -H 'Content-Type: application/json' \
+            -d "{\"workplaceKey\":\"studio-test\",\"date\":\"$booking_today\",\"from\":\"00:00\",\"procedureIds\":[\"procedure-cut\"]}" \
+            "http://localhost:8080/api/online-booking/$tenant_id/requests")
+          if [ "$past_status" != "409" ] || ! grep -Fq "Это время уже прошло" "$past_body"; then
+            echo "Public booking past-time guard failed: HTTP $past_status"
+            cat "$past_body" || true
+            rm -f "$past_body"
+            exit 1
+          fi
+          rm -f "$past_body"
 
           push_config=$(curl -fsS \
             -H "Authorization: Bearer $booking_token" \
