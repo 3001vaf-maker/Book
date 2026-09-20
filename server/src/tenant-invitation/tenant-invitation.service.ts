@@ -18,6 +18,8 @@ import { TransactionalEmailService } from '../transactional-email/transactional-
 
 const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const STARTER_PLAN_KEY = 'starter-people';
+const REGISTRATION_LINK_EMAIL_PREFIX = 'registration+';
+const REGISTRATION_LINK_EMAIL_SUFFIX = '@registration.invalid';
 
 const CAPABILITY_CATALOG: Array<{
   key: string;
@@ -58,6 +60,10 @@ function invitationHash(token: string) {
 
 function createToken() {
   return randomBytes(32).toString('base64url');
+}
+
+function isRegistrationLinkEmail(email: string) {
+  return email.startsWith(REGISTRATION_LINK_EMAIL_PREFIX) && email.endsWith(REGISTRATION_LINK_EMAIL_SUFFIX);
 }
 
 function escapeHtml(value: string) {
@@ -140,6 +146,127 @@ export class TenantInvitationService {
     }
 
     return plan;
+  }
+
+  async createRegistrationLink(adminId: string) {
+    const plan = await this.ensureStarterPlan();
+    const token = createToken();
+    const tokenHash = invitationHash(token);
+    const expiresAt = new Date(Date.now() + INVITATION_TTL_MS);
+    const placeholderEmail = `${REGISTRATION_LINK_EMAIL_PREFIX}${tokenHash.slice(0, 24)}${REGISTRATION_LINK_EMAIL_SUFFIX}`;
+
+    const created = await this.prisma.$transaction(async (tx) => {
+      const tenant = await tx.tenant.create({ data: { name: 'Новый профиль' } });
+      await tx.tenantAccess.create({
+        data: {
+          tenantId: tenant.id,
+          planId: plan.id,
+          status: TenantAccessStatus.ACTIVE,
+          isOwnerBook: false,
+        },
+      });
+      const invitation = await tx.tenantInvitation.create({
+        data: {
+          tenantId: tenant.id,
+          createdByAdminId: adminId,
+          email: placeholderEmail,
+          name: '',
+          tokenHash,
+          expiresAt,
+        },
+      });
+      return { tenant, invitation };
+    });
+
+    const origin = String(process.env.FRONTEND_ORIGIN || '').trim().replace(/\/+$/, '');
+    if (!origin) {
+      await this.prisma.tenant.delete({ where: { id: created.tenant.id } }).catch(() => undefined);
+      throw new BadRequestException('FRONTEND_ORIGIN не настроен');
+    }
+
+    return {
+      id: created.invitation.id,
+      tenantId: created.tenant.id,
+      url: `${origin}/register/?token=${encodeURIComponent(token)}`,
+      expiresAt,
+    };
+  }
+
+  async inspectRegistrationLink(tokenValue: unknown) {
+    const invitation = await this.findActiveRegistrationLink(String(tokenValue || ''));
+    return {
+      expiresAt: invitation.expiresAt,
+      tenant: { id: invitation.tenant.id, name: invitation.tenant.name },
+    };
+  }
+
+  async acceptRegistrationLink(input: { token?: unknown; email?: unknown; password?: unknown }) {
+    const token = String(input?.token || '').trim();
+    const email = normalizeEmail(input?.email);
+    const password = String(input?.password || '');
+
+    if (!email || !email.includes('@')) throw new BadRequestException('Укажите корректный email');
+    if (password.length < 10) throw new BadRequestException('Пароль должен содержать минимум 10 символов');
+
+    const invitation = await this.findActiveRegistrationLink(token);
+    const existingAccount = await this.prisma.platformAccount.findUnique({ where: { email } });
+    if (existingAccount) throw new ConflictException('Учётная запись с таким email уже зарегистрирована');
+
+    const otherPending = await this.prisma.tenantInvitation.findFirst({
+      where: {
+        email,
+        status: TenantInvitationStatus.PENDING,
+        id: { not: invitation.id },
+      },
+      select: { id: true },
+    });
+    if (otherPending) throw new ConflictException('На этот email уже создано другое активное приглашение');
+
+    const passwordHash = await hashPassword(password, 12);
+    const result = await this.prisma.$transaction(async (tx) => {
+      const account = await tx.platformAccount.create({
+        data: {
+          email,
+          passwordHash,
+          onboardingStep: 0,
+          workspaceUnlocked: false,
+        },
+      });
+      const membership = await tx.membership.create({
+        data: {
+          tenantId: invitation.tenantId,
+          platformAccountId: account.id,
+          role: MembershipRole.OWNER,
+        },
+      });
+      await tx.tenantInvitation.update({
+        where: { id: invitation.id },
+        data: {
+          email,
+          status: TenantInvitationStatus.ACCEPTED,
+          acceptedAt: new Date(),
+        },
+      });
+      return { account, membership };
+    });
+
+    const accessToken = await this.jwt.signAsync({
+      sub: result.account.id,
+      tenantId: invitation.tenantId,
+      role: result.membership.role,
+    });
+
+    return {
+      accessToken,
+      account: {
+        id: result.account.id,
+        email: result.account.email,
+        onboardingStep: result.account.onboardingStep,
+        workspaceUnlocked: result.account.workspaceUnlocked,
+      },
+      tenant: { id: invitation.tenant.id, name: invitation.tenant.name },
+      role: result.membership.role,
+    };
   }
 
   async createInvitation(adminId: string, input: { email?: unknown; name?: unknown }) {
