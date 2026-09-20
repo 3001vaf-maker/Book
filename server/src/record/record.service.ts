@@ -154,8 +154,6 @@ export class RecordService {
     const date = dateValue(input.date);
     const workplaceId = text(input.workplaceId);
     const from = text(input.from);
-    const to = text(input.to);
-    await this.validateAvailability(tenantId, { date, workplaceId, from, to }, { excludeRequestId: sourceRequestId });
 
     const requestedProcedures = arrayValue(input.procedures);
     const procedureIds = [...new Set(arrayValue(input.procedureIds).map(text).filter(Boolean).length
@@ -174,6 +172,14 @@ export class RecordService {
         };
       });
     }
+
+    const totalDuration = procedureSnapshots.reduce((sum, item) => sum + Math.max(0, Number(item?.duration || 0)), 0);
+    const startMinutes = this.time.timeToMinutes(from);
+    const derivedTo = totalDuration > 0 && startMinutes != null
+      ? this.time.minutesToTime(startMinutes + totalDuration)
+      : '';
+    const to = derivedTo || text(input.to);
+    await this.validateAvailability(tenantId, { date, workplaceId, from, to }, { excludeRequestId: sourceRequestId });
 
     const products = arrayValue(input.products).map((item) => clone(objectValue(item)));
     const person = clone(objectValue(input.person));
@@ -345,26 +351,18 @@ export class RecordService {
     if (!existing) return this.create(tenantId, incoming, Number(source.position), { createHistory: false });
 
     const current = objectValue(existing.data);
-    const scheduleChanged = ['date', 'workplaceId', 'from', 'to']
-      .some((key) => text(current?.[key]) !== text(incoming?.[key]));
-    const proceduresChanged = !sameJson(arrayValue(current.procedures), arrayValue(incoming.procedures));
+    const incomingWorkplaceId = text(incoming.workplaceId);
+    const workplaceChanged = text(current.workplaceId) !== incomingWorkplaceId;
+    const rawProceduresChanged = !sameJson(arrayValue(current.procedures), arrayValue(incoming.procedures));
     const productsChanged = !sameJson(arrayValue(current.products), arrayValue(incoming.products));
     const personChanged = !sameJson(objectValue(current.person), objectValue(incoming.person));
-
-    if (scheduleChanged) {
-      await this.validateAvailability(tenantId, {
-        date: dateValue(incoming.date),
-        workplaceId: text(incoming.workplaceId),
-        from: text(incoming.from),
-        to: text(incoming.to),
-      }, { excludeRecordId: id });
-    }
+    const refreshProcedures = workplaceChanged || rawProceduresChanged;
 
     let procedures = arrayValue(current.procedures).map((item) => clone(objectValue(item)));
-    if (proceduresChanged) {
-      const requested = arrayValue(incoming.procedures);
+    if (refreshProcedures) {
+      const requested = rawProceduresChanged ? arrayValue(incoming.procedures) : arrayValue(current.procedures);
       const ids = requested.map((item) => text(item?.id)).filter(Boolean);
-      const canonical = ids.length ? await this.procedures.snapshots(tenantId, text(incoming.workplaceId), ids) : [];
+      const canonical = ids.length ? await this.procedures.snapshots(tenantId, incomingWorkplaceId, ids) : [];
       const requestedById = new Map(requested.map((item) => [text(item?.id), objectValue(item)]));
       procedures = canonical.map((item) => {
         const draft = requestedById.get(item.id);
@@ -376,11 +374,33 @@ export class RecordService {
       });
     }
 
+    const from = text(incoming.from);
+    const totalDuration = procedures.reduce((sum, item) => sum + Math.max(0, Number(item?.duration || 0)), 0);
+    const startMinutes = this.time.timeToMinutes(from);
+    const derivedTo = totalDuration > 0 && startMinutes != null
+      ? this.time.minutesToTime(startMinutes + totalDuration)
+      : '';
+    const to = derivedTo || text(incoming.to);
+    const date = dateValue(incoming.date);
+
+    const scheduleChanged = dateValue(current.date) !== date
+      || workplaceChanged
+      || text(current.from) !== from
+      || text(current.to) !== to;
+    if (scheduleChanged) {
+      await this.validateAvailability(tenantId, {
+        date,
+        workplaceId: incomingWorkplaceId,
+        from,
+        to,
+      }, { excludeRecordId: id });
+    }
+
     const products = productsChanged
       ? arrayValue(incoming.products).map((item) => clone(objectValue(item)))
       : arrayValue(current.products).map((item) => clone(objectValue(item)));
     const person = personChanged ? clone(objectValue(incoming.person)) : clone(objectValue(current.person));
-    const finance = (proceduresChanged || productsChanged || personChanged)
+    const finance = (refreshProcedures || productsChanged || personChanged)
       ? this.finance.calculatePlan([
           ...procedures.map((item) => ({ ...item, sourceType: 'procedure', sourceId: item.id })),
           ...products.map((item) => ({ ...item, sourceType: 'product', sourceId: text(item?.id) })),
@@ -389,10 +409,10 @@ export class RecordService {
 
     const stored = {
       ...current,
-      date: dateValue(incoming.date),
-      workplaceId: text(incoming.workplaceId),
-      from: text(incoming.from),
-      to: text(incoming.to),
+      date,
+      workplaceId: incomingWorkplaceId,
+      from,
+      to,
       person,
       procedures,
       products,
@@ -412,5 +432,4 @@ export class RecordService {
       },
     });
     return stored;
-  }
-}
+  }}
