@@ -39,6 +39,14 @@ function percent(value: unknown) {
   return Math.max(0, Math.min(100, numberValue(value)));
 }
 
+function discountMode(item: JsonObject, defaultPercent = 0) {
+  const explicit = text(item.discountMode);
+  if (['percent', 'money', 'none'].includes(explicit)) return explicit;
+  if (item.discountPercent !== '' && item.discountPercent != null && percent(item.discountPercent) > 0) return 'percent';
+  if (item.discountMoney !== '' && item.discountMoney != null && money(item.discountMoney) > 0) return 'money';
+  return defaultPercent > 0 ? 'percent' : 'none';
+}
+
 function dateValue(value: unknown, fallback = new Date()) {
   const date = value instanceof Date ? value : new Date(String(value || ''));
   return Number.isFinite(date.getTime()) ? date : fallback;
@@ -134,28 +142,67 @@ export class FinanceService {
   constructor(private readonly prisma: PrismaService) {}
 
   calculateSettlement(items: JsonObject[], discountValue: unknown = 0) {
-    const discountPercent = percent(discountValue);
+    const defaultPercent = percent(discountValue);
     const prepared = items.map((item) => {
       const price = money(item?.cost ?? item?.price);
-      const discountMoney = money(price * discountPercent / 100);
+      const mode = discountMode(item, defaultPercent);
+      const selectedPercent = mode === 'percent'
+        ? percent(item?.discountPercent === '' || item?.discountPercent == null ? defaultPercent : item.discountPercent)
+        : 0;
+      const discountMoney = Math.min(price, money(
+        mode === 'money' ? item?.discountMoney : price * selectedPercent / 100,
+      ));
+      const resolvedPercent = price > 0
+        ? (mode === 'money' ? discountMoney / price * 100 : selectedPercent)
+        : 0;
       return {
         sourceType: text(item?.sourceType) || 'procedure',
         sourceId: text(item?.sourceId ?? item?.id),
         name: text(item?.name),
         price,
-        discountMode: discountPercent > 0 ? 'percent' : 'none',
-        discountPercent,
+        discountMode: mode,
+        discountPercent: percent(resolvedPercent),
         discountMoney,
         planAmount: Math.max(0, money(price - discountMoney)),
       };
     });
+    const percents = [...new Set(prepared.map((item) => Math.round(item.discountPercent * 10000) / 10000))];
     return {
       items: prepared,
       serviceTotal: money(prepared.reduce((sum, item) => sum + item.price, 0)),
-      discountPercent,
+      discountPercent: percents.length === 1 ? percents[0] : null,
       discountTotal: money(prepared.reduce((sum, item) => sum + item.discountMoney, 0)),
       planTotal: money(prepared.reduce((sum, item) => sum + item.planAmount, 0)),
     };
+  }
+
+  repriceSettlement(items: JsonObject[], current: unknown, discountValue: unknown = 0) {
+    const previous = normalizeSettlement(current);
+    const priorItems = arrayValue(previous.items);
+    const bySource = new Map(priorItems.map((item) => [
+      `${text(item?.sourceType) || 'procedure'}:${text(item?.sourceId)}`,
+      objectValue(item),
+    ]));
+    const defaultPercent = previous.discountPercent == null ? percent(discountValue) : percent(previous.discountPercent);
+    const repriced = items.map((item) => {
+      const sourceType = text(item?.sourceType) || 'procedure';
+      const sourceId = text(item?.sourceId ?? item?.id);
+      const prior = bySource.get(`${sourceType}:${sourceId}`) || null;
+      const base = {
+        ...item,
+        sourceType,
+        sourceId,
+      };
+      if (!prior) return { ...base, discountMode: defaultPercent > 0 ? 'percent' : 'none', discountPercent: defaultPercent };
+      if (prior.discountMode === 'money') {
+        return { ...base, discountMode: 'money', discountMoney: prior.discountMoney };
+      }
+      if (prior.discountMode === 'percent' || numberValue(prior.discountPercent) > 0) {
+        return { ...base, discountMode: 'percent', discountPercent: prior.discountPercent };
+      }
+      return { ...base, discountMode: 'none', discountPercent: 0, discountMoney: 0 };
+    });
+    return this.calculateSettlement(repriced, defaultPercent);
   }
 
   private async saveSettlementWith(db: Db, tenantId: string, sourceType: string, sourceId: string, value: unknown) {
