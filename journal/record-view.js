@@ -13,7 +13,7 @@ import {
   openNotice,
   timeSlots,
 } from '../ui/ui.js';
-import { getRecordPaymentState, recordSettlementItems, repriceSettlement } from '../core/finance/index.js';
+import { getRecordPaymentState, getRecordSettlement } from '../core/finance/index.js';
 import { listAvailableStartTimes } from '../core/time/index.js';
 import { getWorkplaces, getWorkplaceWorkingDates } from '../core/workplace-time.js';
 import { timeToMinutes, minutesToTime } from '../core/time/index.js';
@@ -73,7 +73,7 @@ const stateSnapshot = (state) => JSON.stringify({
   confirmed: Boolean(state.confirmed),
   attendance: normalizedAttendance(state.attendance),
 });
-const stateFromRecord = (record, { paid = false } = {}) => ({
+const stateFromRecord = (record) => ({
   date: record.date,
   workplaceId: record.workplaceId,
   from: record.from,
@@ -81,12 +81,8 @@ const stateFromRecord = (record, { paid = false } = {}) => ({
   person: record.person ? { ...record.person } : null,
   procedures: Array.isArray(record.procedures) ? record.procedures.map((item) => ({ ...item })) : [],
   products: Array.isArray(record.products) ? record.products.map((item) => ({ ...item })) : [],
-  finance: record.finance ? {
-    ...record.finance,
-    items: Array.isArray(record.finance.items) ? record.finance.items.map((item) => ({ ...item })) : [],
-  } : null,
   confirmed: Boolean(record.confirmed),
-  attendance: paid ? 'arrived' : normalizedAttendance(record.attendance),
+  attendance: normalizedAttendance(record.attendance),
 });
 
 function workplaceAssignment(item, workplaceId) {
@@ -348,7 +344,7 @@ function confirmCancel(record, onCancelled) {
 export function openRecordView(record, { onClose = () => {} } = {}) {
   if (!record?.id) return;
   const recordPaid = (value) => Boolean(getRecordPaymentState(value).fullyPaid);
-  let state = stateFromRecord(record, { paid: recordPaid(record) });
+  let state = stateFromRecord(record);
   const isPaid = () => recordPaid({ ...record, ...state, id: record.id });
   const original = { ...record };
   let baseline = stateSnapshot(state);
@@ -473,12 +469,12 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     const person = personDisplay(currentPerson);
     const workplace = workplaceName(state.workplaceId);
     const totalDuration = state.procedures.length ? procedureTotalDuration(state.procedures) : 30;
-    const finance = repriceSettlement(recordSettlementItems(state), state.finance);
-    const discountTotal = Math.max(0, Number(finance?.discountTotal) || 0);
-    const discountPercent = finance?.discountPercent;
+    const settlement = getRecordSettlement({ ...record, ...state, id: record.id });
+    const discountTotal = Math.max(0, Number(settlement?.discountTotal) || 0);
+    const discountPercent = settlement?.discountPercent;
     const meta = [
       { value: durationText(totalDuration), label: 'расход' },
-      { value: formatMoney(finance?.serviceTotal), label: 'стоимость' },
+      { value: formatMoney(settlement?.serviceTotal), label: 'стоимость' },
       {
         value: discountTotal > 0 ? `−${formatMoney(discountTotal)}` : formatMoney(0),
         label: Number(discountPercent) > 0 ? `скидка ${formatPercent(discountPercent)}%` : 'скидка',
@@ -631,7 +627,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
   const syncFromStoredRecord = ({ paid = isPaid() } = {}) => {
     const current = getRecords().find((item) => String(item?.id || '') === String(record.id));
     if (!current) return;
-    state = stateFromRecord(current, { paid });
+    state = stateFromRecord(current);
     baseline = stateSnapshot(state);
     render();
   };
