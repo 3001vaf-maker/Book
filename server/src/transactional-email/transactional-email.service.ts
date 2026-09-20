@@ -42,6 +42,7 @@ export class TransactionalEmailService {
         Destination: {
           ToAddresses: [String(input.to || '').trim().toLowerCase()],
         },
+        EmailTags: input.tag ? [{ Name: 'book-purpose', Value: input.tag }] : undefined,
         Content: {
           Simple: {
             Subject: { Data: input.subject, Charset: 'UTF-8' },
@@ -49,7 +50,6 @@ export class TransactionalEmailService {
               Html: { Data: input.html, Charset: 'UTF-8' },
               Text: input.text ? { Data: input.text, Charset: 'UTF-8' } : undefined,
             },
-            Headers: input.tag ? [{ Name: 'X-Book-Tag', Value: input.tag }] : undefined,
           },
         },
       }));
