@@ -43,7 +43,7 @@ When present, the canonical responsibilities are:
 - `core/day/` — WorkPlan/working-day facts and rules.
 - `core/time/` — neutral time math, TimeGrid, occupancy contract, availability.
 - `core/record/` — Record persistence, events, state/read model, commands.
-- `core/finance/` — financial plan model, financial rules, money-movement persistence/read/commands.
+- `core/finance/` — Settlement/Расчёт rules and projections plus money-movement persistence/read/commands. The future Financial Model is reserved and is not an operational Finance atom.
 
 Simple catalog entities may stay smaller. The moment a simple entity gains business rules, lifecycle, commands, or cross-domain state, it must adopt the same separation inside its own `core/<domain>/` owner.
 
