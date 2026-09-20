@@ -2,6 +2,7 @@
 // This is operational calculation, NOT the reserved future Financial Model.
 // Low-level arithmetic lives in rules.js; money persistence lives in data/service.
 // Legacy record.finance and planTotal/fact* fields remain only as storage compatibility until later migration.
+import { readStoredSettlement } from './data.js';
 import { getActiveDDSMovements, getActiveDDSMovementsForSource } from './read.js';
 import {
   calculateSettlementTotals,
@@ -13,6 +14,7 @@ import {
   isStoredSettlement,
   normalizeStoredSettlement,
   recordSettlementItems,
+  repriceSettlement,
 } from './rules.js';
 
 function latestHistoricalSettlementForSource(type, id) {
@@ -23,14 +25,26 @@ function latestHistoricalSettlementForSource(type, id) {
   return normalizeStoredSettlement(movements[movements.length - 1].finance);
 }
 
-export function resolveRecordSettlement(record = null, { discountPercent = 0 } = {}) {
-  const stored = normalizeStoredSettlement(record?.finance);
-  if (stored) return stored;
+export function resolveRecordSettlement(record = null, { discountPercent = null } = {}) {
+  const items = recordSettlementItems(record);
+  if (record?.id) {
+    const owned = normalizeStoredSettlement(readStoredSettlement({ type: 'record', id: record.id }));
+    if (owned) return repriceSettlement(items, owned);
+  }
+
+  // Migration fallback only. New/updated Record rows must not persist this field.
+  const legacyRecordSettlement = normalizeStoredSettlement(record?.finance);
+  if (legacyRecordSettlement) return repriceSettlement(items, legacyRecordSettlement);
+
   if (record?.id) {
     const historical = latestHistoricalSettlementForSource('record', record.id);
-    if (historical) return historical;
+    if (historical) return repriceSettlement(items, historical);
   }
-  return calculateSettlement(recordSettlementItems(record), { discountPercent });
+
+  const resolvedDiscount = discountPercent == null
+    ? recordSettlementDiscountPercent(record?.person)
+    : discountPercent;
+  return calculateSettlement(items, { discountPercent: resolvedDiscount });
 }
 
 export function getRecordSettlement(record = null, { discountPercent = 0 } = {}) {
@@ -77,18 +91,3 @@ export function normalizeRecordSettlement(value = null) {
   };
 }
 
-export function hydrateRecordSettlement(record = null) {
-  if (!record?.id) return record;
-  const discountPercent = record?.personDiscountPercent == null
-    ? recordSettlementDiscountPercent(record?.person)
-    : clampFinancialPercent(record.personDiscountPercent);
-  const { personDiscountPercent: _legacyDiscount, ...cleanRecord } = record;
-  const normalizedRecord = {
-    ...cleanRecord,
-    procedures: Array.isArray(cleanRecord.procedures) ? cleanRecord.procedures : [],
-    products: Array.isArray(cleanRecord.products) ? cleanRecord.products : [],
-  };
-  const storedSettlement = resolveRecordSettlement(normalizedRecord, { discountPercent });
-  const projectedSettlement = getRecordSettlement({ ...normalizedRecord, finance: storedSettlement }, { discountPercent });
-  return { ...normalizedRecord, finance: normalizeRecordSettlement(projectedSettlement) };
-}
