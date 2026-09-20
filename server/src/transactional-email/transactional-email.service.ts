@@ -1,5 +1,5 @@
 import { BadGatewayException, Injectable, ServiceUnavailableException } from '@nestjs/common';
-import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
+import nodemailer from 'nodemailer';
 
 type TransactionalEmailInput = {
   to: string;
@@ -12,53 +12,49 @@ type TransactionalEmailInput = {
 
 @Injectable()
 export class TransactionalEmailService {
-  private client() {
-    const accessKeyId = String(process.env.YANDEX_POSTBOX_ACCESS_KEY_ID || '').trim();
-    const secretAccessKey = String(process.env.YANDEX_POSTBOX_SECRET_ACCESS_KEY || '').trim();
-    if (!accessKeyId || !secretAccessKey) {
-      throw new ServiceUnavailableException('Yandex Cloud Postbox ещё не настроен');
+  private transporter() {
+    const user = String(process.env.YANDEX_SMTP_USER || '').trim().toLowerCase();
+    const pass = String(process.env.YANDEX_SMTP_APP_PASSWORD || '').trim();
+    if (!user || !pass) {
+      throw new ServiceUnavailableException('Яндекс Почта Book ещё не настроена');
     }
 
-    return new SESv2Client({
-      region: String(process.env.YANDEX_POSTBOX_REGION || 'ru-central1').trim() || 'ru-central1',
-      endpoint: 'https://postbox.cloud.yandex.net',
-      credentials: { accessKeyId, secretAccessKey },
+    return nodemailer.createTransport({
+      host: 'smtp.yandex.ru',
+      port: 465,
+      secure: true,
+      auth: { user, pass },
     });
   }
 
   async send(input: TransactionalEmailInput) {
-    const provider = String(process.env.TRANSACTIONAL_EMAIL_PROVIDER || 'yandex-postbox').trim().toLowerCase();
-    if (provider !== 'yandex-postbox') {
+    const provider = String(process.env.TRANSACTIONAL_EMAIL_PROVIDER || 'yandex-mail').trim().toLowerCase();
+    if (provider !== 'yandex-mail') {
       throw new ServiceUnavailableException(`Неподдерживаемый провайдер транзакционной почты: ${provider}`);
     }
 
-    const fromEmail = String(process.env.TRANSACTIONAL_EMAIL_FROM_EMAIL || '').trim().toLowerCase();
+    const smtpUser = String(process.env.YANDEX_SMTP_USER || '').trim().toLowerCase();
+    const fromEmail = String(process.env.TRANSACTIONAL_EMAIL_FROM_EMAIL || smtpUser).trim().toLowerCase();
     const fromName = String(process.env.TRANSACTIONAL_EMAIL_FROM_NAME || 'Book').trim() || 'Book';
     if (!fromEmail) throw new ServiceUnavailableException('Email отправителя Book ещё не настроен');
 
     try {
-      const result = await this.client().send(new SendEmailCommand({
-        FromEmailAddress: fromName ? `${fromName} <${fromEmail}>` : fromEmail,
-        Destination: {
-          ToAddresses: [String(input.to || '').trim().toLowerCase()],
-        },
-        EmailTags: input.tag ? [{ Name: 'book-purpose', Value: input.tag }] : undefined,
-        Content: {
-          Simple: {
-            Subject: { Data: input.subject, Charset: 'UTF-8' },
-            Body: {
-              Html: { Data: input.html, Charset: 'UTF-8' },
-              Text: input.text ? { Data: input.text, Charset: 'UTF-8' } : undefined,
-            },
-          },
-        },
-      }));
+      const result = await this.transporter().sendMail({
+        from: { address: fromEmail, name: fromName },
+        to: input.toName
+          ? { address: String(input.to || '').trim().toLowerCase(), name: input.toName }
+          : String(input.to || '').trim().toLowerCase(),
+        subject: input.subject,
+        html: input.html,
+        text: input.text,
+        headers: input.tag ? { 'X-Book-Tag': input.tag } : undefined,
+      });
 
-      if (!result.MessageId) throw new BadGatewayException('Yandex Cloud Postbox не вернул идентификатор письма');
-      return { provider: 'yandex-postbox', messageId: result.MessageId };
+      if (!result.messageId) throw new BadGatewayException('Яндекс Почта не вернула идентификатор письма');
+      return { provider: 'yandex-mail', messageId: result.messageId };
     } catch (error) {
       if (error instanceof BadGatewayException || error instanceof ServiceUnavailableException) throw error;
-      throw new BadGatewayException(error instanceof Error ? error.message : 'Yandex Cloud Postbox не отправил письмо');
+      throw new BadGatewayException(error instanceof Error ? error.message : 'Яндекс Почта не отправила письмо');
     }
   }
 }
