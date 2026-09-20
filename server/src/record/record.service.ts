@@ -222,15 +222,14 @@ export class RecordService {
     const resolvedPosition = Number.isInteger(position)
       ? Number(position)
       : (await this.prisma.record.count({ where: { tenantId } }));
-    const operations = [
-      this.prisma.record.create({ data: { tenantId, recordId: id, position: resolvedPosition, data: json(record) } }),
-    ];
     if (createHistory) {
-      operations.push(
+      await this.prisma.$transaction([
+        this.prisma.record.create({ data: { tenantId, recordId: id, position: resolvedPosition, data: json(record) } }),
         this.prisma.recordEvent.create({ data: { tenantId, eventId: event.id, recordId: id, position: 0, data: json(event) } }),
-      );
+      ]);
+    } else {
+      await this.prisma.record.create({ data: { tenantId, recordId: id, position: resolvedPosition, data: json(record) } });
     }
-    await this.prisma.$transaction(operations);
     return record;
   }
 
