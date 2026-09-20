@@ -48,26 +48,28 @@ export function recordActionState(record = {}, events = []) {
   if (record?.status === 'cancelled') return 'cancelled';
   let state = 'booked';
   for (const event of orderedEvents(events)) {
+    if (event.type === RECORD_EVENT_TYPES.CANCELLED) return 'cancelled';
     if (event.type === RECORD_EVENT_TYPES.CREATED) state = 'booked';
     else if (event.type === RECORD_EVENT_TYPES.RESCHEDULED) state = 'rescheduled';
-    else if (event.type === RECORD_EVENT_TYPES.CANCELLED) state = 'cancelled';
   }
   return state;
 }
 
 export function recordVisitState(record = {}, events = []) {
   if (recordActionState(record, events) === 'cancelled') return '';
-  if (record?.attendance === 'arrived') return 'arrived';
-  if (record?.attendance === 'no-show') return 'no-show';
+  const lifecycle = projectRecordLifecycle(record, events);
+  if (lifecycle.attendance === 'arrived') return 'arrived';
+  if (lifecycle.attendance === 'no-show') return 'no-show';
   return 'expected';
 }
 
 export function recordPaymentStatus(record = {}, events = [], payment = {}) {
-  if (recordActionState(record, events) === 'cancelled' || record?.attendance === 'no-show') return '';
+  const visit = recordVisitState(record, events);
+  if (!visit || visit === 'no-show') return '';
   const dueValue = payment?.due ?? payment?.remaining ?? 0;
   const due = Math.max(0, Number(dueValue) || 0);
   if (due <= 0.009) return 'paid';
-  return record?.attendance === 'arrived' ? 'debt' : 'due';
+  return visit === 'arrived' ? 'debt' : 'due';
 }
 
 export function projectRecordStatuses(record = {}, events = [], payment = {}) {
