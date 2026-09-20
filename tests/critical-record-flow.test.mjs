@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { hydrateDaysFromServer } from '../core/day/index.js';
 import {
   calculateSettlement,
   getSettlementItemTotals,
@@ -33,6 +34,12 @@ assert.match(serverRecordSource, /const \{ finance: _legacyFinance, \.\.\.curren
 assert.match(recordPaymentSource, /saveSettlementSnapshot/);
 
 // Record owns source facts; Finance projection calculates the initial Settlement.
+hydrateDaysFromServer([
+  { date: '2026-09-20', workplaceId: 'workplace-1', from: '09:00', to: '20:00' },
+  { date: '2026-09-21', workplaceId: 'workplace-1', from: '09:00', to: '20:00' },
+  { date: '2026-09-22', workplaceId: 'workplace-1', from: '09:00', to: '20:00' },
+  { date: '2026-09-23', workplaceId: 'workplace-1', from: '09:00', to: '20:00' },
+]);
 hydrateRecordStateFromServer({ records: [], recordEvents: [] });
 hydrateFinanceFromServer({ version: 6, settlements: [], operations: [], ledger: [], income: [], expense: [] });
 hydrateWalletsFromServer([]);
