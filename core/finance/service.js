@@ -22,9 +22,9 @@ function notifyFinanceChanged(detail = {}) {
   window.dispatchEvent(new CustomEvent('book:dds-changed', { detail }));
 }
 
-export function recordPaymentIncome({ source = null, workplace = '', person = null, finance = null, allocations = [], maxAmount = null, serviceAmount = null, tips = 0, now = new Date() } = {}) {
+export function recordPaymentIncome({ source = null, workplace = '', person = null, settlement = null, allocations = [], maxAmount = null, serviceAmount = null, tips = 0, now = new Date() } = {}) {
   if (!source?.type || !source?.id) return null;
-  const snapshot = normalizeSettlementSnapshot(finance);
+  const snapshot = normalizeSettlementSnapshot(settlement);
   if (!snapshot || maxAmount == null) return null;
   const limit = Math.max(0, financialNumber(maxAmount));
   if (limit <= 0.009) return null;
