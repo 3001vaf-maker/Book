@@ -173,10 +173,10 @@ export class BusinessStateService {
         await tx.person.create({ data: { tenantId, key: text(person.key), position, data: json(person) } });
       }
       for (const [position, record] of expected.records.entries()) {
-        await tx.businessRecord.create({ data: { tenantId, recordId: text(record.id), position, data: json(record) } });
+        await tx.record.create({ data: { tenantId, recordId: text(record.id), position, data: json(record) } });
       }
       for (const [position, event] of expected.recordEvents.entries()) {
-        await tx.businessRecordEvent.create({
+        await tx.recordEvent.create({
           data: { tenantId, eventId: text(event.id), recordId: text(event.recordId), position, data: json(event) },
         });
       }
