@@ -129,9 +129,9 @@ The previously queued Auth transactional communication block is paused.
 
 ## Active block — Finance ownership rebuild (2026-09-20)
 
-Source checkpoint: `staging@b075c9bf2203d839d5dc9cba6153aa7ab705a893`.
+Source checkpoint: `staging@6dd8b20427811fd1a8373ecd9213dc123d93d271`.
 
-Working branch: none — F2 is complete in `staging`.
+Working branch: `feature/finance-f3-f5-ledger-20260921`.
 
 Continuity anchor: `docs/FINANCE_ARCHITECTURE.md`.
 
@@ -139,9 +139,9 @@ Current status:
 - F0: DONE — canonical Finance ownership and ordered F0-F12 migration chain are documented and merged to `staging` as `522b593d9c5d1a1ea37b152b8f0802389eeb81e8`; post-merge Check Book #1968 passed all three jobs.
 - F1: DONE — verified ownership/storage/formula inventory and current-owner -> target-owner migration map are recorded in `docs/FINANCE_ARCHITECTURE.md`; merged to `staging` as `02bd8e6b0ab82048335d1a29be8e9186a4b614bb`; post-merge Check Book #1972 passed all three jobs.
 - F2: DONE — legacy operational Financial Model/FinancialPlan naming is replaced by `Settlement / Расчёт`; `core/finance/model.js` is removed; guards block the old API and operational Financial Model dependencies. Exact-head Check Book #1977 and post-merge Check Book #1978 both passed all required jobs on `staging@b075c9bf2203d839d5dc9cba6153aa7ab705a893`.
-- F2 closure documentation is tracked by PR #242; this PR is documentation-only and must be green before merge to `staging`.
-- F3-F12: NOT STARTED.
-- F0-F1 changed documentation only. F2 is a terminology/refactor step; no intended financial behavior or persisted data shape change.
+- F3-F5: IMPLEMENTED IN FEATURE BRANCH — Record payment ownership removed; canonical server `FinanceSettlement`, `FinanceOperation` and flat `FinanceLedgerEntry` introduced; payment/refund/cancel commands are server-owned; split-wallet payment is one Operation with multiple Ledger rows; Wallet/DDS project from Ledger; legacy auxiliary Finance is migration-only. One combined F3-F5 verification is pending before merge to `staging`.
+- F6-F12: NOT STARTED.
+- F0-F1 changed documentation only. F2 renamed the operational calculation owner to Settlement. F3-F5 change ownership and persisted money shape from Record/auxiliary JSON to Settlement + Operation + flat Ledger.
 - `main` must not receive this rebuild until F0-F12 are complete and the exact staging release head is fully verified.
 
 Non-negotiable ownership:
@@ -152,11 +152,12 @@ Non-negotiable ownership:
 - Financial Model is reserved for a future plan/fact analytical instrument and must not be reused for Settlement.
 - Future Financial Model UI placement (Finance vs future Analytics) remains intentionally undecided.
 
-Stop rule:
-- complete one Finance stage;
-- run its tests/guards and inspect the diff;
-- mark the checkbox in `docs/FINANCE_ARCHITECTURE.md`;
-- only then begin the next stage.
+Verification rule:
+- make the coherent implementation block first;
+- run targeted tests/guards while building the block;
+- run one complete Check Book for the whole block before merge to `staging`;
+- run one post-merge Check Book on `staging`;
+- do not repeat full four-domain smoke for every small F step inside the same coherent block;
 - merge to production `main` only after the entire Finance rebuild is complete and verified.
 
 ## Completed block — Record ownership cleanup (2026-09-20)
