@@ -62,7 +62,8 @@ function projectOperation(operation, state) {
   const serviceAmount = componentTotal(entries, 'service');
   const tips = componentTotal(entries, 'tips');
   const total = entries.reduce((sum, entry) => sum + Math.max(0, financialNumber(entry?.amount)), 0);
-  const status = operationStatus(operation, state);
+  const rawStatus = operationStatus(operation, state);
+  const status = rawStatus === 'cancelled' ? 'cancelled' : (operation.operationType === 'refund' ? 'refund' : 'completed');
   const cancellation = reversedOperationMap(state).get(String(operation.id || '')) || null;
   const isExpense = operation.operationType === 'refund' || operation.operationType === 'expense';
   const occurredAt = String(operation?.occurredAt || operation?.createdAt || '');
