@@ -212,6 +212,87 @@ export class RecordService {
     return record;
   }
 
+  private projectLifecycle(record: JsonObject, events: JsonObject[]) {
+    let status = text(record?.status) === 'cancelled' ? 'cancelled' : 'active';
+    let confirmed = Boolean(record?.confirmed);
+    let attendance = ['arrived', 'no-show'].includes(text(record?.attendance)) ? text(record.attendance) : '';
+    let confirmedAt = text(record?.confirmedAt);
+    let attendanceAt = text(record?.attendanceAt);
+    let cancelledAt = text(record?.cancelledAt);
+    const ordered = events.slice().sort((left, right) => String(left?.at || '').localeCompare(String(right?.at || '')));
+    for (const event of ordered) {
+      const type = text(event?.type);
+      const at = text(event?.at);
+      if (type === 'confirmed') {
+        confirmed = true;
+        confirmedAt = at;
+      } else if (type === 'unconfirmed') {
+        confirmed = false;
+        confirmedAt = at;
+      } else if (type === 'arrived') {
+        attendance = 'arrived';
+        attendanceAt = at;
+      } else if (type === 'no-show') {
+        attendance = 'no-show';
+        attendanceAt = at;
+      } else if (type === 'attendance-cleared') {
+        attendance = '';
+        attendanceAt = at;
+      } else if (type === 'cancelled') {
+        status = 'cancelled';
+        cancelledAt = at;
+      }
+    }
+    return { status, confirmed, attendance, confirmedAt, attendanceAt, cancelledAt };
+  }
+
+  async listForPeople(tenantId: string, people: JsonObject[]) {
+    await this.requireVerified(tenantId);
+    const personKeys = new Set(people.map((person) => text(person?.key)).filter(Boolean));
+    const personIds = new Set(people.map((person) => text(person?.id)).filter(Boolean));
+    if (!personKeys.size && !personIds.size) return [];
+
+    const [rows, eventRows] = await Promise.all([
+      this.prisma.businessRecord.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
+      this.prisma.businessRecordEvent.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
+    ]);
+    const byRecord = new Map<string, JsonObject[]>();
+    for (const row of eventRows) {
+      const list = byRecord.get(row.recordId) || [];
+      list.push(objectValue(row.data));
+      byRecord.set(row.recordId, list);
+    }
+
+    const result = [];
+    for (const row of rows) {
+      const record = objectValue(row.data);
+      const person = objectValue(record.person);
+      if (!personKeys.has(text(person?.key)) && !personIds.has(text(person?.id))) continue;
+      const events = byRecord.get(text(record.id)) || [];
+      const lifecycle = this.projectLifecycle(record, events);
+      const storedPlan = objectValue(record.finance);
+      const plan = Object.keys(storedPlan).length
+        ? storedPlan
+        : this.finance.calculatePlan([
+            ...arrayValue(record.procedures).map((item) => ({ ...objectValue(item), sourceType: 'procedure', sourceId: text(item?.id) })),
+            ...arrayValue(record.products).map((item) => ({ ...objectValue(item), sourceType: 'product', sourceId: text(item?.id) })),
+          ], person?.discountPercent);
+      const payment = await this.finance.recordPaymentState(tenantId, text(record.id), plan);
+      result.push({
+        ...record,
+        ...lifecycle,
+        finance: plan,
+        payment,
+        history: events,
+      });
+    }
+    return result.sort((left, right) => {
+      const a = `${dateValue(left?.date)}T${text(left?.from)}`;
+      const b = `${dateValue(right?.date)}T${text(right?.from)}`;
+      return b.localeCompare(a);
+    });
+  }
+
   async upsertFromOwner(tenantId: string, recordId: string, body: unknown) {
     await this.requireVerified(tenantId);
     const source = objectValue(body);
