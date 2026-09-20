@@ -19,11 +19,10 @@ export {
   getSettlementItemTotals,
   getRecordSettlement,
   getRecordPaymentState,
-  hydrateRecordSettlement,
   normalizeRecordSettlement,
   recordSettlementDiscountPercent,
   recordAmountDue,
   resolveRecordSettlement,
 } from './settlement.js';
 export { hydrateFinanceFromServer } from './data.js';
-export { cancelPaymentOperation, recordPaymentIncome, recordRefundExpense } from './service.js';
+export { cancelPaymentOperation, migrateLegacyRecordSettlements, recordPaymentIncome, recordRefundExpense, saveRecordSettlement } from './service.js';
