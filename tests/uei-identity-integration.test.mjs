@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { calculateFinancialPlan, hydrateFinanceFromServer, recordPaymentIncome } from '../core/finance/index.js';
+import { calculateSettlement, hydrateFinanceFromServer, recordPaymentIncome } from '../core/finance/index.js';
 import { hydrateRecordStateFromServer } from '../core/record/index.js';
 import { createUEI, detachUEI, hydrateUEIFromServer, linkUEI } from '../core/uei.js';
 import {
@@ -30,10 +30,10 @@ hydrateRecordStateFromServer({
 hydrateFinanceFromServer({ version: 5, income: [], expense: [] });
 
 function pay(recordId, amount) {
-  const finance = calculateFinancialPlan([{ sourceType: 'procedure', sourceId: `service-${recordId}`, name: 'Услуга', price: amount }]);
+  const settlement = calculateSettlement([{ sourceType: 'procedure', sourceId: `service-${recordId}`, name: 'Услуга', price: amount }]);
   return recordPaymentIncome({
     source: { type: 'record', id: recordId },
-    finance,
+    settlement,
     maxAmount: amount,
     serviceAmount: amount,
     allocations: [{ walletId: 'cash', walletName: 'Наличные', amount }],

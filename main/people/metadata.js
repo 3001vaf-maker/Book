@@ -1,5 +1,5 @@
 import { shortDate } from '../../ui/ui.js';
-import { getFinancialFactForRecords } from '../../core/finance/index.js';
+import { getSettlementTotalsForRecords } from '../../core/finance/index.js';
 import { getRecords } from '../../core/record/index.js';
 import { getIdentityMemberKeys } from './data.js';
 
@@ -13,7 +13,7 @@ function personRecords(key) {
 
 export function getPersonMetadata(key) {
   const records = personRecords(key);
-  const fact = getFinancialFactForRecords(records.map((record) => record?.id));
+  const fact = getSettlementTotalsForRecords(records.map((record) => record?.id));
   const dated = records
     .filter((record) => record?.date)
     .sort((a, b) => String(b.date).localeCompare(String(a.date)));

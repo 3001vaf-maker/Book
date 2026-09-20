@@ -1,10 +1,10 @@
 import { checkTimeAvailability } from '../time/index.js';
 import {
-  calculateFinancialPlan,
-  normalizeRecordFinance,
-  recordPersonDiscount,
-  recordFinancialItems,
-  repriceFinancialPlan,
+  calculateSettlement,
+  normalizeRecordSettlement,
+  recordSettlementDiscountPercent,
+  recordSettlementItems,
+  repriceSettlement,
 } from '../finance/index.js';
 import { deleteRecordRow, insertRecordRow, patchRecordRow } from './data.js';
 import { appendRecordEvent, deleteRecordEvents, RECORD_EVENT_TYPES } from './events.js';
@@ -121,8 +121,8 @@ export function createRecord({
     procedures: Array.isArray(procedures) ? procedures : [],
     products: Array.isArray(products) ? products : [],
   };
-  const finance = calculateFinancialPlan(recordFinancialItems(sourceRecord), {
-    discountPercent: recordPersonDiscount(person),
+  const settlement = calculateSettlement(recordSettlementItems(sourceRecord), {
+    discountPercent: recordSettlementDiscountPercent(person),
   });
   const row = {
     id: crypto.randomUUID(),
@@ -136,7 +136,7 @@ export function createRecord({
     source: String(source || 'manual'),
     sourceRequestId: String(sourceRequestId || ''),
     createdBy: actionContext?.actor && typeof actionContext.actor === 'object' ? { ...actionContext.actor } : {},
-    finance,
+    finance: settlement,
     createdAt: now,
     updatedAt: now,
   };
@@ -183,19 +183,19 @@ export function updateRecord(id, patch = {}, { actionContext = null } = {}) {
     excludeId: id,
   }).ok) return null;
 
-  const hasExplicitFinance = hasOwn(nextDataPatch, 'finance');
+  const hasExplicitSettlementSnapshot = hasOwn(nextDataPatch, 'finance');
   const serviceChanged = hasOwn(nextDataPatch, 'procedures');
   const productChanged = hasOwn(nextDataPatch, 'products');
   const personChanged = hasOwn(nextDataPatch, 'person');
 
-  if (hasExplicitFinance) {
-    nextDataPatch.finance = normalizeRecordFinance(nextDataPatch.finance);
+  if (hasExplicitSettlementSnapshot) {
+    nextDataPatch.finance = normalizeRecordSettlement(nextDataPatch.finance);
   } else if (personChanged) {
-    nextDataPatch.finance = calculateFinancialPlan(recordFinancialItems(next), {
-      discountPercent: recordPersonDiscount(next.person),
+    nextDataPatch.finance = calculateSettlement(recordSettlementItems(next), {
+      discountPercent: recordSettlementDiscountPercent(next.person),
     });
   } else if (serviceChanged || productChanged) {
-    nextDataPatch.finance = repriceFinancialPlan(recordFinancialItems(next), current.finance);
+    nextDataPatch.finance = repriceSettlement(recordSettlementItems(next), current.finance);
   }
 
   if (Object.keys(nextDataPatch).length) {

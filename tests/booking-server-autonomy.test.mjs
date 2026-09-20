@@ -27,15 +27,15 @@ assert.doesNotMatch(service, /function\s+procedureCost\(/);
 assert.doesNotMatch(service, /initialRequestSnapshot|recordSnapshot|manualRecordViews/);
 
 assert.match(record, /this\.procedures\.snapshots\(/);
-assert.match(record, /this\.finance\.calculatePlan\(/);
+assert.match(record, /this\.finance\.calculateSettlement\(/);
 assert.match(record, /this\.time\.checkAvailability\(/);
 assert.match(record, /async\s+listForPeople\(/);
 
 assert.match(time, /checkAvailability\(/);
 assert.match(time, /isPastZonedStart\(/);
 assert.match(time, /Intl\.DateTimeFormat/);
-assert.match(finance, /calculatePlan\(/);
-assert.match(finance, /recordPaymentState\(/);
+assert.match(finance, /calculateSettlement\(/);
+assert.match(finance, /recordSettlementPaymentState\(/);
 assert.match(finance, /state:\s*due <= 0\.009 \? 'paid' : paid > 0\.009 \? 'partial' : 'unpaid'/);
 
 assert.doesNotMatch(business, /createOnlineBookingRecord|publicBookingOccupancy|bookingRecordSnapshot/);

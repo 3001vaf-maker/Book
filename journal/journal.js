@@ -2,7 +2,7 @@ import { pageHeader, viewNavigation, initViewNavigation, headerControl, workplac
 import { getWorkplaceContext, setWorkplaceContext } from '../core/workplace-context.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getActiveDayWorkplaces } from '../core/day/index.js';
-import { recordPlanTotal } from '../core/finance/index.js';
+import { recordAmountDue } from '../core/finance/index.js';
 import { openTimetableDayEditor } from '../timetable/day-editor.js';
 import { getActiveRecordCountForDay, getRecordsForDay } from '../core/record/index.js';
 import { openJournalWorkplaceControl } from './workplace-control.js';
@@ -50,7 +50,7 @@ export function renderJournal(root) {
       .filter((record) => record?.status !== 'cancelled');
     const recordCount = records.length;
     const procedureCount = records.reduce((sum, record) => sum + (Array.isArray(record?.procedures) ? record.procedures.length : 0), 0);
-    const total = records.reduce((sum, record) => sum + recordPlanTotal(record), 0);
+    const total = records.reduce((sum, record) => sum + recordAmountDue(record), 0);
     return {
       primaryText: `${recordCount} зап. - ${procedureCount}пр.`,
       secondaryText: formatRubles(total),

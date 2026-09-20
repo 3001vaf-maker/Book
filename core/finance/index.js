@@ -1,9 +1,9 @@
 // Public Finance Core contract.
 export {
-  calculateFinancialFact,
-  calculateFinancialPlan,
-  repriceFinancialPlan,
-  recordFinancialItems,
+  calculateSettlementTotals,
+  calculateSettlement,
+  repriceSettlement,
+  recordSettlementItems,
 } from './rules.js';
 export {
   getDDSExpenses,
@@ -15,15 +15,15 @@ export {
   getWalletDDSMovements,
 } from './read.js';
 export {
-  getFinancialFactForRecords,
-  getFinancialItemFact,
-  getRecordFinancialPlanFact,
+  getSettlementTotalsForRecords,
+  getSettlementItemTotals,
+  getRecordSettlement,
   getRecordPaymentState,
-  hydrateRecordFinance,
-  normalizeRecordFinance,
-  recordPersonDiscount,
-  recordPlanTotal,
-  resolveRecordFinancialPlan,
-} from './model.js';
+  hydrateRecordSettlement,
+  normalizeRecordSettlement,
+  recordSettlementDiscountPercent,
+  recordAmountDue,
+  resolveRecordSettlement,
+} from './settlement.js';
 export { hydrateFinanceFromServer } from './data.js';
 export { cancelPaymentOperation, recordPaymentIncome, recordRefundExpense } from './service.js';

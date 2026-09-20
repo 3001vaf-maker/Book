@@ -76,7 +76,7 @@ Target ownership:
 
 Record is not a money owner. It supplies appointment/source facts and snapshots; Finance owns payment commands and money facts.
 
-Current legacy names such as `core/finance/model.js` and Record-oriented “financial plan/fact” are migration debt, not the future Financial Model contract.
+F2 removes the legacy `core/finance/model.js` and Record-oriented FinancialPlan API. Operational calculation is `Settlement / Расчёт`. Legacy persisted JSON field names remain temporarily for storage compatibility only.
 
 The user-facing Finance folder remains `main/finance/`. The future Financial Model may later be manifested under Finance or a future Analytics folder; this UI placement is intentionally undecided.
 
@@ -131,15 +131,16 @@ The previously queued Auth transactional communication block is paused.
 
 Source checkpoint: `staging@522b593d9c5d1a1ea37b152b8f0802389eeb81e8`.
 
-Working branch: `feature/finance-f1-inventory-20260920`.
+Working branch: `feature/finance-f2-settlement-20260921`.
 
 Continuity anchor: `docs/FINANCE_ARCHITECTURE.md`.
 
 Current status:
 - F0: DONE — canonical Finance ownership and ordered F0-F12 migration chain are documented and merged to `staging` as `522b593d9c5d1a1ea37b152b8f0802389eeb81e8`; post-merge Check Book #1968 passed all three jobs.
-- F1: DONE — verified ownership/storage/formula inventory and current-owner -> target-owner migration map are recorded in `docs/FINANCE_ARCHITECTURE.md`. Check Book #1969 passed all three jobs on the pre-close head; final documentation-close head must also be green before merge to staging.
-- F2-F12: NOT STARTED.
-- No Finance runtime behavior has been changed in F0 or F1.
+- F1: DONE — verified ownership/storage/formula inventory and current-owner -> target-owner migration map are recorded in `docs/FINANCE_ARCHITECTURE.md`; merged to `staging` as `02bd8e6b0ab82048335d1a29be8e9186a4b614bb`; post-merge Check Book #1972 passed all three jobs.
+- F2: DONE IN BRANCH — legacy operational Financial Model/FinancialPlan naming is replaced by `Settlement / Расчёт`; `core/finance/model.js` is removed; guards block the old API and operational Financial Model dependencies. Check Book #1974 passed all three jobs; final documentation-close head must also be green before merge to staging.
+- F3-F12: NOT STARTED.
+- F0-F1 changed documentation only. F2 is a terminology/refactor step; no intended financial behavior or persisted data shape change.
 - `main` must not receive this rebuild until F0-F12 are complete and the exact staging release head is fully verified.
 
 Non-negotiable ownership:

@@ -24,7 +24,7 @@ function percent(value: unknown) {
 export class FinanceService {
   constructor(private readonly prisma: PrismaService) {}
 
-  calculatePlan(items: JsonObject[], discountValue: unknown = 0) {
+  calculateSettlement(items: JsonObject[], discountValue: unknown = 0) {
     const discountPercent = percent(discountValue);
     const prepared = items.map((item) => {
       const price = Math.max(0, numberValue(item?.cost ?? item?.price));
@@ -49,7 +49,7 @@ export class FinanceService {
     };
   }
 
-  async recordPaymentState(tenantId: string, recordId: string, plan: JsonObject) {
+  async recordSettlementPaymentState(tenantId: string, recordId: string, settlement: JsonObject) {
     const row = await this.prisma.businessAuxiliaryState.findUnique({ where: { tenantId } });
     const finance = objectValue(objectValue(row?.data).finance);
     const belongsToRecord = (item: any) => item?.status !== 'cancelled'
@@ -63,7 +63,7 @@ export class FinanceService {
       .filter(belongsToRecord)
       .reduce((sum, item) => sum + Math.max(0, numberValue(item?.serviceAmount ?? item?.total)), 0);
     const paid = Math.max(0, income - expense);
-    const total = Math.max(0, numberValue(plan?.planTotal));
+    const total = Math.max(0, numberValue(settlement?.planTotal));
     const due = Math.max(0, total - paid);
     return {
       state: due <= 0.009 ? 'paid' : paid > 0.009 ? 'partial' : 'unpaid',

@@ -224,17 +224,17 @@ A Ledger entry must be independently persisted so simultaneous users/devices can
 
 Migration must preserve existing valid history until verified replacement exists.
 
-## Known current legacy / defects
+## F1 inventory findings and migration status
 
-These are not canonical architecture; they are migration debt:
+This section preserves what F1 found at `staging@522b593d9c5d1a1ea37b152b8f0802389eeb81e8`. Items marked resolved are historical evidence, not current architecture:
 
-1. `core/finance/model.js` is named and documented as “Financial Model”, although its actual responsibility is closer to Settlement.
-2. Functions such as `calculateFinancialPlan` and `getRecordFinancialPlanFact` use “plan/fact” vocabulary for Record settlement, colliding with the reserved future Financial Model.
+1. **RESOLVED IN F2:** legacy `core/finance/model.js` was removed; its operational responsibility now lives in `core/finance/settlement.js`.
+2. **RESOLVED IN F2:** old `calculateFinancialPlan` / `getRecordFinancialPlanFact` and related Record-plan APIs were replaced by Settlement terminology.
 3. `docs/FINANCE_ARCHITECTURE.md` previously described `Record -> Finance model -> Record snapshot`; that ownership is superseded by this document.
 4. Browser and server Finance calculations are not fully semantically aligned.
 5. Record persistence can retain/derive financial state that competes with corrected payment-stage calculation.
 6. Current Finance facts are stored inside a tenant auxiliary JSON dataset and whole-dataset writes can lose concurrent updates.
-7. Current Finance architecture guard still contains legacy terminology and a wrong reservation for `core/business-model.js`.
+7. **RESOLVED IN F2:** the wrong `core/business-model.js` reservation was removed; CI now reserves Financial Model by rejecting operational financial-model modules/imports and the complete old Record-plan API.
 8. Payment is currently reachable through Record/Journal manifestation code; the migration must ensure the command owner is Finance, while Record only supplies source facts.
 
 ## F1 verified inventory — current ownership before runtime migration
@@ -242,6 +242,8 @@ These are not canonical architecture; they are migration debt:
 Inventory source: `staging@522b593d9c5d1a1ea37b152b8f0802389eeb81e8`.
 
 F1 changes no runtime behavior. It records what the application actually does today so later steps cannot silently recreate a second owner.
+
+**Historical-name note:** code names shown inside the F1 inventory below (for example `calculateFinancialPlan`, `hydrateRecordFinance`, `FinanceService.calculatePlan`) are the exact names that existed at the F1 checkpoint. F2 subsequently replaces those names with Settlement; do not treat the F1 spellings as current APIs.
 
 ### Current physical storage
 
@@ -484,6 +486,32 @@ The inventory fixes these constraints for later steps:
 8. Existing tests that protect correct business behavior should be rewritten around the new owners, not deleted merely because their old storage/terminology changes.
 9. No F1 runtime change is permitted. F1 only establishes the verified migration map.
 
+## F2 implementation checkpoint — Settlement terminology
+
+F2 changes terminology and responsibility names only. It intentionally does not change the persisted money shape or the Record ownership problem scheduled for F3/F4.
+
+Implemented in the F2 branch:
+
+- `core/finance/model.js` removed;
+- `core/finance/settlement.js` is the operational amount-due / paid / refunded / outstanding projection owner;
+- browser public contract uses `calculateSettlement`, `repriceSettlement`, `resolveRecordSettlement`, `getRecordSettlement`, `hydrateRecordSettlement`, `recordAmountDue` and Settlement aggregate names;
+- server `FinanceService` uses `calculateSettlement()` and `recordSettlementPaymentState()`;
+- Record/Journal/People/Procedure/Product consumers use Settlement names through `core/finance/index.js`;
+- Payment UI emits a `settlement` preview to the Finance command;
+- `recordPaymentIncome()` accepts `settlement` as its operational input;
+- regression tests retain the same payment/discount/partial/Tips/refund/cancel behavior under Settlement names;
+- the incorrect future `business-model.js` reservation is removed;
+- finance architecture guards reject the old Record-plan API and forbid operational Financial Model modules/imports.
+
+Compatibility intentionally retained for later stages:
+
+- `record.finance` and payment movement `finance` snapshot fields;
+- persisted `planAmount`, `planTotal`, `factIncome`, `factExpense`, `factTotal`;
+- current `BusinessAuxiliaryState.data.finance` storage;
+- current Record ownership of the stored snapshot.
+
+Those names are persistence compatibility only. They are not the future Financial Model. Removing their ownership/storage role belongs to F3-F5/F11.
+
 ## Ordered rebuild checklist
 
 One step must be completed, tested and checked before the next step is marked complete.
@@ -505,11 +533,12 @@ One step must be completed, tested and checked before the next step is marked co
 - [x] F1 inventory/diff verified on Check Book #1969; final documentation-close head must also pass before merge to staging.
 
 ### F2 — Rename old “Financial Model” responsibility to Settlement
-- [ ] Rename internal responsibility without changing money behavior first.
-- [ ] Remove “Financial Model” terminology from Record settlement APIs/comments/docs/guards.
-- [ ] Remove the incorrect future `business-model` reservation.
-- [ ] Add guard protection so “Financial Model” cannot again become payment/Record logic.
-- [ ] Preserve public compatibility only as long as needed for safe migration, then remove it.
+- [x] Rename internal responsibility without changing money behavior first.
+- [x] Remove “Financial Model” terminology from Record settlement APIs/comments/docs/guards.
+- [x] Remove the incorrect future `business-model` reservation.
+- [x] Add guard protection so “Financial Model” cannot again become payment/Record logic.
+- [x] Migrate all repository callers to the Settlement public contract and remove the old `model.js` atom instead of keeping a permanent compatibility wrapper.
+- [x] F2 behavior/diff verification passed on Check Book #1974; this documentation-close head must also pass exact-head Check Book before merge to staging.
 
 ### F3 — Remove payment ownership from Record
 - [ ] Record remains owner of appointment and immutable source snapshots only.

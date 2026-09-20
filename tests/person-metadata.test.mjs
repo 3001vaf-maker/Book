@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { calculateFinancialPlan, hydrateFinanceFromServer, recordPaymentIncome } from '../core/finance/index.js';
+import { calculateSettlement, hydrateFinanceFromServer, recordPaymentIncome } from '../core/finance/index.js';
 import { hydrateRecordStateFromServer } from '../core/record/index.js';
 import { getPersonMetadata } from '../main/people/metadata.js';
 
@@ -20,10 +20,10 @@ hydrateRecordStateFromServer({
 });
 
 hydrateFinanceFromServer({ version: 5, income: [], expense: [] });
-const plan = calculateFinancialPlan([{ sourceType: 'procedure', sourceId: 'p1', name: 'Услуга', price: 5000 }]);
+const settlement = calculateSettlement([{ sourceType: 'procedure', sourceId: 'p1', name: 'Услуга', price: 5000 }]);
 const payment = recordPaymentIncome({
   source: { type: 'record', id: 'r1' },
-  finance: plan,
+  settlement,
   maxAmount: 5000,
   serviceAmount: 5000,
   allocations: [{ walletId: 'cash', walletName: 'Наличные', amount: 5000 }],

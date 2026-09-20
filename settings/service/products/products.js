@@ -1,5 +1,5 @@
 import { actionBlock, button, collectCost, collectWorkplaceSelections, costCardMeta, costField, costListParts, details, emptyState, entityCard, escapeHtml, field, iconButton, initCostFields, initPhotoField, initWorkplaceSelectors, listEntries, listEntry, mountModal, modal, page, pageHeader, photoField, textareaField, workplaceCountText, workplaceSelector } from '../../../ui/ui.js';
-import { getFinancialItemFact } from '../../../core/finance/index.js';
+import { getSettlementItemTotals } from '../../../core/finance/index.js';
 import { getWorkplaces } from '../../profile/workplaces/data.js';
 import { deleteProduct as deleteProductData, getProducts, pushProductHistory, saveProduct as saveProductData } from './data.js';
 
@@ -36,7 +36,7 @@ function saveProduct(root,m,existing,navigateBack){
 function renderCard(root,id,navigateBack){
   const p=getProducts().find(x=>x.id===id);if(!p)return renderList(root,navigateBack);
   const workplaceNames=(p.workplaces||[]).map(w=>w.name||w.workplaceId).filter(Boolean);
-  const fact=getFinancialItemFact('product',p.id);
+  const fact=getSettlementItemTotals('product',p.id);
   const card=entityCard({
     title:p.name||'',
     image:p.photo||'',
