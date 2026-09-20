@@ -1,7 +1,6 @@
-import { queueAuxiliaryDataset } from '../business-persistence.js';
-
-// Finance persistence only. Business meaning belongs to rules/settlement/service.
-const VERSION = 5;
+// Browser Finance read cache only.
+// Canonical persistence is server FinanceSettlement + FinanceOperation + FinanceLedgerEntry.
+const VERSION = 6;
 let financeState = emptyState();
 
 function numberValue(value) {
@@ -19,7 +18,7 @@ function clone(value) {
 }
 
 function emptyState() {
-  return { version: VERSION, income: [], expense: [] };
+  return { version: VERSION, settlements: [], operations: [], ledger: [], income: [], expense: [] };
 }
 
 function normalizeSettlementSnapshot(value = null) {
@@ -76,6 +75,44 @@ function normalizeExpense(item = {}) {
   };
 }
 
+function normalizeSettlementRow(row = {}) {
+  const source = row?.source && typeof row.source === 'object' ? row.source : {};
+  const settlement = normalizeSettlementSnapshot(row?.settlement ?? row?.data);
+  if (!source?.type || !source?.id || !settlement) return null;
+  return {
+    source: { type: String(source.type), id: String(source.id) },
+    settlement,
+  };
+}
+
+function normalizeOperation(row = {}) {
+  return {
+    operationId: String(row?.operationId || row?.id || ''),
+    kind: String(row?.kind || ''),
+    status: String(row?.status || 'completed'),
+    source: row?.source && typeof row.source === 'object' ? { ...row.source } : null,
+    originalOperationId: String(row?.originalOperationId || ''),
+    occurredAt: String(row?.occurredAt || row?.createdAt || ''),
+    data: row?.data && typeof row.data === 'object' ? clone(row.data) : {},
+  };
+}
+
+function normalizeLedgerEntry(row = {}) {
+  return {
+    entryId: String(row?.entryId || row?.id || ''),
+    operationId: String(row?.operationId || ''),
+    walletId: String(row?.walletId || ''),
+    walletName: String(row?.walletName || ''),
+    direction: String(row?.direction || ''),
+    economicType: String(row?.economicType || ''),
+    amount: Math.max(0, numberValue(row?.amount)),
+    occurredAt: String(row?.occurredAt || ''),
+    source: row?.source && typeof row.source === 'object' ? { ...row.source } : null,
+    component: String(row?.component || ''),
+    relatedOperationId: String(row?.relatedOperationId || ''),
+  };
+}
+
 function normalizedState(value) {
   if (!value || typeof value !== 'object') return null;
   const legacyOperational = Array.isArray(value.operational) ? value.operational : [];
@@ -89,7 +126,14 @@ function normalizedState(value) {
       if (legacy) entry.finance = normalizeSettlementSnapshot(legacy);
     });
   }
-  return { version: VERSION, income, expense };
+  return {
+    version: VERSION,
+    settlements: (Array.isArray(value.settlements) ? value.settlements : []).map(normalizeSettlementRow).filter(Boolean),
+    operations: (Array.isArray(value.operations) ? value.operations : []).map(normalizeOperation),
+    ledger: (Array.isArray(value.ledger) ? value.ledger : []).map(normalizeLedgerEntry),
+    income,
+    expense,
+  };
 }
 
 export function hydrateFinanceFromServer(value = null) {
@@ -97,12 +141,17 @@ export function hydrateFinanceFromServer(value = null) {
   return clone(financeState);
 }
 
-export function writeFinanceState(state) {
-  financeState = normalizedState(state) || emptyState();
-  void queueAuxiliaryDataset('finance', financeState);
+export function replaceFinanceState(value = null) {
+  financeState = normalizedState(value) || emptyState();
   return clone(financeState);
 }
 
 export function readFinanceState() {
   return clone(financeState);
+}
+
+export function getStoredSettlement(type, id) {
+  const key = `${String(type || '')}:${String(id || '')}`;
+  const row = financeState.settlements.find((item) => sourceKey(item?.source) === key);
+  return row?.settlement ? clone(row.settlement) : null;
 }
