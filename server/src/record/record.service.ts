@@ -212,6 +212,32 @@ export class RecordService {
     return record;
   }
 
+  async publicOccupancy(tenantId: string) {
+    await this.requireVerified(tenantId);
+    const [rows, eventRows] = await Promise.all([
+      this.prisma.businessRecord.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
+      this.prisma.businessRecordEvent.findMany({ where: { tenantId } }),
+    ]);
+    const cancelled = new Set(eventRows
+      .filter((row) => text(objectValue(row.data).type) === 'cancelled')
+      .map((row) => row.recordId));
+    return rows
+      .map((row) => objectValue(row.data))
+      .filter((record) => {
+        const id = text(record.id);
+        return id && !cancelled.has(id) && text(record.status) !== 'cancelled';
+      })
+      .map((record) => ({
+        id: text(record.id),
+        type: 'record',
+        workplaceId: text(record.workplaceId),
+        date: dateValue(record.date),
+        from: text(record.from),
+        to: text(record.to),
+      }))
+      .filter((item) => item.workplaceId && item.date && item.from && item.to);
+  }
+
   private projectLifecycle(record: JsonObject, events: JsonObject[]) {
     let status = text(record?.status) === 'cancelled' ? 'cancelled' : 'active';
     let confirmed = Boolean(record?.confirmed);
