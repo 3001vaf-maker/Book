@@ -538,7 +538,7 @@ One step must be completed, tested and checked before the next step is marked co
 - [x] Remove the incorrect future `business-model` reservation.
 - [x] Add guard protection so “Financial Model” cannot again become payment/Record logic.
 - [x] Migrate all repository callers to the Settlement public contract and remove the old `model.js` atom instead of keeping a permanent compatibility wrapper.
-- [ ] Final F2 exact-head Check Book / diff review / PR-to-staging verification.
+- [x] F2 behavior/diff verification passed on Check Book #1974; this documentation-close head must also pass exact-head Check Book before merge to staging.
 
 ### F3 — Remove payment ownership from Record
 - [ ] Record remains owner of appointment and immutable source snapshots only.
