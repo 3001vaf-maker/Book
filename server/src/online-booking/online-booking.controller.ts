@@ -138,9 +138,9 @@ export class OnlineBookingController {
   }
 
   @UseGuards(AccountGuard)
-  @Get(':tenantId/account/requests')
-  myRequests(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
-    return this.booking.getMyRequests(tenantId, request.accountAuth!.accountId);
+  @Get(':tenantId/account/records')
+  myRecords(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
+    return this.booking.getMyRecords(tenantId, request.accountAuth!.accountId);
   }
 
   @UseGuards(AccountGuard)
