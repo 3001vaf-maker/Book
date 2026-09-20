@@ -262,6 +262,22 @@ Therefore future changes to Workplace ownership or multi-user permissions must n
 - Run full checks and staging verification.
 - Only after all checks pass: release through staging -> main -> production.
 
+### Implementation status (2026-09-20)
+
+- R0: DONE — contract and continuity anchor fixed in this file.
+- R1: DONE in branch — Record history distinguishes action/status/attendance; RESCHEDULED stores before/after; Journal sends real Profile/PlatformAccount actor identity; CREATED/CANCELLED/attendance preserve actor/source/Person context.
+- R2: DONE in branch — server TimeService owns authoritative availability rules; Online Booking no longer contains its own overlap/range algorithm or final occupancy decision.
+- R3: DONE in branch — ProcedureService supplies booking-time service snapshots; FinanceService owns plan/payment state; Online Booking no longer calculates a Record finance snapshot.
+- R4: DONE in branch — server RecordService is the one canonical Record constructor used by Online Booking and by initial owner-side Record persistence.
+- R5: DONE in branch — BookingRequest is transport/linkage only after creation; runtime recordSnapshot ownership, owner snapshot bridge and synthetic manualRecordViews adapter are removed.
+- R6: DONE in branch — Account history reads canonical Records by Person identity, including cancelled Records, and consumes Record lifecycle + Finance result rather than BookingRequest state.
+- R7: DONE in branch — Prisma model names are Record / RecordEvent while existing physical table names remain mapped with @@map, avoiding destructive DB migration.
+- R8: IN PROGRESS — PR #220 is draft; Check Book run #1893 started. Do not merge until CI and staging are green.
+
+Important compatibility detail:
+- Browser Journal remains an optimistic client surface for the current product stage, but first persistence of a new row is canonicalized by server RecordService. Browser-created CREATED history is semantically deduplicated against the server-created CREATED fact.
+- Existing physical tables are intentionally retained during this cleanup. Product/domain naming is Record / RecordEvent.
+
 ### Stop rule
 
 At every step, finish tests and inspect the diff before moving to the next step. Do not combine later steps opportunistically. If an unexpected ownership dependency appears, document it here first, then decide which step owns it.
