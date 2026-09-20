@@ -13,6 +13,7 @@ import { CommunicationModule } from './communication/communication.module';
 import { SaasAccessModule } from './saas-access/saas-access.module';
 import { TenantInvitationModule } from './tenant-invitation/tenant-invitation.module';
 import { SaasAdminModule } from './saas-admin/saas-admin.module';
+import { ManualInvitationModule } from './manual-invitation/manual-invitation.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { SaasAdminModule } from './saas-admin/saas-admin.module';
     OnlineBookingModule,
     SaasAccessModule,
     TenantInvitationModule,
+    ManualInvitationModule,
     SaasAdminModule,
   ],
   controllers: [HealthController],
