@@ -3,7 +3,7 @@
 // Low-level arithmetic lives in rules.js; money persistence lives in data/service.
 // Legacy record.finance and planTotal/fact* fields remain only as storage compatibility until later migration.
 import { readStoredSettlement } from './data.js';
-import { getActiveDDSMovements, getActiveDDSMovementsForSource } from './read.js';
+import { getActiveDDSMovements, getActiveDDSMovementsForSource, getPaymentsForSource } from './read.js';
 import {
   calculateSettlementTotals,
   calculateSettlementItemTotals,
@@ -19,10 +19,10 @@ import {
 
 function latestHistoricalSettlementForSource(type, id) {
   const movements = getActiveDDSMovementsForSource(type, id)
-    .filter((movement) => movement?.finance && isStoredSettlement(movement.finance))
+    .filter((movement) => (movement?.settlement || movement?.finance) && isStoredSettlement(movement?.settlement ?? movement?.finance))
     .sort((a, b) => String(a?.createdAt || '').localeCompare(String(b?.createdAt || '')));
   if (!movements.length) return null;
-  return normalizeStoredSettlement(movements[movements.length - 1].finance);
+  return normalizeStoredSettlement(movements[movements.length - 1]?.settlement ?? movements[movements.length - 1]?.finance);
 }
 
 export function resolveRecordSettlement(record = null, { discountPercent = null } = {}) {
@@ -56,7 +56,8 @@ export function getRecordSettlement(record = null, { discountPercent = null } = 
 export function getRecordPaymentState(record = null, { discountPercent = null } = {}) {
   const settlement = resolveRecordSettlement(record, { discountPercent });
   const movements = record?.id ? getActiveDDSMovementsForSource('record', record.id) : [];
-  return calculateSettlementPaymentState(settlement, movements);
+  const payments = record?.id ? getPaymentsForSource('record', record.id) : [];
+  return calculateSettlementPaymentState(settlement, movements, payments);
 }
 
 export function getSettlementTotalsForRecords(recordIds = []) {
