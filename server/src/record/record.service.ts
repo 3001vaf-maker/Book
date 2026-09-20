@@ -168,6 +168,7 @@ export class RecordService {
         const requestedDuration = Number(requested?.duration);
         return {
           ...item,
+          ...(requested && Object.prototype.hasOwnProperty.call(requested, 'cost') ? { cost: clone(requested.cost) } : {}),
           duration: Number.isFinite(requestedDuration) && requestedDuration > 0 ? requestedDuration : item.duration,
         };
       });
@@ -183,10 +184,6 @@ export class RecordService {
 
     const products = arrayValue(input.products).map((item) => clone(objectValue(item)));
     const person = clone(objectValue(input.person));
-    const settlement = this.finance.calculateSettlement([
-      ...procedureSnapshots.map((item) => ({ ...item, sourceType: 'procedure', sourceId: item.id })),
-      ...products.map((item) => ({ ...item, sourceType: 'product', sourceId: text(item?.id) })),
-    ], person?.discountPercent);
 
     const now = new Date().toISOString();
     const createdAt = text(input.createdAt) || now;
@@ -203,7 +200,6 @@ export class RecordService {
       source: text(input.source) || 'manual',
       sourceRequestId,
       createdBy: actor,
-      finance: settlement,
       createdAt,
       updatedAt: text(input.updatedAt) || createdAt,
     };
@@ -317,18 +313,12 @@ export class RecordService {
       if (!personKeys.has(text(person?.key)) && !personIds.has(text(person?.id))) continue;
       const events = byRecord.get(text(record.id)) || [];
       const lifecycle = this.projectLifecycle(record, events);
-      const storedSettlement = objectValue(record.finance);
-      const settlement = Object.keys(storedSettlement).length
-        ? storedSettlement
-        : this.finance.calculateSettlement([
-            ...arrayValue(record.procedures).map((item) => ({ ...objectValue(item), sourceType: 'procedure', sourceId: text(item?.id) })),
-            ...arrayValue(record.products).map((item) => ({ ...objectValue(item), sourceType: 'product', sourceId: text(item?.id) })),
-          ], person?.discountPercent);
+      const settlement = await this.finance.recordSettlement(tenantId, record);
       const payment = await this.finance.recordSettlementPaymentState(tenantId, text(record.id), settlement);
       result.push({
         ...record,
         ...lifecycle,
-        finance: settlement,
+        settlement,
         payment,
         history: events,
       });
@@ -368,6 +358,7 @@ export class RecordService {
         const requestedDuration = Number(draft?.duration);
         return {
           ...item,
+          ...(draft && Object.prototype.hasOwnProperty.call(draft, 'cost') ? { cost: clone(draft.cost) } : {}),
           duration: Number.isFinite(requestedDuration) && requestedDuration > 0 ? requestedDuration : item.duration,
         };
       });
@@ -399,15 +390,10 @@ export class RecordService {
       ? arrayValue(incoming.products).map((item) => clone(objectValue(item)))
       : arrayValue(current.products).map((item) => clone(objectValue(item)));
     const person = personChanged ? clone(objectValue(incoming.person)) : clone(objectValue(current.person));
-    const settlement = (refreshProcedures || productsChanged || personChanged)
-      ? this.finance.calculateSettlement([
-          ...procedures.map((item) => ({ ...item, sourceType: 'procedure', sourceId: item.id })),
-          ...products.map((item) => ({ ...item, sourceType: 'product', sourceId: text(item?.id) })),
-        ], person?.discountPercent)
-      : clone(objectValue(current.finance));
+    const { finance: _legacyFinance, payment: _legacyPayment, ...currentRecord } = current;
 
     const stored = {
-      ...current,
+      ...currentRecord,
       date,
       workplaceId: incomingWorkplaceId,
       from,
@@ -415,7 +401,6 @@ export class RecordService {
       person,
       procedures,
       products,
-      finance: settlement,
       updatedAt: text(incoming.updatedAt) || new Date().toISOString(),
       createdAt: text(current.createdAt),
       createdBy: clone(objectValue(current.createdBy)),
