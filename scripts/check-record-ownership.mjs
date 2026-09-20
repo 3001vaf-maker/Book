@@ -43,7 +43,7 @@ if (!/getRecordRows/.test(recordData)
 if (!/from '.\/data\.js'/.test(recordRead)
   || !/from '.\/events\.js'/.test(recordRead)
   || !/from '.\/state\.js'/.test(recordRead)
-  || !/hydrateRecordFinance/.test(recordRead)) {
+  || !/hydrateRecordSettlement/.test(recordRead)) {
   errors.push('core/record/read.js: read model must compose storage + lifecycle + finance');
 }
 
@@ -75,9 +75,9 @@ if (!/projectRecordLifecycle/.test(recordState) || !/RECORD_EVENT_TYPES/.test(re
 if (!/export class RecordService/.test(serverRecord)
   || !/this\.time\.checkAvailability/.test(serverRecord)
   || !/this\.procedures\.snapshots/.test(serverRecord)
-  || !/this\.finance\.calculatePlan/.test(serverRecord)
+  || !/this\.finance\.calculateSettlement/.test(serverRecord)
   || !/async listForPeople/.test(serverRecord)) {
-  errors.push('server RecordService must own canonical create/read composition through Time, Procedure and Finance owners');
+  errors.push('server RecordService must compose through Time, Procedure and Finance Settlement owners');
 }
 if (/createOnlineBookingRecord|publicBookingOccupancy|bookingRecordSnapshot/.test(serverBusinessState)) {
   errors.push('BusinessState must not own Record creation, occupancy or Booking snapshot adapters');
