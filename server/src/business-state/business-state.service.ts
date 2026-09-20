@@ -90,6 +90,10 @@ function canonical(value: BusinessBundle) {
   return JSON.stringify(stable(value));
 }
 
+function canonicalJson(value: unknown) {
+  return JSON.stringify(stable(value));
+}
+
 function canonicalOperational(value: OperationalBundle) {
   return JSON.stringify(stable(value));
 }
@@ -279,7 +283,7 @@ export class BusinessStateService {
     });
     if (existing) {
       const sameRecord = existing.recordId === recordId;
-      const sameData = canonical(objectValue(existing.data)) === canonical(event);
+      const sameData = canonicalJson(objectValue(existing.data)) === canonicalJson(event);
       if (!sameRecord || !sameData) {
         throw new ConflictException('Событие Record неизменяемо и не может быть переписано');
       }
