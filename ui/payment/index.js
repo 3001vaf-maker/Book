@@ -107,7 +107,7 @@ function settlementInputs(root) {
 }
 
 function applySettlement(root, settlement = null, { preserve = null } = {}) {
-  const items = Array.isArray(settlement?.items) ? plan.items : [];
+  const items = Array.isArray(settlement?.items) ? settlement.items : [];
   [...root.querySelectorAll('[data-payment-procedure]')].forEach((row, index) => {
     const item = items[index];
     if (!item) return;
