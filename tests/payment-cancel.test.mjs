@@ -16,7 +16,11 @@ import {
 } from '../core/finance/index.js';
 
 function recordFor(id, settlement) {
-  return { id, finance: settlement, procedures: [] };
+  return {
+    id,
+    procedures: (settlement?.items || []).map((item) => ({ id: item.sourceId, name: item.name, cost: item.price, duration: 60 })),
+    products: [],
+  };
 }
 
 hydrateFinanceFromServer({ version: 5, income: [], expense: [] });
@@ -38,9 +42,12 @@ assert.ok(cancelled);
 assert.equal(cancelled.status, 'cancelled');
 assert.equal(cancelled.cancelReason, 'incorrect-entry');
 assert.equal(cancelled.cancelledAt, cancelAt.toISOString());
-assert.equal(getDDSIncome().find((item) => item.id === payment.id)?.status, 'cancelled');
-assert.equal(getDDSMovements().find((item) => item.id === payment.id)?.status, 'cancelled');
-assert.equal(getWalletDDSMovements('cancel-cash').length, 0);
+assert.equal(getDDSIncome().find((item) => item.operationId === payment.id)?.status, 'cancelled');
+assert.equal(getDDSMovements().find((item) => item.operationId === payment.id)?.status, 'cancelled');
+assert.equal(getWalletDDSMovements('cancel-cash').reduce((sum, item) => sum + Number(item.total || 0), 0), 0);
+const cancellationRows = getDDSMovements().filter((item) => item.operationType === 'cancellation');
+assert.ok(cancellationRows.length > 0);
+assert.ok(cancellationRows.every((item) => item.reversalOfLedgerEntryId));
 assert.equal(getPaymentRemaining(payment.id), 0);
 assert.equal(recordRefundExpense(payment.id), null);
 let state = getRecordPaymentState(recordFor('record-cancel', settlement));
@@ -67,11 +74,10 @@ assert.equal(getWalletDDSMovements('chain-cash').reduce((sum, item) => sum + Num
 
 const chainCancelled = cancelPaymentOperation(chainPayment.id, { now: cancelAt });
 assert.ok(chainCancelled);
-const storedRefund = getDDSExpenses().find((item) => item.id === chainRefund.id);
+const storedRefund = getDDSExpenses().find((item) => item.operationId === chainRefund.id);
 assert.equal(storedRefund?.status, 'cancelled');
-assert.equal(storedRefund?.cancelledBecausePaymentId, chainPayment.id);
 assert.equal(getRefundsForPayment(chainPayment.id).length, 0);
-assert.equal(getWalletDDSMovements('chain-cash').length, 0);
+assert.equal(getWalletDDSMovements('chain-cash').reduce((sum, item) => sum + Number(item.total || 0), 0), 0);
 state = getRecordPaymentState(recordFor('record-chain', chainSettlement));
 assert.equal(state.paidTotal, 0);
 assert.equal(state.remaining, 5000);
