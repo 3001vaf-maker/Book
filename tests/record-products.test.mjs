@@ -60,8 +60,8 @@ const modalCss = readFileSync(new URL('../ui/modals/modal.css', import.meta.url)
 assert.match(recordViewSource, /button\('Продажа'/);
 assert.match(recordViewSource, /data-record-sale-product/);
 assert.match(recordViewSource, /initMultiSelect/);
-assert.match(recordViewSource, /recordFinancialItems\(state\)/);
-assert.match(recordPaymentSource, /products:\s*sourcesFromFinance/);
+assert.match(recordViewSource, /recordSettlementItems\(state\)/);
+assert.match(recordPaymentSource, /products:\s*sourcesFromSettlement/);
 assert.match(modalCss, /modal--bottom\{[^}]*height:88px[^}]*max-height:88px/);
 
 console.log('record product sale tests: OK');
