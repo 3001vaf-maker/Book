@@ -17,6 +17,7 @@ assert.doesNotMatch(profileData, /localStorage|readLegacyProfileSnapshot/);
 assert.match(profileData, /apiRequest\('\/profile'/);
 assert.match(profileData, /hydrateProfileFromServer/);
 assert.match(profileData, /id:\s*String\(profile\.id\s*\|\|\s*''\)/);
+assert.match(profileData, /platformAccountId:\s*String\(profile\.platformAccountId\s*\|\|\s*''\)/);
 
 assert.doesNotMatch(workplaceData, /localStorage|readLegacyWorkplacesSnapshot/);
 assert.match(workplaceData, /apiRequest\(`\/profile\/workplaces\//);
@@ -33,6 +34,7 @@ assert.match(schema, /model Workplace\s*\{/);
 assert.match(schema, /migrationVerifiedAt\s+DateTime\?/);
 assert.match(serverService, /migrationVerifiedAt/);
 assert.match(serverService, /id:\s*row\.id/);
+assert.match(serverService, /platformAccountId:\s*row\.platformAccountId/);
 assert.match(serverService, /ConflictException\('Проверка переноса Profile \+ Workplaces не пройдена'\)/);
 
 console.log('profile server owner tests: OK');
