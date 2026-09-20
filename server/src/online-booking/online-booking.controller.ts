@@ -200,8 +200,8 @@ export class OnlineBookingController {
       type: 'booking.created',
       title: 'Запись создана',
       body: 'Новая запись добавлена в ваш аккаунт.',
-      entityType: 'booking-request',
-      entityId: String((created as any)?.id || ''),
+      entityType: 'record',
+      entityId: String((created as any)?.recordId || ''),
     });
     return created;
   }
