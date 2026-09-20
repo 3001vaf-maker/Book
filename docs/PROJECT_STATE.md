@@ -168,6 +168,9 @@ Action, lifecycle status, attendance and payment are separate concepts and must 
 3. `manualRecordViews()` reshapes real Records into BookingRequest-shaped objects for Account history.
 4. Record history has CREATED/CONFIRMED/UNCONFIRMED/ARRIVED/NO_SHOW/ATTENDANCE_CLEARED/CANCELLED, but move/reschedule overwrites Record date/time without an immutable RESCHEDULED fact.
 5. Current Record events do not consistently preserve actor Profile/Account/System identity or source channel.
+   - Prisma Profile already has a real `id`, but the server Profile bundle and browser `normalizeProfile()` currently omit it.
+   - `workplaceDto()` currently emits `profileId: 'profile'` instead of the real Profile id.
+   - Current Prisma also enforces one Profile per `(tenantId, platformAccountId)`. Multi-profile support is therefore a later Profile architecture change, but Record history must use a real `actorProfileId` now so it will scale without rewriting history.
 6. Browser Journal uses canonical `core/time/`, while server Online Booking reimplements time parsing/range/overlap and availability checks.
 7. Finance Core is canonical for normal Records, while Online Booking reimplements price/discount/plan calculations in `initialRequestSnapshot()` and `bookingFinance()`.
 8. Account UI independently derives lifecycle/payment labels from BookingRequest/date/snapshot, creating a second business-rule owner.
@@ -185,6 +188,7 @@ Action, lifecycle status, attendance and payment are separate concepts and must 
 - Preserve Person (subject), actor identity, source/origin, action time and appointment time as distinct facts.
 - Add RESCHEDULED history with before/after date/time/workplace.
 - Ensure create/cancel/attendance/confirmation history has sufficient actor/source metadata.
+- Expose the current real Profile id through the existing Profile read contract; do not invent a second profile identifier.
 - Add tests for: create -> reschedule -> cancel and create -> arrived/no-show.
 - No Booking, Time or Finance redesign in this step.
 
