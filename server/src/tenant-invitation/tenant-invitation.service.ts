@@ -428,6 +428,24 @@ export class TenantInvitationService {
     }));
   }
 
+  private async findActiveRegistrationLink(token: string) {
+    if (!token) throw new BadRequestException('Ссылка регистрации недействительна');
+    const invitation = await this.prisma.tenantInvitation.findUnique({
+      where: { tokenHash: invitationHash(token) },
+      include: { tenant: true },
+    });
+    if (!invitation || !isRegistrationLinkEmail(invitation.email)) {
+      throw new NotFoundException('Ссылка регистрации не найдена');
+    }
+    if (invitation.status !== TenantInvitationStatus.PENDING) {
+      throw new ConflictException('Эта ссылка уже использована');
+    }
+    if (invitation.expiresAt.getTime() <= Date.now()) {
+      throw new ConflictException('Срок действия ссылки истёк');
+    }
+    return invitation;
+  }
+
   private async findActiveInvitation(token: string) {
     if (!token) throw new BadRequestException('Приглашение отсутствует');
     const invitation = await this.prisma.tenantInvitation.findUnique({
