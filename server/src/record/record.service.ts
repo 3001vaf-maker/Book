@@ -310,7 +310,7 @@ export class RecordService {
       byRecord.set(row.recordId, list);
     }
 
-    const result = [];
+    const result: JsonObject[] = [];
     for (const row of rows) {
       const record = objectValue(row.data);
       const person = objectValue(record.person);
