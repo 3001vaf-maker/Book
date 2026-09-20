@@ -80,8 +80,8 @@ export class RecordService {
     const planTo = text(day?.to) || text(workplace?.to);
 
     const [records, events, pending] = await Promise.all([
-      this.prisma.businessRecord.findMany({ where: { tenantId } }),
-      this.prisma.businessRecordEvent.findMany({ where: { tenantId } }),
+      this.prisma.record.findMany({ where: { tenantId } }),
+      this.prisma.recordEvent.findMany({ where: { tenantId } }),
       this.prisma.bookingRequest.findMany({
         where: {
           tenantId,
@@ -133,11 +133,11 @@ export class RecordService {
     const id = text(input.id) || randomUUID();
     const sourceRequestId = text(input.sourceRequestId);
     if (sourceRequestId) {
-      const existingRows = await this.prisma.businessRecord.findMany({ where: { tenantId } });
+      const existingRows = await this.prisma.record.findMany({ where: { tenantId } });
       const existing = existingRows.find((row) => text(objectValue(row.data).sourceRequestId) === sourceRequestId);
       if (existing) return objectValue(existing.data);
     }
-    const existingId = await this.prisma.businessRecord.findUnique({ where: { tenantId_recordId: { tenantId, recordId: id } } });
+    const existingId = await this.prisma.record.findUnique({ where: { tenantId_recordId: { tenantId, recordId: id } } });
     if (existingId) return objectValue(existingId.data);
 
     const date = dateValue(input.date);
@@ -204,10 +204,10 @@ export class RecordService {
 
     const resolvedPosition = Number.isInteger(position)
       ? Number(position)
-      : (await this.prisma.businessRecord.count({ where: { tenantId } }));
+      : (await this.prisma.record.count({ where: { tenantId } }));
     await this.prisma.$transaction([
-      this.prisma.businessRecord.create({ data: { tenantId, recordId: id, position: resolvedPosition, data: json(record) } }),
-      this.prisma.businessRecordEvent.create({ data: { tenantId, eventId: event.id, recordId: id, position: 0, data: json(event) } }),
+      this.prisma.record.create({ data: { tenantId, recordId: id, position: resolvedPosition, data: json(record) } }),
+      this.prisma.recordEvent.create({ data: { tenantId, eventId: event.id, recordId: id, position: 0, data: json(event) } }),
     ]);
     return record;
   }
@@ -215,8 +215,8 @@ export class RecordService {
   async publicOccupancy(tenantId: string) {
     await this.requireVerified(tenantId);
     const [rows, eventRows] = await Promise.all([
-      this.prisma.businessRecord.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
-      this.prisma.businessRecordEvent.findMany({ where: { tenantId } }),
+      this.prisma.record.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
+      this.prisma.recordEvent.findMany({ where: { tenantId } }),
     ]);
     const cancelled = new Set(eventRows
       .filter((row) => text(objectValue(row.data).type) === 'cancelled')
@@ -279,8 +279,8 @@ export class RecordService {
     if (!personKeys.size && !personIds.size) return [];
 
     const [rows, eventRows] = await Promise.all([
-      this.prisma.businessRecord.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
-      this.prisma.businessRecordEvent.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
+      this.prisma.record.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
+      this.prisma.recordEvent.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
     ]);
     const byRecord = new Map<string, JsonObject[]>();
     for (const row of eventRows) {
@@ -325,7 +325,7 @@ export class RecordService {
     const record = clone(objectValue(source.record ?? source));
     const id = text(recordId);
     record.id = id;
-    const existing = await this.prisma.businessRecord.findUnique({ where: { tenantId_recordId: { tenantId, recordId: id } } });
+    const existing = await this.prisma.record.findUnique({ where: { tenantId_recordId: { tenantId, recordId: id } } });
     if (!existing) return this.create(tenantId, record, Number(source.position));
 
     const current = objectValue(existing.data);
@@ -339,7 +339,7 @@ export class RecordService {
         to: text(record.to),
       }, { excludeRecordId: id });
     }
-    await this.prisma.businessRecord.update({
+    await this.prisma.record.update({
       where: { tenantId_recordId: { tenantId, recordId: id } },
       data: { position: Number.isInteger(Number(source.position)) ? Number(source.position) : existing.position, data: json(record) },
     });
