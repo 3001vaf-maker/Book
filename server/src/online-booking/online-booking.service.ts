@@ -198,7 +198,7 @@ export class OnlineBookingService {
     });
     const days = arrayValue(data.days).filter((day) => allowedKeys.has(text(day?.workplaceId)));
     const [recordOccupancy, pending] = await Promise.all([
-      this.businessState.publicBookingOccupancy(tenantId),
+      this.records.publicOccupancy(tenantId),
       this.prisma.bookingRequest.findMany({
         where: {
           tenantId,
@@ -439,15 +439,16 @@ export class OnlineBookingService {
     });
 
     try {
-      const record = await this.businessState.createOnlineBookingRecord(tenantId, {
+      const record = await this.records.create(tenantId, {
         date,
         workplaceId: workplaceKey,
         from,
         to,
         person: personSnapshot,
         procedureIds: requestedIds,
+        source: 'online-booking',
         sourceRequestId: request.id,
-        actor: { type: 'account', accountId: account.id, profileId: '' },
+        createdBy: { type: 'account', accountId: account.id, profileId: '' },
       });
       const imported = await this.prisma.bookingRequest.update({
         where: { id: request.id },
