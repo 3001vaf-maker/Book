@@ -59,30 +59,6 @@ export class OnlineBookingController {
     return this.personIdentity.reconcileLegacyAccountDuplicates(request.auth!.tenantId);
   }
 
-  @UseGuards(JwtAuthGuard)
-  @Get('owner/requests')
-  pendingRequests(@Req() request: OwnerRequest) {
-    return this.booking.pendingRequests(request.auth!.tenantId);
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Post('owner/requests/:requestId/imported')
-  markImported(@Req() request: OwnerRequest, @Param('requestId') requestId: string, @Body() body: { recordId?: string }) {
-    return this.booking.markImported(request.auth!.tenantId, requestId, body?.recordId || '');
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Put('owner/requests/:requestId/snapshot')
-  syncRequestSnapshot(@Req() request: OwnerRequest, @Param('requestId') requestId: string, @Body() body: { snapshot?: unknown }) {
-    return this.booking.syncRequestSnapshot(request.auth!.tenantId, requestId, body?.snapshot || {});
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Post('owner/requests/:requestId/rejected')
-  markRejected(@Req() request: OwnerRequest, @Param('requestId') requestId: string) {
-    return this.booking.markRejected(request.auth!.tenantId, requestId);
-  }
-
   @Get(':tenantId/context')
   context(@Param('tenantId') tenantId: string, @Query('workplace') workplace = '') {
     return this.booking.getContext(tenantId, workplace);
