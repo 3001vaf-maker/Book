@@ -76,21 +76,33 @@ const financeData = source('core/finance/data.js');
 if (!/queueAuxiliaryDataset\(['"]finance['"]/.test(financeData)
   || !/let financeState = emptyState\(\)/.test(financeData)
   || !/settlements:\s*\{\}/.test(financeData)
+  || !/operations:\s*\[\]/.test(financeData)
+  || !/ledger:\s*\[\]/.test(financeData)
   || !/readStoredSettlement/.test(financeData)) {
-  errors.push('core/finance/data.js must own server-backed Settlement and money persistence');
+  errors.push('core/finance/data.js must own Finance settlements, Operations and flat Ledger persistence');
+}
+if (/return\s+\{\s*version:\s*VERSION,\s*income:\s*\[\],\s*expense:\s*\[\]/.test(financeData)) {
+  errors.push('core/finance/data.js must not restore income[]/expense[] as canonical Finance storage');
 }
 
 const financeService = source('core/finance/service.js');
 if (!/export function recordPaymentIncome/.test(financeService)
   || !/export function recordRefundExpense/.test(financeService)
   || !/export function cancelPaymentOperation/.test(financeService)
-  || !/export function saveRecordSettlement/.test(financeService)) {
-  errors.push('core/finance/service.js must own Settlement plus payment/refund/cancel commands');
+  || !/export function saveRecordSettlement/.test(financeService)
+  || !/operationType:\s*'payment'/.test(financeService)
+  || !/operationType:\s*'refund'/.test(financeService)
+  || !/operationType:\s*'cancellation'/.test(financeService)
+  || !/reversalOfLedgerEntryId/.test(financeService)) {
+  errors.push('core/finance/service.js must append Settlement-aware payment/refund/cancellation Operations and Ledger reversals');
 }
 
 const financeRead = source('core/finance/read.js');
-if (!/export function getActiveDDSMovements/.test(financeRead) || !/status\s*!==\s*['"]cancelled['"]/.test(financeRead)) {
-  errors.push('core/finance/read.js must keep cancelled history separate from active financial projections');
+if (!/export function getActiveDDSMovements/.test(financeRead)
+  || !/export function getPaymentsForSource/.test(financeRead)
+  || !/operationId/.test(financeRead)
+  || !/direction/.test(financeRead)) {
+  errors.push('core/finance/read.js must project flat Ledger rows and grouped Payment Operations');
 }
 
 const financeRules = source('core/finance/rules.js');
@@ -108,7 +120,7 @@ if (!/recordPaymentIncome/.test(financeIndex) || !/cancelPaymentOperation/.test(
 
 const walletData = source('settings/wallets/data.js');
 if (!/getWalletDDSMovements/.test(walletData) || !/export function getWalletBalance/.test(walletData)) {
-  errors.push('Wallet data owner must derive history/balance from DDS movements');
+  errors.push('Wallet data owner must derive history/balance from flat Ledger movements');
 }
 
 const recordView = source('journal/record-view.js');
@@ -124,6 +136,11 @@ if (/data-record-cost|name=['"]recordCost['"]/.test(recordCreation)) {
 const paymentUI = source('ui/payment/index.js');
 if (!/data-payment-price/.test(paymentUI) || /data-payment-price\s+readonly/.test(paymentUI)) {
   errors.push('Payment must be the single editable procedure/product price correction point');
+}
+
+const financeMain = source('main/finance/finance.js');
+if (!/operationId/.test(financeMain) || /item\.allocations/.test(financeMain)) {
+  errors.push('Finance DDS UI must render flat Ledger rows, not nested payment allocations');
 }
 
 const recordPayment = source('journal/record-payment.js');
