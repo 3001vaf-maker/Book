@@ -16,6 +16,7 @@ import { ProfileService } from '../profile/profile.service';
 import { PersonIdentityService } from './person-identity.service';
 import { TimeService } from '../time/time.service';
 import { RecordService } from '../record/record.service';
+import { ProcedureService } from '../procedure/procedure.service';
 
 function objectValue(value: unknown): Record<string, any> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : {};
@@ -46,11 +47,6 @@ function numeric(value: unknown, fallback = 0) {
 function percent(value: unknown) {
   return Math.max(0, Math.min(100, numeric(value, 0)));
 }
-
-function assignmentFor(procedure: any, workplaceKey: string) {
-  return arrayValue(procedure?.workplaces).find((item) => text(item?.workplaceId ?? item?.key ?? item?.id) === workplaceKey) || null;
-}
-
 
 function normalizeConsents(value: unknown) {
   return arrayValue(value).map((item) => ({
@@ -121,6 +117,7 @@ export class OnlineBookingService {
     private readonly personIdentity: PersonIdentityService,
     private readonly time: TimeService,
     private readonly records: RecordService,
+    private readonly procedures: ProcedureService,
   ) {}
 
   private async publication(tenantId: string) {
@@ -370,46 +367,12 @@ export class OnlineBookingService {
     if (!workplace) throw new BadRequestException('Рабочее пространство недоступно');
 
     const requestedIds = [...new Set(arrayValue(body.procedureIds).map((value) => text(value)).filter(Boolean))];
-    if (!requestedIds.length) throw new BadRequestException('Выберите хотя бы одну процедуру');
-    const catalog = arrayValue(data.procedures);
-    const selected = requestedIds.map((id) => catalog.find((procedure) => text(procedure?.id) === id)).filter(Boolean);
-    if (selected.length !== requestedIds.length || selected.some((procedure) => !assignmentFor(procedure, workplaceKey))) {
-      throw new BadRequestException('Одна из процедур недоступна в этом рабочем пространстве');
-    }
-
-    const duration = selected.reduce((sum, procedure) => sum + Math.max(0, Number(procedure?.duration || 0)), 0);
+    const procedureSnapshots = await this.procedures.snapshots(tenantId, workplaceKey, requestedIds);
+    const duration = procedureSnapshots.reduce((sum, procedure) => sum + Math.max(0, Number(procedure?.duration || 0)), 0);
     if (duration <= 0) throw new BadRequestException('Не удалось определить длительность процедур');
     const start = this.time.timeToMinutes(from)!;
     const to = this.time.minutesToTime(start + duration);
     if (!to) throw new BadRequestException('Выбранное время недоступно');
-
-    const day = arrayValue(data.days).find((item) => text(item?.workplaceId) === workplaceKey && dateValue(item?.date) === date);
-    if (!day) throw new ConflictException('Эта дата больше не доступна');
-    const planFrom = text(day?.from) || text(workplace?.from);
-    const planTo = text(day?.to) || text(workplace?.to);
-    const [recordOccupancy, pending] = await Promise.all([
-      this.records.publicOccupancy(tenantId),
-      this.prisma.bookingRequest.findMany({
-        where: { tenantId, workplaceKey, date, status: BookingRequestStatus.PENDING },
-        select: { from: true, to: true },
-      }),
-    ]);
-    const breaks = arrayValue(data.breaks).filter((item) => text(item?.workplaceId) === workplaceKey && dateValue(item?.date) === date);
-    const occupancy = [...recordOccupancy.filter((item) => text(item?.workplaceId) === workplaceKey && dateValue(item?.date) === date), ...breaks];
-    const availability = this.time.checkAvailability({
-      planFrom,
-      planTo,
-      from,
-      to,
-      usages: [
-        ...occupancy.map((item) => ({ id: text(item?.id), from: text(item?.from), to: text(item?.to) })),
-        ...pending.map((item) => ({ from: item.from, to: item.to })),
-      ],
-    });
-    if (!availability.ok) {
-      if (availability.reason === 'outside-working-time') throw new ConflictException('Время находится вне рабочего графика');
-      throw new ConflictException('Это время уже занято');
-    }
 
     const binding = await this.personIdentity.bindFirstAccess(tenantId, account as any);
     const person = binding.person;
