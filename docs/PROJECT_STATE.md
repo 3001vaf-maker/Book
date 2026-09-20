@@ -129,7 +129,7 @@ The previously queued Auth transactional communication block is paused.
 
 ## Active block — Finance ownership rebuild (2026-09-20)
 
-Source checkpoint: `staging@29999b2c67a4678ad9692c83aee8a246d505e4d4`.
+Source checkpoint: `staging@522b593d9c5d1a1ea37b152b8f0802389eeb81e8`.
 
 Working branch: `feature/finance-f1-inventory-20260920`.
 
