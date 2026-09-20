@@ -132,7 +132,6 @@ async function main() {
       },
       procedures: [{ id: 'procedure-cut', name: 'Стрижка', cost: 5000, duration: 60 }],
       products: [],
-      finance: paidFinance,
       attendance: 'arrived',
       createdAt: nowIso,
       updatedAt: nowIso,
@@ -152,7 +151,6 @@ async function main() {
       },
       procedures: [{ id: 'procedure-color', name: 'Окрашивание', cost: 8000, duration: 90 }],
       products: [],
-      finance: futureFinance,
       createdAt: nowIso,
       updatedAt: nowIso,
     },
@@ -228,7 +226,11 @@ async function main() {
 
   const auxiliary = {
     finance: {
-      version: 5,
+      version: 6,
+      settlements: {
+        'record:staging-record-paid': paidFinance,
+        'record:staging-record-future': futureFinance,
+      },
       income: [{
         id: 'staging-payment-1',
         status: 'completed',
