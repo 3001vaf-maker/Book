@@ -4,7 +4,7 @@ import {
   getAccountChat,
   getAccountChatSettings,
   getAccountNotifications,
-  getAccountRequests,
+  getAccountRecords,
   markAccountNotificationRead,
   sendAccountChatMessage,
 } from '../core/account/index.js';
@@ -361,7 +361,7 @@ function openProfileSettings(state, { onPersonalData, onPassword, onConsents, on
 }
 
 async function renderProfile(root, state, handlers) {
-  const requests = state.accountRequests || [];
+  const requests = state.accountRecords || [];
   const account = state.account || {};
   const profile = account.profileData && typeof account.profileData === 'object' ? account.profileData : {};
   const visit = nearestVisit(requests);
@@ -419,7 +419,7 @@ async function renderProfile(root, state, handlers) {
 }
 
 async function renderHistory(root, state, handlers) {
-  const requests = state.accountRequests || [];
+  const requests = state.accountRecords || [];
   const body = requests.length
     ? listEntries(requests.map((request, index) => historyEntry(request, index)))
     : emptyState('История пока пустая', 'Здесь появятся ваши записи и визиты.');
@@ -522,11 +522,11 @@ export async function renderAccount(root, state, callbacks = {}) {
   state.accountTab ||= 'profile';
   state.accountChatOpen = Boolean(state.accountChatOpen);
   try {
-    const [requests, account] = await Promise.all([
-      getAccountRequests(state.tenantId).catch(() => []),
+    const [records, account] = await Promise.all([
+      getAccountRecords(state.tenantId).catch(() => []),
       getAccount(state.tenantId),
     ]);
-    state.accountRequests = Array.isArray(requests) ? requests : [];
+    state.accountRecords = Array.isArray(records) ? records : [];
     if (account) state.account = account;
     state.error = '';
   } catch (error) {
