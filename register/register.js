@@ -61,7 +61,7 @@ function renderForm(payload) {
     button.disabled = true;
     button.textContent = 'Создаём…';
     try {
-      const account = await post('/tenant-invitations/registration-link/accept', {
+      const account = await post('/manual-invitations/accept', {
         token,
         email: data.get('email'),
         password,
@@ -81,7 +81,7 @@ if (!token) {
   renderError('В ссылке отсутствует код регистрации.');
 } else {
   try {
-    const payload = await post('/tenant-invitations/registration-link/inspect', { token });
+    const payload = await post('/manual-invitations/inspect', { token });
     renderForm(payload);
   } catch (error) {
     renderError(error instanceof Error ? error.message : 'Не удалось проверить ссылку');
