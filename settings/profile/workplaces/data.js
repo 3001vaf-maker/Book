@@ -22,6 +22,7 @@ export function normalizeWorkplace(workplace = {}) {
     address: String(workplace.address || ''),
     phone: normalizePhoneForStorage(workplace.phone),
     currency: String(workplace.currency || 'RUB'),
+    timeZone: String(workplace.timeZone || ''),
     from: String(workplace.from || '09:00'),
     to: String(workplace.to || '18:00'),
     links: normalizeLinks(workplace.links),
