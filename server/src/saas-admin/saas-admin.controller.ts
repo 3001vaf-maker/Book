@@ -3,6 +3,7 @@ import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { TenantInvitationService } from '../tenant-invitation/tenant-invitation.service';
 import { PlatformAdminGuard } from './platform-admin.guard';
+import { PlatformCommunicationService } from './platform-communication.service';
 import { SaasAdminService } from './saas-admin.service';
 
 type AdminRequest = Request & {
@@ -16,6 +17,7 @@ export class SaasAdminController {
   constructor(
     private readonly admin: SaasAdminService,
     private readonly invitations: TenantInvitationService,
+    private readonly communications: PlatformCommunicationService,
   ) {}
 
   @Get('me')
@@ -36,6 +38,19 @@ export class SaasAdminController {
   @Get('document-registry/history')
   documentRegistryHistory() {
     return this.admin.documentRegistryHistory();
+  }
+
+  @Get('communications')
+  platformCommunications(@Req() request: AdminRequest) {
+    return this.communications.list(request.platformAdminId!);
+  }
+
+  @Post('communications/email')
+  sendPlatformEmail(
+    @Req() request: AdminRequest,
+    @Body() body: { tenantId?: unknown; subject?: unknown; body?: unknown },
+  ) {
+    return this.communications.sendEmail(request.platformAdminId!, body || {});
   }
 
   @Get('invitations')

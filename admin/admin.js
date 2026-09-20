@@ -81,6 +81,7 @@ function renderShell() {
           <button data-section="owner" class="owner-link">Мой Book</button>
           <button data-section="document-registry">Реестр документов</button>
           <button data-section="tenants">Профили</button>
+          <button data-section="communications">Технические письма</button>
           <button data-section="capabilities">Возможности</button>
         </nav>
         <div class="admin-sidebar-foot">SaaS Control Plane</div>
@@ -124,6 +125,7 @@ function renderCurrentSection() {
       loadHistory: () => adminRequest('/document-registry/history'),
     });
   }
+  if (state.section === 'communications') return void renderPlatformCommunications();
   if (state.section === 'capabilities') return renderCapabilities();
   return renderTenants();
 }
@@ -168,12 +170,22 @@ function renderTenants() {
   content.innerHTML = `
     <div class="admin-heading"><div><h2>Профили</h2><p>Каждый профиль работает в своём пространстве.</p></div></div>
     <section class="admin-invite-panel">
-      <h3>Создать профиль</h3>
+      <div class="admin-invite-head">
+        <h3>Создать профиль</h3>
+        <button class="admin-button secondary" type="button" data-create-invite-link>Создать ссылку</button>
+      </div>
       <form class="admin-invite-grid" data-invite-form>
         <label class="admin-field"><span>Имя</span><input name="name" placeholder="Имя"></label>
         <label class="admin-field"><span>Email</span><input name="email" type="email" placeholder="name@example.com" required></label>
         <button class="admin-button" type="submit">Отправить приглашение</button>
       </form>
+      <div class="admin-invite-link" data-invite-link hidden>
+        <label class="admin-field">
+          <span>Ссылка для регистрации</span>
+          <input type="text" readonly data-invite-link-value>
+        </label>
+        <button class="admin-button secondary" type="button" data-copy-invite-link>Копировать</button>
+      </div>
       <p class="admin-inline-message" data-invite-message></p>
     </section>
     <div class="admin-card">
@@ -185,6 +197,51 @@ function renderTenants() {
 
   const form = content.querySelector('[data-invite-form]');
   const message = content.querySelector('[data-invite-message]');
+  const createLinkButton = content.querySelector('[data-create-invite-link]');
+  const inviteLinkBox = content.querySelector('[data-invite-link]');
+  const inviteLinkInput = content.querySelector('[data-invite-link-value]');
+  const copyLinkButton = content.querySelector('[data-copy-invite-link]');
+
+  createLinkButton?.addEventListener('click', async () => {
+    message.textContent = '';
+    message.classList.remove('error');
+    createLinkButton.disabled = true;
+    createLinkButton.textContent = 'Создаём…';
+    try {
+      const result = await adminRequest('/manual-invitations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      const url = String(result?.url || '').trim();
+      if (!url) throw new Error('Ссылка не получена');
+      inviteLinkInput.value = url;
+      inviteLinkBox.hidden = false;
+      message.textContent = 'Ссылка создана. Она действует 7 дней и используется один раз.';
+      await refreshData();
+    } catch (error) {
+      message.textContent = error instanceof Error ? error.message : 'Не удалось создать ссылку';
+      message.classList.add('error');
+    } finally {
+      createLinkButton.disabled = false;
+      createLinkButton.textContent = 'Создать ссылку';
+    }
+  });
+
+  copyLinkButton?.addEventListener('click', async () => {
+    const url = String(inviteLinkInput?.value || '').trim();
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      inviteLinkInput.focus();
+      inviteLinkInput.select();
+      document.execCommand('copy');
+    }
+    copyLinkButton.textContent = 'Скопировано';
+    window.setTimeout(() => { copyLinkButton.textContent = 'Копировать'; }, 1200);
+  });
+
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     message.textContent = '';
@@ -232,12 +289,114 @@ function renderTenants() {
 
 function tenantRow(item) {
   const pending = !item.ownerProfile && item.invitation?.status === 'PENDING';
+  const invitationEmail = String(item.invitation?.email || '');
+  const inviteLinkBox = invitationEmail.endsWith('@registration.invalid');
   const name = item.ownerProfile?.name || item.invitation?.name || item.tenantName;
-  const email = item.ownerProfile?.email || item.invitation?.email || '';
+  const email = item.ownerProfile?.email || (inviteLinkBox ? '' : invitationEmail);
   const statusClass = item.status === 'SUSPENDED' ? 'suspended' : pending ? 'pending' : 'active';
-  const statusLabel = item.status === 'SUSPENDED' ? 'Отключён' : pending ? 'Ждёт входа' : item.ownerProfile ? 'Активен' : 'Создан';
-  const resend = pending ? `<button class="admin-button secondary" data-resend="${escapeHtml(item.invitation.id)}">Повторить email</button>` : '';
-  return `<tr data-tenant="${escapeHtml(item.tenantId)}"><td><strong>${escapeHtml(name)}</strong></td><td>${escapeHtml(email)}</td><td><span class="admin-pill ${statusClass}">${statusLabel}</span> ${resend}</td><td>${escapeHtml(item.plan?.name || 'Индивидуальный')}</td></tr>`;
+  const statusLabel = item.status === 'SUSPENDED'
+    ? 'Отключён'
+    : inviteLinkBox && pending
+      ? 'Ждёт регистрации'
+      : pending
+        ? 'Ждёт входа'
+        : item.ownerProfile
+          ? 'Активен'
+          : 'Создан';
+  const resend = pending && !inviteLinkBox ? `<button class="admin-button secondary" data-resend="${escapeHtml(item.invitation.id)}">Повторить email</button>` : '';
+  return `<tr data-tenant="${escapeHtml(item.tenantId)}"><td><strong>${escapeHtml(name)}</strong></td><td>${email ? escapeHtml(email) : '—'}</td><td><span class="admin-pill ${statusClass}">${statusLabel}</span> ${resend}</td><td>${escapeHtml(item.plan?.name || 'Индивидуальный')}</td></tr>`;
+}
+
+
+function platformCommunicationStatus(item) {
+  if (item.status === 'sent') return { label: 'Отправлено', className: 'active' };
+  if (item.status === 'failed') return { label: 'Ошибка', className: 'suspended' };
+  return { label: 'Создано', className: 'pending' };
+}
+
+function platformCommunicationDate(value) {
+  const date = new Date(value || 0);
+  return Number.isFinite(date.getTime())
+    ? new Intl.DateTimeFormat('ru-RU', { dateStyle: 'short', timeStyle: 'short' }).format(date)
+    : '';
+}
+
+async function renderPlatformCommunications() {
+  setActiveSection('Технические письма');
+  const content = app.querySelector('[data-content]');
+  const recipients = state.tenants.filter((item) => item.ownerProfile?.email);
+  content.innerHTML = '<div class="admin-heading"><div><h2>Технические письма</h2><p>Загружаем историю сообщений.</p></div></div>';
+
+  try {
+    const history = await adminRequest('/communications');
+    const recipientOptions = recipients.map((item) => {
+      const label = item.ownerProfile?.name || item.tenantName || item.ownerProfile.email;
+      return `<option value="${escapeHtml(item.tenantId)}">${escapeHtml(label)} — ${escapeHtml(item.ownerProfile.email)}</option>`;
+    }).join('');
+    const rows = (Array.isArray(history) ? history : []).map((item) => {
+      const status = platformCommunicationStatus(item);
+      return `<tr>
+        <td><strong>${escapeHtml(item.recipientName || item.recipientEmail)}</strong><br><span class="admin-muted">${escapeHtml(item.recipientEmail)}</span></td>
+        <td>${escapeHtml(item.subject)}</td>
+        <td><span class="admin-pill ${status.className}">${status.label}</span></td>
+        <td>${escapeHtml(platformCommunicationDate(item.sentAt || item.createdAt))}</td>
+      </tr>`;
+    }).join('');
+
+    content.innerHTML = `
+      <div class="admin-heading"><div><h2>Технические письма</h2><p>Сервисные сообщения владельцам профилей.</p></div></div>
+      <section class="admin-invite-panel">
+        <h3>Новое письмо</h3>
+        <div class="admin-service-note">Только сервисные и технические письма. Рекламные сообщения отправляются через отдельный контур.</div>
+        <form class="admin-form admin-communication-form" data-platform-email-form>
+          <label class="admin-field"><span>Получатель</span><select name="tenantId" required><option value="">Выберите профиль</option>${recipientOptions}</select></label>
+          <label class="admin-field"><span>Тема</span><input name="subject" maxlength="200" required></label>
+          <label class="admin-field"><span>Текст</span><textarea name="body" rows="8" maxlength="20000" required></textarea></label>
+          <div><button class="admin-button" type="submit" ${recipients.length ? '' : 'disabled'}>Отправить письмо</button></div>
+        </form>
+        <p class="admin-inline-message" data-platform-email-message></p>
+      </section>
+      <div class="admin-card">
+        <table class="admin-table">
+          <thead><tr><th>Получатель</th><th>Тема</th><th>Статус</th><th>Дата</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="4">Технических писем пока нет.</td></tr>'}</tbody>
+        </table>
+      </div>`;
+
+    const form = content.querySelector('[data-platform-email-form]');
+    const message = content.querySelector('[data-platform-email-message]');
+    form?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const button = form.querySelector('button[type="submit"]');
+      const data = new FormData(form);
+      message.textContent = '';
+      message.classList.remove('error');
+      button.disabled = true;
+      button.textContent = 'Отправляем…';
+      try {
+        const sent = await adminRequest('/communications/email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tenantId: data.get('tenantId'),
+            subject: data.get('subject'),
+            body: data.get('body'),
+          }),
+        });
+        message.textContent = `Письмо отправлено на ${sent.recipientEmail || 'email получателя'}.`;
+        form.reset();
+        window.setTimeout(() => void renderPlatformCommunications(), 500);
+      } catch (error) {
+        message.textContent = error instanceof Error ? error.message : 'Не удалось отправить письмо';
+        message.classList.add('error');
+        button.disabled = false;
+        button.textContent = 'Отправить письмо';
+      }
+    });
+  } catch (error) {
+    content.innerHTML = `<div class="admin-heading"><div><h2>Технические письма</h2></div></div>
+      <div class="admin-card admin-history-empty">${escapeHtml(error instanceof Error ? error.message : 'Не удалось загрузить технические письма')}</div>`;
+  }
 }
 
 function renderCapabilities() {
