@@ -1,4 +1,6 @@
-// Pure finance rules. No persistence, UI or browser state.
+// Pure Settlement/Finance rules. No persistence, UI or browser state.
+// Legacy persisted fields such as planAmount/planTotal/fact* stay unchanged until the storage migration;
+// they are compatibility fields and are not the future Financial Model.
 
 export function financialNumber(value) {
   const number = Number(String(value ?? '').replace(',', '.'));
@@ -28,7 +30,7 @@ function discountMode(item = {}, defaultPercent = 0) {
   return defaultPercent > 0 ? 'percent' : 'none';
 }
 
-export function recordFinancialItems(record = null) {
+export function recordSettlementItems(record = null) {
   const procedures = Array.isArray(record?.procedures) ? record.procedures : [];
   const products = Array.isArray(record?.products) ? record.products : [];
   return [
@@ -37,7 +39,7 @@ export function recordFinancialItems(record = null) {
   ];
 }
 
-export function calculateFinancialPlan(items = [], { discountPercent = 0 } = {}) {
+export function calculateSettlement(items = [], { discountPercent = 0 } = {}) {
   const defaultPercent = clampFinancialPercent(discountPercent);
   const prepared = (Array.isArray(items) ? items : []).map((item) => {
     const price = Math.max(0, financialNumber(item?.price ?? item?.cost));
@@ -76,7 +78,7 @@ export function calculateFinancialPlan(items = [], { discountPercent = 0 } = {})
   };
 }
 
-export function repriceFinancialPlan(sources = [], currentFinance = null) {
+export function repriceSettlement(sources = [], currentFinance = null) {
   const priorItems = Array.isArray(currentFinance?.items) ? currentFinance.items : [];
   const bySource = new Map(priorItems.map((item) => [sourceKey(item), item]));
   const defaultDiscount = currentFinance?.discountPercent == null ? 0 : clampFinancialPercent(currentFinance.discountPercent);
@@ -99,18 +101,18 @@ export function repriceFinancialPlan(sources = [], currentFinance = null) {
     }
     return { ...base, discountMode: 'none' };
   });
-  return calculateFinancialPlan(items, { discountPercent: defaultDiscount });
+  return calculateSettlement(items, { discountPercent: defaultDiscount });
 }
 
-export function isStoredFinancialPlan(value = null) {
+export function isStoredSettlement(value = null) {
   return Boolean(value && typeof value === 'object'
     && Array.isArray(value.items)
     && Number.isFinite(Number(value.planTotal ?? value.dueTotal)));
 }
 
-export function normalizeStoredFinancialPlan(value = null) {
-  if (!isStoredFinancialPlan(value)) return null;
-  return calculateFinancialPlan(value.items, { discountPercent: value.discountPercent ?? 0 });
+export function normalizeStoredSettlement(value = null) {
+  if (!isStoredSettlement(value)) return null;
+  return calculateSettlement(value.items, { discountPercent: value.discountPercent ?? 0 });
 }
 
 export function movementServiceAmount(item = null) {
@@ -123,14 +125,14 @@ export function movementServiceAmount(item = null) {
   return Math.max(0, financialNumber(item?.serviceAmount ?? item?.total));
 }
 
-export function calculateFinancialFact(plan = null, movements = []) {
+export function calculateSettlementTotals(settlement = null, movements = []) {
   const income = (Array.isArray(movements) ? movements : [])
     .filter((item) => item?.movementType === 'income')
     .reduce((sum, item) => sum + movementServiceAmount(item), 0);
   const expense = (Array.isArray(movements) ? movements : [])
     .filter((item) => item?.movementType === 'expense')
     .reduce((sum, item) => sum + movementServiceAmount(item), 0);
-  return { ...(plan || {}), factIncome: income, factExpense: expense, factTotal: income - expense };
+  return { ...(settlement || {}), factIncome: income, factExpense: expense, factTotal: income - expense };
 }
 
 export function normalizedAllocations(payment = null) {
@@ -158,10 +160,10 @@ export function paymentNet(payment, movements = []) {
   return Math.max(0, financialNumber(payment?.total) - refunded);
 }
 
-export function calculateRecordPaymentState(plan = null, movements = []) {
-  const fact = calculateFinancialFact(plan, movements);
-  const paidTotal = Math.max(0, financialNumber(fact.factTotal));
-  const remaining = Math.max(0, financialNumber(plan?.planTotal) - paidTotal);
+export function calculateSettlementPaymentState(settlement = null, movements = []) {
+  const totals = calculateSettlementTotals(settlement, movements);
+  const paidTotal = Math.max(0, financialNumber(totals.factTotal));
+  const remaining = Math.max(0, financialNumber(settlement?.planTotal) - paidTotal);
   const tipsIncome = (Array.isArray(movements) ? movements : [])
     .filter((item) => item?.movementType === 'income')
     .reduce((sum, item) => sum + Math.max(0, financialNumber(item?.tips)), 0);
@@ -172,9 +174,9 @@ export function calculateRecordPaymentState(plan = null, movements = []) {
   const payments = (Array.isArray(movements) ? movements : [])
     .filter((item) => item?.movementType === 'income' && paymentNet(item, movements) > 0.009)
     .sort((a, b) => String(a?.createdAt || '').localeCompare(String(b?.createdAt || '')));
-  const fullyPaid = financialNumber(plan?.planTotal) > 0 && remaining <= 0.009;
+  const fullyPaid = financialNumber(settlement?.planTotal) > 0 && remaining <= 0.009;
   return {
-    ...fact,
+    ...totals,
     paidTotal,
     remaining,
     tipsTotal,
@@ -186,7 +188,7 @@ export function calculateRecordPaymentState(plan = null, movements = []) {
   };
 }
 
-function itemPlanAmount(item = null) {
+function itemSettlementAmount(item = null) {
   if (!item) return 0;
   if (Number.isFinite(Number(item.planAmount))) return Math.max(0, financialNumber(item.planAmount));
   const price = Math.max(0, financialNumber(item.price));
@@ -199,17 +201,17 @@ function movementItemAmount(movement = null, sourceTypeValue = '', sourceIdValue
   const id = String(sourceIdValue || '');
   const type = String(sourceTypeValue || '');
   if (!id || !items.length) return 0;
-  const totalPlan = Math.max(0, financialNumber(finance?.planTotal ?? finance?.dueTotal));
-  if (!totalPlan) return 0;
-  const itemPlan = items
+  const settlementTotal = Math.max(0, financialNumber(finance?.planTotal ?? finance?.dueTotal));
+  if (!settlementTotal) return 0;
+  const settlementItemTotal = items
     .filter((item) => String(item?.sourceId || '') === id
       && (!type || !item?.sourceType || String(item.sourceType) === type))
-    .reduce((sum, item) => sum + itemPlanAmount(item), 0);
-  if (!itemPlan) return 0;
-  return movementServiceAmount(movement) * (itemPlan / totalPlan);
+    .reduce((sum, item) => sum + itemSettlementAmount(item), 0);
+  if (!settlementItemTotal) return 0;
+  return movementServiceAmount(movement) * (settlementItemTotal / settlementTotal);
 }
 
-export function calculateFinancialItemFact(movements = [], sourceTypeValue = '', sourceIdValue = '') {
+export function calculateSettlementItemTotals(movements = [], sourceTypeValue = '', sourceIdValue = '') {
   let factIncome = 0;
   let factExpense = 0;
   (Array.isArray(movements) ? movements : []).forEach((movement) => {
