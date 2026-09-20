@@ -25,6 +25,8 @@ export {
   getRecordEvents,
   hasRecordEvent,
   RECORD_EVENT_TYPES,
+  RECORD_EVENT_CATEGORIES,
+  recordEventCategory,
 } from './events.js';
 export {
   isRecordCompletedSide,
