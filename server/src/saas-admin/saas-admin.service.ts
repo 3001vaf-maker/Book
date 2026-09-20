@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma.service';
 import { SaasAccessService } from '../saas-access/saas-access.service';
 import { TenantInvitationService } from '../tenant-invitation/tenant-invitation.service';
 import { DocumentRegistryService } from '../document-registry/document-registry.service';
+import { TransactionalEmailService } from '../transactional-email/transactional-email.service';
 
 @Injectable()
 export class SaasAdminService {
@@ -12,6 +13,7 @@ export class SaasAdminService {
     private readonly access: SaasAccessService,
     private readonly invitations: TenantInvitationService,
     private readonly documentRegistry: DocumentRegistryService,
+    private readonly email: TransactionalEmailService,
   ) {}
 
   async me(adminId: string, platformAccountId: string) {
@@ -94,6 +96,61 @@ export class SaasAdminService {
         access: resolved,
       };
     }));
+  }
+
+  async sendTechnicalEmail(tenantId: string, input: { subject?: unknown; body?: unknown }) {
+    const subject = String(input?.subject || '').trim();
+    const body = String(input?.body || '').trim();
+    if (!subject) throw new BadRequestException('Введите тему письма');
+    if (!body) throw new BadRequestException('Введите текст письма');
+    if (subject.length > 200) throw new BadRequestException('Тема письма слишком длинная');
+    if (body.length > 20000) throw new BadRequestException('Текст письма слишком длинный');
+
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      include: {
+        memberships: {
+          include: { account: { select: { id: true, email: true } } },
+          orderBy: { createdAt: 'asc' },
+          take: 1,
+        },
+        profiles: {
+          select: { platformAccountId: true, name: true, surname: true },
+        },
+      },
+    });
+    if (!tenant) throw new NotFoundException('Профиль не найден');
+
+    const membership = tenant.memberships[0];
+    if (!membership) throw new BadRequestException('У профиля ещё нет учётной записи');
+
+    const recipientEmail = String(membership.account.email || '').trim().toLowerCase();
+    if (!recipientEmail || !recipientEmail.includes('@')) throw new BadRequestException('У профиля нет корректного email');
+
+    const profile = tenant.profiles.find((item) => item.platformAccountId === membership.platformAccountId);
+    const recipientName = [profile?.name, profile?.surname].filter(Boolean).join(' ') || tenant.name;
+    const escaped = body.replace(/[&<>"']/g, (char) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#039;',
+    })[char] || char);
+
+    const sent = await this.email.send({
+      to: recipientEmail,
+      toName: recipientName,
+      subject,
+      text: body,
+      html: `<div style="font-family:Arial,sans-serif;white-space:pre-wrap">${escaped}</div>`,
+      tag: 'platform-service',
+    });
+
+    return {
+      recipientEmail,
+      recipientName,
+      messageId: sent.messageId,
+    };
   }
 
   async updateTenantAccess(tenantId: string, input: {
