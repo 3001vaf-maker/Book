@@ -3,6 +3,7 @@ import { Prisma, Workplace as WorkplaceRow } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 
 type ProfileInput = {
+  id?: string;
   key: string;
   name: string;
   surname: string;
@@ -197,6 +198,7 @@ export class ProfileService {
     }
 
     const profile: ProfileInput = {
+      id: row.id,
       key: row.key,
       name: row.name,
       surname: row.surname,
