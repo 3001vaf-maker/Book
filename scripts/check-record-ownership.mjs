@@ -43,14 +43,15 @@ if (!/getRecordRows/.test(recordData)
 if (!/from '.\/data\.js'/.test(recordRead)
   || !/from '.\/events\.js'/.test(recordRead)
   || !/from '.\/state\.js'/.test(recordRead)
-  || !/hydrateRecordSettlement/.test(recordRead)) {
-  errors.push('core/record/read.js: read model must compose storage + lifecycle + finance');
+  || /finance\/index\.js|hydrateRecordSettlement/.test(recordRead)) {
+  errors.push('core/record/read.js: Record read model must compose only Record storage + lifecycle; Finance is an external projection');
 }
 
 if (!/from '.\/data\.js'/.test(recordService)
   || !/from '.\/read\.js'/.test(recordService)
   || !/from '.\/events\.js'/.test(recordService)
-  || !/checkTimeAvailability/.test(recordService)) {
+  || !/checkTimeAvailability/.test(recordService)
+  || /finance\/index\.js/.test(recordService)) {
   errors.push('core/record/service.js: command service must own Record mutations');
 }
 if (!/appendRecordEvent/.test(recordService) || !/RECORD_EVENT_TYPES\.CANCELLED/.test(recordService) || !/RECORD_EVENT_TYPES\.RESCHEDULED/.test(recordService)) {
@@ -71,13 +72,19 @@ if (!/from '.\/data\.js'/.test(recordEvents)
 if (!/projectRecordLifecycle/.test(recordState) || !/RECORD_EVENT_TYPES/.test(recordState)) {
   errors.push('core/record/state.js: Record State must be projected from lifecycle facts');
 }
+if (/recordPaymentStatus|projectRecordStatuses/.test(recordState)) {
+  errors.push('core/record/state.js: Record must not own paid/debt/due status');
+}
 
 if (!/export class RecordService/.test(serverRecord)
   || !/this\.time\.checkAvailability/.test(serverRecord)
   || !/this\.procedures\.snapshots/.test(serverRecord)
-  || !/this\.finance\.calculateSettlement/.test(serverRecord)
+  || !/this\.finance\.recordSettlement/.test(serverRecord)
   || !/async listForPeople/.test(serverRecord)) {
-  errors.push('server RecordService must compose through Time, Procedure and Finance Settlement owners');
+  errors.push('server RecordService must own Record facts and consume Finance projections only for read DTOs');
+}
+if (/this\.finance\.calculateSettlement/.test(serverRecord) || /finance:\s*settlement/.test(serverRecord)) {
+  errors.push('server RecordService must not calculate or persist Settlement');
 }
 if (/createOnlineBookingRecord|publicBookingOccupancy|bookingRecordSnapshot/.test(serverBusinessState)) {
   errors.push('BusinessState must not own Record creation, occupancy or Booking snapshot adapters');
@@ -90,6 +97,9 @@ if (!/this\.records\.create/.test(serverBooking) || !/this\.records\.publicOccup
 }
 if (/recordSnapshot/.test(accountShell) || !/getAccountRecords/.test(accountShell)) {
   errors.push('Account history must consume canonical Records, never BookingRequest snapshots');
+}
+if (/projectRecordStatuses/.test(accountShell)) {
+  errors.push('Account UI must compose Record lifecycle and Finance payment projection without delegating payment status to Record Core');
 }
 if (!/model Record\s*\{/.test(prismaSchema)
   || !/model RecordEvent\s*\{/.test(prismaSchema)
