@@ -26,4 +26,4 @@ export {
   resolveRecordSettlement,
 } from './settlement.js';
 export { hydrateFinanceFromServer } from './data.js';
-export { cancelPaymentOperation, recordPaymentIncome, recordRefundExpense } from './service.js';
+export { cancelPaymentOperation, recordPaymentIncome, recordRefundExpense, refreshFinanceState, saveSettlementSnapshot } from './service.js';
