@@ -53,6 +53,9 @@ model Tenant {
   businessOperationalState BusinessOperationalState?
   documentArchive          TenantDocumentArchive?
   businessAuxiliaryState   BusinessAuxiliaryState?
+  financeSettlements       FinanceSettlement[]
+  financeOperations        FinanceOperation[]
+  financeLedgerEntries     FinanceLedgerEntry[]
   saasAccess               TenantAccess?
   tenantInvitations        TenantInvitation[]
 }
@@ -323,6 +326,67 @@ model BusinessAuxiliaryState {
   updatedAt           DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model FinanceSettlement {
+  id         String   @id @default(cuid())
+  tenantId   String
+  sourceType String
+  sourceId   String
+  data       Json
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, sourceType, sourceId])
+  @@index([tenantId, sourceType])
+}
+
+model FinanceOperation {
+  id                  String   @id @default(cuid())
+  tenantId            String
+  operationId         String
+  kind                String
+  status              String   @default("completed")
+  sourceType          String
+  sourceId            String
+  originalOperationId String   @default("")
+  occurredAt          DateTime
+  data                Json
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  tenant        Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  ledgerEntries FinanceLedgerEntry[]
+
+  @@unique([tenantId, operationId])
+  @@index([tenantId, sourceType, sourceId])
+  @@index([tenantId, occurredAt])
+}
+
+model FinanceLedgerEntry {
+  id                 String   @id @default(cuid())
+  tenantId           String
+  financeOperationId String
+  entryId            String
+  walletId           String
+  direction          String
+  economicType       String
+  amount             Decimal  @db.Decimal(14, 2)
+  occurredAt         DateTime
+  sourceType         String
+  sourceId           String
+  data               Json
+  createdAt          DateTime @default(now())
+
+  tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  operation FinanceOperation @relation(fields: [financeOperationId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, entryId])
+  @@index([tenantId, walletId, occurredAt])
+  @@index([tenantId, sourceType, sourceId])
+  @@index([financeOperationId])
 }
 
 model PlatformAdmin {
