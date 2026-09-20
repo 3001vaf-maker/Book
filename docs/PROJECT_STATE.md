@@ -63,15 +63,22 @@ The old browser-to-server migration phase is complete. Do not restore browser bu
 
 ## Finance
 
-Finance ownership lives under `core/finance/`:
-- `model.js` — plan/fact calculations;
-- `data.js` — persistence boundary;
-- `read.js` — projections/read model;
-- `rules.js` — pure financial rules;
-- `service.js` — financial commands/actions;
-- `index.js` — only public contract.
+Finance is under an ordered ownership rebuild. The single canonical contract and checklist are in `docs/FINANCE_ARCHITECTURE.md`.
 
-DDS movements are finance facts; Wallet is wallet metadata/balance projection; Record stores appointment financial snapshot. Do not reintroduce old parallel owners such as top-level `core/dds.js` or `core/financial-model.js`.
+Target ownership:
+- Settlement / Расчёт — accrued / due / paid / refunded / outstanding calculation for a concrete source;
+- Ledger / DDS — every factual money movement;
+- Operation — grouping of related Ledger rows;
+- Articles — user-extensible hierarchy plus system economic character;
+- Wallet / Касса — metadata only; balance/history are Ledger projections;
+- Z-report — Ledger projection for a day/period;
+- Financial Model / Финансовая модель — RESERVED future planning/analysis instrument, not operational payment logic.
+
+Record is not a money owner. It supplies appointment/source facts and snapshots; Finance owns payment commands and money facts.
+
+Current legacy names such as `core/finance/model.js` and Record-oriented “financial plan/fact” are migration debt, not the future Financial Model contract.
+
+The user-facing Finance folder remains `main/finance/`. The future Financial Model may later be manifested under Finance or a future Analytics folder; this UI placement is intentionally undecided.
 
 ## Production-visible contour
 
@@ -118,9 +125,38 @@ The isolated development contour now exists in code:
 - staging fixtures contain synthetic profile/workplace/client/record/payment data;
 - Check Book runs on pushes and PRs for both `staging` and `main`.
 
-The previously queued Auth transactional communication block is paused. The active functional block is the Record ownership cleanup below.
+The previously queued Auth transactional communication block is paused.
 
-## Active block — Record ownership cleanup (2026-09-20)
+## Active block — Finance ownership rebuild (2026-09-20)
+
+Source checkpoint: `staging@29999b2c67a4678ad9692c83aee8a246d505e4d4`.
+
+Working branch: `feature/finance-ownership-rebuild-20260920`.
+
+Continuity anchor: `docs/FINANCE_ARCHITECTURE.md`.
+
+Current status:
+- F0: DONE — canonical Finance ownership and ordered F0-F12 migration chain are documented. Check Book #1966 passed all three jobs on the pre-close head; the final documentation-close head must also be green before merge to staging.
+- F1-F12: NOT STARTED.
+- No Finance runtime behavior has been changed in F0.
+- `main` must not receive this rebuild until F0-F12 are complete and the exact staging release head is fully verified.
+
+Non-negotiable ownership:
+- Record does not own money movement or payment truth.
+- Settlement owns amount-due / paid / debt calculation for a concrete source.
+- Ledger/DDS owns factual money movement.
+- Wallet balance/history are Ledger projections.
+- Financial Model is reserved for a future plan/fact analytical instrument and must not be reused for Settlement.
+- Future Financial Model UI placement (Finance vs future Analytics) remains intentionally undecided.
+
+Stop rule:
+- complete one Finance stage;
+- run its tests/guards and inspect the diff;
+- mark the checkbox in `docs/FINANCE_ARCHITECTURE.md`;
+- only then begin the next stage.
+- merge to production `main` only after the entire Finance rebuild is complete and verified.
+
+## Completed block — Record ownership cleanup (2026-09-20)
 
 Source checkpoint: `main@fcd7d748bfdd5bb01be832927c52237fb8816ad8`.
 
