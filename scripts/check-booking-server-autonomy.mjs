@@ -29,7 +29,7 @@ assert(requestBlock.includes('importedRecordId: text(record.id)'), 'BookingReque
 assert(!requestBlock.includes('recordSnapshot'), 'BookingRequest must not own a post-create Record snapshot');
 
 assert(service.includes('this.records.publicOccupancy('), 'Online Booking availability must read canonical Record occupancy');
-assert(service.includes('this.time.checkAvailability('), 'Online Booking must use the server Time owner');
+assert(!service.includes('this.time.checkAvailability('), 'Online Booking must not own final availability checks');
 assert(!service.includes('function timeToMinutes('), 'Online Booking must not reimplement time parsing');
 assert(!service.includes('function rangesOverlap('), 'Online Booking must not reimplement overlap rules');
 assert(!service.includes('function procedureCost('), 'Online Booking must not reimplement procedure price ownership');
