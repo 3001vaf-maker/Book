@@ -35,7 +35,7 @@ export class CommunicationDispatchService {
     const preferences = await this.history.getPreferences(tenantId, input || {});
     const preferred = preferences.preferredChannels.find((channel) => available.includes(channel));
     const selected = preferred || available[0] || '';
-    if (!selected) throw new NotFoundException('У человека нет доступного двустороннего канала');
+    if (!selected) throw new NotFoundException('У человека нет доступного канала');
     return selected;
   }
 
