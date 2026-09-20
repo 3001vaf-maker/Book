@@ -502,7 +502,7 @@ One step must be completed, tested and checked before the next step is marked co
 - [x] Identify duplicate calculations and duplicate state owners.
 - [x] Identify all docs/guards/tests that encode the old Financial Model meaning.
 - [x] Produce explicit current-owner -> target-owner mapping before runtime changes.
-- [ ] Final F1 exact-head Check Book / diff review / PR-to-staging verification.
+- [x] F1 inventory/diff verified on Check Book #1969; final documentation-close head must also pass before merge to staging.
 
 ### F2 — Rename old “Financial Model” responsibility to Settlement
 - [ ] Rename internal responsibility without changing money behavior first.
