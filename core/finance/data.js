@@ -1,6 +1,6 @@
 import { queueAuxiliaryDataset } from '../business-persistence.js';
 
-// Finance persistence only. Business meaning belongs to rules/model/service.
+// Finance persistence only. Business meaning belongs to rules/settlement/service.
 const VERSION = 5;
 let financeState = emptyState();
 
@@ -22,7 +22,7 @@ function emptyState() {
   return { version: VERSION, income: [], expense: [] };
 }
 
-function normalizeFinancialSnapshot(value = null) {
+function normalizeSettlementSnapshot(value = null) {
   if (!value || typeof value !== 'object') return null;
   return {
     items: Array.isArray(value.items) ? value.items.map((item) => ({ ...item })) : [],
@@ -53,7 +53,7 @@ function normalizeIncome(item = {}) {
     serviceAmount,
     tips,
     allocations: Array.isArray(item.allocations) ? item.allocations.map((entry) => ({ ...entry })) : [],
-    finance: normalizeFinancialSnapshot(currentFinance || legacyFinancialSnapshot(item)),
+    finance: normalizeSettlementSnapshot(currentFinance || legacyFinancialSnapshot(item)),
   };
 }
 
@@ -72,7 +72,7 @@ function normalizeExpense(item = {}) {
     total,
     serviceAmount,
     tips,
-    finance: normalizeFinancialSnapshot(currentFinance || legacyFinancialSnapshot(item)),
+    finance: normalizeSettlementSnapshot(currentFinance || legacyFinancialSnapshot(item)),
   };
 }
 
@@ -86,7 +86,7 @@ function normalizedState(value) {
     income.forEach((entry) => {
       if (entry.finance) return;
       const legacy = bySource.get(sourceKey(entry?.source));
-      if (legacy) entry.finance = normalizeFinancialSnapshot(legacy);
+      if (legacy) entry.finance = normalizeSettlementSnapshot(legacy);
     });
   }
   return { version: VERSION, income, expense };
