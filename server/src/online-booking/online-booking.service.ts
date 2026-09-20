@@ -478,6 +478,7 @@ export class OnlineBookingService {
         person: personSnapshot,
         procedures,
         sourceRequestId: request.id,
+        actor: { type: 'account', accountId: account.id, profileId: '' },
       });
       const liveSnapshot = await this.businessState.bookingRecordSnapshot(tenantId, text(record.id), recordSnapshot);
       const imported = await this.prisma.bookingRequest.update({
