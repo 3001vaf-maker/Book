@@ -19,7 +19,7 @@ function walk(dir) {
     const file = join(dir, name);
     const stat = statSync(file);
     if (stat.isDirectory()) files.push(...walk(file));
-    else if (/\.(?:js|mjs)$/.test(name)) files.push(file);
+    else if (/\.(?:js|mjs|ts)$/.test(name)) files.push(file);
   }
   return files;
 }
