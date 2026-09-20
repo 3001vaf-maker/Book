@@ -97,7 +97,7 @@ Record — отдельный Core-домен. `journal/record.js`, `journal/rec
 
 Record хранит факт записи и необходимые source snapshots, но не является владельцем денежного движения или независимого payment truth.
 
-Текущие legacy-имена вроде `core/finance/model.js` и Record-oriented “financial plan/fact” подлежат поэтапной миграции в Settlement по `docs/FINANCE_ARCHITECTURE.md`. Пока миграция не завершена, этот документ и `docs/FINANCE_ARCHITECTURE.md` определяют целевую терминологию; старые имена не являются разрешением создавать новые зависимости на них.
+F2 удаляет legacy-атом `core/finance/model.js` и старые Record-oriented `FinancialPlan/plan-fact` API. Операционный расчёт называется только `Settlement / Расчёт`. Legacy JSON-поля `record.finance`, `planAmount`, `planTotal`, `fact*` временно сохраняются как совместимость хранения до следующих этапов и не означают Financial Model.
 
 Старые параллельные владельцы `core/dds.js`, `core/financial-model.js`, `core/payment.js` запрещены. Настоящая Financial Model не создаётся до отдельного будущего проекта.
 
