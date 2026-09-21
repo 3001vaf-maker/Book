@@ -304,6 +304,24 @@ function renderTenants() {
       }
     });
   });
+
+  content.querySelectorAll('[data-delete-invitation]').forEach((button) => {
+    button.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      const invitationId = button.dataset.deleteInvitation;
+      if (!invitationId) return;
+      if (!window.confirm('Удалить эту незавершённую регистрацию и все её пустые технические данные?')) return;
+      button.disabled = true;
+      try {
+        await adminRequest(`/invitations/${encodeURIComponent(invitationId)}`, { method: 'DELETE' });
+        await refreshData();
+        renderTenants();
+      } catch (error) {
+        alert(error instanceof Error ? error.message : 'Не удалось удалить запись');
+        button.disabled = false;
+      }
+    });
+  });
 }
 
 function tenantRow(item) {
@@ -318,7 +336,10 @@ function tenantRow(item) {
   const technicalEmail = item.ownerProfile?.email
     ? `<button class="admin-button secondary" data-email-tenant="${escapeHtml(item.tenantId)}">Письмо</button>`
     : '';
-  return `<tr data-tenant="${escapeHtml(item.tenantId)}"><td><strong>${escapeHtml(name)}</strong></td><td>${email ? escapeHtml(email) : '—'}</td><td><span class="admin-pill ${statusClass}">${resolvedStatusLabel}</span> ${resend} ${technicalEmail}</td><td>${escapeHtml(item.plan?.name || 'Индивидуальный')}</td></tr>`;
+  const remove = pending && item.invitation?.id
+    ? `<button class="admin-button danger" data-delete-invitation="${escapeHtml(item.invitation.id)}">Удалить</button>`
+    : '';
+  return `<tr data-tenant="${escapeHtml(item.tenantId)}"><td><strong>${escapeHtml(name)}</strong></td><td>${email ? escapeHtml(email) : '—'}</td><td><span class="admin-pill ${statusClass}">${resolvedStatusLabel}</span> ${resend} ${technicalEmail} ${remove}</td><td>${escapeHtml(item.plan?.name || 'Индивидуальный')}</td></tr>`;
 }
 
 function renderCapabilities() {
