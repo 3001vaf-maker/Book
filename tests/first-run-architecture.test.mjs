@@ -13,6 +13,7 @@ const firstRun = source('server/src/first-run/first-run.service.ts');
 const access = source('server/src/saas-access/saas-access.service.ts');
 const runtime = source('first-run/runtime.js');
 const core = source('core.js');
+const indexHtml = source('index.html');
 const booking = source('server/src/online-booking/online-booking.service.ts');
 const dispatch = source('server/src/communication/communication-dispatch.service.ts');
 const people = source('main/people/people.js');
@@ -66,6 +67,10 @@ assert.match(runtime, /online-booking-welcome/);
 assert.match(runtime, /finance-dds/);
 assert.match(core, /FirstRunRuntime/);
 assert.match(core, /renderDemoExpired/);
+assert.doesNotMatch(core, /onboarding\/onboarding\.js/);
+assert.doesNotMatch(core, /renderOnboarding/);
+assert.doesNotMatch(core, /isOnboardingComplete/);
+assert.doesNotMatch(indexHtml, /ui\/onboarding\/onboarding\.css/);
 
 assert.match(booking, /assertRealOperationsAllowed\(tenantId\)/);
 assert.match(dispatch, /assertRealOperationsAllowed\(tenantId\)/);
