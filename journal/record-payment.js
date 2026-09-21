@@ -212,9 +212,13 @@ function openPaymentMethodsModal(payment, paymentModal) {
 function openPaymentModal(record) {
   if (paymentStateForRecord(record).fullyPaid) return;
   const current = getRecord(record?.id) || record;
+  const state = paymentStateForRecord(current);
   const payment = paymentFromRecord(current);
   const settlement = payment.settlement;
-  const content = `<div class="modal-title"><h2>Оплата</h2></div>${paymentForm({
+  const paymentHistory = state.hasPayments
+    ? `<div class="modal-actions">${button(`Оплачено ${money(state.paidTotal)} · История`, { variant: 'secondary', data: 'data-payment-history' })}</div>`
+    : '';
+  const content = `<div class="modal-title"><h2>Оплата</h2></div>${paymentHistory}${paymentForm({
     workplace: payment.workplace,
     date: payment.date,
     time: payment.time,
@@ -224,6 +228,7 @@ function openPaymentModal(record) {
   })}`;
   const m = mountModal(document.body, modal(content, { variant: 'large', surface: 'app' }));
   if (!m) return;
+  m.querySelector('[data-payment-history]')?.addEventListener('click', () => openPaidState(current));
   initPaymentForm(m.querySelector('[data-payment-ui]'), {
     calculate: (items) => calculateSettlement(items),
     onRemove: async ({ settlement: updatedSettlement }) => {
@@ -347,15 +352,23 @@ function openPaymentActions(payment) {
 
 function openPaidState(record) {
   const state = paymentStateForRecord(record);
-  if (!state.fullyPaid || !state.latestPayment) return;
-  const payment = state.latestPayment;
-  const refunds = getRefundsForPayment(payment.id);
-  const html = `<div class="modal-title"><h2>Оплачено</h2></div>${sourcePaymentFactMarkup(state)}${refundHistoryMarkup(refunds)}<div class="modal-actions">${button('Действия с оплатой', { variant: 'secondary', data: 'data-payment-actions' })}</div>`;
+  const payments = Array.isArray(state?.payments) ? state.payments : [];
+  if (!payments.length) return;
+  const summary = payments.length > 1 ? sourcePaymentFactMarkup(state) : '';
+  const paymentHistory = payments.map((payment, index) => {
+    const refunds = getRefundsForPayment(payment.id);
+    return `<section class="payment-history-item"><strong>Оплата ${index + 1}</strong>${paymentFactMarkup(payment)}${refundHistoryMarkup(refunds)}<div class="modal-actions">${button('Действия с оплатой', { variant: 'secondary', data: `data-payment-actions="${payment.id}"` })}</div></section>`;
+  }).join('');
+  const html = `<div class="modal-title"><h2>Оплаты</h2></div>${summary}${paymentHistory}`;
   const m = mountModal(document.body, modal(html, { variant: 'medium', surface: 'app' }));
   if (!m) return;
-  m.querySelector('[data-payment-actions]')?.addEventListener('click', () => {
-    m.remove();
-    openPaymentActions(payment);
+  m.querySelectorAll('[data-payment-actions]').forEach((element) => {
+    element.addEventListener('click', () => {
+      const payment = payments.find((item) => String(item?.id || '') === String(element.dataset.paymentActions || ''));
+      if (!payment) return;
+      m.remove();
+      openPaymentActions(payment);
+    });
   });
 }
 
