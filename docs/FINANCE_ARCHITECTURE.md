@@ -541,23 +541,24 @@ One step must be completed, tested and checked before the next step is marked co
 - [x] F2 behavior/diff verification passed on Check Book #1974; this documentation-close head must also pass exact-head Check Book before merge to staging.
 
 ### F3 — Remove payment ownership from Record
-- [ ] Record remains owner of appointment and immutable source snapshots only.
-- [ ] Record does not create money movements.
-- [ ] Record does not persist payment truth as an independent source.
-- [ ] Journal/payment UI only starts Finance commands and displays Finance projections.
-- [ ] Paid/debt state is derived by Settlement from amount due + Ledger facts.
+- [x] Record remains owner of appointment and source snapshots only; Settlement/payment truth lives in Finance.
+- [x] Record does not create money movements.
+- [x] Record does not persist payment truth as an independent source.
+- [x] Journal/payment UI only starts Finance commands and displays Finance projections.
+- [x] Paid/debt state is derived by Settlement from amount due + Ledger facts.
 
 ### F4 — Canonical Ledger / DDS
-- [ ] Define one flat Ledger-entry contract.
-- [ ] Every factual ruble IN/OUT has a timestamp, wallet, amount and economic classification.
-- [ ] Preserve immutable/cancel/refund audit history.
-- [ ] Migrate away from whole-Finance-JSON last-write ownership.
+- [x] Define one flat Ledger-entry contract.
+- [x] Every factual ruble IN/OUT has a timestamp, wallet, amount and economic classification.
+- [x] Preserve immutable/cancel/refund audit history through separate operations/reversal rows.
+- [x] Migrate away from whole-Finance-JSON last-write ownership; legacy auxiliary Finance is migration-only.
 
 ### F5 — Operation grouping
-- [ ] Introduce Operation identity.
-- [ ] One operation may create multiple Ledger rows.
-- [ ] Split-wallet payment remains one economic payment.
-- [ ] Detailed purchase may contain many lines without becoming unrelated expenses.
+- [x] Introduce Operation identity.
+- [x] One operation may create multiple Ledger rows.
+- [x] Split-wallet payment remains one economic payment.
+- [x] Detailed multi-line payment facts remain grouped by one Operation instead of becoming unrelated expenses.
+- [x] F3-F5 merged to `staging@b3819f4033424cec502244b667781e004d5796a0`; Check Book #1989 and post-merge Check Book #1990 passed all required jobs.
 
 ### F6 — Articles
 - [ ] Introduce user-extensible hierarchical article catalog.
