@@ -16,6 +16,8 @@ const booking = source('server/src/online-booking/online-booking.service.ts');
 const dispatch = source('server/src/communication/communication-dispatch.service.ts');
 const people = source('main/people/people.js');
 const admin = source('admin/admin.js');
+const notices = source('server/src/platform-notice/platform-notice.service.ts');
+const platformNoticesUi = source('core/platform-notices.js');
 
 assert.match(schema, /model FirstRunScenario\s*\{/);
 assert.match(schema, /model FirstRunScenarioVersion\s*\{/);
@@ -23,6 +25,7 @@ assert.match(schema, /model FirstRunProgress\s*\{/);
 assert.match(schema, /model FirstRunStepProgress\s*\{/);
 assert.match(schema, /model PlatformActivityEvent\s*\{/);
 assert.match(schema, /model PlatformSession\s*\{/);
+assert.match(schema, /model PlatformNotice\s*\{/);
 assert.match(schema, /commercialMode\s+String\s+@default\("DEMO"\)/);
 assert.match(schema, /demoActivatedAt\s+DateTime\?/);
 assert.match(schema, /demoExpiresAt\s+DateTime\?/);
@@ -65,6 +68,10 @@ assert.match(people, /canUseRealPersonalData/);
 assert.match(admin, /Первое знакомство/);
 assert.match(admin, /Продлить DEMO на 14 дней/);
 assert.match(admin, /data-capability-order-list/);
+assert.match(admin, /CAPABILITY_CHANGED/);
+assert.match(notices, /createForTenantOwner/);
+assert.match(platformNoticesUi, /platform-notices/);
+assert.match(core, /startPlatformNotices/);
 
 const order = [
   'profile',
