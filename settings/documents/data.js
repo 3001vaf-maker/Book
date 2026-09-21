@@ -40,6 +40,9 @@ function normalize(item = {}) {
     baseVersion: Math.max(0, Number(item.baseVersion || 0)),
     availableBaseVersion: Math.max(0, Number(item.availableBaseVersion || 0)),
     availableBookText: String(item.availableBookText || ''),
+    attachment: item.attachment && typeof item.attachment === 'object' && !Array.isArray(item.attachment)
+      ? clone(item.attachment)
+      : null,
   };
 }
 
