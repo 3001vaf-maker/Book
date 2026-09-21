@@ -38,7 +38,7 @@ export class AccountDocumentService {
   constructor(private readonly prisma: PrismaService) {}
 
   private async currentTerms() {
-    const rows = await this.prisma.$queryRaw<AccountTermsRow[]>\`
+    const rows = await this.prisma.$queryRaw<AccountTermsRow[]>`
       SELECT
         d."id" AS "documentId",
         v."id" AS "documentVersionId",
@@ -60,24 +60,24 @@ export class AccountDocumentService {
       WHERE d."key" = 'account-terms'
         AND d."isActive" = true
       LIMIT 1
-    \`;
+    `;
     const row = rows[0];
     if (!row) throw new NotFoundException('Условия использования учетной записи не опубликованы');
     return row;
   }
 
   private async requiredVersion(documentId: string) {
-    const rows = await this.prisma.$queryRaw<Array<{ requiredVersion: number }>>\`
+    const rows = await this.prisma.$queryRaw<Array<{ requiredVersion: number }>>`
       SELECT COALESCE(MAX("version") FILTER (WHERE "requiresAcceptance" = true), 1)::int AS "requiredVersion"
       FROM "PlatformDocumentVersion"
       WHERE "documentId" = ${documentId}
-    \`;
+    `;
     return Math.max(1, Number(rows[0]?.requiredVersion || 1));
   }
 
   private async latestAcceptance(accountId: string, documentId: string) {
     if (!accountId) return null;
-    const rows = await this.prisma.$queryRaw<AcceptanceRow[]>\`
+    const rows = await this.prisma.$queryRaw<AcceptanceRow[]>`
       SELECT
         e."id",
         e."documentVersionId",
@@ -92,7 +92,7 @@ export class AccountDocumentService {
         AND e."action" = 'ACCEPTED'
       ORDER BY e."occurredAt" DESC, e."createdAt" DESC, e."id" DESC
       LIMIT 1
-    \`;
+    `;
     return rows[0] || null;
   }
 
@@ -167,7 +167,7 @@ export class AccountDocumentService {
     const occurredAt = new Date();
     const id = randomUUID();
 
-    await this.prisma.$executeRaw\`
+    await this.prisma.$executeRaw`
       INSERT INTO "AccountDocumentEvent" (
         "id", "accountId", "documentVersionId", "action",
         "source", "technicalEvidence", "occurredAt", "createdAt"
@@ -176,7 +176,7 @@ export class AccountDocumentService {
         ${text(source)}, ${evidenceJson}::jsonb, ${occurredAt}, CURRENT_TIMESTAMP
       )
       ON CONFLICT ("accountId", "documentVersionId", "action") DO NOTHING
-    \`;
+    `;
 
     return this.state(accountId);
   }
