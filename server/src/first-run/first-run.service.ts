@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -742,6 +743,24 @@ export class FirstRunService {
       },
     });
     return { id: event.id, occurredAt: event.occurredAt.toISOString() };
+  }
+
+  async assertRealOperationsAllowed(tenantId: string) {
+    const [access, progress] = await Promise.all([
+      this.prisma.tenantAccess.findUnique({ where: { tenantId } }),
+      this.prisma.firstRunProgress.findFirst({
+        where: { tenantId, status: 'IN_PROGRESS' },
+        select: { id: true },
+      }),
+    ]);
+    if (!access) throw new NotFoundException('Рабочее пространство не найдено');
+    if (access.status !== 'ACTIVE') {
+      throw new ForbiddenException('Рабочее пространство временно недоступно');
+    }
+    if (access.commercialMode !== 'LIVE' || progress) {
+      throw new ForbiddenException('Реальные внешние действия доступны после перехода в LIVE и завершения первого знакомства');
+    }
+    return true;
   }
 
   async setCommercialMode(tenantId: string, modeValue: unknown) {
