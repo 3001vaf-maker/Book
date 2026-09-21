@@ -56,6 +56,12 @@ if (!/from '.\/data\.js'/.test(recordService)
 if (!/appendRecordEvent/.test(recordService) || !/RECORD_EVENT_TYPES\.CANCELLED/.test(recordService) || !/RECORD_EVENT_TYPES\.RESCHEDULED/.test(recordService)) {
   errors.push('core/record/service.js: Record commands must append immutable create/reschedule/cancel and lifecycle history facts');
 }
+if (/finance\/index\.js/.test(recordService) || /calculateSettlement|repriceSettlement|normalizeRecordSettlement/.test(recordService)) {
+  errors.push('core/record/service.js: Record commands must not calculate or persist Settlement');
+}
+if (!/['"]finance['"]/.test(recordService) || !/dataPatchFrom/.test(recordService)) {
+  errors.push('core/record/service.js: Finance projection fields must be filtered from Record persistence');
+}
 if (!/actor:\s*\{/.test(recordService) || !/profileId/.test(recordService) || !/accountId/.test(recordService) || !/subject:\s*recordSubject/.test(recordService)) {
   errors.push('core/record/service.js: Record history must preserve actor and Person subject context');
 }
@@ -76,8 +82,10 @@ if (!/export class RecordService/.test(serverRecord)
   || !/this\.time\.checkAvailability/.test(serverRecord)
   || !/this\.procedures\.snapshots/.test(serverRecord)
   || !/this\.finance\.calculateSettlement/.test(serverRecord)
+  || !/this\.finance\.upsertSettlement/.test(serverRecord)
+  || !/this\.finance\.settlementForSource/.test(serverRecord)
   || !/async listForPeople/.test(serverRecord)) {
-  errors.push('server RecordService must compose through Time, Procedure and Finance Settlement owners');
+  errors.push('server RecordService must compose through Time, Procedure and Finance Settlement owners without owning Settlement persistence');
 }
 if (/createOnlineBookingRecord|publicBookingOccupancy|bookingRecordSnapshot/.test(serverBusinessState)) {
   errors.push('BusinessState must not own Record creation, occupancy or Booking snapshot adapters');

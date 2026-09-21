@@ -5,12 +5,6 @@ const root = process.cwd();
 const ignored = new Set(['.git', 'node_modules', '_site']);
 const errors = [];
 const thisCheck = 'scripts/check-finance-architecture.mjs';
-const obsoletePaymentModule = ['core', 'payment.js'].join('/');
-const obsoleteFinanceModelAtom = ['core', 'finance', 'model.js'].join('/');
-const reservedFinancialModelPaths = [
-  ['core', 'financial-model.js'].join('/'),
-  ['core', 'finance', 'financial-model.js'].join('/'),
-];
 
 function walk(dir) {
   const files = [];
@@ -32,16 +26,19 @@ function source(path) {
   return readFileSync(join(root, path), 'utf8');
 }
 
-if (existsSync(join(root, obsoletePaymentModule))) {
-  errors.push(`${obsoletePaymentModule} must not exist: Finance owns payment commands`);
+function requireFile(path, message) {
+  if (!existsSync(join(root, path))) errors.push(message || `${path} must exist`);
 }
-if (existsSync(join(root, obsoleteFinanceModelAtom))) {
-  errors.push(`${obsoleteFinanceModelAtom} must not exist: operational Record calculation belongs to Settlement`);
-}
-for (const path of reservedFinancialModelPaths) {
-  if (existsSync(join(root, path))) {
-    errors.push(`${path} is reserved for the future analytical Financial Model and must not be implemented during operational Finance work`);
-  }
+
+const forbiddenFiles = [
+  'core/payment.js',
+  'core/finance/model.js',
+  'core/dds.js',
+  'core/financial-model.js',
+  'core/finance/financial-model.js',
+];
+for (const path of forbiddenFiles) {
+  if (existsSync(join(root, path))) errors.push(`${path} must not exist`);
 }
 
 const obsoleteSettlementNames = /\b(?:calculateFinancialPlan|repriceFinancialPlan|calculateFinancialFact|calculateFinancialItemFact|calculateRecordPaymentState|getFinancialFactForRecords|getFinancialItemFact|getRecordFinancialPlanFact|resolveRecordFinancialPlan|recordPlanTotal|hydrateRecordFinance|normalizeRecordFinance|recordFinancialItems|isStoredFinancialPlan|normalizeStoredFinancialPlan)\b/;
@@ -49,60 +46,144 @@ for (const file of walk(root)) {
   const path = rel(file);
   if (path === thisCheck) continue;
   const text = readFileSync(file, 'utf8');
-  if (text.includes(obsoletePaymentModule)) errors.push(`${path}: obsolete ${obsoletePaymentModule} dependency`);
   if (obsoleteSettlementNames.test(text)) errors.push(`${path}: legacy Financial Model/plan API must use Settlement terminology`);
   if (/from\s+['"][^'"]*financial-model[^'"]*['"]/.test(text)) {
     errors.push(`${path}: Financial Model is reserved and cannot be an operational Finance dependency`);
   }
+  if (/queueAuxiliaryDataset\(\s*['"]finance['"]/.test(text)) {
+    errors.push(`${path}: Finance must not be written through auxiliary-state`);
+  }
 }
 
-const ownershipRules = [
-  ['core/finance/data.js', /from\s+['"][^'"]*(?:financial-model|wallet|record|people|person|ui)[^'"]*['"]/, 'Finance persistence must not depend on Settlement projections, Wallet, Record, People or UI'],
-  ['core/finance/rules.js', /from\s+['"][^'"]*(?:wallet|journal|record-data|people|person|ui)[^'"]*['"]/, 'Settlement rules must not depend on manifestations/data owners'],
-  ['journal/record-data.js', /core\/dds\.js/, 'Record data must not own/read money movements directly; fact comes through Finance Settlement'],
-  ['main/people/metadata.js', /core\/dds\.js/, 'Person metrics must read financial fact through Finance Settlement'],
-  ['settings/service/procedures/procedures.js', /core\/dds\.js/, 'Procedure metrics must read financial fact through Finance Settlement'],
-  ['settings/service/products/products.js', /core\/dds\.js/, 'Product metrics must read financial fact through Finance Settlement'],
-  ['settings/wallets/wallets.js', /core\/dds\.js/, 'Wallet UI must read its own Wallet data owner, not DDS directly'],
-  ['ui/payment/index.js', /core\/(?:dds|financial-model)\.js/, 'Payment UI is input/display only and must not own finance logic'],
-];
-
-for (const [path, pattern, message] of ownershipRules) {
-  if (!existsSync(join(root, path))) continue;
-  if (pattern.test(source(path))) errors.push(`${path}: ${message}`);
-}
+requireFile('core/finance/settlement.js');
+requireFile('server/src/finance/finance.controller.ts');
+requireFile('server/prisma/migrations/20260920220500_finance_settlement_operation_ledger/migration.sql');
 
 const financeData = source('core/finance/data.js');
-if (!/queueAuxiliaryDataset\(['"]finance['"]/.test(financeData) || !/let financeState = emptyState\(\)/.test(financeData)) {
-  errors.push('core/finance/data.js must own server-backed DDS movement persistence');
+if (/business-persistence/.test(financeData) || /queueAuxiliaryDataset/.test(financeData)) {
+  errors.push('core/finance/data.js must be a read cache only; canonical persistence is server Finance');
+}
+if (!/settlements:\s*\[\]/.test(financeData) || !/operations:\s*\[\]/.test(financeData) || !/ledger:\s*\[\]/.test(financeData)) {
+  errors.push('core/finance/data.js must cache Settlement, Operation and flat Ledger state');
 }
 
 const financeService = source('core/finance/service.js');
-if (!/export function recordPaymentIncome/.test(financeService) || !/export function recordRefundExpense/.test(financeService) || !/export function cancelPaymentOperation/.test(financeService)) {
-  errors.push('core/finance/service.js must own payment income, refund expense and operation cancellation commands');
+for (const command of ['recordPaymentIncome', 'recordRefundExpense', 'cancelPaymentOperation']) {
+  if (!new RegExp(`export\\s+async\\s+function\\s+${command}`).test(financeService)) {
+    errors.push(`core/finance/service.js: ${command} must be an async server-backed command`);
+  }
+}
+if (!/apiRequest\(['"]\/finance\/operations\/payment['"]/.test(financeService)) {
+  errors.push('Payment must be sent to server /finance/operations/payment');
+}
+if (!/saveSettlementSnapshot/.test(financeService) || !/\/finance\/settlements\//.test(financeService)) {
+  errors.push('Settlement persistence must go through the Finance API');
+}
+if (/writeFinanceState/.test(financeService)) errors.push('Browser Finance service must not persist money locally');
+
+const auxiliaryServer = source('server/src/auxiliary-state/auxiliary-state.service.ts');
+if (/DATASETS[^\n]*['"]finance['"]/.test(auxiliaryServer)) {
+  errors.push('server auxiliary-state must not accept Finance writes after canonical Ledger migration');
+}
+
+const schema = source('server/prisma/schema.prisma');
+for (const model of ['FinanceSettlement', 'FinanceOperation', 'FinanceLedgerEntry']) {
+  if (!new RegExp(`model\\s+${model}\\s+\\{`).test(schema)) errors.push(`Prisma must define ${model}`);
+}
+if (!/Decimal\s+@db\.Decimal\(14, 2\)/.test(schema)) {
+  errors.push('FinanceLedgerEntry.amount must use fixed decimal money storage');
+}
+if (!/@@unique\(\[tenantId, operationId\]\)/.test(schema)) {
+  errors.push('FinanceOperation must have tenant-scoped operation identity');
+}
+
+const migration = source('server/prisma/migrations/20260920220500_finance_settlement_operation_ledger/migration.sql');
+for (const table of ['FinanceSettlement', 'FinanceOperation', 'FinanceLedgerEntry']) {
+  if (!migration.includes(`CREATE TABLE "${table}"`)) errors.push(`Finance migration must create ${table}`);
+}
+
+const financeController = source('server/src/finance/finance.controller.ts');
+for (const route of [
+  /@Get\(\)/,
+  /@Put\(['"]settlements\/:sourceType\/:sourceId['"]\)/,
+  /@Post\(['"]operations\/payment['"]\)/,
+  /@Post\(['"]operations\/:operationId\/refund['"]\)/,
+  /@Post\(['"]operations\/:operationId\/cancel['"]\)/,
+]) {
+  if (!route.test(financeController)) errors.push('FinanceController is missing a canonical Settlement/Operation route');
+}
+
+const serverFinance = source('server/src/finance/finance.service.ts');
+for (const token of [
+  'ensureLegacyMigrated',
+  'saveSettlementWith',
+  'repriceSettlement(',
+  'createOperationWithEntries',
+  'recordPayment(',
+  'recordRefund(',
+  'cancelOperation(',
+  'settlementForSource(',
+  'financeLedgerEntry',
+]) {
+  if (!serverFinance.includes(token)) errors.push(`FinanceService missing canonical owner behavior: ${token}`);
+}
+if (!/canonicalLedgerMigratedAt/.test(serverFinance)) {
+  errors.push('FinanceService must migrate legacy auxiliary Finance exactly into canonical storage');
+}
+
+const browserRecord = source('core/record/service.js');
+if (/from\s+['"][^'"]*finance\/index\.js['"]/.test(browserRecord)) {
+  errors.push('Browser Record service must not calculate or persist Settlement');
+}
+if (!/['"]finance['"]/.test(browserRecord) || !/dataPatchFrom/.test(browserRecord)) {
+  errors.push('Browser Record service must explicitly filter Finance projection fields from persistence');
+}
+
+const serverRecord = source('server/src/record/record.service.ts');
+if (!/this\.finance\.upsertSettlement/.test(serverRecord)
+  || !/this\.finance\.settlementForSource/.test(serverRecord)
+  || !/this\.finance\.repriceSettlement/.test(serverRecord)) {
+  errors.push('Server Record must delegate Settlement ownership and repricing to Finance');
+}
+if (!/const \{ finance: _legacyFinance, \.\.\.currentRecord \} = current/.test(serverRecord)) {
+  errors.push('Server Record update must strip legacy finance before persisting Record');
 }
 
 const financeRead = source('core/finance/read.js');
-if (!/export function getActiveDDSMovements/.test(financeRead) || !/status\s*!==\s*['"]cancelled['"]/.test(financeRead)) {
-  errors.push('core/finance/read.js must keep cancelled history separate from active financial projections');
+if (!/export function getLedgerEntries/.test(financeRead) || !/state\.ledger/.test(financeRead)) {
+  errors.push('Finance reads must expose the canonical flat Ledger');
+}
+if (!/getWalletDDSMovements/.test(financeRead) || !/getLedgerEntries\(\)/.test(financeRead)) {
+  errors.push('Wallet history must be projected from the canonical Ledger');
 }
 
 const financeRules = source('core/finance/rules.js');
 if (!/export function calculateSettlement/.test(financeRules) || !/export function calculateSettlementTotals/.test(financeRules)) {
-  errors.push('core/finance/rules.js must own Settlement amount-due and paid/refunded calculations');
-}
-if (!/export function recordSettlementItems/.test(financeRules) || !/sourceType:\s*'product'/.test(financeRules)) {
-  errors.push('Finance rules must assemble both procedure and product Record sources');
+  errors.push('Settlement rules must own amount-due and paid/refunded calculations');
 }
 
 const financeIndex = source('core/finance/index.js');
-if (!/recordPaymentIncome/.test(financeIndex) || !/cancelPaymentOperation/.test(financeIndex) || !/calculateSettlement/.test(financeIndex) || !/getRecordPaymentState/.test(financeIndex)) {
-  errors.push('core/finance/index.js must expose the complete public Finance/Settlement contract');
+for (const token of ['calculateSettlement', 'getRecordPaymentState', 'getLedgerEntries', 'recordPaymentIncome', 'saveSettlementSnapshot']) {
+  if (!financeIndex.includes(token)) errors.push(`core/finance/index.js must expose ${token}`);
 }
 
 const walletData = source('settings/wallets/data.js');
 if (!/getWalletDDSMovements/.test(walletData) || !/export function getWalletBalance/.test(walletData)) {
-  errors.push('Wallet data owner must derive history/balance from DDS movements');
+  errors.push('Wallet must derive balance from Finance Ledger projection');
+}
+
+const financeUI = source('main/finance/finance.js');
+if (!/getLedgerEntries/.test(financeUI)) errors.push('DDS UI must render flat Ledger rows');
+
+
+const stagingSeed = source('server/prisma/seed-staging.ts');
+if (!/financeSettlement\.upsert/.test(stagingSeed)
+  || !/financeOperation\.upsert/.test(stagingSeed)
+  || !/financeLedgerEntry\.upsert/.test(stagingSeed)) {
+  errors.push('Staging fixtures must seed canonical Settlement, Operation and Ledger owners');
+}
+if (/version:\s*5[\s\S]*income:\s*\[/.test(stagingSeed)) {
+  errors.push('Staging fixtures must not recreate legacy auxiliary Finance income/expense storage');
 }
 
 const recordView = source('journal/record-view.js');
@@ -117,15 +198,18 @@ if (/data-record-cost|name=['"]recordCost['"]/.test(recordCreation)) {
 
 const paymentUI = source('ui/payment/index.js');
 if (!/data-payment-price/.test(paymentUI) || /data-payment-price\s+readonly/.test(paymentUI)) {
-  errors.push('Payment must be the single editable procedure/product price correction point');
+  errors.push('Payment must remain the editable procedure/product price correction point');
 }
 
 const recordPayment = source('journal/record-payment.js');
-if (!/procedures:\s*sourcesFromSettlement/.test(recordPayment) || !/products:\s*sourcesFromSettlement/.test(recordPayment)) {
-  errors.push('Payment-stage price correction must be persisted back into Record procedures and products');
+if (!/saveSettlementSnapshot/.test(recordPayment) || !/await\s+recordPaymentIncome/.test(recordPayment)) {
+  errors.push('Payment UI must save Settlement and await the server money command');
 }
-if (!/cancelPaymentOperation/.test(recordPayment) || !/data-payment-actions/.test(recordPayment)) {
-  errors.push('Paid Record UI must route cancellation through Finance Core and keep it distinct from refund');
+if (/finance:\s*settlement/.test(recordPayment)) {
+  errors.push('Payment-stage Settlement must not be persisted back into Record');
+}
+if (!/await\s+recordRefundExpense/.test(recordPayment) || !/await\s+cancelPaymentOperation/.test(recordPayment)) {
+  errors.push('Refund and cancellation must await server Finance commands');
 }
 
 if (errors.length) {

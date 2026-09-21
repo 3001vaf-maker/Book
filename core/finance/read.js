@@ -1,5 +1,5 @@
 import { readFinanceState } from './data.js';
-import { financialNumber, normalizedAllocations } from './rules.js';
+import { financialNumber } from './rules.js';
 
 function sourceKey(source = null) {
   return `${String(source?.type || '')}:${String(source?.id || '')}`;
@@ -43,33 +43,39 @@ export function getActiveDDSMovementsForSource(type, id) {
   return getActiveDDSMovements().filter((item) => sourceKey(item?.source) === key);
 }
 
+function projectLedgerEntry(state, entry) {
+  const operation = state.operations.find((item) => String(item?.operationId || '') === String(entry?.operationId || '')) || null;
+  const data = operation?.data && typeof operation.data === 'object' ? operation.data : {};
+  const amount = Math.max(0, financialNumber(entry?.amount));
+  return {
+    ...entry,
+    operationKind: operation?.kind || '',
+    operationStatus: operation?.status || 'completed',
+    ledgerType: entry?.economicType || operation?.kind || 'ledger',
+    movementType: entry?.direction === 'OUT' ? 'expense' : 'income',
+    total: entry?.direction === 'OUT' ? -amount : amount,
+    createdAt: entry?.occurredAt || operation?.occurredAt || '',
+    person: data?.person || null,
+    workplace: data?.workplace || '',
+    source: entry?.source || operation?.source || null,
+  };
+}
+
+export function getLedgerEntries() {
+  const state = readFinanceState();
+  return state.ledger
+    .map((entry) => projectLedgerEntry(state, entry))
+    .sort((a, b) => String(a?.createdAt || '').localeCompare(String(b?.createdAt || '')));
+}
+
+export function getLedgerEntriesForSource(type, id) {
+  const key = `${String(type || '')}:${String(id || '')}`;
+  return getLedgerEntries().filter((entry) => sourceKey(entry?.source) === key);
+}
+
 export function getWalletDDSMovements(walletId) {
   const id = String(walletId || '');
-  const state = readFinanceState();
-  const entries = [];
-
-  state.income.filter(isActiveMovement).forEach((payment) => {
-    normalizedAllocations(payment)
-      .filter((allocation) => allocation.walletId === id)
-      .forEach((allocation) => entries.push({
-        ...payment,
-        ledgerType: 'payment',
-        walletId: allocation.walletId,
-        walletName: allocation.walletName,
-        total: allocation.amount,
-      }));
-  });
-
-  state.expense.filter(isActiveMovement).forEach((expense) => {
-    if (String(expense?.walletId || '') !== id) return;
-    entries.push({
-      ...expense,
-      ledgerType: expense.expenseType || 'expense',
-      total: -Math.max(0, financialNumber(expense.total)),
-    });
-  });
-
-  return entries.sort((a, b) => String(a?.createdAt || '').localeCompare(String(b?.createdAt || '')));
+  return getLedgerEntries().filter((entry) => String(entry?.walletId || '') === id);
 }
 
 export function getRefundsForPayment(paymentId) {

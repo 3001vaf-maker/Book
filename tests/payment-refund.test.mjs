@@ -4,253 +4,153 @@ import {
   calculateSettlement,
   getDDSExpenses,
   getDDSIncome,
+  getLedgerEntries,
   getPaymentRemaining,
   getRecordPaymentState,
   getRefundsForPayment,
   getWalletDDSMovements,
   hydrateFinanceFromServer,
-  recordPaymentIncome,
-  recordRefundExpense,
 } from '../core/finance/index.js';
+import {
+  canonicalFinanceState,
+  paymentFixture,
+  refundFixture,
+  settlementRow,
+} from './helpers/finance-canonical.mjs';
 
-const ddsSource = readFileSync(new URL('../core/finance/service.js', import.meta.url), 'utf8');
-const paymentUiSource = readFileSync(new URL('../ui/payment/index.js', import.meta.url), 'utf8');
-const forbiddenEditPayment = /replacesPaymentId|status:\s*['"]corrected['"]|data-edit-payment|openPaymentEditor|Редактировать оплату/;
-assert.doesNotMatch(ddsSource, forbiddenEditPayment);
-assert.doesNotMatch(paymentUiSource, forbiddenEditPayment);
-
-function recordFor(id, settlement) {
-  return { id, finance: settlement, procedures: [] };
+function recordFor(id) {
+  return { id, procedures: [] };
 }
 
-// Existing server DDS entries from an older payload shape are normalized in memory.
-hydrateFinanceFromServer({
-  version: 2,
-  income: [{
-    id: 'legacy-income',
-    status: 'completed',
-    source: { type: 'record', id: 'legacy-record' },
-    total: 6400,
-    allocations: [{ walletId: 'cash', walletName: 'Наличные', amount: 6400 }],
-    business: {
-      items: [{ sourceType: 'procedure', sourceId: 'legacy-procedure', name: 'Стрижка', price: 8000, discountMode: 'percent', discountPercent: 20, discountMoney: 1600, planAmount: 6400 }],
-      serviceTotal: 8000,
-      discountPercent: 20,
-      discountTotal: 1600,
-      planTotal: 6400,
-    },
-  }],
-  expense: [],
-});
-const migratedLegacy = getDDSIncome();
-assert.equal(migratedLegacy.length, 1);
-assert.equal(migratedLegacy[0].finance.serviceTotal, 8000);
-assert.equal(migratedLegacy[0].finance.discountTotal, 1600);
-assert.equal(migratedLegacy[0].finance.planTotal, 6400);
-assert.equal(migratedLegacy[0].serviceAmount, 6400);
-assert.equal(migratedLegacy[0].tips, 0);
-assert.equal(migratedLegacy[0].business, undefined);
+const browserService = readFileSync(new URL('../core/finance/service.js', import.meta.url), 'utf8');
+const serverService = readFileSync(new URL('../server/src/finance/finance.service.ts', import.meta.url), 'utf8');
+assert.match(browserService, /apiRequest\('\/finance\/operations\/payment'/);
+assert.doesNotMatch(browserService, /writeFinanceState|queueAuxiliaryDataset/);
+assert.match(serverService, /serviceAmount > due \+ 0\.009/);
+assert.match(serverService, /splitAllocationComponents/);
+assert.match(serverService, /tipsRemaining/);
 
-hydrateFinanceFromServer({ version: 5, income: [], expense: [] });
-
-const discounted = calculateSettlement([{ sourceId: 'procedure-discount', name: 'Стрижка', price: 8000, discountPercent: 10 }]);
-assert.equal(discounted.serviceTotal, 8000);
-assert.equal(discounted.discountTotal, 800);
-assert.equal(discounted.planTotal, 7200);
-
-// Full payment.
-const settlement = calculateSettlement([{ sourceId: 'procedure-1', name: 'Стрижка', price: 5000 }]);
-const completed = recordPaymentIncome({
-  source: { type: 'record', id: 'record-1' },
-  workplace: 'workplace-1',
-  person: { key: 'person-1' },
-  settlement,
-  maxAmount: 5000,
-  serviceAmount: 5000,
+// Full payment is one Operation and one Ledger row for one wallet.
+const fullSettlement = calculateSettlement([{ sourceId: 'procedure-1', name: 'Стрижка', price: 5000 }]);
+const full = paymentFixture({
+  id: 'payment-full',
+  recordId: 'record-full',
+  settlement: fullSettlement,
   allocations: [{ walletId: 'cash', walletName: 'Наличные', amount: 5000 }],
 });
-assert.equal(completed.status, 'completed');
-assert.equal(completed.movementType, 'income');
-assert.equal(completed.total, 5000);
-assert.equal(completed.serviceAmount, 5000);
-assert.equal(completed.tips, 0);
-assert.equal(getWalletDDSMovements('cash').length, 1);
-let state = getRecordPaymentState(recordFor('record-1', settlement));
+hydrateFinanceFromServer(canonicalFinanceState({
+  settlements: [settlementRow('record-full', fullSettlement)],
+  payments: [full],
+}));
+
+assert.equal(getDDSIncome().length, 1);
+assert.equal(getLedgerEntries().length, 1);
+assert.equal(getWalletDDSMovements('cash').reduce((sum, item) => sum + Number(item.total || 0), 0), 5000);
+let state = getRecordPaymentState(recordFor('record-full'));
+assert.equal(state.fullyPaid, true);
 assert.equal(state.paidTotal, 5000);
 assert.equal(state.remaining, 0);
-assert.equal(state.fullyPaid, true);
-assert.equal(getPaymentRemaining(completed.id), 5000);
+assert.equal(getPaymentRemaining('payment-full'), 5000);
 
-// Refund reopens the amount due.
-const refundAt = new Date('2026-09-10T10:00:00.000Z');
-const refunded = recordRefundExpense(completed.id, { reason: 'Возврат человеку', now: refundAt });
-assert.equal(refunded.status, 'refund');
-assert.equal(refunded.movementType, 'expense');
-assert.equal(refunded.expenseType, 'refund');
-assert.equal(refunded.serviceAmount, 5000);
-assert.equal(refunded.tips, 0);
-assert.equal(refunded.refundedAt, refundAt.toISOString());
-assert.equal(refunded.reason, 'Возврат человеку');
+// Refund is a separate OUT operation and reopens the debt.
+const fullRefund = refundFixture({
+  id: 'refund-full',
+  paymentId: 'payment-full',
+  recordId: 'record-full',
+  settlement: fullSettlement,
+  walletId: 'cash',
+  walletName: 'Наличные',
+  serviceAmount: 5000,
+});
+hydrateFinanceFromServer(canonicalFinanceState({
+  settlements: [settlementRow('record-full', fullSettlement)],
+  payments: [full],
+  refunds: [fullRefund],
+}));
 assert.equal(getDDSExpenses().length, 1);
+assert.equal(getRefundsForPayment('payment-full').length, 1);
+assert.equal(getPaymentRemaining('payment-full'), 0);
 assert.equal(getWalletDDSMovements('cash').reduce((sum, item) => sum + Number(item.total || 0), 0), 0);
-assert.equal(getRefundsForPayment(completed.id).length, 1);
-assert.equal(getPaymentRemaining(completed.id), 0);
-state = getRecordPaymentState(recordFor('record-1', settlement));
+state = getRecordPaymentState(recordFor('record-full'));
+assert.equal(state.fullyPaid, false);
 assert.equal(state.paidTotal, 0);
 assert.equal(state.remaining, 5000);
-assert.equal(state.fullyPaid, false);
-assert.equal(recordRefundExpense(completed.id), null);
 
-const repaid = recordPaymentIncome({
-  source: { type: 'record', id: 'record-1' },
-  settlement,
-  maxAmount: 5000,
-  serviceAmount: 5000,
-  allocations: [{ walletId: 'cash', walletName: 'Наличные', amount: 5000 }],
-});
-assert.ok(repaid);
-assert.equal(getRecordPaymentState(recordFor('record-1', settlement)).fullyPaid, true);
-
-// Partial payments remain separate immutable DDS income movements.
+// Partial payments remain separate Operations. Split wallets are flat Ledger rows.
 const partialSettlement = calculateSettlement([{ sourceId: 'procedure-partial', name: 'Окрашивание', price: 7000 }]);
-const firstPart = recordPaymentIncome({
-  source: { type: 'record', id: 'record-partial' },
+const part1 = paymentFixture({
+  id: 'part-1',
+  recordId: 'record-partial',
   settlement: partialSettlement,
-  maxAmount: 7000,
-  serviceAmount: 2000,
   allocations: [{ walletId: 'partial-cash', walletName: 'Наличные', amount: 2000 }],
 });
-assert.ok(firstPart);
-assert.equal(firstPart.total, 2000);
-let partialState = getRecordPaymentState(recordFor('record-partial', partialSettlement));
-assert.equal(partialState.paidTotal, 2000);
-assert.equal(partialState.remaining, 5000);
-assert.equal(partialState.partiallyPaid, true);
-assert.equal(partialState.fullyPaid, false);
-
-const secondPart = recordPaymentIncome({
-  source: { type: 'record', id: 'record-partial' },
+const part2 = paymentFixture({
+  id: 'part-2',
+  recordId: 'record-partial',
   settlement: partialSettlement,
-  maxAmount: 5000,
-  serviceAmount: 4000,
   allocations: [
     { walletId: 'partial-card', walletName: 'СберБанк', amount: 3000 },
     { walletId: 'partial-cash', walletName: 'Наличные', amount: 1000 },
   ],
 });
-assert.ok(secondPart);
-assert.equal(secondPart.total, 4000);
-partialState = getRecordPaymentState(recordFor('record-partial', partialSettlement));
-assert.equal(partialState.paidTotal, 6000);
-assert.equal(partialState.remaining, 1000);
-assert.equal(partialState.partiallyPaid, true);
-
-// A service amount over the current remainder is rejected.
-assert.equal(recordPaymentIncome({
-  source: { type: 'record', id: 'record-partial' },
+const part3 = paymentFixture({
+  id: 'part-3',
+  recordId: 'record-partial',
   settlement: partialSettlement,
-  maxAmount: 1000,
-  serviceAmount: 1001,
-  allocations: [{ walletId: 'partial-card', walletName: 'СберБанк', amount: 1001 }],
-}), null);
-
-const finalPart = recordPaymentIncome({
-  source: { type: 'record', id: 'record-partial' },
-  settlement: partialSettlement,
-  maxAmount: 1000,
-  serviceAmount: 1000,
   allocations: [{ walletId: 'partial-card', walletName: 'СберБанк', amount: 1000 }],
 });
-assert.ok(finalPart);
-partialState = getRecordPaymentState(recordFor('record-partial', partialSettlement));
-assert.equal(partialState.paidTotal, 7000);
-assert.equal(partialState.remaining, 0);
-assert.equal(partialState.fullyPaid, true);
-assert.equal(partialState.payments.length, 3);
+hydrateFinanceFromServer(canonicalFinanceState({
+  settlements: [settlementRow('record-partial', partialSettlement)],
+  payments: [part1, part2, part3],
+}));
+state = getRecordPaymentState(recordFor('record-partial'));
+assert.equal(state.fullyPaid, true);
+assert.equal(state.paidTotal, 7000);
+assert.equal(state.payments.length, 3);
 assert.equal(getWalletDDSMovements('partial-cash').reduce((sum, item) => sum + Number(item.total || 0), 0), 3000);
 assert.equal(getWalletDDSMovements('partial-card').reduce((sum, item) => sum + Number(item.total || 0), 0), 4000);
+assert.equal(getLedgerEntries().filter((item) => item.operationId === 'part-2').length, 2);
 
-// Required Tips example: 7,000 due, 10,000 received -> 3,000 Tips.
+// Tips increase wallet cash but do not increase paid service fact.
 const tipsSettlement = calculateSettlement([{ sourceId: 'procedure-tips', name: 'Укладка', price: 7000 }]);
-const withTips = recordPaymentIncome({
-  source: { type: 'record', id: 'record-tips' },
+const tipsPayment = paymentFixture({
+  id: 'payment-tips',
+  recordId: 'record-tips',
   settlement: tipsSettlement,
-  maxAmount: 7000,
+  allocations: [{ walletId: 'tips-cash', walletName: 'Наличные', amount: 10000 }],
   serviceAmount: 7000,
   tips: 3000,
-  allocations: [{ walletId: 'tips-cash', walletName: 'Наличные', amount: 10000 }],
 });
-assert.ok(withTips);
-assert.equal(withTips.total, 10000);
-assert.equal(withTips.serviceAmount, 7000);
-assert.equal(withTips.tips, 3000);
-let tipsState = getRecordPaymentState(recordFor('record-tips', tipsSettlement));
-assert.equal(tipsState.paidTotal, 7000);
-assert.equal(tipsState.remaining, 0);
-assert.equal(tipsState.tipsTotal, 3000);
-assert.equal(tipsState.fullyPaid, true);
+hydrateFinanceFromServer(canonicalFinanceState({
+  settlements: [settlementRow('record-tips', tipsSettlement)],
+  payments: [tipsPayment],
+}));
+state = getRecordPaymentState(recordFor('record-tips'));
+assert.equal(state.fullyPaid, true);
+assert.equal(state.paidTotal, 7000);
+assert.equal(state.tipsTotal, 3000);
 assert.equal(getWalletDDSMovements('tips-cash').reduce((sum, item) => sum + Number(item.total || 0), 0), 10000);
+assert.equal(getLedgerEntries().filter((item) => item.operationId === 'payment-tips').length, 2);
 
-// Required discount example: 7,000 price - 1,400 discount = 5,600 service, 6,000 received -> 400 Tips.
-const discountTipsSettlement = calculateSettlement([{ sourceId: 'procedure-discount-tips', name: 'Стрижка', price: 7000, discountPercent: 20 }]);
-assert.equal(discountTipsSettlement.discountTotal, 1400);
-assert.equal(discountTipsSettlement.planTotal, 5600);
-const discountTips = recordPaymentIncome({
-  source: { type: 'record', id: 'record-discount-tips' },
-  settlement: discountTipsSettlement,
-  maxAmount: 5600,
-  serviceAmount: 5600,
-  tips: 400,
-  allocations: [{ walletId: 'discount-cash', walletName: 'Наличные', amount: 6000 }],
-});
-assert.ok(discountTips);
-assert.equal(discountTips.total, 6000);
-assert.equal(discountTips.serviceAmount, 5600);
-assert.equal(discountTips.tips, 400);
-let discountTipsState = getRecordPaymentState(recordFor('record-discount-tips', discountTipsSettlement));
-assert.equal(discountTipsState.paidTotal, 5600);
-assert.equal(discountTipsState.remaining, 0);
-assert.equal(discountTipsState.tipsTotal, 400);
-assert.equal(discountTipsState.fullyPaid, true);
-
-// Refund Tips first: returning the 400 Tips must not reopen service debt.
-const tipsRefund = recordRefundExpense(discountTips.id, { amount: 400 });
-assert.ok(tipsRefund);
-assert.equal(tipsRefund.total, 400);
-assert.equal(tipsRefund.tips, 400);
-assert.equal(tipsRefund.serviceAmount, 0);
-discountTipsState = getRecordPaymentState(recordFor('record-discount-tips', discountTipsSettlement));
-assert.equal(discountTipsState.paidTotal, 5600);
-assert.equal(discountTipsState.remaining, 0);
-assert.equal(discountTipsState.tipsTotal, 0);
-assert.equal(discountTipsState.fullyPaid, true);
-
-// Once Tips are exhausted, further refund reduces service and reopens the debt.
-const serviceRefund = recordRefundExpense(discountTips.id, { amount: 1000 });
-assert.ok(serviceRefund);
-assert.equal(serviceRefund.tips, 0);
-assert.equal(serviceRefund.serviceAmount, 1000);
-discountTipsState = getRecordPaymentState(recordFor('record-discount-tips', discountTipsSettlement));
-assert.equal(discountTipsState.paidTotal, 4600);
-assert.equal(discountTipsState.remaining, 1000);
-assert.equal(discountTipsState.fullyPaid, false);
-
-// One payment can be allocated to two wallets without a mode switch.
-const splitSettlement = calculateSettlement([{ sourceId: 'procedure-2', name: 'Окрашивание', price: 6000 }]);
-const split = recordPaymentIncome({
-  source: { type: 'record', id: 'record-2' },
-  workplace: 'workplace-1',
-  person: { key: 'person-2' },
+// One economic payment split across two wallets stays one Operation and two flat Ledger rows.
+const splitSettlement = calculateSettlement([{ sourceId: 'procedure-split', name: 'Окрашивание', price: 6000 }]);
+const split = paymentFixture({
+  id: 'payment-split',
+  recordId: 'record-split',
   settlement: splitSettlement,
-  maxAmount: 6000,
-  serviceAmount: 6000,
   allocations: [
     { walletId: 'split-cash', walletName: 'Наличные', amount: 2000 },
     { walletId: 'split-card', walletName: 'Карта', amount: 4000 },
   ],
 });
-assert.equal(split.status, 'completed');
-assert.equal(split.allocations.length, 2);
+const splitState = canonicalFinanceState({
+  settlements: [settlementRow('record-split', splitSettlement)],
+  payments: [split],
+});
+hydrateFinanceFromServer(splitState);
+assert.equal(splitState.operations.length, 1);
+assert.equal(getLedgerEntries().length, 2);
+assert.equal(new Set(getLedgerEntries().map((item) => item.operationId)).size, 1);
 assert.equal(getWalletDDSMovements('split-cash').reduce((sum, item) => sum + Number(item.total || 0), 0), 2000);
 assert.equal(getWalletDDSMovements('split-card').reduce((sum, item) => sum + Number(item.total || 0), 0), 4000);
 

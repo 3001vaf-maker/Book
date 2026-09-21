@@ -1,200 +1,189 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { hydrateDaysFromServer } from '../core/day/index.js';
-import { calculateSettlement, getSettlementItemTotals, hydrateFinanceFromServer, recordPaymentIncome, recordRefundExpense } from '../core/finance/index.js';
-import { createRecord, getRecords, hydrateRecordStateFromServer, moveRecord, recordVisualState, updateRecord } from '../core/record/index.js';
-import { renderJournalList } from '../journal/список.js';
-import { hydratePeopleFromServer } from '../main/people/data.js';
-import { getPersonMetadata } from '../main/people/metadata.js';
+import {
+  calculateSettlement,
+  getSettlementItemTotals,
+  hydrateFinanceFromServer,
+} from '../core/finance/index.js';
+import {
+  createRecord,
+  getRecord,
+  getRecords,
+  hydrateRecordStateFromServer,
+  moveRecord,
+  setRecordAttendance,
+  updateRecord,
+} from '../core/record/index.js';
 import { getWalletBalance, hydrateWalletsFromServer } from '../settings/wallets/data.js';
+import {
+  canonicalFinanceState,
+  paymentFixture,
+  refundFixture,
+  settlementRow,
+} from './helpers/finance-canonical.mjs';
 
-globalThis.requestAnimationFrame = (callback) => callback();
+const recordServiceSource = readFileSync(new URL('../core/record/service.js', import.meta.url), 'utf8');
+const serverRecordSource = readFileSync(new URL('../server/src/record/record.service.ts', import.meta.url), 'utf8');
+const recordPaymentSource = readFileSync(new URL('../journal/record-payment.js', import.meta.url), 'utf8');
 
+assert.doesNotMatch(recordServiceSource, /from ['"][^'"]*finance\/index\.js['"]/);
+assert.match(recordServiceSource, /'finance'/);
+assert.match(serverRecordSource, /this\.finance\.upsertSettlement/);
+assert.match(serverRecordSource, /const \{ finance: _legacyFinance, \.\.\.currentRecord \} = current/);
+assert.match(recordPaymentSource, /saveSettlementSnapshot/);
+
+// Record owns source facts; Finance projection calculates the initial Settlement.
 hydrateDaysFromServer([
-  { date: '2026-09-10', workplaceId: 'studio', from: '09:00', to: '18:00' },
-  { date: '2026-09-11', workplaceId: 'studio', from: '09:00', to: '18:00' },
-]);
-hydratePeopleFromServer([
-  { key: 'person-1', name: 'Анна', surname: 'Тест', phones: ['+70000000000'], discountPercent: 20 },
-  { key: 'person-2', name: 'Ирина', surname: 'БезСкидки', phones: ['+71111111111'], discountPercent: 0 },
+  { date: '2026-09-20', workplaceId: 'workplace-1', from: '09:00', to: '20:00' },
+  { date: '2026-09-21', workplaceId: 'workplace-1', from: '09:00', to: '20:00' },
+  { date: '2026-09-22', workplaceId: 'workplace-1', from: '09:00', to: '20:00' },
+  { date: '2026-09-23', workplaceId: 'workplace-1', from: '09:00', to: '20:00' },
 ]);
 hydrateRecordStateFromServer({ records: [], recordEvents: [] });
-hydrateFinanceFromServer({ version: 5, income: [], expense: [] });
+hydrateFinanceFromServer({ version: 6, settlements: [], operations: [], ledger: [], income: [], expense: [] });
 hydrateWalletsFromServer([]);
 
+const person = { id: 'person-1', key: 'person-1', name: 'Анна', discountPercent: 20 };
 const record = createRecord({
-  date: '2026-09-10',
-  workplaceId: 'studio',
+  date: '2026-09-20',
+  workplaceId: 'workplace-1',
   from: '10:00',
   to: '11:00',
-  person: { key: 'person-1', name: 'Анна', surname: 'Тест', phone: '+70000000000', discountPercent: 20 },
-  procedures: [{ id: 'procedure-1', name: 'Стрижка', cost: 5000, duration: 60 }],
+  person,
+  procedures: [{ id: 'procedure-1', name: 'Стрижка', cost: 5000 }],
 });
 assert.ok(record);
-assert.equal(record.procedures[0].cost, 5000);
 assert.equal(record.finance.serviceTotal, 5000);
 assert.equal(record.finance.discountPercent, 20);
-assert.equal(record.finance.discountTotal, 1000);
 assert.equal(record.finance.planTotal, 4000);
 
+// Source price correction belongs to Record; amount due is recalculated as a Finance projection.
 const corrected = updateRecord(record.id, {
-  procedures: [{ id: 'procedure-1', name: 'Стрижка', cost: 8000, duration: 60 }],
+  procedures: [{ id: 'procedure-1', name: 'Стрижка', cost: 8000 }],
 });
 assert.equal(corrected.procedures[0].cost, 8000);
 assert.equal(corrected.finance.serviceTotal, 8000);
-assert.equal(corrected.finance.discountTotal, 1600);
 assert.equal(corrected.finance.planTotal, 6400);
 
-const moved = moveRecord(record.id, { date: '2026-09-11', workplaceId: 'studio', from: '12:00', to: '13:00' });
-assert.equal(moved?.date, '2026-09-11');
-assert.equal(moved?.from, '12:00');
-assert.equal(moved?.finance?.planTotal, 6400);
-
-const noShow = updateRecord(record.id, { attendance: 'no-show' });
-assert.equal(noShow?.attendance, 'no-show');
-assert.equal(recordVisualState(noShow), 'no-show');
-
-const payment = recordPaymentIncome({
-  source: { type: 'record', id: record.id },
-  workplace: 'Студия',
-  person: { key: 'person-1', name: 'Анна Тест' },
-  settlement: noShow.finance,
-  maxAmount: 6400,
-  serviceAmount: 6400,
-  allocations: [{ walletId: 'cash', walletName: 'Наличные', amount: 6400 }],
+const moved = moveRecord(record.id, {
+  date: '2026-09-21',
+  workplaceId: 'workplace-1',
+  from: '12:00',
+  to: '13:00',
 });
-assert.ok(payment);
-assert.equal(payment.finance.serviceTotal, 8000);
-assert.equal(payment.finance.discountTotal, 1600);
-assert.equal(payment.total, 6400);
-assert.equal(recordVisualState(noShow, { paid: true }), 'paid');
+assert.equal(moved.finance.planTotal, 6400);
 
-const attended = updateRecord(record.id, { attendance: 'arrived' });
-assert.equal(attended?.procedures?.[0]?.cost, 8000);
-assert.equal(attended?.finance?.planTotal, 6400);
-assert.equal(attended?.finance?.factTotal, 6400);
-assert.equal(getRecords()[0]?.procedures?.[0]?.cost, 8000);
-assert.equal(getRecords()[0]?.finance?.planTotal, 6400);
+// A server payment snapshot makes paid fact visible without storing money in Record.
+const correctedSettlement = calculateSettlement([
+  { sourceType: 'procedure', sourceId: 'procedure-1', name: 'Стрижка', price: 8000, discountPercent: 20 },
+]);
+const payment = paymentFixture({
+  id: 'payment-1',
+  recordId: record.id,
+  settlement: correctedSettlement,
+  allocations: [{ walletId: 'cash', walletName: 'Наличные', amount: 6400 }],
+  serviceAmount: 6400,
+});
+hydrateFinanceFromServer(canonicalFinanceState({
+  settlements: [settlementRow(record.id, correctedSettlement)],
+  payments: [payment],
+}));
 
-const metadata = getPersonMetadata('person-1');
-assert.equal(metadata.recordCount, 1);
-assert.equal(metadata.paidTotal, 6400);
-assert.equal(metadata.lastVisit, '2026-09-11');
+const attended = setRecordAttendance(record.id, 'arrived');
+assert.equal(attended.finance.planTotal, 6400);
+assert.equal(attended.finance.factTotal, 6400);
+assert.equal(getRecords()[0].finance.factTotal, 6400);
+assert.equal(getWalletBalance('cash'), 6400);
+assert.equal(getSettlementItemTotals('procedure', 'procedure-1').factTotal, 6400);
 
-const listRoot = {
-  innerHTML: '',
-  querySelector: () => null,
-};
-renderJournalList(listRoot, { mode: 'flow' });
-assert.match(listRoot.innerHTML, /journal-list-record--paid/);
-assert.match(listRoot.innerHTML, /Анна Тест/);
-assert.match(listRoot.innerHTML, /6 400 ₽/);
-assert.equal(getRecords().length, 1);
-
-// Profile has no discount. Profile assigns 20% at payment stage.
-const paymentStageRecord = createRecord({
-  date: '2026-09-11',
-  workplaceId: 'studio',
+// Record must reject a direct Settlement write. Only Finance can own that correction.
+const noDiscount = createRecord({
+  date: '2026-09-22',
+  workplaceId: 'workplace-1',
   from: '14:00',
   to: '15:00',
-  person: { key: 'person-2', name: 'Ирина', surname: 'БезСкидки', phone: '+71111111111' },
-  procedures: [{ id: 'procedure-2', name: 'Окрашивание', cost: 8000, duration: 60 }],
+  person: { id: 'person-2', key: 'person-2', name: 'Ирина', discountPercent: 0 },
+  procedures: [{ id: 'procedure-2', name: 'Окрашивание', cost: 8000 }],
 });
-assert.ok(paymentStageRecord);
-assert.equal(paymentStageRecord.finance.serviceTotal, 8000);
-assert.equal(paymentStageRecord.finance.discountTotal, 0);
-assert.equal(paymentStageRecord.finance.planTotal, 8000);
+assert.equal(noDiscount.finance.planTotal, 8000);
 
-const paymentStageSettlement = calculateSettlement(paymentStageRecord.finance.items.map((item) => ({
-  ...item,
-  discountMode: 'percent',
-  discountPercent: 20,
-  discountMoney: '',
-})));
-const paymentStageUpdated = updateRecord(paymentStageRecord.id, { finance: paymentStageSettlement });
-assert.equal(paymentStageUpdated.procedures[0].cost, 8000);
-assert.equal(paymentStageUpdated.finance.serviceTotal, 8000);
-assert.equal(paymentStageUpdated.finance.discountPercent, 20);
-assert.equal(paymentStageUpdated.finance.discountTotal, 1600);
-assert.equal(paymentStageUpdated.finance.planTotal, 6400);
-assert.equal(paymentStageUpdated.finance.items[0].discountMode, 'percent');
+const paymentStageSettlement = calculateSettlement([
+  { sourceType: 'procedure', sourceId: 'procedure-2', name: 'Окрашивание', price: 8000, discountPercent: 20 },
+]);
+const rejectedByRecord = updateRecord(noDiscount.id, { finance: paymentStageSettlement });
+assert.equal(rejectedByRecord.finance.planTotal, 8000);
 
-const paymentStageIncome = recordPaymentIncome({
-  source: { type: 'record', id: paymentStageRecord.id },
-  workplace: 'Студия',
-  person: { key: 'person-2', name: 'Ирина БезСкидки' },
-  settlement: paymentStageUpdated.finance,
-  maxAmount: 6400,
-  serviceAmount: 6400,
+hydrateFinanceFromServer(canonicalFinanceState({
+  settlements: [settlementRow(noDiscount.id, paymentStageSettlement)],
+}));
+assert.equal(getRecord(noDiscount.id).finance.planTotal, 6400);
+assert.equal(getRecord(noDiscount.id).finance.discountPercent, 20);
+
+const stagePayment = paymentFixture({
+  id: 'payment-stage',
+  recordId: noDiscount.id,
+  settlement: paymentStageSettlement,
   allocations: [{ walletId: 'cash', walletName: 'Наличные', amount: 6400 }],
-});
-assert.ok(paymentStageIncome);
-assert.equal(paymentStageIncome.total, 6400);
-assert.equal(paymentStageIncome.finance.serviceTotal, 8000);
-assert.equal(paymentStageIncome.finance.discountTotal, 1600);
-
-const paymentStageAttended = updateRecord(paymentStageRecord.id, { attendance: 'arrived' });
-assert.equal(paymentStageAttended.finance.factTotal, 6400);
-assert.equal(getPersonMetadata('person-2').paidTotal, 6400);
-assert.equal(getSettlementItemTotals('procedure', 'procedure-2').factTotal, 6400);
-assert.equal(getWalletBalance('cash'), 12800);
-
-const returned = recordRefundExpense(paymentStageIncome.id, { reason: 'Возврат человеку' });
-assert.ok(returned);
-assert.equal(getPersonMetadata('person-2').paidTotal, 0);
-assert.equal(getSettlementItemTotals('procedure', 'procedure-2').factTotal, 0);
-assert.equal(getWalletBalance('cash'), 6400);
-
-// A record restored on another device comes from the server; Finance recovers the exact payment-stage snapshot.
-const historicalSettlement = calculateSettlement([{
-  sourceType: 'procedure',
-  sourceId: 'procedure-history',
-  name: 'Историческая услуга',
-  price: 8000,
-  discountMode: 'percent',
-  discountPercent: 20,
-}]);
-const historicalIncome = recordPaymentIncome({
-  source: { type: 'record', id: 'record-history' },
-  workplace: 'Студия',
-  person: { key: 'person-history', name: 'История' },
-  settlement: historicalSettlement,
-  maxAmount: 6400,
   serviceAmount: 6400,
-  allocations: [{ walletId: 'cashless', walletName: 'Безналичные', amount: 6400 }],
 });
-assert.ok(historicalIncome);
+hydrateFinanceFromServer(canonicalFinanceState({
+  settlements: [settlementRow(noDiscount.id, paymentStageSettlement)],
+  payments: [stagePayment],
+}));
+assert.equal(getRecord(noDiscount.id).finance.factTotal, 6400);
+
+// Refund is a Finance OUT fact and reopens the amount due.
+const refund = refundFixture({
+  id: 'refund-stage',
+  paymentId: 'payment-stage',
+  recordId: noDiscount.id,
+  settlement: paymentStageSettlement,
+  walletId: 'cash',
+  walletName: 'Наличные',
+  serviceAmount: 1000,
+});
+hydrateFinanceFromServer(canonicalFinanceState({
+  settlements: [settlementRow(noDiscount.id, paymentStageSettlement)],
+  payments: [stagePayment],
+  refunds: [refund],
+}));
+assert.equal(getRecord(noDiscount.id).finance.factTotal, 5400);
+
+// Another device restores plain Record facts plus Finance-owned Settlement/Ledger.
 hydrateRecordStateFromServer({
   records: [{
-    id: 'record-history',
-    date: '2026-09-01',
-    workplaceId: 'studio',
-    from: '09:00',
-    to: '10:00',
-    person: { key: 'person-history', name: 'История' },
-    procedures: [{ id: 'procedure-history', name: 'Историческая услуга', cost: 8000, duration: 60 }],
+    id: 'restored-record',
+    date: '2026-09-23',
+    workplaceId: 'workplace-1',
+    from: '16:00',
+    to: '17:00',
+    person: { id: 'person-3', key: 'person-3', name: 'Мария', discountPercent: 0 },
+    procedures: [{ id: 'procedure-restored', name: 'Услуга', cost: 8000 }],
     products: [],
-    createdAt: '2026-09-01T08:00:00.000Z',
-    updatedAt: '2026-09-01T08:00:00.000Z',
+    createdAt: '2026-09-20T10:00:00.000Z',
+    updatedAt: '2026-09-20T10:00:00.000Z',
   }],
   recordEvents: [],
 });
-const restoredHistory = getRecords().find((item) => item.id === 'record-history');
-assert.ok(restoredHistory);
-assert.equal(restoredHistory.procedures[0].cost, 8000);
-assert.equal(restoredHistory.finance.discountPercent, 20);
-assert.equal(restoredHistory.finance.discountTotal, 1600);
-assert.equal(restoredHistory.finance.planTotal, 6400);
-assert.equal(restoredHistory.finance.factTotal, 6400);
+const restoredSettlement = calculateSettlement([
+  { sourceType: 'procedure', sourceId: 'procedure-restored', name: 'Услуга', price: 8000, discountPercent: 20 },
+]);
+const restoredPayment = paymentFixture({
+  id: 'payment-restored',
+  recordId: 'restored-record',
+  settlement: restoredSettlement,
+  allocations: [{ walletId: 'cashless', walletName: 'Безналичные', amount: 6400 }],
+  serviceAmount: 6400,
+});
+hydrateFinanceFromServer(canonicalFinanceState({
+  settlements: [settlementRow('restored-record', restoredSettlement)],
+  payments: [restoredPayment],
+}));
+const restored = getRecord('restored-record');
+assert.equal(restored.finance.discountPercent, 20);
+assert.equal(restored.finance.planTotal, 6400);
+assert.equal(restored.finance.factTotal, 6400);
 
-// Record card shows expense / service value / discount metadata. Amount due belongs only to payment bottom sheet.
-const recordViewSource = readFileSync(new URL('../journal/record-view.js', import.meta.url), 'utf8');
-const recordPaymentSource = readFileSync(new URL('../journal/record-payment.js', import.meta.url), 'utf8');
-assert.match(recordViewSource, /label:\s*'расход'/);
-assert.match(recordViewSource, /label:\s*'стоимость'/);
-assert.match(recordViewSource, /скидка/);
-assert.doesNotMatch(recordViewSource, /procedureTotalCost/);
-assert.doesNotMatch(recordViewSource, /К оплате/);
 assert.match(recordPaymentSource, /К оплате/);
-
 console.log('critical record flow tests: OK');

@@ -1,6 +1,6 @@
 import { button, details, initPaymentForm, initPaymentMethods, modal, mountModal, paymentForm, paymentMethods, paymentReceipt, select, shortDate, shortDateTimeParts, shortTime } from '../ui/ui.js';
 import { calculateSettlement, getRecordPaymentState, recordSettlementItems } from '../core/finance/index.js';
-import { cancelPaymentOperation, getRefundsForPayment, recordPaymentIncome, recordRefundExpense } from '../core/finance/index.js';
+import { cancelPaymentOperation, getRefundsForPayment, recordPaymentIncome, recordRefundExpense, saveSettlementSnapshot } from '../core/finance/index.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getAllPeople } from '../main/people/data.js';
 import { personDisplay } from '../main/people/presentation.js';
@@ -36,13 +36,18 @@ function sourcesFromSettlement(sources, settlement, type) {
   });
 }
 
-function saveSettlementCorrection(record, settlement) {
+async function saveSettlementCorrection(record, settlement) {
   const current = getRecord(record?.id) || record;
-  return updateRecord(current.id, {
+  const updated = updateRecord(current.id, {
     procedures: sourcesFromSettlement(current?.procedures, settlement, 'procedure'),
     products: sourcesFromSettlement(current?.products, settlement, 'product'),
-    finance: settlement,
   });
+  if (!updated) return null;
+  await saveSettlementSnapshot({
+    source: { type: 'record', id: current.id },
+    settlement,
+  });
+  return getRecord(current.id) || updated;
 }
 
 function paymentEntryContent(record) {
@@ -164,16 +169,19 @@ function openPaymentMethodsModal(payment, paymentModal) {
   };
 
   initPaymentMethods(methodsModal.querySelector('[data-payment-methods]'), {
-    onPay: ({ allocations, tips, appliedAmount }) => finish(recordPaymentIncome({
-      source: payment.source,
-      workplace: payment.workplace,
-      person: payment.person,
-      settlement: payment.settlement,
-      allocations,
-      maxAmount: total,
-      serviceAmount: appliedAmount,
-      tips,
-    })),
+    onPay: async ({ allocations, tips, appliedAmount }) => {
+      const completed = await recordPaymentIncome({
+        source: payment.source,
+        workplace: payment.workplace,
+        person: payment.person,
+        settlement: payment.settlement,
+        allocations,
+        maxAmount: total,
+        serviceAmount: appliedAmount,
+        tips,
+      });
+      finish(completed);
+    },
   });
 }
 
@@ -194,18 +202,18 @@ function openPaymentModal(record) {
   if (!m) return;
   initPaymentForm(m.querySelector('[data-payment-ui]'), {
     calculate: (items) => calculateSettlement(items),
-    onRemove: ({ settlement: updatedSettlement }) => {
-      saveSettlementCorrection(current, updatedSettlement);
+    onRemove: async ({ settlement: updatedSettlement }) => {
+      await saveSettlementCorrection(current, updatedSettlement);
     },
-    onSave: ({ settlement: updatedSettlement }) => {
-      const updated = saveSettlementCorrection(current, updatedSettlement);
+    onSave: async ({ settlement: updatedSettlement }) => {
+      const updated = await saveSettlementCorrection(current, updatedSettlement);
       if (!updated) return;
       m.remove();
     },
-    onPay: ({ settlement: updatedSettlement }) => {
-      const updated = saveSettlementCorrection(current, updatedSettlement);
+    onPay: async ({ settlement: updatedSettlement }) => {
+      const updated = await saveSettlementCorrection(current, updatedSettlement);
       if (!updated) return;
-      openPaymentMethodsModal({ ...paymentFromRecord(updated), settlement: updated.finance }, m);
+      openPaymentMethodsModal({ ...paymentFromRecord(updated), settlement: updatedSettlement }, m);
     },
   });
 }
@@ -255,11 +263,11 @@ function openRefundModal(payment) {
   };
   walletInput?.addEventListener('change', sync);
   amountInput?.addEventListener('input', sync);
-  submit?.addEventListener('click', () => {
+  submit?.addEventListener('click', async () => {
     const amount = Math.max(0, Math.min(remaining, Number(String(amountInput?.value || '0').replace(',', '.')) || 0));
     const wallet = wallets.find((item) => String(item.id || '') === String(walletInput?.value || ''));
     if (!amount || !wallet) return;
-    const refund = recordRefundExpense(payment.id, { amount, walletId: wallet.id, walletName: wallet.name });
+    const refund = await recordRefundExpense(payment.id, { amount, walletId: wallet.id, walletName: wallet.name });
     if (!refund) return;
     m.remove();
   });
@@ -273,8 +281,8 @@ function openCancelPaymentModal(payment) {
     <div class="modal-actions">${button('Подтвердить отмену', { variant: 'secondary', data: 'data-cancel-payment-confirm' })}</div>`;
   const m = mountModal(document.body, modal(html, { variant: 'medium', surface: 'app' }));
   if (!m) return;
-  m.querySelector('[data-cancel-payment-confirm]')?.addEventListener('click', () => {
-    const cancelled = cancelPaymentOperation(payment.id, { reason: 'incorrect-entry' });
+  m.querySelector('[data-cancel-payment-confirm]')?.addEventListener('click', async () => {
+    const cancelled = await cancelPaymentOperation(payment.id, { reason: 'incorrect-entry' });
     if (!cancelled) return;
     m.remove();
   });

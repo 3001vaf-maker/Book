@@ -11,7 +11,7 @@ type AuxiliaryBundle = {
   productHistory: JsonObject[];
 };
 
-const DATASETS = new Set(['finance', 'wallets', 'tags', 'products', 'productHistory']);
+const DATASETS = new Set(['wallets', 'tags', 'products', 'productHistory']);
 
 function objectValue(value: unknown): JsonObject {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonObject : {};

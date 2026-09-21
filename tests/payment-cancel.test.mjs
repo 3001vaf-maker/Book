@@ -2,86 +2,109 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   calculateSettlement,
-  cancelPaymentOperation,
   getDDSExpenses,
   getDDSIncome,
-  getDDSMovements,
+  getLedgerEntries,
   getPaymentRemaining,
   getRecordPaymentState,
   getRefundsForPayment,
   getWalletDDSMovements,
   hydrateFinanceFromServer,
-  recordPaymentIncome,
-  recordRefundExpense,
 } from '../core/finance/index.js';
+import {
+  canonicalFinanceState,
+  paymentFixture,
+  refundFixture,
+  reversalFixture,
+  settlementRow,
+} from './helpers/finance-canonical.mjs';
 
-function recordFor(id, settlement) {
-  return { id, finance: settlement, procedures: [] };
+function recordFor(id) {
+  return { id, procedures: [] };
 }
 
-hydrateFinanceFromServer({ version: 5, income: [], expense: [] });
-const settlement = calculateSettlement([{ sourceId: 'procedure-cancel', name: 'Стрижка', price: 5000 }]);
-const payment = recordPaymentIncome({
-  source: { type: 'record', id: 'record-cancel' },
-  settlement,
-  maxAmount: 5000,
-  serviceAmount: 5000,
-  allocations: [{ walletId: 'cancel-cash', walletName: 'Наличные', amount: 5000 }],
-});
-assert.ok(payment);
-assert.equal(getRecordPaymentState(recordFor('record-cancel', settlement)).fullyPaid, true);
-assert.equal(getWalletDDSMovements('cancel-cash').reduce((sum, item) => sum + Number(item.total || 0), 0), 5000);
-
-const cancelAt = new Date('2026-09-11T12:00:00.000Z');
-const cancelled = cancelPaymentOperation(payment.id, { reason: 'incorrect-entry', now: cancelAt });
-assert.ok(cancelled);
-assert.equal(cancelled.status, 'cancelled');
-assert.equal(cancelled.cancelReason, 'incorrect-entry');
-assert.equal(cancelled.cancelledAt, cancelAt.toISOString());
-assert.equal(getDDSIncome().find((item) => item.id === payment.id)?.status, 'cancelled');
-assert.equal(getDDSMovements().find((item) => item.id === payment.id)?.status, 'cancelled');
-assert.equal(getWalletDDSMovements('cancel-cash').length, 0);
-assert.equal(getPaymentRemaining(payment.id), 0);
-assert.equal(recordRefundExpense(payment.id), null);
-let state = getRecordPaymentState(recordFor('record-cancel', settlement));
-assert.equal(state.paidTotal, 0);
-assert.equal(state.remaining, 5000);
-assert.equal(state.fullyPaid, false);
-assert.equal(state.hasPayments, false);
-assert.equal(cancelPaymentOperation(payment.id), null);
-
-// If an incorrect payment already has a refund, cancelling the payment cancels the whole erroneous chain.
-hydrateFinanceFromServer({ version: 5, income: [], expense: [] });
-const chainSettlement = calculateSettlement([{ sourceId: 'procedure-chain', name: 'Окрашивание', price: 5000 }]);
-const chainPayment = recordPaymentIncome({
-  source: { type: 'record', id: 'record-chain' },
-  settlement: chainSettlement,
-  maxAmount: 5000,
-  serviceAmount: 5000,
-  allocations: [{ walletId: 'chain-cash', walletName: 'Наличные', amount: 5000 }],
-});
-assert.ok(chainPayment);
-const chainRefund = recordRefundExpense(chainPayment.id, { amount: 1000 });
-assert.ok(chainRefund);
-assert.equal(getWalletDDSMovements('chain-cash').reduce((sum, item) => sum + Number(item.total || 0), 0), 4000);
-
-const chainCancelled = cancelPaymentOperation(chainPayment.id, { now: cancelAt });
-assert.ok(chainCancelled);
-const storedRefund = getDDSExpenses().find((item) => item.id === chainRefund.id);
-assert.equal(storedRefund?.status, 'cancelled');
-assert.equal(storedRefund?.cancelledBecausePaymentId, chainPayment.id);
-assert.equal(getRefundsForPayment(chainPayment.id).length, 0);
-assert.equal(getWalletDDSMovements('chain-cash').length, 0);
-state = getRecordPaymentState(recordFor('record-chain', chainSettlement));
-assert.equal(state.paidTotal, 0);
-assert.equal(state.remaining, 5000);
-assert.equal(state.fullyPaid, false);
-
-// Paid-state UI exposes one neutral entry, then two semantically distinct actions.
+const serverFinance = readFileSync(new URL('../server/src/finance/finance.service.ts', import.meta.url), 'utf8');
 const paymentUi = readFileSync(new URL('../journal/record-payment.js', import.meta.url), 'utf8');
-assert.match(paymentUi, /button\('Действия с оплатой',\s*\{\s*variant:\s*'secondary'/);
-assert.match(paymentUi, /button\('Отменить операцию',\s*\{\s*variant:\s*'secondary'/);
-assert.match(paymentUi, /button\('Возврат',\s*\{\s*variant:\s*'danger'/);
-assert.match(paymentUi, /cancelPaymentOperation\(payment\.id/);
+assert.match(serverFinance, /createReversalFor/);
+assert.match(serverFinance, /kind:\s*'cancel'/);
+assert.match(serverFinance, /direction:\s*entry\.direction === 'IN' \? 'OUT' : 'IN'/);
+assert.match(paymentUi, /await\s+cancelPaymentOperation\(payment\.id/);
+
+// Cancelling a wrong payment keeps the original Ledger fact and appends a reversal.
+const settlement = calculateSettlement([{ sourceId: 'procedure-cancel', name: 'Стрижка', price: 5000 }]);
+const payment = paymentFixture({
+  id: 'payment-cancel',
+  recordId: 'record-cancel',
+  settlement,
+  allocations: [{ walletId: 'cancel-cash', walletName: 'Наличные', amount: 5000 }],
+  status: 'cancelled',
+});
+const reversal = reversalFixture({
+  id: 'cancel-payment-cancel',
+  originalOperationId: payment.operation.operationId,
+  recordId: 'record-cancel',
+  entries: payment.ledger,
+});
+hydrateFinanceFromServer(canonicalFinanceState({
+  settlements: [settlementRow('record-cancel', settlement)],
+  payments: [payment],
+  reversals: [reversal],
+}));
+
+assert.equal(getDDSIncome().find((item) => item.id === 'payment-cancel')?.status, 'cancelled');
+assert.equal(getLedgerEntries().length, 2);
+assert.equal(getWalletDDSMovements('cancel-cash').reduce((sum, item) => sum + Number(item.total || 0), 0), 0);
+assert.equal(getPaymentRemaining('payment-cancel'), 0);
+let state = getRecordPaymentState(recordFor('record-cancel'));
+assert.equal(state.hasPayments, false);
+assert.equal(state.paidTotal, 0);
+assert.equal(state.remaining, 5000);
+
+// Cancelling a payment that already had a refund reverses both parts, preserving the whole audit chain.
+const chainSettlement = calculateSettlement([{ sourceId: 'procedure-chain', name: 'Окрашивание', price: 5000 }]);
+const chainPayment = paymentFixture({
+  id: 'payment-chain',
+  recordId: 'record-chain',
+  settlement: chainSettlement,
+  allocations: [{ walletId: 'chain-cash', walletName: 'Наличные', amount: 5000 }],
+  status: 'cancelled',
+});
+const chainRefund = refundFixture({
+  id: 'refund-chain',
+  paymentId: 'payment-chain',
+  recordId: 'record-chain',
+  settlement: chainSettlement,
+  walletId: 'chain-cash',
+  walletName: 'Наличные',
+  serviceAmount: 1000,
+  status: 'cancelled',
+});
+const reversePayment = reversalFixture({
+  id: 'cancel-payment-chain',
+  originalOperationId: 'payment-chain',
+  recordId: 'record-chain',
+  entries: chainPayment.ledger,
+});
+const reverseRefund = reversalFixture({
+  id: 'cancel-refund-chain',
+  originalOperationId: 'refund-chain',
+  recordId: 'record-chain',
+  entries: chainRefund.ledger,
+});
+hydrateFinanceFromServer(canonicalFinanceState({
+  settlements: [settlementRow('record-chain', chainSettlement)],
+  payments: [chainPayment],
+  refunds: [chainRefund],
+  reversals: [reversePayment, reverseRefund],
+}));
+
+assert.equal(getDDSExpenses().find((item) => item.id === 'refund-chain')?.status, 'cancelled');
+assert.equal(getRefundsForPayment('payment-chain').length, 0);
+assert.equal(getWalletDDSMovements('chain-cash').reduce((sum, item) => sum + Number(item.total || 0), 0), 0);
+assert.equal(getLedgerEntries().length, 4);
+state = getRecordPaymentState(recordFor('record-chain'));
+assert.equal(state.hasPayments, false);
+assert.equal(state.paidTotal, 0);
+assert.equal(state.remaining, 5000);
 
 console.log('payment cancel tests: OK');
