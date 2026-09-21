@@ -1044,7 +1044,9 @@ export class FinanceService {
       serviceAmount: money(data.serviceAmount),
       tips: money(data.tips),
       finance: clone(objectValue(data.settlement)),
-      createdAt: operation.occurredAt.toISOString(),
+      occurredAt: operation.occurredAt.toISOString(),
+      recordedAt: operation.createdAt.toISOString(),
+      createdAt: operation.createdAt.toISOString(),
     };
     if (operation.kind === 'manual-income') {
       return {
@@ -1115,6 +1117,7 @@ export class FinanceService {
       source: { type: row.sourceType, id: row.sourceId },
       originalOperationId: row.originalOperationId,
       occurredAt: row.occurredAt.toISOString(),
+      recordedAt: row.createdAt.toISOString(),
       data: clone(row.data),
     }));
     const ledgerRows = ledger.map((row) => ({
@@ -1126,6 +1129,7 @@ export class FinanceService {
       economicType: row.economicType,
       amount: numberValue(row.amount),
       occurredAt: row.occurredAt.toISOString(),
+      recordedAt: row.createdAt.toISOString(),
       source: { type: row.sourceType, id: row.sourceId },
       component: text(objectValue(row.data).component),
       relatedOperationId: text(objectValue(row.data).relatedOperationId),
