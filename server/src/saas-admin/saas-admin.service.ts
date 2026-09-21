@@ -347,7 +347,14 @@ export class SaasAdminService {
     const platformAccountIds = [...new Set(access.tenant.memberships.map((item) => item.platformAccountId))];
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT set_config('book.allow_test_tenant_delete', 'on', true)`;
+      await tx.$executeRawUnsafe('SET LOCAL "book.allow_test_tenant_delete" = \'on\'');
+      const guard = await tx.$queryRaw<Array<{ value: string | null }>>`
+        SELECT current_setting('book.allow_test_tenant_delete', true) AS "value"
+      `;
+      if (guard[0]?.value !== 'on') {
+        throw new Error('Test tenant delete guard was not enabled');
+      }
+
       await tx.$executeRaw`DELETE FROM "PlatformConsentEvent" WHERE "tenantId" = ${tenantId}`;
       await tx.tenant.delete({ where: { id: tenantId } });
 
@@ -358,6 +365,10 @@ export class SaasAdminService {
           select: { id: true },
         });
         if (remainingMemberships === 0 && !platformAdmin) {
+          await tx.$executeRaw`
+            DELETE FROM "PlatformConsentEvent"
+            WHERE "platformAccountId" = ${platformAccountId}
+          `;
           await tx.platformAccount.delete({ where: { id: platformAccountId } });
         }
       }
