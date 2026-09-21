@@ -1,23 +1,41 @@
 import { API_BASE } from '../environment.js';
 
-function tokenKey(tenantId) {
+const ACCOUNT_TOKEN_KEY = 'book.account.token';
+const ACCOUNT_EMAIL_KEY = 'book.account.email';
+
+function legacyTokenKey(tenantId) {
   return `book.account.token.${String(tenantId || '')}`;
 }
 
-function emailKey(tenantId) {
+function legacyEmailKey(tenantId) {
   return `book.account.email.${String(tenantId || '')}`;
 }
 
-export function getAccountToken(tenantId) {
-  return localStorage.getItem(tokenKey(tenantId)) || '';
+export function getAccountToken(tenantId = '') {
+  const globalToken = localStorage.getItem(ACCOUNT_TOKEN_KEY) || '';
+  if (globalToken) return globalToken;
+  const legacy = tenantId ? localStorage.getItem(legacyTokenKey(tenantId)) || '' : '';
+  if (legacy) {
+    localStorage.setItem(ACCOUNT_TOKEN_KEY, legacy);
+    localStorage.removeItem(legacyTokenKey(tenantId));
+  }
+  return legacy;
 }
 
-export function getRememberedAccountEmail(tenantId) {
-  return localStorage.getItem(emailKey(tenantId)) || '';
+export function getRememberedAccountEmail(tenantId = '') {
+  const globalEmail = localStorage.getItem(ACCOUNT_EMAIL_KEY) || '';
+  if (globalEmail) return globalEmail;
+  const legacy = tenantId ? localStorage.getItem(legacyEmailKey(tenantId)) || '' : '';
+  if (legacy) {
+    localStorage.setItem(ACCOUNT_EMAIL_KEY, legacy);
+    localStorage.removeItem(legacyEmailKey(tenantId));
+  }
+  return legacy;
 }
 
-export function clearAccount(tenantId) {
-  localStorage.removeItem(tokenKey(tenantId));
+export function clearAccount(tenantId = '') {
+  localStorage.removeItem(ACCOUNT_TOKEN_KEY);
+  if (tenantId) localStorage.removeItem(legacyTokenKey(tenantId));
 }
 
 async function request(path, { tenantId = '', auth = false, ...options } = {}) {
@@ -36,9 +54,9 @@ async function jsonResponse(response, fallbackMessage) {
   return payload;
 }
 
-function storeSession(tenantId, payload) {
-  if (payload?.accessToken) localStorage.setItem(tokenKey(tenantId), payload.accessToken);
-  if (payload?.account?.email) localStorage.setItem(emailKey(tenantId), payload.account.email);
+function storeSession(_tenantId, payload) {
+  if (payload?.accessToken) localStorage.setItem(ACCOUNT_TOKEN_KEY, payload.accessToken);
+  if (payload?.account?.email) localStorage.setItem(ACCOUNT_EMAIL_KEY, payload.account.email);
   return payload;
 }
 
@@ -166,6 +184,17 @@ export async function revokeAccountConsent(tenantId, documentId) {
     }),
     'Не удалось отозвать согласие',
   );
+}
+
+export async function resolveAccountTelegramEntry(tenantId, token) {
+  const payload = await jsonResponse(
+    await request(`/online-booking/${encodeURIComponent(tenantId)}/account/telegram-entry/resolve`, {
+      method: 'POST',
+      body: JSON.stringify({ token: String(token || '').trim() }),
+    }),
+    'Не удалось проверить Telegram-вход',
+  );
+  return payload?.accessToken ? storeSession(tenantId, payload) : payload;
 }
 
 export async function bindAccountTelegramEntry(tenantId, token) {
