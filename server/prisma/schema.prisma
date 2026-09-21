@@ -54,6 +54,7 @@ model Tenant {
   documentArchive          TenantDocumentArchive?
   businessAuxiliaryState   BusinessAuxiliaryState?
   financeSettlements       FinanceSettlement[]
+  financeArticles          FinanceArticle[]
   financeOperations        FinanceOperation[]
   financeLedgerEntries     FinanceLedgerEntry[]
   saasAccess               TenantAccess?
@@ -326,6 +327,27 @@ model BusinessAuxiliaryState {
   updatedAt           DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model FinanceArticle {
+  id              String    @id @default(cuid())
+  tenantId        String
+  articleId       String
+  parentArticleId String    @default("")
+  name            String
+  direction       String
+  economicType    String
+  systemKey       String    @default("")
+  position        Int       @default(0)
+  archivedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, articleId])
+  @@index([tenantId, parentArticleId, position])
+  @@index([tenantId, direction, archivedAt])
 }
 
 model FinanceSettlement {
