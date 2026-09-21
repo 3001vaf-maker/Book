@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { CapabilityValueType, TenantAccessStatus } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 
-type ResolutionSource = 'TENANT_OVERRIDE' | 'PLAN' | 'DEFAULT' | 'LEGACY_COMPAT' | 'SUSPENDED';
+type ResolutionSource = 'TENANT_OVERRIDE' | 'PLAN' | 'DEFAULT' | 'LEGACY_COMPAT' | 'SUSPENDED' | 'DEMO' | 'DEMO_EXPIRED';
 
 export type ResolvedCapability = {
   key: string;
@@ -16,7 +16,11 @@ export type ResolvedTenantAccess = {
   tenantId: string;
   status: TenantAccessStatus | 'LEGACY_COMPAT';
   isOwnerBook: boolean;
+  commercialMode: string;
+  demoActivatedAt: string;
+  demoExpiresAt: string;
   plan: { id: string; key: string; name: string } | null;
+  capabilityOrder: string[];
   capabilities: ResolvedCapability[];
 };
 
@@ -30,7 +34,7 @@ export class SaasAccessService {
     });
 
     if (!capability || !capability.isActive) {
-      throw new NotFoundException(`Неизвестная возможность Book: ${capabilityKey}`);
+      throw new NotFoundException(`Неизвестная возможность: ${capabilityKey}`);
     }
 
     const access = await this.prisma.tenantAccess.findUnique({
@@ -58,6 +62,9 @@ export class SaasAccessService {
     if (access.status === TenantAccessStatus.SUSPENDED) {
       return this.suspendedValue(capability.key, capability.valueType);
     }
+
+    if (this.demoActive(access)) return this.demoValue(capability.key, capability.valueType);
+    if (this.demoExpired(access)) return this.demoExpiredValue(capability.key, capability.valueType);
 
     const override = access.overrides[0];
     const planValue = access.plan?.capabilityValues[0];
@@ -144,6 +151,7 @@ export class SaasAccessService {
           },
         },
         overrides: true,
+        capabilityOrder: { orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] },
       },
     });
 
@@ -152,7 +160,11 @@ export class SaasAccessService {
         tenantId,
         status: 'LEGACY_COMPAT',
         isOwnerBook: false,
+        commercialMode: 'LIVE',
+        demoActivatedAt: '',
+        demoExpiresAt: '',
         plan: null,
+        capabilityOrder: [],
         capabilities: capabilities.map((capability) =>
           this.legacyCompatibilityValue(capability.key, capability.valueType),
         ),
@@ -161,11 +173,23 @@ export class SaasAccessService {
 
     const planValues = new Map(access.plan?.capabilityValues.map((value) => [value.capabilityId, value]) || []);
     const overrides = new Map(access.overrides.map((value) => [value.capabilityId, value]));
+    const customOrder = new Map(access.capabilityOrder.map((value, index) => [value.capabilityId, index]));
+
+    capabilities.sort((left, right) => {
+      const leftOrder = customOrder.get(left.id);
+      const rightOrder = customOrder.get(right.id);
+      if (leftOrder != null && rightOrder != null) return leftOrder - rightOrder;
+      if (leftOrder != null) return -1;
+      if (rightOrder != null) return 1;
+      return left.position - right.position || left.key.localeCompare(right.key);
+    });
 
     const resolved = capabilities.map<ResolvedCapability>((capability) => {
       if (access.status === TenantAccessStatus.SUSPENDED) {
         return this.suspendedValue(capability.key, capability.valueType);
       }
+      if (this.demoActive(access)) return this.demoValue(capability.key, capability.valueType);
+      if (this.demoExpired(access)) return this.demoExpiredValue(capability.key, capability.valueType);
 
       const override = overrides.get(capability.id);
       const planValue = planValues.get(capability.id);
@@ -235,9 +259,41 @@ export class SaasAccessService {
       tenantId,
       status: access.status,
       isOwnerBook: access.isOwnerBook,
+      commercialMode: access.commercialMode,
+      demoActivatedAt: access.demoActivatedAt?.toISOString() || '',
+      demoExpiresAt: access.demoExpiresAt?.toISOString() || '',
       plan: access.plan ? { id: access.plan.id, key: access.plan.key, name: access.plan.name } : null,
+      capabilityOrder: capabilities.map((capability) => capability.key),
       capabilities: resolved,
     };
+  }
+
+  private demoActive(access: { commercialMode: string; demoActivatedAt: Date | null; demoExpiresAt: Date | null }) {
+    return access.commercialMode === 'DEMO'
+      && Boolean(access.demoActivatedAt)
+      && Boolean(access.demoExpiresAt)
+      && access.demoExpiresAt!.getTime() > Date.now();
+  }
+
+  private demoExpired(access: { commercialMode: string; demoActivatedAt: Date | null; demoExpiresAt: Date | null }) {
+    return access.commercialMode === 'DEMO'
+      && Boolean(access.demoActivatedAt)
+      && Boolean(access.demoExpiresAt)
+      && access.demoExpiresAt!.getTime() <= Date.now();
+  }
+
+  private demoValue(key: string, valueType: CapabilityValueType): ResolvedCapability {
+    if (valueType === CapabilityValueType.BOOLEAN) {
+      return { key, valueType, enabled: true, limit: null, source: 'DEMO' };
+    }
+    return { key, valueType, enabled: null, limit: null, source: 'DEMO' };
+  }
+
+  private demoExpiredValue(key: string, valueType: CapabilityValueType): ResolvedCapability {
+    if (valueType === CapabilityValueType.BOOLEAN) {
+      return { key, valueType, enabled: false, limit: null, source: 'DEMO_EXPIRED' };
+    }
+    return { key, valueType, enabled: null, limit: 0, source: 'DEMO_EXPIRED' };
   }
 
   private legacyCompatibilityValue(key: string, valueType: CapabilityValueType): ResolvedCapability {
