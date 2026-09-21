@@ -30,7 +30,8 @@ frontendSources.forEach((text) => {
 });
 
 assert.match(persistence, /book:server-mutation-completed/);
-assert.match(persistence, /reportMutationCompleted\(item\.path\)/);
+assert.match(persistence, /markMutationCompleted\(item\.path\)/);
+assert.match(persistence, /reportCompletedMutationBatch\(\)/);
 assert.match(persistence, /item\.resolve\?\.\(result\)/);
 
 assert.match(serverSync, /apiRequest\('\/business-state'\)/);
@@ -48,6 +49,7 @@ assert.match(serverSync, /hydrateProfileFromServer/);
 assert.match(serverSync, /hydrateWorkplacesFromServer/);
 assert.match(serverSync, /hydrateFinanceFromServer/);
 assert.match(serverSync, /book:server-mutation-completed/);
+assert.match(serverSync, /event\?\.detail\?\.scopes/);
 assert.match(serverSync, /book:records-changed/);
 assert.match(serverSync, /book:time-usage-changed/);
 assert.match(serverSync, /book:people-changed/);
