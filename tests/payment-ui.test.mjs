@@ -88,6 +88,8 @@ const methodsSource = readFileSync(new URL('../ui/payment/methods.js', import.me
 const paymentCss = readFileSync(new URL('../ui/payment/payment.css', import.meta.url), 'utf8');
 const recordViewSource = readFileSync(new URL('../journal/record-view.js', import.meta.url), 'utf8');
 const recordPaymentSource = readFileSync(new URL('../journal/record-payment.js', import.meta.url), 'utf8');
+const financeUiSource = readFileSync(new URL('../main/finance/finance.js', import.meta.url), 'utf8');
+const financeServiceSource = readFileSync(new URL('../core/finance/service.js', import.meta.url), 'utf8');
 const journalListSource = readFileSync(new URL('../journal/список.js', import.meta.url), 'utf8');
 const personMetadataSource = readFileSync(new URL('../main/people/metadata.js', import.meta.url), 'utf8');
 const walletSource = readFileSync(new URL('../settings/wallets/wallets.js', import.meta.url), 'utf8');
@@ -146,6 +148,13 @@ assert.doesNotMatch(recordPaymentSource, /if \(!state\.fullyPaid \|\| !state\.la
 assert.match(recordPaymentSource, /Отменить операцию',\s*\{\s*variant:\s*'secondary'/);
 assert.match(recordPaymentSource, /Возврат',\s*\{\s*variant:\s*'danger'/);
 assert.match(recordPaymentSource, /Подтвердить возврат',[\s\S]*variant:\s*'danger'/);
+assert.match(recordPaymentSource, /zonedDateTimeToDate/);
+assert.match(recordPaymentSource, /paymentWorkplaceTimeZone/);
+assert.match(recordPaymentSource, /financeDateTimeInputValue/);
+assert.match(financeServiceSource, /export async function cancelFinanceOperation/);
+assert.match(financeUiSource, /data-finance-operation/);
+assert.match(financeUiSource, /cancelFinanceOperation\(id/);
+assert.match(financeUiSource, /Отменить ошибочную операцию/);
 assert.match(recordPaymentSource, /flatMap/);
 assert.doesNotMatch(recordPaymentSource, /toLocaleDateString/);
 assert.match(journalListSource, /shortDate\(record\?\.date\)/);
