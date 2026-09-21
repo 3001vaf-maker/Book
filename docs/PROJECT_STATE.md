@@ -127,7 +127,27 @@ The isolated development contour now exists in code:
 
 The previously queued Auth transactional communication block is paused.
 
-## Active block — Finance ownership rebuild (2026-09-20)
+## Active block — Global Account + Online Booking flow (2026-09-21)
+
+Working branch: `feature/account-booking-unified-20260921`.
+
+Continuity anchor: `docs/ACCOUNT_BOOKING_ARCHITECTURE.md`.
+
+Target:
+- one global human Account/Profile across every Tenant and every entry channel;
+- globally unique phone/email/Telegram ID contacts;
+- web link and Telegram Mini App resolve the same Account and use the same legal/booking rules;
+- public booking selection happens before login/registration;
+- platform Account Terms are global and separate from Tenant Person consent;
+- Tenant Person data remains tenant-owned; Account contact propagation is one-way Account -> already linked Person(s).
+
+Ordered implementation: A0 architecture -> A1 identity/session -> A2 booking route -> A3 legal split -> A4 Person sync -> A5 full verification.
+
+Current status:
+- A0: DONE — target architecture and handoff state fixed in `docs/ACCOUNT_BOOKING_ARCHITECTURE.md`.
+- A1-A5: pending implementation and verification.
+
+## Completed block — Finance ownership rebuild (2026-09-20)
 
 Released Finance checkpoint: `main@e55e4e58c0073fab313ec0cc26f46415d2e7a1d7` via PR #247. Final whole-staging Check Book #2000, release PR Check Book #2001 and post-main Check Book #2002 all passed.
 
