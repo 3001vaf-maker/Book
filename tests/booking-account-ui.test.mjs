@@ -87,6 +87,8 @@ assert.match(booking, /const account = await getAccount\(state\.tenantId\);[\s\S
 
 // Account stays on canonical shared primitives.
 assert.match(accountShell, /entityCard\(\{/);
+assert.doesNotMatch(accountShell, /UEI \$\{account\.uei\}/);
+assert.doesNotMatch(accountShell, /id:\s*account\.uei/);
 assert.match(accountShell, /className: 'entity-card--hero'/);
 assert.match(accountShell, /image: profile\.photo \|\| ''/);
 assert.doesNotMatch(accountShell, /clientProfileCard\(/);
