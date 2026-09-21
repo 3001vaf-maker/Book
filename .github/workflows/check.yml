@@ -215,7 +215,9 @@ jobs:
           set -euo pipefail
           docker compose -f docker-compose.staging.yml exec -T db psql -U book -d book_staging -v ON_ERROR_STOP=1 <<'SQL'
           INSERT INTO "Tenant" ("id","name","updatedAt")
-          VALUES ('reset-tenant','Reset Tenant',CURRENT_TIMESTAMP);
+          VALUES
+            ('reset-tenant-a','Reset Tenant A',CURRENT_TIMESTAMP),
+            ('reset-tenant-b','Reset Tenant B',CURRENT_TIMESTAMP);
 
           INSERT INTO "Account" (
             "id","tenantId","email","passwordHash","name","surname","phone","telegramId",
@@ -223,11 +225,11 @@ jobs:
           )
           VALUES
             (
-              'reset-account-a','reset-tenant','same@example.invalid','hash-a','A','','+79990000001','7770001',
+              'reset-account-a','reset-tenant-a','same@example.invalid','hash-a','A','','+79990000001','7770001',
               '{}'::jsonb,0,0,0,'','[]'::jsonb,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP
             ),
             (
-              'reset-account-b','reset-tenant','same@example.invalid','hash-b','B','','+79990000001','7770001',
+              'reset-account-b','reset-tenant-b','same@example.invalid','hash-b','B','','+79990000001','7770001',
               '{}'::jsonb,0,0,0,'','[]'::jsonb,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP
             );
 
@@ -235,7 +237,7 @@ jobs:
             "id","tenantId","accountId","workplaceKey","date","from","to","procedures","updatedAt"
           )
           VALUES (
-            'reset-request','reset-tenant','reset-account-a','reset-workplace',
+            'reset-request','reset-tenant-a','reset-account-a','reset-workplace',
             '2026-09-21','10:00','11:00','[]'::jsonb,CURRENT_TIMESTAMP
           );
 
@@ -243,21 +245,21 @@ jobs:
             "id","tenantId","key","position","data","updatedAt"
           )
           VALUES (
-            'reset-person-row','reset-tenant','reset-person',0,
+            'reset-person-row','reset-tenant-a','reset-person',0,
             '{"key":"reset-person","name":"Keep Person","phones":["+79990000001"],"emails":["same@example.invalid"],"accounts":["reset-account-a"],"tags":["keep-me"]}'::jsonb,
             CURRENT_TIMESTAMP
           );
 
           INSERT INTO "UeiState" ("id","tenantId","data","updatedAt")
           VALUES (
-            'reset-uei-row','reset-tenant',
+            'reset-uei-row','reset-tenant-a',
             '{"entities":{"uei-reset":{"members":["person:reset-person"],"owner":{"type":"person","id":"reset-person"}}},"relations":{"person:reset-person":"uei-reset"}}'::jsonb,
             CURRENT_TIMESTAMP
           );
 
           INSERT INTO "TenantDocumentArchive" ("id","tenantId","data","updatedAt")
           VALUES (
-            'reset-doc-row','reset-tenant',
+            'reset-doc-row','reset-tenant-a',
             '{"documents":[{"id":"keep-document","title":"Keep document","version":1}]}'::jsonb,
             CURRENT_TIMESTAMP
           );
@@ -268,7 +270,7 @@ jobs:
             "occurredAt","migratedFromEventId","createdAt"
           )
           VALUES (
-            'reset-consent','reset-tenant','ACCOUNT','reset-account-a','','',
+            'reset-consent','reset-tenant-a','ACCOUNT','reset-account-a','','',
             'pdn-consent',1,'accepted',CURRENT_TIMESTAMP,NULL,'test',
             CURRENT_TIMESTAMP,'',CURRENT_TIMESTAMP
           );
