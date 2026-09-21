@@ -28,21 +28,21 @@ function walletOptions() {
 }
 
 function detailRow(values = {}) {
-  return \`<div class="array-row" data-finance-manual-line>
-    <input type="text" name="lineName" value="\${String(values.name || '').replaceAll('"', '&quot;')}" placeholder="Что купили / что получили">
-    <input type="number" min="0" step="0.01" inputmode="decimal" name="lineQuantity" value="\${values.quantity ?? 1}" placeholder="Количество">
-    <input type="number" min="0" step="0.01" inputmode="decimal" name="linePrice" value="\${values.unitPrice ?? ''}" placeholder="Цена">
+  return `<div class="array-row" data-finance-manual-line>
+    <input type="text" name="lineName" value="${String(values.name || '').replaceAll('"', '&quot;')}" placeholder="Что купили / что получили">
+    <input type="number" min="0" step="0.01" inputmode="decimal" name="lineQuantity" value="${values.quantity ?? 1}" placeholder="Количество">
+    <input type="number" min="0" step="0.01" inputmode="decimal" name="linePrice" value="${values.unitPrice ?? ''}" placeholder="Цена">
     <button type="button" class="remove-button" data-finance-manual-line-remove aria-label="Удалить строку">×</button>
-  </div>\`;
+  </div>`;
 }
 
 function modeMarkup(mode) {
   if (mode === 'detail') {
-    return \`<div class="array-group" data-finance-manual-detail>
+    return `<div class="array-group" data-finance-manual-detail>
       <span class="array-label">Позиции</span>
-      <div data-finance-manual-lines>\${detailRow()}</div>
-      \${button('+ Добавить позицию', { type: 'button', variant: 'secondary', data: 'data-finance-manual-line-add' })}
-    </div>\`;
+      <div data-finance-manual-lines>${detailRow()}</div>
+      ${button('+ Добавить позицию', { type: 'button', variant: 'secondary', data: 'data-finance-manual-line-add' })}
+    </div>`;
   }
   return field({
     label: 'Сумма',
@@ -107,15 +107,15 @@ function openOperation(root, direction, navigateBack) {
     openNotice({ message: 'Сначала добавьте кошелёк.' });
     return;
   }
-  const html = \`<form class="compact-form" data-finance-manual-form>
-    \${select({ label: 'Статья', name: 'articleId', value: articles[0]?.value || '', options: articles, searchable: true })}
-    \${select({ label: 'Кошелёк', name: 'walletId', value: wallets[0]?.value || '', options: wallets })}
-    \${select({ label: 'Ввод', name: 'entryMode', value: 'simple', options: [{ value: 'simple', label: 'Сумма' }, { value: 'detail', label: 'Детально' }] })}
-    \${field({ label: 'Дата и время', name: 'occurredAt', type: 'datetime-local', value: localDateTimeValue(), required: true })}
-    <div data-finance-manual-mode>\${modeMarkup('simple')}</div>
-    \${textareaField({ label: 'Примечание', name: 'note', rows: 3, placeholder: 'Необязательно' })}
-    \${button(isIncome ? 'Записать доход' : 'Записать расход', { type: 'submit' })}
-  </form>\`;
+  const html = `<form class="compact-form" data-finance-manual-form>
+    ${select({ label: 'Статья', name: 'articleId', value: articles[0]?.value || '', options: articles, searchable: true })}
+    ${select({ label: 'Кошелёк', name: 'walletId', value: wallets[0]?.value || '', options: wallets })}
+    ${select({ label: 'Ввод', name: 'entryMode', value: 'simple', options: [{ value: 'simple', label: 'Сумма' }, { value: 'detail', label: 'Детально' }] })}
+    ${field({ label: 'Дата и время', name: 'occurredAt', type: 'datetime-local', value: localDateTimeValue(), required: true })}
+    <div data-finance-manual-mode>${modeMarkup('simple')}</div>
+    ${textareaField({ label: 'Примечание', name: 'note', rows: 3, placeholder: 'Необязательно' })}
+    ${button(isIncome ? 'Записать доход' : 'Записать расход', { type: 'submit' })}
+  </form>`;
   const m = mountModal(root, modal(html, { title: isIncome ? 'Доход' : 'Расход' }));
   if (!m) return;
 
@@ -140,7 +140,7 @@ function openOperation(root, direction, navigateBack) {
 }
 
 export function renderIncomeExpense(root, navigateBack = () => {}) {
-  root.innerHTML = \`\${pageHeader('Доход / Расход')}\${actionBlock(\`\${button('Доход', { data: 'data-finance-manual-income' })}\${button('Расход', { data: 'data-finance-manual-expense' })}\${button('Назад', { variant: 'secondary', data: 'data-finance-manual-back' })}\`)}\`;
+  root.innerHTML = `${pageHeader('Доход / Расход')}${actionBlock(`${button('Доход', { data: 'data-finance-manual-income' })}${button('Расход', { data: 'data-finance-manual-expense' })}${button('Назад', { variant: 'secondary', data: 'data-finance-manual-back' })}`)}`;
   root.querySelector('[data-finance-manual-income]')?.addEventListener('click', () => openOperation(root, 'IN', navigateBack));
   root.querySelector('[data-finance-manual-expense]')?.addEventListener('click', () => openOperation(root, 'OUT', navigateBack));
   root.querySelector('[data-finance-manual-back]')?.addEventListener('click', navigateBack);
