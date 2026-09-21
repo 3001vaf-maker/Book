@@ -560,6 +560,59 @@ jobs:
           fi
           rm -f "$past_body"
 
+          account_id=$(node -e "const p=JSON.parse(process.argv[1]); if(!p.account?.id) process.exit(1); process.stdout.write(p.account.id)" "$booking_payload")
+          booking_slot=$(node -e "
+            const p=JSON.parse(process.argv[1]);
+            const today=process.argv[2];
+            const days=(p.days||[])
+              .filter((d)=>String(d.workplaceId||'')==='studio-test' && String(d.date||'').slice(0,10)>today)
+              .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+            const day=days[0];
+            if(!day){ console.error('No future studio-test booking day in staging context'); process.exit(1); }
+            process.stdout.write(JSON.stringify({date:String(day.date).slice(0,10),from:'09:00'}));
+          " "$booking_context" "$booking_today")
+          booking_date=$(node -e "process.stdout.write(JSON.parse(process.argv[1]).date)" "$booking_slot")
+          booking_from=$(node -e "process.stdout.write(JSON.parse(process.argv[1]).from)" "$booking_slot")
+
+          created_booking=$(curl -fsS \
+            -X POST \
+            -H "Authorization: Bearer $booking_token" \
+            -H 'Content-Type: application/json' \
+            -d "$(node -e "process.stdout.write(JSON.stringify({workplaceKey:'studio-test',date:process.argv[1],from:process.argv[2],procedureIds:['procedure-cut']}))" "$booking_date" "$booking_from")" \
+            "http://localhost:8080/api/online-booking/$tenant_id/requests")
+          created_record_id=$(node -e "const p=JSON.parse(process.argv[1]); if(!p.recordId) { console.error('Public booking did not return recordId'); process.exit(1); } process.stdout.write(p.recordId)" "$created_booking")
+
+          owner_business=$(curl -fsS \
+            -H "Authorization: Bearer $access_token" \
+            "http://localhost:8080/api/business-state")
+          node -e "
+            const business=JSON.parse(process.argv[1]);
+            const accountId=process.argv[2];
+            const recordId=process.argv[3];
+            const people=Array.isArray(business.people)?business.people:[];
+            const records=Array.isArray(business.records)?business.records:[];
+            const linked=people.find((person)=>Array.isArray(person.accounts) && person.accounts.includes(accountId));
+            if(!linked){ console.error('Global Account is not linked to Person in owner business state'); process.exit(1); }
+            const record=records.find((item)=>String(item.id||'')===recordId);
+            if(!record){ console.error('Public booking Record is missing from owner business state'); process.exit(1); }
+            if(String(record.person?.key||'')!==String(linked.key||'')){
+              console.error('Public booking Record is linked to a different Person than Account');
+              process.exit(1);
+            }
+          " "$owner_business" "$account_id" "$created_record_id"
+
+          client_records=$(curl -fsS \
+            -H "Authorization: Bearer $booking_token" \
+            "http://localhost:8080/api/online-booking/$tenant_id/account/records")
+          node -e "
+            const rows=JSON.parse(process.argv[1]);
+            const recordId=process.argv[2];
+            if(!Array.isArray(rows) || !rows.some((item)=>String(item.id||'')===recordId)){
+              console.error('Created Record is missing from Account profile');
+              process.exit(1);
+            }
+          " "$client_records" "$created_record_id"
+
           push_config=$(curl -fsS \
             -H "Authorization: Bearer $booking_token" \
             "http://localhost:8080/api/online-booking/$tenant_id/account/push/config")

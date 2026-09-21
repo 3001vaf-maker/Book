@@ -10,6 +10,8 @@ const finance = fs.readFileSync('server/src/finance/finance.service.ts', 'utf8')
 const business = fs.readFileSync('server/src/business-state/business-state.service.ts', 'utf8');
 const accountShell = fs.readFileSync('online-booking/account-shell.js', 'utf8');
 const consentPolicy = fs.readFileSync('server/src/tenant-document-archive/consent-policy.service.ts', 'utf8');
+const core = fs.readFileSync('core.js', 'utf8');
+const serverSync = fs.readFileSync('online-booking/server-sync.js', 'utf8');
 
 const request = service.slice(service.indexOf('async createRequest('), service.indexOf('async getMyRecords('));
 assert.match(request, /this\.records\.create\(/);
@@ -47,5 +49,10 @@ assert.doesNotMatch(accountShell, /recordSnapshot/);
 assert.doesNotMatch(service, /acceptAccountConsents/);
 assert.match(bookingConsent, /acceptAccountConsents\(auth\.tenantId, auth\.accountId/);
 assert.match(consentPolicy, /INSERT INTO "TenantConsentEvent"/);
+
+assert.match(core, /function ensureServerBookingSync\(\) \{[\s\S]*if \(serverBookingSyncStarted\) return;[\s\S]*startServerBookingSync\(\);/);
+assert.doesNotMatch(core, /serverBookingSyncStarted \|\| !canUseBookCapability\('online_booking\.access'\)/);
+assert.match(serverSync, /hydrateRecordStateFromServer\(\{ records: business\.records \|\| \[\], recordEvents: business\.recordEvents \|\| \[\] \}\)/);
+assert.match(serverSync, /book:records-changed/);
 
 console.log('booking server autonomy tests passed');
