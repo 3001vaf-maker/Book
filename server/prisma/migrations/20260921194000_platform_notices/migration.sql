@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS "PlatformNotice" (
     ON DELETE CASCADE ON UPDATE CASCADE
 );
 
-DO $
+DO $$
 DECLARE
   account_table TEXT;
 BEGIN
@@ -36,7 +36,7 @@ BEGIN
     );
   END IF;
 END
-$;
+$$;
 
 CREATE INDEX IF NOT EXISTS "PlatformNotice_tenant_created_idx"
   ON "PlatformNotice"("tenantId","createdAt");
