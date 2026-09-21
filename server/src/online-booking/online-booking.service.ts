@@ -42,6 +42,19 @@ function canonicalPhone(value: unknown) {
   return digits;
 }
 
+function accountLoginContact(value: unknown) {
+  const raw = text(value);
+  const email = emailValue(raw);
+  if (email && email.includes('@')) {
+    return { type: AccountContactType.EMAIL, value: email };
+  }
+  const phone = canonicalPhone(raw);
+  if (phone.length >= 10 && phone.length <= 15) {
+    return { type: AccountContactType.PHONE, value: phone };
+  }
+  return null;
+}
+
 function dateValue(value: unknown) {
   const result = text(value).slice(0, 10);
   return /^\d{4}-\d{2}-\d{2}$/.test(result) ? result : '';
@@ -294,14 +307,35 @@ export class OnlineBookingService {
     };
   }
 
-  async prepareAccount(_tenantId: string, email: unknown) {
-    const normalizedEmail = emailValue(email);
-    if (!normalizedEmail) throw new BadRequestException('Введите email');
-    const contact = await this.prisma.accountContact.findUnique({
-      where: { type_value: { type: AccountContactType.EMAIL, value: normalizedEmail } },
-      select: { accountId: true },
+  async prepareAccount(_tenantId: string, input: unknown) {
+    const source = objectValue(input);
+    const identifierValue = text(source.identifier || (typeof input === 'string' ? input : ''));
+    const email = emailValue(source.email);
+    const phone = canonicalPhone(source.phone);
+    const contacts: Array<{ type: AccountContactType; value: string; field: 'identifier' | 'email' | 'phone' }> = [];
+
+    const identifier = accountLoginContact(identifierValue);
+    if (identifier) contacts.push({ ...identifier, field: 'identifier' });
+    if (email && email.includes('@')) contacts.push({ type: AccountContactType.EMAIL, value: email, field: 'email' });
+    if (phone) contacts.push({ type: AccountContactType.PHONE, value: phone, field: 'phone' });
+    if (!contacts.length) throw new BadRequestException('Введите телефон или email');
+
+    const unique = [...new Map(contacts.map((contact) => [`${contact.type}:${contact.value}`, contact])).values()];
+    const rows = await this.prisma.accountContact.findMany({
+      where: { OR: unique.map((contact) => ({ type: contact.type, value: contact.value })) },
+      select: { type: true, value: true },
     });
-    return { exists: Boolean(contact) };
+    const occupied = new Set(rows.map((row) => `${row.type}:${row.value}`));
+    const conflicts = {
+      identifier: unique.some((contact) => contact.field === 'identifier' && occupied.has(`${contact.type}:${contact.value}`)),
+      email: unique.some((contact) => contact.field === 'email' && occupied.has(`${contact.type}:${contact.value}`)),
+      phone: unique.some((contact) => contact.field === 'phone' && occupied.has(`${contact.type}:${contact.value}`)),
+    };
+    return {
+      exists: conflicts.identifier || conflicts.email || conflicts.phone,
+      conflicts,
+      identifierType: identifier?.type || '',
+    };
   }
 
   async registerAccount(tenantId: string, body: Record<string, any>) {
@@ -357,15 +391,16 @@ export class OnlineBookingService {
     };
   }
 
-  async loginAccount(tenantId: string, email: unknown, password: unknown) {
-    const normalizedEmail = emailValue(email);
+  async loginAccount(tenantId: string, identifierValue: unknown, password: unknown) {
+    const identifier = accountLoginContact(identifierValue);
+    if (!identifier) throw new BadRequestException('Введите телефон или email');
     const contact = await this.prisma.accountContact.findUnique({
-      where: { type_value: { type: AccountContactType.EMAIL, value: normalizedEmail } },
+      where: { type_value: { type: identifier.type, value: identifier.value } },
       include: { account: true },
     });
     const account = contact?.account || null;
     if (!account || !(await compare(text(password), account.passwordHash))) {
-      throw new UnauthorizedException('Неверный email или пароль');
+      throw new UnauthorizedException('Неверный телефон, email или пароль');
     }
     const binding = await this.personIdentity.bindFirstAccess(tenantId, account as any);
     return {
