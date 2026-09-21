@@ -19,6 +19,7 @@ import { hydrateWalletsFromServer } from '../settings/wallets/data.js';
 
 const POLL_MS = 4000;
 const ALL_SCOPES = Object.freeze(['business', 'operational', 'documents', 'profile', 'auxiliary', 'finance']);
+const POLL_SCOPES = Object.freeze(['business', 'documents']);
 let timer = null;
 let running = false;
 let stopListeners = () => {};
@@ -194,7 +195,7 @@ async function pull(scopes = ALL_SCOPES) {
 export function startServerBookingSync() {
   if (timer) return () => stopServerBookingSync();
   void pull(ALL_SCOPES);
-  timer = window.setInterval(() => void pull(ALL_SCOPES), POLL_MS);
+  timer = window.setInterval(() => void pull(POLL_SCOPES), POLL_MS);
   const refreshAll = () => void pull(ALL_SCOPES);
   const refreshMutation = (event) => {
     const scope = String(event?.detail?.scope || '');
