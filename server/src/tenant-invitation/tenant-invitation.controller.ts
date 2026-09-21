@@ -11,7 +11,7 @@ export class TenantInvitationController {
   }
 
   @Post('accept')
-  accept(@Body() body: { token?: unknown; password?: unknown; email?: unknown }) {
+  accept(@Body() body: { token?: unknown; password?: unknown; email?: unknown; documents?: unknown }) {
     return this.invitations.accept(body || {});
   }
 }
