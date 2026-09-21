@@ -50,7 +50,7 @@ assert.match(adminService, /remainingMemberships === 0 && !platformAdmin/);
 assert.match(adminService, /set_config\('book\.allow_test_tenant_delete', 'on', true\)/);
 assert.match(hardDeleteMigration, /current_setting\('book\.allow_test_tenant_delete', true\) = 'on'/);
 assert.match(adminUi, /data-delete-tenant/);
-assert.match(adminUi, /Полностью удалить/);
+assert.match(adminUi, /Будут полностью удалены/);
 assert.match(adminUi, /openDeleteTenantModal/);
 assert.doesNotMatch(adminUi, /window\.confirm|\balert\s*\(/);
 assert.doesNotMatch(adminUi, /data-delete-invitation/);
