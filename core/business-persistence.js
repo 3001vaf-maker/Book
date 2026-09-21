@@ -5,6 +5,7 @@ let running = false;
 let lastError = null;
 const queue = [];
 const idleWaiters = [];
+const completedMutationScopes = new Set();
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -21,6 +22,29 @@ function reportError(error) {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('book:business-persistence-error', { detail: { message: lastError.message } }));
   }
+}
+
+function mutationScope(path = '') {
+  const value = String(path || '');
+  if (value.startsWith('/business-state/operational')) return 'operational';
+  if (value.startsWith('/business-state/')) return 'business';
+  if (value.startsWith('/tenant-document-archive/')) return 'documents';
+  if (value.startsWith('/auxiliary-state/')) return 'auxiliary';
+  return '';
+}
+
+function markMutationCompleted(path) {
+  const scope = mutationScope(path);
+  if (scope) completedMutationScopes.add(scope);
+}
+
+function reportCompletedMutationBatch() {
+  if (typeof window === 'undefined' || !completedMutationScopes.size) return;
+  const scopes = [...completedMutationScopes];
+  completedMutationScopes.clear();
+  window.dispatchEvent(new CustomEvent('book:server-mutation-completed', {
+    detail: { scopes },
+  }));
 }
 
 function resolveIdle() {
@@ -43,10 +67,11 @@ async function runQueue() {
     while (serverReady && queue.length) {
       const item = queue[0];
       try {
-        await send(item);
+        const result = await send(item);
         queue.shift();
         lastError = null;
-        item.resolve?.();
+        item.resolve?.(result);
+        markMutationCompleted(item.path);
       } catch (error) {
         reportError(error);
         await sleep(1200);
@@ -55,6 +80,7 @@ async function runQueue() {
   } finally {
     running = false;
     resolveIdle();
+    if (!queue.length) reportCompletedMutationBatch();
     if (serverReady && queue.length) void runQueue();
   }
 }

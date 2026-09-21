@@ -640,12 +640,18 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     syncFromStoredRecord();
   };
   const onDDSChanged = (event) => {
+    if (event?.detail?.action === 'server-refresh') {
+      syncFromStoredRecord();
+      return;
+    }
     const source = event?.detail?.source;
     if (String(source?.type || '') !== 'record' || String(source?.id || '') !== String(record.id)) return;
     syncFromStoredRecord();
   };
+  const onPeopleChanged = () => render();
   window.addEventListener('book:records-changed', onRecordsChanged);
   window.addEventListener('book:dds-changed', onDDSChanged);
+  window.addEventListener('book:people-changed', onPeopleChanged);
 
   let closed = false;
   const finishClose = () => {
@@ -655,6 +661,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     startTimer = null;
     window.removeEventListener('book:records-changed', onRecordsChanged);
     window.removeEventListener('book:dds-changed', onDDSChanged);
+    window.removeEventListener('book:people-changed', onPeopleChanged);
     queueMicrotask(() => onClose?.());
   };
 

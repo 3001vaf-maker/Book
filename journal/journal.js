@@ -173,15 +173,28 @@ export function renderJournal(root) {
     initViewNavigation(root, { views, activeView, onChange: (nextView) => { activeView = nextView; renderView(); } });
   };
 
-  const recordsChangedHandler = () => renderView();
-  const ddsChangedHandler = () => renderView();
-
-  window.addEventListener('book:records-changed', recordsChangedHandler);
-  window.addEventListener('book:dds-changed', ddsChangedHandler);
+  let refreshQueued = false;
+  const scheduleRefresh = () => {
+    if (refreshQueued) return;
+    refreshQueued = true;
+    queueMicrotask(() => {
+      refreshQueued = false;
+      renderView();
+    });
+  };
+  const refreshEvents = [
+    'book:records-changed',
+    'book:dds-changed',
+    'book:time-usage-changed',
+    'book:people-changed',
+    'book:procedures-changed',
+    'book:products-changed',
+    'book:workplaces-changed',
+  ];
+  refreshEvents.forEach((eventName) => window.addEventListener(eventName, scheduleRefresh));
   renderView();
 
   return () => {
-    window.removeEventListener('book:records-changed', recordsChangedHandler);
-    window.removeEventListener('book:dds-changed', ddsChangedHandler);
+    refreshEvents.forEach((eventName) => window.removeEventListener(eventName, scheduleRefresh));
   };
 }

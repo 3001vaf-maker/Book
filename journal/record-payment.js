@@ -292,6 +292,15 @@ function refundHistoryMarkup(refunds) {
   }).join('')}</div>`;
 }
 
+function refreshPaidStateForPayment(payment) {
+  const source = payment?.source;
+  if (String(source?.type || '') !== 'record' || !source?.id) return;
+  const current = getRecord(source.id);
+  if (!current) return;
+  const state = paymentStateForRecord(current);
+  if (state.hasPayments) openPaidState(current);
+}
+
 function openRefundModal(payment) {
   const refunds = getRefundsForPayment(payment.id);
   const refunded = refunds.reduce((sum, item) => sum + Number(item?.total || 0), 0);
@@ -341,6 +350,7 @@ function openRefundModal(payment) {
     });
     if (!refund) return;
     m.remove();
+    refreshPaidStateForPayment(refund);
   });
   sync();
 }
@@ -362,6 +372,7 @@ function openCancelPaymentModal(payment) {
     });
     if (!cancelled) return;
     m.remove();
+    refreshPaidStateForPayment(cancelled);
   });
 }
 
@@ -426,6 +437,10 @@ export function openRecordPaymentEntry(record) {
     if (String(event?.detail?.recordId || '') === String(record.id)) renderPaymentState();
   };
   const onDDSChanged = (event) => {
+    if (event?.detail?.action === 'server-refresh') {
+      renderPaymentState();
+      return;
+    }
     const source = event?.detail?.source;
     if (String(source?.type || '') === 'record' && String(source?.id || '') === String(record.id)) renderPaymentState();
   };
