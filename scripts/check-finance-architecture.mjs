@@ -87,7 +87,7 @@ if (/DATASETS[^\n]*['"]finance['"]/.test(auxiliaryServer)) {
 }
 
 const schema = source('server/prisma/schema.prisma');
-for (const model of ['FinanceSettlement', 'FinanceOperation', 'FinanceLedgerEntry']) {
+for (const model of ['FinanceSettlement', 'FinanceArticle', 'FinanceOperation', 'FinanceLedgerEntry']) {
   if (!new RegExp(`model\\s+${model}\\s+\\{`).test(schema)) errors.push(`Prisma must define ${model}`);
 }
 if (!/Decimal\s+@db\.Decimal\(14, 2\)/.test(schema)) {
@@ -98,9 +98,11 @@ if (!/@@unique\(\[tenantId, operationId\]\)/.test(schema)) {
 }
 
 const migration = source('server/prisma/migrations/20260920220500_finance_settlement_operation_ledger/migration.sql');
+const articleMigration = source('server/prisma/migrations/20260921100000_finance_articles/migration.sql');
 for (const table of ['FinanceSettlement', 'FinanceOperation', 'FinanceLedgerEntry']) {
   if (!migration.includes(`CREATE TABLE "${table}"`)) errors.push(`Finance migration must create ${table}`);
 }
+if (!articleMigration.includes('CREATE TABLE "FinanceArticle"')) errors.push('Finance article migration must create FinanceArticle');
 
 const financeController = source('server/src/finance/finance.controller.ts');
 for (const route of [
@@ -109,6 +111,11 @@ for (const route of [
   /@Post\(['"]operations\/payment['"]\)/,
   /@Post\(['"]operations\/:operationId\/refund['"]\)/,
   /@Post\(['"]operations\/:operationId\/cancel['"]\)/,
+  /@Get\(['"]articles['"]\)/,
+  /@Post\(['"]articles['"]\)/,
+  /@Put\(['"]articles\/:articleId['"]\)/,
+  /@Delete\(['"]articles\/:articleId['"]\)/,
+  /@Post\(['"]operations\/manual['"]\)/,
 ]) {
   if (!route.test(financeController)) errors.push('FinanceController is missing a canonical Settlement/Operation route');
 }
@@ -124,8 +131,17 @@ for (const token of [
   'cancelOperation(',
   'settlementForSource(',
   'financeLedgerEntry',
+  'financeArticle',
+  'recordManualOperation(',
+  'ensureDefaultArticles',
 ]) {
   if (!serverFinance.includes(token)) errors.push(`FinanceService missing canonical owner behavior: ${token}`);
+}
+if (!/DEFAULT_FINANCE_ARTICLES/.test(serverFinance) || !/parentArticleId/.test(serverFinance) || !/economicType/.test(serverFinance)) {
+  errors.push('FinanceService must own hierarchical Articles with economic semantics');
+}
+if (!/quantity/.test(serverFinance) || !/unitPrice/.test(serverFinance) || !/manual-income|manual-expense/.test(serverFinance)) {
+  errors.push('Manual Income/Expense must support detailed quantity × unit price lines in one Operation');
 }
 if (!/canonicalLedgerMigratedAt/.test(serverFinance)) {
   errors.push('FinanceService must migrate legacy auxiliary Finance exactly into canonical storage');
@@ -163,7 +179,7 @@ if (!/export function calculateSettlement/.test(financeRules) || !/export functi
 }
 
 const financeIndex = source('core/finance/index.js');
-for (const token of ['calculateSettlement', 'getRecordPaymentState', 'getLedgerEntries', 'recordPaymentIncome', 'saveSettlementSnapshot']) {
+for (const token of ['calculateSettlement', 'getRecordPaymentState', 'getLedgerEntries', 'getFinanceArticles', 'recordManualFinanceOperation', 'recordPaymentIncome', 'saveSettlementSnapshot']) {
   if (!financeIndex.includes(token)) errors.push(`core/finance/index.js must expose ${token}`);
 }
 
@@ -174,6 +190,17 @@ if (!/getWalletDDSMovements/.test(walletData) || !/export function getWalletBala
 
 const financeUI = source('main/finance/finance.js');
 if (!/getLedgerEntries/.test(financeUI)) errors.push('DDS UI must render flat Ledger rows');
+if (!/renderFinanceArticles/.test(financeUI) || !/renderIncomeExpense/.test(financeUI)) {
+  errors.push('Finance UI must expose Articles and Income / Expense instruments');
+}
+const articlesUI = source('main/finance/articles.js');
+if (!/parentArticleId/.test(articlesUI) || !/economicType/.test(articlesUI)) {
+  errors.push('Articles UI must support hierarchy and separate economic character');
+}
+const incomeExpenseUI = source('main/finance/income-expense.js');
+if (!/recordManualFinanceOperation/.test(incomeExpenseUI) || !/lineQuantity/.test(incomeExpenseUI) || !/linePrice/.test(incomeExpenseUI)) {
+  errors.push('Income / Expense UI must support simple and detailed manual operations');
+}
 
 
 const stagingSeed = source('server/prisma/seed-staging.ts');
