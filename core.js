@@ -20,8 +20,9 @@ import { renderOnlineBooking } from './online-booking/booking.js';
 import { startAccountRuntime } from './online-booking/account-runtime.js';
 import { bottomNavigation } from './ui/ui.js';
 import { clearLegacyBusinessStorage } from './core/legacy-browser-business.js';
-import { FirstRunRuntime, demoBadgeMarkup, startPlatformSessionTracking } from './first-run/runtime.js';
+import { FirstRunRuntime, bindDemoBadgeAction, demoBadgeMarkup, startPlatformSessionTracking } from './first-run/runtime.js';
 import { startPlatformNotices } from './core/platform-notices.js';
+import { requestDemoExtension, requestLiveMode } from './first-run/api.js';
 
 configureWorkplaceSource(getWorkplaceEntities);
 configureTimeUsageSource(getJournalTimeUsages);
@@ -130,7 +131,10 @@ function renderWorkspace() {
     const updateBadge = () => {
       app.querySelector('[data-first-run-demo-badge]')?.remove();
       const badge = demoBadgeMarkup(firstRunState);
-      if (badge) app.insertAdjacentHTML('beforeend', badge);
+      if (badge) {
+        app.insertAdjacentHTML('beforeend', badge);
+        bindDemoBadgeAction(app, firstRunState);
+      }
     };
     updateBadge();
     if (firstRunState?.commercialMode === 'DEMO') demoBadgeTimer = window.setInterval(updateBadge, 60_000);
@@ -190,10 +194,42 @@ function renderDemoExpired(firstRun) {
     <main class="first-run-expired">
       <section class="first-run-expired__card">
         <h1>Срок DEMO завершён</h1>
-        <p>Данные и настройки сохранены. Вы можете обратиться в компанию для продления DEMO по её усмотрению или перейти к реальной работе.</p>
+        <p>Данные и настройки сохранены. Компания может продлить DEMO по своему усмотрению, либо вы можете запросить переход в LIVE.</p>
         ${expiresAt ? `<p style="margin-top:12px">DEMO завершено: ${expiresAt}</p>` : ''}
+        <div class="first-run-expired__actions">
+          <button class="ui-button" type="button" data-request-live>Перейти в LIVE</button>
+          <button class="ui-button ui-button--secondary" type="button" data-request-demo-extension>Запросить продление DEMO</button>
+        </div>
+        <p class="first-run-expired__status" data-request-status></p>
       </section>
     </main>`;
+  const status = app.querySelector('[data-request-status]');
+  app.querySelector('[data-request-live]')?.addEventListener('click', async (event) => {
+    const control = event.currentTarget;
+    control.disabled = true;
+    if (status) status.textContent = 'Отправляем запрос…';
+    try {
+      const result = await requestLiveMode();
+      if (status) status.textContent = result?.alreadyLive ? 'LIVE уже активен.' : 'Запрос на LIVE отправлен компании.';
+      control.textContent = 'Запрос отправлен';
+    } catch (error) {
+      control.disabled = false;
+      if (status) status.textContent = error instanceof Error ? error.message : 'Не удалось отправить запрос';
+    }
+  });
+  app.querySelector('[data-request-demo-extension]')?.addEventListener('click', async (event) => {
+    const control = event.currentTarget;
+    control.disabled = true;
+    if (status) status.textContent = 'Отправляем запрос…';
+    try {
+      await requestDemoExtension();
+      if (status) status.textContent = 'Запрос на продление DEMO отправлен компании.';
+      control.textContent = 'Запрос отправлен';
+    } catch (error) {
+      control.disabled = false;
+      if (status) status.textContent = error instanceof Error ? error.message : 'Не удалось отправить запрос';
+    }
+  });
   syncViewport();
 }
 
