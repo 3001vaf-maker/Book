@@ -25,8 +25,8 @@ export class OnlineBookingController {
   ) {}
 
   private async accountTelegramSettings(tenantId: string, accountId: string) {
-    const account = await this.booking.getAccount(tenantId, accountId);
-    const identity = await this.communications.telegramIdentity(tenantId, { phone: account.phone, uei: account.uei });
+    const context = await this.booking.accountTenantContactContext(tenantId, accountId);
+    const identity = await this.communications.telegramIdentity(tenantId, context);
     if (!identity) return { telegram: { linked: false, enabled: false, username: '' } };
     return {
       telegram: {
@@ -208,8 +208,8 @@ export class OnlineBookingController {
   @UseGuards(AccountGuard, BookingPdnConsentGuard)
   @Get(':tenantId/account/chat')
   async accountChat(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
-    const account = await this.booking.getAccount(tenantId, request.accountAuth!.accountId);
-    return this.communications.listThread(tenantId, { phone: account.phone, uei: account.uei }, 500);
+    const context = await this.booking.accountTenantContactContext(tenantId, request.accountAuth!.accountId);
+    return this.communications.listThread(tenantId, context, 500);
   }
 
   @UseGuards(AccountGuard, BookingPdnConsentGuard)
@@ -222,10 +222,10 @@ export class OnlineBookingController {
     const message = String(body?.body ?? '').trim();
     const attachments = Array.isArray(body?.attachments) ? body.attachments : [];
     if (!message && !attachments.length) throw new BadRequestException('Пустое сообщение');
-    const account = await this.booking.getAccount(tenantId, request.accountAuth!.accountId);
+    const context = await this.booking.accountTenantContactContext(tenantId, request.accountAuth!.accountId);
     return this.communications.recordMessage(tenantId, {
-      phone: account.phone,
-      uei: account.uei,
+      phone: context.phone,
+      uei: context.uei,
       direction: 'inbound',
       kind: attachments.length ? 'media' : 'message',
       purpose: 'DIRECT',
