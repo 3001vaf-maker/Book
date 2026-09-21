@@ -182,6 +182,7 @@ jobs:
           set -euo pipefail
           (
             cd server
+            npx prisma generate
             DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' node scripts/check-test-tenant-hard-delete.mjs
           )
       - name: Stop isolated database
