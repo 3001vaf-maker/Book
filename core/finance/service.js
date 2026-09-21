@@ -173,8 +173,8 @@ export async function recordPaymentIncome({
   return payment;
 }
 
-export async function cancelPaymentOperation(paymentId, { reason = 'incorrect-entry', occurredAt = null } = {}) {
-  const id = String(paymentId || '');
+export async function cancelFinanceOperation(operationId, { reason = 'incorrect-entry', occurredAt = null } = {}) {
+  const id = String(operationId || '');
   if (!id || !occurredAt) return null;
   const response = await apiRequest(`/finance/operations/${encodeURIComponent(id)}/cancel`, {
     method: 'POST',
@@ -184,12 +184,20 @@ export async function cancelPaymentOperation(paymentId, { reason = 'incorrect-en
     }),
   });
   const state = await applyServerState(response, 'Не удалось отменить операцию');
-  const cancelled = state.income.find((payment) => String(payment?.id || '') === id)
+  const operation = state.operations.find((item) => String(item?.operationId || '') === id) || null;
+  if (!operation) return null;
+  notifyFinanceChanged({ action: 'operation-cancelled', operationId: id, source: operation.source || null });
+  return operation;
+}
+
+export async function cancelPaymentOperation(paymentId, options = {}) {
+  const id = String(paymentId || '');
+  const operation = await cancelFinanceOperation(id, options);
+  if (!operation) return null;
+  const state = readFinanceState();
+  return state.income.find((payment) => String(payment?.id || '') === id)
     || state.expense.find((expense) => String(expense?.id || '') === id)
     || null;
-  if (!cancelled) return null;
-  notifyFinanceChanged({ action: 'payment-cancelled', paymentId: id, source: cancelled.source || null });
-  return cancelled;
 }
 
 export async function recordRefundExpense(
