@@ -6,6 +6,7 @@ import { TenantInvitationService } from '../tenant-invitation/tenant-invitation.
 import { DocumentRegistryService } from '../document-registry/document-registry.service';
 import { TransactionalEmailService } from '../transactional-email/transactional-email.service';
 import { FirstRunService } from '../first-run/first-run.service';
+import { PlatformNoticeService } from '../platform-notice/platform-notice.service';
 
 @Injectable()
 export class SaasAdminService {
@@ -16,6 +17,7 @@ export class SaasAdminService {
     private readonly documentRegistry: DocumentRegistryService,
     private readonly email: TransactionalEmailService,
     private readonly firstRun: FirstRunService,
+    private readonly notices: PlatformNoticeService,
   ) {}
 
   async me(adminId: string, platformAccountId: string) {
@@ -72,11 +74,11 @@ export class SaasAdminService {
               take: 1,
               select: { id: true, email: true, name: true, status: true, createdAt: true, expiresAt: true, activatedAt: true, demoExpiresAt: true, firstRunScenarioVersionId: true },
             },
-          },
-          firstRunProgress: {
-            orderBy: { updatedAt: 'desc' },
-            take: 1,
-            select: { status: true, currentStepKey: true, startedAt: true, completedAt: true, scenarioVersionId: true },
+            firstRunProgress: {
+              orderBy: { updatedAt: 'desc' },
+              take: 1,
+              select: { status: true, currentStepKey: true, startedAt: true, completedAt: true, scenarioVersionId: true },
+            },
           },
         },
       },
