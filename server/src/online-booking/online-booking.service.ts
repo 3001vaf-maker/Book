@@ -424,7 +424,14 @@ export class OnlineBookingService {
       });
     });
     await this.personIdentity.bindFirstAccess(tenantId, updated as any);
+    await this.personIdentity.syncLinkedPeople(updated as any);
     return this.accountView(tenantId, updated);
+  }
+
+  async syncAccountPersonContacts(accountId: string) {
+    const account = await this.prisma.account.findUnique({ where: { id: accountId } });
+    if (!account) throw new UnauthorizedException('Аккаунт не найден');
+    return this.personIdentity.syncLinkedPeople(account as any);
   }
 
   async changeAccountPassword(tenantId: string, accountId: string, currentPassword: unknown, newPassword: unknown) {
