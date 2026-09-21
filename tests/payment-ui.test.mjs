@@ -5,6 +5,7 @@ import { paymentForm, paymentMethods } from '../ui/payment/index.js';
 import { paymentReceipt } from '../ui/payment/receipt.js';
 import { modal } from '../ui/modals/index.js';
 import { shortDate } from '../ui/utils/date-time.js';
+import { zonedDateTimeParts, zonedDateTimeToDate } from '../core/time/index.js';
 
 const html = paymentForm({
   workplace: 'Бьюти тория',
@@ -25,6 +26,13 @@ assert.match(html, /remove-button payment-procedure__remove/);
 assert.doesNotMatch(html, /data-payment-total[^>]*type="number"/);
 assert.equal(shortDate('2026-09-11'), '11.09.26');
 assert.equal(shortDate('2026-09-11T02:41:00'), '11.09.26');
+const moscowMoment = zonedDateTimeToDate('2026-09-21T14:30', 'Europe/Moscow');
+assert.ok(moscowMoment instanceof Date);
+assert.equal(moscowMoment.toISOString(), '2026-09-21T11:30:00.000Z');
+assert.deepEqual(
+  { date: zonedDateTimeParts(moscowMoment, 'Europe/Moscow').date, time: zonedDateTimeParts(moscowMoment, 'Europe/Moscow').time },
+  { date: '2026-09-21', time: '14:30' },
+);
 
 const methodsHtml = paymentMethods({
   wallets: [{ id: 'cash', name: 'Наличные' }, { id: 'card', name: 'СберБанк' }],
@@ -151,6 +159,7 @@ assert.match(recordPaymentSource, /Подтвердить возврат',[\s\S]
 assert.match(recordPaymentSource, /zonedDateTimeToDate/);
 assert.match(recordPaymentSource, /paymentWorkplaceTimeZone/);
 assert.match(recordPaymentSource, /financeDateTimeInputValue/);
+assert.match(recordPaymentSource, /onRemove:[\s\S]*if \(updated\) return;[\s\S]*openPaymentModal/);
 assert.match(financeServiceSource, /export async function cancelFinanceOperation/);
 assert.match(financeUiSource, /data-finance-operation/);
 assert.match(financeUiSource, /cancelFinanceOperation\(id/);
@@ -160,6 +169,15 @@ assert.doesNotMatch(recordPaymentSource, /toLocaleDateString/);
 assert.match(journalListSource, /shortDate\(record\?\.date\)/);
 assert.match(personMetadataSource, /shortDate\(value,\s*'—'\)/);
 assert.match(walletSource, /shortDateTime\(raw,\s*fallback\)/);
+assert.match(walletSource, /data-wallet-operation/);
+assert.match(walletSource, /getLedgerEntries\(\)/);
+assert.match(walletSource, /openWalletOperation/);
+assert.match(walletSource, /Фактическая дата и время/);
+assert.match(walletSource, /Внесено в Book/);
+assert.match(walletSource, /payment\?\.occurredAt/);
+assert.match(financeUiSource, /const interactive = Boolean\(item\?\.operationId\)/);
+assert.match(financeUiSource, /sourceDetails/);
+assert.match(financeUiSource, /Внесено в Book/);
 assert.match(documentsSource, /shortDateTime\(value,\s*'Дата не зафиксирована'\)/);
 assert.match(peopleSource, /shortDateTime\(value,'—'\)/);
 assert.equal(existsSync(new URL('../ui/payment/single.js', import.meta.url)), false);
