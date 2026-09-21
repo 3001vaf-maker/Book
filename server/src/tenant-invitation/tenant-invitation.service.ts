@@ -15,6 +15,7 @@ import { createHash, randomBytes } from 'crypto';
 import { hash as hashPassword } from 'bcryptjs';
 import { PrismaService } from '../prisma.service';
 import { TransactionalEmailService } from '../transactional-email/transactional-email.service';
+import { FirstRunService } from '../first-run/first-run.service';
 
 const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const STARTER_PLAN_KEY = 'starter-people';
@@ -82,6 +83,7 @@ export class TenantInvitationService {
     private readonly prisma: PrismaService,
     private readonly email: TransactionalEmailService,
     private readonly jwt: JwtService,
+    private readonly firstRun: FirstRunService,
   ) {}
 
   async ensureStarterPlan() {
@@ -219,6 +221,8 @@ export class TenantInvitationService {
       role: result.membership.role,
     });
 
+    await this.firstRun.assignFromInvitation(invitation.id, invitation.tenantId, result.account.id);
+
     return {
       accessToken,
       account: {
@@ -329,12 +333,19 @@ export class TenantInvitationService {
 
   async inspect(tokenValue: unknown) {
     const invitation = await this.findActiveInvitation(String(tokenValue || ''));
+    const activation = await this.firstRun.activateInvitation(invitation.id, invitation.tenantId);
     const requiresEmail = isRegistrationLinkEmail(invitation.email);
     return {
       email: requiresEmail ? '' : invitation.email,
       name: invitation.name,
       requiresEmail,
-      expiresAt: invitation.expiresAt,
+      expiresAt: activation.demoExpiresAt,
+      demo: {
+        activatedAt: activation.activatedAt,
+        expiresAt: activation.demoExpiresAt,
+        days: 14,
+      },
+      scenarioVersionId: activation.scenarioVersionId,
       tenant: { id: invitation.tenant.id, name: invitation.tenant.name },
     };
   }
@@ -400,10 +411,10 @@ export class TenantInvitationService {
     return this.email.send({
       to: input.email,
       toName: input.name,
-      subject: 'Приглашение в Book',
+      subject: 'Приглашение в систему',
       tag: 'tenant-invitation',
-      text: `${input.name ? `Здравствуйте, ${input.name}.` : 'Здравствуйте.'}\n\nВам открыт персональный Book. Создайте пароль и начните настройку рабочего пространства:\n${url}\n\nСсылка действует 7 дней.`,
-      html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#292522"><h2>Book</h2><p>${greeting}</p><p>Вам открыт персональный Book. Создайте пароль и начните настройку своего рабочего пространства.</p><p style="margin:28px 0"><a href="${url}" style="background:#292522;color:#fff;text-decoration:none;padding:14px 20px;border-radius:12px;display:inline-block">Создать пароль и войти</a></p><p style="color:#817a74;font-size:14px">Ссылка действует 7 дней.</p></div>`,
+      text: `${input.name ? `Здравствуйте, ${input.name}.` : 'Здравствуйте.'}\n\nВам открыто персональное рабочее пространство. Создайте пароль и начните настройку:\n${url}\n\nСсылка действует 7 дней.`,
+      html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#292522"><h2>Рабочее пространство</h2><p>${greeting}</p><p>Вам открыто персональное рабочее пространство. Создайте пароль и начните настройку.</p><p style="margin:28px 0"><a href="${url}" style="background:#292522;color:#fff;text-decoration:none;padding:14px 20px;border-radius:12px;display:inline-block">Создать пароль и войти</a></p><p style="color:#817a74;font-size:14px">Ссылка действует 7 дней.</p></div>`,
     });
   }
 
