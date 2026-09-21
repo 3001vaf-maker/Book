@@ -5,6 +5,7 @@ import { renderWallets } from '../../settings/wallets/wallets.js';
 import { renderFinanceArticles } from './articles.js';
 import { renderIncomeExpense } from './income-expense.js';
 import { renderSpecialFinanceOperations } from './special-operations.js';
+import { renderZReport } from './z-report.js';
 
 function formatMoney(value = 0, { signed = false } = {}) {
   const amount = Number(value) || 0;
@@ -152,13 +153,21 @@ export function renderFinance(root) {
     data: 'data-finance-special',
     aria: 'Открыть займы, инвестиции и переводы',
   });
+  const zReportFolder = folderCard({
+    title: 'Z-отчёт',
+    icon: 'Z',
+    variant: 'compact',
+    data: 'data-finance-z-report',
+    aria: 'Открыть Z-отчёт',
+  });
 
-  root.innerHTML = `${pageHeader('Финансы')}<div class="ui-folder-grid">${cashFolder}${ddsFolder}${incomeExpenseFolder}${articlesFolder}${specialFolder}</div>`;
+  root.innerHTML = `${pageHeader('Финансы')}<div class="ui-folder-grid">${cashFolder}${ddsFolder}${incomeExpenseFolder}${articlesFolder}${specialFolder}${zReportFolder}</div>`;
   root.querySelector('[data-finance-cash]')?.addEventListener('click', () => renderWallets(root, () => renderFinance(root)));
   root.querySelector('[data-finance-dds]')?.addEventListener('click', () => renderDDS(root));
   root.querySelector('[data-finance-income-expense]')?.addEventListener('click', () => renderIncomeExpense(root, () => renderFinance(root)));
   root.querySelector('[data-finance-articles]')?.addEventListener('click', () => renderFinanceArticles(root, () => renderFinance(root)));
   root.querySelector('[data-finance-special]')?.addEventListener('click', () => renderSpecialFinanceOperations(root, () => renderFinance(root)));
+  root.querySelector('[data-finance-z-report]')?.addEventListener('click', () => renderZReport(root, () => renderFinance(root)));
 }
 
 export { renderFinance as render };
