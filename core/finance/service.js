@@ -29,7 +29,7 @@ export async function refreshFinanceState() {
 }
 
 export async function saveSettlementSnapshot({ source = null, settlement = null } = {}) {
-  if (!source?.type || !source?.id || !settlement) return null;
+  if (!source?.type || !source?.id || !settlement || !occurredAt) return null;
   const response = await apiRequest(
     `/finance/settlements/${encodeURIComponent(source.type)}/${encodeURIComponent(source.id)}`,
     {
@@ -83,8 +83,9 @@ export async function recordManualFinanceOperation({
   amount = null,
   lines = [],
   note = '',
-  occurredAt = new Date(),
+  occurredAt = null,
 } = {}) {
+  if (!occurredAt) return null;
   const response = await apiRequest('/finance/operations/manual', {
     method: 'POST',
     body: JSON.stringify({
@@ -104,6 +105,7 @@ export async function recordManualFinanceOperation({
 }
 
 export async function recordSpecialFinanceOperation(payload = {}) {
+  if (!payload?.occurredAt) return null;
   const response = await apiRequest('/finance/operations/special', {
     method: 'POST',
     body: JSON.stringify({
@@ -125,7 +127,7 @@ export async function recordPaymentIncome({
   maxAmount = null,
   serviceAmount = null,
   tips = 0,
-  now = new Date(),
+  occurredAt = null,
 } = {}) {
   if (!source?.type || !source?.id || !settlement) return null;
   const preparedAllocations = (Array.isArray(allocations) ? allocations : [])
@@ -153,7 +155,7 @@ export async function recordPaymentIncome({
       allocations: preparedAllocations,
       serviceAmount: applied,
       tips: tipsTotal,
-      occurredAt: now.toISOString(),
+      occurredAt: occurredAt instanceof Date ? occurredAt.toISOString() : occurredAt,
     }),
   });
   const state = await applyServerState(response, 'Не удалось провести оплату');
@@ -189,10 +191,10 @@ export async function cancelPaymentOperation(paymentId, { reason = 'incorrect-en
 
 export async function recordRefundExpense(
   paymentId,
-  { reason = '', amount = null, walletId = '', walletName = '', now = new Date() } = {},
+  { reason = '', amount = null, walletId = '', walletName = '', occurredAt = null } = {},
 ) {
   const id = String(paymentId || '');
-  if (!id || !walletId) return null;
+  if (!id || !walletId || !occurredAt) return null;
   const before = new Set(readFinanceState().expense.map((item) => String(item?.id || '')));
   const response = await apiRequest(`/finance/operations/${encodeURIComponent(id)}/refund`, {
     method: 'POST',
@@ -201,7 +203,7 @@ export async function recordRefundExpense(
       amount,
       walletId,
       walletName,
-      occurredAt: now.toISOString(),
+      occurredAt: occurredAt instanceof Date ? occurredAt.toISOString() : occurredAt,
     }),
   });
   const state = await applyServerState(response, 'Не удалось выполнить возврат');
