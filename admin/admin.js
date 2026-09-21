@@ -176,6 +176,49 @@ function renderOwnerBook() {
   content.querySelector('[data-edit-owner]').addEventListener('click', () => openAccessDrawer(owner.tenantId));
 }
 
+function openDeleteTenantModal(tenantId) {
+  const tenant = state.tenants.find((item) => item.tenantId === tenantId);
+  if (!tenant || tenant.isOwnerBook) return;
+
+  const name = tenant.ownerProfile?.name || tenant.invitation?.name || tenant.tenantName || 'Пользователь';
+  const email = tenant.ownerProfile?.email || tenant.invitation?.email || '';
+  const backdrop = document.createElement('div');
+  backdrop.className = 'admin-delete-backdrop';
+  backdrop.innerHTML = `
+    <section class="admin-delete-modal" role="dialog" aria-modal="true" aria-labelledby="admin-delete-title">
+      <h2 id="admin-delete-title">Удалить пользователя?</h2>
+      <p class="admin-delete-person"><strong>${escapeHtml(name)}</strong>${email ? `<span>${escapeHtml(email)}</span>` : ''}</p>
+      <p class="admin-delete-copy">Будут полностью удалены профиль, рабочее пространство и все его тестовые данные. Отменить это действие будет невозможно.</p>
+      <p class="admin-delete-error" data-delete-error></p>
+      <div class="admin-delete-actions">
+        <button type="button" class="admin-button secondary" data-delete-cancel>Отмена</button>
+        <button type="button" class="admin-button danger" data-delete-confirm>Удалить</button>
+      </div>
+    </section>`;
+  document.body.append(backdrop);
+
+  const close = () => backdrop.remove();
+  backdrop.querySelector('[data-delete-cancel]')?.addEventListener('click', close);
+  backdrop.addEventListener('click', (event) => { if (event.target === backdrop) close(); });
+  backdrop.querySelector('[data-delete-confirm]')?.addEventListener('click', async (event) => {
+    const control = event.currentTarget;
+    const errorNode = backdrop.querySelector('[data-delete-error]');
+    control.disabled = true;
+    control.textContent = 'Удаляем…';
+    errorNode.textContent = '';
+    try {
+      await adminRequest(`/tenants/${encodeURIComponent(tenantId)}`, { method: 'DELETE' });
+      close();
+      await refreshData();
+      renderTenants();
+    } catch (error) {
+      errorNode.textContent = error instanceof Error ? error.message : 'Не удалось удалить пользователя';
+      control.disabled = false;
+      control.textContent = 'Удалить';
+    }
+  });
+}
+
 function renderTenants() {
   setActiveSection('Пользователи');
   const content = app.querySelector('[data-content]');
@@ -306,22 +349,10 @@ function renderTenants() {
   });
 
   content.querySelectorAll('[data-delete-tenant]').forEach((button) => {
-    button.addEventListener('click', async (event) => {
+    button.addEventListener('click', (event) => {
       event.stopPropagation();
       const tenantId = button.dataset.deleteTenant;
-      if (!tenantId) return;
-      const tenant = state.tenants.find((item) => item.tenantId === tenantId);
-      const name = tenant?.ownerProfile?.name || tenant?.invitation?.name || tenant?.tenantName || 'этого пользователя';
-      if (!window.confirm(`Полностью удалить «${name}» и все данные этого тестового рабочего пространства? Отменить это действие будет нельзя.`)) return;
-      button.disabled = true;
-      try {
-        await adminRequest(`/tenants/${encodeURIComponent(tenantId)}`, { method: 'DELETE' });
-        await refreshData();
-        renderTenants();
-      } catch (error) {
-        alert(error instanceof Error ? error.message : 'Не удалось удалить пользователя');
-        button.disabled = false;
-      }
+      if (tenantId) openDeleteTenantModal(tenantId);
     });
   });
 }
