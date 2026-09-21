@@ -1,5 +1,6 @@
 import { apiRequest, clearAuthToken, getCurrentAccount, login } from '../core/auth.js';
 import { renderDocumentRegistry } from './document-registry/view.js';
+import { renderFirstRunAdmin } from './first-run.js';
 
 const app = document.querySelector('#admin-app');
 const state = {
@@ -27,8 +28,8 @@ function renderLogin(message = '') {
   app.innerHTML = `
     <main class="admin-login">
       <section class="admin-login-card">
-        <h1>Book Admin</h1>
-        <p>Управление профилями</p>
+        <h1>Администрирование</h1>
+        <p>Управление пользователями и рабочими пространствами</p>
         <form class="admin-form" data-login-form>
           <label class="admin-field"><span>Email</span><input name="email" type="email" autocomplete="username" required></label>
           <label class="admin-field"><span>Пароль</span><input name="password" type="password" autocomplete="current-password" required></label>
@@ -75,18 +76,19 @@ function renderShell() {
   app.innerHTML = `
     <div class="admin-shell">
       <aside class="admin-sidebar">
-        <div class="admin-brand">Book <span>Admin</span></div>
+        <div class="admin-brand">Панель <span>управления</span></div>
         <nav class="admin-nav">
           <button data-section="overview">Обзор</button>
-          <button data-section="owner" class="owner-link">Мой Book</button>
+          <button data-section="owner" class="owner-link">Моё пространство</button>
           <button data-section="document-registry">Реестр документов</button>
-          <button data-section="tenants">Профили</button>
-          <button data-section="capabilities">Возможности</button>
+          <button data-section="first-run">Первое знакомство</button>
+          <button data-section="tenants">Пользователи</button>
+          <button data-section="capabilities">Инструменты</button>
         </nav>
-        <div class="admin-sidebar-foot">SaaS Control Plane</div>
+        <div class="admin-sidebar-foot">Управление системой</div>
       </aside>
       <header class="admin-toolbar">
-        <h1 data-toolbar-title>Профили</h1>
+        <h1 data-toolbar-title>Пользователи</h1>
         <div class="admin-toolbar-user"><span>${escapeHtml(state.admin?.account?.email || '')}</span><button class="admin-button secondary" data-logout>Выйти</button></div>
       </header>
       <main class="admin-main"><div class="admin-content" data-content></div></main>
@@ -124,6 +126,13 @@ function renderCurrentSection() {
       loadHistory: () => adminRequest('/document-registry/history'),
     });
   }
+  if (state.section === 'first-run') {
+    return renderFirstRunAdmin(app.querySelector('[data-content]'), {
+      request: adminRequest,
+      escapeHtml,
+      setTitle: setActiveSection,
+    });
+  }
   if (state.section === 'capabilities') return renderCapabilities();
   return renderTenants();
 }
@@ -135,24 +144,24 @@ function renderOverview() {
   const active = regular.filter((item) => item.status === 'ACTIVE' && item.ownerProfile).length;
   const pending = regular.filter((item) => !item.ownerProfile && item.invitation?.status === 'PENDING').length;
   content.innerHTML = `
-    <div class="admin-heading"><div><h2>Обзор</h2><p>Состояние персональных Book</p></div></div>
+    <div class="admin-heading"><div><h2>Обзор</h2><p>Состояние рабочих пространств</p></div></div>
     <div class="admin-stats">
-      <div class="admin-stat"><strong>${regular.length}</strong><span>создано профилей</span></div>
-      <div class="admin-stat"><strong>${active}</strong><span>активных профилей</span></div>
-      <div class="admin-stat"><strong>${pending}</strong><span>ожидают принятия приглашения</span></div>
+      <div class="admin-stat"><strong>${regular.length}</strong><span>зарегистрировано</span></div>
+      <div class="admin-stat"><strong>${active}</strong><span>активных</span></div>
+      <div class="admin-stat"><strong>${pending}</strong><span>ожидают регистрации</span></div>
     </div>`;
 }
 
 function renderOwnerBook() {
-  setActiveSection('Мой Book');
+  setActiveSection('Моё пространство');
   const owner = state.tenants.find((item) => item.isOwnerBook);
   const content = app.querySelector('[data-content]');
   if (!owner) {
-    content.innerHTML = '<div class="admin-card" style="padding:20px">Мой Book пока не определён.</div>';
+    content.innerHTML = '<div class="admin-card" style="padding:20px">Личное рабочее пространство пока не определено.</div>';
     return;
   }
   content.innerHTML = `
-    <div class="admin-heading"><div><h2>Мой Book</h2><p>Ваш первый персональный Book остаётся отдельным от списка профилей.</p></div></div>
+    <div class="admin-heading"><div><h2>Моё пространство</h2><p>Личное рабочее пространство администратора остаётся отдельным от списка пользователей.</p></div></div>
     <div class="admin-card" style="padding:20px">
       <strong>${escapeHtml(owner.ownerProfile?.name || owner.tenantName)}</strong>
       <p style="color:#817a74">${escapeHtml(owner.ownerProfile?.email || '')}</p>
@@ -162,15 +171,15 @@ function renderOwnerBook() {
 }
 
 function renderTenants() {
-  setActiveSection('Профили');
+  setActiveSection('Пользователи');
   const content = app.querySelector('[data-content]');
   const tenants = state.tenants.filter((item) => !item.isOwnerBook);
   content.innerHTML = `
-    <div class="admin-heading"><div><h2>Профили</h2><p>Каждый профиль работает в своём пространстве.</p></div></div>
+    <div class="admin-heading"><div><h2>Пользователи</h2><p>Каждый зарегистрированный пользователь работает в своём пространстве.</p></div></div>
     <section class="admin-invite-panel">
       <div class="admin-invite-head">
-        <h3>Создать профиль</h3>
-        <button class="admin-button secondary" type="button" data-create-invite-link>Ссылка без email</button>
+        <h3>Пригласить пользователя</h3>
+        <button class="admin-button secondary" type="button" data-create-invite-link>Регистрационная ссылка</button>
       </div>
       <form class="admin-invite-grid" data-invite-form>
         <label class="admin-field"><span>Имя</span><input name="name" placeholder="Имя"></label>
@@ -188,7 +197,7 @@ function renderTenants() {
     </section>
     <div class="admin-card">
       <table class="admin-table">
-        <thead><tr><th>Профиль</th><th>Email</th><th>Состояние</th><th>Набор</th></tr></thead>
+        <thead><tr><th>Пользователь</th><th>Email</th><th>Состояние</th><th>Набор</th></tr></thead>
         <tbody>${tenants.map(tenantRow).join('') || '<tr><td colspan="4">Пока нет созданных профилей.</td></tr>'}</tbody>
       </table>
     </div>`;
@@ -222,7 +231,7 @@ function renderTenants() {
       message.classList.add('error');
     } finally {
       createLinkButton.disabled = false;
-      createLinkButton.textContent = 'Ссылка без email';
+      createLinkButton.textContent = 'Регистрационная ссылка';
     }
   });
 
@@ -307,7 +316,7 @@ function tenantRow(item) {
 }
 
 function renderCapabilities() {
-  setActiveSection('Возможности');
+  setActiveSection('Инструменты');
   const content = app.querySelector('[data-content]');
   const groups = new Map();
   state.capabilities.forEach((item) => {
@@ -315,7 +324,7 @@ function renderCapabilities() {
     groups.get(item.groupKey).push(item);
   });
   content.innerHTML = `
-    <div class="admin-heading"><div><h2>Возможности Book</h2><p>Единый каталог функций, которые можно выдавать каждому Book.</p></div></div>
+    <div class="admin-heading"><div><h2>Инструменты</h2><p>Единый каталог функций, которые можно выдавать каждому рабочему пространству.</p></div></div>
     ${[...groups.entries()].map(([group, items]) => `<section class="admin-card" style="padding:18px;margin-bottom:14px"><strong>${escapeHtml(group)}</strong>${items.map((item) => `<div class="admin-capability"><div>${escapeHtml(item.name)}<small>${escapeHtml(item.key)}</small></div><span>${item.valueType === 'LIMIT' ? 'лимит' : 'ON / OFF'}</span></div>`).join('')}</section>`).join('')}`;
 }
 
