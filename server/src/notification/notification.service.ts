@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import { AccountContactType } from '@prisma/client';
 import { BusinessStateService } from '../business-state/business-state.service';
 import { ConsentPolicyService } from '../tenant-document-archive/consent-policy.service';
 import { PrismaService } from '../prisma.service';
@@ -113,8 +114,8 @@ export class NotificationService {
 
   private async accountIdentity(tenantId: string, accountId: string) {
     const [account, identity] = await Promise.all([
-      this.prisma.account.findFirst({
-        where: { id: accountId, tenantId },
+      this.prisma.account.findUnique({
+        where: { id: accountId },
         select: { phone: true, email: true },
       }),
       this.businessState.bookingIdentityForAccount(tenantId, accountId),
@@ -144,12 +145,13 @@ export class NotificationService {
   }
 
   private async accountIdentityByPhone(tenantId: string, personPhone: string) {
-    const accounts = await this.prisma.account.findMany({
-      where: { tenantId },
-      select: { id: true, phone: true },
+    const phone = canonicalPhone(personPhone);
+    if (!phone) return null;
+    const contact = await this.prisma.accountContact.findUnique({
+      where: { type_value: { type: AccountContactType.PHONE, value: phone } },
+      select: { accountId: true },
     });
-    const match = accounts.find((account) => canonicalPhone(account.phone) === canonicalPhone(personPhone));
-    return match ? this.accountIdentity(tenantId, match.id) : null;
+    return contact ? this.accountIdentity(tenantId, contact.accountId) : null;
   }
 
   private project(row: NotificationRow) {

@@ -18,7 +18,7 @@ if (!core.includes('await initializeBusinessState(authenticatedAccount)')) failu
 if (!people.includes('hydratePeopleFromServer') || !people.includes('queuePersonUpsert')) failures.push('Person owner must use server-hydrated runtime state and server writes.');
 if (!uei.includes('hydrateUEIFromServer') || !uei.includes('queueUEIStore')) failures.push('UEI owner must use server-hydrated runtime state and server writes.');
 if (!records.includes('hydrateRecordStateFromServer') || !records.includes('queueRecordUpsert') || !records.includes('queueRecordEventUpsert')) failures.push('Record persistence gateway must use server-hydrated rows and server writes.');
-if (!online.includes('upsertPersonFromAccount') || !online.includes('this.records.create(')) failures.push('Online booking must write canonical Person and call canonical RecordService on the server.');
+if (!online.includes('this.personIdentity.bindFirstAccess(') || !online.includes('this.records.create(')) failures.push('Online booking must resolve canonical Person and call canonical RecordService on the server.');
 if (!serverRecord.includes('export class RecordService') || !serverRecord.includes('this.prisma.record.')) failures.push('RecordService must own canonical server Record persistence.');
 if (!app.includes('BusinessStateModule')) failures.push('Nest application must register BusinessStateModule.');
 for (const model of ['BusinessStateMeta', 'Person', 'UeiState', 'Record', 'RecordEvent']) {

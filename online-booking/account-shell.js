@@ -389,7 +389,7 @@ async function renderProfile(root, state, handlers) {
   const rows = programRows(account);
   const discount = Math.max(0, Number(account.discountPercent || 0));
   const card = entityCard({
-    id: account.uei ? `UEI ${account.uei}` : '',
+    id: '',
     title: [account.name, account.surname].filter(Boolean).join(' '),
     subtitle: formatPhone(account.phone || ''),
     image: profile.photo || '',

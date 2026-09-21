@@ -72,8 +72,8 @@ export class WebPushService {
   }
 
   private async ensureAccount(tenantId: string, accountId: string) {
-    const account = await this.prisma.account.findFirst({
-      where: { id: accountId, tenantId },
+    const account = await this.prisma.account.findUnique({
+      where: { id: accountId },
       select: { id: true },
     });
     if (!account) throw new NotFoundException('Аккаунт не найден');

@@ -454,45 +454,6 @@ export class BusinessStateService {
     );
   }
 
-  async upsertPersonFromAccount(tenantId: string, account: JsonObject) {
-    await this.requireVerified(tenantId);
-    const accountId = text(account.id);
-    if (!accountId) throw new BadRequestException('У аккаунта онлайн-записи отсутствует id');
-    const rows = await this.prisma.person.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] });
-    const found = rows.find((row) => accountIdsFromPerson(objectValue(row.data)).includes(accountId)) || null;
-    const previous = objectValue(found?.data || {});
-    const profileData = objectValue(account.profileData);
-    const now = new Date().toISOString();
-    const person = {
-      ...clone(previous),
-      key: text(previous.key) || `account-${accountId}`,
-      id: text(previous.id),
-      name: text(account.name) || text(previous.name),
-      surname: text(account.surname) || text(previous.surname),
-      photo: text(previous.photo),
-      gender: text(profileData.gender) || text(previous.gender),
-      birthDate: text(profileData.birthDate) || text(previous.birthDate),
-      phones: uniqueStrings([...(Array.isArray(previous.phones) ? previous.phones : []), account.phone]),
-      telegrams: uniqueStrings([...(Array.isArray(previous.telegrams) ? previous.telegrams : []), account.telegramId]),
-      emails: uniqueStrings([...(Array.isArray(previous.emails) ? previous.emails : []), String(account.email || '').toLowerCase()]),
-      accounts: uniqueStrings([...(Array.isArray(previous.accounts) ? previous.accounts : []), accountId]),
-      links: Array.isArray(previous.links) ? previous.links : [],
-      tags: Array.isArray(previous.tags) ? previous.tags : [],
-      discountPercent: Math.max(0, Math.min(100, Number(previous.discountPercent || 0) || 0)),
-      visits: Math.max(0, Number(previous.visits || 0)),
-      totalSpent: Math.max(0, Number(previous.totalSpent || 0)),
-      lastVisit: text(previous.lastVisit),
-      programs: Array.isArray(previous.programs) ? previous.programs : [],
-      createdAt: text(previous.createdAt) || now,
-    };
-    const position = found ? found.position : rows.reduce((max, row) => Math.max(max, row.position), -1) + 1;
-    await this.prisma.person.upsert({
-      where: { tenantId_key: { tenantId, key: person.key } },
-      create: { tenantId, key: person.key, position, data: json(person) },
-      update: { position, data: json(person) },
-    });
-    return person;
-  }
 
 
 

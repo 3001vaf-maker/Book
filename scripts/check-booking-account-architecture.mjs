@@ -30,11 +30,21 @@ expect(booking.includes('bookingTimeGroups('), 'Public booking time must use sha
 expect(booking.includes('initCalendar('), 'Public booking date must use the shared Book calendar.');
 expect(!booking.includes("type: 'date'"), 'Public booking must not use native technical date controls.');
 
-expect(booking.includes('renderRegistrationAgreements') && booking.includes('renderAccountEntry') && booking.includes('renderAccountDetails') && booking.includes('renderPassword'), 'Registration must own agreements, account lookup, details and password.');
-expect(booking.includes("subtitle: 'Согласия относятся к регистрации и аккаунту'"), 'Consent UI must be explicitly registration/account scoped.');
-expect(booking.includes('if (prepared.exists) renderPassword(root, state);') && booking.includes('else renderAccountDetails(root, state);'), 'Registration must branch between an existing account and a new account.');
-expect(booking.includes('if (payload.personExisted)') && booking.includes("state.accountTab = 'profile'"), 'Known accounts must land on the personal page after registration.');
-expect(booking.includes('else {\n          nextBookingStep(root, state);'), 'New accounts without an existing card must continue into booking after registration.');
+expect(booking.includes('renderAccountTerms') && booking.includes('renderTenantAgreements') && booking.includes('renderAccountEntry') && booking.includes('renderAccountDetails') && booking.includes('renderPassword'), 'Identity/legal flow must keep one Account flow with separate platform terms and Tenant consent screens.');
+expect(booking.includes("state.identityDestination = 'booking';\n    nextBookingStep(root, state);"), 'Welcome must enter booking selection, never registration.');
+expect(booking.includes("await loadAccountTerms(state);\n        renderAccountTerms(root, state);"), 'A new Account must see platform terms before personal details/password.');
+expect(booking.includes("accountTerms: currentAccountTermsFact(state)"), 'Account registration must submit platform terms acceptance.');
+expect(booking.includes("label: 'Телефон или email'") && booking.includes("name: 'identifier'"), 'Account entry must accept phone or email through one identifier field.');
+expect(booking.includes("prepareAccount(state.tenantId, { identifier })"), 'Account entry must resolve the global identifier before choosing login or registration.');
+expect(booking.includes("prepareAccount(state.tenantId, { email, phone })"), 'New Account contacts must be checked before password creation.');
+expect(booking.includes("loginAccount(state.tenantId, state.accountDraft.identifier, password)"), 'Password login must use the resolved phone/email identifier.');
+expect(!booking.includes('registrationMode'), 'Legacy registration consent mode must not return.');
+expect(!booking.includes('renderRegistrationAgreements'), 'Tenant consent must not be modeled as registration agreements.');
+expect(!booking.includes('saveRegistrationConsents'), 'Tenant consent must not be saved as registration consent.');
+expect(booking.includes("const platformState = await getAccountPlatformState(state.tenantId);") && booking.includes("if (!platformState?.accepted) {\n      renderAccountTerms(root, state);"), 'Platform terms state must be checked before Tenant consent state.');
+expect(booking.includes("const consentState = await refreshTenantConsentState(state);") && booking.includes("if (consentState.pdnActive) {\n      renderConfirmation(root, state);"), 'Tenant consent is checked only after Account/platform terms resolution.');
+expect(!booking.includes('if (payload.personExisted)'), 'Person matching must not decide whether booking continues or Profile opens.');
+expect(booking.includes("state.identityDestination = 'booking';\n    void continueAfterIdentity(root, state);"), 'Time selection must enter the final identity/legal gate before confirmation.');
 
 expect(booking.includes('renderWorkplaces') && booking.includes('renderProcedures') && booking.includes('renderDates') && booking.includes('renderTimes') && booking.includes('renderConfirmation'), 'Booking itself must preserve workplace -> procedures -> date -> time -> confirmation.');
 expect(booking.includes("root.querySelector('[data-booking-workplaces-back]')?.addEventListener('click', () => backFromFirstBookingStep(root, state));"), 'Back from the first booking step must leave booking, not return to registration.');
@@ -42,7 +52,7 @@ expect(booking.includes("if (state.lockedWorkplaceKey) backFromFirstBookingStep(
 expect(booking.includes("root.querySelector('[data-booking-dates-back]')?.addEventListener('click', () => renderProcedures(root, state));"), 'Date back must return to procedures.');
 expect(booking.includes("root.querySelector('[data-booking-times-back]')?.addEventListener('click', () => renderDates(root, state));"), 'Time back must return to date.');
 expect(booking.includes("root.querySelector('[data-booking-confirm-back]')?.addEventListener('click'"), 'Confirmation must have a back control.');
-expect(booking.includes('function backFromFirstBookingStep') && booking.includes('renderAccountHome(root, state)'), 'The booking back boundary must return to the personal page.');
+expect(booking.includes('function backFromFirstBookingStep') && booking.includes("state.identityDestination = 'profile'") && booking.includes('if (state.account)') && booking.includes('renderAccountEntry(root, state);'), 'The first booking back boundary must open Profile directly when known or authenticate before Profile when unknown.');
 
 expect(booking.includes('renderAccount('), 'Authenticated account account must use the unified account shell.');
 expect(!booking.includes('step: 15'), 'Public booking must not hardcode a 15 minute slot step.');

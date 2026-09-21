@@ -289,22 +289,35 @@ jobs:
             sleep 2
           done
 
+          owner_password=$(docker compose -f docker-compose.staging.yml exec -T backend printenv OWNER_PASSWORD | tr -d '\r\n')
           login_payload=$(curl -fsS \
             -H 'Content-Type: application/json' \
-            -d '{"email":"staging@book.local","password":"BookStaging-2026!"}' \
+            -d "$(node -e "process.stdout.write(JSON.stringify({email:'staging@book.local',password:process.argv[1]}))" "$owner_password")" \
             http://localhost:8080/api/auth/login)
           access_token=$(node -e "const p=JSON.parse(process.argv[1]); if(!p.accessToken) process.exit(1); process.stdout.write(p.accessToken)" "$login_payload")
           tenant_id=$(node -e "const p=JSON.parse(process.argv[1]); if(!p.tenant?.id) process.exit(1); process.stdout.write(p.tenant.id)" "$login_payload")
           curl -fsS -H "Authorization: Bearer $access_token" http://localhost:8080/api/auth/me >/dev/null
 
+          account_terms=$(curl -fsS "http://localhost:8080/api/online-booking/account-terms")
+          account_terms_fact=$(node -e "const p=JSON.parse(process.argv[1]); if(!p.key || !p.version) process.exit(1); process.stdout.write(JSON.stringify({key:p.key,version:p.version,accepted:true,acceptedAt:new Date().toISOString()}))" "$account_terms")
+          smoke_password="Smoke-${GITHUB_RUN_ID}-Pass"
+
           booking_payload=$(curl -fsS \
             -H 'Content-Type: application/json' \
-            -d '{"email":"push-smoke@book.local","password":"BookPush-2026!","name":"Push","phone":"+79990000999","consents":[{"documentId":"pdn-consent","documentVersion":1,"accepted":true}]}' \
+            -d "$(node -e "process.stdout.write(JSON.stringify({email:'push-smoke@book.local',password:process.argv[1],name:'Push',phone:'+79990000999',accountTerms:JSON.parse(process.argv[2])}))" "$smoke_password" "$account_terms_fact")" \
             "http://localhost:8080/api/online-booking/$tenant_id/account/register")
           booking_token=$(node -e "const p=JSON.parse(process.argv[1]); if(!p.accessToken) process.exit(1); process.stdout.write(p.accessToken)" "$booking_payload")
 
           booking_context=$(curl -fsS "http://localhost:8080/api/online-booking/$tenant_id/context")
           node -e "const p=JSON.parse(process.argv[1]); const w=(p.workplaces||[]).find((item)=>item.key==='studio-test'); if(!w || w.timeZone!=='Europe/Moscow') { console.error('Workplace timezone missing from public booking context'); process.exit(1); }" "$booking_context"
+
+          pdn_consent=$(node -e "const p=JSON.parse(process.argv[1]); const d=(p.documents||[]).find((item)=>item.id==='pdn-consent'); if(!d || !d.version) { console.error('PDN consent missing from public booking context'); process.exit(1); } process.stdout.write(JSON.stringify({documentId:d.id,documentVersion:d.version,accepted:true,acceptedAt:new Date().toISOString()}))" "$booking_context")
+          curl -fsS \
+            -X POST \
+            -H "Authorization: Bearer $booking_token" \
+            -H 'Content-Type: application/json' \
+            -d "$(node -e "process.stdout.write(JSON.stringify({consents:[JSON.parse(process.argv[1])] }))" "$pdn_consent")" \
+            "http://localhost:8080/api/online-booking/$tenant_id/account/consents" >/dev/null
 
           booking_today=$(node -e "const parts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Moscow',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()).filter((x)=>x.type!=='literal').map((x)=>[x.type,x.value])); process.stdout.write(parts.year+'-'+parts.month+'-'+parts.day)")
           past_body=$(mktemp)
