@@ -1,5 +1,5 @@
-import { actionBlock, button, emptyState, folderCard, list, pageHeader, shortDateTime } from '../../ui/ui.js';
-import { getLedgerEntries } from '../../core/finance/index.js';
+import { actionBlock, button, details, emptyState, field, folderCard, list, modal, mountModal, openNotice, pageHeader, shortDateTime } from '../../ui/ui.js';
+import { cancelFinanceOperation, getLedgerEntries } from '../../core/finance/index.js';
 import { getWalletTotalBalance } from '../../settings/wallets/data.js';
 import { renderWallets } from '../../settings/wallets/wallets.js';
 import { renderFinanceArticles } from './articles.js';
@@ -59,8 +59,10 @@ function personText(item) {
 function operationDetails(item) {
   const details = [
     personText(item),
+    item?.sourceDetails || '',
     item?.articleName || '',
     item?.lineName || '',
+    item?.counterparty || '',
     item?.workplace || '',
     walletText(item),
   ].filter(Boolean);
@@ -74,12 +76,15 @@ function operationDetails(item) {
 }
 
 function movementListItem(item) {
+  const interactive = Boolean(item?.operationId);
   return {
     overline: operationMoment(item),
     title: operationName(item),
     secondary: operationDetails(item),
     right: formatMoney(operationAmount(item), { signed: true }),
-    interactive: false,
+    interactive,
+    data: interactive ? `data-finance-operation="${item.operationId}"` : '',
+    aria: interactive ? `Открыть финансовую операцию ${operationName(item)}` : '',
   };
 }
 
@@ -111,6 +116,67 @@ function downloadDDS(movements) {
   URL.revokeObjectURL(url);
 }
 
+function localDateTimeValue(date = new Date()) {
+  const shifted = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return shifted.toISOString().slice(0, 16);
+}
+
+function openFinanceOperation(root, movements, operationId) {
+  const id = String(operationId || '');
+  const entries = movements.filter((item) => String(item?.operationId || '') === id);
+  if (!entries.length) return;
+  const first = entries[0];
+  const canCancel = first?.operationKind !== 'cancel' && first?.operationStatus !== 'cancelled';
+  const person = [first?.person?.name, first?.person?.surname].filter(Boolean).join(' ').trim();
+  const wallets = [...new Set(entries.map((item) => walletText(item)).filter(Boolean))].join(' + ');
+  const articles = [...new Set(entries.map((item) => String(item?.articleName || '')).filter(Boolean))].join(', ');
+  const sourceDetails = [...new Set(entries.map((item) => String(item?.sourceDetails || '')).filter(Boolean))].join(', ');
+  const context = details([
+    { label: 'Фактическая дата и время', value: operationMoment(first) || '—' },
+    { label: 'Внесено в Book', value: recordedMoment(first) || '—' },
+    person ? { label: 'Клиент', value: person } : null,
+    sourceDetails ? { label: 'За что', value: sourceDetails } : null,
+    first?.workplace ? { label: 'Рабочее место', value: first.workplace } : null,
+    wallets ? { label: 'Кошелёк', value: wallets } : null,
+    articles ? { label: 'Статья', value: articles } : null,
+    first?.counterparty ? { label: 'Контрагент', value: first.counterparty } : null,
+    first?.note ? { label: 'Комментарий', value: first.note } : null,
+    { label: 'Статус', value: first?.operationStatus === 'cancelled' ? 'Отменена' : 'Активна' },
+  ]);
+  const rows = list({
+    items: entries.map((item) => ({
+      ...movementListItem(item),
+      interactive: false,
+      data: '',
+      aria: '',
+    })),
+  });
+  const cancel = canCancel
+    ? `<div class="compact-form">
+        ${field({ label: 'Фактическая дата и время отмены', name: 'financeCancelOccurredAt', type: 'datetime-local', value: localDateTimeValue(), required: true })}
+        <p>Ошибочный ввод останется в финансовой истории, а его влияние на кошельки и отчёты будет отменено обратной операцией.</p>
+        ${button('Отменить ошибочную операцию', { variant: 'danger', data: 'data-finance-operation-cancel' })}
+      </div>`
+    : '';
+  const m = mountModal(root, modal(`<div class="modal-title"><h2>${operationName(first)}</h2></div>${context}${rows}${cancel}`, { variant: 'medium' }));
+  if (!m || !canCancel) return;
+  m.querySelector('[data-finance-operation-cancel]')?.addEventListener('click', async () => {
+    const input = m.querySelector('input[name="financeCancelOccurredAt"]');
+    if (!input?.value) return;
+    try {
+      const cancelled = await cancelFinanceOperation(id, {
+        reason: 'incorrect-entry',
+        occurredAt: new Date(input.value),
+      });
+      if (!cancelled) return;
+      m.remove();
+      renderDDS(root);
+    } catch (error) {
+      openNotice({ message: String(error?.message || 'Не удалось отменить операцию') });
+    }
+  });
+}
+
 function renderDDS(root) {
   const movements = [...getLedgerEntries()].reverse();
   const operations = movements.length
@@ -119,6 +185,9 @@ function renderDDS(root) {
 
   root.innerHTML = `${pageHeader('ДДС', 'Все операции')}<div class="ui-list-toolbar"><div></div><div class="ui-list-toolbar__actions">${button('Excel', { className: 'ui-button--secondary', data: 'data-finance-dds-excel' })}</div></div>${operations}${actionBlock(button('Назад', { variant: 'secondary', data: 'data-finance-dds-back' }))}`;
   root.querySelector('[data-finance-dds-excel]')?.addEventListener('click', () => downloadDDS(movements));
+  root.querySelectorAll('[data-finance-operation]').forEach((element) => {
+    element.addEventListener('click', () => openFinanceOperation(root, movements, element.dataset.financeOperation));
+  });
   root.querySelector('[data-finance-dds-back]')?.addEventListener('click', () => renderFinance(root));
 }
 
