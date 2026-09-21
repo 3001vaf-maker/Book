@@ -60,6 +60,11 @@ function requiredOccurredAt(value: unknown) {
   return date;
 }
 
+function isRetryableTransactionError(error: unknown) {
+  const code = text(objectValue(error).code);
+  return code === 'P2034' || code === '40001';
+}
+
 function sourceValue(value: unknown) {
   const source = objectValue(value);
   return { type: text(source.type), id: text(source.id) };
@@ -183,6 +188,21 @@ function splitAllocationComponents(allocations: JsonObject[], serviceAmount: num
 @Injectable()
 export class FinanceService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private async serializable<T>(work: (tx: Prisma.TransactionClient) => Promise<T>) {
+    let lastError: unknown = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await this.prisma.$transaction(work, {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        });
+      } catch (error) {
+        lastError = error;
+        if (!isRetryableTransactionError(error) || attempt === 2) throw error;
+      }
+    }
+    throw lastError;
+  }
 
   calculateSettlement(items: JsonObject[], discountValue: unknown = 0) {
     const defaultPercent = percent(discountValue);
@@ -522,7 +542,7 @@ export class FinanceService {
 
     if (alreadyMarked && !recordsWithSettlement.length) return;
 
-    await this.prisma.$transaction(async (tx) => {
+    await this.serializable(async (tx) => {
       for (const row of recordsWithSettlement) {
         const record = clone(objectValue(row.data));
         const settlement = validSettlement(record.finance);
@@ -726,7 +746,7 @@ export class FinanceService {
     const occurredAt = requiredOccurredAt(input.occurredAt);
     const total = money(preparedLines.reduce((sum, line) => sum + line.total, 0));
     const source = { type: 'manual', id: operationId };
-    await this.prisma.$transaction(async (tx) => {
+    await this.serializable(async (tx) => {
       await this.createOperationWithEntries(tx, tenantId, {
         operationId,
         kind: direction === 'IN' ? 'manual-income' : 'manual-expense',
@@ -801,7 +821,7 @@ export class FinanceService {
       });
       if (!article) throw new BadRequestException('Системная статья перевода не найдена');
 
-      await this.prisma.$transaction(async (tx) => {
+      await this.serializable(async (tx) => {
         await this.createOperationWithEntries(tx, tenantId, {
           operationId,
           kind: 'transfer',
@@ -840,7 +860,7 @@ export class FinanceService {
             },
           ],
         });
-      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      });
 
       return this.snapshot(tenantId, { skipMigration: true });
     }
@@ -855,7 +875,7 @@ export class FinanceService {
     });
     if (!article) throw new BadRequestException('Системная статья операции не найдена');
 
-    await this.prisma.$transaction(async (tx) => {
+    await this.serializable(async (tx) => {
       await this.createOperationWithEntries(tx, tenantId, {
         operationId,
         kind: definition.operationKind,
@@ -884,7 +904,7 @@ export class FinanceService {
           note,
         }],
       });
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    });
 
     return this.snapshot(tenantId, { skipMigration: true });
   }
@@ -908,7 +928,7 @@ export class FinanceService {
 
     const operationId = randomUUID();
     const occurredAt = requiredOccurredAt(input.occurredAt);
-    await this.prisma.$transaction(async (tx) => {
+    await this.serializable(async (tx) => {
       await this.saveSettlementWith(tx, tenantId, source.type, source.id, settlement);
       const paid = Math.max(0, await this.serviceNet(tx, tenantId, source.type, source.id));
       const due = Math.max(0, money(settlement.planTotal - paid));
@@ -935,7 +955,7 @@ export class FinanceService {
           economicType: entry.component === 'tips' ? 'TIPS' : 'SERVICE_REVENUE',
         })),
       });
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    });
     return this.snapshot(tenantId, { skipMigration: true });
   }
 
@@ -970,7 +990,7 @@ export class FinanceService {
     const refundId = randomUUID();
     const occurredAt = requiredOccurredAt(input.occurredAt);
 
-    await this.prisma.$transaction(async (tx) => {
+    await this.serializable(async (tx) => {
       await this.createOperationWithEntries(tx, tenantId, {
         operationId: refundId,
         kind: 'refund',
@@ -997,7 +1017,7 @@ export class FinanceService {
           }] : []),
         ],
       });
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    });
 
     return this.snapshot(tenantId, { skipMigration: true });
   }
@@ -1012,7 +1032,7 @@ export class FinanceService {
     if (!original) throw new NotFoundException('Операция не найдена');
     if (original.status === 'cancelled') return this.snapshot(tenantId, { skipMigration: true });
 
-    await this.prisma.$transaction(async (tx) => {
+    await this.serializable(async (tx) => {
       const targets = [original];
       if (original.kind === 'payment') {
         const refunds = await tx.financeOperation.findMany({
@@ -1025,7 +1045,7 @@ export class FinanceService {
         await this.createReversalFor(tx, tenantId, target.operationId, text(input.reason) || 'incorrect-entry', new Date());
         await tx.financeOperation.update({ where: { id: target.id }, data: { status: 'cancelled' } });
       }
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    });
 
     return this.snapshot(tenantId, { skipMigration: true });
   }
