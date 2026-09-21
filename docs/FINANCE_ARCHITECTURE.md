@@ -602,10 +602,11 @@ One step must be completed, tested and checked before the next step is marked co
 ### F12 — Guards, full regression, staging, release
 - [x] Guards reject a second payment owner, DDS owner, wallet balance owner or Record-owned money truth.
 - [x] Guards reserve Financial Model meaning and prevent operational imports/mutations.
-- [ ] Full Check Book green.
-- [ ] Staging smoke + payment/expense/refund/wallet/Z-report verification.
-- [ ] Update PROJECT_STATE with final verified Finance ownership.
-- [ ] Only then release staging -> main -> production.
+- [x] Full Check Book green on feature head: #1996.
+- [x] Post-merge staging Check Book green: #1997, including migration, backend, four production domains and staging frontend.
+- [x] PROJECT_STATE updated with final verified Finance ownership.
+- [ ] Final whole-staging release Check Book on the exact Finance closeout head.
+- [ ] Only after that check and a green `staging -> main` PR may this release merge to `main`.
 
 ## Financial Model reservation rule
 
