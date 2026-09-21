@@ -427,5 +427,32 @@ export function renderTimetable(root) {
     if (blockedRemoval.length) openRemovalBlockedModal(blockedRemoval);
   });
 
-  return { get selection() { return selection; } };
+  let refreshQueued = false;
+  const syncCanonicalState = () => {
+    if (refreshQueued) return;
+    refreshQueued = true;
+    queueMicrotask(() => {
+      refreshQueued = false;
+      if (!root.isConnected) return;
+      const nextWorkplaces = getWorkplaces();
+      const nextDays = getDays();
+      workplaces.splice(0, workplaces.length, ...nextWorkplaces);
+      workingDays.splice(0, workingDays.length, ...nextDays);
+      if (!isAllMode() && !workplaces.some((item) => String(item?.key || '') === String(selectedWorkplaceId || ''))) {
+        selectedWorkplaceId = getWorkplaceContext(workplaces).workplaceId;
+      }
+      const month = calendar?.getDisplayedMonth?.() || initialMonth;
+      if (workplaces.length) startSelectionSession(month);
+      else calendar = initCalendar(calendarRoot, { month, workingDates: [] });
+      renderHeader(month);
+    });
+  };
+  window.addEventListener('book:time-usage-changed', syncCanonicalState);
+  window.addEventListener('book:workplaces-changed', syncCanonicalState);
+
+  return () => {
+    window.removeEventListener('book:time-usage-changed', syncCanonicalState);
+    window.removeEventListener('book:workplaces-changed', syncCanonicalState);
+    selection?.destroy?.();
+  };
 }
