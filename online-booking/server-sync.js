@@ -198,8 +198,10 @@ export function startServerBookingSync() {
   timer = window.setInterval(() => void pull(POLL_SCOPES), POLL_MS);
   const refreshAll = () => void pull(ALL_SCOPES);
   const refreshMutation = (event) => {
-    const scope = String(event?.detail?.scope || '');
-    void pull(scope ? [scope] : ALL_SCOPES);
+    const scopes = Array.isArray(event?.detail?.scopes)
+      ? event.detail.scopes.map((scope) => String(scope || '')).filter(Boolean)
+      : [];
+    void pull(scopes.length ? scopes : ALL_SCOPES);
   };
   document.addEventListener('visibilitychange', refreshAll);
   window.addEventListener('focus', refreshAll);
