@@ -26,7 +26,7 @@ assert.match(adminService, /tag: 'platform-service'/);
 assert.match(adminModule, /TransactionalEmailModule/);
 
 assert.match(adminUi, /data-create-invite-link/);
-assert.match(adminUi, /Ссылка без email/);
+assert.match(adminUi, /Регистрационная ссылка/);
 assert.match(adminUi, /data-email-tenant/);
 assert.match(adminUi, />Письмо<\/button>/);
 assert.match(adminUi, /\/invitations\/link/);
