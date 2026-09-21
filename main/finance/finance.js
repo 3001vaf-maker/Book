@@ -2,6 +2,8 @@ import { actionBlock, button, emptyState, folderCard, list, pageHeader, shortDat
 import { getLedgerEntries } from '../../core/finance/index.js';
 import { getWalletTotalBalance } from '../../settings/wallets/data.js';
 import { renderWallets } from '../../settings/wallets/wallets.js';
+import { renderFinanceArticles } from './articles.js';
+import { renderIncomeExpense } from './income-expense.js';
 
 function formatMoney(value = 0, { signed = false } = {}) {
   const amount = Number(value) || 0;
@@ -43,8 +45,17 @@ function personText(item) {
 }
 
 function operationDetails(item) {
-  const details = [personText(item), item?.workplace || '', walletText(item)].filter(Boolean);
+  const details = [
+    personText(item),
+    item?.articleName || '',
+    item?.lineName || '',
+    item?.workplace || '',
+    walletText(item),
+  ].filter(Boolean);
   if (item?.economicType === 'TIPS' || item?.economicType === 'TIPS_REFUND') details.push('Чаевые');
+  if (item?.quantity != null && item?.unitPrice != null && Number(item.quantity) !== 1) {
+    details.push(`${item.quantity} × ${formatMoney(item.unitPrice)}`);
+  }
   return details.join(' · ');
 }
 
@@ -112,9 +123,26 @@ export function renderFinance(root) {
     aria: 'Открыть движение денежных средств',
   });
 
-  root.innerHTML = `${pageHeader('Финансы')}<div class="ui-folder-grid">${cashFolder}${ddsFolder}</div>`;
+  const incomeExpenseFolder = folderCard({
+    title: 'Доход / Расход',
+    icon: '±',
+    variant: 'compact',
+    data: 'data-finance-income-expense',
+    aria: 'Открыть доходы и расходы',
+  });
+  const articlesFolder = folderCard({
+    title: 'Статьи',
+    icon: '≡',
+    variant: 'compact',
+    data: 'data-finance-articles',
+    aria: 'Открыть статьи доходов и расходов',
+  });
+
+  root.innerHTML = `${pageHeader('Финансы')}<div class="ui-folder-grid">${cashFolder}${ddsFolder}${incomeExpenseFolder}${articlesFolder}</div>`;
   root.querySelector('[data-finance-cash]')?.addEventListener('click', () => renderWallets(root, () => renderFinance(root)));
   root.querySelector('[data-finance-dds]')?.addEventListener('click', () => renderDDS(root));
+  root.querySelector('[data-finance-income-expense]')?.addEventListener('click', () => renderIncomeExpense(root, () => renderFinance(root)));
+  root.querySelector('[data-finance-articles]')?.addEventListener('click', () => renderFinanceArticles(root, () => renderFinance(root)));
 }
 
 export { renderFinance as render };
