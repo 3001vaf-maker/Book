@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { CapabilityValueType, TenantAccessStatus } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 
-type ResolutionSource = 'TENANT_OVERRIDE' | 'PLAN' | 'DEFAULT' | 'LEGACY_COMPAT' | 'SUSPENDED' | 'DEMO' | 'DEMO_EXPIRED';
+type ResolutionSource = 'TENANT_OVERRIDE' | 'PLAN' | 'DEFAULT' | 'LEGACY_COMPAT' | 'SUSPENDED' | 'DEMO' | 'DEMO_EXPIRED' | 'FIRST_RUN';
 
 export type ResolvedCapability = {
   key: string;
@@ -63,6 +63,7 @@ export class SaasAccessService {
       return this.suspendedValue(capability.key, capability.valueType);
     }
 
+    if (await this.firstRunActive(tenantId)) return this.firstRunValue(capability.key, capability.valueType);
     if (this.demoActive(access)) return this.demoValue(capability.key, capability.valueType);
     if (this.demoExpired(access)) return this.demoExpiredValue(capability.key, capability.valueType);
 
@@ -171,6 +172,7 @@ export class SaasAccessService {
       };
     }
 
+    const firstRunActive = await this.firstRunActive(tenantId);
     const planValues = new Map(access.plan?.capabilityValues.map((value) => [value.capabilityId, value]) || []);
     const overrides = new Map(access.overrides.map((value) => [value.capabilityId, value]));
     const customOrder = new Map(access.capabilityOrder.map((value, index) => [value.capabilityId, index]));
@@ -188,6 +190,7 @@ export class SaasAccessService {
       if (access.status === TenantAccessStatus.SUSPENDED) {
         return this.suspendedValue(capability.key, capability.valueType);
       }
+      if (firstRunActive) return this.firstRunValue(capability.key, capability.valueType);
       if (this.demoActive(access)) return this.demoValue(capability.key, capability.valueType);
       if (this.demoExpired(access)) return this.demoExpiredValue(capability.key, capability.valueType);
 
@@ -266,6 +269,21 @@ export class SaasAccessService {
       capabilityOrder: capabilities.map((capability) => capability.key),
       capabilities: resolved,
     };
+  }
+
+  private async firstRunActive(tenantId: string) {
+    const progress = await this.prisma.firstRunProgress.findFirst({
+      where: { tenantId, status: 'IN_PROGRESS' },
+      select: { id: true },
+    });
+    return Boolean(progress);
+  }
+
+  private firstRunValue(key: string, valueType: CapabilityValueType): ResolvedCapability {
+    if (valueType === CapabilityValueType.BOOLEAN) {
+      return { key, valueType, enabled: true, limit: null, source: 'FIRST_RUN' };
+    }
+    return { key, valueType, enabled: null, limit: null, source: 'FIRST_RUN' };
   }
 
   private demoActive(access: { commercialMode: string; demoActivatedAt: Date | null; demoExpiresAt: Date | null }) {
