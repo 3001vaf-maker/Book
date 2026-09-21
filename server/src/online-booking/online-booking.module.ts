@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { BusinessStateModule } from '../business-state/business-state.module';
 import { CommunicationModule } from '../communication/communication.module';
+import { DocumentRegistryModule } from '../document-registry/document-registry.module';
 import { TenantDocumentArchiveModule } from '../tenant-document-archive/tenant-document-archive.module';
 import { NotificationModule } from '../notification/notification.module';
 import { ProfileModule } from '../profile/profile.module';
@@ -18,7 +19,7 @@ import { OnlineBookingController } from './online-booking.controller';
 import { OnlineBookingService } from './online-booking.service';
 
 @Module({
-  imports: [AuthModule, BusinessStateModule, CommunicationModule, TenantDocumentArchiveModule, NotificationModule, ProfileModule, TimeModule, RecordModule, ProcedureModule],
+  imports: [AuthModule, BusinessStateModule, CommunicationModule, DocumentRegistryModule, TenantDocumentArchiveModule, NotificationModule, ProfileModule, TimeModule, RecordModule, ProcedureModule],
   controllers: [OnlineBookingController, BookingConsentController, AccountSettingsController],
   providers: [OnlineBookingService, AccountGuard, BookingPdnConsentGuard, PersonIdentityService, PrismaService],
 })
