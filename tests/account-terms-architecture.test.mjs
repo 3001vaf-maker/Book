@@ -3,6 +3,7 @@ import fs from 'node:fs';
 
 const migration = fs.readFileSync('server/prisma/migrations/20260921143000_account_terms/migration.sql', 'utf8');
 const accountDocuments = fs.readFileSync('server/src/document-registry/account-document.service.ts', 'utf8');
+const registry = fs.readFileSync('server/src/document-registry/document-registry.service.ts', 'utf8');
 const bookingService = fs.readFileSync('server/src/online-booking/online-booking.service.ts', 'utf8');
 const bookingController = fs.readFileSync('server/src/online-booking/online-booking.controller.ts', 'utf8');
 const bookingUi = fs.readFileSync('online-booking/booking.js', 'utf8');
@@ -29,6 +30,8 @@ assert.match(accountDocuments, /async state\(accountIdValue: unknown\)/);
 assert.match(accountDocuments, /acceptedVersion >= requiredVersion/);
 assert.match(accountDocuments, /INSERT INTO "AccountDocumentEvent"/);
 assert.match(accountDocuments, /ON CONFLICT \("accountId", "documentVersionId", "action"\) DO NOTHING/);
+assert.match(registry, /FROM "AccountDocumentEvent"/);
+assert.match(registry, /'ACCOUNT'::text AS "subjectType"/);
 
 const registerBlock = bookingService.slice(
   bookingService.indexOf('async registerAccount('),
