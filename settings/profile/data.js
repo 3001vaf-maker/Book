@@ -49,6 +49,11 @@ function requireServerReady() {
   if (!serverReady) throw new Error('Profile + Workplaces ещё не готовы к серверной записи');
 }
 
+function notifyProfileChanged(detail = {}) {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('book:profile-changed', { detail }));
+}
+
 export function hydrateProfileFromServer(profile = {}, customProfessions = []) {
   profileState = normalizeProfile(profile);
   customProfessionsState = normalizeCustomProfessions(customProfessions);
@@ -76,6 +81,7 @@ export async function saveProfile(profile) {
   });
   const payload = await responseJson(response, 'Не удалось сохранить профиль');
   hydrateProfileFromServer(payload.profile, payload.customProfessions);
+  notifyProfileChanged({ action: 'profile-saved' });
   return getProfile();
 }
 
@@ -96,5 +102,6 @@ export async function addCustomProfession(value) {
   });
   const payload = await responseJson(response, 'Не удалось сохранить профессию');
   hydrateProfileFromServer(payload.profile, payload.customProfessions);
+  notifyProfileChanged({ action: 'profession-saved' });
   return getCustomProfessions();
 }
