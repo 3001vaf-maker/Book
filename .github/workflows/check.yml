@@ -69,6 +69,9 @@ jobs:
           mv server/prisma/migrations/20260919183000_tenant_invitation_naming /tmp/profile-migrations/
           mv server/prisma/migrations/20260919184000_owner_membership_role /tmp/profile-migrations/
           mv server/prisma/migrations/20260919185000_platform_account_naming /tmp/profile-migrations/
+          mv server/prisma/migrations/20260921190000_first_run_scenario /tmp/profile-migrations/
+          mv server/prisma/migrations/20260921193000_platform_profile_controls /tmp/profile-migrations/
+          mv server/prisma/migrations/20260921194000_platform_notices /tmp/profile-migrations/
           (
             cd server
             DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' npx prisma migrate deploy
@@ -116,6 +119,9 @@ jobs:
           mv /tmp/profile-migrations/20260919183000_tenant_invitation_naming server/prisma/migrations/
           mv /tmp/profile-migrations/20260919184000_owner_membership_role server/prisma/migrations/
           mv /tmp/profile-migrations/20260919185000_platform_account_naming server/prisma/migrations/
+          mv /tmp/profile-migrations/20260921190000_first_run_scenario server/prisma/migrations/
+          mv /tmp/profile-migrations/20260921193000_platform_profile_controls server/prisma/migrations/
+          mv /tmp/profile-migrations/20260921194000_platform_notices server/prisma/migrations/
           (
             cd server
             DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' npx prisma migrate deploy
