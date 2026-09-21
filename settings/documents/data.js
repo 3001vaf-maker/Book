@@ -279,5 +279,6 @@ export function createDocument({ title = 'Новый документ', text = '
 }
 
 export function resetDocumentTemplates() {
-  return saveDocuments(buildTenantDocumentsFromPlatformBases());
+  const savedGuides = getDocuments().filter((item) => item?.attachment?.type === 'RKN_GUIDE_PDF');
+  return saveDocuments([...buildTenantDocumentsFromPlatformBases(), ...savedGuides]);
 }
