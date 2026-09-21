@@ -119,10 +119,12 @@ function renderProfile(root,navigateBack,options={}){
     {title:'Профессиональные данные',content:`<div class="form-grid">${select({label:'Профессия *',name:'profession',value:profession,options:professionOptions()})}${select({label:'Опыт работы',name:'experience',value:p.experience||'',options:[{value:'',label:'Не указан'},...EXPERIENCES.map(v=>({value:v,label:v}))]})}${textareaField({label:'О профессии',name:'professionAbout',value:p.professionAbout||'',placeholder:'Расскажите о своей профессии'})}</div>`}
   ];
   const workplaces=`<section class="workplaces-section"><div class="section-heading"><h2>Рабочие места</h2></div>${actionBlock(`${workplaceAddButton()}${workplaceList()}`)}</section>`;
+  const accountControls=options.onboarding?'':`<section class="profile-account-controls">${folderList([{title:'Согласия и уведомления',data:'data-profile-account-controls'}])}</section>`;
   root.innerHTML=page([
     profileCard(p),
     accordion(items),
     workplaces,
+    accountControls,
     actionBlock(`${button('Сохранить',{className:'accordion-save',data:'data-save-profile'})}${button('Назад',{className:'ui-button--secondary',data:'data-profile-back'})}`)
   ]);
   initPhotoField(root);
@@ -132,6 +134,7 @@ function renderProfile(root,navigateBack,options={}){
   root.querySelector('[name="profession"]')?.addEventListener('change',e=>{if(e.target.value==='Другая')openCustomProfessionModal(root)});
   root.querySelector('[data-save-profile]')?.addEventListener('click',()=>{saveProfile(root,navigateBack,options)});
   root.querySelector('[data-profile-back]')?.addEventListener('click',navigateBack);
+  root.querySelector('[data-profile-account-controls]')?.addEventListener('click',()=>import('./account-controls.js').then(({render})=>render(root,()=>renderProfile(root,navigateBack,options))));
   root.querySelector('[data-add-workplace]')?.addEventListener('click',async()=>{
     if(options.onboarding){
       try{await persistDraft(root)}catch(error){showProfileError(error instanceof Error?error.message:'Не удалось сохранить профиль');return}
