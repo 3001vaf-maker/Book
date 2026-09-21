@@ -92,7 +92,8 @@ function normalizeOperation(row = {}) {
     status: String(row?.status || 'completed'),
     source: row?.source && typeof row.source === 'object' ? { ...row.source } : null,
     originalOperationId: String(row?.originalOperationId || ''),
-    occurredAt: String(row?.occurredAt || row?.createdAt || ''),
+    occurredAt: String(row?.occurredAt || ''),
+    recordedAt: String(row?.recordedAt || row?.createdAt || ''),
     data: row?.data && typeof row.data === 'object' ? clone(row.data) : {},
   };
 }
@@ -107,6 +108,7 @@ function normalizeLedgerEntry(row = {}) {
     economicType: String(row?.economicType || ''),
     amount: Math.max(0, numberValue(row?.amount)),
     occurredAt: String(row?.occurredAt || ''),
+    recordedAt: String(row?.recordedAt || row?.createdAt || ''),
     source: row?.source && typeof row.source === 'object' ? { ...row.source } : null,
     component: String(row?.component || ''),
     relatedOperationId: String(row?.relatedOperationId || ''),
