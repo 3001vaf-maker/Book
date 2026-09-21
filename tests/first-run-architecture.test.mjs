@@ -16,6 +16,7 @@ const booking = source('server/src/online-booking/online-booking.service.ts');
 const dispatch = source('server/src/communication/communication-dispatch.service.ts');
 const people = source('main/people/people.js');
 const admin = source('admin/admin.js');
+const saasAdminService = source('server/src/saas-admin/saas-admin.service.ts');
 const notices = source('server/src/platform-notice/platform-notice.service.ts');
 const platformNoticesUi = source('core/platform-notices.js');
 
@@ -68,7 +69,7 @@ assert.match(people, /canUseRealPersonalData/);
 assert.match(admin, /Первое знакомство/);
 assert.match(admin, /Продлить DEMO на 14 дней/);
 assert.match(admin, /data-capability-order-list/);
-assert.match(admin, /CAPABILITY_CHANGED/);
+assert.match(saasAdminService, /CAPABILITY_CHANGED/);
 assert.match(notices, /createForTenantOwner/);
 assert.match(platformNoticesUi, /platform-notices/);
 assert.match(core, /startPlatformNotices/);
