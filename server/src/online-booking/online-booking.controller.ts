@@ -128,13 +128,16 @@ export class OnlineBookingController {
     if (!resolved.exists || !resolved.accountId) return { exists: false };
     const payload = await this.booking.resumeAccount(tenantId, resolved.accountId);
     await this.communications.bindTelegramEntry(tenantId, resolved.accountId, body?.token);
+    await this.booking.syncAccountPersonContacts(resolved.accountId);
     return { ...payload, exists: true };
   }
 
   @UseGuards(AccountGuard)
   @Post(':tenantId/account/telegram-entry')
-  bindTelegramEntry(@Param('tenantId') tenantId: string, @Req() request: AccountRequest, @Body() body: { token?: unknown }) {
-    return this.communications.bindTelegramEntry(tenantId, request.accountAuth!.accountId, body?.token);
+  async bindTelegramEntry(@Param('tenantId') tenantId: string, @Req() request: AccountRequest, @Body() body: { token?: unknown }) {
+    const result = await this.communications.bindTelegramEntry(tenantId, request.accountAuth!.accountId, body?.token);
+    await this.booking.syncAccountPersonContacts(request.accountAuth!.accountId);
+    return result;
   }
 
   @UseGuards(AccountGuard)
