@@ -34,6 +34,10 @@ expect(booking.includes('renderAccountTerms') && booking.includes('renderTenantA
 expect(booking.includes("state.identityDestination = 'booking';\n    nextBookingStep(root, state);"), 'Welcome must enter booking selection, never registration.');
 expect(booking.includes("await loadAccountTerms(state);\n        renderAccountTerms(root, state);"), 'A new Account must see platform terms before personal details/password.');
 expect(booking.includes("accountTerms: currentAccountTermsFact(state)"), 'Account registration must submit platform terms acceptance.');
+expect(booking.includes("label: 'Телефон или email'") && booking.includes("name: 'identifier'"), 'Account entry must accept phone or email through one identifier field.');
+expect(booking.includes("prepareAccount(state.tenantId, { identifier })"), 'Account entry must resolve the global identifier before choosing login or registration.');
+expect(booking.includes("prepareAccount(state.tenantId, { email, phone })"), 'New Account contacts must be checked before password creation.');
+expect(booking.includes("loginAccount(state.tenantId, state.accountDraft.identifier, password)"), 'Password login must use the resolved phone/email identifier.');
 expect(!booking.includes('registrationMode'), 'Legacy registration consent mode must not return.');
 expect(!booking.includes('renderRegistrationAgreements'), 'Tenant consent must not be modeled as registration agreements.');
 expect(!booking.includes('saveRegistrationConsents'), 'Tenant consent must not be saved as registration consent.');
