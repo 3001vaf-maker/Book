@@ -84,5 +84,13 @@ assert.match(financeSource, /Book-ДДС\.csv/);
 assert.match(folderSource, /variant === 'compact'/);
 assert.doesNotMatch(settingsSource, /\['wallets', 'Кошелёк'/);
 assert.match(walletSource, /pageHeader\('Касса'\)/);
+assert.match(walletSource, /data-wallet-operation/);
+assert.match(walletSource, /openWalletOperation/);
+assert.match(walletSource, /getLedgerEntries/);
+assert.match(walletSource, /Фактическая дата и время/);
+assert.match(walletSource, /Внесено в Book/);
+assert.match(walletSource, /cancelFinanceOperation/);
+assert.match(financeSource, /data-finance-operation/);
+assert.match(financeSource, /const interactive = Boolean\(item\?\.operationId\)/);
 
 console.log('wallet tests: OK');
