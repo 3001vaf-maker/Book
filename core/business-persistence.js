@@ -5,6 +5,7 @@ let running = false;
 let lastError = null;
 const queue = [];
 const idleWaiters = [];
+const completedMutationScopes = new Set();
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -32,12 +33,17 @@ function mutationScope(path = '') {
   return '';
 }
 
-function reportMutationCompleted(path) {
-  if (typeof window === 'undefined') return;
+function markMutationCompleted(path) {
   const scope = mutationScope(path);
-  if (!scope) return;
+  if (scope) completedMutationScopes.add(scope);
+}
+
+function reportCompletedMutationBatch() {
+  if (typeof window === 'undefined' || !completedMutationScopes.size) return;
+  const scopes = [...completedMutationScopes];
+  completedMutationScopes.clear();
   window.dispatchEvent(new CustomEvent('book:server-mutation-completed', {
-    detail: { path: String(path || ''), scope },
+    detail: { scopes },
   }));
 }
 
@@ -65,7 +71,7 @@ async function runQueue() {
         queue.shift();
         lastError = null;
         item.resolve?.(result);
-        reportMutationCompleted(item.path);
+        markMutationCompleted(item.path);
       } catch (error) {
         reportError(error);
         await sleep(1200);
@@ -74,6 +80,7 @@ async function runQueue() {
   } finally {
     running = false;
     resolveIdle();
+    if (!queue.length) reportCompletedMutationBatch();
     if (serverReady && queue.length) void runQueue();
   }
 }
