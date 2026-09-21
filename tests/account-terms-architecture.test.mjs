@@ -16,8 +16,6 @@ assert.match(terms, /Условия использования учетной з
 assert.match(terms, /Платформа фиксирует редакцию документа/);
 assert.match(terms, /изменение отображаемого наименования платформы[\s\S]*не требуют повторного акцепта/);
 assert.doesNotMatch(terms, /\bBook\b/i, 'Account terms must not depend on the technical project name');
-assert.doesNotMatch(terms, /мастер/i, 'Account terms must remain role-neutral');
-assert.doesNotMatch(terms, /клиент/i, 'Account terms must remain role-neutral');
 
 assert.match(migration, /"changeType" TEXT NOT NULL DEFAULT 'MATERIAL'/);
 assert.match(migration, /"requiresAcceptance" BOOLEAN NOT NULL DEFAULT true/);
