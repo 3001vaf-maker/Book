@@ -1,4 +1,4 @@
-import { actionBlock, button, emptyState, field, folderCard, list, modal, mountModal, openNotice, pageHeader, shortDateTime } from '../../ui/ui.js';
+import { actionBlock, button, details, emptyState, field, folderCard, list, modal, mountModal, openNotice, pageHeader, shortDateTime } from '../../ui/ui.js';
 import { cancelFinanceOperation, getLedgerEntries } from '../../core/finance/index.js';
 import { getWalletTotalBalance } from '../../settings/wallets/data.js';
 import { renderWallets } from '../../settings/wallets/wallets.js';
@@ -127,6 +127,22 @@ function openFinanceOperation(root, movements, operationId) {
   if (!entries.length) return;
   const first = entries[0];
   const canCancel = first?.operationKind !== 'cancel' && first?.operationStatus !== 'cancelled';
+  const person = [first?.person?.name, first?.person?.surname].filter(Boolean).join(' ').trim();
+  const wallets = [...new Set(entries.map((item) => walletText(item)).filter(Boolean))].join(' + ');
+  const articles = [...new Set(entries.map((item) => String(item?.articleName || '')).filter(Boolean))].join(', ');
+  const sourceDetails = [...new Set(entries.map((item) => String(item?.sourceDetails || '')).filter(Boolean))].join(', ');
+  const context = details([
+    { label: 'Фактическая дата и время', value: operationMoment(first) || '—' },
+    { label: 'Внесено в Book', value: recordedMoment(first) || '—' },
+    person ? { label: 'Клиент', value: person } : null,
+    sourceDetails ? { label: 'За что', value: sourceDetails } : null,
+    first?.workplace ? { label: 'Рабочее место', value: first.workplace } : null,
+    wallets ? { label: 'Кошелёк', value: wallets } : null,
+    articles ? { label: 'Статья', value: articles } : null,
+    first?.counterparty ? { label: 'Контрагент', value: first.counterparty } : null,
+    first?.note ? { label: 'Комментарий', value: first.note } : null,
+    { label: 'Статус', value: first?.operationStatus === 'cancelled' ? 'Отменена' : 'Активна' },
+  ]);
   const rows = list({
     items: entries.map((item) => ({
       ...movementListItem(item),
@@ -142,7 +158,7 @@ function openFinanceOperation(root, movements, operationId) {
         ${button('Отменить ошибочную операцию', { variant: 'danger', data: 'data-finance-operation-cancel' })}
       </div>`
     : '';
-  const m = mountModal(root, modal(`<div class="modal-title"><h2>${operationName(first)}</h2></div>${rows}${cancel}`, { variant: 'medium' }));
+  const m = mountModal(root, modal(`<div class="modal-title"><h2>${operationName(first)}</h2></div>${context}${rows}${cancel}`, { variant: 'medium' }));
   if (!m || !canCancel) return;
   m.querySelector('[data-finance-operation-cancel]')?.addEventListener('click', async () => {
     const input = m.querySelector('input[name="financeCancelOccurredAt"]');
