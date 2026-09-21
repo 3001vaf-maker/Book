@@ -1026,6 +1026,7 @@ export class FinanceService {
     await this.ensureLegacyMigrated(tenantId);
     const id = text(operationId);
     const input = objectValue(body);
+    const occurredAt = requiredOccurredAt(input.occurredAt);
     const original = await this.prisma.financeOperation.findUnique({
       where: { tenantId_operationId: { tenantId, operationId: id } },
     });
@@ -1042,7 +1043,7 @@ export class FinanceService {
       }
 
       for (const target of targets) {
-        await this.createReversalFor(tx, tenantId, target.operationId, text(input.reason) || 'incorrect-entry', new Date());
+        await this.createReversalFor(tx, tenantId, target.operationId, text(input.reason) || 'incorrect-entry', occurredAt);
         await tx.financeOperation.update({ where: { id: target.id }, data: { status: 'cancelled' } });
       }
     });
