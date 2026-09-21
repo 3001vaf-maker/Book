@@ -982,8 +982,8 @@ export class FinanceService {
     const input = objectValue(body);
     const requested = Math.min(remaining, money(input.amount == null ? remaining : input.amount));
     if (requested <= 0) throw new BadRequestException('Некорректная сумма возврата');
-    const tips = Math.min(requested, tipsRemaining);
-    const serviceAmount = Math.min(money(requested - tips), serviceRemaining);
+    const serviceAmount = Math.min(requested, serviceRemaining);
+    const tips = Math.min(money(requested - serviceAmount), tipsRemaining);
     const walletId = text(input.walletId);
     const walletName = text(input.walletName);
     if (!walletId) throw new BadRequestException('Не выбран кошелёк возврата');
