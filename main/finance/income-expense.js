@@ -84,7 +84,7 @@ async function saveManual(root, modalRoot, direction, navigateBack) {
     amount: mode === 'simple' ? Number(data.get('amount') || 0) : null,
     lines: mode === 'detail' ? collectLines(modalRoot) : [],
     note: String(data.get('note') || '').trim(),
-    occurredAt: String(data.get('occurredAt') || ''),
+    occurredAt: data.get('occurredAt') ? new Date(String(data.get('occurredAt'))).toISOString() : new Date().toISOString(),
   };
   try {
     await recordManualFinanceOperation(payload);
