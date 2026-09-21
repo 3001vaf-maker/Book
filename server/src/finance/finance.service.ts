@@ -52,6 +52,14 @@ function dateValue(value: unknown, fallback = new Date()) {
   return Number.isFinite(date.getTime()) ? date : fallback;
 }
 
+function requiredOccurredAt(value: unknown) {
+  const raw = text(value);
+  if (!raw) throw new BadRequestException('Укажите фактическую дату и время операции');
+  const date = value instanceof Date ? value : new Date(raw);
+  if (!Number.isFinite(date.getTime())) throw new BadRequestException('Некорректная фактическая дата операции');
+  return date;
+}
+
 function sourceValue(value: unknown) {
   const source = objectValue(value);
   return { type: text(source.type), id: text(source.id) };
@@ -715,7 +723,7 @@ export class FinanceService {
     }
 
     const operationId = randomUUID();
-    const occurredAt = dateValue(input.occurredAt);
+    const occurredAt = requiredOccurredAt(input.occurredAt);
     const total = money(preparedLines.reduce((sum, line) => sum + line.total, 0));
     const source = { type: 'manual', id: operationId };
     await this.prisma.$transaction(async (tx) => {
@@ -775,7 +783,7 @@ export class FinanceService {
       'investment-return': { direction: 'OUT', economicType: 'INVESTMENT_RETURN', systemKey: 'INVESTMENT_RETURN', operationKind: 'investment-return' },
     };
 
-    const occurredAt = dateValue(input.occurredAt);
+    const occurredAt = requiredOccurredAt(input.occurredAt);
     const operationId = randomUUID();
     const note = text(input.note);
     const counterparty = text(input.counterparty);
@@ -899,7 +907,7 @@ export class FinanceService {
     }
 
     const operationId = randomUUID();
-    const occurredAt = dateValue(input.occurredAt);
+    const occurredAt = requiredOccurredAt(input.occurredAt);
     await this.prisma.$transaction(async (tx) => {
       await this.saveSettlementWith(tx, tenantId, source.type, source.id, settlement);
       const paid = Math.max(0, await this.serviceNet(tx, tenantId, source.type, source.id));
@@ -960,7 +968,7 @@ export class FinanceService {
     const walletName = text(input.walletName);
     if (!walletId) throw new BadRequestException('Не выбран кошелёк возврата');
     const refundId = randomUUID();
-    const occurredAt = dateValue(input.occurredAt);
+    const occurredAt = requiredOccurredAt(input.occurredAt);
 
     await this.prisma.$transaction(async (tx) => {
       await this.createOperationWithEntries(tx, tenantId, {
