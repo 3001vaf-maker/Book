@@ -5,6 +5,7 @@ import { ConsentPolicyService } from '../tenant-document-archive/consent-policy.
 import { PrismaService } from '../prisma.service';
 import { CommunicationService } from './communication.service';
 import { CommunicationDispatchService } from './communication-dispatch.service';
+import { FirstRunService } from '../first-run/first-run.service';
 
 type TemplateRow = { id: string; tenantId: string; name: string; body: string; createdAt: Date; updatedAt: Date };
 type GroupRow = { id: string; tenantId: string; name: string; createdAt: Date; updatedAt: Date };
@@ -30,6 +31,7 @@ export class CommunicationBroadcastService {
     private readonly documents: ConsentPolicyService,
     private readonly communications: CommunicationService,
     private readonly dispatch: CommunicationDispatchService,
+    private readonly firstRun: FirstRunService,
   ) {}
 
   private normalizeChannel(value: unknown) {
@@ -256,6 +258,7 @@ export class CommunicationBroadcastService {
   }
 
   async send(tenantId: string, input: { channel?: unknown; all?: unknown; phones?: unknown; personKeys?: unknown; groupId?: unknown; name?: unknown; body?: unknown }) {
+    await this.firstRun.assertRealOperationsAllowed(tenantId);
     const name = text(input?.name) || 'Сообщение'; const body = text(input?.body);
     if (!body) throw new BadRequestException('Введите текст сообщения');
     const preview = await this.preview(tenantId, input || {});

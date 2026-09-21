@@ -69,6 +69,9 @@ jobs:
           mv server/prisma/migrations/20260919183000_tenant_invitation_naming /tmp/profile-migrations/
           mv server/prisma/migrations/20260919184000_owner_membership_role /tmp/profile-migrations/
           mv server/prisma/migrations/20260919185000_platform_account_naming /tmp/profile-migrations/
+          mv server/prisma/migrations/20260921190000_first_run_scenario /tmp/profile-migrations/
+          mv server/prisma/migrations/20260921193000_platform_profile_controls /tmp/profile-migrations/
+          mv server/prisma/migrations/20260921194000_platform_notices /tmp/profile-migrations/
           (
             cd server
             DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' npx prisma migrate deploy
@@ -116,6 +119,9 @@ jobs:
           mv /tmp/profile-migrations/20260919183000_tenant_invitation_naming server/prisma/migrations/
           mv /tmp/profile-migrations/20260919184000_owner_membership_role server/prisma/migrations/
           mv /tmp/profile-migrations/20260919185000_platform_account_naming server/prisma/migrations/
+          mv /tmp/profile-migrations/20260921190000_first_run_scenario server/prisma/migrations/
+          mv /tmp/profile-migrations/20260921193000_platform_profile_controls server/prisma/migrations/
+          mv /tmp/profile-migrations/20260921194000_platform_notices server/prisma/migrations/
           (
             cd server
             DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' npx prisma migrate deploy
@@ -472,7 +478,7 @@ jobs:
           expect_status "admin.va-tools.ru" "/admin/document-registry/view.js" "200"
           expect_status "admin.va-tools.ru" "/admin/document-registry/catalog.js" "200"
           expect_status "admin.va-tools.ru" "/admin/document-registry/history.js" "200"
-          expect_contains "admin.va-tools.ru" "/admin/" "Book Admin"
+          expect_contains "admin.va-tools.ru" "/admin/" "<title>Администрирование</title>"
           expect_contains "admin.va-tools.ru" "/admin/" "admin.js?build="
           expect_contains "admin.va-tools.ru" "/admin/admin.js" "document-registry/view.js"
           expect_contains "admin.va-tools.ru" "/admin/document-registry/catalog.js" "privacy-policy"
@@ -480,14 +486,14 @@ jobs:
 
           expect_status "book.va-tools.ru" "/" "200"
           expect_status "book.va-tools.ru" "/core.js" "200"
-          expect_contains "book.va-tools.ru" "/" "<title>Book</title>"
+          expect_contains "book.va-tools.ru" "/" "<title>Рабочее пространство</title>"
           expect_contains "book.va-tools.ru" "/core.js" "app-content"
 
           expect_status "client.va-tools.ru" "/" "200"
           expect_status "client.va-tools.ru" "/online-booking/booking.js" "200"
           expect_status "client.va-tools.ru" "/online-booking/model.js" "200"
           expect_status "client.va-tools.ru" "/core/time/zone.js" "200"
-          expect_contains "client.va-tools.ru" "/" "<title>Book</title>"
+          expect_contains "client.va-tools.ru" "/" "<title>Рабочее пространство</title>"
           expect_contains "client.va-tools.ru" "/online-booking/booking.js" "renderOnlineBooking"
           expect_contains "client.va-tools.ru" "/online-booking/model.js" "zonedDateTimeParts"
           expect_contains "client.va-tools.ru" "/core/time/zone.js" "Intl.DateTimeFormat"

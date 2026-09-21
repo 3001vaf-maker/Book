@@ -5,6 +5,8 @@ import { SaasAccessService } from '../saas-access/saas-access.service';
 import { TenantInvitationService } from '../tenant-invitation/tenant-invitation.service';
 import { DocumentRegistryService } from '../document-registry/document-registry.service';
 import { TransactionalEmailService } from '../transactional-email/transactional-email.service';
+import { FirstRunService } from '../first-run/first-run.service';
+import { PlatformNoticeService } from '../platform-notice/platform-notice.service';
 
 @Injectable()
 export class SaasAdminService {
@@ -14,6 +16,8 @@ export class SaasAdminService {
     private readonly invitations: TenantInvitationService,
     private readonly documentRegistry: DocumentRegistryService,
     private readonly email: TransactionalEmailService,
+    private readonly firstRun: FirstRunService,
+    private readonly notices: PlatformNoticeService,
   ) {}
 
   async me(adminId: string, platformAccountId: string) {
@@ -27,6 +31,10 @@ export class SaasAdminService {
 
   documentRegistryHistory() {
     return this.documentRegistry.history();
+  }
+
+  syncDocumentRegistry(documents: unknown) {
+    return this.documentRegistry.syncCatalog(documents);
   }
 
   async capabilities() {
@@ -64,7 +72,12 @@ export class SaasAdminService {
             tenantInvitations: {
               orderBy: { createdAt: 'desc' },
               take: 1,
-              select: { id: true, email: true, name: true, status: true, createdAt: true, expiresAt: true },
+              select: { id: true, email: true, name: true, status: true, createdAt: true, expiresAt: true, activatedAt: true, demoExpiresAt: true, firstRunScenarioVersionId: true },
+            },
+            firstRunProgress: {
+              orderBy: { updatedAt: 'desc' },
+              take: 1,
+              select: { status: true, currentStepKey: true, startedAt: true, completedAt: true, scenarioVersionId: true },
             },
           },
         },
@@ -94,6 +107,7 @@ export class SaasAdminService {
         } : null,
         invitation,
         access: resolved,
+        firstRun: row.tenant.firstRunProgress[0] || null,
       };
     }));
   }
@@ -157,56 +171,231 @@ export class SaasAdminService {
     status?: unknown;
     capabilities?: unknown;
   }) {
-    const tenantAccess = await this.prisma.tenantAccess.findUnique({ where: { tenantId } });
-    if (!tenantAccess) throw new NotFoundException('Book не найден');
+    const tenantAccess = await this.prisma.tenantAccess.findUnique({
+      where: { tenantId },
+      include: {
+        plan: { include: { capabilityValues: true } },
+        overrides: true,
+      },
+    });
+    if (!tenantAccess) throw new NotFoundException('Рабочее пространство не найдено');
+
+    const planValues = new Map(tenantAccess.plan?.capabilityValues.map((item) => [item.capabilityId, item]) || []);
+    const overrideValues = new Map(tenantAccess.overrides.map((item) => [item.capabilityId, item]));
+
+    const baseValue = (capability: {
+      id: string;
+      valueType: CapabilityValueType;
+      defaultEnabled: boolean;
+      defaultLimit: number | null;
+    }) => {
+      const planValue = planValues.get(capability.id);
+      if (capability.valueType === CapabilityValueType.BOOLEAN) {
+        if (tenantAccess.isOwnerBook && !tenantAccess.plan) return true;
+        if (planValue?.enabled !== null && planValue?.enabled !== undefined) return planValue.enabled;
+        return capability.defaultEnabled;
+      }
+      if (tenantAccess.isOwnerBook && !tenantAccess.plan) return null;
+      if (planValue) return planValue.limit;
+      return capability.defaultLimit;
+    };
+
+    const currentValue = (capability: {
+      id: string;
+      valueType: CapabilityValueType;
+      defaultEnabled: boolean;
+      defaultLimit: number | null;
+    }) => {
+      const override = overrideValues.get(capability.id);
+      if (capability.valueType === CapabilityValueType.BOOLEAN) {
+        if (override?.enabled !== null && override?.enabled !== undefined) return override.enabled;
+        return baseValue(capability);
+      }
+      if (override) return override.limit;
+      return baseValue(capability);
+    };
 
     const statusText = String(input?.status || '').trim().toUpperCase();
     if (statusText) {
       if (!Object.values(TenantAccessStatus).includes(statusText as TenantAccessStatus)) {
-        throw new BadRequestException('Неизвестный статус Book');
+        throw new BadRequestException('Неизвестный статус рабочего пространства');
       }
-      await this.prisma.tenantAccess.update({
-        where: { tenantId },
-        data: { status: statusText as TenantAccessStatus },
-      });
+      if (statusText !== tenantAccess.status) {
+        await this.prisma.tenantAccess.update({
+          where: { tenantId },
+          data: { status: statusText as TenantAccessStatus },
+        });
+        await this.prisma.platformActivityEvent.create({
+          data: {
+            tenantId,
+            eventType: 'ACCESS_STATUS_CHANGED',
+            metadata: {
+              from: tenantAccess.status,
+              to: statusText,
+            },
+          },
+        });
+        await this.notices.createForTenantOwner(tenantId, {
+          type: 'ACCESS_STATUS_CHANGED',
+          title: statusText === TenantAccessStatus.SUSPENDED
+            ? 'Рабочее пространство временно отключено'
+            : 'Рабочее пространство снова доступно',
+          body: statusText === TenantAccessStatus.SUSPENDED
+            ? 'Администратор временно ограничил доступ к рабочему пространству.'
+            : 'Администратор восстановил доступ к рабочему пространству.',
+          metadata: { status: statusText },
+        });
+      }
     }
 
     const values = Array.isArray(input?.capabilities) ? input.capabilities : [];
+    const seenKeys = new Set<string>();
     for (const raw of values) {
       if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
       const value = raw as Record<string, unknown>;
       const key = String(value.key || '').trim();
       if (!key) continue;
+      if (seenKeys.has(key)) throw new BadRequestException(`Инструмент ${key} передан несколько раз`);
+      seenKeys.add(key);
+
       const capability = await this.prisma.capability.findUnique({ where: { key } });
       if (!capability || !capability.isActive) throw new BadRequestException(`Неизвестная возможность: ${key}`);
+      const before = currentValue(capability);
 
       if (value.inherit === true) {
         await this.prisma.tenantCapabilityOverride.deleteMany({
           where: { tenantId, capabilityId: capability.id },
         });
-        continue;
-      }
-
-      if (capability.valueType === CapabilityValueType.BOOLEAN) {
+        overrideValues.delete(capability.id);
+      } else if (capability.valueType === CapabilityValueType.BOOLEAN) {
         if (typeof value.enabled !== 'boolean') throw new BadRequestException(`Для ${key} требуется ON/OFF`);
-        await this.prisma.tenantCapabilityOverride.upsert({
+        const saved = await this.prisma.tenantCapabilityOverride.upsert({
           where: { tenantId_capabilityId: { tenantId, capabilityId: capability.id } },
           create: { tenantId, capabilityId: capability.id, enabled: value.enabled, limit: null },
           update: { enabled: value.enabled, limit: null },
         });
-        continue;
+        overrideValues.set(capability.id, saved);
+      } else {
+        const limit = value.limit === null ? null : Number(value.limit);
+        if (limit !== null && (!Number.isInteger(limit) || limit < 0)) {
+          throw new BadRequestException(`Для ${key} требуется целый лимит или без ограничения`);
+        }
+        const saved = await this.prisma.tenantCapabilityOverride.upsert({
+          where: { tenantId_capabilityId: { tenantId, capabilityId: capability.id } },
+          create: { tenantId, capabilityId: capability.id, enabled: null, limit },
+          update: { enabled: null, limit },
+        });
+        overrideValues.set(capability.id, saved);
       }
 
-      const limit = value.limit === null ? null : Number(value.limit);
-      if (limit !== null && (!Number.isInteger(limit) || limit < 0)) {
-        throw new BadRequestException(`Для ${key} требуется целый лимит или без ограничения`);
-      }
-      await this.prisma.tenantCapabilityOverride.upsert({
-        where: { tenantId_capabilityId: { tenantId, capabilityId: capability.id } },
-        create: { tenantId, capabilityId: capability.id, enabled: null, limit },
-        update: { enabled: null, limit },
+      const after = currentValue(capability);
+      if (before === after) continue;
+
+      const booleanChange = capability.valueType === CapabilityValueType.BOOLEAN;
+      const enabled = booleanChange ? after === true : null;
+      await this.prisma.platformActivityEvent.create({
+        data: {
+          tenantId,
+          eventType: 'CAPABILITY_CHANGED',
+          metadata: {
+            key: capability.key,
+            name: capability.name,
+            valueType: capability.valueType,
+            before,
+            after,
+          },
+        },
+      });
+      await this.notices.createForTenantOwner(tenantId, {
+        type: 'CAPABILITY_CHANGED',
+        title: booleanChange
+          ? (enabled ? `Инструмент «${capability.name}» добавлен` : `Инструмент «${capability.name}» отключён`)
+          : `Изменён лимит «${capability.name}»`,
+        body: booleanChange
+          ? (enabled
+            ? 'Администратор добавил этот инструмент в ваш набор. Он станет доступен в соответствии с текущим режимом работы.'
+            : 'Администратор отключил этот инструмент в вашем наборе.')
+          : `Новое значение лимита: ${after === null ? 'без ограничения' : after}.`,
+        metadata: {
+          key: capability.key,
+          valueType: capability.valueType,
+          before,
+          after,
+        },
       });
     }
+
+    return this.access.resolveTenantAccess(tenantId);
+  }
+
+  firstRunScenario() {
+    return this.firstRun.adminScenario();
+  }
+
+  ensureFirstRunDraft() {
+    return this.firstRun.ensureAdminDraft();
+  }
+
+  updateFirstRunStep(stepKey: string, input: Record<string, unknown>) {
+    return this.firstRun.updateDraftStep(stepKey, input);
+  }
+
+  reorderFirstRun(stepKeys: unknown) {
+    return this.firstRun.reorderDraft(stepKeys);
+  }
+
+  publishFirstRun() {
+    return this.firstRun.publishDraft();
+  }
+
+  firstRunAnalytics() {
+    return this.firstRun.adminAnalytics();
+  }
+
+  async tenantActivity(tenantId: string) {
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { id: true } });
+    if (!tenant) throw new NotFoundException('Рабочее пространство не найдено');
+    return this.firstRun.adminActivity(tenantId);
+  }
+
+  setCommercialMode(tenantId: string, mode: unknown) {
+    return this.firstRun.setCommercialMode(tenantId, mode);
+  }
+
+  extendDemo(tenantId: string, days: unknown) {
+    return this.firstRun.extendDemo(tenantId, days);
+  }
+
+  async updateCapabilityOrder(tenantId: string, keysValue: unknown) {
+    const keys = (Array.isArray(keysValue) ? keysValue : [])
+      .map((value) => String(value || '').trim())
+      .filter(Boolean);
+    if (!keys.length || new Set(keys).size !== keys.length) {
+      throw new BadRequestException('Передайте порядок инструментов без дублей');
+    }
+
+    const capabilities = await this.prisma.capability.findMany({
+      where: { isActive: true },
+      select: { id: true, key: true },
+    });
+    const byKey = new Map(capabilities.map((item) => [item.key, item]));
+    if (keys.length !== capabilities.length || capabilities.some((item) => !keys.includes(item.key))) {
+      throw new BadRequestException('Передайте полный порядок доступных инструментов');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.tenantCapabilityOrder.deleteMany({ where: { tenantId } });
+      for (const [index, key] of keys.entries()) {
+        const capability = byKey.get(key)!;
+        await tx.tenantCapabilityOrder.create({
+          data: {
+            tenantId,
+            capabilityId: capability.id,
+            position: (index + 1) * 10,
+          },
+        });
+      }
+    });
 
     return this.access.resolveTenantAccess(tenantId);
   }

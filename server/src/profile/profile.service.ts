@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { Prisma, Workplace as WorkplaceRow } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { resolveWorkplaceTimeZone } from '../time/workplace-time-zone';
@@ -350,6 +351,163 @@ export class ProfileService {
     if (!existing || existing.profileId !== profile.id) throw new NotFoundException('Рабочее место не найдено');
     await this.prisma.workplace.delete({ where: { tenantId_key: { tenantId, key } } });
     return this.bundle(tenantId, platformAccountId);
+  }
+
+  async accountControls(tenantId: string, platformAccountId: string) {
+    const [documents, preferences] = await Promise.all([
+      this.prisma.$queryRaw<Array<{
+        documentId: string;
+        key: string;
+        type: string;
+        title: string;
+        requiredForRegistration: boolean;
+        currentVersion: number;
+        latestAction: string | null;
+        latestOccurredAt: Date | null;
+        latestVersion: number | null;
+      }>>`
+        SELECT
+          d."id" AS "documentId",
+          d."key",
+          d."type",
+          d."title",
+          d."requiredForRegistration",
+          current_v."version" AS "currentVersion",
+          latest_event."action" AS "latestAction",
+          latest_event."occurredAt" AS "latestOccurredAt",
+          latest_event."documentVersion" AS "latestVersion"
+        FROM "PlatformDocument" d
+        JOIN LATERAL (
+          SELECT "version"
+          FROM "PlatformDocumentVersion"
+          WHERE "documentId" = d."id"
+          ORDER BY "version" DESC
+          LIMIT 1
+        ) current_v ON true
+        LEFT JOIN LATERAL (
+          SELECT e."action", e."occurredAt", v."version" AS "documentVersion"
+          FROM "PlatformConsentEvent" e
+          JOIN "PlatformDocumentVersion" v ON v."id" = e."documentVersionId"
+          WHERE e."platformAccountId" = ${platformAccountId}
+            AND v."documentId" = d."id"
+          ORDER BY e."occurredAt" DESC, e."id" DESC
+          LIMIT 1
+        ) latest_event ON true
+        WHERE d."isActive" = true
+          AND d."type" LIKE '%CONSENT%'
+        ORDER BY d."requiredForRegistration" DESC, d."createdAt" ASC
+      `,
+      this.prisma.platformNotificationPreference.findUnique({
+        where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
+      }),
+    ]);
+
+    const history = await this.prisma.$queryRaw<Array<{
+      id: string;
+      key: string;
+      title: string;
+      version: number;
+      action: string;
+      occurredAt: Date;
+    }>>`
+      SELECT
+        e."id",
+        d."key",
+        d."title",
+        v."version",
+        e."action",
+        e."occurredAt"
+      FROM "PlatformConsentEvent" e
+      JOIN "PlatformDocumentVersion" v ON v."id" = e."documentVersionId"
+      JOIN "PlatformDocument" d ON d."id" = v."documentId"
+      WHERE e."platformAccountId" = ${platformAccountId}
+        AND d."type" LIKE '%CONSENT%'
+      ORDER BY e."occurredAt" DESC, e."id" DESC
+      LIMIT 200
+    `;
+
+    return {
+      consents: documents.map((document) => ({
+        key: document.key,
+        title: document.title,
+        requiredForRegistration: document.requiredForRegistration,
+        currentVersion: document.currentVersion,
+        action: document.latestAction || 'DECLINED',
+        eventVersion: document.latestVersion,
+        occurredAt: document.latestOccurredAt?.toISOString() || '',
+        active: document.latestAction === 'CONSENTED',
+      })),
+      history: history.map((event) => ({
+        ...event,
+        occurredAt: event.occurredAt.toISOString(),
+      })),
+      serviceNotifications: {
+        email: preferences?.emailEnabled ?? true,
+      },
+    };
+  }
+
+  async setAccountConsent(
+    tenantId: string,
+    platformAccountId: string,
+    documentKeyValue: unknown,
+    activeValue: unknown,
+  ) {
+    const documentKey = stringValue(documentKeyValue).trim();
+    const active = Boolean(activeValue);
+    const rows = await this.prisma.$queryRaw<Array<{ documentVersionId: string; title: string; type: string; version: number }>>`
+      SELECT
+        v."id" AS "documentVersionId",
+        d."title",
+        d."type",
+        v."version"
+      FROM "PlatformDocument" d
+      JOIN LATERAL (
+        SELECT *
+        FROM "PlatformDocumentVersion"
+        WHERE "documentId" = d."id"
+        ORDER BY "version" DESC
+        LIMIT 1
+      ) v ON true
+      WHERE d."key" = ${documentKey}
+        AND d."isActive" = true
+      LIMIT 1
+    `;
+    const document = rows[0];
+    if (!document || !document.type.includes('CONSENT')) {
+      throw new BadRequestException('Согласие не найдено');
+    }
+
+    const now = new Date();
+    const action = active ? 'CONSENTED' : 'REVOKED';
+    await this.prisma.$executeRaw`
+      INSERT INTO "PlatformConsentEvent" (
+        "id","tenantId","platformAccountId","documentVersionId",
+        "action","source","technicalEvidence","occurredAt"
+      ) VALUES (
+        ${randomUUID()},${tenantId},${platformAccountId},${document.documentVersionId},
+        ${action},'profile-controls',
+        ${JSON.stringify({ documentKey, documentVersion: document.version })}::jsonb,${now}
+      )
+    `;
+    return this.accountControls(tenantId, platformAccountId);
+  }
+
+  async setServiceNotifications(
+    tenantId: string,
+    platformAccountId: string,
+    input: unknown,
+  ) {
+    const source = input && typeof input === 'object' && !Array.isArray(input)
+      ? input as Record<string, unknown>
+      : {};
+    const emailEnabled = source.email === undefined ? true : Boolean(source.email);
+    await this.prisma.platformNotificationPreference.upsert({
+      where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
+      create: { tenantId, platformAccountId, emailEnabled },
+      update: { emailEnabled },
+    });
+    return this.accountControls(tenantId, platformAccountId);
   }
 
   async publicBookingBundle(tenantId: string) {

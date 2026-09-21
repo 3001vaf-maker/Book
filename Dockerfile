@@ -14,6 +14,7 @@ COPY server/src ./src
 RUN npm run build
 
 FROM node:24-alpine AS runtime
+RUN apk add --no-cache font-dejavu
 ENV NODE_ENV=production
 WORKDIR /app/server
 COPY server/package*.json ./

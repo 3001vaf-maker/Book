@@ -17,9 +17,10 @@ import { BookingPdnConsentGuard } from './booking-pdn-consent.guard';
 import { PersonIdentityService } from './person-identity.service';
 import { OnlineBookingController } from './online-booking.controller';
 import { OnlineBookingService } from './online-booking.service';
+import { FirstRunModule } from '../first-run/first-run.module';
 
 @Module({
-  imports: [AuthModule, BusinessStateModule, CommunicationModule, DocumentRegistryModule, TenantDocumentArchiveModule, NotificationModule, ProfileModule, TimeModule, RecordModule, ProcedureModule],
+  imports: [AuthModule, BusinessStateModule, CommunicationModule, DocumentRegistryModule, TenantDocumentArchiveModule, NotificationModule, ProfileModule, TimeModule, RecordModule, ProcedureModule, FirstRunModule],
   controllers: [OnlineBookingController, BookingConsentController, AccountSettingsController],
   providers: [OnlineBookingService, AccountGuard, BookingPdnConsentGuard, PersonIdentityService, PrismaService],
 })
