@@ -223,6 +223,10 @@ export class SaasAdminService {
     return this.firstRun.adminScenario();
   }
 
+  ensureFirstRunDraft() {
+    return this.firstRun.ensureAdminDraft();
+  }
+
   updateFirstRunStep(stepKey: string, input: Record<string, unknown>) {
     return this.firstRun.updateDraftStep(stepKey, input);
   }
