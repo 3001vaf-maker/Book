@@ -15,6 +15,7 @@ export {
   getPaymentRemaining,
   getRefundsForPayment,
   getWalletDDSMovements,
+  getZReport,
 } from './read.js';
 export {
   getSettlementTotalsForRecords,
