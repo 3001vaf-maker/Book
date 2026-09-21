@@ -96,11 +96,14 @@ export async function getBookingContext(tenantId, workplaceKey = '') {
   );
 }
 
-export async function prepareAccount(tenantId, email) {
+export async function prepareAccount(tenantId, input) {
+  const body = input && typeof input === 'object' && !Array.isArray(input)
+    ? input
+    : { identifier: String(input || '').trim() };
   return jsonResponse(
     await request(`/online-booking/${encodeURIComponent(tenantId)}/account/prepare`, {
       method: 'POST',
-      body: JSON.stringify({ email }),
+      body: JSON.stringify(body),
     }),
     'Не удалось проверить аккаунт',
   );
@@ -117,11 +120,11 @@ export async function registerAccount(tenantId, data) {
   return storeSession(tenantId, payload);
 }
 
-export async function loginAccount(tenantId, email, password) {
+export async function loginAccount(tenantId, identifier, password) {
   const payload = await jsonResponse(
     await request(`/online-booking/${encodeURIComponent(tenantId)}/account/login`, {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ identifier, password }),
     }),
     'Не удалось войти',
   );
