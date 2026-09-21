@@ -15,7 +15,7 @@ const operations = [
   { operationId: 'invest-in', kind: 'investment-received', status: 'completed', source: { type: 'finance', id: 'invest-in' }, occurredAt: at('11:00'), data: {} },
   { operationId: 'invest-out', kind: 'investment-return', status: 'completed', source: { type: 'finance', id: 'invest-out' }, occurredAt: at('12:00'), data: {} },
   { operationId: 'transfer-1', kind: 'transfer', status: 'completed', source: { type: 'finance', id: 'transfer-1' }, occurredAt: at('13:00'), data: {} },
-  { operationId: 'service-1', kind: 'payment', status: 'completed', source: { type: 'record', id: 'r1' }, occurredAt: at('14:00'), data: {} },
+  { operationId: 'service-1', kind: 'payment', status: 'completed', source: { type: 'record', id: 'r1' }, occurredAt: at('14:00'), recordedAt: '2026-09-28T09:00:00.000Z', data: {} },
   { operationId: 'expense-1', kind: 'manual-expense', status: 'completed', source: { type: 'manual', id: 'expense-1' }, occurredAt: at('15:00'), data: {} },
   { operationId: 'tax-1', kind: 'manual-expense', status: 'completed', source: { type: 'manual', id: 'tax-1' }, occurredAt: at('16:00'), data: {} },
   { operationId: 'cancelled-1', kind: 'payment', status: 'cancelled', source: { type: 'record', id: 'r-cancelled' }, occurredAt: at('17:00'), data: {} },
@@ -29,7 +29,7 @@ const ledger = [
   { entryId: 'invest-out-1', operationId: 'invest-out', walletId: 'card', walletName: 'Карта', direction: 'OUT', economicType: 'INVESTMENT_RETURN', amount: 10000, occurredAt: at('12:00'), source: { type: 'finance', id: 'invest-out' }, articleId: 'system-investment-return', articleName: 'Возврат инвестиций' },
   { entryId: 'transfer-out', operationId: 'transfer-1', walletId: 'cash', walletName: 'Наличные', direction: 'OUT', economicType: 'TRANSFER', amount: 30000, occurredAt: at('13:00'), source: { type: 'finance', id: 'transfer-1' }, articleId: 'system-transfer', articleName: 'Перевод между кошельками' },
   { entryId: 'transfer-in', operationId: 'transfer-1', walletId: 'card', walletName: 'Карта', direction: 'IN', economicType: 'TRANSFER', amount: 30000, occurredAt: at('13:00'), source: { type: 'finance', id: 'transfer-1' }, articleId: 'system-transfer', articleName: 'Перевод между кошельками' },
-  { entryId: 'service-in', operationId: 'service-1', walletId: 'cash', walletName: 'Наличные', direction: 'IN', economicType: 'SERVICE_REVENUE', amount: 8000, occurredAt: at('14:00'), source: { type: 'record', id: 'r1' }, articleId: 'system-service-revenue', articleName: 'Услуги' },
+  { entryId: 'service-in', operationId: 'service-1', walletId: 'cash', walletName: 'Наличные', direction: 'IN', economicType: 'SERVICE_REVENUE', amount: 8000, occurredAt: at('14:00'), recordedAt: '2026-09-28T09:00:00.000Z', source: { type: 'record', id: 'r1' }, articleId: 'system-service-revenue', articleName: 'Услуги' },
   { entryId: 'expense-out', operationId: 'expense-1', walletId: 'cash', walletName: 'Наличные', direction: 'OUT', economicType: 'OPERATING_EXPENSE', amount: 2000, occurredAt: at('15:00'), source: { type: 'manual', id: 'expense-1' }, articleId: 'materials', articleName: 'Материалы' },
   { entryId: 'tax-out', operationId: 'tax-1', walletId: 'card', walletName: 'Карта', direction: 'OUT', economicType: 'TAX', amount: 1000, occurredAt: at('16:00'), source: { type: 'manual', id: 'tax-1' }, articleId: 'system-tax', articleName: 'Налог' },
   { entryId: 'cancelled-in', operationId: 'cancelled-1', walletId: 'cash', walletName: 'Наличные', direction: 'IN', economicType: 'SERVICE_REVENUE', amount: 5000, occurredAt: at('17:00'), source: { type: 'record', id: 'r-cancelled' } },
@@ -64,6 +64,16 @@ assert.equal(report.totals.investmentReceived, 50000);
 assert.equal(report.totals.investmentReturned, 10000);
 assert.equal(report.totals.transferIn, 30000);
 assert.equal(report.totals.transferOut, 30000);
+
+const lateClosedService = report.entries.find((row) => row.operationId === 'service-1');
+assert.equal(lateClosedService?.occurredAt, at('14:00'));
+assert.equal(lateClosedService?.recordedAt, '2026-09-28T09:00:00.000Z');
+
+const laterReport = getZReport({
+  from: '2026-09-28T00:00:00.000Z',
+  to: '2026-09-28T23:59:59.999Z',
+});
+assert.equal(laterReport.entries.some((row) => row.operationId === 'service-1'), false);
 
 const cash = report.byWallet.find((row) => row.id === 'cash');
 const card = report.byWallet.find((row) => row.id === 'card');
