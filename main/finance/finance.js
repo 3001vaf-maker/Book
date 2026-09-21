@@ -4,6 +4,8 @@ import { getWalletTotalBalance } from '../../settings/wallets/data.js';
 import { renderWallets } from '../../settings/wallets/wallets.js';
 import { renderFinanceArticles } from './articles.js';
 import { renderIncomeExpense } from './income-expense.js';
+import { renderSpecialFinanceOperations } from './special-operations.js';
+import { renderZReport } from './z-report.js';
 
 function formatMoney(value = 0, { signed = false } = {}) {
   const amount = Number(value) || 0;
@@ -13,9 +15,14 @@ function formatMoney(value = 0, { signed = false } = {}) {
 }
 
 function operationMoment(item) {
-  const raw = item?.refundedAt || item?.paidAt || item?.createdAt || '';
+  const raw = item?.occurredAt || item?.refundedAt || item?.paidAt || '';
   const fallback = `${item?.date || ''} ${item?.time || ''}`.trim();
   return shortDateTime(raw, fallback);
+}
+
+function recordedMoment(item) {
+  const raw = item?.recordedAt || '';
+  return raw ? shortDateTime(raw, '') : '';
 }
 
 function operationName(item) {
@@ -26,6 +33,11 @@ function operationName(item) {
   else if (type === 'SERVICE_REFUND') label = 'Возврат услуги';
   else if (type === 'TIPS_REFUND') label = 'Возврат чаевых';
   else if (type === 'REVERSAL') label = 'Отмена операции';
+  else if (type === 'LOAN_RECEIVED') label = 'Получен займ';
+  else if (type === 'LOAN_REPAYMENT') label = 'Возврат займа';
+  else if (type === 'INVESTMENT_RECEIVED') label = 'Получена инвестиция';
+  else if (type === 'INVESTMENT_RETURN') label = 'Возврат инвестиций';
+  else if (type === 'TRANSFER') label = item?.direction === 'OUT' ? 'Перевод · списание' : 'Перевод · зачисление';
   else if (item?.direction === 'IN') label = 'Доход';
   else if (item?.direction === 'OUT') label = 'Расход';
   return item?.operationStatus === 'cancelled' ? `${label} · Отменена` : label;
@@ -56,6 +68,8 @@ function operationDetails(item) {
   if (item?.quantity != null && item?.unitPrice != null && Number(item.quantity) !== 1) {
     details.push(`${item.quantity} × ${formatMoney(item.unitPrice)}`);
   }
+  const recorded = recordedMoment(item);
+  if (recorded) details.push(`Внесено ${recorded}`);
   return details.join(' · ');
 }
 
@@ -74,9 +88,10 @@ function csvCell(value) {
 }
 
 function downloadDDS(movements) {
-  const headers = ['Дата и время', 'Операция', 'Статья', 'Позиция', 'Человек', 'Рабочее место', 'Кошелёк', 'Сумма', 'Статус', 'Чаевые'];
+  const headers = ['Фактическая дата и время', 'Внесено в Book', 'Операция', 'Статья', 'Позиция', 'Человек', 'Рабочее место', 'Кошелёк', 'Сумма', 'Статус', 'Чаевые'];
   const rows = movements.map((item) => [
     operationMoment(item),
+    recordedMoment(item),
     operationName(item).replace(' · Отменена', ''),
     item?.articleName || '',
     item?.lineName || '',
@@ -139,12 +154,28 @@ export function renderFinance(root) {
     data: 'data-finance-articles',
     aria: 'Открыть статьи доходов и расходов',
   });
+  const specialFolder = folderCard({
+    title: 'Прочие операции',
+    icon: '↔',
+    variant: 'compact',
+    data: 'data-finance-special',
+    aria: 'Открыть займы, инвестиции и переводы',
+  });
+  const zReportFolder = folderCard({
+    title: 'Z-отчёт',
+    icon: 'Z',
+    variant: 'compact',
+    data: 'data-finance-z-report',
+    aria: 'Открыть Z-отчёт',
+  });
 
-  root.innerHTML = `${pageHeader('Финансы')}<div class="ui-folder-grid">${cashFolder}${ddsFolder}${incomeExpenseFolder}${articlesFolder}</div>`;
+  root.innerHTML = `${pageHeader('Финансы')}<div class="ui-folder-grid">${cashFolder}${ddsFolder}${incomeExpenseFolder}${articlesFolder}${specialFolder}${zReportFolder}</div>`;
   root.querySelector('[data-finance-cash]')?.addEventListener('click', () => renderWallets(root, () => renderFinance(root)));
   root.querySelector('[data-finance-dds]')?.addEventListener('click', () => renderDDS(root));
   root.querySelector('[data-finance-income-expense]')?.addEventListener('click', () => renderIncomeExpense(root, () => renderFinance(root)));
   root.querySelector('[data-finance-articles]')?.addEventListener('click', () => renderFinanceArticles(root, () => renderFinance(root)));
+  root.querySelector('[data-finance-special]')?.addEventListener('click', () => renderSpecialFinanceOperations(root, () => renderFinance(root)));
+  root.querySelector('[data-finance-z-report]')?.addEventListener('click', () => renderZReport(root, () => renderFinance(root)));
 }
 
 export { renderFinance as render };

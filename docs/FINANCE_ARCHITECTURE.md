@@ -580,28 +580,30 @@ One step must be completed, tested and checked before the next step is marked co
 - [x] F6-F8 merged to `staging@18af1dee4f127e00f720dfd522835b5e2c3e0258` via PR #245; feature Check Book #1993 and post-merge Check Book #1994 passed all required jobs.
 
 ### F9 — Loans / Investments / Returns / Transfers
-- [ ] Loan received is cash IN but not operating revenue.
-- [ ] Loan repayment is cash OUT but not ordinary operating expense.
-- [ ] Investment received/returned are distinct economic types.
-- [ ] Wallet-to-wallet transfer does not become business revenue/expense.
+- [x] Loan received is cash IN but not operating revenue.
+- [x] Loan repayment is cash OUT but not ordinary operating expense.
+- [x] Investment received/returned are distinct economic types.
+- [x] Wallet-to-wallet transfer is one Operation with OUT + IN Ledger rows and does not become business revenue/expense.
 
 ### F10 — Z-report
-- [ ] Build day report from Ledger only.
-- [ ] Support arbitrary period with the same projection engine.
-- [ ] Show relevant article/economic/wallet breakdowns without creating report-owned facts.
+- [x] Build day report from Ledger only.
+- [x] Support arbitrary period with the same projection engine.
+- [x] Show article/economic/wallet breakdowns without creating report-owned facts.
+- [x] Z-report uses factual `occurredAt`, so late entry/late Record closure does not move revenue to the Book recording date.
 
 ### F11 — Browser/server/storage alignment
-- [ ] One semantic Finance contract across browser and server.
-- [ ] Server transaction is authoritative for money writes.
-- [ ] Add concurrency-safe append persistence.
-- [ ] Add roundtrip tests for discounts, corrections, partial payments, split wallets, tips, refund and cancel.
-- [ ] Verify reload cannot create phantom debt or lose a payment.
+- [x] One semantic Finance contract across browser and server, including cent-level money rounding.
+- [x] Server transaction is authoritative for money writes.
+- [x] Append persistence is concurrency-safe through Serializable transactions with retry on serialization conflict.
+- [x] Roundtrip tests cover discounts, corrections, partial payments, split wallets, tips, refund and cancel.
+- [x] Reload cannot prefer stale Record.finance over canonical FinanceSettlement or create phantom debt.
+- [x] Every factual Finance operation has immutable `occurredAt` (real-world occurrence) and separate system `recordedAt` (when written to Book).
 
 ### F12 — Guards, full regression, staging, release
-- [ ] Guards reject a second payment owner, DDS owner, wallet balance owner or Record-owned money truth.
-- [ ] Guards reserve Financial Model meaning and prevent operational imports/mutations.
+- [x] Guards reject a second payment owner, DDS owner, wallet balance owner or Record-owned money truth.
+- [x] Guards reserve Financial Model meaning and prevent operational imports/mutations.
 - [ ] Full Check Book green.
-- [ ] Staging smoke + manual payment/expense/refund/wallet/Z-report verification.
+- [ ] Staging smoke + payment/expense/refund/wallet/Z-report verification.
 - [ ] Update PROJECT_STATE with final verified Finance ownership.
 - [ ] Only then release staging -> main -> production.
 
@@ -616,3 +618,28 @@ Until a dedicated future project explicitly begins the Financial Model:
 - do not decide its UI placement merely because Finance is being rebuilt.
 
 This reservation exists specifically so future Financial Model work can be added as a new analytical layer without rewriting the operational Finance core.
+
+## Transaction time rule
+
+Every factual financial Operation has two separate timestamps:
+
+- `occurredAt` = when the money movement actually happened in the real world. This is mandatory and may be entered for a past date.
+- `recordedAt` = when the Operation was written into Book. This is system-owned audit time and is not user-editable.
+
+Reports, Z-report, daily income and period analytics use `occurredAt`, never the Record closing time and never `recordedAt`.
+
+For a Record payment opened later, the payment form defaults `occurredAt` to the Record date and end time; the master may change it if actual payment occurred at another moment.
+
+## Workplace rent ownership rule
+
+Rent conditions are not Finance-owned configuration.
+
+- Workplace owns the rent agreement/condition facts: amount and cadence/unit such as hour, day, month or another future workplace-specific rule.
+- Finance/Ledger owns only factual rent money movements once they occur, normally classified under the rent expense article.
+- Future Financial Model may read Workplace rent conditions to build planned cost and compare plan vs fact.
+- Record does not own rent conditions and Finance must not duplicate them as settings.
+
+Target flow:
+
+`Workplace rent condition -> future Financial Model plan -> factual rent payment -> Finance Operation/Ledger -> Z/reporting`.
+

@@ -52,6 +52,19 @@ function dateValue(value: unknown, fallback = new Date()) {
   return Number.isFinite(date.getTime()) ? date : fallback;
 }
 
+function requiredOccurredAt(value: unknown) {
+  const raw = text(value);
+  if (!raw) throw new BadRequestException('Укажите фактическую дату и время операции');
+  const date = value instanceof Date ? value : new Date(raw);
+  if (!Number.isFinite(date.getTime())) throw new BadRequestException('Некорректная фактическая дата операции');
+  return date;
+}
+
+function isRetryableTransactionError(error: unknown) {
+  const code = text(objectValue(error).code);
+  return code === 'P2034' || code === '40001';
+}
+
 function sourceValue(value: unknown) {
   const source = objectValue(value);
   return { type: text(source.type), id: text(source.id) };
@@ -175,6 +188,21 @@ function splitAllocationComponents(allocations: JsonObject[], serviceAmount: num
 @Injectable()
 export class FinanceService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private async serializable<T>(work: (tx: Prisma.TransactionClient) => Promise<T>) {
+    let lastError: unknown = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await this.prisma.$transaction(work, {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        });
+      } catch (error) {
+        lastError = error;
+        if (!isRetryableTransactionError(error) || attempt === 2) throw error;
+      }
+    }
+    throw lastError;
+  }
 
   calculateSettlement(items: JsonObject[], discountValue: unknown = 0) {
     const defaultPercent = percent(discountValue);
@@ -477,7 +505,7 @@ export class FinanceService {
     }
   }
 
-  private async createReversalFor(db: Db, tenantId: string, originalOperationId: string, reason: string, occurredAt = new Date()) {
+  private async createReversalFor(db: Db, tenantId: string, originalOperationId: string, reason: string, occurredAt: Date) {
     const original = await db.financeOperation.findUnique({
       where: { tenantId_operationId: { tenantId, operationId: originalOperationId } },
       include: { ledgerEntries: true },
@@ -514,7 +542,7 @@ export class FinanceService {
 
     if (alreadyMarked && !recordsWithSettlement.length) return;
 
-    await this.prisma.$transaction(async (tx) => {
+    await this.serializable(async (tx) => {
       for (const row of recordsWithSettlement) {
         const record = clone(objectValue(row.data));
         const settlement = validSettlement(record.finance);
@@ -715,10 +743,10 @@ export class FinanceService {
     }
 
     const operationId = randomUUID();
-    const occurredAt = dateValue(input.occurredAt);
+    const occurredAt = requiredOccurredAt(input.occurredAt);
     const total = money(preparedLines.reduce((sum, line) => sum + line.total, 0));
     const source = { type: 'manual', id: operationId };
-    await this.prisma.$transaction(async (tx) => {
+    await this.serializable(async (tx) => {
       await this.createOperationWithEntries(tx, tenantId, {
         operationId,
         kind: direction === 'IN' ? 'manual-income' : 'manual-expense',
@@ -755,6 +783,132 @@ export class FinanceService {
     return this.snapshot(tenantId, { skipMigration: true });
   }
 
+  async recordSpecialOperation(tenantId: string, body: unknown) {
+    await this.ensureLegacyMigrated(tenantId);
+    await this.ensureDefaultArticles(tenantId);
+    const input = objectValue(body);
+    const kind = text(input.kind);
+    const amount = money(input.amount);
+    if (amount <= 0) throw new BadRequestException('Введите сумму операции');
+
+    const definitions: Record<string, {
+      direction: 'IN' | 'OUT';
+      economicType: string;
+      systemKey: string;
+      operationKind: string;
+    }> = {
+      'loan-received': { direction: 'IN', economicType: 'LOAN_RECEIVED', systemKey: 'LOAN_RECEIVED', operationKind: 'loan-received' },
+      'loan-repayment': { direction: 'OUT', economicType: 'LOAN_REPAYMENT', systemKey: 'LOAN_REPAYMENT', operationKind: 'loan-repayment' },
+      'investment-received': { direction: 'IN', economicType: 'INVESTMENT_RECEIVED', systemKey: 'INVESTMENT_RECEIVED', operationKind: 'investment-received' },
+      'investment-return': { direction: 'OUT', economicType: 'INVESTMENT_RETURN', systemKey: 'INVESTMENT_RETURN', operationKind: 'investment-return' },
+    };
+
+    const occurredAt = requiredOccurredAt(input.occurredAt);
+    const operationId = randomUUID();
+    const note = text(input.note);
+    const counterparty = text(input.counterparty);
+
+    if (kind === 'transfer') {
+      const fromWalletId = text(input.fromWalletId);
+      const fromWalletName = text(input.fromWalletName);
+      const toWalletId = text(input.toWalletId);
+      const toWalletName = text(input.toWalletName);
+      if (!fromWalletId || !toWalletId) throw new BadRequestException('Выберите оба кошелька');
+      if (fromWalletId === toWalletId) throw new BadRequestException('Для перевода нужны разные кошельки');
+
+      const article = await this.prisma.financeArticle.findFirst({
+        where: { tenantId, systemKey: 'TRANSFER', archivedAt: null },
+      });
+      if (!article) throw new BadRequestException('Системная статья перевода не найдена');
+
+      await this.serializable(async (tx) => {
+        await this.createOperationWithEntries(tx, tenantId, {
+          operationId,
+          kind: 'transfer',
+          source: { type: 'finance', id: operationId },
+          occurredAt,
+          data: {
+            total: amount,
+            fromWalletId,
+            fromWalletName,
+            toWalletId,
+            toWalletName,
+            note,
+          },
+          entries: [
+            {
+              walletId: fromWalletId,
+              walletName: fromWalletName,
+              direction: 'OUT',
+              economicType: 'TRANSFER',
+              amount,
+              component: 'transfer-out',
+              articleId: article.articleId,
+              articleName: article.name,
+              note,
+            },
+            {
+              walletId: toWalletId,
+              walletName: toWalletName,
+              direction: 'IN',
+              economicType: 'TRANSFER',
+              amount,
+              component: 'transfer-in',
+              articleId: article.articleId,
+              articleName: article.name,
+              note,
+            },
+          ],
+        });
+      });
+
+      return this.snapshot(tenantId, { skipMigration: true });
+    }
+
+    const definition = definitions[kind];
+    if (!definition) throw new BadRequestException('Неизвестный вид финансовой операции');
+    const walletId = text(input.walletId);
+    const walletName = text(input.walletName);
+    if (!walletId) throw new BadRequestException('Выберите кошелёк');
+    const article = await this.prisma.financeArticle.findFirst({
+      where: { tenantId, systemKey: definition.systemKey, archivedAt: null },
+    });
+    if (!article) throw new BadRequestException('Системная статья операции не найдена');
+
+    await this.serializable(async (tx) => {
+      await this.createOperationWithEntries(tx, tenantId, {
+        operationId,
+        kind: definition.operationKind,
+        source: { type: 'finance', id: operationId },
+        occurredAt,
+        data: {
+          total: amount,
+          walletId,
+          walletName,
+          counterparty,
+          note,
+          articleId: article.articleId,
+        },
+        entries: [{
+          walletId,
+          walletName,
+          direction: definition.direction,
+          economicType: definition.economicType,
+          amount,
+          component: kind,
+          articleId: article.articleId,
+          articleName: article.name,
+          lineName: counterparty,
+          quantity: 1,
+          unitPrice: amount,
+          note,
+        }],
+      });
+    });
+
+    return this.snapshot(tenantId, { skipMigration: true });
+  }
+
   async recordPayment(tenantId: string, body: unknown) {
     await this.ensureLegacyMigrated(tenantId);
     const input = objectValue(body);
@@ -773,8 +927,8 @@ export class FinanceService {
     }
 
     const operationId = randomUUID();
-    const occurredAt = dateValue(input.occurredAt);
-    await this.prisma.$transaction(async (tx) => {
+    const occurredAt = requiredOccurredAt(input.occurredAt);
+    await this.serializable(async (tx) => {
       await this.saveSettlementWith(tx, tenantId, source.type, source.id, settlement);
       const paid = Math.max(0, await this.serviceNet(tx, tenantId, source.type, source.id));
       const due = Math.max(0, money(settlement.planTotal - paid));
@@ -834,9 +988,9 @@ export class FinanceService {
     const walletName = text(input.walletName);
     if (!walletId) throw new BadRequestException('Не выбран кошелёк возврата');
     const refundId = randomUUID();
-    const occurredAt = dateValue(input.occurredAt);
+    const occurredAt = requiredOccurredAt(input.occurredAt);
 
-    await this.prisma.$transaction(async (tx) => {
+    await this.serializable(async (tx) => {
       await this.createOperationWithEntries(tx, tenantId, {
         operationId: refundId,
         kind: 'refund',
@@ -872,13 +1026,14 @@ export class FinanceService {
     await this.ensureLegacyMigrated(tenantId);
     const id = text(operationId);
     const input = objectValue(body);
+    const occurredAt = requiredOccurredAt(input.occurredAt);
     const original = await this.prisma.financeOperation.findUnique({
       where: { tenantId_operationId: { tenantId, operationId: id } },
     });
     if (!original) throw new NotFoundException('Операция не найдена');
     if (original.status === 'cancelled') return this.snapshot(tenantId, { skipMigration: true });
 
-    await this.prisma.$transaction(async (tx) => {
+    await this.serializable(async (tx) => {
       const targets = [original];
       if (original.kind === 'payment') {
         const refunds = await tx.financeOperation.findMany({
@@ -888,7 +1043,7 @@ export class FinanceService {
       }
 
       for (const target of targets) {
-        await this.createReversalFor(tx, tenantId, target.operationId, text(input.reason) || 'incorrect-entry', new Date());
+        await this.createReversalFor(tx, tenantId, target.operationId, text(input.reason) || 'incorrect-entry', occurredAt);
         await tx.financeOperation.update({ where: { id: target.id }, data: { status: 'cancelled' } });
       }
     });
@@ -910,13 +1065,28 @@ export class FinanceService {
       serviceAmount: money(data.serviceAmount),
       tips: money(data.tips),
       finance: clone(objectValue(data.settlement)),
-      createdAt: operation.occurredAt.toISOString(),
+      occurredAt: operation.occurredAt.toISOString(),
+      recordedAt: operation.createdAt.toISOString(),
+      createdAt: operation.createdAt.toISOString(),
     };
     if (operation.kind === 'manual-income') {
       return {
         ...base,
         movementType: 'income',
         incomeType: 'manual',
+        walletId: text(data.walletId),
+        walletName: text(data.walletName),
+        articleId: text(data.articleId),
+        note: text(data.note),
+        paidAt: operation.occurredAt.toISOString(),
+      };
+    }
+    if (operation.kind === 'transfer') return null;
+    if (operation.kind === 'loan-received' || operation.kind === 'investment-received') {
+      return {
+        ...base,
+        movementType: 'income',
+        incomeType: operation.kind,
         walletId: text(data.walletId),
         walletName: text(data.walletName),
         articleId: text(data.articleId),
@@ -938,7 +1108,11 @@ export class FinanceService {
     return {
       ...base,
       movementType: 'expense',
-      expenseType: operation.kind === 'refund' ? 'refund' : (operation.kind === 'manual-expense' ? 'manual' : 'expense'),
+      expenseType: operation.kind === 'refund'
+        ? 'refund'
+        : (operation.kind === 'manual-expense'
+          ? 'manual'
+          : (operation.kind === 'loan-repayment' || operation.kind === 'investment-return' ? operation.kind : 'expense')),
       originalPaymentId: operation.originalOperationId,
       walletId: text(data.walletId),
       walletName: text(data.walletName),
@@ -964,6 +1138,7 @@ export class FinanceService {
       source: { type: row.sourceType, id: row.sourceId },
       originalOperationId: row.originalOperationId,
       occurredAt: row.occurredAt.toISOString(),
+      recordedAt: row.createdAt.toISOString(),
       data: clone(row.data),
     }));
     const ledgerRows = ledger.map((row) => ({
@@ -975,6 +1150,7 @@ export class FinanceService {
       economicType: row.economicType,
       amount: numberValue(row.amount),
       occurredAt: row.occurredAt.toISOString(),
+      recordedAt: row.createdAt.toISOString(),
       source: { type: row.sourceType, id: row.sourceId },
       component: text(objectValue(row.data).component),
       relatedOperationId: text(objectValue(row.data).relatedOperationId),
@@ -992,6 +1168,8 @@ export class FinanceService {
       settlements: settlements.map((row) => ({
         source: { type: row.sourceType, id: row.sourceId },
         settlement: clone(row.data),
+        recordedAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
       })),
       operations: operationRows,
       ledger: ledgerRows,

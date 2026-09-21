@@ -84,8 +84,12 @@ async function saveManual(root, modalRoot, direction, navigateBack) {
     amount: mode === 'simple' ? Number(data.get('amount') || 0) : null,
     lines: mode === 'detail' ? collectLines(modalRoot) : [],
     note: String(data.get('note') || '').trim(),
-    occurredAt: data.get('occurredAt') ? new Date(String(data.get('occurredAt'))).toISOString() : new Date().toISOString(),
+    occurredAt: data.get('occurredAt') ? new Date(String(data.get('occurredAt'))).toISOString() : '',
   };
+  if (!payload.occurredAt) {
+    openNotice({ message: 'Укажите фактическую дату и время операции.' });
+    return;
+  }
   try {
     await recordManualFinanceOperation(payload);
     modalRoot.remove();
@@ -111,7 +115,7 @@ function openOperation(root, direction, navigateBack) {
     ${select({ label: 'Статья', name: 'articleId', value: articles[0]?.value || '', options: articles, searchable: true })}
     ${select({ label: 'Кошелёк', name: 'walletId', value: wallets[0]?.value || '', options: wallets })}
     ${select({ label: 'Ввод', name: 'entryMode', value: 'simple', options: [{ value: 'simple', label: 'Сумма' }, { value: 'detail', label: 'Детально' }] })}
-    ${field({ label: 'Дата и время', name: 'occurredAt', type: 'datetime-local', value: localDateTimeValue(), required: true })}
+    ${field({ label: 'Фактическая дата и время', name: 'occurredAt', type: 'datetime-local', value: localDateTimeValue(), required: true })}
     <div data-finance-manual-mode>${modeMarkup('simple')}</div>
     ${textareaField({ label: 'Примечание', name: 'note', rows: 3, placeholder: 'Необязательно' })}
     ${button(isIncome ? 'Записать доход' : 'Записать расход', { type: 'submit' })}
