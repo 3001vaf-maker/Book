@@ -50,3 +50,12 @@ button,input,select,textarea{font:inherit}
 .admin-activity-summary>div{padding:10px;border:1px solid #eee9e5;border-radius:10px}.admin-activity-summary span,.admin-activity-summary strong{display:block}.admin-activity-summary span{font-size:11px;color:var(--muted);margin-bottom:4px}.admin-activity-summary strong{font-size:13px}
 .admin-activity-timeline{margin-top:14px;border-left:2px solid #eee9e5;padding-left:14px}.admin-activity-event{position:relative;padding:0 0 14px}.admin-activity-event::before{content:"";position:absolute;left:-20px;top:4px;width:8px;height:8px;border-radius:50%;background:#9a6b5f}.admin-activity-event time{display:block;color:var(--muted);font-size:11px;margin-bottom:3px}.admin-activity-event div{font-size:13px}
 @media(max-width:900px){.admin-two-fields,.admin-activity-summary{grid-template-columns:1fr}.admin-analytics-row{grid-template-columns:1fr}.admin-preview-backdrop{padding:0}.admin-preview-shell{height:100vh;border-radius:0}}
+
+.admin-delete-backdrop{position:fixed;inset:0;z-index:60;display:grid;place-items:center;padding:24px;background:rgba(25,22,20,.42)}
+.admin-delete-modal{width:min(100%,620px);background:#fff;border:1px solid var(--line);border-radius:20px;padding:30px;box-shadow:0 20px 60px rgba(41,37,34,.22)}
+.admin-delete-modal h2{margin:0 0 18px;font-size:30px;line-height:1.15}
+.admin-delete-person{display:grid;gap:5px;margin:0 0 18px;font-size:19px;line-height:1.4}.admin-delete-person span{color:var(--muted);font-size:17px}
+.admin-delete-copy{margin:0;font-size:18px;line-height:1.55;color:#403a36}
+.admin-delete-error{min-height:28px;margin:16px 0 0;color:#a33d32;font-size:17px;font-weight:700;line-height:1.4}
+.admin-delete-actions{display:flex;justify-content:flex-end;gap:12px;margin-top:24px}.admin-delete-actions .admin-button{min-width:140px;padding:13px 18px;font-size:17px}.admin-delete-actions .admin-button.danger{background:#9e3d33;color:#fff;border-color:#9e3d33}
+@media(max-width:620px){.admin-delete-modal{padding:24px}.admin-delete-modal h2{font-size:26px}.admin-delete-copy{font-size:17px}.admin-delete-actions{display:grid;grid-template-columns:1fr 1fr}.admin-delete-actions .admin-button{min-width:0}}

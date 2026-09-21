@@ -40,6 +40,9 @@ function normalize(item = {}) {
     baseVersion: Math.max(0, Number(item.baseVersion || 0)),
     availableBaseVersion: Math.max(0, Number(item.availableBaseVersion || 0)),
     availableBookText: String(item.availableBookText || ''),
+    attachment: item.attachment && typeof item.attachment === 'object' && !Array.isArray(item.attachment)
+      ? clone(item.attachment)
+      : null,
   };
 }
 
@@ -276,5 +279,6 @@ export function createDocument({ title = 'Новый документ', text = '
 }
 
 export function resetDocumentTemplates() {
-  return saveDocuments(buildTenantDocumentsFromPlatformBases());
+  const savedGuides = getDocuments().filter((item) => item?.attachment?.type === 'RKN_GUIDE_PDF');
+  return saveDocuments([...buildTenantDocumentsFromPlatformBases(), ...savedGuides]);
 }

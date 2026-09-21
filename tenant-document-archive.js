@@ -57,6 +57,14 @@ async function persistReconciled(value) {
   await responseJson(historyResponse, 'Не удалось обновить историю документов');
 }
 
+export async function refreshTenantDocumentArchive() {
+  const remoteResponse = await apiRequest('/tenant-document-archive');
+  const remote = await responseJson(remoteResponse, 'Не удалось обновить документы');
+  if (!remote?.verified) throw new Error('Серверное хранилище документов не подтверждено');
+  hydrate(remote);
+  return { source: 'server-refresh', verified: true };
+}
+
 export async function initializeTenantDocumentArchive() {
   configurePlatformDocumentBases(getPlatformDocumentBases(), {
     profile: getProfile(),

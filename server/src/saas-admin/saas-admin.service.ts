@@ -347,6 +347,7 @@ export class SaasAdminService {
     const platformAccountIds = [...new Set(access.tenant.memberships.map((item) => item.platformAccountId))];
 
     await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT set_config('book.allow_test_tenant_delete', 'on', true)`;
       await tx.$executeRaw`DELETE FROM "PlatformConsentEvent" WHERE "tenantId" = ${tenantId}`;
       await tx.tenant.delete({ where: { id: tenantId } });
 

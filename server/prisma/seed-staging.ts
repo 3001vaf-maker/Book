@@ -7,9 +7,15 @@ function json(value: unknown): Prisma.InputJsonValue {
 }
 
 function dateOffset(days: number) {
-  const date = new Date();
-  date.setUTCHours(12, 0, 0, 0);
-  date.setUTCDate(date.getUTCDate() + days);
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Moscow',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const part = (type: 'year' | 'month' | 'day') =>
+    Number(parts.find((item) => item.type === type)?.value || 0);
+  const date = new Date(Date.UTC(part('year'), part('month') - 1, part('day') + days, 12, 0, 0, 0));
   return date.toISOString().slice(0, 10);
 }
 

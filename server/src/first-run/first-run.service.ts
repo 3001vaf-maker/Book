@@ -8,6 +8,7 @@ import {
 import { Prisma } from '@prisma/client';
 import PDFDocument = require('pdfkit');
 import { PrismaService } from '../prisma.service';
+import { TenantDocumentArchiveService } from '../tenant-document-archive/tenant-document-archive.service';
 
 const SCENARIO_KEY = 'first-run';
 const DEMO_DAYS = 14;
@@ -37,7 +38,10 @@ function addDays(value: Date, days: number) {
 
 @Injectable()
 export class FirstRunService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly documentArchive: TenantDocumentArchiveService,
+  ) {}
 
   private async publishedVersion() {
     const scenario = await this.prisma.firstRunScenario.findUnique({ where: { key: SCENARIO_KEY } });
@@ -51,7 +55,7 @@ export class FirstRunService {
     return version;
   }
 
-  async rknGuide(tenantId: string, platformAccountId: string) {
+  private async rknGuideSnapshot(tenantId: string, platformAccountId: string) {
     const [profile, operational] = await Promise.all([
       this.prisma.profile.findUnique({
         where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
@@ -68,15 +72,32 @@ export class FirstRunService {
       .filter(Boolean);
     const phones = arrayValue(profile.phones).map(text).filter(Boolean);
     const emails = arrayValue(profile.emails).map(text).filter(Boolean);
-    const fullName = [profile.name, profile.surname].map(text).filter(Boolean).join(' ') || 'Не указано';
-    const workplaceLines = profile.workplaces.map((workplace, index) => {
-      const parts = [
-        text(workplace.name),
-        text(workplace.city),
-        text(workplace.address),
-      ].filter(Boolean);
+    const workplaces = profile.workplaces.map((workplace) => ({
+      name: text(workplace.name),
+      city: text(workplace.city),
+      address: text(workplace.address),
+    }));
+
+    return {
+      fullName: [profile.name, profile.surname].map(text).filter(Boolean).join(' ') || 'Не указано',
+      profession: text(profile.profession),
+      phone: phones[0] || '',
+      email: emails[0] || '',
+      workplaces,
+      procedures,
+    };
+  }
+
+  private renderRknGuidePdf(snapshotValue: unknown, generatedAtValue: unknown) {
+    const snapshot = objectValue(snapshotValue);
+    const workplaces = arrayValue(snapshot.workplaces).map((value) => objectValue(value));
+    const procedures = arrayValue(snapshot.procedures).map(text).filter(Boolean);
+    const workplaceLines = workplaces.map((workplace, index) => {
+      const parts = [text(workplace.name), text(workplace.city), text(workplace.address)].filter(Boolean);
       return `${index + 1}. ${parts.join(' · ') || 'Рабочее пространство'}`;
     });
+    const generatedAt = new Date(String(generatedAtValue || ''));
+    const generatedMoment = Number.isFinite(generatedAt.getTime()) ? generatedAt : new Date();
 
     const doc = new PDFDocument({ size: 'A4', margins: { top: 48, bottom: 48, left: 52, right: 52 } });
     doc.font('/usr/share/fonts/ttf-dejavu/DejaVuSans.ttf');
@@ -100,10 +121,10 @@ export class FirstRunService {
     doc.fillColor('#000000');
 
     heading('1. Данные профиля, которые уже есть в системе');
-    item(`Пользователь: ${fullName}`);
-    item(`Вид деятельности: ${text(profile.profession) || 'не указан'}`);
-    item(`Контактный телефон: ${phones[0] || 'не указан'}`);
-    item(`Электронная почта: ${emails[0] || 'не указана'}`);
+    item(`Пользователь: ${text(snapshot.fullName) || 'Не указано'}`);
+    item(`Вид деятельности: ${text(snapshot.profession) || 'не указан'}`);
+    item(`Контактный телефон: ${text(snapshot.phone) || 'не указан'}`);
+    item(`Электронная почта: ${text(snapshot.email) || 'не указана'}`);
     if (workplaceLines.length) {
       doc.text('Рабочие пространства:');
       workplaceLines.forEach((value) => item(value));
@@ -157,9 +178,24 @@ export class FirstRunService {
     ].forEach(item);
 
     doc.moveDown(1).fontSize(8.5).fillColor('#666666')
-      .text(`Сформировано: ${new Intl.DateTimeFormat('ru-RU', { dateStyle: 'long', timeStyle: 'short' }).format(new Date())}`);
+      .text(`Сформировано: ${new Intl.DateTimeFormat('ru-RU', { dateStyle: 'long', timeStyle: 'short' }).format(generatedMoment)}`);
     doc.end();
     return result;
+  }
+
+  async rknGuide(tenantId: string, platformAccountId: string, documentId = '') {
+    const stored = documentId
+      ? await this.documentArchive.rknGuideDocument(tenantId, documentId)
+      : await this.documentArchive.saveRknGuide(
+        tenantId,
+        await this.rknGuideSnapshot(tenantId, platformAccountId),
+      );
+    const attachment = objectValue((stored as JsonObject).attachment);
+    return {
+      pdf: await this.renderRknGuidePdf(attachment.snapshot, attachment.generatedAt),
+      documentId: text((stored as JsonObject).id),
+      fileName: text(attachment.fileName) || 'rkn-guide.pdf',
+    };
   }
 
   async registrationDocuments() {
