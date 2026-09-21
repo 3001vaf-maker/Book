@@ -1,5 +1,6 @@
-import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { createHash, randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma.service';
 
 type JsonObject = Record<string, any>;
@@ -138,6 +139,74 @@ export class TenantDocumentArchiveService {
     current[dataset as keyof typeof current] = Array.isArray(value) ? clone(value) : [];
     await this.prisma.tenantDocumentArchive.update({ where: { tenantId }, data: { data: json(current) } });
     return { dataset, value: current[dataset as keyof typeof current] };
+  }
+
+  async saveRknGuide(tenantId: string, snapshotValue: unknown) {
+    const state = await this.prisma.tenantDocumentArchive.findUnique({ where: { tenantId } });
+    if (!state?.migrationVerifiedAt) throw new ConflictException('Архив документов ещё не готов');
+
+    const current = normalize(state.data);
+    const snapshot = objectValue(snapshotValue);
+    const snapshotHash = createHash('sha256').update(JSON.stringify(stable(snapshot)), 'utf8').digest('hex');
+    const existing = current.documents.find((item: any) => (
+      item?.attachment?.type === 'RKN_GUIDE_PDF'
+      && item?.attachment?.snapshotHash === snapshotHash
+    ));
+    if (existing) return clone(existing);
+
+    const version = current.documents.filter((item: any) => item?.attachment?.type === 'RKN_GUIDE_PDF').length + 1;
+    const generatedAt = new Date().toISOString();
+    const document = {
+      id: `rkn-guide-${randomUUID()}`,
+      system: true,
+      kind: 'agreement',
+      title: 'Инструкция по уведомлению Роскомнадзора',
+      personConsent: false,
+      required: false,
+      version,
+      text: 'Персональная PDF-инструкция по подготовке уведомления об обработке персональных данных.',
+      sourceMode: 'BOOK',
+      baseKey: 'rkn-guide',
+      baseVersion: version,
+      availableBaseVersion: 0,
+      availableBookText: '',
+      attachment: {
+        type: 'RKN_GUIDE_PDF',
+        fileName: `rkn-guide-v${version}.pdf`,
+        mimeType: 'application/pdf',
+        generatedAt,
+        snapshotHash,
+        snapshot: clone(snapshot),
+      },
+    };
+    current.documents.push(document);
+    current.history.push({
+      id: randomUUID(),
+      documentId: document.id,
+      documentTitle: document.title,
+      documentVersion: document.version,
+      action: 'created',
+      createdAt: generatedAt,
+      source: 'system-rkn-guide',
+      snapshot: clone(document),
+    });
+
+    await this.prisma.tenantDocumentArchive.update({
+      where: { tenantId },
+      data: { data: json(current) },
+    });
+    return clone(document);
+  }
+
+  async rknGuideDocument(tenantId: string, documentId: string) {
+    const state = await this.prisma.tenantDocumentArchive.findUnique({ where: { tenantId } });
+    if (!state?.migrationVerifiedAt) throw new ConflictException('Архив документов ещё не готов');
+    const document = normalize(state.data).documents.find((item: any) => (
+      String(item?.id || '') === documentId
+      && item?.attachment?.type === 'RKN_GUIDE_PDF'
+    ));
+    if (!document) throw new NotFoundException('Инструкция РКН не найдена');
+    return clone(document);
   }
 
   async publicDocuments(tenantId: string) {
