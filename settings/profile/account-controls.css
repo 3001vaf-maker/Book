@@ -1,0 +1,11 @@
+.profile-account-controls{margin-top:18px}
+.account-controls-section{display:grid;gap:12px;margin-bottom:22px}
+.account-controls-list{display:grid;gap:9px}
+.account-controls-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:13px;border:1px solid #e5ddd7;border-radius:14px;background:#fff}
+.account-controls-card strong,.account-controls-card span,.account-controls-card small{display:block}
+.account-controls-card span{margin-top:4px;color:#6f6863;font-size:12px}.account-controls-card small{margin-top:3px;color:#968e88;font-size:11px}
+.account-controls-history-link{display:flex;justify-content:flex-start}
+.account-controls-switch{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px;border:1px solid #e5ddd7;border-radius:14px;background:#fff}
+.account-controls-switch strong,.account-controls-switch small{display:block}.account-controls-switch small{margin-top:4px;color:#817a74;font-weight:400}
+.account-controls-switch input{width:44px;height:24px;accent-color:#292522}
+@media(max-width:520px){.account-controls-card{grid-template-columns:1fr}.account-controls-card .ui-button{width:100%}}

@@ -15,6 +15,7 @@ import { createHash, randomBytes } from 'crypto';
 import { hash as hashPassword } from 'bcryptjs';
 import { PrismaService } from '../prisma.service';
 import { TransactionalEmailService } from '../transactional-email/transactional-email.service';
+import { FirstRunService } from '../first-run/first-run.service';
 
 const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const STARTER_PLAN_KEY = 'starter-people';
@@ -82,6 +83,7 @@ export class TenantInvitationService {
     private readonly prisma: PrismaService,
     private readonly email: TransactionalEmailService,
     private readonly jwt: JwtService,
+    private readonly firstRun: FirstRunService,
   ) {}
 
   async ensureStarterPlan() {
@@ -184,6 +186,13 @@ export class TenantInvitationService {
     invitation: { id: string; tenantId: string; tenant: { id: string; name: string } },
     email: string,
     password: string,
+    registrationDocuments: Array<{
+      documentVersionId: string;
+      key: string;
+      version: number;
+      accepted: boolean;
+      action: string;
+    }>,
   ) {
     const passwordHash = await hashPassword(password, 12);
     const result = await this.prisma.$transaction(async (tx) => {
@@ -202,14 +211,33 @@ export class TenantInvitationService {
           role: MembershipRole.OWNER,
         },
       });
+      const acceptedAt = new Date();
       await tx.tenantInvitation.update({
         where: { id: invitation.id },
         data: {
           email,
           status: TenantInvitationStatus.ACCEPTED,
-          acceptedAt: new Date(),
+          acceptedAt,
         },
       });
+
+      for (const document of registrationDocuments) {
+        const eventId = randomBytes(18).toString('hex');
+        const evidence = JSON.stringify({
+          documentKey: document.key,
+          documentVersion: document.version,
+          registration: true,
+        });
+        await tx.$executeRaw`
+          INSERT INTO "PlatformConsentEvent" (
+            "id", "tenantId", "platformAccountId", "documentVersionId",
+            "action", "source", "technicalEvidence", "occurredAt"
+          ) VALUES (
+            ${eventId}, ${invitation.tenantId}, ${account.id}, ${document.documentVersionId},
+            ${document.action}, 'platform-registration', ${evidence}::jsonb, ${acceptedAt}
+          )
+        `;
+      }
       return { account, membership };
     });
 
@@ -218,6 +246,8 @@ export class TenantInvitationService {
       tenantId: invitation.tenantId,
       role: result.membership.role,
     });
+
+    await this.firstRun.assignFromInvitation(invitation.id, invitation.tenantId, result.account.id);
 
     return {
       accessToken,
@@ -329,17 +359,25 @@ export class TenantInvitationService {
 
   async inspect(tokenValue: unknown) {
     const invitation = await this.findActiveInvitation(String(tokenValue || ''));
+    const activation = await this.firstRun.activateInvitation(invitation.id, invitation.tenantId);
     const requiresEmail = isRegistrationLinkEmail(invitation.email);
     return {
       email: requiresEmail ? '' : invitation.email,
       name: invitation.name,
       requiresEmail,
-      expiresAt: invitation.expiresAt,
+      expiresAt: activation.demoExpiresAt,
+      demo: {
+        activatedAt: activation.activatedAt,
+        expiresAt: activation.demoExpiresAt,
+        days: 14,
+      },
+      scenarioVersionId: activation.scenarioVersionId,
+      documents: await this.firstRun.registrationDocuments(),
       tenant: { id: invitation.tenant.id, name: invitation.tenant.name },
     };
   }
 
-  async accept(input: { token?: unknown; password?: unknown; email?: unknown }) {
+  async accept(input: { token?: unknown; password?: unknown; email?: unknown; documents?: unknown }) {
     const token = String(input?.token || '').trim();
     const password = String(input?.password || '');
     if (password.length < 10) throw new BadRequestException('Пароль должен содержать минимум 10 символов');
@@ -349,6 +387,8 @@ export class TenantInvitationService {
       ? normalizeEmail(input?.email)
       : invitation.email;
     if (!email || !email.includes('@')) throw new BadRequestException('Укажите корректный email');
+
+    const registrationDocuments = await this.firstRun.validateRegistrationDocuments(input?.documents);
 
     const existingAccount = await this.prisma.platformAccount.findUnique({ where: { email } });
     if (existingAccount) throw new ConflictException('Учётная запись с таким email уже зарегистрирована');
@@ -363,7 +403,7 @@ export class TenantInvitationService {
     });
     if (existingInvitation) throw new ConflictException('На этот email уже создано другое активное приглашение');
 
-    return this.acceptPendingInvitation(invitation, email, password);
+    return this.acceptPendingInvitation(invitation, email, password, registrationDocuments);
   }
 
   async listInvitations(adminId: string) {
@@ -400,10 +440,10 @@ export class TenantInvitationService {
     return this.email.send({
       to: input.email,
       toName: input.name,
-      subject: 'Приглашение в Book',
+      subject: 'Приглашение в систему',
       tag: 'tenant-invitation',
-      text: `${input.name ? `Здравствуйте, ${input.name}.` : 'Здравствуйте.'}\n\nВам открыт персональный Book. Создайте пароль и начните настройку рабочего пространства:\n${url}\n\nСсылка действует 7 дней.`,
-      html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#292522"><h2>Book</h2><p>${greeting}</p><p>Вам открыт персональный Book. Создайте пароль и начните настройку своего рабочего пространства.</p><p style="margin:28px 0"><a href="${url}" style="background:#292522;color:#fff;text-decoration:none;padding:14px 20px;border-radius:12px;display:inline-block">Создать пароль и войти</a></p><p style="color:#817a74;font-size:14px">Ссылка действует 7 дней.</p></div>`,
+      text: `${input.name ? `Здравствуйте, ${input.name}.` : 'Здравствуйте.'}\n\nВам открыто персональное рабочее пространство. Создайте пароль и начните настройку:\n${url}\n\nСсылка действует 7 дней.`,
+      html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#292522"><h2>Рабочее пространство</h2><p>${greeting}</p><p>Вам открыто персональное рабочее пространство. Создайте пароль и начните настройку.</p><p style="margin:28px 0"><a href="${url}" style="background:#292522;color:#fff;text-decoration:none;padding:14px 20px;border-radius:12px;display:inline-block">Создать пароль и войти</a></p><p style="color:#817a74;font-size:14px">Ссылка действует 7 дней.</p></div>`,
     });
   }
 

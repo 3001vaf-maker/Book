@@ -4,6 +4,9 @@ let currentAccess = {
   tenantId: '',
   status: 'LEGACY_COMPAT',
   isOwnerBook: false,
+  commercialMode: '',
+  demoActivatedAt: '',
+  demoExpiresAt: '',
   plan: null,
   capabilities: [],
 };
@@ -18,7 +21,7 @@ function applyAccess(value) {
 export async function loadBookAccess() {
   const response = await apiRequest('/saas-access/me');
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload?.message || 'Не удалось загрузить доступы Book');
+  if (!response.ok) throw new Error(payload?.message || 'Не удалось загрузить доступы');
   return applyAccess(payload);
 }
 
@@ -43,4 +46,12 @@ export function getBookLimit(key) {
   const capability = getBookCapability(key);
   if (!capability) return null;
   return capability.valueType === 'LIMIT' ? capability.limit : null;
+}
+
+
+export function canUseRealPersonalData() {
+  if (currentAccess.status === 'SUSPENDED') return false;
+  if (currentAccess.commercialMode && currentAccess.commercialMode !== 'LIVE') return false;
+  return !(Array.isArray(currentAccess.capabilities)
+    && currentAccess.capabilities.some((item) => item?.source === 'FIRST_RUN'));
 }
