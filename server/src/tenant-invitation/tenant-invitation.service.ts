@@ -186,6 +186,13 @@ export class TenantInvitationService {
     invitation: { id: string; tenantId: string; tenant: { id: string; name: string } },
     email: string,
     password: string,
+    registrationDocuments: Array<{
+      documentVersionId: string;
+      key: string;
+      version: number;
+      accepted: boolean;
+      action: string;
+    }>,
   ) {
     const passwordHash = await hashPassword(password, 12);
     const result = await this.prisma.$transaction(async (tx) => {
@@ -204,14 +211,33 @@ export class TenantInvitationService {
           role: MembershipRole.OWNER,
         },
       });
+      const acceptedAt = new Date();
       await tx.tenantInvitation.update({
         where: { id: invitation.id },
         data: {
           email,
           status: TenantInvitationStatus.ACCEPTED,
-          acceptedAt: new Date(),
+          acceptedAt,
         },
       });
+
+      for (const document of registrationDocuments) {
+        const eventId = randomBytes(18).toString('hex');
+        const evidence = JSON.stringify({
+          documentKey: document.key,
+          documentVersion: document.version,
+          registration: true,
+        });
+        await tx.$executeRaw`
+          INSERT INTO "PlatformConsentEvent" (
+            "id", "tenantId", "platformAccountId", "documentVersionId",
+            "action", "source", "technicalEvidence", "occurredAt"
+          ) VALUES (
+            ${eventId}, ${invitation.tenantId}, ${account.id}, ${document.documentVersionId},
+            ${document.action}, 'platform-registration', ${evidence}::jsonb, ${acceptedAt}
+          )
+        `;
+      }
       return { account, membership };
     });
 
@@ -240,6 +266,8 @@ export class TenantInvitationService {
     const email = normalizeEmail(input?.email);
     const name = normalizeName(input?.name);
     if (!email || !email.includes('@')) throw new BadRequestException('Укажите корректный email');
+
+    const registrationDocuments = await this.firstRun.validateRegistrationDocuments(input?.documents);
 
     const existingAccount = await this.prisma.platformAccount.findUnique({ where: { email } });
     if (existingAccount) throw new ConflictException('Учётная запись с таким email уже зарегистрирована');
@@ -346,11 +374,12 @@ export class TenantInvitationService {
         days: 14,
       },
       scenarioVersionId: activation.scenarioVersionId,
+      documents: await this.firstRun.registrationDocuments(),
       tenant: { id: invitation.tenant.id, name: invitation.tenant.name },
     };
   }
 
-  async accept(input: { token?: unknown; password?: unknown; email?: unknown }) {
+  async accept(input: { token?: unknown; password?: unknown; email?: unknown; documents?: unknown }) {
     const token = String(input?.token || '').trim();
     const password = String(input?.password || '');
     if (password.length < 10) throw new BadRequestException('Пароль должен содержать минимум 10 символов');
@@ -374,7 +403,7 @@ export class TenantInvitationService {
     });
     if (existingInvitation) throw new ConflictException('На этот email уже создано другое активное приглашение');
 
-    return this.acceptPendingInvitation(invitation, email, password);
+    return this.acceptPendingInvitation(invitation, email, password, registrationDocuments);
   }
 
   async listInvitations(adminId: string) {
