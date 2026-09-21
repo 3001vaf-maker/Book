@@ -6,6 +6,7 @@ import { getPeopleCount } from '../main/people/data.js';
 import { getProcedures } from '../settings/service/procedures/data.js';
 import { getProducts } from '../settings/service/products/data.js';
 import { button, escapeHtml, modal, mountModal } from '../ui/ui.js';
+import { refreshTenantDocumentArchive } from '../tenant-document-archive.js';
 import {
   completeFirstRunStep,
   downloadRknGuide,
@@ -560,6 +561,7 @@ export class FirstRunRuntime {
       control.textContent = 'Формируем PDF…';
       try {
         await downloadRknGuide();
+        await refreshTenantDocumentArchive().catch(() => undefined);
         await recordFirstRunActivity('RKN_GUIDE_DOWNLOADED', {
           stepKey: step.key,
           scenarioVersionId: this.state?.scenario?.id || '',
