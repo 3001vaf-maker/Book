@@ -7,6 +7,10 @@ export function financialNumber(value) {
   return Number.isFinite(number) ? number : 0;
 }
 
+export function financialMoney(value) {
+  return Math.round(Math.max(0, financialNumber(value)) * 100) / 100;
+}
+
 export function clampFinancialPercent(value) {
   return Math.max(0, Math.min(100, financialNumber(value)));
 }
@@ -42,13 +46,13 @@ export function recordSettlementItems(record = null) {
 export function calculateSettlement(items = [], { discountPercent = 0 } = {}) {
   const defaultPercent = clampFinancialPercent(discountPercent);
   const prepared = (Array.isArray(items) ? items : []).map((item) => {
-    const price = Math.max(0, financialNumber(item?.price ?? item?.cost));
+    const price = financialMoney(item?.price ?? item?.cost);
     const mode = discountMode(item, defaultPercent);
     const selectedPercent = mode === 'percent'
       ? clampFinancialPercent(item?.discountPercent === '' || item?.discountPercent == null ? defaultPercent : item.discountPercent)
       : 0;
-    const discountMoney = Math.max(0, Math.min(price,
-      mode === 'money' ? financialNumber(item?.discountMoney) : price * selectedPercent / 100));
+    const discountMoney = financialMoney(Math.min(price,
+      mode === 'money' ? financialMoney(item?.discountMoney) : price * selectedPercent / 100));
     const resolvedPercent = price > 0
       ? (mode === 'money' ? discountMoney / price * 100 : selectedPercent)
       : 0;
@@ -60,13 +64,13 @@ export function calculateSettlement(items = [], { discountPercent = 0 } = {}) {
       discountMode: mode,
       discountPercent: clampFinancialPercent(resolvedPercent),
       discountMoney,
-      planAmount: Math.max(0, price - discountMoney),
+      planAmount: financialMoney(price - discountMoney),
     };
   });
 
-  const serviceTotal = prepared.reduce((sum, item) => sum + item.price, 0);
-  const discountTotal = prepared.reduce((sum, item) => sum + item.discountMoney, 0);
-  const planTotal = prepared.reduce((sum, item) => sum + item.planAmount, 0);
+  const serviceTotal = financialMoney(prepared.reduce((sum, item) => sum + item.price, 0));
+  const discountTotal = financialMoney(prepared.reduce((sum, item) => sum + item.discountMoney, 0));
+  const planTotal = financialMoney(prepared.reduce((sum, item) => sum + item.planAmount, 0));
   const percents = [...new Set(prepared.map((item) => Math.round(item.discountPercent * 10000) / 10000))];
 
   return {
@@ -92,7 +96,7 @@ export function repriceSettlement(sources = [], currentSettlement = null) {
       sourceType: type,
       sourceId: id,
       name: String(source?.name || ''),
-      price: Math.max(0, financialNumber(source?.cost ?? source?.price)),
+      price: financialMoney(source?.cost ?? source?.price),
     };
     if (!prior) return { ...base, discountMode: defaultDiscount > 0 ? 'percent' : 'none', discountPercent: defaultDiscount };
     if (prior.discountMode === 'money') return { ...base, discountMode: 'money', discountMoney: prior.discountMoney };
@@ -118,11 +122,11 @@ export function normalizeStoredSettlement(value = null) {
 export function movementServiceAmount(item = null) {
   if (!item) return 0;
   if (item?.movementType === 'income') {
-    const total = Math.max(0, financialNumber(item?.total));
-    const tips = Math.max(0, financialNumber(item?.tips));
-    return Math.max(0, financialNumber(item?.serviceAmount ?? (total - tips)));
+    const total = financialMoney(item?.total);
+    const tips = financialMoney(item?.tips);
+    return financialMoney(item?.serviceAmount ?? (total - tips));
   }
-  return Math.max(0, financialNumber(item?.serviceAmount ?? item?.total));
+  return financialMoney(item?.serviceAmount ?? item?.total);
 }
 
 export function calculateSettlementTotals(settlement = null, movements = []) {
@@ -132,7 +136,12 @@ export function calculateSettlementTotals(settlement = null, movements = []) {
   const expense = (Array.isArray(movements) ? movements : [])
     .filter((item) => item?.movementType === 'expense')
     .reduce((sum, item) => sum + movementServiceAmount(item), 0);
-  return { ...(settlement || {}), factIncome: income, factExpense: expense, factTotal: income - expense };
+  return {
+    ...(settlement || {}),
+    factIncome: financialMoney(income),
+    factExpense: financialMoney(expense),
+    factTotal: Math.round((income - expense) * 100) / 100,
+  };
 }
 
 export function normalizedAllocations(payment = null) {
@@ -162,8 +171,8 @@ export function paymentNet(payment, movements = []) {
 
 export function calculateSettlementPaymentState(settlement = null, movements = []) {
   const totals = calculateSettlementTotals(settlement, movements);
-  const paidTotal = Math.max(0, financialNumber(totals.factTotal));
-  const remaining = Math.max(0, financialNumber(settlement?.planTotal) - paidTotal);
+  const paidTotal = financialMoney(totals.factTotal);
+  const remaining = financialMoney(financialMoney(settlement?.planTotal) - paidTotal);
   const tipsIncome = (Array.isArray(movements) ? movements : [])
     .filter((item) => item?.movementType === 'income')
     .reduce((sum, item) => sum + Math.max(0, financialNumber(item?.tips)), 0);
