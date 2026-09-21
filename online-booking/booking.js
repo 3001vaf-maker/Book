@@ -346,13 +346,16 @@ function renderTenantAgreements(root, state) {
 }
 
 function renderAccountEntry(root, state) {
-  const rememberedEmail = state.accountDraft?.email || getRememberedAccountEmail(state.tenantId) || '';
+  const rememberedIdentifier = state.accountDraft?.identifier
+    || state.accountDraft?.email
+    || getRememberedAccountEmail(state.tenantId)
+    || '';
   renderFlowPage(root, state, {
-    title: 'Регистрация',
-    subtitle: 'Введите email. Если аккаунт уже существует, откроется вход.',
+    title: 'Вход или регистрация',
+    subtitle: 'Введите телефон или email',
     back: { data: 'data-booking-entry-back', aria: 'Назад' },
     action: { label: 'Далее', data: 'data-booking-entry-submit' },
-    body: `<form data-booking-entry-form>${field({ label: 'Email', name: 'email', value: rememberedEmail, type: 'email', required: true, autocomplete: 'email' })}${errorBlock(state.error)}</form>`,
+    body: `<form data-booking-entry-form>${field({ label: 'Телефон или email', name: 'identifier', value: rememberedIdentifier, required: true, autocomplete: 'username' })}${errorBlock(state.error)}</form>`,
     center: true,
   });
   const form = root.querySelector('[data-booking-entry-form]');
@@ -364,12 +367,18 @@ function renderAccountEntry(root, state) {
   root.querySelector('[data-booking-entry-submit]')?.addEventListener('click', () => form?.requestSubmit());
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const email = String(new FormData(form).get('email') || '').trim().toLowerCase();
-    state.accountDraft = { ...(state.accountDraft || {}), email };
+    const identifier = String(new FormData(form).get('identifier') || '').trim();
     const submit = root.querySelector('[data-booking-entry-submit]');
     if (submit) submit.disabled = true;
     try {
-      const prepared = await prepareAccount(state.tenantId, email);
+      const prepared = await prepareAccount(state.tenantId, { identifier });
+      state.accountDraft = {
+        ...(state.accountDraft || {}),
+        identifier,
+        ...(prepared.identifierType === 'EMAIL' ? { email: identifier.toLowerCase() } : {}),
+        ...(prepared.identifierType === 'PHONE' ? { phone: identifier } : {}),
+      };
+      state.contactErrors = {};
       state.passwordMode = prepared.exists ? 'login' : 'register';
       state.error = '';
       if (prepared.exists) {
@@ -387,31 +396,55 @@ function renderAccountEntry(root, state) {
 
 function renderAccountDetails(root, state) {
   const draft = state.accountDraft || {};
+  const contactErrors = state.contactErrors || {};
   renderFlowPage(root, state, {
     title: 'Ваши данные',
-    subtitle: draft.email || 'Они сохранятся в вашем аккаунте',
+    subtitle: 'Они сохранятся в вашей учетной записи',
     back: { data: 'data-booking-account-back', aria: 'Назад' },
     action: { label: 'Далее', data: 'data-booking-account-submit' },
-    body: `<form data-booking-account-form>${field({ label: 'Имя', name: 'name', value: draft.name || '', required: true, autocomplete: 'given-name' })}${field({ label: 'Фамилия', name: 'surname', value: draft.surname || '', autocomplete: 'family-name' })}${phoneField({ label: 'Телефон', name: 'phone', value: draft.phone || '', required: true })}${errorBlock(state.error)}</form>`,
+    body: `<form data-booking-account-form>${field({ label: 'Имя', name: 'name', value: draft.name || '', required: true, autocomplete: 'given-name' })}${field({ label: 'Фамилия', name: 'surname', value: draft.surname || '', autocomplete: 'family-name' })}${field({ label: 'Email', name: 'email', value: draft.email || '', type: 'email', required: true, autocomplete: 'email' })}${errorBlock(contactErrors.email || '')}${phoneField({ label: 'Телефон', name: 'phone', value: draft.phone || '', required: true })}${errorBlock(contactErrors.phone || '')}${errorBlock(state.error)}</form>`,
   });
   const form = root.querySelector('[data-booking-account-form]');
   root.querySelector('[data-booking-account-back]')?.addEventListener('click', () => {
     state.error = '';
+    state.contactErrors = {};
     renderAccountTerms(root, state);
   });
   root.querySelector('[data-booking-account-submit]')?.addEventListener('click', () => form?.requestSubmit());
-  form?.addEventListener('submit', (event) => {
+  form?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const data = new FormData(form);
+    const email = String(data.get('email') || '').trim().toLowerCase();
+    const phone = String(data.get('phone') || '').trim();
     state.accountDraft = {
       ...(state.accountDraft || {}),
       name: String(data.get('name') || '').trim(),
       surname: String(data.get('surname') || '').trim(),
-      phone: String(data.get('phone') || '').trim(),
+      email,
+      phone,
     };
-    state.passwordMode = 'register';
-    state.error = '';
-    renderPassword(root, state);
+    const submit = root.querySelector('[data-booking-account-submit]');
+    if (submit) submit.disabled = true;
+    try {
+      const prepared = await prepareAccount(state.tenantId, { email, phone });
+      const contactMessage = 'Этот контакт уже зарегистрирован. Войдите в учетную запись или восстановите пароль.';
+      state.contactErrors = {
+        email: prepared?.conflicts?.email ? contactMessage : '',
+        phone: prepared?.conflicts?.phone ? contactMessage : '',
+      };
+      if (state.contactErrors.email || state.contactErrors.phone) {
+        state.error = '';
+        renderAccountDetails(root, state);
+        return;
+      }
+      state.contactErrors = {};
+      state.passwordMode = 'register';
+      state.error = '';
+      renderPassword(root, state);
+    } catch (error) {
+      state.error = error instanceof Error ? error.message : 'Не удалось проверить контакты';
+      renderAccountDetails(root, state);
+    }
   });
 }
 
@@ -419,7 +452,7 @@ function renderPassword(root, state) {
   const register = state.passwordMode !== 'login';
   renderFlowPage(root, state, {
     title: register ? 'Создайте пароль' : 'Введите пароль',
-    subtitle: state.accountDraft.email || '',
+    subtitle: register ? (state.accountDraft.email || state.accountDraft.phone || '') : (state.accountDraft.identifier || ''),
     back: { data: 'data-booking-password-back', aria: 'Назад' },
     action: { label: register ? 'Создать' : 'Войти', data: 'data-booking-password-submit' },
     body: `<form data-booking-password-form>${field({ label: 'Пароль', name: 'password', type: 'password', required: true, autocomplete: register ? 'new-password' : 'current-password' })}${errorBlock(state.error)}${bookingActions(bookingAction('Показать пароль', { secondary: true, data: 'data-booking-password-toggle' }))}</form>`,
@@ -455,7 +488,7 @@ function renderPassword(root, state) {
         return;
       }
 
-      const payload = await loginAccount(state.tenantId, state.accountDraft.email, password);
+      const payload = await loginAccount(state.tenantId, state.accountDraft.identifier, password);
       state.account = payload.account;
       state.error = '';
       await continueAfterIdentity(root, state);
@@ -746,6 +779,7 @@ export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = 
     from: '',
     to: '',
     accountDraft: {},
+    contactErrors: {},
     account: null,
     accountTerms: null,
     accountTermsAccepted: false,
