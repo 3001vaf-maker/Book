@@ -82,6 +82,8 @@ function normalizeSettlementRow(row = {}) {
   return {
     source: { type: String(source.type), id: String(source.id) },
     settlement,
+    recordedAt: String(row?.recordedAt || ''),
+    updatedAt: String(row?.updatedAt || ''),
   };
 }
 
