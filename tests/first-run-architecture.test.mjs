@@ -7,11 +7,13 @@ function source(path) {
 
 const schema = source('server/prisma/schema.prisma');
 const migration = source('server/prisma/migrations/20260921190000_first_run_scenario/migration.sql');
+const ownerSeed = source('server/prisma/seed-owner.ts');
 const invitation = source('server/src/tenant-invitation/tenant-invitation.service.ts');
 const firstRun = source('server/src/first-run/first-run.service.ts');
 const access = source('server/src/saas-access/saas-access.service.ts');
 const runtime = source('first-run/runtime.js');
 const core = source('core.js');
+const indexHtml = source('index.html');
 const booking = source('server/src/online-booking/online-booking.service.ts');
 const dispatch = source('server/src/communication/communication-dispatch.service.ts');
 const people = source('main/people/people.js');
@@ -52,7 +54,10 @@ assert.match(invitation, /commercialMode: 'DEMO'/);
 assert.match(access, /source: 'FIRST_RUN'/);
 assert.match(access, /source: 'DEMO'/);
 assert.match(access, /source: 'DEMO_EXPIRED'/);
+assert.match(access, /source: 'OWNER'/);
 assert.match(access, /firstRunActive/);
+assert.doesNotMatch(access, /LEGACY_COMPAT/);
+assert.doesNotMatch(access, /legacyCompatibilityValue/);
 
 assert.match(runtime, /markFirstRunStepSeen/);
 assert.match(runtime, /completeFirstRunStep/);
@@ -62,6 +67,10 @@ assert.match(runtime, /online-booking-welcome/);
 assert.match(runtime, /finance-dds/);
 assert.match(core, /FirstRunRuntime/);
 assert.match(core, /renderDemoExpired/);
+assert.doesNotMatch(core, /onboarding\/onboarding\.js/);
+assert.doesNotMatch(core, /renderOnboarding/);
+assert.doesNotMatch(core, /isOnboardingComplete/);
+assert.doesNotMatch(indexHtml, /ui\/onboarding\/onboarding\.css/);
 
 assert.match(booking, /assertRealOperationsAllowed\(tenantId\)/);
 assert.match(dispatch, /assertRealOperationsAllowed\(tenantId\)/);
@@ -106,4 +115,9 @@ assert.match(migration, /'chat',150,'OPTIONAL_INFO'/);
 
 console.log('first-run architecture tests: OK');
 
-assert.match(firstRun, /if \(!access\) \{/);
+assert.match(firstRun, /Состояние рабочего пространства не настроено/);
+assert.doesNotMatch(firstRun, /if \(!access\)[\s\S]{0,400}return true/);
+
+assert.match(ownerSeed, /tenantAccess\.upsert/);
+assert.match(ownerSeed, /isOwnerBook:\s*true/);
+assert.match(ownerSeed, /commercialMode:\s*'LIVE'/);

@@ -14,7 +14,6 @@ import { configureWorkplaceSource } from './core/workplace-time.js';
 import { configureTimeUsageSource, configureSoftTimeUsageReleaseSource } from './core/time/index.js';
 import { getCurrentAccount, login } from './core/auth.js';
 import { canUseBookCapability, getBookAccess, loadBookAccess } from './core/access.js';
-import { isOnboardingComplete, renderOnboarding } from './onboarding/onboarding.js';
 import { startServerBookingSync } from './online-booking/server-sync.js';
 import { renderOnlineBooking } from './online-booking/booking.js';
 import { startAccountRuntime } from './online-booking/account-runtime.js';
@@ -347,23 +346,6 @@ async function renderAuthenticated(account = authenticatedAccount) {
 
   candidateRuntime.dispose();
   disposePlatformSession = await startPlatformSessionTracking();
-
-  const serverWorkspaceUnlocked = Boolean(authenticatedAccount?.account?.workspaceUnlocked);
-  if (!serverWorkspaceUnlocked && !isOnboardingComplete()) {
-    workspaceReady = false;
-    history.replaceState({}, '', location.pathname);
-    await renderOnboarding(app, {
-      accountEmail: authenticatedAccount?.account?.email || '',
-      onComplete: () => {
-        state.activeSection = defaultSection();
-        history.replaceState({}, '', `#${state.activeSection}`);
-        renderWorkspace();
-        startRegularPlatformNotices();
-      },
-    });
-    syncViewport();
-    return;
-  }
 
   const requested = location.hash.slice(1);
   state.activeSection = sectionAllowed(requested) ? requested : defaultSection();
