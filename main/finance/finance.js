@@ -74,10 +74,12 @@ function csvCell(value) {
 }
 
 function downloadDDS(movements) {
-  const headers = ['Дата и время', 'Операция', 'Человек', 'Рабочее место', 'Кошелёк', 'Сумма', 'Статус', 'Чаевые'];
+  const headers = ['Дата и время', 'Операция', 'Статья', 'Позиция', 'Человек', 'Рабочее место', 'Кошелёк', 'Сумма', 'Статус', 'Чаевые'];
   const rows = movements.map((item) => [
     operationMoment(item),
     operationName(item).replace(' · Отменена', ''),
+    item?.articleName || '',
+    item?.lineName || '',
     personText(item),
     item?.workplace || '',
     walletText(item),
