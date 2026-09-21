@@ -1,6 +1,6 @@
 # Global Account + Online Booking Architecture
 
-Status: active implementation block, started 2026-09-21.
+Status: A0-A5 implementation complete on feature branch. Behavior head `3d6538dae26c9b24b3fa418876138cef8904b698` passed full Check Book #2049; this documentation-only checkpoint still requires its own final green check before merge to `staging`.
 
 This file is the continuity anchor for the end-human Account/Profile and public online-booking flow. Do not replace this model with a tenant-scoped account or a channel-specific registration path.
 
@@ -128,15 +128,15 @@ Welcome -> booking. Never Welcome -> registration.
 
 A0 DONE: architecture/continuity anchor.
 
-A1 PENDING: global Account identity, global contact uniqueness, global session, shared link/Mini App identity resolution.
+A1 DONE: Account is global across Tenants; AccountContact owns globally unique phone/email/Telegram identifiers; browser session is global; manual entry accepts phone or email; Telegram entry resolves the same Account.
 
-A2 PENDING: reorder public booking so anonymous selection happens before identity/legal gate and selected booking survives auth/legal steps.
+A2 DONE: public booking selection happens before identity/legal gates; selected workplace/services/date/time survive login, registration and consent steps.
 
-A3 PENDING: platform-neutral Account Terms document + append-only global Account acceptance; keep Tenant consent separate.
+A3 DONE: platform-neutral "Условия использования учетной записи" are stored in the platform document registry; global Account acceptance is append-only and separate from TenantConsentEvent; Tenant consent remains tenant-specific.
 
-A4 PENDING: Person matching/enrichment using Account contacts; enforce one-way Account -> linked Person contact propagation.
+A4 DONE: PersonIdentityService is the single Account -> Person resolution owner; matching uses the complete Account contact set; ambiguous multi-Person matches are not auto-merged; Account contacts propagate only to already linked Person records; Person data never writes back into global Account contacts.
 
-A5 PENDING: guards/tests, migration/build, full Check Book, staging verification.
+A5 DONE on behavior head `3d6538dae26c9b24b3fa418876138cef8904b698`: Check Book #2049 passed `check`, `profile-migration-upgrade` and `staging-smoke`; staging smoke built the backend, started isolated PostgreSQL/backend, verified the backend, verified all four production-domain host routes and verified the staging frontend with the split Account Terms -> Tenant consent flow.
 
 ## Release rule
 

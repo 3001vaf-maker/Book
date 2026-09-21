@@ -145,7 +145,12 @@ Ordered implementation: A0 architecture -> A1 identity/session -> A2 booking rou
 
 Current status:
 - A0: DONE — target architecture and handoff state fixed in `docs/ACCOUNT_BOOKING_ARCHITECTURE.md`.
-- A1-A5: pending implementation and verification.
+- A1: DONE — global Account identity/contact/session model is implemented; phone/email entry and Telegram entry resolve the same Account.
+- A2: DONE — booking selection precedes identity/legal gates and survives those gates.
+- A3: DONE — global Account Terms acceptance is separated from Tenant consent and recorded append-only in the platform document contour.
+- A4: DONE — grouped Account-contact -> Person matching and one-way Account -> linked Person propagation are implemented; ambiguous matches are preserved for explicit review.
+- A5: DONE on behavior head `3d6538dae26c9b24b3fa418876138cef8904b698` — Check Book #2049 passed `check`, `profile-migration-upgrade` and `staging-smoke`, including backend build/start, migration verification, all four production-domain host checks and staging frontend.
+- Release gate now: final documentation-only PR check -> merge PR #249 to `staging` -> post-merge Check Book on `staging`. Do not merge this block directly to `main`.
 
 ## Completed block — Finance ownership rebuild (2026-09-20)
 
