@@ -29,6 +29,18 @@ assert.doesNotMatch(browserService, /writeFinanceState|queueAuxiliaryDataset/);
 assert.match(serverService, /serviceAmount > due \+ 0\.009/);
 assert.match(serverService, /splitAllocationComponents/);
 assert.match(serverService, /tipsRemaining/);
+assert.match(serverService, /const serviceAmount = Math\.min\(requested, serviceRemaining\);/);
+assert.match(serverService, /const tips = Math\.min\(money\(requested - serviceAmount\), tipsRemaining\);/);
+assert.doesNotMatch(serverService, /const tips = Math\.min\(requested, tipsRemaining\);/);
+
+// A partial refund from a service+Tips payment must reopen service debt first.
+const refundRequested = 1500;
+const serviceRemainingForRefund = 7000;
+const tipsRemainingForRefund = 1000;
+const refundedServiceFirst = Math.min(refundRequested, serviceRemainingForRefund);
+const refundedTipsAfterService = Math.min(refundRequested - refundedServiceFirst, tipsRemainingForRefund);
+assert.equal(refundedServiceFirst, 1500);
+assert.equal(refundedTipsAfterService, 0);
 
 // Full payment is one Operation and one Ledger row for one wallet.
 const fullSettlement = calculateSettlement([{ sourceId: 'procedure-1', name: 'Стрижка', price: 5000 }]);
