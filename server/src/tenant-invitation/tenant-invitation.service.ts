@@ -267,8 +267,6 @@ export class TenantInvitationService {
     const name = normalizeName(input?.name);
     if (!email || !email.includes('@')) throw new BadRequestException('Укажите корректный email');
 
-    const registrationDocuments = await this.firstRun.validateRegistrationDocuments(input?.documents);
-
     const existingAccount = await this.prisma.platformAccount.findUnique({ where: { email } });
     if (existingAccount) throw new ConflictException('Учётная запись с таким email уже зарегистрирована');
 
@@ -389,6 +387,8 @@ export class TenantInvitationService {
       ? normalizeEmail(input?.email)
       : invitation.email;
     if (!email || !email.includes('@')) throw new BadRequestException('Укажите корректный email');
+
+    const registrationDocuments = await this.firstRun.validateRegistrationDocuments(input?.documents);
 
     const existingAccount = await this.prisma.platformAccount.findUnique({ where: { email } });
     if (existingAccount) throw new ConflictException('Учётная запись с таким email уже зарегистрирована');
