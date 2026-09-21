@@ -246,14 +246,43 @@ export class FirstRunRuntime {
   }
 
   async renderWorkspaceStep(step) {
-    this.showWorkspace(this.workspaceSection(step));
+    const current = this.getActiveSection();
+
+    if (step.key === 'people') {
+      this.showWorkspace('main');
+      const host = this.app.querySelector('#app-content');
+      if (host) {
+        const people = await import('../main/people/people.js');
+        people.renderPeople(host);
+      }
+      this.installObserver();
+      await this.showStepModal(step);
+      this.queueSync();
+      return;
+    }
+
+    if (step.key === 'timetable') {
+      this.showWorkspace('timetable');
+      this.installObserver();
+      await this.showStepModal(step);
+      this.queueSync();
+      return;
+    }
+
     if (step.key.startsWith('finance-') && step.key !== 'finance-overview') {
+      if (current !== 'main') this.showWorkspace('main');
       const host = this.app.querySelector('#app-content');
       if (host) {
         const finance = await import('../main/finance/finance.js');
         finance.renderFinance(host);
       }
+      this.installObserver();
+      this.queueSync();
+      return;
     }
+
+    // Журнал, Чат и переход на Главную пользователь открывает сам:
+    // контроллер оставляет текущий экран и подсвечивает реальную навигацию.
     this.installObserver();
     this.queueSync();
   }
