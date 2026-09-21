@@ -15,15 +15,21 @@ assert.doesNotMatch(service, /identity\.relations\[relationKey\]\s*=\s*uei/, 'Co
 assert.doesNotMatch(service, /await this\.reconcileLegacyAccountDuplicates\(tenantId\)/, 'Account login/access must not run identity reconciliation automatically');
 
 const findOrAttach = service.slice(service.indexOf('async findOrAttachExistingPerson('), service.indexOf('async bindFirstAccess('));
-assert.match(findOrAttach, /const personState = await this\.personState\(tenantId, account\.phone\)/, 'Known phone lookup must happen before any new Person is created');
-assert.match(findOrAttach, /if \(!personState\.owner\) return null/, 'Only an actually unknown phone may fall through to Person creation');
-assert.doesNotMatch(findOrAttach, /upsertPersonFromAccount/, 'Known-phone path must never create a new Person');
-const bindFirstAccess = service.slice(service.indexOf('async bindFirstAccess('), service.indexOf('async personStats('));
-assert.match(bindFirstAccess, /if \(existing\) return existing/, 'Existing known-phone Person must be reused');
-assert.match(bindFirstAccess, /upsertPersonFromAccount/, 'Person creation remains available only after existing-Person lookup returns null');
+assert.match(findOrAttach, /const contacts = await this\.contactsForAccount\(account\)/, 'Account contact set must be resolved before Person matching');
+assert.match(findOrAttach, /const state = await this\.stateForContacts\(tenantId, contacts\)/, 'Tenant Person lookup must use the complete Account contact set');
+assert.match(findOrAttach, /const matchedKeys = uniqueStrings\(state\.matches\.map\(\(match\) => match\.person\.key\)\)/, 'All contact matches must be resolved as a group');
+assert.match(findOrAttach, /if \(matchedKeys\.length !== 1\)/, 'Conflicting Person matches must not be silently collapsed');
+assert.match(findOrAttach, /CONTACT_CONFLICT|createBoundPerson\(tenantId, account, contacts, matchedKeys\)/, 'Conflicting contact matches must use explicit review state');
+assert.doesNotMatch(findOrAttach, /personState\(tenantId, account\.phone\)/, 'Phone-only Person matching must remain removed');
+assert.doesNotMatch(findOrAttach, /upsertPersonFromAccount/, 'Parallel Account-to-Person creation owner must remain removed');
+
+const bindFirstAccess = service.slice(service.indexOf('async bindFirstAccess('), service.indexOf('async syncLinkedPeople('));
+assert.match(bindFirstAccess, /if \(existing\) return existing/, 'A resolved Person binding must be reused');
+assert.match(bindFirstAccess, /const contacts = await this\.contactsForAccount\(account\)/, 'New Person creation must use the complete Account contact set');
+assert.match(bindFirstAccess, /createBoundPerson\(tenantId, account, contacts\)/, 'New Person creation is allowed only after grouped contact matching returns no existing Person');
 
 const myRecords = onlineBooking.slice(onlineBooking.indexOf('async getMyRecords('), onlineBooking.indexOf('async ownerAccounts('));
-assert.match(myRecords, /await this\.personIdentity\.bindFirstAccess\(tenantId, account as any\)/, 'Known-phone Account must attach to the existing Person before Record history is read');
+assert.match(myRecords, /await this\.personIdentity\.bindFirstAccess\(tenantId, account as any\)/, 'Account must resolve its tenant Person binding before Record history is read');
 assert.match(myRecords, /bookingIdentityForAccount\(tenantId, accountId\)/, 'Account Record history must resolve canonical identity after Person attachment');
 assert.match(myRecords, /identity\?\.memberPeople/, 'Account Record history must include all canonical UEI member People');
 assert.match(myRecords, /this\.records\.listForPeople\(tenantId, people\)/, 'Pre-existing and online-created Records must be read from the one canonical Record owner');

@@ -55,6 +55,8 @@ if (!(auxiliaryCheck >= 0 && cleanupCall > auxiliaryCheck && workspaceRender > c
 
 const cleanup = source(path.join(ROOT, CLEANUP_OWNER));
 for (const requiredTechnicalKey of [
+  'book.account.token',
+  'book.account.email',
   'book.account.token.',
   'book.account.email.',
   'book.people.sort',

@@ -10,6 +10,9 @@ function clone(value) {
 function normalize(item = {}) {
   return {
     id: String(item.id || ''),
+    subjectType: String(item.subjectType || ''),
+    subjectId: String(item.subjectId || ''),
+    accountId: String(item.accountId || ''),
     tenantId: String(item.tenantId || ''),
     tenantName: String(item.tenantName || ''),
     platformAccountId: String(item.platformAccountId || ''),

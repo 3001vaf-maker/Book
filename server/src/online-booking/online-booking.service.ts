@@ -6,8 +6,9 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { BookingRequestStatus, Prisma } from '@prisma/client';
+import { AccountContactType, BookingRequestStatus, Prisma } from '@prisma/client';
 import { compare, hash } from 'bcryptjs';
+import { AccountDocumentService } from '../document-registry/account-document.service';
 import { PrismaService } from '../prisma.service';
 import { BusinessStateService } from '../business-state/business-state.service';
 import { ConsentPolicyService } from '../tenant-document-archive/consent-policy.service';
@@ -34,6 +35,26 @@ function emailValue(value: unknown) {
   return text(value).toLowerCase();
 }
 
+function canonicalPhone(value: unknown) {
+  const digits = text(value).replace(/\D/g, '');
+  if (digits.length === 10) return `7${digits}`;
+  if (digits.length === 11 && digits.startsWith('8')) return `7${digits.slice(1)}`;
+  return digits;
+}
+
+function accountLoginContact(value: unknown) {
+  const raw = text(value);
+  const email = emailValue(raw);
+  if (email && email.includes('@')) {
+    return { type: AccountContactType.EMAIL, value: email };
+  }
+  const phone = canonicalPhone(raw);
+  if (phone.length >= 10 && phone.length <= 15) {
+    return { type: AccountContactType.PHONE, value: phone };
+  }
+  return null;
+}
+
 function dateValue(value: unknown) {
   const result = text(value).slice(0, 10);
   return /^\d{4}-\d{2}-\d{2}$/.test(result) ? result : '';
@@ -46,15 +67,6 @@ function numeric(value: unknown, fallback = 0) {
 
 function percent(value: unknown) {
   return Math.max(0, Math.min(100, numeric(value, 0)));
-}
-
-function normalizeConsents(value: unknown) {
-  return arrayValue(value).map((item) => ({
-    documentId: text(item?.documentId),
-    documentVersion: Math.max(1, Number(item?.documentVersion || 1)),
-    accepted: Boolean(item?.accepted),
-    acceptedAt: text(item?.acceptedAt) || new Date().toISOString(),
-  })).filter((item) => item.documentId);
 }
 
 function uniqueStrings(value: unknown, normalize: (item: unknown) => string, limit = 5) {
@@ -85,6 +97,39 @@ function normalizeProfileData(value: unknown) {
   };
 }
 
+type AccountContactFact = {
+  type: AccountContactType;
+  value: string;
+  isPrimary: boolean;
+};
+
+function accountContactFacts(account: {
+  email?: unknown;
+  phone?: unknown;
+  telegramId?: unknown;
+  profileData?: unknown;
+}) {
+  const profileData = normalizeProfileData(account.profileData);
+  const facts: AccountContactFact[] = [];
+  const push = (type: AccountContactType, value: string, isPrimary = false) => {
+    const normalized = text(value);
+    if (!normalized) return;
+    const existing = facts.find((item) => item.type === type && item.value === normalized);
+    if (existing) {
+      existing.isPrimary = existing.isPrimary || isPrimary;
+      return;
+    }
+    facts.push({ type, value: normalized, isPrimary });
+  };
+
+  push(AccountContactType.EMAIL, emailValue(account.email), true);
+  push(AccountContactType.PHONE, canonicalPhone(account.phone), true);
+  push(AccountContactType.TELEGRAM, text(account.telegramId), true);
+  profileData.emails.forEach((value) => push(AccountContactType.EMAIL, emailValue(value)));
+  profileData.phones.forEach((value) => push(AccountContactType.PHONE, canonicalPhone(value)));
+  return facts;
+}
+
 function publicAccount(account: any) {
   return {
     id: account.id,
@@ -94,7 +139,6 @@ function publicAccount(account: any) {
     phone: account.phone,
     telegramId: account.telegramId || '',
     profileData: normalizeProfileData(account.profileData),
-    uei: text(account.uei),
     discountPercent: percent(account.discountPercent),
     visits: Math.max(0, Math.floor(numeric(account.visits, 0))),
     totalSpent: Math.max(0, numeric(account.totalSpent, 0)),
@@ -110,6 +154,7 @@ export class OnlineBookingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    private readonly accountDocuments: AccountDocumentService,
     private readonly businessState: BusinessStateService,
     private readonly tenantDocumentArchive: TenantDocumentArchiveService,
     private readonly consentPolicy: ConsentPolicyService,
@@ -141,7 +186,6 @@ export class OnlineBookingService {
     const personStats = await this.personIdentity.personStats(tenantId, account);
     return publicAccount({
       ...account,
-      uei: identity?.uei || '',
       discountPercent: person.discountPercent ?? account.discountPercent,
       visits: personStats?.visits ?? person.visits ?? account.visits,
       totalSpent: personStats?.totalSpent ?? person.totalSpent ?? account.totalSpent,
@@ -150,22 +194,50 @@ export class OnlineBookingService {
     });
   }
 
-  private async issueAccountToken(account: { id: string; tenantId: string }) {
+  private async issueAccountToken(account: { id: string }) {
     return this.jwt.signAsync({
       sub: account.id,
-      tenantId: account.tenantId,
       kind: 'account',
-    }, { expiresIn: '30d' });
+    }, { expiresIn: '365d' });
   }
 
-  private ensurePdnConsent(publicationData: Record<string, any>, consents: any[]) {
-    const documents = arrayValue(publicationData.documents);
-    const document = documents.find((item) => Boolean(item?.personConsent) && text(item?.id) === 'pdn-consent');
-    if (!document) throw new BadRequestException('Согласие на обработку персональных данных недоступно');
-    const accepted = consents.some((item) => item.documentId === 'pdn-consent'
-      && Number(item.documentVersion) === Math.max(1, Number(document.version || 1))
-      && item.accepted);
-    if (!accepted) throw new BadRequestException(`Необходимо согласие: ${text(document.title) || 'Согласие на обработку персональных данных'}`);
+  private async assertContactsAvailable(
+    contacts: AccountContactFact[],
+    accountId = '',
+    tx: Prisma.TransactionClient | PrismaService = this.prisma,
+  ) {
+    if (!contacts.length) return;
+    const existing = await tx.accountContact.findMany({
+      where: {
+        OR: contacts.map((contact) => ({ type: contact.type, value: contact.value })),
+      },
+      select: { accountId: true, type: true, value: true },
+    });
+    const conflict = existing.find((contact) => contact.accountId !== accountId);
+    if (conflict) {
+      throw new ConflictException('Этот контакт уже зарегистрирован. Войдите в аккаунт или восстановите пароль.');
+    }
+  }
+
+  private async replaceAccountContacts(
+    tx: Prisma.TransactionClient,
+    accountId: string,
+    contacts: AccountContactFact[],
+  ) {
+    await this.assertContactsAvailable(contacts, accountId, tx);
+    await tx.accountContact.deleteMany({ where: { accountId } });
+    if (contacts.length) {
+      await tx.accountContact.createMany({
+        data: contacts.map((contact) => ({ accountId, ...contact })),
+      });
+    }
+  }
+
+  private async tenantAccountIds(tenantId: string) {
+    const business = await this.businessState.get(tenantId);
+    return [...new Set(arrayValue(business.people)
+      .flatMap((person) => arrayValue(person?.accounts).map((value) => text(value)))
+      .filter(Boolean))];
   }
 
   async publish(tenantId: string, data: unknown) {
@@ -233,56 +305,83 @@ export class OnlineBookingService {
     };
   }
 
-  async prepareAccount(tenantId: string, email: unknown) {
-    const normalizedEmail = emailValue(email);
-    if (!normalizedEmail) throw new BadRequestException('Введите email');
-    const account = await this.prisma.account.findUnique({
-      where: { tenantId_email: { tenantId, email: normalizedEmail } },
-      select: { id: true },
+  async prepareAccount(_tenantId: string, input: unknown) {
+    const source = objectValue(input);
+    const identifierValue = text(source.identifier || (typeof input === 'string' ? input : ''));
+    const email = emailValue(source.email);
+    const phone = canonicalPhone(source.phone);
+    const contacts: Array<{ type: AccountContactType; value: string; field: 'identifier' | 'email' | 'phone' }> = [];
+
+    const identifier = accountLoginContact(identifierValue);
+    if (identifier) contacts.push({ ...identifier, field: 'identifier' });
+    if (email && email.includes('@')) contacts.push({ type: AccountContactType.EMAIL, value: email, field: 'email' });
+    if (phone) contacts.push({ type: AccountContactType.PHONE, value: phone, field: 'phone' });
+    if (!contacts.length) throw new BadRequestException('Введите телефон или email');
+
+    const unique = [...new Map(contacts.map((contact) => [`${contact.type}:${contact.value}`, contact])).values()];
+    const rows = await this.prisma.accountContact.findMany({
+      where: { OR: unique.map((contact) => ({ type: contact.type, value: contact.value })) },
+      select: { type: true, value: true },
     });
-    return { exists: Boolean(account) };
+    const occupied = new Set(rows.map((row) => `${row.type}:${row.value}`));
+    const conflicts = {
+      identifier: unique.some((contact) => contact.field === 'identifier' && occupied.has(`${contact.type}:${contact.value}`)),
+      email: unique.some((contact) => contact.field === 'email' && occupied.has(`${contact.type}:${contact.value}`)),
+      phone: unique.some((contact) => contact.field === 'phone' && occupied.has(`${contact.type}:${contact.value}`)),
+    };
+    return {
+      exists: conflicts.identifier || conflicts.email || conflicts.phone,
+      conflicts,
+      identifierType: identifier?.type || '',
+    };
   }
 
   async registerAccount(tenantId: string, body: Record<string, any>) {
-    const documents = await this.tenantDocumentArchive.publicDocuments(tenantId);
     const email = emailValue(body.email);
     const password = text(body.password);
     const name = text(body.name);
     const phone = text(body.phone);
-    const consents = normalizeConsents(body.consents);
+    const telegramId = text(body.telegramId);
+    const profileData = normalizeProfileData(body.profileData);
+    const accountTerms = objectValue(body.accountTerms);
     if (!email || !email.includes('@')) throw new BadRequestException('Введите корректный email');
     if (password.length < 6) throw new BadRequestException('Пароль должен содержать не менее 6 символов');
     if (!name) throw new BadRequestException('Введите имя');
     if (!/^\+\d{8,15}$/.test(phone)) throw new BadRequestException('Введите телефон полностью');
-    this.ensurePdnConsent({ documents }, consents);
 
-    const exists = await this.prisma.account.findUnique({ where: { tenantId_email: { tenantId, email } } });
-    if (exists) throw new ConflictException('Аккаунт с этим email уже существует');
-
-    const account = await this.prisma.account.create({
-      data: {
-        tenantId,
-        email,
-        passwordHash: await hash(password, 12),
-        name,
-        surname: text(body.surname),
-        phone,
-        telegramId: text(body.telegramId),
-        profileData: normalizeProfileData(body.profileData) as Prisma.InputJsonValue,
-      },
-    });
-    const personState = await this.personIdentity.personState(tenantId, account.phone);
-    const binding = personState.owner
-      ? await this.personIdentity.bindFirstAccess(tenantId, account as any)
-      : {
-          person: await this.businessState.upsertPersonFromAccount(tenantId, account as any),
-          personExisted: false,
-        };
-    await this.consentPolicy.acceptAccountConsents(tenantId, account.id, consents, 'online-booking-registration');
-    if (consents.some((item) => item.documentId === 'messages-consent' && item.accepted)) {
-      await this.consentPolicy.acceptContactPointConsent(tenantId, 'PHONE', account.phone, 'messages-consent', 'online-booking-registration');
-      await this.consentPolicy.acceptContactPointConsent(tenantId, 'EMAIL', account.email, 'messages-consent', 'online-booking-registration');
+    const currentTerms = await this.accountDocuments.publicTerms();
+    if (!accountTerms.accepted
+      || text(accountTerms.key) !== currentTerms.key
+      || Number(accountTerms.version || 0) !== currentTerms.version) {
+      throw new BadRequestException('Необходимо принять актуальные Условия использования учетной записи');
     }
+
+    const contacts = accountContactFacts({ email, phone, telegramId, profileData });
+    const account = await this.prisma.$transaction(async (tx) => {
+      await this.assertContactsAvailable(contacts, '', tx);
+      const created = await tx.account.create({
+        data: {
+          createdViaTenantId: tenantId,
+          email,
+          passwordHash: await hash(password, 12),
+          name,
+          surname: text(body.surname),
+          phone,
+          telegramId,
+          profileData: profileData as Prisma.InputJsonValue,
+        },
+      });
+      await this.replaceAccountContacts(tx, created.id, contacts);
+      return created;
+    });
+
+    await this.accountDocuments.accept(
+      account.id,
+      accountTerms,
+      'online-booking-registration',
+      { tenantContext: tenantId },
+    );
+    const binding = await this.personIdentity.bindFirstAccess(tenantId, account as any);
     return {
       accessToken: await this.issueAccountToken(account),
       account: await this.accountView(tenantId, account),
@@ -290,13 +389,16 @@ export class OnlineBookingService {
     };
   }
 
-  async loginAccount(tenantId: string, email: unknown, password: unknown) {
-    const normalizedEmail = emailValue(email);
-    const account = await this.prisma.account.findUnique({
-      where: { tenantId_email: { tenantId, email: normalizedEmail } },
+  async loginAccount(tenantId: string, identifierValue: unknown, password: unknown) {
+    const identifier = accountLoginContact(identifierValue);
+    if (!identifier) throw new BadRequestException('Введите телефон или email');
+    const contact = await this.prisma.accountContact.findUnique({
+      where: { type_value: { type: identifier.type, value: identifier.value } },
+      include: { account: true },
     });
+    const account = contact?.account || null;
     if (!account || !(await compare(text(password), account.passwordHash))) {
-      throw new UnauthorizedException('Неверный email или пароль');
+      throw new UnauthorizedException('Неверный телефон, email или пароль');
     }
     const binding = await this.personIdentity.bindFirstAccess(tenantId, account as any);
     return {
@@ -306,15 +408,37 @@ export class OnlineBookingService {
     };
   }
 
+  async resumeAccount(tenantId: string, accountId: string) {
+    const account = await this.prisma.account.findUnique({ where: { id: accountId } });
+    if (!account) throw new UnauthorizedException('Аккаунт не найден');
+    const binding = await this.personIdentity.bindFirstAccess(tenantId, account as any);
+    return {
+      accessToken: await this.issueAccountToken(account),
+      account: await this.accountView(tenantId, account),
+      personExisted: binding.personExisted,
+    };
+  }
+
   async getAccount(tenantId: string, accountId: string) {
-    const account = await this.prisma.account.findFirst({ where: { id: accountId, tenantId } });
+    const account = await this.prisma.account.findUnique({ where: { id: accountId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
     await this.personIdentity.bindFirstAccess(tenantId, account as any);
     return this.accountView(tenantId, account);
   }
 
+  async accountTenantContactContext(tenantId: string, accountId: string) {
+    const account = await this.prisma.account.findUnique({ where: { id: accountId } });
+    if (!account) throw new UnauthorizedException('Аккаунт не найден');
+    await this.personIdentity.bindFirstAccess(tenantId, account as any);
+    const identity = await this.businessState.bookingIdentityForAccount(tenantId, accountId);
+    return {
+      phone: account.phone,
+      uei: text(identity?.uei),
+    };
+  }
+
   async updateAccount(tenantId: string, accountId: string, body: Record<string, any>) {
-    const account = await this.prisma.account.findFirst({ where: { id: accountId, tenantId } });
+    const account = await this.prisma.account.findUnique({ where: { id: accountId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
 
     const phone = text(body.phone) || account.phone;
@@ -322,25 +446,43 @@ export class OnlineBookingService {
     const profileData = body.profileData == null
       ? normalizeProfileData(account.profileData)
       : normalizeProfileData({ ...objectValue(account.profileData), ...objectValue(body.profileData) });
-    const updated = await this.prisma.account.update({
-      where: { id: account.id },
-      data: {
-        name: text(body.name) || account.name,
-        surname: body.surname == null ? account.surname : text(body.surname),
-        phone,
-        telegramId: text(body.telegramId) || account.telegramId,
-        profileData: profileData as Prisma.InputJsonValue,
-      },
+    const telegramId = text(body.telegramId) || account.telegramId;
+    const contacts = accountContactFacts({
+      email: account.email,
+      phone,
+      telegramId,
+      profileData,
+    });
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await this.replaceAccountContacts(tx, account.id, contacts);
+      return tx.account.update({
+        where: { id: account.id },
+        data: {
+          name: text(body.name) || account.name,
+          surname: body.surname == null ? account.surname : text(body.surname),
+          phone,
+          telegramId,
+          profileData: profileData as Prisma.InputJsonValue,
+        },
+      });
     });
     await this.personIdentity.bindFirstAccess(tenantId, updated as any);
+    await this.personIdentity.syncLinkedPeople(updated as any);
     return this.accountView(tenantId, updated);
+  }
+
+  async syncAccountPersonContacts(accountId: string) {
+    const account = await this.prisma.account.findUnique({ where: { id: accountId } });
+    if (!account) throw new UnauthorizedException('Аккаунт не найден');
+    return this.personIdentity.syncLinkedPeople(account as any);
   }
 
   async changeAccountPassword(tenantId: string, accountId: string, currentPassword: unknown, newPassword: unknown) {
     const current = String(currentPassword ?? '');
     const next = String(newPassword ?? '');
     if (next.length < 8) throw new BadRequestException('Новый пароль должен содержать минимум 8 символов');
-    const account = await this.prisma.account.findFirst({ where: { id: accountId, tenantId } });
+    const account = await this.prisma.account.findUnique({ where: { id: accountId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
     if (!(await compare(current, account.passwordHash))) throw new BadRequestException('Текущий пароль указан неверно');
     if (await compare(next, account.passwordHash)) throw new BadRequestException('Новый пароль должен отличаться от текущего');
@@ -352,7 +494,7 @@ export class OnlineBookingService {
   }
 
   async createRequest(tenantId: string, accountId: string, body: Record<string, any>) {
-    const account = await this.prisma.account.findFirst({ where: { id: accountId, tenantId } });
+    const account = await this.prisma.account.findUnique({ where: { id: accountId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
     const data = await this.bookingSource(tenantId);
     if (!(await this.consentPolicy.hasActivePdnConsent(tenantId, accountId))) {
@@ -431,7 +573,7 @@ export class OnlineBookingService {
   }
 
   async getMyRecords(tenantId: string, accountId: string) {
-    const account = await this.prisma.account.findFirst({ where: { id: accountId, tenantId } });
+    const account = await this.prisma.account.findUnique({ where: { id: accountId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
     await this.personIdentity.bindFirstAccess(tenantId, account as any);
     const identity = await this.businessState.bookingIdentityForAccount(tenantId, accountId);
@@ -442,20 +584,23 @@ export class OnlineBookingService {
   }
 
   async ownerAccounts(tenantId: string) {
+    const accountIds = await this.tenantAccountIds(tenantId);
+    if (!accountIds.length) return [];
     const accounts = await this.prisma.account.findMany({
-      where: { tenantId },
+      where: { id: { in: accountIds } },
       orderBy: { updatedAt: 'desc' },
     });
     return accounts.map(publicAccount);
   }
 
   async syncOwnerAccounts(tenantId: string, value: unknown) {
+    const allowed = new Set(await this.tenantAccountIds(tenantId));
     const items = arrayValue(value);
     let updated = 0;
     for (const item of items) {
       const accountId = text(item?.accountId ?? item?.id);
-      if (!accountId) continue;
-      const account = await this.prisma.account.findFirst({ where: { id: accountId, tenantId } });
+      if (!accountId || !allowed.has(accountId)) continue;
+      const account = await this.prisma.account.findUnique({ where: { id: accountId } });
       if (!account) continue;
       await this.prisma.account.update({
         where: { id: account.id },

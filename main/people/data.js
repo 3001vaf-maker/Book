@@ -47,6 +47,9 @@ export function normalizePerson(person = {}) {
     telegrams: Array.isArray(person.telegrams) ? person.telegrams : [],
     emails: normalizeStrings(person.emails),
     accounts: normalizeStrings(person.accounts),
+    identityReview: person.identityReview && typeof person.identityReview === 'object' && !Array.isArray(person.identityReview)
+      ? clone(person.identityReview)
+      : null,
     links: Array.isArray(person.links) ? person.links : [],
     tags: normalizeTagAssignments(person.tags),
     discountPercent: normalizeDiscount(person),

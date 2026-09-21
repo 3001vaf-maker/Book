@@ -3,6 +3,7 @@ import fs from 'node:fs';
 
 const service = fs.readFileSync('server/src/online-booking/online-booking.service.ts', 'utf8');
 const controller = fs.readFileSync('server/src/online-booking/online-booking.controller.ts', 'utf8');
+const bookingConsent = fs.readFileSync('server/src/online-booking/booking-consent.controller.ts', 'utf8');
 const record = fs.readFileSync('server/src/record/record.service.ts', 'utf8');
 const time = fs.readFileSync('server/src/time/time.service.ts', 'utf8');
 const finance = fs.readFileSync('server/src/finance/finance.service.ts', 'utf8');
@@ -43,7 +44,8 @@ assert.match(controller, /@Get\(':tenantId\/account\/records'\)/);
 assert.doesNotMatch(controller, /@Get\(':tenantId\/account\/requests'\)/);
 assert.doesNotMatch(accountShell, /recordSnapshot/);
 
-assert.match(service, /acceptAccountConsents/);
+assert.doesNotMatch(service, /acceptAccountConsents/);
+assert.match(bookingConsent, /acceptAccountConsents\(auth\.tenantId, auth\.accountId/);
 assert.match(consentPolicy, /INSERT INTO "TenantConsentEvent"/);
 
 console.log('booking server autonomy tests passed');

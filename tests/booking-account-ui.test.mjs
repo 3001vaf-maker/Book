@@ -26,14 +26,15 @@ const accountThemeCss = fs.readFileSync('ui/shell/account-theme.css', 'utf8');
 const indexHtml = fs.readFileSync('index.html', 'utf8');
 const bookingUi = fs.readFileSync('ui/booking/index.js', 'utf8');
 
-// Registration owns agreements. Booking starts only after account resolution.
+// Public booking selection comes first. Identity/legal checks happen only after time selection.
 assert.match(booking, /renderAccount/);
 assert.match(booking, /appHeader\(\{ title, back, action \}\)/);
 assert.match(booking, /appShell\(\{/);
 assert.match(booking, /bookingThemeStyle\(state\.settings\)/);
 assert.match(booking, /bookingChoiceCards\(/);
 assert.match(booking, /bookingTimeGroups\(/);
-assert.match(booking, /function renderRegistrationAgreements/);
+assert.match(booking, /function renderAccountTerms/);
+assert.match(booking, /function renderTenantAgreements/);
 assert.match(booking, /function renderAccountEntry/);
 assert.match(booking, /function renderAccountDetails/);
 assert.match(booking, /function renderPassword/);
@@ -42,12 +43,22 @@ assert.match(booking, /function renderProcedures/);
 assert.match(booking, /function renderDates/);
 assert.match(booking, /function renderTimes/);
 assert.match(booking, /function renderConfirmation/);
-assert.match(booking, /subtitle: 'Согласия относятся к регистрации и аккаунту'/);
-assert.match(booking, /if \(prepared\.exists\) renderPassword\(root, state\);/);
-assert.match(booking, /else renderAccountDetails\(root, state\);/);
-assert.match(booking, /if \(payload\.personExisted\)/);
-assert.match(booking, /nextBookingStep\(root, state\)/);
-assert.match(booking, /saveRegistrationConsents\(state\)/);
+assert.match(booking, /state\.identityDestination = 'booking';[\s\S]*?nextBookingStep\(root, state\)/);
+assert.match(booking, /if \(prepared\.exists\) \{[\s\S]*?renderPassword\(root, state\);[\s\S]*?await loadAccountTerms\(state\);[\s\S]*?renderAccountTerms\(root, state\);/);
+assert.match(booking, /accountTerms: currentAccountTermsFact\(state\)/);
+assert.match(booking, /label: 'Телефон или email'/);
+assert.match(booking, /name: 'identifier'/);
+assert.match(booking, /prepareAccount\(state\.tenantId, \{ identifier \}\)/);
+assert.match(booking, /prepareAccount\(state\.tenantId, \{ email, phone \}\)/);
+assert.match(booking, /prepared\?\.conflicts\?\.email/);
+assert.match(booking, /prepared\?\.conflicts\?\.phone/);
+assert.match(booking, /loginAccount\(state\.tenantId, state\.accountDraft\.identifier, password\)/);
+assert.doesNotMatch(booking, /registrationMode/);
+assert.doesNotMatch(booking, /renderRegistrationAgreements/);
+assert.doesNotMatch(booking, /saveRegistrationConsents/);
+assert.doesNotMatch(booking, /if \(payload\.personExisted\)/);
+assert.match(booking, /void continueAfterIdentity\(root, state\)/);
+assert.match(booking, /saveTenantConsents\(state\)/);
 assert.match(booking, /submitAccountConsents\(state\.tenantId, consents\)/);
 assert.match(booking, /data-booking-workplaces-back[\s\S]*?backFromFirstBookingStep\(root, state\)/);
 assert.match(booking, /if \(state\.lockedWorkplaceKey\) backFromFirstBookingStep\(root, state\)/);
@@ -63,13 +74,21 @@ assert.doesNotMatch(booking, /durationText\(duration\)/);
 assert.doesNotMatch(booking, /personalDataAccordion/);
 assert.doesNotMatch(booking, /type:\s*'date'/);
 assert.match(booking, /getAccountConsentState/);
-assert.match(booking, /async function refreshAccountConsentState/);
-assert.match(booking, /if \(consentState\.pdnActive\) \{[\s\S]*?nextBookingStep\(root, state\)/);
+assert.match(booking, /getAccountPlatformState/);
+assert.match(booking, /getAccountTerms/);
+assert.match(booking, /acceptAccountTerms/);
+assert.match(booking, /async function refreshTenantConsentState/);
+assert.match(booking, /async function continueAfterIdentity/);
+assert.match(booking, /if \(!state\.account\) \{[\s\S]*?renderAccountEntry\(root, state\);/);
+assert.match(booking, /const platformState = await getAccountPlatformState\(state\.tenantId\);[\s\S]*?if \(!platformState\?\.accepted\) \{[\s\S]*?renderAccountTerms\(root, state\);/);
+assert.match(booking, /const consentState = await refreshTenantConsentState\(state\);[\s\S]*?if \(consentState\.pdnActive\) \{[\s\S]*?renderConfirmation\(root, state\);/);
 assert.doesNotMatch(booking, /consentState\.allowed/);
-assert.match(booking, /state\.registrationMode = 'repair'/);
+assert.match(booking, /const account = await getAccount\(state\.tenantId\);[\s\S]*?if \(account\) state\.account = account;[\s\S]*?renderWelcome\(root, state\);/);
 
 // Account stays on canonical shared primitives.
 assert.match(accountShell, /entityCard\(\{/);
+assert.doesNotMatch(accountShell, /UEI \$\{account\.uei\}/);
+assert.doesNotMatch(accountShell, /id:\s*account\.uei/);
 assert.match(accountShell, /className: 'entity-card--hero'/);
 assert.match(accountShell, /image: profile\.photo \|\| ''/);
 assert.doesNotMatch(accountShell, /clientProfileCard\(/);
@@ -158,6 +177,12 @@ assert.match(accountApi, /account\/password/);
 assert.match(accountSettingsController, /@Put\(':tenantId\/account\/password'\)/);
 assert.match(accountSettingsController, /changeAccountPassword/);
 assert.match(onlineBookingService, /async changeAccountPassword/);
+const publicAccountBlock = onlineBookingService.slice(
+  onlineBookingService.indexOf('function publicAccount('),
+  onlineBookingService.indexOf('@Injectable()'),
+);
+assert.doesNotMatch(publicAccountBlock, /\buei\s*:/, 'Public Account projection must not expose internal UEI');
+assert.match(onlineBookingService, /async accountTenantContactContext\(/);
 assert.match(onlineBookingService, /compare\(current, account\.passwordHash\)/);
 assert.match(onlineBookingService, /passwordHash: await hash\(next, 12\)/);
 assert.match(onlineBookingService, /photo: text\(source\.photo\)/);

@@ -605,8 +605,9 @@ One step must be completed, tested and checked before the next step is marked co
 - [x] Full Check Book green on feature head: #1996.
 - [x] Post-merge staging Check Book green: #1997, including migration, backend, four production domains and staging frontend.
 - [x] PROJECT_STATE updated with final verified Finance ownership.
-- [ ] Final whole-staging release Check Book on the exact Finance closeout head.
-- [ ] Only after that check and a green `staging -> main` PR may this release merge to `main`.
+- [x] Final whole-staging release Check Book #2000 passed on the exact Finance closeout tree.
+- [x] `staging -> main` PR #247 passed Check Book #2001 and merged as `main@e55e4e58c0073fab313ec0cc26f46415d2e7a1d7`.
+- [x] Post-main Check Book #2002 passed all required jobs.
 
 ## Financial Model reservation rule
 

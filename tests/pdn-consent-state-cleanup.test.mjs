@@ -23,11 +23,10 @@ assert.doesNotMatch(guard, /requiredConsentState/);
 assert.doesNotMatch(guard, /bookingConsentAccess/);
 assert.doesNotMatch(guard, /Promise\.all/);
 
-assert.match(service, /private ensurePdnConsent\(/);
-assert.match(service, /text\(item\?\.id\) === 'pdn-consent'/);
-assert.match(service, /item\.documentId === 'pdn-consent'/);
-assert.match(service, /this\.ensurePdnConsent\(\{ documents \}, consents\)/);
+assert.doesNotMatch(service, /private ensurePdnConsent\(/);
+assert.doesNotMatch(service, /this\.ensurePdnConsent/);
 assert.doesNotMatch(service, /ensureRequiredConsents/);
+assert.match(controller, /acceptAccountConsents\(auth\.tenantId, auth\.accountId/);
 
 assert.match(booking, /consentState\.pdnActive/);
 assert.doesNotMatch(booking, /consentState\.allowed/);

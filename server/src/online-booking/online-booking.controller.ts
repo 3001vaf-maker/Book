@@ -2,6 +2,7 @@ import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Put, Q
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CommunicationService } from '../communication/communication.service';
+import { AccountDocumentService } from '../document-registry/account-document.service';
 import { NotificationService } from '../notification/notification.service';
 import { WebPushService } from '../notification/web-push.service';
 import { AccountGuard } from './account.guard';
@@ -16,6 +17,7 @@ type AccountRequest = Request & { accountAuth?: { accountId: string; tenantId: s
 export class OnlineBookingController {
   constructor(
     private readonly booking: OnlineBookingService,
+    private readonly accountDocuments: AccountDocumentService,
     private readonly notifications: NotificationService,
     private readonly communications: CommunicationService,
     private readonly webPush: WebPushService,
@@ -23,8 +25,8 @@ export class OnlineBookingController {
   ) {}
 
   private async accountTelegramSettings(tenantId: string, accountId: string) {
-    const account = await this.booking.getAccount(tenantId, accountId);
-    const identity = await this.communications.telegramIdentity(tenantId, { phone: account.phone, uei: account.uei });
+    const context = await this.booking.accountTenantContactContext(tenantId, accountId);
+    const identity = await this.communications.telegramIdentity(tenantId, context);
     if (!identity) return { telegram: { linked: false, enabled: false, username: '' } };
     return {
       telegram: {
@@ -59,14 +61,43 @@ export class OnlineBookingController {
     return this.personIdentity.reconcileLegacyAccountDuplicates(request.auth!.tenantId);
   }
 
+  @Get('account-terms')
+  accountTerms() {
+    return this.accountDocuments.publicTerms();
+  }
+
+  @UseGuards(AccountGuard)
+  @Get(':tenantId/account/platform-state')
+  accountPlatformState(@Req() request: AccountRequest) {
+    return this.accountDocuments.state(request.accountAuth!.accountId);
+  }
+
+  @UseGuards(AccountGuard)
+  @Post(':tenantId/account/platform-terms')
+  acceptAccountTerms(
+    @Param('tenantId') tenantId: string,
+    @Req() request: AccountRequest,
+    @Body() body: { accountTerms?: unknown },
+  ) {
+    return this.accountDocuments.accept(
+      request.accountAuth!.accountId,
+      body?.accountTerms,
+      'online-booking-account',
+      { tenantContext: tenantId },
+    );
+  }
+
   @Get(':tenantId/context')
   context(@Param('tenantId') tenantId: string, @Query('workplace') workplace = '') {
     return this.booking.getContext(tenantId, workplace);
   }
 
   @Post(':tenantId/account/prepare')
-  prepareAccount(@Param('tenantId') tenantId: string, @Body() body: { email?: string }) {
-    return this.booking.prepareAccount(tenantId, body?.email || '');
+  prepareAccount(
+    @Param('tenantId') tenantId: string,
+    @Body() body: { identifier?: unknown; email?: unknown; phone?: unknown },
+  ) {
+    return this.booking.prepareAccount(tenantId, body || {});
   }
 
   @Post(':tenantId/account/register')
@@ -75,8 +106,8 @@ export class OnlineBookingController {
   }
 
   @Post(':tenantId/account/login')
-  loginAccount(@Param('tenantId') tenantId: string, @Body() body: { email?: string; password?: string }) {
-    return this.booking.loginAccount(tenantId, body?.email || '', body?.password || '');
+  loginAccount(@Param('tenantId') tenantId: string, @Body() body: { identifier?: unknown; email?: unknown; password?: unknown }) {
+    return this.booking.loginAccount(tenantId, body?.identifier ?? body?.email ?? '', body?.password ?? '');
   }
 
   @UseGuards(AccountGuard)
@@ -91,10 +122,25 @@ export class OnlineBookingController {
     return this.booking.updateAccount(tenantId, request.accountAuth!.accountId, body || {});
   }
 
+  @Post(':tenantId/account/telegram-entry/resolve')
+  async resolveTelegramEntry(
+    @Param('tenantId') tenantId: string,
+    @Body() body: { token?: unknown },
+  ) {
+    const resolved = await this.communications.resolveTelegramEntryAccount(tenantId, body?.token);
+    if (!resolved.exists || !resolved.accountId) return { exists: false };
+    const payload = await this.booking.resumeAccount(tenantId, resolved.accountId);
+    await this.communications.bindTelegramEntry(tenantId, resolved.accountId, body?.token);
+    await this.booking.syncAccountPersonContacts(resolved.accountId);
+    return { ...payload, exists: true };
+  }
+
   @UseGuards(AccountGuard)
   @Post(':tenantId/account/telegram-entry')
-  bindTelegramEntry(@Param('tenantId') tenantId: string, @Req() request: AccountRequest, @Body() body: { token?: unknown }) {
-    return this.communications.bindTelegramEntry(tenantId, request.accountAuth!.accountId, body?.token);
+  async bindTelegramEntry(@Param('tenantId') tenantId: string, @Req() request: AccountRequest, @Body() body: { token?: unknown }) {
+    const result = await this.communications.bindTelegramEntry(tenantId, request.accountAuth!.accountId, body?.token);
+    await this.booking.syncAccountPersonContacts(request.accountAuth!.accountId);
+    return result;
   }
 
   @UseGuards(AccountGuard)
@@ -162,8 +208,8 @@ export class OnlineBookingController {
   @UseGuards(AccountGuard, BookingPdnConsentGuard)
   @Get(':tenantId/account/chat')
   async accountChat(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
-    const account = await this.booking.getAccount(tenantId, request.accountAuth!.accountId);
-    return this.communications.listThread(tenantId, { phone: account.phone, uei: account.uei }, 500);
+    const context = await this.booking.accountTenantContactContext(tenantId, request.accountAuth!.accountId);
+    return this.communications.listThread(tenantId, context, 500);
   }
 
   @UseGuards(AccountGuard, BookingPdnConsentGuard)
@@ -176,10 +222,10 @@ export class OnlineBookingController {
     const message = String(body?.body ?? '').trim();
     const attachments = Array.isArray(body?.attachments) ? body.attachments : [];
     if (!message && !attachments.length) throw new BadRequestException('Пустое сообщение');
-    const account = await this.booking.getAccount(tenantId, request.accountAuth!.accountId);
+    const context = await this.booking.accountTenantContactContext(tenantId, request.accountAuth!.accountId);
     return this.communications.recordMessage(tenantId, {
-      phone: account.phone,
-      uei: account.uei,
+      phone: context.phone,
+      uei: context.uei,
       direction: 'inbound',
       kind: attachments.length ? 'media' : 'message',
       purpose: 'DIRECT',

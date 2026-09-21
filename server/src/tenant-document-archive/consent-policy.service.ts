@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import { AccountContactType } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { BusinessStateService } from '../business-state/business-state.service';
 import { TenantDocumentArchiveService } from './tenant-document-archive.service';
@@ -366,40 +367,20 @@ export class ConsentPolicyService {
     const normalizedValue = contactPointValue(type, value);
     if (!type || !normalizedValue) return false;
 
-    if (type === 'PHONE' || type === 'EMAIL') {
-      const accounts = await this.prisma.account.findMany({
-        where: { tenantId },
-        select: { id: true, phone: true, email: true },
-      });
-      const candidates = accounts.filter((account) =>
-        type === 'PHONE'
-          ? canonicalPhone(account.phone) === normalizedValue
-          : canonicalEmail(account.email) === normalizedValue
-      );
-      for (const account of candidates) {
-        if (await this.hasActivePdnConsent(tenantId, account.id)) return true;
-      }
-      return false;
-    }
+    const accountContactType = type === 'PHONE'
+      ? AccountContactType.PHONE
+      : type === 'EMAIL'
+        ? AccountContactType.EMAIL
+        : type === 'TELEGRAM'
+          ? AccountContactType.TELEGRAM
+          : null;
+    if (!accountContactType) return false;
 
-    const identities = await this.prisma.$queryRaw<Array<{ cardPhone: string; uei: string }>>`
-      SELECT "cardPhone", "uei"
-      FROM "CommunicationIdentity"
-      WHERE "tenantId" = ${tenantId}
-        AND "channel" = 'TELEGRAM'
-        AND "externalUserId" = ${normalizedValue}
-      ORDER BY "verifiedAt" DESC NULLS LAST, "updatedAt" DESC
-    `;
-    const accountIds = new Set<string>();
-    for (const identity of identities) {
-      for (const accountId of await this.businessState.accountIdsForIdentity(tenantId, identity.cardPhone, identity.uei)) {
-        accountIds.add(accountId);
-      }
-    }
-    for (const accountId of accountIds) {
-      if (await this.hasActivePdnConsent(tenantId, accountId)) return true;
-    }
-    return false;
+    const contact = await this.prisma.accountContact.findUnique({
+      where: { type_value: { type: accountContactType, value: normalizedValue } },
+      select: { accountId: true },
+    });
+    return contact ? this.hasActivePdnConsent(tenantId, contact.accountId) : false;
   }
 
   async canSendMarketing(tenantId: string, typeValue: unknown, value: unknown) {

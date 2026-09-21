@@ -4,7 +4,6 @@ import type { Request } from 'express';
 
 type AccountToken = {
   sub?: string;
-  tenantId?: string;
   kind?: string;
 };
 
@@ -20,8 +19,10 @@ export class AccountGuard implements CanActivate {
 
     try {
       const payload = await this.jwt.verifyAsync<AccountToken>(token);
-      if (payload.kind !== 'account' || !payload.sub || !payload.tenantId) throw new Error('invalid account token');
-      request.accountAuth = { accountId: payload.sub, tenantId: payload.tenantId };
+      if (payload.kind !== 'account' || !payload.sub) throw new Error('invalid account token');
+      const tenantId = String(request.params?.tenantId || '').trim();
+      if (!tenantId) throw new Error('missing tenant context');
+      request.accountAuth = { accountId: payload.sub, tenantId };
       return true;
     } catch {
       throw new UnauthorizedException('Войдите в аккаунт заново');
