@@ -49,6 +49,7 @@ let serverBookingSyncStarted = false;
 let firstRunRuntime = null;
 let firstRunState = null;
 let disposePlatformSession = () => {};
+let demoBadgeTimer = null;
 
 function syncViewport() {
   const vv = window.visualViewport;
@@ -124,8 +125,13 @@ function renderWorkspace() {
     button.addEventListener('click', () => navigate(button.dataset.nav));
   });
   if (firstRunState?.progress?.status === 'COMPLETED') {
-    const badge = demoBadgeMarkup(firstRunState);
-    if (badge) app.insertAdjacentHTML('beforeend', badge);
+    const updateBadge = () => {
+      app.querySelector('[data-first-run-demo-badge]')?.remove();
+      const badge = demoBadgeMarkup(firstRunState);
+      if (badge) app.insertAdjacentHTML('beforeend', badge);
+    };
+    updateBadge();
+    if (firstRunState?.commercialMode === 'DEMO') demoBadgeTimer = window.setInterval(updateBadge, 60_000);
   }
   firstRunRuntime?.afterWorkspaceRender();
   syncViewport();
@@ -167,6 +173,10 @@ function renderSuspended() {
 
 
 function renderDemoExpired(firstRun) {
+  if (demoBadgeTimer) {
+    window.clearInterval(demoBadgeTimer);
+    demoBadgeTimer = null;
+  }
   app.classList.remove('app-shell--booking');
   workspaceReady = false;
   disposeView();
