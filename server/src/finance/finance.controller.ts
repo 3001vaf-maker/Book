@@ -60,6 +60,12 @@ export class FinanceController {
     return this.finance.recordManualOperation(request.auth!.tenantId, body);
   }
 
+  @Post('operations/special')
+  special(@Req() request: AuthenticatedRequest, @Body() body: unknown) {
+    return this.finance.recordSpecialOperation(request.auth!.tenantId, body);
+  }
+
+
   @Post('operations/payment')
   payment(@Req() request: AuthenticatedRequest, @Body() body: unknown) {
     return this.finance.recordPayment(request.auth!.tenantId, body);
