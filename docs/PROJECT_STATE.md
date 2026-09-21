@@ -129,9 +129,9 @@ The previously queued Auth transactional communication block is paused.
 
 ## Active block — Finance ownership rebuild (2026-09-20)
 
-Source checkpoint: `staging@765b73ad7e78541cbbd0ebe3524fa1fb0a03a160`.
+Source checkpoint: `staging@18af1dee4f127e00f720dfd522835b5e2c3e0258`.
 
-Working branch: `feature/finance-f6-f8-articles-income-expense-20260921`.
+Working branch: none — F6-F8 are complete in `staging`.
 
 Continuity anchor: `docs/FINANCE_ARCHITECTURE.md`.
 
@@ -140,7 +140,7 @@ Current status:
 - F1: DONE — verified ownership/storage/formula inventory and current-owner -> target-owner migration map are recorded in `docs/FINANCE_ARCHITECTURE.md`; merged to `staging` as `02bd8e6b0ab82048335d1a29be8e9186a4b614bb`; post-merge Check Book #1972 passed all three jobs.
 - F2: DONE — legacy operational Financial Model/FinancialPlan naming is replaced by `Settlement / Расчёт`; `core/finance/model.js` is removed; guards block the old API and operational Financial Model dependencies. Exact-head Check Book #1977 and post-merge Check Book #1978 both passed all required jobs on `staging@b075c9bf2203d839d5dc9cba6153aa7ab705a893`.
 - F3-F5: DONE — merged to `staging` as `b3819f4033424cec502244b667781e004d5796a0`. Record no longer owns payment truth; canonical server `FinanceSettlement`, `FinanceOperation` and flat `FinanceLedgerEntry` own Settlement, operations and factual money rows; payment/refund/cancel are server-owned; split-wallet payment is one Operation with multiple Ledger rows; Wallet/DDS project from Ledger; legacy auxiliary Finance is migration-only. Combined feature Check Book #1989 and post-merge Check Book #1990 both passed all required jobs, including migration, backend, four production domains and staging frontend.
-- F6-F8: IMPLEMENTED IN FEATURE BRANCH — server-owned hierarchical `FinanceArticle` catalog with separate `direction` and `economicType`; custom nested articles; manual Income/Expense command writes one FinanceOperation with one or many flat Ledger rows; simple amount and detailed quantity × unit price entry are supported; Wallet/Cash remains metadata-only with balance/history projected from Ledger. One combined F6-F8 verification is pending before merge to `staging`.
+- F6-F8: DONE — merged to `staging` as `18af1dee4f127e00f720dfd522835b5e2c3e0258` via PR #245. Server-owned hierarchical `FinanceArticle` catalog separates custom names from `direction`/`economicType`; manual Income/Expense writes one FinanceOperation with one or many flat Ledger rows; simple amount and detailed quantity × unit price entry are supported; Wallet/Cash remains metadata-only with balance/history projected from Ledger. Feature Check Book #1993 and post-merge Check Book #1994 both passed all required jobs, including migration, backend, four production domains and staging frontend.
 - F9-F12: NOT STARTED.
 - F0-F1 changed documentation only. F2 renamed the operational calculation owner to Settlement. F3-F5 moved payment truth to Settlement + Operation + flat Ledger. F6-F8 add Articles and direct manual Income/Expense on the same Ledger without introducing a parallel money store.
 - `main` must not receive this rebuild until F0-F12 are complete and the exact staging release head is fully verified.

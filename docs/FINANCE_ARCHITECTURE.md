@@ -577,7 +577,7 @@ One step must be completed, tested and checked before the next step is marked co
 - [x] Simple amount entry supported.
 - [x] Detailed quantity × unit price lines supported.
 - [x] Results are one Operation + one or many Ledger rows, not a parallel store.
-- [ ] Final combined F6-F8 Check Book / merge-to-staging verification.
+- [x] F6-F8 merged to `staging@18af1dee4f127e00f720dfd522835b5e2c3e0258` via PR #245; feature Check Book #1993 and post-merge Check Book #1994 passed all required jobs.
 
 ### F9 — Loans / Investments / Returns / Transfers
 - [ ] Loan received is cash IN but not operating revenue.
