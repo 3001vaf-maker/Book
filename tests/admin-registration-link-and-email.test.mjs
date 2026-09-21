@@ -8,6 +8,7 @@ const adminService = fs.readFileSync('server/src/saas-admin/saas-admin.service.t
 const adminModule = fs.readFileSync('server/src/saas-admin/saas-admin.module.ts', 'utf8');
 const adminUi = fs.readFileSync('admin/admin.js', 'utf8');
 const inviteUi = fs.readFileSync('invite/invite.js', 'utf8');
+const hardDeleteMigration = fs.readFileSync('server/prisma/migrations/20260921233000_allow_test_tenant_hard_delete/migration.sql', 'utf8');
 
 assert.match(invitation, /async createRegistrationLink\(/);
 assert.match(invitation, /@registration\.invalid/);
@@ -46,8 +47,12 @@ assert.match(adminService, /prisma\.\$transaction/);
 assert.match(adminService, /DELETE FROM "PlatformConsentEvent" WHERE "tenantId"/);
 assert.match(adminService, /tx\.tenant\.delete/);
 assert.match(adminService, /remainingMemberships === 0 && !platformAdmin/);
+assert.match(adminService, /set_config\('book\.allow_test_tenant_delete', 'on', true\)/);
+assert.match(hardDeleteMigration, /current_setting\('book\.allow_test_tenant_delete', true\) = 'on'/);
 assert.match(adminUi, /data-delete-tenant/);
 assert.match(adminUi, /Полностью удалить/);
+assert.match(adminUi, /openDeleteTenantModal/);
+assert.doesNotMatch(adminUi, /window\.confirm|\balert\s*\(/);
 assert.doesNotMatch(adminUi, /data-delete-invitation/);
 
 console.log('Admin registration link and technical email tests passed');
