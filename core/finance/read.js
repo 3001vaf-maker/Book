@@ -113,7 +113,10 @@ export function getZReport({ from = null, to = null } = {}) {
   const toMs = reportBoundary(to, Number.POSITIVE_INFINITY);
   const entries = getLedgerEntries().filter((entry) => {
     const time = new Date(String(entry?.createdAt || entry?.occurredAt || '')).getTime();
-    return Number.isFinite(time) && time >= fromMs && time <= toMs;
+    if (!Number.isFinite(time) || time < fromMs || time > toMs) return false;
+    if (entry?.operationStatus === 'cancelled') return false;
+    if (entry?.economicType === 'REVERSAL') return false;
+    return true;
   });
 
   const walletMap = new Map();
