@@ -177,6 +177,10 @@ assert.equal(getWalletDDSMovements('cash').reduce((sum, row) => sum + Number(row
 // Server remains authoritative and protects same-source money writes with Serializable transactions.
 const serverFinance = readFileSync(new URL('../server/src/finance/finance.service.ts', import.meta.url), 'utf8');
 const recordServer = readFileSync(new URL('../server/src/record/record.service.ts', import.meta.url), 'utf8');
+const financeData = readFileSync(new URL('../core/finance/data.js', import.meta.url), 'utf8');
+const financeRead = readFileSync(new URL('../core/finance/read.js', import.meta.url), 'utf8');
+const financeUi = readFileSync(new URL('../main/finance/finance.js', import.meta.url), 'utf8');
+const paymentUi = readFileSync(new URL('../journal/record-payment.js', import.meta.url), 'utf8');
 assert.match(serverFinance, /TransactionIsolationLevel\.Serializable/);
 assert.match(serverFinance, /saveSettlementWith\(tx/);
 assert.match(serverFinance, /financeLedgerEntry\.create/);
@@ -184,5 +188,16 @@ assert.doesNotMatch(serverFinance, /queueAuxiliaryDataset/);
 assert.match(recordServer, /settlementForSource/);
 assert.match(recordServer, /repriceSettlement/);
 assert.match(recordServer, /const \{ finance: _legacyFinance, \.\.\.currentRecord \} = current/);
+assert.match(serverFinance, /requiredOccurredAt/);
+assert.match(serverFinance, /recordedAt: row\.createdAt\.toISOString\(\)/);
+assert.match(financeData, /recordedAt/);
+assert.match(financeRead, /entry\?\.occurredAt/);
+assert.match(financeUi, /Фактическая дата и время/);
+assert.match(financeUi, /Внесено в Book/);
+assert.match(paymentUi, /recordPaymentOccurredAtValue/);
+assert.match(paymentUi, /record\?\.to \|\| record\?\.from/);
+assert.match(paymentUi, /paymentOccurredAt/);
+assert.match(paymentUi, /refundOccurredAt/);
+assert.match(paymentUi, /cancelOccurredAt/);
 
 console.log('finance roundtrip alignment tests: OK');
