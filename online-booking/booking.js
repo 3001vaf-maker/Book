@@ -129,12 +129,12 @@ async function loadAccountTerms(state) {
 }
 
 function openAccountTermsDocument(state) {
-  const document = state.accountTerms || {};
-  if (!document.key) return;
-  mountModal(document.body, modal(bookingDocument({
-    title: document.title || 'Условия использования учетной записи',
-    version: document.version || 1,
-    text: document.content || '',
+  const legalDocument = state.accountTerms || {};
+  if (!legalDocument.key) return;
+  mountModal(globalThis.document.body, modal(bookingDocument({
+    title: legalDocument.title || 'Условия использования учетной записи',
+    version: legalDocument.version || 1,
+    text: legalDocument.content || '',
   }), { variant: 'large' }));
 }
 
@@ -277,12 +277,12 @@ function backFromFirstBookingStep(root, state) {
 }
 
 function openTenantDocument(state, documentId) {
-  const document = requiredBookingDocuments(state.context).find((item) => String(item.id) === String(documentId));
-  if (!document) return;
-  mountModal(document.body, modal(bookingDocument({
-    title: document.title || 'Документ',
-    version: document.version || 1,
-    text: document.text || '',
+  const legalDocument = requiredBookingDocuments(state.context).find((item) => String(item.id) === String(documentId));
+  if (!legalDocument) return;
+  mountModal(globalThis.document.body, modal(bookingDocument({
+    title: legalDocument.title || 'Документ',
+    version: legalDocument.version || 1,
+    text: legalDocument.text || '',
   }), { variant: 'large' }));
 }
 
@@ -495,16 +495,21 @@ async function continueAfterIdentity(root, state) {
     renderTenantAgreements(root, state);
   } catch (error) {
     state.error = error instanceof Error ? error.message : 'Не удалось проверить юридический статус';
-    if (!state.accountTerms?.key) {
-      try {
-        await loadAccountTerms(state);
-        renderAccountTerms(root, state);
-        return;
-      } catch {
-        // Fall through to the tenant-specific screen only when platform terms are already known.
-      }
+    try {
+      await loadAccountTerms(state);
+      renderAccountTerms(root, state);
+    } catch {
+      renderFlowPage(root, state, {
+        title: 'Проверка учетной записи',
+        back: { data: 'data-account-status-back', aria: 'Назад' },
+        body: errorBlock(state.error),
+        center: true,
+      });
+      root.querySelector('[data-account-status-back]')?.addEventListener('click', () => {
+        if (state.identityDestination === 'booking' && state.from) renderTimes(root, state);
+        else nextBookingStep(root, state);
+      });
     }
-    renderTenantAgreements(root, state);
   }
 }
 
