@@ -1,6 +1,7 @@
 import { apiRequest, clearAuthToken, getCurrentAccount, login } from '../core/auth.js';
 import { renderDocumentRegistry } from './document-registry/view.js';
 import { renderFirstRunAdmin } from './first-run.js';
+import { DOCUMENT_CATALOG } from './document-registry/catalog.js';
 
 const app = document.querySelector('#admin-app');
 const state = {
@@ -59,6 +60,11 @@ function renderLogin(message = '') {
 
 async function loadAdmin() {
   state.admin = await adminRequest('/me');
+  await adminRequest('/document-registry/sync', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ documents: DOCUMENT_CATALOG }),
+  });
   await refreshData();
   renderShell();
 }
