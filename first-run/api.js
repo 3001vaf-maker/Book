@@ -90,3 +90,17 @@ export async function downloadRknGuide() {
   link.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+export async function requestLiveMode() {
+  return jsonResponse(await apiRequest('/first-run/requests/live', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  }), 'Не удалось отправить запрос на LIVE');
+}
+
+export async function requestDemoExtension() {
+  return jsonResponse(await apiRequest('/first-run/requests/demo-extension', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  }), 'Не удалось отправить запрос на продление DEMO');
+}
