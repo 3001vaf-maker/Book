@@ -305,19 +305,21 @@ function renderTenants() {
     });
   });
 
-  content.querySelectorAll('[data-delete-invitation]').forEach((button) => {
+  content.querySelectorAll('[data-delete-tenant]').forEach((button) => {
     button.addEventListener('click', async (event) => {
       event.stopPropagation();
-      const invitationId = button.dataset.deleteInvitation;
-      if (!invitationId) return;
-      if (!window.confirm('Удалить эту незавершённую регистрацию и все её пустые технические данные?')) return;
+      const tenantId = button.dataset.deleteTenant;
+      if (!tenantId) return;
+      const tenant = state.tenants.find((item) => item.tenantId === tenantId);
+      const name = tenant?.ownerProfile?.name || tenant?.invitation?.name || tenant?.tenantName || 'этого пользователя';
+      if (!window.confirm(`Полностью удалить «${name}» и все данные этого тестового рабочего пространства? Отменить это действие будет нельзя.`)) return;
       button.disabled = true;
       try {
-        await adminRequest(`/invitations/${encodeURIComponent(invitationId)}`, { method: 'DELETE' });
+        await adminRequest(`/tenants/${encodeURIComponent(tenantId)}`, { method: 'DELETE' });
         await refreshData();
         renderTenants();
       } catch (error) {
-        alert(error instanceof Error ? error.message : 'Не удалось удалить запись');
+        alert(error instanceof Error ? error.message : 'Не удалось удалить пользователя');
         button.disabled = false;
       }
     });
@@ -336,9 +338,7 @@ function tenantRow(item) {
   const technicalEmail = item.ownerProfile?.email
     ? `<button class="admin-button secondary" data-email-tenant="${escapeHtml(item.tenantId)}">Письмо</button>`
     : '';
-  const remove = pending && item.invitation?.id
-    ? `<button class="admin-button danger" data-delete-invitation="${escapeHtml(item.invitation.id)}">Удалить</button>`
-    : '';
+  const remove = `<button class="admin-button danger" data-delete-tenant="${escapeHtml(item.tenantId)}">Удалить</button>`;
   return `<tr data-tenant="${escapeHtml(item.tenantId)}"><td><strong>${escapeHtml(name)}</strong></td><td>${email ? escapeHtml(email) : '—'}</td><td><span class="admin-pill ${statusClass}">${resolvedStatusLabel}</span> ${resend} ${technicalEmail} ${remove}</td><td>${escapeHtml(item.plan?.name || 'Индивидуальный')}</td></tr>`;
 }
 
