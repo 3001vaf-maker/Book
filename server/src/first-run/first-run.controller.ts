@@ -1,0 +1,88 @@
+import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import type { Request } from 'express';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { FirstRunService } from './first-run.service';
+
+type AuthenticatedRequest = Request & { auth?: { platformAccountId: string; tenantId: string; role: string } };
+
+@Controller('first-run')
+@UseGuards(JwtAuthGuard)
+export class FirstRunController {
+  constructor(private readonly firstRun: FirstRunService) {}
+
+  @Get('state')
+  state(@Req() request: AuthenticatedRequest) {
+    return this.firstRun.state(request.auth!.tenantId, request.auth!.platformAccountId);
+  }
+
+  @Post('steps/:stepKey/seen')
+  seen(
+    @Req() request: AuthenticatedRequest,
+    @Param('stepKey') stepKey: string,
+    @Body() body: { sessionId?: unknown },
+  ) {
+    return this.firstRun.markModalSeen(
+      request.auth!.tenantId,
+      request.auth!.platformAccountId,
+      stepKey,
+      String(body?.sessionId || ''),
+    );
+  }
+
+  @Post('steps/:stepKey/complete')
+  complete(
+    @Req() request: AuthenticatedRequest,
+    @Param('stepKey') stepKey: string,
+    @Body() body: { action?: unknown; sessionId?: unknown },
+  ) {
+    return this.firstRun.completeStep(
+      request.auth!.tenantId,
+      request.auth!.platformAccountId,
+      stepKey,
+      body?.action,
+      String(body?.sessionId || ''),
+    );
+  }
+
+  @Post('session/start')
+  sessionStart(@Req() request: AuthenticatedRequest) {
+    return this.firstRun.startSession(request.auth!.tenantId, request.auth!.platformAccountId);
+  }
+
+  @Post('session/:sessionId/heartbeat')
+  heartbeat(@Req() request: AuthenticatedRequest, @Param('sessionId') sessionId: string) {
+    return this.firstRun.heartbeat(request.auth!.tenantId, request.auth!.platformAccountId, sessionId);
+  }
+
+  @Post('session/:sessionId/end')
+  sessionEnd(
+    @Req() request: AuthenticatedRequest,
+    @Param('sessionId') sessionId: string,
+    @Body() body: { reason?: unknown },
+  ) {
+    return this.firstRun.endSession(
+      request.auth!.tenantId,
+      request.auth!.platformAccountId,
+      sessionId,
+      body?.reason,
+    );
+  }
+
+  @Post('activity')
+  activity(
+    @Req() request: AuthenticatedRequest,
+    @Body() body: {
+      eventType?: unknown;
+      stepKey?: unknown;
+      scenarioVersionId?: unknown;
+      metadata?: unknown;
+      sessionId?: unknown;
+    },
+  ) {
+    return this.firstRun.recordActivity(
+      request.auth!.tenantId,
+      request.auth!.platformAccountId,
+      body || {},
+    );
+  }
+}
