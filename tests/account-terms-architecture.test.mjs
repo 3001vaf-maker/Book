@@ -8,6 +8,7 @@ const bookingService = fs.readFileSync('server/src/online-booking/online-booking
 const bookingController = fs.readFileSync('server/src/online-booking/online-booking.controller.ts', 'utf8');
 const bookingUi = fs.readFileSync('online-booking/booking.js', 'utf8');
 const accountApi = fs.readFileSync('core/account/index.js', 'utf8');
+const workflow = fs.readFileSync('.github/workflows/check.yml', 'utf8');
 
 const termsMatch = migration.match(/\$terms\$([\s\S]*?)\$terms\$/);
 assert.ok(termsMatch, 'Account terms content must be stored in the platform document migration');
@@ -61,6 +62,15 @@ assert.ok(
   bookingUi.indexOf('const platformState = await getAccountPlatformState(state.tenantId)')
     < bookingUi.indexOf('const consentState = await refreshTenantConsentState(state)'),
   'Platform terms must be checked before Tenant consent',
+);
+
+assert.match(workflow, /online-booking\/account-terms/);
+assert.match(workflow, /accountTerms:JSON\.parse/);
+assert.match(workflow, /account\/consents/);
+assert.doesNotMatch(
+  workflow,
+  /account\/register[^\n]*[\s\S]{0,500}consents\s*:/,
+  'Staging smoke must not put Tenant consent back into Account registration',
 );
 
 console.log('account terms architecture tests passed');
