@@ -5,6 +5,7 @@ import { SaasAccessService } from '../saas-access/saas-access.service';
 import { TenantInvitationService } from '../tenant-invitation/tenant-invitation.service';
 import { DocumentRegistryService } from '../document-registry/document-registry.service';
 import { TransactionalEmailService } from '../transactional-email/transactional-email.service';
+import { FirstRunService } from '../first-run/first-run.service';
 
 @Injectable()
 export class SaasAdminService {
@@ -14,6 +15,7 @@ export class SaasAdminService {
     private readonly invitations: TenantInvitationService,
     private readonly documentRegistry: DocumentRegistryService,
     private readonly email: TransactionalEmailService,
+    private readonly firstRun: FirstRunService,
   ) {}
 
   async me(adminId: string, platformAccountId: string) {
@@ -64,8 +66,13 @@ export class SaasAdminService {
             tenantInvitations: {
               orderBy: { createdAt: 'desc' },
               take: 1,
-              select: { id: true, email: true, name: true, status: true, createdAt: true, expiresAt: true },
+              select: { id: true, email: true, name: true, status: true, createdAt: true, expiresAt: true, activatedAt: true, demoExpiresAt: true, firstRunScenarioVersionId: true },
             },
+          },
+          firstRunProgress: {
+            orderBy: { updatedAt: 'desc' },
+            take: 1,
+            select: { status: true, currentStepKey: true, startedAt: true, completedAt: true, scenarioVersionId: true },
           },
         },
       },
@@ -94,6 +101,7 @@ export class SaasAdminService {
         } : null,
         invitation,
         access: resolved,
+        firstRun: row.tenant.firstRunProgress[0] || null,
       };
     }));
   }
@@ -158,12 +166,12 @@ export class SaasAdminService {
     capabilities?: unknown;
   }) {
     const tenantAccess = await this.prisma.tenantAccess.findUnique({ where: { tenantId } });
-    if (!tenantAccess) throw new NotFoundException('Book не найден');
+    if (!tenantAccess) throw new NotFoundException('Рабочее пространство не найдено');
 
     const statusText = String(input?.status || '').trim().toUpperCase();
     if (statusText) {
       if (!Object.values(TenantAccessStatus).includes(statusText as TenantAccessStatus)) {
-        throw new BadRequestException('Неизвестный статус Book');
+        throw new BadRequestException('Неизвестный статус рабочего пространства');
       }
       await this.prisma.tenantAccess.update({
         where: { tenantId },
@@ -207,6 +215,74 @@ export class SaasAdminService {
         update: { enabled: null, limit },
       });
     }
+
+    return this.access.resolveTenantAccess(tenantId);
+  }
+
+  firstRunScenario() {
+    return this.firstRun.adminScenario();
+  }
+
+  updateFirstRunStep(stepKey: string, input: Record<string, unknown>) {
+    return this.firstRun.updateDraftStep(stepKey, input);
+  }
+
+  reorderFirstRun(stepKeys: unknown) {
+    return this.firstRun.reorderDraft(stepKeys);
+  }
+
+  publishFirstRun() {
+    return this.firstRun.publishDraft();
+  }
+
+  firstRunAnalytics() {
+    return this.firstRun.adminAnalytics();
+  }
+
+  async tenantActivity(tenantId: string) {
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { id: true } });
+    if (!tenant) throw new NotFoundException('Рабочее пространство не найдено');
+    return this.firstRun.adminActivity(tenantId);
+  }
+
+  setCommercialMode(tenantId: string, mode: unknown) {
+    return this.firstRun.setCommercialMode(tenantId, mode);
+  }
+
+  extendDemo(tenantId: string, days: unknown) {
+    return this.firstRun.extendDemo(tenantId, days);
+  }
+
+  async updateCapabilityOrder(tenantId: string, keysValue: unknown) {
+    const keys = (Array.isArray(keysValue) ? keysValue : [])
+      .map((value) => String(value || '').trim())
+      .filter(Boolean);
+    if (!keys.length || new Set(keys).size !== keys.length) {
+      throw new BadRequestException('Передайте порядок инструментов без дублей');
+    }
+
+    const capabilities = await this.prisma.capability.findMany({
+      where: { isActive: true },
+      select: { id: true, key: true },
+    });
+    const byKey = new Map(capabilities.map((item) => [item.key, item]));
+    if (keys.length !== capabilities.length || capabilities.some((item) => !keys.includes(item.key))) {
+      throw new BadRequestException('Передайте полный порядок доступных инструментов');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.tenantCapabilityOrder.deleteMany({ where: { tenantId } });
+      for (const [index, key] of keys.entries()) {
+        const capability = byKey.get(key)!;
+        await tx.tenantCapabilityOrder.create({
+          data: {
+            tenantId,
+            capabilityId: capability.id,
+            position: (index + 1) * 10,
+          },
+        });
+      }
+    });
 
     return this.access.resolveTenantAccess(tenantId);
   }
