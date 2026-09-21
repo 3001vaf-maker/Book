@@ -263,7 +263,10 @@ function openPaymentModal(record) {
   initPaymentForm(m.querySelector('[data-payment-ui]'), {
     calculate: (items) => calculateSettlement(items),
     onRemove: async ({ settlement: updatedSettlement }) => {
-      await saveSettlementCorrection(current, updatedSettlement);
+      const updated = await saveSettlementCorrection(current, updatedSettlement);
+      if (updated) return;
+      m.remove();
+      openPaymentModal(getRecord(current.id) || current);
     },
     onSave: async ({ settlement: updatedSettlement }) => {
       const updated = await saveSettlementCorrection(current, updatedSettlement);
