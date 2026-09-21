@@ -68,7 +68,7 @@ if (!/settlements:\s*\[\]/.test(financeData) || !/operations:\s*\[\]/.test(finan
 }
 
 const financeService = source('core/finance/service.js');
-for (const command of ['recordPaymentIncome', 'recordRefundExpense', 'cancelPaymentOperation']) {
+for (const command of ['recordPaymentIncome', 'recordRefundExpense', 'cancelPaymentOperation', 'recordManualFinanceOperation', 'recordSpecialFinanceOperation']) {
   if (!new RegExp(`export\\s+async\\s+function\\s+${command}`).test(financeService)) {
     errors.push(`core/finance/service.js: ${command} must be an async server-backed command`);
   }
@@ -116,6 +116,7 @@ for (const route of [
   /@Put\(['"]articles\/:articleId['"]\)/,
   /@Delete\(['"]articles\/:articleId['"]\)/,
   /@Post\(['"]operations\/manual['"]\)/,
+  /@Post\(['"]operations\/special['"]\)/,
 ]) {
   if (!route.test(financeController)) errors.push('FinanceController is missing a canonical Settlement/Operation route');
 }
@@ -133,6 +134,7 @@ for (const token of [
   'financeLedgerEntry',
   'financeArticle',
   'recordManualOperation(',
+  'recordSpecialOperation(',
   'ensureDefaultArticles',
 ]) {
   if (!serverFinance.includes(token)) errors.push(`FinanceService missing canonical owner behavior: ${token}`);
@@ -142,6 +144,12 @@ if (!/DEFAULT_FINANCE_ARTICLES/.test(serverFinance) || !/parentArticleId/.test(s
 }
 if (!/quantity/.test(serverFinance) || !/unitPrice/.test(serverFinance) || !/manual-income|manual-expense/.test(serverFinance)) {
   errors.push('Manual Income/Expense must support detailed quantity × unit price lines in one Operation');
+}
+if (!/TransactionIsolationLevel\.Serializable/.test(serverFinance)) {
+  errors.push('Finance server must protect authoritative same-source money writes with Serializable transactions');
+}
+for (const economicType of ['LOAN_RECEIVED', 'LOAN_REPAYMENT', 'INVESTMENT_RECEIVED', 'INVESTMENT_RETURN', 'TRANSFER']) {
+  if (!serverFinance.includes(economicType)) errors.push(`FinanceService missing special economic type: ${economicType}`);
 }
 if (!/canonicalLedgerMigratedAt/.test(serverFinance)) {
   errors.push('FinanceService must migrate legacy auxiliary Finance exactly into canonical storage');
@@ -177,9 +185,12 @@ const financeRules = source('core/finance/rules.js');
 if (!/export function calculateSettlement/.test(financeRules) || !/export function calculateSettlementTotals/.test(financeRules)) {
   errors.push('Settlement rules must own amount-due and paid/refunded calculations');
 }
+if (!/export function financialMoney/.test(financeRules) || !/Math\.round\([^\n]*\* 100\) \/ 100/.test(financeRules)) {
+  errors.push('Browser Settlement must use the same cent-level money contract as server Finance');
+}
 
 const financeIndex = source('core/finance/index.js');
-for (const token of ['calculateSettlement', 'getRecordPaymentState', 'getLedgerEntries', 'getFinanceArticles', 'recordManualFinanceOperation', 'recordPaymentIncome', 'saveSettlementSnapshot']) {
+for (const token of ['calculateSettlement', 'getRecordPaymentState', 'getLedgerEntries', 'getFinanceArticles', 'getZReport', 'recordManualFinanceOperation', 'recordSpecialFinanceOperation', 'recordPaymentIncome', 'saveSettlementSnapshot']) {
   if (!financeIndex.includes(token)) errors.push(`core/finance/index.js must expose ${token}`);
 }
 
@@ -187,11 +198,17 @@ const walletData = source('settings/wallets/data.js');
 if (!/getWalletDDSMovements/.test(walletData) || !/export function getWalletBalance/.test(walletData)) {
   errors.push('Wallet must derive balance from Finance Ledger projection');
 }
+if (/\bbalance\s*:/.test(walletData)) {
+  errors.push('Wallet metadata must not persist an independent balance field');
+}
 
 const financeUI = source('main/finance/finance.js');
 if (!/getLedgerEntries/.test(financeUI)) errors.push('DDS UI must render flat Ledger rows');
 if (!/renderFinanceArticles/.test(financeUI) || !/renderIncomeExpense/.test(financeUI)) {
   errors.push('Finance UI must expose Articles and Income / Expense instruments');
+}
+if (!/renderSpecialFinanceOperations/.test(financeUI) || !/renderZReport/.test(financeUI)) {
+  errors.push('Finance UI must expose special operations and Z-report');
 }
 const articlesUI = source('main/finance/articles.js');
 if (!/parentArticleId/.test(articlesUI) || !/economicType/.test(articlesUI)) {
@@ -200,6 +217,21 @@ if (!/parentArticleId/.test(articlesUI) || !/economicType/.test(articlesUI)) {
 const incomeExpenseUI = source('main/finance/income-expense.js');
 if (!/recordManualFinanceOperation/.test(incomeExpenseUI) || !/lineQuantity/.test(incomeExpenseUI) || !/linePrice/.test(incomeExpenseUI)) {
   errors.push('Income / Expense UI must support simple and detailed manual operations');
+}
+
+const specialOperationsUI = source('main/finance/special-operations.js');
+if (!/recordSpecialFinanceOperation/.test(specialOperationsUI)
+  || !/loan-received/.test(specialOperationsUI)
+  || !/investment-return/.test(specialOperationsUI)
+  || !/transfer/.test(specialOperationsUI)) {
+  errors.push('Special Finance UI must expose loans, investments, returns and wallet transfers');
+}
+const zReportUI = source('main/finance/z-report.js');
+if (!/getZReport/.test(zReportUI) || !/type:\s*'date'/.test(zReportUI)) {
+  errors.push('Z-report UI must project Ledger for a day or arbitrary period');
+}
+if (!/export function getZReport/.test(financeRead) || !/getLedgerEntries\(\)/.test(financeRead)) {
+  errors.push('Z-report must be a Ledger-only projection');
 }
 
 
