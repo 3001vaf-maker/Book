@@ -186,7 +186,12 @@ function nextBookingStep(root, state) {
 function backFromFirstBookingStep(root, state) {
   state.error = '';
   state.repeatSelection = null;
-  void renderAccountHome(root, state);
+  state.identityDestination = 'profile';
+  if (state.account) {
+    void renderAccountHome(root, state);
+    return;
+  }
+  renderAccountEntry(root, state);
 }
 
 function openDocument(state, documentId) {
@@ -212,7 +217,8 @@ function renderWelcome(root, state) {
   });
   root.querySelector('[data-booking-welcome-next]')?.addEventListener('click', () => {
     resetBookingChoice(state);
-    renderRegistrationAgreements(root, state);
+    state.identityDestination = 'booking';
+    nextBookingStep(root, state);
   });
 }
 
@@ -236,8 +242,12 @@ function renderRegistrationAgreements(root, state) {
   });
   root.querySelector('[data-booking-agreements-back]')?.addEventListener('click', () => {
     state.error = '';
-    if (state.registrationMode === 'repair' && state.account) void renderAccountHome(root, state);
-    else renderWelcome(root, state);
+    if (state.registrationMode === 'repair' && state.account) {
+      if (state.identityDestination === 'booking') renderTimes(root, state);
+      else void renderAccountHome(root, state);
+      return;
+    }
+    renderAccountEntry(root, state);
   });
   root.querySelectorAll('[data-booking-document]').forEach((node) => node.addEventListener('click', () => openDocument(state, node.dataset.bookingDocument)));
   root.querySelectorAll('[data-booking-consent]').forEach((node) => node.addEventListener('click', () => {
@@ -248,14 +258,15 @@ function renderRegistrationAgreements(root, state) {
   root.querySelector('[data-booking-agreements-next]')?.addEventListener('click', async (event) => {
     if (!canContinue) return;
     if (state.registrationMode !== 'repair') {
-      renderAccountEntry(root, state);
+      renderAccountDetails(root, state);
       return;
     }
     event.currentTarget.disabled = true;
     try {
       await saveRegistrationConsents(state);
       state.registrationMode = 'initial';
-      await renderAccountHome(root, state);
+      if (state.identityDestination === 'booking') renderConfirmation(root, state);
+      else await renderAccountHome(root, state);
     } catch (error) {
       state.error = error instanceof Error ? error.message : 'Не удалось сохранить согласия';
       renderRegistrationAgreements(root, state);
@@ -276,7 +287,8 @@ function renderAccountEntry(root, state) {
   const form = root.querySelector('[data-booking-entry-form]');
   root.querySelector('[data-booking-entry-back]')?.addEventListener('click', () => {
     state.error = '';
-    renderRegistrationAgreements(root, state);
+    if (state.identityDestination === 'booking' && state.from) renderTimes(root, state);
+    else nextBookingStep(root, state);
   });
   root.querySelector('[data-booking-entry-submit]')?.addEventListener('click', () => form?.requestSubmit());
   form?.addEventListener('submit', async (event) => {
@@ -289,8 +301,12 @@ function renderAccountEntry(root, state) {
       const prepared = await prepareAccount(state.tenantId, email);
       state.passwordMode = prepared.exists ? 'login' : 'register';
       state.error = '';
-      if (prepared.exists) renderPassword(root, state);
-      else renderAccountDetails(root, state);
+      if (prepared.exists) {
+        renderPassword(root, state);
+      } else {
+        state.registrationMode = 'initial';
+        renderRegistrationAgreements(root, state);
+      }
     } catch (error) {
       state.error = error instanceof Error ? error.message : 'Не удалось проверить аккаунт';
       renderAccountEntry(root, state);
@@ -310,7 +326,7 @@ function renderAccountDetails(root, state) {
   const form = root.querySelector('[data-booking-account-form]');
   root.querySelector('[data-booking-account-back]')?.addEventListener('click', () => {
     state.error = '';
-    renderAccountEntry(root, state);
+    renderRegistrationAgreements(root, state);
   });
   root.querySelector('[data-booking-account-submit]')?.addEventListener('click', () => form?.requestSubmit());
   form?.addEventListener('submit', (event) => {
@@ -365,26 +381,46 @@ function renderPassword(root, state) {
         state.account = payload.account;
         state.error = '';
         seedConsents(state, currentConsentFacts(state));
-        if (payload.personExisted) {
-          state.accountTab = 'profile';
-          await renderAccountHome(root, state);
-        } else {
-          nextBookingStep(root, state);
-        }
+        await continueAfterIdentity(root, state);
         return;
       }
 
       const payload = await loginAccount(state.tenantId, state.accountDraft.email, password);
       state.account = payload.account;
       state.error = '';
-      await saveRegistrationConsents(state);
-      state.accountTab = 'profile';
-      await renderAccountHome(root, state);
+      await continueAfterIdentity(root, state);
     } catch (error) {
       state.error = error instanceof Error ? error.message : 'Не удалось войти';
       renderPassword(root, state);
     }
   });
+}
+
+async function continueAfterIdentity(root, state) {
+  if (!state.account) {
+    renderAccountEntry(root, state);
+    return;
+  }
+
+  if (state.identityDestination === 'profile') {
+    state.accountTab = 'profile';
+    await renderAccountHome(root, state);
+    return;
+  }
+
+  try {
+    const consentState = await refreshAccountConsentState(state);
+    if (consentState.pdnActive) {
+      renderConfirmation(root, state);
+      return;
+    }
+    state.registrationMode = 'repair';
+    renderRegistrationAgreements(root, state);
+  } catch (error) {
+    state.error = error instanceof Error ? error.message : 'Не удалось проверить согласия';
+    state.registrationMode = 'repair';
+    renderRegistrationAgreements(root, state);
+  }
 }
 
 function renderWorkplaces(root, state) {
@@ -501,7 +537,8 @@ function renderTimes(root, state) {
     state.from = slot.from;
     state.to = slot.to;
     state.error = '';
-    renderConfirmation(root, state);
+    state.identityDestination = 'booking';
+    void continueAfterIdentity(root, state);
   }));
 }
 
@@ -567,19 +604,8 @@ function renderConfirmation(root, state) {
 
 async function startBookingFromAccount(root, state) {
   resetBookingChoice(state);
-  try {
-    const consentState = await refreshAccountConsentState(state);
-    if (consentState.pdnActive) {
-      nextBookingStep(root, state);
-      return;
-    }
-    state.registrationMode = 'repair';
-    renderRegistrationAgreements(root, state);
-  } catch (error) {
-    state.error = error instanceof Error ? error.message : 'Не удалось проверить согласия';
-    state.registrationMode = 'repair';
-    renderRegistrationAgreements(root, state);
-  }
+  state.identityDestination = 'booking';
+  nextBookingStep(root, state);
 }
 
 async function repeatBooking(root, state, request) {
@@ -591,21 +617,8 @@ async function repeatBooking(root, state, request) {
   state.date = '';
   state.from = '';
   state.to = '';
-  try {
-    const consentState = await refreshAccountConsentState(state);
-    if (consentState.pdnActive) {
-      continueRepeat(root, state);
-      return;
-    }
-    state.repeatSelection = null;
-    state.registrationMode = 'repair';
-    renderRegistrationAgreements(root, state);
-  } catch (error) {
-    state.repeatSelection = null;
-    state.error = error instanceof Error ? error.message : 'Не удалось проверить согласия';
-    state.registrationMode = 'repair';
-    renderRegistrationAgreements(root, state);
-  }
+  state.identityDestination = 'booking';
+  continueRepeat(root, state);
 }
 
 async function renderAccountHome(root, state) {
@@ -650,6 +663,7 @@ export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = 
     lastRequest: null,
     repeatSelection: null,
     registrationMode: 'initial',
+    identityDestination: 'booking',
     accountTab: 'profile',
     accountChatOpen: false,
     accountRequests: [],
@@ -664,11 +678,7 @@ export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = 
   try {
     await refreshContext(state);
     const account = await getAccount(state.tenantId);
-    if (account) {
-      state.account = account;
-      await renderAccountHome(root, state);
-      return;
-    }
+    if (account) state.account = account;
     renderWelcome(root, state);
   } catch (error) {
     renderFlowPage(root, state, {
