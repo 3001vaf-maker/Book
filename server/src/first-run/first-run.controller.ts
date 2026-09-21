@@ -82,6 +82,16 @@ export class FirstRunController {
     );
   }
 
+  @Post('requests/live')
+  requestLive(@Req() request: AuthenticatedRequest) {
+    return this.firstRun.requestLive(request.auth!.tenantId, request.auth!.platformAccountId);
+  }
+
+  @Post('requests/demo-extension')
+  requestDemoExtension(@Req() request: AuthenticatedRequest) {
+    return this.firstRun.requestDemoExtension(request.auth!.tenantId, request.auth!.platformAccountId);
+  }
+
   @Post('activity')
   activity(
     @Req() request: AuthenticatedRequest,
