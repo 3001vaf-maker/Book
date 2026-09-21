@@ -38,6 +38,11 @@ export class SaasAdminController {
     return this.admin.documentRegistryHistory();
   }
 
+  @Post('document-registry/sync')
+  syncDocumentRegistry(@Body() body: { documents?: unknown }) {
+    return this.admin.syncDocumentRegistry(body?.documents);
+  }
+
   @Get('invitations')
   listInvitations(@Req() request: AdminRequest) {
     return this.invitations.listInvitations(request.platformAdminId!);
