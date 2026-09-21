@@ -46,6 +46,11 @@ export function getActiveDDSMovementsForSource(type, id) {
 function projectLedgerEntry(state, entry) {
   const operation = state.operations.find((item) => String(item?.operationId || '') === String(entry?.operationId || '')) || null;
   const data = operation?.data && typeof operation.data === 'object' ? operation.data : {};
+  const settlement = data?.settlement && typeof data.settlement === 'object' ? data.settlement : null;
+  const sourceDetails = (Array.isArray(settlement?.items) ? settlement.items : [])
+    .map((item) => String(item?.name || '').trim())
+    .filter(Boolean)
+    .join(', ');
   const amount = Math.max(0, financialNumber(entry?.amount));
   return {
     ...entry,
@@ -59,6 +64,9 @@ function projectLedgerEntry(state, entry) {
     person: data?.person || null,
     workplace: data?.workplace || '',
     source: entry?.source || operation?.source || null,
+    sourceDetails,
+    note: entry?.note || data?.note || '',
+    counterparty: data?.counterparty || '',
   };
 }
 
