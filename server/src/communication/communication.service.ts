@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { AccountContactType } from '@prisma/client';
 import { BusinessStateService } from '../business-state/business-state.service';
 import { PrismaService } from '../prisma.service';
 import { normalizeMessagePurpose, type MessagePurpose } from './message-purpose';
@@ -135,10 +136,29 @@ export class CommunicationService {
     return ticket;
   }
 
+  async resolveTelegramEntryAccount(tenantId: string, entryToken: unknown) {
+    const ticket = await this.telegramEntry(tenantId, entryToken);
+    const contact = await this.prisma.accountContact.findUnique({
+      where: { type_value: { type: AccountContactType.TELEGRAM, value: ticket.telegramUserId } },
+      select: { accountId: true },
+    });
+    return contact
+      ? { exists: true, accountId: contact.accountId }
+      : { exists: false, accountId: '' };
+  }
+
   async bindTelegramEntry(tenantId: string, accountId: string, entryToken: unknown) {
     const ticket = await this.telegramEntry(tenantId, entryToken);
-    const account = await this.prisma.account.findFirst({ where: { id: accountId, tenantId }, select: { phone: true } });
+    const account = await this.prisma.account.findUnique({ where: { id: accountId }, select: { phone: true, telegramId: true } });
     if (!account) throw new NotFoundException('Аккаунт не найден');
+
+    const globalTelegram = await this.prisma.accountContact.findUnique({
+      where: { type_value: { type: AccountContactType.TELEGRAM, value: ticket.telegramUserId } },
+      select: { accountId: true },
+    });
+    if (globalTelegram && globalTelegram.accountId !== accountId) {
+      throw new ConflictException('Этот Telegram уже зарегистрирован в другом аккаунте');
+    }
     const personPhone = canonicalPhone(account.phone);
     if (!personPhone) throw new BadRequestException('У человека не определён телефон');
 
@@ -179,6 +199,23 @@ export class CommunicationService {
           AND "expiresAt" > CURRENT_TIMESTAMP
       `;
       if (!used) throw new ConflictException('Telegram-вход уже использован или истёк');
+
+      await tx.accountContact.upsert({
+        where: { type_value: { type: AccountContactType.TELEGRAM, value: ticket.telegramUserId } },
+        create: {
+          accountId,
+          type: AccountContactType.TELEGRAM,
+          value: ticket.telegramUserId,
+          isPrimary: !text(account.telegramId),
+        },
+        update: {},
+      });
+      if (!text(account.telegramId)) {
+        await tx.account.update({
+          where: { id: accountId },
+          data: { telegramId: ticket.telegramUserId },
+        });
+      }
 
       await tx.$executeRaw`
         INSERT INTO "CommunicationIdentity" (
