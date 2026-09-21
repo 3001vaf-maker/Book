@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { CapabilityValueType, TenantAccessStatus } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { SaasAccessService } from '../saas-access/saas-access.service';
@@ -10,6 +10,8 @@ import { PlatformNoticeService } from '../platform-notice/platform-notice.servic
 
 @Injectable()
 export class SaasAdminService {
+  private readonly logger = new Logger(SaasAdminService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: SaasAccessService,
@@ -346,23 +348,51 @@ export class SaasAdminService {
 
     const platformAccountIds = [...new Set(access.tenant.memberships.map((item) => item.platformAccountId))];
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT set_config('book.allow_test_tenant_delete', 'on', true)`;
-      await tx.$executeRaw`DELETE FROM "PlatformConsentEvent" WHERE "tenantId" = ${tenantId}`;
-      await tx.tenant.delete({ where: { id: tenantId } });
+    let deleteStage = 'transaction-start';
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        deleteStage = 'allow-append-only-delete';
+        await tx.$queryRaw`SELECT set_config('book.allow_test_tenant_delete', 'on', true)`;
 
-      for (const platformAccountId of platformAccountIds) {
-        const remainingMemberships = await tx.membership.count({ where: { platformAccountId } });
-        const platformAdmin = await tx.platformAdmin.findUnique({
-          where: { platformAccountId },
-          select: { id: true },
-        });
-        if (remainingMemberships === 0 && !platformAdmin) {
-          await tx.platformAccount.delete({ where: { id: platformAccountId } });
+        deleteStage = 'delete-platform-consent-events';
+        await tx.$executeRaw`DELETE FROM "PlatformConsentEvent" WHERE "tenantId" = ${tenantId}`;
+
+        deleteStage = 'delete-tenant';
+        await tx.tenant.delete({ where: { id: tenantId } });
+
+        for (const platformAccountId of platformAccountIds) {
+          deleteStage = 'count-remaining-memberships';
+          const remainingMemberships = await tx.membership.count({ where: { platformAccountId } });
+
+          deleteStage = 'check-platform-admin';
+          const platformAdmin = await tx.platformAdmin.findUnique({
+            where: { platformAccountId },
+            select: { id: true },
+          });
+
+          if (remainingMemberships === 0 && !platformAdmin) {
+            deleteStage = 'delete-orphan-platform-account';
+            await tx.platformAccount.delete({ where: { id: platformAccountId } });
+          }
         }
-      }
-    });
+      });
+    } catch (error) {
+      const value = error && typeof error === 'object' ? error as Record<string, unknown> : {};
+      const meta = value.meta && typeof value.meta === 'object' ? value.meta as Record<string, unknown> : {};
+      this.logger.error([
+        '[deleteTenant] failed',
+        `stage=${deleteStage}`,
+        `tenantId=${tenantId}`,
+        `code=${String(value.code || '')}`,
+        `table=${String(value.table || meta.table || '')}`,
+        `constraint=${String(value.constraint || meta.constraint || '')}`,
+        `target=${JSON.stringify(meta.target || '')}`,
+        `message=${error instanceof Error ? error.message : String(error)}`,
+      ].join(' | '), error instanceof Error ? error.stack : undefined);
+      throw error;
+    }
 
+    this.logger.log(`[deleteTenant] success | tenantId=${tenantId} | accounts=${platformAccountIds.length}`);
     return { deleted: true, tenantId, platformAccountIds };
   }
 
