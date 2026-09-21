@@ -625,6 +625,17 @@ export class FinanceService {
       ? await this.prisma.financeArticle.findUnique({ where: { tenantId_articleId: { tenantId, articleId: parentArticleId } } })
       : null;
     if (parentArticleId && (!parent || parent.archivedAt)) throw new BadRequestException('Родительская статья не найдена');
+    let ancestor = parent;
+    let depthGuard = 0;
+    while (ancestor && depthGuard < 100) {
+      if (ancestor.articleId === id) throw new BadRequestException('Нельзя создать цикл в дереве статей');
+      ancestor = ancestor.parentArticleId
+        ? await this.prisma.financeArticle.findUnique({
+            where: { tenantId_articleId: { tenantId, articleId: ancestor.parentArticleId } },
+          })
+        : null;
+      depthGuard += 1;
+    }
 
     const direction = current.systemKey ? current.direction : text(input.direction || current.direction);
     const economicType = current.systemKey ? current.economicType : text(input.economicType || current.economicType);
@@ -901,6 +912,18 @@ export class FinanceService {
       finance: clone(objectValue(data.settlement)),
       createdAt: operation.occurredAt.toISOString(),
     };
+    if (operation.kind === 'manual-income') {
+      return {
+        ...base,
+        movementType: 'income',
+        incomeType: 'manual',
+        walletId: text(data.walletId),
+        walletName: text(data.walletName),
+        articleId: text(data.articleId),
+        note: text(data.note),
+        paidAt: operation.occurredAt.toISOString(),
+      };
+    }
     if (operation.kind === 'payment') {
       return {
         ...base,
@@ -915,7 +938,7 @@ export class FinanceService {
     return {
       ...base,
       movementType: 'expense',
-      expenseType: operation.kind === 'refund' ? 'refund' : 'expense',
+      expenseType: operation.kind === 'refund' ? 'refund' : (operation.kind === 'manual-expense' ? 'manual' : 'expense'),
       originalPaymentId: operation.originalOperationId,
       walletId: text(data.walletId),
       walletName: text(data.walletName),
