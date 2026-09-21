@@ -3,11 +3,14 @@ import fs from 'node:fs';
 
 const schema = fs.readFileSync('server/prisma/schema.prisma', 'utf8');
 const migration = fs.readFileSync('server/prisma/migrations/20260921130000_global_account_identity/migration.sql', 'utf8');
+const conflictMigration = fs.readFileSync('server/prisma/migrations/20260921150000_account_contact_conflicts/migration.sql', 'utf8');
 const accountApi = fs.readFileSync('core/account/index.js', 'utf8');
 const guard = fs.readFileSync('server/src/online-booking/account.guard.ts', 'utf8');
 const booking = fs.readFileSync('server/src/online-booking/online-booking.service.ts', 'utf8');
 const communication = fs.readFileSync('server/src/communication/communication.service.ts', 'utf8');
 const runtime = fs.readFileSync('online-booking/account-runtime.js', 'utf8');
+const dockerfile = fs.readFileSync('Dockerfile', 'utf8');
+const recovery = fs.readFileSync('server/scripts/recover-global-account-migration.mjs', 'utf8');
 
 const accountModel = schema.slice(schema.indexOf('model Account {'), schema.indexOf('model BookingRequest {'));
 
@@ -17,9 +20,14 @@ assert.match(schema, /model AccountContact \{/);
 assert.match(schema, /@@unique\(\[type, value\]\)/, 'Every concrete contact must be globally unique');
 assert.match(schema, /enum AccountContactType \{[\s\S]*EMAIL[\s\S]*PHONE[\s\S]*TELEGRAM[\s\S]*\}/);
 
-assert.match(migration, /Global Account migration found one contact assigned to multiple Accounts/);
+assert.doesNotMatch(migration, /RAISE EXCEPTION 'Global Account migration found one contact assigned to multiple Accounts'/);
 assert.match(migration, /CREATE UNIQUE INDEX "AccountContact_type_value_key"/);
+assert.match(migration, /HAVING count\(DISTINCT "accountId"\) = 1/);
+assert.doesNotMatch(migration, /CREATE TABLE "AccountContactConflict"/);
+assert.match(conflictMigration, /CREATE TABLE "AccountContactConflict"/);
+assert.match(conflictMigration, /jsonb_agg\(DISTINCT "accountId" ORDER BY "accountId"\)/);
 assert.match(migration, /'TELEGRAM'::"AccountContactType"/);
+assert.match(schema, /model AccountContactConflict \{/);
 
 assert.match(accountApi, /const ACCOUNT_TOKEN_KEY = 'book\.account\.token'/);
 assert.doesNotMatch(accountApi, /function tokenKey\(tenantId\)/);
@@ -36,12 +44,16 @@ assert.match(booking, /function accountLoginContact/);
 assert.match(booking, /AccountContactType\.EMAIL/);
 assert.match(booking, /AccountContactType\.PHONE/);
 assert.match(booking, /async loginAccount\(tenantId: string, identifierValue: unknown/);
+assert.match(booking, /accountContactConflict\.findMany/);
+assert.match(booking, /accountContactConflict\.findUnique/);
 assert.doesNotMatch(booking, /tenantId_email/, 'Account lookup must never return to tenant-scoped email uniqueness');
 assert.doesNotMatch(booking, /signAsync\(\{[\s\S]{0,120}tenantId:/, 'Global Account token must not encode one Tenant as identity owner');
 
 assert.match(communication, /resolveTelegramEntryAccount/);
 assert.match(communication, /AccountContactType\.TELEGRAM/);
 assert.match(communication, /Этот Telegram уже зарегистрирован в другом аккаунте/);
+assert.match(communication, /accountContactConflict\.findUnique/);
+assert.match(communication, /Этот Telegram связан с несколькими ранее созданными учетными записями/);
 
 assert.match(runtime, /resolveAccountTelegramEntry/);
 assert.match(runtime, /if \(entry && !getAccountToken\(tenant\)\)/);

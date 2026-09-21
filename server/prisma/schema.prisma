@@ -224,6 +224,16 @@ model AccountContact {
   @@index([accountId, type])
 }
 
+model AccountContactConflict {
+  id         String             @id
+  type       AccountContactType
+  value      String
+  accountIds Json
+  createdAt  DateTime           @default(now())
+
+  @@unique([type, value])
+}
+
 model BookingRequest {
   id               String               @id @default(cuid())
   tenantId         String

@@ -138,10 +138,19 @@ export class CommunicationService {
 
   async resolveTelegramEntryAccount(tenantId: string, entryToken: unknown) {
     const ticket = await this.telegramEntry(tenantId, entryToken);
-    const contact = await this.prisma.accountContact.findUnique({
-      where: { type_value: { type: AccountContactType.TELEGRAM, value: ticket.telegramUserId } },
-      select: { accountId: true },
-    });
+    const [contact, quarantined] = await Promise.all([
+      this.prisma.accountContact.findUnique({
+        where: { type_value: { type: AccountContactType.TELEGRAM, value: ticket.telegramUserId } },
+        select: { accountId: true },
+      }),
+      this.prisma.accountContactConflict.findUnique({
+        where: { type_value: { type: AccountContactType.TELEGRAM, value: ticket.telegramUserId } },
+        select: { id: true },
+      }),
+    ]);
+    if (quarantined) {
+      throw new ConflictException('Этот Telegram связан с несколькими ранее созданными учетными записями');
+    }
     return contact
       ? { exists: true, accountId: contact.accountId }
       : { exists: false, accountId: '' };
@@ -152,10 +161,19 @@ export class CommunicationService {
     const account = await this.prisma.account.findUnique({ where: { id: accountId }, select: { phone: true, telegramId: true } });
     if (!account) throw new NotFoundException('Аккаунт не найден');
 
-    const globalTelegram = await this.prisma.accountContact.findUnique({
-      where: { type_value: { type: AccountContactType.TELEGRAM, value: ticket.telegramUserId } },
-      select: { accountId: true },
-    });
+    const [globalTelegram, quarantinedTelegram] = await Promise.all([
+      this.prisma.accountContact.findUnique({
+        where: { type_value: { type: AccountContactType.TELEGRAM, value: ticket.telegramUserId } },
+        select: { accountId: true },
+      }),
+      this.prisma.accountContactConflict.findUnique({
+        where: { type_value: { type: AccountContactType.TELEGRAM, value: ticket.telegramUserId } },
+        select: { id: true },
+      }),
+    ]);
+    if (quarantinedTelegram) {
+      throw new ConflictException('Этот Telegram связан с несколькими ранее созданными учетными записями');
+    }
     if (globalTelegram && globalTelegram.accountId !== accountId) {
       throw new ConflictException('Этот Telegram уже зарегистрирован в другом аккаунте');
     }

@@ -1,39 +1,5 @@
 BEGIN;
 
-DO $$
-BEGIN
-  IF EXISTS (
-    WITH contacts AS (
-      SELECT "id" AS "accountId", 'EMAIL' AS "type", lower(trim("email")) AS "value"
-      FROM "Account"
-      WHERE trim("email") <> ''
-      UNION ALL
-      SELECT "id", 'PHONE',
-        CASE
-          WHEN length(regexp_replace("phone", '\\D', '', 'g')) = 10
-            THEN '7' || regexp_replace("phone", '\\D', '', 'g')
-          WHEN length(regexp_replace("phone", '\\D', '', 'g')) = 11
-            AND regexp_replace("phone", '\\D', '', 'g') LIKE '8%'
-            THEN '7' || substring(regexp_replace("phone", '\\D', '', 'g') from 2)
-          ELSE regexp_replace("phone", '\\D', '', 'g')
-        END
-      FROM "Account"
-      WHERE regexp_replace("phone", '\\D', '', 'g') <> ''
-      UNION ALL
-      SELECT "id", 'TELEGRAM', trim("telegramId")
-      FROM "Account"
-      WHERE trim("telegramId") <> ''
-    )
-    SELECT 1
-    FROM contacts
-    GROUP BY "type", "value"
-    HAVING count(DISTINCT "accountId") > 1
-  ) THEN
-    RAISE EXCEPTION 'Global Account migration found one contact assigned to multiple Accounts; explicit identity resolution is required';
-  END IF;
-END
-$$;
-
 DROP INDEX IF EXISTS "Account_tenantId_email_key";
 DROP INDEX IF EXISTS "Account_tenantId_idx";
 DROP INDEX IF EXISTS "Account_tenantId_phone_idx";
@@ -75,31 +41,55 @@ CREATE UNIQUE INDEX "AccountContact_type_value_key"
 CREATE INDEX "AccountContact_accountId_type_idx"
   ON "AccountContact"("accountId", "type");
 
-INSERT INTO "AccountContact" ("id", "accountId", "type", "value", "isPrimary")
-SELECT 'legacy-email-' || "id", "id", 'EMAIL'::"AccountContactType", lower(trim("email")), true
+CREATE TEMP TABLE "_AccountContactStage" (
+  "accountId" TEXT NOT NULL,
+  "type" "AccountContactType" NOT NULL,
+  "value" TEXT NOT NULL,
+  "isPrimary" BOOLEAN NOT NULL
+) ON COMMIT DROP;
+
+INSERT INTO "_AccountContactStage" ("accountId", "type", "value", "isPrimary")
+SELECT "id", 'EMAIL'::"AccountContactType", lower(trim("email")), true
 FROM "Account"
 WHERE trim("email") <> '';
 
-INSERT INTO "AccountContact" ("id", "accountId", "type", "value", "isPrimary")
+INSERT INTO "_AccountContactStage" ("accountId", "type", "value", "isPrimary")
 SELECT
-  'legacy-phone-' || "id",
   "id",
   'PHONE'::"AccountContactType",
   CASE
-    WHEN length(regexp_replace("phone", '\\D', '', 'g')) = 10
-      THEN '7' || regexp_replace("phone", '\\D', '', 'g')
-    WHEN length(regexp_replace("phone", '\\D', '', 'g')) = 11
-      AND regexp_replace("phone", '\\D', '', 'g') LIKE '8%'
-      THEN '7' || substring(regexp_replace("phone", '\\D', '', 'g') from 2)
-    ELSE regexp_replace("phone", '\\D', '', 'g')
+    WHEN length(regexp_replace("phone", '[^0-9]', '', 'g')) = 10
+      THEN '7' || regexp_replace("phone", '[^0-9]', '', 'g')
+    WHEN length(regexp_replace("phone", '[^0-9]', '', 'g')) = 11
+      AND regexp_replace("phone", '[^0-9]', '', 'g') LIKE '8%'
+      THEN '7' || substring(regexp_replace("phone", '[^0-9]', '', 'g') from 2)
+    ELSE regexp_replace("phone", '[^0-9]', '', 'g')
   END,
   true
 FROM "Account"
-WHERE regexp_replace("phone", '\\D', '', 'g') <> '';
+WHERE regexp_replace("phone", '[^0-9]', '', 'g') <> '';
 
-INSERT INTO "AccountContact" ("id", "accountId", "type", "value", "isPrimary")
-SELECT 'legacy-telegram-' || "id", "id", 'TELEGRAM'::"AccountContactType", trim("telegramId"), true
+INSERT INTO "_AccountContactStage" ("accountId", "type", "value", "isPrimary")
+SELECT "id", 'TELEGRAM'::"AccountContactType", trim("telegramId"), true
 FROM "Account"
 WHERE trim("telegramId") <> '';
+
+INSERT INTO "AccountContact" ("id", "accountId", "type", "value", "isPrimary")
+SELECT
+  'legacy-' || lower(s."type"::text) || '-' || s."accountId",
+  s."accountId",
+  s."type",
+  s."value",
+  s."isPrimary"
+FROM "_AccountContactStage" s
+JOIN (
+  SELECT "type", "value"
+  FROM "_AccountContactStage"
+  GROUP BY "type", "value"
+  HAVING count(DISTINCT "accountId") = 1
+) unique_contact
+  ON unique_contact."type" = s."type"
+ AND unique_contact."value" = s."value"
+ON CONFLICT ("type", "value") DO NOTHING;
 
 COMMIT;

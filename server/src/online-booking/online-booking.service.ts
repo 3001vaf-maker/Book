@@ -207,14 +207,19 @@ export class OnlineBookingService {
     tx: Prisma.TransactionClient | PrismaService = this.prisma,
   ) {
     if (!contacts.length) return;
-    const existing = await tx.accountContact.findMany({
-      where: {
-        OR: contacts.map((contact) => ({ type: contact.type, value: contact.value })),
-      },
-      select: { accountId: true, type: true, value: true },
-    });
+    const where = contacts.map((contact) => ({ type: contact.type, value: contact.value }));
+    const [existing, quarantined] = await Promise.all([
+      tx.accountContact.findMany({
+        where: { OR: where },
+        select: { accountId: true, type: true, value: true },
+      }),
+      tx.accountContactConflict.findMany({
+        where: { OR: where },
+        select: { type: true, value: true },
+      }),
+    ]);
     const conflict = existing.find((contact) => contact.accountId !== accountId);
-    if (conflict) {
+    if (conflict || quarantined.length) {
       throw new ConflictException('Этот контакт уже зарегистрирован. Войдите в аккаунт или восстановите пароль.');
     }
   }
@@ -319,11 +324,21 @@ export class OnlineBookingService {
     if (!contacts.length) throw new BadRequestException('Введите телефон или email');
 
     const unique = [...new Map(contacts.map((contact) => [`${contact.type}:${contact.value}`, contact])).values()];
-    const rows = await this.prisma.accountContact.findMany({
-      where: { OR: unique.map((contact) => ({ type: contact.type, value: contact.value })) },
-      select: { type: true, value: true },
-    });
-    const occupied = new Set(rows.map((row) => `${row.type}:${row.value}`));
+    const where = unique.map((contact) => ({ type: contact.type, value: contact.value }));
+    const [rows, quarantined] = await Promise.all([
+      this.prisma.accountContact.findMany({
+        where: { OR: where },
+        select: { type: true, value: true },
+      }),
+      this.prisma.accountContactConflict.findMany({
+        where: { OR: where },
+        select: { type: true, value: true },
+      }),
+    ]);
+    const occupied = new Set([
+      ...rows.map((row) => `${row.type}:${row.value}`),
+      ...quarantined.map((row) => `${row.type}:${row.value}`),
+    ]);
     const conflicts = {
       identifier: unique.some((contact) => contact.field === 'identifier' && occupied.has(`${contact.type}:${contact.value}`)),
       email: unique.some((contact) => contact.field === 'email' && occupied.has(`${contact.type}:${contact.value}`)),
@@ -392,10 +407,19 @@ export class OnlineBookingService {
   async loginAccount(tenantId: string, identifierValue: unknown, password: unknown) {
     const identifier = accountLoginContact(identifierValue);
     if (!identifier) throw new BadRequestException('Введите телефон или email');
-    const contact = await this.prisma.accountContact.findUnique({
-      where: { type_value: { type: identifier.type, value: identifier.value } },
-      include: { account: true },
-    });
+    const [contact, quarantined] = await Promise.all([
+      this.prisma.accountContact.findUnique({
+        where: { type_value: { type: identifier.type, value: identifier.value } },
+        include: { account: true },
+      }),
+      this.prisma.accountContactConflict.findUnique({
+        where: { type_value: { type: identifier.type, value: identifier.value } },
+        select: { id: true },
+      }),
+    ]);
+    if (quarantined) {
+      throw new ConflictException('Этот контакт связан с несколькими ранее созданными учетными записями. Требуется восстановление доступа.');
+    }
     const account = contact?.account || null;
     if (!account || !(await compare(text(password), account.passwordHash))) {
       throw new UnauthorizedException('Неверный телефон, email или пароль');

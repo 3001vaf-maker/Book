@@ -173,6 +173,163 @@ jobs:
         run: docker compose -f docker-compose.staging.yml down -v
 
 
+  global-account-production-recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install server dependencies
+        run: npm install --prefix server
+      - name: Generate Prisma client
+        run: npm run prisma:generate --prefix server
+      - name: Start isolated database
+        run: |
+          docker compose -f docker-compose.staging.yml up -d db
+          for attempt in $(seq 1 30); do
+            if docker compose -f docker-compose.staging.yml exec -T db pg_isready -U book -d book_staging >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose -f docker-compose.staging.yml logs db
+          exit 1
+      - name: Apply pre-global Account migration chain
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/global-account-migrations
+          mv server/prisma/migrations/20260921130000_global_account_identity /tmp/global-account-migrations/
+          mv server/prisma/migrations/20260921143000_account_terms /tmp/global-account-migrations/
+          mv server/prisma/migrations/20260921150000_account_contact_conflicts /tmp/global-account-migrations/
+          (
+            cd server
+            DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' npx prisma migrate deploy
+          )
+      - name: Seed legacy duplicate Account contacts and failed migration marker
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.staging.yml exec -T db psql -U book -d book_staging -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO "Tenant" ("id","name","updatedAt")
+          VALUES
+            ('legacy-tenant-a','Legacy A',CURRENT_TIMESTAMP),
+            ('legacy-tenant-b','Legacy B',CURRENT_TIMESTAMP);
+
+          INSERT INTO "Account" (
+            "id","tenantId","email","passwordHash","name","surname","phone","telegramId",
+            "profileData","discountPercent","visits","totalSpent","lastVisit","programs","createdAt","updatedAt"
+          )
+          VALUES
+            (
+              'legacy-account-a','legacy-tenant-a','same@example.invalid','hash-a','A','','+79990000001','7770001',
+              '{}'::jsonb,0,0,0,'','[]'::jsonb,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP
+            ),
+            (
+              'legacy-account-b','legacy-tenant-b','same@example.invalid','hash-b','B','','+79990000001','7770001',
+              '{}'::jsonb,0,0,0,'','[]'::jsonb,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP
+            );
+
+          INSERT INTO "_prisma_migrations" (
+            "id","checksum","finished_at","migration_name","logs","rolled_back_at","started_at","applied_steps_count"
+          ) VALUES (
+            'simulated-failed-global-account',
+            'simulated-checksum',
+            NULL,
+            '20260921130000_global_account_identity',
+            'simulated production failure',
+            NULL,
+            CURRENT_TIMESTAMP,
+            0
+          );
+          SQL
+      - name: Verify guarded recovery preflight
+        shell: bash
+        run: |
+          set -uo pipefail
+          cd server
+          set +e
+          DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' node scripts/recover-global-account-migration.mjs
+          recovery_status=$?
+          set -e
+          if [ "$recovery_status" -ne 42 ]; then
+            echo "Expected recovery preflight exit 42, got $recovery_status"
+            exit 1
+          fi
+          DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' npx prisma migrate resolve --rolled-back 20260921130000_global_account_identity
+      - name: Restore and apply global Account migrations
+        shell: bash
+        run: |
+          set -euo pipefail
+          mv /tmp/global-account-migrations/20260921130000_global_account_identity server/prisma/migrations/
+          mv /tmp/global-account-migrations/20260921143000_account_terms server/prisma/migrations/
+          mv /tmp/global-account-migrations/20260921150000_account_contact_conflicts server/prisma/migrations/
+          (
+            cd server
+            DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' npx prisma migrate deploy
+          )
+      - name: Verify ambiguous contacts are preserved without auto-merge
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.staging.yml exec -T db psql -U book -d book_staging -v ON_ERROR_STOP=1 <<'SQL'
+          DO $global_account_check$
+          BEGIN
+            IF (SELECT COUNT(*) FROM "Account" WHERE "id" IN ('legacy-account-a','legacy-account-b')) <> 2 THEN
+              RAISE EXCEPTION 'Legacy Accounts were not preserved';
+            END IF;
+
+            IF EXISTS (
+              SELECT 1 FROM information_schema.columns
+              WHERE table_schema = 'public' AND table_name = 'Account' AND column_name = 'tenantId'
+            ) THEN
+              RAISE EXCEPTION 'Legacy tenantId column still exists on Account';
+            END IF;
+
+            IF NOT EXISTS (
+              SELECT 1 FROM information_schema.columns
+              WHERE table_schema = 'public' AND table_name = 'Account' AND column_name = 'createdViaTenantId'
+            ) THEN
+              RAISE EXCEPTION 'createdViaTenantId was not created';
+            END IF;
+
+            IF EXISTS (
+              SELECT 1 FROM "AccountContact"
+              WHERE ("type" = 'EMAIL' AND "value" = 'same@example.invalid')
+                 OR ("type" = 'PHONE' AND "value" = '79990000001')
+                 OR ("type" = 'TELEGRAM' AND "value" = '7770001')
+            ) THEN
+              RAISE EXCEPTION 'Ambiguous legacy contact was assigned to one Account';
+            END IF;
+
+            IF (SELECT COUNT(*) FROM "AccountContactConflict"
+                WHERE ("type" = 'EMAIL' AND "value" = 'same@example.invalid')
+                   OR ("type" = 'PHONE' AND "value" = '79990000001')
+                   OR ("type" = 'TELEGRAM' AND "value" = '7770001')) <> 3 THEN
+              RAISE EXCEPTION 'Legacy contact conflicts were not quarantined';
+            END IF;
+
+            IF EXISTS (
+              SELECT 1
+              FROM "_prisma_migrations"
+              WHERE "migration_name" = '20260921130000_global_account_identity'
+                AND "finished_at" IS NULL
+                AND "rolled_back_at" IS NULL
+            ) THEN
+              RAISE EXCEPTION 'Failed migration marker remains active';
+            END IF;
+          END
+          $global_account_check$;
+          SQL
+      - name: Stop isolated database
+        if: always()
+        run: docker compose -f docker-compose.staging.yml down -v
+
+
   staging-smoke:
     if: github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/main' || github.base_ref == 'staging' || github.base_ref == 'main'
     runs-on: ubuntu-latest
