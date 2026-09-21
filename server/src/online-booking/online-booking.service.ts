@@ -8,6 +8,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { AccountContactType, BookingRequestStatus, Prisma } from '@prisma/client';
 import { compare, hash } from 'bcryptjs';
+import { AccountDocumentService } from '../document-registry/account-document.service';
 import { PrismaService } from '../prisma.service';
 import { BusinessStateService } from '../business-state/business-state.service';
 import { ConsentPolicyService } from '../tenant-document-archive/consent-policy.service';
@@ -53,15 +54,6 @@ function numeric(value: unknown, fallback = 0) {
 
 function percent(value: unknown) {
   return Math.max(0, Math.min(100, numeric(value, 0)));
-}
-
-function normalizeConsents(value: unknown) {
-  return arrayValue(value).map((item) => ({
-    documentId: text(item?.documentId),
-    documentVersion: Math.max(1, Number(item?.documentVersion || 1)),
-    accepted: Boolean(item?.accepted),
-    acceptedAt: text(item?.acceptedAt) || new Date().toISOString(),
-  })).filter((item) => item.documentId);
 }
 
 function uniqueStrings(value: unknown, normalize: (item: unknown) => string, limit = 5) {
@@ -150,6 +142,7 @@ export class OnlineBookingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    private readonly accountDocuments: AccountDocumentService,
     private readonly businessState: BusinessStateService,
     private readonly tenantDocumentArchive: TenantDocumentArchiveService,
     private readonly consentPolicy: ConsentPolicyService,
@@ -236,16 +229,6 @@ export class OnlineBookingService {
       .filter(Boolean))];
   }
 
-  private ensurePdnConsent(publicationData: Record<string, any>, consents: any[]) {
-    const documents = arrayValue(publicationData.documents);
-    const document = documents.find((item) => Boolean(item?.personConsent) && text(item?.id) === 'pdn-consent');
-    if (!document) throw new BadRequestException('Согласие на обработку персональных данных недоступно');
-    const accepted = consents.some((item) => item.documentId === 'pdn-consent'
-      && Number(item.documentVersion) === Math.max(1, Number(document.version || 1))
-      && item.accepted);
-    if (!accepted) throw new BadRequestException(`Необходимо согласие: ${text(document.title) || 'Согласие на обработку персональных данных'}`);
-  }
-
   async publish(tenantId: string, data: unknown) {
     const normalized = objectValue(data);
     return this.prisma.bookingPublication.upsert({
@@ -322,19 +305,24 @@ export class OnlineBookingService {
   }
 
   async registerAccount(tenantId: string, body: Record<string, any>) {
-    const documents = await this.tenantDocumentArchive.publicDocuments(tenantId);
     const email = emailValue(body.email);
     const password = text(body.password);
     const name = text(body.name);
     const phone = text(body.phone);
     const telegramId = text(body.telegramId);
     const profileData = normalizeProfileData(body.profileData);
-    const consents = normalizeConsents(body.consents);
+    const accountTerms = objectValue(body.accountTerms);
     if (!email || !email.includes('@')) throw new BadRequestException('Введите корректный email');
     if (password.length < 6) throw new BadRequestException('Пароль должен содержать не менее 6 символов');
     if (!name) throw new BadRequestException('Введите имя');
     if (!/^\+\d{8,15}$/.test(phone)) throw new BadRequestException('Введите телефон полностью');
-    this.ensurePdnConsent({ documents }, consents);
+
+    const currentTerms = await this.accountDocuments.publicTerms();
+    if (!accountTerms.accepted
+      || text(accountTerms.key) !== currentTerms.key
+      || Number(accountTerms.version || 0) !== currentTerms.version) {
+      throw new BadRequestException('Необходимо принять актуальные Условия использования учетной записи');
+    }
 
     const contacts = accountContactFacts({ email, phone, telegramId, profileData });
     const account = await this.prisma.$transaction(async (tx) => {
@@ -355,12 +343,13 @@ export class OnlineBookingService {
       return created;
     });
 
+    await this.accountDocuments.accept(
+      account.id,
+      accountTerms,
+      'online-booking-registration',
+      { tenantContext: tenantId },
+    );
     const binding = await this.personIdentity.bindFirstAccess(tenantId, account as any);
-    await this.consentPolicy.acceptAccountConsents(tenantId, account.id, consents, 'online-booking-registration');
-    if (consents.some((item) => item.documentId === 'messages-consent' && item.accepted)) {
-      await this.consentPolicy.acceptContactPointConsent(tenantId, 'PHONE', account.phone, 'messages-consent', 'online-booking-registration');
-      await this.consentPolicy.acceptContactPointConsent(tenantId, 'EMAIL', account.email, 'messages-consent', 'online-booking-registration');
-    }
     return {
       accessToken: await this.issueAccountToken(account),
       account: await this.accountView(tenantId, account),
