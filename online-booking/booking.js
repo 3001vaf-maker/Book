@@ -1,8 +1,11 @@
 import {
+  acceptAccountTerms,
   clearAccount,
   createBookingRequest,
   getAccount,
   getAccountConsentState,
+  getAccountPlatformState,
+  getAccountTerms,
   getBookingContext,
   getRememberedAccountEmail,
   loginAccount,
@@ -79,7 +82,7 @@ function errorBlock(message = '') {
   return message ? `<div class="form-error" role="alert">${escapeHtml(message)}</div>` : '';
 }
 
-function currentConsentFacts(state) {
+function currentTenantConsentFacts(state) {
   return requiredBookingDocuments(state.context).map((document) => ({
     documentId: String(document.id || ''),
     documentVersion: Math.max(1, Number(document.version || 1)),
@@ -88,7 +91,7 @@ function currentConsentFacts(state) {
   }));
 }
 
-function seedConsents(state, facts = []) {
+function seedTenantConsents(state, facts = []) {
   state.consents = {};
   for (const fact of Array.isArray(facts) ? facts : []) {
     if (!fact?.accepted) continue;
@@ -96,16 +99,95 @@ function seedConsents(state, facts = []) {
   }
 }
 
-async function refreshAccountConsentState(state) {
+async function refreshTenantConsentState(state) {
   const consentState = await getAccountConsentState(state.tenantId);
-  seedConsents(state, consentState?.consents || []);
+  seedTenantConsents(state, consentState?.consents || []);
   return consentState || { pdnActive: false, consents: [] };
 }
 
-async function saveRegistrationConsents(state) {
-  const consents = currentConsentFacts(state);
+async function saveTenantConsents(state) {
+  const consents = currentTenantConsentFacts(state);
   const consentState = await submitAccountConsents(state.tenantId, consents);
-  seedConsents(state, consentState?.consents || consents);
+  seedTenantConsents(state, consentState?.consents || consents);
+}
+
+
+function currentAccountTermsFact(state) {
+  const document = state.accountTerms || {};
+  return {
+    key: String(document.key || ''),
+    version: Math.max(1, Number(document.version || 1)),
+    accepted: Boolean(state.accountTermsAccepted),
+    acceptedAt: new Date().toISOString(),
+  };
+}
+
+async function loadAccountTerms(state) {
+  state.accountTerms = await getAccountTerms();
+  state.accountTermsAccepted = false;
+  return state.accountTerms;
+}
+
+function openAccountTermsDocument(state) {
+  const document = state.accountTerms || {};
+  if (!document.key) return;
+  mountModal(document.body, modal(bookingDocument({
+    title: document.title || 'Условия использования учетной записи',
+    version: document.version || 1,
+    text: document.content || '',
+  }), { variant: 'large' }));
+}
+
+function renderAccountTerms(root, state) {
+  const document = state.accountTerms || {};
+  const canContinue = Boolean(document.key && state.accountTermsAccepted);
+  const cards = bookingAgreementCards([{
+    label: document.title || 'Условия использования учетной записи',
+    checked: Boolean(state.accountTermsAccepted),
+    openData: 'data-account-terms-document',
+    toggleData: 'data-account-terms-toggle',
+    openAria: 'Открыть Условия использования учетной записи',
+    toggleAria: state.accountTermsAccepted ? 'Снять подтверждение' : 'Принять Условия использования учетной записи',
+  }]);
+
+  renderFlowPage(root, state, {
+    title: 'Условия использования учетной записи',
+    back: { data: 'data-account-terms-back', aria: 'Назад' },
+    action: { label: 'Далее', data: 'data-account-terms-next', disabled: !canContinue },
+    body: `${cards}${errorBlock(state.error)}`,
+  });
+
+  root.querySelector('[data-account-terms-document]')?.addEventListener('click', () => openAccountTermsDocument(state));
+  root.querySelector('[data-account-terms-toggle]')?.addEventListener('click', () => {
+    state.accountTermsAccepted = !state.accountTermsAccepted;
+    renderAccountTerms(root, state);
+  });
+  root.querySelector('[data-account-terms-back]')?.addEventListener('click', () => {
+    state.error = '';
+    if (!state.account) {
+      renderAccountEntry(root, state);
+      return;
+    }
+    if (state.identityDestination === 'booking' && state.from) renderTimes(root, state);
+    else nextBookingStep(root, state);
+  });
+  root.querySelector('[data-account-terms-next]')?.addEventListener('click', async (event) => {
+    if (!canContinue) return;
+    if (!state.account) {
+      renderAccountDetails(root, state);
+      return;
+    }
+    event.currentTarget.disabled = true;
+    try {
+      const accepted = await acceptAccountTerms(state.tenantId, currentAccountTermsFact(state));
+      state.accountTerms = accepted?.document || state.accountTerms;
+      state.accountTermsAccepted = Boolean(accepted?.accepted);
+      await continueAfterIdentity(root, state);
+    } catch (error) {
+      state.error = error instanceof Error ? error.message : 'Не удалось сохранить Условия использования учетной записи';
+      renderAccountTerms(root, state);
+    }
+  });
 }
 
 function resetBookingChoice(state) {
@@ -194,7 +276,7 @@ function backFromFirstBookingStep(root, state) {
   renderAccountEntry(root, state);
 }
 
-function openDocument(state, documentId) {
+function openTenantDocument(state, documentId) {
   const document = requiredBookingDocuments(state.context).find((item) => String(item.id) === String(documentId));
   if (!document) return;
   mountModal(document.body, modal(bookingDocument({
@@ -205,7 +287,6 @@ function openDocument(state, documentId) {
 }
 
 function renderWelcome(root, state) {
-  state.registrationMode = 'initial';
   const profile = state.context.profile || {};
   const owner = [profile.name, profile.surname].filter(Boolean).join(' ');
   const subtitle = [state.settings.welcomeText, owner].filter(Boolean).join('\n');
@@ -222,7 +303,7 @@ function renderWelcome(root, state) {
   });
 }
 
-function renderRegistrationAgreements(root, state) {
+function renderTenantAgreements(root, state) {
   const documents = requiredBookingDocuments(state.context);
   const canContinue = documents.filter((document) => document.required).every((document) => state.consents[String(document.id || '')]);
   const cards = bookingAgreementCards(documents.map((document) => ({
@@ -234,42 +315,32 @@ function renderRegistrationAgreements(root, state) {
     toggleAria: `${state.consents[String(document.id || '')] ? 'Снять' : 'Дать'} согласие: ${document.title || ''}`,
   })));
   renderFlowPage(root, state, {
-    title: 'Соглашения',
-    subtitle: 'Согласия относятся к регистрации и аккаунту',
+    title: 'Согласия',
     back: { data: 'data-booking-agreements-back', aria: 'Назад' },
     action: { label: 'Далее', data: 'data-booking-agreements-next', disabled: !canContinue },
-    body: `${documents.length ? cards : emptyState('Документов нет', 'Для регистрации не настроены документы согласия.')}${errorBlock(state.error)}`,
+    body: `${documents.length ? cards : emptyState('Документов нет', 'Для этого действия не настроены документы.')}${errorBlock(state.error)}`,
   });
   root.querySelector('[data-booking-agreements-back]')?.addEventListener('click', () => {
     state.error = '';
-    if (state.registrationMode === 'repair' && state.account) {
-      if (state.identityDestination === 'booking') renderTimes(root, state);
-      else void renderAccountHome(root, state);
-      return;
-    }
-    renderAccountEntry(root, state);
+    if (state.identityDestination === 'booking') renderTimes(root, state);
+    else void renderAccountHome(root, state);
   });
-  root.querySelectorAll('[data-booking-document]').forEach((node) => node.addEventListener('click', () => openDocument(state, node.dataset.bookingDocument)));
+  root.querySelectorAll('[data-booking-document]').forEach((node) => node.addEventListener('click', () => openTenantDocument(state, node.dataset.bookingDocument)));
   root.querySelectorAll('[data-booking-consent]').forEach((node) => node.addEventListener('click', () => {
     const id = String(node.dataset.bookingConsent || '');
     state.consents[id] = !state.consents[id];
-    renderRegistrationAgreements(root, state);
+    renderTenantAgreements(root, state);
   }));
   root.querySelector('[data-booking-agreements-next]')?.addEventListener('click', async (event) => {
     if (!canContinue) return;
-    if (state.registrationMode !== 'repair') {
-      renderAccountDetails(root, state);
-      return;
-    }
     event.currentTarget.disabled = true;
     try {
-      await saveRegistrationConsents(state);
-      state.registrationMode = 'initial';
+      await saveTenantConsents(state);
       if (state.identityDestination === 'booking') renderConfirmation(root, state);
       else await renderAccountHome(root, state);
     } catch (error) {
       state.error = error instanceof Error ? error.message : 'Не удалось сохранить согласия';
-      renderRegistrationAgreements(root, state);
+      renderTenantAgreements(root, state);
     }
   });
 }
@@ -304,8 +375,8 @@ function renderAccountEntry(root, state) {
       if (prepared.exists) {
         renderPassword(root, state);
       } else {
-        state.registrationMode = 'initial';
-        renderRegistrationAgreements(root, state);
+        await loadAccountTerms(state);
+        renderAccountTerms(root, state);
       }
     } catch (error) {
       state.error = error instanceof Error ? error.message : 'Не удалось проверить аккаунт';
@@ -326,7 +397,7 @@ function renderAccountDetails(root, state) {
   const form = root.querySelector('[data-booking-account-form]');
   root.querySelector('[data-booking-account-back]')?.addEventListener('click', () => {
     state.error = '';
-    renderRegistrationAgreements(root, state);
+    renderAccountTerms(root, state);
   });
   root.querySelector('[data-booking-account-submit]')?.addEventListener('click', () => form?.requestSubmit());
   form?.addEventListener('submit', (event) => {
@@ -376,11 +447,10 @@ function renderPassword(root, state) {
         const payload = await registerAccount(state.tenantId, {
           ...state.accountDraft,
           password,
-          consents: currentConsentFacts(state),
+          accountTerms: currentAccountTermsFact(state),
         });
         state.account = payload.account;
         state.error = '';
-        seedConsents(state, currentConsentFacts(state));
         await continueAfterIdentity(root, state);
         return;
       }
@@ -402,24 +472,39 @@ async function continueAfterIdentity(root, state) {
     return;
   }
 
-  if (state.identityDestination === 'profile') {
-    state.accountTab = 'profile';
-    await renderAccountHome(root, state);
-    return;
-  }
-
   try {
-    const consentState = await refreshAccountConsentState(state);
+    const platformState = await getAccountPlatformState(state.tenantId);
+    state.accountTerms = platformState?.document || state.accountTerms;
+    state.accountTermsAccepted = Boolean(platformState?.accepted);
+    if (!platformState?.accepted) {
+      renderAccountTerms(root, state);
+      return;
+    }
+
+    if (state.identityDestination === 'profile') {
+      state.accountTab = 'profile';
+      await renderAccountHome(root, state);
+      return;
+    }
+
+    const consentState = await refreshTenantConsentState(state);
     if (consentState.pdnActive) {
       renderConfirmation(root, state);
       return;
     }
-    state.registrationMode = 'repair';
-    renderRegistrationAgreements(root, state);
+    renderTenantAgreements(root, state);
   } catch (error) {
-    state.error = error instanceof Error ? error.message : 'Не удалось проверить согласия';
-    state.registrationMode = 'repair';
-    renderRegistrationAgreements(root, state);
+    state.error = error instanceof Error ? error.message : 'Не удалось проверить юридический статус';
+    if (!state.accountTerms?.key) {
+      try {
+        await loadAccountTerms(state);
+        renderAccountTerms(root, state);
+        return;
+      } catch {
+        // Fall through to the tenant-specific screen only when platform terms are already known.
+      }
+    }
+    renderTenantAgreements(root, state);
   }
 }
 
@@ -631,8 +716,9 @@ async function renderAccountHome(root, state) {
       state.error = '';
       state.accountTab = 'profile';
       state.accountChatOpen = false;
-      state.registrationMode = 'initial';
-      seedConsents(state, []);
+      seedTenantConsents(state, []);
+      state.accountTerms = null;
+      state.accountTermsAccepted = false;
       renderWelcome(root, state);
     },
   });
@@ -656,13 +742,14 @@ export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = 
     to: '',
     accountDraft: {},
     account: null,
+    accountTerms: null,
+    accountTermsAccepted: false,
     consents: {},
     passwordMode: 'register',
     error: '',
     notice: '',
     lastRequest: null,
     repeatSelection: null,
-    registrationMode: 'initial',
     identityDestination: 'booking',
     accountTab: 'profile',
     accountChatOpen: false,
