@@ -69,6 +69,7 @@ model Tenant {
   activityEvents           PlatformActivityEvent[]
   accountSessions          PlatformSession[]
   notificationPreferences  PlatformNotificationPreference[]
+  platformNotices           PlatformNotice[]
 }
 
 model PlatformAccount {
@@ -87,6 +88,7 @@ model PlatformAccount {
   activityEvents    PlatformActivityEvent[]
   accountSessions   PlatformSession[]
   notificationPreferences PlatformNotificationPreference[]
+  platformNotices   PlatformNotice[]
 }
 
 model Membership {
@@ -733,4 +735,23 @@ model PlatformNotificationPreference {
 
   @@unique([tenantId, platformAccountId])
   @@index([platformAccountId])
+}
+
+
+model PlatformNotice {
+  id                String   @id @default(cuid())
+  tenantId          String
+  platformAccountId String
+  type              String
+  title             String
+  body              String   @default("")
+  metadata          Json     @default("{}")
+  readAt            DateTime?
+  createdAt         DateTime @default(now())
+
+  tenant  Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  account PlatformAccount @relation(fields: [platformAccountId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([platformAccountId, readAt, createdAt])
 }
