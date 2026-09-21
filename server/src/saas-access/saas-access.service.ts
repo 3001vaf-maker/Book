@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { CapabilityValueType, TenantAccessStatus } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 
-type ResolutionSource = 'TENANT_OVERRIDE' | 'PLAN' | 'DEFAULT' | 'LEGACY_COMPAT' | 'SUSPENDED' | 'DEMO' | 'DEMO_EXPIRED' | 'FIRST_RUN';
+type ResolutionSource = 'TENANT_OVERRIDE' | 'PLAN' | 'DEFAULT' | 'OWNER' | 'SUSPENDED' | 'DEMO' | 'DEMO_EXPIRED' | 'FIRST_RUN';
 
 export type ResolvedCapability = {
   key: string;
@@ -14,7 +14,7 @@ export type ResolvedCapability = {
 
 export type ResolvedTenantAccess = {
   tenantId: string;
-  status: TenantAccessStatus | 'LEGACY_COMPAT';
+  status: TenantAccessStatus;
   isOwnerBook: boolean;
   commercialMode: string;
   demoActivatedAt: string;
@@ -56,7 +56,7 @@ export class SaasAccessService {
     });
 
     if (!access) {
-      return this.legacyCompatibilityValue(capability.key, capability.valueType);
+      throw new NotFoundException('Состояние рабочего пространства не настроено');
     }
 
     if (access.status === TenantAccessStatus.SUSPENDED) {
@@ -82,7 +82,7 @@ export class SaasAccessService {
       }
 
       if (access.isOwnerBook && !access.plan) {
-        return this.legacyCompatibilityValue(capability.key, capability.valueType);
+        return this.ownerValue(capability.key, capability.valueType);
       }
 
       if (planValue && planValue.enabled !== null) {
@@ -115,7 +115,7 @@ export class SaasAccessService {
     }
 
     if (access.isOwnerBook && !access.plan) {
-      return this.legacyCompatibilityValue(capability.key, capability.valueType);
+      return this.ownerValue(capability.key, capability.valueType);
     }
 
     if (planValue) {
@@ -157,19 +157,7 @@ export class SaasAccessService {
     });
 
     if (!access) {
-      return {
-        tenantId,
-        status: 'LEGACY_COMPAT',
-        isOwnerBook: false,
-        commercialMode: 'LIVE',
-        demoActivatedAt: '',
-        demoExpiresAt: '',
-        plan: null,
-        capabilityOrder: [],
-        capabilities: capabilities.map((capability) =>
-          this.legacyCompatibilityValue(capability.key, capability.valueType),
-        ),
-      };
+      throw new NotFoundException('Состояние рабочего пространства не настроено');
     }
 
     const firstRunActive = await this.firstRunActive(tenantId);
@@ -208,7 +196,7 @@ export class SaasAccessService {
           };
         }
         if (access.isOwnerBook && !access.plan) {
-          return this.legacyCompatibilityValue(capability.key, capability.valueType);
+          return this.ownerValue(capability.key, capability.valueType);
         }
         if (planValue && planValue.enabled !== null) {
           return {
@@ -238,7 +226,7 @@ export class SaasAccessService {
         };
       }
       if (access.isOwnerBook && !access.plan) {
-        return this.legacyCompatibilityValue(capability.key, capability.valueType);
+        return this.ownerValue(capability.key, capability.valueType);
       }
       if (planValue) {
         return {
@@ -314,11 +302,11 @@ export class SaasAccessService {
     return { key, valueType, enabled: null, limit: 0, source: 'DEMO_EXPIRED' };
   }
 
-  private legacyCompatibilityValue(key: string, valueType: CapabilityValueType): ResolvedCapability {
+  private ownerValue(key: string, valueType: CapabilityValueType): ResolvedCapability {
     if (valueType === CapabilityValueType.BOOLEAN) {
-      return { key, valueType, enabled: true, limit: null, source: 'LEGACY_COMPAT' };
+      return { key, valueType, enabled: true, limit: null, source: 'OWNER' };
     }
-    return { key, valueType, enabled: null, limit: null, source: 'LEGACY_COMPAT' };
+    return { key, valueType, enabled: null, limit: null, source: 'OWNER' };
   }
 
   private suspendedValue(key: string, valueType: CapabilityValueType): ResolvedCapability {
