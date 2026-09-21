@@ -91,6 +91,18 @@ export class OnlineBookingController {
     return this.booking.updateAccount(tenantId, request.accountAuth!.accountId, body || {});
   }
 
+  @Post(':tenantId/account/telegram-entry/resolve')
+  async resolveTelegramEntry(
+    @Param('tenantId') tenantId: string,
+    @Body() body: { token?: unknown },
+  ) {
+    const resolved = await this.communications.resolveTelegramEntryAccount(tenantId, body?.token);
+    if (!resolved.exists || !resolved.accountId) return { exists: false };
+    const payload = await this.booking.resumeAccount(tenantId, resolved.accountId);
+    await this.communications.bindTelegramEntry(tenantId, resolved.accountId, body?.token);
+    return { ...payload, exists: true };
+  }
+
   @UseGuards(AccountGuard)
   @Post(':tenantId/account/telegram-entry')
   bindTelegramEntry(@Param('tenantId') tenantId: string, @Req() request: AccountRequest, @Body() body: { token?: unknown }) {
