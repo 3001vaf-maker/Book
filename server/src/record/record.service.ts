@@ -183,7 +183,7 @@ export class RecordService {
 
     const products = arrayValue(input.products).map((item) => clone(objectValue(item)));
     const person = clone(objectValue(input.person));
-    const finance = this.finance.calculatePlan([
+    const settlement = this.finance.calculateSettlement([
       ...procedureSnapshots.map((item) => ({ ...item, sourceType: 'procedure', sourceId: item.id })),
       ...products.map((item) => ({ ...item, sourceType: 'product', sourceId: text(item?.id) })),
     ], person?.discountPercent);
@@ -203,7 +203,6 @@ export class RecordService {
       source: text(input.source) || 'manual',
       sourceRequestId,
       createdBy: actor,
-      finance,
       createdAt,
       updatedAt: text(input.updatedAt) || createdAt,
     };
@@ -230,6 +229,7 @@ export class RecordService {
     } else {
       await this.prisma.record.create({ data: { tenantId, recordId: id, position: resolvedPosition, data: json(record) } });
     }
+    await this.finance.upsertSettlement(tenantId, 'record', id, settlement);
     return record;
   }
 
@@ -317,18 +317,21 @@ export class RecordService {
       if (!personKeys.has(text(person?.key)) && !personIds.has(text(person?.id))) continue;
       const events = byRecord.get(text(record.id)) || [];
       const lifecycle = this.projectLifecycle(record, events);
-      const storedPlan = objectValue(record.finance);
-      const plan = Object.keys(storedPlan).length
-        ? storedPlan
-        : this.finance.calculatePlan([
-            ...arrayValue(record.procedures).map((item) => ({ ...objectValue(item), sourceType: 'procedure', sourceId: text(item?.id) })),
-            ...arrayValue(record.products).map((item) => ({ ...objectValue(item), sourceType: 'product', sourceId: text(item?.id) })),
-          ], person?.discountPercent);
-      const payment = await this.finance.recordPaymentState(tenantId, text(record.id), plan);
+      const fallbackSettlement = this.finance.calculateSettlement([
+        ...arrayValue(record.procedures).map((item) => ({ ...objectValue(item), sourceType: 'procedure', sourceId: text(item?.id) })),
+        ...arrayValue(record.products).map((item) => ({ ...objectValue(item), sourceType: 'product', sourceId: text(item?.id) })),
+      ], person?.discountPercent);
+      const settlement = await this.finance.settlementForSource(
+        tenantId,
+        'record',
+        text(record.id),
+        objectValue(record.finance).items ? record.finance : fallbackSettlement,
+      ) || fallbackSettlement;
+      const payment = await this.finance.recordSettlementPaymentState(tenantId, text(record.id), settlement);
       result.push({
         ...record,
         ...lifecycle,
-        finance: plan,
+        finance: settlement,
         payment,
         history: events,
       });
@@ -366,9 +369,11 @@ export class RecordService {
       procedures = canonical.map((item) => {
         const draft = requestedById.get(item.id);
         const requestedDuration = Number(draft?.duration);
+        const requestedCost = Number(draft?.cost ?? draft?.price);
         return {
           ...item,
           duration: Number.isFinite(requestedDuration) && requestedDuration > 0 ? requestedDuration : item.duration,
+          cost: Number.isFinite(requestedCost) && requestedCost >= 0 ? requestedCost : item.cost,
         };
       });
     }
@@ -399,15 +404,30 @@ export class RecordService {
       ? arrayValue(incoming.products).map((item) => clone(objectValue(item)))
       : arrayValue(current.products).map((item) => clone(objectValue(item)));
     const person = personChanged ? clone(objectValue(incoming.person)) : clone(objectValue(current.person));
-    const finance = (refreshProcedures || productsChanged || personChanged)
-      ? this.finance.calculatePlan([
-          ...procedures.map((item) => ({ ...item, sourceType: 'procedure', sourceId: item.id })),
-          ...products.map((item) => ({ ...item, sourceType: 'product', sourceId: text(item?.id) })),
-        ], person?.discountPercent)
-      : clone(objectValue(current.finance));
+    const currentFallbackSettlement = this.finance.calculateSettlement([
+      ...arrayValue(current.procedures).map((item) => ({ ...objectValue(item), sourceType: 'procedure', sourceId: text(item?.id) })),
+      ...arrayValue(current.products).map((item) => ({ ...objectValue(item), sourceType: 'product', sourceId: text(item?.id) })),
+    ], objectValue(current.person)?.discountPercent);
+    const currentSettlement = await this.finance.settlementForSource(
+      tenantId,
+      'record',
+      id,
+      objectValue(current.finance).items ? current.finance : currentFallbackSettlement,
+    ) || currentFallbackSettlement;
 
+    const nextSettlementSources = [
+      ...procedures.map((item) => ({ ...item, sourceType: 'procedure', sourceId: item.id })),
+      ...products.map((item) => ({ ...item, sourceType: 'product', sourceId: text(item?.id) })),
+    ];
+    const settlement = personChanged
+      ? this.finance.calculateSettlement(nextSettlementSources, person?.discountPercent)
+      : (refreshProcedures || productsChanged)
+        ? this.finance.repriceSettlement(nextSettlementSources, currentSettlement, person?.discountPercent)
+        : null;
+
+    const { finance: _legacyFinance, ...currentRecord } = current;
     const stored = {
-      ...current,
+      ...currentRecord,
       date,
       workplaceId: incomingWorkplaceId,
       from,
@@ -415,7 +435,6 @@ export class RecordService {
       person,
       procedures,
       products,
-      finance,
       updatedAt: text(incoming.updatedAt) || new Date().toISOString(),
       createdAt: text(current.createdAt),
       createdBy: clone(objectValue(current.createdBy)),
@@ -430,6 +449,7 @@ export class RecordService {
         data: json(stored),
       },
     });
+    if (settlement) await this.finance.upsertSettlement(tenantId, 'record', id, settlement);
     return stored;
   }
 }

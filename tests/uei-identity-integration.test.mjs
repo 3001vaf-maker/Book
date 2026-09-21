@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { calculateFinancialPlan, hydrateFinanceFromServer, recordPaymentIncome } from '../core/finance/index.js';
+import { calculateSettlement, hydrateFinanceFromServer } from '../core/finance/index.js';
 import { hydrateRecordStateFromServer } from '../core/record/index.js';
 import { createUEI, detachUEI, hydrateUEIFromServer, linkUEI } from '../core/uei.js';
 import {
@@ -10,6 +10,7 @@ import {
   hydratePeopleFromServer,
 } from '../main/people/data.js';
 import { getPersonMetadata } from '../main/people/metadata.js';
+import { canonicalFinanceState, paymentFixture, settlementRow } from './helpers/finance-canonical.mjs';
 
 hydratePeopleFromServer([
   { key: 'p1', name: 'Александр', phones: ['+79030000001'], accounts: ['a1'], discountPercent: 15, programs: [{ name: 'VIP' }] },
@@ -27,23 +28,27 @@ hydrateRecordStateFromServer({
   ],
   recordEvents: [],
 });
-hydrateFinanceFromServer({ version: 5, income: [], expense: [] });
 
-function pay(recordId, amount) {
-  const finance = calculateFinancialPlan([{ sourceType: 'procedure', sourceId: `service-${recordId}`, name: 'Услуга', price: amount }]);
-  return recordPaymentIncome({
-    source: { type: 'record', id: recordId },
-    finance,
-    maxAmount: amount,
-    serviceAmount: amount,
-    allocations: [{ walletId: 'cash', walletName: 'Наличные', amount }],
-  });
-}
-
-assert.ok(pay('r1', 1000));
-assert.ok(pay('r2', 2000));
-assert.ok(pay('r3', 3000));
-assert.ok(pay('r4', 4000));
+const settlements = [
+  ['r1', 1000],
+  ['r2', 2000],
+  ['r3', 3000],
+  ['r4', 4000],
+].map(([recordId, amount]) => {
+  const settlement = calculateSettlement([{ sourceType: 'procedure', sourceId: `service-${recordId}`, name: 'Услуга', price: amount }]);
+  return { recordId, settlement };
+});
+const payments = settlements.map(({ recordId, settlement }) => paymentFixture({
+  id: `payment-${recordId}`,
+  recordId,
+  settlement,
+  allocations: [{ walletId: 'cash', walletName: 'Наличные', amount: settlement.planTotal }],
+  serviceAmount: settlement.planTotal,
+}));
+hydrateFinanceFromServer(canonicalFinanceState({
+  settlements: settlements.map(({ recordId, settlement }) => settlementRow(recordId, settlement)),
+  payments,
+}));
 
 createUEI({ entityType: 'person', entityId: 'p1', value: 'A1', identifiers: ['+79030000001'] });
 linkUEI({ entityType: 'person', entityId: 'p2', value: '00A1', identifiers: ['+79030000002'] });

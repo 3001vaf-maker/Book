@@ -1,4 +1,4 @@
-import { hydrateRecordFinance } from '../finance/index.js';
+import { hydrateRecordSettlement } from '../finance/index.js';
 import { getRecordRow, getRecordRows } from './data.js';
 import { getRecordEvents } from './events.js';
 import { projectRecordLifecycle } from './state.js';
@@ -13,8 +13,8 @@ function normalizeId(value) {
 
 export function readRecord(row = null) {
   if (!row?.id) return null;
-  const financed = hydrateRecordFinance(row);
-  return projectRecordLifecycle(financed, getRecordEvents(row.id));
+  const settled = hydrateRecordSettlement(row);
+  return projectRecordLifecycle(settled, getRecordEvents(row.id));
 }
 
 export function getRecord(id) {

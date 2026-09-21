@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
-import { calculateFinancialPlan, hydrateFinanceFromServer, recordPaymentIncome } from '../core/finance/index.js';
+import { calculateSettlement, hydrateFinanceFromServer } from '../core/finance/index.js';
 import { hydrateRecordStateFromServer } from '../core/record/index.js';
 import { getPersonMetadata } from '../main/people/metadata.js';
+import { canonicalFinanceState, paymentFixture, settlementRow } from './helpers/finance-canonical.mjs';
 
 hydrateRecordStateFromServer({
   records: [
@@ -19,16 +20,18 @@ hydrateRecordStateFromServer({
   ],
 });
 
-hydrateFinanceFromServer({ version: 5, income: [], expense: [] });
-const plan = calculateFinancialPlan([{ sourceType: 'procedure', sourceId: 'p1', name: 'Услуга', price: 5000 }]);
-const payment = recordPaymentIncome({
-  source: { type: 'record', id: 'r1' },
-  finance: plan,
-  maxAmount: 5000,
-  serviceAmount: 5000,
+const settlement = calculateSettlement([{ sourceType: 'procedure', sourceId: 'p1', name: 'Услуга', price: 5000 }]);
+const payment = paymentFixture({
+  id: 'payment-r1',
+  recordId: 'r1',
+  settlement,
   allocations: [{ walletId: 'cash', walletName: 'Наличные', amount: 5000 }],
+  serviceAmount: 5000,
 });
-assert.ok(payment);
+hydrateFinanceFromServer(canonicalFinanceState({
+  settlements: [settlementRow('r1', settlement)],
+  payments: [payment],
+}));
 
 const metadata = getPersonMetadata('c1');
 

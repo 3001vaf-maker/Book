@@ -63,15 +63,22 @@ The old browser-to-server migration phase is complete. Do not restore browser bu
 
 ## Finance
 
-Finance ownership lives under `core/finance/`:
-- `model.js` — plan/fact calculations;
-- `data.js` — persistence boundary;
-- `read.js` — projections/read model;
-- `rules.js` — pure financial rules;
-- `service.js` — financial commands/actions;
-- `index.js` — only public contract.
+Finance is under an ordered ownership rebuild. The single canonical contract and checklist are in `docs/FINANCE_ARCHITECTURE.md`.
 
-DDS movements are finance facts; Wallet is wallet metadata/balance projection; Record stores appointment financial snapshot. Do not reintroduce old parallel owners such as top-level `core/dds.js` or `core/financial-model.js`.
+Target ownership:
+- Settlement / Расчёт — accrued / due / paid / refunded / outstanding calculation for a concrete source;
+- Ledger / DDS — every factual money movement;
+- Operation — grouping of related Ledger rows;
+- Articles — user-extensible hierarchy plus system economic character;
+- Wallet / Касса — metadata only; balance/history are Ledger projections;
+- Z-report — Ledger projection for a day/period;
+- Financial Model / Финансовая модель — RESERVED future planning/analysis instrument, not operational payment logic.
+
+Record is not a money owner. It supplies appointment/source facts and snapshots; Finance owns payment commands and money facts.
+
+F2 removes the legacy `core/finance/model.js` and Record-oriented FinancialPlan API. Operational calculation is `Settlement / Расчёт`. Legacy persisted JSON field names remain temporarily for storage compatibility only.
+
+The user-facing Finance folder remains `main/finance/`. The future Financial Model may later be manifested under Finance or a future Analytics folder; this UI placement is intentionally undecided.
 
 ## Production-visible contour
 
@@ -118,9 +125,46 @@ The isolated development contour now exists in code:
 - staging fixtures contain synthetic profile/workplace/client/record/payment data;
 - Check Book runs on pushes and PRs for both `staging` and `main`.
 
-The previously queued Auth transactional communication block is paused. The active functional block is the Record ownership cleanup below.
+The previously queued Auth transactional communication block is paused.
 
-## Active block — Record ownership cleanup (2026-09-20)
+## Active block — Finance ownership rebuild (2026-09-20)
+
+Release-candidate base: `staging@5562cdc1a110184f2e92dfd39b6ac3ac3d7ad8a9` (PR #246 merged). The docs-only Finance closeout commit created from this base is the exact staging head that must pass the final whole-staging Check Book before `main`.
+
+Working branch: none — Finance F0-F12 is complete in `staging`; final whole-staging release verification is pending before `main`.
+
+Continuity anchor: `docs/FINANCE_ARCHITECTURE.md`.
+
+Current status:
+- F0: DONE — canonical Finance ownership and ordered F0-F12 migration chain are documented and merged to `staging` as `522b593d9c5d1a1ea37b152b8f0802389eeb81e8`; post-merge Check Book #1968 passed all three jobs.
+- F1: DONE — verified ownership/storage/formula inventory and current-owner -> target-owner migration map are recorded in `docs/FINANCE_ARCHITECTURE.md`; merged to `staging` as `02bd8e6b0ab82048335d1a29be8e9186a4b614bb`; post-merge Check Book #1972 passed all three jobs.
+- F2: DONE — legacy operational Financial Model/FinancialPlan naming is replaced by `Settlement / Расчёт`; `core/finance/model.js` is removed; guards block the old API and operational Financial Model dependencies. Exact-head Check Book #1977 and post-merge Check Book #1978 both passed all required jobs on `staging@b075c9bf2203d839d5dc9cba6153aa7ab705a893`.
+- F3-F5: DONE — merged to `staging` as `b3819f4033424cec502244b667781e004d5796a0`. Record no longer owns payment truth; canonical server `FinanceSettlement`, `FinanceOperation` and flat `FinanceLedgerEntry` own Settlement, operations and factual money rows; payment/refund/cancel are server-owned; split-wallet payment is one Operation with multiple Ledger rows; Wallet/DDS project from Ledger; legacy auxiliary Finance is migration-only. Combined feature Check Book #1989 and post-merge Check Book #1990 both passed all required jobs, including migration, backend, four production domains and staging frontend.
+- F6-F8: DONE — merged to `staging` as `18af1dee4f127e00f720dfd522835b5e2c3e0258` via PR #245. Server-owned hierarchical `FinanceArticle` catalog separates custom names from `direction`/`economicType`; manual Income/Expense writes one FinanceOperation with one or many flat Ledger rows; simple amount and detailed quantity × unit price entry are supported; Wallet/Cash remains metadata-only with balance/history projected from Ledger. Feature Check Book #1993 and post-merge Check Book #1994 both passed all required jobs, including migration, backend, four production domains and staging frontend.
+- F9-F11: DONE — merged to `staging` as `5562cdc1a110184f2e92dfd39b6ac3ac3d7ad8a9` via PR #246. Loans, loan repayments, investments, investment returns and wallet transfers use canonical Operation + Ledger semantics; Z-report is a Ledger-only day/period projection; browser/server cent rounding is aligned; authoritative money writes use Serializable transactions with retry; roundtrip regressions cover stale Record finance, partial/split/tips/refund/cancel/reload; all factual operations separate mandatory `occurredAt` from system `recordedAt`, so late Record closure does not move historical income. Feature Check Book #1996 and post-merge Check Book #1997 both passed all required jobs.
+- F12: DONE ON STAGING — final guards, regression, migration, backend, four production-domain checks and staging frontend all passed in #1996 and #1997. Release to `main` remains blocked until one additional whole-staging Check Book passes on the exact Finance closeout head.
+- F0-F1 changed documentation only. F2 renamed the operational calculation owner to Settlement. F3-F5 moved payment truth to Settlement + Operation + flat Ledger. F6-F8 added Articles and direct manual Income/Expense on the same Ledger. F9-F11 add special capital operations, Z-report, concurrency/roundtrip alignment and the factual-time/audit-time contract without introducing another money owner.
+- `main` must not receive this rebuild until the exact Finance closeout staging head passes one additional complete Check Book. After that, open `staging -> main`, require its PR checks green, and only then merge.
+
+Non-negotiable ownership:
+- Record does not own money movement or payment truth.
+- Settlement owns amount-due / paid / debt calculation for a concrete source.
+- Ledger/DDS owns factual money movement.
+- Wallet balance/history are Ledger projections.
+- Financial Model is reserved for a future plan/fact analytical instrument and must not be reused for Settlement.
+- Future Financial Model UI placement (Finance vs future Analytics) remains intentionally undecided.
+- Workplace owns rent conditions/cadence; Finance owns only factual rent money movements; future Financial Model may consume Workplace rent conditions for planned costs.
+- Every factual Finance Operation owns mandatory real-world `occurredAt`; Book owns immutable audit `recordedAt`. Daily/period reporting uses `occurredAt`.
+
+Verification rule:
+- make the coherent implementation block first;
+- run targeted tests/guards while building the block;
+- run one complete Check Book for the whole block before merge to `staging`;
+- run one post-merge Check Book on `staging`;
+- do not repeat full four-domain smoke for every small F step inside the same coherent block;
+- merge to production `main` only after the entire Finance rebuild is complete and verified.
+
+## Completed block — Record ownership cleanup (2026-09-20)
 
 Source checkpoint: `main@fcd7d748bfdd5bb01be832927c52237fb8816ad8`.
 

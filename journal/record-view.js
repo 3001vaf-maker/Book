@@ -13,7 +13,7 @@ import {
   openNotice,
   timeSlots,
 } from '../ui/ui.js';
-import { getRecordPaymentState, recordFinancialItems, repriceFinancialPlan } from '../core/finance/index.js';
+import { getRecordPaymentState, recordSettlementItems, repriceSettlement } from '../core/finance/index.js';
 import { listAvailableStartTimes } from '../core/time/index.js';
 import { getWorkplaces, getWorkplaceWorkingDates } from '../core/workplace-time.js';
 import { timeToMinutes, minutesToTime } from '../core/time/index.js';
@@ -473,7 +473,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     const person = personDisplay(currentPerson);
     const workplace = workplaceName(state.workplaceId);
     const totalDuration = state.procedures.length ? procedureTotalDuration(state.procedures) : 30;
-    const finance = repriceFinancialPlan(recordFinancialItems(state), state.finance);
+    const finance = repriceSettlement(recordSettlementItems(state), state.finance);
     const discountTotal = Math.max(0, Number(finance?.discountTotal) || 0);
     const discountPercent = finance?.discountPercent;
     const meta = [

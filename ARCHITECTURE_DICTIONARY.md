@@ -29,7 +29,7 @@ core/<domain>/
 - `core/day/` — рабочий план/Day;
 - `core/time/` — нейтральное время, TimeGrid, occupancy, availability;
 - `core/record/` — Record, lifecycle, state/read, commands;
-- `core/finance/` — Financial Model, DDS-факты, финансовые правила/команды.
+- `core/finance/` — Settlement/Расчёт, Ledger/DDS-факты, финансовые правила/команды; `Financial Model` зарезервирован для будущего аналитического план-факт инструмента.
 
 Код из `journal/`, `timetable/`, `settings/`, `main/`, `ui/` обращается к сложному домену через его `index.js`, а не к внутренним `data.js`, `rules.js`, `service.js` и т. п.
 
@@ -84,14 +84,22 @@ Record — отдельный Core-домен. `journal/record.js`, `journal/rec
 
 ## 8. Finance
 
-Finance живёт только в `core/finance/`.
+Пользовательский раздел Finance живёт в `main/finance/`. Канонические скрытые бизнес-правила Finance принадлежат `core/finance/` и доступны наружу только через публичный контракт домена.
 
-- Financial Model рассчитывает plan/fact и состояние оплаты;
-- DDS — факты движения денег внутри Finance;
-- Wallet — сущность кошелька и проекция баланса/истории;
-- Record хранит финансовый snapshot записи, но не рассчитывает Finance и не двигает деньги.
+Канонические понятия:
+- Settlement / Расчёт — сумма начисления, скидка, к оплате, оплачено, возврат и задолженность по конкретному источнику;
+- Ledger / DDS — каждый фактический входящий/исходящий денежный факт;
+- Operation — объединяет связанные Ledger-строки одной экономической операции;
+- Articles / Статьи — расширяемая пользователем классификация с отдельным системным экономическим характером;
+- Wallet / Касса — метаданные кошельков; баланс и история являются проекцией Ledger;
+- Z-report — отчётная проекция Ledger за день/период;
+- Financial Model / Финансовая модель — **зарезервированный будущий аналитический инструмент** для планов, факта, отклонений и анализа; он не участвует в проведении оплаты и не владеет Record/Ledger.
 
-Старые параллельные владельцы `core/dds.js`, `core/financial-model.js`, `core/payment.js` запрещены.
+Record хранит факт записи и необходимые source snapshots, но не является владельцем денежного движения или независимого payment truth.
+
+F2 удаляет legacy-атом `core/finance/model.js` и старые Record-oriented `FinancialPlan/plan-fact` API. Операционный расчёт называется только `Settlement / Расчёт`. Legacy JSON-поля `record.finance`, `planAmount`, `planTotal`, `fact*` временно сохраняются как совместимость хранения до следующих этапов и не означают Financial Model.
+
+Старые параллельные владельцы `core/dds.js`, `core/financial-model.js`, `core/payment.js` запрещены. Настоящая Financial Model не создаётся до отдельного будущего проекта.
 
 ## 9. Навигация и BACK
 

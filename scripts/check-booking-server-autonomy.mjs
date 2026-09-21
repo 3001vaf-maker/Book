@@ -39,13 +39,13 @@ assert(!service.includes('manualRecordViews'), 'Online Booking must not wrap Rec
 
 assert(record.includes('this.time.checkAvailability('), 'RecordService must use TimeService');
 assert(record.includes('this.procedures.snapshots('), 'RecordService must obtain procedure snapshots from ProcedureService');
-assert(record.includes('this.finance.calculatePlan('), 'RecordService must obtain the financial plan from FinanceService');
+assert(record.includes('this.finance.calculateSettlement('), 'RecordService must obtain Settlement from FinanceService');
 assert(record.includes('async listForPeople('), 'Account history must read canonical Records');
 assert(record.includes('async publicOccupancy('), 'Record must own its occupancy projection');
 
 assert(time.includes('checkAvailability('), 'TimeService must own availability rules');
-assert(finance.includes('calculatePlan('), 'FinanceService must own plan calculations');
-assert(finance.includes('recordPaymentState('), 'FinanceService must own payment state');
+assert(finance.includes('calculateSettlement('), 'FinanceService must own Settlement calculations');
+assert(finance.includes('recordSettlementPaymentState('), 'FinanceService must own Settlement payment state');
 assert(procedure.includes('async snapshots('), 'ProcedureService must own booking-time procedure snapshots');
 
 assert(account.includes('getAccountRecords'), 'Account API contract must expose Records');

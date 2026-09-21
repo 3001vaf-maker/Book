@@ -3,7 +3,7 @@ import { getWorkplaces } from '../core/workplace-time.js';
 import { getDays, getDay, getDayTime, getDaysForDate, getScheduleConflicts } from '../core/day/index.js';
 import { getTimeUsagesForScope } from '../core/time/index.js';
 import { getTimeAvailabilityAt } from '../core/time/index.js';
-import { getRecordPaymentState, recordPlanTotal } from '../core/finance/index.js';
+import { getRecordPaymentState, recordAmountDue } from '../core/finance/index.js';
 import { openRecordCreation } from './record.js';
 import { openRecordView } from './record-view.js';
 import { openRecordPaymentEntry } from './record-payment.js';
@@ -14,7 +14,7 @@ function withFinancialState(usages = []) {
   return (Array.isArray(usages) ? usages : []).map((usage) => usage?.type === 'record' ? {
     ...usage,
     paid: Boolean(getRecordPaymentState(usage).fullyPaid),
-    financialTotal: recordPlanTotal(usage),
+    financialTotal: recordAmountDue(usage),
   } : usage);
 }
 

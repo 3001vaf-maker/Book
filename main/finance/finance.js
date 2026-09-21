@@ -1,7 +1,11 @@
 import { actionBlock, button, emptyState, folderCard, list, pageHeader, shortDateTime } from '../../ui/ui.js';
-import { getDDSMovements } from '../../core/finance/index.js';
+import { getLedgerEntries } from '../../core/finance/index.js';
 import { getWalletTotalBalance } from '../../settings/wallets/data.js';
 import { renderWallets } from '../../settings/wallets/wallets.js';
+import { renderFinanceArticles } from './articles.js';
+import { renderIncomeExpense } from './income-expense.js';
+import { renderSpecialFinanceOperations } from './special-operations.js';
+import { renderZReport } from './z-report.js';
 
 function formatMoney(value = 0, { signed = false } = {}) {
   const amount = Number(value) || 0;
@@ -11,32 +15,41 @@ function formatMoney(value = 0, { signed = false } = {}) {
 }
 
 function operationMoment(item) {
-  const raw = item?.refundedAt || item?.paidAt || item?.createdAt || '';
+  const raw = item?.occurredAt || item?.refundedAt || item?.paidAt || '';
   const fallback = `${item?.date || ''} ${item?.time || ''}`.trim();
   return shortDateTime(raw, fallback);
 }
 
+function recordedMoment(item) {
+  const raw = item?.recordedAt || '';
+  return raw ? shortDateTime(raw, '') : '';
+}
+
 function operationName(item) {
-  let label = 'Операция';
-  if (item?.movementType === 'income' && item?.incomeType === 'payment') label = 'Оплата';
-  else if (item?.movementType === 'expense' && item?.expenseType === 'refund') label = 'Возврат';
-  else if (item?.movementType === 'income') label = 'Доход';
-  else if (item?.movementType === 'expense') label = 'Расход';
-  return item?.status === 'cancelled' ? `${label} · Отменена` : label;
+  const type = String(item?.economicType || '');
+  let label = 'Движение';
+  if (type === 'SERVICE_REVENUE') label = 'Оплата услуги';
+  else if (type === 'TIPS') label = 'Чаевые';
+  else if (type === 'SERVICE_REFUND') label = 'Возврат услуги';
+  else if (type === 'TIPS_REFUND') label = 'Возврат чаевых';
+  else if (type === 'REVERSAL') label = 'Отмена операции';
+  else if (type === 'LOAN_RECEIVED') label = 'Получен займ';
+  else if (type === 'LOAN_REPAYMENT') label = 'Возврат займа';
+  else if (type === 'INVESTMENT_RECEIVED') label = 'Получена инвестиция';
+  else if (type === 'INVESTMENT_RETURN') label = 'Возврат инвестиций';
+  else if (type === 'TRANSFER') label = item?.direction === 'OUT' ? 'Перевод · списание' : 'Перевод · зачисление';
+  else if (item?.direction === 'IN') label = 'Доход';
+  else if (item?.direction === 'OUT') label = 'Расход';
+  return item?.operationStatus === 'cancelled' ? `${label} · Отменена` : label;
 }
 
 function operationAmount(item) {
-  const total = Math.max(0, Number(item?.total) || 0);
-  return item?.movementType === 'expense' ? -total : total;
+  const amount = Math.max(0, Number(item?.amount) || Math.abs(Number(item?.total) || 0));
+  return item?.direction === 'OUT' ? -amount : amount;
 }
 
 function walletText(item) {
-  if (Array.isArray(item?.allocations) && item.allocations.length) {
-    return item.allocations
-      .map((allocation) => `${allocation?.walletName || 'Кошелёк'} ${formatMoney(allocation?.amount)}`)
-      .join(' · ');
-  }
-  return item?.walletName || '';
+  return item?.walletName || item?.walletId || '';
 }
 
 function personText(item) {
@@ -44,8 +57,19 @@ function personText(item) {
 }
 
 function operationDetails(item) {
-  const details = [personText(item), item?.workplace || '', walletText(item)].filter(Boolean);
-  if (Number(item?.tips || 0) > 0) details.push(`Чаевые ${formatMoney(item.tips)}`);
+  const details = [
+    personText(item),
+    item?.articleName || '',
+    item?.lineName || '',
+    item?.workplace || '',
+    walletText(item),
+  ].filter(Boolean);
+  if (item?.economicType === 'TIPS' || item?.economicType === 'TIPS_REFUND') details.push('Чаевые');
+  if (item?.quantity != null && item?.unitPrice != null && Number(item.quantity) !== 1) {
+    details.push(`${item.quantity} × ${formatMoney(item.unitPrice)}`);
+  }
+  const recorded = recordedMoment(item);
+  if (recorded) details.push(`Внесено ${recorded}`);
   return details.join(' · ');
 }
 
@@ -64,16 +88,19 @@ function csvCell(value) {
 }
 
 function downloadDDS(movements) {
-  const headers = ['Дата и время', 'Операция', 'Человек', 'Рабочее место', 'Кошелёк', 'Сумма', 'Статус', 'Чаевые'];
+  const headers = ['Фактическая дата и время', 'Внесено в Book', 'Операция', 'Статья', 'Позиция', 'Человек', 'Рабочее место', 'Кошелёк', 'Сумма', 'Статус', 'Чаевые'];
   const rows = movements.map((item) => [
     operationMoment(item),
+    recordedMoment(item),
     operationName(item).replace(' · Отменена', ''),
+    item?.articleName || '',
+    item?.lineName || '',
     personText(item),
     item?.workplace || '',
     walletText(item),
     operationAmount(item),
-    item?.status === 'cancelled' ? 'Отменена' : 'Активна',
-    Number(item?.tips || 0),
+    item?.operationStatus === 'cancelled' ? 'Отменена' : 'Активна',
+    item?.economicType === 'TIPS' || item?.economicType === 'TIPS_REFUND' ? Math.abs(operationAmount(item)) : 0,
   ]);
   const text = '\uFEFF' + [headers, ...rows].map((row) => row.map(csvCell).join(';')).join('\r\n');
   const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
@@ -85,7 +112,7 @@ function downloadDDS(movements) {
 }
 
 function renderDDS(root) {
-  const movements = [...getDDSMovements()].reverse();
+  const movements = [...getLedgerEntries()].reverse();
   const operations = movements.length
     ? list({ items: movements.map(movementListItem) })
     : emptyState('Все операции', 'Финансовых операций пока нет.');
@@ -113,9 +140,42 @@ export function renderFinance(root) {
     aria: 'Открыть движение денежных средств',
   });
 
-  root.innerHTML = `${pageHeader('Финансы')}<div class="ui-folder-grid">${cashFolder}${ddsFolder}</div>`;
+  const incomeExpenseFolder = folderCard({
+    title: 'Доход / Расход',
+    icon: '±',
+    variant: 'compact',
+    data: 'data-finance-income-expense',
+    aria: 'Открыть доходы и расходы',
+  });
+  const articlesFolder = folderCard({
+    title: 'Статьи',
+    icon: '≡',
+    variant: 'compact',
+    data: 'data-finance-articles',
+    aria: 'Открыть статьи доходов и расходов',
+  });
+  const specialFolder = folderCard({
+    title: 'Прочие операции',
+    icon: '↔',
+    variant: 'compact',
+    data: 'data-finance-special',
+    aria: 'Открыть займы, инвестиции и переводы',
+  });
+  const zReportFolder = folderCard({
+    title: 'Z-отчёт',
+    icon: 'Z',
+    variant: 'compact',
+    data: 'data-finance-z-report',
+    aria: 'Открыть Z-отчёт',
+  });
+
+  root.innerHTML = `${pageHeader('Финансы')}<div class="ui-folder-grid">${cashFolder}${ddsFolder}${incomeExpenseFolder}${articlesFolder}${specialFolder}${zReportFolder}</div>`;
   root.querySelector('[data-finance-cash]')?.addEventListener('click', () => renderWallets(root, () => renderFinance(root)));
   root.querySelector('[data-finance-dds]')?.addEventListener('click', () => renderDDS(root));
+  root.querySelector('[data-finance-income-expense]')?.addEventListener('click', () => renderIncomeExpense(root, () => renderFinance(root)));
+  root.querySelector('[data-finance-articles]')?.addEventListener('click', () => renderFinanceArticles(root, () => renderFinance(root)));
+  root.querySelector('[data-finance-special]')?.addEventListener('click', () => renderSpecialFinanceOperations(root, () => renderFinance(root)));
+  root.querySelector('[data-finance-z-report]')?.addEventListener('click', () => renderZReport(root, () => renderFinance(root)));
 }
 
 export { renderFinance as render };
