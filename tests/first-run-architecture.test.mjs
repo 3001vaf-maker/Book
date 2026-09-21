@@ -27,7 +27,7 @@ assert.match(schema, /model FirstRunStepProgress\s*\{/);
 assert.match(schema, /model PlatformActivityEvent\s*\{/);
 assert.match(schema, /model PlatformSession\s*\{/);
 assert.match(schema, /model PlatformNotice\s*\{/);
-assert.match(schema, /commercialMode\s+String\s+@default\("DEMO"\)/);
+assert.match(schema, /commercialMode\s+String\s+@default\("LIVE"\)/);
 assert.match(schema, /demoActivatedAt\s+DateTime\?/);
 assert.match(schema, /demoExpiresAt\s+DateTime\?/);
 
@@ -47,6 +47,7 @@ assert.match(invitation, /activateInvitation\(invitation\.id, invitation\.tenant
 assert.match(invitation, /validateRegistrationDocuments\(input\?\.documents\)/);
 assert.match(invitation, /PlatformConsentEvent/);
 assert.match(invitation, /assignFromInvitation/);
+assert.match(invitation, /commercialMode: 'DEMO'/);
 
 assert.match(access, /source: 'FIRST_RUN'/);
 assert.match(access, /source: 'DEMO'/);
