@@ -73,3 +73,20 @@ export async function recordFirstRunActivity(eventType, {
     body: JSON.stringify({ eventType, stepKey, scenarioVersionId, metadata, sessionId }),
   }), 'Не удалось сохранить событие');
 }
+
+export async function downloadRknGuide() {
+  const response = await apiRequest('/first-run/rkn-guide.pdf');
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload?.message || 'Не удалось сформировать PDF');
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'rkn-guide.pdf';
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
