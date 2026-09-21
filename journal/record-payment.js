@@ -310,11 +310,17 @@ function openCancelPaymentModal(payment) {
   const html = `<div class="modal-title"><h2>Отменить операцию?</h2></div>
     ${paymentFactMarkup(payment)}
     <p>Неверный ввод останется в финансовой истории с пометкой «Отменена», но не будет участвовать в кошельках и расчётах.</p>
+    ${field({ label: 'Фактическая дата и время отмены', name: 'cancelOccurredAt', type: 'datetime-local', value: localDateTimeValue(), required: true })}
     <div class="modal-actions">${button('Подтвердить отмену', { variant: 'secondary', data: 'data-cancel-payment-confirm' })}</div>`;
   const m = mountModal(document.body, modal(html, { variant: 'medium', surface: 'app' }));
   if (!m) return;
   m.querySelector('[data-cancel-payment-confirm]')?.addEventListener('click', async () => {
-    const cancelled = await cancelPaymentOperation(payment.id, { reason: 'incorrect-entry' });
+    const occurredAtInput = m.querySelector('input[name="cancelOccurredAt"]');
+    if (!occurredAtInput?.value) return;
+    const cancelled = await cancelPaymentOperation(payment.id, {
+      reason: 'incorrect-entry',
+      occurredAt: new Date(occurredAtInput.value),
+    });
     if (!cancelled) return;
     m.remove();
   });
