@@ -77,7 +77,7 @@ async function renderPublicBooking(route) {
 }
 
 function ensureServerBookingSync() {
-  if (serverBookingSyncStarted || !canUseBookCapability('online_booking.access')) return;
+  if (serverBookingSyncStarted) return;
   serverBookingSyncStarted = true;
   startServerBookingSync();
 }
