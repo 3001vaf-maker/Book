@@ -8,6 +8,7 @@ import { getProducts } from '../settings/service/products/data.js';
 import { button, escapeHtml, modal, mountModal } from '../ui/ui.js';
 import {
   completeFirstRunStep,
+  downloadRknGuide,
   endFirstRunSessionKeepalive,
   getFirstRunState,
   heartbeatFirstRunSession,
@@ -441,8 +442,24 @@ export class FirstRunRuntime {
       layer.remove();
       this.queueSync();
     });
-    layer.querySelector('[data-first-run-rkn-guide]')?.addEventListener('click', () => {
-      window.dispatchEvent(new CustomEvent('first-run:rkn-guide-requested'));
+    layer.querySelector('[data-first-run-rkn-guide]')?.addEventListener('click', async (event) => {
+      const control = event.currentTarget;
+      control.disabled = true;
+      const original = control.textContent;
+      control.textContent = 'Формируем PDF…';
+      try {
+        await downloadRknGuide();
+        await recordFirstRunActivity('RKN_GUIDE_DOWNLOADED', {
+          stepKey: step.key,
+          scenarioVersionId: this.state?.scenario?.id || '',
+          sessionId: this.sessionId,
+        }).catch(() => undefined);
+      } catch (error) {
+        this.showError(error);
+      } finally {
+        control.disabled = false;
+        control.textContent = original;
+      }
     });
     this.queueSync();
   }
