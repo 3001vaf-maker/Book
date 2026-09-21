@@ -1,6 +1,7 @@
 import {
   bindAccountTelegramEntry,
   getAccountToken,
+  resolveAccountTelegramEntry,
 } from '../core/account/index.js';
 
 function removeTelegramEntryFromUrl() {
@@ -10,7 +11,7 @@ function removeTelegramEntryFromUrl() {
   history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
 }
 
-export function startAccountRuntime({ tenantId = '', telegramEntry = '' } = {}) {
+export async function startAccountRuntime({ tenantId = '', telegramEntry = '' } = {}) {
   const tenant = String(tenantId || '').trim();
   const entry = String(telegramEntry || '').trim();
   if (!tenant) return () => {};
@@ -18,14 +19,26 @@ export function startAccountRuntime({ tenantId = '', telegramEntry = '' } = {}) 
   let telegramAttempted = !entry;
   let disposed = false;
 
+  if (entry && !getAccountToken(tenant)) {
+    try {
+      const resolved = await resolveAccountTelegramEntry(tenant, entry);
+      if (resolved?.exists && resolved?.accessToken) {
+        telegramAttempted = true;
+        removeTelegramEntryFromUrl();
+      }
+    } catch {
+      // Keep the entry token for the normal login/registration path.
+    }
+  }
+
   async function bindTelegramWhenAuthenticated() {
     if (disposed || telegramAttempted || !getAccountToken(tenant)) return;
-    telegramAttempted = true;
     try {
       await bindAccountTelegramEntry(tenant, entry);
+      telegramAttempted = true;
       removeTelegramEntryFromUrl();
     } catch {
-      // Keep the one-time token in the URL so a fresh page load can retry after an interrupted login.
+      // Keep retry available while the one-time entry token is still valid.
     }
   }
 
