@@ -79,21 +79,34 @@ function recordPerson(record) {
   };
 }
 
-function paymentMoment(now = new Date()) {
+function recordPaymentOccurredAtValue(record) {
+  const date = String(record?.date || '').slice(0, 10);
+  const time = String(record?.to || record?.from || '').slice(0, 5);
+  if (date && /^\d{2}:\d{2}$/.test(time)) return `${date}T${time}`;
+  if (date) return `${date}T12:00`;
+  return localDateTimeValue();
+}
+
+function paymentMoment(record) {
+  const raw = recordPaymentOccurredAtValue(record);
+  const date = raw.slice(0, 10);
+  const time = raw.slice(11, 16);
   return {
-    date: shortDate(now),
-    time: shortTime(now),
+    date: date ? shortDate(new Date(`${date}T12:00:00`)) : '',
+    time: time || '',
+    occurredAtValue: raw,
   };
 }
 
 function paymentFromRecord(record) {
-  const moment = paymentMoment();
+  const moment = paymentMoment(record);
   return {
     source: { type: 'record', id: record?.id || '' },
     workplace: workplaceName(record?.workplaceId),
     person: recordPerson(record),
     date: moment.date,
     time: moment.time,
+    occurredAtValue: moment.occurredAtValue,
     settlement: settlementForRecord(record),
   };
 }
@@ -162,7 +175,7 @@ function openPaymentMethodsModal(payment, paymentModal) {
   const total = Number(recordState.remaining || 0);
   if (total <= 0.009) return;
   const content = `<div class="modal-title"><h2>Способ оплаты</h2></div>
-    ${field({ label: 'Фактическая дата и время', name: 'paymentOccurredAt', type: 'datetime-local', value: localDateTimeValue(), required: true })}
+    ${field({ label: 'Фактическая дата и время', name: 'paymentOccurredAt', type: 'datetime-local', value: payment?.occurredAtValue || localDateTimeValue(), required: true })}
     ${paymentMethods({ wallets: getWallets(), total })}`;
   const methodsModal = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
   if (!methodsModal) return;
