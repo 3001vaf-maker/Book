@@ -80,6 +80,9 @@ if (!/saveSettlementSnapshot/.test(financeService) || !/\/finance\/settlements\/
   errors.push('Settlement persistence must go through the Finance API');
 }
 if (/writeFinanceState/.test(financeService)) errors.push('Browser Finance service must not persist money locally');
+if (!/occurredAt/.test(financeService)) {
+  errors.push('Browser money commands must carry factual occurredAt to the Finance server');
+}
 
 const auxiliaryServer = source('server/src/auxiliary-state/auxiliary-state.service.ts');
 if (/DATASETS[^\n]*['"]finance['"]/.test(auxiliaryServer)) {
@@ -148,6 +151,12 @@ if (!/quantity/.test(serverFinance) || !/unitPrice/.test(serverFinance) || !/man
 if (!/TransactionIsolationLevel\.Serializable/.test(serverFinance)) {
   errors.push('Finance server must protect authoritative same-source money writes with Serializable transactions');
 }
+if (!/requiredOccurredAt/.test(serverFinance)) {
+  errors.push('Every factual Finance command must require occurredAt instead of silently using write time');
+}
+if (!/recordedAt:\s*row\.createdAt\.toISOString\(\)/.test(serverFinance)) {
+  errors.push('Finance snapshot must expose immutable recordedAt separately from occurredAt');
+}
 for (const economicType of ['LOAN_RECEIVED', 'LOAN_REPAYMENT', 'INVESTMENT_RECEIVED', 'INVESTMENT_RETURN', 'TRANSFER']) {
   if (!serverFinance.includes(economicType)) errors.push(`FinanceService missing special economic type: ${economicType}`);
 }
@@ -180,6 +189,9 @@ if (!/export function getLedgerEntries/.test(financeRead) || !/state\.ledger/.te
 if (!/getWalletDDSMovements/.test(financeRead) || !/getLedgerEntries\(\)/.test(financeRead)) {
   errors.push('Wallet history must be projected from the canonical Ledger');
 }
+if (!/recordedAt/.test(financeRead) || !/entry\?\.occurredAt/.test(financeRead)) {
+  errors.push('Ledger projections must preserve factual occurredAt and audit recordedAt separately');
+}
 
 const financeRules = source('core/finance/rules.js');
 if (!/export function calculateSettlement/.test(financeRules) || !/export function calculateSettlementTotals/.test(financeRules)) {
@@ -209,6 +221,9 @@ if (!/renderFinanceArticles/.test(financeUI) || !/renderIncomeExpense/.test(fina
 }
 if (!/renderSpecialFinanceOperations/.test(financeUI) || !/renderZReport/.test(financeUI)) {
   errors.push('Finance UI must expose special operations and Z-report');
+}
+if (!/Фактическая дата и время/.test(financeUI) || !/Внесено в Book/.test(financeUI)) {
+  errors.push('DDS/export must expose factual occurrence time separately from Book recording time');
 }
 const articlesUI = source('main/finance/articles.js');
 if (!/parentArticleId/.test(articlesUI) || !/economicType/.test(articlesUI)) {
@@ -263,6 +278,12 @@ if (!/data-payment-price/.test(paymentUI) || /data-payment-price\s+readonly/.tes
 const recordPayment = source('journal/record-payment.js');
 if (!/saveSettlementSnapshot/.test(recordPayment) || !/await\s+recordPaymentIncome/.test(recordPayment)) {
   errors.push('Payment UI must save Settlement and await the server money command');
+}
+if (!/recordPaymentOccurredAtValue/.test(recordPayment)
+  || !/paymentOccurredAt/.test(recordPayment)
+  || !/refundOccurredAt/.test(recordPayment)
+  || !/cancelOccurredAt/.test(recordPayment)) {
+  errors.push('Payment/refund/cancel UI must capture factual occurredAt; late Record closure must default payment to Record date/time');
 }
 if (/finance:\s*settlement/.test(recordPayment)) {
   errors.push('Payment-stage Settlement must not be persisted back into Record');
