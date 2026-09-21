@@ -21,6 +21,7 @@ import { startAccountRuntime } from './online-booking/account-runtime.js';
 import { bottomNavigation } from './ui/ui.js';
 import { clearLegacyBusinessStorage } from './core/legacy-browser-business.js';
 import { FirstRunRuntime, demoBadgeMarkup, startPlatformSessionTracking } from './first-run/runtime.js';
+import { startPlatformNotices } from './core/platform-notices.js';
 
 configureWorkplaceSource(getWorkplaceEntities);
 configureTimeUsageSource(getJournalTimeUsages);
@@ -50,6 +51,7 @@ let firstRunRuntime = null;
 let firstRunState = null;
 let disposePlatformSession = () => {};
 let demoBadgeTimer = null;
+let disposePlatformNotices = () => {};
 
 function syncViewport() {
   const vv = window.visualViewport;
@@ -200,6 +202,21 @@ function showGuidedWorkspace(section) {
   state.activeSection = sectionAllowed(section) ? section : defaultSection();
   history.replaceState({}, '', `#${state.activeSection}`);
   renderWorkspace();
+  startRegularPlatformNotices();
+}
+
+function startRegularPlatformNotices() {
+  disposePlatformNotices();
+  disposePlatformNotices = startPlatformNotices({
+    onAccessChanged: async () => {
+      await loadBookAccess();
+      if (getBookAccess().status === 'SUSPENDED') {
+        renderSuspended();
+        return;
+      }
+      if (workspaceReady) renderWorkspace();
+    },
+  });
 }
 
 async function renderAuthenticated(account = authenticatedAccount) {
@@ -239,6 +256,8 @@ async function renderAuthenticated(account = authenticatedAccount) {
 
   firstRunRuntime?.dispose();
   firstRunRuntime = null;
+  disposePlatformNotices();
+  disposePlatformNotices = () => {};
   disposePlatformSession();
   disposePlatformSession = () => {};
 
@@ -253,6 +272,7 @@ async function renderAuthenticated(account = authenticatedAccount) {
       state.activeSection = defaultSection();
       history.replaceState({}, '', `#${state.activeSection}`);
       renderWorkspace();
+      startRegularPlatformNotices();
     },
   });
 
@@ -285,6 +305,7 @@ async function renderAuthenticated(account = authenticatedAccount) {
     state.activeSection = sectionAllowed(requested) ? requested : defaultSection();
     history.replaceState({}, '', `#${state.activeSection}`);
     renderWorkspace();
+    startRegularPlatformNotices();
     return;
   }
 
@@ -301,6 +322,7 @@ async function renderAuthenticated(account = authenticatedAccount) {
         state.activeSection = defaultSection();
         history.replaceState({}, '', `#${state.activeSection}`);
         renderWorkspace();
+        startRegularPlatformNotices();
       },
     });
     syncViewport();
