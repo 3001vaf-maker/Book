@@ -824,7 +824,17 @@ export class FirstRunService {
         select: { id: true },
       }),
     ]);
-    if (!access) throw new NotFoundException('Рабочее пространство не найдено');
+    if (!access) {
+      const tenant = await this.prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { id: true },
+      });
+      if (!tenant) throw new NotFoundException('Рабочее пространство не найдено');
+      if (progress) {
+        throw new ForbiddenException('Реальные внешние действия доступны после завершения первого знакомства');
+      }
+      return true;
+    }
     if (access.status !== 'ACTIVE') {
       throw new ForbiddenException('Рабочее пространство временно недоступно');
     }

@@ -166,6 +166,7 @@ export class TenantInvitationService {
           planId: plan.id,
           status: TenantAccessStatus.ACTIVE,
           isOwnerBook: false,
+          commercialMode: 'DEMO',
         },
       });
       const invitation = await tx.tenantInvitation.create({
