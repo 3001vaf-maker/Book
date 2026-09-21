@@ -467,7 +467,6 @@ export class FirstRunService {
         update: {
           status: 'ACTIVE',
           modalSeenAt: now,
-          startedAt: { set: now },
           lastSeenAt: now,
         },
       });
