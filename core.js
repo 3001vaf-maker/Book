@@ -66,13 +66,13 @@ function bookingRoute() {
   };
 }
 
-function renderPublicBooking(route) {
+async function renderPublicBooking(route) {
   workspaceReady = false;
   disposeView();
-  disposeView = startAccountRuntime(route);
   app.classList.add('app-shell--booking');
   app.innerHTML = '<main class="booking-content" id="app-content"></main>';
-  void renderOnlineBooking(document.querySelector('#app-content'), route);
+  disposeView = await startAccountRuntime(route);
+  await renderOnlineBooking(document.querySelector('#app-content'), route);
   syncViewport();
 }
 
@@ -290,7 +290,7 @@ syncViewport();
 
 const publicBooking = bookingRoute();
 if (publicBooking) {
-  renderPublicBooking(publicBooking);
+  await renderPublicBooking(publicBooking);
 } else {
   try {
     const currentAccount = await getCurrentAccount();
