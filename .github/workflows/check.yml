@@ -176,6 +176,14 @@ jobs:
           END
           $profile_check$;
           SQL
+      - name: Verify guarded registered tenant hard delete
+        shell: bash
+        run: |
+          set -euo pipefail
+          (
+            cd server
+            DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' node scripts/check-test-tenant-hard-delete.mjs
+          )
       - name: Stop isolated database
         if: always()
         run: docker compose -f docker-compose.staging.yml down -v
