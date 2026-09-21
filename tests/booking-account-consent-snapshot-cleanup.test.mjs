@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
 const bookingService = read('server/src/online-booking/online-booking.service.ts');
+const bookingConsent = read('server/src/online-booking/booking-consent.controller.ts');
 const pdnGuard = read('server/src/online-booking/booking-pdn-consent.guard.ts');
 const bookingUi = read('online-booking/booking.js');
 const peopleUi = read('main/people/people.js');
@@ -22,10 +23,10 @@ assert.doesNotMatch(bookingUi, /account\.consents/);
 assert.doesNotMatch(bookingUi, /state\.account\?\.consents/);
 assert.doesNotMatch(bookingUi, /updateAccount\(state\.tenantId, \{ consents \}\)/);
 
-// Registration still writes canonical ConsentEvent facts.
-assert.match(bookingService, /acceptAccountConsents\(tenantId, account\.id, consents, 'online-booking-registration'\)/);
-assert.match(bookingService, /acceptContactPointConsent\(tenantId, 'PHONE'/);
-assert.match(bookingService, /acceptContactPointConsent\(tenantId, 'EMAIL'/);
+// Account registration is independent from Tenant consent. The dedicated controller writes canonical Tenant consent facts.
+assert.doesNotMatch(bookingService, /acceptAccountConsents/);
+assert.doesNotMatch(bookingService, /acceptContactPointConsent/);
+assert.match(bookingConsent, /acceptAccountConsents\(auth\.tenantId, auth\.accountId/);
 
 // The legacy DB column is physically removed; ConsentEvent is the only persisted consent store.
 assert.doesNotMatch(schema, /consents\s+Json/);
