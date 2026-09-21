@@ -505,7 +505,7 @@ export class FinanceService {
     }
   }
 
-  private async createReversalFor(db: Db, tenantId: string, originalOperationId: string, reason: string, occurredAt = new Date()) {
+  private async createReversalFor(db: Db, tenantId: string, originalOperationId: string, reason: string, occurredAt: Date) {
     const original = await db.financeOperation.findUnique({
       where: { tenantId_operationId: { tenantId, operationId: originalOperationId } },
       include: { ledgerEntries: true },
@@ -1168,6 +1168,8 @@ export class FinanceService {
       settlements: settlements.map((row) => ({
         source: { type: row.sourceType, id: row.sourceId },
         settlement: clone(row.data),
+        recordedAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
       })),
       operations: operationRows,
       ledger: ledgerRows,
