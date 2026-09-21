@@ -29,7 +29,7 @@ export async function refreshFinanceState() {
 }
 
 export async function saveSettlementSnapshot({ source = null, settlement = null } = {}) {
-  if (!source?.type || !source?.id || !settlement || !occurredAt) return null;
+  if (!source?.type || !source?.id || !settlement) return null;
   const response = await apiRequest(
     `/finance/settlements/${encodeURIComponent(source.type)}/${encodeURIComponent(source.id)}`,
     {
@@ -129,7 +129,7 @@ export async function recordPaymentIncome({
   tips = 0,
   occurredAt = null,
 } = {}) {
-  if (!source?.type || !source?.id || !settlement) return null;
+  if (!source?.type || !source?.id || !settlement || !occurredAt) return null;
   const preparedAllocations = (Array.isArray(allocations) ? allocations : [])
     .map((item) => ({
       walletId: String(item?.walletId || ''),
