@@ -8,9 +8,9 @@ This file is the continuity anchor for the end-human Account/Profile and public 
 
 - Account / Profile: the human's own platform identity.
 - Person: the representation of that human inside one concrete Tenant's People dataset.
-- Tenant: one master/teacher/doctor/business container.
+- Tenant: one Tenant container.
 - Entry channel: web link, Telegram Mini App, or a future channel. A channel is transport/context only; it never owns identity or legal rules.
-- Do not rename the global human Account/Profile to Client.
+- Do not rename the global human Account/Profile to Person.
 
 ## Hard invariants
 
@@ -47,7 +47,7 @@ The system must never copy a Tenant's privately stored contact into the human's 
 
 ### Booking intent comes before identity
 
-A master's public link means: the human intends to book.
+A Tenant's public link means: the human intends to book.
 
 Canonical public flow:
 
@@ -63,7 +63,7 @@ Back from the first visible booking step does not reveal skipped link parameters
 
 If the device already has a valid Account session, do not ask for login/password again.
 
-The Account session is global, not tenant-scoped. Changing master/Tenant or entry channel must not create a second session or second Account.
+The Account session is global, not tenant-scoped. Changing Tenant/Tenant or entry channel must not create a second session or second Account.
 
 ### Final identity/legal gate
 
@@ -118,7 +118,7 @@ UEI is tenant-internal identity-management state. It is not the global Account I
 
 ## Welcome
 
-Welcome belongs to the Tenant/master.
+Welcome belongs to the Tenant/Tenant.
 
 Settings already own welcomeTitle/welcomeText. Later UI polish may replace the current shared header presentation with a clean welcome page. That cosmetic change is separate from this architecture block.
 
