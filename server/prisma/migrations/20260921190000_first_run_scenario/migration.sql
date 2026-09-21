@@ -16,10 +16,23 @@ BEGIN
 END
 $$;
 
-ALTER TABLE "TenantInvitation"
-  ADD COLUMN IF NOT EXISTS "activatedAt" TIMESTAMP(3),
-  ADD COLUMN IF NOT EXISTS "demoExpiresAt" TIMESTAMP(3),
-  ADD COLUMN IF NOT EXISTS "firstRunScenarioVersionId" TEXT;
+DO $
+BEGIN
+  IF to_regclass('"TenantInvitation"') IS NOT NULL THEN
+    EXECUTE 'ALTER TABLE "TenantInvitation"
+      ADD COLUMN IF NOT EXISTS "activatedAt" TIMESTAMP(3),
+      ADD COLUMN IF NOT EXISTS "demoExpiresAt" TIMESTAMP(3),
+      ADD COLUMN IF NOT EXISTS "firstRunScenarioVersionId" TEXT';
+  ELSIF to_regclass('"MasterInvitation"') IS NOT NULL THEN
+    EXECUTE 'ALTER TABLE "MasterInvitation"
+      ADD COLUMN IF NOT EXISTS "activatedAt" TIMESTAMP(3),
+      ADD COLUMN IF NOT EXISTS "demoExpiresAt" TIMESTAMP(3),
+      ADD COLUMN IF NOT EXISTS "firstRunScenarioVersionId" TEXT';
+  ELSE
+    RAISE EXCEPTION 'Invitation table is missing';
+  END IF;
+END
+$;
 
 CREATE TABLE IF NOT EXISTS "FirstRunScenario" (
   "id" TEXT PRIMARY KEY,
@@ -94,9 +107,6 @@ CREATE TABLE IF NOT EXISTS "FirstRunProgress" (
   CONSTRAINT "FirstRunProgress_tenantId_fkey"
     FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id")
     ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "FirstRunProgress_platformAccountId_fkey"
-    FOREIGN KEY ("platformAccountId") REFERENCES "PlatformAccount"("id")
-    ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "FirstRunProgress_scenarioVersionId_fkey"
     FOREIGN KEY ("scenarioVersionId") REFERENCES "FirstRunScenarioVersion"("id")
     ON DELETE RESTRICT ON UPDATE CASCADE,
@@ -151,9 +161,6 @@ CREATE TABLE IF NOT EXISTS "PlatformSession" (
   "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT "PlatformSession_tenantId_fkey"
     FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id")
-    ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "PlatformSession_platformAccountId_fkey"
-    FOREIGN KEY ("platformAccountId") REFERENCES "PlatformAccount"("id")
     ON DELETE CASCADE ON UPDATE CASCADE
 );
 
@@ -178,13 +185,45 @@ CREATE TABLE IF NOT EXISTS "PlatformActivityEvent" (
   CONSTRAINT "PlatformActivityEvent_tenantId_fkey"
     FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id")
     ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "PlatformActivityEvent_platformAccountId_fkey"
-    FOREIGN KEY ("platformAccountId") REFERENCES "PlatformAccount"("id")
-    ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT "PlatformActivityEvent_sessionId_fkey"
     FOREIGN KEY ("sessionId") REFERENCES "PlatformSession"("id")
     ON DELETE SET NULL ON UPDATE CASCADE
 );
+
+DO $
+DECLARE
+  account_table TEXT;
+BEGIN
+  IF to_regclass('"PlatformAccount"') IS NOT NULL THEN
+    account_table := '"PlatformAccount"';
+  ELSIF to_regclass('"User"') IS NOT NULL THEN
+    account_table := '"User"';
+  ELSE
+    RAISE EXCEPTION 'Platform account table is missing';
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FirstRunProgress_platformAccountId_fkey') THEN
+    EXECUTE format(
+      'ALTER TABLE "FirstRunProgress" ADD CONSTRAINT "FirstRunProgress_platformAccountId_fkey" FOREIGN KEY ("platformAccountId") REFERENCES %s("id") ON DELETE CASCADE ON UPDATE CASCADE',
+      account_table
+    );
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'PlatformSession_platformAccountId_fkey') THEN
+    EXECUTE format(
+      'ALTER TABLE "PlatformSession" ADD CONSTRAINT "PlatformSession_platformAccountId_fkey" FOREIGN KEY ("platformAccountId") REFERENCES %s("id") ON DELETE CASCADE ON UPDATE CASCADE',
+      account_table
+    );
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'PlatformActivityEvent_platformAccountId_fkey') THEN
+    EXECUTE format(
+      'ALTER TABLE "PlatformActivityEvent" ADD CONSTRAINT "PlatformActivityEvent_platformAccountId_fkey" FOREIGN KEY ("platformAccountId") REFERENCES %s("id") ON DELETE SET NULL ON UPDATE CASCADE',
+      account_table
+    );
+  END IF;
+END
+$;
 
 CREATE INDEX IF NOT EXISTS "PlatformActivityEvent_tenant_occurred_idx"
   ON "PlatformActivityEvent"("tenantId", "occurredAt");
@@ -255,17 +294,27 @@ VALUES
 ('frs-v1-complete','first-run-default-v1','complete',180,'SYSTEM','Завершение','Основные возможности изучены','Основная цепочка знакомства завершена. Вы можете продолжать пользоваться DEMO до окончания доступного срока или перейти к реальной работе, когда это будет доступно для вашего рабочего пространства.','Продолжить','', 'main','', 'first-run.complete','{"phase":"workspace"}',true)
 ON CONFLICT ("scenarioVersionId","key") DO NOTHING;
 
-DO $$
+DO $
+DECLARE
+  invitation_table TEXT;
 BEGIN
+  IF to_regclass('"TenantInvitation"') IS NOT NULL THEN
+    invitation_table := '"TenantInvitation"';
+  ELSIF to_regclass('"MasterInvitation"') IS NOT NULL THEN
+    invitation_table := '"MasterInvitation"';
+  ELSE
+    RAISE EXCEPTION 'Invitation table is missing';
+  END IF;
+
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint WHERE conname = 'TenantInvitation_firstRunScenarioVersionId_fkey'
   ) THEN
-    ALTER TABLE "TenantInvitation"
-      ADD CONSTRAINT "TenantInvitation_firstRunScenarioVersionId_fkey"
-      FOREIGN KEY ("firstRunScenarioVersionId") REFERENCES "FirstRunScenarioVersion"("id")
-      ON DELETE SET NULL ON UPDATE CASCADE;
+    EXECUTE format(
+      'ALTER TABLE %s ADD CONSTRAINT "TenantInvitation_firstRunScenarioVersionId_fkey" FOREIGN KEY ("firstRunScenarioVersionId") REFERENCES "FirstRunScenarioVersion"("id") ON DELETE SET NULL ON UPDATE CASCADE',
+      invitation_table
+    );
   END IF;
 END
-$$;
+$;
 
 COMMIT;
