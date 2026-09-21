@@ -103,6 +103,19 @@ export async function recordManualFinanceOperation({
   return state;
 }
 
+export async function recordSpecialFinanceOperation(payload = {}) {
+  const response = await apiRequest('/finance/operations/special', {
+    method: 'POST',
+    body: JSON.stringify({
+      ...payload,
+      occurredAt: payload?.occurredAt instanceof Date ? payload.occurredAt.toISOString() : payload?.occurredAt,
+    }),
+  });
+  const state = await applyServerState(response, 'Не удалось сохранить финансовую операцию');
+  notifyFinanceChanged({ action: 'special-operation', kind: String(payload?.kind || '') });
+  return state;
+}
+
 export async function recordPaymentIncome({
   source = null,
   workplace = '',
