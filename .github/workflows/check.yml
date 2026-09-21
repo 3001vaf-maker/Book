@@ -267,12 +267,12 @@ jobs:
           INSERT INTO "TenantConsentEvent" (
             "id","tenantId","subjectType","subjectKey","contactType","contactValue",
             "documentId","documentVersion","status","acceptedAt","revokedAt","source",
-            "occurredAt","migratedFromEventId","createdAt"
+            "occurredAt","createdAt"
           )
           VALUES (
             'reset-consent','reset-tenant-a','ACCOUNT','reset-account-a','','',
             'pdn-consent',1,'accepted',CURRENT_TIMESTAMP,NULL,'test',
-            CURRENT_TIMESTAMP,'',CURRENT_TIMESTAMP
+            CURRENT_TIMESTAMP,CURRENT_TIMESTAMP
           );
 
           INSERT INTO "_prisma_migrations" (
