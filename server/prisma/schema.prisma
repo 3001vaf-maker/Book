@@ -68,6 +68,7 @@ model Tenant {
   firstRunProgress         FirstRunProgress[]
   activityEvents           PlatformActivityEvent[]
   accountSessions          PlatformSession[]
+  notificationPreferences  PlatformNotificationPreference[]
 }
 
 model PlatformAccount {
@@ -85,6 +86,7 @@ model PlatformAccount {
   firstRunProgress  FirstRunProgress[]
   activityEvents    PlatformActivityEvent[]
   accountSessions   PlatformSession[]
+  notificationPreferences PlatformNotificationPreference[]
 }
 
 model Membership {
@@ -715,4 +717,22 @@ model TenantCapabilityOrder {
   @@unique([tenantId, capabilityId])
   @@index([tenantId, position])
   @@index([capabilityId])
+}
+
+
+model PlatformNotificationPreference {
+  id                String   @id @default(cuid())
+  tenantId          String
+  platformAccountId String
+  emailEnabled      Boolean  @default(true)
+  telegramEnabled   Boolean  @default(true)
+  pushEnabled       Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  tenant  Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  account PlatformAccount @relation(fields: [platformAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, platformAccountId])
+  @@index([platformAccountId])
 }
