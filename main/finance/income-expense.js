@@ -91,7 +91,7 @@ async function saveManual(root, modalRoot, direction, navigateBack) {
     modalRoot.remove();
     renderIncomeExpense(root, navigateBack);
   } catch (error) {
-    openNotice(root, String(error?.message || 'Не удалось сохранить операцию'));
+    openNotice({ message: String(error?.message || 'Не удалось сохранить операцию') });
   }
 }
 
@@ -100,11 +100,11 @@ function openOperation(root, direction, navigateBack) {
   const articles = articleOptions(direction);
   const wallets = walletOptions();
   if (!articles.length) {
-    openNotice(root, 'Сначала добавьте конечную статью для этого типа операции.');
+    openNotice({ message: 'Сначала добавьте конечную статью для этого типа операции.' });
     return;
   }
   if (!wallets.length) {
-    openNotice(root, 'Сначала добавьте кошелёк.');
+    openNotice({ message: 'Сначала добавьте кошелёк.' });
     return;
   }
   const html = \`<form class="compact-form" data-finance-manual-form>
