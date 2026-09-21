@@ -146,7 +146,7 @@ export class PersonIdentityService {
     return { phones, emails, telegrams };
   }
 
-  private enrichPerson(personValue: unknown, accountId: string, contacts: ContactSet) {
+  private enrichPerson(personValue: unknown, accountId: string, contacts: ContactSet): Record<string, any> {
     const person = objectValue(personValue);
     return {
       ...person,
@@ -226,7 +226,7 @@ export class PersonIdentityService {
     if (!accountId) throw new BadRequestException('У Account отсутствует id');
 
     const contacts = await this.contactsForAccount(account);
-    const existingIdentity = await this.businessState.bookingIdentityForAccount(tenantId, accountId);
+    const existingIdentity: any = await this.businessState.bookingIdentityForAccount(tenantId, accountId);
     if (existingIdentity?.matchedPerson?.key || existingIdentity?.person?.key) {
       const direct = objectValue(existingIdentity.matchedPerson || existingIdentity.person);
       const enriched = this.enrichPerson(direct, accountId, contacts);
