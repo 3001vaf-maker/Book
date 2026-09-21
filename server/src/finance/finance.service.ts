@@ -1050,6 +1050,19 @@ export class FinanceService {
         paidAt: operation.occurredAt.toISOString(),
       };
     }
+    if (operation.kind === 'transfer') return null;
+    if (operation.kind === 'loan-received' || operation.kind === 'investment-received') {
+      return {
+        ...base,
+        movementType: 'income',
+        incomeType: operation.kind,
+        walletId: text(data.walletId),
+        walletName: text(data.walletName),
+        articleId: text(data.articleId),
+        note: text(data.note),
+        paidAt: operation.occurredAt.toISOString(),
+      };
+    }
     if (operation.kind === 'payment') {
       return {
         ...base,
@@ -1064,7 +1077,11 @@ export class FinanceService {
     return {
       ...base,
       movementType: 'expense',
-      expenseType: operation.kind === 'refund' ? 'refund' : (operation.kind === 'manual-expense' ? 'manual' : 'expense'),
+      expenseType: operation.kind === 'refund'
+        ? 'refund'
+        : (operation.kind === 'manual-expense'
+          ? 'manual'
+          : (operation.kind === 'loan-repayment' || operation.kind === 'investment-return' ? operation.kind : 'expense')),
       originalPaymentId: operation.originalOperationId,
       walletId: text(data.walletId),
       walletName: text(data.walletName),
