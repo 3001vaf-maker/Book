@@ -5,8 +5,6 @@ CREATE TABLE IF NOT EXISTS "PlatformNotificationPreference" (
   "tenantId" TEXT NOT NULL,
   "platformAccountId" TEXT NOT NULL,
   "emailEnabled" BOOLEAN NOT NULL DEFAULT true,
-  "telegramEnabled" BOOLEAN NOT NULL DEFAULT true,
-  "pushEnabled" BOOLEAN NOT NULL DEFAULT true,
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT "PlatformNotificationPreference_tenantId_fkey"
