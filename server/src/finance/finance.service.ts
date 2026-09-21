@@ -755,6 +755,132 @@ export class FinanceService {
     return this.snapshot(tenantId, { skipMigration: true });
   }
 
+  async recordSpecialOperation(tenantId: string, body: unknown) {
+    await this.ensureLegacyMigrated(tenantId);
+    await this.ensureDefaultArticles(tenantId);
+    const input = objectValue(body);
+    const kind = text(input.kind);
+    const amount = money(input.amount);
+    if (amount <= 0) throw new BadRequestException('Введите сумму операции');
+
+    const definitions: Record<string, {
+      direction: 'IN' | 'OUT';
+      economicType: string;
+      systemKey: string;
+      operationKind: string;
+    }> = {
+      'loan-received': { direction: 'IN', economicType: 'LOAN_RECEIVED', systemKey: 'LOAN_RECEIVED', operationKind: 'loan-received' },
+      'loan-repayment': { direction: 'OUT', economicType: 'LOAN_REPAYMENT', systemKey: 'LOAN_REPAYMENT', operationKind: 'loan-repayment' },
+      'investment-received': { direction: 'IN', economicType: 'INVESTMENT_RECEIVED', systemKey: 'INVESTMENT_RECEIVED', operationKind: 'investment-received' },
+      'investment-return': { direction: 'OUT', economicType: 'INVESTMENT_RETURN', systemKey: 'INVESTMENT_RETURN', operationKind: 'investment-return' },
+    };
+
+    const occurredAt = dateValue(input.occurredAt);
+    const operationId = randomUUID();
+    const note = text(input.note);
+    const counterparty = text(input.counterparty);
+
+    if (kind === 'transfer') {
+      const fromWalletId = text(input.fromWalletId);
+      const fromWalletName = text(input.fromWalletName);
+      const toWalletId = text(input.toWalletId);
+      const toWalletName = text(input.toWalletName);
+      if (!fromWalletId || !toWalletId) throw new BadRequestException('Выберите оба кошелька');
+      if (fromWalletId === toWalletId) throw new BadRequestException('Для перевода нужны разные кошельки');
+
+      const article = await this.prisma.financeArticle.findFirst({
+        where: { tenantId, systemKey: 'TRANSFER', archivedAt: null },
+      });
+      if (!article) throw new BadRequestException('Системная статья перевода не найдена');
+
+      await this.prisma.$transaction(async (tx) => {
+        await this.createOperationWithEntries(tx, tenantId, {
+          operationId,
+          kind: 'transfer',
+          source: { type: 'finance', id: operationId },
+          occurredAt,
+          data: {
+            total: amount,
+            fromWalletId,
+            fromWalletName,
+            toWalletId,
+            toWalletName,
+            note,
+          },
+          entries: [
+            {
+              walletId: fromWalletId,
+              walletName: fromWalletName,
+              direction: 'OUT',
+              economicType: 'TRANSFER',
+              amount,
+              component: 'transfer-out',
+              articleId: article.articleId,
+              articleName: article.name,
+              note,
+            },
+            {
+              walletId: toWalletId,
+              walletName: toWalletName,
+              direction: 'IN',
+              economicType: 'TRANSFER',
+              amount,
+              component: 'transfer-in',
+              articleId: article.articleId,
+              articleName: article.name,
+              note,
+            },
+          ],
+        });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+      return this.snapshot(tenantId, { skipMigration: true });
+    }
+
+    const definition = definitions[kind];
+    if (!definition) throw new BadRequestException('Неизвестный вид финансовой операции');
+    const walletId = text(input.walletId);
+    const walletName = text(input.walletName);
+    if (!walletId) throw new BadRequestException('Выберите кошелёк');
+    const article = await this.prisma.financeArticle.findFirst({
+      where: { tenantId, systemKey: definition.systemKey, archivedAt: null },
+    });
+    if (!article) throw new BadRequestException('Системная статья операции не найдена');
+
+    await this.prisma.$transaction(async (tx) => {
+      await this.createOperationWithEntries(tx, tenantId, {
+        operationId,
+        kind: definition.operationKind,
+        source: { type: 'finance', id: operationId },
+        occurredAt,
+        data: {
+          total: amount,
+          walletId,
+          walletName,
+          counterparty,
+          note,
+          articleId: article.articleId,
+        },
+        entries: [{
+          walletId,
+          walletName,
+          direction: definition.direction,
+          economicType: definition.economicType,
+          amount,
+          component: kind,
+          articleId: article.articleId,
+          articleName: article.name,
+          lineName: counterparty,
+          quantity: 1,
+          unitPrice: amount,
+          note,
+        }],
+      });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+    return this.snapshot(tenantId, { skipMigration: true });
+  }
+
   async recordPayment(tenantId: string, body: unknown) {
     await this.ensureLegacyMigrated(tenantId);
     const input = objectValue(body);
@@ -801,7 +927,7 @@ export class FinanceService {
           economicType: entry.component === 'tips' ? 'TIPS' : 'SERVICE_REVENUE',
         })),
       });
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     return this.snapshot(tenantId, { skipMigration: true });
   }
 
@@ -863,7 +989,7 @@ export class FinanceService {
           }] : []),
         ],
       });
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
     return this.snapshot(tenantId, { skipMigration: true });
   }
@@ -891,7 +1017,7 @@ export class FinanceService {
         await this.createReversalFor(tx, tenantId, target.operationId, text(input.reason) || 'incorrect-entry', new Date());
         await tx.financeOperation.update({ where: { id: target.id }, data: { status: 'cancelled' } });
       }
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
     return this.snapshot(tenantId, { skipMigration: true });
   }
