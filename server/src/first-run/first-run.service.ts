@@ -197,6 +197,11 @@ export class FirstRunService {
       ORDER BY d."requiredForRegistration" DESC, d."createdAt" ASC, d."key" ASC
     `;
 
+    const requiredCount = rows.filter((row) => row.requiredForRegistration).length;
+    if (!requiredCount) {
+      throw new ConflictException('Обязательные регистрационные документы Реестра не подготовлены');
+    }
+
     return rows.map((row) => ({
       documentId: row.documentId,
       documentVersionId: row.documentVersionId,
