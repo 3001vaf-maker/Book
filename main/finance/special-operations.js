@@ -64,8 +64,13 @@ function openAction(root, action, navigateBack) {
       amount: Number(data.get('amount') || 0),
       counterparty: String(data.get('counterparty') || '').trim(),
       note: String(data.get('note') || '').trim(),
-      occurredAt: data.get('occurredAt') ? new Date(String(data.get('occurredAt'))).toISOString() : new Date().toISOString(),
+      occurredAt: data.get('occurredAt') ? new Date(String(data.get('occurredAt'))).toISOString() : '',
     };
+
+    if (!payload.occurredAt) {
+      openNotice({ message: 'Укажите фактическую дату и время операции.' });
+      return;
+    }
 
     if (action.transfer) {
       payload.fromWalletId = String(data.get('fromWalletId') || '');
