@@ -104,3 +104,5 @@ assert.match(migration, /'journal-month',130,'OPTIONAL_INFO'/);
 assert.match(migration, /'chat',150,'OPTIONAL_INFO'/);
 
 console.log('first-run architecture tests: OK');
+
+assert.match(firstRun, /if \(!access\) \{/);
