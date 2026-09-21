@@ -177,6 +177,12 @@ assert.match(accountApi, /account\/password/);
 assert.match(accountSettingsController, /@Put\(':tenantId\/account\/password'\)/);
 assert.match(accountSettingsController, /changeAccountPassword/);
 assert.match(onlineBookingService, /async changeAccountPassword/);
+const publicAccountBlock = onlineBookingService.slice(
+  onlineBookingService.indexOf('function publicAccount('),
+  onlineBookingService.indexOf('@Injectable()'),
+);
+assert.doesNotMatch(publicAccountBlock, /\buei\s*:/, 'Public Account projection must not expose internal UEI');
+assert.match(onlineBookingService, /async accountTenantContactContext\(/);
 assert.match(onlineBookingService, /compare\(current, account\.passwordHash\)/);
 assert.match(onlineBookingService, /passwordHash: await hash\(next, 12\)/);
 assert.match(onlineBookingService, /photo: text\(source\.photo\)/);
