@@ -17,7 +17,8 @@ import {
   startFirstRunSession,
 } from './api.js';
 
-const SETTINGS_STEPS = new Set(['online-booking', 'notifications', 'integrations', 'tags', 'documents']);
+const ONLINE_BOOKING_STEPS = new Set(['online-booking-welcome', 'online-booking-appearance', 'online-booking-time']);
+const SETTINGS_STEPS = new Set(['online-booking', ...ONLINE_BOOKING_STEPS, 'notifications', 'integrations', 'tags', 'documents']);
 const WORKSPACE_STEPS = new Set([
   'people',
   'timetable',
@@ -27,7 +28,12 @@ const WORKSPACE_STEPS = new Set([
   'journal-list',
   'chat',
   'finance-overview',
-  'finance-sections',
+  'finance-cash',
+  'finance-dds',
+  'finance-income-expense',
+  'finance-articles',
+  'finance-special',
+  'finance-report',
   'complete',
 ]);
 
@@ -80,7 +86,7 @@ export class FirstRunRuntime {
     this.enteredStepKey = '';
     this.disposed = false;
     this.clickHandler = (event) => this.handleClick(event);
-    this.app.addEventListener('click', this.clickHandler, true);
+    document.addEventListener('click', this.clickHandler, true);
   }
 
   async load() {
@@ -108,6 +114,7 @@ export class FirstRunRuntime {
   async start() {
     if (!this.state) await this.load();
     await this.startSession();
+    this.demoTimer = window.setInterval(() => this.decorateDemo(), 60_000);
     if (!this.state?.assigned || this.state?.progress?.status === 'COMPLETED') {
       this.onFinished?.(this.state);
       return;
@@ -119,8 +126,9 @@ export class FirstRunRuntime {
     this.disposed = true;
     this.observer?.disconnect();
     this.observer = null;
-    this.app.removeEventListener('click', this.clickHandler, true);
+    document.removeEventListener('click', this.clickHandler, true);
     if (this.heartbeatTimer) window.clearInterval(this.heartbeatTimer);
+    if (this.demoTimer) window.clearInterval(this.demoTimer);
     if (this.pageHideHandler) window.removeEventListener('pagehide', this.pageHideHandler);
   }
 
@@ -168,11 +176,11 @@ export class FirstRunRuntime {
       return;
     }
     if (WORKSPACE_STEPS.has(step.key)) {
-      this.renderWorkspaceStep(step);
+      await this.renderWorkspaceStep(step);
       return;
     }
 
-    this.renderWorkspaceStep(step);
+    await this.renderWorkspaceStep(step);
   }
 
   focusedShell() {
@@ -218,22 +226,34 @@ export class FirstRunRuntime {
 
   async renderSettingsStep(step) {
     const host = this.focusedShell();
-    const settings = await import('../settings/settings.js');
-    settings.renderSettings(host);
+    if (ONLINE_BOOKING_STEPS.has(step.key)) {
+      const onlineBooking = await import('../settings/online-booking/online-booking.js');
+      onlineBooking.render(host, () => {});
+    } else {
+      const settings = await import('../settings/settings.js');
+      settings.renderSettings(host);
+    }
     this.installObserver();
     this.syncCurrent();
   }
 
   workspaceSection(step) {
-    if (step.key === 'people' || step.key === 'finance-overview' || step.key === 'finance-sections' || step.key === 'complete') return 'main';
+    if (step.key === 'people' || step.key.startsWith('finance-') || step.key === 'complete') return 'main';
     if (step.key === 'timetable') return 'timetable';
     if (step.key.startsWith('journal') || step.key === 'payment') return 'journal';
     if (step.key === 'chat') return 'chat';
     return 'main';
   }
 
-  renderWorkspaceStep(step) {
+  async renderWorkspaceStep(step) {
     this.showWorkspace(this.workspaceSection(step));
+    if (step.key.startsWith('finance-') && step.key !== 'finance-overview') {
+      const host = this.app.querySelector('#app-content');
+      if (host) {
+        const finance = await import('../main/finance/finance.js');
+        finance.renderFinance(host);
+      }
+    }
     this.installObserver();
     this.queueSync();
   }
@@ -253,6 +273,9 @@ export class FirstRunRuntime {
     if (step.key === 'procedures') return this.app.querySelector('[data-service-open="procedures"]');
     if (step.key === 'products') return this.app.querySelector('[data-service-open="products"]');
     if (step.key === 'online-booking') return this.app.querySelector('[data-settings-open="online-booking"]');
+    if (step.key === 'online-booking-welcome') return document.querySelector('[data-online-booking-open="welcome"]') || this.app.querySelector('[data-online-booking-sections]');
+    if (step.key === 'online-booking-appearance') return document.querySelector('[data-online-booking-open="appearance"]') || this.app.querySelector('[data-online-booking-sections]');
+    if (step.key === 'online-booking-time') return document.querySelector('[data-online-booking-open="time"]') || this.app.querySelector('[data-online-booking-sections]');
     if (step.key === 'notifications') return this.app.querySelector('[data-settings-open="communications"]');
     if (step.key === 'integrations') return this.app.querySelector('[data-settings-open="integrations"]');
     if (step.key === 'tags') return this.app.querySelector('[data-settings-open="tags"]');
@@ -261,6 +284,12 @@ export class FirstRunRuntime {
     if (step.key === 'journal-month') return this.app.querySelector('[data-view="month"]');
     if (step.key === 'journal-list') return this.app.querySelector('[data-view="list"]');
     if (step.key === 'finance-overview') return this.app.querySelector('[data-open-finance]');
+    if (step.key === 'finance-cash') return this.app.querySelector('[data-finance-cash]');
+    if (step.key === 'finance-dds') return this.app.querySelector('[data-finance-dds]');
+    if (step.key === 'finance-income-expense') return this.app.querySelector('[data-finance-income-expense]');
+    if (step.key === 'finance-articles') return this.app.querySelector('[data-finance-articles]');
+    if (step.key === 'finance-special') return this.app.querySelector('[data-finance-special]');
+    if (step.key === 'finance-report') return this.app.querySelector('[data-finance-z-report]');
     return null;
   }
 
@@ -387,6 +416,11 @@ export class FirstRunRuntime {
 
     const routeTarget = this.routeTarget(step);
     if (routeTarget && (target === routeTarget || routeTarget.contains(target))) {
+      const onlineSectionButton = target.closest('[data-online-booking-sections]');
+      if (ONLINE_BOOKING_STEPS.has(step.key) && onlineSectionButton) {
+        window.setTimeout(() => this.queueSync(), 80);
+        return;
+      }
       this.enteredStepKey = step.key;
       window.setTimeout(() => {
         void this.showStepModal(step);
