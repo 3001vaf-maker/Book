@@ -82,6 +82,11 @@ export class SaasAdminController {
     return this.admin.firstRunScenario();
   }
 
+  @Post('first-run-scenario/draft')
+  ensureFirstRunDraft() {
+    return this.admin.ensureFirstRunDraft();
+  }
+
   @Put('first-run-scenario/steps/:stepKey')
   updateFirstRunStep(@Param('stepKey') stepKey: string, @Body() body: Record<string, unknown>) {
     return this.admin.updateFirstRunStep(stepKey, body || {});
