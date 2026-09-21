@@ -13,6 +13,7 @@ const record = text('server/src/record/record.service.ts');
 const time = text('server/src/time/time.service.ts');
 const finance = text('server/src/finance/finance.service.ts');
 const procedure = text('server/src/procedure/procedure.service.ts');
+const personIdentity = text('server/src/online-booking/person-identity.service.ts');
 const account = text('core/account/index.js');
 const accountShell = text('online-booking/account-shell.js');
 const sync = text('online-booking/server-sync.js');
@@ -67,7 +68,8 @@ assert(service.includes('accountDocuments.accept('), 'Account registration must 
 assert(bookingConsent.includes('acceptAccountConsents'), 'Tenant consent facts must be written only by the dedicated consent controller.');
 assert(accountDocuments.includes('FROM "AccountDocumentEvent"') && accountDocuments.includes('INSERT INTO "AccountDocumentEvent"'), 'Global Account terms must use the append-only Account document event owner.');
 assert(!service.includes('recordAcceptedConsents'), 'online booking must not write legacy consent JSON');
-assert(business.includes('upsertPersonFromAccount'), 'online Account must create/update canonical Person on the server');
+assert(!business.includes('upsertPersonFromAccount'), 'BusinessState must not own a parallel Account-to-Person mapper.');
+assert(personIdentity.includes('class PersonIdentityService') && personIdentity.includes('businessState.upsertPerson'), 'PersonIdentityService must own Account-to-Person resolution and enrichment.');
 assert(!sync.includes('/online-booking/owner/publication'), 'browser sync must not publish booking context');
 assert(!sync.includes('/online-booking/owner/requests'), 'browser sync must not import booking requests');
 
