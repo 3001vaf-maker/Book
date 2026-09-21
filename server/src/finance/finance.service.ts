@@ -301,7 +301,20 @@ export class FinanceService {
   }
 
   async saveSettlement(tenantId: string, sourceType: string, sourceId: string, value: unknown) {
-    await this.upsertSettlement(tenantId, sourceType, sourceId, value);
+    await this.ensureLegacyMigrated(tenantId);
+    const settlement = validSettlement(value);
+    if (!settlement) throw new BadRequestException('Расчёт не содержит суммы');
+    const type = text(sourceType);
+    const id = text(sourceId);
+    if (!type || !id) throw new BadRequestException('У расчёта отсутствует источник');
+
+    await this.serializable(async (tx) => {
+      const paid = Math.max(0, await this.serviceNet(tx, tenantId, type, id));
+      if (money(settlement.planTotal) + 0.009 < paid) {
+        throw new BadRequestException('Расчёт нельзя уменьшить ниже уже оплаченной суммы. Сначала выполните возврат или отмените ошибочную оплату.');
+      }
+      await this.saveSettlementWith(tx, tenantId, type, id, settlement);
+    });
     return this.snapshot(tenantId, { skipMigration: true });
   }
 

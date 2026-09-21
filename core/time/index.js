@@ -37,4 +37,5 @@ export {
 export {
   normalizeWorkplaceTimeZone,
   zonedDateTimeParts,
+  zonedDateTimeToDate,
 } from './zone.js';

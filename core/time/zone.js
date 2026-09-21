@@ -44,3 +44,46 @@ export function zonedDateTimeParts(value = new Date(), timeZone = DEFAULT_WORKPL
     minuteOfDay: hour * 60 + minute,
   };
 }
+
+
+function parseLocalDateTime(value) {
+  const match = String(value || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/);
+  if (!match) return null;
+  const [, year, month, day, hour, minute, second = '00'] = match;
+  return {
+    year: Number(year),
+    month: Number(month),
+    day: Number(day),
+    hour: Number(hour),
+    minute: Number(minute),
+    second: Number(second),
+  };
+}
+
+function partsUtcValue(parts) {
+  return Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second || 0);
+}
+
+export function zonedDateTimeToDate(value, timeZone = DEFAULT_WORKPLACE_TIME_ZONE) {
+  const desired = parseLocalDateTime(value);
+  if (!desired) return null;
+  const zone = validTimeZone(timeZone);
+  const desiredUtc = partsUtcValue(desired);
+  let candidate = new Date(desiredUtc);
+
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const actual = zonedDateTimeParts(candidate, zone);
+    const actualUtc = Date.UTC(
+      Number(actual.date.slice(0, 4)),
+      Number(actual.date.slice(5, 7)) - 1,
+      Number(actual.date.slice(8, 10)),
+      actual.hour,
+      actual.minute,
+      actual.second,
+    );
+    const delta = actualUtc - desiredUtc;
+    if (Math.abs(delta) < 1000) return candidate;
+    candidate = new Date(candidate.getTime() - delta);
+  }
+  return candidate;
+}
