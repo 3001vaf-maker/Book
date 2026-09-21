@@ -82,6 +82,8 @@ assert.match(documentData, /attachment:/);
 assert.match(documentData, /savedGuides/);
 assert.match(documentUi, /Инструкции/);
 assert.match(documentUi, /data-rkn-guide-download/);
+assert.match(documentUi, /Сформировать актуальную инструкцию/);
+assert.match(documentUi, /refreshTenantDocumentArchive/);
 assert.match(tenantDocumentArchiveUi, /refreshTenantDocumentArchive/);
 assert.match(core, /FirstRunRuntime/);
 assert.match(core, /renderDemoExpired/);
