@@ -1,7 +1,8 @@
-import { button, details, field, initPaymentForm, initPaymentMethods, modal, mountModal, paymentForm, paymentMethods, paymentReceipt, select, shortDate, shortDateTimeParts, shortTime } from '../ui/ui.js';
+import { button, details, field, initPaymentForm, initPaymentMethods, modal, mountModal, openNotice, paymentForm, paymentMethods, paymentReceipt, select, shortDate, shortTime } from '../ui/ui.js';
 import { calculateSettlement, getRecordPaymentState, recordSettlementItems } from '../core/finance/index.js';
 import { cancelPaymentOperation, getRefundsForPayment, recordPaymentIncome, recordRefundExpense, saveSettlementSnapshot } from '../core/finance/index.js';
 import { getWorkplaces } from '../core/workplace-time.js';
+import { normalizeWorkplaceTimeZone, zonedDateTimeParts, zonedDateTimeToDate } from '../core/time/index.js';
 import { getAllPeople } from '../main/people/data.js';
 import { personDisplay } from '../main/people/presentation.js';
 import { getWallets } from '../settings/wallets/data.js';
@@ -44,15 +45,28 @@ function sourcesFromSettlement(sources, settlement, type) {
 
 async function saveSettlementCorrection(record, settlement) {
   const current = getRecord(record?.id) || record;
+  const state = paymentStateForRecord(current);
+  if (Number(settlement?.planTotal || 0) + 0.009 < Number(state?.paidTotal || 0)) {
+    openNotice({ message: 'Расчёт нельзя уменьшить ниже уже оплаченной суммы. Сначала выполните возврат или отмените ошибочную оплату.' });
+    return null;
+  }
+  try {
+    await saveSettlementSnapshot({
+      source: { type: 'record', id: current.id },
+      settlement,
+    });
+  } catch (error) {
+    openNotice({ message: String(error?.message || 'Не удалось сохранить расчёт') });
+    return null;
+  }
   const updated = updateRecord(current.id, {
     procedures: sourcesFromSettlement(current?.procedures, settlement, 'procedure'),
     products: sourcesFromSettlement(current?.products, settlement, 'product'),
   });
-  if (!updated) return null;
-  await saveSettlementSnapshot({
-    source: { type: 'record', id: current.id },
-    settlement,
-  });
+  if (!updated) {
+    openNotice({ message: 'Расчёт сохранён, но запись не удалось обновить. Перезагрузите Book перед следующей операцией.' });
+    return null;
+  }
   return getRecord(current.id) || updated;
 }
 
@@ -65,9 +79,31 @@ function paymentEntryContent(record) {
   return `<button type="button" class="modal-bottom-action${partialClass}" data-record-payment-open aria-label="Открыть оплату, к оплате ${state.remaining} рублей"><span>К оплате</span><strong>${money(state.remaining)}</strong></button>`;
 }
 
+function workplaceForId(id) {
+  return getWorkplaces().find((item) => String(item?.key ?? item?.id ?? '') === String(id || '')) || null;
+}
+
 function workplaceName(id) {
-  const workplace = getWorkplaces().find((item) => String(item?.key ?? item?.id ?? '') === String(id || ''));
+  const workplace = workplaceForId(id);
   return workplace?.name || workplace?.title || 'Рабочее пространство';
+}
+
+function paymentWorkplaceTimeZone(paymentOrRecord = null) {
+  const sourceRecordId = String(paymentOrRecord?.source?.type || '') === 'record'
+    ? String(paymentOrRecord?.source?.id || '')
+    : String(paymentOrRecord?.id || '');
+  const record = sourceRecordId ? (getRecord(sourceRecordId) || paymentOrRecord) : paymentOrRecord;
+  const workplace = workplaceForId(record?.workplaceId);
+  return normalizeWorkplaceTimeZone(workplace?.timeZone || '');
+}
+
+function financeDateTimeInputValue(date = new Date(), paymentOrRecord = null) {
+  const parts = zonedDateTimeParts(date, paymentWorkplaceTimeZone(paymentOrRecord));
+  return `${parts.date}T${parts.time}`;
+}
+
+function financeDateTimeValue(value, paymentOrRecord = null) {
+  return zonedDateTimeToDate(value, paymentWorkplaceTimeZone(paymentOrRecord));
 }
 
 function recordPerson(record) {
@@ -84,7 +120,7 @@ function recordPaymentOccurredAtValue(record) {
   const time = String(record?.to || record?.from || '').slice(0, 5);
   if (date && /^\d{2}:\d{2}$/.test(time)) return `${date}T${time}`;
   if (date) return `${date}T12:00`;
-  return localDateTimeValue();
+  return financeDateTimeInputValue(new Date(), record);
 }
 
 function paymentMoment(record) {
@@ -120,8 +156,8 @@ function paymentAllocations(payment) {
 function paymentDateTime(payment) {
   const value = payment?.refundedAt || payment?.paidAt || payment?.createdAt;
   if (value) {
-    const parts = shortDateTimeParts(value);
-    if (parts.date) return parts;
+    const parts = zonedDateTimeParts(value, paymentWorkplaceTimeZone(payment));
+    if (parts.date) return { date: shortDate(parts.date), time: parts.time };
   }
   return {
     date: String(payment?.date || ''),
@@ -175,7 +211,7 @@ function openPaymentMethodsModal(payment, paymentModal) {
   const total = Number(recordState.remaining || 0);
   if (total <= 0.009) return;
   const content = `<div class="modal-title"><h2>Способ оплаты</h2></div>
-    ${field({ label: 'Фактическая дата и время', name: 'paymentOccurredAt', type: 'datetime-local', value: payment?.occurredAtValue || localDateTimeValue(), required: true })}
+    ${field({ label: 'Фактическая дата и время', name: 'paymentOccurredAt', type: 'datetime-local', value: payment?.occurredAtValue || financeDateTimeInputValue(new Date(), payment), required: true })}
     ${paymentMethods({ wallets: getWallets(), total })}`;
   const methodsModal = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
   if (!methodsModal) return;
@@ -202,7 +238,7 @@ function openPaymentMethodsModal(payment, paymentModal) {
         maxAmount: total,
         serviceAmount: appliedAmount,
         tips,
-        occurredAt: new Date(occurredAtInput.value),
+        occurredAt: financeDateTimeValue(occurredAtInput.value, payment),
       });
       finish(completed);
     },
@@ -276,7 +312,7 @@ function openRefundModal(payment) {
     <div class="payment-refund-form">
       <label class="payment-refund-amount"><span>Сумма возврата</span><input type="number" min="0" max="${remaining}" step="0.01" inputmode="decimal" value="${remaining}" data-refund-amount></label>
       ${select({ value: defaultWalletId, options, data: 'data-refund-wallet', aria: 'Кошелёк возврата' })}
-      ${field({ label: 'Фактическая дата и время', name: 'refundOccurredAt', type: 'datetime-local', value: localDateTimeValue(), required: true })}
+      ${field({ label: 'Фактическая дата и время', name: 'refundOccurredAt', type: 'datetime-local', value: financeDateTimeInputValue(new Date(), payment), required: true })}
       ${button(remaining === Number(payment.total || 0) ? 'Вернуть полностью' : 'Подтвердить возврат', { variant: 'danger', data: 'data-refund-submit' })}
     </div>`;
   const m = mountModal(document.body, modal(html, { variant: 'medium', surface: 'app' }));
@@ -303,7 +339,7 @@ function openRefundModal(payment) {
       amount,
       walletId: wallet.id,
       walletName: wallet.name,
-      occurredAt: new Date(occurredAtInput.value),
+      occurredAt: financeDateTimeValue(occurredAtInput.value, payment),
     });
     if (!refund) return;
     m.remove();
