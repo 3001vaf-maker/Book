@@ -129,9 +129,9 @@ The previously queued Auth transactional communication block is paused.
 
 ## Active block — Finance ownership rebuild (2026-09-20)
 
-Source checkpoint: `staging@6dd8b20427811fd1a8373ecd9213dc123d93d271`.
+Source checkpoint: `staging@b3819f4033424cec502244b667781e004d5796a0`.
 
-Working branch: `feature/finance-f3-f5-ledger-20260921`.
+Working branch: none — F3-F5 are complete in `staging`.
 
 Continuity anchor: `docs/FINANCE_ARCHITECTURE.md`.
 
@@ -139,7 +139,7 @@ Current status:
 - F0: DONE — canonical Finance ownership and ordered F0-F12 migration chain are documented and merged to `staging` as `522b593d9c5d1a1ea37b152b8f0802389eeb81e8`; post-merge Check Book #1968 passed all three jobs.
 - F1: DONE — verified ownership/storage/formula inventory and current-owner -> target-owner migration map are recorded in `docs/FINANCE_ARCHITECTURE.md`; merged to `staging` as `02bd8e6b0ab82048335d1a29be8e9186a4b614bb`; post-merge Check Book #1972 passed all three jobs.
 - F2: DONE — legacy operational Financial Model/FinancialPlan naming is replaced by `Settlement / Расчёт`; `core/finance/model.js` is removed; guards block the old API and operational Financial Model dependencies. Exact-head Check Book #1977 and post-merge Check Book #1978 both passed all required jobs on `staging@b075c9bf2203d839d5dc9cba6153aa7ab705a893`.
-- F3-F5: IMPLEMENTED IN FEATURE BRANCH — Record payment ownership removed; canonical server `FinanceSettlement`, `FinanceOperation` and flat `FinanceLedgerEntry` introduced; payment/refund/cancel commands are server-owned; split-wallet payment is one Operation with multiple Ledger rows; Wallet/DDS project from Ledger; legacy auxiliary Finance is migration-only. One combined F3-F5 verification is pending before merge to `staging`.
+- F3-F5: DONE — merged to `staging` as `b3819f4033424cec502244b667781e004d5796a0`. Record no longer owns payment truth; canonical server `FinanceSettlement`, `FinanceOperation` and flat `FinanceLedgerEntry` own Settlement, operations and factual money rows; payment/refund/cancel are server-owned; split-wallet payment is one Operation with multiple Ledger rows; Wallet/DDS project from Ledger; legacy auxiliary Finance is migration-only. Combined feature Check Book #1989 and post-merge Check Book #1990 both passed all required jobs, including migration, backend, four production domains and staging frontend.
 - F6-F12: NOT STARTED.
 - F0-F1 changed documentation only. F2 renamed the operational calculation owner to Settlement. F3-F5 change ownership and persisted money shape from Record/auxiliary JSON to Settlement + Operation + flat Ledger.
 - `main` must not receive this rebuild until F0-F12 are complete and the exact staging release head is fully verified.
