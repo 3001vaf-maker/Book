@@ -171,54 +171,157 @@ export class SaasAdminService {
     status?: unknown;
     capabilities?: unknown;
   }) {
-    const tenantAccess = await this.prisma.tenantAccess.findUnique({ where: { tenantId } });
+    const tenantAccess = await this.prisma.tenantAccess.findUnique({
+      where: { tenantId },
+      include: {
+        plan: { include: { capabilityValues: true } },
+        overrides: true,
+      },
+    });
     if (!tenantAccess) throw new NotFoundException('Рабочее пространство не найдено');
+
+    const planValues = new Map(tenantAccess.plan?.capabilityValues.map((item) => [item.capabilityId, item]) || []);
+    const overrideValues = new Map(tenantAccess.overrides.map((item) => [item.capabilityId, item]));
+
+    const baseValue = (capability: {
+      id: string;
+      valueType: CapabilityValueType;
+      defaultEnabled: boolean;
+      defaultLimit: number | null;
+    }) => {
+      const planValue = planValues.get(capability.id);
+      if (capability.valueType === CapabilityValueType.BOOLEAN) {
+        if (tenantAccess.isOwnerBook && !tenantAccess.plan) return true;
+        if (planValue?.enabled !== null && planValue?.enabled !== undefined) return planValue.enabled;
+        return capability.defaultEnabled;
+      }
+      if (tenantAccess.isOwnerBook && !tenantAccess.plan) return null;
+      if (planValue) return planValue.limit;
+      return capability.defaultLimit;
+    };
+
+    const currentValue = (capability: {
+      id: string;
+      valueType: CapabilityValueType;
+      defaultEnabled: boolean;
+      defaultLimit: number | null;
+    }) => {
+      const override = overrideValues.get(capability.id);
+      if (capability.valueType === CapabilityValueType.BOOLEAN) {
+        if (override?.enabled !== null && override?.enabled !== undefined) return override.enabled;
+        return baseValue(capability);
+      }
+      if (override) return override.limit;
+      return baseValue(capability);
+    };
 
     const statusText = String(input?.status || '').trim().toUpperCase();
     if (statusText) {
       if (!Object.values(TenantAccessStatus).includes(statusText as TenantAccessStatus)) {
         throw new BadRequestException('Неизвестный статус рабочего пространства');
       }
-      await this.prisma.tenantAccess.update({
-        where: { tenantId },
-        data: { status: statusText as TenantAccessStatus },
-      });
+      if (statusText !== tenantAccess.status) {
+        await this.prisma.tenantAccess.update({
+          where: { tenantId },
+          data: { status: statusText as TenantAccessStatus },
+        });
+        await this.prisma.platformActivityEvent.create({
+          data: {
+            tenantId,
+            eventType: 'ACCESS_STATUS_CHANGED',
+            metadata: {
+              from: tenantAccess.status,
+              to: statusText,
+            },
+          },
+        });
+        await this.notices.createForTenantOwner(tenantId, {
+          type: 'ACCESS_STATUS_CHANGED',
+          title: statusText === TenantAccessStatus.SUSPENDED
+            ? 'Рабочее пространство временно отключено'
+            : 'Рабочее пространство снова доступно',
+          body: statusText === TenantAccessStatus.SUSPENDED
+            ? 'Администратор временно ограничил доступ к рабочему пространству.'
+            : 'Администратор восстановил доступ к рабочему пространству.',
+          metadata: { status: statusText },
+        });
+      }
     }
 
     const values = Array.isArray(input?.capabilities) ? input.capabilities : [];
+    const seenKeys = new Set<string>();
     for (const raw of values) {
       if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
       const value = raw as Record<string, unknown>;
       const key = String(value.key || '').trim();
       if (!key) continue;
+      if (seenKeys.has(key)) throw new BadRequestException(`Инструмент ${key} передан несколько раз`);
+      seenKeys.add(key);
+
       const capability = await this.prisma.capability.findUnique({ where: { key } });
       if (!capability || !capability.isActive) throw new BadRequestException(`Неизвестная возможность: ${key}`);
+      const before = currentValue(capability);
 
       if (value.inherit === true) {
         await this.prisma.tenantCapabilityOverride.deleteMany({
           where: { tenantId, capabilityId: capability.id },
         });
-        continue;
-      }
-
-      if (capability.valueType === CapabilityValueType.BOOLEAN) {
+        overrideValues.delete(capability.id);
+      } else if (capability.valueType === CapabilityValueType.BOOLEAN) {
         if (typeof value.enabled !== 'boolean') throw new BadRequestException(`Для ${key} требуется ON/OFF`);
-        await this.prisma.tenantCapabilityOverride.upsert({
+        const saved = await this.prisma.tenantCapabilityOverride.upsert({
           where: { tenantId_capabilityId: { tenantId, capabilityId: capability.id } },
           create: { tenantId, capabilityId: capability.id, enabled: value.enabled, limit: null },
           update: { enabled: value.enabled, limit: null },
         });
-        continue;
+        overrideValues.set(capability.id, saved);
+      } else {
+        const limit = value.limit === null ? null : Number(value.limit);
+        if (limit !== null && (!Number.isInteger(limit) || limit < 0)) {
+          throw new BadRequestException(`Для ${key} требуется целый лимит или без ограничения`);
+        }
+        const saved = await this.prisma.tenantCapabilityOverride.upsert({
+          where: { tenantId_capabilityId: { tenantId, capabilityId: capability.id } },
+          create: { tenantId, capabilityId: capability.id, enabled: null, limit },
+          update: { enabled: null, limit },
+        });
+        overrideValues.set(capability.id, saved);
       }
 
-      const limit = value.limit === null ? null : Number(value.limit);
-      if (limit !== null && (!Number.isInteger(limit) || limit < 0)) {
-        throw new BadRequestException(`Для ${key} требуется целый лимит или без ограничения`);
-      }
-      await this.prisma.tenantCapabilityOverride.upsert({
-        where: { tenantId_capabilityId: { tenantId, capabilityId: capability.id } },
-        create: { tenantId, capabilityId: capability.id, enabled: null, limit },
-        update: { enabled: null, limit },
+      const after = currentValue(capability);
+      if (before === after) continue;
+
+      const booleanChange = capability.valueType === CapabilityValueType.BOOLEAN;
+      const enabled = booleanChange ? after === true : null;
+      await this.prisma.platformActivityEvent.create({
+        data: {
+          tenantId,
+          eventType: 'CAPABILITY_CHANGED',
+          metadata: {
+            key: capability.key,
+            name: capability.name,
+            valueType: capability.valueType,
+            before,
+            after,
+          },
+        },
+      });
+      await this.notices.createForTenantOwner(tenantId, {
+        type: 'CAPABILITY_CHANGED',
+        title: booleanChange
+          ? (enabled ? `Инструмент «${capability.name}» добавлен` : `Инструмент «${capability.name}» отключён`)
+          : `Изменён лимит «${capability.name}»`,
+        body: booleanChange
+          ? (enabled
+            ? 'Администратор добавил этот инструмент в ваш набор. Он станет доступен в соответствии с текущим режимом работы.'
+            : 'Администратор отключил этот инструмент в вашем наборе.')
+          : `Новое значение лимита: ${after === null ? 'без ограничения' : after}.`,
+        metadata: {
+          key: capability.key,
+          valueType: capability.valueType,
+          before,
+          after,
+        },
       });
     }
 
