@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Req, Res, StreamableFile, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Req, Res, StreamableFile, UseGuards } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { FirstRunService } from './first-run.service';
@@ -19,14 +19,20 @@ export class FirstRunController {
   async rknGuide(
     @Req() request: AuthenticatedRequest,
     @Res({ passthrough: true }) response: Response,
+    @Query('documentId') documentId = '',
   ) {
-    const pdf = await this.firstRun.rknGuide(request.auth!.tenantId, request.auth!.platformAccountId);
+    const result = await this.firstRun.rknGuide(
+      request.auth!.tenantId,
+      request.auth!.platformAccountId,
+      String(documentId || ''),
+    );
     response.set({
       'Content-Type': 'application/pdf',
-      'Content-Disposition': 'attachment; filename="rkn-guide.pdf"',
+      'Content-Disposition': `attachment; filename="${result.fileName}"`,
       'Cache-Control': 'private, no-store',
+      'X-Book-Document-Id': result.documentId,
     });
-    return new StreamableFile(pdf);
+    return new StreamableFile(result.pdf);
   }
 
   @Post('steps/:stepKey/seen')
