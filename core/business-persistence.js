@@ -23,6 +23,24 @@ function reportError(error) {
   }
 }
 
+function mutationScope(path = '') {
+  const value = String(path || '');
+  if (value.startsWith('/business-state/operational')) return 'operational';
+  if (value.startsWith('/business-state/')) return 'business';
+  if (value.startsWith('/tenant-document-archive/')) return 'documents';
+  if (value.startsWith('/auxiliary-state/')) return 'auxiliary';
+  return '';
+}
+
+function reportMutationCompleted(path) {
+  if (typeof window === 'undefined') return;
+  const scope = mutationScope(path);
+  if (!scope) return;
+  window.dispatchEvent(new CustomEvent('book:server-mutation-completed', {
+    detail: { path: String(path || ''), scope },
+  }));
+}
+
 function resolveIdle() {
   if (queue.length || running) return;
   while (idleWaiters.length) idleWaiters.shift()?.();
@@ -43,10 +61,11 @@ async function runQueue() {
     while (serverReady && queue.length) {
       const item = queue[0];
       try {
-        await send(item);
+        const result = await send(item);
         queue.shift();
         lastError = null;
-        item.resolve?.();
+        item.resolve?.(result);
+        reportMutationCompleted(item.path);
       } catch (error) {
         reportError(error);
         await sleep(1200);
