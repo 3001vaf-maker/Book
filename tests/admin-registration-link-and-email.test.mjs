@@ -38,4 +38,16 @@ assert.match(inviteUi, /invitation\.requiresEmail/);
 assert.match(inviteUi, /\/tenant-invitations\/accept/);
 assert.doesNotMatch(inviteUi, /manual-invitations|\/register\//);
 
+assert.match(adminController, /@Delete\('tenants\/:tenantId'\)/);
+assert.match(adminService, /async deleteTenant\(tenantId: string\)/);
+assert.match(adminService, /access\.isOwnerBook/);
+assert.match(adminService, /OWNER Book нельзя удалить/);
+assert.match(adminService, /prisma\.\$transaction/);
+assert.match(adminService, /DELETE FROM "PlatformConsentEvent" WHERE "tenantId"/);
+assert.match(adminService, /tx\.tenant\.delete/);
+assert.match(adminService, /remainingMemberships === 0 && !platformAdmin/);
+assert.match(adminUi, /data-delete-tenant/);
+assert.match(adminUi, /Полностью удалить/);
+assert.doesNotMatch(adminUi, /data-delete-invitation/);
+
 console.log('Admin registration link and technical email tests passed');

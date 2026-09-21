@@ -33,6 +33,11 @@ export class SaasAdminController {
     return this.admin.capabilities();
   }
 
+  @Delete('tenants/:tenantId')
+  deleteTenant(@Param('tenantId') tenantId: string) {
+    return this.admin.deleteTenant(tenantId);
+  }
+
   @Get('document-registry/history')
   documentRegistryHistory() {
     return this.admin.documentRegistryHistory();

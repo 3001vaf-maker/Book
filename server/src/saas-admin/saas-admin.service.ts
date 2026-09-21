@@ -328,6 +328,43 @@ export class SaasAdminService {
     return this.access.resolveTenantAccess(tenantId);
   }
 
+  async deleteTenant(tenantId: string) {
+    const access = await this.prisma.tenantAccess.findUnique({
+      where: { tenantId },
+      select: {
+        tenantId: true,
+        isOwnerBook: true,
+        tenant: {
+          select: {
+            memberships: { select: { platformAccountId: true } },
+          },
+        },
+      },
+    });
+    if (!access) throw new NotFoundException('Рабочее пространство не найдено');
+    if (access.isOwnerBook) throw new BadRequestException('OWNER Book нельзя удалить');
+
+    const platformAccountIds = [...new Set(access.tenant.memberships.map((item) => item.platformAccountId))];
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`DELETE FROM "PlatformConsentEvent" WHERE "tenantId" = ${tenantId}`;
+      await tx.tenant.delete({ where: { id: tenantId } });
+
+      for (const platformAccountId of platformAccountIds) {
+        const remainingMemberships = await tx.membership.count({ where: { platformAccountId } });
+        const platformAdmin = await tx.platformAdmin.findUnique({
+          where: { platformAccountId },
+          select: { id: true },
+        });
+        if (remainingMemberships === 0 && !platformAdmin) {
+          await tx.platformAccount.delete({ where: { id: platformAccountId } });
+        }
+      }
+    });
+
+    return { deleted: true, tenantId, platformAccountIds };
+  }
+
   firstRunScenario() {
     return this.firstRun.adminScenario();
   }
