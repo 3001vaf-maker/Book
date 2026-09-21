@@ -240,7 +240,7 @@ function openPaymentMethodsModal(payment, paymentModal) {
   });
 }
 
-function openPaymentModal(record) {
+function openPaymentModal(record, { onCancelled = () => {} } = {}) {
   if (paymentStateForRecord(record).fullyPaid) return;
   const current = getRecord(record?.id) || record;
   const state = paymentStateForRecord(current);
@@ -259,7 +259,12 @@ function openPaymentModal(record) {
   })}`;
   const m = mountModal(document.body, modal(content, { variant: 'large', surface: 'app' }));
   if (!m) return;
-  m.querySelector('[data-payment-history]')?.addEventListener('click', () => openPaidState(current));
+  m.querySelector('[data-payment-history]')?.addEventListener('click', () => openPaidState(current, {
+    onCancelled: (cancelled) => {
+      m.remove();
+      onCancelled(cancelled);
+    },
+  }));
   initPaymentForm(m.querySelector('[data-payment-ui]'), {
     calculate: (items) => calculateSettlement(items),
     onRemove: async ({ settlement: updatedSettlement }) => {
@@ -355,7 +360,7 @@ function openRefundModal(payment) {
   sync();
 }
 
-function openCancelPaymentModal(payment) {
+function openCancelPaymentModal(payment, { onCancelled = () => {} } = {}) {
   const html = `<div class="modal-title"><h2>Отменить операцию?</h2></div>
     ${paymentFactMarkup(payment)}
     <p>Неверный ввод останется в финансовой истории с пометкой «Отменена», но не будет участвовать в кошельках и расчётах.</p>
@@ -372,11 +377,11 @@ function openCancelPaymentModal(payment) {
     });
     if (!cancelled) return;
     m.remove();
-    refreshPaidStateForPayment(cancelled);
+    onCancelled(cancelled);
   });
 }
 
-function openPaymentActions(payment) {
+function openPaymentActions(payment, { onCancelled = () => {} } = {}) {
   const html = `<div class="modal-title"><h2>Действия с оплатой</h2></div>
     ${paymentFactMarkup(payment)}
     <div class="modal-actions">
@@ -387,7 +392,7 @@ function openPaymentActions(payment) {
   if (!m) return;
   m.querySelector('[data-cancel-payment]')?.addEventListener('click', () => {
     m.remove();
-    openCancelPaymentModal(payment);
+    openCancelPaymentModal(payment, { onCancelled });
   });
   m.querySelector('[data-refund-payment]')?.addEventListener('click', () => {
     m.remove();
@@ -395,7 +400,7 @@ function openPaymentActions(payment) {
   });
 }
 
-function openPaidState(record) {
+function openPaidState(record, { onCancelled = () => {} } = {}) {
   const state = paymentStateForRecord(record);
   const payments = Array.isArray(state?.payments) ? state.payments : [];
   if (!payments.length) return;
@@ -412,7 +417,7 @@ function openPaidState(record) {
       const payment = payments.find((item) => String(item?.id || '') === String(element.dataset.paymentActions || ''));
       if (!payment) return;
       m.remove();
-      openPaymentActions(payment);
+      openPaymentActions(payment, { onCancelled });
     });
   });
 }
@@ -422,9 +427,19 @@ export function openRecordPaymentEntry(record) {
   const bottom = mountModal(document.body, modal(paymentEntryContent(record), { variant: 'bottom' }));
   if (!bottom) return () => {};
 
+  let closed = false;
+  const closePaymentEntry = () => {
+    if (closed) return;
+    closed = true;
+    window.removeEventListener('book:records-changed', onRecordsChanged);
+    window.removeEventListener('book:dds-changed', onDDSChanged);
+    bottom.remove();
+  };
+  const finishCancelledPayment = () => closePaymentEntry();
+
   const bindEntry = (current) => {
-    bottom.querySelector('[data-record-payment-open]')?.addEventListener('click', () => openPaymentModal(current));
-    bottom.querySelector('[data-record-payment-paid]')?.addEventListener('click', () => openPaidState(current));
+    bottom.querySelector('[data-record-payment-open]')?.addEventListener('click', () => openPaymentModal(current, { onCancelled: finishCancelledPayment }));
+    bottom.querySelector('[data-record-payment-paid]')?.addEventListener('click', () => openPaidState(current, { onCancelled: finishCancelledPayment }));
   };
   const renderPaymentState = () => {
     const current = getRecord(record.id) || record;
@@ -448,9 +463,5 @@ export function openRecordPaymentEntry(record) {
   bindEntry(record);
   window.addEventListener('book:records-changed', onRecordsChanged);
   window.addEventListener('book:dds-changed', onDDSChanged);
-  return () => {
-    window.removeEventListener('book:records-changed', onRecordsChanged);
-    window.removeEventListener('book:dds-changed', onDDSChanged);
-    bottom.remove();
-  };
+  return closePaymentEntry;
 }
