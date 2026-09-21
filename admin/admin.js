@@ -328,26 +328,143 @@ function renderCapabilities() {
     ${[...groups.entries()].map(([group, items]) => `<section class="admin-card" style="padding:18px;margin-bottom:14px"><strong>${escapeHtml(group)}</strong>${items.map((item) => `<div class="admin-capability"><div>${escapeHtml(item.name)}<small>${escapeHtml(item.key)}</small></div><span>${item.valueType === 'LIMIT' ? 'лимит' : 'ON / OFF'}</span></div>`).join('')}</section>`).join('')}`;
 }
 
+function formatAdminMoment(value, fallback = '—') {
+  const date = new Date(value || 0);
+  if (!Number.isFinite(date.getTime())) return fallback;
+  return new Intl.DateTimeFormat('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
+
+function activeTimeText(secondsValue) {
+  const seconds = Math.max(0, Number(secondsValue) || 0);
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (hours) return `${hours} ч ${minutes} мин`;
+  return `${minutes} мин`;
+}
+
+function orderedCapabilityCatalog(tenant) {
+  const byKey = new Map(state.capabilities.map((item) => [item.key, item]));
+  const order = Array.isArray(tenant.access?.capabilityOrder) ? tenant.access.capabilityOrder : [];
+  const result = order.map((key) => byKey.get(key)).filter(Boolean);
+  state.capabilities.forEach((item) => {
+    if (!result.some((entry) => entry.key === item.key)) result.push(item);
+  });
+  return result;
+}
+
+function activityEventLabel(event, stepTitles) {
+  const stepTitle = stepTitles.get(event.stepKey) || event.stepKey || '';
+  if (event.eventType === 'INVITATION_ACTIVATED') return 'Открыта регистрационная ссылка';
+  if (event.eventType === 'ACCOUNT_CREATED') return 'Создана учётная запись';
+  if (event.eventType === 'FIRST_RUN_STARTED') return 'Начато первое знакомство';
+  if (event.eventType === 'STEP_MODAL_SHOWN') return stepTitle ? `Показана подсказка «${stepTitle}»` : 'Показана подсказка';
+  if (event.eventType === 'STEP_COMPLETED') return stepTitle ? `Завершён этап «${stepTitle}»` : 'Этап завершён';
+  if (event.eventType === 'STEP_SKIPPED') return stepTitle ? `Пропущен этап «${stepTitle}»` : 'Этап пропущен';
+  if (event.eventType === 'FIRST_RUN_COMPLETED') return 'Первое знакомство завершено';
+  if (event.eventType === 'SESSION_STARTED') return 'Вход в систему';
+  if (event.eventType === 'SESSION_ENDED') {
+    const reason = String(event.metadata?.reason || '');
+    return reason === 'LOGOUT' ? 'Выход из системы' : reason === 'TIMEOUT' ? 'Сеанс завершён по отсутствию активности' : 'Сеанс завершён';
+  }
+  if (event.eventType === 'COMMERCIAL_MODE_CHANGED') return `Режим изменён: ${escapeHtml(event.metadata?.commercialMode || '')}`;
+  if (event.eventType === 'DEMO_EXTENDED') return 'DEMO продлено компанией';
+  if (event.eventType === 'DEMO_OPERATIONAL_DATA_CLEARED') return 'Учебные операционные данные очищены';
+  if (event.eventType === 'FINANCE_SECTION_OPENED') return 'Открыт финансовый раздел';
+  return event.eventType;
+}
+
+function activityMarkup(activity) {
+  const progress = activity?.progress || null;
+  const steps = Array.isArray(progress?.steps) ? progress.steps : [];
+  const stepTitles = new Map(steps.map((item) => [item.key, item.title]));
+  const currentTitle = stepTitles.get(progress?.currentStepKey) || progress?.currentStepKey || '—';
+  const sessions = Array.isArray(activity?.sessions) ? activity.sessions : [];
+  const events = Array.isArray(activity?.events) ? activity.events : [];
+  const firstSession = sessions.length ? sessions[sessions.length - 1] : null;
+  return `
+    <div class="admin-activity-summary">
+      <div><span>Первый вход</span><strong>${escapeHtml(firstSession ? formatAdminMoment(firstSession.startedAt) : 'Не входил')}</strong></div>
+      <div><span>Последняя активность</span><strong>${escapeHtml(activity?.lastActivityAt ? formatAdminMoment(activity.lastActivityAt) : 'Нет')}</strong></div>
+      <div><span>Сеансов</span><strong>${escapeHtml(sessions.length)}</strong></div>
+      <div><span>Активное время</span><strong>${escapeHtml(activeTimeText(activity?.totalActiveSeconds))}</strong></div>
+      <div><span>Обучение</span><strong>${escapeHtml(progress ? (progress.status === 'COMPLETED' ? 'Завершено' : currentTitle) : 'Не начато')}</strong></div>
+      <div><span>Версия сценария</span><strong>${escapeHtml(progress?.scenarioVersion || '—')}</strong></div>
+    </div>
+    <div class="admin-activity-timeline">
+      ${events.length ? events.map((event) => `<div class="admin-activity-event">
+        <time>${escapeHtml(formatAdminMoment(event.occurredAt))}</time>
+        <div>${escapeHtml(activityEventLabel(event, stepTitles))}</div>
+      </div>`).join('') : '<div class="admin-history-empty">Событий пока нет.</div>'}
+    </div>`;
+}
+
+function capabilityOrderRow(capability, resolved) {
+  return `<div class="admin-capability-order-row" draggable="true" data-capability-row="${escapeHtml(capability.key)}">
+    <div class="admin-capability-move">
+      <button type="button" data-capability-up aria-label="Поднять">↑</button>
+      <button type="button" data-capability-down aria-label="Опустить">↓</button>
+    </div>
+    <div class="admin-capability-control">${capabilityEditor(capability, resolved)}</div>
+  </div>`;
+}
+
 function openAccessDrawer(tenantId) {
   const tenant = state.tenants.find((item) => item.tenantId === tenantId);
   if (!tenant) return;
   const resolved = new Map((tenant.access?.capabilities || []).map((item) => [item.key, item]));
+  const capabilities = orderedCapabilityCatalog(tenant);
+  const mode = String(tenant.access?.commercialMode || 'DEMO');
+  const demoActivated = tenant.access?.demoActivatedAt || tenant.invitation?.activatedAt || '';
+  const demoExpires = tenant.access?.demoExpiresAt || tenant.invitation?.demoExpiresAt || '';
+  const progress = tenant.firstRun || null;
   const backdrop = document.createElement('div');
   backdrop.className = 'admin-drawer-backdrop';
   backdrop.innerHTML = `
     <aside class="admin-drawer">
       <div class="admin-drawer-head">
-        <div><h3>${escapeHtml(tenant.isOwnerBook ? 'Мой Book' : (tenant.ownerProfile?.name || tenant.invitation?.name || tenant.tenantName))}</h3><p>${escapeHtml(tenant.ownerProfile?.email || tenant.invitation?.email || '')}</p></div>
+        <div><h3>${escapeHtml(tenant.ownerProfile?.name || tenant.invitation?.name || tenant.tenantName || 'Пользователь')}</h3><p>${escapeHtml(tenant.ownerProfile?.email || tenant.invitation?.email || '')}</p></div>
         <button class="admin-close" data-close aria-label="Закрыть">×</button>
       </div>
+
       <section class="admin-section">
-        <h4>Доступ Book</h4>
-        ${state.capabilities.map((capability) => capabilityEditor(capability, resolved.get(capability.key))).join('')}
+        <h4>Режим</h4>
+        <div class="admin-mode-card">
+          <strong>${escapeHtml(mode)}</strong>
+          <span>${demoActivated ? `DEMO активировано ${escapeHtml(formatAdminMoment(demoActivated))}` : 'DEMO ещё не активировано'}</span>
+          <span>${demoExpires ? `Срок DEMO до ${escapeHtml(formatAdminMoment(demoExpires))}` : ''}</span>
+          <span>${progress ? (progress.status === 'COMPLETED' ? 'Первое знакомство завершено' : `Текущий этап: ${escapeHtml(progress.currentStepKey || '—')}`) : 'Первое знакомство ещё не начато'}</span>
+        </div>
+        <div class="admin-inline-actions">
+          ${mode === 'DEMO' ? '<button class="admin-button secondary" data-extend-demo>Продлить DEMO на 14 дней</button>' : ''}
+          ${mode !== 'LIVE' && tenant.ownerProfile ? '<button class="admin-button" data-set-live>Перевести в LIVE</button>' : ''}
+        </div>
+        <p class="admin-inline-message" data-mode-message></p>
       </section>
+
       <section class="admin-section">
-        <h4>Состояние</h4>
-        <button class="admin-button ${tenant.status === 'SUSPENDED' ? '' : 'danger'}" data-status>${tenant.status === 'SUSPENDED' ? 'Включить Book' : 'Отключить Book'}</button>
+        <h4>Инструменты</h4>
+        <p class="admin-service-note">Порядок индивидуален для этого пользователя и не меняет функциональность инструмента.</p>
+        <div data-capability-order-list>
+          ${capabilities.map((capability) => capabilityOrderRow(capability, resolved.get(capability.key))).join('')}
+        </div>
       </section>
+
+      <section class="admin-section">
+        <h4>Состояние пространства</h4>
+        <button class="admin-button ${tenant.status === 'SUSPENDED' ? '' : 'danger'}" data-status>${tenant.status === 'SUSPENDED' ? 'Включить пространство' : 'Отключить пространство'}</button>
+      </section>
+
+      <section class="admin-section">
+        <h4>Журнал активности</h4>
+        <div data-activity><div class="admin-history-empty">Загрузка…</div></div>
+      </section>
+
       ${tenant.ownerProfile?.email ? `
       <section class="admin-section">
         <h4>Техническое письмо</h4>
@@ -359,13 +476,42 @@ function openAccessDrawer(tenantId) {
           <p class="admin-inline-message" data-technical-email-message></p>
         </form>
       </section>` : ''}
-      <div class="admin-actions"><button class="admin-button secondary" data-close>Закрыть</button><button class="admin-button" data-save>Сохранить доступы</button></div>
+
+      <div class="admin-actions"><button class="admin-button secondary" data-close>Закрыть</button><button class="admin-button" data-save>Сохранить инструменты</button></div>
       <p class="admin-inline-message" data-save-message></p>
     </aside>`;
   document.body.append(backdrop);
 
-  backdrop.querySelectorAll('[data-close]').forEach((button) => button.addEventListener('click', () => backdrop.remove()));
-  backdrop.addEventListener('click', (event) => { if (event.target === backdrop) backdrop.remove(); });
+  const close = () => backdrop.remove();
+  backdrop.querySelectorAll('[data-close]').forEach((button) => button.addEventListener('click', close));
+  backdrop.addEventListener('click', (event) => { if (event.target === backdrop) close(); });
+
+  const capabilityList = backdrop.querySelector('[data-capability-order-list]');
+  const originalOrder = capabilities.map((item) => item.key).join('|');
+  const moveCapability = (row, direction) => {
+    const sibling = direction < 0 ? row.previousElementSibling : row.nextElementSibling;
+    if (!sibling) return;
+    if (direction < 0) capabilityList.insertBefore(row, sibling);
+    else capabilityList.insertBefore(sibling, row);
+  };
+  capabilityList?.querySelectorAll('[data-capability-row]').forEach((row) => {
+    row.querySelector('[data-capability-up]')?.addEventListener('click', () => moveCapability(row, -1));
+    row.querySelector('[data-capability-down]')?.addEventListener('click', () => moveCapability(row, 1));
+    row.addEventListener('dragstart', (event) => {
+      row.classList.add('is-dragging');
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', row.dataset.capabilityRow || '');
+    });
+    row.addEventListener('dragend', () => row.classList.remove('is-dragging'));
+    row.addEventListener('dragover', (event) => {
+      event.preventDefault();
+      const dragging = capabilityList.querySelector('.is-dragging');
+      if (!dragging || dragging === row) return;
+      const rect = row.getBoundingClientRect();
+      capabilityList.insertBefore(dragging, event.clientY < rect.top + rect.height / 2 ? row : row.nextSibling);
+    });
+  });
+
   backdrop.querySelectorAll('[data-toggle]').forEach((button) => {
     button.addEventListener('click', () => {
       button.classList.toggle('is-on');
@@ -373,7 +519,7 @@ function openAccessDrawer(tenantId) {
     });
   });
 
-  backdrop.querySelector('[data-status]').addEventListener('click', async () => {
+  backdrop.querySelector('[data-status]')?.addEventListener('click', async () => {
     const next = tenant.status === 'SUSPENDED' ? 'ACTIVE' : 'SUSPENDED';
     try {
       await adminRequest(`/tenants/${encodeURIComponent(tenantId)}/access`, {
@@ -382,24 +528,61 @@ function openAccessDrawer(tenantId) {
         body: JSON.stringify({ status: next }),
       });
       await refreshData();
-      backdrop.remove();
+      close();
       renderCurrentSection();
     } catch (error) {
-      backdrop.querySelector('[data-save-message]').textContent = error instanceof Error ? error.message : 'Не удалось изменить состояние';
-      backdrop.querySelector('[data-save-message]').classList.add('error');
+      const message = backdrop.querySelector('[data-save-message]');
+      message.textContent = error instanceof Error ? error.message : 'Не удалось изменить состояние';
+      message.classList.add('error');
+    }
+  });
+
+  backdrop.querySelector('[data-extend-demo]')?.addEventListener('click', async (event) => {
+    const message = backdrop.querySelector('[data-mode-message]');
+    event.currentTarget.disabled = true;
+    try {
+      const result = await adminRequest(`/tenants/${encodeURIComponent(tenantId)}/demo/extend`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ days: 14 }),
+      });
+      message.textContent = `DEMO продлено до ${formatAdminMoment(result.expiresAt)}.`;
+      await refreshData();
+    } catch (error) {
+      message.textContent = error instanceof Error ? error.message : 'Не удалось продлить DEMO';
+      message.classList.add('error');
+      event.currentTarget.disabled = false;
+    }
+  });
+
+  backdrop.querySelector('[data-set-live]')?.addEventListener('click', async (event) => {
+    const message = backdrop.querySelector('[data-mode-message]');
+    event.currentTarget.disabled = true;
+    try {
+      await adminRequest(`/tenants/${encodeURIComponent(tenantId)}/commercial-mode`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'LIVE' }),
+      });
+      message.textContent = 'Режим LIVE установлен. Незавершённое первое знакомство продолжится.';
+      await refreshData();
+    } catch (error) {
+      message.textContent = error instanceof Error ? error.message : 'Не удалось изменить режим';
+      message.classList.add('error');
+      event.currentTarget.disabled = false;
     }
   });
 
   const technicalEmailForm = backdrop.querySelector('[data-technical-email-form]');
   technicalEmailForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const button = technicalEmailForm.querySelector('button[type="submit"]');
+    const buttonNode = technicalEmailForm.querySelector('button[type="submit"]');
     const message = technicalEmailForm.querySelector('[data-technical-email-message]');
     const data = new FormData(technicalEmailForm);
     message.textContent = '';
     message.classList.remove('error');
-    button.disabled = true;
-    button.textContent = 'Отправляем…';
+    buttonNode.disabled = true;
+    buttonNode.textContent = 'Отправляем…';
     try {
       const result = await adminRequest(`/tenants/${encodeURIComponent(tenantId)}/technical-email`, {
         method: 'POST',
@@ -412,12 +595,12 @@ function openAccessDrawer(tenantId) {
       message.textContent = error instanceof Error ? error.message : 'Не удалось отправить письмо';
       message.classList.add('error');
     } finally {
-      button.disabled = false;
-      button.textContent = 'Отправить письмо';
+      buttonNode.disabled = false;
+      buttonNode.textContent = 'Отправить письмо';
     }
   });
 
-  backdrop.querySelector('[data-save]').addEventListener('click', async () => {
+  backdrop.querySelector('[data-save]')?.addEventListener('click', async () => {
     const changes = [];
     backdrop.querySelectorAll('[data-capability]').forEach((element) => {
       const key = element.dataset.capability;
@@ -434,26 +617,49 @@ function openAccessDrawer(tenantId) {
         if (current !== original) changes.push({ key, limit: current });
       }
     });
+
+    const orderKeys = [...capabilityList.querySelectorAll('[data-capability-row]')].map((row) => row.dataset.capabilityRow);
+    const orderChanged = orderKeys.join('|') !== originalOrder;
     const message = backdrop.querySelector('[data-save-message]');
-    if (!changes.length) {
+    if (!changes.length && !orderChanged) {
       message.textContent = 'Изменений нет.';
       return;
     }
+
     try {
-      await adminRequest(`/tenants/${encodeURIComponent(tenantId)}/access`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ capabilities: changes }),
-      });
-      message.textContent = 'Доступы сохранены.';
+      if (changes.length) {
+        await adminRequest(`/tenants/${encodeURIComponent(tenantId)}/access`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ capabilities: changes }),
+        });
+      }
+      if (orderChanged) {
+        await adminRequest(`/tenants/${encodeURIComponent(tenantId)}/capability-order`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ keys: orderKeys }),
+        });
+      }
+      message.textContent = 'Инструменты сохранены.';
       message.classList.remove('error');
       await refreshData();
-      window.setTimeout(() => { backdrop.remove(); renderCurrentSection(); }, 300);
+      window.setTimeout(() => { close(); renderCurrentSection(); }, 300);
     } catch (error) {
-      message.textContent = error instanceof Error ? error.message : 'Не удалось сохранить доступы';
+      message.textContent = error instanceof Error ? error.message : 'Не удалось сохранить инструменты';
       message.classList.add('error');
     }
   });
+
+  void adminRequest(`/tenants/${encodeURIComponent(tenantId)}/activity`)
+    .then((activity) => {
+      const host = backdrop.querySelector('[data-activity]');
+      if (host) host.innerHTML = activityMarkup(activity);
+    })
+    .catch((error) => {
+      const host = backdrop.querySelector('[data-activity]');
+      if (host) host.innerHTML = `<div class="admin-history-empty">${escapeHtml(error instanceof Error ? error.message : 'Не удалось загрузить активность')}</div>`;
+    });
 }
 
 function capabilityEditor(capability, resolved) {
