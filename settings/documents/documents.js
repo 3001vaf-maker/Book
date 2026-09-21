@@ -1,4 +1,5 @@
 import { actionBlock, button, escapeHtml, field, folderList, iconButton, initViewNavigation, list, modal, mountModal, page, pageHeader, shortDateTime, textareaField, viewNavigation } from '../../ui/ui.js';
+import { downloadRknGuide } from '../../first-run/api.js';
 import { phonesMatch } from '../../core/phone/index.js';
 import { getAllPeople } from '../../main/people/data.js';
 import { createDocument, getDocuments, saveDocument } from './data.js';
@@ -17,6 +18,11 @@ function statusText(item) {
   if (!item.personConsent) return 'Документ';
   return item.required ? 'Обязательное согласие' : 'Необязательное согласие';
 }
+
+function isRknGuide(item) {
+  return item?.attachment?.type === 'RKN_GUIDE_PDF';
+}
+
 
 function actionText(action) {
   if (action === 'created') return 'Создан';
@@ -87,6 +93,7 @@ function rootMarkup() {
     pageHeader('Документы'),
     folderList([
       { title: 'Шаблоны', data: 'data-documents-section="templates"', aria: 'Открыть шаблоны документов' },
+      { title: 'Инструкции', data: 'data-documents-section="guides"', aria: 'Открыть сохранённые инструкции' },
       { title: 'История', data: 'data-documents-section="history"', aria: 'Открыть историю документов' },
     ]),
     actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-documents-back' }))
@@ -94,7 +101,7 @@ function rootMarkup() {
 }
 
 function templatesMarkup() {
-  const documents = getDocuments();
+  const documents = getDocuments().filter((item) => !isRknGuide(item));
   const rows = list({
     items: documents.map((item) => ({
       title: item.title,
@@ -107,6 +114,59 @@ function templatesMarkup() {
 
   return page([
     `<div class="entity-page-header">${pageHeader('Шаблоны')}<div class="page-header-action">${iconButton('+', { className: 'icon-button--primary', data: 'data-add-document', aria: 'Добавить шаблон' })}</div></div>`,
+    rows,
+    actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-documents-root' }))
+  ]);
+}
+
+function openRknGuide(item) {
+  const generatedAt = item?.attachment?.generatedAt || '';
+  const html = `
+    <div class="modal-title">
+      <h2>${escapeHtml(item.title || 'Инструкция РКН')}</h2>
+      <p>PDF · версия ${escapeHtml(item.version || 1)} · ${escapeHtml(formatMoment(generatedAt))}</p>
+    </div>
+    <p style="font-size:18px;line-height:1.55;margin:0 0 18px">Инструкция сохранена в ваших документах. Её можно скачать повторно в любое время.</p>
+    <p class="muted" data-rkn-guide-error></p>
+    <div class="modal-actions">
+      ${button('Скачать PDF', { data: 'data-rkn-guide-download' })}
+      ${button('Закрыть', { className: 'ui-button--secondary', data: 'data-rkn-guide-close' })}
+    </div>`;
+  const layer = mountModal(document.body, modal(html, { title: item.title || 'Инструкция РКН', variant: 'medium', surface: 'app' }));
+  if (!layer) return;
+  layer.querySelector('[data-rkn-guide-close]')?.addEventListener('click', () => layer.remove());
+  layer.querySelector('[data-rkn-guide-download]')?.addEventListener('click', async (event) => {
+    const control = event.currentTarget;
+    const errorNode = layer.querySelector('[data-rkn-guide-error]');
+    control.disabled = true;
+    if (errorNode) errorNode.textContent = '';
+    try {
+      await downloadRknGuide(item.id, item?.attachment?.fileName || 'rkn-guide.pdf');
+    } catch (error) {
+      if (errorNode) errorNode.textContent = error instanceof Error ? error.message : 'Не удалось скачать PDF';
+      control.disabled = false;
+    }
+  });
+}
+
+function guidesMarkup() {
+  const guides = getDocuments()
+    .filter(isRknGuide)
+    .sort((a, b) => Date.parse(b?.attachment?.generatedAt || 0) - Date.parse(a?.attachment?.generatedAt || 0));
+  const rows = guides.length
+    ? list({
+      items: guides.map((item) => ({
+        title: item.title,
+        secondary: [`PDF · версия ${item.version || 1}`, formatMoment(item?.attachment?.generatedAt)],
+        interactive: true,
+        data: `data-rkn-guide-id="${escapeHtml(item.id)}"`,
+        aria: `Открыть сохранённую инструкцию ${item.title}`,
+      })),
+    })
+    : '<div class="empty-state">Сохранённых инструкций пока нет.</div>';
+
+  return page([
+    pageHeader('Инструкции'),
     rows,
     actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-documents-root' }))
   ]);
@@ -213,6 +273,10 @@ function bind(root, navigateBack) {
     const item = getDocuments().find((document) => document.id === row.dataset.documentId);
     if (item) openDocumentEditor(item, () => render(root, navigateBack));
   }));
+  root.querySelectorAll('[data-rkn-guide-id]').forEach((row) => row.addEventListener('click', () => {
+    const item = getDocuments().find((document) => document.id === row.dataset.rknGuideId);
+    if (item) openRknGuide(item);
+  }));
   root.querySelectorAll('[data-signed-document-event]').forEach((row) => row.addEventListener('click', () => {
     const item = getConsents().find((event) => event.id === row.dataset.signedDocumentEvent);
     if (item) openSignedDocument(item);
@@ -232,8 +296,10 @@ function bind(root, navigateBack) {
 export function render(root, navigateBack = () => {}) {
   root.innerHTML = currentSection === 'templates'
     ? templatesMarkup()
-    : currentSection === 'history'
-      ? historyMarkup()
-      : rootMarkup();
+    : currentSection === 'guides'
+      ? guidesMarkup()
+      : currentSection === 'history'
+        ? historyMarkup()
+        : rootMarkup();
   bind(root, navigateBack);
 }
