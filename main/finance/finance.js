@@ -59,8 +59,10 @@ function personText(item) {
 function operationDetails(item) {
   const details = [
     personText(item),
+    item?.sourceDetails || '',
     item?.articleName || '',
     item?.lineName || '',
+    item?.counterparty || '',
     item?.workplace || '',
     walletText(item),
   ].filter(Boolean);
@@ -74,17 +76,15 @@ function operationDetails(item) {
 }
 
 function movementListItem(item) {
-  const cancellable = Boolean(item?.operationId)
-    && item?.operationKind !== 'cancel'
-    && item?.operationStatus !== 'cancelled';
+  const interactive = Boolean(item?.operationId);
   return {
     overline: operationMoment(item),
     title: operationName(item),
     secondary: operationDetails(item),
     right: formatMoney(operationAmount(item), { signed: true }),
-    interactive: cancellable,
-    data: cancellable ? `data-finance-operation="${item.operationId}"` : '',
-    aria: cancellable ? `Открыть финансовую операцию ${operationName(item)}` : '',
+    interactive,
+    data: interactive ? `data-finance-operation="${item.operationId}"` : '',
+    aria: interactive ? `Открыть финансовую операцию ${operationName(item)}` : '',
   };
 }
 
