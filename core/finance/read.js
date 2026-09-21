@@ -66,7 +66,7 @@ export function getLedgerEntries() {
   const state = readFinanceState();
   return state.ledger
     .map((entry) => projectLedgerEntry(state, entry))
-    .sort((a, b) => String(a?.createdAt || '').localeCompare(String(b?.createdAt || '')));
+    .sort((a, b) => String(a?.occurredAt || '').localeCompare(String(b?.occurredAt || '')));
 }
 
 export function getLedgerEntriesForSource(type, id) {
