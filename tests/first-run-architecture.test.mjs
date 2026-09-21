@@ -7,7 +7,6 @@ function source(path) {
 
 const schema = source('server/prisma/schema.prisma');
 const migration = source('server/prisma/migrations/20260921190000_first_run_scenario/migration.sql');
-const accessBackfill = source('server/prisma/migrations/20260921201000_explicit_tenant_access/migration.sql');
 const ownerSeed = source('server/prisma/seed-owner.ts');
 const invitation = source('server/src/tenant-invitation/tenant-invitation.service.ts');
 const firstRun = source('server/src/first-run/first-run.service.ts');
@@ -54,7 +53,10 @@ assert.match(invitation, /commercialMode: 'DEMO'/);
 assert.match(access, /source: 'FIRST_RUN'/);
 assert.match(access, /source: 'DEMO'/);
 assert.match(access, /source: 'DEMO_EXPIRED'/);
+assert.match(access, /source: 'OWNER'/);
 assert.match(access, /firstRunActive/);
+assert.doesNotMatch(access, /LEGACY_COMPAT/);
+assert.doesNotMatch(access, /legacyCompatibilityValue/);
 
 assert.match(runtime, /markFirstRunStepSeen/);
 assert.match(runtime, /completeFirstRunStep/);
@@ -110,12 +112,6 @@ console.log('first-run architecture tests: OK');
 
 assert.match(firstRun, /Состояние рабочего пространства не настроено/);
 assert.doesNotMatch(firstRun, /if \(!access\)[\s\S]{0,400}return true/);
-
-assert.match(accessBackfill, /INSERT INTO "TenantAccess"/);
-assert.match(accessBackfill, /"commercialMode"[\s\S]*'DEMO'[\s\S]*'LIVE'/);
-assert.match(accessBackfill, /"PlatformAdmin"/);
-assert.doesNotMatch(accessBackfill, /DELETE FROM/);
-assert.doesNotMatch(accessBackfill, /TRUNCATE/);
 
 assert.match(ownerSeed, /tenantAccess\.upsert/);
 assert.match(ownerSeed, /isOwnerBook:\s*true/);
