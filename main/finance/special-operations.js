@@ -48,7 +48,7 @@ function openAction(root, action, navigateBack) {
     ${walletFields}
     ${field({ label: 'Сумма', name: 'amount', type: 'number', inputmode: 'decimal', required: true, placeholder: '0', data: 'min="0" step="0.01"' })}
     ${!action.transfer ? field({ label: action.counterparty || 'Контрагент', name: 'counterparty', placeholder: 'Необязательно' }) : ''}
-    ${field({ label: 'Дата и время', name: 'occurredAt', type: 'datetime-local', value: localDateTimeValue(), required: true })}
+    ${field({ label: 'Фактическая дата и время', name: 'occurredAt', type: 'datetime-local', value: localDateTimeValue(), required: true })}
     ${textareaField({ label: 'Примечание', name: 'note', rows: 3, placeholder: 'Необязательно' })}
     ${button('Сохранить', { type: 'submit' })}
   </form>`;
