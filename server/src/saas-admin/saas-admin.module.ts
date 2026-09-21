@@ -9,9 +9,10 @@ import { PlatformAdminGuard } from './platform-admin.guard';
 import { SaasAdminController } from './saas-admin.controller';
 import { SaasAdminService } from './saas-admin.service';
 import { FirstRunModule } from '../first-run/first-run.module';
+import { PlatformNoticeModule } from '../platform-notice/platform-notice.module';
 
 @Module({
-  imports: [AuthModule, SaasAccessModule, TenantInvitationModule, DocumentRegistryModule, TransactionalEmailModule, FirstRunModule],
+  imports: [AuthModule, SaasAccessModule, TenantInvitationModule, DocumentRegistryModule, TransactionalEmailModule, FirstRunModule, PlatformNoticeModule],
   controllers: [SaasAdminController],
   providers: [SaasAdminService, PlatformAdminGuard, PrismaService],
 })
