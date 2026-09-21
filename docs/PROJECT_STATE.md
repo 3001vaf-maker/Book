@@ -129,9 +129,9 @@ The previously queued Auth transactional communication block is paused.
 
 ## Active block — Finance ownership rebuild (2026-09-20)
 
-Release-candidate base: `staging@5562cdc1a110184f2e92dfd39b6ac3ac3d7ad8a9` (PR #246 merged). The docs-only Finance closeout commit created from this base is the exact staging head that must pass the final whole-staging Check Book before `main`.
+Released Finance checkpoint: `main@e55e4e58c0073fab313ec0cc26f46415d2e7a1d7` via PR #247. Final whole-staging Check Book #2000, release PR Check Book #2001 and post-main Check Book #2002 all passed.
 
-Working branch: none — Finance F0-F12 is complete in `staging`; final whole-staging release verification is pending before `main`.
+Working branch: none — Finance F0-F12 is complete and released to `main`.
 
 Continuity anchor: `docs/FINANCE_ARCHITECTURE.md`.
 
@@ -142,9 +142,9 @@ Current status:
 - F3-F5: DONE — merged to `staging` as `b3819f4033424cec502244b667781e004d5796a0`. Record no longer owns payment truth; canonical server `FinanceSettlement`, `FinanceOperation` and flat `FinanceLedgerEntry` own Settlement, operations and factual money rows; payment/refund/cancel are server-owned; split-wallet payment is one Operation with multiple Ledger rows; Wallet/DDS project from Ledger; legacy auxiliary Finance is migration-only. Combined feature Check Book #1989 and post-merge Check Book #1990 both passed all required jobs, including migration, backend, four production domains and staging frontend.
 - F6-F8: DONE — merged to `staging` as `18af1dee4f127e00f720dfd522835b5e2c3e0258` via PR #245. Server-owned hierarchical `FinanceArticle` catalog separates custom names from `direction`/`economicType`; manual Income/Expense writes one FinanceOperation with one or many flat Ledger rows; simple amount and detailed quantity × unit price entry are supported; Wallet/Cash remains metadata-only with balance/history projected from Ledger. Feature Check Book #1993 and post-merge Check Book #1994 both passed all required jobs, including migration, backend, four production domains and staging frontend.
 - F9-F11: DONE — merged to `staging` as `5562cdc1a110184f2e92dfd39b6ac3ac3d7ad8a9` via PR #246. Loans, loan repayments, investments, investment returns and wallet transfers use canonical Operation + Ledger semantics; Z-report is a Ledger-only day/period projection; browser/server cent rounding is aligned; authoritative money writes use Serializable transactions with retry; roundtrip regressions cover stale Record finance, partial/split/tips/refund/cancel/reload; all factual operations separate mandatory `occurredAt` from system `recordedAt`, so late Record closure does not move historical income. Feature Check Book #1996 and post-merge Check Book #1997 both passed all required jobs.
-- F12: DONE ON STAGING — final guards, regression, migration, backend, four production-domain checks and staging frontend all passed in #1996 and #1997. Release to `main` remains blocked until one additional whole-staging Check Book passes on the exact Finance closeout head.
+- F12: DONE AND RELEASED — final guards, regression, migration, backend, four production-domain checks and staging frontend passed in #1996/#1997; final whole-staging Check Book #2000 passed; release PR #247 Check Book #2001 passed; Finance F0-F12 was merged to `main` as `e55e4e58c0073fab313ec0cc26f46415d2e7a1d7`; post-main Check Book #2002 passed.
 - F0-F1 changed documentation only. F2 renamed the operational calculation owner to Settlement. F3-F5 moved payment truth to Settlement + Operation + flat Ledger. F6-F8 added Articles and direct manual Income/Expense on the same Ledger. F9-F11 add special capital operations, Z-report, concurrency/roundtrip alignment and the factual-time/audit-time contract without introducing another money owner.
-- `main` must not receive this rebuild until the exact Finance closeout staging head passes one additional complete Check Book. After that, open `staging -> main`, require its PR checks green, and only then merge.
+- Finance F0-F12 release gate is closed: `main@e55e4e58c0073fab313ec0cc26f46415d2e7a1d7` is the verified release; future Finance changes must start from a new staged work block.
 
 Non-negotiable ownership:
 - Record does not own money movement or payment truth.
