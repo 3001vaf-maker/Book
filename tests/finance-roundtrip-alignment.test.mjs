@@ -178,6 +178,7 @@ assert.equal(getWalletDDSMovements('cash').reduce((sum, row) => sum + Number(row
 const serverFinance = readFileSync(new URL('../server/src/finance/finance.service.ts', import.meta.url), 'utf8');
 const recordServer = readFileSync(new URL('../server/src/record/record.service.ts', import.meta.url), 'utf8');
 const financeData = readFileSync(new URL('../core/finance/data.js', import.meta.url), 'utf8');
+const financeService = readFileSync(new URL('../core/finance/service.js', import.meta.url), 'utf8');
 const financeRead = readFileSync(new URL('../core/finance/read.js', import.meta.url), 'utf8');
 const financeUi = readFileSync(new URL('../main/finance/finance.js', import.meta.url), 'utf8');
 const paymentUi = readFileSync(new URL('../journal/record-payment.js', import.meta.url), 'utf8');
@@ -199,5 +200,10 @@ assert.match(paymentUi, /record\?\.to \|\| record\?\.from/);
 assert.match(paymentUi, /paymentOccurredAt/);
 assert.match(paymentUi, /refundOccurredAt/);
 assert.match(paymentUi, /cancelOccurredAt/);
+assert.match(financeService, /saveSettlementSnapshot\(\{ source = null, settlement = null \} = \{\}\)[\s\S]*if \(!source\?\.type \|\| !source\?\.id \|\| !settlement\) return null/);
+assert.match(financeService, /recordPaymentIncome\([\s\S]*!settlement \|\| !occurredAt/);
+assert.match(financeService, /cancelPaymentOperation\([\s\S]*!id \|\| !occurredAt/);
+assert.match(financeService, /recordRefundExpense\([\s\S]*!id \|\| !walletId \|\| !occurredAt/);
+assert.doesNotMatch(serverFinance, /dateValue\(input\.occurredAt/);
 
 console.log('finance roundtrip alignment tests: OK');
