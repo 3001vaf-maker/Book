@@ -28,4 +28,4 @@ export {
   resolveRecordSettlement,
 } from './settlement.js';
 export { hydrateFinanceFromServer } from './data.js';
-export { cancelPaymentOperation, recordPaymentIncome, recordRefundExpense, refreshFinanceState, saveSettlementSnapshot } from './service.js';
+export { archiveFinanceArticle, cancelPaymentOperation, createFinanceArticle, recordManualFinanceOperation, recordPaymentIncome, recordRefundExpense, refreshFinanceState, saveSettlementSnapshot, updateFinanceArticle } from './service.js';
