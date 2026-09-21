@@ -342,7 +342,8 @@ function renderTenants() {
         await adminRequest(`/invitations/${encodeURIComponent(button.dataset.resend)}/resend`, { method: 'POST' });
         button.textContent = 'Отправлено';
       } catch (error) {
-        alert(error instanceof Error ? error.message : 'Не удалось отправить письмо');
+        message.textContent = error instanceof Error ? error.message : 'Не удалось отправить письмо';
+        message.classList.add('error');
         button.disabled = false;
       }
     });
