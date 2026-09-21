@@ -40,6 +40,12 @@ function requireServerReady() {
   if (!serverReady) throw new Error('Profile + Workplaces ещё не готовы к серверной записи');
 }
 
+function notifyWorkplacesChanged(detail = {}) {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('book:workplaces-changed', { detail }));
+  window.dispatchEvent(new CustomEvent('book:time-usage-changed', { detail }));
+}
+
 async function responseJson(response, fallbackMessage) {
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload?.message || fallbackMessage);
@@ -83,6 +89,7 @@ export async function saveWorkplaces(values) {
     const payload = await responseJson(response, 'Не удалось сохранить рабочее место');
     hydrateWorkplacesFromServer(payload.workplaces);
   }
+  notifyWorkplacesChanged({ action: 'workplaces-saved' });
   return getWorkplaces();
 }
 
@@ -96,6 +103,7 @@ export async function upsertWorkplace(workplace) {
   });
   const payload = await responseJson(response, 'Не удалось сохранить рабочее место');
   hydrateWorkplacesFromServer(payload.workplaces);
+  notifyWorkplacesChanged({ action: 'workplace-saved', workplaceId: item.key });
   return getWorkplaces().find((value) => value.key === item.key) || null;
 }
 
@@ -107,5 +115,6 @@ export async function deleteWorkplace(key) {
   if (response.status === 404) return false;
   const payload = await responseJson(response, 'Не удалось удалить рабочее место');
   hydrateWorkplacesFromServer(payload.workplaces);
+  notifyWorkplacesChanged({ action: 'workplace-deleted', workplaceId: target });
   return true;
 }
