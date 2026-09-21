@@ -84,8 +84,12 @@ async function saveManual(root, modalRoot, direction, navigateBack) {
     amount: mode === 'simple' ? Number(data.get('amount') || 0) : null,
     lines: mode === 'detail' ? collectLines(modalRoot) : [],
     note: String(data.get('note') || '').trim(),
-    occurredAt: data.get('occurredAt') ? new Date(String(data.get('occurredAt'))).toISOString() : new Date().toISOString(),
+    occurredAt: data.get('occurredAt') ? new Date(String(data.get('occurredAt'))).toISOString() : '',
   };
+  if (!payload.occurredAt) {
+    openNotice({ message: 'Укажите фактическую дату и время операции.' });
+    return;
+  }
   try {
     await recordManualFinanceOperation(payload);
     modalRoot.remove();
