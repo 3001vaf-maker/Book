@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { TenantInvitationService } from '../tenant-invitation/tenant-invitation.service';
@@ -64,6 +64,11 @@ export class SaasAdminController {
   @Post('invitations/:id/resend')
   resendInvitation(@Req() request: AdminRequest, @Param('id') id: string) {
     return this.invitations.resendInvitation(request.platformAdminId!, id);
+  }
+
+  @Delete('invitations/:id')
+  deleteInvitation(@Req() request: AdminRequest, @Param('id') id: string) {
+    return this.invitations.deleteUnregisteredInvitation(request.platformAdminId!, id);
   }
 
   @Post('tenants/:tenantId/technical-email')
