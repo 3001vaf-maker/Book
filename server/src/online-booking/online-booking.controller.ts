@@ -2,6 +2,7 @@ import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Put, Q
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CommunicationService } from '../communication/communication.service';
+import { AccountDocumentService } from '../document-registry/account-document.service';
 import { NotificationService } from '../notification/notification.service';
 import { WebPushService } from '../notification/web-push.service';
 import { AccountGuard } from './account.guard';
@@ -16,6 +17,7 @@ type AccountRequest = Request & { accountAuth?: { accountId: string; tenantId: s
 export class OnlineBookingController {
   constructor(
     private readonly booking: OnlineBookingService,
+    private readonly accountDocuments: AccountDocumentService,
     private readonly notifications: NotificationService,
     private readonly communications: CommunicationService,
     private readonly webPush: WebPushService,
@@ -57,6 +59,32 @@ export class OnlineBookingController {
   @Post('owner/reconcile-legacy-people')
   reconcileLegacyPeople(@Req() request: OwnerRequest) {
     return this.personIdentity.reconcileLegacyAccountDuplicates(request.auth!.tenantId);
+  }
+
+  @Get('account-terms')
+  accountTerms() {
+    return this.accountDocuments.publicTerms();
+  }
+
+  @UseGuards(AccountGuard)
+  @Get(':tenantId/account/platform-state')
+  accountPlatformState(@Req() request: AccountRequest) {
+    return this.accountDocuments.state(request.accountAuth!.accountId);
+  }
+
+  @UseGuards(AccountGuard)
+  @Post(':tenantId/account/platform-terms')
+  acceptAccountTerms(
+    @Param('tenantId') tenantId: string,
+    @Req() request: AccountRequest,
+    @Body() body: { accountTerms?: unknown },
+  ) {
+    return this.accountDocuments.accept(
+      request.accountAuth!.accountId,
+      body?.accountTerms,
+      'online-booking-account',
+      { tenantContext: tenantId },
+    );
   }
 
   @Get(':tenantId/context')
