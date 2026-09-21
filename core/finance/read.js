@@ -26,7 +26,7 @@ export function getDDSExpenses() {
 export function getDDSMovements() {
   const state = readFinanceState();
   return [...state.income, ...state.expense]
-    .sort((a, b) => String(a?.createdAt || '').localeCompare(String(b?.createdAt || '')));
+    .sort((a, b) => String(a?.occurredAt || '').localeCompare(String(b?.occurredAt || '')));
 }
 
 export function getDDSMovementsForSource(type, id) {
@@ -54,7 +54,8 @@ function projectLedgerEntry(state, entry) {
     ledgerType: entry?.economicType || operation?.kind || 'ledger',
     movementType: entry?.direction === 'OUT' ? 'expense' : 'income',
     total: entry?.direction === 'OUT' ? -amount : amount,
-    createdAt: entry?.occurredAt || operation?.occurredAt || '',
+    occurredAt: entry?.occurredAt || operation?.occurredAt || '',
+    recordedAt: entry?.recordedAt || operation?.recordedAt || '',
     person: data?.person || null,
     workplace: data?.workplace || '',
     source: entry?.source || operation?.source || null,
@@ -112,7 +113,7 @@ export function getZReport({ from = null, to = null } = {}) {
   const fromMs = reportBoundary(from, Number.NEGATIVE_INFINITY);
   const toMs = reportBoundary(to, Number.POSITIVE_INFINITY);
   const entries = getLedgerEntries().filter((entry) => {
-    const time = new Date(String(entry?.createdAt || entry?.occurredAt || '')).getTime();
+    const time = new Date(String(entry?.occurredAt || '')).getTime();
     if (!Number.isFinite(time) || time < fromMs || time > toMs) return false;
     if (entry?.operationStatus === 'cancelled') return false;
     if (entry?.economicType === 'REVERSAL') return false;
