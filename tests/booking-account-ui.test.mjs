@@ -26,7 +26,7 @@ const accountThemeCss = fs.readFileSync('ui/shell/account-theme.css', 'utf8');
 const indexHtml = fs.readFileSync('index.html', 'utf8');
 const bookingUi = fs.readFileSync('ui/booking/index.js', 'utf8');
 
-// Registration owns agreements. Booking starts only after account resolution.
+// Public booking selection comes first. Identity/legal checks happen only after time selection.
 assert.match(booking, /renderAccount/);
 assert.match(booking, /appHeader\(\{ title, back, action \}\)/);
 assert.match(booking, /appShell\(\{/);
@@ -43,10 +43,10 @@ assert.match(booking, /function renderDates/);
 assert.match(booking, /function renderTimes/);
 assert.match(booking, /function renderConfirmation/);
 assert.match(booking, /subtitle: 'Согласия относятся к регистрации и аккаунту'/);
-assert.match(booking, /if \(prepared\.exists\) renderPassword\(root, state\);/);
-assert.match(booking, /else renderAccountDetails\(root, state\);/);
-assert.match(booking, /if \(payload\.personExisted\)/);
-assert.match(booking, /nextBookingStep\(root, state\)/);
+assert.match(booking, /state\.identityDestination = 'booking';[\s\S]*?nextBookingStep\(root, state\)/);
+assert.match(booking, /if \(prepared\.exists\) \{[\s\S]*?renderPassword\(root, state\);[\s\S]*?state\.registrationMode = 'initial';[\s\S]*?renderRegistrationAgreements\(root, state\);/);
+assert.doesNotMatch(booking, /if \(payload\.personExisted\)/);
+assert.match(booking, /void continueAfterIdentity\(root, state\)/);
 assert.match(booking, /saveRegistrationConsents\(state\)/);
 assert.match(booking, /submitAccountConsents\(state\.tenantId, consents\)/);
 assert.match(booking, /data-booking-workplaces-back[\s\S]*?backFromFirstBookingStep\(root, state\)/);
@@ -64,9 +64,12 @@ assert.doesNotMatch(booking, /personalDataAccordion/);
 assert.doesNotMatch(booking, /type:\s*'date'/);
 assert.match(booking, /getAccountConsentState/);
 assert.match(booking, /async function refreshAccountConsentState/);
-assert.match(booking, /if \(consentState\.pdnActive\) \{[\s\S]*?nextBookingStep\(root, state\)/);
+assert.match(booking, /async function continueAfterIdentity/);
+assert.match(booking, /if \(!state\.account\) \{[\s\S]*?renderAccountEntry\(root, state\);/);
+assert.match(booking, /if \(consentState\.pdnActive\) \{[\s\S]*?renderConfirmation\(root, state\);/);
 assert.doesNotMatch(booking, /consentState\.allowed/);
 assert.match(booking, /state\.registrationMode = 'repair'/);
+assert.match(booking, /const account = await getAccount\(state\.tenantId\);[\s\S]*?if \(account\) state\.account = account;[\s\S]*?renderWelcome\(root, state\);/);
 
 // Account stays on canonical shared primitives.
 assert.match(accountShell, /entityCard\(\{/);
