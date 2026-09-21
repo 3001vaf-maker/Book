@@ -386,6 +386,17 @@ export class OnlineBookingService {
     };
   }
 
+  async resumeAccount(tenantId: string, accountId: string) {
+    const account = await this.prisma.account.findUnique({ where: { id: accountId } });
+    if (!account) throw new UnauthorizedException('Аккаунт не найден');
+    const binding = await this.personIdentity.bindFirstAccess(tenantId, account as any);
+    return {
+      accessToken: await this.issueAccountToken(account),
+      account: await this.accountView(tenantId, account),
+      personExisted: binding.personExisted,
+    };
+  }
+
   async getAccount(tenantId: string, accountId: string) {
     const account = await this.prisma.account.findUnique({ where: { id: accountId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
