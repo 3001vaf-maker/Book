@@ -749,6 +749,73 @@ export class FirstRunService {
     return { id: event.id, occurredAt: event.occurredAt.toISOString() };
   }
 
+  async requestLive(tenantId: string, platformAccountId: string) {
+    const access = await this.prisma.tenantAccess.findUnique({ where: { tenantId } });
+    if (!access) throw new NotFoundException('Рабочее пространство не найдено');
+    if (access.commercialMode === 'LIVE') {
+      return { requested: false, alreadyLive: true };
+    }
+
+    const recent = await this.prisma.platformActivityEvent.findFirst({
+      where: {
+        tenantId,
+        platformAccountId,
+        eventType: 'LIVE_REQUESTED',
+        occurredAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+      },
+      orderBy: { occurredAt: 'desc' },
+    });
+    if (recent) return { requested: true, duplicate: true, occurredAt: recent.occurredAt.toISOString() };
+
+    const event = await this.prisma.platformActivityEvent.create({
+      data: {
+        tenantId,
+        platformAccountId,
+        eventType: 'LIVE_REQUESTED',
+        metadata: json({
+          firstRunStatus: (await this.prisma.firstRunProgress.findUnique({
+            where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
+            select: { status: true, currentStepKey: true },
+          })) || null,
+        }),
+        occurredAt: new Date(),
+      },
+    });
+    return { requested: true, occurredAt: event.occurredAt.toISOString() };
+  }
+
+  async requestDemoExtension(tenantId: string, platformAccountId: string) {
+    const access = await this.prisma.tenantAccess.findUnique({ where: { tenantId } });
+    if (!access) throw new NotFoundException('Рабочее пространство не найдено');
+    if (access.commercialMode === 'LIVE') {
+      throw new ConflictException('Продление DEMO не требуется в режиме LIVE');
+    }
+
+    const recent = await this.prisma.platformActivityEvent.findFirst({
+      where: {
+        tenantId,
+        platformAccountId,
+        eventType: 'DEMO_EXTENSION_REQUESTED',
+        occurredAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+      },
+      orderBy: { occurredAt: 'desc' },
+    });
+    if (recent) return { requested: true, duplicate: true, occurredAt: recent.occurredAt.toISOString() };
+
+    const event = await this.prisma.platformActivityEvent.create({
+      data: {
+        tenantId,
+        platformAccountId,
+        eventType: 'DEMO_EXTENSION_REQUESTED',
+        metadata: json({
+          demoExpiresAt: access.demoExpiresAt?.toISOString() || '',
+        }),
+        occurredAt: new Date(),
+      },
+    });
+    return { requested: true, occurredAt: event.occurredAt.toISOString() };
+  }
+
   async assertRealOperationsAllowed(tenantId: string) {
     const [access, progress] = await Promise.all([
       this.prisma.tenantAccess.findUnique({ where: { tenantId } }),
