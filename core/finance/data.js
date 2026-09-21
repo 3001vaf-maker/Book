@@ -1,6 +1,6 @@
 // Browser Finance read cache only.
 // Canonical persistence is server FinanceSettlement + FinanceOperation + FinanceLedgerEntry.
-const VERSION = 6;
+const VERSION = 7;
 let financeState = emptyState();
 
 function numberValue(value) {
@@ -18,7 +18,7 @@ function clone(value) {
 }
 
 function emptyState() {
-  return { version: VERSION, settlements: [], operations: [], ledger: [], income: [], expense: [] };
+  return { version: VERSION, articles: [], settlements: [], operations: [], ledger: [], income: [], expense: [] };
 }
 
 function normalizeSettlementSnapshot(value = null) {
@@ -110,6 +110,12 @@ function normalizeLedgerEntry(row = {}) {
     source: row?.source && typeof row.source === 'object' ? { ...row.source } : null,
     component: String(row?.component || ''),
     relatedOperationId: String(row?.relatedOperationId || ''),
+    articleId: String(row?.articleId || ''),
+    articleName: String(row?.articleName || ''),
+    lineName: String(row?.lineName || ''),
+    quantity: row?.quantity == null ? null : numberValue(row.quantity),
+    unitPrice: row?.unitPrice == null ? null : Math.max(0, numberValue(row.unitPrice)),
+    note: String(row?.note || ''),
   };
 }
 
@@ -128,6 +134,16 @@ function normalizedState(value) {
   }
   return {
     version: VERSION,
+    articles: (Array.isArray(value.articles) ? value.articles : []).map((row) => ({
+      articleId: String(row?.articleId || ''),
+      parentArticleId: String(row?.parentArticleId || ''),
+      name: String(row?.name || ''),
+      direction: String(row?.direction || ''),
+      economicType: String(row?.economicType || ''),
+      systemKey: String(row?.systemKey || ''),
+      position: Number(row?.position) || 0,
+      archivedAt: String(row?.archivedAt || ''),
+    })).filter((row) => row.articleId && row.name),
     settlements: (Array.isArray(value.settlements) ? value.settlements : []).map(normalizeSettlementRow).filter(Boolean),
     operations: (Array.isArray(value.operations) ? value.operations : []).map(normalizeOperation),
     ledger: (Array.isArray(value.ledger) ? value.ledger : []).map(normalizeLedgerEntry),
@@ -154,4 +170,9 @@ export function getStoredSettlement(type, id) {
   const key = `${String(type || '')}:${String(id || '')}`;
   const row = financeState.settlements.find((item) => sourceKey(item?.source) === key);
   return row?.settlement ? clone(row.settlement) : null;
+}
+
+
+export function getFinanceArticles() {
+  return clone(financeState.articles || []);
 }
