@@ -20,6 +20,7 @@ import { renderOnlineBooking } from './online-booking/booking.js';
 import { startAccountRuntime } from './online-booking/account-runtime.js';
 import { bottomNavigation } from './ui/ui.js';
 import { clearLegacyBusinessStorage } from './core/legacy-browser-business.js';
+import { FirstRunRuntime, demoBadgeMarkup, startPlatformSessionTracking } from './first-run/runtime.js';
 
 configureWorkplaceSource(getWorkplaceEntities);
 configureTimeUsageSource(getJournalTimeUsages);
@@ -45,6 +46,9 @@ let disposeView = () => {};
 let workspaceReady = false;
 let authenticatedAccount = null;
 let serverBookingSyncStarted = false;
+let firstRunRuntime = null;
+let firstRunState = null;
+let disposePlatformSession = () => {};
 
 function syncViewport() {
   const vv = window.visualViewport;
@@ -119,6 +123,11 @@ function renderWorkspace() {
   app.querySelectorAll('[data-nav]').forEach((button) => {
     button.addEventListener('click', () => navigate(button.dataset.nav));
   });
+  if (firstRunState?.progress?.status === 'COMPLETED') {
+    const badge = demoBadgeMarkup(firstRunState);
+    if (badge) app.insertAdjacentHTML('beforeend', badge);
+  }
+  firstRunRuntime?.afterWorkspaceRender();
   syncViewport();
 }
 
@@ -131,7 +140,7 @@ function renderMigrationPending() {
     <main class="auth-view">
       <section class="auth-card">
         <div class="auth-card__heading">
-          <h1>Book</h1>
+          <h1>Подготовка рабочего пространства</h1>
           <p>Сервер ожидает безопасный перенос данных из основного браузера. Текущие данные не изменены.</p>
         </div>
       </section>
@@ -148,12 +157,39 @@ function renderSuspended() {
     <main class="auth-view">
       <section class="auth-card">
         <div class="auth-card__heading">
-          <h1>Book временно недоступен</h1>
+          <h1>Рабочее пространство временно недоступно</h1>
           <p>Доступ к этому рабочему пространству приостановлен владельцем платформы.</p>
         </div>
       </section>
     </main>`;
   syncViewport();
+}
+
+
+function renderDemoExpired(firstRun) {
+  app.classList.remove('app-shell--booking');
+  workspaceReady = false;
+  disposeView();
+  disposeView = () => {};
+  const expiresAt = firstRun?.demo?.expiresAt
+    ? new Intl.DateTimeFormat('ru-RU', { dateStyle: 'long', timeStyle: 'short' }).format(new Date(firstRun.demo.expiresAt))
+    : '';
+  app.innerHTML = `
+    <main class="first-run-expired">
+      <section class="first-run-expired__card">
+        <h1>Срок DEMO завершён</h1>
+        <p>Данные и настройки сохранены. Вы можете обратиться в компанию для продления DEMO по её усмотрению или перейти к реальной работе.</p>
+        ${expiresAt ? `<p style="margin-top:12px">DEMO завершено: ${expiresAt}</p>` : ''}
+      </section>
+    </main>`;
+  syncViewport();
+}
+
+function showGuidedWorkspace(section) {
+  workspaceReady = true;
+  state.activeSection = sectionAllowed(section) ? section : defaultSection();
+  history.replaceState({}, '', `#${state.activeSection}`);
+  renderWorkspace();
 }
 
 async function renderAuthenticated(account = authenticatedAccount) {
@@ -191,6 +227,60 @@ async function renderAuthenticated(account = authenticatedAccount) {
   }
   ensureServerBookingSync();
 
+  firstRunRuntime?.dispose();
+  firstRunRuntime = null;
+  disposePlatformSession();
+  disposePlatformSession = () => {};
+
+  const candidateRuntime = new FirstRunRuntime({
+    app,
+    accountEmail: authenticatedAccount?.account?.email || '',
+    getActiveSection: () => state.activeSection,
+    showWorkspace: showGuidedWorkspace,
+    onStateChange: (nextState) => { firstRunState = nextState; },
+    onFinished: (nextState) => {
+      firstRunState = nextState || firstRunState;
+      state.activeSection = defaultSection();
+      history.replaceState({}, '', `#${state.activeSection}`);
+      renderWorkspace();
+    },
+  });
+
+  try {
+    firstRunState = await candidateRuntime.load();
+  } catch {
+    firstRunState = null;
+  }
+
+  if (firstRunState?.assigned) {
+    if (firstRunState.commercialMode === 'DEMO' && firstRunState.demo?.expired) {
+      candidateRuntime.dispose();
+      disposePlatformSession = await startPlatformSessionTracking();
+      renderDemoExpired(firstRunState);
+      return;
+    }
+
+    if (firstRunState.progress?.status === 'IN_PROGRESS') {
+      firstRunRuntime = candidateRuntime;
+      workspaceReady = false;
+      history.replaceState({}, '', location.pathname);
+      await firstRunRuntime.start();
+      syncViewport();
+      return;
+    }
+
+    candidateRuntime.dispose();
+    disposePlatformSession = await startPlatformSessionTracking();
+    const requested = location.hash.slice(1);
+    state.activeSection = sectionAllowed(requested) ? requested : defaultSection();
+    history.replaceState({}, '', `#${state.activeSection}`);
+    renderWorkspace();
+    return;
+  }
+
+  candidateRuntime.dispose();
+  disposePlatformSession = await startPlatformSessionTracking();
+
   const serverWorkspaceUnlocked = Boolean(authenticatedAccount?.account?.workspaceUnlocked);
   if (!serverWorkspaceUnlocked && !isOnboardingComplete()) {
     workspaceReady = false;
@@ -222,8 +312,8 @@ function renderLogin(message = '') {
     <main class="auth-view">
       <section class="auth-card" aria-labelledby="auth-title">
         <div class="auth-card__heading">
-          <h1>Book</h1>
-          <p>Вход в рабочее пространство</p>
+          <h1>Рабочее пространство</h1>
+          <p>Вход в систему</p>
         </div>
         <form class="auth-form" id="auth-form">
           <label class="field">
