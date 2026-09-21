@@ -357,6 +357,33 @@ export class TenantInvitationService {
     return this.invitationDto(updated);
   }
 
+  async deleteUnregisteredInvitation(adminId: string, invitationId: string) {
+    const invitation = await this.prisma.tenantInvitation.findUnique({
+      where: { id: invitationId },
+      include: {
+        tenant: {
+          include: {
+            memberships: { select: { id: true }, take: 1 },
+            profiles: { select: { id: true }, take: 1 },
+          },
+        },
+      },
+    });
+    if (!invitation || invitation.createdByAdminId !== adminId) {
+      throw new NotFoundException('Приглашение не найдено');
+    }
+    if (invitation.status === TenantInvitationStatus.ACCEPTED) {
+      throw new ConflictException('Зарегистрированного пользователя нельзя удалить этим действием');
+    }
+    if (invitation.tenant.memberships.length || invitation.tenant.profiles.length) {
+      throw new ConflictException('У этого рабочего пространства уже есть зарегистрированные данные');
+    }
+
+    await this.prisma.tenant.delete({ where: { id: invitation.tenantId } });
+
+    return { deleted: true, invitationId, tenantId: invitation.tenantId };
+  }
+
   async inspect(tokenValue: unknown) {
     const invitation = await this.findActiveInvitation(String(tokenValue || ''));
     const activation = await this.firstRun.activateInvitation(invitation.id, invitation.tenantId);
