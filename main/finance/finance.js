@@ -15,9 +15,14 @@ function formatMoney(value = 0, { signed = false } = {}) {
 }
 
 function operationMoment(item) {
-  const raw = item?.refundedAt || item?.paidAt || item?.createdAt || '';
+  const raw = item?.occurredAt || item?.refundedAt || item?.paidAt || '';
   const fallback = `${item?.date || ''} ${item?.time || ''}`.trim();
   return shortDateTime(raw, fallback);
+}
+
+function recordedMoment(item) {
+  const raw = item?.recordedAt || '';
+  return raw ? shortDateTime(raw, '') : '';
 }
 
 function operationName(item) {
@@ -63,6 +68,8 @@ function operationDetails(item) {
   if (item?.quantity != null && item?.unitPrice != null && Number(item.quantity) !== 1) {
     details.push(`${item.quantity} × ${formatMoney(item.unitPrice)}`);
   }
+  const recorded = recordedMoment(item);
+  if (recorded) details.push(`Внесено ${recorded}`);
   return details.join(' · ');
 }
 
@@ -81,9 +88,10 @@ function csvCell(value) {
 }
 
 function downloadDDS(movements) {
-  const headers = ['Дата и время', 'Операция', 'Статья', 'Позиция', 'Человек', 'Рабочее место', 'Кошелёк', 'Сумма', 'Статус', 'Чаевые'];
+  const headers = ['Фактическая дата и время', 'Внесено в Book', 'Операция', 'Статья', 'Позиция', 'Человек', 'Рабочее место', 'Кошелёк', 'Сумма', 'Статус', 'Чаевые'];
   const rows = movements.map((item) => [
     operationMoment(item),
+    recordedMoment(item),
     operationName(item).replace(' · Отменена', ''),
     item?.articleName || '',
     item?.lineName || '',
