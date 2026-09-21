@@ -771,6 +771,11 @@ export class FirstRunService {
     });
   }
 
+  async ensureAdminDraft() {
+    await this.ensureDraft();
+    return this.adminScenario();
+  }
+
   async adminScenario() {
     const scenario = await this.prisma.firstRunScenario.findUnique({ where: { key: SCENARIO_KEY } });
     if (!scenario) throw new NotFoundException('Сценарий не найден');
@@ -789,6 +794,21 @@ export class FirstRunService {
         status: item.status,
         publishedAt: item.publishedAt?.toISOString() || '',
         createdAt: item.createdAt.toISOString(),
+        steps: item.steps.map((step) => ({
+          key: step.key,
+          position: step.position,
+          kind: step.kind,
+          title: step.title,
+          modalTitle: step.modalTitle,
+          modalBody: step.modalBody,
+          primaryLabel: step.primaryLabel,
+          skipLabel: step.skipLabel,
+          route: step.route,
+          target: step.target,
+          completionKey: step.completionKey,
+          metadata: step.metadata,
+          isActive: step.isActive,
+        })),
       })),
     };
   }
