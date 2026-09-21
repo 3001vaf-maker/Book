@@ -32,11 +32,18 @@ function renderRow(wallet) {
 }
 
 function renderPaymentRow(payment) {
-  const isRefund = payment?.ledgerType === 'refund' || payment?.expenseType === 'refund';
+  const direction = String(payment?.direction || '');
+  const economicType = String(payment?.economicType || '');
+  let title = direction === 'OUT' ? 'Расход' : 'Доход';
+  if (economicType === 'SERVICE_REVENUE') title = 'Оплата услуги';
+  else if (economicType === 'SERVICE_REFUND' || economicType === 'TIPS_REFUND') title = 'Возврат';
+  else if (economicType === 'TIPS') title = 'Чаевые';
+  else if (payment?.articleName) title = payment.articleName;
+  const amount = Number(payment?.total) || 0;
   return listEntry({
-    title: isRefund ? 'Возврат' : 'Оплата',
-    subtitle: operationMoment(payment),
-    rightTop: formatMoney(payment?.total),
+    title,
+    subtitle: [payment?.lineName || '', operationMoment(payment)].filter(Boolean).join(' · '),
+    rightTop: formatMoney(amount),
     initial: '₽',
     interactive: false,
   });

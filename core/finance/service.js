@@ -42,6 +42,67 @@ export async function saveSettlementSnapshot({ source = null, settlement = null 
   return state.settlements?.find((item) => sourceMatch(item, source))?.settlement || settlement;
 }
 
+export async function createFinanceArticle(payload = {}) {
+  const response = await apiRequest('/finance/articles', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  const state = await applyServerState(response, 'Не удалось создать статью');
+  notifyFinanceChanged({ action: 'article-created' });
+  return state;
+}
+
+export async function updateFinanceArticle(articleId, payload = {}) {
+  const id = String(articleId || '');
+  if (!id) return null;
+  const response = await apiRequest(`/finance/articles/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+  const state = await applyServerState(response, 'Не удалось изменить статью');
+  notifyFinanceChanged({ action: 'article-updated', articleId: id });
+  return state;
+}
+
+export async function archiveFinanceArticle(articleId) {
+  const id = String(articleId || '');
+  if (!id) return null;
+  const response = await apiRequest(`/finance/articles/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+  const state = await applyServerState(response, 'Не удалось удалить статью');
+  notifyFinanceChanged({ action: 'article-archived', articleId: id });
+  return state;
+}
+
+export async function recordManualFinanceOperation({
+  direction = '',
+  articleId = '',
+  walletId = '',
+  walletName = '',
+  amount = null,
+  lines = [],
+  note = '',
+  occurredAt = new Date(),
+} = {}) {
+  const response = await apiRequest('/finance/operations/manual', {
+    method: 'POST',
+    body: JSON.stringify({
+      direction,
+      articleId,
+      walletId,
+      walletName,
+      amount,
+      lines,
+      note,
+      occurredAt: occurredAt instanceof Date ? occurredAt.toISOString() : occurredAt,
+    }),
+  });
+  const state = await applyServerState(response, 'Не удалось сохранить доход или расход');
+  notifyFinanceChanged({ action: 'manual-operation', direction });
+  return state;
+}
+
 export async function recordPaymentIncome({
   source = null,
   workplace = '',

@@ -105,6 +105,41 @@ function allocationsValue(value: unknown) {
     .filter((entry) => entry.walletId && entry.amount > 0);
 }
 
+const DEFAULT_FINANCE_ARTICLES = [
+  { articleId: 'system-income', parentArticleId: '', name: 'Доходы', direction: 'IN', economicType: 'GROUP', systemKey: 'INCOME_ROOT', position: 10 },
+  { articleId: 'system-service-revenue', parentArticleId: 'system-income', name: 'Услуги', direction: 'IN', economicType: 'OPERATING_REVENUE', systemKey: 'SERVICE_REVENUE', position: 20 },
+  { articleId: 'system-product-revenue', parentArticleId: 'system-income', name: 'Продажа товаров', direction: 'IN', economicType: 'PRODUCT_REVENUE', systemKey: 'PRODUCT_REVENUE', position: 30 },
+  { articleId: 'system-other-income', parentArticleId: 'system-income', name: 'Прочие доходы', direction: 'IN', economicType: 'OPERATING_REVENUE', systemKey: 'OTHER_INCOME', position: 40 },
+  { articleId: 'system-tips', parentArticleId: 'system-income', name: 'Чаевые', direction: 'IN', economicType: 'TIPS', systemKey: 'TIPS', position: 50 },
+  { articleId: 'system-loan-received', parentArticleId: 'system-income', name: 'Займ', direction: 'IN', economicType: 'LOAN_RECEIVED', systemKey: 'LOAN_RECEIVED', position: 60 },
+  { articleId: 'system-investment-received', parentArticleId: 'system-income', name: 'Инвестиции', direction: 'IN', economicType: 'INVESTMENT_RECEIVED', systemKey: 'INVESTMENT_RECEIVED', position: 70 },
+  { articleId: 'system-expense', parentArticleId: '', name: 'Расходы', direction: 'OUT', economicType: 'GROUP', systemKey: 'EXPENSE_ROOT', position: 100 },
+  { articleId: 'system-materials', parentArticleId: 'system-expense', name: 'Материалы', direction: 'OUT', economicType: 'OPERATING_EXPENSE', systemKey: 'MATERIALS', position: 110 },
+  { articleId: 'system-rent', parentArticleId: 'system-expense', name: 'Аренда', direction: 'OUT', economicType: 'OPERATING_EXPENSE', systemKey: 'RENT', position: 120 },
+  { articleId: 'system-tax', parentArticleId: 'system-expense', name: 'Налог', direction: 'OUT', economicType: 'TAX', systemKey: 'TAX', position: 130 },
+  { articleId: 'system-other-expense', parentArticleId: 'system-expense', name: 'Прочие расходы', direction: 'OUT', economicType: 'OPERATING_EXPENSE', systemKey: 'OTHER_EXPENSE', position: 140 },
+  { articleId: 'system-refund', parentArticleId: 'system-expense', name: 'Возврат', direction: 'OUT', economicType: 'REFUND', systemKey: 'REFUND', position: 150 },
+  { articleId: 'system-loan-repayment', parentArticleId: 'system-expense', name: 'Возврат займа', direction: 'OUT', economicType: 'LOAN_REPAYMENT', systemKey: 'LOAN_REPAYMENT', position: 160 },
+  { articleId: 'system-investment-return', parentArticleId: 'system-expense', name: 'Возврат инвестиций', direction: 'OUT', economicType: 'INVESTMENT_RETURN', systemKey: 'INVESTMENT_RETURN', position: 170 },
+  { articleId: 'system-transfer', parentArticleId: '', name: 'Перевод между кошельками', direction: 'TRANSFER', economicType: 'TRANSFER', systemKey: 'TRANSFER', position: 200 },
+] as const;
+
+const ARTICLE_DIRECTIONS = new Set(['IN', 'OUT', 'TRANSFER']);
+const ARTICLE_ECONOMIC_TYPES = new Set([
+  'GROUP',
+  'OPERATING_REVENUE',
+  'PRODUCT_REVENUE',
+  'OPERATING_EXPENSE',
+  'TAX',
+  'TIPS',
+  'REFUND',
+  'LOAN_RECEIVED',
+  'LOAN_REPAYMENT',
+  'INVESTMENT_RECEIVED',
+  'INVESTMENT_RETURN',
+  'TRANSFER',
+]);
+
 function splitAllocationComponents(allocations: JsonObject[], serviceAmount: number, tips: number) {
   let serviceLeft = money(serviceAmount);
   let tipsLeft = money(tips);
@@ -322,6 +357,12 @@ export class FinanceService {
             walletName: text(entry.walletName),
             component: text(entry.component),
             relatedOperationId: text(entry.relatedOperationId),
+            articleId: text(entry.articleId),
+            articleName: text(entry.articleName),
+            lineName: text(entry.lineName),
+            quantity: entry.quantity == null ? null : numberValue(entry.quantity),
+            unitPrice: entry.unitPrice == null ? null : money(entry.unitPrice),
+            note: text(entry.note),
           }),
         },
       });
@@ -498,6 +539,222 @@ export class FinanceService {
     });
   }
 
+  private async ensureDefaultArticles(tenantId: string, db: Db = this.prisma) {
+    const existing = await db.financeArticle.findMany({
+      where: { tenantId, systemKey: { not: '' } },
+      select: { systemKey: true },
+    });
+    const keys = new Set(existing.map((row) => row.systemKey));
+    for (const item of DEFAULT_FINANCE_ARTICLES) {
+      if (keys.has(item.systemKey)) continue;
+      await db.financeArticle.create({ data: { tenantId, ...item } });
+    }
+  }
+
+  private articleDto(row: any) {
+    return {
+      articleId: row.articleId,
+      parentArticleId: row.parentArticleId,
+      name: row.name,
+      direction: row.direction,
+      economicType: row.economicType,
+      systemKey: row.systemKey,
+      position: row.position,
+      archivedAt: row.archivedAt ? row.archivedAt.toISOString() : '',
+    };
+  }
+
+  async listArticles(tenantId: string) {
+    await this.ensureDefaultArticles(tenantId);
+    const rows = await this.prisma.financeArticle.findMany({
+      where: { tenantId, archivedAt: null },
+      orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+    });
+    return rows.map((row) => this.articleDto(row));
+  }
+
+  async createArticle(tenantId: string, body: unknown) {
+    await this.ensureDefaultArticles(tenantId);
+    const input = objectValue(body);
+    const name = text(input.name);
+    if (!name) throw new BadRequestException('Введите название статьи');
+    const parentArticleId = text(input.parentArticleId);
+    const parent = parentArticleId
+      ? await this.prisma.financeArticle.findUnique({
+          where: { tenantId_articleId: { tenantId, articleId: parentArticleId } },
+        })
+      : null;
+    if (parentArticleId && (!parent || parent.archivedAt)) throw new BadRequestException('Родительская статья не найдена');
+
+    const direction = text(input.direction || parent?.direction);
+    const economicType = text(input.economicType || parent?.economicType);
+    if (!ARTICLE_DIRECTIONS.has(direction)) throw new BadRequestException('Некорректное направление статьи');
+    if (!ARTICLE_ECONOMIC_TYPES.has(economicType) || economicType === 'GROUP') {
+      throw new BadRequestException('Выберите экономический характер статьи');
+    }
+    if (parent && parent.direction !== direction) throw new BadRequestException('Направление дочерней статьи должно совпадать с родительской');
+
+    const max = await this.prisma.financeArticle.aggregate({ where: { tenantId, parentArticleId }, _max: { position: true } });
+    const row = await this.prisma.financeArticle.create({
+      data: {
+        tenantId,
+        articleId: randomUUID(),
+        parentArticleId,
+        name,
+        direction,
+        economicType,
+        position: (max._max.position || 0) + 10,
+      },
+    });
+    return this.snapshot(tenantId, { skipMigration: true });
+  }
+
+  async updateArticle(tenantId: string, articleId: string, body: unknown) {
+    await this.ensureDefaultArticles(tenantId);
+    const id = text(articleId);
+    const current = await this.prisma.financeArticle.findUnique({
+      where: { tenantId_articleId: { tenantId, articleId: id } },
+    });
+    if (!current || current.archivedAt) throw new NotFoundException('Статья не найдена');
+    const input = objectValue(body);
+    const name = text(input.name || current.name);
+    if (!name) throw new BadRequestException('Введите название статьи');
+    const parentArticleId = input.parentArticleId == null ? current.parentArticleId : text(input.parentArticleId);
+    if (parentArticleId === id) throw new BadRequestException('Статья не может быть родителем самой себе');
+    const parent = parentArticleId
+      ? await this.prisma.financeArticle.findUnique({ where: { tenantId_articleId: { tenantId, articleId: parentArticleId } } })
+      : null;
+    if (parentArticleId && (!parent || parent.archivedAt)) throw new BadRequestException('Родительская статья не найдена');
+    let ancestor = parent;
+    let depthGuard = 0;
+    while (ancestor && depthGuard < 100) {
+      if (ancestor.articleId === id) throw new BadRequestException('Нельзя создать цикл в дереве статей');
+      ancestor = ancestor.parentArticleId
+        ? await this.prisma.financeArticle.findUnique({
+            where: { tenantId_articleId: { tenantId, articleId: ancestor.parentArticleId } },
+          })
+        : null;
+      depthGuard += 1;
+    }
+
+    const direction = current.systemKey ? current.direction : text(input.direction || current.direction);
+    const economicType = current.systemKey ? current.economicType : text(input.economicType || current.economicType);
+    if (!ARTICLE_DIRECTIONS.has(direction) || !ARTICLE_ECONOMIC_TYPES.has(economicType)) {
+      throw new BadRequestException('Некорректный экономический характер статьи');
+    }
+    if (parent && parent.direction !== direction) throw new BadRequestException('Направление дочерней статьи должно совпадать с родительской');
+
+    await this.prisma.financeArticle.update({
+      where: { id: current.id },
+      data: { name, parentArticleId, direction, economicType },
+    });
+    return this.snapshot(tenantId, { skipMigration: true });
+  }
+
+  async archiveArticle(tenantId: string, articleId: string) {
+    await this.ensureDefaultArticles(tenantId);
+    const id = text(articleId);
+    const current = await this.prisma.financeArticle.findUnique({
+      where: { tenantId_articleId: { tenantId, articleId: id } },
+    });
+    if (!current || current.archivedAt) return this.snapshot(tenantId, { skipMigration: true });
+    if (current.systemKey) throw new BadRequestException('Системную статью удалить нельзя');
+    const child = await this.prisma.financeArticle.findFirst({ where: { tenantId, parentArticleId: id, archivedAt: null } });
+    if (child) throw new BadRequestException('Сначала удалите или перенесите вложенные статьи');
+    await this.prisma.financeArticle.update({ where: { id: current.id }, data: { archivedAt: new Date() } });
+    return this.snapshot(tenantId, { skipMigration: true });
+  }
+
+  async recordManualOperation(tenantId: string, body: unknown) {
+    await this.ensureLegacyMigrated(tenantId);
+    await this.ensureDefaultArticles(tenantId);
+    const input = objectValue(body);
+    const direction = text(input.direction);
+    if (!['IN', 'OUT'].includes(direction)) throw new BadRequestException('Для ручной операции выберите доход или расход');
+    const walletId = text(input.walletId);
+    const walletName = text(input.walletName);
+    if (!walletId) throw new BadRequestException('Выберите кошелёк');
+
+    const operationArticleId = text(input.articleId);
+    const rawLines = arrayValue(input.lines);
+    const simpleAmount = money(input.amount);
+    const preparedLines = rawLines.length
+      ? rawLines.map((value, index) => {
+          const row = objectValue(value);
+          const quantity = Math.max(0, numberValue(row.quantity || 1));
+          const unitPrice = money(row.unitPrice ?? row.price);
+          const total = money(quantity * unitPrice);
+          return {
+            lineName: text(row.name) || `Позиция ${index + 1}`,
+            quantity,
+            unitPrice,
+            total,
+            articleId: text(row.articleId || operationArticleId),
+          };
+        }).filter((row) => row.quantity > 0 && row.unitPrice > 0 && row.total > 0)
+      : (simpleAmount > 0 ? [{
+          lineName: text(input.name),
+          quantity: 1,
+          unitPrice: simpleAmount,
+          total: simpleAmount,
+          articleId: operationArticleId,
+        }] : []);
+    if (!preparedLines.length) throw new BadRequestException('Введите сумму или позиции');
+
+    const articleIds = [...new Set(preparedLines.map((line) => line.articleId).filter(Boolean))];
+    if (!articleIds.length) throw new BadRequestException('Выберите статью');
+    const articles = await this.prisma.financeArticle.findMany({
+      where: { tenantId, articleId: { in: articleIds }, archivedAt: null },
+    });
+    const articleById = new Map(articles.map((article) => [article.articleId, article]));
+    for (const line of preparedLines) {
+      const article = articleById.get(line.articleId);
+      if (!article) throw new BadRequestException('Статья не найдена');
+      if (article.economicType === 'GROUP') throw new BadRequestException('Выберите конечную статью, а не группу');
+      if (article.direction !== direction) throw new BadRequestException('Статья не соответствует типу операции');
+    }
+
+    const operationId = randomUUID();
+    const occurredAt = dateValue(input.occurredAt);
+    const total = money(preparedLines.reduce((sum, line) => sum + line.total, 0));
+    const source = { type: 'manual', id: operationId };
+    await this.prisma.$transaction(async (tx) => {
+      await this.createOperationWithEntries(tx, tenantId, {
+        operationId,
+        kind: direction === 'IN' ? 'manual-income' : 'manual-expense',
+        source,
+        occurredAt,
+        data: {
+          direction,
+          articleId: operationArticleId,
+          walletId,
+          walletName,
+          note: text(input.note),
+          total,
+          lines: preparedLines,
+        },
+        entries: preparedLines.map((line) => {
+          const article = articleById.get(line.articleId)!;
+          return {
+            walletId,
+            walletName,
+            direction,
+            economicType: article.economicType,
+            amount: line.total,
+            component: 'manual',
+            articleId: article.articleId,
+            articleName: article.name,
+            lineName: line.lineName,
+            quantity: line.quantity,
+            unitPrice: line.unitPrice,
+            note: text(input.note),
+          };
+        }),
+      });
+    });
+    return this.snapshot(tenantId, { skipMigration: true });
+  }
+
   async recordPayment(tenantId: string, body: unknown) {
     await this.ensureLegacyMigrated(tenantId);
     const input = objectValue(body);
@@ -655,6 +912,18 @@ export class FinanceService {
       finance: clone(objectValue(data.settlement)),
       createdAt: operation.occurredAt.toISOString(),
     };
+    if (operation.kind === 'manual-income') {
+      return {
+        ...base,
+        movementType: 'income',
+        incomeType: 'manual',
+        walletId: text(data.walletId),
+        walletName: text(data.walletName),
+        articleId: text(data.articleId),
+        note: text(data.note),
+        paidAt: operation.occurredAt.toISOString(),
+      };
+    }
     if (operation.kind === 'payment') {
       return {
         ...base,
@@ -669,7 +938,7 @@ export class FinanceService {
     return {
       ...base,
       movementType: 'expense',
-      expenseType: operation.kind === 'refund' ? 'refund' : 'expense',
+      expenseType: operation.kind === 'refund' ? 'refund' : (operation.kind === 'manual-expense' ? 'manual' : 'expense'),
       originalPaymentId: operation.originalOperationId,
       walletId: text(data.walletId),
       walletName: text(data.walletName),
@@ -680,7 +949,9 @@ export class FinanceService {
 
   async snapshot(tenantId: string, { skipMigration = false } = {}) {
     if (!skipMigration) await this.ensureLegacyMigrated(tenantId);
-    const [settlements, operations, ledger] = await Promise.all([
+    await this.ensureDefaultArticles(tenantId);
+    const [articles, settlements, operations, ledger] = await Promise.all([
+      this.prisma.financeArticle.findMany({ where: { tenantId, archivedAt: null }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
       this.prisma.financeSettlement.findMany({ where: { tenantId }, orderBy: { createdAt: 'asc' } }),
       this.prisma.financeOperation.findMany({ where: { tenantId }, orderBy: [{ occurredAt: 'asc' }, { createdAt: 'asc' }] }),
       this.prisma.financeLedgerEntry.findMany({ where: { tenantId }, orderBy: [{ occurredAt: 'asc' }, { createdAt: 'asc' }] }),
@@ -707,10 +978,17 @@ export class FinanceService {
       source: { type: row.sourceType, id: row.sourceId },
       component: text(objectValue(row.data).component),
       relatedOperationId: text(objectValue(row.data).relatedOperationId),
+      articleId: text(objectValue(row.data).articleId),
+      articleName: text(objectValue(row.data).articleName),
+      lineName: text(objectValue(row.data).lineName),
+      quantity: objectValue(row.data).quantity == null ? null : numberValue(objectValue(row.data).quantity),
+      unitPrice: objectValue(row.data).unitPrice == null ? null : money(objectValue(row.data).unitPrice),
+      note: text(objectValue(row.data).note),
     }));
     const compatibility = operations.map((row) => this.legacyReadModel(row)).filter(Boolean) as JsonObject[];
     return {
-      version: 6,
+      version: 7,
+      articles: articles.map((row) => this.articleDto(row)),
       settlements: settlements.map((row) => ({
         source: { type: row.sourceType, id: row.sourceId },
         settlement: clone(row.data),

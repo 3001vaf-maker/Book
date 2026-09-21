@@ -561,22 +561,23 @@ One step must be completed, tested and checked before the next step is marked co
 - [x] F3-F5 merged to `staging@b3819f4033424cec502244b667781e004d5796a0`; Check Book #1989 and post-merge Check Book #1990 passed all required jobs.
 
 ### F6 — Articles
-- [ ] Introduce user-extensible hierarchical article catalog.
-- [ ] Allow arbitrary useful detail depth.
-- [ ] Keep system economic character separate from custom article name.
-- [ ] Cover operating revenue/expense, tax, tips, refund, loan, investment and transfer semantics.
+- [x] Introduce user-extensible hierarchical article catalog.
+- [x] Allow arbitrary useful detail depth with cycle protection.
+- [x] Keep system economic character separate from custom article name.
+- [x] Cover operating revenue/expense, tax, tips, refund, loan, investment and transfer semantics.
 
 ### F7 — Wallet / Cash projection
-- [ ] Wallet stores metadata/settings only.
-- [ ] Balance = Ledger projection.
-- [ ] Wallet history = Ledger projection.
-- [ ] No independent wallet balance truth remains.
+- [x] Wallet stores metadata/settings only.
+- [x] Balance = Ledger projection.
+- [x] Wallet history = Ledger projection.
+- [x] No independent wallet balance truth remains.
 
 ### F8 — Income / Expense instrument
-- [ ] Add direct manual income/expense command surface.
-- [ ] Simple amount entry supported.
-- [ ] Detailed quantity × unit price lines supported.
-- [ ] Results are Operations + Ledger rows, not a parallel store.
+- [x] Add direct manual income/expense command surface.
+- [x] Simple amount entry supported.
+- [x] Detailed quantity × unit price lines supported.
+- [x] Results are one Operation + one or many Ledger rows, not a parallel store.
+- [ ] Final combined F6-F8 Check Book / merge-to-staging verification.
 
 ### F9 — Loans / Investments / Returns / Transfers
 - [ ] Loan received is cash IN but not operating revenue.
