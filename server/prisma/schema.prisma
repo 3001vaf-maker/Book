@@ -725,8 +725,6 @@ model PlatformNotificationPreference {
   tenantId          String
   platformAccountId String
   emailEnabled      Boolean  @default(true)
-  telegramEnabled   Boolean  @default(true)
-  pushEnabled       Boolean  @default(true)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
