@@ -1,5 +1,5 @@
 .first-run-focused{min-height:var(--visual-vh,100dvh);padding-bottom:calc(92px + env(safe-area-inset-bottom))}
-.first-run-demo-badge{position:fixed;top:max(10px,env(safe-area-inset-top));right:12px;z-index:850;border:1px solid rgba(41,37,34,.14);border-radius:999px;background:rgba(255,255,255,.94);backdrop-filter:blur(10px);padding:7px 10px;color:#625b56;font-size:12px;font-weight:800;box-shadow:0 6px 20px rgba(41,37,34,.08);pointer-events:none}
+.first-run-demo-badge{position:fixed;top:max(10px,env(safe-area-inset-top));right:12px;z-index:850;border:1px solid rgba(41,37,34,.14);border-radius:999px;background:rgba(255,255,255,.94);backdrop-filter:blur(10px);padding:7px 10px;color:#625b56;font-size:12px;font-weight:800;box-shadow:0 6px 20px rgba(41,37,34,.08);pointer-events:auto;cursor:pointer}
 .first-run-action-dock{position:fixed;left:50%;bottom:calc(82px + env(safe-area-inset-bottom));z-index:800;transform:translateX(-50%);width:min(calc(100% - 24px),560px);display:flex;gap:10px;justify-content:flex-end;padding:10px;border:1px solid rgba(41,37,34,.12);border-radius:16px;background:rgba(245,245,243,.96);backdrop-filter:blur(12px);box-shadow:0 12px 34px rgba(41,37,34,.14)}
 .first-run-focused~.first-run-action-dock{bottom:calc(14px + env(safe-area-inset-bottom))}
 .first-run-action-dock .ui-button{flex:1}
@@ -9,6 +9,6 @@
 .first-run-expired{min-height:var(--visual-vh,100dvh);display:grid;place-items:center;padding:24px}
 .first-run-expired__card{width:min(100%,520px);padding:28px;border:1px solid #e2ddd7;border-radius:22px;background:#fff;box-shadow:0 14px 44px rgba(41,37,34,.08)}
 .first-run-expired__card h1{margin:0 0 10px;font-size:26px}
-.first-run-expired__card p{margin:0;color:#6f6863;line-height:1.55}
+.first-run-expired__card p{margin:0;color:#6f6863;line-height:1.55}.first-run-expired__actions{display:grid;gap:10px;margin-top:18px}.first-run-expired__status{margin-top:12px!important;font-size:13px}
 @media(max-width:620px){.first-run-demo-badge{top:max(8px,env(safe-area-inset-top));right:8px}.first-run-action-dock{bottom:calc(74px + env(safe-area-inset-bottom));width:calc(100% - 16px);padding:8px}}
 @media(prefers-reduced-motion:reduce){.first-run-pulse{animation:none;outline:3px solid rgba(154,107,95,.3)}}
