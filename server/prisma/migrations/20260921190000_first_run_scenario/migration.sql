@@ -16,7 +16,7 @@ BEGIN
 END
 $$;
 
-DO $
+DO $$
 BEGIN
   IF to_regclass('"TenantInvitation"') IS NOT NULL THEN
     EXECUTE 'ALTER TABLE "TenantInvitation"
@@ -32,7 +32,7 @@ BEGIN
     RAISE EXCEPTION 'Invitation table is missing';
   END IF;
 END
-$;
+$$;
 
 CREATE TABLE IF NOT EXISTS "FirstRunScenario" (
   "id" TEXT PRIMARY KEY,
@@ -190,7 +190,7 @@ CREATE TABLE IF NOT EXISTS "PlatformActivityEvent" (
     ON DELETE SET NULL ON UPDATE CASCADE
 );
 
-DO $
+DO $$
 DECLARE
   account_table TEXT;
 BEGIN
@@ -223,7 +223,7 @@ BEGIN
     );
   END IF;
 END
-$;
+$$;
 
 CREATE INDEX IF NOT EXISTS "PlatformActivityEvent_tenant_occurred_idx"
   ON "PlatformActivityEvent"("tenantId", "occurredAt");
@@ -294,7 +294,7 @@ VALUES
 ('frs-v1-complete','first-run-default-v1','complete',180,'SYSTEM','Завершение','Основные возможности изучены','Основная цепочка знакомства завершена. Вы можете продолжать пользоваться DEMO до окончания доступного срока или перейти к реальной работе, когда это будет доступно для вашего рабочего пространства.','Продолжить','', 'main','', 'first-run.complete','{"phase":"workspace"}',true)
 ON CONFLICT ("scenarioVersionId","key") DO NOTHING;
 
-DO $
+DO $$
 DECLARE
   invitation_table TEXT;
 BEGIN
@@ -315,6 +315,6 @@ BEGIN
     );
   END IF;
 END
-$;
+$$;
 
 COMMIT;
