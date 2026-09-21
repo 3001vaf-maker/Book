@@ -31,6 +31,10 @@ export class SaasAdminService {
     return this.documentRegistry.history();
   }
 
+  syncDocumentRegistry(documents: unknown) {
+    return this.documentRegistry.syncCatalog(documents);
+  }
+
   async capabilities() {
     await this.invitations.ensureStarterPlan();
     return this.prisma.capability.findMany({
