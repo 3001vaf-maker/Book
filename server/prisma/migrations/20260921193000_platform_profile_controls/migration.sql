@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS "PlatformNotificationPreference" (
     ON DELETE CASCADE ON UPDATE CASCADE
 );
 
-DO $
+DO $$
 DECLARE
   account_table TEXT;
 BEGIN
@@ -33,7 +33,7 @@ BEGIN
     );
   END IF;
 END
-$;
+$$;
 
 CREATE UNIQUE INDEX IF NOT EXISTS "PlatformNotificationPreference_tenant_account_key"
   ON "PlatformNotificationPreference"("tenantId","platformAccountId");
