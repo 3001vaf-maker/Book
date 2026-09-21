@@ -37,7 +37,7 @@ function canonicalEmail(value: unknown) {
 function telegramId(value: unknown) {
   if (value && typeof value === 'object' && !Array.isArray(value)) {
     const source = value as Record<string, unknown>;
-    return text(source.telegramId ?? source.userId ?? source.id);
+    return text(source.telegramId ?? source.externalUserId ?? source.id);
   }
   return text(value);
 }
