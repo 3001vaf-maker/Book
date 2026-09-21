@@ -454,7 +454,7 @@ export class OnlineBookingService {
   }
 
   async createRequest(tenantId: string, accountId: string, body: Record<string, any>) {
-    const account = await this.prisma.account.findFirst({ where: { id: accountId, tenantId } });
+    const account = await this.prisma.account.findUnique({ where: { id: accountId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
     const data = await this.bookingSource(tenantId);
     if (!(await this.consentPolicy.hasActivePdnConsent(tenantId, accountId))) {
@@ -533,7 +533,7 @@ export class OnlineBookingService {
   }
 
   async getMyRecords(tenantId: string, accountId: string) {
-    const account = await this.prisma.account.findFirst({ where: { id: accountId, tenantId } });
+    const account = await this.prisma.account.findUnique({ where: { id: accountId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
     await this.personIdentity.bindFirstAccess(tenantId, account as any);
     const identity = await this.businessState.bookingIdentityForAccount(tenantId, accountId);
