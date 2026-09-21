@@ -41,6 +41,9 @@ assert.doesNotMatch(profileMigration, /\.\/admin\/documents\/catalog\.js/);
 
 assert.match(controller, /@Get\('document-registry\/history'\)/);
 assert.match(service, /FROM "PlatformConsentEvent"/);
+assert.match(service, /FROM "AccountDocumentEvent"/);
+assert.match(service, /'ACCOUNT'::text AS "subjectType"/);
+assert.match(service, /UNION ALL/);
 assert.match(service, /v\."contentSnapshot" AS "documentContent"/);
 assert.match(service, /JOIN "PlatformDocumentVersion"/);
 assert.match(service, /JOIN "PlatformDocument"/);
