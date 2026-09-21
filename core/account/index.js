@@ -60,6 +60,32 @@ function storeSession(_tenantId, payload) {
   return payload;
 }
 
+export async function getAccountTerms() {
+  return jsonResponse(
+    await request('/online-booking/account-terms'),
+    'Не удалось загрузить Условия использования учетной записи',
+  );
+}
+
+export async function getAccountPlatformState(tenantId) {
+  return jsonResponse(
+    await request(`/online-booking/${encodeURIComponent(tenantId)}/account/platform-state`, { tenantId, auth: true }),
+    'Не удалось проверить Условия использования учетной записи',
+  );
+}
+
+export async function acceptAccountTerms(tenantId, accountTerms) {
+  return jsonResponse(
+    await request(`/online-booking/${encodeURIComponent(tenantId)}/account/platform-terms`, {
+      tenantId,
+      auth: true,
+      method: 'POST',
+      body: JSON.stringify({ accountTerms }),
+    }),
+    'Не удалось сохранить принятие Условий использования учетной записи',
+  );
+}
+
 export async function getBookingContext(tenantId, workplaceKey = '') {
   const params = new URLSearchParams();
   if (workplaceKey) params.set('workplace', workplaceKey);
