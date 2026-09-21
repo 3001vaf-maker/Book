@@ -8,6 +8,8 @@ const guard = fs.readFileSync('server/src/online-booking/account.guard.ts', 'utf
 const booking = fs.readFileSync('server/src/online-booking/online-booking.service.ts', 'utf8');
 const communication = fs.readFileSync('server/src/communication/communication.service.ts', 'utf8');
 const runtime = fs.readFileSync('online-booking/account-runtime.js', 'utf8');
+const dockerfile = fs.readFileSync('Dockerfile', 'utf8');
+const reset = fs.readFileSync('server/scripts/reset-test-account-before-global-migration.mjs', 'utf8');
 
 const accountModel = schema.slice(schema.indexOf('model Account {'), schema.indexOf('model BookingRequest {'));
 
