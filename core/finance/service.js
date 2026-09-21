@@ -173,12 +173,15 @@ export async function recordPaymentIncome({
   return payment;
 }
 
-export async function cancelPaymentOperation(paymentId, { reason = 'incorrect-entry' } = {}) {
+export async function cancelPaymentOperation(paymentId, { reason = 'incorrect-entry', occurredAt = null } = {}) {
   const id = String(paymentId || '');
-  if (!id) return null;
+  if (!id || !occurredAt) return null;
   const response = await apiRequest(`/finance/operations/${encodeURIComponent(id)}/cancel`, {
     method: 'POST',
-    body: JSON.stringify({ reason }),
+    body: JSON.stringify({
+      reason,
+      occurredAt: occurredAt instanceof Date ? occurredAt.toISOString() : occurredAt,
+    }),
   });
   const state = await applyServerState(response, 'Не удалось отменить операцию');
   const cancelled = state.income.find((payment) => String(payment?.id || '') === id)
