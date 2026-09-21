@@ -1,5 +1,6 @@
 import { actionBlock, button, escapeHtml, field, folderList, iconButton, initViewNavigation, list, modal, mountModal, page, pageHeader, shortDateTime, textareaField, viewNavigation } from '../../ui/ui.js';
 import { downloadRknGuide } from '../../first-run/api.js';
+import { refreshTenantDocumentArchive } from '../../tenant-document-archive.js';
 import { phonesMatch } from '../../core/phone/index.js';
 import { getAllPeople } from '../../main/people/data.js';
 import { createDocument, getDocuments, saveDocument } from './data.js';
@@ -167,6 +168,8 @@ function guidesMarkup() {
 
   return page([
     pageHeader('Инструкции'),
+    actionBlock(button('Сформировать актуальную инструкцию', { data: 'data-rkn-guide-create' })),
+    '<p class="muted" data-rkn-guide-create-status></p>',
     rows,
     actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-documents-root' }))
   ]);
@@ -256,6 +259,20 @@ function historyMarkup() {
 }
 
 function bind(root, navigateBack) {
+  root.querySelector('[data-rkn-guide-create]')?.addEventListener('click', async (event) => {
+    const control = event.currentTarget;
+    const status = root.querySelector('[data-rkn-guide-create-status]');
+    control.disabled = true;
+    if (status) status.textContent = 'Формируем и сохраняем PDF…';
+    try {
+      await downloadRknGuide();
+      await refreshTenantDocumentArchive();
+      render(root, navigateBack);
+    } catch (error) {
+      if (status) status.textContent = error instanceof Error ? error.message : 'Не удалось сформировать инструкцию';
+      control.disabled = false;
+    }
+  });
   root.querySelector('[data-documents-back]')?.addEventListener('click', () => {
     currentSection = 'root';
     navigateBack();
