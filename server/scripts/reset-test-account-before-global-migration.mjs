@@ -75,15 +75,24 @@ async function main() {
   };
   console.warn('[account-reset] removing test end-person contour:', JSON.stringify(before));
 
+  const tables = {
+    tenantConsentEvent: await tableExists('TenantConsentEvent'),
+    person: await tableExists('Person'),
+    telegramEntryTicket: await tableExists('TelegramEntryTicket'),
+    webPushSubscription: await tableExists('WebPushSubscription'),
+    bookingRequest: await tableExists('BookingRequest'),
+    account: await tableExists('Account'),
+  };
+
   await prisma.$transaction(async (tx) => {
-    if (await tableExists('TenantConsentEvent')) {
+    if (tables.tenantConsentEvent) {
       await tx.$executeRawUnsafe(
         `DELETE FROM "TenantConsentEvent"
          WHERE "subjectType" IN ('ACCOUNT', 'BOOKING_ACCOUNT', 'CONTACT_POINT')`,
       );
     }
 
-    if (await tableExists('Person')) {
+    if (tables.person) {
       await tx.$executeRawUnsafe(
         `UPDATE "Person"
          SET "data" = jsonb_set(COALESCE("data", '{}'::jsonb), '{accounts}', '[]'::jsonb, true)
@@ -92,19 +101,19 @@ async function main() {
       );
     }
 
-    if (await tableExists('TelegramEntryTicket')) {
+    if (tables.telegramEntryTicket) {
       await tx.$executeRawUnsafe('DELETE FROM "TelegramEntryTicket"');
     }
 
-    if (await tableExists('WebPushSubscription')) {
+    if (tables.webPushSubscription) {
       await tx.$executeRawUnsafe('DELETE FROM "WebPushSubscription"');
     }
 
-    if (await tableExists('BookingRequest')) {
+    if (tables.bookingRequest) {
       await tx.$executeRawUnsafe('DELETE FROM "BookingRequest"');
     }
 
-    if (await tableExists('Account')) {
+    if (tables.account) {
       await tx.$executeRawUnsafe('DELETE FROM "Account"');
     }
   });
