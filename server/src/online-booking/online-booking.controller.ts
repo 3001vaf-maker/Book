@@ -93,8 +93,11 @@ export class OnlineBookingController {
   }
 
   @Post(':tenantId/account/prepare')
-  prepareAccount(@Param('tenantId') tenantId: string, @Body() body: { email?: string }) {
-    return this.booking.prepareAccount(tenantId, body?.email || '');
+  prepareAccount(
+    @Param('tenantId') tenantId: string,
+    @Body() body: { identifier?: unknown; email?: unknown; phone?: unknown },
+  ) {
+    return this.booking.prepareAccount(tenantId, body || {});
   }
 
   @Post(':tenantId/account/register')
@@ -103,8 +106,8 @@ export class OnlineBookingController {
   }
 
   @Post(':tenantId/account/login')
-  loginAccount(@Param('tenantId') tenantId: string, @Body() body: { email?: string; password?: string }) {
-    return this.booking.loginAccount(tenantId, body?.email || '', body?.password || '');
+  loginAccount(@Param('tenantId') tenantId: string, @Body() body: { identifier?: unknown; email?: unknown; password?: unknown }) {
+    return this.booking.loginAccount(tenantId, body?.identifier ?? body?.email ?? '', body?.password ?? '');
   }
 
   @UseGuards(AccountGuard)
