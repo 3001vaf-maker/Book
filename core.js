@@ -333,6 +333,7 @@ async function renderAuthenticated(account = authenticatedAccount) {
   state.activeSection = sectionAllowed(requested) ? requested : defaultSection();
   history.replaceState({}, '', `#${state.activeSection}`);
   renderWorkspace();
+  startRegularPlatformNotices();
 }
 
 function renderLogin(message = '') {
