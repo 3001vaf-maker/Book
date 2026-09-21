@@ -77,27 +77,27 @@ function parentOptions(items, currentId = '') {
       .filter((item) => item.articleId !== currentId)
       .map((item) => ({
         value: item.articleId,
-        label: \`\${'— '.repeat(item.depth)}\${item.name}\`,
+        label: `${'— '.repeat(item.depth)}${item.name}`,
       })),
   ];
 }
 
 function row(item) {
   return {
-    overline: \`\${directionLabel(item.direction)} · \${economicLabel(item.economicType)}\`,
-    title: \`\${'— '.repeat(item.depth)}\${item.name}\`,
+    overline: `${directionLabel(item.direction)} · ${economicLabel(item.economicType)}`,
+    title: `${'— '.repeat(item.depth)}${item.name}`,
     secondary: item.systemKey ? 'Системная статья' : '',
     right: '',
     interactive: true,
-    data: \`data-finance-article="\${escapeHtml(item.articleId)}"\`,
-    aria: \`Открыть статью \${item.name}\`,
+    data: `data-finance-article="${escapeHtml(item.articleId)}"`,
+    aria: `Открыть статью ${item.name}`,
   };
 }
 
 function renderList(root, navigateBack) {
   const items = getFinanceArticles();
   const rows = treeRows(items);
-  root.innerHTML = \`<div class="entity-page-header">\${pageHeader('Статьи')}<div class="page-header-action">\${iconButton('+', { className: 'icon-button--primary', data: 'data-add-finance-article', aria: 'Добавить статью' })}</div></div>\${rows.length ? list({ items: rows.map(row) }) : emptyState('Статей пока нет', 'Добавьте первую статью кнопкой «+».')}\${actionBlock(button('Назад', { variant: 'secondary', data: 'data-finance-articles-back' }))}\`;
+  root.innerHTML = `<div class="entity-page-header">${pageHeader('Статьи')}<div class="page-header-action">${iconButton('+', { className: 'icon-button--primary', data: 'data-add-finance-article', aria: 'Добавить статью' })}</div></div>${rows.length ? list({ items: rows.map(row) }) : emptyState('Статей пока нет', 'Добавьте первую статью кнопкой «+».')}${actionBlock(button('Назад', { variant: 'secondary', data: 'data-finance-articles-back' }))}`;
   root.querySelector('[data-add-finance-article]')?.addEventListener('click', () => openForm(root, navigateBack));
   root.querySelectorAll('[data-finance-article]').forEach((element) => {
     element.addEventListener('click', () => {
@@ -113,14 +113,14 @@ function openForm(root, navigateBack, existing = null) {
   const isSystem = Boolean(existing?.systemKey);
   const direction = existing?.direction || 'OUT';
   const economicType = existing?.economicType === 'GROUP' ? 'OPERATING_EXPENSE' : (existing?.economicType || 'OPERATING_EXPENSE');
-  const form = \`<form class="compact-form" data-finance-article-form>
-    \${field({ label: 'Название', name: 'articleName', value: existing?.name || '', required: true, placeholder: 'Например, Краска' })}
-    \${select({ label: 'Родитель', name: 'parentArticleId', value: existing?.parentArticleId || '', options: parentOptions(items, existing?.articleId || '') })}
-    \${select({ label: 'Тип', name: 'direction', value: direction, options: DIRECTION_OPTIONS })}
-    \${select({ label: 'Экономический характер', name: 'economicType', value: economicType, options: ECONOMIC_OPTIONS })}
-    \${button('Сохранить', { type: 'submit' })}
-    \${existing && !isSystem ? button('Удалить', { type: 'button', variant: 'danger', data: 'data-delete-finance-article' }) : ''}
-  </form>\`;
+  const form = `<form class="compact-form" data-finance-article-form>
+    ${field({ label: 'Название', name: 'articleName', value: existing?.name || '', required: true, placeholder: 'Например, Краска' })}
+    ${select({ label: 'Родитель', name: 'parentArticleId', value: existing?.parentArticleId || '', options: parentOptions(items, existing?.articleId || '') })}
+    ${select({ label: 'Тип', name: 'direction', value: direction, options: DIRECTION_OPTIONS })}
+    ${select({ label: 'Экономический характер', name: 'economicType', value: economicType, options: ECONOMIC_OPTIONS })}
+    ${button('Сохранить', { type: 'submit' })}
+    ${existing && !isSystem ? button('Удалить', { type: 'button', variant: 'danger', data: 'data-delete-finance-article' }) : ''}
+  </form>`;
   const m = mountModal(root, modal(form, { title: existing ? 'Изменить статью' : 'Новая статья' }));
   if (!m) return;
   m.querySelector('[data-finance-article-form]')?.addEventListener('submit', async (event) => {
