@@ -139,7 +139,6 @@ function publicAccount(account: any) {
     phone: account.phone,
     telegramId: account.telegramId || '',
     profileData: normalizeProfileData(account.profileData),
-    uei: text(account.uei),
     discountPercent: percent(account.discountPercent),
     visits: Math.max(0, Math.floor(numeric(account.visits, 0))),
     totalSpent: Math.max(0, numeric(account.totalSpent, 0)),
@@ -187,7 +186,6 @@ export class OnlineBookingService {
     const personStats = await this.personIdentity.personStats(tenantId, account);
     return publicAccount({
       ...account,
-      uei: identity?.uei || '',
       discountPercent: person.discountPercent ?? account.discountPercent,
       visits: personStats?.visits ?? person.visits ?? account.visits,
       totalSpent: personStats?.totalSpent ?? person.totalSpent ?? account.totalSpent,
@@ -426,6 +424,17 @@ export class OnlineBookingService {
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
     await this.personIdentity.bindFirstAccess(tenantId, account as any);
     return this.accountView(tenantId, account);
+  }
+
+  async accountTenantContactContext(tenantId: string, accountId: string) {
+    const account = await this.prisma.account.findUnique({ where: { id: accountId } });
+    if (!account) throw new UnauthorizedException('Аккаунт не найден');
+    await this.personIdentity.bindFirstAccess(tenantId, account as any);
+    const identity = await this.businessState.bookingIdentityForAccount(tenantId, accountId);
+    return {
+      phone: account.phone,
+      uei: text(identity?.uei),
+    };
   }
 
   async updateAccount(tenantId: string, accountId: string, body: Record<string, any>) {
