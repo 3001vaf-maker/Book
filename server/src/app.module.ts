@@ -14,6 +14,8 @@ import { CommunicationModule } from './communication/communication.module';
 import { SaasAccessModule } from './saas-access/saas-access.module';
 import { TenantInvitationModule } from './tenant-invitation/tenant-invitation.module';
 import { SaasAdminModule } from './saas-admin/saas-admin.module';
+import { FirstRunModule } from './first-run/first-run.module';
+import { PlatformNoticeModule } from './platform-notice/platform-notice.module';
 
 @Module({
   imports: [
@@ -30,6 +32,8 @@ import { SaasAdminModule } from './saas-admin/saas-admin.module';
     SaasAccessModule,
     TenantInvitationModule,
     SaasAdminModule,
+    FirstRunModule,
+    PlatformNoticeModule,
   ],
   controllers: [HealthController],
   providers: [PrismaService],

@@ -1,7 +1,7 @@
 import { actionBlock, button, costCardMeta, costListParts, durationText, emptyState, entityCard, escapeHtml, iconButton, listEntries, listEntry, mountModal, modal, page, pageHeader, workplaceCountText } from '../../../ui/ui.js';
 import { getSettlementItemTotals } from '../../../core/finance/index.js';
 import { getRecords } from '../../../core/record/index.js';
-import { deleteProcedure as deleteProcedureData, getProcedures } from './data.js';
+import { deleteProcedure as deleteProcedureData, getProcedures, reorderProcedures } from './data.js';
 import { openProcedureForm } from './form.js';
 
 const money = (value) => `${new Intl.NumberFormat('ru-RU').format(Number(value || 0))} ₽`;
@@ -14,9 +14,46 @@ function procedureMetrics(procedureId) {
   return { records: records.length, revenue: fact.factTotal };
 }
 
+function openProcedureOrder(root, navigateBack) {
+  let items = getProcedures();
+  const m = mountModal(root, modal('<div data-procedure-order></div>', { title: 'Порядок услуг', variant: 'medium' }));
+  if (!m) return;
+
+  const renderOrder = () => {
+    const host = m.querySelector('[data-procedure-order]');
+    host.innerHTML = `<div class="modal-title"><h2>Порядок услуг</h2><p>Переместите важные услуги выше. Этот порядок сохраняется.</p></div>
+      <div class="form-grid">${items.map((item, index) => `
+        <div class="action-block">
+          <strong>${escapeHtml(item.name || 'Без названия')}</strong>
+          <div class="modal-actions">
+            ${button('↑', { variant: 'secondary', data: `data-order-up="${escapeHtml(item.id)}"`, disabled: index === 0 })}
+            ${button('↓', { variant: 'secondary', data: `data-order-down="${escapeHtml(item.id)}"`, disabled: index === items.length - 1 })}
+          </div>
+        </div>`).join('')}</div>
+      <div class="modal-actions">${button('Готово', { data: 'data-order-done' })}</div>`;
+
+    const move = (id, delta) => {
+      const index = items.findIndex((item) => String(item.id) === String(id));
+      const next = index + delta;
+      if (index < 0 || next < 0 || next >= items.length) return;
+      [items[index], items[next]] = [items[next], items[index]];
+      reorderProcedures(items.map((item) => item.id));
+      renderOrder();
+    };
+    host.querySelectorAll('[data-order-up]').forEach((control) => control.addEventListener('click', () => move(control.dataset.orderUp, -1)));
+    host.querySelectorAll('[data-order-down]').forEach((control) => control.addEventListener('click', () => move(control.dataset.orderDown, 1)));
+    host.querySelector('[data-order-done]')?.addEventListener('click', () => {
+      m.remove();
+      renderList(root, navigateBack);
+    });
+  };
+  renderOrder();
+}
+
 function renderList(root, navigateBack) {
   const items = getProcedures();
-  root.innerHTML = `<div class="entity-page-header">${pageHeader('Процедуры')}<div class="page-header-action">${iconButton('+', { className: 'icon-button--primary', data: 'data-add-procedure', aria: 'Добавить процедуру' })}</div></div>${items.length ? listEntries(items.map(renderRow)) : emptyState('Процедур пока нет', 'Добавьте первую процедуру кнопкой «+».')}${actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-back-procedures' }))}`;
+  root.innerHTML = `<div class="entity-page-header">${pageHeader('Процедуры')}<div class="page-header-action">${items.length > 1 ? iconButton('↕', { data: 'data-order-procedures', aria: 'Изменить порядок услуг' }) : ''}${iconButton('+', { className: 'icon-button--primary', data: 'data-add-procedure', aria: 'Добавить услугу' })}</div></div>${items.length ? listEntries(items.map(renderRow)) : emptyState('Процедур пока нет', 'Добавьте первую процедуру кнопкой «+».')}${actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-back-procedures' }))}`;
+  root.querySelector('[data-order-procedures]')?.addEventListener('click', () => openProcedureOrder(root, navigateBack));
   root.querySelector('[data-add-procedure]')?.addEventListener('click', () => openProcedureForm({ root, onSaved: () => renderList(root, navigateBack) }));
   root.querySelectorAll('[data-procedure]').forEach((element) => element.addEventListener('click', () => renderCard(root, element.dataset.procedure, navigateBack)));
   root.querySelectorAll('[data-delete-action]').forEach((element) => element.addEventListener('click', (event) => {

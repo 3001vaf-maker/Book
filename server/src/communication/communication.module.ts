@@ -12,9 +12,10 @@ import { CommunicationHistoryService } from './communication-history.service';
 import { CommunicationService } from './communication.service';
 import { TelegramBotService } from './telegram-bot.service';
 import { EmailChannelService } from './email-channel.service';
+import { FirstRunModule } from '../first-run/first-run.module';
 
 @Module({
-  imports: [AuthModule, BusinessStateModule, TenantDocumentArchiveModule, NotificationModule, TransactionalEmailModule],
+  imports: [AuthModule, BusinessStateModule, TenantDocumentArchiveModule, NotificationModule, TransactionalEmailModule, FirstRunModule],
   controllers: [CommunicationController],
   providers: [CommunicationService, CommunicationHistoryService, CommunicationDispatchService, CommunicationBroadcastService, TelegramBotService, EmailChannelService, PrismaService],
   exports: [CommunicationService, CommunicationHistoryService, CommunicationDispatchService, CommunicationBroadcastService, TelegramBotService, EmailChannelService],

@@ -36,6 +36,37 @@ export class ProfileController {
     return this.profile.updateProfile(request.auth!.tenantId, request.auth!.platformAccountId, body);
   }
 
+  @Get('account-controls')
+  accountControls(@Req() request: AuthenticatedRequest) {
+    return this.profile.accountControls(request.auth!.tenantId, request.auth!.platformAccountId);
+  }
+
+  @Put('account-controls/consents/:documentKey')
+  accountConsent(
+    @Req() request: AuthenticatedRequest,
+    @Param('documentKey') documentKey: string,
+    @Body() body: { active?: unknown },
+  ) {
+    return this.profile.setAccountConsent(
+      request.auth!.tenantId,
+      request.auth!.platformAccountId,
+      documentKey,
+      body?.active,
+    );
+  }
+
+  @Put('account-controls/service-notifications')
+  serviceNotifications(
+    @Req() request: AuthenticatedRequest,
+    @Body() body: unknown,
+  ) {
+    return this.profile.setServiceNotifications(
+      request.auth!.tenantId,
+      request.auth!.platformAccountId,
+      body,
+    );
+  }
+
   @Put('workplaces/:key')
   @UseGuards(WorkplaceLimitGuard)
   upsertWorkplace(

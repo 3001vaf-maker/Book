@@ -56,3 +56,16 @@ export function deleteProcedure(id) {
   writeProcedures(values.map((item) => item.id === id ? { ...item, deletedAt: new Date().toISOString() } : item));
   return true;
 }
+
+
+export function reorderProcedures(ids = []) {
+  const order = (Array.isArray(ids) ? ids : []).map((value) => String(value || '')).filter(Boolean);
+  const values = readRawProcedures();
+  const active = values.filter((item) => !item.deletedAt);
+  if (order.length !== active.length || new Set(order).size !== active.length) return false;
+  const byId = new Map(active.map((item) => [String(item.id || ''), item]));
+  if (order.some((id) => !byId.has(id))) return false;
+  const deleted = values.filter((item) => item.deletedAt);
+  writeProcedures([...order.map((id) => byId.get(id)), ...deleted]);
+  return true;
+}

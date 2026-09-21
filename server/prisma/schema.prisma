@@ -65,6 +65,11 @@ model Tenant {
   financeLedgerEntries     FinanceLedgerEntry[]
   saasAccess               TenantAccess?
   tenantInvitations        TenantInvitation[]
+  firstRunProgress         FirstRunProgress[]
+  activityEvents           PlatformActivityEvent[]
+  accountSessions          PlatformSession[]
+  notificationPreferences  PlatformNotificationPreference[]
+  platformNotices           PlatformNotice[]
 }
 
 model PlatformAccount {
@@ -79,6 +84,11 @@ model PlatformAccount {
   workspaceStates   WorkspaceState[]
   profiles          Profile[]
   platformAdmin     PlatformAdmin?
+  firstRunProgress  FirstRunProgress[]
+  activityEvents    PlatformActivityEvent[]
+  accountSessions   PlatformSession[]
+  notificationPreferences PlatformNotificationPreference[]
+  platformNotices   PlatformNotice[]
 }
 
 model Membership {
@@ -457,6 +467,7 @@ model Capability {
 
   planValues      PlanCapability[]
   tenantOverrides TenantCapabilityOverride[]
+  tenantOrders    TenantCapabilityOrder[]
 
   @@index([groupKey, position])
 }
@@ -496,12 +507,17 @@ model TenantAccess {
   planId     String?
   status     TenantAccessStatus @default(ACTIVE)
   isOwnerBook Boolean           @default(false)
+  commercialMode String         @default("LIVE")
+  demoActivatedAt DateTime?
+  demoExpiresAt DateTime?
+  demoExtendedAt DateTime?
   createdAt  DateTime           @default(now())
   updatedAt  DateTime           @updatedAt
 
   tenant    Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   plan      Plan?                      @relation(fields: [planId], references: [id], onDelete: SetNull)
   overrides TenantCapabilityOverride[]
+  capabilityOrder TenantCapabilityOrder[]
 
   @@index([planId])
   @@index([status])
@@ -536,11 +552,206 @@ model TenantInvitation {
   revokedAt        DateTime?
   createdAt        DateTime               @default(now())
   updatedAt        DateTime               @updatedAt
+  activatedAt      DateTime?
+  demoExpiresAt    DateTime?
+  firstRunScenarioVersionId String?
 
   tenant    Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   createdBy PlatformAdmin @relation(fields: [createdByAdminId], references: [id], onDelete: Restrict)
+  firstRunScenarioVersion FirstRunScenarioVersion? @relation(fields: [firstRunScenarioVersionId], references: [id], onDelete: SetNull)
 
   @@index([tenantId])
   @@index([email, status])
   @@index([createdByAdminId])
+}
+
+
+model FirstRunScenario {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  title     String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  versions FirstRunScenarioVersion[]
+}
+
+model FirstRunScenarioVersion {
+  id          String   @id @default(cuid())
+  scenarioId  String
+  version     Int
+  status      String   @default("DRAFT")
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  scenario    FirstRunScenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  steps       FirstRunStep[]
+  invitations TenantInvitation[]
+  progress    FirstRunProgress[]
+
+  @@unique([scenarioId, version])
+  @@index([scenarioId, status, publishedAt])
+}
+
+model FirstRunStep {
+  id                String   @id @default(cuid())
+  scenarioVersionId String
+  key               String
+  position          Int
+  kind              String
+  title             String
+  modalTitle        String
+  modalBody         String
+  primaryLabel      String   @default("Далее")
+  skipLabel         String   @default("Пропустить")
+  route             String   @default("")
+  target            String   @default("")
+  completionKey     String   @default("")
+  metadata          Json     @default("{}")
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  scenarioVersion FirstRunScenarioVersion @relation(fields: [scenarioVersionId], references: [id], onDelete: Cascade)
+  progress        FirstRunStepProgress[]
+
+  @@unique([scenarioVersionId, key])
+  @@index([scenarioVersionId, position])
+}
+
+model FirstRunProgress {
+  id                String   @id @default(cuid())
+  tenantId          String
+  platformAccountId String
+  scenarioVersionId String
+  status            String   @default("IN_PROGRESS")
+  currentStepKey    String   @default("")
+  startedAt         DateTime @default(now())
+  completedAt       DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  tenant          Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  account         PlatformAccount         @relation(fields: [platformAccountId], references: [id], onDelete: Cascade)
+  scenarioVersion FirstRunScenarioVersion @relation(fields: [scenarioVersionId], references: [id], onDelete: Restrict)
+  steps           FirstRunStepProgress[]
+
+  @@unique([tenantId, platformAccountId])
+  @@index([scenarioVersionId, status])
+  @@index([platformAccountId, updatedAt])
+}
+
+model FirstRunStepProgress {
+  id          String   @id @default(cuid())
+  progressId  String
+  stepId      String
+  status      String   @default("NOT_STARTED")
+  modalSeenAt DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
+  skippedAt   DateTime?
+  lastSeenAt  DateTime?
+  metadata    Json     @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  progress FirstRunProgress @relation(fields: [progressId], references: [id], onDelete: Cascade)
+  step     FirstRunStep     @relation(fields: [stepId], references: [id], onDelete: Restrict)
+
+  @@unique([progressId, stepId])
+  @@index([progressId, status])
+}
+
+model PlatformActivityEvent {
+  id                String   @id @default(cuid())
+  tenantId          String
+  platformAccountId String?
+  sessionId         String?
+  eventType         String
+  stepKey           String   @default("")
+  scenarioVersionId String   @default("")
+  metadata          Json     @default("{}")
+  occurredAt        DateTime @default(now())
+  createdAt         DateTime @default(now())
+
+  tenant  Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  account PlatformAccount? @relation(fields: [platformAccountId], references: [id], onDelete: SetNull)
+  session PlatformSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, occurredAt])
+  @@index([platformAccountId, occurredAt])
+  @@index([eventType, occurredAt])
+}
+
+model PlatformSession {
+  id                String   @id @default(cuid())
+  tenantId          String
+  platformAccountId String
+  startedAt         DateTime @default(now())
+  lastSeenAt        DateTime @default(now())
+  endedAt           DateTime?
+  endReason         String   @default("")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  tenant   Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  account  PlatformAccount         @relation(fields: [platformAccountId], references: [id], onDelete: Cascade)
+  activity PlatformActivityEvent[]
+
+  @@index([tenantId, startedAt])
+  @@index([platformAccountId, startedAt])
+  @@index([endedAt, lastSeenAt])
+}
+
+model TenantCapabilityOrder {
+  id           String   @id @default(cuid())
+  tenantId     String
+  capabilityId String
+  position     Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenantAccess TenantAccess @relation(fields: [tenantId], references: [tenantId], onDelete: Cascade)
+  capability   Capability   @relation(fields: [capabilityId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, capabilityId])
+  @@index([tenantId, position])
+  @@index([capabilityId])
+}
+
+
+model PlatformNotificationPreference {
+  id                String   @id @default(cuid())
+  tenantId          String
+  platformAccountId String
+  emailEnabled      Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  tenant  Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  account PlatformAccount @relation(fields: [platformAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, platformAccountId])
+  @@index([platformAccountId])
+}
+
+
+model PlatformNotice {
+  id                String   @id @default(cuid())
+  tenantId          String
+  platformAccountId String
+  type              String
+  title             String
+  body              String   @default("")
+  metadata          Json     @default("{}")
+  readAt            DateTime?
+  createdAt         DateTime @default(now())
+
+  tenant  Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  account PlatformAccount @relation(fields: [platformAccountId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([platformAccountId, readAt, createdAt])
 }
