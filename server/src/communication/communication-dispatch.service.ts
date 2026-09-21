@@ -5,6 +5,7 @@ import { CommunicationHistoryService } from './communication-history.service';
 import { TelegramBotService } from './telegram-bot.service';
 import { EmailChannelService } from './email-channel.service';
 import type { MessagePurpose } from './message-purpose';
+import { FirstRunService } from '../first-run/first-run.service';
 
 function text(value: unknown) { return String(value ?? '').trim(); }
 
@@ -16,6 +17,7 @@ export class CommunicationDispatchService {
     private readonly history: CommunicationHistoryService,
     private readonly telegram: TelegramBotService,
     private readonly email: EmailChannelService,
+    private readonly firstRun: FirstRunService,
   ) {}
 
   private async availableChannels(tenantId: string, input: { phone?: unknown; uei?: unknown }) {
@@ -40,6 +42,7 @@ export class CommunicationDispatchService {
   }
 
   async send(tenantId: string, input: { phone?: unknown; uei?: unknown; channel?: unknown; subject?: unknown; body?: unknown; attachments?: unknown; purpose: MessagePurpose }) {
+    await this.firstRun.assertRealOperationsAllowed(tenantId);
     const body = text(input?.body);
     const attachments = Array.isArray(input?.attachments) ? input.attachments : [];
     if (!body && !attachments.length) throw new BadRequestException('Пустое сообщение');
