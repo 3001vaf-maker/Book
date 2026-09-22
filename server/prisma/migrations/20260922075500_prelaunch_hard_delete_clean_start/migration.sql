@@ -72,9 +72,10 @@ $cleanup$;
 
 -- One-time clean start: capture only accounts attached to incoming non-OWNER workspaces.
 CREATE TEMP TABLE "_book_prelaunch_cleanup_tenants" ON COMMIT DROP AS
-SELECT "tenantId"
-FROM "TenantAccess"
-WHERE "isOwnerBook" = false;
+SELECT tenant."id" AS "tenantId"
+FROM "Tenant" tenant
+LEFT JOIN "TenantAccess" access ON access."tenantId" = tenant."id"
+WHERE COALESCE(access."isOwnerBook", false) = false;
 
 CREATE TEMP TABLE "_book_prelaunch_cleanup_accounts" ON COMMIT DROP AS
 SELECT DISTINCT membership."platformAccountId"
@@ -90,9 +91,7 @@ WHERE tenant."id" = cleanup."tenantId";
 -- Delete only now-orphaned incoming platform profiles.
 -- OWNER/admin accounts and accounts still attached to another workspace are preserved.
 DELETE FROM "PlatformAccount" account
-USING "_book_prelaunch_cleanup_accounts" cleanup
-WHERE account."id" = cleanup."platformAccountId"
-  AND NOT EXISTS (
+WHERE NOT EXISTS (
     SELECT 1 FROM "Membership" membership
     WHERE membership."platformAccountId" = account."id"
   )
