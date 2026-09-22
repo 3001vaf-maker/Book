@@ -76,6 +76,7 @@ jobs:
           mv server/prisma/migrations/20260922043000_detach_immutable_legal_events /tmp/profile-migrations/
           mv server/prisma/migrations/20260922075500_prelaunch_hard_delete_clean_start /tmp/profile-migrations/
           mv server/prisma/migrations/20260922081000_purge_non_owner_profiles /tmp/profile-migrations/
+          mv server/prisma/migrations/20260922094500_purge_unapproved_legacy_live /tmp/profile-migrations/
           (
             cd server
             DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' npx prisma migrate deploy
@@ -275,16 +276,26 @@ jobs:
           INSERT INTO "PlatformActivityEvent" (
             "id","tenantId","platformAccountId","eventType","metadata","occurredAt","createdAt"
           )
-          VALUES (
-            'approved-live-event','approved-live-tenant','approved-live-account',
-            'LIVE_APPROVED_BY_ADMIN','{"platformAdminId":"upgrade-admin"}'::jsonb,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP
-          );
+          VALUES
+            (
+              'dirty-live-legacy-event','dirty-live-tenant','dirty-live-account',
+              'COMMERCIAL_MODE_CHANGED','{"commercialMode":"LIVE"}'::jsonb,CURRENT_TIMESTAMP - INTERVAL '2 minutes',CURRENT_TIMESTAMP - INTERVAL '2 minutes'
+            ),
+            (
+              'approved-live-request','approved-live-tenant','approved-live-account',
+              'LIVE_REQUESTED','{}'::jsonb,CURRENT_TIMESTAMP - INTERVAL '1 minute',CURRENT_TIMESTAMP - INTERVAL '1 minute'
+            ),
+            (
+              'approved-live-event','approved-live-tenant','approved-live-account',
+              'LIVE_APPROVED_BY_ADMIN','{"platformAdminId":"upgrade-admin"}'::jsonb,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP
+            );
           SQL
       - name: Apply incoming profile clean-start purge
         shell: bash
         run: |
           set -euo pipefail
           mv /tmp/profile-migrations/20260922081000_purge_non_owner_profiles server/prisma/migrations/
+          mv /tmp/profile-migrations/20260922094500_purge_unapproved_legacy_live server/prisma/migrations/
           (
             cd server
             DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' npx prisma migrate deploy
