@@ -641,6 +641,7 @@ jobs:
           mkdir -p /tmp/prelaunch-recovery-migrations
           mv server/prisma/migrations/20260922075500_prelaunch_hard_delete_clean_start /tmp/prelaunch-recovery-migrations/
           mv server/prisma/migrations/20260922081000_purge_non_owner_profiles /tmp/prelaunch-recovery-migrations/
+          mv server/prisma/migrations/20260922094500_purge_unapproved_legacy_live /tmp/prelaunch-recovery-migrations/
           (
             cd server
             DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' npx prisma migrate deploy
@@ -684,6 +685,7 @@ jobs:
           set -euo pipefail
           mv /tmp/prelaunch-recovery-migrations/20260922075500_prelaunch_hard_delete_clean_start server/prisma/migrations/
           mv /tmp/prelaunch-recovery-migrations/20260922081000_purge_non_owner_profiles server/prisma/migrations/
+          mv /tmp/prelaunch-recovery-migrations/20260922094500_purge_unapproved_legacy_live server/prisma/migrations/
           (
             cd server
             DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' npx prisma migrate deploy
