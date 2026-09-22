@@ -14,6 +14,7 @@ import { PlatformNoticeService } from '../platform-notice/platform-notice.servic
 const SCENARIO_KEY = 'first-run';
 const DEMO_DAYS = 14;
 const SESSION_TIMEOUT_MS = 15 * 60 * 1000;
+const RKN_GUIDE_TEMPLATE_KEY = 'rkn-notification-guide-template';
 
 type JsonObject = Record<string, any>;
 
@@ -71,6 +72,31 @@ export class FirstRunService {
     return version;
   }
 
+  private async rknGuideTemplate() {
+    const rows = await this.prisma.$queryRaw<Array<{
+      key: string;
+      title: string;
+      version: number;
+      content: string;
+    }>>`
+      SELECT d."key", d."title", v."version", v."contentSnapshot" AS "content"
+      FROM "PlatformDocument" d
+      JOIN LATERAL (
+        SELECT "version", "contentSnapshot"
+        FROM "PlatformDocumentVersion"
+        WHERE "documentId" = d."id"
+        ORDER BY "version" DESC, "publishedAt" DESC
+        LIMIT 1
+      ) v ON true
+      WHERE d."key" = ${RKN_GUIDE_TEMPLATE_KEY}
+        AND d."isActive" = true
+      LIMIT 1
+    `;
+    const template = rows[0];
+    if (!template?.content) throw new ConflictException('Шаблон инструкции РКН не опубликован в Реестре документов');
+    return template;
+  }
+
   private async rknGuideSnapshot(tenantId: string, platformAccountId: string) {
     const [profile, operational] = await Promise.all([
       this.prisma.profile.findUnique({
@@ -95,7 +121,7 @@ export class FirstRunService {
     }));
 
     return {
-      fullName: [profile.name, profile.surname].map(text).filter(Boolean).join(' ') || 'Не указано',
+      fullName: [profile.name, profile.surname].map(text).filter(Boolean).join(' '),
       profession: text(profile.profession),
       phone: phones[0] || '',
       email: emails[0] || '',
@@ -104,19 +130,58 @@ export class FirstRunService {
     };
   }
 
-  private renderRknGuidePdf(snapshotValue: unknown, generatedAtValue: unknown) {
+  private personalizeRknGuide(
+    templateContent: string,
+    snapshotValue: unknown,
+    templateVersion: number,
+    personalVersion: number,
+    generatedAt: Date,
+  ) {
     const snapshot = objectValue(snapshotValue);
-    const workplaces = arrayValue(snapshot.workplaces).map((value) => objectValue(value));
-    const procedures = arrayValue(snapshot.procedures).map(text).filter(Boolean);
-    const workplaceLines = workplaces.map((workplace, index) => {
+    const workplaceLines = arrayValue(snapshot.workplaces).map((value) => {
+      const workplace = objectValue(value);
       const parts = [text(workplace.name), text(workplace.city), text(workplace.address)].filter(Boolean);
-      return `${index + 1}. ${parts.join(' · ') || 'Рабочее пространство'}`;
+      return `• ${parts.join(' · ') || 'Рабочее место'}`;
     });
-    const generatedAt = new Date(String(generatedAtValue || ''));
-    const generatedMoment = Number.isFinite(generatedAt.getTime()) ? generatedAt : new Date();
+    const procedureLines = arrayValue(snapshot.procedures).map(text).filter(Boolean).map((value) => `• ${value}`);
+    const marketingSection = [
+      'Что видите в форме',
+      'Отдельная цель обработки для продвижения товаров, работ, услуг на рынке',
+      '',
+      'Что делать',
+      'Добавлять эту цель только если вы фактически используете персональные данные для рекламных/маркетинговых сообщений.',
+      'Для этой цели отмечать только те контактные данные и идентификаторы каналов, которые реально используются для рассылки.',
+      'Правовое основание для рекламной цели не подменять договором: предварительное согласие на рекламу должно быть доказуемым.',
+      '',
+      'Почему',
+      'Маркетинговая обработка отделяется от записи и оказания услуги. Если маркетинг не используется, отдельную маркетинговую цель не добавлять.',
+    ].join('\n');
+    const values: Record<string, string> = {
+      FULL_NAME: text(snapshot.fullName) || 'не указано',
+      PROFESSION: text(snapshot.profession) || 'не указана',
+      PHONE: text(snapshot.phone) || 'не указан',
+      EMAIL: text(snapshot.email) || 'не указан',
+      WORKPLACES: workplaceLines.length ? workplaceLines.join('\n') : '• не указаны',
+      PROCEDURES: procedureLines.length ? procedureLines.join('\n') : '• услуги не добавлены',
+      MARKETING_SECTION: marketingSection,
+      TEMPLATE_VERSION: String(templateVersion || 1),
+      PERSONAL_VERSION: String(personalVersion || 1),
+      GENERATED_AT: new Intl.DateTimeFormat('ru-RU', { dateStyle: 'long', timeStyle: 'short' }).format(generatedAt),
+    };
+    let result = templateContent;
+    for (const [key, value] of Object.entries(values)) {
+      result = result.split(`[[${key}]]`).join(value);
+    }
+    return result;
+  }
 
-    const doc = new PDFDocument({ size: 'A4', margins: { top: 48, bottom: 48, left: 52, right: 52 } });
-    doc.font('/usr/share/fonts/ttf-dejavu/DejaVuSans.ttf');
+  private renderRknGuidePdf(contentValue: unknown, titleValue: unknown) {
+    const content = String(contentValue || '');
+    const title = text(titleValue) || 'Инструкция по уведомлению Роскомнадзора';
+    const regularFont = '/usr/share/fonts/dejavu/DejaVuSans.ttf';
+    const boldFont = '/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf';
+    const doc = new PDFDocument({ size: 'A4', margins: { top: 46, bottom: 46, left: 48, right: 48 } });
+    doc.font(regularFont);
     const chunks: Buffer[] = [];
     const result = new Promise<Buffer>((resolve, reject) => {
       doc.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
@@ -124,91 +189,87 @@ export class FirstRunService {
       doc.on('error', reject);
     });
 
-    const heading = (value: string) => {
-      doc.moveDown(0.7).fontSize(14).text(value, { underline: false }).moveDown(0.3);
-      doc.fontSize(10.5);
-    };
-    const item = (value: string) => doc.text(`• ${value}`, { indent: 8, paragraphGap: 3 });
+    doc.info.Title = title;
+    const lines = content.split(/\r?\n/);
+    const majorHeading = /^(BOOK|ЭКРАН|ПОВТОРЯЮЩИЙСЯ|БЛОК|КОНТРОЛЬ|ПРОФЕССИЯ И УСЛУГИ)/;
+    const labelHeading = /^(КАК ПОЛЬЗОВАТЬСЯ|ВАЖНО ОБ ОТВЕТСТВЕННОСТИ|ПЕРСОНАЛЬНЫЕ ДАННЫЕ ДЛЯ ЭТОЙ ИНСТРУКЦИИ|ПРОВЕРКА ПЕРЕД НАЧАЛОМ|МАРКЕТИНГ|Что видите в форме|Что делать|Почему|Внимание|Проверить отдельно|Не ставить автоматически|Перед отправкой)$/;
 
-    doc.info.Title = 'Подготовка к уведомлению об обработке персональных данных';
-    doc.fontSize(18).text('Подготовка к уведомлению об обработке персональных данных');
-    doc.moveDown(0.5).fontSize(9.5).fillColor('#555555')
-      .text('Персональный рабочий лист. Он помогает подготовить сведения для официальной формы Роскомнадзора, но не является юридическим заключением и не подтверждает факт подачи уведомления.');
-    doc.fillColor('#000000');
-
-    heading('1. Данные профиля, которые уже есть в системе');
-    item(`Пользователь: ${text(snapshot.fullName) || 'Не указано'}`);
-    item(`Вид деятельности: ${text(snapshot.profession) || 'не указан'}`);
-    item(`Контактный телефон: ${text(snapshot.phone) || 'не указан'}`);
-    item(`Электронная почта: ${text(snapshot.email) || 'не указана'}`);
-    if (workplaceLines.length) {
-      doc.text('Рабочие пространства:');
-      workplaceLines.forEach((value) => item(value));
-    } else {
-      item('Рабочее пространство: не указано');
+    for (const rawLine of lines) {
+      const line = rawLine.trimEnd();
+      if (!line.trim()) {
+        doc.moveDown(0.45);
+        continue;
+      }
+      if (majorHeading.test(line)) {
+        doc.moveDown(0.35).font(boldFont).fontSize(line.startsWith('BOOK') ? 16 : 13).fillColor('#111111')
+          .text(line, { paragraphGap: 4 });
+        doc.font(regularFont).fontSize(10.2).fillColor('#111111');
+        continue;
+      }
+      if (labelHeading.test(line)) {
+        doc.moveDown(0.2).font(boldFont).fontSize(10.4).fillColor('#333333').text(line, { paragraphGap: 2 });
+        doc.font(regularFont).fontSize(10.2).fillColor('#111111');
+        continue;
+      }
+      if (/^[✓×•]/.test(line)) {
+        doc.font(regularFont).fontSize(10.2).fillColor('#111111').text(line, { indent: 10, paragraphGap: 2 });
+        continue;
+      }
+      doc.font(regularFont).fontSize(10.2).fillColor('#111111').text(line, {
+        lineGap: 1.8,
+        paragraphGap: 3,
+      });
     }
 
-    heading('2. Настроенная деятельность');
-    if (procedures.length) {
-      doc.text('Добавленные услуги:');
-      procedures.slice(0, 30).forEach((value) => item(value));
-      if (procedures.length > 30) item(`И ещё: ${procedures.length - 30}`);
-    } else {
-      item('Услуги ещё не добавлены');
-    }
-
-    heading('3. Что подготовить перед заполнением официальной формы');
-    [
-      'Сведения об операторе персональных данных и актуальные контактные данные.',
-      'Фактические цели обработки персональных данных в вашей деятельности.',
-      'Категории людей, чьи данные вы действительно будете обрабатывать.',
-      'Категории и конкретный состав персональных данных, которые действительно необходимы для этих целей.',
-      'Перечень операций с данными и способы обработки, которые используются фактически.',
-      'Сведения о хранении, защите и месте нахождения базы данных.',
-      'Дату начала обработки и условия прекращения обработки.',
-      'Сведения об ответственных лицах и мерах защиты — в объёме, который требует актуальная официальная форма.',
-    ].forEach(item);
-
-    heading('4. Важное для работы с системой');
-    [
-      'Не переносите в рабочую среду реальные персональные данные других людей до того, как определены законные основания их обработки.',
-      'Рекламные и маркетинговые сообщения требуют отдельного предварительного согласия адресата; это согласие не заменяется обычным согласием на обработку персональных данных.',
-      'В учебном сценарии используйте только вымышленные данные.',
-      'После подачи уведомления сохраняйте у себя подтверждение и актуализируйте сведения при изменении фактической обработки.',
-    ].forEach(item);
-
-    heading('5. Официальный сервис');
-    doc.fillColor('#1f4f8a').text('https://pd.rkn.gov.ru/operators-registry/notification/', {
-      link: 'https://pd.rkn.gov.ru/operators-registry/notification/',
-      underline: true,
-    });
-    doc.fillColor('#000000').moveDown(0.4)
-      .text('Перед отправкой сверяйте поля и формулировки с актуальной официальной формой и своей фактической деятельностью.');
-
-    heading('6. Что система намеренно не подставляет');
-    [
-      'паспортные данные;',
-      'ИНН и ОГРНИП;',
-      'юридический адрес;',
-      'реальные персональные данные других людей.',
-    ].forEach(item);
-
-    doc.moveDown(1).fontSize(8.5).fillColor('#666666')
-      .text(`Сформировано: ${new Intl.DateTimeFormat('ru-RU', { dateStyle: 'long', timeStyle: 'short' }).format(generatedMoment)}`);
     doc.end();
     return result;
+  }
+
+  async ensureRknGuide(tenantId: string, platformAccountId: string) {
+    const snapshot = await this.rknGuideSnapshot(tenantId, platformAccountId);
+    if (!text(snapshot.fullName) || !text(snapshot.profession) || !snapshot.workplaces.length) {
+      return { ready: false, reason: 'PROFILE_NOT_READY' };
+    }
+
+    const template = await this.rknGuideTemplate();
+    const archive = await this.documentArchive.get(tenantId);
+    if (!archive?.verified) throw new ConflictException('Архив документов ещё не готов');
+    const documents = arrayValue(archive?.data?.documents);
+    const canonicalGuides = documents.filter((item) => (
+      objectValue(item).attachment?.type === 'RKN_GUIDE_PDF'
+      && objectValue(objectValue(item).attachment).templateKey === RKN_GUIDE_TEMPLATE_KEY
+    ));
+    const personalVersion = canonicalGuides.length + 1;
+    const generatedAt = new Date();
+    const personalizedContent = this.personalizeRknGuide(
+      template.content,
+      snapshot,
+      template.version,
+      personalVersion,
+      generatedAt,
+    );
+    const pdf = await this.renderRknGuidePdf(personalizedContent, template.title);
+    const document = await this.documentArchive.saveRknGuide(tenantId, {
+      snapshot,
+      templateKey: template.key,
+      templateVersion: template.version,
+      templateContent: template.content,
+      personalizedContent,
+      pdfBase64: pdf.toString('base64'),
+    });
+    return { ready: true, document };
   }
 
   async rknGuide(tenantId: string, platformAccountId: string, documentId = '') {
     const stored = documentId
       ? await this.documentArchive.rknGuideDocument(tenantId, documentId)
-      : await this.documentArchive.saveRknGuide(
-        tenantId,
-        await this.rknGuideSnapshot(tenantId, platformAccountId),
-      );
+      : (await this.ensureRknGuide(tenantId, platformAccountId)).document;
+    if (!stored) throw new ConflictException('Персональная инструкция РКН ещё не готова');
     const attachment = objectValue((stored as JsonObject).attachment);
+    const pdfBase64 = text(attachment.pdfBase64);
+    if (!pdfBase64) throw new ConflictException('Сохранённая версия PDF недоступна. Сформируйте актуальную версию.');
     return {
-      pdf: await this.renderRknGuidePdf(attachment.snapshot, attachment.generatedAt),
+      pdf: Buffer.from(pdfBase64, 'base64'),
       documentId: text((stored as JsonObject).id),
       fileName: text(attachment.fileName) || 'rkn-guide.pdf',
     };
@@ -641,6 +702,10 @@ export class FirstRunService {
     }
     if (step.kind === 'REQUIRED_INFO' && !existingStep?.modalSeenAt) {
       throw new ConflictException('Сначала ознакомьтесь с информацией этого этапа');
+    }
+    if (action === 'complete' && step.key === 'procedures') {
+      const guide = await this.ensureRknGuide(tenantId, platformAccountId);
+      if (!guide.ready) throw new ConflictException('Сначала заполните профиль и рабочие данные для персональной инструкции РКН');
     }
 
     const now = new Date();
