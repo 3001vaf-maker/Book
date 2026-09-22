@@ -8,7 +8,7 @@ const adminService = fs.readFileSync('server/src/saas-admin/saas-admin.service.t
 const adminModule = fs.readFileSync('server/src/saas-admin/saas-admin.module.ts', 'utf8');
 const adminUi = fs.readFileSync('admin/admin.js', 'utf8');
 const inviteUi = fs.readFileSync('invite/invite.js', 'utf8');
-const hardDeleteMigration = fs.readFileSync('server/prisma/migrations/20260921233000_allow_test_tenant_hard_delete/migration.sql', 'utf8');
+const immutableLegalHistoryMigration = fs.readFileSync('server/prisma/migrations/20260922043000_detach_immutable_legal_events/migration.sql', 'utf8');
 
 assert.match(invitation, /async createRegistrationLink\(/);
 assert.match(invitation, /@registration\.invalid/);
