@@ -598,6 +598,160 @@ jobs:
         run: docker compose -f docker-compose.staging.yml down -v
 
 
+  prelaunch-failed-migration-recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install server dependencies
+        run: npm install --prefix server
+      - name: Generate Prisma client
+        run: npm run prisma:generate --prefix server
+      - name: Start isolated database
+        run: |
+          docker compose -f docker-compose.staging.yml up -d db
+          for attempt in $(seq 1 30); do
+            if docker compose -f docker-compose.staging.yml exec -T db pg_isready -U book -d book_staging >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose -f docker-compose.staging.yml logs db
+          exit 1
+      - name: Apply chain before failed 07:55
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/prelaunch-recovery-migrations
+          mv server/prisma/migrations/20260922075500_prelaunch_hard_delete_clean_start /tmp/prelaunch-recovery-migrations/
+          mv server/prisma/migrations/20260922081000_purge_non_owner_profiles /tmp/prelaunch-recovery-migrations/
+          (
+            cd server
+            DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' npx prisma migrate deploy
+          )
+      - name: Simulate production P3009 row
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.staging.yml exec -T db psql -U book -d book_staging -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO "_prisma_migrations" (
+            "id","checksum","finished_at","migration_name","logs","rolled_back_at","started_at","applied_steps_count"
+          )
+          VALUES (
+            '22222222-2222-4222-8222-222222222222',
+            'simulated-failed-prelaunch-checksum',
+            NULL,
+            '20260922075500_prelaunch_hard_delete_clean_start',
+            'simulated production P3009 for failed 07:55',
+            NULL,
+            CURRENT_TIMESTAMP,
+            0
+          );
+          SQL
+      - name: Verify guarded recovery and resolve failed 07:55
+        shell: bash
+        run: |
+          set -uo pipefail
+          cd server
+          set +e
+          DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' node scripts/recover-failed-prelaunch-migration.mjs
+          recovery_status=$?
+          set -e
+          if [ "$recovery_status" -ne 42 ]; then
+            echo "Expected guarded recovery exit 42, got $recovery_status"
+            exit 1
+          fi
+          DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' npx prisma migrate resolve --rolled-back 20260922075500_prelaunch_hard_delete_clean_start
+      - name: Restore and retry corrected migrations
+        shell: bash
+        run: |
+          set -euo pipefail
+          mv /tmp/prelaunch-recovery-migrations/20260922075500_prelaunch_hard_delete_clean_start server/prisma/migrations/
+          mv /tmp/prelaunch-recovery-migrations/20260922081000_purge_non_owner_profiles server/prisma/migrations/
+          (
+            cd server
+            DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' npx prisma migrate deploy
+          )
+      - name: Verify recovered migration state
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.staging.yml exec -T db psql -U book -d book_staging -v ON_ERROR_STOP=1 <<'SQL'
+          DO $recovery_check$
+          BEGIN
+            IF (
+              SELECT COUNT(*)
+              FROM "_prisma_migrations"
+              WHERE "id" = '22222222-2222-4222-8222-222222222222'
+                AND "rolled_back_at" IS NOT NULL
+            ) <> 1 THEN
+              RAISE EXCEPTION 'Failed 07:55 row was not marked rolled back';
+            END IF;
+
+            IF (
+              SELECT COUNT(*)
+              FROM "_prisma_migrations"
+              WHERE "migration_name" = '20260922075500_prelaunch_hard_delete_clean_start'
+                AND "finished_at" IS NOT NULL
+                AND "rolled_back_at" IS NULL
+            ) <> 1 THEN
+              RAISE EXCEPTION 'Corrected 07:55 was not applied successfully';
+            END IF;
+
+            IF NOT EXISTS (
+              SELECT 1 FROM information_schema.columns
+              WHERE table_schema = 'public'
+                AND table_name = 'TenantAccess'
+                AND column_name = 'liveApprovedAt'
+            ) THEN
+              RAISE EXCEPTION 'LIVE approval schema was not applied';
+            END IF;
+
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_trigger
+              WHERE tgname = 'PlatformConsentEvent_append_only'
+                AND NOT tgisinternal
+            ) THEN
+              RAISE EXCEPTION 'PlatformConsentEvent append-only trigger was lost';
+            END IF;
+
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_trigger
+              WHERE tgname = 'PlatformActivityEvent_append_only'
+                AND NOT tgisinternal
+            ) THEN
+              RAISE EXCEPTION 'PlatformActivityEvent append-only trigger was lost';
+            END IF;
+
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_constraint
+              WHERE conname = 'WorkspaceState_tenantId_fkey'
+            ) THEN
+              RAISE EXCEPTION 'WorkspaceState tenant FK missing after recovery';
+            END IF;
+
+            IF EXISTS (
+              SELECT 1 FROM pg_constraint
+              WHERE conname IN (
+                'PlatformConsentEvent_tenantId_fkey',
+                'PlatformConsentEvent_platformAccountId_fkey'
+              )
+            ) THEN
+              RAISE EXCEPTION 'Unsafe PlatformConsentEvent cascade FK returned';
+            END IF;
+          END
+          $recovery_check$;
+          SQL
+      - name: Stop isolated database
+        if: always()
+        run: docker compose -f docker-compose.staging.yml down -v
+
+
   staging-smoke:
     if: github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/main' || github.base_ref == 'staging' || github.base_ref == 'main'
     runs-on: ubuntu-latest
