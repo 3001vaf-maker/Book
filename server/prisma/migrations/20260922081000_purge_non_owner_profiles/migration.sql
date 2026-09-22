@@ -127,7 +127,7 @@ WHERE NOT EXISTS (
 
 -- Remove account-scoped test residue too (for example consent rows whose
 -- tenantId is NULL). This is still limited to orphaned incoming accounts.
-DO $$
+DO $
 DECLARE
   row_record RECORD;
 BEGIN
@@ -144,7 +144,21 @@ BEGIN
       row_record.table_name
     );
   END LOOP;
-END $$;
+
+  -- Legacy legal/audit tables used actorUserId before the current naming.
+  FOR row_record IN
+    SELECT DISTINCT table_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND column_name = 'actorUserId'
+    ORDER BY table_name
+  LOOP
+    EXECUTE format(
+      'DELETE FROM public.%I WHERE "actorUserId" IN (SELECT "platformAccountId" FROM "_BookDeletePlatformAccount")',
+      row_record.table_name
+    );
+  END LOOP;
+END $;
 
 DELETE FROM "PlatformAccount" account_row
 USING "_BookDeletePlatformAccount" incoming
