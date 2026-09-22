@@ -1,6 +1,5 @@
 import { actionBlock, button, escapeHtml, field, folderList, iconButton, initViewNavigation, list, modal, mountModal, page, pageHeader, shortDateTime, textareaField, viewNavigation } from '../../ui/ui.js';
-import { downloadRknGuide } from '../../first-run/api.js';
-import { refreshTenantDocumentArchive } from '../../tenant-document-archive.js';
+import { downloadRknGuide } from '../../tenant-document-archive.js';
 import { phonesMatch } from '../../core/phone/index.js';
 import { getAllPeople } from '../../main/people/data.js';
 import { createDocument, getDocuments, saveDocument } from './data.js';
