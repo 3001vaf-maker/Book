@@ -227,8 +227,8 @@ export class FirstRunService {
 
   async ensureRknGuide(tenantId: string, platformAccountId: string) {
     const snapshot = await this.rknGuideSnapshot(tenantId, platformAccountId);
-    if (!text(snapshot.fullName) || !text(snapshot.profession) || !snapshot.workplaces.length) {
-      return { ready: false, reason: 'PROFILE_NOT_READY' };
+    if (!text(snapshot.fullName) || !text(snapshot.profession) || !snapshot.workplaces.length || !snapshot.procedures.length) {
+      return { ready: false, reason: 'PROFILE_OR_SERVICES_NOT_READY' };
     }
 
     const template = await this.rknGuideTemplate();
