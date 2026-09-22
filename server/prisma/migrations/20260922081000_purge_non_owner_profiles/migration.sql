@@ -49,7 +49,7 @@ WHERE NOT EXISTS (
 
 -- Remove every row scoped to an incoming Tenant explicitly.
 -- This also cleans old tables whose historical FK behavior no longer matches the current Prisma schema.
-DO $
+DO $$
 DECLARE
   row_record RECORD;
 BEGIN
@@ -66,7 +66,7 @@ BEGIN
       row_record.table_name
     );
   END LOOP;
-END $;
+END $$;
 
 DELETE FROM "Tenant" t
 USING "_BookIncomingTenant" incoming
