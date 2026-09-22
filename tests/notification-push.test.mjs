@@ -54,5 +54,7 @@ assert.match(platformNoticeController, /push\/subscription/);
 assert.match(adminUi, /navigator\.serviceWorker\.register\('\/service-worker\.js'/);
 assert.match(adminUi, /Notification\.requestPermission/);
 assert.match(adminUi, /data-live-request-count/);
+assert.match(adminUi, /data-enable-admin-push/);
+assert.match(adminUi, /Включить PUSH/);
 
 console.log('account and platform notification Web Push tests passed');
