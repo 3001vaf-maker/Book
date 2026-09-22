@@ -1,14 +1,140 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
+import * as webpush from 'web-push';
 import { PrismaService } from '../prisma.service';
 
 function json(value: unknown): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(value ?? {})) as Prisma.InputJsonValue;
 }
 
+function text(value: unknown) {
+  return String(value ?? '').trim();
+}
+
+function validEndpoint(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 @Injectable()
 export class PlatformNoticeService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private pushConfig() {
+    const publicKey = text(process.env.WEB_PUSH_VAPID_PUBLIC_KEY);
+    const privateKey = text(process.env.WEB_PUSH_VAPID_PRIVATE_KEY);
+    const subject = text(process.env.WEB_PUSH_VAPID_SUBJECT);
+    return {
+      enabled: Boolean(publicKey && privateKey && subject),
+      publicKey,
+      privateKey,
+      subject,
+    };
+  }
+
+  pushConfiguration() {
+    const config = this.pushConfig();
+    return { enabled: config.enabled, publicKey: config.enabled ? config.publicKey : '' };
+  }
+
+  async savePushSubscription(platformAccountId: string, input: unknown, userAgent = '') {
+    const config = this.pushConfig();
+    if (!config.enabled) return { subscribed: false, enabled: false };
+    const source = input && typeof input === 'object' && !Array.isArray(input) ? input as Record<string, any> : {};
+    const endpoint = text(source.endpoint);
+    const keys = source.keys && typeof source.keys === 'object' && !Array.isArray(source.keys)
+      ? source.keys as Record<string, any>
+      : {};
+    const p256dh = text(keys.p256dh);
+    const auth = text(keys.auth);
+    if (!validEndpoint(endpoint) || !p256dh || !auth) throw new BadRequestException('Некорректная Push-подписка');
+
+    const account = await this.prisma.platformAccount.findUnique({
+      where: { id: platformAccountId },
+      select: { id: true },
+    });
+    if (!account) throw new NotFoundException('Платформенный аккаунт не найден');
+
+    await this.prisma.$executeRaw`
+      INSERT INTO "PlatformPushSubscription" (
+        "id", "platformAccountId", "endpoint", "p256dh", "auth", "userAgent", "createdAt", "updatedAt"
+      ) VALUES (
+        ${randomUUID()}, ${platformAccountId}, ${endpoint}, ${p256dh}, ${auth}, ${text(userAgent).slice(0, 1000)},
+        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+      )
+      ON CONFLICT ("endpoint") DO UPDATE
+      SET "platformAccountId" = EXCLUDED."platformAccountId",
+          "p256dh" = EXCLUDED."p256dh",
+          "auth" = EXCLUDED."auth",
+          "userAgent" = EXCLUDED."userAgent",
+          "updatedAt" = CURRENT_TIMESTAMP
+    `;
+    return { subscribed: true, enabled: true };
+  }
+
+  async deletePushSubscription(platformAccountId: string, endpointValue: unknown) {
+    const endpoint = text(endpointValue);
+    if (!endpoint) return { subscribed: false };
+    await this.prisma.$executeRaw`
+      DELETE FROM "PlatformPushSubscription"
+      WHERE "platformAccountId" = ${platformAccountId}
+        AND "endpoint" = ${endpoint}
+    `;
+    return { subscribed: false };
+  }
+
+  private async dispatchPush(
+    platformAccountId: string,
+    notice: { id: string; title: string; body: string; type: string; metadata: unknown },
+  ) {
+    const config = this.pushConfig();
+    if (!config.enabled) return { sent: 0, failed: 0 };
+    webpush.setVapidDetails(config.subject, config.publicKey, config.privateKey);
+
+    const rows = await this.prisma.$queryRaw<Array<{ endpoint: string; p256dh: string; auth: string }>>`
+      SELECT "endpoint", "p256dh", "auth"
+      FROM "PlatformPushSubscription"
+      WHERE "platformAccountId" = ${platformAccountId}
+      ORDER BY "updatedAt" DESC
+    `;
+    const metadata = notice.metadata && typeof notice.metadata === 'object' && !Array.isArray(notice.metadata)
+      ? notice.metadata as Record<string, any>
+      : {};
+    const tenantId = text(metadata.tenantId);
+    const url = tenantId ? `/admin/?liveRequest=${encodeURIComponent(tenantId)}` : '/admin/';
+    const payload = JSON.stringify({
+      notificationId: notice.id,
+      title: notice.title,
+      body: notice.body,
+      type: notice.type,
+      tag: notice.id,
+      url,
+    });
+
+    let sent = 0;
+    let failed = 0;
+    for (const row of rows) {
+      try {
+        await webpush.sendNotification({
+          endpoint: row.endpoint,
+          keys: { p256dh: row.p256dh, auth: row.auth },
+        }, payload, { TTL: 86400, urgency: 'high' });
+        sent += 1;
+      } catch (error) {
+        const statusCode = Number((error as { statusCode?: unknown })?.statusCode || 0);
+        if (statusCode === 404 || statusCode === 410) {
+          await this.prisma.$executeRaw`DELETE FROM "PlatformPushSubscription" WHERE "endpoint" = ${row.endpoint}`;
+        }
+        failed += 1;
+      }
+    }
+    return { sent, failed };
+  }
 
   async list(tenantId: string, platformAccountId: string) {
     const rows = await this.prisma.platformNotice.findMany({
@@ -62,5 +188,47 @@ export class PlatformNoticeService {
         metadata: json(input.metadata),
       },
     });
+  }
+
+  async createForPlatformAdmins(
+    input: { type: string; title: string; body?: string; metadata?: unknown },
+  ) {
+    const admins = await this.prisma.platformAdmin.findMany({
+      select: { platformAccountId: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    const created = [];
+    for (const admin of admins) {
+      const memberships = await this.prisma.membership.findMany({
+        where: { platformAccountId: admin.platformAccountId },
+        include: { tenant: { include: { saasAccess: true } } },
+        orderBy: { createdAt: 'asc' },
+      });
+      const membership = memberships.find((item) => item.tenant.saasAccess?.isOwnerBook) || memberships[0];
+      if (!membership) continue;
+      const notice = await this.prisma.platformNotice.create({
+        data: {
+          tenantId: membership.tenantId,
+          platformAccountId: admin.platformAccountId,
+          type: input.type,
+          title: input.title,
+          body: input.body || '',
+          metadata: json(input.metadata),
+        },
+      });
+      await this.dispatchPush(admin.platformAccountId, notice).catch(() => ({ sent: 0, failed: 0 }));
+      created.push(notice);
+    }
+    return created;
+  }
+
+  async resolveLiveRequest(targetTenantId: string) {
+    await this.prisma.$executeRaw`
+      UPDATE "PlatformNotice"
+      SET "readAt" = COALESCE("readAt", CURRENT_TIMESTAMP)
+      WHERE "type" = 'LIVE_REQUESTED'
+        AND "metadata"->>'tenantId' = ${targetTenantId}
+        AND "readAt" IS NULL
+    `;
   }
 }
