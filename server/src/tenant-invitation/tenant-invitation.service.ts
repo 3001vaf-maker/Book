@@ -55,6 +55,14 @@ function normalizeName(value: unknown) {
   return String(value || '').trim();
 }
 
+function normalizePhone(value: unknown) {
+  return String(value || '').trim();
+}
+
+function validRegistrationPhone(value: string) {
+  return value.replace(/\D/g, '').length >= 5;
+}
+
 function invitationHash(token: string) {
   return createHash('sha256').update(token).digest('hex');
 }
@@ -187,6 +195,7 @@ export class TenantInvitationService {
     invitation: { id: string; tenantId: string; tenant: { id: string; name: string } },
     email: string,
     password: string,
+    registrationProfile: { name: string; surname: string; phone: string },
     registrationDocuments: Array<{
       documentVersionId: string;
       key: string;
@@ -196,6 +205,7 @@ export class TenantInvitationService {
     }>,
   ) {
     const passwordHash = await hashPassword(password, 12);
+    const preparedFirstRun = await this.firstRun.prepareInvitationAssignment(invitation.id, invitation.tenantId);
     const result = await this.prisma.$transaction(async (tx) => {
       const account = await tx.platformAccount.create({
         data: {
@@ -213,14 +223,36 @@ export class TenantInvitationService {
         },
       });
       const acceptedAt = new Date();
+      await tx.profile.create({
+        data: {
+          tenantId: invitation.tenantId,
+          platformAccountId: account.id,
+          name: registrationProfile.name,
+          surname: registrationProfile.surname,
+          phone: registrationProfile.phone,
+          phones: [registrationProfile.phone],
+          telegrams: [],
+          emails: [email],
+          customProfessions: [],
+          migrationVerifiedAt: acceptedAt,
+        },
+      });
       await tx.tenantInvitation.update({
         where: { id: invitation.id },
         data: {
           email,
+          name: registrationProfile.name,
           status: TenantInvitationStatus.ACCEPTED,
           acceptedAt,
         },
       });
+      await this.firstRun.assignPreparedFromInvitation(
+        tx,
+        invitation.tenantId,
+        account.id,
+        preparedFirstRun,
+        acceptedAt,
+      );
 
       for (const document of registrationDocuments) {
         const eventId = randomBytes(18).toString('hex');
@@ -247,8 +279,6 @@ export class TenantInvitationService {
       tenantId: invitation.tenantId,
       role: result.membership.role,
     });
-
-    await this.firstRun.assignFromInvitation(invitation.id, invitation.tenantId, result.account.id);
 
     return {
       accessToken,
@@ -387,25 +417,32 @@ export class TenantInvitationService {
 
   async inspect(tokenValue: unknown) {
     const invitation = await this.findActiveInvitation(String(tokenValue || ''));
-    const activation = await this.firstRun.activateInvitation(invitation.id, invitation.tenantId);
     const requiresEmail = isRegistrationLinkEmail(invitation.email);
     return {
       email: requiresEmail ? '' : invitation.email,
       name: invitation.name,
       requiresEmail,
-      expiresAt: activation.demoExpiresAt,
+      expiresAt: invitation.expiresAt,
       demo: {
-        activatedAt: activation.activatedAt,
-        expiresAt: activation.demoExpiresAt,
+        activatedAt: '',
+        expiresAt: '',
         days: 14,
       },
-      scenarioVersionId: activation.scenarioVersionId,
+      scenarioVersionId: invitation.firstRunScenarioVersionId || '',
       documents: await this.firstRun.registrationDocuments(),
       tenant: { id: invitation.tenant.id, name: invitation.tenant.name },
     };
   }
 
-  async accept(input: { token?: unknown; password?: unknown; email?: unknown; documents?: unknown }) {
+  async accept(input: {
+    token?: unknown;
+    password?: unknown;
+    email?: unknown;
+    name?: unknown;
+    surname?: unknown;
+    phone?: unknown;
+    documents?: unknown;
+  }) {
     const token = String(input?.token || '').trim();
     const password = String(input?.password || '');
     if (password.length < 10) throw new BadRequestException('Пароль должен содержать минимум 10 символов');
@@ -415,6 +452,12 @@ export class TenantInvitationService {
       ? normalizeEmail(input?.email)
       : invitation.email;
     if (!email || !email.includes('@')) throw new BadRequestException('Укажите корректный email');
+
+    const name = normalizeName(input?.name);
+    const surname = normalizeName(input?.surname);
+    const phone = normalizePhone(input?.phone);
+    if (!name) throw new BadRequestException('Укажите имя');
+    if (!phone || !validRegistrationPhone(phone)) throw new BadRequestException('Укажите корректный номер телефона');
 
     const registrationDocuments = await this.firstRun.validateRegistrationDocuments(input?.documents);
 
@@ -431,7 +474,13 @@ export class TenantInvitationService {
     });
     if (existingInvitation) throw new ConflictException('На этот email уже создано другое активное приглашение');
 
-    return this.acceptPendingInvitation(invitation, email, password, registrationDocuments);
+    return this.acceptPendingInvitation(
+      invitation,
+      email,
+      password,
+      { name, surname, phone },
+      registrationDocuments,
+    );
   }
 
   async listInvitations(adminId: string) {
