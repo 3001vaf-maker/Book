@@ -141,6 +141,8 @@ assert.match(documentCatalog, /Что делать/);
 assert.match(documentCatalog, /ВАЖНО ОБ ОТВЕТСТВЕННОСТИ/);
 assert.match(documentCatalog, /\[\[PROFESSION\]\]/);
 assert.match(documentCatalog, /\[\[UPDATE_SECTION\]\]/);
+assert.doesNotMatch(documentCatalog, /\[\[WORKPLACES\]\]/);
+assert.doesNotMatch(firstRun, /WORKPLACES:/);
 assert.match(firstRun, /Версия \$\{personalVersion\} — инструкция по проверке и изменению ранее поданных сведений/);
 assert.match(firstRun, /Старая версия инструкции остаётся в Документах и не перезаписывается/);
 assert.match(rknTemplateMigration, /rkn-notification-guide-template/);
@@ -152,7 +154,7 @@ assert.doesNotMatch(firstRun, /\/usr\/share\/fonts\/ttf-dejavu\/DejaVuSans\.ttf/
 assert.match(runtime, /modalSeenKey/);
 assert.doesNotMatch(runtime, /data-first-run-rkn-guide/);
 assert.match(core, /syncRknGuideIfReady/);
-assert.match(core, /book:workplaces-changed/);
+assert.doesNotMatch(core, /book:workplaces-changed/);
 assert.match(core, /book:server-mutation-completed/);
 assert.match(core, /FirstRunRuntime/);
 assert.match(core, /renderDemoExpired/);
