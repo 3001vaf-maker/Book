@@ -24,4 +24,4 @@ COPY --from=build /app/server/node_modules ./node_modules
 COPY --from=build /app/server/dist ./dist
 COPY --from=frontend-build /app/_site /app/site
 EXPOSE 3000
-CMD ["sh", "-c", "node scripts/reset-test-account-before-global-migration.mjs; reset_status=$?; if [ \"$reset_status\" -eq 42 ]; then npx prisma migrate resolve --rolled-back 20260921130000_global_account_identity; elif [ \"$reset_status\" -ne 0 ]; then exit \"$reset_status\"; fi; npx prisma migrate deploy && npm run seed:owner && node dist/main.js"]
+CMD ["sh", "-c", "node scripts/recover-failed-prelaunch-migration.mjs; prelaunch_status=$?; if [ \"$prelaunch_status\" -eq 42 ]; then npx prisma migrate resolve --rolled-back 20260922075500_prelaunch_hard_delete_clean_start; elif [ \"$prelaunch_status\" -ne 0 ]; then exit \"$prelaunch_status\"; fi; node scripts/reset-test-account-before-global-migration.mjs; reset_status=$?; if [ \"$reset_status\" -eq 42 ]; then npx prisma migrate resolve --rolled-back 20260921130000_global_account_identity; elif [ \"$reset_status\" -ne 0 ]; then exit \"$reset_status\"; fi; npx prisma migrate deploy && npm run seed:owner && node dist/main.js"]
