@@ -44,8 +44,6 @@ Book отвечает за хранение, техническую обрабо
 Телефон: [[PHONE]]
 Email: [[EMAIL]]
 
-Рабочие места:
-[[WORKPLACES]]
 
 Услуги:
 [[PROCEDURES]]
@@ -361,7 +359,7 @@ Book видит, что вы ведёте запись и оказываете �
 Версия шаблона: [[TEMPLATE_VERSION]]
 Персональная версия: [[PERSONAL_VERSION]]
 Сформировано: [[GENERATED_AT]]$book_rkn$,
-  '6e8cef654e18a065c75b2b8f66c2e2f199af7e7d1b18e2a198eb9df101e7c6f0',
+  '87ed9936008ce8d5c40b3deabc31804eb959dd2a8d20ae16a58705547df92a77',
   '{}'::jsonb,
   CURRENT_TIMESTAMP,
   NULL
