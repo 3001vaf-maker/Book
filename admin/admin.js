@@ -12,6 +12,8 @@ const state = {
   section: 'tenants',
 };
 
+let adminPollTimer = null;
+
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
@@ -23,6 +25,118 @@ async function adminRequest(path, options = {}) {
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload?.message || 'Ошибка панели управления');
   return payload;
+}
+
+async function platformNoticeRequest(path, options = {}) {
+  const response = await apiRequest(`/platform-notices${path}`, options);
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.message || 'Ошибка уведомлений');
+  return payload;
+}
+
+function pendingLiveRequests() {
+  return state.tenants.filter((item) => (
+    !item.isOwnerBook
+    && item.ownerProfile
+    && item.access?.commercialMode !== 'LIVE'
+    && item.liveRequestedAt
+  ));
+}
+
+function decodeBase64Url(value) {
+  const padding = '='.repeat((4 - (String(value || '').length % 4)) % 4);
+  const base64 = `${String(value || '').replaceAll('-', '+').replaceAll('_', '/')}${padding}`;
+  const raw = atob(base64);
+  return Uint8Array.from(raw, (character) => character.charCodeAt(0));
+}
+
+async function enableAdminPush(promptUser = false) {
+  if (
+    typeof navigator === 'undefined'
+    || !('serviceWorker' in navigator)
+    || !('PushManager' in window)
+    || !('Notification' in window)
+  ) return false;
+
+  const configuration = await platformNoticeRequest('/push/configuration');
+  if (!configuration?.enabled || !configuration?.publicKey) return false;
+
+  if (Notification.permission === 'default' && promptUser) {
+    await Notification.requestPermission();
+  }
+  if (Notification.permission !== 'granted') return false;
+
+  const registration = await navigator.serviceWorker.register('/service-worker.js', { scope: '/' });
+  await navigator.serviceWorker.ready;
+  let subscription = await registration.pushManager.getSubscription();
+  if (!subscription) {
+    subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: decodeBase64Url(configuration.publicKey),
+    });
+  }
+  await platformNoticeRequest('/push/subscription', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(subscription.toJSON()),
+  });
+  return true;
+}
+
+function updateLiveRequestIndicator() {
+  const count = pendingLiveRequests().length;
+  document.querySelectorAll('[data-live-request-count]').forEach((node) => {
+    node.textContent = String(count);
+    node.hidden = count === 0;
+    node.closest('[data-section="live-requests"]')?.classList.toggle('has-live-requests', count > 0);
+  });
+}
+
+async function approveLiveTenant(tenantId, control, messageNode = null) {
+  if (control) {
+    control.disabled = true;
+    control.textContent = 'Включаем LIVE…';
+  }
+  if (messageNode) {
+    messageNode.textContent = '';
+    messageNode.classList.remove('error');
+  }
+  try {
+    await adminRequest(`/tenants/${encodeURIComponent(tenantId)}/commercial-mode`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'LIVE' }),
+    });
+    await refreshData();
+    updateLiveRequestIndicator();
+    if (messageNode) messageNode.textContent = 'LIVE включён.';
+    if (state.section === 'live-requests') renderLiveRequests();
+    if (state.section === 'tenants') renderTenants();
+    return true;
+  } catch (error) {
+    if (messageNode) {
+      messageNode.textContent = error instanceof Error ? error.message : 'Не удалось включить LIVE';
+      messageNode.classList.add('error');
+    }
+    if (control) {
+      control.disabled = false;
+      control.textContent = 'Перевести в LIVE';
+    }
+    return false;
+  }
+}
+
+function startAdminPolling() {
+  if (adminPollTimer) window.clearInterval(adminPollTimer);
+  adminPollTimer = window.setInterval(async () => {
+    try {
+      await refreshData();
+      updateLiveRequestIndicator();
+      if (state.section === 'live-requests') renderLiveRequests();
+    } catch {
+      // Фоновая проверка заявок не должна мешать работе админки.
+    }
+  }, 15_000);
 }
 
 function renderLogin(message = '') {
@@ -66,7 +180,16 @@ async function loadAdmin() {
     body: JSON.stringify({ documents: DOCUMENT_CATALOG }),
   });
   await refreshData();
+  const requestedTenantId = new URLSearchParams(window.location.search).get('liveRequest') || '';
+  if (requestedTenantId) state.section = 'live-requests';
   renderShell();
+  updateLiveRequestIndicator();
+  startAdminPolling();
+  void enableAdminPush(false).catch(() => false);
+  if (requestedTenantId && state.tenants.some((item) => item.tenantId === requestedTenantId)) {
+    window.setTimeout(() => openAccessDrawer(requestedTenantId), 0);
+    window.history.replaceState({}, '', '/admin/');
+  }
 }
 
 async function refreshData() {
@@ -79,6 +202,7 @@ async function refreshData() {
 }
 
 function renderShell() {
+  const liveRequestCount = pendingLiveRequests().length;
   app.innerHTML = `
     <div class="admin-shell">
       <aside class="admin-sidebar">
@@ -89,6 +213,7 @@ function renderShell() {
           <button data-section="document-registry">Реестр документов</button>
           <button data-section="first-run">Первое знакомство</button>
           <button data-section="tenants">Пользователи</button>
+          <button data-section="live-requests" class="${liveRequestCount ? 'has-live-requests' : ''}">🔔 Запросы LIVE <span class="admin-live-count" data-live-request-count ${liveRequestCount ? '' : 'hidden'}>${liveRequestCount}</span></button>
           <button data-section="capabilities">Инструменты</button>
         </nav>
         <div class="admin-sidebar-foot">Управление системой</div>
@@ -103,6 +228,7 @@ function renderShell() {
   app.querySelectorAll('[data-section]').forEach((button) => {
     button.addEventListener('click', () => {
       state.section = button.dataset.section;
+      if (state.section === 'live-requests') void enableAdminPush(true).catch(() => false);
       renderCurrentSection();
     });
   });
@@ -140,6 +266,7 @@ function renderCurrentSection() {
     });
   }
   if (state.section === 'capabilities') return renderCapabilities();
+  if (state.section === 'live-requests') return renderLiveRequests();
   return renderTenants();
 }
 
@@ -156,6 +283,39 @@ function renderOverview() {
       <div class="admin-stat"><strong>${active}</strong><span>активных</span></div>
       <div class="admin-stat"><strong>${pending}</strong><span>ожидают регистрации</span></div>
     </div>`;
+}
+
+function renderLiveRequests() {
+  setActiveSection('Запросы LIVE');
+  const content = app.querySelector('[data-content]');
+  const requests = pendingLiveRequests().sort((a, b) => Date.parse(a.liveRequestedAt || 0) - Date.parse(b.liveRequestedAt || 0));
+  content.innerHTML = `
+    <div class="admin-heading"><div><h2>Запросы LIVE</h2><p>Запрос пользователя — сигнал для администратора. LIVE можно включить и без запроса.</p></div></div>
+    <div class="admin-card">
+      <table class="admin-table">
+        <thead><tr><th>Пользователь</th><th>Email</th><th>Запрос</th><th>Действие</th></tr></thead>
+        <tbody>${requests.length ? requests.map((item) => `
+          <tr data-live-request-tenant="${escapeHtml(item.tenantId)}">
+            <td><strong>${escapeHtml(item.ownerProfile?.name || item.tenantName || 'Пользователь')}</strong></td>
+            <td>${escapeHtml(item.ownerProfile?.email || '—')}</td>
+            <td>${escapeHtml(formatAdminMoment(item.liveRequestedAt))}</td>
+            <td><button class="admin-button" data-live-request-approve="${escapeHtml(item.tenantId)}">Перевести в LIVE</button></td>
+          </tr>`).join('') : '<tr><td colspan="4">Новых запросов LIVE нет.</td></tr>'}</tbody>
+      </table>
+    </div>
+    <p class="admin-inline-message" data-live-request-message></p>`;
+
+  const message = content.querySelector('[data-live-request-message]');
+  content.querySelectorAll('[data-live-request-approve]').forEach((button) => {
+    button.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      await approveLiveTenant(button.dataset.liveRequestApprove, button, message);
+    });
+  });
+  content.querySelectorAll('[data-live-request-tenant]').forEach((row) => {
+    row.addEventListener('click', () => openAccessDrawer(row.dataset.liveRequestTenant));
+  });
+  updateLiveRequestIndicator();
 }
 
 function renderOwnerBook() {
@@ -349,6 +509,14 @@ function renderTenants() {
     });
   });
 
+  content.querySelectorAll('[data-grant-live]').forEach((button) => {
+    button.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      const tenantId = button.dataset.grantLive;
+      if (tenantId) await approveLiveTenant(tenantId, button, message);
+    });
+  });
+
   content.querySelectorAll('[data-delete-tenant]').forEach((button) => {
     button.addEventListener('click', (event) => {
       event.stopPropagation();
@@ -362,6 +530,7 @@ function tenantRow(item) {
   const pending = !item.ownerProfile && item.invitation?.status === 'PENDING';
   const name = item.ownerProfile?.name || item.invitation?.name || item.tenantName;
   const email = item.ownerProfile?.email || item.invitation?.email || '';
+  const mode = String(item.access?.commercialMode || 'DEMO');
   const statusClass = item.status === 'SUSPENDED' ? 'suspended' : pending ? 'pending' : 'active';
   const statusLabel = item.status === 'SUSPENDED' ? 'Отключён' : pending ? 'Ждёт входа' : item.ownerProfile ? 'Активен' : 'Создан';
   const registrationLink = Boolean(item.invitation?.registrationLink);
@@ -370,8 +539,14 @@ function tenantRow(item) {
   const technicalEmail = item.ownerProfile?.email
     ? `<button class="admin-button secondary" data-email-tenant="${escapeHtml(item.tenantId)}">Письмо</button>`
     : '';
+  const liveRequest = item.liveRequestedAt && mode !== 'LIVE'
+    ? '<span class="admin-pill live-request">Запрос LIVE</span>'
+    : '';
+  const grantLive = item.ownerProfile && mode !== 'LIVE'
+    ? `<button class="admin-button" data-grant-live="${escapeHtml(item.tenantId)}">Перевести в LIVE</button>`
+    : '';
   const remove = `<button class="admin-button danger" data-delete-tenant="${escapeHtml(item.tenantId)}">Удалить</button>`;
-  return `<tr data-tenant="${escapeHtml(item.tenantId)}"><td><strong>${escapeHtml(name)}</strong></td><td>${email ? escapeHtml(email) : '—'}</td><td><span class="admin-pill ${statusClass}">${resolvedStatusLabel}</span> ${resend} ${technicalEmail} ${remove}</td><td>${escapeHtml(item.plan?.name || 'Индивидуальный')}</td></tr>`;
+  return `<tr data-tenant="${escapeHtml(item.tenantId)}"><td><strong>${escapeHtml(name)}</strong></td><td>${email ? escapeHtml(email) : '—'}</td><td><span class="admin-pill ${statusClass}">${resolvedStatusLabel}</span> ${liveRequest} ${resend} ${technicalEmail} ${grantLive} ${remove}</td><td>${escapeHtml(item.plan?.name || 'Индивидуальный')}</td></tr>`;
 }
 
 function renderCapabilities() {
@@ -504,8 +679,9 @@ function openAccessDrawer(tenantId) {
         </div>
         <div class="admin-inline-actions">
           ${mode === 'DEMO' ? '<button class="admin-button secondary" data-extend-demo>Продлить DEMO на 14 дней</button>' : ''}
-          ${mode !== 'LIVE' && liveRequestedAt && tenant.ownerProfile ? '<button class="admin-button" data-set-live>Подтвердить LIVE</button>' : ''}
-          ${mode !== 'LIVE' && !liveRequestedAt && tenant.ownerProfile ? '<span class="admin-service-note">Запрос LIVE от пользователя ещё не поступал.</span>' : ''}
+          ${mode !== 'LIVE' && tenant.ownerProfile ? '<button class="admin-button" data-set-live>Перевести в LIVE</button>' : ''}
+          ${mode !== 'LIVE' && liveRequestedAt ? `<span class="admin-service-note">Запрос LIVE получен ${escapeHtml(formatAdminMoment(liveRequestedAt))}.</span>` : ''}
+          ${mode !== 'LIVE' && !liveRequestedAt && tenant.ownerProfile ? '<span class="admin-service-note">Запроса нет — администратор всё равно может включить LIVE.</span>' : ''}
         </div>
         <p class="admin-inline-message" data-mode-message></p>
       </section>
@@ -627,7 +803,7 @@ function openAccessDrawer(tenantId) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode: 'LIVE' }),
       });
-      message.textContent = 'LIVE подтверждён администратором.';
+      message.textContent = 'LIVE включён.';
       await refreshData();
     } catch (error) {
       message.textContent = error instanceof Error ? error.message : 'Не удалось изменить режим';
