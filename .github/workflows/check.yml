@@ -114,6 +114,58 @@ jobs:
             'upgrade-invitation','upgrade-tenant','upgrade-admin','invite@example.invalid','Invite',
             'upgrade-token-hash','PENDING',CURRENT_TIMESTAMP + INTERVAL '7 days',CURRENT_TIMESTAMP
           );
+
+          INSERT INTO "Tenant" ("id","name","updatedAt")
+          VALUES
+            ('cleanup-owner-tenant','Cleanup OWNER',CURRENT_TIMESTAMP),
+            ('cleanup-user-a-tenant','Cleanup User A',CURRENT_TIMESTAMP),
+            ('cleanup-user-b-tenant','Cleanup User B',CURRENT_TIMESTAMP);
+
+          INSERT INTO "User" ("id","email","passwordHash","onboardingStep","workspaceUnlocked","updatedAt")
+          VALUES
+            ('cleanup-owner-account','cleanup-owner@example.invalid','hash',3,true,CURRENT_TIMESTAMP),
+            ('cleanup-user-a-account','cleanup-a@example.invalid','hash',3,true,CURRENT_TIMESTAMP),
+            ('cleanup-user-b-account','cleanup-b@example.invalid','hash',3,true,CURRENT_TIMESTAMP);
+
+          INSERT INTO "Membership" ("id","tenantId","userId","role")
+          VALUES
+            ('cleanup-owner-membership','cleanup-owner-tenant','cleanup-owner-account','OWNER'),
+            ('cleanup-user-a-membership','cleanup-user-a-tenant','cleanup-user-a-account','OWNER'),
+            ('cleanup-user-b-membership','cleanup-user-b-tenant','cleanup-user-b-account','OWNER');
+
+          INSERT INTO "TenantAccess" ("tenantId","status","isOwnerBook","updatedAt")
+          VALUES
+            ('cleanup-owner-tenant','ACTIVE',true,CURRENT_TIMESTAMP),
+            ('cleanup-user-a-tenant','ACTIVE',false,CURRENT_TIMESTAMP),
+            ('cleanup-user-b-tenant','ACTIVE',false,CURRENT_TIMESTAMP);
+
+          INSERT INTO "Profile" (
+            "id","tenantId","userId","name","phones","telegrams","emails","customProfessions","updatedAt"
+          )
+          VALUES
+            ('cleanup-owner-profile','cleanup-owner-tenant','cleanup-owner-account','OWNER profile',
+             '[]'::jsonb,'[]'::jsonb,'["cleanup-owner@example.invalid"]'::jsonb,'[]'::jsonb,CURRENT_TIMESTAMP),
+            ('cleanup-user-a-profile','cleanup-user-a-tenant','cleanup-user-a-account','Test profile A',
+             '[]'::jsonb,'[]'::jsonb,'["cleanup-a@example.invalid"]'::jsonb,'[]'::jsonb,CURRENT_TIMESTAMP),
+            ('cleanup-user-b-profile','cleanup-user-b-tenant','cleanup-user-b-account','Test profile B',
+             '[]'::jsonb,'[]'::jsonb,'["cleanup-b@example.invalid"]'::jsonb,'[]'::jsonb,CURRENT_TIMESTAMP);
+
+          INSERT INTO "WorkspaceState" ("id","tenantId","userId","data","revision","updatedAt")
+          VALUES
+            ('cleanup-owner-workspace','cleanup-owner-tenant','cleanup-owner-account','{"owner":true}'::jsonb,1,CURRENT_TIMESTAMP),
+            ('cleanup-user-a-workspace','cleanup-user-a-tenant','cleanup-user-a-account','{"test":"a"}'::jsonb,1,CURRENT_TIMESTAMP),
+            ('cleanup-user-b-workspace','cleanup-user-b-tenant','cleanup-user-b-account','{"test":"b"}'::jsonb,1,CURRENT_TIMESTAMP);
+
+          INSERT INTO "Plan" ("id","key","name","description","position","isActive","updatedAt")
+          VALUES ('cleanup-system-plan','cleanup-system-plan','System plan marker','',999,true,CURRENT_TIMESTAMP);
+
+          INSERT INTO "Capability" (
+            "id","key","groupKey","name","description","valueType","defaultEnabled","defaultLimit","position","isActive","updatedAt"
+          )
+          VALUES (
+            'cleanup-system-capability','cleanup-system-capability','system','System capability marker','',
+            'BOOLEAN',true,NULL,999,true,CURRENT_TIMESTAMP
+          );
           SQL
       - name: Apply PROFILE migrations
         shell: bash
@@ -156,6 +208,45 @@ jobs:
             END IF;
             IF (SELECT COUNT(*) FROM "TenantInvitation" WHERE "id" = 'upgrade-invitation' AND "tenantId" = 'upgrade-tenant') <> 1 THEN
               RAISE EXCEPTION 'TenantInvitation row was not preserved';
+            END IF;
+
+            IF (SELECT COUNT(*) FROM "Tenant" WHERE "id" = 'cleanup-owner-tenant') <> 1
+               OR (SELECT COUNT(*) FROM "PlatformAccount" WHERE "id" = 'cleanup-owner-account') <> 1
+               OR (SELECT COUNT(*) FROM "Profile" WHERE "id" = 'cleanup-owner-profile') <> 1 THEN
+              RAISE EXCEPTION 'OWNER Book representative profile was removed by prelaunch cleanup';
+            END IF;
+
+            IF EXISTS (
+              SELECT 1 FROM "Tenant"
+              WHERE "id" IN ('cleanup-user-a-tenant','cleanup-user-b-tenant')
+            ) THEN
+              RAISE EXCEPTION 'Non-owner test Tenant rows remain after prelaunch cleanup';
+            END IF;
+
+            IF EXISTS (
+              SELECT 1 FROM "PlatformAccount"
+              WHERE "id" IN ('cleanup-user-a-account','cleanup-user-b-account')
+            ) THEN
+              RAISE EXCEPTION 'Non-owner test PlatformAccount rows remain after prelaunch cleanup';
+            END IF;
+
+            IF EXISTS (
+              SELECT 1 FROM "Profile"
+              WHERE "id" IN ('cleanup-user-a-profile','cleanup-user-b-profile')
+            ) THEN
+              RAISE EXCEPTION 'Non-owner test Profile rows remain after prelaunch cleanup';
+            END IF;
+
+            IF EXISTS (
+              SELECT 1 FROM "WorkspaceState"
+              WHERE "id" IN ('cleanup-user-a-workspace','cleanup-user-b-workspace')
+            ) THEN
+              RAISE EXCEPTION 'Non-owner test WorkspaceState rows remain after prelaunch cleanup';
+            END IF;
+
+            IF (SELECT COUNT(*) FROM "Plan" WHERE "id" = 'cleanup-system-plan') <> 1
+               OR (SELECT COUNT(*) FROM "Capability" WHERE "id" = 'cleanup-system-capability') <> 1 THEN
+              RAISE EXCEPTION 'System Plan/Capability data was touched by profile cleanup';
             END IF;
             IF to_regclass('"User"') IS NOT NULL THEN
               RAISE EXCEPTION 'Retired account table still exists';
