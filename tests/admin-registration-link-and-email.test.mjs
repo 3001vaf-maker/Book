@@ -56,7 +56,7 @@ assert.match(prelaunchHardDeleteMigration, /DROP TRIGGER IF EXISTS "PlatformActi
 assert.match(prelaunchHardDeleteMigration, /PlatformConsentEvent_tenantId_fkey/);
 assert.match(prelaunchHardDeleteMigration, /PlatformConsentEvent_platformAccountId_fkey/);
 assert.match(prelaunchHardDeleteMigration, /ON DELETE CASCADE ON UPDATE CASCADE/);
-assert.match(prelaunchHardDeleteMigration, /WHERE "isOwnerBook" = false/);
+assert.match(prelaunchHardDeleteMigration, /COALESCE\(access\."isOwnerBook", false\) = false/);
 assert.match(prelaunchHardDeleteMigration, /DELETE FROM "Tenant"/);
 assert.match(prelaunchHardDeleteMigration, /NOT EXISTS \([\s\S]*"PlatformAdmin"/);
 assert.match(adminUi, /data-delete-tenant/);
