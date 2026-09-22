@@ -17,6 +17,20 @@ const SESSION_TIMEOUT_MS = 15 * 60 * 1000;
 
 type JsonObject = Record<string, any>;
 
+type FirstRunStatePayload = {
+  assigned: boolean;
+  commercialMode: string;
+  liveRequestedAt: string;
+  demo: {
+    activatedAt: string;
+    expiresAt: string;
+    expired: boolean;
+  };
+  scenario?: JsonObject;
+  progress?: JsonObject;
+  steps?: JsonObject[];
+};
+
 function objectValue(value: unknown): JsonObject {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonObject : {};
 }
@@ -360,7 +374,11 @@ export class FirstRunService {
     return progress;
   }
 
-  async assignFromInvitation(invitationId: string, tenantId: string, platformAccountId: string) {
+  async assignFromInvitation(
+    invitationId: string,
+    tenantId: string,
+    platformAccountId: string,
+  ): Promise<FirstRunStatePayload> {
     const prepared = await this.prepareInvitationAssignment(invitationId, tenantId);
     await this.prisma.$transaction((tx) => this.assignPreparedFromInvitation(
       tx,
@@ -419,7 +437,7 @@ export class FirstRunService {
     });
   }
 
-  async state(tenantId: string, platformAccountId: string) {
+  async state(tenantId: string, platformAccountId: string): Promise<FirstRunStatePayload> {
     const [access, progress] = await Promise.all([
       this.prisma.tenantAccess.findUnique({ where: { tenantId } }),
       this.progress(tenantId, platformAccountId),
