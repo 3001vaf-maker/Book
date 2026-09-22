@@ -17,6 +17,20 @@ const SESSION_TIMEOUT_MS = 15 * 60 * 1000;
 
 type JsonObject = Record<string, any>;
 
+type FirstRunStatePayload = {
+  assigned: boolean;
+  commercialMode: string;
+  liveRequestedAt: string;
+  demo: {
+    activatedAt: string;
+    expiresAt: string;
+    expired: boolean;
+  };
+  scenario?: JsonObject;
+  progress?: JsonObject;
+  steps?: JsonObject[];
+};
+
 function objectValue(value: unknown): JsonObject {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonObject : {};
 }
@@ -283,111 +297,127 @@ export class FirstRunService {
     });
   }
 
-  async activateInvitation(invitationId: string, tenantId: string) {
-    const invitation = await this.prisma.tenantInvitation.findUnique({ where: { id: invitationId } });
+  async prepareInvitationAssignment(invitationId: string, tenantId: string) {
+    let invitation = await this.prisma.tenantInvitation.findUnique({ where: { id: invitationId } });
     if (!invitation || invitation.tenantId !== tenantId) throw new NotFoundException('Приглашение не найдено');
 
-    if (invitation.activatedAt && invitation.firstRunScenarioVersionId && invitation.demoExpiresAt) {
-      return {
-        activatedAt: invitation.activatedAt,
-        demoExpiresAt: invitation.demoExpiresAt,
-        scenarioVersionId: invitation.firstRunScenarioVersionId,
-      };
+    let version = invitation.firstRunScenarioVersionId
+      ? await this.prisma.firstRunScenarioVersion.findUnique({
+        where: { id: invitation.firstRunScenarioVersionId },
+        include: { steps: { where: { isActive: true }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] } },
+      })
+      : null;
+
+    if (!version) {
+      version = await this.publishedVersion();
+      invitation = await this.prisma.tenantInvitation.update({
+        where: { id: invitation.id },
+        data: { firstRunScenarioVersionId: version.id },
+      });
     }
 
-    const version = await this.publishedVersion();
+    return {
+      invitationId: invitation.id,
+      scenarioVersionId: version.id,
+      scenarioVersion: version.version,
+      firstStepKey: version.steps[0]?.key || '',
+    };
+  }
+
+  async assignPreparedFromInvitation(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    platformAccountId: string,
+    prepared: {
+      invitationId: string;
+      scenarioVersionId: string;
+      scenarioVersion: number;
+      firstStepKey: string;
+    },
+    occurredAt = new Date(),
+  ) {
+    const existing = await tx.firstRunProgress.findUnique({
+      where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
+    });
+    if (existing) return existing;
+
+    const progress = await tx.firstRunProgress.create({
+      data: {
+        tenantId,
+        platformAccountId,
+        scenarioVersionId: prepared.scenarioVersionId,
+        currentStepKey: prepared.firstStepKey,
+        startedAt: occurredAt,
+      },
+    });
+    await tx.platformActivityEvent.createMany({
+      data: [
+        {
+          tenantId,
+          platformAccountId,
+          eventType: 'ACCOUNT_CREATED',
+          scenarioVersionId: prepared.scenarioVersionId,
+          metadata: json({ invitationId: prepared.invitationId }),
+          occurredAt,
+        },
+        {
+          tenantId,
+          platformAccountId,
+          eventType: 'FIRST_RUN_STARTED',
+          stepKey: prepared.firstStepKey,
+          scenarioVersionId: prepared.scenarioVersionId,
+          metadata: json({ scenarioVersion: prepared.scenarioVersion }),
+          occurredAt,
+        },
+      ],
+    });
+    return progress;
+  }
+
+  async assignFromInvitation(
+    invitationId: string,
+    tenantId: string,
+    platformAccountId: string,
+  ): Promise<FirstRunStatePayload> {
+    const prepared = await this.prepareInvitationAssignment(invitationId, tenantId);
+    await this.prisma.$transaction((tx) => this.assignPreparedFromInvitation(
+      tx,
+      tenantId,
+      platformAccountId,
+      prepared,
+    ));
+    return this.state(tenantId, platformAccountId);
+  }
+
+  private async activateDemoAtProfileOpen(tenantId: string, platformAccountId: string) {
+    const current = await this.prisma.tenantAccess.findUnique({ where: { tenantId } });
+    if (!current) throw new NotFoundException('Рабочее пространство не найдено');
+    if (current.commercialMode !== 'DEMO') return current;
+    if (current.demoActivatedAt && current.demoExpiresAt) return current;
+
     const now = new Date();
     const demoExpiresAt = addDays(now, DEMO_DAYS);
-    const invitationExpiresAt = invitation.expiresAt.getTime() < demoExpiresAt.getTime()
-      ? demoExpiresAt
-      : invitation.expiresAt;
-
-    await this.prisma.$transaction(async (tx) => {
-      await tx.tenantInvitation.update({
-        where: { id: invitation.id },
-        data: {
-          activatedAt: now,
-          demoExpiresAt,
-          firstRunScenarioVersionId: version.id,
-          expiresAt: invitationExpiresAt,
-        },
-      });
-      await tx.tenantAccess.update({
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const access = await tx.tenantAccess.update({
         where: { tenantId },
-        data: {
-          demoActivatedAt: now,
-          demoExpiresAt,
-        },
+        data: { demoActivatedAt: now, demoExpiresAt },
+      });
+      await tx.tenantInvitation.updateMany({
+        where: { tenantId },
+        data: { activatedAt: now, demoExpiresAt },
       });
       await tx.platformActivityEvent.create({
         data: {
           tenantId,
-          eventType: 'INVITATION_ACTIVATED',
-          scenarioVersionId: version.id,
-          metadata: json({ invitationId: invitation.id, demoDays: DEMO_DAYS }),
+          platformAccountId,
+          eventType: 'DEMO_ACTIVATED',
+          metadata: json({ demoDays: DEMO_DAYS, source: 'PROFILE_OPENED' }),
           occurredAt: now,
         },
       });
+      return access;
     });
-
-    return { activatedAt: now, demoExpiresAt, scenarioVersionId: version.id };
-  }
-
-  async assignFromInvitation(invitationId: string, tenantId: string, platformAccountId: string) {
-    let invitation = await this.prisma.tenantInvitation.findUnique({ where: { id: invitationId } });
-    if (!invitation || invitation.tenantId !== tenantId) throw new NotFoundException('Приглашение не найдено');
-    if (!invitation.firstRunScenarioVersionId || !invitation.activatedAt || !invitation.demoExpiresAt) {
-      await this.activateInvitation(invitationId, tenantId);
-      invitation = await this.prisma.tenantInvitation.findUnique({ where: { id: invitationId } });
-    }
-    if (!invitation?.firstRunScenarioVersionId) throw new ConflictException('Версия сценария не зафиксирована');
-
-    const version = await this.prisma.firstRunScenarioVersion.findUnique({
-      where: { id: invitation.firstRunScenarioVersionId },
-      include: { steps: { where: { isActive: true }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] } },
-    });
-    if (!version) throw new NotFoundException('Версия сценария не найдена');
-    const firstStep = version.steps[0]?.key || '';
-
-    const existing = await this.prisma.firstRunProgress.findUnique({
-      where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
-    });
-    if (!existing) {
-      const now = new Date();
-      await this.prisma.$transaction(async (tx) => {
-        await tx.firstRunProgress.create({
-          data: {
-            tenantId,
-            platformAccountId,
-            scenarioVersionId: version.id,
-            currentStepKey: firstStep,
-            startedAt: now,
-          },
-        });
-        await tx.platformActivityEvent.createMany({
-          data: [
-            {
-              tenantId,
-              platformAccountId,
-              eventType: 'ACCOUNT_CREATED',
-              scenarioVersionId: version.id,
-              metadata: json({ invitationId }),
-              occurredAt: now,
-            },
-            {
-              tenantId,
-              platformAccountId,
-              eventType: 'FIRST_RUN_STARTED',
-              stepKey: firstStep,
-              scenarioVersionId: version.id,
-              metadata: json({ scenarioVersion: version.version }),
-              occurredAt: now,
-            },
-          ],
-        });
-      });
-    }
-    return this.state(tenantId, platformAccountId);
+    return updated;
   }
 
   private async progress(tenantId: string, platformAccountId: string) {
@@ -407,7 +437,7 @@ export class FirstRunService {
     });
   }
 
-  async state(tenantId: string, platformAccountId: string) {
+  async state(tenantId: string, platformAccountId: string): Promise<FirstRunStatePayload> {
     const [access, progress] = await Promise.all([
       this.prisma.tenantAccess.findUnique({ where: { tenantId } }),
       this.progress(tenantId, platformAccountId),
@@ -423,6 +453,20 @@ export class FirstRunService {
     );
 
     if (!progress) {
+      const account = await this.prisma.platformAccount.findUnique({
+        where: { id: platformAccountId },
+        select: { email: true },
+      });
+      const acceptedInvitation = account?.email
+        ? await this.prisma.tenantInvitation.findFirst({
+          where: { tenantId, email: account.email, status: 'ACCEPTED' },
+          orderBy: [{ acceptedAt: 'desc' }, { createdAt: 'desc' }],
+        })
+        : null;
+      if (acceptedInvitation) {
+        return this.assignFromInvitation(acceptedInvitation.id, tenantId, platformAccountId);
+      }
+
       return {
         assigned: false,
         commercialMode: access.commercialMode,
@@ -497,6 +541,9 @@ export class FirstRunService {
 
   async markModalSeen(tenantId: string, platformAccountId: string, stepKey: string, sessionId = '') {
     const { progress, step } = await this.currentStep(tenantId, platformAccountId, stepKey);
+    if (step.key === 'profile') {
+      await this.activateDemoAtProfileOpen(tenantId, platformAccountId);
+    }
     const now = new Date();
     await this.prisma.$transaction(async (tx) => {
       await tx.firstRunStepProgress.upsert({
@@ -672,13 +719,6 @@ export class FirstRunService {
         });
       }
     });
-
-    if (final) {
-      const access = await this.prisma.tenantAccess.findUnique({ where: { tenantId } });
-      if (access?.commercialMode === 'LIVE' && (access.isOwnerBook || access.liveApprovedAt)) {
-        await this.cleanupDemoOperationalData(tenantId);
-      }
-    }
 
     return this.state(tenantId, platformAccountId);
   }
