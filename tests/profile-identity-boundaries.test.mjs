@@ -76,13 +76,15 @@ assert.match(personModel, /tenant\s+Tenant\s+@relation/);
 assert.doesNotMatch(personModel, /profileId\s+String/);
 assert.doesNotMatch(personModel, /profile\s+Profile\s+@relation/);
 
-// Current PRIVATE provisioning path creates one Tenant and one OWNER membership.
-// It does not create nested/additional Profiles during invitation acceptance.
+// Current PRIVATE provisioning path creates one Tenant, one OWNER membership
+// and exactly one Profile for that login identity. Registration identity data
+// belongs to this canonical Profile; no nested/additional Profile is created.
 assert.equal((invitationService.match(/tx\.tenant\.create/g) || []).length, 1);
 assert.equal((invitationService.match(/tx\.platformAccount\.create/g) || []).length, 1);
 assert.equal((invitationService.match(/tx\.membership\.create/g) || []).length, 1);
+assert.equal((invitationService.match(/tx\.profile\.create/g) || []).length, 1);
 assert.match(invitationService, /role: MembershipRole\.OWNER/);
-assert.doesNotMatch(invitationService, /tx\.profile\.create/);
+assert.match(invitationService, /platformAccountId: account\.id/);
 
 // Profile bootstrap is idempotent for the current Tenant + login identity.
 assert.match(profileService, /where: \{ tenantId_platformAccountId: \{ tenantId, platformAccountId \} \}/);
