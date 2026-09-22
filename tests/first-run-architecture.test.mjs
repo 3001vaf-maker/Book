@@ -41,7 +41,7 @@ assert.match(schema, /demoExpiresAt\s+DateTime\?/);
 
 assert.match(firstRun, /const DEMO_DAYS = 14/);
 assert.match(firstRun, /firstRunScenarioVersionId/);
-assert.match(firstRun, /status:\s*'IN_PROGRESS'/);
+assert.match(schema, /model FirstRunProgress[\s\S]*?status\s+String\s+@default\("IN_PROGRESS"\)/);
 assert.match(firstRun, /assertRealOperationsAllowed/);
 assert.match(firstRun, /if \(access\.commercialMode !== 'LIVE'\)/);
 assert.doesNotMatch(firstRun, /commercialMode !== 'LIVE' \|\| progress/);
