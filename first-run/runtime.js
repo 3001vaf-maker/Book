@@ -111,6 +111,7 @@ export class FirstRunRuntime {
     this.observer = null;
     this.syncQueued = false;
     this.modalShownKey = '';
+    this.modalSeenKey = '';
     this.enteredStepKey = '';
     this.disposed = false;
     this.clickHandler = (event) => this.handleClick(event);
@@ -201,6 +202,7 @@ export class FirstRunRuntime {
   async renderCurrent() {
     this.observer?.disconnect();
     this.modalShownKey = '';
+    this.modalSeenKey = '';
     this.enteredStepKey = '';
     const step = currentStep(this.state);
     if (!step) {
@@ -451,7 +453,7 @@ export class FirstRunRuntime {
 
     if (step.kind === 'REQUIRED_INFO') {
       this.renderActionDock(step, {
-        primaryVisible: this.modalShownKey === step.key,
+        primaryVisible: this.modalSeenKey === step.key,
         onPrimary: () => this.complete(step, 'complete'),
       });
       return;
@@ -459,7 +461,7 @@ export class FirstRunRuntime {
 
     if (step.kind === 'OPTIONAL_INFO') {
       this.renderActionDock(step, {
-        primaryVisible: this.modalShownKey === step.key,
+        primaryVisible: this.modalSeenKey === step.key,
         skipVisible: true,
         onPrimary: () => this.complete(step, 'complete'),
         onSkip: () => this.complete(step, 'skip'),
@@ -468,7 +470,7 @@ export class FirstRunRuntime {
     }
 
     this.renderActionDock(step, {
-      primaryVisible: this.modalShownKey === step.key,
+      primaryVisible: this.modalSeenKey === step.key,
       onPrimary: () => this.complete(step, 'complete'),
     });
   }
@@ -547,10 +549,14 @@ export class FirstRunRuntime {
     void markFirstRunStepSeen(step.key, this.sessionId)
       .then((state) => {
         this.state = state;
+        this.modalSeenKey = step.key;
         this.onStateChange(this.state);
         this.queueSync();
       })
-      .catch(() => undefined);
+      .catch((error) => {
+        this.modalShownKey = '';
+        this.showError(error);
+      });
     layer.querySelector('[data-first-run-modal-close]')?.addEventListener('click', () => {
       layer.remove();
       this.queueSync();
