@@ -2,28 +2,25 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-const tenantId = 'immutable-history-tenant';
-const accountId = 'immutable-history-platform-account';
-const membershipId = 'immutable-history-membership';
-const eventId = 'immutable-history-consent';
-
-function messageOf(error) {
-  if (error instanceof Error) return error.message;
-  return String(error);
-}
+const tenantId = 'prelaunch-delete-tenant';
+const accountId = 'prelaunch-delete-platform-account';
+const membershipId = 'prelaunch-delete-membership';
+const consentEventId = 'prelaunch-delete-consent';
+const sessionId = 'prelaunch-delete-session';
+const activityEventId = 'prelaunch-delete-activity';
 
 try {
   await prisma.tenant.create({
     data: {
       id: tenantId,
-      name: 'Immutable History Tenant',
+      name: 'Prelaunch Active Live Tenant',
     },
   });
 
   await prisma.platformAccount.create({
     data: {
       id: accountId,
-      email: 'immutable-history@example.invalid',
+      email: 'prelaunch-delete@example.invalid',
       passwordHash: 'test-hash',
       onboardingStep: 3,
       workspaceUnlocked: true,
@@ -42,8 +39,27 @@ try {
   await prisma.tenantAccess.create({
     data: {
       tenantId,
+      status: 'ACTIVE',
       isOwnerBook: false,
-      commercialMode: 'DEMO',
+      commercialMode: 'LIVE',
+    },
+  });
+
+  await prisma.platformSession.create({
+    data: {
+      id: sessionId,
+      tenantId,
+      platformAccountId: accountId,
+    },
+  });
+
+  await prisma.platformActivityEvent.create({
+    data: {
+      id: activityEventId,
+      tenantId,
+      platformAccountId: accountId,
+      sessionId,
+      eventType: 'PRELAUNCH_DELETE_TEST',
     },
   });
 
@@ -62,23 +78,10 @@ try {
       "id","tenantId","platformAccountId","documentVersionId",
       "action","source","technicalEvidence","occurredAt"
     ) VALUES (
-      ${eventId},${tenantId},${accountId},'platform-account-terms-v1',
-      'ACCEPTED','immutable-history-test','{}'::jsonb,CURRENT_TIMESTAMP
+      ${consentEventId},${tenantId},${accountId},'platform-account-terms-v1',
+      'ACCEPTED','prelaunch-delete-test','{}'::jsonb,CURRENT_TIMESTAMP
     )
   `;
-
-  let appendOnlyBlocked = false;
-  try {
-    await prisma.$executeRaw`
-      DELETE FROM "PlatformConsentEvent"
-      WHERE "id" = ${eventId}
-    `;
-  } catch (error) {
-    appendOnlyBlocked = messageOf(error).includes('append-only');
-  }
-  if (!appendOnlyBlocked) {
-    throw new Error('PlatformConsentEvent ordinary DELETE was not blocked');
-  }
 
   await prisma.$transaction(async (tx) => {
     await tx.tenant.delete({ where: { id: tenantId } });
@@ -98,26 +101,33 @@ try {
     await tx.platformAccount.delete({ where: { id: accountId } });
   });
 
-  const [tenant, account, events] = await Promise.all([
+  const [tenant, account, consentEvents, activityEvents, sessions] = await Promise.all([
     prisma.tenant.findUnique({ where: { id: tenantId }, select: { id: true } }),
     prisma.platformAccount.findUnique({ where: { id: accountId }, select: { id: true } }),
     prisma.$queryRaw`
-      SELECT "id","tenantId","platformAccountId"
+      SELECT "id"
       FROM "PlatformConsentEvent"
-      WHERE "id" = ${eventId}
+      WHERE "id" = ${consentEventId}
     `,
+    prisma.platformActivityEvent.findMany({
+      where: { id: activityEventId },
+      select: { id: true },
+    }),
+    prisma.platformSession.findMany({
+      where: { id: sessionId },
+      select: { id: true },
+    }),
   ]);
 
-  if (tenant) throw new Error('Tenant was not deleted');
+  if (tenant) throw new Error('ACTIVE/LIVE Tenant was not deleted');
   if (account) throw new Error('Orphan PlatformAccount was not deleted');
-  if (!Array.isArray(events) || events.length !== 1) {
-    throw new Error('Immutable PlatformConsentEvent history was not preserved');
+  if (Array.isArray(consentEvents) && consentEvents.length) {
+    throw new Error('PlatformConsentEvent test history remains');
   }
-  if (events[0].tenantId !== tenantId || events[0].platformAccountId !== accountId) {
-    throw new Error('Immutable PlatformConsentEvent identifiers were rewritten');
-  }
+  if (activityEvents.length) throw new Error('PlatformActivityEvent test history remains');
+  if (sessions.length) throw new Error('PlatformSession test row remains');
 
-  console.log('Immutable legal history survives tenant/account deletion');
+  console.log('ACTIVE/LIVE non-owner tenant hard delete leaves no test history');
 } finally {
   await prisma.$disconnect();
 }
