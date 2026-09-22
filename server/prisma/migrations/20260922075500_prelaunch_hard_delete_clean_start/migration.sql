@@ -1,43 +1,104 @@
 BEGIN;
 
 -- PRE-LAUNCH TEST MODE
--- All non-OWNER tenants are test data and must be fully removable.
--- OWNER Book remains protected in application code.
+-- Only incoming non-OWNER profiles/workspaces are test data.
+-- Book OWNER, system catalogues, scenarios, document templates and infrastructure are preserved.
 
--- Retire legacy legal/audit tables that are no longer part of the current Book model.
-DROP TABLE IF EXISTS "LegalStateEvent";
-DROP TABLE IF EXISTS "LegalAuditEvent";
-DROP TABLE IF EXISTS "TenantLegalState";
-DROP TABLE IF EXISTS "PlatformLegalState";
-DROP TABLE IF EXISTS "DataSubjectRequest";
-DROP TABLE IF EXISTS "RetentionPolicy";
-DROP TABLE IF EXISTS "CapabilityAccessEvent";
-DROP TABLE IF EXISTS "TestTenant";
-
-DROP FUNCTION IF EXISTS "book_reject_append_only_mutation"();
-DROP FUNCTION IF EXISTS "book_normalize_legal_actor_user"();
-DROP FUNCTION IF EXISTS "book_block_test_tenant_live"();
-
--- Test-stage histories must disappear with the test subject.
--- Remove append-only guards for the two current platform event stores.
+-- Current platform consent history belongs to the incoming test profile during pre-launch.
 DROP TRIGGER IF EXISTS "PlatformConsentEvent_append_only" ON "PlatformConsentEvent";
-DROP TRIGGER IF EXISTS "PlatformActivityEvent_append_only" ON "PlatformActivityEvent";
 
--- PlatformConsentEvent had been detached from subjects in a previous cleanup.
--- Reattach it for PRE-LAUNCH test cleanup so deleting a test Tenant/Account removes its test history.
-ALTER TABLE IF EXISTS "PlatformConsentEvent"
+ALTER TABLE "PlatformConsentEvent"
   DROP CONSTRAINT IF EXISTS "PlatformConsentEvent_tenantId_fkey";
-ALTER TABLE IF EXISTS "PlatformConsentEvent"
+ALTER TABLE "PlatformConsentEvent"
   DROP CONSTRAINT IF EXISTS "PlatformConsentEvent_platformAccountId_fkey";
 
-ALTER TABLE IF EXISTS "PlatformConsentEvent"
+ALTER TABLE "PlatformConsentEvent"
   ADD CONSTRAINT "PlatformConsentEvent_tenantId_fkey"
   FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id")
   ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE IF EXISTS "PlatformConsentEvent"
+ALTER TABLE "PlatformConsentEvent"
   ADD CONSTRAINT "PlatformConsentEvent_platformAccountId_fkey"
   FOREIGN KEY ("platformAccountId") REFERENCES "PlatformAccount"("id")
   ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- Current activity history is also test-profile data during pre-launch.
+DROP TRIGGER IF EXISTS "PlatformActivityEvent_append_only" ON "PlatformActivityEvent";
+
+-- Old legal event tables may still exist in an upgraded production database.
+-- Keep the tables themselves; only make their profile references cascade so
+-- deleting a test profile removes that profile's old test rows.
+DO $cleanup$
+BEGIN
+  IF to_regclass('"LegalStateEvent"') IS NOT NULL THEN
+    EXECUTE 'DROP TRIGGER IF EXISTS "LegalStateEvent_append_only" ON "LegalStateEvent"';
+
+    ALTER TABLE "LegalStateEvent"
+      DROP CONSTRAINT IF EXISTS "LegalStateEvent_tenantId_fkey";
+    ALTER TABLE "LegalStateEvent"
+      DROP CONSTRAINT IF EXISTS "LegalStateEvent_actorUserId_fkey";
+
+    ALTER TABLE "LegalStateEvent"
+      ADD CONSTRAINT "LegalStateEvent_tenantId_fkey"
+      FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id")
+      ON DELETE CASCADE ON UPDATE CASCADE;
+
+    ALTER TABLE "LegalStateEvent"
+      ADD CONSTRAINT "LegalStateEvent_actorUserId_fkey"
+      FOREIGN KEY ("actorUserId") REFERENCES "PlatformAccount"("id")
+      ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+
+  IF to_regclass('"LegalAuditEvent"') IS NOT NULL THEN
+    EXECUTE 'DROP TRIGGER IF EXISTS "LegalAuditEvent_append_only" ON "LegalAuditEvent"';
+
+    ALTER TABLE "LegalAuditEvent"
+      DROP CONSTRAINT IF EXISTS "LegalAuditEvent_tenantId_fkey";
+    ALTER TABLE "LegalAuditEvent"
+      DROP CONSTRAINT IF EXISTS "LegalAuditEvent_actorUserId_fkey";
+
+    ALTER TABLE "LegalAuditEvent"
+      ADD CONSTRAINT "LegalAuditEvent_tenantId_fkey"
+      FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id")
+      ON DELETE CASCADE ON UPDATE CASCADE;
+
+    ALTER TABLE "LegalAuditEvent"
+      ADD CONSTRAINT "LegalAuditEvent_actorUserId_fkey"
+      FOREIGN KEY ("actorUserId") REFERENCES "PlatformAccount"("id")
+      ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+END
+$cleanup$;
+
+-- One-time clean start: capture only accounts attached to incoming non-OWNER workspaces.
+CREATE TEMP TABLE "_book_prelaunch_cleanup_tenants" ON COMMIT DROP AS
+SELECT "tenantId"
+FROM "TenantAccess"
+WHERE "isOwnerBook" = false;
+
+CREATE TEMP TABLE "_book_prelaunch_cleanup_accounts" ON COMMIT DROP AS
+SELECT DISTINCT membership."platformAccountId"
+FROM "Membership" membership
+JOIN "_book_prelaunch_cleanup_tenants" cleanup
+  ON cleanup."tenantId" = membership."tenantId";
+
+-- Delete only incoming test workspaces. Tenant-scoped rows follow their declared cascades.
+DELETE FROM "Tenant" tenant
+USING "_book_prelaunch_cleanup_tenants" cleanup
+WHERE tenant."id" = cleanup."tenantId";
+
+-- Delete only now-orphaned incoming platform profiles.
+-- OWNER/admin accounts and accounts still attached to another workspace are preserved.
+DELETE FROM "PlatformAccount" account
+USING "_book_prelaunch_cleanup_accounts" cleanup
+WHERE account."id" = cleanup."platformAccountId"
+  AND NOT EXISTS (
+    SELECT 1 FROM "Membership" membership
+    WHERE membership."platformAccountId" = account."id"
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM "PlatformAdmin" admin
+    WHERE admin."platformAccountId" = account."id"
+  );
 
 COMMIT;
