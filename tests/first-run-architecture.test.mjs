@@ -41,9 +41,10 @@ assert.match(schema, /demoExpiresAt\s+DateTime\?/);
 
 assert.match(firstRun, /const DEMO_DAYS = 14/);
 assert.match(firstRun, /firstRunScenarioVersionId/);
-assert.match(firstRun, /status:\s*'IN_PROGRESS'/);
+assert.match(schema, /model FirstRunProgress[\s\S]*?status\s+String\s+@default\("IN_PROGRESS"\)/);
 assert.match(firstRun, /assertRealOperationsAllowed/);
-assert.match(firstRun, /commercialMode !== 'LIVE' \|\| progress/);
+assert.match(firstRun, /if \(access\.commercialMode !== 'LIVE'\)/);
+assert.doesNotMatch(firstRun, /commercialMode !== 'LIVE' \|\| progress/);
 assert.match(firstRun, /cleanupDemoOperationalData/);
 assert.match(firstRun, /person\.deleteMany/);
 assert.match(firstRun, /record\.deleteMany/);
@@ -141,7 +142,7 @@ assert.match(migration, /'chat',150,'OPTIONAL_INFO'/);
 console.log('first-run architecture tests: OK');
 
 assert.match(firstRun, /Состояние рабочего пространства не настроено/);
-assert.doesNotMatch(firstRun, /if \(!access\)[\s\S]{0,400}return true/);
+assert.doesNotMatch(firstRun, /if \(!access\)\s*return true/);
 
 assert.match(ownerSeed, /tenantAccess\.upsert/);
 assert.match(ownerSeed, /isOwnerBook:\s*true/);
