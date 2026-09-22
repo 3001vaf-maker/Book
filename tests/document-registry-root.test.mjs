@@ -6,8 +6,8 @@ const bookDocs = catalogModule.getRegistryBookUserDocuments();
 const userBases = catalogModule.getRegistryUserDocumentBases();
 
 assert.equal(bookDocs.length, 6, 'Document Registry must contain exactly 6 Book ↔ user documents');
-assert.equal(userBases.length, 3, 'Document Registry must contain exactly 3 user document bases');
-assert.equal(new Set([...bookDocs, ...userBases].map((item) => item.key)).size, 9, 'Registry document keys must be unique');
+assert.equal(userBases.length, 4, 'Document Registry must contain exactly 4 user document bases including the RKN guide template');
+assert.equal(new Set([...bookDocs, ...userBases].map((item) => item.key)).size, 10, 'Registry document keys must be unique');
 
 for (const item of [...bookDocs, ...userBases]) {
   assert.ok(item.title?.trim(), `Missing title for ${item.key}`);
