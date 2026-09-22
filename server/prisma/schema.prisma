@@ -511,6 +511,8 @@ model TenantAccess {
   demoActivatedAt DateTime?
   demoExpiresAt DateTime?
   demoExtendedAt DateTime?
+  liveRequestedAt DateTime?
+  liveRequestedByPlatformAccountId String?
   liveApprovedAt DateTime?
   liveApprovedByAdminId String?
   createdAt  DateTime           @default(now())
