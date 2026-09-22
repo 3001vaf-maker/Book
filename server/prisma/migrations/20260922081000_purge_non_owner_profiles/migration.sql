@@ -10,7 +10,7 @@ CREATE TEMP TABLE "_BookPreservedTenant" (
   "tenantId" TEXT PRIMARY KEY
 ) ON COMMIT DROP;
 
-DO $$
+DO $purge1$
 DECLARE
   tenant_count BIGINT;
   owner_count BIGINT;
@@ -52,7 +52,7 @@ BEGIN
     AND event."eventType" = 'COMMERCIAL_MODE_CHANGED'
     AND event."metadata"->>'commercialMode' = 'LIVE'
   ON CONFLICT ("tenantId") DO NOTHING;
-END $$;
+END $purge1$;
 
 CREATE TEMP TABLE "_BookIncomingTenant" (
   "tenantId" TEXT PRIMARY KEY
@@ -84,7 +84,7 @@ SET LOCAL "book.allow_test_tenant_delete" = 'on';
 
 -- Remove all tenant-scoped rows for test profiles, including append-only test
 -- events. Platform/system catalogues have no tenantId and are not touched.
-DO $$
+DO $purge2$
 DECLARE
   row_record RECORD;
 BEGIN
@@ -101,7 +101,7 @@ BEGIN
       row_record.table_name
     );
   END LOOP;
-END $$;
+END $purge2$;
 
 DELETE FROM "Tenant" tenant
 USING "_BookIncomingTenant" incoming
@@ -127,7 +127,7 @@ WHERE NOT EXISTS (
 
 -- Remove account-scoped test residue too (for example consent rows whose
 -- tenantId is NULL). This is still limited to orphaned incoming accounts.
-DO $
+DO $purge3$
 DECLARE
   row_record RECORD;
 BEGIN
@@ -158,13 +158,13 @@ BEGIN
       row_record.table_name
     );
   END LOOP;
-END $;
+END $purge3$;
 
 DELETE FROM "PlatformAccount" account_row
 USING "_BookDeletePlatformAccount" incoming
 WHERE account_row."id" = incoming."platformAccountId";
 
-DO $$
+DO $purge4$
 DECLARE
   tenant_count BIGINT;
   owner_count BIGINT;
@@ -205,6 +205,6 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'BOOK_PROFILE_PURGE failed: selected test Tenant remains';
   END IF;
-END $$;
+END $purge4$;
 
 COMMIT;
