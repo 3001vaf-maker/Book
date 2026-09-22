@@ -7,7 +7,7 @@ import { getWorkplaces as getWorkplaceEntities } from './settings/profile/workpl
 import { initializeProfileWorkplaces } from './settings/profile/migration.js';
 import { initializeBusinessState } from './business-migration.js';
 import { initializeOperationalState } from './operational-migration.js';
-import { initializeTenantDocumentArchive, refreshTenantDocumentArchive } from './tenant-document-archive.js';
+import { ensureRknGuide, initializeTenantDocumentArchive, refreshTenantDocumentArchive } from './tenant-document-archive.js';
 import { initializeAuxiliaryState } from './auxiliary-migration.js';
 import { getJournalTimeUsages, releaseJournalSoftTimeUsages } from './journal/time-usage-source.js';
 import { configureWorkplaceSource } from './core/workplace-time.js';
@@ -21,7 +21,7 @@ import { bottomNavigation } from './ui/ui.js';
 import { clearLegacyBusinessStorage } from './core/legacy-browser-business.js';
 import { FirstRunRuntime, bindDemoBadgeAction, demoBadgeMarkup, startPlatformSessionTracking } from './first-run/runtime.js';
 import { startPlatformNotices } from './core/platform-notices.js';
-import { ensureRknGuide, requestDemoExtension, requestLiveMode } from './first-run/api.js';
+import { requestDemoExtension, requestLiveMode } from './first-run/api.js';
 
 configureWorkplaceSource(getWorkplaceEntities);
 configureTimeUsageSource(getJournalTimeUsages);
