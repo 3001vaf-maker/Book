@@ -74,7 +74,6 @@ function scheduleRknGuideSync() {
 }
 
 window.addEventListener('book:profile-changed', scheduleRknGuideSync);
-window.addEventListener('book:workplaces-changed', scheduleRknGuideSync);
 window.addEventListener('book:server-mutation-completed', (event) => {
   const scopes = Array.isArray(event?.detail?.scopes) ? event.detail.scopes : [];
   if (scopes.includes('operational')) scheduleRknGuideSync();
