@@ -235,10 +235,16 @@ export class FirstRunService {
     const archive = await this.documentArchive.get(tenantId);
     if (!archive?.verified) throw new ConflictException('Архив документов ещё не готов');
     const documents = arrayValue(archive?.data?.documents);
-    const canonicalGuides = documents.filter((item) => (
-      objectValue(item).attachment?.type === 'RKN_GUIDE_PDF'
-      && objectValue(objectValue(item).attachment).templateKey === RKN_GUIDE_TEMPLATE_KEY
-    ));
+    const canonicalGuides = documents.filter((item) => {
+      const attachment = objectValue(objectValue(item).attachment);
+      return (
+        attachment.type === 'RKN_GUIDE_PDF'
+        && text(attachment.templateKey) === RKN_GUIDE_TEMPLATE_KEY
+        && Number(attachment.templateVersion || 0) > 0
+        && Boolean(text(attachment.sourceHash))
+        && Boolean(text(attachment.pdfBase64))
+      );
+    });
     const personalVersion = canonicalGuides.length + 1;
     const generatedAt = new Date();
     const personalizedContent = this.personalizeRknGuide(
