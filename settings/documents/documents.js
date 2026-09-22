@@ -20,8 +20,14 @@ function statusText(item) {
   return item.required ? 'Обязательное согласие' : 'Необязательное согласие';
 }
 
-function isRknGuide(item) {
+function isAnyRknGuide(item) {
   return item?.attachment?.type === 'RKN_GUIDE_PDF';
+}
+
+function isRknGuide(item) {
+  return isAnyRknGuide(item)
+    && item?.attachment?.templateKey === 'rkn-notification-guide-template'
+    && Boolean(item?.attachment?.pdfBase64);
 }
 
 
@@ -102,7 +108,7 @@ function rootMarkup() {
 }
 
 function templatesMarkup() {
-  const documents = getDocuments().filter((item) => !isRknGuide(item));
+  const documents = getDocuments().filter((item) => !isAnyRknGuide(item));
   const rows = list({
     items: documents.map((item) => ({
       title: item.title,
@@ -127,7 +133,7 @@ function openRknGuide(item) {
       <h2>${escapeHtml(item.title || 'Инструкция РКН')}</h2>
       <p>PDF · версия ${escapeHtml(item.version || 1)} · ${escapeHtml(formatMoment(generatedAt))}</p>
     </div>
-    <p style="font-size:18px;line-height:1.55;margin:0 0 18px">Инструкция сохранена в ваших документах. Её можно скачать повторно в любое время.</p>
+    <p style="font-size:18px;line-height:1.55;margin:0 0 18px">Это зафиксированная персональная версия инструкции, автоматически собранная из шаблона Реестра и ваших рабочих данных. Её можно скачать повторно в любое время.</p>
     <p class="muted" data-rkn-guide-error></p>
     <div class="modal-actions">
       ${button('Скачать PDF', { data: 'data-rkn-guide-download' })}
@@ -168,8 +174,7 @@ function guidesMarkup() {
 
   return page([
     pageHeader('Инструкции'),
-    actionBlock(button('Сформировать актуальную инструкцию', { data: 'data-rkn-guide-create' })),
-    '<p class="muted" data-rkn-guide-create-status></p>',
+    '<p class="muted">Персональные инструкции Book формирует автоматически из актуального шаблона Реестра и ваших рабочих данных.</p>',
     rows,
     actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-documents-root' }))
   ]);
@@ -259,20 +264,6 @@ function historyMarkup() {
 }
 
 function bind(root, navigateBack) {
-  root.querySelector('[data-rkn-guide-create]')?.addEventListener('click', async (event) => {
-    const control = event.currentTarget;
-    const status = root.querySelector('[data-rkn-guide-create-status]');
-    control.disabled = true;
-    if (status) status.textContent = 'Формируем и сохраняем PDF…';
-    try {
-      await downloadRknGuide();
-      await refreshTenantDocumentArchive();
-      render(root, navigateBack);
-    } catch (error) {
-      if (status) status.textContent = error instanceof Error ? error.message : 'Не удалось сформировать инструкцию';
-      control.disabled = false;
-    }
-  });
   root.querySelector('[data-documents-back]')?.addEventListener('click', () => {
     currentSection = 'root';
     navigateBack();
