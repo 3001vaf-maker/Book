@@ -128,7 +128,7 @@ export class DocumentRegistryService {
         FROM "PlatformConsentEvent" e
         JOIN "PlatformDocumentVersion" v ON v."id" = e."documentVersionId"
         JOIN "PlatformDocument" d ON d."id" = v."documentId"
-        JOIN "PlatformAccount" a ON a."id" = e."platformAccountId"
+        LEFT JOIN "PlatformAccount" a ON a."id" = e."platformAccountId"
         LEFT JOIN "Tenant" t ON t."id" = e."tenantId"
 
         UNION ALL
