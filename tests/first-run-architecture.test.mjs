@@ -38,12 +38,17 @@ assert.match(schema, /model PlatformNotice\s*\{/);
 assert.match(schema, /commercialMode\s+String\s+@default\("LIVE"\)/);
 assert.match(schema, /demoActivatedAt\s+DateTime\?/);
 assert.match(schema, /demoExpiresAt\s+DateTime\?/);
+assert.match(schema, /liveApprovedAt\s+DateTime\?/);
+assert.match(schema, /liveApprovedByAdminId\s+String\?/);
 
 assert.match(firstRun, /const DEMO_DAYS = 14/);
 assert.match(firstRun, /firstRunScenarioVersionId/);
 assert.match(schema, /model FirstRunProgress[\s\S]*?status\s+String\s+@default\("IN_PROGRESS"\)/);
 assert.match(firstRun, /assertRealOperationsAllowed/);
 assert.match(firstRun, /if \(access\.commercialMode !== 'LIVE'\)/);
+assert.match(firstRun, /!access\.isOwnerBook && !access\.liveApprovedAt/);
+assert.match(firstRun, /LIVE_APPROVED_BY_ADMIN/);
+assert.match(firstRun, /liveApprovedByAdminId/);
 assert.doesNotMatch(firstRun, /commercialMode !== 'LIVE' \|\| progress/);
 assert.match(firstRun, /cleanupDemoOperationalData/);
 assert.match(firstRun, /person\.deleteMany/);
@@ -68,6 +73,8 @@ assert.doesNotMatch(access, /firstRunActive/);
 assert.match(access, /source: 'TENANT_OVERRIDE'/);
 assert.match(access, /source: 'PLAN'/);
 assert.match(access, /source: 'DEFAULT'/);
+assert.match(access, /liveUnapproved/);
+assert.match(access, /liveApprovedAt/);
 assert.doesNotMatch(access, /LEGACY_COMPAT/);
 assert.doesNotMatch(access, /legacyCompatibilityValue/);
 
