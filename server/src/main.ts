@@ -68,7 +68,8 @@ async function bootstrap() {
     if (host === ADMIN_HOST) {
       if (request.path === '/') return response.redirect(302, '/admin/');
       if (
-        request.path.startsWith('/admin/')
+        request.path === '/service-worker.js'
+        || request.path.startsWith('/admin/')
         || request.path.startsWith('/core/')
         || request.path.startsWith('/ui/')
         || request.path.startsWith('/css/')
