@@ -38,7 +38,7 @@ WHERE access."tenantId" = legacy."tenantId"
 -- Append-only remains the default. The exception exists only while an
 -- administrator/pre-launch cleanup explicitly enables the LOCAL transaction
 -- setting. SET LOCAL disappears automatically at COMMIT/ROLLBACK.
-CREATE OR REPLACE FUNCTION "book_reject_document_registry_event_mutation"() RETURNS trigger AS $
+CREATE OR REPLACE FUNCTION "book_reject_document_registry_event_mutation"() RETURNS trigger AS $book$
 DECLARE
   allow_test_delete TEXT;
 BEGIN
@@ -50,12 +50,12 @@ BEGIN
 
   RAISE EXCEPTION '% is append-only', TG_TABLE_NAME;
 END;
-$ LANGUAGE plpgsql;
+$book$ LANGUAGE plpgsql;
 
 -- Some upgraded databases can still have legacy append-only triggers pointing
 -- at this older function. Preserve the same default protection and the same
 -- transaction-local pre-launch exception instead of dropping those triggers.
-CREATE OR REPLACE FUNCTION "book_reject_append_only_mutation"() RETURNS trigger AS $
+CREATE OR REPLACE FUNCTION "book_reject_append_only_mutation"() RETURNS trigger AS $book$
 DECLARE
   allow_test_delete TEXT;
 BEGIN
@@ -67,7 +67,7 @@ BEGIN
 
   RAISE EXCEPTION '% is append-only', TG_TABLE_NAME;
 END;
-$ LANGUAGE plpgsql;
+$book$ LANGUAGE plpgsql;
 
 -- WorkspaceState was created before these foreign keys existed.
 -- Remove only rows already orphaned by earlier test failures, then align the
