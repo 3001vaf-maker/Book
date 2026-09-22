@@ -280,6 +280,14 @@ jobs:
             npx prisma generate
             DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' node scripts/check-prelaunch-hard-delete.mjs
           )
+      - name: Verify DEMO and LIVE runtime access
+        shell: bash
+        run: |
+          set -euo pipefail
+          (
+            cd server
+            DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' npx ts-node scripts/check-demo-live-access.ts
+          )
       - name: Stop isolated database
         if: always()
         run: docker compose -f docker-compose.staging.yml down -v
