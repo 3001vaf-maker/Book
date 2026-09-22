@@ -244,7 +244,10 @@ export class RknGuideService {
       }
     }
 
-    const personalVersion = canonicalGuides.length + 1;
+    const personalVersion = canonicalGuides.reduce(
+      (maxVersion, item) => Math.max(maxVersion, Number(objectValue(item).version || 0)),
+      0,
+    ) + 1;
     const generatedAt = new Date();
     const previousSnapshot = latestGuide
       ? objectValue(objectValue(latestGuide).attachment).snapshot
