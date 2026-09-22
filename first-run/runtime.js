@@ -161,13 +161,27 @@ export class FirstRunRuntime {
     if (this.pageHideHandler) window.removeEventListener('pagehide', this.pageHideHandler);
   }
 
-  decorateDemo() {
-    this.app.querySelector('[data-first-run-demo-badge]')?.remove();
-    const html = demoBadgeMarkup(this.state);
-    if (html) {
-      this.app.insertAdjacentHTML('beforeend', html);
-      bindDemoBadgeAction(this.app, this.state);
+  mutateAppWithoutObserver(callback) {
+    const observer = this.observer;
+    observer?.disconnect();
+    try {
+      return callback();
+    } finally {
+      if (observer && this.observer === observer && !this.disposed) {
+        observer.observe(this.app, { childList: true, subtree: true });
+      }
     }
+  }
+
+  decorateDemo() {
+    this.mutateAppWithoutObserver(() => {
+      this.app.querySelector('[data-first-run-demo-badge]')?.remove();
+      const html = demoBadgeMarkup(this.state);
+      if (html) {
+        this.app.insertAdjacentHTML('beforeend', html);
+        bindDemoBadgeAction(this.app, this.state);
+      }
+    });
   }
 
   installObserver() {
@@ -566,23 +580,25 @@ export class FirstRunRuntime {
     onPrimary = null,
     onSkip = null,
   } = {}) {
-    this.app.querySelector('[data-first-run-actions]')?.remove();
-    if (!primaryVisible && !skipVisible) return;
+    this.mutateAppWithoutObserver(() => {
+      this.app.querySelector('[data-first-run-actions]')?.remove();
+      if (!primaryVisible && !skipVisible) return;
 
-    const primary = primaryVisible && onPrimary
-      ? button(step.primaryLabel || 'Далее', { data: 'data-first-run-primary' })
-      : '';
-    const skip = skipVisible && onSkip
-      ? button(step.skipLabel || 'Пропустить', { variant: 'secondary', data: 'data-first-run-skip' })
-      : '';
-    this.app.insertAdjacentHTML('beforeend', `<div class="first-run-action-dock" data-first-run-actions>${primary}${skip}</div>`);
-    this.app.querySelector('[data-first-run-primary]')?.addEventListener('click', async (event) => {
-      event.currentTarget.disabled = true;
-      try { await onPrimary(); } catch (error) { this.showError(error); event.currentTarget.disabled = false; }
-    });
-    this.app.querySelector('[data-first-run-skip]')?.addEventListener('click', async (event) => {
-      event.currentTarget.disabled = true;
-      try { await onSkip(); } catch (error) { this.showError(error); event.currentTarget.disabled = false; }
+      const primary = primaryVisible && onPrimary
+        ? button(step.primaryLabel || 'Далее', { data: 'data-first-run-primary' })
+        : '';
+      const skip = skipVisible && onSkip
+        ? button(step.skipLabel || 'Пропустить', { variant: 'secondary', data: 'data-first-run-skip' })
+        : '';
+      this.app.insertAdjacentHTML('beforeend', `<div class="first-run-action-dock" data-first-run-actions>${primary}${skip}</div>`);
+      this.app.querySelector('[data-first-run-primary]')?.addEventListener('click', async (event) => {
+        event.currentTarget.disabled = true;
+        try { await onPrimary(); } catch (error) { this.showError(error); event.currentTarget.disabled = false; }
+      });
+      this.app.querySelector('[data-first-run-skip]')?.addEventListener('click', async (event) => {
+        event.currentTarget.disabled = true;
+        try { await onSkip(); } catch (error) { this.showError(error); event.currentTarget.disabled = false; }
+      });
     });
   }
 
