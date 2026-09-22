@@ -58,50 +58,33 @@ function remainingDemoText(demo) {
 
 export function demoBadgeMarkup(state) {
   if (state?.commercialMode !== 'DEMO' || !state?.demo?.expiresAt) return '';
-  return `<button type="button" class="first-run-demo-badge" data-first-run-demo-badge>DEMO · осталось ${escapeHtml(remainingDemoText(state.demo))}</button>`;
+  const completed = state?.progress?.status === 'COMPLETED';
+  const requested = Boolean(state?.liveRequestedAt);
+  return `<div class="first-run-demo-badge" data-first-run-demo-badge>
+    <span>DEMO · осталось ${escapeHtml(remainingDemoText(state.demo))}</span>
+    ${completed ? `<button type="button" class="first-run-live-request" data-first-run-live-request ${requested ? 'disabled' : ''}>${requested ? 'Запрос LIVE отправлен' : 'Запросить LIVE'}</button>` : ''}
+  </div>`;
 }
 
 export function bindDemoBadgeAction(root, state) {
-  const control = root?.querySelector?.('[data-first-run-demo-badge]');
+  const control = root?.querySelector?.('[data-first-run-live-request]');
   if (!control || control.dataset.bound === 'true') return;
   control.dataset.bound = 'true';
-  control.addEventListener('click', () => {
-    const incomplete = state?.progress?.status === 'IN_PROGRESS';
-    const content = `
-      <div class="modal-title">
-        <h2>Перейти в LIVE</h2>
-        <p>${incomplete
-          ? 'Вы можете запросить LIVE уже сейчас. Первое знакомство при этом продолжится с текущего этапа.'
-          : 'Вы можете обратиться в компанию для перехода в LIVE.'}</p>
-      </div>
-      <div class="modal-actions">
-        ${button('Отправить запрос', { data: 'data-live-request' })}
-        ${button('Закрыть', { variant: 'secondary', data: 'data-live-request-close' })}
-      </div>
-      <p class="muted" data-live-request-status></p>`;
-    const layer = mountModal(document.body, modal(content, {
-      title: 'Перейти в LIVE',
-      variant: 'compact',
-      surface: 'app',
-    }));
-    if (!layer) return;
-    layer.querySelector('[data-live-request-close]')?.addEventListener('click', () => layer.remove());
-    layer.querySelector('[data-live-request]')?.addEventListener('click', async (event) => {
-      const buttonNode = event.currentTarget;
-      const status = layer.querySelector('[data-live-request-status]');
-      buttonNode.disabled = true;
-      if (status) status.textContent = 'Отправляем запрос…';
-      try {
-        const result = await requestLiveMode();
-        if (status) status.textContent = result?.alreadyLive
-          ? 'LIVE уже активен.'
-          : 'Запрос отправлен компании.';
-        buttonNode.textContent = 'Запрос отправлен';
-      } catch (error) {
-        buttonNode.disabled = false;
-        if (status) status.textContent = error instanceof Error ? error.message : 'Не удалось отправить запрос';
+  control.addEventListener('click', async () => {
+    control.disabled = true;
+    control.textContent = 'Отправляем…';
+    try {
+      const result = await requestLiveMode();
+      if (result?.alreadyLive) {
+        control.textContent = 'LIVE уже включён';
+        return;
       }
-    });
+      state.liveRequestedAt = result?.occurredAt || new Date().toISOString();
+      control.textContent = 'Запрос LIVE отправлен';
+    } catch (error) {
+      control.disabled = false;
+      control.textContent = error instanceof Error ? error.message : 'Не удалось отправить запрос';
+    }
   });
 }
 
