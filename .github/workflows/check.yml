@@ -190,7 +190,7 @@ jobs:
             npx prisma generate
             DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' node scripts/check-prelaunch-hard-delete.mjs
           )
-      - name: Seed OWNER and incoming profile purge fixture
+      - name: Seed OWNER, dirty LIVE, DEMO and approved LIVE purge fixture
         shell: bash
         run: |
           set -euo pipefail
@@ -208,41 +208,74 @@ jobs:
             "updatedAt" = CURRENT_TIMESTAMP;
 
           INSERT INTO "Tenant" ("id","name","updatedAt")
-          VALUES ('incoming-profile-tenant','Incoming Profile Tenant',CURRENT_TIMESTAMP);
+          VALUES
+            ('incoming-profile-tenant','Incoming DEMO Profile',CURRENT_TIMESTAMP),
+            ('dirty-live-tenant','Dirty Automatic LIVE Profile',CURRENT_TIMESTAMP),
+            ('approved-live-tenant','Approved LIVE Profile',CURRENT_TIMESTAMP);
 
           INSERT INTO "PlatformAccount" (
             "id","email","passwordHash","onboardingStep","workspaceUnlocked","updatedAt"
           )
-          VALUES (
-            'incoming-profile-account','incoming-profile@example.invalid','hash',3,true,CURRENT_TIMESTAMP
-          );
+          VALUES
+            ('incoming-profile-account','incoming-profile@example.invalid','hash',3,true,CURRENT_TIMESTAMP),
+            ('dirty-live-account','dirty-live@example.invalid','hash',3,true,CURRENT_TIMESTAMP),
+            ('approved-live-account','approved-live@example.invalid','hash',3,true,CURRENT_TIMESTAMP);
 
           INSERT INTO "Membership" ("id","tenantId","platformAccountId","role")
-          VALUES (
-            'incoming-profile-membership','incoming-profile-tenant','incoming-profile-account','OWNER'
-          );
+          VALUES
+            ('incoming-profile-membership','incoming-profile-tenant','incoming-profile-account','OWNER'),
+            ('dirty-live-membership','dirty-live-tenant','dirty-live-account','OWNER'),
+            ('approved-live-membership','approved-live-tenant','approved-live-account','OWNER');
 
           INSERT INTO "TenantAccess" (
-            "tenantId","planId","status","isOwnerBook","commercialMode","createdAt","updatedAt"
+            "tenantId","planId","status","isOwnerBook","commercialMode",
+            "liveApprovedAt","liveApprovedByAdminId","createdAt","updatedAt"
           )
-          VALUES (
-            'incoming-profile-tenant',NULL,'ACTIVE',false,'DEMO',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP
-          );
+          VALUES
+            ('incoming-profile-tenant',NULL,'ACTIVE',false,'DEMO',NULL,NULL,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+            ('dirty-live-tenant',NULL,'ACTIVE',false,'LIVE',NULL,NULL,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+            ('approved-live-tenant',NULL,'ACTIVE',false,'LIVE',CURRENT_TIMESTAMP,'upgrade-admin',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
 
           INSERT INTO "Profile" (
             "id","tenantId","platformAccountId","name","phones","telegrams","emails","customProfessions","updatedAt"
           )
-          VALUES (
-            'incoming-profile-profile','incoming-profile-tenant','incoming-profile-account','Incoming Profile',
-            '[]'::jsonb,'[]'::jsonb,'["incoming-profile@example.invalid"]'::jsonb,'[]'::jsonb,CURRENT_TIMESTAMP
-          );
+          VALUES
+            (
+              'incoming-profile-profile','incoming-profile-tenant','incoming-profile-account','Incoming Profile',
+              '[]'::jsonb,'[]'::jsonb,'["incoming-profile@example.invalid"]'::jsonb,'[]'::jsonb,CURRENT_TIMESTAMP
+            ),
+            (
+              'dirty-live-profile','dirty-live-tenant','dirty-live-account','Dirty LIVE Profile',
+              '[]'::jsonb,'[]'::jsonb,'["dirty-live@example.invalid"]'::jsonb,'[]'::jsonb,CURRENT_TIMESTAMP
+            ),
+            (
+              'approved-live-profile','approved-live-tenant','approved-live-account','Approved LIVE Profile',
+              '[]'::jsonb,'[]'::jsonb,'["approved-live@example.invalid"]'::jsonb,'[]'::jsonb,CURRENT_TIMESTAMP
+            );
 
           INSERT INTO "WorkspaceState" (
             "id","tenantId","platformAccountId","data","revision","updatedAt"
           )
+          VALUES
+            (
+              'incoming-profile-workspace','incoming-profile-tenant','incoming-profile-account',
+              '{"incoming":true}'::jsonb,1,CURRENT_TIMESTAMP
+            ),
+            (
+              'dirty-live-workspace','dirty-live-tenant','dirty-live-account',
+              '{"dirtyLive":true}'::jsonb,1,CURRENT_TIMESTAMP
+            ),
+            (
+              'approved-live-workspace','approved-live-tenant','approved-live-account',
+              '{"approvedLive":true}'::jsonb,1,CURRENT_TIMESTAMP
+            );
+
+          INSERT INTO "PlatformActivityEvent" (
+            "id","tenantId","platformAccountId","eventType","metadata","occurredAt","createdAt"
+          )
           VALUES (
-            'incoming-profile-workspace','incoming-profile-tenant','incoming-profile-account',
-            '{"incoming":true}'::jsonb,1,CURRENT_TIMESTAMP
+            'approved-live-event','approved-live-tenant','approved-live-account',
+            'LIVE_APPROVED_BY_ADMIN','{"platformAdminId":"upgrade-admin"}'::jsonb,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP
           );
           SQL
       - name: Apply incoming profile clean-start purge
@@ -254,7 +287,7 @@ jobs:
             cd server
             DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' npx prisma migrate deploy
           )
-      - name: Verify OWNER preserved and incoming profiles removed
+      - name: Verify OWNER and approved LIVE preserved, unapproved profiles removed
         shell: bash
         run: |
           set -euo pipefail
@@ -277,20 +310,56 @@ jobs:
               RAISE EXCEPTION 'OWNER TenantAccess was not preserved';
             END IF;
 
-            IF (SELECT COUNT(*) FROM "Tenant" WHERE "id" = 'incoming-profile-tenant') <> 0 THEN
-              RAISE EXCEPTION 'Incoming Tenant remains';
+            IF (SELECT COUNT(*) FROM "Tenant" WHERE "id" IN ('incoming-profile-tenant','dirty-live-tenant')) <> 0 THEN
+              RAISE EXCEPTION 'Unapproved test Tenant remains';
             END IF;
-            IF (SELECT COUNT(*) FROM "PlatformAccount" WHERE "id" = 'incoming-profile-account') <> 0 THEN
-              RAISE EXCEPTION 'Incoming PlatformAccount remains';
+            IF (SELECT COUNT(*) FROM "PlatformAccount" WHERE "id" IN ('incoming-profile-account','dirty-live-account')) <> 0 THEN
+              RAISE EXCEPTION 'Unapproved test PlatformAccount remains';
             END IF;
-            IF (SELECT COUNT(*) FROM "Profile" WHERE "id" = 'incoming-profile-profile') <> 0 THEN
-              RAISE EXCEPTION 'Incoming Profile remains';
+            IF (SELECT COUNT(*) FROM "Profile" WHERE "id" IN ('incoming-profile-profile','dirty-live-profile')) <> 0 THEN
+              RAISE EXCEPTION 'Unapproved test Profile remains';
             END IF;
-            IF (SELECT COUNT(*) FROM "WorkspaceState" WHERE "id" = 'incoming-profile-workspace') <> 0 THEN
-              RAISE EXCEPTION 'Incoming WorkspaceState remains';
+            IF (SELECT COUNT(*) FROM "WorkspaceState" WHERE "id" IN ('incoming-profile-workspace','dirty-live-workspace')) <> 0 THEN
+              RAISE EXCEPTION 'Unapproved test WorkspaceState remains';
             END IF;
-            IF (SELECT COUNT(*) FROM "TenantAccess" WHERE "isOwnerBook" = false) <> 0 THEN
-              RAISE EXCEPTION 'Non-owner TenantAccess rows remain';
+
+            IF (SELECT COUNT(*) FROM "Tenant" WHERE "id" = 'approved-live-tenant') <> 1 THEN
+              RAISE EXCEPTION 'Approved LIVE Tenant was removed';
+            END IF;
+            IF (SELECT COUNT(*) FROM "PlatformAccount" WHERE "id" = 'approved-live-account') <> 1 THEN
+              RAISE EXCEPTION 'Approved LIVE PlatformAccount was removed';
+            END IF;
+            IF (SELECT COUNT(*) FROM "Profile" WHERE "id" = 'approved-live-profile') <> 1 THEN
+              RAISE EXCEPTION 'Approved LIVE Profile was removed';
+            END IF;
+            IF (SELECT COUNT(*) FROM "WorkspaceState" WHERE "id" = 'approved-live-workspace') <> 1 THEN
+              RAISE EXCEPTION 'Approved LIVE WorkspaceState was removed';
+            END IF;
+            IF (
+              SELECT COUNT(*)
+              FROM "TenantAccess"
+              WHERE "tenantId" = 'approved-live-tenant'
+                AND "isOwnerBook" = false
+                AND "commercialMode" = 'LIVE'
+                AND "liveApprovedAt" IS NOT NULL
+                AND "liveApprovedByAdminId" = 'upgrade-admin'
+            ) <> 1 THEN
+              RAISE EXCEPTION 'Approved LIVE proof was not preserved';
+            END IF;
+
+            IF (SELECT COUNT(*) FROM "TenantAccess" WHERE "isOwnerBook" = false) <> 1 THEN
+              RAISE EXCEPTION 'Unexpected non-owner profiles remain after purge';
+            END IF;
+
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_trigger WHERE tgname = 'PlatformConsentEvent_append_only' AND NOT tgisinternal
+            ) THEN
+              RAISE EXCEPTION 'PlatformConsentEvent append-only protection is missing';
+            END IF;
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_trigger WHERE tgname = 'PlatformActivityEvent_append_only' AND NOT tgisinternal
+            ) THEN
+              RAISE EXCEPTION 'PlatformActivityEvent append-only protection is missing';
             END IF;
           END
           $profile_purge$;
