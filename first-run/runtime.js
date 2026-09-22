@@ -402,7 +402,7 @@ export class FirstRunRuntime {
         });
       } else if (step.kind === 'REQUIRED_INFO') {
         this.renderActionDock(step, {
-          primaryVisible: this.modalShownKey === step.key,
+          primaryVisible: this.modalSeenKey === step.key,
           onPrimary: () => this.complete(step, 'complete'),
         });
       } else {
@@ -557,7 +557,18 @@ export class FirstRunRuntime {
         this.modalShownKey = '';
         this.showError(error);
       });
-    layer.querySelector('[data-first-run-modal-close]')?.addEventListener('click', () => {
+    layer.querySelector('[data-first-run-modal-close]')?.addEventListener('click', async () => {
+      if (this.modalSeenKey !== step.key) {
+        try {
+          const state = await markFirstRunStepSeen(step.key, this.sessionId);
+          this.state = state;
+          this.modalSeenKey = step.key;
+          this.onStateChange(this.state);
+        } catch (error) {
+          this.showError(error);
+          return;
+        }
+      }
       layer.remove();
       this.queueSync();
     });
