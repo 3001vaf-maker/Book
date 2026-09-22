@@ -30,6 +30,18 @@ function text(value: unknown) {
   return String(value ?? '').trim();
 }
 
+function isCanonicalRknGuide(item: any, templateKey = '') {
+  const attachment = objectValue(item?.attachment);
+  return (
+    attachment.type === 'RKN_GUIDE_PDF'
+    && Boolean(text(attachment.templateKey))
+    && Number(attachment.templateVersion || 0) > 0
+    && Boolean(text(attachment.sourceHash))
+    && Boolean(text(attachment.pdfBase64))
+    && (!templateKey || text(attachment.templateKey) === templateKey)
+  );
+}
+
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value));
 }
@@ -153,13 +165,15 @@ export class TenantDocumentArchiveService {
 
     // Старые тестовые RKN_GUIDE_PDF создавались до появления шаблона Реестра.
     // Они сохраняются в архиве для истории, но не участвуют в новой цепочке версий.
+    let legacyChanged = false;
     current.documents = current.documents.map((item: any) => {
       const attachment = objectValue(item?.attachment);
       if (
         attachment.type === 'RKN_GUIDE_PDF'
-        && (!text(attachment.templateKey) || !Number(attachment.templateVersion || 0) || !text(attachment.pdfBase64))
+        && !isCanonicalRknGuide(item)
         && !attachment.legacyFormat
       ) {
+        legacyChanged = true;
         return {
           ...item,
           title: item?.title || 'Старая инструкция РКН',
@@ -191,16 +205,20 @@ export class TenantDocumentArchiveService {
     };
     const sourceHash = createHash('sha256').update(JSON.stringify(stable(source)), 'utf8').digest('hex');
     const existing = current.documents.find((item: any) => (
-      item?.attachment?.type === 'RKN_GUIDE_PDF'
-      && item?.attachment?.templateKey === templateKey
+      isCanonicalRknGuide(item, templateKey)
       && item?.attachment?.sourceHash === sourceHash
     ));
-    if (existing) return clone(existing);
+    if (existing) {
+      if (legacyChanged) {
+        await this.prisma.tenantDocumentArchive.update({
+          where: { tenantId },
+          data: { data: json(current) },
+        });
+      }
+      return clone(existing);
+    }
 
-    const canonicalGuides = current.documents.filter((item: any) => (
-      item?.attachment?.type === 'RKN_GUIDE_PDF'
-      && item?.attachment?.templateKey === templateKey
-    ));
+    const canonicalGuides = current.documents.filter((item: any) => isCanonicalRknGuide(item, templateKey));
     const version = canonicalGuides.length + 1;
     const generatedAt = new Date().toISOString();
     const mode = version === 1 ? 'INITIAL' : 'UPDATE';
@@ -264,9 +282,7 @@ export class TenantDocumentArchiveService {
     const attachment = objectValue(document?.attachment);
     if (
       attachment.legacyFormat === 'PRE_REGISTRY_TEMPLATE'
-      || !text(attachment.templateKey)
-      || !Number(attachment.templateVersion || 0)
-      || !text(attachment.pdfBase64)
+      || !isCanonicalRknGuide(document)
     ) {
       throw new ConflictException('Это старая тестовая инструкция РКН. Она сохранена в истории, но не относится к новой цепочке версий.');
     }
