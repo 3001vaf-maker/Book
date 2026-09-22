@@ -9,7 +9,6 @@ import { button, escapeHtml, modal, mountModal } from '../ui/ui.js';
 import { refreshTenantDocumentArchive } from '../tenant-document-archive.js';
 import {
   completeFirstRunStep,
-  downloadRknGuide,
   endFirstRunSessionKeepalive,
   getFirstRunState,
   heartbeatFirstRunSession,
@@ -497,6 +496,11 @@ export class FirstRunRuntime {
         return;
       }
       this.enteredStepKey = step.key;
+      if (step.key === 'documents') {
+        void this.showStepModal(step);
+        this.queueSync();
+        return;
+      }
       window.setTimeout(() => {
         void this.showStepModal(step);
         this.queueSync();
@@ -520,23 +524,13 @@ export class FirstRunRuntime {
   async showStepModal(step) {
     if (!step || this.modalShownKey === step.key || document.querySelector('[data-first-run-step-modal]')) return;
     this.modalShownKey = step.key;
-    try {
-      this.state = await markFirstRunStepSeen(step.key, this.sessionId);
-      this.onStateChange(this.state);
-    } catch {
-      // The modal remains useful even when telemetry is temporarily unavailable.
-    }
 
-    const rknButton = step?.metadata?.rknGuide
-      ? button('Получить инструкцию по РКН', { variant: 'secondary', data: 'data-first-run-rkn-guide' })
-      : '';
     const content = `
       <div class="modal-title">
         <h2>${escapeHtml(step.modalTitle || step.title)}</h2>
         <p>${modalText(step.modalBody)}</p>
       </div>
       <div class="modal-actions">
-        ${rknButton}
         ${button('Понятно', { data: 'data-first-run-modal-close' })}
       </div>`;
     const layer = mountModal(document.body, modal(content, {
@@ -545,31 +539,21 @@ export class FirstRunRuntime {
       surface: 'app',
       className: 'first-run-step-modal',
     }));
-    if (!layer) return;
+    if (!layer) {
+      this.modalShownKey = '';
+      return;
+    }
     layer.dataset.firstRunStepModal = step.key;
+    void markFirstRunStepSeen(step.key, this.sessionId)
+      .then((state) => {
+        this.state = state;
+        this.onStateChange(this.state);
+        this.queueSync();
+      })
+      .catch(() => undefined);
     layer.querySelector('[data-first-run-modal-close]')?.addEventListener('click', () => {
       layer.remove();
       this.queueSync();
-    });
-    layer.querySelector('[data-first-run-rkn-guide]')?.addEventListener('click', async (event) => {
-      const control = event.currentTarget;
-      control.disabled = true;
-      const original = control.textContent;
-      control.textContent = 'Формируем PDF…';
-      try {
-        await downloadRknGuide();
-        await refreshTenantDocumentArchive().catch(() => undefined);
-        await recordFirstRunActivity('RKN_GUIDE_DOWNLOADED', {
-          stepKey: step.key,
-          scenarioVersionId: this.state?.scenario?.id || '',
-          sessionId: this.sessionId,
-        }).catch(() => undefined);
-      } catch (error) {
-        this.showError(error);
-      } finally {
-        control.disabled = false;
-        control.textContent = original;
-      }
     });
     this.queueSync();
   }
@@ -615,6 +599,9 @@ export class FirstRunRuntime {
   async complete(step, action) {
     await flushBusinessPersistence();
     this.state = await completeFirstRunStep(step.key, action, this.sessionId);
+    if (step.key === 'procedures' && action === 'complete') {
+      await refreshTenantDocumentArchive();
+    }
     this.onStateChange(this.state);
     this.localObserver?.disconnect();
     this.localObserver = null;
