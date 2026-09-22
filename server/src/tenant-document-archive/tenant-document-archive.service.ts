@@ -146,6 +146,30 @@ export class TenantDocumentArchiveService {
     if (!state?.migrationVerifiedAt) throw new ConflictException('Архив документов ещё не готов');
 
     const current = normalize(state.data);
+
+    // Старые тестовые RKN_GUIDE_PDF создавались до появления шаблона Реестра.
+    // Они сохраняются в архиве для истории, но не участвуют в новой цепочке версий.
+    let legacyChanged = false;
+    current.documents = current.documents.map((item: any) => {
+      const attachment = objectValue(item?.attachment);
+      if (
+        attachment.type === 'RKN_GUIDE_PDF'
+        && (!text(attachment.templateKey) || !Number(attachment.templateVersion || 0) || !text(attachment.pdfBase64))
+        && !attachment.legacyFormat
+      ) {
+        legacyChanged = true;
+        return {
+          ...item,
+          title: item?.title || 'Старая инструкция РКН',
+          attachment: {
+            ...attachment,
+            legacyFormat: 'PRE_REGISTRY_TEMPLATE',
+          },
+        };
+      }
+      return item;
+    });
+
     const input = objectValue(inputValue);
     const snapshot = objectValue(input.snapshot);
     const templateKey = String(input.templateKey || '').trim();
@@ -235,6 +259,15 @@ export class TenantDocumentArchiveService {
       && item?.attachment?.type === 'RKN_GUIDE_PDF'
     ));
     if (!document) throw new NotFoundException('Инструкция РКН не найдена');
+    const attachment = objectValue(document?.attachment);
+    if (
+      attachment.legacyFormat === 'PRE_REGISTRY_TEMPLATE'
+      || !text(attachment.templateKey)
+      || !Number(attachment.templateVersion || 0)
+      || !text(attachment.pdfBase64)
+    ) {
+      throw new ConflictException('Это старая тестовая инструкция РКН. Она сохранена в истории, но не относится к новой цепочке версий.');
+    }
     return clone(document);
   }
 
