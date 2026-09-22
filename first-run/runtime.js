@@ -6,7 +6,6 @@ import { getPeopleCount } from '../main/people/data.js';
 import { getProcedures } from '../settings/service/procedures/data.js';
 import { getProducts } from '../settings/service/products/data.js';
 import { button, escapeHtml, modal, mountModal } from '../ui/ui.js';
-import { ensureRknGuide, refreshTenantDocumentArchive } from '../tenant-document-archive.js';
 import {
   completeFirstRunStep,
   endFirstRunSessionKeepalive,
@@ -615,11 +614,6 @@ export class FirstRunRuntime {
 
   async complete(step, action) {
     await flushBusinessPersistence();
-    if (step.key === 'procedures' && action === 'complete') {
-      const guide = await ensureRknGuide();
-      if (!guide?.ready) throw new Error('Сначала заполните профиль и услуги для персональной инструкции РКН');
-      await refreshTenantDocumentArchive();
-    }
     this.state = await completeFirstRunStep(step.key, action, this.sessionId);
     this.onStateChange(this.state);
     this.localObserver?.disconnect();
