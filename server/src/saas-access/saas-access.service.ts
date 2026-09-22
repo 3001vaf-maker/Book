@@ -267,14 +267,11 @@ export class SaasAccessService {
 
   private demoActive(access: { commercialMode: string; demoActivatedAt: Date | null; demoExpiresAt: Date | null }) {
     return access.commercialMode === 'DEMO'
-      && Boolean(access.demoActivatedAt)
-      && Boolean(access.demoExpiresAt)
-      && access.demoExpiresAt!.getTime() > Date.now();
+      && (!access.demoExpiresAt || access.demoExpiresAt.getTime() > Date.now());
   }
 
   private demoExpired(access: { commercialMode: string; demoActivatedAt: Date | null; demoExpiresAt: Date | null }) {
     return access.commercialMode === 'DEMO'
-      && Boolean(access.demoActivatedAt)
       && Boolean(access.demoExpiresAt)
       && access.demoExpiresAt!.getTime() <= Date.now();
   }
