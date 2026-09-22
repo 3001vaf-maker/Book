@@ -15,6 +15,11 @@ export class FirstRunController {
     return this.firstRun.state(request.auth!.tenantId, request.auth!.platformAccountId);
   }
 
+  @Post('rkn-guide/ensure')
+  ensureRknGuide(@Req() request: AuthenticatedRequest) {
+    return this.firstRun.ensureRknGuide(request.auth!.tenantId, request.auth!.platformAccountId);
+  }
+
   @Get('rkn-guide.pdf')
   async rknGuide(
     @Req() request: AuthenticatedRequest,
