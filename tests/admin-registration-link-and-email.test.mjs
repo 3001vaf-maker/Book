@@ -8,7 +8,7 @@ const adminService = fs.readFileSync('server/src/saas-admin/saas-admin.service.t
 const adminModule = fs.readFileSync('server/src/saas-admin/saas-admin.module.ts', 'utf8');
 const adminUi = fs.readFileSync('admin/admin.js', 'utf8');
 const inviteUi = fs.readFileSync('invite/invite.js', 'utf8');
-const immutableLegalHistoryMigration = fs.readFileSync('server/prisma/migrations/20260922043000_detach_immutable_legal_events/migration.sql', 'utf8');
+const prelaunchHardDeleteMigration = fs.readFileSync('server/prisma/migrations/20260922075500_prelaunch_hard_delete_clean_start/migration.sql', 'utf8');
 
 assert.match(invitation, /async createRegistrationLink\(/);
 assert.match(invitation, /@registration\.invalid/);
@@ -49,11 +49,13 @@ assert.match(adminService, /remainingMemberships === 0 && !platformAdmin/);
 assert.doesNotMatch(adminService, /DELETE FROM "PlatformConsentEvent"/);
 assert.doesNotMatch(adminService, /allow_test_tenant_delete/);
 assert.doesNotMatch(adminService, /set_config\(/);
-assert.match(immutableLegalHistoryMigration, /DROP CONSTRAINT IF EXISTS "PlatformConsentEvent_tenantId_fkey"/);
-assert.match(immutableLegalHistoryMigration, /DROP CONSTRAINT IF EXISTS "PlatformConsentEvent_platformAccountId_fkey"/);
-assert.match(immutableLegalHistoryMigration, /DROP CONSTRAINT IF EXISTS "LegalAuditEvent_tenantId_fkey"/);
-assert.match(immutableLegalHistoryMigration, /DROP CONSTRAINT IF EXISTS "LegalAuditEvent_actorUserId_fkey"/);
-assert.match(immutableLegalHistoryMigration, /RAISE EXCEPTION '% is append-only'/);
+assert.match(prelaunchHardDeleteMigration, /DROP TABLE IF EXISTS "LegalAuditEvent"/);
+assert.match(prelaunchHardDeleteMigration, /DROP TABLE IF EXISTS "LegalStateEvent"/);
+assert.match(prelaunchHardDeleteMigration, /DROP TRIGGER IF EXISTS "PlatformConsentEvent_append_only"/);
+assert.match(prelaunchHardDeleteMigration, /DROP TRIGGER IF EXISTS "PlatformActivityEvent_append_only"/);
+assert.match(prelaunchHardDeleteMigration, /PlatformConsentEvent_tenantId_fkey/);
+assert.match(prelaunchHardDeleteMigration, /PlatformConsentEvent_platformAccountId_fkey/);
+assert.match(prelaunchHardDeleteMigration, /ON DELETE CASCADE ON UPDATE CASCADE/);
 assert.match(adminUi, /data-delete-tenant/);
 assert.match(adminUi, /Будут полностью удалены/);
 assert.match(adminUi, /openDeleteTenantModal/);

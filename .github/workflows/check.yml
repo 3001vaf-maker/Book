@@ -74,6 +74,8 @@ jobs:
           mv server/prisma/migrations/20260921194000_platform_notices /tmp/profile-migrations/
           mv server/prisma/migrations/20260921195000_commercial_mode_compat /tmp/profile-migrations/
           mv server/prisma/migrations/20260922043000_detach_immutable_legal_events /tmp/profile-migrations/
+          mv server/prisma/migrations/20260922075500_prelaunch_hard_delete_clean_start /tmp/profile-migrations/
+          mv server/prisma/migrations/20260922081000_purge_non_owner_profiles /tmp/profile-migrations/
           (
             cd server
             DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' npx prisma migrate deploy
@@ -126,6 +128,7 @@ jobs:
           mv /tmp/profile-migrations/20260921194000_platform_notices server/prisma/migrations/
           mv /tmp/profile-migrations/20260921195000_commercial_mode_compat server/prisma/migrations/
           mv /tmp/profile-migrations/20260922043000_detach_immutable_legal_events server/prisma/migrations/
+          mv /tmp/profile-migrations/20260922075500_prelaunch_hard_delete_clean_start server/prisma/migrations/
           (
             cd server
             DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' npx prisma migrate deploy
@@ -178,15 +181,120 @@ jobs:
           END
           $profile_check$;
           SQL
-      - name: Verify immutable legal history survives subject deletion
+      - name: Verify ACTIVE LIVE test tenant hard delete
         shell: bash
         run: |
           set -euo pipefail
           (
             cd server
             npx prisma generate
-            DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' node scripts/check-immutable-legal-history-delete.mjs
+            DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' node scripts/check-prelaunch-hard-delete.mjs
           )
+      - name: Seed OWNER and incoming profile purge fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.staging.yml exec -T db psql -U book -d book_staging -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO "TenantAccess" (
+            "tenantId","planId","status","isOwnerBook","commercialMode","createdAt","updatedAt"
+          )
+          VALUES (
+            'upgrade-tenant',NULL,'ACTIVE',true,'LIVE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP
+          )
+          ON CONFLICT ("tenantId") DO UPDATE SET
+            "isOwnerBook" = true,
+            "status" = 'ACTIVE',
+            "commercialMode" = 'LIVE',
+            "updatedAt" = CURRENT_TIMESTAMP;
+
+          INSERT INTO "Tenant" ("id","name","updatedAt")
+          VALUES ('incoming-profile-tenant','Incoming Profile Tenant',CURRENT_TIMESTAMP);
+
+          INSERT INTO "PlatformAccount" (
+            "id","email","passwordHash","onboardingStep","workspaceUnlocked","updatedAt"
+          )
+          VALUES (
+            'incoming-profile-account','incoming-profile@example.invalid','hash',3,true,CURRENT_TIMESTAMP
+          );
+
+          INSERT INTO "Membership" ("id","tenantId","platformAccountId","role")
+          VALUES (
+            'incoming-profile-membership','incoming-profile-tenant','incoming-profile-account','OWNER'
+          );
+
+          INSERT INTO "TenantAccess" (
+            "tenantId","planId","status","isOwnerBook","commercialMode","createdAt","updatedAt"
+          )
+          VALUES (
+            'incoming-profile-tenant',NULL,'ACTIVE',false,'DEMO',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP
+          );
+
+          INSERT INTO "Profile" (
+            "id","tenantId","platformAccountId","name","phones","telegrams","emails","customProfessions","updatedAt"
+          )
+          VALUES (
+            'incoming-profile-profile','incoming-profile-tenant','incoming-profile-account','Incoming Profile',
+            '[]'::jsonb,'[]'::jsonb,'["incoming-profile@example.invalid"]'::jsonb,'[]'::jsonb,CURRENT_TIMESTAMP
+          );
+
+          INSERT INTO "WorkspaceState" (
+            "id","tenantId","platformAccountId","data","revision","updatedAt"
+          )
+          VALUES (
+            'incoming-profile-workspace','incoming-profile-tenant','incoming-profile-account',
+            '{"incoming":true}'::jsonb,1,CURRENT_TIMESTAMP
+          );
+          SQL
+      - name: Apply incoming profile clean-start purge
+        shell: bash
+        run: |
+          set -euo pipefail
+          mv /tmp/profile-migrations/20260922081000_purge_non_owner_profiles server/prisma/migrations/
+          (
+            cd server
+            DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' npx prisma migrate deploy
+          )
+      - name: Verify OWNER preserved and incoming profiles removed
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.staging.yml exec -T db psql -U book -d book_staging -v ON_ERROR_STOP=1 <<'SQL'
+          DO $profile_purge$
+          BEGIN
+            IF (SELECT COUNT(*) FROM "Tenant" WHERE "id" = 'upgrade-tenant') <> 1 THEN
+              RAISE EXCEPTION 'OWNER Tenant was removed';
+            END IF;
+            IF (SELECT COUNT(*) FROM "PlatformAccount" WHERE "id" = 'upgrade-user') <> 1 THEN
+              RAISE EXCEPTION 'OWNER PlatformAccount was removed';
+            END IF;
+            IF (SELECT COUNT(*) FROM "Profile" WHERE "id" = 'upgrade-profile') <> 1 THEN
+              RAISE EXCEPTION 'OWNER Profile was removed';
+            END IF;
+            IF (SELECT COUNT(*) FROM "WorkspaceState" WHERE "id" = 'upgrade-workspace') <> 1 THEN
+              RAISE EXCEPTION 'OWNER WorkspaceState was removed';
+            END IF;
+            IF (SELECT COUNT(*) FROM "TenantAccess" WHERE "tenantId" = 'upgrade-tenant' AND "isOwnerBook" = true) <> 1 THEN
+              RAISE EXCEPTION 'OWNER TenantAccess was not preserved';
+            END IF;
+
+            IF (SELECT COUNT(*) FROM "Tenant" WHERE "id" = 'incoming-profile-tenant') <> 0 THEN
+              RAISE EXCEPTION 'Incoming Tenant remains';
+            END IF;
+            IF (SELECT COUNT(*) FROM "PlatformAccount" WHERE "id" = 'incoming-profile-account') <> 0 THEN
+              RAISE EXCEPTION 'Incoming PlatformAccount remains';
+            END IF;
+            IF (SELECT COUNT(*) FROM "Profile" WHERE "id" = 'incoming-profile-profile') <> 0 THEN
+              RAISE EXCEPTION 'Incoming Profile remains';
+            END IF;
+            IF (SELECT COUNT(*) FROM "WorkspaceState" WHERE "id" = 'incoming-profile-workspace') <> 0 THEN
+              RAISE EXCEPTION 'Incoming WorkspaceState remains';
+            END IF;
+            IF (SELECT COUNT(*) FROM "TenantAccess" WHERE "isOwnerBook" = false) <> 0 THEN
+              RAISE EXCEPTION 'Non-owner TenantAccess rows remain';
+            END IF;
+          END
+          $profile_purge$;
+          SQL
       - name: Stop isolated database
         if: always()
         run: docker compose -f docker-compose.staging.yml down -v
