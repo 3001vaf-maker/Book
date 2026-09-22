@@ -47,7 +47,27 @@ WHERE NOT EXISTS (
   WHERE owner_row."tenantId" = t."id"
 );
 
--- Tenant cascades remove only the incoming profile's own workspace/profile/business rows.
+-- Remove every row scoped to an incoming Tenant explicitly.
+-- This also cleans old tables whose historical FK behavior no longer matches the current Prisma schema.
+DO $
+DECLARE
+  row_record RECORD;
+BEGIN
+  FOR row_record IN
+    SELECT DISTINCT table_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND column_name = 'tenantId'
+      AND table_name <> 'Tenant'
+    ORDER BY table_name
+  LOOP
+    EXECUTE format(
+      'DELETE FROM public.%I WHERE "tenantId" IN (SELECT "tenantId" FROM "_BookIncomingTenant")',
+      row_record.table_name
+    );
+  END LOOP;
+END $;
+
 DELETE FROM "Tenant" t
 USING "_BookIncomingTenant" incoming
 WHERE t."id" = incoming."tenantId";
