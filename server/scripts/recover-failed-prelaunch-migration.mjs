@@ -66,8 +66,7 @@ async function main() {
   }
 
   if (!String(failed.logs || '').trim()) {
-    console.error('[prelaunch-recovery] failed 07:55 row has no stored error log; refusing automatic recovery');
-    return 2;
+    console.warn('[prelaunch-recovery] failed 07:55 row has no stored error log; validating database state instead');
   }
 
   const state = {
