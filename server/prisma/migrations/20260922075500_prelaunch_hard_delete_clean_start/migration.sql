@@ -11,6 +11,12 @@ DROP TABLE IF EXISTS "TenantLegalState";
 DROP TABLE IF EXISTS "PlatformLegalState";
 DROP TABLE IF EXISTS "DataSubjectRequest";
 DROP TABLE IF EXISTS "RetentionPolicy";
+DROP TABLE IF EXISTS "CapabilityAccessEvent";
+DROP TABLE IF EXISTS "TestTenant";
+
+DROP FUNCTION IF EXISTS "book_reject_append_only_mutation"();
+DROP FUNCTION IF EXISTS "book_normalize_legal_actor_user"();
+DROP FUNCTION IF EXISTS "book_block_test_tenant_live"();
 
 -- Test-stage histories must disappear with the test subject.
 -- Remove append-only guards for the two current platform event stores.
