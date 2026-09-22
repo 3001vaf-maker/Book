@@ -73,6 +73,7 @@ jobs:
           mv server/prisma/migrations/20260921193000_platform_profile_controls /tmp/profile-migrations/
           mv server/prisma/migrations/20260921194000_platform_notices /tmp/profile-migrations/
           mv server/prisma/migrations/20260921195000_commercial_mode_compat /tmp/profile-migrations/
+          mv server/prisma/migrations/20260922043000_detach_immutable_legal_events /tmp/profile-migrations/
           (
             cd server
             DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' npx prisma migrate deploy
@@ -124,6 +125,7 @@ jobs:
           mv /tmp/profile-migrations/20260921193000_platform_profile_controls server/prisma/migrations/
           mv /tmp/profile-migrations/20260921194000_platform_notices server/prisma/migrations/
           mv /tmp/profile-migrations/20260921195000_commercial_mode_compat server/prisma/migrations/
+          mv /tmp/profile-migrations/20260922043000_detach_immutable_legal_events server/prisma/migrations/
           (
             cd server
             DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' npx prisma migrate deploy
