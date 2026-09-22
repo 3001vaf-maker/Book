@@ -4,6 +4,32 @@ BEGIN;
 -- Only incoming non-OWNER profiles/workspaces are test data.
 -- Book OWNER, system catalogues, scenarios, document templates and infrastructure are preserved.
 
+-- Repair old WorkspaceState rows created before foreign keys existed.
+DELETE FROM "WorkspaceState" workspace
+WHERE NOT EXISTS (
+    SELECT 1 FROM "Tenant" tenant
+    WHERE tenant."id" = workspace."tenantId"
+  )
+  OR NOT EXISTS (
+    SELECT 1 FROM "PlatformAccount" account
+    WHERE account."id" = workspace."platformAccountId"
+  );
+
+ALTER TABLE "WorkspaceState"
+  DROP CONSTRAINT IF EXISTS "WorkspaceState_tenantId_fkey";
+ALTER TABLE "WorkspaceState"
+  DROP CONSTRAINT IF EXISTS "WorkspaceState_platformAccountId_fkey";
+
+ALTER TABLE "WorkspaceState"
+  ADD CONSTRAINT "WorkspaceState_tenantId_fkey"
+  FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id")
+  ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE "WorkspaceState"
+  ADD CONSTRAINT "WorkspaceState_platformAccountId_fkey"
+  FOREIGN KEY ("platformAccountId") REFERENCES "PlatformAccount"("id")
+  ON DELETE CASCADE ON UPDATE CASCADE;
+
 -- Current platform consent history belongs to the incoming test profile during pre-launch.
 DROP TRIGGER IF EXISTS "PlatformConsentEvent_append_only" ON "PlatformConsentEvent";
 
