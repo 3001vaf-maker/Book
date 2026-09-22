@@ -791,14 +791,6 @@ export class FirstRunService {
     if (access.commercialMode === 'LIVE' && (access.isOwnerBook || access.liveApprovedAt)) {
       return { requested: false, alreadyLive: true };
     }
-    if (
-      access.commercialMode !== 'DEMO'
-      || !access.demoExpiresAt
-      || access.demoExpiresAt.getTime() > Date.now()
-    ) {
-      throw new ConflictException('Запрос LIVE доступен после окончания 14 дней DEMO');
-    }
-
     const recent = await this.prisma.platformActivityEvent.findFirst({
       where: {
         tenantId,
@@ -903,17 +895,13 @@ export class FirstRunService {
       }
 
       if (mode === 'LIVE') {
-        if (!current.demoExpiresAt || current.demoExpiresAt.getTime() > now.getTime()) {
-          throw new ConflictException('LIVE можно подтвердить после окончания DEMO');
-        }
         const request = await tx.platformActivityEvent.findFirst({
           where: {
             tenantId,
             eventType: 'LIVE_REQUESTED',
-            occurredAt: { gte: current.demoExpiresAt },
           },
           orderBy: { occurredAt: 'desc' },
-          select: { id: true },
+          select: { id: true, occurredAt: true },
         });
         if (!request) {
           throw new ConflictException('Пользователь ещё не запросил переход в LIVE');
