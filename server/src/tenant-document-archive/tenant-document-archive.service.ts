@@ -219,7 +219,10 @@ export class TenantDocumentArchiveService {
     }
 
     const canonicalGuides = current.documents.filter((item: any) => isCanonicalRknGuide(item, templateKey));
-    const version = canonicalGuides.length + 1;
+    const version = canonicalGuides.reduce(
+      (maxVersion: number, item: any) => Math.max(maxVersion, Number(item?.version || 0)),
+      0,
+    ) + 1;
     const generatedAt = new Date().toISOString();
     const mode = version === 1 ? 'INITIAL' : 'UPDATE';
     const title = mode === 'INITIAL'
