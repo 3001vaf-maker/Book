@@ -51,7 +51,5 @@ export function getBookLimit(key) {
 
 export function canUseRealPersonalData() {
   if (currentAccess.status === 'SUSPENDED') return false;
-  if (currentAccess.commercialMode && currentAccess.commercialMode !== 'LIVE') return false;
-  return !(Array.isArray(currentAccess.capabilities)
-    && currentAccess.capabilities.some((item) => item?.source === 'FIRST_RUN'));
+  return !currentAccess.commercialMode || currentAccess.commercialMode === 'LIVE';
 }
