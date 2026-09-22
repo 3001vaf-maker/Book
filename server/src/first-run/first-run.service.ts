@@ -111,7 +111,7 @@ export class FirstRunService {
     const [profile, operational] = await Promise.all([
       this.prisma.profile.findUnique({
         where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
-        include: { workplaces: { orderBy: { position: 'asc' } } },
+
       }),
       this.prisma.businessOperationalState.findUnique({ where: { tenantId } }),
     ]);
@@ -124,18 +124,11 @@ export class FirstRunService {
       .filter(Boolean);
     const phones = arrayValue(profile.phones).map(text).filter(Boolean);
     const emails = arrayValue(profile.emails).map(text).filter(Boolean);
-    const workplaces = profile.workplaces.map((workplace) => ({
-      name: text(workplace.name),
-      city: text(workplace.city),
-      address: text(workplace.address),
-    }));
-
     return {
       fullName: [profile.name, profile.surname].map(text).filter(Boolean).join(' '),
       profession: text(profile.profession),
       phone: phones[0] || '',
       email: emails[0] || '',
-      workplaces,
       procedures,
     };
   }
@@ -149,15 +142,9 @@ export class FirstRunService {
     previousSnapshotValue: unknown = null,
   ) {
     const snapshot = objectValue(snapshotValue);
-    const workplaceLines = arrayValue(snapshot.workplaces).map((value) => {
-      const workplace = objectValue(value);
-      const parts = [text(workplace.name), text(workplace.city), text(workplace.address)].filter(Boolean);
-      return `• ${parts.join(' · ') || 'Рабочее место'}`;
-    });
     const procedureLines = arrayValue(snapshot.procedures).map(text).filter(Boolean).map((value) => `• ${value}`);
     const previousSnapshot = objectValue(previousSnapshotValue);
     const previousProcedures = arrayValue(previousSnapshot.procedures).map(text).filter(Boolean);
-    const previousWorkplaces = arrayValue(previousSnapshot.workplaces).map((value) => objectValue(value));
     const changes: string[] = [];
     if (personalVersion > 1) {
       if (text(previousSnapshot.profession) !== text(snapshot.profession)) {
@@ -169,9 +156,6 @@ export class FirstRunService {
         .filter((value) => !arrayValue(snapshot.procedures).map(text).filter(Boolean).includes(value));
       if (addedProcedures.length) changes.push(`Добавлены услуги: ${addedProcedures.join('; ')}.`);
       if (removedProcedures.length) changes.push(`Убраны услуги: ${removedProcedures.join('; ')}.`);
-      if (!sameJson(previousWorkplaces, arrayValue(snapshot.workplaces))) {
-        changes.push('Изменились рабочие места или их адреса.');
-      }
       if (text(previousSnapshot.phone) !== text(snapshot.phone)) changes.push('Изменился контактный телефон.');
       if (text(previousSnapshot.email) !== text(snapshot.email)) changes.push('Изменилась электронная почта.');
     }
@@ -209,7 +193,6 @@ export class FirstRunService {
       PROFESSION: text(snapshot.profession) || 'не указана',
       PHONE: text(snapshot.phone) || 'не указан',
       EMAIL: text(snapshot.email) || 'не указан',
-      WORKPLACES: workplaceLines.length ? workplaceLines.join('\n') : '• не указаны',
       PROCEDURES: procedureLines.length ? procedureLines.join('\n') : '• услуги не добавлены',
       UPDATE_SECTION: updateSection,
       MARKETING_SECTION: marketingSection,
@@ -276,7 +259,7 @@ export class FirstRunService {
 
   async ensureRknGuide(tenantId: string, platformAccountId: string) {
     const snapshot = await this.rknGuideSnapshot(tenantId, platformAccountId);
-    if (!text(snapshot.fullName) || !text(snapshot.profession) || !snapshot.workplaces.length || !snapshot.procedures.length) {
+    if (!text(snapshot.fullName) || !text(snapshot.profession) || !snapshot.procedures.length) {
       return { ready: false, reason: 'PROFILE_OR_SERVICES_NOT_READY' };
     }
 
