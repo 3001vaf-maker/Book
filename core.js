@@ -193,10 +193,12 @@ function renderDemoExpired(firstRun) {
     <main class="first-run-expired">
       <section class="first-run-expired__card">
         <h1>Срок DEMO завершён</h1>
-        <p>Данные и настройки сохранены. Компания может продлить DEMO по своему усмотрению, либо вы можете запросить переход в LIVE.</p>
+        <p>${firstRun?.progress?.status === 'COMPLETED'
+          ? 'Данные и настройки сохранены. Вы можете запросить переход в LIVE или попросить продлить DEMO.'
+          : 'Данные и настройки сохранены. Для продолжения знакомства потребуется продление DEMO или включение LIVE администратором.'}</p>
         ${expiresAt ? `<p style="margin-top:12px">DEMO завершено: ${expiresAt}</p>` : ''}
         <div class="first-run-expired__actions">
-          <button class="ui-button" type="button" data-request-live>Перейти в LIVE</button>
+          ${firstRun?.progress?.status === 'COMPLETED' ? '<button class="ui-button" type="button" data-request-live>Запросить LIVE</button>' : ''}
           <button class="ui-button ui-button--secondary" type="button" data-request-demo-extension>Запросить продление DEMO</button>
         </div>
         <p class="first-run-expired__status" data-request-status></p>
