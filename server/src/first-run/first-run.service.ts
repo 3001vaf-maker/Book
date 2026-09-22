@@ -788,7 +788,7 @@ export class FirstRunService {
   async requestLive(tenantId: string, platformAccountId: string) {
     const access = await this.prisma.tenantAccess.findUnique({ where: { tenantId } });
     if (!access) throw new NotFoundException('Рабочее пространство не найдено');
-    if (access.commercialMode === 'LIVE') {
+    if (access.commercialMode === 'LIVE' && (access.isOwnerBook || access.liveApprovedAt)) {
       return { requested: false, alreadyLive: true };
     }
 
@@ -863,32 +863,88 @@ export class FirstRunService {
     if (access.commercialMode !== 'LIVE') {
       throw new ForbiddenException('Реальные внешние действия доступны после перехода в LIVE');
     }
+    if (!access.isOwnerBook && !access.liveApprovedAt) {
+      throw new ForbiddenException('LIVE доступен после подтверждения администратором');
+    }
     return true;
   }
 
-  async setCommercialMode(tenantId: string, modeValue: unknown) {
+  async setCommercialMode(tenantId: string, modeValue: unknown, platformAdminId = '') {
     const mode = text(modeValue).toUpperCase();
     if (!['DEMO', 'LIVE'].includes(mode)) throw new BadRequestException('Неизвестный режим');
-    const access = await this.prisma.tenantAccess.update({
-      where: { tenantId },
-      data: { commercialMode: mode },
+
+    const approvedByAdminId = text(platformAdminId);
+    if (mode === 'LIVE' && !approvedByAdminId) {
+      throw new BadRequestException('LIVE требует явного подтверждения администратора');
+    }
+
+    const now = new Date();
+    const access = await this.prisma.$transaction(async (tx) => {
+      const current = await tx.tenantAccess.findUnique({ where: { tenantId } });
+      if (!current) throw new NotFoundException('Рабочее пространство не найдено');
+
+      if (
+        mode === 'LIVE'
+        && current.commercialMode === 'LIVE'
+        && current.liveApprovedAt
+        && current.liveApprovedByAdminId
+      ) {
+        return current;
+      }
+
+      const updated = await tx.tenantAccess.update({
+        where: { tenantId },
+        data: mode === 'LIVE'
+          ? {
+            commercialMode: 'LIVE',
+            liveApprovedAt: now,
+            liveApprovedByAdminId: approvedByAdminId,
+          }
+          : {
+            commercialMode: 'DEMO',
+            liveApprovedAt: null,
+            liveApprovedByAdminId: null,
+          },
+      });
+
+      await tx.platformActivityEvent.create({
+        data: {
+          tenantId,
+          eventType: 'COMMERCIAL_MODE_CHANGED',
+          metadata: json({
+            from: current.commercialMode,
+            commercialMode: mode,
+            approvedByAdminId: mode === 'LIVE' ? approvedByAdminId : '',
+          }),
+          occurredAt: now,
+        },
+      });
+
+      if (mode === 'LIVE') {
+        await tx.platformActivityEvent.create({
+          data: {
+            tenantId,
+            eventType: 'LIVE_APPROVED_BY_ADMIN',
+            metadata: json({ platformAdminId: approvedByAdminId }),
+            occurredAt: now,
+          },
+        });
+      }
+
+      return updated;
     });
-    await this.prisma.platformActivityEvent.create({
-      data: {
-        tenantId,
-        eventType: 'COMMERCIAL_MODE_CHANGED',
-        metadata: json({ commercialMode: mode }),
-        occurredAt: new Date(),
-      },
-    });
+
     if (mode === 'LIVE') {
       const completed = await this.prisma.firstRunProgress.findFirst({ where: { tenantId, status: 'COMPLETED' } });
       if (completed) await this.cleanupDemoOperationalData(tenantId);
     }
+
     return {
       commercialMode: access.commercialMode,
       demoActivatedAt: access.demoActivatedAt?.toISOString() || '',
       demoExpiresAt: access.demoExpiresAt?.toISOString() || '',
+      liveApprovedAt: access.liveApprovedAt?.toISOString() || '',
+      liveApprovedByAdminId: access.liveApprovedByAdminId || '',
     };
   }
 
