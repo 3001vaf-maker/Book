@@ -128,8 +128,12 @@ export class SaasAdminController {
   }
 
   @Put('tenants/:tenantId/commercial-mode')
-  setCommercialMode(@Param('tenantId') tenantId: string, @Body() body: { mode?: unknown }) {
-    return this.admin.setCommercialMode(tenantId, body?.mode);
+  setCommercialMode(
+    @Req() request: AdminRequest,
+    @Param('tenantId') tenantId: string,
+    @Body() body: { mode?: unknown },
+  ) {
+    return this.admin.setCommercialMode(tenantId, body?.mode, request.platformAdminId!);
   }
 
   @Post('tenants/:tenantId/demo/extend')
