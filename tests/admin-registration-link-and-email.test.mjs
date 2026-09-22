@@ -55,6 +55,8 @@ assert.match(prelaunchHardDeleteMigration, /DROP TRIGGER IF EXISTS "PlatformCons
 assert.match(prelaunchHardDeleteMigration, /DROP TRIGGER IF EXISTS "PlatformActivityEvent_append_only"/);
 assert.match(prelaunchHardDeleteMigration, /PlatformConsentEvent_tenantId_fkey/);
 assert.match(prelaunchHardDeleteMigration, /PlatformConsentEvent_platformAccountId_fkey/);
+assert.match(prelaunchHardDeleteMigration, /WorkspaceState_tenantId_fkey/);
+assert.match(prelaunchHardDeleteMigration, /WorkspaceState_platformAccountId_fkey/);
 assert.match(prelaunchHardDeleteMigration, /ON DELETE CASCADE ON UPDATE CASCADE/);
 assert.match(prelaunchHardDeleteMigration, /COALESCE\(access\."isOwnerBook", false\) = false/);
 assert.match(prelaunchHardDeleteMigration, /DELETE FROM "Tenant"/);
