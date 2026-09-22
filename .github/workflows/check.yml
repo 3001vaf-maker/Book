@@ -659,7 +659,7 @@ jobs:
             'simulated-failed-prelaunch-checksum',
             NULL,
             '20260922075500_prelaunch_hard_delete_clean_start',
-            'simulated production P3009 for failed 07:55',
+            NULL,
             NULL,
             CURRENT_TIMESTAMP,
             0
