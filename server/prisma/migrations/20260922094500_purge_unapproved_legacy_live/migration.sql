@@ -149,8 +149,14 @@ WHERE account_row."id" = doomed."platformAccountId";
 
 DO $verify_cleanup$
 DECLARE
+  tenant_count BIGINT;
   owner_count BIGINT;
 BEGIN
+  SELECT count(*) INTO tenant_count FROM "Tenant";
+  IF tenant_count = 0 THEN
+    RETURN;
+  END IF;
+
   SELECT count(*) INTO owner_count
   FROM "TenantAccess"
   WHERE "isOwnerBook" = true;
