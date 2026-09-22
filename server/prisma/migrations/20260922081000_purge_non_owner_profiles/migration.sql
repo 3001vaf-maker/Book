@@ -52,7 +52,8 @@ BEGIN
     AND event."eventType" = 'COMMERCIAL_MODE_CHANGED'
     AND event."metadata"->>'commercialMode' = 'LIVE'
   ON CONFLICT ("tenantId") DO NOTHING;
-END $purge1$;
+END;
+$purge1$;
 
 CREATE TEMP TABLE "_BookIncomingTenant" (
   "tenantId" TEXT PRIMARY KEY
@@ -101,7 +102,8 @@ BEGIN
       row_record.table_name
     );
   END LOOP;
-END $purge2$;
+END;
+$purge2$;
 
 DELETE FROM "Tenant" tenant
 USING "_BookIncomingTenant" incoming
@@ -158,7 +160,8 @@ BEGIN
       row_record.table_name
     );
   END LOOP;
-END $purge3$;
+END;
+$purge3$;
 
 DELETE FROM "PlatformAccount" account_row
 USING "_BookDeletePlatformAccount" incoming
@@ -205,6 +208,7 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'BOOK_PROFILE_PURGE failed: selected test Tenant remains';
   END IF;
-END $purge4$;
+END;
+$purge4$;
 
 COMMIT;
