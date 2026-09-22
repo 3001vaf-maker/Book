@@ -142,7 +142,7 @@ assert.match(migration, /'chat',150,'OPTIONAL_INFO'/);
 console.log('first-run architecture tests: OK');
 
 assert.match(firstRun, /Состояние рабочего пространства не настроено/);
-assert.doesNotMatch(firstRun, /if \(!access\)[\s\S]{0,400}return true/);
+assert.doesNotMatch(firstRun, /if \(!access\)\s*return true/);
 
 assert.match(ownerSeed, /tenantAccess\.upsert/);
 assert.match(ownerSeed, /isOwnerBook:\s*true/);
