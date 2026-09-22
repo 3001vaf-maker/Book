@@ -11,6 +11,10 @@ const serviceWorker = fs.readFileSync('service-worker.js', 'utf8');
 const notificationService = fs.readFileSync('server/src/notification/notification.service.ts', 'utf8');
 const pushService = fs.readFileSync('server/src/notification/web-push.service.ts', 'utf8');
 const migration = fs.readFileSync('server/prisma/migrations/20260913070000_web_push_subscription/migration.sql', 'utf8');
+const platformNoticeService = fs.readFileSync('server/src/platform-notice/platform-notice.service.ts', 'utf8');
+const platformNoticeController = fs.readFileSync('server/src/platform-notice/platform-notice.controller.ts', 'utf8');
+const platformPushMigration = fs.readFileSync('server/prisma/migrations/20260922173000_platform_push_subscription/migration.sql', 'utf8');
+const adminUi = fs.readFileSync('admin/admin.js', 'utf8');
 
 assert.match(core, /params\.get\('tg_entry'\)/);
 assert.doesNotMatch(core, /params\.get\('tg'\)|params\.get\('telegram'\)/);
@@ -41,4 +45,16 @@ assert.match(pushService, /WEB_PUSH_VAPID_PUBLIC_KEY/);
 assert.match(migration, /CREATE TABLE "WebPushSubscription"/);
 assert.match(migration, /UNIQUE INDEX "WebPushSubscription_endpoint_key"/);
 
-console.log('account notification and Web Push tests passed');
+assert.match(platformPushMigration, /PlatformPushSubscription/);
+assert.match(platformPushMigration, /PlatformAccount/);
+assert.match(platformNoticeService, /createForPlatformAdmins/);
+assert.match(platformNoticeService, /webpush\.sendNotification/);
+assert.match(platformNoticeController, /push\/configuration/);
+assert.match(platformNoticeController, /push\/subscription/);
+assert.match(adminUi, /navigator\.serviceWorker\.register\('\/service-worker\.js'/);
+assert.match(adminUi, /Notification\.requestPermission/);
+assert.match(adminUi, /data-live-request-count/);
+assert.match(adminUi, /data-enable-admin-push/);
+assert.match(adminUi, /Включить PUSH/);
+
+console.log('account and platform notification Web Push tests passed');

@@ -9,6 +9,7 @@ import { Prisma } from '@prisma/client';
 import PDFDocument = require('pdfkit');
 import { PrismaService } from '../prisma.service';
 import { TenantDocumentArchiveService } from '../tenant-document-archive/tenant-document-archive.service';
+import { PlatformNoticeService } from '../platform-notice/platform-notice.service';
 
 const SCENARIO_KEY = 'first-run';
 const DEMO_DAYS = 14;
@@ -41,6 +42,7 @@ export class FirstRunService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly documentArchive: TenantDocumentArchiveService,
+    private readonly notices: PlatformNoticeService,
   ) {}
 
   private async publishedVersion() {
@@ -424,6 +426,7 @@ export class FirstRunService {
       return {
         assigned: false,
         commercialMode: access.commercialMode,
+        liveRequestedAt: access.liveRequestedAt?.toISOString() || '',
         demo: {
           activatedAt: access.demoActivatedAt?.toISOString() || '',
           expiresAt: demoExpiresAt,
@@ -461,6 +464,7 @@ export class FirstRunService {
     return {
       assigned: true,
       commercialMode: access.commercialMode,
+      liveRequestedAt: access.liveRequestedAt?.toISOString() || '',
       demo: {
         activatedAt: access.demoActivatedAt?.toISOString() || '',
         expiresAt: demoExpiresAt,
@@ -805,6 +809,9 @@ export class FirstRunService {
       where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
       select: { status: true, currentStepKey: true },
     })) || null;
+    if (firstRunStatus?.status !== 'COMPLETED') {
+      throw new ConflictException('Запрос LIVE доступен после завершения знакомства с приложением');
+    }
     const now = new Date();
 
     const event = await this.prisma.$transaction(async (tx) => {
@@ -837,6 +844,30 @@ export class FirstRunService {
       });
       return { id: created.id, occurredAt: created.occurredAt, duplicate: false };
     });
+
+    if (!event.duplicate) {
+      const [profile, account] = await Promise.all([
+        this.prisma.profile.findUnique({
+          where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
+          select: { name: true, surname: true },
+        }),
+        this.prisma.platformAccount.findUnique({
+          where: { id: platformAccountId },
+          select: { email: true },
+        }),
+      ]);
+      const requester = [profile?.name, profile?.surname].filter(Boolean).join(' ') || account?.email || 'Пользователь';
+      await this.notices.createForPlatformAdmins({
+        type: 'LIVE_REQUESTED',
+        title: 'Запрос LIVE',
+        body: `${requester} запросил переход в LIVE.`,
+        metadata: {
+          tenantId,
+          platformAccountId,
+          occurredAt: event.occurredAt.toISOString(),
+        },
+      });
+    }
 
     return {
       requested: true,
@@ -918,10 +949,6 @@ export class FirstRunService {
         && current.liveApprovedByAdminId
       ) {
         return current;
-      }
-
-      if (mode === 'LIVE' && !current.liveRequestedAt) {
-        throw new ConflictException('Пользователь ещё не запросил переход в LIVE');
       }
 
       const updated = await tx.tenantAccess.update({
