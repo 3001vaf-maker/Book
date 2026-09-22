@@ -6,10 +6,8 @@ import { getPeopleCount } from '../main/people/data.js';
 import { getProcedures } from '../settings/service/procedures/data.js';
 import { getProducts } from '../settings/service/products/data.js';
 import { button, escapeHtml, modal, mountModal } from '../ui/ui.js';
-import { refreshTenantDocumentArchive } from '../tenant-document-archive.js';
 import {
   completeFirstRunStep,
-  downloadRknGuide,
   endFirstRunSessionKeepalive,
   getFirstRunState,
   heartbeatFirstRunSession,
@@ -112,6 +110,7 @@ export class FirstRunRuntime {
     this.observer = null;
     this.syncQueued = false;
     this.modalShownKey = '';
+    this.modalSeenKey = '';
     this.enteredStepKey = '';
     this.disposed = false;
     this.clickHandler = (event) => this.handleClick(event);
@@ -202,6 +201,7 @@ export class FirstRunRuntime {
   async renderCurrent() {
     this.observer?.disconnect();
     this.modalShownKey = '';
+    this.modalSeenKey = '';
     this.enteredStepKey = '';
     const step = currentStep(this.state);
     if (!step) {
@@ -401,7 +401,7 @@ export class FirstRunRuntime {
         });
       } else if (step.kind === 'REQUIRED_INFO') {
         this.renderActionDock(step, {
-          primaryVisible: this.modalShownKey === step.key,
+          primaryVisible: this.modalSeenKey === step.key,
           onPrimary: () => this.complete(step, 'complete'),
         });
       } else {
@@ -452,7 +452,7 @@ export class FirstRunRuntime {
 
     if (step.kind === 'REQUIRED_INFO') {
       this.renderActionDock(step, {
-        primaryVisible: this.modalShownKey === step.key,
+        primaryVisible: this.modalSeenKey === step.key,
         onPrimary: () => this.complete(step, 'complete'),
       });
       return;
@@ -460,7 +460,7 @@ export class FirstRunRuntime {
 
     if (step.kind === 'OPTIONAL_INFO') {
       this.renderActionDock(step, {
-        primaryVisible: this.modalShownKey === step.key,
+        primaryVisible: this.modalSeenKey === step.key,
         skipVisible: true,
         onPrimary: () => this.complete(step, 'complete'),
         onSkip: () => this.complete(step, 'skip'),
@@ -469,7 +469,7 @@ export class FirstRunRuntime {
     }
 
     this.renderActionDock(step, {
-      primaryVisible: this.modalShownKey === step.key,
+      primaryVisible: this.modalSeenKey === step.key,
       onPrimary: () => this.complete(step, 'complete'),
     });
   }
@@ -497,6 +497,11 @@ export class FirstRunRuntime {
         return;
       }
       this.enteredStepKey = step.key;
+      if (step.key === 'documents') {
+        void this.showStepModal(step);
+        this.queueSync();
+        return;
+      }
       window.setTimeout(() => {
         void this.showStepModal(step);
         this.queueSync();
@@ -520,23 +525,13 @@ export class FirstRunRuntime {
   async showStepModal(step) {
     if (!step || this.modalShownKey === step.key || document.querySelector('[data-first-run-step-modal]')) return;
     this.modalShownKey = step.key;
-    try {
-      this.state = await markFirstRunStepSeen(step.key, this.sessionId);
-      this.onStateChange(this.state);
-    } catch {
-      // The modal remains useful even when telemetry is temporarily unavailable.
-    }
 
-    const rknButton = step?.metadata?.rknGuide
-      ? button('Получить инструкцию по РКН', { variant: 'secondary', data: 'data-first-run-rkn-guide' })
-      : '';
     const content = `
       <div class="modal-title">
         <h2>${escapeHtml(step.modalTitle || step.title)}</h2>
         <p>${modalText(step.modalBody)}</p>
       </div>
       <div class="modal-actions">
-        ${rknButton}
         ${button('Понятно', { data: 'data-first-run-modal-close' })}
       </div>`;
     const layer = mountModal(document.body, modal(content, {
@@ -545,31 +540,36 @@ export class FirstRunRuntime {
       surface: 'app',
       className: 'first-run-step-modal',
     }));
-    if (!layer) return;
+    if (!layer) {
+      this.modalShownKey = '';
+      return;
+    }
     layer.dataset.firstRunStepModal = step.key;
-    layer.querySelector('[data-first-run-modal-close]')?.addEventListener('click', () => {
+    void markFirstRunStepSeen(step.key, this.sessionId)
+      .then((state) => {
+        this.state = state;
+        this.modalSeenKey = step.key;
+        this.onStateChange(this.state);
+        this.queueSync();
+      })
+      .catch((error) => {
+        this.modalShownKey = '';
+        this.showError(error);
+      });
+    layer.querySelector('[data-first-run-modal-close]')?.addEventListener('click', async () => {
+      if (this.modalSeenKey !== step.key) {
+        try {
+          const state = await markFirstRunStepSeen(step.key, this.sessionId);
+          this.state = state;
+          this.modalSeenKey = step.key;
+          this.onStateChange(this.state);
+        } catch (error) {
+          this.showError(error);
+          return;
+        }
+      }
       layer.remove();
       this.queueSync();
-    });
-    layer.querySelector('[data-first-run-rkn-guide]')?.addEventListener('click', async (event) => {
-      const control = event.currentTarget;
-      control.disabled = true;
-      const original = control.textContent;
-      control.textContent = 'Формируем PDF…';
-      try {
-        await downloadRknGuide();
-        await refreshTenantDocumentArchive().catch(() => undefined);
-        await recordFirstRunActivity('RKN_GUIDE_DOWNLOADED', {
-          stepKey: step.key,
-          scenarioVersionId: this.state?.scenario?.id || '',
-          sessionId: this.sessionId,
-        }).catch(() => undefined);
-      } catch (error) {
-        this.showError(error);
-      } finally {
-        control.disabled = false;
-        control.textContent = original;
-      }
     });
     this.queueSync();
   }

@@ -26,6 +26,22 @@ function objectValue(value: unknown): JsonObject {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonObject : {};
 }
 
+function text(value: unknown) {
+  return String(value ?? '').trim();
+}
+
+function isCanonicalRknGuide(item: any, templateKey = '') {
+  const attachment = objectValue(item?.attachment);
+  return (
+    attachment.type === 'RKN_GUIDE_PDF'
+    && Boolean(text(attachment.templateKey))
+    && Number(attachment.templateVersion || 0) > 0
+    && Boolean(text(attachment.sourceHash))
+    && Boolean(text(attachment.pdfBase64))
+    && (!templateKey || text(attachment.templateKey) === templateKey)
+  );
+}
+
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value));
 }
@@ -141,42 +157,102 @@ export class TenantDocumentArchiveService {
     return { dataset, value: current[dataset as keyof typeof current] };
   }
 
-  async saveRknGuide(tenantId: string, snapshotValue: unknown) {
+  async saveRknGuide(tenantId: string, inputValue: unknown) {
     const state = await this.prisma.tenantDocumentArchive.findUnique({ where: { tenantId } });
     if (!state?.migrationVerifiedAt) throw new ConflictException('Архив документов ещё не готов');
 
     const current = normalize(state.data);
-    const snapshot = objectValue(snapshotValue);
-    const snapshotHash = createHash('sha256').update(JSON.stringify(stable(snapshot)), 'utf8').digest('hex');
-    const existing = current.documents.find((item: any) => (
-      item?.attachment?.type === 'RKN_GUIDE_PDF'
-      && item?.attachment?.snapshotHash === snapshotHash
-    ));
-    if (existing) return clone(existing);
 
-    const version = current.documents.filter((item: any) => item?.attachment?.type === 'RKN_GUIDE_PDF').length + 1;
+    // Старые тестовые RKN_GUIDE_PDF создавались до появления шаблона Реестра.
+    // Они сохраняются в архиве для истории, но не участвуют в новой цепочке версий.
+    let legacyChanged = false;
+    current.documents = current.documents.map((item: any) => {
+      const attachment = objectValue(item?.attachment);
+      if (
+        attachment.type === 'RKN_GUIDE_PDF'
+        && !isCanonicalRknGuide(item)
+        && !attachment.legacyFormat
+      ) {
+        legacyChanged = true;
+        return {
+          ...item,
+          title: item?.title || 'Старая инструкция РКН',
+          attachment: {
+            ...attachment,
+            legacyFormat: 'PRE_REGISTRY_TEMPLATE',
+          },
+        };
+      }
+      return item;
+    });
+
+    const input = objectValue(inputValue);
+    const snapshot = objectValue(input.snapshot);
+    const templateKey = String(input.templateKey || '').trim();
+    const templateVersion = Number(input.templateVersion || 0);
+    const templateContent = String(input.templateContent || '');
+    const personalizedContent = String(input.personalizedContent || '');
+    const pdfBase64 = String(input.pdfBase64 || '');
+    if (!templateKey || !templateVersion || !templateContent || !personalizedContent || !pdfBase64) {
+      throw new BadRequestException('Персональная инструкция РКН сформирована не полностью');
+    }
+
+    const source = {
+      templateKey,
+      templateVersion,
+      templateContent,
+      snapshot,
+    };
+    const sourceHash = createHash('sha256').update(JSON.stringify(stable(source)), 'utf8').digest('hex');
+    const existing = current.documents.find((item: any) => (
+      isCanonicalRknGuide(item, templateKey)
+      && item?.attachment?.sourceHash === sourceHash
+    ));
+    if (existing) {
+      if (legacyChanged) {
+        await this.prisma.tenantDocumentArchive.update({
+          where: { tenantId },
+          data: { data: json(current) },
+        });
+      }
+      return clone(existing);
+    }
+
+    const canonicalGuides = current.documents.filter((item: any) => isCanonicalRknGuide(item, templateKey));
+    const version = canonicalGuides.reduce(
+      (maxVersion: number, item: any) => Math.max(maxVersion, Number(item?.version || 0)),
+      0,
+    ) + 1;
     const generatedAt = new Date().toISOString();
+    const mode = version === 1 ? 'INITIAL' : 'UPDATE';
+    const title = mode === 'INITIAL'
+      ? 'Инструкция по уведомлению Роскомнадзора'
+      : 'Инструкция по изменению сведений Роскомнадзора';
     const document = {
       id: `rkn-guide-${randomUUID()}`,
       system: true,
-      kind: 'agreement',
-      title: 'Инструкция по уведомлению Роскомнадзора',
+      kind: 'instruction',
+      title,
       personConsent: false,
       required: false,
       version,
-      text: 'Персональная PDF-инструкция по подготовке уведомления об обработке персональных данных.',
+      text: personalizedContent,
       sourceMode: 'BOOK',
-      baseKey: 'rkn-guide',
-      baseVersion: version,
-      availableBaseVersion: 0,
-      availableBookText: '',
+      baseKey: templateKey,
+      baseVersion: templateVersion,
+      availableBaseVersion: templateVersion,
+      availableBookText: templateContent,
       attachment: {
         type: 'RKN_GUIDE_PDF',
+        guideMode: mode,
         fileName: `rkn-guide-v${version}.pdf`,
         mimeType: 'application/pdf',
         generatedAt,
-        snapshotHash,
+        templateKey,
+        templateVersion,
+        sourceHash,
         snapshot: clone(snapshot),
+        pdfBase64,
       },
     };
     current.documents.push(document);
@@ -185,7 +261,7 @@ export class TenantDocumentArchiveService {
       documentId: document.id,
       documentTitle: document.title,
       documentVersion: document.version,
-      action: 'created',
+      action: version === 1 ? 'created' : 'version-created',
       createdAt: generatedAt,
       source: 'system-rkn-guide',
       snapshot: clone(document),
@@ -206,6 +282,13 @@ export class TenantDocumentArchiveService {
       && item?.attachment?.type === 'RKN_GUIDE_PDF'
     ));
     if (!document) throw new NotFoundException('Инструкция РКН не найдена');
+    const attachment = objectValue(document?.attachment);
+    if (
+      attachment.legacyFormat === 'PRE_REGISTRY_TEMPLATE'
+      || !isCanonicalRknGuide(document)
+    ) {
+      throw new ConflictException('Это старая тестовая инструкция РКН. Она сохранена в истории, но не относится к новой цепочке версий.');
+    }
     return clone(document);
   }
 

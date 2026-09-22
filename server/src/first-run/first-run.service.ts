@@ -6,9 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import PDFDocument = require('pdfkit');
 import { PrismaService } from '../prisma.service';
-import { TenantDocumentArchiveService } from '../tenant-document-archive/tenant-document-archive.service';
 import { PlatformNoticeService } from '../platform-notice/platform-notice.service';
 
 const SCENARIO_KEY = 'first-run';
@@ -43,6 +41,7 @@ function text(value: unknown) {
   return String(value ?? '').trim();
 }
 
+
 function json(value: unknown): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(value ?? {})) as Prisma.InputJsonValue;
 }
@@ -55,7 +54,6 @@ function addDays(value: Date, days: number) {
 export class FirstRunService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly documentArchive: TenantDocumentArchiveService,
     private readonly notices: PlatformNoticeService,
   ) {}
 
@@ -71,148 +69,6 @@ export class FirstRunService {
     return version;
   }
 
-  private async rknGuideSnapshot(tenantId: string, platformAccountId: string) {
-    const [profile, operational] = await Promise.all([
-      this.prisma.profile.findUnique({
-        where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
-        include: { workplaces: { orderBy: { position: 'asc' } } },
-      }),
-      this.prisma.businessOperationalState.findUnique({ where: { tenantId } }),
-    ]);
-    if (!profile) throw new NotFoundException('Профиль ещё не заполнен');
-
-    const operationalData = objectValue(operational?.data);
-    const procedures = arrayValue(operationalData.procedures)
-      .filter((item) => item && typeof item === 'object' && !item.deletedAt)
-      .map((item) => text(item.name))
-      .filter(Boolean);
-    const phones = arrayValue(profile.phones).map(text).filter(Boolean);
-    const emails = arrayValue(profile.emails).map(text).filter(Boolean);
-    const workplaces = profile.workplaces.map((workplace) => ({
-      name: text(workplace.name),
-      city: text(workplace.city),
-      address: text(workplace.address),
-    }));
-
-    return {
-      fullName: [profile.name, profile.surname].map(text).filter(Boolean).join(' ') || 'Не указано',
-      profession: text(profile.profession),
-      phone: phones[0] || '',
-      email: emails[0] || '',
-      workplaces,
-      procedures,
-    };
-  }
-
-  private renderRknGuidePdf(snapshotValue: unknown, generatedAtValue: unknown) {
-    const snapshot = objectValue(snapshotValue);
-    const workplaces = arrayValue(snapshot.workplaces).map((value) => objectValue(value));
-    const procedures = arrayValue(snapshot.procedures).map(text).filter(Boolean);
-    const workplaceLines = workplaces.map((workplace, index) => {
-      const parts = [text(workplace.name), text(workplace.city), text(workplace.address)].filter(Boolean);
-      return `${index + 1}. ${parts.join(' · ') || 'Рабочее пространство'}`;
-    });
-    const generatedAt = new Date(String(generatedAtValue || ''));
-    const generatedMoment = Number.isFinite(generatedAt.getTime()) ? generatedAt : new Date();
-
-    const doc = new PDFDocument({ size: 'A4', margins: { top: 48, bottom: 48, left: 52, right: 52 } });
-    doc.font('/usr/share/fonts/ttf-dejavu/DejaVuSans.ttf');
-    const chunks: Buffer[] = [];
-    const result = new Promise<Buffer>((resolve, reject) => {
-      doc.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
-      doc.on('end', () => resolve(Buffer.concat(chunks)));
-      doc.on('error', reject);
-    });
-
-    const heading = (value: string) => {
-      doc.moveDown(0.7).fontSize(14).text(value, { underline: false }).moveDown(0.3);
-      doc.fontSize(10.5);
-    };
-    const item = (value: string) => doc.text(`• ${value}`, { indent: 8, paragraphGap: 3 });
-
-    doc.info.Title = 'Подготовка к уведомлению об обработке персональных данных';
-    doc.fontSize(18).text('Подготовка к уведомлению об обработке персональных данных');
-    doc.moveDown(0.5).fontSize(9.5).fillColor('#555555')
-      .text('Персональный рабочий лист. Он помогает подготовить сведения для официальной формы Роскомнадзора, но не является юридическим заключением и не подтверждает факт подачи уведомления.');
-    doc.fillColor('#000000');
-
-    heading('1. Данные профиля, которые уже есть в системе');
-    item(`Пользователь: ${text(snapshot.fullName) || 'Не указано'}`);
-    item(`Вид деятельности: ${text(snapshot.profession) || 'не указан'}`);
-    item(`Контактный телефон: ${text(snapshot.phone) || 'не указан'}`);
-    item(`Электронная почта: ${text(snapshot.email) || 'не указана'}`);
-    if (workplaceLines.length) {
-      doc.text('Рабочие пространства:');
-      workplaceLines.forEach((value) => item(value));
-    } else {
-      item('Рабочее пространство: не указано');
-    }
-
-    heading('2. Настроенная деятельность');
-    if (procedures.length) {
-      doc.text('Добавленные услуги:');
-      procedures.slice(0, 30).forEach((value) => item(value));
-      if (procedures.length > 30) item(`И ещё: ${procedures.length - 30}`);
-    } else {
-      item('Услуги ещё не добавлены');
-    }
-
-    heading('3. Что подготовить перед заполнением официальной формы');
-    [
-      'Сведения об операторе персональных данных и актуальные контактные данные.',
-      'Фактические цели обработки персональных данных в вашей деятельности.',
-      'Категории людей, чьи данные вы действительно будете обрабатывать.',
-      'Категории и конкретный состав персональных данных, которые действительно необходимы для этих целей.',
-      'Перечень операций с данными и способы обработки, которые используются фактически.',
-      'Сведения о хранении, защите и месте нахождения базы данных.',
-      'Дату начала обработки и условия прекращения обработки.',
-      'Сведения об ответственных лицах и мерах защиты — в объёме, который требует актуальная официальная форма.',
-    ].forEach(item);
-
-    heading('4. Важное для работы с системой');
-    [
-      'Не переносите в рабочую среду реальные персональные данные других людей до того, как определены законные основания их обработки.',
-      'Рекламные и маркетинговые сообщения требуют отдельного предварительного согласия адресата; это согласие не заменяется обычным согласием на обработку персональных данных.',
-      'В учебном сценарии используйте только вымышленные данные.',
-      'После подачи уведомления сохраняйте у себя подтверждение и актуализируйте сведения при изменении фактической обработки.',
-    ].forEach(item);
-
-    heading('5. Официальный сервис');
-    doc.fillColor('#1f4f8a').text('https://pd.rkn.gov.ru/operators-registry/notification/', {
-      link: 'https://pd.rkn.gov.ru/operators-registry/notification/',
-      underline: true,
-    });
-    doc.fillColor('#000000').moveDown(0.4)
-      .text('Перед отправкой сверяйте поля и формулировки с актуальной официальной формой и своей фактической деятельностью.');
-
-    heading('6. Что система намеренно не подставляет');
-    [
-      'паспортные данные;',
-      'ИНН и ОГРНИП;',
-      'юридический адрес;',
-      'реальные персональные данные других людей.',
-    ].forEach(item);
-
-    doc.moveDown(1).fontSize(8.5).fillColor('#666666')
-      .text(`Сформировано: ${new Intl.DateTimeFormat('ru-RU', { dateStyle: 'long', timeStyle: 'short' }).format(generatedMoment)}`);
-    doc.end();
-    return result;
-  }
-
-  async rknGuide(tenantId: string, platformAccountId: string, documentId = '') {
-    const stored = documentId
-      ? await this.documentArchive.rknGuideDocument(tenantId, documentId)
-      : await this.documentArchive.saveRknGuide(
-        tenantId,
-        await this.rknGuideSnapshot(tenantId, platformAccountId),
-      );
-    const attachment = objectValue((stored as JsonObject).attachment);
-    return {
-      pdf: await this.renderRknGuidePdf(attachment.snapshot, attachment.generatedAt),
-      documentId: text((stored as JsonObject).id),
-      fileName: text(attachment.fileName) || 'rkn-guide.pdf',
-    };
-  }
 
   async registrationDocuments() {
     const rows = await this.prisma.$queryRaw<Array<{
@@ -642,7 +498,6 @@ export class FirstRunService {
     if (step.kind === 'REQUIRED_INFO' && !existingStep?.modalSeenAt) {
       throw new ConflictException('Сначала ознакомьтесь с информацией этого этапа');
     }
-
     const now = new Date();
     const ordered = progress.scenarioVersion.steps;
     const index = ordered.findIndex((item) => item.id === step.id);
