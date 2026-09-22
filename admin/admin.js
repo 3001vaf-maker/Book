@@ -431,6 +431,8 @@ function activityEventLabel(event, stepTitles) {
     const reason = String(event.metadata?.reason || '');
     return reason === 'LOGOUT' ? 'Выход из системы' : reason === 'TIMEOUT' ? 'Сеанс завершён по отсутствию активности' : 'Сеанс завершён';
   }
+  if (event.eventType === 'LIVE_REQUESTED') return 'Пользователь запросил переход в LIVE';
+  if (event.eventType === 'LIVE_APPROVED_BY_ADMIN') return 'LIVE подтверждён администратором';
   if (event.eventType === 'COMMERCIAL_MODE_CHANGED') return `Режим изменён: ${escapeHtml(event.metadata?.commercialMode || '')}`;
   if (event.eventType === 'DEMO_EXTENDED') return 'DEMO продлено компанией';
   if (event.eventType === 'DEMO_OPERATIONAL_DATA_CLEARED') return 'Учебные операционные данные очищены';
@@ -482,6 +484,7 @@ function openAccessDrawer(tenantId) {
   const demoActivated = tenant.access?.demoActivatedAt || tenant.invitation?.activatedAt || '';
   const demoExpires = tenant.access?.demoExpiresAt || tenant.invitation?.demoExpiresAt || '';
   const progress = tenant.firstRun || null;
+  const liveRequestedAt = tenant.liveRequestedAt || '';
   const backdrop = document.createElement('div');
   backdrop.className = 'admin-drawer-backdrop';
   backdrop.innerHTML = `
@@ -501,7 +504,8 @@ function openAccessDrawer(tenantId) {
         </div>
         <div class="admin-inline-actions">
           ${mode === 'DEMO' ? '<button class="admin-button secondary" data-extend-demo>Продлить DEMO на 14 дней</button>' : ''}
-          ${mode !== 'LIVE' && tenant.ownerProfile ? '<button class="admin-button" data-set-live>Перевести в LIVE</button>' : ''}
+          ${mode !== 'LIVE' && liveRequestedAt && tenant.ownerProfile ? '<button class="admin-button" data-set-live>Подтвердить LIVE</button>' : ''}
+          ${mode !== 'LIVE' && !liveRequestedAt && tenant.ownerProfile ? '<span class="admin-service-note">Запрос LIVE от пользователя ещё не поступал.</span>' : ''}
         </div>
         <p class="admin-inline-message" data-mode-message></p>
       </section>
@@ -623,7 +627,7 @@ function openAccessDrawer(tenantId) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode: 'LIVE' }),
       });
-      message.textContent = 'Режим LIVE установлен. Незавершённое первое знакомство продолжится.';
+      message.textContent = 'LIVE подтверждён администратором.';
       await refreshData();
     } catch (error) {
       message.textContent = error instanceof Error ? error.message : 'Не удалось изменить режим';

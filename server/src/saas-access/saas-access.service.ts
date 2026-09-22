@@ -19,6 +19,7 @@ export type ResolvedTenantAccess = {
   commercialMode: string;
   demoActivatedAt: string;
   demoExpiresAt: string;
+  liveApprovedAt: string;
   plan: { id: string; key: string; name: string } | null;
   capabilityOrder: string[];
   capabilities: ResolvedCapability[];
@@ -65,6 +66,7 @@ export class SaasAccessService {
 
     if (this.demoActive(access)) return this.demoValue(capability.key, capability.valueType);
     if (this.demoExpired(access)) return this.demoExpiredValue(capability.key, capability.valueType);
+    if (this.liveUnapproved(access)) return this.demoExpiredValue(capability.key, capability.valueType);
 
     const override = access.overrides[0];
     const planValue = access.plan?.capabilityValues[0];
@@ -250,10 +252,17 @@ export class SaasAccessService {
       commercialMode: access.commercialMode,
       demoActivatedAt: access.demoActivatedAt?.toISOString() || '',
       demoExpiresAt: access.demoExpiresAt?.toISOString() || '',
+      liveApprovedAt: access.liveApprovedAt?.toISOString() || '',
       plan: access.plan ? { id: access.plan.id, key: access.plan.key, name: access.plan.name } : null,
       capabilityOrder: capabilities.map((capability) => capability.key),
       capabilities: resolved,
     };
+  }
+
+  private liveUnapproved(access: { commercialMode: string; isOwnerBook: boolean; liveApprovedAt: Date | null }) {
+    return access.commercialMode === 'LIVE'
+      && !access.isOwnerBook
+      && !access.liveApprovedAt;
   }
 
   private demoActive(access: { commercialMode: string; demoActivatedAt: Date | null; demoExpiresAt: Date | null }) {

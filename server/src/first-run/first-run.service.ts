@@ -671,7 +671,9 @@ export class FirstRunService {
 
     if (final) {
       const access = await this.prisma.tenantAccess.findUnique({ where: { tenantId } });
-      if (access?.commercialMode === 'LIVE') await this.cleanupDemoOperationalData(tenantId);
+      if (access?.commercialMode === 'LIVE' && (access.isOwnerBook || access.liveApprovedAt)) {
+        await this.cleanupDemoOperationalData(tenantId);
+      }
     }
 
     return this.state(tenantId, platformAccountId);
@@ -788,36 +790,59 @@ export class FirstRunService {
   async requestLive(tenantId: string, platformAccountId: string) {
     const access = await this.prisma.tenantAccess.findUnique({ where: { tenantId } });
     if (!access) throw new NotFoundException('Рабочее пространство не найдено');
-    if (access.commercialMode === 'LIVE') {
+    if (access.commercialMode === 'LIVE' && (access.isOwnerBook || access.liveApprovedAt)) {
       return { requested: false, alreadyLive: true };
     }
+    if (access.liveRequestedAt) {
+      return {
+        requested: true,
+        duplicate: true,
+        occurredAt: access.liveRequestedAt.toISOString(),
+      };
+    }
 
-    const recent = await this.prisma.platformActivityEvent.findFirst({
-      where: {
-        tenantId,
-        platformAccountId,
-        eventType: 'LIVE_REQUESTED',
-        occurredAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
-      },
-      orderBy: { occurredAt: 'desc' },
-    });
-    if (recent) return { requested: true, duplicate: true, occurredAt: recent.occurredAt.toISOString() };
+    const firstRunStatus = (await this.prisma.firstRunProgress.findUnique({
+      where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
+      select: { status: true, currentStepKey: true },
+    })) || null;
+    const now = new Date();
 
-    const event = await this.prisma.platformActivityEvent.create({
-      data: {
-        tenantId,
-        platformAccountId,
-        eventType: 'LIVE_REQUESTED',
-        metadata: json({
-          firstRunStatus: (await this.prisma.firstRunProgress.findUnique({
-            where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
-            select: { status: true, currentStepKey: true },
-          })) || null,
-        }),
-        occurredAt: new Date(),
-      },
+    const event = await this.prisma.$transaction(async (tx) => {
+      const current = await tx.tenantAccess.findUnique({ where: { tenantId } });
+      if (!current) throw new NotFoundException('Рабочее пространство не найдено');
+      if (current.liveRequestedAt) {
+        return {
+          id: '',
+          occurredAt: current.liveRequestedAt,
+          duplicate: true,
+        };
+      }
+
+      await tx.tenantAccess.update({
+        where: { tenantId },
+        data: {
+          liveRequestedAt: now,
+          liveRequestedByPlatformAccountId: platformAccountId,
+        },
+      });
+
+      const created = await tx.platformActivityEvent.create({
+        data: {
+          tenantId,
+          platformAccountId,
+          eventType: 'LIVE_REQUESTED',
+          metadata: json({ firstRunStatus }),
+          occurredAt: now,
+        },
+      });
+      return { id: created.id, occurredAt: created.occurredAt, duplicate: false };
     });
-    return { requested: true, occurredAt: event.occurredAt.toISOString() };
+
+    return {
+      requested: true,
+      duplicate: event.duplicate || undefined,
+      occurredAt: event.occurredAt.toISOString(),
+    };
   }
 
   async requestDemoExtension(tenantId: string, platformAccountId: string) {
@@ -863,32 +888,103 @@ export class FirstRunService {
     if (access.commercialMode !== 'LIVE') {
       throw new ForbiddenException('Реальные внешние действия доступны после перехода в LIVE');
     }
+    if (!access.isOwnerBook && !access.liveApprovedAt) {
+      throw new ForbiddenException('LIVE доступен после подтверждения администратором');
+    }
     return true;
   }
 
-  async setCommercialMode(tenantId: string, modeValue: unknown) {
+  async setCommercialMode(tenantId: string, modeValue: unknown, platformAdminId = '') {
     const mode = text(modeValue).toUpperCase();
     if (!['DEMO', 'LIVE'].includes(mode)) throw new BadRequestException('Неизвестный режим');
-    const access = await this.prisma.tenantAccess.update({
-      where: { tenantId },
-      data: { commercialMode: mode },
+
+    const approvedByAdminId = text(platformAdminId);
+    if (mode === 'LIVE' && !approvedByAdminId) {
+      throw new BadRequestException('LIVE требует явного подтверждения администратора');
+    }
+
+    const now = new Date();
+    const access = await this.prisma.$transaction(async (tx) => {
+      const current = await tx.tenantAccess.findUnique({ where: { tenantId } });
+      if (!current) throw new NotFoundException('Рабочее пространство не найдено');
+
+      if (current.isOwnerBook && mode === 'LIVE' && current.commercialMode === 'LIVE') {
+        return current;
+      }
+      if (
+        mode === 'LIVE'
+        && current.commercialMode === 'LIVE'
+        && current.liveApprovedAt
+        && current.liveApprovedByAdminId
+      ) {
+        return current;
+      }
+
+      if (mode === 'LIVE' && !current.liveRequestedAt) {
+        throw new ConflictException('Пользователь ещё не запросил переход в LIVE');
+      }
+
+      const updated = await tx.tenantAccess.update({
+        where: { tenantId },
+        data: mode === 'LIVE'
+          ? {
+            commercialMode: 'LIVE',
+            liveApprovedAt: now,
+            liveApprovedByAdminId: approvedByAdminId,
+          }
+          : {
+            commercialMode: 'DEMO',
+            liveRequestedAt: null,
+            liveRequestedByPlatformAccountId: null,
+            liveApprovedAt: null,
+            liveApprovedByAdminId: null,
+          },
+      });
+
+      await tx.platformActivityEvent.create({
+        data: {
+          tenantId,
+          eventType: 'COMMERCIAL_MODE_CHANGED',
+          metadata: json({
+            from: current.commercialMode,
+            commercialMode: mode,
+            approvedByAdminId: mode === 'LIVE' ? approvedByAdminId : '',
+          }),
+          occurredAt: now,
+        },
+      });
+
+      if (mode === 'LIVE') {
+        await tx.platformActivityEvent.create({
+          data: {
+            tenantId,
+            eventType: 'LIVE_APPROVED_BY_ADMIN',
+            metadata: json({
+              platformAdminId: approvedByAdminId,
+              requestedAt: current.liveRequestedAt?.toISOString() || '',
+              requestedByPlatformAccountId: current.liveRequestedByPlatformAccountId || '',
+            }),
+            occurredAt: now,
+          },
+        });
+      }
+
+      return updated;
     });
-    await this.prisma.platformActivityEvent.create({
-      data: {
-        tenantId,
-        eventType: 'COMMERCIAL_MODE_CHANGED',
-        metadata: json({ commercialMode: mode }),
-        occurredAt: new Date(),
-      },
-    });
+
     if (mode === 'LIVE') {
       const completed = await this.prisma.firstRunProgress.findFirst({ where: { tenantId, status: 'COMPLETED' } });
       if (completed) await this.cleanupDemoOperationalData(tenantId);
     }
+
     return {
       commercialMode: access.commercialMode,
       demoActivatedAt: access.demoActivatedAt?.toISOString() || '',
       demoExpiresAt: access.demoExpiresAt?.toISOString() || '',
+      liveRequestedAt: access.liveRequestedAt?.toISOString() || '',
+      liveRequestedByPlatformAccountId: access.liveRequestedByPlatformAccountId || '',
+      liveApprovedAt: access.liveApprovedAt?.toISOString() || '',
+      liveApprovedByAdminId: access.liveApprovedByAdminId || '',
     };
   }
 
