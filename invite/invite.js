@@ -76,14 +76,13 @@ function registrationFacts(invitation) {
 
 function renderForm(invitation) {
   const documents = Array.isArray(invitation.documents) ? invitation.documents : [];
-  const demoEnd = formatDateTime(invitation.demo?.expiresAt);
   state.innerHTML = `
     <h1>Создайте учётную запись</h1>
-    <p>После регистрации начнётся последовательная настройка и знакомство с системой.</p>
+    <p>Сначала подтвердите документы, затем укажите основные данные. 14 дней DEMO начнутся только после открытия вашего профиля.</p>
     <div class="invite-meta">
       <strong data-name></strong>
       <span data-email></span>
-      <span>DEMO доступно до ${escapeHtml(demoEnd)}</span>
+      <span>DEMO · 14 дней с первого открытия профиля</span>
     </div>
 
     <form class="invite-form" data-form>
@@ -95,26 +94,48 @@ function renderForm(invitation) {
         <div class="invite-documents">${documents.map(documentRow).join('')}</div>
       </section>
 
-      ${invitation.requiresEmail ? `<label class="invite-field">
-        <span>Email</span>
-        <input name="email" type="email" autocomplete="email" required>
-      </label>` : ''}
+      <section data-registration-data hidden>
+        <div class="invite-legal__heading">
+          <h2>Основные данные</h2>
+          <p>Имя и номер телефона обязательны. Фамилию можно добавить сейчас или позже в профиле.</p>
+        </div>
 
-      <label class="invite-field">
-        <span>Пароль</span>
-        <input name="password" type="password" minlength="10" autocomplete="new-password" required>
-      </label>
-      <label class="invite-field">
-        <span>Повторите пароль</span>
-        <input name="passwordConfirm" type="password" minlength="10" autocomplete="new-password" required>
-      </label>
+        <label class="invite-field">
+          <span>Имя</span>
+          <input name="name" type="text" autocomplete="given-name" required>
+        </label>
+        <label class="invite-field">
+          <span>Фамилия</span>
+          <input name="surname" type="text" autocomplete="family-name">
+        </label>
+        <label class="invite-field">
+          <span>Телефон</span>
+          <input name="phone" type="tel" autocomplete="tel" required>
+        </label>
 
-      <p class="invite-error" data-form-error role="alert"></p>
-      <button class="invite-button" type="submit" disabled>Создать учётную запись</button>
+        ${invitation.requiresEmail ? `<label class="invite-field">
+          <span>Email</span>
+          <input name="email" type="email" autocomplete="email" required>
+        </label>` : ''}
+
+        <label class="invite-field">
+          <span>Пароль</span>
+          <input name="password" type="password" minlength="10" autocomplete="new-password" required>
+        </label>
+        <label class="invite-field">
+          <span>Повторите пароль</span>
+          <input name="passwordConfirm" type="password" minlength="10" autocomplete="new-password" required>
+        </label>
+
+        <p class="invite-error" data-form-error role="alert"></p>
+        <button class="invite-button" type="submit">Создать учётную запись</button>
+      </section>
     </form>`;
 
   state.querySelector('[data-name]').textContent = invitation.name || 'Новое рабочее пространство';
   state.querySelector('[data-email]').textContent = invitation.email || '';
+  const registrationName = state.querySelector('[name="name"]');
+  if (registrationName && invitation.name) registrationName.value = invitation.name;
 
   state.querySelectorAll('[data-document-open]').forEach((button) => {
     button.addEventListener('click', () => {
@@ -129,17 +150,19 @@ function renderForm(invitation) {
   const form = state.querySelector('[data-form]');
   const error = state.querySelector('[data-form-error]');
   const button = form.querySelector('button[type="submit"]');
+  const registrationData = form.querySelector('[data-registration-data]');
   const requiredChecks = [...form.querySelectorAll('[data-required-document]')];
 
   const syncReady = () => {
-    button.disabled = !requiredChecks.every((checkbox) => checkbox.checked);
+    const legalReady = requiredChecks.every((checkbox) => checkbox.checked);
+    registrationData.hidden = !legalReady;
   };
   form.querySelectorAll('[data-document-check]').forEach((checkbox) => checkbox.addEventListener('change', syncReady));
   syncReady();
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
-    if (button.disabled) return;
+    if (registrationData.hidden) return;
     error.textContent = '';
 
     const data = new FormData(form);
@@ -161,6 +184,9 @@ function renderForm(invitation) {
         token,
         password,
         email: invitation.requiresEmail ? data.get('email') : undefined,
+        name: data.get('name'),
+        surname: data.get('surname'),
+        phone: data.get('phone'),
         documents: registrationFacts(invitation),
       });
       setAuthToken(account.accessToken);
