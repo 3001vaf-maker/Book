@@ -141,42 +141,71 @@ export class TenantDocumentArchiveService {
     return { dataset, value: current[dataset as keyof typeof current] };
   }
 
-  async saveRknGuide(tenantId: string, snapshotValue: unknown) {
+  async saveRknGuide(tenantId: string, inputValue: unknown) {
     const state = await this.prisma.tenantDocumentArchive.findUnique({ where: { tenantId } });
     if (!state?.migrationVerifiedAt) throw new ConflictException('Архив документов ещё не готов');
 
     const current = normalize(state.data);
-    const snapshot = objectValue(snapshotValue);
-    const snapshotHash = createHash('sha256').update(JSON.stringify(stable(snapshot)), 'utf8').digest('hex');
+    const input = objectValue(inputValue);
+    const snapshot = objectValue(input.snapshot);
+    const templateKey = String(input.templateKey || '').trim();
+    const templateVersion = Number(input.templateVersion || 0);
+    const templateContent = String(input.templateContent || '');
+    const personalizedContent = String(input.personalizedContent || '');
+    const pdfBase64 = String(input.pdfBase64 || '');
+    if (!templateKey || !templateVersion || !templateContent || !personalizedContent || !pdfBase64) {
+      throw new BadRequestException('Персональная инструкция РКН сформирована не полностью');
+    }
+
+    const source = {
+      templateKey,
+      templateVersion,
+      templateContent,
+      snapshot,
+    };
+    const sourceHash = createHash('sha256').update(JSON.stringify(stable(source)), 'utf8').digest('hex');
     const existing = current.documents.find((item: any) => (
       item?.attachment?.type === 'RKN_GUIDE_PDF'
-      && item?.attachment?.snapshotHash === snapshotHash
+      && item?.attachment?.templateKey === templateKey
+      && item?.attachment?.sourceHash === sourceHash
     ));
     if (existing) return clone(existing);
 
-    const version = current.documents.filter((item: any) => item?.attachment?.type === 'RKN_GUIDE_PDF').length + 1;
+    const canonicalGuides = current.documents.filter((item: any) => (
+      item?.attachment?.type === 'RKN_GUIDE_PDF'
+      && item?.attachment?.templateKey === templateKey
+    ));
+    const version = canonicalGuides.length + 1;
     const generatedAt = new Date().toISOString();
+    const mode = version === 1 ? 'INITIAL' : 'UPDATE';
+    const title = mode === 'INITIAL'
+      ? 'Инструкция по уведомлению Роскомнадзора'
+      : 'Инструкция по изменению сведений Роскомнадзора';
     const document = {
       id: `rkn-guide-${randomUUID()}`,
       system: true,
-      kind: 'agreement',
-      title: 'Инструкция по уведомлению Роскомнадзора',
+      kind: 'instruction',
+      title,
       personConsent: false,
       required: false,
       version,
-      text: 'Персональная PDF-инструкция по подготовке уведомления об обработке персональных данных.',
+      text: personalizedContent,
       sourceMode: 'BOOK',
-      baseKey: 'rkn-guide',
-      baseVersion: version,
-      availableBaseVersion: 0,
-      availableBookText: '',
+      baseKey: templateKey,
+      baseVersion: templateVersion,
+      availableBaseVersion: templateVersion,
+      availableBookText: templateContent,
       attachment: {
         type: 'RKN_GUIDE_PDF',
+        guideMode: mode,
         fileName: `rkn-guide-v${version}.pdf`,
         mimeType: 'application/pdf',
         generatedAt,
-        snapshotHash,
+        templateKey,
+        templateVersion,
+        sourceHash,
         snapshot: clone(snapshot),
+        pdfBase64,
       },
     };
     current.documents.push(document);
@@ -185,7 +214,7 @@ export class TenantDocumentArchiveService {
       documentId: document.id,
       documentTitle: document.title,
       documentVersion: document.version,
-      action: 'created',
+      action: version === 1 ? 'created' : 'version-created',
       createdAt: generatedAt,
       source: 'system-rkn-guide',
       snapshot: clone(document),
