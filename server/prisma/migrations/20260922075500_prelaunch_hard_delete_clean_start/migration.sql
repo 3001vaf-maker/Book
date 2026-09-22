@@ -12,6 +12,11 @@ ALTER TABLE "TenantAccess"
   ADD COLUMN IF NOT EXISTS "liveApprovedAt" TIMESTAMP(3),
   ADD COLUMN IF NOT EXISTS "liveApprovedByAdminId" TEXT;
 
+-- New workspaces start in DEMO. OWNER Book is assigned LIVE explicitly by the
+-- owner seed; no ordinary profile can become LIVE merely because a row was created.
+ALTER TABLE "TenantAccess"
+  ALTER COLUMN "commercialMode" SET DEFAULT 'DEMO';
+
 -- Older manual admin transitions already have an audit event even though the
 -- explicit approval columns did not exist yet. Backfill only from that event.
 WITH legacy_admin_live AS (
