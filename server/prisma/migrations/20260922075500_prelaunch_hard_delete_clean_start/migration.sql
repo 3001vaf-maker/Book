@@ -3,12 +3,14 @@ BEGIN;
 -- RECOVERY OF THE FAILED PRE-LAUNCH MIGRATION.
 -- Keep permanent legal/audit protections intact.
 -- The only permanent schema fixes here are:
---   1) explicit proof that LIVE was approved by an administrator;
+--   1) explicit proof that LIVE was requested by the user and approved by an administrator;
 --   2) missing WorkspaceState foreign keys;
 --   3) a transaction-local hard-delete gate for pre-launch test cleanup.
 -- No append-only trigger is removed and no legal/system table is dropped.
 
 ALTER TABLE "TenantAccess"
+  ADD COLUMN IF NOT EXISTS "liveRequestedAt" TIMESTAMP(3),
+  ADD COLUMN IF NOT EXISTS "liveRequestedByPlatformAccountId" TEXT,
   ADD COLUMN IF NOT EXISTS "liveApprovedAt" TIMESTAMP(3),
   ADD COLUMN IF NOT EXISTS "liveApprovedByAdminId" TEXT;
 
