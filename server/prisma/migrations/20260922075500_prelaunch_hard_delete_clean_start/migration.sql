@@ -1,11 +1,55 @@
 BEGIN;
 
--- PRE-LAUNCH TEST MODE
--- Keep Book system tables and platform configuration intact.
--- Only incoming profile/workspace rows are removable during pre-launch.
+-- RECOVERY OF THE FAILED PRE-LAUNCH MIGRATION.
+-- Keep permanent legal/audit protections intact.
+-- The only permanent schema fixes here are:
+--   1) explicit proof that LIVE was approved by an administrator;
+--   2) missing WorkspaceState foreign keys;
+--   3) a transaction-local hard-delete gate for pre-launch test cleanup.
+-- No append-only trigger is removed and no legal/system table is dropped.
 
--- WorkspaceState was originally created without foreign keys.
--- Remove already orphaned rows, then make future profile deletion cascade cleanly.
+ALTER TABLE "TenantAccess"
+  ADD COLUMN IF NOT EXISTS "liveApprovedAt" TIMESTAMP(3),
+  ADD COLUMN IF NOT EXISTS "liveApprovedByAdminId" TEXT;
+
+-- Older manual admin transitions already have an audit event even though the
+-- explicit approval columns did not exist yet. Backfill only from that event.
+WITH legacy_admin_live AS (
+  SELECT
+    "tenantId",
+    max("occurredAt") AS "approvedAt"
+  FROM "PlatformActivityEvent"
+  WHERE "eventType" = 'COMMERCIAL_MODE_CHANGED'
+    AND "metadata"->>'commercialMode' = 'LIVE'
+  GROUP BY "tenantId"
+)
+UPDATE "TenantAccess" access
+SET "liveApprovedAt" = legacy."approvedAt"
+FROM legacy_admin_live legacy
+WHERE access."tenantId" = legacy."tenantId"
+  AND access."isOwnerBook" = false
+  AND access."liveApprovedAt" IS NULL;
+
+-- Append-only remains the default. The exception exists only while an
+-- administrator/pre-launch cleanup explicitly enables the LOCAL transaction
+-- setting. SET LOCAL disappears automatically at COMMIT/ROLLBACK.
+CREATE OR REPLACE FUNCTION "book_reject_document_registry_event_mutation"() RETURNS trigger AS $$
+DECLARE
+  allow_test_delete TEXT;
+BEGIN
+  allow_test_delete := current_setting('book.allow_test_tenant_delete', true);
+
+  IF TG_OP = 'DELETE' AND allow_test_delete = 'on' THEN
+    RETURN OLD;
+  END IF;
+
+  RAISE EXCEPTION '% is append-only', TG_TABLE_NAME;
+END;
+$$ LANGUAGE plpgsql;
+
+-- WorkspaceState was created before these foreign keys existed.
+-- Remove only rows already orphaned by earlier test failures, then align the
+-- database with the Prisma relations.
 DELETE FROM "WorkspaceState" workspace
 WHERE NOT EXISTS (
     SELECT 1 FROM "Tenant" tenant
@@ -30,70 +74,5 @@ ALTER TABLE "WorkspaceState"
   ADD CONSTRAINT "WorkspaceState_platformAccountId_fkey"
   FOREIGN KEY ("platformAccountId") REFERENCES "PlatformAccount"("id")
   ON DELETE CASCADE ON UPDATE CASCADE;
-
--- During pre-launch, consent/activity rows are test-profile data and must be
--- removable together with the incoming profile.
-DROP TRIGGER IF EXISTS "PlatformConsentEvent_append_only" ON "PlatformConsentEvent";
-DROP TRIGGER IF EXISTS "PlatformActivityEvent_append_only" ON "PlatformActivityEvent";
-
-ALTER TABLE "PlatformConsentEvent"
-  DROP CONSTRAINT IF EXISTS "PlatformConsentEvent_tenantId_fkey";
-ALTER TABLE "PlatformConsentEvent"
-  DROP CONSTRAINT IF EXISTS "PlatformConsentEvent_platformAccountId_fkey";
-
-ALTER TABLE "PlatformConsentEvent"
-  ADD CONSTRAINT "PlatformConsentEvent_tenantId_fkey"
-  FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id")
-  ON DELETE CASCADE ON UPDATE CASCADE;
-
-ALTER TABLE "PlatformConsentEvent"
-  ADD CONSTRAINT "PlatformConsentEvent_platformAccountId_fkey"
-  FOREIGN KEY ("platformAccountId") REFERENCES "PlatformAccount"("id")
-  ON DELETE CASCADE ON UPDATE CASCADE;
-
--- Upgraded production databases can still contain legacy legal event tables.
--- Preserve those tables; only allow their rows to follow deletion of the
--- incoming profile they belong to.
-DO $legacy$
-BEGIN
-  IF to_regclass('"LegalStateEvent"') IS NOT NULL THEN
-    EXECUTE 'DROP TRIGGER IF EXISTS "LegalStateEvent_append_only" ON "LegalStateEvent"';
-
-    ALTER TABLE "LegalStateEvent"
-      DROP CONSTRAINT IF EXISTS "LegalStateEvent_tenantId_fkey";
-    ALTER TABLE "LegalStateEvent"
-      DROP CONSTRAINT IF EXISTS "LegalStateEvent_actorUserId_fkey";
-
-    ALTER TABLE "LegalStateEvent"
-      ADD CONSTRAINT "LegalStateEvent_tenantId_fkey"
-      FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id")
-      ON DELETE CASCADE ON UPDATE CASCADE;
-
-    ALTER TABLE "LegalStateEvent"
-      ADD CONSTRAINT "LegalStateEvent_actorUserId_fkey"
-      FOREIGN KEY ("actorUserId") REFERENCES "PlatformAccount"("id")
-      ON DELETE CASCADE ON UPDATE CASCADE;
-  END IF;
-
-  IF to_regclass('"LegalAuditEvent"') IS NOT NULL THEN
-    EXECUTE 'DROP TRIGGER IF EXISTS "LegalAuditEvent_append_only" ON "LegalAuditEvent"';
-
-    ALTER TABLE "LegalAuditEvent"
-      DROP CONSTRAINT IF EXISTS "LegalAuditEvent_tenantId_fkey";
-    ALTER TABLE "LegalAuditEvent"
-      DROP CONSTRAINT IF EXISTS "LegalAuditEvent_actorUserId_fkey";
-
-    ALTER TABLE "LegalAuditEvent"
-      ADD CONSTRAINT "LegalAuditEvent_tenantId_fkey"
-      FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id")
-      ON DELETE CASCADE ON UPDATE CASCADE;
-
-    ALTER TABLE "LegalAuditEvent"
-      ADD CONSTRAINT "LegalAuditEvent_actorUserId_fkey"
-      FOREIGN KEY ("actorUserId") REFERENCES "PlatformAccount"("id")
-      ON DELETE CASCADE ON UPDATE CASCADE;
-  END IF;
-END
-$legacy$;
 
 COMMIT;
