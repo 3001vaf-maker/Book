@@ -229,12 +229,14 @@ jobs:
 
           INSERT INTO "TenantAccess" (
             "tenantId","planId","status","isOwnerBook","commercialMode",
+            "liveRequestedAt","liveRequestedByPlatformAccountId",
             "liveApprovedAt","liveApprovedByAdminId","createdAt","updatedAt"
           )
           VALUES
-            ('incoming-profile-tenant',NULL,'ACTIVE',false,'DEMO',NULL,NULL,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
-            ('dirty-live-tenant',NULL,'ACTIVE',false,'LIVE',NULL,NULL,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
-            ('approved-live-tenant',NULL,'ACTIVE',false,'LIVE',CURRENT_TIMESTAMP,'upgrade-admin',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
+            ('incoming-profile-tenant',NULL,'ACTIVE',false,'DEMO',NULL,NULL,NULL,NULL,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+            ('dirty-live-tenant',NULL,'ACTIVE',false,'LIVE',NULL,NULL,NULL,NULL,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+            ('approved-live-tenant',NULL,'ACTIVE',false,'LIVE',
+             CURRENT_TIMESTAMP,'approved-live-account',CURRENT_TIMESTAMP,'upgrade-admin',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
 
           INSERT INTO "Profile" (
             "id","tenantId","platformAccountId","name","phones","telegrams","emails","customProfessions","updatedAt"
@@ -341,6 +343,8 @@ jobs:
               WHERE "tenantId" = 'approved-live-tenant'
                 AND "isOwnerBook" = false
                 AND "commercialMode" = 'LIVE'
+                AND "liveRequestedAt" IS NOT NULL
+                AND "liveRequestedByPlatformAccountId" = 'approved-live-account'
                 AND "liveApprovedAt" IS NOT NULL
                 AND "liveApprovedByAdminId" = 'upgrade-admin'
             ) <> 1 THEN
