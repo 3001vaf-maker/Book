@@ -35,7 +35,7 @@ assert.match(schema, /model FirstRunStepProgress\s*\{/);
 assert.match(schema, /model PlatformActivityEvent\s*\{/);
 assert.match(schema, /model PlatformSession\s*\{/);
 assert.match(schema, /model PlatformNotice\s*\{/);
-assert.match(schema, /commercialMode\s+String\s+@default\("LIVE"\)/);
+assert.match(schema, /commercialMode\s+String\s+@default\("DEMO"\)/);
 assert.match(schema, /demoActivatedAt\s+DateTime\?/);
 assert.match(schema, /demoExpiresAt\s+DateTime\?/);
 assert.match(schema, /liveApprovedAt\s+DateTime\?/);
