@@ -55,6 +55,7 @@ assert.doesNotMatch(prelaunchHardDeleteMigration, /DROP TRIGGER IF EXISTS/);
 assert.match(prelaunchHardDeleteMigration, /liveApprovedAt/);
 assert.match(prelaunchHardDeleteMigration, /COMMERCIAL_MODE_CHANGED/);
 assert.match(prelaunchHardDeleteMigration, /current_setting\('book\.allow_test_tenant_delete', true\)/);
+assert.match(prelaunchHardDeleteMigration, /book_reject_append_only_mutation/);
 assert.match(prelaunchHardDeleteMigration, /WorkspaceState_tenantId_fkey/);
 assert.match(prelaunchHardDeleteMigration, /WorkspaceState_platformAccountId_fkey/);
 assert.doesNotMatch(prelaunchHardDeleteMigration, /LegalAuditEvent.*ON DELETE CASCADE/s);
