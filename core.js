@@ -177,83 +177,6 @@ function renderSuspended() {
 }
 
 
-function renderDemoExpired(firstRun) {
-  if (demoBadgeTimer) {
-    window.clearInterval(demoBadgeTimer);
-    demoBadgeTimer = null;
-  }
-  app.classList.remove('app-shell--booking');
-  workspaceReady = false;
-  disposeView();
-  disposeView = () => {};
-  const expiresAt = firstRun?.demo?.expiresAt
-    ? new Intl.DateTimeFormat('ru-RU', { dateStyle: 'long', timeStyle: 'short' }).format(new Date(firstRun.demo.expiresAt))
-    : '';
-  app.innerHTML = `
-    <main class="first-run-expired">
-      <section class="first-run-expired__card">
-        <h1>Срок DEMO завершён</h1>
-        <p>Данные и настройки сохранены. Компания может продлить DEMO по своему усмотрению, либо вы можете запросить переход в LIVE.</p>
-        ${expiresAt ? `<p style="margin-top:12px">DEMO завершено: ${expiresAt}</p>` : ''}
-        <div class="first-run-expired__actions">
-          <button class="ui-button" type="button" data-request-live>Перейти в LIVE</button>
-          <button class="ui-button ui-button--secondary" type="button" data-request-demo-extension>Запросить продление DEMO</button>
-        </div>
-        <p class="first-run-expired__status" data-request-status></p>
-      </section>
-    </main>`;
-  const status = app.querySelector('[data-request-status]');
-  app.querySelector('[data-request-live]')?.addEventListener('click', async (event) => {
-    const control = event.currentTarget;
-    control.disabled = true;
-    if (status) status.textContent = 'Отправляем запрос…';
-    try {
-      const result = await requestLiveMode();
-      if (status) status.textContent = result?.alreadyLive ? 'LIVE уже активен.' : 'Запрос на LIVE отправлен компании.';
-      control.textContent = 'Запрос отправлен';
-    } catch (error) {
-      control.disabled = false;
-      if (status) status.textContent = error instanceof Error ? error.message : 'Не удалось отправить запрос';
-    }
-  });
-  app.querySelector('[data-request-demo-extension]')?.addEventListener('click', async (event) => {
-    const control = event.currentTarget;
-    control.disabled = true;
-    if (status) status.textContent = 'Отправляем запрос…';
-    try {
-      await requestDemoExtension();
-      if (status) status.textContent = 'Запрос на продление DEMO отправлен компании.';
-      control.textContent = 'Запрос отправлен';
-    } catch (error) {
-      control.disabled = false;
-      if (status) status.textContent = error instanceof Error ? error.message : 'Не удалось отправить запрос';
-    }
-  });
-  syncViewport();
-}
-
-function showGuidedWorkspace(section) {
-  workspaceReady = true;
-  state.activeSection = sectionAllowed(section) ? section : defaultSection();
-  history.replaceState({}, '', `#${state.activeSection}`);
-  renderWorkspace();
-  startRegularPlatformNotices();
-}
-
-function startRegularPlatformNotices() {
-  disposePlatformNotices();
-  disposePlatformNotices = startPlatformNotices({
-    onAccessChanged: async () => {
-      await loadBookAccess();
-      if (getBookAccess().status === 'SUSPENDED') {
-        renderSuspended();
-        return;
-      }
-      if (workspaceReady) renderWorkspace();
-    },
-  });
-}
-
 async function renderAuthenticated(account = authenticatedAccount) {
   authenticatedAccount = account || authenticatedAccount;
   const migration = await initializeProfileWorkplaces(authenticatedAccount);
@@ -318,14 +241,9 @@ async function renderAuthenticated(account = authenticatedAccount) {
   }
 
   if (firstRunState?.assigned) {
-    if (firstRunState.commercialMode === 'DEMO' && firstRunState.demo?.expired) {
-      candidateRuntime.dispose();
-      disposePlatformSession = await startPlatformSessionTracking();
-      renderDemoExpired(firstRunState);
-      return;
-    }
+    const demoExpired = firstRunState.commercialMode === 'DEMO' && firstRunState.demo?.expired;
 
-    if (firstRunState.progress?.status === 'IN_PROGRESS') {
+    if (firstRunState.progress?.status === 'IN_PROGRESS' && !demoExpired) {
       firstRunRuntime = candidateRuntime;
       workspaceReady = false;
       history.replaceState({}, '', location.pathname);
