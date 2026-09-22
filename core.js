@@ -159,6 +159,32 @@ function renderMigrationPending() {
   syncViewport();
 }
 
+function renderFirstRunUnavailable(error) {
+  app.classList.remove('app-shell--booking');
+  workspaceReady = false;
+  disposeView();
+  disposeView = () => {};
+  const message = error instanceof Error ? error.message : 'Не удалось продолжить знакомство с Book.';
+  app.innerHTML = `
+    <main class="auth-view">
+      <section class="auth-card">
+        <div class="auth-card__heading">
+          <h1>Не удалось открыть знакомство с Book</h1>
+          <p data-first-run-load-error></p>
+        </div>
+        <button class="ui-button" type="button" data-first-run-retry>Повторить</button>
+      </section>
+    </main>`;
+  app.querySelector('[data-first-run-load-error]').textContent = message;
+  app.querySelector('[data-first-run-retry]')?.addEventListener('click', async (event) => {
+    const control = event.currentTarget;
+    control.disabled = true;
+    control.textContent = 'Открываем…';
+    await renderAuthenticated(authenticatedAccount);
+  });
+  syncViewport();
+}
+
 function renderSuspended() {
   app.classList.remove('app-shell--booking');
   workspaceReady = false;
@@ -315,8 +341,10 @@ async function renderAuthenticated(account = authenticatedAccount) {
 
   try {
     firstRunState = await candidateRuntime.load();
-  } catch {
-    firstRunState = null;
+  } catch (error) {
+    candidateRuntime.dispose();
+    renderFirstRunUnavailable(error);
+    return;
   }
 
   if (firstRunState?.assigned) {
