@@ -185,7 +185,13 @@ async function loadAdmin() {
   renderShell();
   updateLiveRequestIndicator();
   startAdminPolling();
-  void enableAdminPush(false).catch(() => false);
+  void enableAdminPush(false).then((enabled) => {
+    const pushButton = app.querySelector('[data-enable-admin-push]');
+    if (enabled && pushButton) {
+      pushButton.textContent = 'PUSH включён';
+      pushButton.disabled = true;
+    }
+  }).catch(() => false);
   if (requestedTenantId && state.tenants.some((item) => item.tenantId === requestedTenantId)) {
     window.setTimeout(() => openAccessDrawer(requestedTenantId), 0);
     window.history.replaceState({}, '', '/admin/');
@@ -220,7 +226,7 @@ function renderShell() {
       </aside>
       <header class="admin-toolbar">
         <h1 data-toolbar-title>Пользователи</h1>
-        <div class="admin-toolbar-user"><span>${escapeHtml(state.admin?.account?.email || '')}</span><button class="admin-button secondary" data-logout>Выйти</button></div>
+        <div class="admin-toolbar-user"><span>${escapeHtml(state.admin?.account?.email || '')}</span><button class="admin-button secondary" data-enable-admin-push>Включить PUSH</button><button class="admin-button secondary" data-logout>Выйти</button></div>
       </header>
       <main class="admin-main"><div class="admin-content" data-content></div></main>
     </div>`;
@@ -232,7 +238,30 @@ function renderShell() {
       renderCurrentSection();
     });
   });
+  const pushButton = app.querySelector('[data-enable-admin-push]');
+  const syncPushButton = (enabled = false) => {
+    if (!pushButton) return;
+    const supported = typeof Notification !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window;
+    if (!supported) {
+      pushButton.hidden = true;
+      return;
+    }
+    const active = enabled || Notification.permission === 'granted';
+    pushButton.textContent = active ? 'PUSH включён' : 'Включить PUSH';
+    pushButton.disabled = active;
+  };
+  syncPushButton(false);
+  pushButton?.addEventListener('click', async () => {
+    pushButton.disabled = true;
+    pushButton.textContent = 'Включаем…';
+    const enabled = await enableAdminPush(true).catch(() => false);
+    syncPushButton(enabled);
+    if (!enabled && Notification.permission !== 'granted') pushButton.disabled = false;
+  });
+
   app.querySelector('[data-logout]').addEventListener('click', () => {
+    if (adminPollTimer) window.clearInterval(adminPollTimer);
+    adminPollTimer = null;
     clearAuthToken();
     state.account = null;
     state.admin = null;
