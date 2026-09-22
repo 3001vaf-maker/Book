@@ -176,14 +176,14 @@ jobs:
           END
           $profile_check$;
           SQL
-      - name: Verify guarded registered tenant hard delete
+      - name: Verify immutable legal history survives subject deletion
         shell: bash
         run: |
           set -euo pipefail
           (
             cd server
             npx prisma generate
-            DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' node scripts/check-test-tenant-hard-delete.mjs
+            DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' node scripts/check-immutable-legal-history-delete.mjs
           )
       - name: Stop isolated database
         if: always()
