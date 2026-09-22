@@ -76,7 +76,6 @@ jobs:
           mv server/prisma/migrations/20260922043000_detach_immutable_legal_events /tmp/profile-migrations/
           mv server/prisma/migrations/20260922075500_prelaunch_hard_delete_clean_start /tmp/profile-migrations/
           mv server/prisma/migrations/20260922081000_purge_non_owner_profiles /tmp/profile-migrations/
-          mv server/prisma/migrations/20260922082000_workspace_state_profile_cascade /tmp/profile-migrations/
           (
             cd server
             DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' npx prisma migrate deploy
@@ -191,7 +190,7 @@ jobs:
             npx prisma generate
             DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' node scripts/check-prelaunch-hard-delete.mjs
           )
-      - name: Seed OWNER and incoming profile purge fixture
+      - name: Seed OWNER, dirty LIVE, DEMO and approved LIVE purge fixture
         shell: bash
         run: |
           set -euo pipefail
@@ -209,41 +208,76 @@ jobs:
             "updatedAt" = CURRENT_TIMESTAMP;
 
           INSERT INTO "Tenant" ("id","name","updatedAt")
-          VALUES ('incoming-profile-tenant','Incoming Profile Tenant',CURRENT_TIMESTAMP);
+          VALUES
+            ('incoming-profile-tenant','Incoming DEMO Profile',CURRENT_TIMESTAMP),
+            ('dirty-live-tenant','Dirty Automatic LIVE Profile',CURRENT_TIMESTAMP),
+            ('approved-live-tenant','Approved LIVE Profile',CURRENT_TIMESTAMP);
 
           INSERT INTO "PlatformAccount" (
             "id","email","passwordHash","onboardingStep","workspaceUnlocked","updatedAt"
           )
-          VALUES (
-            'incoming-profile-account','incoming-profile@example.invalid','hash',3,true,CURRENT_TIMESTAMP
-          );
+          VALUES
+            ('incoming-profile-account','incoming-profile@example.invalid','hash',3,true,CURRENT_TIMESTAMP),
+            ('dirty-live-account','dirty-live@example.invalid','hash',3,true,CURRENT_TIMESTAMP),
+            ('approved-live-account','approved-live@example.invalid','hash',3,true,CURRENT_TIMESTAMP);
 
           INSERT INTO "Membership" ("id","tenantId","platformAccountId","role")
-          VALUES (
-            'incoming-profile-membership','incoming-profile-tenant','incoming-profile-account','OWNER'
-          );
+          VALUES
+            ('incoming-profile-membership','incoming-profile-tenant','incoming-profile-account','OWNER'),
+            ('dirty-live-membership','dirty-live-tenant','dirty-live-account','OWNER'),
+            ('approved-live-membership','approved-live-tenant','approved-live-account','OWNER');
 
           INSERT INTO "TenantAccess" (
-            "tenantId","planId","status","isOwnerBook","commercialMode","createdAt","updatedAt"
+            "tenantId","planId","status","isOwnerBook","commercialMode",
+            "liveRequestedAt","liveRequestedByPlatformAccountId",
+            "liveApprovedAt","liveApprovedByAdminId","createdAt","updatedAt"
           )
-          VALUES (
-            'incoming-profile-tenant',NULL,'ACTIVE',false,'DEMO',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP
-          );
+          VALUES
+            ('incoming-profile-tenant',NULL,'ACTIVE',false,'DEMO',NULL,NULL,NULL,NULL,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+            ('dirty-live-tenant',NULL,'ACTIVE',false,'LIVE',NULL,NULL,NULL,NULL,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+            ('approved-live-tenant',NULL,'ACTIVE',false,'LIVE',
+             CURRENT_TIMESTAMP,'approved-live-account',CURRENT_TIMESTAMP,'upgrade-admin',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
 
           INSERT INTO "Profile" (
             "id","tenantId","platformAccountId","name","phones","telegrams","emails","customProfessions","updatedAt"
           )
-          VALUES (
-            'incoming-profile-profile','incoming-profile-tenant','incoming-profile-account','Incoming Profile',
-            '[]'::jsonb,'[]'::jsonb,'["incoming-profile@example.invalid"]'::jsonb,'[]'::jsonb,CURRENT_TIMESTAMP
-          );
+          VALUES
+            (
+              'incoming-profile-profile','incoming-profile-tenant','incoming-profile-account','Incoming Profile',
+              '[]'::jsonb,'[]'::jsonb,'["incoming-profile@example.invalid"]'::jsonb,'[]'::jsonb,CURRENT_TIMESTAMP
+            ),
+            (
+              'dirty-live-profile','dirty-live-tenant','dirty-live-account','Dirty LIVE Profile',
+              '[]'::jsonb,'[]'::jsonb,'["dirty-live@example.invalid"]'::jsonb,'[]'::jsonb,CURRENT_TIMESTAMP
+            ),
+            (
+              'approved-live-profile','approved-live-tenant','approved-live-account','Approved LIVE Profile',
+              '[]'::jsonb,'[]'::jsonb,'["approved-live@example.invalid"]'::jsonb,'[]'::jsonb,CURRENT_TIMESTAMP
+            );
 
           INSERT INTO "WorkspaceState" (
             "id","tenantId","platformAccountId","data","revision","updatedAt"
           )
+          VALUES
+            (
+              'incoming-profile-workspace','incoming-profile-tenant','incoming-profile-account',
+              '{"incoming":true}'::jsonb,1,CURRENT_TIMESTAMP
+            ),
+            (
+              'dirty-live-workspace','dirty-live-tenant','dirty-live-account',
+              '{"dirtyLive":true}'::jsonb,1,CURRENT_TIMESTAMP
+            ),
+            (
+              'approved-live-workspace','approved-live-tenant','approved-live-account',
+              '{"approvedLive":true}'::jsonb,1,CURRENT_TIMESTAMP
+            );
+
+          INSERT INTO "PlatformActivityEvent" (
+            "id","tenantId","platformAccountId","eventType","metadata","occurredAt","createdAt"
+          )
           VALUES (
-            'incoming-profile-workspace','incoming-profile-tenant','incoming-profile-account',
-            '{"incoming":true}'::jsonb,1,CURRENT_TIMESTAMP
+            'approved-live-event','approved-live-tenant','approved-live-account',
+            'LIVE_APPROVED_BY_ADMIN','{"platformAdminId":"upgrade-admin"}'::jsonb,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP
           );
           SQL
       - name: Apply incoming profile clean-start purge
@@ -251,12 +285,11 @@ jobs:
         run: |
           set -euo pipefail
           mv /tmp/profile-migrations/20260922081000_purge_non_owner_profiles server/prisma/migrations/
-          mv /tmp/profile-migrations/20260922082000_workspace_state_profile_cascade server/prisma/migrations/
           (
             cd server
             DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' npx prisma migrate deploy
           )
-      - name: Verify OWNER preserved and incoming profiles removed
+      - name: Verify OWNER and approved LIVE preserved, unapproved profiles removed
         shell: bash
         run: |
           set -euo pipefail
@@ -279,20 +312,58 @@ jobs:
               RAISE EXCEPTION 'OWNER TenantAccess was not preserved';
             END IF;
 
-            IF (SELECT COUNT(*) FROM "Tenant" WHERE "id" = 'incoming-profile-tenant') <> 0 THEN
-              RAISE EXCEPTION 'Incoming Tenant remains';
+            IF (SELECT COUNT(*) FROM "Tenant" WHERE "id" IN ('incoming-profile-tenant','dirty-live-tenant')) <> 0 THEN
+              RAISE EXCEPTION 'Unapproved test Tenant remains';
             END IF;
-            IF (SELECT COUNT(*) FROM "PlatformAccount" WHERE "id" = 'incoming-profile-account') <> 0 THEN
-              RAISE EXCEPTION 'Incoming PlatformAccount remains';
+            IF (SELECT COUNT(*) FROM "PlatformAccount" WHERE "id" IN ('incoming-profile-account','dirty-live-account')) <> 0 THEN
+              RAISE EXCEPTION 'Unapproved test PlatformAccount remains';
             END IF;
-            IF (SELECT COUNT(*) FROM "Profile" WHERE "id" = 'incoming-profile-profile') <> 0 THEN
-              RAISE EXCEPTION 'Incoming Profile remains';
+            IF (SELECT COUNT(*) FROM "Profile" WHERE "id" IN ('incoming-profile-profile','dirty-live-profile')) <> 0 THEN
+              RAISE EXCEPTION 'Unapproved test Profile remains';
             END IF;
-            IF (SELECT COUNT(*) FROM "WorkspaceState" WHERE "id" = 'incoming-profile-workspace') <> 0 THEN
-              RAISE EXCEPTION 'Incoming WorkspaceState remains';
+            IF (SELECT COUNT(*) FROM "WorkspaceState" WHERE "id" IN ('incoming-profile-workspace','dirty-live-workspace')) <> 0 THEN
+              RAISE EXCEPTION 'Unapproved test WorkspaceState remains';
             END IF;
-            IF (SELECT COUNT(*) FROM "TenantAccess" WHERE "isOwnerBook" = false) <> 0 THEN
-              RAISE EXCEPTION 'Non-owner TenantAccess rows remain';
+
+            IF (SELECT COUNT(*) FROM "Tenant" WHERE "id" = 'approved-live-tenant') <> 1 THEN
+              RAISE EXCEPTION 'Approved LIVE Tenant was removed';
+            END IF;
+            IF (SELECT COUNT(*) FROM "PlatformAccount" WHERE "id" = 'approved-live-account') <> 1 THEN
+              RAISE EXCEPTION 'Approved LIVE PlatformAccount was removed';
+            END IF;
+            IF (SELECT COUNT(*) FROM "Profile" WHERE "id" = 'approved-live-profile') <> 1 THEN
+              RAISE EXCEPTION 'Approved LIVE Profile was removed';
+            END IF;
+            IF (SELECT COUNT(*) FROM "WorkspaceState" WHERE "id" = 'approved-live-workspace') <> 1 THEN
+              RAISE EXCEPTION 'Approved LIVE WorkspaceState was removed';
+            END IF;
+            IF (
+              SELECT COUNT(*)
+              FROM "TenantAccess"
+              WHERE "tenantId" = 'approved-live-tenant'
+                AND "isOwnerBook" = false
+                AND "commercialMode" = 'LIVE'
+                AND "liveRequestedAt" IS NOT NULL
+                AND "liveRequestedByPlatformAccountId" = 'approved-live-account'
+                AND "liveApprovedAt" IS NOT NULL
+                AND "liveApprovedByAdminId" = 'upgrade-admin'
+            ) <> 1 THEN
+              RAISE EXCEPTION 'Approved LIVE proof was not preserved';
+            END IF;
+
+            IF (SELECT COUNT(*) FROM "TenantAccess" WHERE "isOwnerBook" = false) <> 1 THEN
+              RAISE EXCEPTION 'Unexpected non-owner profiles remain after purge';
+            END IF;
+
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_trigger WHERE tgname = 'PlatformConsentEvent_append_only' AND NOT tgisinternal
+            ) THEN
+              RAISE EXCEPTION 'PlatformConsentEvent append-only protection is missing';
+            END IF;
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_trigger WHERE tgname = 'PlatformActivityEvent_append_only' AND NOT tgisinternal
+            ) THEN
+              RAISE EXCEPTION 'PlatformActivityEvent append-only protection is missing';
             END IF;
           END
           $profile_purge$;
@@ -521,6 +592,160 @@ jobs:
             END IF;
           END
           $global_check$;
+          SQL
+      - name: Stop isolated database
+        if: always()
+        run: docker compose -f docker-compose.staging.yml down -v
+
+
+  prelaunch-failed-migration-recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install server dependencies
+        run: npm install --prefix server
+      - name: Generate Prisma client
+        run: npm run prisma:generate --prefix server
+      - name: Start isolated database
+        run: |
+          docker compose -f docker-compose.staging.yml up -d db
+          for attempt in $(seq 1 30); do
+            if docker compose -f docker-compose.staging.yml exec -T db pg_isready -U book -d book_staging >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose -f docker-compose.staging.yml logs db
+          exit 1
+      - name: Apply chain before failed 07:55
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/prelaunch-recovery-migrations
+          mv server/prisma/migrations/20260922075500_prelaunch_hard_delete_clean_start /tmp/prelaunch-recovery-migrations/
+          mv server/prisma/migrations/20260922081000_purge_non_owner_profiles /tmp/prelaunch-recovery-migrations/
+          (
+            cd server
+            DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' npx prisma migrate deploy
+          )
+      - name: Simulate production P3009 row
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.staging.yml exec -T db psql -U book -d book_staging -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO "_prisma_migrations" (
+            "id","checksum","finished_at","migration_name","logs","rolled_back_at","started_at","applied_steps_count"
+          )
+          VALUES (
+            '22222222-2222-4222-8222-222222222222',
+            'simulated-failed-prelaunch-checksum',
+            NULL,
+            '20260922075500_prelaunch_hard_delete_clean_start',
+            'simulated production P3009 for failed 07:55',
+            NULL,
+            CURRENT_TIMESTAMP,
+            0
+          );
+          SQL
+      - name: Verify guarded recovery and resolve failed 07:55
+        shell: bash
+        run: |
+          set -uo pipefail
+          cd server
+          set +e
+          DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' node scripts/recover-failed-prelaunch-migration.mjs
+          recovery_status=$?
+          set -e
+          if [ "$recovery_status" -ne 42 ]; then
+            echo "Expected guarded recovery exit 42, got $recovery_status"
+            exit 1
+          fi
+          DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' npx prisma migrate resolve --rolled-back 20260922075500_prelaunch_hard_delete_clean_start
+      - name: Restore and retry corrected migrations
+        shell: bash
+        run: |
+          set -euo pipefail
+          mv /tmp/prelaunch-recovery-migrations/20260922075500_prelaunch_hard_delete_clean_start server/prisma/migrations/
+          mv /tmp/prelaunch-recovery-migrations/20260922081000_purge_non_owner_profiles server/prisma/migrations/
+          (
+            cd server
+            DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' npx prisma migrate deploy
+          )
+      - name: Verify recovered migration state
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.staging.yml exec -T db psql -U book -d book_staging -v ON_ERROR_STOP=1 <<'SQL'
+          DO $recovery_check$
+          BEGIN
+            IF (
+              SELECT COUNT(*)
+              FROM "_prisma_migrations"
+              WHERE "id" = '22222222-2222-4222-8222-222222222222'
+                AND "rolled_back_at" IS NOT NULL
+            ) <> 1 THEN
+              RAISE EXCEPTION 'Failed 07:55 row was not marked rolled back';
+            END IF;
+
+            IF (
+              SELECT COUNT(*)
+              FROM "_prisma_migrations"
+              WHERE "migration_name" = '20260922075500_prelaunch_hard_delete_clean_start'
+                AND "finished_at" IS NOT NULL
+                AND "rolled_back_at" IS NULL
+            ) <> 1 THEN
+              RAISE EXCEPTION 'Corrected 07:55 was not applied successfully';
+            END IF;
+
+            IF NOT EXISTS (
+              SELECT 1 FROM information_schema.columns
+              WHERE table_schema = 'public'
+                AND table_name = 'TenantAccess'
+                AND column_name = 'liveApprovedAt'
+            ) THEN
+              RAISE EXCEPTION 'LIVE approval schema was not applied';
+            END IF;
+
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_trigger
+              WHERE tgname = 'PlatformConsentEvent_append_only'
+                AND NOT tgisinternal
+            ) THEN
+              RAISE EXCEPTION 'PlatformConsentEvent append-only trigger was lost';
+            END IF;
+
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_trigger
+              WHERE tgname = 'PlatformActivityEvent_append_only'
+                AND NOT tgisinternal
+            ) THEN
+              RAISE EXCEPTION 'PlatformActivityEvent append-only trigger was lost';
+            END IF;
+
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_constraint
+              WHERE conname = 'WorkspaceState_tenantId_fkey'
+            ) THEN
+              RAISE EXCEPTION 'WorkspaceState tenant FK missing after recovery';
+            END IF;
+
+            IF EXISTS (
+              SELECT 1 FROM pg_constraint
+              WHERE conname IN (
+                'PlatformConsentEvent_tenantId_fkey',
+                'PlatformConsentEvent_platformAccountId_fkey'
+              )
+            ) THEN
+              RAISE EXCEPTION 'Unsafe PlatformConsentEvent cascade FK returned';
+            END IF;
+          END
+          $recovery_check$;
           SQL
       - name: Stop isolated database
         if: always()

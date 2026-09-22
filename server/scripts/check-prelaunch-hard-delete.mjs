@@ -9,12 +9,13 @@ const consentEventId = 'prelaunch-delete-consent';
 const sessionId = 'prelaunch-delete-session';
 const activityEventId = 'prelaunch-delete-activity';
 
+function messageOf(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+
 try {
   await prisma.tenant.create({
-    data: {
-      id: tenantId,
-      name: 'Prelaunch Active Live Tenant',
-    },
+    data: { id: tenantId, name: 'Prelaunch Unapproved LIVE Tenant' },
   });
 
   await prisma.platformAccount.create({
@@ -28,12 +29,7 @@ try {
   });
 
   await prisma.membership.create({
-    data: {
-      id: membershipId,
-      tenantId,
-      platformAccountId: accountId,
-      role: 'OWNER',
-    },
+    data: { id: membershipId, tenantId, platformAccountId: accountId, role: 'OWNER' },
   });
 
   await prisma.tenantAccess.create({
@@ -42,15 +38,13 @@ try {
       status: 'ACTIVE',
       isOwnerBook: false,
       commercialMode: 'LIVE',
+      liveApprovedAt: null,
+      liveApprovedByAdminId: null,
     },
   });
 
   await prisma.platformSession.create({
-    data: {
-      id: sessionId,
-      tenantId,
-      platformAccountId: accountId,
-    },
+    data: { id: sessionId, tenantId, platformAccountId: accountId },
   });
 
   await prisma.platformActivityEvent.create({
@@ -83,7 +77,30 @@ try {
     )
   `;
 
+  let appendOnlyBlocked = false;
+  try {
+    await prisma.platformActivityEvent.delete({ where: { id: activityEventId } });
+  } catch (error) {
+    appendOnlyBlocked = messageOf(error).includes('append-only');
+  }
+  if (!appendOnlyBlocked) {
+    throw new Error('Ordinary event deletion bypassed append-only protection');
+  }
+
   await prisma.$transaction(async (tx) => {
+    await tx.$executeRawUnsafe('SET LOCAL "book.allow_test_tenant_delete" = \'on\'');
+    const guard = await tx.$queryRaw`
+      SELECT current_setting('book.allow_test_tenant_delete', true) AS "value"
+    `;
+    if (!Array.isArray(guard) || guard[0]?.value !== 'on') {
+      throw new Error('Transaction-local test delete guard was not enabled');
+    }
+
+    await tx.$executeRaw`
+      DELETE FROM "PlatformConsentEvent"
+      WHERE "tenantId" = ${tenantId}
+    `;
+
     await tx.tenant.delete({ where: { id: tenantId } });
 
     const remainingMemberships = await tx.membership.count({
@@ -98,6 +115,10 @@ try {
       throw new Error('PlatformAccount unexpectedly remains referenced after Tenant delete');
     }
 
+    await tx.$executeRaw`
+      DELETE FROM "PlatformConsentEvent"
+      WHERE "platformAccountId" = ${accountId}
+    `;
     await tx.platformAccount.delete({ where: { id: accountId } });
   });
 
@@ -119,7 +140,7 @@ try {
     }),
   ]);
 
-  if (tenant) throw new Error('ACTIVE/LIVE Tenant was not deleted');
+  if (tenant) throw new Error('Unapproved LIVE Tenant was not deleted');
   if (account) throw new Error('Orphan PlatformAccount was not deleted');
   if (Array.isArray(consentEvents) && consentEvents.length) {
     throw new Error('PlatformConsentEvent test history remains');
@@ -127,7 +148,7 @@ try {
   if (activityEvents.length) throw new Error('PlatformActivityEvent test history remains');
   if (sessions.length) throw new Error('PlatformSession test row remains');
 
-  console.log('ACTIVE/LIVE non-owner tenant hard delete leaves no test history');
+  console.log('Unapproved LIVE test tenant hard delete passed with append-only restored afterward');
 } finally {
   await prisma.$disconnect();
 }
