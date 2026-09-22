@@ -76,6 +76,7 @@ jobs:
           mv server/prisma/migrations/20260922043000_detach_immutable_legal_events /tmp/profile-migrations/
           mv server/prisma/migrations/20260922075500_prelaunch_hard_delete_clean_start /tmp/profile-migrations/
           mv server/prisma/migrations/20260922081000_purge_non_owner_profiles /tmp/profile-migrations/
+          mv server/prisma/migrations/20260922082000_workspace_state_profile_cascade /tmp/profile-migrations/
           (
             cd server
             DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' npx prisma migrate deploy
@@ -250,6 +251,7 @@ jobs:
         run: |
           set -euo pipefail
           mv /tmp/profile-migrations/20260922081000_purge_non_owner_profiles server/prisma/migrations/
+          mv /tmp/profile-migrations/20260922082000_workspace_state_profile_cascade server/prisma/migrations/
           (
             cd server
             DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' npx prisma migrate deploy

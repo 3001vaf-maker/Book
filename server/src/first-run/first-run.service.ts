@@ -853,21 +853,15 @@ export class FirstRunService {
   }
 
   async assertRealOperationsAllowed(tenantId: string) {
-    const [access, progress] = await Promise.all([
-      this.prisma.tenantAccess.findUnique({ where: { tenantId } }),
-      this.prisma.firstRunProgress.findFirst({
-        where: { tenantId, status: 'IN_PROGRESS' },
-        select: { id: true },
-      }),
-    ]);
+    const access = await this.prisma.tenantAccess.findUnique({ where: { tenantId } });
     if (!access) {
       throw new NotFoundException('Состояние рабочего пространства не настроено');
     }
     if (access.status !== 'ACTIVE') {
       throw new ForbiddenException('Рабочее пространство временно недоступно');
     }
-    if (access.commercialMode !== 'LIVE' || progress) {
-      throw new ForbiddenException('Реальные внешние действия доступны после перехода в LIVE и завершения первого знакомства');
+    if (access.commercialMode !== 'LIVE') {
+      throw new ForbiddenException('Реальные внешние действия доступны после перехода в LIVE');
     }
     return true;
   }
