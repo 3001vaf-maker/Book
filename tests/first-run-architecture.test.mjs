@@ -57,11 +57,14 @@ assert.match(invitation, /PlatformConsentEvent/);
 assert.match(invitation, /assignFromInvitation/);
 assert.match(invitation, /commercialMode: 'DEMO'/);
 
-assert.match(access, /source: 'FIRST_RUN'/);
 assert.match(access, /source: 'DEMO'/);
-assert.match(access, /source: 'DEMO_EXPIRED'/);
+assert.match(access, /return \{ key, valueType, enabled: true, limit: null, source: 'DEMO' \}/);
+assert.match(access, /return \{ key, valueType, enabled: null, limit: null, source: 'DEMO' \}/);
 assert.match(access, /source: 'OWNER'/);
-assert.match(access, /firstRunActive/);
+assert.doesNotMatch(access, /source: 'FIRST_RUN'/);
+assert.doesNotMatch(access, /source: 'DEMO_EXPIRED'/);
+assert.doesNotMatch(access, /firstRunActive/);
+assert.doesNotMatch(access, /demoExpiredValue/);
 assert.doesNotMatch(access, /LEGACY_COMPAT/);
 assert.doesNotMatch(access, /legacyCompatibilityValue/);
 
@@ -86,7 +89,9 @@ assert.match(documentUi, /Сформировать актуальную инст
 assert.match(documentUi, /refreshTenantDocumentArchive/);
 assert.match(tenantDocumentArchiveUi, /refreshTenantDocumentArchive/);
 assert.match(core, /FirstRunRuntime/);
-assert.match(core, /renderDemoExpired/);
+assert.doesNotMatch(core, /function renderDemoExpired/);
+assert.match(core, /const demoExpired = firstRunState\.commercialMode === 'DEMO'/);
+assert.match(core, /progress\?\.status === 'IN_PROGRESS' && !demoExpired/);
 assert.doesNotMatch(core, /onboarding\/onboarding\.js/);
 assert.doesNotMatch(core, /renderOnboarding/);
 assert.doesNotMatch(core, /isOnboardingComplete/);
