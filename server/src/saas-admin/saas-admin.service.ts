@@ -79,12 +79,6 @@ export class SaasAdminService {
               take: 1,
               select: { status: true, currentStepKey: true, startedAt: true, completedAt: true, scenarioVersionId: true },
             },
-            activityEvents: {
-              where: { eventType: 'LIVE_REQUESTED' },
-              orderBy: { occurredAt: 'desc' },
-              take: 1,
-              select: { occurredAt: true },
-            },
           },
         },
       },
@@ -114,7 +108,8 @@ export class SaasAdminService {
         invitation,
         access: resolved,
         firstRun: row.tenant.firstRunProgress[0] || null,
-        liveRequestedAt: row.tenant.activityEvents[0]?.occurredAt?.toISOString() || '',
+        liveRequestedAt: row.liveRequestedAt?.toISOString() || '',
+        liveRequestedByPlatformAccountId: row.liveRequestedByPlatformAccountId || '',
       };
     }));
   }
