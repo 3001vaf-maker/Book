@@ -5,11 +5,12 @@ import { PrismaService } from '../prisma.service';
 import { ConsentPolicyService } from './consent-policy.service';
 import { TenantDocumentArchiveController } from './tenant-document-archive.controller';
 import { TenantDocumentArchiveService } from './tenant-document-archive.service';
+import { RknGuideService } from './rkn-guide.service';
 
 @Module({
   imports: [AuthModule, BusinessStateModule],
   controllers: [TenantDocumentArchiveController],
-  providers: [PrismaService, TenantDocumentArchiveService, ConsentPolicyService],
-  exports: [TenantDocumentArchiveService, ConsentPolicyService],
+  providers: [PrismaService, TenantDocumentArchiveService, ConsentPolicyService, RknGuideService],
+  exports: [TenantDocumentArchiveService, ConsentPolicyService, RknGuideService],
 })
 export class TenantDocumentArchiveModule {}

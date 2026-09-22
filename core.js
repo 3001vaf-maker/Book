@@ -7,7 +7,7 @@ import { getWorkplaces as getWorkplaceEntities } from './settings/profile/workpl
 import { initializeProfileWorkplaces } from './settings/profile/migration.js';
 import { initializeBusinessState } from './business-migration.js';
 import { initializeOperationalState } from './operational-migration.js';
-import { initializeTenantDocumentArchive } from './tenant-document-archive.js';
+import { ensureRknGuide, initializeTenantDocumentArchive, refreshTenantDocumentArchive } from './tenant-document-archive.js';
 import { initializeAuxiliaryState } from './auxiliary-migration.js';
 import { getJournalTimeUsages, releaseJournalSoftTimeUsages } from './journal/time-usage-source.js';
 import { configureWorkplaceSource } from './core/workplace-time.js';
@@ -52,6 +52,32 @@ let firstRunState = null;
 let disposePlatformSession = () => {};
 let demoBadgeTimer = null;
 let disposePlatformNotices = () => {};
+let rknGuideSyncTimer = null;
+
+async function syncRknGuideIfReady() {
+  if (!authenticatedAccount) return false;
+  const result = await ensureRknGuide();
+  if (!result?.ready) return false;
+  await refreshTenantDocumentArchive();
+  return true;
+}
+
+function scheduleRknGuideSync() {
+  if (!authenticatedAccount) return;
+  if (rknGuideSyncTimer) window.clearTimeout(rknGuideSyncTimer);
+  rknGuideSyncTimer = window.setTimeout(() => {
+    rknGuideSyncTimer = null;
+    void syncRknGuideIfReady().catch((error) => {
+      console.error('RKN guide sync failed', error);
+    });
+  }, 700);
+}
+
+window.addEventListener('book:profile-changed', scheduleRknGuideSync);
+window.addEventListener('book:server-mutation-completed', (event) => {
+  const scopes = Array.isArray(event?.detail?.scopes) ? event.detail.scopes : [];
+  if (scopes.includes('operational')) scheduleRknGuideSync();
+});
 
 function syncViewport() {
   const vv = window.visualViewport;
@@ -304,6 +330,9 @@ async function renderAuthenticated(account = authenticatedAccount) {
     renderMigrationPending();
     return;
   }
+  await syncRknGuideIfReady().catch((error) => {
+    console.error('RKN guide initial sync failed', error);
+  });
   const auxiliaryMigration = await initializeAuxiliaryState(authenticatedAccount);
   if (!auxiliaryMigration.verified) {
     renderMigrationPending();

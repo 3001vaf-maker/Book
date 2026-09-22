@@ -57,6 +57,32 @@ async function persistReconciled(value) {
   await responseJson(historyResponse, 'Не удалось обновить историю документов');
 }
 
+export async function ensureRknGuide() {
+  return responseJson(await apiRequest('/tenant-document-archive/rkn-guide/ensure', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  }), 'Не удалось подготовить инструкцию РКН');
+}
+
+export async function downloadRknGuide(documentId = '', fileName = 'rkn-guide.pdf') {
+  const suffix = documentId ? `?documentId=${encodeURIComponent(documentId)}` : '';
+  const response = await apiRequest(`/tenant-document-archive/rkn-guide.pdf${suffix}`);
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload?.message || 'Не удалось скачать PDF');
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName || 'rkn-guide.pdf';
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return { documentId: response.headers.get('X-Book-Document-Id') || documentId || '' };
+}
+
 export async function refreshTenantDocumentArchive() {
   const remoteResponse = await apiRequest('/tenant-document-archive');
   const remote = await responseJson(remoteResponse, 'Не удалось обновить документы');
