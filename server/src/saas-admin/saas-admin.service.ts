@@ -412,8 +412,25 @@ export class SaasAdminService {
     return this.firstRun.adminActivity(tenantId);
   }
 
-  setCommercialMode(tenantId: string, mode: unknown, platformAdminId: string) {
-    return this.firstRun.setCommercialMode(tenantId, mode, platformAdminId);
+  async setCommercialMode(tenantId: string, mode: unknown, platformAdminId: string) {
+    const normalizedMode = String(mode || '').trim().toUpperCase();
+    const before = await this.prisma.tenantAccess.findUnique({
+      where: { tenantId },
+      select: { commercialMode: true },
+    });
+    const result = await this.firstRun.setCommercialMode(tenantId, mode, platformAdminId);
+    if (normalizedMode === 'LIVE' && before?.commercialMode !== 'LIVE') {
+      await Promise.all([
+        this.notices.resolveLiveRequest(tenantId),
+        this.notices.createForTenantOwner(tenantId, {
+          type: 'LIVE_ENABLED',
+          title: 'LIVE включён',
+          body: 'Администратор включил рабочий режим LIVE.',
+          metadata: { tenantId },
+        }),
+      ]);
+    }
+    return result;
   }
 
   extendDemo(tenantId: string, days: unknown) {
