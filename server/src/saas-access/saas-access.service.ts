@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { CapabilityValueType, TenantAccessStatus } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 
-type ResolutionSource = 'TENANT_OVERRIDE' | 'PLAN' | 'DEFAULT' | 'OWNER' | 'SUSPENDED' | 'DEMO' | 'DEMO_EXPIRED' | 'FIRST_RUN';
+type ResolutionSource = 'TENANT_OVERRIDE' | 'PLAN' | 'DEFAULT' | 'OWNER' | 'SUSPENDED' | 'DEMO';
 
 export type ResolvedCapability = {
   key: string;
@@ -63,9 +63,7 @@ export class SaasAccessService {
       return this.suspendedValue(capability.key, capability.valueType);
     }
 
-    if (await this.firstRunActive(tenantId)) return this.firstRunValue(capability.key, capability.valueType);
     if (this.demoActive(access)) return this.demoValue(capability.key, capability.valueType);
-    if (this.demoExpired(access)) return this.demoExpiredValue(capability.key, capability.valueType);
 
     const override = access.overrides[0];
     const planValue = access.plan?.capabilityValues[0];
@@ -160,7 +158,6 @@ export class SaasAccessService {
       throw new NotFoundException('Состояние рабочего пространства не настроено');
     }
 
-    const firstRunActive = await this.firstRunActive(tenantId);
     const planValues = new Map(access.plan?.capabilityValues.map((value) => [value.capabilityId, value]) || []);
     const overrides = new Map(access.overrides.map((value) => [value.capabilityId, value]));
     const customOrder = new Map(access.capabilityOrder.map((value, index) => [value.capabilityId, index]));
@@ -178,9 +175,7 @@ export class SaasAccessService {
       if (access.status === TenantAccessStatus.SUSPENDED) {
         return this.suspendedValue(capability.key, capability.valueType);
       }
-      if (firstRunActive) return this.firstRunValue(capability.key, capability.valueType);
       if (this.demoActive(access)) return this.demoValue(capability.key, capability.valueType);
-      if (this.demoExpired(access)) return this.demoExpiredValue(capability.key, capability.valueType);
 
       const override = overrides.get(capability.id);
       const planValue = planValues.get(capability.id);
@@ -259,47 +254,11 @@ export class SaasAccessService {
     };
   }
 
-  private async firstRunActive(tenantId: string) {
-    const progress = await this.prisma.firstRunProgress.findFirst({
-      where: { tenantId, status: 'IN_PROGRESS' },
-      select: { id: true },
-    });
-    return Boolean(progress);
-  }
-
-  private firstRunValue(key: string, valueType: CapabilityValueType): ResolvedCapability {
-    if (valueType === CapabilityValueType.BOOLEAN) {
-      return { key, valueType, enabled: true, limit: null, source: 'FIRST_RUN' };
-    }
-    return { key, valueType, enabled: null, limit: null, source: 'FIRST_RUN' };
-  }
-
   private demoActive(access: { commercialMode: string; demoActivatedAt: Date | null; demoExpiresAt: Date | null }) {
     return access.commercialMode === 'DEMO'
       && Boolean(access.demoActivatedAt)
       && Boolean(access.demoExpiresAt)
       && access.demoExpiresAt!.getTime() > Date.now();
-  }
-
-  private demoExpired(access: { commercialMode: string; demoActivatedAt: Date | null; demoExpiresAt: Date | null }) {
-    return access.commercialMode === 'DEMO'
-      && Boolean(access.demoActivatedAt)
-      && Boolean(access.demoExpiresAt)
-      && access.demoExpiresAt!.getTime() <= Date.now();
-  }
-
-  private demoValue(key: string, valueType: CapabilityValueType): ResolvedCapability {
-    if (valueType === CapabilityValueType.BOOLEAN) {
-      return { key, valueType, enabled: true, limit: null, source: 'DEMO' };
-    }
-    return { key, valueType, enabled: null, limit: null, source: 'DEMO' };
-  }
-
-  private demoExpiredValue(key: string, valueType: CapabilityValueType): ResolvedCapability {
-    if (valueType === CapabilityValueType.BOOLEAN) {
-      return { key, valueType, enabled: false, limit: null, source: 'DEMO_EXPIRED' };
-    }
-    return { key, valueType, enabled: null, limit: 0, source: 'DEMO_EXPIRED' };
   }
 
   private ownerValue(key: string, valueType: CapabilityValueType): ResolvedCapability {
