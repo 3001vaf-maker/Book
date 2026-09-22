@@ -52,6 +52,8 @@ assert.match(adminService, /current_setting\('book\.allow_test_tenant_delete', t
 assert.doesNotMatch(prelaunchHardDeleteMigration, /DROP TABLE IF EXISTS/);
 assert.doesNotMatch(prelaunchHardDeleteMigration, /DROP FUNCTION IF EXISTS/);
 assert.doesNotMatch(prelaunchHardDeleteMigration, /DROP TRIGGER IF EXISTS/);
+assert.match(prelaunchHardDeleteMigration, /liveRequestedAt/);
+assert.match(prelaunchHardDeleteMigration, /liveRequestedByPlatformAccountId/);
 assert.match(prelaunchHardDeleteMigration, /liveApprovedAt/);
 assert.match(prelaunchHardDeleteMigration, /COMMERCIAL_MODE_CHANGED/);
 assert.match(prelaunchHardDeleteMigration, /current_setting\('book\.allow_test_tenant_delete', true\)/);
