@@ -135,6 +135,7 @@ jobs:
 
           INSERT INTO "TenantAccess" ("tenantId","status","isOwnerBook","updatedAt")
           VALUES
+            ('upgrade-tenant','ACTIVE',true,CURRENT_TIMESTAMP),
             ('cleanup-owner-tenant','ACTIVE',true,CURRENT_TIMESTAMP),
             ('cleanup-user-a-tenant','ACTIVE',false,CURRENT_TIMESTAMP),
             ('cleanup-user-b-tenant','ACTIVE',false,CURRENT_TIMESTAMP);
