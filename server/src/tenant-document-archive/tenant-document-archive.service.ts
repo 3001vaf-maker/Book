@@ -26,6 +26,10 @@ function objectValue(value: unknown): JsonObject {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonObject : {};
 }
 
+function text(value: unknown) {
+  return String(value ?? '').trim();
+}
+
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value));
 }
@@ -149,7 +153,6 @@ export class TenantDocumentArchiveService {
 
     // Старые тестовые RKN_GUIDE_PDF создавались до появления шаблона Реестра.
     // Они сохраняются в архиве для истории, но не участвуют в новой цепочке версий.
-    let legacyChanged = false;
     current.documents = current.documents.map((item: any) => {
       const attachment = objectValue(item?.attachment);
       if (
@@ -157,7 +160,6 @@ export class TenantDocumentArchiveService {
         && (!text(attachment.templateKey) || !Number(attachment.templateVersion || 0) || !text(attachment.pdfBase64))
         && !attachment.legacyFormat
       ) {
-        legacyChanged = true;
         return {
           ...item,
           title: item?.title || 'Старая инструкция РКН',
