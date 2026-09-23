@@ -202,3 +202,56 @@ export function initV2Swipe(root, { onRight = null, onLeft = null, threshold = 7
     surface.removeEventListener('pointercancel', reset);
   };
 }
+
+
+export function initV2StickerSwipe(root, { onRight = null, onLeft = null, threshold = 64 } = {}) {
+  const surface = root?.matches?.('[data-v2-sticker]') ? root : root?.querySelector?.('[data-v2-sticker]');
+  if (!surface) return () => {};
+  let pointerId = null;
+  let startX = 0;
+  let startY = 0;
+  let dx = 0;
+  let horizontal = false;
+  const reset = () => {
+    surface.style.removeProperty('--v2-sticker-drag-x');
+    surface.classList.remove('is-dragging');
+    pointerId = null;
+    dx = 0;
+    horizontal = false;
+  };
+  const down = (event) => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    pointerId = event.pointerId;
+    startX = event.clientX;
+    startY = event.clientY;
+    surface.setPointerCapture?.(pointerId);
+  };
+  const move = (event) => {
+    if (event.pointerId !== pointerId) return;
+    const nextX = event.clientX - startX;
+    const nextY = event.clientY - startY;
+    if (!horizontal && Math.abs(nextX) > 10) horizontal = Math.abs(nextX) > Math.abs(nextY) * 1.15;
+    if (!horizontal) return;
+    dx = Math.max(-180, Math.min(180, nextX));
+    surface.classList.add('is-dragging');
+    surface.style.setProperty('--v2-sticker-drag-x', `${dx}px`);
+    event.preventDefault();
+  };
+  const up = (event) => {
+    if (event.pointerId !== pointerId) return;
+    const finalDx = dx;
+    reset();
+    if (finalDx >= threshold) onRight?.();
+    else if (finalDx <= -threshold) onLeft?.();
+  };
+  surface.addEventListener('pointerdown', down);
+  surface.addEventListener('pointermove', move, { passive: false });
+  surface.addEventListener('pointerup', up);
+  surface.addEventListener('pointercancel', reset);
+  return () => {
+    surface.removeEventListener('pointerdown', down);
+    surface.removeEventListener('pointermove', move);
+    surface.removeEventListener('pointerup', up);
+    surface.removeEventListener('pointercancel', reset);
+  };
+}
