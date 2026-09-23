@@ -52,6 +52,8 @@ expect(!booking.includes('if (payload.personExisted)'), 'Person matching must no
 expect(booking.includes("root.querySelector('[data-booking-times-next]')") && booking.includes('renderConfirmation(root, state);'), 'Time selection must open the confirmation Z before identity/legal checks.');
 expect(booking.includes("root.querySelector('[data-booking-confirm]')") && booking.includes('await continueAfterIdentity(root, state);'), 'C «Подтвердить» must enter the identity/legal gate before the final server write.');
 expect(booking.includes('async function finalizeBookingRequest') && booking.includes('createBookingRequest(state.tenantId'), 'Only the post-identity/legal finalizer may create the booking request.');
+expect(booking.includes('slotStillAvailable') && booking.includes('await refreshContext(state);'), 'Final booking write must recheck the selected slot against refreshed availability.');
+expect(booking.includes("state.accountChatReturn = 'booking'"), 'Chat opened from booking must remember the booking stack as its return target.');
 
 expect(booking.includes('renderWorkplaces') && booking.includes('renderProcedures') && booking.includes('renderDates') && booking.includes('renderTimes') && booking.includes('renderConfirmation'), 'Booking itself must preserve workplace -> services -> date -> time -> confirmation.');
 expect(booking.includes("step: 'workplaces'") && booking.includes("step: 'procedures'") && booking.includes("step: 'dates'") && booking.includes("step: 'times'") && booking.includes("step: 'confirmation'"), 'Booking must preserve the canonical V2 Z-stack steps.');
@@ -93,7 +95,8 @@ expect(!accountMobileCss.includes('--app-max-width:'), 'Account shell must inher
 expect(!accountMobileCss.includes('max-width:none'), 'Account application must never disable its phone-width limit.');
 expect(!accountShell.includes("document.createElement('style')") && !accountShell.includes('<style>'), 'Account features must not own local CSS.');
 expect(accountShell.includes("messageComposer({ attachments: true, attachmentTrigger: 'external' })"), 'End-user Chat must use the shared composer while Header D owns the media attachment control.');
-expect(accountShell.includes("action: procedures.length ? { label: 'Записаться'"), 'V2 history detail must re-enter the current service flow through «Записаться».');
+expect(accountShell.includes('function renderHistoryDetail') && accountShell.includes("label: 'Записаться', data: 'data-account-history-repeat'"), 'V2 history detail must expose repeat booking in Header C.');
+expect(accountShell.includes("state.accountChatReturn === 'booking'") && accountShell.includes('state.accountDeckOpen = true'), 'Chat must return to booking only when opened from booking; otherwise swipe returns to F level.');
 expect(accountShell.includes("label: 'Согласия'"), 'Account account and chat settings must expose consent controls.');
 expect(consentSettings.includes('revokeAccountConsent'), 'Account consent settings must use the canonical server-backed revoke flow.');
 expect(bookingUi.includes('bookingChoiceCards'), 'Shared booking UI must continue to own booking choice controls.');
