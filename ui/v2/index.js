@@ -79,6 +79,10 @@ export function v2HorizontalRail(content = '', { className = '' } = {}) {
   return `<div class="v2-rail ${text(className)}">${content}</div>`;
 }
 
+export function v2RailCard({ title = '', subtitle = '', meta = '', data = '', aria = '', className = '' } = {}) {
+  return `<button type="button" class="v2-rail-card ${text(className)}"${dataAttributes(data)} aria-label="${text(aria || title)}"><strong>${text(title)}</strong>${subtitle ? `<span>${text(subtitle)}</span>` : ''}${meta ? `<small>${text(meta)}</small>` : ''}</button>`;
+}
+
 export function v2ServiceStickers(items = [], { selected = [], data = 'data-v2-service' } = {}) {
   const selectedSet = new Set((Array.isArray(selected) ? selected : []).map(String));
   return `<div class="v2-sticker-list v2-sticker-list--services">${(Array.isArray(items) ? items : []).map((item) => {
