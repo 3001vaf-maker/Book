@@ -32,7 +32,7 @@
 | Header | `ui/header/` | `pageHeader`, `headerControl`, `headerToggle`, `headerControlGroup`, `openHeaderControl` |
 | Modals | `ui/modals/` | `modal`, `mountModal`, `openNotice` |
 | Buttons | `ui/buttons/` | `button`, `iconButton`, `copyIconButton`, `copyTextToClipboard`, `setCopyButtonCopied`, `sheetIconButton`, `iconButtonGroup` |
-| Inputs | `ui/inputs/` | `field`, `phoneField`, `textareaField`, `photoField`, `initPhotoField` |
+| Inputs | `ui/inputs/` | `field`, `passwordField`, `initPasswordFields`, `phoneField`, `textareaField`, `photoField`, `initPhotoField` |
 | States | `ui/states/` | `emptyState`, `stateView`, `initStateView` |
 | Colors | `ui/colors/` | `colorPicker`, `initColorPickers` |
 | Utils | `ui/utils/` | `escapeHtml`, `shortDate`, `shortTime`, `shortDateTime`, `shortDateTimeParts` |
