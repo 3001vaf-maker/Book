@@ -1,5 +1,5 @@
 import { changeAccountPassword } from '../core/account/index.js';
-import { button, field, modal, mountModal, openNotice } from '../ui/ui.js';
+import { button, field, mountV2Layer, v2Layer } from '../ui/ui.js';
 
 export function openAccountPasswordSettings(state) {
   const content = `<form class="form-grid" data-account-password-form>
@@ -9,7 +9,7 @@ export function openAccountPasswordSettings(state) {
     <div class="form-error" data-account-password-error role="alert"></div>
     ${button('Сохранить пароль', { type: 'submit' })}
   </form>`;
-  const layer = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app', title: 'Изменить пароль' }));
+  const layer = mountV2Layer(v2Layer(content, { kind: 'standard', title: 'Изменить пароль' }));
   if (!layer) return null;
   const form = layer.querySelector('[data-account-password-form]');
   const errorNode = layer.querySelector('[data-account-password-error]');
@@ -33,7 +33,7 @@ export function openAccountPasswordSettings(state) {
     try {
       await changeAccountPassword(state.tenantId, currentPassword, newPassword);
       layer.remove();
-      openNotice({ title: 'Пароль изменён', message: 'Новый пароль сохранён.' });
+      mountV2Layer(v2Layer('<p>Новый пароль сохранён.</p>', { kind: 'quick', title: 'Пароль изменён' }));
     } catch (error) {
       if (errorNode) errorNode.textContent = error instanceof Error ? error.message : 'Не удалось изменить пароль';
       if (submit) submit.disabled = false;
