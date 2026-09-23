@@ -31,6 +31,8 @@ expect(v2Ui.includes('v2Header') && v2Ui.includes('v2Shell'), 'V2 H + Z geometry
 expect(v2Css.includes('.v2-app--chat .v2-z') && v2Css.includes('.v2-header'), 'V2 CSS must own the end-user Chat geometry.');
 
 expect(chatApi.includes('attachments = []') && chatApi.includes('body, attachments'), 'Profile communication API must carry attachments.');
+expect(profileChat.includes("application/pdf") && accountChat.includes("application/pdf"), 'Both Chat contours must accept PDF attachments through the shared attachment control.');
+expect(shellCss.includes('.message-attachment--file'), 'Shared Chat UI must render file/PDF attachments.');
 expect(controller.includes('attachments?: unknown'), 'Profile chat controller must accept attachments.');
 expect(dispatch.includes('Array.isArray(input?.attachments)') && dispatch.includes("channel: 'IN_APP'") && dispatch.includes('attachments,'), 'Profile media messages must be persisted into the shared Book chat thread.');
 
