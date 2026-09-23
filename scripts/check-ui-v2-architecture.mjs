@@ -9,6 +9,7 @@ const calendar = fs.readFileSync('ui/calendar/calendar.css', 'utf8');
 const personalData = fs.readFileSync('online-booking/personal-data.js', 'utf8');
 const passwordSettings = fs.readFileSync('online-booking/password-settings.js', 'utf8');
 const consentSettings = fs.readFileSync('online-booking/consent-settings.js', 'utf8');
+const inputs = fs.readFileSync('ui/inputs/index.js', 'utf8');
 
 const failures = [];
 const expect = (condition, message) => { if (!condition) failures.push(message); };
@@ -47,6 +48,8 @@ expect(!/\.booking-account--account \.v2-app \.calendar__date\{[^}]*border-radiu
 expect(calendar.includes('.calendar__grid') && calendar.includes('.calendar__month-button'), 'Canonical Calendar owner must remain intact.');
 
 expect(booking.includes('v2ServiceStickers('), 'Booking services must use shared compact V2 stickers.');
+expect(inputs.includes('export function passwordField') && inputs.includes('export function initPasswordFields'), 'Password reveal control must belong to shared UI inputs.');
+expect(booking.includes('passwordField({') && booking.includes('initPasswordFields(root)'), 'Auth and Registration must use the shared password reveal control.');
 expect(booking.includes("step: 'workplaces'") && booking.includes("step: 'confirmation'"), 'Booking must remain a V2 Z-stack flow.');
 expect(booking.includes('initV2Swipe(root'), 'Booking Z-stack must use the shared physical swipe.');
 expect(booking.includes('v2LegalCards(') && booking.includes('v2Sticker({'), 'Legal checkpoint must use the shared sticker system.');
