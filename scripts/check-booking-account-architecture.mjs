@@ -49,7 +49,9 @@ expect(!booking.includes('saveRegistrationConsents'), 'Tenant consent must not b
 expect(booking.includes('getAccountPlatformState(state.tenantId)') && booking.includes('refreshTenantConsentState(state)'), 'Existing Account legal gate must check both platform terms and Tenant consent state.');
 expect(booking.includes("if (!platformState?.accepted || !consentState.pdnActive) {") && booking.includes('renderLegalSticker(root, state);'), 'Missing platform or Tenant legal state must open one V2 Legal Sticker checkpoint.');
 expect(!booking.includes('if (payload.personExisted)'), 'Person matching must not decide whether booking continues or Profile opens.');
-expect(booking.includes("state.identityDestination = 'booking';") && booking.includes('void continueAfterIdentity(root, state);'), 'Time confirmation must enter the final identity/legal gate before final confirmation.');
+expect(booking.includes("root.querySelector('[data-booking-times-next]')") && booking.includes('renderConfirmation(root, state);'), 'Time selection must open the confirmation Z before identity/legal checks.');
+expect(booking.includes("root.querySelector('[data-booking-confirm]')") && booking.includes('await continueAfterIdentity(root, state);'), 'C «Подтвердить» must enter the identity/legal gate before the final server write.');
+expect(booking.includes('async function finalizeBookingRequest') && booking.includes('createBookingRequest(state.tenantId'), 'Only the post-identity/legal finalizer may create the booking request.');
 
 expect(booking.includes('renderWorkplaces') && booking.includes('renderProcedures') && booking.includes('renderDates') && booking.includes('renderTimes') && booking.includes('renderConfirmation'), 'Booking itself must preserve workplace -> services -> date -> time -> confirmation.');
 expect(booking.includes("step: 'workplaces'") && booking.includes("step: 'procedures'") && booking.includes("step: 'dates'") && booking.includes("step: 'times'") && booking.includes("step: 'confirmation'"), 'Booking must preserve the canonical V2 Z-stack steps.');
