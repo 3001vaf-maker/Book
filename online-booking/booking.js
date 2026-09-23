@@ -130,66 +130,117 @@ async function loadAccountTerms(state) {
   return state.accountTerms;
 }
 
-function openAccountTermsDocument(state) {
-  const legalDocument = state.accountTerms || {};
-  if (!legalDocument.key) return;
-  mountModal(globalThis.document.body, modal(bookingDocument({
-    title: legalDocument.title || 'Условия использования учетной записи',
-    version: legalDocument.version || 1,
-    text: legalDocument.content || '',
-  }), { variant: 'large' }));
+function renderExpandedLegalDocument(root, state, document, onBack) {
+  const content = v2Document({
+    title: document?.title || 'Документ',
+    version: document?.version || 1,
+    content: document?.content ?? document?.text ?? '',
+  });
+  root.innerHTML = `<section class="${flowThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${v2Sticker({ body: content, className: 'v2-sticker-screen--legal-document' })}</section>`;
+  initV2StickerSwipe(root, { onRight: onBack });
+}
+
+function legalTitle(document = {}) {
+  if (document.platform) return 'Условия использования';
+  return document.required ? 'Согласие на обработку персональных данных' : 'Согласие на получение рекламы';
+}
+
+function renderLegalSticker(root, state) {
+  const tenantDocuments = requiredBookingDocuments(state.context);
+  const platformDocument = state.accountTerms && !state.accountTermsAccepted
+    ? { ...state.accountTerms, platform: true, required: true }
+    : null;
+  const documents = [...(platformDocument ? [platformDocument] : []), ...tenantDocuments];
+  const platformReady = !platformDocument || state.accountTermsAccepted;
+  const tenantReady = tenantDocuments.filter((document) => document.required).every((document) => state.consents[String(document.id || '')]);
+  const canContinue = platformReady && tenantReady;
+
+  const cards = v2LegalCards(documents.map((document) => ({
+    title: legalTitle(document),
+    required: Boolean(document.required),
+    checked: document.platform ? Boolean(state.accountTermsAccepted) : Boolean(state.consents[String(document.id || '')]),
+    openData: document.platform ? 'data-legal-platform-document' : `data-booking-document="${escapeHtml(document.id)}"`,
+    toggleData: document.platform ? 'data-legal-platform-toggle' : `data-booking-consent="${escapeHtml(document.id)}"`,
+    openAria: `Открыть ${legalTitle(document)}`,
+    toggleAria: `Изменить согласие: ${legalTitle(document)}`,
+  })));
+
+  const action = button('Продолжить', { data: 'data-legal-continue', disabled: !canContinue });
+  root.innerHTML = `<section class="${flowThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${v2Sticker({
+    title: 'Документы',
+    body: `${cards}${errorBlock(state.error)}`,
+    action,
+    className: 'v2-sticker-screen--legal',
+  })}</section>`;
+
+  initV2StickerSwipe(root, {
+    onRight: () => {
+      state.error = '';
+      if (state.identityDestination === 'booking' && state.from) renderTimes(root, state);
+      else if (state.account) void renderAccountHome(root, state);
+      else renderAccountDetails(root, state);
+    },
+  });
+
+  root.querySelector('[data-legal-platform-document]')?.addEventListener('click', () => {
+    renderExpandedLegalDocument(root, state, {
+      title: state.accountTerms?.title || 'Условия использования',
+      version: state.accountTerms?.version || 1,
+      content: state.accountTerms?.content || '',
+    }, () => renderLegalSticker(root, state));
+  });
+  root.querySelector('[data-legal-platform-toggle]')?.addEventListener('click', () => {
+    state.accountTermsAccepted = !state.accountTermsAccepted;
+    renderLegalSticker(root, state);
+  });
+  root.querySelectorAll('[data-booking-document]').forEach((node) => node.addEventListener('click', () => {
+    const document = tenantDocuments.find((item) => String(item.id) === String(node.dataset.bookingDocument));
+    if (!document) return;
+    renderExpandedLegalDocument(root, state, {
+      title: document.title || legalTitle(document),
+      version: document.version || 1,
+      content: document.text || '',
+    }, () => renderLegalSticker(root, state));
+  }));
+  root.querySelectorAll('[data-booking-consent]').forEach((node) => node.addEventListener('click', () => {
+    const id = String(node.dataset.bookingConsent || '');
+    state.consents[id] = !state.consents[id];
+    renderLegalSticker(root, state);
+  }));
+
+  root.querySelector('[data-legal-continue]')?.addEventListener('click', async (event) => {
+    if (!canContinue) return;
+    event.currentTarget.disabled = true;
+    try {
+      if (!state.account) {
+        const payload = await registerAccount(state.tenantId, {
+          ...state.accountDraft,
+          password: state.accountDraft.password,
+          accountTerms: currentAccountTermsFact(state),
+        });
+        state.account = payload.account;
+      } else if (platformDocument) {
+        const accepted = await acceptAccountTerms(state.tenantId, currentAccountTermsFact(state));
+        state.accountTerms = accepted?.document || state.accountTerms;
+        state.accountTermsAccepted = Boolean(accepted?.accepted);
+      }
+      if (tenantDocuments.length) await saveTenantConsents(state);
+      state.error = '';
+      if (state.identityDestination === 'booking') renderConfirmation(root, state);
+      else await renderAccountHome(root, state);
+    } catch (error) {
+      state.error = error instanceof Error ? error.message : 'Не удалось сохранить документы';
+      renderLegalSticker(root, state);
+    }
+  });
 }
 
 function renderAccountTerms(root, state) {
-  const document = state.accountTerms || {};
-  const canContinue = Boolean(document.key && state.accountTermsAccepted);
-  const cards = bookingAgreementCards([{
-    label: document.title || 'Условия использования учетной записи',
-    checked: Boolean(state.accountTermsAccepted),
-    openData: 'data-account-terms-document',
-    toggleData: 'data-account-terms-toggle',
-    openAria: 'Открыть Условия использования учетной записи',
-    toggleAria: state.accountTermsAccepted ? 'Снять подтверждение' : 'Принять Условия использования учетной записи',
-  }]);
+  renderLegalSticker(root, state);
+}
 
-  renderFlowPage(root, state, {
-    title: 'Условия использования учетной записи',
-    back: { data: 'data-account-terms-back', aria: 'Назад' },
-    action: { label: 'Далее', data: 'data-account-terms-next', disabled: !canContinue },
-    body: `${cards}${errorBlock(state.error)}`,
-  });
-
-  root.querySelector('[data-account-terms-document]')?.addEventListener('click', () => openAccountTermsDocument(state));
-  root.querySelector('[data-account-terms-toggle]')?.addEventListener('click', () => {
-    state.accountTermsAccepted = !state.accountTermsAccepted;
-    renderAccountTerms(root, state);
-  });
-  root.querySelector('[data-account-terms-back]')?.addEventListener('click', () => {
-    state.error = '';
-    if (!state.account) {
-      renderAccountEntry(root, state);
-      return;
-    }
-    if (state.identityDestination === 'booking' && state.from) renderTimes(root, state);
-    else nextBookingStep(root, state);
-  });
-  root.querySelector('[data-account-terms-next]')?.addEventListener('click', async (event) => {
-    if (!canContinue) return;
-    if (!state.account) {
-      renderAccountDetails(root, state);
-      return;
-    }
-    event.currentTarget.disabled = true;
-    try {
-      const accepted = await acceptAccountTerms(state.tenantId, currentAccountTermsFact(state));
-      state.accountTerms = accepted?.document || state.accountTerms;
-      state.accountTermsAccepted = Boolean(accepted?.accepted);
-      await continueAfterIdentity(root, state);
-    } catch (error) {
-      state.error = error instanceof Error ? error.message : 'Не удалось сохранить Условия использования учетной записи';
-      renderAccountTerms(root, state);
-    }
-  });
+function renderTenantAgreements(root, state) {
+  renderLegalSticker(root, state);
 }
 
 function resetBookingChoice(state) {
@@ -319,16 +370,6 @@ function backFromFirstBookingStep(root, state) {
   renderAccountEntry(root, state);
 }
 
-function openTenantDocument(state, documentId) {
-  const legalDocument = requiredBookingDocuments(state.context).find((item) => String(item.id) === String(documentId));
-  if (!legalDocument) return;
-  mountModal(globalThis.document.body, modal(bookingDocument({
-    title: legalDocument.title || 'Документ',
-    version: legalDocument.version || 1,
-    text: legalDocument.text || '',
-  }), { variant: 'large' }));
-}
-
 function renderWelcome(root, state) {
   const profile = state.context.profile || {};
   const owner = [profile.name, profile.surname].filter(Boolean).join(' ');
@@ -343,48 +384,6 @@ function renderWelcome(root, state) {
     resetBookingChoice(state);
     state.identityDestination = 'booking';
     nextBookingStep(root, state);
-  });
-}
-
-function renderTenantAgreements(root, state) {
-  const documents = requiredBookingDocuments(state.context);
-  const canContinue = documents.filter((document) => document.required).every((document) => state.consents[String(document.id || '')]);
-  const cards = bookingAgreementCards(documents.map((document) => ({
-    label: document.title || 'Документ',
-    checked: Boolean(state.consents[String(document.id || '')]),
-    openData: `data-booking-document="${escapeHtml(document.id)}"`,
-    toggleData: `data-booking-consent="${escapeHtml(document.id)}"`,
-    openAria: `Открыть документ ${document.title || ''}`,
-    toggleAria: `${state.consents[String(document.id || '')] ? 'Снять' : 'Дать'} согласие: ${document.title || ''}`,
-  })));
-  renderFlowPage(root, state, {
-    title: 'Согласия',
-    back: { data: 'data-booking-agreements-back', aria: 'Назад' },
-    action: { label: 'Далее', data: 'data-booking-agreements-next', disabled: !canContinue },
-    body: `${documents.length ? cards : emptyState('Документов нет', 'Для этого действия не настроены документы.')}${errorBlock(state.error)}`,
-  });
-  root.querySelector('[data-booking-agreements-back]')?.addEventListener('click', () => {
-    state.error = '';
-    if (state.identityDestination === 'booking') renderTimes(root, state);
-    else void renderAccountHome(root, state);
-  });
-  root.querySelectorAll('[data-booking-document]').forEach((node) => node.addEventListener('click', () => openTenantDocument(state, node.dataset.bookingDocument)));
-  root.querySelectorAll('[data-booking-consent]').forEach((node) => node.addEventListener('click', () => {
-    const id = String(node.dataset.bookingConsent || '');
-    state.consents[id] = !state.consents[id];
-    renderTenantAgreements(root, state);
-  }));
-  root.querySelector('[data-booking-agreements-next]')?.addEventListener('click', async (event) => {
-    if (!canContinue) return;
-    event.currentTarget.disabled = true;
-    try {
-      await saveTenantConsents(state);
-      if (state.identityDestination === 'booking') renderConfirmation(root, state);
-      else await renderAccountHome(root, state);
-    } catch (error) {
-      state.error = error instanceof Error ? error.message : 'Не удалось сохранить согласия';
-      renderTenantAgreements(root, state);
-    }
   });
 }
 
