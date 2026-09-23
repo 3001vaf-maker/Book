@@ -313,6 +313,8 @@ function resumeBookingStep(root, state) {
   if (state.bookingStep === 'registration') return renderAccountDetails(root, state);
   if (state.bookingStep === 'auth') return renderAccountEntry(root, state);
   return renderAccountHome(root, state);
+}
+
 function requestProcedures(request = {}) {
   return Array.isArray(request.procedures) ? request.procedures : [];
 }
