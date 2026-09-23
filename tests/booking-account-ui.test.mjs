@@ -72,6 +72,9 @@ assert.match(booking, /getAccountPlatformState/);
 assert.match(booking, /getAccountConsentState/);
 assert.match(booking, /state\.accountTab = 'representative'/);
 assert.match(booking, /onChatBack: \(\) => resumeBookingStep\(root, state\)/);
+assert.match(booking, /state\.accountChatReturn = 'booking'/);
+assert.match(booking, /slotStillAvailable/);
+assert.match(booking, /Выбранное время уже недоступно/);
 assert.doesNotMatch(booking, /consentState\.allowed/);
 assert.match(booking, /const account = await getAccount\(state\.tenantId\);[\s\S]*?if \(account\) state\.account = account;[\s\S]*?renderWelcome\(root, state\);/);
 
@@ -105,6 +108,10 @@ assert.match(accountShell, /openAccountPersonalData/);
 assert.match(accountShell, /openAccountPasswordSettings/);
 assert.match(accountShell, /openAccountConsentSettings/);
 assert.match(accountShell, /mountV2Layer\(v2Layer/);
+assert.match(accountShell, /function renderHistoryDetail/);
+assert.match(accountShell, /label: 'Записаться', data: 'data-account-history-repeat'/);
+assert.match(accountShell, /state\.accountChatReturn === 'booking'/);
+assert.match(accountShell, /state\.accountDeckOpen = true/);
 assert.doesNotMatch(accountShell, /requestMoment\(request\)\s*[<>]=?\s*nowMoment\(\)\s*\?\s*'Задолженность'/);
 
 // Personal-data modal uses the Book controls, including Book calendar.
