@@ -31,6 +31,7 @@ import {
   v2Section,
   v2Shell,
   initV2Swipe,
+  initV2DeckSwipe,
   mountV2Layer,
 } from '../ui/ui.js';
 import { openAccountConsentSettings } from './consent-settings.js';
@@ -353,10 +354,12 @@ function visitCard(state, request, index) {
 }
 
 function accountDeck(state) {
+  const fallback = state.accountTab === 'history' ? 'history' : 'representatives';
+  state.accountDeckActive ||= fallback;
   return v2FDeck([
     { id: 'representatives', label: 'Представители' },
     { id: 'history', label: 'История' },
-  ], { active: state.accountTab === 'history' ? 'history' : 'representatives', data: 'data-account-deck-item' });
+  ], { active: state.accountDeckActive, data: 'data-account-deck-item' });
 }
 
 function renderV2Shell(root, state, { header, body = '', deck = true, className = '' } = {}) {
@@ -371,8 +374,22 @@ function renderV2Shell(root, state, { header, body = '', deck = true, className 
 }
 
 function bindDeck(root, state, handlers) {
+  initV2DeckSwipe(root, {
+    activeId: state.accountDeckActive || 'representatives',
+    onActiveChange: (id) => {
+      state.accountDeckActive = id;
+      state.accountDeckOpen = true;
+      void handlers.render();
+    },
+  });
   root.querySelectorAll('[data-account-deck-item]').forEach((node) => node.addEventListener('click', () => {
     const id = String(node.dataset.accountDeckItem || '');
+    if (id !== String(state.accountDeckActive || '')) {
+      state.accountDeckActive = id;
+      state.accountDeckOpen = true;
+      void handlers.render();
+      return;
+    }
     state.accountDeckOpen = false;
     state.accountChatOpen = false;
     state.accountTab = id === 'history' ? 'history' : 'representatives';
@@ -702,6 +719,7 @@ async function renderMessages(root, state, handlers) {
 export async function renderAccount(root, state, callbacks = {}) {
   state.accountTab ||= 'home';
   state.accountDeckOpen = Boolean(state.accountDeckOpen);
+  state.accountDeckActive ||= state.accountTab === 'history' ? 'history' : 'representatives';
   state.accountChatOpen = Boolean(state.accountChatOpen);
   try {
     const [records, account, notifications] = await Promise.all([
