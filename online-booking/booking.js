@@ -492,7 +492,6 @@ function renderAccountDetails(root, state) {
     },
   });
   initPasswordFields(root);
-  initPasswordFields(root);
   const form = root.querySelector('[data-booking-account-form]');
   root.querySelector('[data-booking-account-submit]')?.addEventListener('click', () => form?.requestSubmit());
   form?.addEventListener('submit', async (event) => {
