@@ -14,10 +14,7 @@ import {
   submitAccountConsents,
 } from '../core/account/index.js';
 import { normalizeBookingSettings } from '../core/booking-settings/index.js';
-import { formatPhone } from '../core/phone/index.js';
 import {
-  bookingAction,
-  bookingActions,
   bookingChoiceCards,
   bookingThemeStyle,
   bookingTimeGroups,
@@ -539,57 +536,6 @@ function renderAccountDetails(root, state) {
   });
 }
 
-function renderPassword(root, state) {
-  const register = state.passwordMode !== 'login';
-  renderFlowPage(root, state, {
-    title: register ? 'Создайте пароль' : 'Введите пароль',
-    subtitle: register ? (state.accountDraft.email || state.accountDraft.phone || '') : (state.accountDraft.identifier || ''),
-    back: { data: 'data-booking-password-back', aria: 'Назад' },
-    action: { label: register ? 'Создать' : 'Войти', data: 'data-booking-password-submit' },
-    body: `<form data-booking-password-form>${field({ label: 'Пароль', name: 'password', type: 'password', required: true, autocomplete: register ? 'new-password' : 'current-password' })}${errorBlock(state.error)}${bookingActions(bookingAction('Показать пароль', { secondary: true, data: 'data-booking-password-toggle' }))}</form>`,
-    center: true,
-  });
-  const form = root.querySelector('[data-booking-password-form]');
-  root.querySelector('[data-booking-password-back]')?.addEventListener('click', () => {
-    state.error = '';
-    if (register) renderAccountDetails(root, state);
-    else renderAccountEntry(root, state);
-  });
-  root.querySelector('[data-booking-password-submit]')?.addEventListener('click', () => form?.requestSubmit());
-  root.querySelector('[data-booking-password-toggle]')?.addEventListener('click', () => {
-    const input = form?.querySelector('[name="password"]');
-    if (!input) return;
-    input.type = input.type === 'password' ? 'text' : 'password';
-  });
-  form?.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const password = String(new FormData(form).get('password') || '');
-    const submit = root.querySelector('[data-booking-password-submit]');
-    if (submit) submit.disabled = true;
-    try {
-      if (register) {
-        const payload = await registerAccount(state.tenantId, {
-          ...state.accountDraft,
-          password,
-          accountTerms: currentAccountTermsFact(state),
-        });
-        state.account = payload.account;
-        state.error = '';
-        await continueAfterIdentity(root, state);
-        return;
-      }
-
-      const payload = await loginAccount(state.tenantId, state.accountDraft.identifier, password);
-      state.account = payload.account;
-      state.error = '';
-      await continueAfterIdentity(root, state);
-    } catch (error) {
-      state.error = error instanceof Error ? error.message : 'Не удалось войти';
-      renderPassword(root, state);
-    }
-  });
-}
-
 async function continueAfterIdentity(root, state) {
   if (!state.account) {
     renderAccountEntry(root, state);
@@ -892,7 +838,6 @@ export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = 
     accountTerms: null,
     accountTermsAccepted: false,
     consents: {},
-    passwordMode: 'register',
     error: '',
     notice: '',
     lastRequest: null,
