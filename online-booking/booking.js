@@ -313,15 +313,6 @@ function resumeBookingStep(root, state) {
   if (state.bookingStep === 'registration') return renderAccountDetails(root, state);
   if (state.bookingStep === 'auth') return renderAccountEntry(root, state);
   return renderAccountHome(root, state);
-} = {}) {
-  const shell = appShell({
-    header: appHeader({ title, back, action }),
-    body: `${subtitleBlock(subtitle)}${body}`,
-    className: `app-view-shell--booking-flow${center ? ' app-view-shell--booking-flow-center' : ''}`,
-  });
-  root.innerHTML = `<section class="${flowThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${shell}</section>`;
-}
-
 function requestProcedures(request = {}) {
   return Array.isArray(request.procedures) ? request.procedures : [];
 }
