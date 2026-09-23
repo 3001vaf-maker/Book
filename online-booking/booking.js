@@ -365,19 +365,22 @@ function backFromFirstBookingStep(root, state) {
 
 function renderWelcome(root, state) {
   const profile = state.context.profile || {};
-  const owner = [profile.name, profile.surname].filter(Boolean).join(' ');
-  const subtitle = [state.settings.welcomeText, owner].filter(Boolean).join('\n');
-  renderFlowPage(root, state, {
-    title: state.settings.welcomeTitle,
-    subtitle,
-    action: { label: 'Далее', data: 'data-booking-welcome-next' },
-    center: true,
-  });
-  root.querySelector('[data-booking-welcome-next]')?.addEventListener('click', () => {
+  const owner = [profile.name, profile.surname].filter(Boolean).join(' ').trim();
+  const continueFlow = () => {
     resetBookingChoice(state);
     state.identityDestination = 'booking';
     nextBookingStep(root, state);
-  });
+  };
+  const action = button('Продолжить', { data: 'data-booking-welcome-next' });
+  root.innerHTML = `<section class="${flowThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${v2Sticker({
+    eyebrow: owner ? `Приглашение от ${owner}` : '',
+    title: state.settings.welcomeTitle || '',
+    body: state.settings.welcomeText ? `<p>${escapeHtml(state.settings.welcomeText).replaceAll('\n', '<br>')}</p>` : '',
+    action,
+    className: 'v2-sticker-screen--welcome',
+  })}</section>`;
+  initV2StickerSwipe(root, { onRight: continueFlow, onLeft: continueFlow });
+  root.querySelector('[data-booking-welcome-next]')?.addEventListener('click', continueFlow);
 }
 
 function renderAccountEntry(root, state) {
