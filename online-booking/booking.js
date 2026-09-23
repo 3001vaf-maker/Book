@@ -410,7 +410,6 @@ function renderAccountEntry(root, state) {
   });
 
   initPasswordFields(root);
-  initPasswordFields(root);
   const authForm = root.querySelector('[data-booking-entry-form]');
   root.querySelector('[data-booking-register]')?.addEventListener('click', async () => {
     const data = new FormData(authForm);
