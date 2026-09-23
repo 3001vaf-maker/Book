@@ -37,7 +37,7 @@
 }
 .v2-header__slot{min-width:0;display:grid;place-items:center}
 .v2-header__slot.is-empty{width:0;min-width:0;overflow:hidden}
-.v2-header__title{min-width:0;margin:0;font-size:18px;line-height:1.1;font-weight:760;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.v2-header__title{min-width:0;margin:0;font-size:18px;line-height:1.1;font-weight:760;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.v2-header__title-control{width:100%;border:0;padding:0;background:transparent;color:#fff;text-align:left}
 .v2-header__control{position:relative;min-width:42px;height:42px;border:0;padding:0 12px;display:grid;place-items:center;background:#fff;color:var(--v2-ink);font:inherit;font-weight:760}
 .v2-header__control--avatar{width:48px;height:48px;border-radius:50%;padding:0;overflow:hidden}
 .v2-header__control--settings,.v2-header__control--chat,.v2-header__control--contacts,.v2-header__control--attachment{width:42px;border-radius:50%;padding:0}
