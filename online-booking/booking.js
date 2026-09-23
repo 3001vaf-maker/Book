@@ -173,7 +173,7 @@ function renderLegalSticker(root, state) {
   initV2StickerSwipe(root, {
     onRight: () => {
       state.error = '';
-      if (state.identityDestination === 'booking' && state.from) renderTimes(root, state);
+      if (state.identityDestination === 'booking' && state.from) renderConfirmation(root, state);
       else if (state.account) void renderAccountHome(root, state);
       else renderAccountDetails(root, state);
     },
@@ -223,7 +223,7 @@ function renderLegalSticker(root, state) {
       }
       if (tenantDocuments.length) await saveTenantConsents(state);
       state.error = '';
-      if (state.identityDestination === 'booking') renderConfirmation(root, state);
+      if (state.identityDestination === 'booking') await finalizeBookingRequest(root, state);
       else await renderAccountHome(root, state);
     } catch (error) {
       state.error = error instanceof Error ? error.message : 'Не удалось сохранить документы';
@@ -403,7 +403,7 @@ function renderAccountEntry(root, state) {
   initV2StickerSwipe(root, {
     onRight: () => {
       state.error = '';
-      if (state.identityDestination === 'booking' && state.from) renderTimes(root, state);
+      if (state.identityDestination === 'booking' && state.from) renderConfirmation(root, state);
       else nextBookingStep(root, state);
     },
   });
@@ -559,7 +559,7 @@ async function continueAfterIdentity(root, state) {
       return;
     }
 
-    renderConfirmation(root, state);
+    await finalizeBookingRequest(root, state);
   } catch (error) {
     state.error = error instanceof Error ? error.message : 'Не удалось проверить юридический статус';
     try {
@@ -574,7 +574,7 @@ async function continueAfterIdentity(root, state) {
       });
       initV2Swipe(root, {
         onRight: () => {
-          if (state.identityDestination === 'booking' && state.from) renderTimes(root, state);
+          if (state.identityDestination === 'booking' && state.from) renderConfirmation(root, state);
           else nextBookingStep(root, state);
         },
       });
@@ -717,7 +717,7 @@ function renderTimes(root, state) {
   root.querySelector('[data-booking-times-next]')?.addEventListener('click', () => {
     if (!state.from) return;
     state.identityDestination = 'booking';
-    void continueAfterIdentity(root, state);
+    renderConfirmation(root, state);
   });
 }
 
@@ -755,27 +755,36 @@ function renderConfirmation(root, state) {
   });
   root.querySelector('[data-booking-confirm]')?.addEventListener('click', async (event) => {
     event.currentTarget.disabled = true;
-    try {
-      state.lastRequest = await createBookingRequest(state.tenantId, {
-        workplaceKey: state.workplaceKey,
-        date: state.date,
-        from: state.from,
-        procedureIds: state.procedureIds,
-      });
-      state.notice = 'Запись отправлена в журнал.';
-      state.error = '';
-      await refreshContext(state);
-      state.accountTab = 'representative';
-      state.accountChatOpen = false;
-      state.accountDeckOpen = false;
-      await renderAccountHome(root, state);
-    } catch (error) {
-      state.error = error instanceof Error ? error.message : 'Не удалось подтвердить запись';
-      renderConfirmation(root, state);
+    state.identityDestination = 'booking';
+    state.error = '';
+    if (!state.account) {
+      renderAccountEntry(root, state);
+      return;
     }
+    await continueAfterIdentity(root, state);
   });
 }
 
+async function finalizeBookingRequest(root, state) {
+  try {
+    state.lastRequest = await createBookingRequest(state.tenantId, {
+      workplaceKey: state.workplaceKey,
+      date: state.date,
+      from: state.from,
+      procedureIds: state.procedureIds,
+    });
+    state.notice = 'Запись отправлена в журнал.';
+    state.error = '';
+    await refreshContext(state);
+    state.accountTab = 'representative';
+    state.accountChatOpen = false;
+    state.accountDeckOpen = false;
+    await renderAccountHome(root, state);
+  } catch (error) {
+    state.error = error instanceof Error ? error.message : 'Не удалось подтвердить запись';
+    renderConfirmation(root, state);
+  }
+}
 async function startBookingFromAccount(root, state) {
   resetBookingChoice(state);
   state.identityDestination = 'booking';
