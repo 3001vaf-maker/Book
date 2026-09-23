@@ -6,12 +6,16 @@ const facade = fs.readFileSync('ui/ui.js', 'utf8');
 const booking = fs.readFileSync('online-booking/booking.js', 'utf8');
 const account = fs.readFileSync('online-booking/account-shell.js', 'utf8');
 const calendar = fs.readFileSync('ui/calendar/calendar.css', 'utf8');
+const personalData = fs.readFileSync('online-booking/personal-data.js', 'utf8');
+const passwordSettings = fs.readFileSync('online-booking/password-settings.js', 'utf8');
+const consentSettings = fs.readFileSync('online-booking/consent-settings.js', 'utf8');
 
 const failures = [];
 const expect = (condition, message) => { if (!condition) failures.push(message); };
 
 for (const name of [
   'v2Header',
+  'v2EList',
   'v2FDeck',
   'v2Shell',
   'v2ServiceStickers',
@@ -21,6 +25,7 @@ for (const name of [
   'v2Layer',
   'initV2Swipe',
   'initV2StickerSwipe',
+  'initV2DeckSwipe',
 ]) {
   expect(ui.includes(`export function ${name}`), `Shared UI V2 owner must export ${name}().`);
   expect(facade.includes(name), `ui/ui.js must expose ${name}().`);
@@ -32,6 +37,8 @@ expect(/\.v2-layer--quick\{[\s\S]*?border-radius:0/.test(css), 'QUICK must remai
 expect(/\.v2-layer--standard\{[\s\S]*?border-radius:0/.test(css), 'STANDARD must remain rectangular.');
 expect(/\.v2-layer--system\{[\s\S]*?border-radius:var\(--v2-z-radius\) 0 0 0/.test(css), 'SYSTEM may repeat only the upper-left UZ corner.');
 expect(/\.v2-deck__card\{[\s\S]*?border-radius:0 var\(--v2-z-radius\) 0 0/.test(css), 'F cards must mirror Z toward the left.');
+expect(css.includes('--v2-deck-width:min(45vw,176px)') && css.includes('.v2-deck{') && css.includes('width:var(--v2-deck-width)'), 'F width must leave a real GAP before opened Z.');
+expect(css.includes('.v2-e-list{') && css.includes('flex-direction:column'), 'E must remain a distinct long vertical list, not F geometry.');
 expect(css.includes('.v2-legal-cards{display:grid;gap:12px}'), 'Legal document cards must have an explicit equal gap.');
 expect(css.includes('.v2-legal-card{\n  height:96px;'), 'Legal document cards must share one base height.');
 expect(css.includes('.booking-account--account .v2-app .booking-time-grid{grid-template-columns:repeat(3,minmax(0,1fr))}'), 'V2 time slots must stay three per row.');
@@ -46,10 +53,15 @@ expect(booking.includes('v2LegalCards(') && booking.includes('v2Sticker({'), 'Le
 expect(!booking.includes('data-booking-workplaces-back') && !booking.includes('data-booking-confirm-back'), 'V2 booking flow must not restore legacy back buttons.');
 
 expect(account.includes('v2FDeck('), 'End-user root must use shared F deck.');
+expect(account.includes('initV2DeckSwipe(root'), 'End-user F deck must page horizontally with the shared interaction.');
 expect(account.includes("className: 'v2-app--chat'"), 'End-user Chat must share V2 H + Z geometry.');
 expect(account.includes("attachmentTrigger: 'external'"), 'Chat attachment action must live in Header D.');
 expect(!account.includes('accountBottomNavigation') && !account.includes('bindBottomNavigation'), 'End-user V2 must not contain bottom navigation.');
 expect(!account.includes('<style>') && !booking.includes('<style>'), 'Feature code must not create local V2 style owners.');
+for (const [name, source] of [['personal-data', personalData], ['password-settings', passwordSettings], ['consent-settings', consentSettings]]) {
+  expect(source.includes('v2Layer') && source.includes('mountV2Layer'), `${name} must use shared V2 layers.`);
+  expect(!source.includes('mountModal(') && !source.includes('modal('), `${name} must not reopen the legacy rounded modal shell.`);
+}
 
 if (failures.length) {
   failures.forEach((message) => console.error(`ui v2 architecture: ${message}`));
