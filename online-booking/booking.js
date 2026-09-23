@@ -355,12 +355,12 @@ function nextBookingStep(root, state) {
 function backFromFirstBookingStep(root, state) {
   state.error = '';
   state.repeatSelection = null;
-  state.identityDestination = 'profile';
-  if (state.account) {
+  if (state.bookingOrigin === 'profile' && state.account) {
     void renderAccountHome(root, state);
     return;
   }
-  renderAccountEntry(root, state);
+  state.identityDestination = 'booking';
+  renderWelcome(root, state);
 }
 
 function renderWelcome(root, state) {
@@ -369,6 +369,7 @@ function renderWelcome(root, state) {
   const continueFlow = () => {
     resetBookingChoice(state);
     state.identityDestination = 'booking';
+    state.bookingOrigin = 'welcome';
     nextBookingStep(root, state);
   };
   root.innerHTML = `<section class="${flowThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${v2Sticker({
@@ -597,7 +598,6 @@ function renderWorkplaces(root, state) {
   renderFlowPage(root, state, {
     title: 'Рабочее пространство',
     subtitle: 'Выберите, где хотите записаться',
-    action: { label: 'Далее', data: 'data-booking-workplaces-next', disabled: !state.workplaceKey },
     body: content || emptyState('Нет доступных пространств', 'Рабочие пространства для онлайн-записи не найдены.'),
     step: 'workplaces',
   });
@@ -607,12 +607,8 @@ function renderWorkplaces(root, state) {
     state.procedureIds = [];
     state.date = '';
     state.from = '';
-    renderWorkplaces(root, state);
-  }));
-  root.querySelector('[data-booking-workplaces-next]')?.addEventListener('click', () => {
-    if (!state.workplaceKey) return;
     renderProcedures(root, state);
-  });
+  }));
 }
 
 function renderProcedures(root, state) {
@@ -664,7 +660,6 @@ function renderDates(root, state) {
   renderFlowPage(root, state, {
     title: 'Дата',
     subtitle: 'Выберите удобный день',
-    action: { label: 'Далее', data: 'data-booking-dates-next', disabled: !state.date },
     body: dates.length ? '<div data-booking-calendar></div>' : emptyState('Свободных дат нет', 'В графике пока нет доступных дат.'),
     step: 'dates',
   });
@@ -679,12 +674,8 @@ function renderDates(root, state) {
       if (!dates.includes(date)) return;
       state.date = date;
       state.from = '';
-      renderDates(root, state);
+      renderTimes(root, state);
     },
-  });
-  root.querySelector('[data-booking-dates-next]')?.addEventListener('click', () => {
-    if (!state.date) return;
-    renderTimes(root, state);
   });
 }
 
@@ -698,7 +689,6 @@ function renderTimes(root, state) {
   renderFlowPage(root, state, {
     title: 'Время',
     subtitle: formatDate(state.date),
-    action: { label: 'Далее', data: 'data-booking-times-next', disabled: !state.from },
     body: `${slots.length
       ? bookingTimeGroups(slots, { data: 'data-booking-time' })
       : emptyState('Свободного времени нет', 'На эту дату нет интервала для выбранных услуг.')}${errorBlock(state.error)}`,
@@ -713,13 +703,9 @@ function renderTimes(root, state) {
       state.from = slot.from;
       state.to = slot.to;
       state.error = '';
-      renderTimes(root, state);
+      state.identityDestination = 'booking';
+      renderConfirmation(root, state);
     });
-  });
-  root.querySelector('[data-booking-times-next]')?.addEventListener('click', () => {
-    if (!state.from) return;
-    state.identityDestination = 'booking';
-    renderConfirmation(root, state);
   });
 }
 
@@ -816,6 +802,7 @@ async function finalizeBookingRequest(root, state) {
 async function startBookingFromAccount(root, state) {
   resetBookingChoice(state);
   state.identityDestination = 'booking';
+  state.bookingOrigin = 'profile';
   nextBookingStep(root, state);
 }
 
@@ -829,6 +816,7 @@ async function repeatBooking(root, state, request) {
   state.from = '';
   state.to = '';
   state.identityDestination = 'booking';
+  state.bookingOrigin = 'profile';
   continueRepeat(root, state);
 }
 
@@ -879,6 +867,7 @@ export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = 
     lastRequest: null,
     repeatSelection: null,
     identityDestination: 'booking',
+    bookingOrigin: 'welcome',
     accountTab: 'home',
     accountDeckOpen: false,
     accountChatOpen: false,

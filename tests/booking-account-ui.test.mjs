@@ -50,10 +50,13 @@ assert.match(booking, /step: 'procedures'/);
 assert.match(booking, /step: 'dates'/);
 assert.match(booking, /step: 'times'/);
 assert.match(booking, /step: 'confirmation'/);
-assert.match(booking, /data-booking-workplaces-next/);
+assert.doesNotMatch(booking, /data-booking-workplaces-next/);
 assert.match(booking, /data-booking-procedures-next/);
-assert.match(booking, /data-booking-dates-next/);
-assert.match(booking, /data-booking-times-next/);
+assert.doesNotMatch(booking, /data-booking-dates-next/);
+assert.doesNotMatch(booking, /data-booking-times-next/);
+assert.match(booking, /state\.workplaceKey = node\.dataset\.bookingWorkplace \|\| '';[\s\S]*?renderProcedures\(root, state\);/);
+assert.match(booking, /onDateSelect: \(date\) => \{[\s\S]*?state\.date = date;[\s\S]*?renderTimes\(root, state\);/);
+assert.match(booking, /node\.addEventListener\('click', \(\) => \{[\s\S]*?state\.from = slot\.from;[\s\S]*?renderConfirmation\(root, state\);/);
 assert.doesNotMatch(booking, /data-booking-workplaces-back/);
 assert.doesNotMatch(booking, /data-booking-dates-back/);
 assert.doesNotMatch(booking, /data-booking-times-back/);
@@ -77,6 +80,12 @@ assert.match(booking, /slotStillAvailable/);
 assert.match(booking, /Выбранное время уже недоступно/);
 assert.doesNotMatch(booking, /consentState\.allowed/);
 assert.match(booking, /const account = await getAccount\(state\.tenantId\);[\s\S]*?if \(account\) state\.account = account;[\s\S]*?renderWelcome\(root, state\);/);
+assert.match(booking, /function backFromFirstBookingStep[\s\S]*?state\.bookingOrigin === 'profile'[\s\S]*?renderWelcome\(root, state\);/);
+const bookingBackBlock = booking.slice(
+  booking.indexOf('function backFromFirstBookingStep'),
+  booking.indexOf('function renderWelcome'),
+);
+assert.doesNotMatch(bookingBackBlock, /renderAccountEntry\(root, state\);/);
 
 // End-user account is the first consumer of shared UI Reference V2.
 assert.match(accountShell, /v2Header\(\{/);
@@ -217,6 +226,9 @@ assert.match(v2Ui, /export function v2Shell/);
 assert.match(v2Ui, /export function v2FDeck/);
 assert.match(v2Ui, /export function v2Layer/);
 assert.match(v2Ui, /export function initV2Swipe/);
+assert.match(v2Ui, /axis = Math\.abs\(nextX\) > Math\.abs\(nextY\) \* 1\.25 \? 'horizontal' : 'vertical'/);
+assert.match(v2Css, /\.v2-z\{[\s\S]*?touch-action:pan-y/);
+assert.match(v2Css, /\.v2-sticker-screen\{[\s\S]*?touch-action:pan-y/);
 assert.match(v2Css, /--v2-base:#2F3338/);
 assert.match(v2Css, /\.v2-z[\s\S]*?border-radius:var\(--v2-z-radius\) 0 0 0/);
 assert.match(v2Css, /\.v2-layer--quick[\s\S]*?border-radius:0/);
