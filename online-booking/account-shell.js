@@ -606,8 +606,12 @@ async function renderMessages(root, state, handlers) {
     renderV2Shell(root, state, { header: v2Header({ b: 'Чат' }), body, deck: false, className: 'v2-app--chat-list' });
     initV2Swipe(root, {
       onRight: () => {
-        state.accountTab = 'home';
         state.accountChatOpen = false;
+        if (handlers.onChatBack) {
+          handlers.onChatBack();
+          return;
+        }
+        state.accountTab = 'home';
         void handlers.render();
       },
     });
@@ -630,6 +634,10 @@ async function renderMessages(root, state, handlers) {
   initV2Swipe(root, {
     onRight: () => {
       state.accountChatOpen = false;
+      if (handlers.onChatBack) {
+        handlers.onChatBack();
+        return;
+      }
       state.accountTab = 'home';
       state.accountDeckOpen = true;
       void handlers.render();
@@ -713,6 +721,7 @@ export async function renderAccount(root, state, callbacks = {}) {
     render: () => renderAccount(root, state, callbacks),
     onStartBooking: callbacks.onStartBooking || (() => {}),
     onRepeat: callbacks.onRepeat || (() => {}),
+    onChatBack: typeof callbacks.onChatBack === 'function' ? callbacks.onChatBack : null,
     onPersonalData: () => openAccountPersonalData(state, {
       onSaved: () => renderAccount(root, state, callbacks),
     }),
