@@ -52,6 +52,7 @@
 .v2-app__stage{position:relative;min-height:calc(var(--visual-vh,100dvh) - 72px);background:var(--v2-base);overflow:hidden}
 .v2-z{
   position:relative;
+  touch-action:pan-y;
   z-index:3;
   width:calc(100% - var(--v2-edge));
   min-height:calc(var(--visual-vh,100dvh) - 72px);
@@ -124,8 +125,8 @@
 .v2-service-sticker__selector{width:24px;height:24px;border:1px solid var(--v2-ink);display:grid;place-items:center;font-size:13px;font-weight:850}
 .v2-service-sticker.is-selected .v2-service-sticker__selector{background:var(--v2-ink);color:#fff}
 
-.v2-sticker-screen{width:min(100%,var(--app-max-width));min-height:var(--visual-vh,100dvh);margin:0 auto;transform:translateX(var(--v2-sticker-drag-x,0px));transition:transform .22s ease;padding:calc(14px + env(safe-area-inset-top)) 12px calc(14px + env(safe-area-inset-bottom));display:grid;place-items:center;background:var(--v2-base)}
-.v2-sticker-screen.is-dragging{transition:none}.v2-sticker{width:100%;max-height:calc(var(--visual-vh,100dvh) - 28px - env(safe-area-inset-top) - env(safe-area-inset-bottom));overflow:auto;padding:24px 20px;display:grid;gap:16px;background:#fff;color:var(--v2-ink);box-shadow:0 18px 44px rgba(0,0,0,.24)}
+.v2-sticker-screen{width:min(100%,var(--app-max-width));min-height:var(--visual-vh,100dvh);touch-action:pan-y;overscroll-behavior:contain;margin:0 auto;transform:translateX(var(--v2-sticker-drag-x,0px));transition:transform .22s ease;padding:calc(14px + env(safe-area-inset-top)) 12px calc(14px + env(safe-area-inset-bottom));display:grid;place-items:center;background:var(--v2-base)}
+.v2-sticker-screen.is-dragging{transition:none}.v2-sticker{width:100%;overscroll-behavior:contain;max-height:calc(var(--visual-vh,100dvh) - 28px - env(safe-area-inset-top) - env(safe-area-inset-bottom));overflow:auto;padding:24px 20px;display:grid;gap:16px;background:#fff;color:var(--v2-ink);box-shadow:0 18px 44px rgba(0,0,0,.24)}
 .v2-sticker__eyebrow{font-size:12px;font-weight:650}
 .v2-sticker__title{margin:0;font-size:28px;line-height:1.05}
 .v2-sticker__body{display:grid;gap:14px}

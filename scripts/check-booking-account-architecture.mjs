@@ -49,7 +49,10 @@ expect(!booking.includes('saveRegistrationConsents'), 'Tenant consent must not b
 expect(booking.includes('getAccountPlatformState(state.tenantId)') && booking.includes('refreshTenantConsentState(state)'), 'Existing Account legal gate must check both platform terms and Tenant consent state.');
 expect(booking.includes("if (!platformState?.accepted || !consentState.pdnActive) {") && booking.includes('renderLegalSticker(root, state);'), 'Missing platform or Tenant legal state must open one V2 Legal Sticker checkpoint.');
 expect(!booking.includes('if (payload.personExisted)'), 'Person matching must not decide whether booking continues or Profile opens.');
-expect(booking.includes("root.querySelector('[data-booking-times-next]')") && booking.includes('renderConfirmation(root, state);'), 'Time selection must open the confirmation Z before identity/legal checks.');
+expect(!booking.includes('data-booking-workplaces-next') && !booking.includes('data-booking-dates-next') && !booking.includes('data-booking-times-next'), 'Workplace, date and time must auto-advance without artificial C «Далее» actions.');
+expect(booking.includes("state.workplaceKey = node.dataset.bookingWorkplace || '';") && booking.includes('renderProcedures(root, state);'), 'Choosing a workplace must immediately open services.');
+expect(booking.includes('onDateSelect: (date) => {') && booking.includes('state.date = date;') && booking.includes('renderTimes(root, state);'), 'Choosing a date must immediately open time.');
+expect(booking.includes('state.from = slot.from;') && booking.includes('state.to = slot.to;') && booking.includes('renderConfirmation(root, state);'), 'Choosing a time slot must immediately open confirmation.');
 expect(booking.includes("root.querySelector('[data-booking-confirm]')") && booking.includes('await continueAfterIdentity(root, state);'), 'C «Подтвердить» must enter the identity/legal gate before the final server write.');
 expect(booking.includes('async function finalizeBookingRequest') && booking.includes('createBookingRequest(state.tenantId'), 'Only the post-identity/legal finalizer may create the booking request.');
 expect(booking.includes('slotStillAvailable') && booking.includes('await refreshContext(state);'), 'Final booking write must recheck the selected slot against refreshed availability.');
@@ -63,7 +66,8 @@ expect(booking.includes("initV2Swipe(root, { onRight: () => renderProcedures(roo
 expect(booking.includes("initV2Swipe(root, { onRight: () => renderDates(root, state) })"), 'Time swipe must return to date.');
 expect(booking.includes("renderTimes(root, state);") && booking.includes("step: 'confirmation'"), 'Confirmation swipe must return to time.');
 expect(!booking.includes('data-booking-workplaces-back') && !booking.includes('data-booking-dates-back') && !booking.includes('data-booking-times-back') && !booking.includes('data-booking-confirm-back'), 'V2 booking flow must not restore legacy back buttons.');
-expect(booking.includes('function backFromFirstBookingStep') && booking.includes("state.identityDestination = 'profile'") && booking.includes('if (state.account)') && booking.includes('renderAccountEntry(root, state);'), 'The first booking swipe boundary must open Profile directly when known or authenticate before Profile when unknown.');
+expect(booking.includes('function backFromFirstBookingStep') && booking.includes("state.bookingOrigin === 'profile'") && booking.includes('renderWelcome(root, state);'), 'The first booking swipe boundary must return to Profile only when booking started there; otherwise it must return to Welcome.');
+expect(!booking.slice(booking.indexOf('function backFromFirstBookingStep'), booking.indexOf('function renderWelcome')).includes('renderAccountEntry(root, state);'), 'Backing out of booking must never force Auth Sticker.');
 
 expect(booking.includes('renderAccount('), 'Authenticated account must use the unified account shell.');
 expect(!booking.includes('step: 15'), 'Public booking must not hardcode a 15 minute slot step.');
