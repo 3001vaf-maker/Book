@@ -24,8 +24,10 @@ import {
   field,
   initCalendar,
   initPasswordFields,
+  initPasswordFields,
   initV2StickerSwipe,
   initV2Swipe,
+  passwordField,
   passwordField,
   phoneField,
   v2Document,
@@ -411,6 +413,7 @@ function renderAccountEntry(root, state) {
   });
 
   initPasswordFields(root);
+  initPasswordFields(root);
   const authForm = root.querySelector('[data-booking-entry-form]');
   root.querySelector('[data-booking-register]')?.addEventListener('click', async () => {
     const data = new FormData(authForm);
@@ -492,6 +495,7 @@ function renderAccountDetails(root, state) {
       renderAccountEntry(root, state);
     },
   });
+  initPasswordFields(root);
   initPasswordFields(root);
   const form = root.querySelector('[data-booking-account-form]');
   root.querySelector('[data-booking-account-submit]')?.addEventListener('click', () => form?.requestSubmit());
