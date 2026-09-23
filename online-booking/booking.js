@@ -597,41 +597,42 @@ async function continueAfterIdentity(root, state) {
   }
 
   try {
-    const platformState = await getAccountPlatformState(state.tenantId);
+    const [platformState, consentState] = await Promise.all([
+      getAccountPlatformState(state.tenantId),
+      refreshTenantConsentState(state),
+    ]);
     state.accountTerms = platformState?.document || state.accountTerms;
     state.accountTermsAccepted = Boolean(platformState?.accepted);
-    if (!platformState?.accepted) {
-      renderAccountTerms(root, state);
+
+    if (!platformState?.accepted || !consentState.pdnActive) {
+      renderLegalSticker(root, state);
       return;
     }
 
     if (state.identityDestination === 'profile') {
-      state.accountTab = 'profile';
+      state.accountTab = 'home';
       await renderAccountHome(root, state);
       return;
     }
 
-    const consentState = await refreshTenantConsentState(state);
-    if (consentState.pdnActive) {
-      renderConfirmation(root, state);
-      return;
-    }
-    renderTenantAgreements(root, state);
+    renderConfirmation(root, state);
   } catch (error) {
     state.error = error instanceof Error ? error.message : 'Не удалось проверить юридический статус';
     try {
-      await loadAccountTerms(state);
-      renderAccountTerms(root, state);
+      if (!state.accountTerms) await loadAccountTerms(state);
+      await refreshTenantConsentState(state).catch(() => ({ pdnActive: false }));
+      renderLegalSticker(root, state);
     } catch {
       renderFlowPage(root, state, {
         title: 'Проверка учетной записи',
-        back: { data: 'data-account-status-back', aria: 'Назад' },
         body: errorBlock(state.error),
-        center: true,
+        step: state.bookingStep || 'times',
       });
-      root.querySelector('[data-account-status-back]')?.addEventListener('click', () => {
-        if (state.identityDestination === 'booking' && state.from) renderTimes(root, state);
-        else nextBookingStep(root, state);
+      initV2Swipe(root, {
+        onRight: () => {
+          if (state.identityDestination === 'booking' && state.from) renderTimes(root, state);
+          else nextBookingStep(root, state);
+        },
       });
     }
   }
@@ -643,50 +644,54 @@ function renderWorkplaces(root, state) {
     title: workplace.name || 'Рабочее пространство',
     secondary: [workplace.city || '', workplace.address || ''].filter(Boolean),
     image: workplace.photo || '',
+    selected: String(state.workplaceKey || '') === String(workplace.key || ''),
     data: `data-booking-workplace="${escapeHtml(workplace.key)}"`,
     aria: `Выбрать рабочее пространство ${workplace.name || ''}`,
-  })));
+  })), { multiple: false });
   renderFlowPage(root, state, {
     title: 'Рабочее пространство',
     subtitle: 'Выберите, где хотите записаться',
-    back: { data: 'data-booking-workplaces-back', aria: 'Назад' },
+    action: { label: 'Далее', data: 'data-booking-workplaces-next', disabled: !state.workplaceKey },
     body: content || emptyState('Нет доступных пространств', 'Рабочие пространства для онлайн-записи не найдены.'),
+    step: 'workplaces',
   });
-  root.querySelector('[data-booking-workplaces-back]')?.addEventListener('click', () => backFromFirstBookingStep(root, state));
+  initV2Swipe(root, { onRight: () => backFromFirstBookingStep(root, state) });
   root.querySelectorAll('[data-booking-workplace]').forEach((node) => node.addEventListener('click', () => {
     state.workplaceKey = node.dataset.bookingWorkplace || '';
     state.procedureIds = [];
     state.date = '';
     state.from = '';
-    renderProcedures(root, state);
+    renderWorkplaces(root, state);
   }));
+  root.querySelector('[data-booking-workplaces-next]')?.addEventListener('click', () => {
+    if (!state.workplaceKey) return;
+    renderProcedures(root, state);
+  });
 }
 
 function renderProcedures(root, state) {
   const procedures = getBookingProcedures(state.context, state.workplaceKey);
-  const selected = new Set(state.procedureIds);
-  const content = bookingChoiceCards(procedures.map((procedure) => {
+  const content = v2ServiceStickers(procedures.map((procedure) => {
     const cost = bookingProcedureCost(procedure, state.workplaceKey);
     return {
+      id: String(procedure.id || ''),
       title: procedure.name || '',
-      secondary: [procedure.duration ? `${Number(procedure.duration)} мин` : '', procedure.description || ''].filter(Boolean),
+      secondary: [procedure.duration ? `${Number(procedure.duration)} мин` : '', procedure.description || ''].filter(Boolean).join(' · '),
       right: cost !== '' ? money(cost) : '',
-      image: procedure.photo || '',
-      selected: selected.has(String(procedure.id)),
-      data: `data-booking-procedure="${escapeHtml(procedure.id)}"`,
-      aria: `Выбрать процедуру ${procedure.name || ''}`,
     };
-  }), { multiple: true });
+  }), { selected: state.procedureIds, data: 'data-booking-procedure' });
   renderFlowPage(root, state, {
-    title: 'Процедуры',
+    title: 'Услуги',
     subtitle: 'Выберите всё, что хотите сделать',
-    back: { data: 'data-booking-procedures-back', aria: 'Назад' },
     action: { label: 'Далее', data: 'data-booking-procedures-next', disabled: state.procedureIds.length === 0 },
-    body: content || emptyState('Процедур нет', 'Для этого рабочего пространства процедуры не настроены.'),
+    body: content || emptyState('Услуг нет', 'Для этого рабочего пространства услуги не настроены.'),
+    step: 'procedures',
   });
-  root.querySelector('[data-booking-procedures-back]')?.addEventListener('click', () => {
-    if (state.lockedWorkplaceKey) backFromFirstBookingStep(root, state);
-    else renderWorkplaces(root, state);
+  initV2Swipe(root, {
+    onRight: () => {
+      if (state.lockedWorkplaceKey) backFromFirstBookingStep(root, state);
+      else renderWorkplaces(root, state);
+    },
   });
   root.querySelectorAll('[data-booking-procedure]').forEach((node) => node.addEventListener('click', () => {
     const id = String(node.dataset.bookingProcedure || '');
@@ -694,6 +699,8 @@ function renderProcedures(root, state) {
     if (next.has(id)) next.delete(id);
     else next.add(id);
     state.procedureIds = [...next];
+    state.date = '';
+    state.from = '';
     renderProcedures(root, state);
   }));
   root.querySelector('[data-booking-procedures-next]')?.addEventListener('click', () => {
@@ -706,26 +713,32 @@ function renderProcedures(root, state) {
 
 function renderDates(root, state) {
   const dates = getBookingWorkingDates(state.context, state.workplaceKey);
-  const first = dates[0] || '2000-01-01';
+  const first = state.date || dates[0] || '2000-01-01';
   const firstDate = new Date(`${first}T00:00:00`);
   renderFlowPage(root, state, {
     title: 'Дата',
     subtitle: 'Выберите удобный день',
-    back: { data: 'data-booking-dates-back', aria: 'Назад' },
+    action: { label: 'Далее', data: 'data-booking-dates-next', disabled: !state.date },
     body: dates.length ? '<div data-booking-calendar></div>' : emptyState('Свободных дат нет', 'В графике пока нет доступных дат.'),
+    step: 'dates',
   });
-  root.querySelector('[data-booking-dates-back]')?.addEventListener('click', () => renderProcedures(root, state));
+  initV2Swipe(root, { onRight: () => renderProcedures(root, state) });
   const calendarRoot = root.querySelector('[data-booking-calendar]');
   if (!calendarRoot) return;
   initCalendar(calendarRoot, {
     month: new Date(firstDate.getFullYear(), firstDate.getMonth(), 1),
+    selectedValue: state.date || '',
     workingDates: dates,
     onDateSelect: (date) => {
       if (!dates.includes(date)) return;
       state.date = date;
       state.from = '';
-      renderTimes(root, state);
+      renderDates(root, state);
     },
+  });
+  root.querySelector('[data-booking-dates-next]')?.addEventListener('click', () => {
+    if (!state.date) return;
+    renderTimes(root, state);
   });
 }
 
@@ -739,21 +752,29 @@ function renderTimes(root, state) {
   renderFlowPage(root, state, {
     title: 'Время',
     subtitle: formatDate(state.date),
-    back: { data: 'data-booking-times-back', aria: 'Назад' },
+    action: { label: 'Далее', data: 'data-booking-times-next', disabled: !state.from },
     body: `${slots.length
       ? bookingTimeGroups(slots, { data: 'data-booking-time' })
-      : emptyState('Свободного времени нет', 'На эту дату нет интервала для выбранных процедур.')}${errorBlock(state.error)}`,
+      : emptyState('Свободного времени нет', 'На эту дату нет интервала для выбранных услуг.')}${errorBlock(state.error)}`,
+    step: 'times',
   });
-  root.querySelector('[data-booking-times-back]')?.addEventListener('click', () => renderDates(root, state));
-  root.querySelectorAll('[data-booking-time]').forEach((node) => node.addEventListener('click', () => {
-    const slot = slots.find((item) => item.from === node.dataset.bookingTime);
-    if (!slot) return;
-    state.from = slot.from;
-    state.to = slot.to;
-    state.error = '';
+  initV2Swipe(root, { onRight: () => renderDates(root, state) });
+  root.querySelectorAll('[data-booking-time]').forEach((node) => {
+    if (String(node.dataset.bookingTime || '') === String(state.from || '')) node.classList.add('is-selected');
+    node.addEventListener('click', () => {
+      const slot = slots.find((item) => item.from === node.dataset.bookingTime);
+      if (!slot) return;
+      state.from = slot.from;
+      state.to = slot.to;
+      state.error = '';
+      renderTimes(root, state);
+    });
+  });
+  root.querySelector('[data-booking-times-next]')?.addEventListener('click', () => {
+    if (!state.from) return;
     state.identityDestination = 'booking';
     void continueAfterIdentity(root, state);
-  }));
+  });
 }
 
 function confirmationCard(state) {
@@ -762,38 +783,31 @@ function confirmationCard(state) {
   const subtotal = selectedSubtotal(state.context, state.workplaceKey, state.procedureIds);
   const discount = accountDiscount(state.account);
   const total = discountedTotal(subtotal, discount);
-  return entityCard({
-    title: accountName(state.account),
-    subtitle: formatPhone(state.account?.phone || state.accountDraft?.phone || ''),
-    topMeta: [{ value: workplace.name || 'Рабочее пространство', row: 1 }],
-    topRightMeta: [
-      { value: formatDate(state.date), row: 2 },
-      { value: state.from, row: 3 },
-    ],
-    meta: [
-      { value: money(subtotal), label: 'Стоимость' },
-      { value: `${discount} %`, label: 'Скидка' },
-      { value: money(total), label: 'Итого' },
-    ],
-    detailRows: procedures.map((procedure) => ({
-      left: procedure.name || '',
-      right: money(bookingProcedureCost(procedure, state.workplaceKey)),
-    })),
-    className: 'entity-card--hero entity-card--top-dark',
-  });
+  return `<section class="v2-confirmation">
+    <div class="v2-confirmation__profile">${escapeHtml(workplace.name || representativeName(state))}</div>
+    <div class="v2-confirmation__services">${procedures.map((procedure) => `<div class="v2-confirmation__service"><span>${escapeHtml(procedure.name || '')}</span><strong>${escapeHtml(money(bookingProcedureCost(procedure, state.workplaceKey)))}</strong></div>`).join('')}</div>
+    <div class="v2-confirmation__moment"><strong>${escapeHtml(formatDate(state.date))}</strong><span>${escapeHtml(state.from || '')}</span></div>
+    <div class="v2-confirmation__divider"></div>
+    <div class="v2-confirmation__totals">
+      <div class="v2-confirmation__row"><span>Стоимость</span><strong>${escapeHtml(money(subtotal))}</strong></div>
+      ${discount > 0 ? `<div class="v2-confirmation__row"><span>Скидка</span><strong>${escapeHtml(`${discount} %`)}</strong></div>` : ''}
+      <div class="v2-confirmation__row is-total"><span>Итого</span><strong>${escapeHtml(money(total))}</strong></div>
+    </div>
+  </section>`;
 }
 
 function renderConfirmation(root, state) {
   renderFlowPage(root, state, {
     title: 'Подтверждение',
-    back: { data: 'data-booking-confirm-back', aria: 'Назад' },
     action: { label: 'Подтвердить', data: 'data-booking-confirm' },
     body: `${confirmationCard(state)}${errorBlock(state.error)}`,
-    center: true,
+    step: 'confirmation',
   });
-  root.querySelector('[data-booking-confirm-back]')?.addEventListener('click', () => {
-    state.error = '';
-    renderTimes(root, state);
+  initV2Swipe(root, {
+    onRight: () => {
+      state.error = '';
+      renderTimes(root, state);
+    },
   });
   root.querySelector('[data-booking-confirm]')?.addEventListener('click', async (event) => {
     event.currentTarget.disabled = true;
@@ -807,7 +821,9 @@ function renderConfirmation(root, state) {
       state.notice = 'Запись отправлена в журнал.';
       state.error = '';
       await refreshContext(state);
-      state.accountTab = 'profile';
+      state.accountTab = 'representative';
+      state.accountChatOpen = false;
+      state.accountDeckOpen = false;
       await renderAccountHome(root, state);
     } catch (error) {
       state.error = error instanceof Error ? error.message : 'Не удалось подтвердить запись';
@@ -839,11 +855,12 @@ async function renderAccountHome(root, state) {
   await renderAccount(root, state, {
     onStartBooking: () => void startBookingFromAccount(root, state),
     onRepeat: (request) => void repeatBooking(root, state, request),
+    onChatBack: () => resumeBookingStep(root, state),
     onLogout: () => {
       clearAccount(state.tenantId);
       state.account = null;
       state.error = '';
-      state.accountTab = 'profile';
+      state.accountTab = 'home';
       state.accountChatOpen = false;
       seedTenantConsents(state, []);
       state.accountTerms = null;
