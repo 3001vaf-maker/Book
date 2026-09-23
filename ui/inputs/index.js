@@ -90,26 +90,6 @@ export function initPasswordFields(root = document) {
   });
 }
 
-export function passwordField({ label = 'Пароль', name = 'password', value = '', required = false, autocomplete = 'current-password' } = {}) {
-  const eye = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.4-5.5 9.5-5.5 9.5 5.5 9.5 5.5-3.4 5.5-9.5 5.5S2.5 12 2.5 12Z"></path><circle cx="12" cy="12" r="2.5"></circle></svg>';
-  return `<div class="field password-field" data-password-field><span>${escapeHtml(labelText(label, required))}</span><div class="password-field__control"><input name="${escapeHtml(name)}" type="password" value="${escapeHtml(value)}"${required ? ' required' : ''} autocomplete="${escapeHtml(autocomplete)}" data-password-input><button type="button" class="password-field__toggle" data-password-toggle aria-label="Показать пароль" aria-pressed="false">${eye}</button></div></div>`;
-}
-
-export function initPasswordFields(root = document) {
-  root?.querySelectorAll?.('[data-password-field]').forEach((host) => {
-    const input = host.querySelector('[data-password-input]');
-    const toggle = host.querySelector('[data-password-toggle]');
-    if (!input || !toggle || toggle.dataset.passwordReady === 'true') return;
-    toggle.dataset.passwordReady = 'true';
-    toggle.addEventListener('click', () => {
-      const show = input.type === 'password';
-      input.type = show ? 'text' : 'password';
-      toggle.setAttribute('aria-pressed', show ? 'true' : 'false');
-      toggle.setAttribute('aria-label', show ? 'Скрыть пароль' : 'Показать пароль');
-    });
-  });
-}
-
 export function phoneInput({ name = 'phone', value = '', required = false, aria = 'Телефон' } = {}) {
   ensurePhoneEvents();
   const state = phoneInputState(value, 'RU');
