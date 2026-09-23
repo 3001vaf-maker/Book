@@ -201,7 +201,7 @@ function historyEntry(request, index) {
   });
 }
 
-function openHistoryDetail(state, request, onRepeat) {
+function historyDetailBody(state, request) {
   const pricing = requestPricing(request);
   const payment = requestPayment(request);
   const totals = [
@@ -213,20 +213,29 @@ function openHistoryDetail(state, request, onRepeat) {
   if ((paymentStatus === 'due' || paymentStatus === 'debt') && payment.due > 0.009) {
     totals.push({ label: PAYMENT_STATUS_LABELS[paymentStatus], value: money(payment.due), strong: true });
   }
-  const procedures = requestProcedures(request);
-  const layer = mountV2Layer(v2Layer(readOnlyReceipt({
+  return readOnlyReceipt({
     title: workplaceName(state, request),
     status: actionStatus(request),
     date: formatDate(request.date),
     time: request.from || '',
-    items: procedures.map((item) => ({ label: item?.name || 'Процедура', value: money(item?.cost || 0) })),
+    items: requestProcedures(request).map((item) => ({ label: item?.name || 'Процедура', value: money(item?.cost || 0) })),
     totals,
-    action: procedures.length ? { label: 'Записаться', data: 'data-repeat-procedure' } : null,
-  }), { kind: 'standard', title: 'Запись' }));
-  layer?.querySelector('[data-repeat-procedure]')?.addEventListener('click', () => {
-    layer.remove();
-    onRepeat?.(request);
   });
+}
+
+function selectHistoryRequest(state, request, returnTab = 'history') {
+  state.accountHistoryRequestId = String(request?.id || '');
+  state.accountHistoryRequestMoment = requestMoment(request);
+  state.accountHistoryReturn = returnTab;
+  state.accountTab = 'history-detail';
+  state.accountDeckOpen = false;
+}
+
+function currentHistoryRequest(state) {
+  const rows = Array.isArray(state.accountRecords) ? state.accountRecords : [];
+  return rows.find((request) => String(request?.id || '') === String(state.accountHistoryRequestId || ''))
+    || rows.find((request) => requestMoment(request) === String(state.accountHistoryRequestMoment || ''))
+    || null;
 }
 
 function notificationMessages(feed = {}) {
@@ -494,6 +503,7 @@ async function renderHome(root, state, handlers) {
   root.querySelector('[data-account-open-chat-root]')?.addEventListener('click', () => {
     state.accountTab = 'messages';
     state.accountChatOpen = false;
+    state.accountChatReturn = 'deck';
     state.accountDeckOpen = false;
     void handlers.render();
   });
@@ -504,7 +514,9 @@ async function renderHome(root, state, handlers) {
   });
   root.querySelectorAll('[data-account-upcoming]').forEach((node) => node.addEventListener('click', () => {
     const request = requests[Number(node.dataset.accountUpcoming)];
-    if (request) openHistoryDetail(state, request, handlers.onRepeat);
+    if (!request) return;
+    selectHistoryRequest(state, request, 'home');
+    void handlers.render();
   }));
 }
 
@@ -540,13 +552,16 @@ async function renderRepresentatives(root, state, handlers) {
 
 async function renderRepresentative(root, state, handlers) {
   const requests = futureRequests(state.accountRecords || []);
-  const finance = aggregateFinance(state.accountRecords || [], state.account || {});
+  const records = Array.isArray(state.accountRecords) ? state.accountRecords : [];
+  const finance = aggregateFinance(records, state.account || {});
   const rows = programRows(state.account || {});
-  const metrics = v2HorizontalRail([
+  const hasInteractionHistory = records.some((request) => !isCancelled(request) && requestMoment(request) < nowMoment())
+    || Number(state.account?.totalSpent || 0) > 0;
+  const metrics = hasInteractionHistory ? v2HorizontalRail([
     v2RailCard({ title: money(finance.subtotal), subtitle: 'Стоимость' }),
     v2RailCard({ title: money(finance.discount), subtitle: 'Скидка' }),
     v2RailCard({ title: money(finance.paid), subtitle: 'Оплачено' }),
-  ].join(''));
+  ].join('')) : '';
   const upcoming = requests.length ? v2HorizontalRail(requests.map((request, index) => visitCard(state, request, index)).join('')) : '';
   const programs = rows.length
     ? v2HorizontalRail(rows.map((row, index) => v2RailCard({ title: row.label, subtitle: row.value, data: `data-account-program="${index}"`, aria: `Открыть программу ${row.label}` })).join(''))
@@ -559,7 +574,7 @@ async function renderRepresentative(root, state, handlers) {
   });
   renderV2Shell(root, state, {
     header,
-    body: `${v2Section('Взаимодействие', metrics)}${upcoming ? v2Section('Предстоящие визиты', upcoming) : ''}${programs ? v2Section('Программы', programs) : ''}`,
+    body: `${metrics ? v2Section('Взаимодействие', metrics) : ''}${upcoming ? v2Section('Предстоящие визиты', upcoming) : ''}${programs ? v2Section('Программы', programs) : ''}`,
   });
   bindDeck(root, state, handlers);
   bindRootSwipe(root, state, handlers);
@@ -567,12 +582,15 @@ async function renderRepresentative(root, state, handlers) {
   root.querySelector('[data-account-open-chat-direct]')?.addEventListener('click', () => {
     state.accountTab = 'messages';
     state.accountChatOpen = true;
+    state.accountChatReturn = 'deck';
     state.accountDeckOpen = false;
     void handlers.render();
   });
   root.querySelectorAll('[data-account-upcoming]').forEach((node) => node.addEventListener('click', () => {
     const request = requests[Number(node.dataset.accountUpcoming)];
-    if (request) openHistoryDetail(state, request, handlers.onRepeat);
+    if (!request) return;
+    selectHistoryRequest(state, request, 'representative');
+    void handlers.render();
   }));
   root.querySelectorAll('[data-account-program]').forEach((node) => node.addEventListener('click', () => openProgram(rows[Number(node.dataset.accountProgram)])));
 }
@@ -592,11 +610,56 @@ async function renderHistory(root, state, handlers) {
   bindRootSwipe(root, state, handlers);
   root.querySelectorAll('[data-account-history]').forEach((node) => node.addEventListener('click', () => {
     const request = requests[Number(node.dataset.accountHistory)];
-    if (request) openHistoryDetail(state, request, handlers.onRepeat);
+    if (!request) return;
+    selectHistoryRequest(state, request, 'history');
+    void handlers.render();
   }));
+  const anchorIndex = requests.findIndex((request) => !isCancelled(request) && requestMoment(request) >= nowMoment());
+  if (anchorIndex > 0) requestAnimationFrame(() => root.querySelector(`[data-account-history="${anchorIndex}"]`)?.scrollIntoView?.({ block: 'center' }));
   root.querySelector('[data-account-open-chat-root]')?.addEventListener('click', () => {
     state.accountTab = 'messages';
     state.accountChatOpen = false;
+    state.accountChatReturn = 'deck';
+    void handlers.render();
+  });
+  root.querySelector('[data-account-profile-settings]')?.addEventListener('click', () => openProfileSettings(state, {
+    onPersonalData: handlers.onPersonalData,
+    onPassword: handlers.onPassword,
+    onConsents: handlers.onConsents,
+    onLogout: handlers.onLogout,
+  }));
+}
+
+async function renderHistoryDetail(root, state, handlers) {
+  const request = currentHistoryRequest(state);
+  if (!request) {
+    state.accountTab = state.accountHistoryReturn || 'history';
+    await handlers.render();
+    return;
+  }
+  const canRepeat = requestProcedures(request).length > 0;
+  const header = v2Header({
+    a: { kind: 'avatar', label: accountName(state), image: accountPhoto(state), data: 'data-account-profile-settings', aria: 'Настройки профиля' },
+    b: workplaceName(state, request),
+    c: canRepeat ? { kind: 'text', label: 'Записаться', data: 'data-account-history-repeat', aria: 'Записаться снова' } : null,
+    d: { kind: 'chat', data: 'data-account-history-chat', aria: 'Чат', badge: state.accountUnreadCount || 0 },
+  });
+  renderV2Shell(root, state, { header, body: historyDetailBody(state, request) });
+  bindDeck(root, state, handlers);
+  initV2Swipe(root, {
+    onRight: () => {
+      state.accountTab = state.accountHistoryReturn || 'history';
+      state.accountHistoryRequestId = '';
+      state.accountHistoryRequestMoment = '';
+      void handlers.render();
+    },
+  });
+  root.querySelector('[data-account-history-repeat]')?.addEventListener('click', () => handlers.onRepeat?.(request));
+  root.querySelector('[data-account-history-chat]')?.addEventListener('click', () => {
+    state.accountTab = 'messages';
+    state.accountChatOpen = true;
+    state.accountChatReturn = 'deck';
+    state.accountDeckOpen = false;
     void handlers.render();
   });
   root.querySelector('[data-account-profile-settings]')?.addEventListener('click', () => openProfileSettings(state, {
@@ -624,11 +687,14 @@ async function renderMessages(root, state, handlers) {
     initV2Swipe(root, {
       onRight: () => {
         state.accountChatOpen = false;
-        if (handlers.onChatBack) {
+        if (state.accountChatReturn === 'booking' && handlers.onChatBack) {
+          state.accountChatReturn = '';
           handlers.onChatBack();
           return;
         }
         state.accountTab = 'home';
+        state.accountDeckOpen = true;
+        state.accountDeckActive ||= 'representatives';
         void handlers.render();
       },
     });
@@ -651,12 +717,14 @@ async function renderMessages(root, state, handlers) {
   initV2Swipe(root, {
     onRight: () => {
       state.accountChatOpen = false;
-      if (handlers.onChatBack) {
+      if (state.accountChatReturn === 'booking' && handlers.onChatBack) {
+        state.accountChatReturn = '';
         handlers.onChatBack();
         return;
       }
       state.accountTab = 'home';
       state.accountDeckOpen = true;
+      state.accountDeckActive ||= 'representatives';
       void handlers.render();
     },
   });
@@ -762,6 +830,7 @@ export async function renderAccount(root, state, callbacks = {}) {
   }
 
   if (state.accountTab === 'messages') return renderMessages(root, state, handlers);
+  if (state.accountTab === 'history-detail') return renderHistoryDetail(root, state, handlers);
   if (state.accountTab === 'history') return renderHistory(root, state, handlers);
   if (state.accountTab === 'representatives') return renderRepresentatives(root, state, handlers);
   if (state.accountTab === 'representative') return renderRepresentative(root, state, handlers);
