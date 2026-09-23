@@ -23,8 +23,10 @@ import {
   escapeHtml,
   field,
   initCalendar,
+  initPasswordFields,
   initV2StickerSwipe,
   initV2Swipe,
+  passwordField,
   phoneField,
   v2Document,
   v2Header,
@@ -388,7 +390,7 @@ function renderAccountEntry(root, state) {
     || '';
   const form = `<form data-booking-entry-form>
     ${field({ label: 'Телефон или email', name: 'identifier', value: rememberedIdentifier, required: true, autocomplete: 'username' })}
-    ${field({ label: 'Пароль', name: 'password', type: 'password', required: true, autocomplete: 'current-password' })}
+    ${passwordField({ label: 'Пароль', name: 'password', required: true, autocomplete: 'current-password' })}
     ${errorBlock(state.error)}
     ${button('Войти', { type: 'submit' })}
     <button type="button" class="v2-sticker-link" data-booking-register>Зарегистрироваться</button>
@@ -408,6 +410,7 @@ function renderAccountEntry(root, state) {
     },
   });
 
+  initPasswordFields(root);
   const authForm = root.querySelector('[data-booking-entry-form]');
   root.querySelector('[data-booking-register]')?.addEventListener('click', async () => {
     const data = new FormData(authForm);
@@ -477,8 +480,8 @@ function renderAccountDetails(root, state) {
       ${errorBlock(contactErrors.phone || '')}
       ${field({ label: 'Email', name: 'email', value: draft.email || '', type: 'email', required: true, autocomplete: 'email' })}
       ${errorBlock(contactErrors.email || '')}
-      ${field({ label: 'Пароль', name: 'password', type: 'password', required: true, autocomplete: 'new-password' })}
-      ${field({ label: 'Повтор пароля', name: 'repeatPassword', type: 'password', required: true, autocomplete: 'new-password' })}
+      ${passwordField({ label: 'Пароль', name: 'password', required: true, autocomplete: 'new-password' })}
+      ${passwordField({ label: 'Повтор пароля', name: 'repeatPassword', required: true, autocomplete: 'new-password' })}
       ${errorBlock(state.error)}
     </form>`,
   });
@@ -489,6 +492,7 @@ function renderAccountDetails(root, state) {
       renderAccountEntry(root, state);
     },
   });
+  initPasswordFields(root);
   const form = root.querySelector('[data-booking-account-form]');
   root.querySelector('[data-booking-account-submit]')?.addEventListener('click', () => form?.requestSubmit());
   form?.addEventListener('submit', async (event) => {
