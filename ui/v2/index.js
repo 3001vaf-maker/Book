@@ -169,14 +169,14 @@ export function initV2Swipe(root, { onRight = null, onLeft = null, threshold = 7
   let startX = 0;
   let startY = 0;
   let dx = 0;
-  let horizontal = false;
+  let axis = 'pending';
 
   const reset = () => {
     surface.style.removeProperty('--v2-drag-x');
     surface.classList.remove('is-dragging');
     pointerId = null;
     dx = 0;
-    horizontal = false;
+    axis = 'pending';
   };
 
   const down = (event) => {
@@ -185,18 +185,28 @@ export function initV2Swipe(root, { onRight = null, onLeft = null, threshold = 7
     startX = event.clientX;
     startY = event.clientY;
     dx = 0;
-    horizontal = false;
-    surface.setPointerCapture?.(pointerId);
+    axis = 'pending';
   };
   const move = (event) => {
     if (event.pointerId !== pointerId) return;
     const nextX = event.clientX - startX;
     const nextY = event.clientY - startY;
-    if (!horizontal && Math.abs(nextX) > 10) horizontal = Math.abs(nextX) > Math.abs(nextY) * 1.15;
-    if (!horizontal) return;
-    dx = Math.max(-maxDrag, Math.min(maxDrag, nextX));
-    surface.classList.add('is-dragging');
-    surface.style.setProperty('--v2-drag-x', `${dx}px`);
+    if (axis === 'pending') {
+      if (Math.max(Math.abs(nextX), Math.abs(nextY)) < 12) return;
+      axis = Math.abs(nextX) > Math.abs(nextY) * 1.25 ? 'horizontal' : 'vertical';
+      if (axis === 'vertical') {
+        pointerId = null;
+        return;
+      }
+      surface.setPointerCapture?.(event.pointerId);
+    }
+    if (axis !== 'horizontal') return;
+    const allowedX = nextX > 0 ? (onRight ? nextX : 0) : (onLeft ? nextX : 0);
+    dx = Math.max(-maxDrag, Math.min(maxDrag, allowedX));
+    if (dx !== 0) {
+      surface.classList.add('is-dragging');
+      surface.style.setProperty('--v2-drag-x', `${dx}px`);
+    }
     event.preventDefault();
   };
   const up = (event) => {
@@ -219,38 +229,50 @@ export function initV2Swipe(root, { onRight = null, onLeft = null, threshold = 7
   };
 }
 
-
-export function initV2StickerSwipe(root, { onRight = null, onLeft = null, threshold = 64 } = {}) {
+export function initV2StickerSwipe(root, { onRight = null, onLeft = null, threshold = 64, maxDrag = 180 } = {}) {
   const surface = root?.matches?.('[data-v2-sticker]') ? root : root?.querySelector?.('[data-v2-sticker]');
   if (!surface) return () => {};
   let pointerId = null;
   let startX = 0;
   let startY = 0;
   let dx = 0;
-  let horizontal = false;
+  let axis = 'pending';
+
   const reset = () => {
     surface.style.removeProperty('--v2-sticker-drag-x');
     surface.classList.remove('is-dragging');
     pointerId = null;
     dx = 0;
-    horizontal = false;
+    axis = 'pending';
   };
   const down = (event) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     pointerId = event.pointerId;
     startX = event.clientX;
     startY = event.clientY;
-    surface.setPointerCapture?.(pointerId);
+    dx = 0;
+    axis = 'pending';
   };
   const move = (event) => {
     if (event.pointerId !== pointerId) return;
     const nextX = event.clientX - startX;
     const nextY = event.clientY - startY;
-    if (!horizontal && Math.abs(nextX) > 10) horizontal = Math.abs(nextX) > Math.abs(nextY) * 1.15;
-    if (!horizontal) return;
-    dx = Math.max(-180, Math.min(180, nextX));
-    surface.classList.add('is-dragging');
-    surface.style.setProperty('--v2-sticker-drag-x', `${dx}px`);
+    if (axis === 'pending') {
+      if (Math.max(Math.abs(nextX), Math.abs(nextY)) < 12) return;
+      axis = Math.abs(nextX) > Math.abs(nextY) * 1.25 ? 'horizontal' : 'vertical';
+      if (axis === 'vertical') {
+        pointerId = null;
+        return;
+      }
+      surface.setPointerCapture?.(event.pointerId);
+    }
+    if (axis !== 'horizontal') return;
+    const allowedX = nextX > 0 ? (onRight ? nextX : 0) : (onLeft ? nextX : 0);
+    dx = Math.max(-maxDrag, Math.min(maxDrag, allowedX));
+    if (dx !== 0) {
+      surface.classList.add('is-dragging');
+      surface.style.setProperty('--v2-sticker-drag-x', `${dx}px`);
+    }
     event.preventDefault();
   };
   const up = (event) => {
@@ -271,7 +293,6 @@ export function initV2StickerSwipe(root, { onRight = null, onLeft = null, thresh
     surface.removeEventListener('pointercancel', reset);
   };
 }
-
 
 export function initV2DeckSwipe(root, { activeId = '', onActiveChange = null, threshold = 58 } = {}) {
   const deck = root?.matches?.('[data-v2-deck]') ? root : root?.querySelector?.('[data-v2-deck]');
