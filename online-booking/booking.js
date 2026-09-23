@@ -543,12 +543,10 @@ async function continueAfterIdentity(root, state) {
   }
 
   try {
-    const [platformState, consentState] = await Promise.all([
-      getAccountPlatformState(state.tenantId),
-      refreshTenantConsentState(state),
-    ]);
+    const platformState = await getAccountPlatformState(state.tenantId);
     state.accountTerms = platformState?.document || state.accountTerms;
     state.accountTermsAccepted = Boolean(platformState?.accepted);
+    const consentState = await refreshTenantConsentState(state);
 
     if (!platformState?.accepted || !consentState.pdnActive) {
       renderLegalSticker(root, state);
