@@ -1,16 +1,17 @@
 import { changeAccountPassword } from '../core/account/index.js';
-import { button, field, mountV2Layer, v2Layer } from '../ui/ui.js';
+import { button, initPasswordFields, mountV2Layer, passwordField, v2Layer } from '../ui/ui.js';
 
 export function openAccountPasswordSettings(state) {
   const content = `<form class="form-grid" data-account-password-form>
-    ${field({ label: 'Текущий пароль', name: 'currentPassword', type: 'password', required: true, autocomplete: 'current-password' })}
-    ${field({ label: 'Новый пароль', name: 'newPassword', type: 'password', required: true, autocomplete: 'new-password' })}
-    ${field({ label: 'Повторите новый пароль', name: 'repeatPassword', type: 'password', required: true, autocomplete: 'new-password' })}
+    ${passwordField({ label: 'Текущий пароль', name: 'currentPassword', required: true, autocomplete: 'current-password' })}
+    ${passwordField({ label: 'Новый пароль', name: 'newPassword', required: true, autocomplete: 'new-password' })}
+    ${passwordField({ label: 'Повторите новый пароль', name: 'repeatPassword', required: true, autocomplete: 'new-password' })}
     <div class="form-error" data-account-password-error role="alert"></div>
     ${button('Сохранить пароль', { type: 'submit' })}
   </form>`;
   const layer = mountV2Layer(v2Layer(content, { kind: 'standard', title: 'Изменить пароль' }));
   if (!layer) return null;
+  initPasswordFields(layer);
   const form = layer.querySelector('[data-account-password-form]');
   const errorNode = layer.querySelector('[data-account-password-error]');
   form?.addEventListener('submit', async (event) => {
