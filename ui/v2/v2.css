@@ -89,7 +89,7 @@
 .v2-deck__card:nth-child(3n+2){background:var(--v2-taupe)}
 .v2-deck__card:nth-child(3n+3){background:var(--v2-smoke);color:#fff}
 .v2-deck__card:not(.is-active) strong{visibility:hidden}
-.v2-deck__card.is-active{z-index:5;transform:translateX(0)}
+.v2-deck__card.is-active{z-index:5;transform:translateX(var(--v2-deck-drag-x,0px));transition:transform .22s ease}.v2-deck__card.is-active.is-dragging{transition:none}
 .v2-deck__card strong{font-size:20px;line-height:1.15}
 
 .v2-section{display:grid;gap:10px;margin-bottom:24px}
