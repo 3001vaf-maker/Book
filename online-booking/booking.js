@@ -298,6 +298,7 @@ function renderFlowPage(root, state, {
   root.querySelector('[data-booking-flow-chat]')?.addEventListener('click', () => {
     state.accountTab = 'messages';
     state.accountChatOpen = true;
+    state.accountChatReturn = 'booking';
     state.accountDeckOpen = false;
     void renderAccountHome(root, state);
   });
@@ -767,7 +768,23 @@ function renderConfirmation(root, state) {
 }
 
 async function finalizeBookingRequest(root, state) {
+  const slotStillAvailable = () => getBookingSlots(state.context, {
+    workplaceKey: state.workplaceKey,
+    date: state.date,
+    procedureIds: state.procedureIds,
+    step: state.settings.slotStep,
+  }).some((slot) => String(slot.from || '') === String(state.from || ''));
+
   try {
+    await refreshContext(state);
+    if (!slotStillAvailable()) {
+      state.error = 'Выбранное время уже недоступно. Выберите другое.';
+      state.from = '';
+      state.to = '';
+      renderTimes(root, state);
+      return;
+    }
+
     state.lastRequest = await createBookingRequest(state.tenantId, {
       workplaceKey: state.workplaceKey,
       date: state.date,
@@ -779,13 +796,23 @@ async function finalizeBookingRequest(root, state) {
     await refreshContext(state);
     state.accountTab = 'representative';
     state.accountChatOpen = false;
+    state.accountChatReturn = '';
     state.accountDeckOpen = false;
     await renderAccountHome(root, state);
   } catch (error) {
+    await refreshContext(state).catch(() => {});
+    if (state.from && !slotStillAvailable()) {
+      state.error = 'Выбранное время уже занято или стало недоступно. Выберите другое.';
+      state.from = '';
+      state.to = '';
+      renderTimes(root, state);
+      return;
+    }
     state.error = error instanceof Error ? error.message : 'Не удалось подтвердить запись';
     renderConfirmation(root, state);
   }
 }
+
 async function startBookingFromAccount(root, state) {
   resetBookingChoice(state);
   state.identityDestination = 'booking';
@@ -816,6 +843,7 @@ async function renderAccountHome(root, state) {
       state.error = '';
       state.accountTab = 'home';
       state.accountChatOpen = false;
+      state.accountChatReturn = '';
       seedTenantConsents(state, []);
       state.accountTerms = null;
       state.accountTermsAccepted = false;
@@ -854,6 +882,7 @@ export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = 
     accountTab: 'home',
     accountDeckOpen: false,
     accountChatOpen: false,
+    accountChatReturn: '',
     bookingStep: '',
     accountRequests: [],
   };
