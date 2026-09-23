@@ -22,13 +22,13 @@ function headerControl(slot = {}, role = '') {
       ? `<span class="v2-header__avatar" style="--v2-avatar:url('${text(image)}')" aria-hidden="true"></span>`
       : `<span class="v2-header__avatar v2-header__avatar--initials" aria-hidden="true">${initials}</span>`;
   } else if (kind === 'chat') {
-    body = '<span class="v2-header__icon" aria-hidden="true">◌</span>';
+    body = '<span class="v2-header__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 5.5h16v11H9l-5 3v-14Z"></path></svg></span>';
   } else if (kind === 'contacts') {
-    body = '<span class="v2-header__icon" aria-hidden="true">☷</span>';
+    body = '<span class="v2-header__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="7" cy="8" r="2.2"></circle><path d="M3.8 14.5c.7-2.1 1.8-3.1 3.2-3.1s2.5 1 3.2 3.1M13 7h7M13 12h7M13 17h7"></path></svg></span>';
   } else if (kind === 'attachment') {
-    body = '<span class="v2-header__icon" aria-hidden="true">⌕</span>';
+    body = '<span class="v2-header__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m8.5 12.5 6.2-6.2a3.2 3.2 0 0 1 4.5 4.5l-8.3 8.3a5 5 0 0 1-7.1-7.1l8.1-8.1"></path></svg></span>';
   } else if (kind === 'settings') {
-    body = '<span class="v2-header__icon" aria-hidden="true">⚙</span>';
+    body = '<span class="v2-header__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"></path></svg></span>';
   }
   return `<div class="v2-header__slot v2-header__slot--${role}"><button type="button" class="v2-header__control v2-header__control--${kind}"${dataAttributes(slot.data)} aria-label="${aria}"${slot.disabled ? ' disabled' : ''}>${body}${badge}</button></div>`;
 }
