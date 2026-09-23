@@ -384,82 +384,135 @@ function renderWelcome(root, state) {
 }
 
 function renderAccountEntry(root, state) {
+  state.bookingStep = 'auth';
   const rememberedIdentifier = state.accountDraft?.identifier
     || state.accountDraft?.email
     || getRememberedAccountEmail(state.tenantId)
     || '';
-  renderFlowPage(root, state, {
-    title: 'Вход или регистрация',
-    subtitle: 'Введите телефон или email',
-    back: { data: 'data-booking-entry-back', aria: 'Назад' },
-    action: { label: 'Далее', data: 'data-booking-entry-submit' },
-    body: `<form data-booking-entry-form>${field({ label: 'Телефон или email', name: 'identifier', value: rememberedIdentifier, required: true, autocomplete: 'username' })}${errorBlock(state.error)}</form>`,
-    center: true,
+  const form = `<form data-booking-entry-form>
+    ${field({ label: 'Телефон или email', name: 'identifier', value: rememberedIdentifier, required: true, autocomplete: 'username' })}
+    ${field({ label: 'Пароль', name: 'password', type: 'password', required: true, autocomplete: 'current-password' })}
+    ${errorBlock(state.error)}
+    ${button('Войти', { type: 'submit' })}
+    <button type="button" class="v2-sticker-link" data-booking-register>Зарегистрироваться</button>
+    <button type="button" class="v2-sticker-link" data-booking-forgot>Забыли пароль?</button>
+  </form>`;
+  root.innerHTML = `<section class="${flowThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${v2Sticker({
+    title: 'Вход',
+    body: form,
+    className: 'v2-sticker-screen--auth',
+  })}</section>`;
+
+  initV2StickerSwipe(root, {
+    onRight: () => {
+      state.error = '';
+      if (state.identityDestination === 'booking' && state.from) renderTimes(root, state);
+      else nextBookingStep(root, state);
+    },
   });
-  const form = root.querySelector('[data-booking-entry-form]');
-  root.querySelector('[data-booking-entry-back]')?.addEventListener('click', () => {
+
+  const authForm = root.querySelector('[data-booking-entry-form]');
+  root.querySelector('[data-booking-register]')?.addEventListener('click', async () => {
+    const data = new FormData(authForm);
+    const identifier = String(data.get('identifier') || '').trim();
+    state.accountDraft = {
+      ...(state.accountDraft || {}),
+      identifier,
+      ...(identifier.includes('@') ? { email: identifier.toLowerCase() } : {}),
+    };
     state.error = '';
-    if (state.identityDestination === 'booking' && state.from) renderTimes(root, state);
-    else nextBookingStep(root, state);
+    try {
+      await loadAccountTerms(state);
+      renderAccountDetails(root, state);
+    } catch (error) {
+      state.error = error instanceof Error ? error.message : 'Не удалось открыть регистрацию';
+      renderAccountEntry(root, state);
+    }
   });
-  root.querySelector('[data-booking-entry-submit]')?.addEventListener('click', () => form?.requestSubmit());
-  form?.addEventListener('submit', async (event) => {
+  root.querySelector('[data-booking-forgot]')?.addEventListener('click', () => {
+    state.error = 'Восстановление пароля будет подключено отдельным flow.';
+    renderAccountEntry(root, state);
+  });
+  authForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const identifier = String(new FormData(form).get('identifier') || '').trim();
-    const submit = root.querySelector('[data-booking-entry-submit]');
+    const data = new FormData(authForm);
+    const identifier = String(data.get('identifier') || '').trim();
+    const password = String(data.get('password') || '');
+    const submit = authForm.querySelector('button[type="submit"]');
     if (submit) submit.disabled = true;
     try {
       const prepared = await prepareAccount(state.tenantId, { identifier });
-      state.accountDraft = {
-        ...(state.accountDraft || {}),
-        identifier,
-        ...(prepared.identifierType === 'EMAIL' ? { email: identifier.toLowerCase() } : {}),
-        ...(prepared.identifierType === 'PHONE' ? { phone: identifier } : {}),
-      };
-      state.contactErrors = {};
-      state.passwordMode = prepared.exists ? 'login' : 'register';
-      state.error = '';
-      if (prepared.exists) {
-        renderPassword(root, state);
-      } else {
-        await loadAccountTerms(state);
-        renderAccountTerms(root, state);
+      if (!prepared.exists) {
+        state.accountDraft = {
+          ...(state.accountDraft || {}),
+          identifier,
+          ...(prepared.identifierType === 'EMAIL' ? { email: identifier.toLowerCase() } : {}),
+          ...(prepared.identifierType === 'PHONE' ? { phone: identifier } : {}),
+        };
+        state.error = 'Аккаунт не найден. Выберите «Зарегистрироваться».';
+        renderAccountEntry(root, state);
+        return;
       }
+      const payload = await loginAccount(state.tenantId, identifier, password);
+      state.accountDraft = { ...(state.accountDraft || {}), identifier };
+      state.account = payload.account;
+      state.error = '';
+      await continueAfterIdentity(root, state);
     } catch (error) {
-      state.error = error instanceof Error ? error.message : 'Не удалось проверить аккаунт';
+      state.error = error instanceof Error ? error.message : 'Не удалось войти';
       renderAccountEntry(root, state);
     }
   });
 }
 
 function renderAccountDetails(root, state) {
+  state.bookingStep = 'registration';
   const draft = state.accountDraft || {};
   const contactErrors = state.contactErrors || {};
   renderFlowPage(root, state, {
-    title: 'Ваши данные',
-    subtitle: 'Они сохранятся в вашей учетной записи',
-    back: { data: 'data-booking-account-back', aria: 'Назад' },
-    action: { label: 'Далее', data: 'data-booking-account-submit' },
-    body: `<form data-booking-account-form>${field({ label: 'Имя', name: 'name', value: draft.name || '', required: true, autocomplete: 'given-name' })}${field({ label: 'Фамилия', name: 'surname', value: draft.surname || '', autocomplete: 'family-name' })}${field({ label: 'Email', name: 'email', value: draft.email || '', type: 'email', required: true, autocomplete: 'email' })}${errorBlock(contactErrors.email || '')}${phoneField({ label: 'Телефон', name: 'phone', value: draft.phone || '', required: true })}${errorBlock(contactErrors.phone || '')}${errorBlock(state.error)}</form>`,
+    title: 'Регистрация',
+    action: { label: 'Подтвердить', data: 'data-booking-account-submit' },
+    step: 'registration',
+    body: `<form data-booking-account-form>
+      ${field({ label: 'Имя', name: 'name', value: draft.name || '', required: true, autocomplete: 'given-name' })}
+      ${field({ label: 'Фамилия', name: 'surname', value: draft.surname || '', autocomplete: 'family-name' })}
+      ${phoneField({ label: 'Телефон', name: 'phone', value: draft.phone || '', required: true })}
+      ${errorBlock(contactErrors.phone || '')}
+      ${field({ label: 'Email', name: 'email', value: draft.email || '', type: 'email', required: true, autocomplete: 'email' })}
+      ${errorBlock(contactErrors.email || '')}
+      ${field({ label: 'Пароль', name: 'password', type: 'password', required: true, autocomplete: 'new-password' })}
+      ${field({ label: 'Повтор пароля', name: 'repeatPassword', type: 'password', required: true, autocomplete: 'new-password' })}
+      ${errorBlock(state.error)}
+    </form>`,
+  });
+  initV2Swipe(root, {
+    onRight: () => {
+      state.error = '';
+      state.contactErrors = {};
+      renderAccountEntry(root, state);
+    },
   });
   const form = root.querySelector('[data-booking-account-form]');
-  root.querySelector('[data-booking-account-back]')?.addEventListener('click', () => {
-    state.error = '';
-    state.contactErrors = {};
-    renderAccountTerms(root, state);
-  });
   root.querySelector('[data-booking-account-submit]')?.addEventListener('click', () => form?.requestSubmit());
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const data = new FormData(form);
     const email = String(data.get('email') || '').trim().toLowerCase();
     const phone = String(data.get('phone') || '').trim();
+    const password = String(data.get('password') || '');
+    const repeatPassword = String(data.get('repeatPassword') || '');
+    if (password !== repeatPassword) {
+      state.error = 'Пароли не совпадают.';
+      renderAccountDetails(root, state);
+      return;
+    }
     state.accountDraft = {
       ...(state.accountDraft || {}),
       name: String(data.get('name') || '').trim(),
       surname: String(data.get('surname') || '').trim(),
       email,
       phone,
+      password,
     };
     const submit = root.querySelector('[data-booking-account-submit]');
     if (submit) submit.disabled = true;
@@ -476,9 +529,9 @@ function renderAccountDetails(root, state) {
         return;
       }
       state.contactErrors = {};
-      state.passwordMode = 'register';
       state.error = '';
-      renderPassword(root, state);
+      if (!state.accountTerms) await loadAccountTerms(state);
+      renderLegalSticker(root, state);
     } catch (error) {
       state.error = error instanceof Error ? error.message : 'Не удалось проверить контакты';
       renderAccountDetails(root, state);
