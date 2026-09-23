@@ -129,7 +129,7 @@ async function loadAccountTerms(state) {
   return state.accountTerms;
 }
 
-function renderExpandedLegalDocument(root, state, document, onBack) {
+function renderExpandedDocument(root, state, document, onBack) {
   const content = v2Document({
     title: document?.title || 'Документ',
     version: document?.version || 1,
@@ -182,7 +182,7 @@ function renderLegalSticker(root, state) {
   });
 
   root.querySelector('[data-legal-platform-document]')?.addEventListener('click', () => {
-    renderExpandedLegalDocument(root, state, {
+    renderExpandedDocument(root, state, {
       title: state.accountTerms?.title || 'Условия использования',
       version: state.accountTerms?.version || 1,
       content: state.accountTerms?.content || '',
@@ -195,7 +195,7 @@ function renderLegalSticker(root, state) {
   root.querySelectorAll('[data-booking-document]').forEach((node) => node.addEventListener('click', () => {
     const document = tenantDocuments.find((item) => String(item.id) === String(node.dataset.bookingDocument));
     if (!document) return;
-    renderExpandedLegalDocument(root, state, {
+    renderExpandedDocument(root, state, {
       title: document.title || legalTitle(document),
       version: document.version || 1,
       content: document.text || '',
