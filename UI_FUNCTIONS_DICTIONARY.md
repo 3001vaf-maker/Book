@@ -41,7 +41,7 @@
 | UEI | `ui/uei/` | `uei`, `initUEI` |
 | Payment | `ui/payment/` | `paymentForm`, `initPaymentForm`, `paymentMethods`, `initPaymentMethods`, `paymentReceipt` |
 | Public booking | `ui/booking/` | `bookingAccountHeader`, `bookingAction`, `bookingActions`, `bookingAgreementCards`, `bookingChoiceCards`, `bookingDocument`, `bookingHeading`, `bookingHistoryCards`, `bookingPersonalDataButton`, `bookingScreen`, `bookingThemePreview`, `bookingThemeStyle`, `bookingTimeGroups` |
-| UI Reference V2 shell | `ui/v2/` | `v2Header`, `v2FDeck`, `v2Shell`, `v2Section`, `v2HorizontalRail`, `v2RailCard`, `v2ServiceStickers`, `v2Sticker`, `v2LegalCards`, `v2Layer`, `mountV2Layer`, `initV2Swipe`, `initV2StickerSwipe` |
+| UI Reference V2 shell | `ui/v2/` | `v2Header`, `v2FDeck`, `v2Shell`, `v2Section`, `v2HorizontalRail`, `v2RailCard`, `v2ServiceStickers`, `v2Sticker`, `v2Document`, `v2LegalCards`, `v2Layer`, `mountV2Layer`, `initV2Swipe`, `initV2StickerSwipe` |
 
 ## Ключевые ownership-границы
 
