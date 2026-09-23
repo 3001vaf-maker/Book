@@ -898,8 +898,10 @@ export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = 
     lastRequest: null,
     repeatSelection: null,
     identityDestination: 'booking',
-    accountTab: 'profile',
+    accountTab: 'home',
+    accountDeckOpen: false,
     accountChatOpen: false,
+    bookingStep: '',
     accountRequests: [],
   };
 
