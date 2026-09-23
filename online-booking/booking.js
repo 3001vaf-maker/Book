@@ -372,16 +372,13 @@ function renderWelcome(root, state) {
     state.identityDestination = 'booking';
     nextBookingStep(root, state);
   };
-  const action = button('Продолжить', { data: 'data-booking-welcome-next' });
   root.innerHTML = `<section class="${flowThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${v2Sticker({
     eyebrow: owner ? `Приглашение от ${owner}` : '',
     title: state.settings.welcomeTitle || '',
     body: state.settings.welcomeText ? `<p>${escapeHtml(state.settings.welcomeText).replaceAll('\n', '<br>')}</p>` : '',
-    action,
     className: 'v2-sticker-screen--welcome',
   })}</section>`;
   initV2StickerSwipe(root, { onRight: continueFlow, onLeft: continueFlow });
-  root.querySelector('[data-booking-welcome-next]')?.addEventListener('click', continueFlow);
 }
 
 function renderAccountEntry(root, state) {
