@@ -130,7 +130,7 @@
 .v2-sticker__body{display:grid;gap:14px}
 .v2-sticker__action{display:grid;gap:8px}
 
-.v2-legal-cards{display:grid;gap:12px}
+.v2-document{display:grid;gap:14px}.v2-document__version{font-size:12px;color:var(--v2-muted)}.v2-document h2{margin:0;font-size:24px;line-height:1.08}.v2-document__body{font-size:15px;line-height:1.55}.v2-document__body p{margin:0 0 1em}.v2-document__body p:last-child{margin-bottom:0}.v2-legal-cards{display:grid;gap:12px}
 .v2-legal-card{
   height:96px;
   display:grid;
