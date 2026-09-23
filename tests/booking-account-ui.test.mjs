@@ -81,7 +81,11 @@ assert.match(booking, /Выбранное время уже недоступно
 assert.doesNotMatch(booking, /consentState\.allowed/);
 assert.match(booking, /const account = await getAccount\(state\.tenantId\);[\s\S]*?if \(account\) state\.account = account;[\s\S]*?renderWelcome\(root, state\);/);
 assert.match(booking, /function backFromFirstBookingStep[\s\S]*?state\.bookingOrigin === 'profile'[\s\S]*?renderWelcome\(root, state\);/);
-assert.doesNotMatch(booking, /function backFromFirstBookingStep[\s\S]*?renderAccountEntry\(root, state\);/);
+const bookingBackBlock = booking.slice(
+  booking.indexOf('function backFromFirstBookingStep'),
+  booking.indexOf('function renderWelcome'),
+);
+assert.doesNotMatch(bookingBackBlock, /renderAccountEntry\(root, state\);/);
 
 // End-user account is the first consumer of shared UI Reference V2.
 assert.match(accountShell, /v2Header\(\{/);
