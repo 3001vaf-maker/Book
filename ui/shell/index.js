@@ -116,6 +116,9 @@ function attachmentMarkup(attachment = {}) {
   if (type.startsWith('video/') && dataUrl.startsWith('data:video/')) {
     return `<video class="message-attachment message-attachment--video" controls preload="metadata"><source src="${text(dataUrl)}" type="${text(type)}"></video>`;
   }
+  if (type === 'application/pdf' && dataUrl.startsWith('data:application/pdf')) {
+    return `<a class="message-attachment message-attachment--file" href="${text(dataUrl)}" target="_blank" rel="noopener" aria-label="Открыть ${name}"><strong>PDF</strong><span>${name}</span></a>`;
+  }
   return '';
 }
 
@@ -135,9 +138,10 @@ export function messageThread(messages = [], options = {}) {
   return `<div class="message-thread" data-message-thread>${values.map((message) => messageBubble(message, options)).join('')}</div>`;
 }
 
-export function messageComposer({ placeholder = 'Написать сообщение...', data = 'data-message-composer', sendData = 'data-message-send', attachments = false } = {}) {
-  const composerClass = attachments ? 'message-composer message-composer--with-attachments' : 'message-composer message-composer--plain';
-  return `<form class="${composerClass}" ${data}>${attachments ? `<input class="sr-only" type="file" accept="image/*,video/*" multiple data-message-attachment-input><button type="button" class="message-composer__attach" data-message-attachment aria-label="Прикрепить фото или медиа">📎</button>` : ''}<textarea class="message-composer__input" name="message" rows="1" placeholder="${text(placeholder)}" aria-label="${text(placeholder)}"></textarea>${button('➤', { className: 'message-composer__send', type: 'submit', data: sendData, aria: 'Отправить' })}${attachments ? '<div class="message-composer__attachments" data-message-attachment-preview></div>' : ''}</form>`;
+export function messageComposer({ placeholder = 'Написать сообщение...', data = 'data-message-composer', sendData = 'data-message-send', attachments = false, attachmentTrigger = 'composer' } = {}) {
+  const externalAttachmentTrigger = attachments && attachmentTrigger === 'external';
+  const composerClass = attachments && !externalAttachmentTrigger ? 'message-composer message-composer--with-attachments' : 'message-composer message-composer--plain';
+  return `<form class="${composerClass}" ${data}>${attachments ? `<input class="sr-only" type="file" accept="image/*,video/*,application/pdf,.pdf" multiple data-message-attachment-input><button type="button" class="message-composer__attach${externalAttachmentTrigger ? ' sr-only' : ''}" data-message-attachment aria-label="Прикрепить файл">📎</button>` : ''}<textarea class="message-composer__input" name="message" rows="1" placeholder="${text(placeholder)}" aria-label="${text(placeholder)}"></textarea>${button('➤', { className: 'message-composer__send', type: 'submit', data: sendData, aria: 'Отправить' })}${attachments ? '<div class="message-composer__attachments" data-message-attachment-preview></div>' : ''}</form>`;
 }
 
 export function settingToggle({ label = '', checked = false, data = '', disabled = false } = {}) {

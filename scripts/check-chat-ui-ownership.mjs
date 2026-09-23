@@ -6,6 +6,8 @@ const chatApi = fs.readFileSync('core/communications/chat.js', 'utf8');
 const controller = fs.readFileSync('server/src/communication/communication.controller.ts', 'utf8');
 const dispatch = fs.readFileSync('server/src/communication/communication-dispatch.service.ts', 'utf8');
 const shellCss = fs.readFileSync('ui/shell/shell.css', 'utf8');
+const v2Css = fs.readFileSync('ui/v2/v2.css', 'utf8');
+const v2Ui = fs.readFileSync('ui/v2/index.js', 'utf8');
 
 const failures = [];
 const expect = (condition, message) => { if (!condition) failures.push(message); };
@@ -19,11 +21,18 @@ expect(profileChat.includes('bindMessageAttachments(form)') && profileChat.inclu
 expect(!profileChat.includes('root.innerHTML = `${header}<div class="form-grid">'), 'Profile chat must not keep the legacy local chat screen wrapper.');
 expect(!profileChat.includes('<style>') && !profileChat.includes("document.createElement('style')"), 'Profile chat must not own local styles.');
 
-expect(accountChat.includes("className: 'app-view-shell--chat'"), 'Account chat must use the canonical Book chat shell class.');
-expect(accountChat.includes('messageThread(messages') && accountChat.includes('messageComposer({ attachments: true })'), 'Account chat must use the shared message thread and composer with attachments.');
+expect(accountChat.includes('v2Header({') && accountChat.includes('v2Shell'), 'End-user Chat must use the shared V2 H + Z shell.');
+expect(accountChat.includes("className: 'v2-app--chat'"), 'End-user Chat must use the canonical V2 Chat shell class.');
+expect(accountChat.includes("messageComposer({ attachments: true, attachmentTrigger: 'external' })"), 'End-user Chat must keep attachments in Header D instead of a permanent composer paperclip.');
+expect(accountChat.includes("kind: 'contacts'") && accountChat.includes("kind: 'attachment'"), 'End-user Chat Header must expose C contacts and D attachment roles.');
+expect(!accountChat.includes('accountBottomNavigation') && !accountChat.includes('bindBottomNavigation'), 'End-user V2 Chat must not restore bottom navigation.');
 expect(!accountChat.includes('<style>') && !accountChat.includes("document.createElement('style')"), 'Account chat must not own local styles.');
+expect(v2Ui.includes('v2Header') && v2Ui.includes('v2Shell'), 'V2 H + Z geometry must be owned by shared ui/v2.');
+expect(v2Css.includes('.v2-app--chat .v2-z') && v2Css.includes('.v2-header'), 'V2 CSS must own the end-user Chat geometry.');
 
 expect(chatApi.includes('attachments = []') && chatApi.includes('body, attachments'), 'Profile communication API must carry attachments.');
+expect(profileChat.includes("application/pdf") && accountChat.includes("application/pdf"), 'Both Chat contours must accept PDF attachments through the shared attachment control.');
+expect(shellCss.includes('.message-attachment--file'), 'Shared Chat UI must render file/PDF attachments.');
 expect(controller.includes('attachments?: unknown'), 'Profile chat controller must accept attachments.');
 expect(dispatch.includes('Array.isArray(input?.attachments)') && dispatch.includes("channel: 'IN_APP'") && dispatch.includes('attachments,'), 'Profile media messages must be persisted into the shared Book chat thread.');
 
