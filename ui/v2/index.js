@@ -45,6 +45,15 @@ export function v2Header({ a = null, b = '', c = null, d = null } = {}) {
   </header>`;
 }
 
+export function v2EList(items = [], { data = 'data-v2-e-item' } = {}) {
+  const values = (Array.isArray(items) ? items : []).filter(Boolean);
+  if (!values.length) return '';
+  return `<nav class="v2-e-list" data-v2-e-list>${values.map((item, index) => {
+    const id = String(item.id || index);
+    return `<button type="button" class="v2-e-list__item" ${data}="${text(id)}" aria-label="${text(item.aria || item.label || '')}"><strong>${text(item.label || '')}</strong></button>`;
+  }).join('')}</nav>`;
+}
+
 export function v2FDeck(items = [], { active = '', data = 'data-v2-deck-item' } = {}) {
   const values = (Array.isArray(items) ? items : []).filter(Boolean);
   if (!values.length) return '';
