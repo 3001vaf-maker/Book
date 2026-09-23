@@ -52,7 +52,7 @@ export function v2FDeck(items = [], { active = '', data = 'data-v2-deck-item' } 
     const id = String(item.id || index);
     const isActive = id === String(active || values[0]?.id || '0');
     const depth = Math.min(index, 4);
-    return `<button type="button" class="v2-deck__card${isActive ? ' is-active' : ''}" style="--v2-depth:${depth}" ${data}="${text(id)}" aria-label="${text(item.aria || item.label || '')}"><strong>${text(item.label || '')}</strong></button>`;
+    return `<button type="button" class="v2-deck__card${isActive ? ' is-active' : ''}" style="--v2-depth:${depth}" ${data}="${text(id)}" data-v2-deck-index="${index}" aria-label="${text(item.aria || item.label || '')}"><strong>${text(item.label || '')}</strong></button>`;
   }).join('')}</div>`;
 }
 
@@ -260,5 +260,72 @@ export function initV2StickerSwipe(root, { onRight = null, onLeft = null, thresh
     surface.removeEventListener('pointermove', move);
     surface.removeEventListener('pointerup', up);
     surface.removeEventListener('pointercancel', reset);
+  };
+}
+
+
+export function initV2DeckSwipe(root, { activeId = '', onActiveChange = null, threshold = 58 } = {}) {
+  const deck = root?.matches?.('[data-v2-deck]') ? root : root?.querySelector?.('[data-v2-deck]');
+  if (!deck) return () => {};
+  const cards = [...deck.querySelectorAll('.v2-deck__card')];
+  if (cards.length < 2) return () => {};
+  let activeIndex = Math.max(0, cards.findIndex((card) => String(card.getAttribute('data-account-deck-item') || card.getAttribute('data-v2-deck-item') || '') === String(activeId || '')));
+  let pointerId = null;
+  let startX = 0;
+  let startY = 0;
+  let dx = 0;
+  let horizontal = false;
+
+  const activeCard = () => cards[activeIndex] || cards[0];
+  const reset = () => {
+    const card = activeCard();
+    card?.style.removeProperty('--v2-deck-drag-x');
+    card?.classList.remove('is-dragging');
+    pointerId = null;
+    dx = 0;
+    horizontal = false;
+  };
+  const down = (event) => {
+    const card = activeCard();
+    if (!card || !event.target.closest('.v2-deck__card.is-active')) return;
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    pointerId = event.pointerId;
+    startX = event.clientX;
+    startY = event.clientY;
+    card.setPointerCapture?.(pointerId);
+  };
+  const move = (event) => {
+    if (event.pointerId !== pointerId) return;
+    const nextX = event.clientX - startX;
+    const nextY = event.clientY - startY;
+    if (!horizontal && Math.abs(nextX) > 10) horizontal = Math.abs(nextX) > Math.abs(nextY) * 1.15;
+    if (!horizontal) return;
+    dx = Math.max(-190, Math.min(190, nextX));
+    const card = activeCard();
+    card?.classList.add('is-dragging');
+    card?.style.setProperty('--v2-deck-drag-x', `${dx}px`);
+    event.preventDefault();
+  };
+  const up = (event) => {
+    if (event.pointerId !== pointerId) return;
+    const finalDx = dx;
+    reset();
+    if (Math.abs(finalDx) < threshold) return;
+    const direction = finalDx < 0 ? 1 : -1;
+    const nextIndex = (activeIndex + direction + cards.length) % cards.length;
+    const next = cards[nextIndex];
+    const id = next?.getAttribute('data-account-deck-item') || next?.getAttribute('data-v2-deck-item') || '';
+    if (id) onActiveChange?.(id);
+  };
+
+  deck.addEventListener('pointerdown', down);
+  deck.addEventListener('pointermove', move, { passive: false });
+  deck.addEventListener('pointerup', up);
+  deck.addEventListener('pointercancel', reset);
+  return () => {
+    deck.removeEventListener('pointerdown', down);
+    deck.removeEventListener('pointermove', move);
+    deck.removeEventListener('pointerup', up);
+    deck.removeEventListener('pointercancel', reset);
   };
 }
