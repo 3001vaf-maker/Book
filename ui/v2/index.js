@@ -34,9 +34,12 @@ function headerControl(slot = {}, role = '') {
 }
 
 export function v2Header({ a = null, b = '', c = null, d = null } = {}) {
+  const title = b && typeof b === 'object'
+    ? `<button type="button" class="v2-header__title v2-header__title-control"${dataAttributes(b.data)} aria-label="${text(b.aria || b.label || '')}">${text(b.label || '')}</button>`
+    : `<h1 class="v2-header__title">${text(b)}</h1>`;
   return `<header class="v2-header" data-v2-header>
     ${headerControl(a, 'a')}
-    <h1 class="v2-header__title">${text(b)}</h1>
+    ${title}
     ${headerControl(c, 'c')}
     ${headerControl(d, 'd')}
   </header>`;
