@@ -12,8 +12,8 @@ import {
   initPhotoField,
   initRepeatedFields,
   links,
-  modal,
-  mountModal,
+  mountV2Layer,
+  v2Layer,
   phoneField,
   photoField,
   repeatedField,
@@ -64,7 +64,7 @@ function openBirthDatePicker(host) {
   let displayed = current?.date || new Date(today.getFullYear() - 30, today.getMonth(), 1);
   let selectedValue = current ? hidden.value : '';
   const content = `<div class="form-grid"><div data-account-birth-year></div><div data-account-birth-calendar></div>${selectedValue ? button('Очистить дату', { variant: 'secondary', data: 'data-account-birth-clear' }) : ''}</div>`;
-  const layer = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app', title: 'Дата рождения' }));
+  const layer = mountV2Layer(v2Layer(content, { kind: 'standard', title: 'Дата рождения' }));
   if (!layer) return;
   const yearHost = layer.querySelector('[data-account-birth-year]');
   const calendarHost = layer.querySelector('[data-account-birth-calendar]');
@@ -163,7 +163,7 @@ function editorMarkup(account = {}) {
 }
 
 export function openAccountPersonalData(state, { onSaved } = {}) {
-  const layer = mountModal(document.body, modal(editorMarkup(state.account || {}), { variant: 'medium', surface: 'app', title: 'Личные данные' }));
+  const layer = mountV2Layer(v2Layer(editorMarkup(state.account || {}), { kind: 'standard', title: 'Личные данные' }));
   if (!layer) return null;
   initAccordions(layer);
   initPhotoField(layer);
