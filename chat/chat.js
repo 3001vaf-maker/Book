@@ -61,7 +61,7 @@ function screen(root, header, body = '', className = '') {
 
 async function fileAttachment(file) {
   if (!(file instanceof File)) return null;
-  if (!/^(image|video)\//i.test(file.type || '')) throw new Error('Можно прикрепить фото или видео');
+  if (!/^(image|video)\//i.test(file.type || '') && String(file.type || '').toLowerCase() !== 'application/pdf') throw new Error('Можно прикрепить фото, видео или PDF');
   if (file.size > 8 * 1024 * 1024) throw new Error('Один файл должен быть не больше 8 МБ');
   const dataUrl = await new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -69,7 +69,7 @@ async function fileAttachment(file) {
     reader.onerror = () => reject(new Error('Не удалось прочитать файл'));
     reader.readAsDataURL(file);
   });
-  return { name: file.name || 'Медиа', type: file.type || '', size: file.size || 0, dataUrl };
+  return { name: file.name || 'Файл', type: file.type || '', size: file.size || 0, dataUrl };
 }
 
 function bindMessageAttachments(form) {

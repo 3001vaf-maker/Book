@@ -32,7 +32,7 @@
 | Header | `ui/header/` | `pageHeader`, `headerControl`, `headerToggle`, `headerControlGroup`, `openHeaderControl` |
 | Modals | `ui/modals/` | `modal`, `mountModal`, `openNotice` |
 | Buttons | `ui/buttons/` | `button`, `iconButton`, `copyIconButton`, `copyTextToClipboard`, `setCopyButtonCopied`, `sheetIconButton`, `iconButtonGroup` |
-| Inputs | `ui/inputs/` | `field`, `phoneField`, `textareaField`, `photoField`, `initPhotoField` |
+| Inputs | `ui/inputs/` | `field`, `passwordField`, `initPasswordFields`, `phoneField`, `textareaField`, `photoField`, `initPhotoField` |
 | States | `ui/states/` | `emptyState`, `stateView`, `initStateView` |
 | Colors | `ui/colors/` | `colorPicker`, `initColorPickers` |
 | Utils | `ui/utils/` | `escapeHtml`, `shortDate`, `shortTime`, `shortDateTime`, `shortDateTimeParts` |
@@ -41,6 +41,7 @@
 | UEI | `ui/uei/` | `uei`, `initUEI` |
 | Payment | `ui/payment/` | `paymentForm`, `initPaymentForm`, `paymentMethods`, `initPaymentMethods`, `paymentReceipt` |
 | Public booking | `ui/booking/` | `bookingAccountHeader`, `bookingAction`, `bookingActions`, `bookingAgreementCards`, `bookingChoiceCards`, `bookingDocument`, `bookingHeading`, `bookingHistoryCards`, `bookingPersonalDataButton`, `bookingScreen`, `bookingThemePreview`, `bookingThemeStyle`, `bookingTimeGroups` |
+| UI Reference V2 shell | `ui/v2/` | `v2Header`, `v2EList`, `v2FDeck`, `v2Shell`, `v2Section`, `v2HorizontalRail`, `v2RailCard`, `v2ServiceStickers`, `v2Sticker`, `v2Document`, `v2LegalCards`, `v2Layer`, `mountV2Layer`, `initV2Swipe`, `initV2StickerSwipe`, `initV2DeckSwipe` |
 
 ## Ключевые ownership-границы
 
