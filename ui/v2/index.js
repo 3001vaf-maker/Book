@@ -117,6 +117,13 @@ export function v2Sticker({
   </section>`;
 }
 
+export function v2Document({ title = 'Документ', version = '', content = '' } = {}) {
+  const body = String(content || '').trim()
+    ? String(content).trim().split(/\n{2,}/).map((part) => `<p>${text(part).replaceAll('\n', '<br>')}</p>`).join('')
+    : '<p>Текст документа не заполнен.</p>';
+  return `<article class="v2-document">${version ? `<div class="v2-document__version">Версия ${text(version)}</div>` : ''}<h2>${text(title)}</h2><div class="v2-document__body">${body}</div></article>`;
+}
+
 export function v2LegalCards(items = []) {
   return `<div class="v2-legal-cards">${(Array.isArray(items) ? items : []).map((item, index) => `<article class="v2-legal-card">
     <button type="button" class="v2-legal-card__document"${dataAttributes(item.openData)} aria-label="${text(item.openAria || item.title || 'Документ')}">
