@@ -16,23 +16,25 @@ import {
 import { normalizeBookingSettings } from '../core/booking-settings/index.js';
 import { formatPhone } from '../core/phone/index.js';
 import {
-  appHeader,
-  appShell,
   bookingAction,
   bookingActions,
-  bookingAgreementCards,
   bookingChoiceCards,
-  bookingDocument,
   bookingThemeStyle,
   bookingTimeGroups,
+  button,
   emptyState,
-  entityCard,
   escapeHtml,
   field,
   initCalendar,
-  modal,
-  mountModal,
+  initV2StickerSwipe,
+  initV2Swipe,
   phoneField,
+  v2Document,
+  v2Header,
+  v2LegalCards,
+  v2ServiceStickers,
+  v2Shell,
+  v2Sticker,
 } from '../ui/ui.js';
 import {
   bookingProcedureCost,
@@ -204,21 +206,62 @@ function flowThemeClasses(state) {
   const theme = state.settings?.theme && typeof state.settings.theme === 'object' ? state.settings.theme : {};
   const shape = ['soft', 'round', 'straight', 'cut'].includes(theme.shape) ? theme.shape : 'soft';
   const choiceStyle = ['cards', 'compact', 'list'].includes(theme.choiceStyle) ? theme.choiceStyle : 'cards';
-  return `booking-account booking-account--account booking-shape--${shape} booking-choice-style--${choiceStyle}`;
+  return `booking-account booking-account--account booking-account--v2 booking-shape--${shape} booking-choice-style--${choiceStyle}`;
+}
+
+function representativeName(state) {
+  const profile = state.context?.profile || {};
+  return [profile.name, profile.surname].filter(Boolean).join(' ').trim() || 'Запись';
+}
+
+function representativePhoto(state) {
+  return String(state.context?.profile?.photo || '');
 }
 
 function subtitleBlock(value = '') {
-  const text = String(value || '').trim();
-  return text ? `<div class="muted">${escapeHtml(text).replaceAll('\n', '<br>')}</div>` : '';
+  const valueText = String(value || '').trim();
+  return valueText ? `<div class="v2-flow-subtitle">${escapeHtml(valueText).replaceAll('\n', '<br>')}</div>` : '';
 }
 
 function renderFlowPage(root, state, {
   title = '',
   subtitle = '',
   body = '',
-  back = null,
   action = null,
   center = false,
+  step = '',
+} = {}) {
+  if (step) state.bookingStep = step;
+  const header = v2Header({
+    a: { kind: 'avatar', label: representativeName(state), image: representativePhoto(state), disabled: true },
+    b: representativeName(state),
+    c: action ? { kind: 'text', label: action.label || '', data: action.data || '', aria: action.aria || action.label || '', disabled: Boolean(action.disabled) } : null,
+    d: state.account ? { kind: 'chat', data: 'data-booking-flow-chat', aria: 'Чат' } : null,
+  });
+  const localTitle = title ? `<h2 class="v2-flow-title">${escapeHtml(title)}</h2>` : '';
+  const shell = v2Shell({
+    header,
+    body: `${localTitle}${subtitleBlock(subtitle)}${body}`,
+    className: center ? 'v2-app--flow-center' : 'v2-app--booking-flow',
+  });
+  root.innerHTML = `<section class="${flowThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${shell}</section>`;
+  root.querySelector('[data-booking-flow-chat]')?.addEventListener('click', () => {
+    state.accountTab = 'messages';
+    state.accountChatOpen = true;
+    state.accountDeckOpen = false;
+    void renderAccountHome(root, state);
+  });
+}
+
+function resumeBookingStep(root, state) {
+  if (state.bookingStep === 'workplaces') return renderWorkplaces(root, state);
+  if (state.bookingStep === 'procedures') return renderProcedures(root, state);
+  if (state.bookingStep === 'dates') return renderDates(root, state);
+  if (state.bookingStep === 'times') return renderTimes(root, state);
+  if (state.bookingStep === 'confirmation') return renderConfirmation(root, state);
+  if (state.bookingStep === 'registration') return renderAccountDetails(root, state);
+  if (state.bookingStep === 'auth') return renderAccountEntry(root, state);
+  return renderAccountHome(root, state);
 } = {}) {
   const shell = appShell({
     header: appHeader({ title, back, action }),
