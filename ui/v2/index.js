@@ -204,21 +204,40 @@ export function mountV2ZLayer(root, html, { onClose = null } = {}) {
 }
 
 export function v2Layer(content = '', { kind = 'standard', title = '', className = '' } = {}) {
-  const allowed = new Set(['quick', 'standard', 'system']);
-  const resolved = allowed.has(kind) ? kind : 'standard';
-  return `<div class="v2-layer-backdrop" data-v2-layer><section class="v2-layer v2-layer--${resolved} ${text(className)}" role="dialog" aria-modal="true" aria-label="${text(title)}" tabindex="-1"><button type="button" class="v2-layer__close" data-v2-layer-close aria-label="Закрыть">×</button>${title ? `<header class="v2-layer__header"><h2>${text(title)}</h2></header>` : ''}${content}</section></div>`;
+  const aliases = { quick: 'bottom', system: 'top' };
+  const allowed = new Set(['top', 'standard', 'bottom', 'technical']);
+  const candidate = aliases[kind] || kind;
+  const resolved = allowed.has(candidate) ? candidate : 'standard';
+  return `<div class="v2-layer-backdrop" data-v2-layer data-v2-layer-kind="${resolved}"><section class="v2-layer v2-layer--${resolved} ${text(className)}" role="dialog" aria-modal="true" aria-label="${text(title)}" tabindex="-1"><button type="button" class="v2-layer__close" data-v2-layer-close aria-label="Закрыть">×</button>${title ? `<header class="v2-layer__header"><h2>${text(title)}</h2></header>` : ''}${content}</section></div>`;
 }
 
-export function mountV2Layer(html) {
+function activeV2ModalSurface(root = null) {
+  if (root?.matches?.('[data-v2-z-layer], [data-v2-z]')) return root;
+  const closest = root?.closest?.('[data-v2-z-layer], [data-v2-z]');
+  if (closest) return closest;
+  const app = root?.closest?.('[data-v2-app]') || document.querySelector('[data-v2-app]');
+  const layers = [...(app?.querySelectorAll?.('[data-v2-z-layer]') || [])];
+  return layers.at(-1)
+    || app?.querySelector?.('.v2-app__stage > [data-v2-z]')
+    || document.querySelector('.app-content')
+    || document.querySelector('#app');
+}
+
+export function mountV2Layer(html, { root = null } = {}) {
   const template = document.createElement('template');
   template.innerHTML = String(html || '').trim();
   const node = template.content.firstElementChild;
   if (!node?.matches('[data-v2-layer]')) return null;
-  document.body.appendChild(node);
+  const kind = node.dataset.v2LayerKind || 'standard';
+  const technical = kind === 'technical';
+  const host = technical ? document.body : activeV2ModalSurface(root);
+  if (!host) return null;
+  node.classList.add(technical ? 'v2-layer-backdrop--technical' : 'v2-layer-backdrop--contained');
+  host.appendChild(node);
   const close = () => node.remove();
   node.v2Close = close;
   node.addEventListener('click', (event) => {
-    if (event.target === node || event.target.closest('[data-v2-layer-close]')) node.v2Close?.();
+    if (event.target.closest('[data-v2-layer-close]')) node.v2Close?.();
   });
   return node;
 }
