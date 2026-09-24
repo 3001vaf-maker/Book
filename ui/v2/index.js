@@ -192,7 +192,7 @@ export function mountV2ZLayer(root, html, { onClose = null } = {}) {
 export function v2Layer(content = '', { kind = 'standard', title = '', className = '' } = {}) {
   const allowed = new Set(['quick', 'standard', 'system']);
   const resolved = allowed.has(kind) ? kind : 'standard';
-  return `<div class="v2-layer-backdrop" data-v2-layer><section class="v2-layer v2-layer--${resolved} ${text(className)}" role="dialog" aria-modal="true" aria-label="${text(title)}"><button type="button" class="v2-layer__close" data-v2-layer-close aria-label="Закрыть">×</button>${title ? `<header class="v2-layer__header"><h2>${text(title)}</h2></header>` : ''}${content}</section></div>`;
+  return `<div class="v2-layer-backdrop" data-v2-layer><section class="v2-layer v2-layer--${resolved} ${text(className)}" role="dialog" aria-modal="true" aria-label="${text(title)}" tabindex="-1"><button type="button" class="v2-layer__close" data-v2-layer-close aria-label="Закрыть">×</button>${title ? `<header class="v2-layer__header"><h2>${text(title)}</h2></header>` : ''}${content}</section></div>`;
 }
 
 export function mountV2Layer(html) {
