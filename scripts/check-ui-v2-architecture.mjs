@@ -67,7 +67,7 @@ expect(ui.includes('const direction = finalDx < 0 ? 1 : -1') && ui.includes('con
 expect(ui.includes('threshold = 42') && ui.includes('settleTimer = setTimeout') && ui.includes('}, 210);'), 'F paging must use a forgiving snap threshold and finish the card-under-stack motion before rerender.');
 expect(css.includes('box-shadow:-9px 8px 14px -11px rgba(0,0,0,.34)') && css.includes('.v2-z .entity-card{transform:translateY(-2px)') && css.includes('.v2-rail-card{') && css.includes('transform:translateY(-2px)'), 'Z stickers must lift at the edges while large cards float above the Z surface.');
 expect(css.includes('touch-action:pan-y'), 'Shared V2 surfaces must allow vertical scrolling without fighting horizontal swipe.');
-expect(accountShell.includes("state.accountTab = id === 'history' ? 'history' : 'representatives';"), 'Changing the active F folder must immediately change Z to that folder face while the deck stays open.');
+expect(account.includes("state.accountTab = id === 'history' ? 'history' : 'representatives';"), 'Changing the active F folder must immediately change Z to that folder face while the deck stays open.');
 expect(accountMobileCss.includes('background:var(--v2-base)'), 'Public booking shell safe area must continue the H base.');
 expect(core.includes("setThemeColor('#2F3338')") && core.includes("setThemeColor('#F5F5F3')"), 'Public booking must tint browser chrome to H and restore the workspace theme afterwards.');
 expect(booking.includes('v2LegalCards(') && booking.includes('v2Sticker({'), 'Legal checkpoint must use the shared sticker system.');
