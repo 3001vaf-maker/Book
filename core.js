@@ -19,7 +19,7 @@ import { canUseBookCapability, getBookAccess, loadBookAccess } from './core/acce
 import { startServerBookingSync } from './online-booking/server-sync.js';
 import { renderOnlineBooking } from './online-booking/booking.js';
 import { startAccountRuntime } from './online-booking/account-runtime.js';
-import { initV2DeckSwipe, initV2Swipe, v2FDeck, v2Header, v2Shell } from './ui/ui.js';
+import { initV2DeckSwipe, initV2Swipe, v2EList, v2FDeck, v2Header, v2Shell } from './ui/ui.js';
 import { clearLegacyBusinessStorage } from './core/legacy-browser-business.js';
 import { FirstRunRuntime, bindDemoBadgeAction, demoBadgeMarkup, startPlatformSessionTracking } from './first-run/runtime.js';
 import { startPlatformNotices } from './core/platform-notices.js';
@@ -374,11 +374,9 @@ function renderWorkspace() {
     className: 'v2-deck--root',
     role: 'root',
   });
-  const secondaryDeck = childItems.length ? v2FDeck(childItems, {
+  const eDeck = childItems.length ? v2EList(childItems, {
     active: childActive,
     data: 'data-v2-secondary-item',
-    className: 'v2-deck--secondary',
-    role: 'secondary',
   }) : '';
 
   app.innerHTML = v2Shell({
@@ -387,7 +385,7 @@ function renderWorkspace() {
       d: sectionAllowed('chat') ? { kind: 'chat', data: 'data-v2-workspace-chat', aria: 'Чат' } : null,
     }),
     deck: rootDeck,
-    secondaryDeck,
+    eDeck,
     deckOpen: state.navigationOpen,
     className: 'v2-app--workspace',
     body: '<section class="v2-workspace-surface" data-v2-workspace-surface></section>',
@@ -413,11 +411,6 @@ function renderWorkspace() {
   if (rootDeckNode) disposers.push(initV2DeckSwipe(rootDeckNode, {
     activeId: root,
     onActiveChange: (id) => navigate(id, { navigationOpen: true }),
-  }));
-  const secondaryDeckNode = shell?.querySelector('[data-v2-deck-role="secondary"]');
-  if (secondaryDeckNode) disposers.push(initV2DeckSwipe(secondaryDeckNode, {
-    activeId: childActive,
-    onActiveChange: (id) => selectSecondary(id),
   }));
   if (z) disposers.push(initV2Swipe(z, {
     onRight: () => setNavigationOpen(true),
