@@ -79,6 +79,8 @@ Every feature/staging PR must pass:
 
 Production merge happens only after the same checks pass on the exact release head.
 
+For Shared UI owner changes, the validation gate also requires a consumer audit before release: enumerate every affected F/E/Z screen, reject nested fullscreen shells/headers/fixed/touch owners, and close the F swipe / E swipe / Z swipe / vertical scroll / modal / header matrix for all affected consumers. CI is necessary but is not by itself sufficient for a production merge.
+
 ## Main protection
 
 `main` should be protected by a GitHub branch ruleset requiring pull requests and successful `Check Book` before merge. Repository administration is a GitHub setting, not application code; until that ruleset is enabled, the workflow above remains mandatory and no direct `main` writes are allowed.
