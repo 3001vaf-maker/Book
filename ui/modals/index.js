@@ -20,9 +20,10 @@ export function modal(content, { title = '', className = '', variant = '', surfa
   const classes = ['modal-sheet', className, variantClass, surfaceClass].filter(Boolean).join(' ');
   let html = v2Layer(content, {
     kind: v2Kind(resolvedVariant),
-    title,
+    title: '',
     className: classes,
   });
+  if (title) html = html.replace('aria-label=""', `aria-label="${escapeHtml(title)}"`);
   html = html
     .replace('class="v2-layer-backdrop"', 'class="v2-layer-backdrop modal-backdrop" data-modal')
     .replace('class="v2-layer__close"', 'class="v2-layer__close modal-close" data-modal-close');
