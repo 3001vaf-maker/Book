@@ -10,6 +10,8 @@ const personalData = fs.readFileSync('online-booking/personal-data.js', 'utf8');
 const passwordSettings = fs.readFileSync('online-booking/password-settings.js', 'utf8');
 const consentSettings = fs.readFileSync('online-booking/consent-settings.js', 'utf8');
 const inputs = fs.readFileSync('ui/inputs/index.js', 'utf8');
+const accountMobileCss = fs.readFileSync('ui/shell/account-mobile.css', 'utf8');
+const core = fs.readFileSync('core.js', 'utf8');
 
 const failures = [];
 const expect = (condition, message) => { if (!condition) failures.push(message); };
@@ -38,7 +40,10 @@ expect(/\.v2-layer--quick\{[\s\S]*?border-radius:0/.test(css), 'QUICK must remai
 expect(/\.v2-layer--standard\{[\s\S]*?border-radius:0/.test(css), 'STANDARD must remain rectangular.');
 expect(/\.v2-layer--system\{[\s\S]*?border-radius:var\(--v2-z-radius\) 0 0 0/.test(css), 'SYSTEM may repeat only the upper-left UZ corner.');
 expect(/\.v2-deck__card\{[\s\S]*?border-radius:0 var\(--v2-z-radius\) 0 0/.test(css), 'F cards must mirror Z toward the left.');
-expect(css.includes('--v2-deck-width:min(45vw,176px)') && css.includes('.v2-deck{') && css.includes('width:var(--v2-deck-width)'), 'F width must leave a real GAP before opened Z.');
+expect(css.includes('--v2-deck-width:min(33vw,128px)') && css.includes('--v2-gap:20px') && css.includes('--v2-z-open-x:calc(var(--v2-deck-width) + var(--v2-gap))'), 'F must stay smaller than Z and leave a real H GAP before opened Z.');
+expect(css.includes('--v2-deck-top:34px') && css.includes('top:var(--v2-deck-top)'), 'F must start lower than Z to preserve layer hierarchy.');
+expect(css.includes('opacity:0') && css.includes('.v2-app.is-deck-open .v2-deck') && css.includes('.v2-app.is-revealing-deck .v2-deck'), 'Closed F must disappear into H and reveal physically during Z swipe.');
+expect(css.includes('box-shadow:-14px 10px 30px rgba(0,0,0,.16)') && css.includes('cubic-bezier(.22,.78,.18,1)'), 'Z/F movement must keep restrained physical depth and eased motion.');
 expect(css.includes('.v2-e-list{') && css.includes('flex-direction:column'), 'E must remain a distinct long vertical list, not F geometry.');
 expect(css.includes('.v2-legal-cards{display:grid;gap:12px}'), 'Legal document cards must have an explicit equal gap.');
 expect(css.includes('.v2-legal-card{\n  height:96px;'), 'Legal document cards must share one base height.');
@@ -53,7 +58,11 @@ expect(booking.includes('passwordField({') && booking.includes('initPasswordFiel
 expect(booking.includes("step: 'workplaces'") && booking.includes("step: 'confirmation'"), 'Booking must remain a V2 Z-stack flow.');
 expect(booking.includes('initV2Swipe(root'), 'Booking Z-stack must use the shared physical swipe.');
 expect(ui.includes("axis = Math.abs(nextX) > Math.abs(nextY) * 1.25 ? 'horizontal' : 'vertical'"), 'Shared V2 swipe must axis-lock before moving the surface.');
+expect(ui.includes("app?.classList.add('is-revealing-deck')") && ui.includes("app?.classList.remove('is-revealing-deck')"), 'Z swipe must reveal and reset the F stack physically.');
+expect(ui.includes('const activeIndex = Math.max(0, values.findIndex') && ui.includes('const depthX = visualDepth * 6') && ui.includes('const depthY = visualDepth * 12'), 'F cards must stack relative to the active folder with horizontal and vertical depth.');
 expect(css.includes('touch-action:pan-y'), 'Shared V2 surfaces must allow vertical scrolling without fighting horizontal swipe.');
+expect(accountMobileCss.includes('background:var(--v2-base)'), 'Public booking shell safe area must continue the H base.');
+expect(core.includes("setThemeColor('#2F3338')") && core.includes("setThemeColor('#F5F5F3')"), 'Public booking must tint browser chrome to H and restore the workspace theme afterwards.');
 expect(booking.includes('v2LegalCards(') && booking.includes('v2Sticker({'), 'Legal checkpoint must use the shared sticker system.');
 expect(!booking.includes('data-booking-workplaces-back') && !booking.includes('data-booking-confirm-back'), 'V2 booking flow must not restore legacy back buttons.');
 
