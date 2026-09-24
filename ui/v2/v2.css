@@ -248,6 +248,8 @@
 }
 .v2-e-card:nth-child(3n+2){background:var(--v2-taupe)}
 .v2-e-card:nth-child(3n+3){background:var(--v2-smoke);color:#fff}
+.v2-e-card.is-stacked strong{opacity:0}
+.v2-e-card.is-next-ready strong{opacity:1}
 .v2-app.is-deck-open .v2-e-card,
 .v2-app.is-revealing-deck .v2-e-card{
   transform:translate3d(calc(var(--v2-e-pull) + var(--v2-e-depth-x,0px) + var(--v2-fe-drag-x,0px)),0,0);
