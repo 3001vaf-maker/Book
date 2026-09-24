@@ -411,6 +411,8 @@ function renderWorkspace() {
   if (rootDeckNode) disposers.push(initV2DeckSwipe(rootDeckNode, {
     activeId: root,
     onActiveChange: (id) => navigate(id, { navigationOpen: true }),
+    eActiveId: childActive,
+    onEActiveChange: (id) => selectSecondary(id),
   }));
   if (z) disposers.push(initV2Swipe(z, {
     onRight: () => setNavigationOpen(true),
