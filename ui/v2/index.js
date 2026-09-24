@@ -210,7 +210,7 @@ export function mountV2Layer(html) {
 }
 
 export function initV2Swipe(root, { onRight = null, onLeft = null, threshold = 72, maxDrag = 180, revealDeck = true } = {}) {
-  const surface = root?.matches?.('[data-v2-z]') ? root : root?.querySelector?.('[data-v2-z]');
+  const surface = root?.matches?.('[data-v2-z], [data-v2-z-layer]') ? root : root?.querySelector?.('[data-v2-z], [data-v2-z-layer]');
   if (!surface) return () => {};
   const app = surface.closest?.('[data-v2-app]');
   const hasDeck = revealDeck && Boolean(app?.querySelector?.('[data-v2-deck]'));
