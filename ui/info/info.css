@@ -1,0 +1,6 @@
+.ui-info{position:relative;display:inline-flex;vertical-align:middle}
+.ui-info__trigger{box-sizing:border-box;width:24px;height:24px;border:1px solid #111;border-radius:0;padding:0;display:grid;place-items:center;background:#fff;color:#111;font:inherit;font-size:15px;line-height:1;font-weight:800;cursor:pointer}
+.ui-info__panel{position:absolute;z-index:40;top:calc(100% + 6px);left:0;width:min(260px,72vw);padding:10px 11px;border:1px solid #111;border-radius:0;background:#fff;color:#111;box-shadow:0 8px 24px rgba(0,0,0,.14);font-size:12px;line-height:1.35;text-align:left}
+.ui-info__panel[hidden]{display:none!important}
+.ui-info--inverse .ui-info__trigger,.v2-header .ui-info__trigger{border-color:#fff;background:#111;color:#fff}
+.ui-info--inverse .ui-info__panel,.v2-header .ui-info__panel{border-color:#fff;background:#111;color:#fff}
