@@ -26,8 +26,23 @@ const profile = fs.readFileSync('settings/profile/profile.js', 'utf8');
 const style = fs.readFileSync('css/style.css', 'utf8');
 const entityCardCss = fs.readFileSync('ui/cards/entity-card.css', 'utf8');
 
+function cssFilesUnder(directory) {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = `${directory}/${entry.name}`;
+    if (entry.isDirectory()) return cssFilesUnder(path);
+    return entry.isFile() && entry.name.endsWith('.css') ? [path] : [];
+  });
+}
+
+const sharedCssFiles = ['css/style.css', ...cssFilesUnder('ui'), ...cssFilesUnder('settings/profile')];
+const legacySystemBrown = /#(?:3B302B|7A6F69|B8AEA8|E7E1DB|E8E1DC|D7CEC7|968982|E9E6E2|D8D0CA)\b|rgba\(59,48,43,[^)]+\)|rgba\(30,25,22,[^)]+\)/i;
+
 const failures = [];
 const expect = (condition, message) => { if (!condition) failures.push(message); };
+for (const file of sharedCssFiles) {
+  expect(!legacySystemBrown.test(fs.readFileSync(file, 'utf8')), `Legacy system brown must not remain in Shared UI CSS: ${file}.`);
+}
+
 
 for (const name of [
   'v2Header',
