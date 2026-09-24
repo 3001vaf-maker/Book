@@ -59,20 +59,19 @@ export function v2FDeck(items = [], { active = '', data = 'data-v2-deck-item' } 
   if (!values.length) return '';
   const activeId = String(active || values[0]?.id || '0');
   const activeIndex = Math.max(0, values.findIndex((item, index) => String(item.id || index) === activeId));
-  return `<div class="v2-deck" data-v2-deck data-v2-deck-count="${values.length}">${values.map((item, index) => {
+  const count = values.length;
+  const depthStepX = count > 1 ? Math.min(10, 18 / (count - 1)) : 0;
+  return `<div class="v2-deck" data-v2-deck data-v2-deck-count="${count}">${values.map((item, index) => {
     const id = String(item.id || index);
-    const relation = index - activeIndex;
-    const isActive = relation === 0;
-    const isBefore = relation < 0;
-    const visualDepth = Math.min(Math.max(relation, 0), 6);
-    const depthX = visualDepth * 16;
-    const depthY = visualDepth * 16;
-    const stackZ = Math.max(1, 7 - visualDepth);
-    const classes = ['v2-deck__card', isActive ? 'is-active' : '', isBefore ? 'is-before' : 'is-after'].filter(Boolean).join(' ');
+    const visualDepth = (index - activeIndex + count) % count;
+    const isActive = visualDepth === 0;
+    const depthX = Number((visualDepth * depthStepX).toFixed(2));
+    const depthY = visualDepth * 8;
+    const stackZ = Math.max(1, count - visualDepth);
+    const classes = ['v2-deck__card', isActive ? 'is-active' : 'is-stacked'].filter(Boolean).join(' ');
     return `<button type="button" class="${classes}" style="--v2-depth:${visualDepth};--v2-depth-x:${depthX}px;--v2-depth-y:${depthY}px;--v2-stack-z:${stackZ}" ${data}="${text(id)}" data-v2-deck-index="${index}" data-v2-f-level="F${index + 1}" aria-label="${text(item.aria || item.label || '')}"><strong>${text(item.label || '')}</strong></button>`;
   }).join('')}</div>`;
 }
-
 export function v2Shell({
   header = '',
   body = '',
@@ -322,6 +321,7 @@ export function initV2DeckSwipe(root, { activeId = '', onActiveChange = null, th
   let dx = 0;
   let axis = 'pending';
   let suppressNextClick = false;
+  let settleTimer = null;
 
   const activeCard = () => cards[activeIndex] || cards[0];
   const reset = () => {
@@ -333,6 +333,7 @@ export function initV2DeckSwipe(root, { activeId = '', onActiveChange = null, th
     axis = 'pending';
   };
   const down = (event) => {
+    if (settleTimer) return;
     if (!event.target.closest('.v2-deck__card')) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     pointerId = event.pointerId;
@@ -355,12 +356,7 @@ export function initV2DeckSwipe(root, { activeId = '', onActiveChange = null, th
       deck.setPointerCapture?.(event.pointerId);
     }
     if (axis !== 'horizontal') return;
-    const canMoveLeft = activeIndex < cards.length - 1;
-    const canMoveRight = activeIndex > 0;
-    const requested = Math.max(-maxDrag, Math.min(maxDrag, nextX));
-    dx = requested < 0
-      ? (canMoveLeft ? requested : requested * 0.22)
-      : (canMoveRight ? requested : requested * 0.22);
+    dx = Math.max(-maxDrag, Math.min(maxDrag, nextX));
     const card = activeCard();
     card?.classList.add('is-dragging');
     card?.style.setProperty('--v2-deck-drag-x', `${dx}px`);
@@ -371,14 +367,22 @@ export function initV2DeckSwipe(root, { activeId = '', onActiveChange = null, th
     if (event.pointerId !== pointerId) return;
     const finalDx = dx;
     const finalAxis = axis;
+    const outgoing = activeCard();
     reset();
     if (finalAxis !== 'horizontal' || Math.abs(finalDx) < threshold) return;
-    const nextIndex = finalDx < 0 ? activeIndex + 1 : activeIndex - 1;
-    if (nextIndex < 0 || nextIndex >= cards.length) return;
-    activeIndex = nextIndex;
+    const direction = finalDx < 0 ? 1 : -1;
+    const nextIndex = (activeIndex + direction + cards.length) % cards.length;
     const next = cards[nextIndex];
-    const id = next?.getAttribute('data-account-deck-item') || next?.getAttribute('data-v2-deck-item') || '';
-    if (id) onActiveChange?.(id);
+    outgoing?.classList.add(direction > 0 ? 'is-cycling-under' : 'is-cycling-back');
+    deck.classList.add('is-cycling');
+    settleTimer = setTimeout(() => {
+      activeIndex = nextIndex;
+      const id = next?.getAttribute('data-account-deck-item') || next?.getAttribute('data-v2-deck-item') || '';
+      settleTimer = null;
+      deck.classList.remove('is-cycling');
+      outgoing?.classList.remove('is-cycling-under', 'is-cycling-back');
+      if (id) onActiveChange?.(id);
+    }, 210);
   };
   const click = (event) => {
     if (!suppressNextClick) return;
@@ -393,6 +397,7 @@ export function initV2DeckSwipe(root, { activeId = '', onActiveChange = null, th
   deck.addEventListener('pointercancel', reset);
   deck.addEventListener('click', click, true);
   return () => {
+    if (settleTimer) clearTimeout(settleTimer);
     deck.removeEventListener('pointerdown', down);
     deck.removeEventListener('pointermove', move);
     deck.removeEventListener('pointerup', up);
