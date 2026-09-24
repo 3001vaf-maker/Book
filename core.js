@@ -88,6 +88,10 @@ function syncViewport() {
   document.documentElement.classList.toggle('keyboard-open', vv ? height < window.innerHeight * 0.78 : false);
 }
 
+function setThemeColor(value) {
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', value);
+}
+
 function bookingRoute() {
   const params = new URLSearchParams(location.search);
   const tenantId = String(params.get('booking') || '').trim();
@@ -102,6 +106,7 @@ function bookingRoute() {
 async function renderPublicBooking(route) {
   workspaceReady = false;
   disposeView();
+  setThemeColor('#2F3338');
   app.classList.add('app-shell--booking');
   app.innerHTML = '<main class="booking-content" id="app-content"></main>';
   disposeView = await startAccountRuntime(route);
@@ -140,6 +145,7 @@ function navigate(section) {
 }
 
 function renderWorkspace() {
+  setThemeColor('#F5F5F3');
   app.classList.remove('app-shell--booking');
   workspaceReady = true;
   disposeView();
