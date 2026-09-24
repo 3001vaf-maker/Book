@@ -192,6 +192,7 @@ export function initPhotoField(root) {
       if (cropX) cropX.value = String(nextX);
       if (cropY) cropY.value = String(nextY);
       syncPhotoCropPreview(fieldRoot);
+      cropXValue.dispatchEvent(new Event('change', { bubbles: true }));
     };
 
     const setOriginal = (src) => {
