@@ -1,14 +1,14 @@
 :root{
-  --v2-base:#2F3338;
+  --v2-base:var(--surface-dark);
   --v2-white:#FFFFFF;
   --v2-ink:#111111;
   --v2-muted:#777A7D;
   --v2-disabled:#D8D3CF;
   --v2-danger:#FF1111;
   --v2-yellow:#FFFF00;
-  --v2-beige:#D8D1C8;
-  --v2-taupe:#B9AEA4;
-  --v2-smoke:#8F8178;
+  --v2-beige:var(--button-secondary);
+  --v2-taupe:var(--text-muted);
+  --v2-smoke:var(--surface-dark);
   --v2-z-radius:34px;
   --v2-gap:20px;
   --v2-edge:16px;
@@ -108,6 +108,20 @@
   transform:translate3d(0,0,0);
 }
 .v2-app--workspace .v2-deck--secondary{left:var(--v2-z-open-x)}
+.v2-workspace-context{display:none!important}
+.v2-z--layer{
+  position:absolute;
+  z-index:7;
+  inset:0 0 0 var(--v2-edge);
+  width:auto;
+  height:100%;
+  min-height:100%;
+  margin-left:0;
+  transform:translate3d(var(--v2-drag-x,0px),0,0);
+  animation:v2-z-layer-in .24s cubic-bezier(.22,.78,.18,1) both;
+}
+.v2-z--layer.is-dragging{transition:none;animation:none}
+
 .v2-app--workspace .v2-workspace-surface{min-height:100%}
 .v2-app--workspace .v2-z .page-header,
 .v2-app--workspace .v2-z .app-header{display:none}
@@ -230,8 +244,9 @@
 .v2-sticker__body{display:grid;gap:14px}
 .v2-sticker__action{display:grid;gap:8px}.v2-sticker-link{border:0;padding:4px 0;background:transparent;color:var(--v2-ink);font:inherit;font-size:13px;text-decoration:underline;text-align:left}.v2-sticker-screen--auth form{display:grid;gap:12px}
 
-.v2-document{display:grid;gap:14px}.v2-document__version{font-size:12px;color:var(--v2-muted)}.v2-document h2{margin:0;font-size:24px;line-height:1.08}.v2-document__body{font-size:15px;line-height:1.55}.v2-document__body p{margin:0 0 1em}.v2-document__body p:last-child{margin-bottom:0}.v2-legal-cards{display:grid;gap:12px}
+.v2-document{display:grid;gap:14px}.v2-document__version{font-size:12px;color:var(--v2-muted)}.v2-document h2{margin:0;font-size:24px;line-height:1.08}.v2-document__body{font-size:15px;line-height:1.55}.v2-document__body p{margin:0 0 1em}.v2-document__body p:last-child{margin-bottom:0}.v2-legal-cards{display:flex;gap:10px;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;padding:2px 0 10px}.v2-legal-cards::-webkit-scrollbar{display:none}
 .v2-legal-card{
+  flex:0 0 min(86%,320px);
   height:96px;
   display:grid;
   grid-template-columns:minmax(0,1fr) 62px;
@@ -301,4 +316,4 @@
   .v2-z{padding-left:15px;padding-right:15px}
   .v2-rail>*{flex-basis:88%}
 }
-@keyframes v2-quick-in{from{transform:translateY(100%)}to{transform:translateY(0)}}@keyframes v2-standard-in{from{transform:translateX(100%)}to{transform:translateX(0)}}@keyframes v2-system-in{from{transform:translateY(-100%)}to{transform:translateY(0)}}
+@keyframes v2-z-layer-in{from{transform:translate3d(100%,0,0)}to{transform:translate3d(0,0,0)}}@keyframes v2-quick-in{from{transform:translateY(100%)}to{transform:translateY(0)}}@keyframes v2-standard-in{from{transform:translateX(100%)}to{transform:translateX(0)}}@keyframes v2-system-in{from{transform:translateY(-100%)}to{transform:translateY(0)}}
