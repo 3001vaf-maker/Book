@@ -108,7 +108,6 @@
   transform:translate3d(0,0,0);
 }
 .v2-app--workspace .v2-deck--secondary{left:var(--v2-z-open-x)}
-.v2-workspace-context{display:none!important}
 .v2-z--layer{
   position:absolute;
   z-index:7;
