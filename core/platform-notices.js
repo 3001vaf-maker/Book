@@ -32,11 +32,16 @@ export async function getPlatformPushState() {
   const configuration = await platformPushConfiguration();
   const registration = await navigator.serviceWorker.getRegistration('/');
   const subscription = await registration?.pushManager.getSubscription();
+  let serverSubscribed = false;
+  if (subscription?.endpoint) {
+    const state = await jsonResponse(await apiRequest(`/platform-notices/push/subscription?endpoint=${encodeURIComponent(subscription.endpoint)}`), 'Не удалось проверить Push');
+    serverSubscribed = Boolean(state?.subscribed);
+  }
   return {
     supported:true,
     enabled:Boolean(configuration?.enabled && configuration?.publicKey),
     permission:Notification.permission,
-    subscribed:Boolean(subscription),
+    subscribed:Boolean(subscription && serverSubscribed),
     publicKey:String(configuration?.publicKey || ''),
   };
 }
