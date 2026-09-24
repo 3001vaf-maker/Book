@@ -1,5 +1,6 @@
 import { apiRequest } from '../../core/auth.js';
-import { button, emptyState, escapeHtml, list, modal, mountModal, page, pageHeader, v2Document, v2LegalCards, v2Section } from '../../ui/ui.js';
+import { disablePlatformPush, enablePlatformPush, getPlatformPushState } from '../../core/platform-notices.js';
+import { emptyState, escapeHtml, modal, mountModal, v2Document, v2LegalCards, v2Section } from '../../ui/ui.js';
 import { getDocuments } from '../documents/data.js';
 
 async function request(path, options = {}) {
@@ -29,10 +30,10 @@ function actionText(action) {
 }
 
 function consentCards(consents) {
-  if (!consents.length) return emptyState('Согласий пока нет', 'Здесь появятся согласия, которые относятся к вашей учётной записи.');
+  if (!consents.length) return emptyState('Согласий пока нет', 'Здесь появятся актуальные согласия вашей учётной записи.');
   return v2LegalCards(consents.map((item) => ({
     title:item.title,
-    required:Boolean(item.requiredForRegistration),
+    status:actionText(item.action),
     checked:Boolean(item.active),
     openData:`data-account-consent-open="${escapeHtml(item.key)}"`,
     openAria:`Открыть документ ${item.title}`,
@@ -41,22 +42,25 @@ function consentCards(consents) {
   })));
 }
 
-function historyMarkup(history) {
-  if (!history.length) return emptyState('История пока пуста', 'Изменения согласий будут сохраняться здесь.');
-  return list({
-    items: history.map((item) => ({
-      title: item.title,
-      secondary: `${actionText(item.action)} · версия ${item.version} · ${moment(item.occurredAt)}`,
-    })),
-  });
-}
-
-function serviceMarkup(state) {
+function serviceMarkup(state, pushState) {
   const emailEnabled = state.serviceNotifications?.email !== false;
-  return `<div class="account-controls-service-list">
+  const telegramAvailable = state.serviceNotifications?.telegramAvailable === true;
+  const telegramEnabled = telegramAvailable && state.serviceNotifications?.telegram !== false;
+  const pushSupported = Boolean(pushState?.supported && pushState?.enabled);
+  const pushEnabled = Boolean(pushState?.subscribed);
+
+  return `<div class="account-controls-service-list" aria-label="Куда получать сервисные уведомления">
+    <label class="account-controls-service-row">
+      <input type="checkbox" data-service-telegram ${telegramEnabled ? 'checked' : ''} ${telegramAvailable ? '' : 'disabled'}>
+      <span><strong>Telegram</strong><small>${telegramAvailable ? 'Канал подключён.' : 'Канал платформенного аккаунта не подключён.'}</small></span>
+    </label>
     <label class="account-controls-service-row">
       <input type="checkbox" data-service-email ${emailEnabled ? 'checked' : ''}>
-      <span><strong>Email</strong><small>Сервисные сообщения по вашей учётной записи.</small></span>
+      <span><strong>Email</strong><small>Сервисные сообщения на email учётной записи.</small></span>
+    </label>
+    <label class="account-controls-service-row">
+      <input type="checkbox" data-service-push ${pushEnabled ? 'checked' : ''} ${pushSupported ? '' : 'disabled'}>
+      <span><strong>Push</strong><small>${pushSupported ? 'Push-уведомления на этом устройстве.' : 'Push на этом устройстве сейчас недоступен.'}</small></span>
     </label>
     <div class="muted" data-controls-status></div>
   </div>`;
@@ -77,19 +81,14 @@ function openConsentDocument(item) {
   }),{variant:'large',title:item.title || 'Документ'}));
 }
 
-function openConsentHistory(state) {
-  mountModal(document.body,modal(historyMarkup(Array.isArray(state.history)?state.history:[]),{variant:'large',title:'История согласий'}));
-}
-
-function renderPanelState(root,state){
+async function renderPanelState(root,state,pushState=null){
   const consents=Array.isArray(state.consents)?state.consents:[];
+  const push=pushState || await getPlatformPushState().catch(()=>({supported:false,enabled:false,subscribed:false}));
   root.innerHTML=`
     ${v2Section('Согласия',consentCards(consents))}
-    <div class="account-controls-history-link">${button('История согласий',{variant:'secondary',data:'data-consent-history'})}</div>
-    ${v2Section('Сервисные уведомления',serviceMarkup(state))}
+    ${v2Section('Сервисные уведомления',serviceMarkup(state,push))}
   `;
 
-  root.querySelector('[data-consent-history]')?.addEventListener('click',()=>openConsentHistory(state));
   root.querySelectorAll('[data-account-consent-open]').forEach((control)=>{
     control.addEventListener('click',()=>{
       const item=consents.find((entry)=>entry.key===control.dataset.accountConsentOpen);
@@ -107,7 +106,7 @@ function renderPanelState(root,state){
           method:'PUT',
           body:JSON.stringify({active:!active}),
         });
-        renderPanelState(root,next);
+        await renderPanelState(root,next,push);
       }catch(error){
         control.disabled=false;
         const status=root.querySelector('[data-controls-status]');
@@ -135,27 +134,35 @@ function renderPanelState(root,state){
       input.disabled=false;
     }
   });
+
+  root.querySelector('[data-service-push]')?.addEventListener('change',async(event)=>{
+    const input=event.currentTarget;
+    const status=root.querySelector('[data-controls-status]');
+    input.disabled=true;
+    if(status)status.textContent='Сохраняем…';
+    try{
+      const next=input.checked?await enablePlatformPush():await disablePlatformPush();
+      input.checked=Boolean(next?.subscribed);
+      input.disabled=!(next?.supported&&next?.enabled);
+      if(status)status.textContent=input.checked?'Push включён.':'Push выключен.';
+    }catch(error){
+      input.checked=!input.checked;
+      if(status)status.textContent=error instanceof Error?error.message:'Не удалось изменить Push';
+    }finally{
+      if(push?.supported&&push?.enabled)input.disabled=false;
+    }
+  });
 }
 
 export async function renderAccountControlsPanel(root){
   root.innerHTML=emptyState('Загрузка','Получаем актуальные состояния.');
   try{
-    const state=await request('/profile/account-controls');
-    renderPanelState(root,state);
+    const [state,push]=await Promise.all([
+      request('/profile/account-controls'),
+      getPlatformPushState().catch(()=>({supported:false,enabled:false,subscribed:false})),
+    ]);
+    await renderPanelState(root,state,push);
   }catch(error){
     root.innerHTML=emptyState('Раздел недоступен',error instanceof Error?error.message:'Не удалось загрузить данные');
   }
 }
-
-export async function renderAccountControls(root,navigateBack=()=>{}){
-  root.innerHTML=page([
-    pageHeader('Согласия и уведомления'),
-    '<div data-profile-account-controls-panel></div>',
-    button('Назад',{variant:'secondary',data:'data-controls-back'}),
-  ]);
-  root.querySelector('[data-controls-back]')?.addEventListener('click',navigateBack);
-  const panel=root.querySelector('[data-profile-account-controls-panel]');
-  if(panel)await renderAccountControlsPanel(panel);
-}
-
-export { renderAccountControls as render };
