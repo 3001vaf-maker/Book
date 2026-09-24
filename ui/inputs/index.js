@@ -1,7 +1,7 @@
 import { escapeHtml } from '../utils/escape-html.js';
 import { button } from '../buttons/index.js';
 import { select } from '../selectors/index.js';
-import { mountV2Layer, v2Layer } from '../v2/index.js';
+import { modal, mountModal } from '../modals/index.js';
 import { phoneCountryOptions, phoneInputState } from '../../core/phone/index.js';
 
 let phoneInputId = 0;
@@ -144,13 +144,13 @@ function croppedSquare(src, xPercent = 50, yPercent = 50) {
 }
 
 function openPhotoCrop(fieldRoot, src) {
-  const html = v2Layer(`<div class="photo-cropper" data-photo-cropper>
+  const html = modal(`<div class="photo-cropper" data-photo-cropper>
     <div class="photo-cropper__preview" data-photo-crop-preview></div>
     <label class="field"><span>По горизонтали</span><input type="range" min="0" max="100" value="50" data-photo-crop-x></label>
     <label class="field"><span>По вертикали</span><input type="range" min="0" max="100" value="50" data-photo-crop-y></label>
     ${button('Использовать фото',{data:'data-photo-crop-save'})}
-  </div>`,{kind:'standard',title:'Кадрирование'});
-  const layer = mountV2Layer(html);
+  </div>`,{variant:'medium',title:'Кадрирование'});
+  const layer = mountModal(document.body, html);
   if (!layer) return;
   const preview = layer.querySelector('[data-photo-crop-preview]');
   const x = layer.querySelector('[data-photo-crop-x]');
