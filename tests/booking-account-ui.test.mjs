@@ -247,6 +247,10 @@ assert.match(v2Ui, /const nextIndex = \(activeIndex \+ direction \+ cards\.lengt
 assert.match(v2Ui, /commit\(finalDx < 0 \? 1 : -1\)/);
 assert.match(v2Ui, /is-next-ready/);
 assert.match(v2Ui, /addEventListener\('transitionend'/);
+assert.match(v2Ui, /const eDeck = host\.querySelector\?\.\('\[data-v2-e-list\]'\)/);
+assert.match(v2Ui, /const commitE = \(direction\) =>/);
+assert.match(v2Ui, /eDeck\.addEventListener\('pointermove', eMove/);
+assert.match(v2Ui, /--v2-e-drag-x/);
 assert.doesNotMatch(v2Ui, /settleTimer|}, 210\);/);
 assert.match(v2Ui, /axis = Math\.abs\(nextX\) >= Math\.abs\(nextY\) \* 1\.08 \? 'horizontal' : 'vertical'/);
 assert.match(v2Css, /\.v2-z\{[\s\S]*?touch-action:pan-y/);
@@ -258,10 +262,12 @@ assert.match(v2Css, /--v2-deck-width:calc\(var\(--v2-z-open-x\) - var\(--v2-gap\
 assert.match(v2Css, /--v2-deck-top:34px/);
 assert.match(v2Css, /--v2-gap:20px/);
 assert.match(v2Css, /border:1px solid rgba\(17,17,17,.32\)/);
-assert.match(v2Css, /\.v2-deck__card\{[\s\S]*?display:grid;[\s\S]*?place-items:center/);
-assert.match(v2Css, /\.v2-deck__card strong\{[\s\S]*?text-align:center/);
-assert.doesNotMatch(v2Css, /transform:rotate\(-90deg\)/);
-assert.match(v2Css, /\.v2-e-card\{[\s\S]*?height:50%;[\s\S]*?place-items:center/);
+assert.match(v2Css, /\.v2-deck__card strong\{[\s\S]*?font-size:18px;[\s\S]*?transform:translate\(-50%,-50%\) rotate\(-90deg\)/);
+assert.match(v2Css, /--v2-e-top-gap:72px/);
+assert.match(v2Css, /\.v2-e-deck\{[\s\S]*?top:calc\(var\(--v2-deck-top\) \+ var\(--v2-e-top-gap\)\);[\s\S]*?bottom:0/);
+assert.match(v2Css, /\.v2-e-card\{[\s\S]*?bottom:0;/);
+assert.doesNotMatch(v2Css, /\.v2-e-card\{[\s\S]*?height:50%/);
+assert.match(v2Css, /\.v2-e-card strong\{[\s\S]*?left:calc\(100% - \(var\(--v2-e-pull\) \/ 2\)\);[\s\S]*?font-size:17px;[\s\S]*?rotate\(-90deg\)/);
 assert.match(v2Css, /box-shadow:-18px 12px 34px rgba\(0,0,0,.18\)/);
 assert.match(v2Css, /box-shadow:-9px 8px 14px -11px rgba\(0,0,0,.34\)/);
 assert.match(v2Css, /\.v2-z \.entity-card\{transform:translateY\(-2px\)/);
