@@ -16,6 +16,8 @@ type ProfileInput = {
   emails: string[];
   about: string;
   photo: string;
+  photoCropX: number;
+  photoCropY: number;
   profession: string;
   experience: string;
   professionAbout: string;
@@ -27,6 +29,8 @@ type WorkplaceInput = {
   key: string;
   profileId: string;
   photo: string;
+  photoCropX: number;
+  photoCropY: number;
   name: string;
   color: string;
   city: string;
@@ -58,6 +62,12 @@ function stringList(value: unknown) {
     .filter(Boolean);
 }
 
+function cropPosition(value: unknown, fallback = 50) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.max(0, Math.min(100, Math.round(numeric)));
+}
+
 function normalizeLinks(value: unknown): LinkInput[] {
   return (Array.isArray(value) ? value : [])
     .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object' && !Array.isArray(item))
@@ -79,6 +89,8 @@ function normalizeProfile(value: unknown): ProfileInput {
     emails: stringList(source.emails),
     about: stringValue(source.about),
     photo: stringValue(source.photo),
+    photoCropX: cropPosition(source.photoCropX),
+    photoCropY: cropPosition(source.photoCropY),
     profession: stringValue(source.profession),
     experience: stringValue(source.experience),
     professionAbout: stringValue(source.professionAbout),
@@ -91,6 +103,8 @@ function normalizeWorkplace(value: unknown): WorkplaceInput {
     key: stringValue(source.key).trim(),
     profileId: stringValue(source.profileId, 'profile') || 'profile',
     photo: stringValue(source.photo),
+    photoCropX: cropPosition(source.photoCropX),
+    photoCropY: cropPosition(source.photoCropY),
     name: stringValue(source.name),
     color: stringValue(source.color),
     city: stringValue(source.city),
@@ -131,6 +145,8 @@ function profileData(profile: ProfileInput, customProfessions: string[]) {
     emails: profile.emails as Prisma.InputJsonValue,
     about: profile.about,
     photo: profile.photo,
+    photoCropX: profile.photoCropX,
+    photoCropY: profile.photoCropY,
     profession: profile.profession,
     experience: profile.experience,
     professionAbout: profile.professionAbout,
@@ -143,6 +159,8 @@ function workplaceData(workplace: WorkplaceInput, position: number) {
     key: workplace.key,
     position,
     photo: workplace.photo,
+    photoCropX: workplace.photoCropX,
+    photoCropY: workplace.photoCropY,
     name: workplace.name,
     color: workplace.color,
     city: workplace.city,
@@ -164,6 +182,8 @@ function workplaceDto(workplace: WorkplaceRow): WorkplaceInput {
     key: workplace.key,
     profileId: 'profile',
     photo: workplace.photo,
+    photoCropX: workplace.photoCropX,
+    photoCropY: workplace.photoCropY,
     name: workplace.name,
     color: workplace.color,
     city: workplace.city,
@@ -216,6 +236,8 @@ export class ProfileService {
       emails: stringList(row.emails),
       about: row.about,
       photo: row.photo,
+      photoCropX: row.photoCropX,
+      photoCropY: row.photoCropY,
       profession: row.profession,
       experience: row.experience,
       professionAbout: row.professionAbout,
@@ -308,6 +330,29 @@ export class ProfileService {
       where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
       data: profileData(profile, customProfessions),
     });
+    return this.bundle(tenantId, platformAccountId);
+  }
+
+  async reorderWorkplaces(tenantId: string, platformAccountId: string, body: unknown) {
+    const profile = await this.prisma.profile.findUnique({
+      where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
+      include: { workplaces: { orderBy: [{ position: 'asc' }, { createdAt: 'asc' }], select: { id: true, key: true } } },
+    });
+    if (!profile?.migrationVerifiedAt) throw new ConflictException('Перенос Profile + Workplaces ещё не подтверждён');
+
+    const source = body && typeof body === 'object' && !Array.isArray(body) ? body as Record<string, unknown> : {};
+    const keys = Array.isArray(source.keys) ? source.keys.map((value) => stringValue(value).trim()).filter(Boolean) : [];
+    const uniqueKeys = [...new Set(keys)];
+    const currentKeys = profile.workplaces.map((item) => item.key);
+    if (uniqueKeys.length !== currentKeys.length || uniqueKeys.some((key) => !currentKeys.includes(key))) {
+      throw new BadRequestException('Некорректный порядок рабочих пространств');
+    }
+
+    const byKey = new Map(profile.workplaces.map((item) => [item.key, item.id]));
+    await this.prisma.$transaction(uniqueKeys.map((key, position) => this.prisma.workplace.update({
+      where: { id: byKey.get(key)! },
+      data: { position },
+    })));
     return this.bundle(tenantId, platformAccountId);
   }
 

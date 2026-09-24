@@ -139,7 +139,7 @@ export function select({ name = '', label = '', value = '', options = [], aria =
   const stringValue = String(value ?? '');
   if (stringValue && !normalized.some((option) => option.value === stringValue) && allowCustom) normalized.unshift({ value: stringValue, label: stringValue });
   const inputId = `ui-select-${++selectorId}`;
-  const current = normalized.find((option) => option.value === stringValue) || normalized[0] || { value: '', label: placeholder || 'Выбрать' };
+  const current = normalized.find((option) => option.value === stringValue) || (!stringValue && placeholder ? { value: '', label: placeholder } : normalized[0]) || { value: '', label: placeholder || 'Выбрать' };
   const optionData = escapeHtml(JSON.stringify(normalized));
   const dataAttrs = data ? ` ${data}` : '';
 

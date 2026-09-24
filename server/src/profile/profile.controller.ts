@@ -67,6 +67,18 @@ export class ProfileController {
     );
   }
 
+  @Put('workplaces-order')
+  reorderWorkplaces(
+    @Req() request: AuthenticatedRequest,
+    @Body() body: unknown,
+  ) {
+    return this.profile.reorderWorkplaces(
+      request.auth!.tenantId,
+      request.auth!.platformAccountId,
+      body,
+    );
+  }
+
   @Put('workplaces/:key')
   @UseGuards(WorkplaceLimitGuard)
   upsertWorkplace(

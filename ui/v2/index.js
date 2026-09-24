@@ -19,7 +19,7 @@ function headerControl(slot = {}, role = '') {
   let body = label;
   if (kind === 'avatar') {
     body = image
-      ? `<span class="v2-header__avatar" style="--v2-avatar:url('${text(image)}')" aria-hidden="true"></span>`
+      ? `<span class="v2-header__avatar" style="--v2-avatar:url('${text(image)}');--v2-avatar-position:${text(slot.imagePosition || '50% 50%')}" aria-hidden="true"></span>`
       : `<span class="v2-header__avatar v2-header__avatar--initials" aria-hidden="true">${initials}</span>`;
   } else if (kind === 'chat') {
     body = '<span class="v2-header__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 5.5h16v11H9l-5 3v-14Z"></path></svg></span>';
@@ -152,7 +152,7 @@ export function v2LegalCards(items = []) {
   return `<div class="v2-legal-cards">${(Array.isArray(items) ? items : []).map((item, index) => `<article class="v2-legal-card">
     <button type="button" class="v2-legal-card__document"${dataAttributes(item.openData)} aria-label="${text(item.openAria || item.title || 'Документ')}">
       <strong>${text(item.title || 'Документ')}</strong>
-      <span>${text(item.required ? 'обязательное' : 'необязательное')}</span>
+      <span>${text(item.status || (item.required ? 'обязательное' : 'необязательное'))}</span>
     </button>
     <button type="button" class="v2-legal-card__toggle${item.checked ? ' is-on' : ''}"${dataAttributes(item.toggleData)} aria-pressed="${item.checked ? 'true' : 'false'}" aria-label="${text(item.toggleAria || item.title || 'Согласие')}"><span></span></button>
   </article>`).join('')}</div>`;
@@ -210,7 +210,7 @@ export function mountV2Layer(html) {
 }
 
 export function initV2Swipe(root, { onRight = null, onLeft = null, threshold = 72, maxDrag = 180, revealDeck = true } = {}) {
-  const surface = root?.matches?.('[data-v2-z]') ? root : root?.querySelector?.('[data-v2-z]');
+  const surface = root?.matches?.('[data-v2-z], [data-v2-z-layer]') ? root : root?.querySelector?.('[data-v2-z], [data-v2-z-layer]');
   if (!surface) return () => {};
   const app = surface.closest?.('[data-v2-app]');
   const hasDeck = revealDeck && Boolean(app?.querySelector?.('[data-v2-deck]'));

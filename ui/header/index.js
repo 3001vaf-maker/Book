@@ -17,7 +17,7 @@ export function pageHeader(title, subtitle = '', meta = '') {
  * second visible header inside Z.
  */
 export function workspaceHeaderContext({ title = '', a = null, hideD = false } = {}) {
-  const action = a ? `<button type="button" class="workspace-header-context__action" data-workspace-context-action data-workspace-a-kind="${escapeHtml(a.kind || 'settings')}" data-workspace-a-image="${escapeHtml(a.image || '')}" data-workspace-a-initials="${escapeHtml(a.initials || '')}" aria-label="${escapeHtml(a.aria || 'Настройки контекста')}"></button>` : '';
+  const action = a ? `<button type="button" class="workspace-header-context__action" data-workspace-context-action data-workspace-a-kind="${escapeHtml(a.kind || 'settings')}" data-workspace-a-image="${escapeHtml(a.image || '')}" data-workspace-a-image-position="${escapeHtml(a.imagePosition || '')}" data-workspace-a-initials="${escapeHtml(a.initials || '')}" aria-label="${escapeHtml(a.aria || 'Настройки контекста')}"></button>` : '';
   return `<div class="workspace-header-context" data-workspace-header-context data-workspace-title="${escapeHtml(title)}" data-workspace-hide-d="${hideD ? 'true' : 'false'}">${action}</div>`;
 }
 

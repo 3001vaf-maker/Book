@@ -11,11 +11,18 @@ function normalizeLinks(values) {
     .map((value) => ({ type: String(value.type || ''), url: String(value.url || '') }));
 }
 
+function cropPosition(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? Math.max(0, Math.min(100, Math.round(numeric))) : 50;
+}
+
 export function normalizeWorkplace(workplace = {}) {
   return {
     key: String(workplace.key || ''),
     profileId: String(workplace.profileId || 'profile'),
     photo: String(workplace.photo || ''),
+    photoCropX: cropPosition(workplace.photoCropX),
+    photoCropY: cropPosition(workplace.photoCropY),
     name: String(workplace.name || ''),
     color: String(workplace.color || ''),
     city: String(workplace.city || ''),
@@ -90,6 +97,20 @@ export async function saveWorkplaces(values) {
     hydrateWorkplacesFromServer(payload.workplaces);
   }
   notifyWorkplacesChanged({ action: 'workplaces-saved' });
+  return getWorkplaces();
+}
+
+export async function reorderWorkplaces(keys) {
+  requireServerReady();
+  const orderedKeys = [...new Set((Array.isArray(keys) ? keys : []).map((value) => String(value || '')).filter(Boolean))];
+  if (orderedKeys.length !== workplacesState.length) throw new Error('Некорректный порядок рабочих пространств');
+  const response = await apiRequest('/profile/workplaces-order', {
+    method: 'PUT',
+    body: JSON.stringify({ keys: orderedKeys }),
+  });
+  const payload = await responseJson(response, 'Не удалось сохранить порядок рабочих пространств');
+  hydrateWorkplacesFromServer(payload.workplaces);
+  notifyWorkplacesChanged({ action: 'workplaces-reordered' });
   return getWorkplaces();
 }
 

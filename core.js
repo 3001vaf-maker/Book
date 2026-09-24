@@ -246,7 +246,7 @@ function primaryLabel(source) {
 }
 
 function primaryVisible(source) {
-  if (!source || source.hidden) return false;
+  if (!source || source.hidden || source.dataset.v2PrimaryVisible === 'false') return false;
   if (source.matches('.accordion-save') && !source.classList.contains('is-visible')) return false;
   return true;
 }
@@ -306,6 +306,7 @@ function syncWorkspaceHeader(surface) {
     a: aSource ? {
       kind: aSource.dataset.workspaceAKind || 'settings',
       image: aSource.dataset.workspaceAImage || '',
+      imagePosition: aSource.dataset.workspaceAImagePosition || '',
       initials: aSource.dataset.workspaceAInitials || '',
       data: 'data-v2-workspace-a',
       aria: aSource.getAttribute('aria-label') || sourceText(aSource, 'Контекст раздела'),
@@ -441,7 +442,7 @@ function renderWorkspace() {
     subtree: true,
     characterData: true,
     attributes: true,
-    attributeFilter: ['class', 'disabled', 'aria-label'],
+    attributeFilter: ['class', 'disabled', 'aria-label', 'data-v2-primary-visible'],
   });
 
   const result = surface ? renderActiveWorkspaceSurface(surface) : null;

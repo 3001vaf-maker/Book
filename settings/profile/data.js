@@ -15,6 +15,11 @@ function normalizePhones(values) {
   return [...new Set(normalizeList(values).map((value) => normalizePhoneForStorage(value)).filter(Boolean))];
 }
 
+function cropPosition(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? Math.max(0, Math.min(100, Math.round(numeric))) : 50;
+}
+
 export function normalizeProfile(profile = {}) {
   const phones = normalizePhones(profile.phones?.length ? profile.phones : [profile.phone]);
   return {
@@ -29,6 +34,8 @@ export function normalizeProfile(profile = {}) {
     emails: normalizeList(profile.emails),
     about: String(profile.about || ''),
     photo: String(profile.photo || ''),
+    photoCropX: cropPosition(profile.photoCropX),
+    photoCropY: cropPosition(profile.photoCropY),
     profession: String(profile.profession || ''),
     experience: String(profile.experience || ''),
     professionAbout: String(profile.professionAbout || ''),

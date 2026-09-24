@@ -7,6 +7,82 @@ async function jsonResponse(response, fallback) {
   return payload;
 }
 
+
+function decodeBase64Url(value) {
+  const padding = '='.repeat((4 - (String(value || '').length % 4)) % 4);
+  const base64 = `${String(value || '').replaceAll('-', '+').replaceAll('_', '/')}${padding}`;
+  const raw = atob(base64);
+  return Uint8Array.from(raw, (character) => character.charCodeAt(0));
+}
+
+function platformPushSupported() {
+  return typeof navigator !== 'undefined'
+    && typeof window !== 'undefined'
+    && 'serviceWorker' in navigator
+    && 'PushManager' in window
+    && 'Notification' in window;
+}
+
+async function platformPushConfiguration() {
+  return jsonResponse(await apiRequest('/platform-notices/push/configuration'), 'Не удалось проверить Push');
+}
+
+export async function getPlatformPushState() {
+  if (!platformPushSupported()) return { supported:false, enabled:false, permission:'unsupported', subscribed:false };
+  const configuration = await platformPushConfiguration();
+  const registration = await navigator.serviceWorker.getRegistration('/');
+  const subscription = await registration?.pushManager.getSubscription();
+  let serverSubscribed = false;
+  if (subscription?.endpoint) {
+    const state = await jsonResponse(await apiRequest(`/platform-notices/push/subscription?endpoint=${encodeURIComponent(subscription.endpoint)}`), 'Не удалось проверить Push');
+    serverSubscribed = Boolean(state?.subscribed);
+  }
+  return {
+    supported:true,
+    enabled:Boolean(configuration?.enabled && configuration?.publicKey),
+    permission:Notification.permission,
+    subscribed:Boolean(subscription && serverSubscribed),
+    publicKey:String(configuration?.publicKey || ''),
+  };
+}
+
+export async function enablePlatformPush() {
+  if (!platformPushSupported()) return getPlatformPushState();
+  const configuration = await platformPushConfiguration();
+  if (!configuration?.enabled || !configuration?.publicKey) return getPlatformPushState();
+  if (Notification.permission === 'default') await Notification.requestPermission();
+  if (Notification.permission !== 'granted') return getPlatformPushState();
+
+  const registration = await navigator.serviceWorker.register('/service-worker.js', { scope:'/' });
+  await navigator.serviceWorker.ready;
+  let subscription = await registration.pushManager.getSubscription();
+  if (!subscription) {
+    subscription = await registration.pushManager.subscribe({
+      userVisibleOnly:true,
+      applicationServerKey:decodeBase64Url(configuration.publicKey),
+    });
+  }
+  await jsonResponse(await apiRequest('/platform-notices/push/subscription', {
+    method:'POST',
+    body:JSON.stringify(subscription.toJSON()),
+  }), 'Не удалось включить Push');
+  return getPlatformPushState();
+}
+
+export async function disablePlatformPush() {
+  if (!platformPushSupported()) return getPlatformPushState();
+  const registration = await navigator.serviceWorker.getRegistration('/');
+  const subscription = await registration?.pushManager.getSubscription();
+  if (subscription) {
+    await jsonResponse(await apiRequest('/platform-notices/push/subscription', {
+      method:'DELETE',
+      body:JSON.stringify({ endpoint:subscription.endpoint }),
+    }), 'Не удалось отключить Push');
+    await subscription.unsubscribe().catch(() => false);
+  }
+  return getPlatformPushState();
+}
+
 async function listNotices() {
   return jsonResponse(await apiRequest('/platform-notices'), 'Не удалось получить системные уведомления');
 }

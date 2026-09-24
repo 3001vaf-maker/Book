@@ -135,6 +135,7 @@ expect(core.includes("kind: 'chat'") && core.includes("data: 'data-v2-workspace-
 expect(core.includes("[data-workspace-context-action]") && core.includes('aSource.dataset.workspaceAKind') && core.includes('function syncWorkspaceBack(') && !core.includes("kind: backSource ? 'back' : 'settings'"), 'Workspace Header A must consume the canonical Header context; local Back must remain inside Z instead of taking A.');
 expect(core.includes("[data-v2-primary-action]") && core.includes("surface.querySelector('.page-header-action button')") && core.includes("form button[type=\"submit\"]") && core.includes('syncWorkspacePrimarySource'), 'Workspace Header C must reuse the shared or existing primary action instead of duplicating module logic.');
 expect(css.includes('.v2-workspace-source-hidden{display:none!important}') && css.includes('.v2-workspace-back{'), 'Workspace V2 must hide only the proxied original action and keep local Back on the Z surface.');
+expect(css.includes('.v2-primary-source-only{display:none!important}'), 'Header C may proxy a single hidden source without duplicating the visible action in Z body.');
 expect(ui.includes("secondaryDeck = ''") && ui.includes("role = ''") && ui.includes('data-v2-deck-role'), 'Shared V2 must own both F levels through the same deck component.');
 expect(css.includes('.v2-app--workspace .v2-deck--secondary{left:var(--v2-z-open-x)}') && css.includes('--v2-z-double-open-x:'), 'Workspace F2 must be separated from F1 by the shared GAP and move Z farther right.');
 expect(css.includes('.v2-app--workspace.is-deck-open .v2-deck--secondary + .v2-z'), 'Workspace Z double shift must be structurally bound to a real second F deck, not only to a helper class.');
@@ -151,9 +152,22 @@ expect(profile.includes("v2Section('Рабочие пространства',wor
 expect(!profile.includes('accordion(') && !profile.includes('initAccordions('), 'Regular Profile UI must not retain the legacy accordion.');
 expect(profile.includes('mountV2ZLayer(root,v2ZLayer(') && profile.includes("'Настройки профиля'"), 'Profile settings must open as a shared second Z layer.');
 expect(profile.includes('data-v2-primary-action') && profile.includes('data-add-workplace'), 'Profile root C must proxy the existing add-workplace action.');
+
+expect(profile.includes("data:'data-profile-card'") && profile.includes("openProfileData(root") && profile.includes("'Данные профиля'"), 'Profile Card must open a dedicated Profile Data Z2.');
+expect(profile.includes("openProfileSettings(root") && profile.includes("'Настройки профиля'"), 'Header A must open a separate Profile Settings Z2.');
+expect(profile.includes("openWorkplaceZ2(root") && profile.includes("workplaceForm(existing,{sourceOnly:true})"), 'Workplace cards and create action must use the reusable workplace form inside Z2.');
+expect(profile.includes("className:'entity-card--hero entity-card--rail") && !profile.includes("entity-card--compact"), 'Workplaces in Profile must remain real Entity Cards, not compact substitutes.');
+expect(profile.includes("data-v2-primary-visible=\"false\"") && profile.includes("formSnapshot(form)!==initial"), 'Profile Data C=Save must appear reactively only after changes.');
+expect(workplacesUi.includes("data-v2-primary-label=\"") && workplacesUi.includes("existing&&!dirty?'Удалить':'Сохранить'"), 'Existing Workplace Z2 C must switch between Delete and Save based on dirty state.');
+expect(workplacesUi.includes("workplaceForm(existing,{bodyActions:true})") && workplacesUi.includes("workplaceForm(existing=null,{sourceOnly=false,bodyActions=false}={})"), 'Workplace must have one reusable form renderer with compatibility wrappers, not a second V2 form.');
+expect(css.includes('--v2-z-layer-offset:12px') && css.includes('inset:0 0 0 calc(var(--v2-edge) + var(--v2-z-layer-offset))'), 'Shared Z2 must leave a single 12px Z1 edge through the shared token.');
+expect(ui.includes("[data-v2-z], [data-v2-z-layer]") && ui.includes("revealDeck: false"), 'Shared swipe must own Z2 and close it without revealing F.');
+expect(accountControlsUi.includes("data-service-email") && accountControlsUi.includes("data-service-push") && accountControlsUi.includes("data-service-telegram"), 'Profile Settings must expose Telegram, Email and Push service channels.');
+expect(!accountControlsUi.includes('История согласий') && !accountControlsUi.includes('historyMarkup') && !accountControlsUi.includes('openConsentHistory') && !accountControlsUi.includes('data-consent-history'), 'Profile Settings must not expose consent history.');
+
 expect(style.includes('--text:#111111') && style.includes('--button-secondary:#D8D3CF') && style.includes('--text-secondary:#777A7D'), 'Shared palette must use the approved black and neutral tokens.');
-expect(entityCardCss.includes('background:var(--surface-dark)') && !/#D7CEC7|#968982|#E7E1DB|#B8AEA8|rgba\(59,48,43/.test(entityCardCss), 'Shared entity cards must not retain the legacy system brown palette.');
-expect(inputs.includes('openPhotoCrop(') && inputs.includes('croppedSquare(') && inputs.includes('mountModal'), 'Shared photo owner must provide the common crop flow through the sole modal owner.');
+expect(entityCardCss.includes('--entity-card-h:var(--v2-base,var(--surface-dark))') && entityCardCss.includes('--entity-card-neutral:var(--v2-disabled,var(--button-secondary))') && entityCardCss.includes('linear-gradient(135deg,var(--entity-card-h) 0%,var(--entity-card-neutral) 100%)') && !/#D7CEC7|#968982|#E7E1DB|#B8AEA8|rgba\(59,48,43/.test(entityCardCss), 'Shared entity cards must use the canonical H-to-neutral gradient without legacy brown.');
+expect(inputs.includes('data-photo-crop-x-value') && inputs.includes('data-photo-crop-y-value') && inputs.includes('setOriginal(src)') && !inputs.includes('croppedSquare('), 'Shared photo owner must preserve the original image and store crop position metadata instead of replacing the original with a cropped blob.');
 expect(headerUi.includes('export function workspaceHeaderContext') && facade.includes('workspaceHeaderContext'), 'Canonical Header owner must own workspace context metadata.');
 expect(!ui.includes('v2WorkspaceContext'), 'Shared V2 must not duplicate the canonical Header context owner.');
 expect(ui.includes('export function v2ZLayer') && ui.includes('export function mountV2ZLayer'), 'Shared V2 must own stacked Z layers.');
@@ -170,7 +184,6 @@ for (const [name, source] of [
   ['profile', profile],
   ['profile workplaces', workplacesUi],
   ['profile account controls', accountControlsUi],
-  ['shared inputs', inputs],
   ['shared time', timeUi],
   ['shared colors', colorUi],
   ['end-user account shell', account],
@@ -181,6 +194,8 @@ for (const [name, source] of [
   expect(source.includes('modal(') && source.includes('mountModal('), `${name} must consume the sole shared modal owner.`);
   expect(!source.includes('mountV2Layer(') && !source.includes('v2Layer('), `${name} must not bypass ui/modals with a parallel V2 modal path.`);
 }
+expect(!inputs.includes('modal(') && !inputs.includes('mountModal('), 'Shared photo/input owner must keep crop inline and must not open a modal.');
+expect(!inputs.includes('mountV2Layer(') && !inputs.includes('v2Layer('), 'Shared inputs must not bypass canonical owners with local V2 layers.');
 
 
 
