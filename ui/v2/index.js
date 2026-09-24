@@ -402,7 +402,6 @@ export function initV2DeckSwipe(root, { activeId = '', onActiveChange = null, eA
   const deck = root?.matches?.('[data-v2-deck]') ? root : root?.querySelector?.('[data-v2-deck]');
   if (!deck) return () => {};
   const cards = [...deck.querySelectorAll('.v2-deck__card')];
-  if (cards.length < 2) return () => {};
   const host = deck.closest?.('[data-v2-fe]') || deck;
   let activeIndex = Math.max(0, cards.findIndex((card) => String(card.getAttribute('data-account-deck-item') || card.getAttribute('data-v2-deck-item') || '') === String(activeId || '')));
   let pointerId = null;
@@ -541,11 +540,13 @@ export function initV2DeckSwipe(root, { activeId = '', onActiveChange = null, eA
     event.stopPropagation();
   };
 
-  deck.addEventListener('pointerdown', down);
-  deck.addEventListener('pointermove', move, { passive: false });
-  deck.addEventListener('pointerup', up);
-  deck.addEventListener('pointercancel', cancel);
-  deck.addEventListener('click', click, true);
+  if (cards.length > 1) {
+    deck.addEventListener('pointerdown', down);
+    deck.addEventListener('pointermove', move, { passive: false });
+    deck.addEventListener('pointerup', up);
+    deck.addEventListener('pointercancel', cancel);
+    deck.addEventListener('click', click, true);
+  }
 
   const eDeck = host.querySelector?.('[data-v2-e-list]');
   const eCards = [...(eDeck?.querySelectorAll?.('.v2-e-card') || [])];
