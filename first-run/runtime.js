@@ -386,7 +386,7 @@ export class FirstRunRuntime {
     if (!step || this.disposed) return;
     this.decorateDemo();
 
-    if (step.key === 'procedures' || step.key === 'products' || SETTINGS_STEPS.has(step.key)) {
+    if (step.key === 'procedures' || step.key === 'products') {
       const target = this.routeTarget(step);
       if (target && this.enteredStepKey !== step.key) this.pulse(target);
 
