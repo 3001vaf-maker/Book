@@ -34,13 +34,37 @@ function cssFilesUnder(directory) {
   });
 }
 
+function jsFilesUnder(directory) {
+  if (!fs.existsSync(directory)) return [];
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = `${directory}/${entry.name}`;
+    if (entry.isDirectory()) return jsFilesUnder(path);
+    return entry.isFile() && entry.name.endsWith('.js') ? [path] : [];
+  });
+}
+
 const sharedCssFiles = ['css/style.css', ...cssFilesUnder('ui'), ...cssFilesUnder('settings/profile')];
+const runtimeJsFiles = [
+  'core.js',
+  ...jsFilesUnder('ui'),
+  ...jsFilesUnder('online-booking'),
+  ...jsFilesUnder('settings'),
+  ...jsFilesUnder('main'),
+  ...jsFilesUnder('journal'),
+  ...jsFilesUnder('first-run'),
+];
+
 const legacySystemBrown = /#(?:3B302B|7A6F69|B8AEA8|E7E1DB|E8E1DC|D7CEC7|968982|E9E6E2|D8D0CA)\b|rgba\(59,48,43,[^)]+\)|rgba\(30,25,22,[^)]+\)/i;
 
 const failures = [];
 const expect = (condition, message) => { if (!condition) failures.push(message); };
 for (const file of sharedCssFiles) {
   expect(!legacySystemBrown.test(fs.readFileSync(file, 'utf8')), `Legacy system brown must not remain in Shared UI CSS: ${file}.`);
+}
+for (const file of runtimeJsFiles) {
+  if (file === 'ui/v2/index.js' || file === 'ui/modals/index.js') continue;
+  const source = fs.readFileSync(file, 'utf8');
+  expect(!/\b(?:v2Layer|mountV2Layer)\s*\(/.test(source), `Runtime code must use canonical modal()/mountModal() instead of parallel V2 modal primitives: ${file}.`);
 }
 
 
