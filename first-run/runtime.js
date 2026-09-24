@@ -284,23 +284,19 @@ export class FirstRunRuntime {
   }
 
   workspaceSection(step) {
-    if (step.key === 'people' || step.key.startsWith('finance-') || step.key === 'complete') return 'main';
+    if (step.key === 'people' || step.key === 'complete') return 'people';
+    if (step.key.startsWith('finance-')) return 'finance';
     if (step.key === 'timetable') return 'timetable';
     if (step.key.startsWith('journal') || step.key === 'payment') return 'journal';
     if (step.key === 'chat') return 'chat';
-    return 'main';
+    return 'people';
   }
 
   async renderWorkspaceStep(step) {
     const current = this.getActiveSection();
 
     if (step.key === 'people') {
-      this.showWorkspace('main');
-      const host = this.app.querySelector('#app-content');
-      if (host) {
-        const people = await import('../main/people/people.js');
-        people.renderPeople(host);
-      }
+      this.showWorkspace('people');
       this.installObserver();
       await this.showStepModal(step);
       this.queueSync();
@@ -315,20 +311,23 @@ export class FirstRunRuntime {
       return;
     }
 
-    if (step.key.startsWith('finance-') && step.key !== 'finance-overview') {
-      if (current !== 'main') this.showWorkspace('main');
-      const host = this.app.querySelector('#app-content');
-      if (host) {
-        const finance = await import('../main/finance/finance.js');
-        finance.renderFinance(host);
-      }
+    if (step.key.startsWith('finance-')) {
+      if (current !== 'finance') this.showWorkspace('finance');
+      window.dispatchEvent(new CustomEvent('book:v2-navigation-request', { detail: { open: true } }));
       this.installObserver();
       this.queueSync();
       return;
     }
 
-    // Журнал, Чат и переход на Главную пользователь открывает сам:
-    // контроллер оставляет текущий экран и подсвечивает реальную навигацию.
+    if (step.key === 'journal-month' || step.key === 'journal-list') {
+      if (current !== 'journal') this.showWorkspace('journal');
+      window.dispatchEvent(new CustomEvent('book:v2-navigation-request', { detail: { open: true } }));
+      this.installObserver();
+      this.queueSync();
+      return;
+    }
+
+    // Остальные шаги сохраняют текущий экран и ведут через реальную V2-навигацию.
     this.installObserver();
     this.queueSync();
   }
@@ -355,22 +354,22 @@ export class FirstRunRuntime {
     if (step.key === 'integrations') return this.app.querySelector('[data-settings-open="integrations"]');
     if (step.key === 'tags') return this.app.querySelector('[data-settings-open="tags"]');
     if (step.key === 'documents') return this.app.querySelector('[data-settings-open="documents"]');
-    if (step.key === 'people') return this.app.querySelector('[data-open-people]');
-    if (step.key === 'journal-month') return this.app.querySelector('[data-view="month"]');
-    if (step.key === 'journal-list') return this.app.querySelector('[data-view="list"]');
-    if (step.key === 'finance-overview') return this.app.querySelector('[data-open-finance]');
-    if (step.key === 'finance-cash') return this.app.querySelector('[data-finance-cash]');
-    if (step.key === 'finance-dds') return this.app.querySelector('[data-finance-dds]');
-    if (step.key === 'finance-income-expense') return this.app.querySelector('[data-finance-income-expense]');
-    if (step.key === 'finance-articles') return this.app.querySelector('[data-finance-articles]');
-    if (step.key === 'finance-special') return this.app.querySelector('[data-finance-special]');
-    if (step.key === 'finance-report') return this.app.querySelector('[data-finance-z-report]');
+    if (step.key === 'people' || step.key === 'finance-overview') return null;
+    if (step.key === 'journal-month') return this.app.querySelector('[data-v2-secondary-item="month"]');
+    if (step.key === 'journal-list') return this.app.querySelector('[data-v2-secondary-item="list"]');
+    if (step.key === 'finance-cash') return this.app.querySelector('[data-v2-secondary-item="cash"]');
+    if (step.key === 'finance-dds') return this.app.querySelector('[data-v2-secondary-item="dds"]');
+    if (step.key === 'finance-income-expense') return this.app.querySelector('[data-v2-secondary-item="income-expense"]');
+    if (step.key === 'finance-articles') return this.app.querySelector('[data-v2-secondary-item="articles"]');
+    if (step.key === 'finance-special') return this.app.querySelector('[data-v2-secondary-item="special"]');
+    if (step.key === 'finance-report') return this.app.querySelector('[data-v2-secondary-item="z-report"]');
     return null;
   }
 
   navTarget(step) {
     const section = this.workspaceSection(step);
-    return this.app.querySelector(`[data-nav="${CSS.escape(section)}"]`);
+    if (section === 'chat') return this.app.querySelector('[data-v2-workspace-chat]');
+    return this.app.querySelector(`[data-v2-root-item="${CSS.escape(section)}"]`);
   }
 
   localReady(step) {
@@ -419,7 +418,10 @@ export class FirstRunRuntime {
     const activeSection = this.getActiveSection();
     const requiredSection = this.workspaceSection(step);
     if (activeSection !== requiredSection) {
-      this.pulse(this.app.querySelector(`[data-nav="${CSS.escape(requiredSection)}"]`));
+      if (requiredSection !== 'chat') {
+        window.dispatchEvent(new CustomEvent('book:v2-navigation-request', { detail: { open: true } }));
+      }
+      this.pulse(this.navTarget(step));
       if (step.kind === 'OPTIONAL_INFO') {
         this.renderActionDock(step, { skipVisible: true, onSkip: () => this.complete(step, 'skip') });
       }
@@ -435,7 +437,7 @@ export class FirstRunRuntime {
       return;
     }
 
-    if (!target && !this.modalShownKey && ['timetable', 'journal-record', 'payment', 'chat', 'finance-sections', 'complete'].includes(step.key)) {
+    if (!target && !this.modalShownKey && ['timetable', 'journal-record', 'payment', 'chat', 'finance-overview', 'finance-sections', 'complete'].includes(step.key)) {
       void this.showStepModal(step);
     }
 
@@ -480,8 +482,10 @@ export class FirstRunRuntime {
     const target = event.target instanceof Element ? event.target : null;
     if (!target) return;
 
-    const nav = target.closest('[data-nav]');
-    if (nav && nav.dataset.nav === this.workspaceSection(step)) {
+    const rootNav = target.closest('[data-v2-root-item]');
+    const chatNav = target.closest('[data-v2-workspace-chat]');
+    const requestedSection = rootNav?.dataset.v2RootItem || (chatNav ? 'chat' : '');
+    if (requestedSection && requestedSection === this.workspaceSection(step)) {
       window.setTimeout(() => {
         if (['timetable', 'journal-record', 'chat'].includes(step.key)) void this.showStepModal(step);
         this.queueSync();

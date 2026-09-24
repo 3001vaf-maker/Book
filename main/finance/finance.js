@@ -121,7 +121,7 @@ function localDateTimeValue(date = new Date()) {
   return shifted.toISOString().slice(0, 16);
 }
 
-function openFinanceOperation(root, movements, operationId) {
+function openFinanceOperation(root, movements, operationId, onBack = () => renderFinance(root)) {
   const id = String(operationId || '');
   const entries = movements.filter((item) => String(item?.operationId || '') === id);
   if (!entries.length) return;
@@ -170,14 +170,14 @@ function openFinanceOperation(root, movements, operationId) {
       });
       if (!cancelled) return;
       m.remove();
-      renderDDS(root);
+      renderDDS(root, onBack);
     } catch (error) {
       openNotice({ message: String(error?.message || 'Не удалось отменить операцию') });
     }
   });
 }
 
-function renderDDS(root) {
+function renderDDS(root, onBack = () => renderFinance(root)) {
   const movements = [...getLedgerEntries()].reverse();
   const operations = movements.length
     ? list({ items: movements.map(movementListItem) })
@@ -186,9 +186,31 @@ function renderDDS(root) {
   root.innerHTML = `${pageHeader('ДДС', 'Все операции')}<div class="ui-list-toolbar"><div></div><div class="ui-list-toolbar__actions">${button('Excel', { className: 'ui-button--secondary', data: 'data-finance-dds-excel' })}</div></div>${operations}${actionBlock(button('Назад', { variant: 'secondary', data: 'data-finance-dds-back' }))}`;
   root.querySelector('[data-finance-dds-excel]')?.addEventListener('click', () => downloadDDS(movements));
   root.querySelectorAll('[data-finance-operation]').forEach((element) => {
-    element.addEventListener('click', () => openFinanceOperation(root, movements, element.dataset.financeOperation));
+    element.addEventListener('click', () => openFinanceOperation(root, movements, element.dataset.financeOperation, onBack));
   });
-  root.querySelector('[data-finance-dds-back]')?.addEventListener('click', () => renderFinance(root));
+  root.querySelector('[data-finance-dds-back]')?.addEventListener('click', onBack);
+}
+
+const FINANCE_NAVIGATION = [
+  { id: 'cash', label: 'Касса' },
+  { id: 'dds', label: 'ДДС' },
+  { id: 'income-expense', label: 'Доход / Расход' },
+  { id: 'articles', label: 'Статьи' },
+  { id: 'special', label: 'Прочие операции' },
+  { id: 'z-report', label: 'Z-отчёт' },
+];
+
+export function financeNavigationItems() {
+  return FINANCE_NAVIGATION.map((item) => ({ ...item }));
+}
+
+export function renderFinanceSection(root, section = 'cash', { onBack = () => renderFinance(root) } = {}) {
+  if (section === 'dds') return renderDDS(root, onBack);
+  if (section === 'income-expense') return renderIncomeExpense(root, onBack);
+  if (section === 'articles') return renderFinanceArticles(root, onBack);
+  if (section === 'special') return renderSpecialFinanceOperations(root, onBack);
+  if (section === 'z-report') return renderZReport(root, onBack);
+  return renderWallets(root, onBack);
 }
 
 export function renderFinance(root) {

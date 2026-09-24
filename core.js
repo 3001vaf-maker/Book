@@ -1,7 +1,9 @@
-import { renderMain } from './main/main.js';
-import { renderJournal } from './journal/journal.js';
+import { renderPeople } from './main/people/people.js';
+import { financeNavigationItems, renderFinanceSection } from './main/finance/finance.js';
+import { journalNavigationItems, renderJournalView } from './journal/journal.js';
 import { renderTimetable } from './timetable/timetable.js';
-import { renderSettings } from './settings/settings.js';
+import { settingsNavigationItems, renderSettingsSection } from './settings/settings.js';
+import { render as renderProfile } from './settings/profile/profile.js';
 import { renderChat } from './chat/chat.js';
 import { getWorkplaces as getWorkplaceEntities } from './settings/profile/workplaces/data.js';
 import { initializeProfileWorkplaces } from './settings/profile/migration.js';
@@ -17,7 +19,7 @@ import { canUseBookCapability, getBookAccess, loadBookAccess } from './core/acce
 import { startServerBookingSync } from './online-booking/server-sync.js';
 import { renderOnlineBooking } from './online-booking/booking.js';
 import { startAccountRuntime } from './online-booking/account-runtime.js';
-import { bottomNavigation } from './ui/ui.js';
+import { initV2DeckSwipe, initV2Swipe, v2FDeck, v2Header, v2Shell } from './ui/ui.js';
 import { clearLegacyBusinessStorage } from './core/legacy-browser-business.js';
 import { FirstRunRuntime, bindDemoBadgeAction, demoBadgeMarkup, startPlatformSessionTracking } from './first-run/runtime.js';
 import { startPlatformNotices } from './core/platform-notices.js';
@@ -27,21 +29,25 @@ configureWorkplaceSource(getWorkplaceEntities);
 configureTimeUsageSource(getJournalTimeUsages);
 configureSoftTimeUsageReleaseSource(releaseJournalSoftTimeUsages);
 
-const routes = {
-  main: renderMain,
-  timetable: renderTimetable,
-  journal: renderJournal,
-  chat: renderChat,
-  settings: renderSettings,
-};
+const ROOT_SECTIONS = [
+  { id: 'people', label: 'Клиенты', capability: 'people.access' },
+  { id: 'finance', label: 'Финансы', capability: 'finance.access' },
+  { id: 'timetable', label: 'График', capability: 'timetable.access' },
+  { id: 'journal', label: 'Журнал', capability: 'journal.access' },
+  { id: 'profile', label: 'Профиль', capability: 'profile.access' },
+  { id: 'settings', label: 'Настройки', capability: '' },
+];
 
-const sectionCapabilities = {
-  timetable: 'timetable.access',
-  journal: 'journal.access',
-  chat: 'chat.access',
+const state = {
+  activeSection: 'people',
+  lastRootSection: 'people',
+  navigationOpen: false,
+  secondary: {
+    finance: 'cash',
+    journal: 'day',
+    settings: 'service',
+  },
 };
-
-const state = { activeSection: 'main' };
 const app = document.querySelector('#app');
 let disposeView = () => {};
 let workspaceReady = false;
@@ -53,6 +59,7 @@ let disposePlatformSession = () => {};
 let demoBadgeTimer = null;
 let disposePlatformNotices = () => {};
 let rknGuideSyncTimer = null;
+let workspaceRenderVersion = 0;
 
 async function syncRknGuideIfReady() {
   if (!authenticatedAccount) return false;
@@ -120,44 +127,297 @@ function ensureServerBookingSync() {
   startServerBookingSync();
 }
 
+function rootDefinition(section) {
+  return ROOT_SECTIONS.find((item) => item.id === section) || null;
+}
+
 function sectionAllowed(section) {
-  if (!routes[section]) return false;
-  const capability = sectionCapabilities[section];
-  return capability ? canUseBookCapability(capability) : true;
+  if (section === 'chat') return canUseBookCapability('chat.access');
+  const item = rootDefinition(section);
+  return Boolean(item && (!item.capability || canUseBookCapability(item.capability)));
 }
 
 function allowedSections() {
-  return Object.keys(routes).filter(sectionAllowed);
+  return ROOT_SECTIONS.filter((item) => sectionAllowed(item.id)).map((item) => item.id);
+}
+
+function allowedRootItems() {
+  return ROOT_SECTIONS.filter((item) => sectionAllowed(item.id)).map(({ id, label }) => ({ id, label }));
 }
 
 function defaultSection() {
-  if (sectionAllowed('main')) return 'main';
-  if (sectionAllowed('journal')) return 'journal';
-  if (sectionAllowed('timetable')) return 'timetable';
-  return 'settings';
+  return allowedSections()[0] || 'settings';
 }
 
-function navigate(section) {
-  if (!workspaceReady || !sectionAllowed(section)) return;
-  state.activeSection = section;
+function normalizeRequestedSection(section) {
+  const value = String(section || '').trim();
+  if (value === 'main') {
+    if (sectionAllowed('people')) return 'people';
+    if (sectionAllowed('finance')) return 'finance';
+    return defaultSection();
+  }
+  return value;
+}
+
+function activeRootSection() {
+  return state.activeSection === 'chat' ? state.lastRootSection : state.activeSection;
+}
+
+function secondaryItems(section = activeRootSection()) {
+  if (section === 'finance') return financeNavigationItems();
+  if (section === 'journal') return journalNavigationItems();
+  if (section === 'settings') return settingsNavigationItems();
+  return [];
+}
+
+function ensureSecondary(section) {
+  const items = secondaryItems(section);
+  if (!items.length) return '';
+  const selected = String(state.secondary[section] || '');
+  if (items.some((item) => item.id === selected)) return selected;
+  state.secondary[section] = items[0].id;
+  return items[0].id;
+}
+
+function setNavigationOpen(open) {
+  state.navigationOpen = Boolean(open);
+  app.querySelector('[data-v2-app]')?.classList.toggle('is-deck-open', state.navigationOpen);
+}
+
+function navigate(section, { navigationOpen = state.navigationOpen, updateHash = true } = {}) {
+  if (!workspaceReady) return;
+  const next = normalizeRequestedSection(section);
+  if (!sectionAllowed(next)) return;
+  if (next === 'chat') {
+    if (state.activeSection !== 'chat') state.lastRootSection = activeRootSection();
+    state.activeSection = 'chat';
+    state.navigationOpen = false;
+  } else {
+    state.activeSection = next;
+    state.lastRootSection = next;
+    state.navigationOpen = Boolean(navigationOpen);
+    ensureSecondary(next);
+  }
+  renderWorkspace();
+  if (updateHash) history.replaceState({}, '', `#${state.activeSection}`);
+}
+
+function selectSecondary(id) {
+  const section = activeRootSection();
+  const items = secondaryItems(section);
+  if (!items.some((item) => item.id === id)) return;
+  state.secondary[section] = id;
+  state.navigationOpen = true;
   renderWorkspace();
   history.replaceState({}, '', `#${section}`);
 }
 
+function sourceText(node, fallback = '') {
+  const value = String(node?.textContent || '').replace(/\s+/g, ' ').trim();
+  return value || fallback;
+}
+
+function primarySource(surface) {
+  const shellAction = surface.querySelector('.app-header__slot--action button');
+  if (shellAction) return shellAction;
+  if (state.activeSection === 'people') return surface.querySelector('[data-add]');
+  if (state.activeSection === 'timetable') return surface.querySelector('[data-timetable-apply]');
+  if (state.activeSection === 'profile') return surface.querySelector('[data-save-profile]');
+  return null;
+}
+
+function primaryLabel(source) {
+  if (!source) return '';
+  if (source.matches('[data-add]')) return 'Добавить';
+  if (source.matches('[data-timetable-apply]')) return 'Применить';
+  if (source.matches('[data-save-profile]')) return 'Сохранить';
+  return sourceText(source);
+}
+
+function primaryVisible(source) {
+  if (!source || source.hidden) return false;
+  if (source.matches('.accordion-save') && !source.classList.contains('is-visible')) return false;
+  return true;
+}
+
+function syncWorkspaceHeader(surface) {
+  if (!surface?.isConnected) return;
+  const root = activeRootSection();
+  const fallbackTitle = state.activeSection === 'chat'
+    ? 'Чат'
+    : rootDefinition(root)?.label || '';
+  const title = sourceText(
+    surface.querySelector('.page-header h1, .app-header__title'),
+    fallbackTitle,
+  );
+  const backSource = surface.querySelector('.app-header__slot--back button');
+  const contextSource = surface.querySelector('.page-header__meta button, .app-header__slot--settings button');
+  const aSource = backSource || contextSource;
+  const cSource = primarySource(surface);
+  const cVisible = primaryVisible(cSource);
+  const header = app.querySelector('[data-v2-header]');
+  if (!header) return;
+
+  header.outerHTML = v2Header({
+    a: aSource ? {
+      kind: backSource ? 'back' : 'settings',
+      data: 'data-v2-workspace-a',
+      aria: aSource.getAttribute('aria-label') || sourceText(aSource, 'Контекст раздела'),
+    } : null,
+    b: title,
+    c: cVisible ? {
+      label: primaryLabel(cSource),
+      data: 'data-v2-workspace-primary',
+      aria: cSource.getAttribute('aria-label') || primaryLabel(cSource),
+      disabled: Boolean(cSource.disabled),
+    } : null,
+    d: sectionAllowed('chat') ? {
+      kind: 'chat',
+      data: 'data-v2-workspace-chat',
+      aria: state.activeSection === 'chat' ? 'Вернуться из чата' : 'Чат',
+    } : null,
+  });
+
+  app.querySelector('[data-v2-workspace-a]')?.addEventListener('click', () => aSource?.click());
+  app.querySelector('[data-v2-workspace-primary]')?.addEventListener('click', () => cSource?.click());
+  app.querySelector('[data-v2-workspace-chat]')?.addEventListener('click', () => {
+    if (state.activeSection === 'chat') navigate(state.lastRootSection, { navigationOpen: false });
+    else navigate('chat', { navigationOpen: false });
+  });
+}
+
+function renderActiveWorkspaceSurface(surface) {
+  const section = state.activeSection;
+  const openNavigation = () => setNavigationOpen(true);
+  if (section === 'people') return renderPeople(surface);
+  if (section === 'finance') return renderFinanceSection(surface, ensureSecondary('finance'), { onBack: openNavigation });
+  if (section === 'timetable') return renderTimetable(surface);
+  if (section === 'journal') {
+    return renderJournalView(surface, ensureSecondary('journal'), {
+      onViewChange: (view) => {
+        if (state.secondary.journal === view) return;
+        state.secondary.journal = view;
+        renderWorkspace();
+      },
+    });
+  }
+  if (section === 'profile') return renderProfile(surface, openNavigation);
+  if (section === 'settings') return renderSettingsSection(surface, ensureSecondary('settings'), { onBack: openNavigation });
+  if (section === 'chat') return renderChat(surface);
+  return renderPeople(surface);
+}
+
 function renderWorkspace() {
-  setThemeColor('#F5F5F3');
+  setThemeColor('#2F3338');
   app.classList.remove('app-shell--booking');
   workspaceReady = true;
   disposeView();
   disposeView = () => {};
-  if (!sectionAllowed(state.activeSection)) state.activeSection = defaultSection();
-  const view = routes[state.activeSection];
-  app.innerHTML = `<main class="app-content" id="app-content"></main>${bottomNavigation(state.activeSection, allowedSections())}`;
-  const nextDispose = view(document.querySelector('#app-content'), { navigate });
-  if (typeof nextDispose === 'function') disposeView = nextDispose;
-  app.querySelectorAll('[data-nav]').forEach((button) => {
-    button.addEventListener('click', () => navigate(button.dataset.nav));
+  const requested = normalizeRequestedSection(state.activeSection);
+  if (!sectionAllowed(requested)) state.activeSection = defaultSection();
+  if (state.activeSection !== 'chat') state.lastRootSection = state.activeSection;
+
+  const root = activeRootSection();
+  const rootItems = allowedRootItems();
+  const childItems = secondaryItems(root);
+  const childActive = ensureSecondary(root);
+  const rootDeck = v2FDeck(rootItems, {
+    active: root,
+    data: 'data-v2-root-item',
+    className: 'v2-deck--root',
+    role: 'root',
   });
+  const secondaryDeck = childItems.length ? v2FDeck(childItems, {
+    active: childActive,
+    data: 'data-v2-secondary-item',
+    className: 'v2-deck--secondary',
+    role: 'secondary',
+  }) : '';
+
+  app.innerHTML = v2Shell({
+    header: v2Header({
+      b: state.activeSection === 'chat' ? 'Чат' : rootDefinition(root)?.label || '',
+      d: sectionAllowed('chat') ? { kind: 'chat', data: 'data-v2-workspace-chat', aria: 'Чат' } : null,
+    }),
+    deck: rootDeck,
+    secondaryDeck,
+    deckOpen: state.navigationOpen,
+    className: 'v2-app--workspace',
+    body: '<section class="v2-workspace-surface" data-v2-workspace-surface></section>',
+  });
+
+  const shell = app.querySelector('[data-v2-app]');
+  const surface = app.querySelector('[data-v2-workspace-surface]');
+  const z = app.querySelector('[data-v2-z]');
+  const disposers = [];
+  let moduleDispose = () => {};
+  let disposed = false;
+  const renderVersion = ++workspaceRenderVersion;
+
+  app.querySelectorAll('[data-v2-root-item]').forEach((control) => {
+    control.addEventListener('click', () => navigate(control.dataset.v2RootItem, { navigationOpen: true }));
+  });
+  app.querySelectorAll('[data-v2-secondary-item]').forEach((control) => {
+    control.addEventListener('click', () => selectSecondary(control.dataset.v2SecondaryItem));
+  });
+  app.querySelector('[data-v2-workspace-chat]')?.addEventListener('click', () => navigate('chat', { navigationOpen: false }));
+
+  const rootDeckNode = shell?.querySelector('[data-v2-deck-role="root"]');
+  if (rootDeckNode) disposers.push(initV2DeckSwipe(rootDeckNode, {
+    activeId: root,
+    onActiveChange: (id) => navigate(id, { navigationOpen: true }),
+  }));
+  const secondaryDeckNode = shell?.querySelector('[data-v2-deck-role="secondary"]');
+  if (secondaryDeckNode) disposers.push(initV2DeckSwipe(secondaryDeckNode, {
+    activeId: childActive,
+    onActiveChange: (id) => selectSecondary(id),
+  }));
+  if (z) disposers.push(initV2Swipe(z, {
+    onRight: () => setNavigationOpen(true),
+    onLeft: () => setNavigationOpen(false),
+  }));
+
+  let headerSyncQueued = false;
+  const observer = new MutationObserver(() => {
+    if (headerSyncQueued || disposed) return;
+    headerSyncQueued = true;
+    queueMicrotask(() => {
+      headerSyncQueued = false;
+      if (!disposed) syncWorkspaceHeader(surface);
+    });
+  });
+  if (surface) observer.observe(surface, {
+    childList: true,
+    subtree: true,
+    characterData: true,
+    attributes: true,
+    attributeFilter: ['class', 'disabled', 'aria-label'],
+  });
+
+  const result = surface ? renderActiveWorkspaceSurface(surface) : null;
+  Promise.resolve(result).then((nextDispose) => {
+    if (disposed || renderVersion !== workspaceRenderVersion) {
+      if (typeof nextDispose === 'function') nextDispose();
+      return;
+    }
+    if (typeof nextDispose === 'function') moduleDispose = nextDispose;
+    syncWorkspaceHeader(surface);
+  }).catch((error) => {
+    console.error('Workspace UI render failed', error);
+  });
+  syncWorkspaceHeader(surface);
+
+  disposeView = () => {
+    disposed = true;
+    observer.disconnect();
+    disposers.forEach((dispose) => dispose?.());
+    moduleDispose?.();
+  };
+
+  if (demoBadgeTimer) {
+    window.clearInterval(demoBadgeTimer);
+    demoBadgeTimer = null;
+  }
   if (firstRunState?.progress?.status === 'COMPLETED') {
     const updateBadge = () => {
       app.querySelector('[data-first-run-demo-badge]')?.remove();
@@ -294,7 +554,9 @@ function renderDemoExpired(firstRun) {
 
 function showGuidedWorkspace(section) {
   workspaceReady = true;
-  state.activeSection = sectionAllowed(section) ? section : defaultSection();
+  const requested = normalizeRequestedSection(section);
+  state.activeSection = sectionAllowed(requested) ? requested : defaultSection();
+  if (state.activeSection !== 'chat') state.lastRootSection = state.activeSection;
   history.replaceState({}, '', `#${state.activeSection}`);
   renderWorkspace();
   startRegularPlatformNotices();
@@ -401,8 +663,9 @@ async function renderAuthenticated(account = authenticatedAccount) {
 
     candidateRuntime.dispose();
     disposePlatformSession = await startPlatformSessionTracking();
-    const requested = location.hash.slice(1);
+    const requested = normalizeRequestedSection(location.hash.slice(1));
     state.activeSection = sectionAllowed(requested) ? requested : defaultSection();
+    if (state.activeSection !== 'chat') state.lastRootSection = state.activeSection;
     history.replaceState({}, '', `#${state.activeSection}`);
     renderWorkspace();
     startRegularPlatformNotices();
@@ -412,14 +675,16 @@ async function renderAuthenticated(account = authenticatedAccount) {
   candidateRuntime.dispose();
   disposePlatformSession = await startPlatformSessionTracking();
 
-  const requested = location.hash.slice(1);
+  const requested = normalizeRequestedSection(location.hash.slice(1));
   state.activeSection = sectionAllowed(requested) ? requested : defaultSection();
+  if (state.activeSection !== 'chat') state.lastRootSection = state.activeSection;
   history.replaceState({}, '', `#${state.activeSection}`);
   renderWorkspace();
   startRegularPlatformNotices();
 }
 
 function renderLogin(message = '') {
+  setThemeColor('#F5F5F3');
   app.classList.remove('app-shell--booking');
   workspaceReady = false;
   disposeView();
@@ -473,13 +738,16 @@ function renderLogin(message = '') {
 
 window.addEventListener('hashchange', () => {
   if (!workspaceReady) return;
-  const section = location.hash.slice(1);
+  const section = normalizeRequestedSection(location.hash.slice(1));
   if (sectionAllowed(section)) {
-    state.activeSection = section;
-    renderWorkspace();
+    navigate(section, { navigationOpen: false, updateHash: false });
   } else {
     history.replaceState({}, '', `#${state.activeSection}`);
   }
+});
+window.addEventListener('book:v2-navigation-request', (event) => {
+  if (!workspaceReady) return;
+  setNavigationOpen(event?.detail?.open !== false);
 });
 window.addEventListener('resize', syncViewport, { passive: true });
 window.visualViewport?.addEventListener('resize', syncViewport, { passive: true });
