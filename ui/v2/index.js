@@ -209,7 +209,7 @@ export function mountV2Layer(html) {
   const close = () => node.remove();
   node.v2Close = close;
   node.addEventListener('click', (event) => {
-    if (event.target === node || event.target.closest('[data-v2-layer-close]')) close();
+    if (event.target === node || event.target.closest('[data-v2-layer-close]')) node.v2Close?.();
   });
   return node;
 }
