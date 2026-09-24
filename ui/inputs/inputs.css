@@ -7,3 +7,5 @@
 .photo-cropper{display:grid;gap:16px}.photo-cropper__preview{width:min(100%,320px);aspect-ratio:1;margin:0 auto;border-radius:50%;background-size:cover;background-position:center;background-color:var(--button-secondary);box-shadow:0 0 0 1px var(--border)}.photo-cropper input[type="range"]{width:100%}
 
 .array-row__add{width:40px;min-width:40px;min-height:40px;height:40px;padding:0;font-size:22px;line-height:1}.v2-app .array-row__add{border-radius:0}
+
+.photo-field__tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.photo-field__tools.is-hidden{display:none}.photo-field__crop-panel[hidden]{display:none!important}.photo-field__crop-panel{padding:12px 0 2px;border-top:1px solid var(--border)}
