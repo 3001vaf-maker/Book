@@ -38,6 +38,7 @@ export function initRepeatedFields(root) {
       const remove = event.target.closest('[data-repeated-remove]');
       if (remove) {
         remove.closest('[data-repeated-row]')?.remove();
+        group.dispatchEvent(new Event('change', { bubbles: true }));
         return;
       }
       const add = event.target.closest('[data-repeated-add]');
@@ -49,6 +50,7 @@ export function initRepeatedFields(root) {
       const type = group.dataset.repeatedType || 'text';
       const placeholder = group.dataset.repeatedPlaceholder || 'Добавить значение';
       list.insertAdjacentHTML('beforeend', repeatedRow({ name, type, placeholder, label, primary:false }));
+      group.dispatchEvent(new Event('change', { bubbles: true }));
     });
   });
 }
