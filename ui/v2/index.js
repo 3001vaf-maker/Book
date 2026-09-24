@@ -204,21 +204,40 @@ export function mountV2ZLayer(root, html, { onClose = null } = {}) {
 }
 
 export function v2Layer(content = '', { kind = 'standard', title = '', className = '' } = {}) {
-  const allowed = new Set(['quick', 'standard', 'system']);
-  const resolved = allowed.has(kind) ? kind : 'standard';
-  return `<div class="v2-layer-backdrop" data-v2-layer><section class="v2-layer v2-layer--${resolved} ${text(className)}" role="dialog" aria-modal="true" aria-label="${text(title)}" tabindex="-1"><button type="button" class="v2-layer__close" data-v2-layer-close aria-label="Закрыть">×</button>${title ? `<header class="v2-layer__header"><h2>${text(title)}</h2></header>` : ''}${content}</section></div>`;
+  const aliases = { quick: 'bottom', system: 'top' };
+  const allowed = new Set(['top', 'standard', 'bottom', 'technical']);
+  const candidate = aliases[kind] || kind;
+  const resolved = allowed.has(candidate) ? candidate : 'standard';
+  return `<div class="v2-layer-backdrop" data-v2-layer data-v2-layer-kind="${resolved}"><section class="v2-layer v2-layer--${resolved} ${text(className)}" role="dialog" aria-modal="true" aria-label="${text(title)}" tabindex="-1"><button type="button" class="v2-layer__close" data-v2-layer-close aria-label="Закрыть">×</button>${title ? `<header class="v2-layer__header"><h2>${text(title)}</h2></header>` : ''}${content}</section></div>`;
 }
 
-export function mountV2Layer(html) {
+function activeV2ModalSurface(root = null) {
+  if (root?.matches?.('[data-v2-z-layer], [data-v2-z]')) return root;
+  const closest = root?.closest?.('[data-v2-z-layer], [data-v2-z]');
+  if (closest) return closest;
+  const app = root?.closest?.('[data-v2-app]') || document.querySelector('[data-v2-app]');
+  const layers = [...(app?.querySelectorAll?.('[data-v2-z-layer]') || [])];
+  return layers.at(-1)
+    || app?.querySelector?.('.v2-app__stage > [data-v2-z]')
+    || document.querySelector('.app-content')
+    || document.querySelector('#app');
+}
+
+export function mountV2Layer(html, { root = null } = {}) {
   const template = document.createElement('template');
   template.innerHTML = String(html || '').trim();
   const node = template.content.firstElementChild;
   if (!node?.matches('[data-v2-layer]')) return null;
-  document.body.appendChild(node);
+  const kind = node.dataset.v2LayerKind || 'standard';
+  const technical = kind === 'technical';
+  const host = technical ? document.body : activeV2ModalSurface(root);
+  if (!host) return null;
+  node.classList.add(technical ? 'v2-layer-backdrop--technical' : 'v2-layer-backdrop--contained');
+  host.appendChild(node);
   const close = () => node.remove();
   node.v2Close = close;
   node.addEventListener('click', (event) => {
-    if (event.target === node || event.target.closest('[data-v2-layer-close]')) node.v2Close?.();
+    if (event.target.closest('[data-v2-layer-close]')) node.v2Close?.();
   });
   return node;
 }
@@ -379,7 +398,7 @@ export function initV2StickerSwipe(root, { onRight = null, onLeft = null, thresh
   };
 }
 
-export function initV2DeckSwipe(root, { activeId = '', onActiveChange = null, threshold = 42, maxDrag = 150 } = {}) {
+export function initV2DeckSwipe(root, { activeId = '', onActiveChange = null, eActiveId = '', onEActiveChange = null, threshold = 42, maxDrag = 150 } = {}) {
   const deck = root?.matches?.('[data-v2-deck]') ? root : root?.querySelector?.('[data-v2-deck]');
   if (!deck) return () => {};
   const cards = [...deck.querySelectorAll('.v2-deck__card')];
@@ -527,13 +546,155 @@ export function initV2DeckSwipe(root, { activeId = '', onActiveChange = null, th
   deck.addEventListener('pointerup', up);
   deck.addEventListener('pointercancel', cancel);
   deck.addEventListener('click', click, true);
+
+  const eDeck = host.querySelector?.('[data-v2-e-list]');
+  const eCards = [...(eDeck?.querySelectorAll?.('.v2-e-card') || [])];
+  let ePointerId = null;
+  let eStartX = 0;
+  let eStartY = 0;
+  let eDx = 0;
+  let eAxis = 'pending';
+  let eSuppressNextClick = false;
+  let eSettling = false;
+  let eFrameId = 0;
+  let eTransitionTarget = null;
+  let eTransitionHandler = null;
+  let eActiveIndex = Math.max(0, eCards.findIndex((card) => String(card.getAttribute('data-v2-secondary-item') || card.getAttribute('data-v2-e-item') || '') === String(eActiveId || '')));
+
+  const eActiveCard = () => eCards[eActiveIndex] || eCards[0];
+  const clearETransition = () => {
+    if (eTransitionTarget && eTransitionHandler) eTransitionTarget.removeEventListener('transitionend', eTransitionHandler);
+    eTransitionTarget = null;
+    eTransitionHandler = null;
+  };
+  const clearEPointer = () => {
+    ePointerId = null;
+    eDx = 0;
+    eAxis = 'pending';
+  };
+  const returnEToRest = () => {
+    eDeck?.classList.remove('is-dragging');
+    eActiveCard()?.classList.remove('is-dragging');
+    eDeck?.style.removeProperty('--v2-e-drag-x');
+  };
+  const eDown = (event) => {
+    if (eSettling || !event.target.closest('.v2-e-card')) return;
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    ePointerId = event.pointerId;
+    eStartX = event.clientX;
+    eStartY = event.clientY;
+    eDx = 0;
+    eAxis = 'pending';
+  };
+  const eMove = (event) => {
+    if (event.pointerId !== ePointerId) return;
+    const nextX = event.clientX - eStartX;
+    const nextY = event.clientY - eStartY;
+    if (eAxis === 'pending') {
+      if (Math.max(Math.abs(nextX), Math.abs(nextY)) < 6) return;
+      eAxis = Math.abs(nextX) >= Math.abs(nextY) * 1.05 ? 'horizontal' : 'vertical';
+      if (eAxis === 'vertical') {
+        ePointerId = null;
+        return;
+      }
+      eDeck?.setPointerCapture?.(event.pointerId);
+    }
+    if (eAxis !== 'horizontal') return;
+    eDx = Math.max(-maxDrag, Math.min(maxDrag, nextX));
+    eDeck?.classList.add('is-dragging');
+    eActiveCard()?.classList.add('is-dragging');
+    eDeck?.style.setProperty('--v2-e-drag-x', `${eDx}px`);
+    if (Math.abs(nextX) > 6) eSuppressNextClick = true;
+    event.preventDefault();
+  };
+  const commitE = (direction) => {
+    const outgoing = eActiveCard();
+    const nextIndex = (eActiveIndex + direction + eCards.length) % eCards.length;
+    const next = eCards[nextIndex];
+    if (!outgoing || !next) {
+      returnEToRest();
+      return;
+    }
+    eSettling = true;
+    eDeck.classList.remove('is-dragging');
+    eDeck.classList.add('is-settling');
+    outgoing.classList.remove('is-dragging');
+    outgoing.classList.add('is-committing');
+    next.classList.add('is-next-ready');
+    outgoing.getBoundingClientRect();
+    const distance = Math.max(eDeck.getBoundingClientRect().width * 1.2, 150);
+    const targetX = direction > 0 ? -distance : distance;
+    clearETransition();
+    eTransitionTarget = outgoing;
+    eTransitionHandler = (transitionEvent) => {
+      if (transitionEvent.target !== outgoing || transitionEvent.propertyName !== 'transform') return;
+      clearETransition();
+      eActiveIndex = nextIndex;
+      const id = next.getAttribute('data-v2-secondary-item') || next.getAttribute('data-v2-e-item') || '';
+      if (id && onEActiveChange) {
+        onEActiveChange(id);
+        if (!host.isConnected) return;
+        return;
+      }
+      eSettling = false;
+      eDeck.classList.remove('is-settling');
+      eDeck.style.removeProperty('--v2-e-drag-x');
+      outgoing.classList.remove('is-committing');
+      next.classList.remove('is-next-ready');
+    };
+    outgoing.addEventListener('transitionend', eTransitionHandler);
+    eFrameId = requestAnimationFrame(() => {
+      eFrameId = 0;
+      eDeck.style.setProperty('--v2-e-drag-x', `${targetX}px`);
+    });
+  };
+  const eUp = (event) => {
+    if (event.pointerId !== ePointerId) return;
+    const finalDx = eDx;
+    const finalAxis = eAxis;
+    eDeck?.releasePointerCapture?.(event.pointerId);
+    clearEPointer();
+    if (finalAxis !== 'horizontal' || Math.abs(finalDx) < threshold) {
+      returnEToRest();
+      return;
+    }
+    eSuppressNextClick = true;
+    commitE(finalDx < 0 ? 1 : -1);
+  };
+  const eCancel = (event) => {
+    if (event?.pointerId != null && event.pointerId !== ePointerId) return;
+    clearEPointer();
+    returnEToRest();
+  };
+  const eClick = (event) => {
+    if (!eSuppressNextClick) return;
+    eSuppressNextClick = false;
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  if (eDeck && eCards.length > 1) {
+    eDeck.addEventListener('pointerdown', eDown);
+    eDeck.addEventListener('pointermove', eMove, { passive: false });
+    eDeck.addEventListener('pointerup', eUp);
+    eDeck.addEventListener('pointercancel', eCancel);
+    eDeck.addEventListener('click', eClick, true);
+  }
+
   return () => {
     if (frameId) cancelAnimationFrame(frameId);
+    if (eFrameId) cancelAnimationFrame(eFrameId);
     clearTransitionListener();
+    clearETransition();
     deck.removeEventListener('pointerdown', down);
     deck.removeEventListener('pointermove', move);
     deck.removeEventListener('pointerup', up);
     deck.removeEventListener('pointercancel', cancel);
     deck.removeEventListener('click', click, true);
+    eDeck?.removeEventListener('pointerdown', eDown);
+    eDeck?.removeEventListener('pointermove', eMove);
+    eDeck?.removeEventListener('pointerup', eUp);
+    eDeck?.removeEventListener('pointercancel', eCancel);
+    eDeck?.removeEventListener('click', eClick, true);
   };
 }
