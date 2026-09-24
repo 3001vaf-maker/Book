@@ -135,6 +135,8 @@ model Profile {
   emails              Json
   about               String      @default("")
   photo               String      @default("")
+  photoCropX          Int         @default(50)
+  photoCropY          Int         @default(50)
   profession          String      @default("")
   experience          String      @default("")
   professionAbout     String      @default("")
@@ -160,6 +162,8 @@ model Workplace {
   key             String
   position        Int      @default(0)
   photo           String   @default("")
+  photoCropX      Int      @default(50)
+  photoCropY      Int      @default(50)
   name            String   @default("")
   color           String   @default("")
   city            String   @default("")
