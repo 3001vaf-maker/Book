@@ -475,14 +475,18 @@ export function initV2DeckSwipe(root, { activeId = '', onActiveChange = null, th
     transitionHandler = (transitionEvent) => {
       if (transitionEvent.target !== outgoing || transitionEvent.propertyName !== 'transform') return;
       clearTransitionListener();
-      settling = false;
       activeIndex = nextIndex;
       const id = next.getAttribute('data-account-deck-item') || next.getAttribute('data-v2-deck-item') || '';
+      if (id && onActiveChange) {
+        onActiveChange(id);
+        if (!host.isConnected) return;
+        return;
+      }
+      settling = false;
       host.classList.remove('is-settling');
       host.style.removeProperty('--v2-fe-drag-x');
       outgoing.classList.remove('is-committing');
       next.classList.remove('is-next-ready');
-      if (id) onActiveChange?.(id);
     };
     outgoing.addEventListener('transitionend', transitionHandler);
     frameId = requestAnimationFrame(() => {
