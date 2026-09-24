@@ -207,6 +207,7 @@ export function mountV2Layer(html) {
   if (!node?.matches('[data-v2-layer]')) return null;
   document.body.appendChild(node);
   const close = () => node.remove();
+  node.v2Close = close;
   node.addEventListener('click', (event) => {
     if (event.target === node || event.target.closest('[data-v2-layer-close]')) close();
   });
