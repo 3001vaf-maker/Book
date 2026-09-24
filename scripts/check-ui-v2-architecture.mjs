@@ -67,7 +67,20 @@ const legacySystemBrown = /#(?:3B302B|7A6F69|B8AEA8|E7E1DB|E8E1DC|D7CEC7|968982|
 const failures = [];
 const expect = (condition, message) => { if (!condition) failures.push(message); };
 for (const file of sharedCssFiles) {
-  expect(!legacySystemBrown.test(fs.readFileSync(file, 'utf8')), `Legacy system brown must not remain in Shared UI CSS: ${file}.`);
+  const source = fs.readFileSync(file, 'utf8');
+  expect(!legacySystemBrown.test(source), `Legacy system brown must not remain in Shared UI CSS: ${file}.`);
+  if (file !== 'ui/buttons/buttons.css') {
+    expect(!/\.ui-button--(?:secondary|outline)\s*\{|\.ui-button:disabled\s*\{/.test(source), `Shared Button states must not be re-owned outside ui/buttons/buttons.css: ${file}.`);
+  }
+  if (file !== 'ui/selection/segment-control.css') {
+    expect(!/(^|\})\.segment-control\s*\{|(^|\})\.segment-control button(?:\.is-active)?\s*\{/.test(source), `Segmented-control base styling must not be re-owned outside ui/selection/segment-control.css: ${file}.`);
+  }
+  if (file !== 'ui/cards/entity-card.css') {
+    expect(!/--entity-card-(?:depth|mid|light|surface)\s*:/.test(source), `Entity Card surface tokens must stay owned by ui/cards/entity-card.css: ${file}.`);
+  }
+  if (file !== 'ui/info/info.css') {
+    expect(!/\.ui-info__(?:trigger|panel)\s*\{/.test(source), `Info UI styling must stay owned by ui/info/info.css: ${file}.`);
+  }
 }
 for (const file of runtimeJsFiles) {
   if (file === 'ui/v2/index.js' || file === 'ui/modals/index.js') continue;
