@@ -1,7 +1,6 @@
 import { escapeHtml } from '../utils/escape-html.js';
 import { button } from '../buttons/index.js';
 import { select } from '../selectors/index.js';
-import { modal, mountModal } from '../modals/index.js';
 import { phoneCountryOptions, phoneInputState } from '../../core/phone/index.js';
 
 let phoneInputId = 0;
@@ -115,78 +114,96 @@ export function textareaField({ label = '', name = '', value = '', placeholder =
   return `<label class="field"><span>${escapeHtml(labelText(label, required))}</span><textarea name="${escapeHtml(name)}" rows="${escapeHtml(rows)}" placeholder="${escapeHtml(placeholder)}"${required ? ' required' : ''}${maxlength !== '' ? ` maxlength="${escapeHtml(maxlength)}"` : ''}>${escapeHtml(value)}</textarea></label>`;
 }
 
-export function photoField({ name = 'photo', value = '' } = {}) {
+function photoCropPosition(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? Math.max(0, Math.min(100, Math.round(numeric))) : 50;
+}
+
+export function photoField({
+  name = 'photo',
+  value = '',
+  cropX = 50,
+  cropY = 50,
+  cropXName = '',
+  cropYName = '',
+} = {}) {
+  const x = photoCropPosition(cropX);
+  const y = photoCropPosition(cropY);
+  const resolvedCropXName = cropXName || `${name}CropX`;
+  const resolvedCropYName = cropYName || `${name}CropY`;
   const preview = value
     ? `<div class="photo-field__preview" style="background-image:url('${escapeHtml(value)}')" aria-hidden="true"></div>`
     : '<div class="photo-field__preview photo-field__preview--empty" aria-hidden="true">Фото</div>';
-  return `<div class="photo-field" data-photo-field><span class="photo-field__label">Фото</span><label class="photo-field__control">${preview}<span class="photo-field__action">${value ? 'Изменить фото' : 'Добавить фото'}</span><input type="file" accept="image/*" data-photo-input></label>${value ? button('Удалить фото', { className: 'photo-field__remove', data: 'data-photo-remove', variant: 'secondary' }) : ''}<input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(value)}" data-photo-value></div>`;
+  const toolsClass = value ? 'photo-field__tools' : 'photo-field__tools is-hidden';
+  return `<div class="photo-field" data-photo-field>
+    <span class="photo-field__label">Фото</span>
+    <label class="photo-field__control">
+      ${preview}
+      <span class="photo-field__action">${value ? 'Изменить фото' : 'Добавить фото'}</span>
+      <input type="file" accept="image/*" data-photo-input>
+    </label>
+    <div class="${toolsClass}" data-photo-tools>
+      ${button('Кадр для A', { className:'photo-field__crop-toggle', data:'data-photo-crop-toggle', variant:'secondary' })}
+      ${button('Удалить фото', { className:'photo-field__remove', data:'data-photo-remove', variant:'secondary' })}
+    </div>
+    <div class="photo-field__crop-panel photo-cropper" data-photo-crop-panel hidden>
+      <div class="photo-cropper__preview" data-photo-crop-preview style="background-image:url('${escapeHtml(value)}');background-position:${x}% ${y}%"></div>
+      <label class="field"><span>По горизонтали</span><input type="range" min="0" max="100" value="${x}" data-photo-crop-x></label>
+      <label class="field"><span>По вертикали</span><input type="range" min="0" max="100" value="${y}" data-photo-crop-y></label>
+    </div>
+    <input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(value)}" data-photo-value>
+    <input type="hidden" name="${escapeHtml(resolvedCropXName)}" value="${x}" data-photo-crop-x-value>
+    <input type="hidden" name="${escapeHtml(resolvedCropYName)}" value="${y}" data-photo-crop-y-value>
+  </div>`;
 }
 
-function croppedSquare(src, xPercent = 50, yPercent = 50) {
-  return new Promise((resolve) => {
-    const image = new Image();
-    image.onload = () => {
-      const size = Math.min(image.naturalWidth, image.naturalHeight);
-      const maxX = Math.max(0, image.naturalWidth - size);
-      const maxY = Math.max(0, image.naturalHeight - size);
-      const sx = maxX * Math.max(0, Math.min(100, Number(xPercent) || 50)) / 100;
-      const sy = maxY * Math.max(0, Math.min(100, Number(yPercent) || 50)) / 100;
-      const canvas = document.createElement('canvas');
-      canvas.width = 960;
-      canvas.height = 960;
-      const context = canvas.getContext('2d');
-      context?.drawImage(image, sx, sy, size, size, 0, 0, 960, 960);
-      resolve(canvas.toDataURL('image/jpeg', .9));
-    };
-    image.onerror = () => resolve(src);
-    image.src = src;
-  });
-}
-
-function openPhotoCrop(fieldRoot, src) {
-  const html = modal(`<div class="photo-cropper" data-photo-cropper>
-    <div class="photo-cropper__preview" data-photo-crop-preview></div>
-    <label class="field"><span>По горизонтали</span><input type="range" min="0" max="100" value="50" data-photo-crop-x></label>
-    <label class="field"><span>По вертикали</span><input type="range" min="0" max="100" value="50" data-photo-crop-y></label>
-    ${button('Использовать фото',{data:'data-photo-crop-save'})}
-  </div>`,{variant:'medium',title:'Кадрирование'});
-  const layer = mountModal(document.body, html);
-  if (!layer) return;
-  const preview = layer.querySelector('[data-photo-crop-preview]');
-  const x = layer.querySelector('[data-photo-crop-x]');
-  const y = layer.querySelector('[data-photo-crop-y]');
-  if (preview) preview.style.backgroundImage = `url("${src.replaceAll('"','%22')}")`;
-  const sync = () => {
-    if (!preview) return;
-    preview.style.backgroundPosition = `${x?.value || 50}% ${y?.value || 50}%`;
-  };
-  x?.addEventListener('input', sync);
-  y?.addEventListener('input', sync);
-  sync();
-  layer.querySelector('[data-photo-crop-save]')?.addEventListener('click', async () => {
-    const cropped = await croppedSquare(src, x?.value, y?.value);
-    const value = fieldRoot.querySelector('[data-photo-value]');
-    const fieldPreview = fieldRoot.querySelector('.photo-field__preview');
-    const action = fieldRoot.querySelector('.photo-field__action');
-    if (!value || !fieldPreview || !action) return;
-    value.value = cropped;
-    fieldPreview.classList.remove('photo-field__preview--empty');
-    fieldPreview.style.backgroundImage = `url("${cropped.replaceAll('"','%22')}")`;
-    fieldPreview.textContent = '';
-    action.textContent = 'Изменить фото';
-    if (!fieldRoot.querySelector('[data-photo-remove]')) fieldRoot.insertAdjacentHTML('beforeend', button('Удалить фото', { className: 'photo-field__remove', data: 'data-photo-remove', variant: 'secondary' }));
-    value.dispatchEvent(new Event('change', { bubbles: true }));
-    layer.remove();
-  });
+function syncPhotoCropPreview(fieldRoot) {
+  const value = fieldRoot.querySelector('[data-photo-value]');
+  const cropX = fieldRoot.querySelector('[data-photo-crop-x-value]');
+  const cropY = fieldRoot.querySelector('[data-photo-crop-y-value]');
+  const preview = fieldRoot.querySelector('[data-photo-crop-preview]');
+  if (!preview || !value) return;
+  preview.style.backgroundImage = value.value ? `url("${value.value.replaceAll('"','%22')}")` : '';
+  preview.style.backgroundPosition = `${photoCropPosition(cropX?.value)}% ${photoCropPosition(cropY?.value)}%`;
 }
 
 export function initPhotoField(root) {
   root.querySelectorAll('[data-photo-field]').forEach((fieldRoot) => {
+    if (fieldRoot.dataset.photoInitialized === 'true') return;
+    fieldRoot.dataset.photoInitialized = 'true';
+
     const input = fieldRoot.querySelector('[data-photo-input]');
     const value = fieldRoot.querySelector('[data-photo-value]');
+    const cropXValue = fieldRoot.querySelector('[data-photo-crop-x-value]');
+    const cropYValue = fieldRoot.querySelector('[data-photo-crop-y-value]');
+    const cropX = fieldRoot.querySelector('[data-photo-crop-x]');
+    const cropY = fieldRoot.querySelector('[data-photo-crop-y]');
     const preview = fieldRoot.querySelector('.photo-field__preview');
     const action = fieldRoot.querySelector('.photo-field__action');
-    if (!input || !value || !preview || !action) return;
+    const tools = fieldRoot.querySelector('[data-photo-tools]');
+    const cropPanel = fieldRoot.querySelector('[data-photo-crop-panel]');
+    if (!input || !value || !preview || !action || !cropXValue || !cropYValue) return;
+
+    const setCrop = (x, y) => {
+      const nextX = photoCropPosition(x);
+      const nextY = photoCropPosition(y);
+      cropXValue.value = String(nextX);
+      cropYValue.value = String(nextY);
+      if (cropX) cropX.value = String(nextX);
+      if (cropY) cropY.value = String(nextY);
+      syncPhotoCropPreview(fieldRoot);
+    };
+
+    const setOriginal = (src) => {
+      value.value = src;
+      preview.classList.toggle('photo-field__preview--empty', !src);
+      preview.style.backgroundImage = src ? `url("${src.replaceAll('"','%22')}")` : '';
+      preview.textContent = src ? '' : 'Фото';
+      action.textContent = src ? 'Изменить фото' : 'Добавить фото';
+      tools?.classList.toggle('is-hidden', !src);
+      if (!src && cropPanel) cropPanel.hidden = true;
+      value.dispatchEvent(new Event('change', { bubbles: true }));
+    };
 
     input.addEventListener('change', () => {
       const file = input.files?.[0];
@@ -194,22 +211,33 @@ export function initPhotoField(root) {
       const reader = new FileReader();
       reader.addEventListener('load', () => {
         const src = String(reader.result || '');
-        if (src) openPhotoCrop(fieldRoot, src);
+        if (!src) return;
+        setOriginal(src);
+        setCrop(50, 50);
+        if (cropPanel) cropPanel.hidden = false;
       });
       reader.readAsDataURL(file);
     });
 
-    fieldRoot.addEventListener('click', (event) => {
-      const remove = event.target.closest('[data-photo-remove]');
-      if (!remove) return;
-      value.value = '';
-      input.value = '';
-      preview.style.backgroundImage = '';
-      preview.classList.add('photo-field__preview--empty');
-      preview.textContent = 'Фото';
-      action.textContent = 'Добавить фото';
-      remove.remove();
-      value.dispatchEvent(new Event('change', { bubbles: true }));
+    fieldRoot.querySelector('[data-photo-crop-toggle]')?.addEventListener('click', () => {
+      if (!value.value || !cropPanel) return;
+      cropPanel.hidden = !cropPanel.hidden;
+      if (!cropPanel.hidden) syncPhotoCropPreview(fieldRoot);
     });
+
+    const onCropInput = () => {
+      setCrop(cropX?.value, cropY?.value);
+    };
+    cropX?.addEventListener('input', onCropInput);
+    cropY?.addEventListener('input', onCropInput);
+
+    fieldRoot.querySelector('[data-photo-remove]')?.addEventListener('click', () => {
+      input.value = '';
+      setOriginal('');
+      setCrop(50, 50);
+    });
+
+    syncPhotoCropPreview(fieldRoot);
   });
 }
+
