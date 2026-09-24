@@ -1,4 +1,4 @@
-import { actionBlock, button, collectRepeatedField, entityCard, escapeHtml, field, initPhotoField, initRepeatedFields, mountV2Layer, mountV2ZLayer, page, photoField, repeatedField, select, textareaField, v2HorizontalRail, v2Section, v2WorkspaceContext, v2Layer, v2ZLayer, workplaceAddButton, workplaceCountText } from '../../ui/ui.js';
+import { actionBlock, button, collectRepeatedField, entityCard, escapeHtml, field, initPhotoField, initRepeatedFields, modal, mountModal, mountV2ZLayer, page, photoField, repeatedField, select, textareaField, v2HorizontalRail, v2Section, v2WorkspaceContext, v2ZLayer, workplaceAddButton, workplaceCountText } from '../../ui/ui.js';
 import { getBookLimit } from '../../core/access.js';
 import { addCustomProfession, getCustomProfessions, getProfile, saveProfile as saveProfileData } from './data.js';
 import { getWorkplaces } from './workplaces/data.js';
@@ -82,12 +82,12 @@ function profileSettingsForm(p,options={}, {embedded=false}={}){
 }
 
 function showProfileError(message){
-  mountV2Layer(v2Layer(`<div class="modal-title"><h2>Не удалось сохранить</h2><p>${escapeHtml(message||'Ошибка сервера')}</p></div>`,{kind:'system',title:'Не удалось сохранить'}));
+  mountModal(document.body,modal(`<div class="modal-title"><h2>Не удалось сохранить</h2><p>${escapeHtml(message||'Ошибка сервера')}</p></div>`,{variant:'compact',title:'Не удалось сохранить'}));
 }
 
 function openWorkplaceLimitModal(root,limit){
   const current=Number.isFinite(limit)?String(limit):'текущий лимит';
-  const m=mountV2Layer(v2Layer(`<div class="modal-title"><h2>Работаете в нескольких местах?</h2><p>Сейчас доступно рабочих пространств: ${escapeHtml(current)}.</p></div>${actionBlock(button('Понятно',{data:'data-close-workplace-limit'}))}`,{kind:'system',title:'Рабочие пространства'}));
+  const m=mountModal(root,modal(`<div class="modal-title"><h2>Работаете в нескольких местах?</h2><p>Сейчас доступно рабочих пространств: ${escapeHtml(current)}.</p></div>${actionBlock(button('Понятно',{data:'data-close-workplace-limit'}))}`,{variant:'compact',title:'Рабочие пространства'}));
   m?.querySelector('[data-close-workplace-limit]')?.addEventListener('click',()=>m.remove());
 }
 
@@ -103,7 +103,7 @@ function applyProfessionValue(root,value){
 }
 
 function openCustomProfessionModal(root){
-  const m=mountV2Layer(v2Layer(`<form data-custom-profession-form>${field({label:'Профессия',name:'customProfessionModal',placeholder:'Введите профессию',required:true})}<div class="form-error" data-custom-profession-error></div>${button('Сохранить',{type:'submit'})}</form>`,{kind:'quick',title:'Своя профессия'}));
+  const m=mountModal(root,modal(`<form data-custom-profession-form>${field({label:'Профессия',name:'customProfessionModal',placeholder:'Введите профессию',required:true})}<div class="form-error" data-custom-profession-error></div>${button('Сохранить',{type:'submit'})}</form>`,{variant:'compact',title:'Своя профессия'}));
   if(!m)return;
   const input=m.querySelector('[name="customProfessionModal"]');
   input?.focus();
