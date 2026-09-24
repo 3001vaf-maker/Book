@@ -1,5 +1,6 @@
 import { apiRequest } from '../../core/auth.js';
-import { actionBlock, button, emptyState, escapeHtml, list, page, pageHeader } from '../../ui/ui.js';
+import { button, emptyState, escapeHtml, list, mountV2Layer, page, pageHeader, v2Document, v2Layer, v2LegalCards, v2Section } from '../../ui/ui.js';
+import { getDocuments } from '../documents/data.js';
 
 async function request(path, options = {}) {
   const response = await apiRequest(path, options);
@@ -27,20 +28,17 @@ function actionText(action) {
   return action || 'Не дано';
 }
 
-function consentMarkup(consents) {
-  if (!consents.length) return emptyState('Согласий пока нет', 'Здесь появятся отдельные согласия, которые относятся к вашей учётной записи.');
-  return `<div class="account-controls-list">${consents.map((item) => `
-    <section class="account-controls-card">
-      <div>
-        <strong>${escapeHtml(item.title)}</strong>
-        <span>${escapeHtml(actionText(item.action))} · версия ${escapeHtml(item.eventVersion || item.currentVersion || '—')}</span>
-        ${item.occurredAt ? `<small>${escapeHtml(moment(item.occurredAt))}</small>` : ''}
-      </div>
-      ${button(item.active ? 'Отозвать' : 'Дать согласие', {
-        variant: item.active ? 'secondary' : 'primary',
-        data: `data-consent-toggle="${escapeHtml(item.key)}" data-active="${item.active ? 'true' : 'false'}"`,
-      })}
-    </section>`).join('')}</div>`;
+function consentCards(consents) {
+  if (!consents.length) return emptyState('Согласий пока нет', 'Здесь появятся согласия, которые относятся к вашей учётной записи.');
+  return v2LegalCards(consents.map((item) => ({
+    title:item.title,
+    required:Boolean(item.requiredForRegistration),
+    checked:Boolean(item.active),
+    openData:`data-account-consent-open="${escapeHtml(item.key)}"`,
+    openAria:`Открыть документ ${item.title}`,
+    toggleData:`data-consent-toggle="${escapeHtml(item.key)}" data-active="${item.active ? 'true' : 'false'}"`,
+    toggleAria:`${item.active ? 'Отозвать' : 'Дать'} согласие: ${item.title}`,
+  })));
 }
 
 function historyMarkup(history) {
@@ -53,93 +51,114 @@ function historyMarkup(history) {
   });
 }
 
-function renderState(root, navigateBack, state, view = 'root') {
-  if (view === 'history') {
-    root.innerHTML = page([
-      pageHeader('История согласий'),
-      historyMarkup(Array.isArray(state.history) ? state.history : []),
-      actionBlock(button('Назад', { variant: 'secondary', data: 'data-controls-root' })),
-    ]);
-    root.querySelector('[data-controls-root]')?.addEventListener('click', () => renderState(root, navigateBack, state));
-    return;
-  }
-
+function serviceMarkup(state) {
   const emailEnabled = state.serviceNotifications?.email !== false;
-  root.innerHTML = page([
-    pageHeader('Согласия и уведомления'),
-    `<section class="account-controls-section">
-      <div class="section-heading"><h2>Согласия</h2></div>
-      ${consentMarkup(Array.isArray(state.consents) ? state.consents : [])}
-      <div class="account-controls-history-link">${button('История согласий', { variant: 'secondary', data: 'data-consent-history' })}</div>
-    </section>`,
-    `<section class="account-controls-section">
-      <div class="section-heading"><h2>Сервисные уведомления</h2></div>
-      <label class="account-controls-switch">
-        <span><strong>Email</strong><small>Сервисные сообщения по вашей учётной записи.</small></span>
-        <input type="checkbox" data-service-email ${emailEnabled ? 'checked' : ''}>
-      </label>
-      <p class="muted">Показываются только реально подключённые сервисные каналы. Телефон появится после подключения соответствующего модуля.</p>
-      <div class="muted" data-controls-status></div>
-    </section>`,
-    actionBlock(button('Назад', { variant: 'secondary', data: 'data-controls-back' })),
-  ]);
+  return `<div class="account-controls-service-list">
+    <label class="account-controls-service-row">
+      <input type="checkbox" data-service-email ${emailEnabled ? 'checked' : ''}>
+      <span><strong>Email</strong><small>Сервисные сообщения по вашей учётной записи.</small></span>
+    </label>
+    <div class="muted" data-controls-status></div>
+  </div>`;
+}
 
-  root.querySelector('[data-controls-back]')?.addEventListener('click', navigateBack);
-  root.querySelector('[data-consent-history]')?.addEventListener('click', () => renderState(root, navigateBack, state, 'history'));
+function findDocument(item) {
+  const title = String(item?.title || '').trim();
+  return getDocuments().find((document) => document.title === title) || null;
+}
 
-  root.querySelectorAll('[data-consent-toggle]').forEach((control) => {
-    control.addEventListener('click', async () => {
-      const key = control.dataset.consentToggle;
-      const active = control.dataset.active === 'true';
-      control.disabled = true;
-      try {
-        const next = await request(`/profile/account-controls/consents/${encodeURIComponent(key)}`, {
-          method: 'PUT',
-          body: JSON.stringify({ active: !active }),
+function openConsentDocument(item) {
+  const document = findDocument(item);
+  const content = document?.text || `Статус: ${actionText(item.action)}\nВерсия: ${item.eventVersion || item.currentVersion || '—'}\nДата: ${moment(item.occurredAt)}`;
+  mountV2Layer(v2Layer(v2Document({
+    title:item.title || 'Документ',
+    version:document?.version || item.currentVersion || item.eventVersion || '',
+    content,
+  }),{kind:'standard',title:item.title || 'Документ'}));
+}
+
+function openConsentHistory(state) {
+  mountV2Layer(v2Layer(historyMarkup(Array.isArray(state.history)?state.history:[]),{
+    kind:'standard',
+    title:'История согласий',
+  }));
+}
+
+function renderPanelState(root,state){
+  const consents=Array.isArray(state.consents)?state.consents:[];
+  root.innerHTML=`
+    ${v2Section('Согласия',consentCards(consents))}
+    <div class="account-controls-history-link">${button('История согласий',{variant:'secondary',data:'data-consent-history'})}</div>
+    ${v2Section('Сервисные уведомления',serviceMarkup(state))}
+  `;
+
+  root.querySelector('[data-consent-history]')?.addEventListener('click',()=>openConsentHistory(state));
+  root.querySelectorAll('[data-account-consent-open]').forEach((control)=>{
+    control.addEventListener('click',()=>{
+      const item=consents.find((entry)=>entry.key===control.dataset.accountConsentOpen);
+      if(item)openConsentDocument(item);
+    });
+  });
+
+  root.querySelectorAll('[data-consent-toggle]').forEach((control)=>{
+    control.addEventListener('click',async()=>{
+      const key=control.dataset.consentToggle;
+      const active=control.dataset.active==='true';
+      control.disabled=true;
+      try{
+        const next=await request(`/profile/account-controls/consents/${encodeURIComponent(key)}`,{
+          method:'PUT',
+          body:JSON.stringify({active:!active}),
         });
-        renderState(root, navigateBack, next);
-      } catch (error) {
-        control.disabled = false;
-        const status = root.querySelector('[data-controls-status]');
-        if (status) status.textContent = error instanceof Error ? error.message : 'Не удалось изменить согласие';
+        renderPanelState(root,next);
+      }catch(error){
+        control.disabled=false;
+        const status=root.querySelector('[data-controls-status]');
+        if(status)status.textContent=error instanceof Error?error.message:'Не удалось изменить согласие';
       }
     });
   });
 
-  root.querySelector('[data-service-email]')?.addEventListener('change', async (event) => {
-    const input = event.currentTarget;
-    const status = root.querySelector('[data-controls-status]');
-    input.disabled = true;
-    if (status) status.textContent = 'Сохраняем…';
-    try {
-      const next = await request('/profile/account-controls/service-notifications', {
-        method: 'PUT',
-        body: JSON.stringify({ email: input.checked }),
+  root.querySelector('[data-service-email]')?.addEventListener('change',async(event)=>{
+    const input=event.currentTarget;
+    const status=root.querySelector('[data-controls-status]');
+    input.disabled=true;
+    if(status)status.textContent='Сохраняем…';
+    try{
+      const next=await request('/profile/account-controls/service-notifications',{
+        method:'PUT',
+        body:JSON.stringify({email:input.checked}),
       });
-      if (status) status.textContent = 'Сохранено.';
-      input.checked = next.serviceNotifications?.email !== false;
-    } catch (error) {
-      input.checked = !input.checked;
-      if (status) status.textContent = error instanceof Error ? error.message : 'Не удалось сохранить';
-    } finally {
-      input.disabled = false;
+      input.checked=next.serviceNotifications?.email!==false;
+      if(status)status.textContent='Сохранено.';
+    }catch(error){
+      input.checked=!input.checked;
+      if(status)status.textContent=error instanceof Error?error.message:'Не удалось сохранить';
+    }finally{
+      input.disabled=false;
     }
   });
 }
 
-export async function renderAccountControls(root, navigateBack = () => {}) {
-  root.innerHTML = `${pageHeader('Согласия и уведомления')}${emptyState('Загрузка', 'Получаем актуальные состояния.')}`;
-  try {
-    const state = await request('/profile/account-controls');
-    renderState(root, navigateBack, state);
-  } catch (error) {
-    root.innerHTML = page([
-      pageHeader('Согласия и уведомления'),
-      emptyState('Раздел недоступен', error instanceof Error ? error.message : 'Не удалось загрузить данные'),
-      actionBlock(button('Назад', { variant: 'secondary', data: 'data-controls-back' })),
-    ]);
-    root.querySelector('[data-controls-back]')?.addEventListener('click', navigateBack);
+export async function renderAccountControlsPanel(root){
+  root.innerHTML=emptyState('Загрузка','Получаем актуальные состояния.');
+  try{
+    const state=await request('/profile/account-controls');
+    renderPanelState(root,state);
+  }catch(error){
+    root.innerHTML=emptyState('Раздел недоступен',error instanceof Error?error.message:'Не удалось загрузить данные');
   }
+}
+
+export async function renderAccountControls(root,navigateBack=()=>{}){
+  root.innerHTML=page([
+    pageHeader('Согласия и уведомления'),
+    '<div data-profile-account-controls-panel></div>',
+    button('Назад',{variant:'secondary',data:'data-controls-back'}),
+  ]);
+  root.querySelector('[data-controls-back]')?.addEventListener('click',navigateBack);
+  const panel=root.querySelector('[data-profile-account-controls-panel]');
+  if(panel)await renderAccountControlsPanel(panel);
 }
 
 export { renderAccountControls as render };
