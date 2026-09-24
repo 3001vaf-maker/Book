@@ -19,7 +19,7 @@ function headerControl(slot = {}, role = '') {
   let body = label;
   if (kind === 'avatar') {
     body = image
-      ? `<span class="v2-header__avatar" style="--v2-avatar:url('${text(image)}')" aria-hidden="true"></span>`
+      ? `<span class="v2-header__avatar" style="--v2-avatar:url('${text(image)}');--v2-avatar-position:${text(slot.imagePosition || '50% 50%')}" aria-hidden="true"></span>`
       : `<span class="v2-header__avatar v2-header__avatar--initials" aria-hidden="true">${initials}</span>`;
   } else if (kind === 'chat') {
     body = '<span class="v2-header__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 5.5h16v11H9l-5 3v-14Z"></path></svg></span>';
