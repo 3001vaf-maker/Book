@@ -333,6 +333,29 @@ export class ProfileService {
     return this.bundle(tenantId, platformAccountId);
   }
 
+  async reorderWorkplaces(tenantId: string, platformAccountId: string, body: unknown) {
+    const profile = await this.prisma.profile.findUnique({
+      where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
+      include: { workplaces: { orderBy: [{ position: 'asc' }, { createdAt: 'asc' }], select: { id: true, key: true } } },
+    });
+    if (!profile?.migrationVerifiedAt) throw new ConflictException('Перенос Profile + Workplaces ещё не подтверждён');
+
+    const source = body && typeof body === 'object' && !Array.isArray(body) ? body as Record<string, unknown> : {};
+    const keys = Array.isArray(source.keys) ? source.keys.map((value) => text(value)).filter(Boolean) : [];
+    const uniqueKeys = [...new Set(keys)];
+    const currentKeys = profile.workplaces.map((item) => item.key);
+    if (uniqueKeys.length !== currentKeys.length || uniqueKeys.some((key) => !currentKeys.includes(key))) {
+      throw new BadRequestException('Некорректный порядок рабочих пространств');
+    }
+
+    const byKey = new Map(profile.workplaces.map((item) => [item.key, item.id]));
+    await this.prisma.$transaction(uniqueKeys.map((key, position) => this.prisma.workplace.update({
+      where: { id: byKey.get(key)! },
+      data: { position },
+    })));
+    return this.bundle(tenantId, platformAccountId);
+  }
+
   async upsertWorkplace(tenantId: string, platformAccountId: string, key: string, body: unknown) {
     const profile = await this.prisma.profile.findUnique({
       where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
