@@ -11,6 +11,7 @@ const passwordSettings = fs.readFileSync('online-booking/password-settings.js', 
 const consentSettings = fs.readFileSync('online-booking/consent-settings.js', 'utf8');
 const inputs = fs.readFileSync('ui/inputs/index.js', 'utf8');
 const modals = fs.readFileSync('ui/modals/index.js', 'utf8');
+const headerUi = fs.readFileSync('ui/header/index.js', 'utf8');
 const timeUi = fs.readFileSync('ui/time/index.js', 'utf8');
 const colorUi = fs.readFileSync('ui/colors/index.js', 'utf8');
 const workplacesUi = fs.readFileSync('settings/profile/workplaces/workplaces.js', 'utf8');
@@ -37,7 +38,6 @@ for (const name of [
   'v2Sticker',
   'v2Document',
   'v2LegalCards',
-  'v2WorkspaceContext',
   'v2ZLayer',
   'mountV2ZLayer',
   'v2Layer',
@@ -94,7 +94,7 @@ for (const marker of ["{ id: 'people', label: 'Клиенты'", "{ id: 'finance
 }
 expect(!core.includes('bottomNavigation(') && !core.includes("renderMain } from './main/main.js'"), 'Workspace V2 must not retain legacy bottom navigation or Main hub routing.');
 expect(core.includes("kind: 'chat'") && core.includes("data: 'data-v2-workspace-chat'"), 'Chat must live in Header D instead of root F.');
-expect(core.includes("[data-v2-context-action]") && core.includes('aSource.dataset.v2AKind') && core.includes('function syncWorkspaceBack(') && !core.includes("kind: backSource ? 'back' : 'settings'"), 'Workspace Header A must consume the shared context contract; local Back must remain inside Z instead of taking A.');
+expect(core.includes("[data-workspace-context-action]") && core.includes('aSource.dataset.workspaceAKind') && core.includes('function syncWorkspaceBack(') && !core.includes("kind: backSource ? 'back' : 'settings'"), 'Workspace Header A must consume the canonical Header context; local Back must remain inside Z instead of taking A.');
 expect(core.includes("[data-v2-primary-action]") && core.includes("surface.querySelector('.page-header-action button')") && core.includes("form button[type=\"submit\"]") && core.includes('syncWorkspacePrimarySource'), 'Workspace Header C must reuse the shared or existing primary action instead of duplicating module logic.');
 expect(css.includes('.v2-workspace-source-hidden{display:none!important}') && css.includes('.v2-workspace-back{'), 'Workspace V2 must hide only the proxied original action and keep local Back on the Z surface.');
 expect(ui.includes("secondaryDeck = ''") && ui.includes("role = ''") && ui.includes('data-v2-deck-role'), 'Shared V2 must own both F levels through the same deck component.');
@@ -108,7 +108,7 @@ expect(firstRun.includes("return 'people';") && firstRun.includes("return 'finan
 expect(firstRun.includes("book:v2-navigation-request") && firstRun.includes('this.navTarget(step)'), 'DEMO must reveal the real V2 deck before pointing to a root or second-level folder.');
 expect(finance.includes('openFinanceOperation(root, movements, element.dataset.financeOperation, onBack)'), 'Finance DDS must preserve its F2 back callback through operation detail/cancel refresh.');
 
-expect(profile.includes('v2WorkspaceContext({') && profile.includes("hideD:true") && profile.includes("kind:'avatar'"), 'Profile must feed Header A/B/D through the shared V2 context contract.');
+expect(profile.includes('workspaceHeaderContext({') && profile.includes("hideD:true") && profile.includes("kind:'avatar'"), 'Profile must feed Header A/B/D through the canonical Header owner.');
 expect(profile.includes("v2Section('Рабочие пространства',workplaceRail())") && profile.includes('v2HorizontalRail('), 'Profile root Z must contain the profile card plus a horizontal workplace rail.');
 expect(!profile.includes('accordion(') && !profile.includes('initAccordions('), 'Regular Profile UI must not retain the legacy accordion.');
 expect(profile.includes('mountV2ZLayer(root,v2ZLayer(') && profile.includes("'Настройки профиля'"), 'Profile settings must open as a shared second Z layer.');
@@ -116,8 +116,10 @@ expect(profile.includes('data-v2-primary-action') && profile.includes('data-add-
 expect(style.includes('--text:#111111') && style.includes('--button-secondary:#D8D3CF') && style.includes('--text-secondary:#777A7D'), 'Shared palette must use the approved black and neutral tokens.');
 expect(entityCardCss.includes('background:var(--surface-dark)') && !/#D7CEC7|#968982|#E7E1DB|#B8AEA8|rgba\(59,48,43/.test(entityCardCss), 'Shared entity cards must not retain the legacy system brown palette.');
 expect(inputs.includes('openPhotoCrop(') && inputs.includes('croppedSquare(') && inputs.includes('mountModal'), 'Shared photo owner must provide the common crop flow through the sole modal owner.');
-expect(ui.includes('export function v2WorkspaceContext') && ui.includes('export function v2ZLayer') && ui.includes('export function mountV2ZLayer'), 'Shared V2 must own context metadata and stacked Z layers.');
-expect(core.includes('activeWorkspaceSurface(surface)') && core.includes("context?.dataset.v2HideD === 'true'"), 'Workspace Header must follow the top Z layer and allow context-owned D visibility.');
+expect(headerUi.includes('export function workspaceHeaderContext') && facade.includes('workspaceHeaderContext'), 'Canonical Header owner must own workspace context metadata.');
+expect(!ui.includes('v2WorkspaceContext'), 'Shared V2 must not duplicate the canonical Header context owner.');
+expect(ui.includes('export function v2ZLayer') && ui.includes('export function mountV2ZLayer'), 'Shared V2 must own stacked Z layers.');
+expect(core.includes('activeWorkspaceSurface(surface)') && core.includes("context?.dataset.workspaceHideD === 'true'") && core.includes("[data-workspace-context-action]"), 'Workspace Header must follow the top Z layer and consume the canonical Header context owner.');
 
 expect(modals.includes("import { mountV2Layer, v2Layer } from '../v2/index.js';")
   && modals.includes('v2Layer(content')
