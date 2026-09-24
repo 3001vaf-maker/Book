@@ -218,7 +218,7 @@ export class FirstRunRuntime {
       return;
     }
     if (SETTINGS_STEPS.has(step.key)) {
-      await this.renderSettingsStep(step);
+      await this.renderWorkspaceStep(step);
       return;
     }
     if (WORKSPACE_STEPS.has(step.key)) {
@@ -270,24 +270,12 @@ export class FirstRunRuntime {
     this.syncCurrent();
   }
 
-  async renderSettingsStep(step) {
-    const host = this.focusedShell();
-    if (ONLINE_BOOKING_STEPS.has(step.key)) {
-      const onlineBooking = await import('../settings/online-booking/online-booking.js');
-      onlineBooking.render(host, () => {});
-    } else {
-      const settings = await import('../settings/settings.js');
-      settings.renderSettings(host);
-    }
-    this.installObserver();
-    this.syncCurrent();
-  }
-
   workspaceSection(step) {
     if (step.key === 'people' || step.key === 'complete') return 'people';
     if (step.key.startsWith('finance-')) return 'finance';
     if (step.key === 'timetable') return 'timetable';
     if (step.key.startsWith('journal') || step.key === 'payment') return 'journal';
+    if (SETTINGS_STEPS.has(step.key)) return 'settings';
     if (step.key === 'chat') return 'chat';
     return 'people';
   }
@@ -327,6 +315,14 @@ export class FirstRunRuntime {
       return;
     }
 
+    if (SETTINGS_STEPS.has(step.key)) {
+      if (current !== 'settings') this.showWorkspace('settings');
+      window.dispatchEvent(new CustomEvent('book:v2-navigation-request', { detail: { open: true } }));
+      this.installObserver();
+      this.queueSync();
+      return;
+    }
+
     // Остальные шаги сохраняют текущий экран и ведут через реальную V2-навигацию.
     this.installObserver();
     this.queueSync();
@@ -340,20 +336,23 @@ export class FirstRunRuntime {
 
   pulse(element) {
     this.app.querySelectorAll('.first-run-pulse').forEach((node) => node.classList.remove('first-run-pulse'));
-    element?.classList.add('first-run-pulse');
+    const visible = element?.matches?.('[data-online-booking-sections]')
+      ? this.app.querySelector('[data-v2-workspace-a]') || element
+      : element;
+    visible?.classList.add('first-run-pulse');
   }
 
   routeTarget(step) {
     if (step.key === 'procedures') return this.app.querySelector('[data-service-open="procedures"]');
     if (step.key === 'products') return this.app.querySelector('[data-service-open="products"]');
-    if (step.key === 'online-booking') return this.app.querySelector('[data-settings-open="online-booking"]');
-    if (step.key === 'online-booking-welcome') return document.querySelector('[data-online-booking-open="welcome"]') || this.app.querySelector('[data-online-booking-sections]');
-    if (step.key === 'online-booking-appearance') return document.querySelector('[data-online-booking-open="appearance"]') || this.app.querySelector('[data-online-booking-sections]');
-    if (step.key === 'online-booking-time') return document.querySelector('[data-online-booking-open="time"]') || this.app.querySelector('[data-online-booking-sections]');
-    if (step.key === 'notifications') return this.app.querySelector('[data-settings-open="communications"]');
-    if (step.key === 'integrations') return this.app.querySelector('[data-settings-open="integrations"]');
-    if (step.key === 'tags') return this.app.querySelector('[data-settings-open="tags"]');
-    if (step.key === 'documents') return this.app.querySelector('[data-settings-open="documents"]');
+    if (step.key === 'online-booking') return this.app.querySelector('[data-v2-secondary-item="online-booking"]');
+    if (step.key === 'online-booking-welcome') return document.querySelector('[data-online-booking-open="welcome"]') || this.app.querySelector('[data-online-booking-sections]') || this.app.querySelector('[data-v2-secondary-item="online-booking"]');
+    if (step.key === 'online-booking-appearance') return document.querySelector('[data-online-booking-open="appearance"]') || this.app.querySelector('[data-online-booking-sections]') || this.app.querySelector('[data-v2-secondary-item="online-booking"]');
+    if (step.key === 'online-booking-time') return document.querySelector('[data-online-booking-open="time"]') || this.app.querySelector('[data-online-booking-sections]') || this.app.querySelector('[data-v2-secondary-item="online-booking"]');
+    if (step.key === 'notifications') return this.app.querySelector('[data-v2-secondary-item="communications"]');
+    if (step.key === 'integrations') return this.app.querySelector('[data-v2-secondary-item="integrations"]');
+    if (step.key === 'tags') return this.app.querySelector('[data-v2-secondary-item="tags"]');
+    if (step.key === 'documents') return this.app.querySelector('[data-v2-secondary-item="documents"]');
     if (step.key === 'people' || step.key === 'finance-overview') return null;
     if (step.key === 'journal-month') return this.app.querySelector('[data-v2-secondary-item="month"]');
     if (step.key === 'journal-list') return this.app.querySelector('[data-v2-secondary-item="list"]');
@@ -495,6 +494,11 @@ export class FirstRunRuntime {
 
     const routeTarget = this.routeTarget(step);
     if (routeTarget && (target === routeTarget || routeTarget.contains(target))) {
+      const onlineBookingFolder = target.closest('[data-v2-secondary-item="online-booking"]');
+      if (ONLINE_BOOKING_STEPS.has(step.key) && onlineBookingFolder) {
+        window.setTimeout(() => this.queueSync(), 80);
+        return;
+      }
       const onlineSectionButton = target.closest('[data-online-booking-sections]');
       if (ONLINE_BOOKING_STEPS.has(step.key) && onlineSectionButton) {
         window.setTimeout(() => this.queueSync(), 80);
