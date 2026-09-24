@@ -282,21 +282,21 @@ function activeWorkspaceSurface(surface) {
 function syncWorkspaceHeader(surface) {
   if (!surface?.isConnected) return;
   const contextRoot = activeWorkspaceSurface(surface);
-  const context = contextRoot.querySelector('[data-v2-workspace-context]');
+  const context = contextRoot.querySelector('[data-workspace-header-context]');
   const root = activeRootSection();
   const fallbackTitle = state.activeSection === 'chat'
     ? 'Чат'
     : rootDefinition(root)?.label || '';
-  const title = context?.dataset.v2Title || sourceText(
+  const title = context?.dataset.workspaceTitle || sourceText(
     contextRoot.querySelector('.page-header h1, .app-header__title'),
     fallbackTitle,
   );
   const backSource = contextRoot.querySelector('.app-header__slot--back button');
-  const contextSource = contextRoot.querySelector('[data-v2-context-action], .page-header__meta button, .app-header__slot--settings button');
+  const contextSource = contextRoot.querySelector('[data-workspace-context-action], .page-header__meta button, .app-header__slot--settings button');
   const aSource = contextSource;
   const cSource = primarySource(contextRoot);
   const cVisible = primaryVisible(cSource);
-  const hideD = context?.dataset.v2HideD === 'true';
+  const hideD = context?.dataset.workspaceHideD === 'true';
   syncWorkspaceBack(contextRoot, backSource);
   syncWorkspacePrimarySource(contextRoot, cVisible ? cSource : null);
   const header = app.querySelector('[data-v2-header]');
@@ -304,9 +304,9 @@ function syncWorkspaceHeader(surface) {
 
   header.outerHTML = v2Header({
     a: aSource ? {
-      kind: aSource.dataset.v2AKind || 'settings',
-      image: aSource.dataset.v2AImage || '',
-      initials: aSource.dataset.v2AInitials || '',
+      kind: aSource.dataset.workspaceAKind || 'settings',
+      image: aSource.dataset.workspaceAImage || '',
+      initials: aSource.dataset.workspaceAInitials || '',
       data: 'data-v2-workspace-a',
       aria: aSource.getAttribute('aria-label') || sourceText(aSource, 'Контекст раздела'),
     } : null,
