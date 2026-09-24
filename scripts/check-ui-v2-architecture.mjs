@@ -44,6 +44,8 @@ expect(css.includes('--v2-deck-width:min(33vw,128px)') && css.includes('--v2-gap
 expect(css.includes('--v2-deck-top:34px') && css.includes('top:var(--v2-deck-top)'), 'F must start lower than Z to preserve layer hierarchy.');
 expect(css.includes('opacity:0') && css.includes('.v2-app.is-deck-open .v2-deck') && css.includes('.v2-app.is-revealing-deck .v2-deck'), 'Closed F must disappear into H and reveal physically during Z swipe.');
 expect(css.includes('box-shadow:-14px 10px 30px rgba(0,0,0,.16)') && css.includes('cubic-bezier(.22,.78,.18,1)'), 'Z/F movement must keep restrained physical depth and eased motion.');
+expect(css.includes('border:1px solid rgba(17,17,17,.28)') && css.includes('inset -1px 0 0 rgba(17,17,17,.10)'), 'F cards must keep a visible contour so adjacent beige layers do not merge.');
+expect(css.includes('transform:rotate(-90deg)') && css.includes('transform-origin:left bottom'), 'F folder names must read vertically from bottom to top.');
 expect(css.includes('.v2-e-list{') && css.includes('flex-direction:column'), 'E must remain a distinct long vertical list, not F geometry.');
 expect(css.includes('.v2-legal-cards{display:grid;gap:12px}'), 'Legal document cards must have an explicit equal gap.');
 expect(css.includes('.v2-legal-card{\n  height:96px;'), 'Legal document cards must share one base height.');
@@ -59,7 +61,10 @@ expect(booking.includes("step: 'workplaces'") && booking.includes("step: 'confir
 expect(booking.includes('initV2Swipe(root'), 'Booking Z-stack must use the shared physical swipe.');
 expect(ui.includes("axis = Math.abs(nextX) > Math.abs(nextY) * 1.25 ? 'horizontal' : 'vertical'"), 'Shared V2 swipe must axis-lock before moving the surface.');
 expect(ui.includes("app?.classList.add('is-revealing-deck')") && ui.includes("app?.classList.remove('is-revealing-deck')"), 'Z swipe must reveal and reset the F stack physically.');
-expect(ui.includes('const activeIndex = Math.max(0, values.findIndex') && ui.includes('const depthX = visualDepth * 6') && ui.includes('const depthY = visualDepth * 12'), 'F cards must stack relative to the active folder with horizontal and vertical depth.');
+expect(ui.includes('const activeIndex = Math.max(0, values.findIndex') && ui.includes('const relation = index - activeIndex') && ui.includes('const depthX = visualDepth * 16') && ui.includes('const depthY = visualDepth * 16'), 'F cards must keep a linear F1-F7 hierarchy relative to the active folder.');
+expect(ui.includes('.slice(0, 7)') && ui.includes('data-v2-f-level="F${index + 1}"'), 'F deck must support the explicit F1-F7 hierarchy.');
+expect(ui.includes('const nextIndex = finalDx < 0 ? activeIndex + 1 : activeIndex - 1') && !ui.includes('(activeIndex + direction + cards.length) % cards.length'), 'F paging must move exactly one level and must not wrap cyclically.');
+expect(ui.includes('threshold = 42') && ui.includes('requested * 0.22'), 'F paging must use a forgiving snap threshold with edge resistance.');
 expect(css.includes('touch-action:pan-y'), 'Shared V2 surfaces must allow vertical scrolling without fighting horizontal swipe.');
 expect(accountMobileCss.includes('background:var(--v2-base)'), 'Public booking shell safe area must continue the H base.');
 expect(core.includes("setThemeColor('#2F3338')") && core.includes("setThemeColor('#F5F5F3')"), 'Public booking must tint browser chrome to H and restore the workspace theme afterwards.');
