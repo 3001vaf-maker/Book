@@ -10,6 +10,11 @@ const personalData = fs.readFileSync('online-booking/personal-data.js', 'utf8');
 const passwordSettings = fs.readFileSync('online-booking/password-settings.js', 'utf8');
 const consentSettings = fs.readFileSync('online-booking/consent-settings.js', 'utf8');
 const inputs = fs.readFileSync('ui/inputs/index.js', 'utf8');
+const modals = fs.readFileSync('ui/modals/index.js', 'utf8');
+const timeUi = fs.readFileSync('ui/time/index.js', 'utf8');
+const colorUi = fs.readFileSync('ui/colors/index.js', 'utf8');
+const workplacesUi = fs.readFileSync('settings/profile/workplaces/workplaces.js', 'utf8');
+const accountControlsUi = fs.readFileSync('settings/profile/account-controls.js', 'utf8');
 const accountMobileCss = fs.readFileSync('ui/shell/account-mobile.css', 'utf8');
 const core = fs.readFileSync('core.js', 'utf8');
 const finance = fs.readFileSync('main/finance/finance.js', 'utf8');
@@ -110,9 +115,27 @@ expect(profile.includes('mountV2ZLayer(root,v2ZLayer(') && profile.includes("'Н
 expect(profile.includes('data-v2-primary-action') && profile.includes('data-add-workplace'), 'Profile root C must proxy the existing add-workplace action.');
 expect(style.includes('--text:#111111') && style.includes('--button-secondary:#D8D3CF') && style.includes('--text-secondary:#777A7D'), 'Shared palette must use the approved black and neutral tokens.');
 expect(entityCardCss.includes('background:var(--surface-dark)') && !/#D7CEC7|#968982|#E7E1DB|#B8AEA8|rgba\(59,48,43/.test(entityCardCss), 'Shared entity cards must not retain the legacy system brown palette.');
-expect(inputs.includes('openPhotoCrop(') && inputs.includes('croppedSquare(') && inputs.includes('mountV2Layer'), 'Shared photo owner must provide the common crop flow.');
+expect(inputs.includes('openPhotoCrop(') && inputs.includes('croppedSquare(') && inputs.includes('mountModal'), 'Shared photo owner must provide the common crop flow through the sole modal owner.');
 expect(ui.includes('export function v2WorkspaceContext') && ui.includes('export function v2ZLayer') && ui.includes('export function mountV2ZLayer'), 'Shared V2 must own context metadata and stacked Z layers.');
 expect(core.includes('activeWorkspaceSurface(surface)') && core.includes("context?.dataset.v2HideD === 'true'"), 'Workspace Header must follow the top Z layer and allow context-owned D visibility.');
+
+expect(modals.includes("import { mountV2Layer, v2Layer } from '../v2/index.js';")
+  && modals.includes('v2Layer(content')
+  && modals.includes('mountV2Layer(html)')
+  && !modals.includes('<div class="modal-backdrop"'),
+  'ui/modals must be a compatibility facade over the single shared V2 layer owner, not a parallel modal shell.');
+for (const [name, source] of [
+  ['profile', profile],
+  ['profile workplaces', workplacesUi],
+  ['profile account controls', accountControlsUi],
+  ['shared inputs', inputs],
+  ['shared time', timeUi],
+  ['shared colors', colorUi],
+]) {
+  expect(source.includes('modal(') && source.includes('mountModal('), `${name} must consume the sole shared modal owner.`);
+  expect(!source.includes('mountV2Layer(') && !source.includes('v2Layer('), `${name} must not bypass ui/modals with a parallel V2 modal path.`);
+}
+
 
 
 expect(account.includes('v2FDeck('), 'End-user root must use shared F deck.');
