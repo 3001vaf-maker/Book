@@ -67,8 +67,9 @@ export function v2FDeck(items = [], { active = '', data = 'data-v2-deck-item' } 
     const visualDepth = Math.min(Math.max(relation, 0), 6);
     const depthX = visualDepth * 16;
     const depthY = visualDepth * 16;
+    const stackZ = Math.max(1, 7 - visualDepth);
     const classes = ['v2-deck__card', isActive ? 'is-active' : '', isBefore ? 'is-before' : 'is-after'].filter(Boolean).join(' ');
-    return `<button type="button" class="${classes}" style="--v2-depth:${visualDepth};--v2-depth-x:${depthX}px;--v2-depth-y:${depthY}px" ${data}="${text(id)}" data-v2-deck-index="${index}" data-v2-f-level="F${index + 1}" aria-label="${text(item.aria || item.label || '')}"><strong>${text(item.label || '')}</strong></button>`;
+    return `<button type="button" class="${classes}" style="--v2-depth:${visualDepth};--v2-depth-x:${depthX}px;--v2-depth-y:${depthY}px;--v2-stack-z:${stackZ}" ${data}="${text(id)}" data-v2-deck-index="${index}" data-v2-f-level="F${index + 1}" aria-label="${text(item.aria || item.label || '')}"><strong>${text(item.label || '')}</strong></button>`;
   }).join('')}</div>`;
 }
 
