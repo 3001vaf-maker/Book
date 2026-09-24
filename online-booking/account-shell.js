@@ -26,13 +26,13 @@ import {
   v2FDeck,
   v2Header,
   v2HorizontalRail,
-  v2Layer,
+  modal,
   v2RailCard,
   v2Section,
   v2Shell,
   initV2Swipe,
   initV2DeckSwipe,
-  mountV2Layer,
+  mountModal,
 } from '../ui/ui.js';
 import { openAccountConsentSettings } from './consent-settings.js';
 import { openAccountPasswordSettings } from './password-settings.js';
@@ -174,7 +174,7 @@ function openProgram(row) {
     title: row?.label || 'Программа',
     items: items.length ? items : [{ label: row?.label || 'Значение', value: row?.value || '' }],
   });
-  mountV2Layer(v2Layer(content, { kind: 'standard', title: row?.label || 'Программа' }));
+  mountModal(document.body, modal(content, { variant: 'large', title: row?.label || 'Программа' }));
 }
 
 function historyEntry(request, index) {
@@ -436,7 +436,7 @@ async function openChatSettings(state) {
     { label: telegram.linked ? `Telegram: ${telegram.username || 'подключён'}` : 'Telegram не подключён' },
     { label: 'Согласия', data: 'data-chat-consents' },
   ]);
-  const layer = mountV2Layer(v2Layer(render(), { kind: 'standard', title: 'Настройки чата' }));
+  const layer = mountModal(document.body, modal(render(), { variant: 'large', title: 'Настройки чата' }));
   const redraw = () => {
     const panel = layer?.querySelector('.app-settings-panel');
     if (panel) panel.outerHTML = render();
@@ -456,12 +456,12 @@ async function openChatSettings(state) {
 }
 
 function openProfileSettings(state, { onPersonalData, onPassword, onConsents, onLogout }) {
-  const layer = mountV2Layer(v2Layer(settingsPanel([
+  const layer = mountModal(document.body, modal(settingsPanel([
     { label: 'Личные данные', data: 'data-account-personal-data' },
     { label: 'Изменить пароль', data: 'data-account-change-password' },
     { label: 'Согласия', data: 'data-account-consents' },
     { label: 'Выход', data: 'data-account-logout', variant: 'danger' },
-  ]), { kind: 'standard', title: 'Настройки профиля' }));
+  ]), { variant: 'large', title: 'Настройки профиля' }));
   layer?.querySelector('[data-account-personal-data]')?.addEventListener('click', () => {
     layer.remove();
     onPersonalData?.();

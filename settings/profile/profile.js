@@ -1,8 +1,8 @@
-import { accordion, actionBlock, button, collectRepeatedField, entityCard, escapeHtml, field, folderList, initAccordions, initPhotoField, initRepeatedFields, modal, mountModal, page, photoField, repeatedField, select, textareaField, workplaceAddButton, workplaceCountText } from '../../ui/ui.js';
+import { actionBlock, button, collectRepeatedField, entityCard, escapeHtml, field, initPhotoField, initRepeatedFields, modal, mountModal, mountV2ZLayer, page, photoField, repeatedField, select, textareaField, v2HorizontalRail, v2Section, workspaceHeaderContext, v2ZLayer, workplaceAddButton, workplaceCountText } from '../../ui/ui.js';
 import { getBookLimit } from '../../core/access.js';
 import { addCustomProfession, getCustomProfessions, getProfile, saveProfile as saveProfileData } from './data.js';
 import { getWorkplaces } from './workplaces/data.js';
-import { initWorkplaceListDeletion, openWorkplaceModal, renderWorkplace, workplaceList } from './workplaces/workplaces.js';
+import { openWorkplaceModal } from './workplaces/workplaces.js';
 
 const PROFESSIONS=['Парикмахер','Колорист','Барбер','Визажист','Стилист','Маникюр','Педикюр','Бровист','Лэшмейкер','Косметолог','Массажист','Наращивание волос','Перманентный макияж','Другая'];
 const EXPERIENCES=['Без опыта','До 1 года','1–3 года','3–5 лет','5–10 лет','10–15 лет','15–20 лет','Более 20 лет'];
@@ -11,6 +11,14 @@ const initial=p=>fullName(p).slice(0,1).toUpperCase()||'?';
 const professionOptions=()=>[{value:'',label:'Выберите профессию'},...[...new Set([...PROFESSIONS.filter(p=>p!=='Другая'),...getCustomProfessions(),'Другая'])].map(value=>({value,label:value}))];
 
 export function render(root,navigateBack=()=>{},options={}){renderProfile(root,navigateBack,options)}
+
+function profileContext(p,title='Профиль'){
+  return workspaceHeaderContext({
+    title,
+    a:{kind:'avatar',image:p.photo||'',initials:initial(p),aria:'Настройки профиля'},
+    hideD:true,
+  });
+}
 
 function profileCard(p){
   const workplaceCount=getWorkplaces().length;
@@ -31,18 +39,55 @@ function profileCard(p){
   });
 }
 
+function workplaceRail(){
+  const items=getWorkplaces();
+  if(!items.length){
+    return '<div class="v2-profile-empty">Рабочих пространств пока нет.</div>';
+  }
+  return v2HorizontalRail(items.map(w=>entityCard({
+    title:w.name||'Без названия',
+    subtitle:w.city||w.address||'',
+    image:w.photo||'',
+    initial:(w.name||'?').slice(0,1).toUpperCase(),
+    meta:[
+      {value:`${w.from||'—'}–${w.to||'—'}`,label:'график'}
+    ],
+    interactive:true,
+    data:`data-workplace="${escapeHtml(w.key)}"`,
+    aria:`Открыть рабочее пространство ${w.name||''}`,
+    className:'entity-card--compact'
+  })).join(''),{className:'v2-profile-workplaces'});
+}
+
+function profileSettingsFields(p,emails){
+  return `<div class="v2-profile-settings-grid">
+    ${v2Section('Фото',photoField({name:'profilePhoto',value:p.photo||''}))}
+    ${v2Section('Личные данные',`<div class="form-grid">${field({label:'Имя',name:'profileName',value:p.name,placeholder:'Ваше имя',required:true})}${field({label:'Фамилия',name:'profileSurname',value:p.surname,placeholder:'Ваша фамилия'})}${textareaField({label:'О себе',name:'profileAbout',value:p.about||'',placeholder:'Коротко о себе'})}</div>`)}
+    ${v2Section('Контактные данные',repeatedField({label:'Телефон',name:'profilePhones',values:p.phones?.length?p.phones:[p.phone||''],type:'tel'})+repeatedField({label:'Telegram',name:'profileTelegrams',values:p.telegrams||[]})+repeatedField({label:'Email',name:'profileEmails',values:emails,type:'email'}))}
+    ${v2Section('Профессиональные данные',`<div class="form-grid">${select({label:'Профессия *',name:'profession',value:p.profession||'',options:professionOptions()})}${select({label:'Опыт работы',name:'experience',value:p.experience||'',options:[{value:'',label:'Не указан'},...EXPERIENCES.map(v=>({value:v,label:v}))]})}${textareaField({label:'О профессии',name:'professionAbout',value:p.professionAbout||'',placeholder:'Расскажите о своей профессии'})}</div>`)}
+  </div>`;
+}
+
+function profileSettingsForm(p,options={}, {embedded=false}={}){
+  const emails=p.emails?.length?p.emails:(options.accountEmail?[options.accountEmail]:[]);
+  const submit=button('Сохранить',{
+    type:'submit',
+    data:embedded?'data-save-profile':'data-save-profile data-v2-primary-action data-v2-primary-label="Сохранить"',
+  });
+  return `<form class="v2-profile-settings-form" data-profile-settings-form>
+    ${profileSettingsFields(p,emails)}
+    <div data-profile-account-controls-panel></div>
+    ${embedded?actionBlock(submit):submit}
+  </form>`;
+}
+
 function showProfileError(message){
-  mountModal(document.body,modal(`<div class="modal-title"><h2>Не удалось сохранить</h2><p>${escapeHtml(message||'Ошибка сервера')}</p></div>`,{variant:'compact'}));
+  mountModal(document.body,modal(`<div class="modal-title"><h2>Не удалось сохранить</h2><p>${escapeHtml(message||'Ошибка сервера')}</p></div>`,{variant:'compact',title:'Не удалось сохранить'}));
 }
 
 function openWorkplaceLimitModal(root,limit){
   const current=Number.isFinite(limit)?String(limit):'текущий лимит';
-  const choices=folderList([
-    {title:'До 3 рабочих пространств'},
-    {title:'До 5 рабочих пространств'},
-    {title:'Без ограничения'}
-  ]);
-  const m=mountModal(root,modal(`<div class="modal-title"><h2>Работаете в нескольких местах?</h2><p>Сейчас вашему Book доступно рабочих пространств: ${escapeHtml(current)}. Book поддерживает несколько мест работы с отдельными адресами и настройками. Дополнительный лимит можно подключить отдельно.</p></div>${choices}${actionBlock(button('Понятно',{data:'data-close-workplace-limit'}))}`,{variant:'medium'}));
+  const m=mountModal(root,modal(`<div class="modal-title"><h2>Работаете в нескольких местах?</h2><p>Сейчас доступно рабочих пространств: ${escapeHtml(current)}.</p></div>${actionBlock(button('Понятно',{data:'data-close-workplace-limit'}))}`,{variant:'compact',title:'Рабочие пространства'}));
   m?.querySelector('[data-close-workplace-limit]')?.addEventListener('click',()=>m.remove());
 }
 
@@ -58,7 +103,7 @@ function applyProfessionValue(root,value){
 }
 
 function openCustomProfessionModal(root){
-  const m=mountModal(root,modal(`<form data-custom-profession-form><div class="modal-title"><h2>Своя профессия</h2></div>${field({label:'Профессия',name:'customProfessionModal',placeholder:'Введите профессию',required:true})}<div class="form-error" data-custom-profession-error></div>${button('Сохранить',{type:'submit'})}</form>`,{variant:'compact'}));
+  const m=mountModal(root,modal(`<form data-custom-profession-form>${field({label:'Профессия',name:'customProfessionModal',placeholder:'Введите профессию',required:true})}<div class="form-error" data-custom-profession-error></div>${button('Сохранить',{type:'submit'})}</form>`,{variant:'compact',title:'Своя профессия'}));
   if(!m)return;
   const input=m.querySelector('[name="customProfessionModal"]');
   input?.focus();
@@ -110,57 +155,92 @@ export async function saveOnboardingProfile(root){
   }
 }
 
-function renderProfile(root,navigateBack,options={}){
-  const p=getProfile(),profession=p.profession||'';
-  const emails=p.emails?.length?p.emails:(options.accountEmail?[options.accountEmail]:[]);
-  const items=[
-    {title:'Личные данные',content:`<div class="form-grid">${photoField({name:'profilePhoto',value:p.photo||''})}${field({label:'Имя',name:'profileName',value:p.name,placeholder:'Ваше имя',required:true})}${field({label:'Фамилия',name:'profileSurname',value:p.surname,placeholder:'Ваша фамилия'})}${textareaField({label:'О себе',name:'profileAbout',value:p.about||'',placeholder:'Коротко о себе'})}</div>`},
-    {title:'Контактные данные',content:repeatedField({label:'Телефон',name:'profilePhones',values:p.phones?.length?p.phones:[p.phone||''],type:'tel'})+repeatedField({label:'Telegram',name:'profileTelegrams',values:p.telegrams||[]})+repeatedField({label:'Email',name:'profileEmails',values:emails,type:'email'})},
-    {title:'Профессиональные данные',content:`<div class="form-grid">${select({label:'Профессия *',name:'profession',value:profession,options:professionOptions()})}${select({label:'Опыт работы',name:'experience',value:p.experience||'',options:[{value:'',label:'Не указан'},...EXPERIENCES.map(v=>({value:v,label:v}))]})}${textareaField({label:'О профессии',name:'professionAbout',value:p.professionAbout||'',placeholder:'Расскажите о своей профессии'})}</div>`}
-  ];
-  const workplaces=`<section class="workplaces-section"><div class="section-heading"><h2>Рабочие места</h2></div>${actionBlock(`${workplaceAddButton()}${workplaceList()}`)}</section>`;
-  const accountControls=options.onboarding?'':`<section class="profile-account-controls">${folderList([{title:'Согласия и уведомления',data:'data-profile-account-controls'}])}</section>`;
-  root.innerHTML=page([
-    profileCard(p),
-    accordion(items),
-    workplaces,
-    accountControls,
-    actionBlock(`${button('Сохранить',{className:'accordion-save',data:'data-save-profile'})}${button('Назад',{className:'ui-button--secondary',data:'data-profile-back'})}`)
-  ]);
-  initPhotoField(root);
-  initRepeatedFields(root);
-  initAccordions(root,{onDirty:()=>root.querySelector('[data-save-profile]')?.classList.add('is-visible')});
-  initWorkplaceListDeletion(root,()=>renderProfile(root,navigateBack,options));
-  root.querySelector('[name="profession"]')?.addEventListener('change',e=>{if(e.target.value==='Другая')openCustomProfessionModal(root)});
-  root.querySelector('[data-save-profile]')?.addEventListener('click',()=>{saveProfile(root,navigateBack,options)});
-  root.querySelector('[data-profile-back]')?.addEventListener('click',navigateBack);
-  root.querySelector('[data-profile-account-controls]')?.addEventListener('click',()=>import('./account-controls.js').then(({render})=>render(root,()=>renderProfile(root,navigateBack,options))));
-  root.querySelector('[data-add-workplace]')?.addEventListener('click',async()=>{
+function bindProfileSettings(layer,p,navigateBack,options,onSaved){
+  initPhotoField(layer);
+  initRepeatedFields(layer);
+  layer.querySelector('[name="profession"]')?.addEventListener('change',e=>{if(e.target.value==='Другая')openCustomProfessionModal(layer)});
+  layer.querySelector('[data-profile-settings-form]')?.addEventListener('submit',async e=>{
+    e.preventDefault();
+    const data=collectProfileData(layer);
+    if(!data.name||!data.phones.length||!data.profession||data.profession==='Другая')return;
+    try{
+      await saveProfileData(data);
+      onSaved?.();
+    }catch(error){
+      showProfileError(error instanceof Error?error.message:'Не удалось сохранить профиль');
+    }
+  });
+  if(!options.onboarding){
+    import('./account-controls.js').then(({renderAccountControlsPanel})=>{
+      const host=layer.querySelector('[data-profile-account-controls-panel]');
+      if(host)renderAccountControlsPanel(host);
+    });
+  }
+}
+
+function openProfileSettings(root,navigateBack,options={}){
+  const p=getProfile();
+  const layer=mountV2ZLayer(root,v2ZLayer(page([
+    profileContext(p,'Настройки профиля'),
+    profileSettingsForm(p,options)
+  ]),{className:'v2-profile-settings-layer'}));
+  if(!layer)return;
+  layer.querySelector('[data-workspace-context-action]')?.addEventListener('click',()=>{});
+  bindProfileSettings(layer,p,navigateBack,options,()=>{
+    layer.v2Close?.();
+    renderProfile(root,navigateBack,options);
+  });
+}
+
+function openWorkplace(root,existing,navigateBack,options={}){
+  const open=async()=>{
     if(options.onboarding){
       try{await persistDraft(root)}catch(error){showProfileError(error instanceof Error?error.message:'Не удалось сохранить профиль');return}
     }
     const workplaceLimit=getBookLimit('workplaces.max');
-    if(workplaceLimit!==null&&getWorkplaces().length>=workplaceLimit){
+    if(!existing&&workplaceLimit!==null&&getWorkplaces().length>=workplaceLimit){
       openWorkplaceLimitModal(root,workplaceLimit);
       return;
     }
-    openWorkplaceModal(root,null,()=>renderProfile(root,navigateBack,options));
-  });
-  root.querySelectorAll('[data-workplace]').forEach(el=>el.addEventListener('click',async()=>{
-    if(options.onboarding){
-      try{await persistDraft(root)}catch(error){showProfileError(error instanceof Error?error.message:'Не удалось сохранить профиль');return}
-    }
-    renderWorkplace(root,el.dataset.workplace,()=>renderProfile(root,navigateBack,options));
-  }));
+    openWorkplaceModal(root,existing,()=>renderProfile(root,navigateBack,options));
+  };
+  open();
 }
 
-async function saveProfile(root,navigateBack,options={}){
-  const data=collectProfileData(root);
-  if(!data.name||!data.phones.length||!data.profession||data.profession==='Другая')return;
-  try{
-    await saveProfileData(data);
-    renderProfile(root,navigateBack,options);
-  }catch(error){
-    showProfileError(error instanceof Error?error.message:'Не удалось сохранить профиль');
+function renderOnboarding(root,navigateBack,options={}){
+  const p=getProfile();
+  root.innerHTML=page([
+    profileSettingsForm(p,options,{embedded:true}),
+    v2Section('Рабочие пространства',workplaceRail()),
+    actionBlock(workplaceAddButton())
+  ]);
+  bindProfileSettings(root,p,navigateBack,options,()=>{});
+  root.querySelector('[data-add-workplace]')?.addEventListener('click',()=>openWorkplace(root,null,navigateBack,options));
+  root.querySelectorAll('[data-workplace]').forEach(el=>el.addEventListener('click',()=>openWorkplace(root,getWorkplaces().find(w=>w.key===el.dataset.workplace)||null,navigateBack,options)));
+}
+
+function promotePrimaryWorkplaceAction(root){
+  const control=root.querySelector('[data-add-workplace]');
+  if(!control)return;
+  control.setAttribute('data-v2-primary-action','');
+  control.dataset.v2PrimaryLabel='Добавить';
+  control.setAttribute('aria-label','Добавить рабочее пространство');
+}
+
+function renderProfile(root,navigateBack,options={}){
+  if(options.onboarding){
+    renderOnboarding(root,navigateBack,options);
+    return;
   }
+  const p=getProfile();
+  root.innerHTML=page([
+    profileContext(p),
+    profileCard(p),
+    v2Section('Рабочие пространства',workplaceRail()),
+    workplaceAddButton()
+  ]);
+  promotePrimaryWorkplaceAction(root);
+  root.querySelector('[data-workspace-context-action]')?.addEventListener('click',()=>openProfileSettings(root,navigateBack,options));
+  root.querySelector('[data-add-workplace]')?.addEventListener('click',()=>openWorkplace(root,null,navigateBack,options));
+  root.querySelectorAll('[data-workplace]').forEach(el=>el.addEventListener('click',()=>openWorkplace(root,getWorkplaces().find(w=>w.key===el.dataset.workplace)||null,navigateBack,options)));
 }

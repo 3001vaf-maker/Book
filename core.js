@@ -218,6 +218,9 @@ function sourceText(node, fallback = '') {
 }
 
 function primarySource(surface) {
+  const explicit = surface.querySelector('[data-v2-primary-action]');
+  if (explicit) return explicit;
+
   const shellAction = surface.querySelector('.app-header__slot--action button');
   if (shellAction) return shellAction;
 
@@ -235,7 +238,8 @@ function primarySource(surface) {
 
 function primaryLabel(source) {
   if (!source) return '';
-  if (source.matches('[data-add]')) return 'Добавить';
+  if (source.dataset.v2PrimaryLabel) return source.dataset.v2PrimaryLabel;
+  if (source.matches('[data-add], [data-add-workplace]')) return 'Добавить';
   if (source.matches('[data-timetable-apply]')) return 'Применить';
   if (source.matches('[data-save-profile]')) return 'Сохранить';
   return sourceText(source);
@@ -270,29 +274,39 @@ function syncWorkspacePrimarySource(surface, source) {
   }
 }
 
+function activeWorkspaceSurface(surface) {
+  const layers = [...app.querySelectorAll('[data-v2-z-layer]')];
+  return layers.at(-1) || surface;
+}
+
 function syncWorkspaceHeader(surface) {
   if (!surface?.isConnected) return;
+  const contextRoot = activeWorkspaceSurface(surface);
+  const context = contextRoot.querySelector('[data-workspace-header-context]');
   const root = activeRootSection();
   const fallbackTitle = state.activeSection === 'chat'
     ? 'Чат'
     : rootDefinition(root)?.label || '';
-  const title = sourceText(
-    surface.querySelector('.page-header h1, .app-header__title'),
+  const title = context?.dataset.workspaceTitle || sourceText(
+    contextRoot.querySelector('.page-header h1, .app-header__title'),
     fallbackTitle,
   );
-  const backSource = surface.querySelector('.app-header__slot--back button');
-  const contextSource = surface.querySelector('.page-header__meta button, .app-header__slot--settings button');
+  const backSource = contextRoot.querySelector('.app-header__slot--back button');
+  const contextSource = contextRoot.querySelector('[data-workspace-context-action], .page-header__meta button, .app-header__slot--settings button');
   const aSource = contextSource;
-  const cSource = primarySource(surface);
+  const cSource = primarySource(contextRoot);
   const cVisible = primaryVisible(cSource);
-  syncWorkspaceBack(surface, backSource);
-  syncWorkspacePrimarySource(surface, cVisible ? cSource : null);
+  const hideD = context?.dataset.workspaceHideD === 'true';
+  syncWorkspaceBack(contextRoot, backSource);
+  syncWorkspacePrimarySource(contextRoot, cVisible ? cSource : null);
   const header = app.querySelector('[data-v2-header]');
   if (!header) return;
 
   header.outerHTML = v2Header({
     a: aSource ? {
-      kind: 'settings',
+      kind: aSource.dataset.workspaceAKind || 'settings',
+      image: aSource.dataset.workspaceAImage || '',
+      initials: aSource.dataset.workspaceAInitials || '',
       data: 'data-v2-workspace-a',
       aria: aSource.getAttribute('aria-label') || sourceText(aSource, 'Контекст раздела'),
     } : null,
@@ -303,7 +317,7 @@ function syncWorkspaceHeader(surface) {
       aria: cSource.getAttribute('aria-label') || primaryLabel(cSource),
       disabled: Boolean(cSource.disabled),
     } : null,
-    d: sectionAllowed('chat') ? {
+    d: !hideD && sectionAllowed('chat') ? {
       kind: 'chat',
       data: 'data-v2-workspace-chat',
       aria: state.activeSection === 'chat' ? 'Вернуться из чата' : 'Чат',
@@ -408,6 +422,10 @@ function renderWorkspace() {
     onRight: () => setNavigationOpen(true),
     onLeft: () => setNavigationOpen(false),
   }));
+
+  const onV2ContextChanged = () => syncWorkspaceHeader(surface);
+  window.addEventListener('book:v2-context-changed', onV2ContextChanged);
+  disposers.push(() => window.removeEventListener('book:v2-context-changed', onV2ContextChanged));
 
   let headerSyncQueued = false;
   const observer = new MutationObserver(() => {

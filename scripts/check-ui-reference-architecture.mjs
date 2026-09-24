@@ -5,6 +5,8 @@ const referenceHtml = fs.readFileSync('ui/reference/index.html', 'utf8');
 const facade = fs.readFileSync('ui/ui.js', 'utf8');
 const style = fs.readFileSync('css/style.css', 'utf8');
 const modalCss = fs.readFileSync('ui/modals/modal.css', 'utf8');
+const modalUi = fs.readFileSync('ui/modals/index.js', 'utf8');
+const v2Css = fs.readFileSync('ui/v2/v2.css', 'utf8');
 
 const failures = [];
 const expect = (condition, message) => { if (!condition) failures.push(message); };
@@ -12,7 +14,7 @@ const expect = (condition, message) => { if (!condition) failures.push(message);
 expect(style.includes('--app-max-width:390px'), 'Book UI reference requires the shared 390px Book width.');
 expect(facade.includes('segmentControl') && facade.includes('initSegmentControls'), 'Segmented control must be owned by Shared UI.');
 expect(facade.includes('columnLayout'), 'One-to-three column geometry must be owned by Shared UI.');
-expect(modalCss.includes('var(--app-max-width)') && !modalCss.includes('430px'), 'Modal variants must stay inside the shared Book width.');
+expect(modalUi.includes("import { mountV2Layer, v2Layer } from '../v2/index.js';") && v2Css.includes('width:min(100%,var(--app-max-width))') && !modalCss.includes('430px'), 'Modal variants must use the shared V2 layer owner inside the shared app width.');
 
 for (const css of ['../layout/layout.css', '../accordion/accordion.css', '../calendar/calendar.css', '../lists/list.css', '../lists/list-entry.css']) {
   expect(referenceHtml.includes(css), `UI reference must load ${css}.`);
