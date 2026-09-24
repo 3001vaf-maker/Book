@@ -210,6 +210,8 @@ for (const marker of ['data-v2-secondary-item="online-booking"', 'data-v2-second
   expect(firstRun.includes(marker), `DEMO Settings routing must use the real V2 E folder: ${marker}.`);
 }
 expect(firstRun.includes("ONLINE_BOOKING_STEPS.has(step.key) && onlineBookingFolder"), 'DEMO online-booking substeps must navigate into the real E folder before treating the substep as entered.');
+expect(!firstRun.includes("step.key === 'procedures' || step.key === 'products' || SETTINGS_STEPS.has(step.key)"), 'DEMO Settings must not bypass active workspace-section recovery inside syncCurrent().');
+expect(firstRun.includes("const requiredSection = this.workspaceSection(step);") && firstRun.includes("if (activeSection !== requiredSection)"), 'DEMO Settings must retain the normal workspace recovery path when the user leaves the required F section.');
 expect(firstRun.includes("book:v2-navigation-request") && firstRun.includes('this.navTarget(step)'), 'DEMO must reveal the real V2 deck before pointing to a root or second-level folder.');
 expect(finance.includes('openFinanceOperation(root, movements, element.dataset.financeOperation, onBack)'), 'Finance DDS must preserve its E back callback through operation detail/cancel refresh.');
 
