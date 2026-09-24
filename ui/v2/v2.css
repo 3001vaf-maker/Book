@@ -80,10 +80,12 @@
   box-shadow:-18px 12px 34px rgba(0,0,0,.18);
 }
 .v2-app.is-deck-open .v2-z.is-dragging{transform:translate3d(calc(var(--v2-z-open-x) + var(--v2-drag-x,0px)),0,0)}
-.v2-app--workspace.has-secondary-deck.is-deck-open .v2-z{
+.v2-app--workspace.has-secondary-deck.is-deck-open .v2-z,
+.v2-app--workspace.is-deck-open .v2-deck--secondary + .v2-z{
   transform:translate3d(var(--v2-z-double-open-x),0,0);
 }
-.v2-app--workspace.has-secondary-deck.is-deck-open .v2-z.is-dragging{
+.v2-app--workspace.has-secondary-deck.is-deck-open .v2-z.is-dragging,
+.v2-app--workspace.is-deck-open .v2-deck--secondary + .v2-z.is-dragging{
   transform:translate3d(calc(var(--v2-z-double-open-x) + var(--v2-drag-x,0px)),0,0);
 }
 
