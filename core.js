@@ -261,7 +261,10 @@ function syncWorkspaceBack(surface, backSource) {
     surface.insertAdjacentHTML('afterbegin', '<button type="button" class="v2-workspace-back" data-v2-workspace-back aria-label="Назад">‹</button>');
     control = surface.querySelector(':scope > [data-v2-workspace-back]');
   }
-  control.setAttribute('aria-label', backSource.getAttribute('aria-label') || 'Назад');
+  const backLabel = backSource.getAttribute('aria-label') || 'Назад';
+  if (control.getAttribute('aria-label') !== backLabel) {
+    control.setAttribute('aria-label', backLabel);
+  }
   control.onclick = () => backSource.click();
 }
 
