@@ -29,6 +29,8 @@ function headerControl(slot = {}, role = '') {
     body = '<span class="v2-header__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m8.5 12.5 6.2-6.2a3.2 3.2 0 0 1 4.5 4.5l-8.3 8.3a5 5 0 0 1-7.1-7.1l8.1-8.1"></path></svg></span>';
   } else if (kind === 'settings') {
     body = '<span class="v2-header__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"></path></svg></span>';
+  } else if (kind === 'back') {
+    body = '<span class="v2-header__back" aria-hidden="true">‹</span>';
   }
   return `<div class="v2-header__slot v2-header__slot--${role}"><button type="button" class="v2-header__control v2-header__control--${kind}"${dataAttributes(slot.data)} aria-label="${aria}"${slot.disabled ? ' disabled' : ''}>${body}${badge}</button></div>`;
 }
@@ -54,14 +56,16 @@ export function v2EList(items = [], { data = 'data-v2-e-item' } = {}) {
   }).join('')}</nav>`;
 }
 
-export function v2FDeck(items = [], { active = '', data = 'data-v2-deck-item' } = {}) {
+export function v2FDeck(items = [], { active = '', data = 'data-v2-deck-item', className = '', role = '' } = {}) {
   const values = (Array.isArray(items) ? items : []).filter(Boolean).slice(0, 7);
   if (!values.length) return '';
   const activeId = String(active || values[0]?.id || '0');
   const activeIndex = Math.max(0, values.findIndex((item, index) => String(item.id || index) === activeId));
   const count = values.length;
   const depthStepX = count > 1 ? Math.min(10, 18 / (count - 1)) : 0;
-  return `<div class="v2-deck" data-v2-deck data-v2-deck-count="${count}">${values.map((item, index) => {
+  const deckClasses = ['v2-deck', className].filter(Boolean).join(' ');
+  const roleData = role ? ` data-v2-deck-role="${text(role)}"` : '';
+  return `<div class="${text(deckClasses)}" data-v2-deck data-v2-deck-count="${count}"${roleData}>${values.map((item, index) => {
     const id = String(item.id || index);
     const visualDepth = (index - activeIndex + count) % count;
     const isActive = visualDepth === 0;
@@ -69,22 +73,26 @@ export function v2FDeck(items = [], { active = '', data = 'data-v2-deck-item' } 
     const depthY = visualDepth * 8;
     const stackZ = Math.max(1, count - visualDepth);
     const classes = ['v2-deck__card', isActive ? 'is-active' : 'is-stacked'].filter(Boolean).join(' ');
-    return `<button type="button" class="${classes}" style="--v2-depth:${visualDepth};--v2-depth-x:${depthX}px;--v2-depth-y:${depthY}px;--v2-stack-z:${stackZ}" ${data}="${text(id)}" data-v2-deck-index="${index}" data-v2-f-level="F${index + 1}" aria-label="${text(item.aria || item.label || '')}"><strong>${text(item.label || '')}</strong></button>`;
+    const customData = data && data !== 'data-v2-deck-item' ? ` ${data}="${text(id)}"` : '';
+    return `<button type="button" class="${classes}" style="--v2-depth:${visualDepth};--v2-depth-x:${depthX}px;--v2-depth-y:${depthY}px;--v2-stack-z:${stackZ}" data-v2-deck-item="${text(id)}"${customData} data-v2-deck-index="${index}" data-v2-f-level="F${index + 1}" aria-label="${text(item.aria || item.label || '')}"><strong>${text(item.label || '')}</strong></button>`;
   }).join('')}</div>`;
 }
+
 export function v2Shell({
   header = '',
   body = '',
   deck = '',
+  secondaryDeck = '',
   className = '',
   deckOpen = false,
   zData = 'data-v2-z',
 } = {}) {
-  const classes = ['v2-app', deck ? 'v2-app--with-deck' : '', deckOpen ? 'is-deck-open' : '', className].filter(Boolean).join(' ');
+  const classes = ['v2-app', deck ? 'v2-app--with-deck' : '', secondaryDeck ? 'has-secondary-deck' : '', deckOpen ? 'is-deck-open' : '', className].filter(Boolean).join(' ');
   return `<section class="${classes}" data-v2-app>
     ${header}
     <div class="v2-app__stage">
       ${deck}
+      ${secondaryDeck}
       <main class="v2-z" ${zData}>\n${body}\n</main>
     </div>
   </section>`;

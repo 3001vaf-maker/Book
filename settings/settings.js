@@ -15,6 +15,25 @@ function availableFolders() {
   return folders.filter((folder) => canUseBookCapability(folder[4]));
 }
 
+function workspaceFolders() {
+  return availableFolders().filter(([key]) => key !== 'profile');
+}
+
+export function settingsNavigationItems() {
+  return workspaceFolders().map(([id, label]) => ({ id, label }));
+}
+
+export async function renderSettingsSection(root, key = '', { onBack = () => {} } = {}) {
+  const visible = workspaceFolders();
+  const folder = visible.find(([id]) => id === key) || visible[0];
+  if (!folder) {
+    root.innerHTML = pageHeader('Настройки');
+    return;
+  }
+  const module = await folder[3]();
+  return module.render(root, onBack);
+}
+
 function renderRows(root) {
   const visible = availableFolders();
   root.innerHTML = `${pageHeader('Настройки')}${folderList(visible.map(([key, label]) => ({ title: label, data: `data-settings-open="${key}"` })))}`;
