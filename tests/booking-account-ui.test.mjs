@@ -225,6 +225,7 @@ assert.match(messageAttachmentMigration, /ADD COLUMN "attachments" JSONB NOT NUL
 // Shared V2 owns H / Z / F geometry while legacy Shared UI remains available to non-migrated contours.
 assert.match(v2Ui, /export function v2Header/);
 assert.match(v2Ui, /export function v2Shell/);
+assert.match(v2Ui, /export function v2EList/);
 assert.match(v2Ui, /export function v2FDeck/);
 assert.match(v2Ui, /export function v2Layer/);
 assert.match(v2Ui, /export function initV2Swipe/);
@@ -233,11 +234,14 @@ assert.match(v2Ui, /const visualDepth = \(index - activeIndex \+ count\) % count
 assert.match(v2Ui, /const depthStepX = count > 1 \? Math\.min\(10, 18 \/ \(count - 1\)\) : 0/);
 assert.match(v2Ui, /const depthY = visualDepth \* 8/);
 assert.match(v2Ui, /\.slice\(0, 7\)/);
-assert.match(v2Ui, /data-v2-f-level="F\$\{index \+ 1\}"/);
-assert.match(v2Ui, /const direction = finalDx < 0 \? 1 : -1/);
+assert.match(v2Ui, /data-v2-f-index="\$\{index\}"/);
+assert.doesNotMatch(v2Ui, /data-v2-f-level/);
 assert.match(v2Ui, /const nextIndex = \(activeIndex \+ direction \+ cards\.length\) % cards\.length/);
-assert.match(v2Ui, /is-cycling-under/);
-assert.match(v2Ui, /axis = Math\.abs\(nextX\) > Math\.abs\(nextY\) \* 1\.25 \? 'horizontal' : 'vertical'/);
+assert.match(v2Ui, /commit\(finalDx < 0 \? 1 : -1\)/);
+assert.match(v2Ui, /is-next-ready/);
+assert.match(v2Ui, /addEventListener\('transitionend'/);
+assert.doesNotMatch(v2Ui, /settleTimer|}, 210\);/);
+assert.match(v2Ui, /axis = Math\.abs\(nextX\) >= Math\.abs\(nextY\) \* 1\.08 \? 'horizontal' : 'vertical'/);
 assert.match(v2Css, /\.v2-z\{[\s\S]*?touch-action:pan-y/);
 assert.match(v2Css, /\.v2-sticker-screen\{[\s\S]*?touch-action:pan-y/);
 assert.match(styleCss, /--surface-dark:#2F3338/);
@@ -247,12 +251,15 @@ assert.match(v2Css, /--v2-deck-width:calc\(var\(--v2-z-open-x\) - var\(--v2-gap\
 assert.match(v2Css, /--v2-deck-top:34px/);
 assert.match(v2Css, /--v2-gap:20px/);
 assert.match(v2Css, /border:1px solid rgba\(17,17,17,.32\)/);
-assert.match(v2Css, /transform:rotate\(-90deg\)/);
-assert.match(v2Css, /transform-origin:left bottom/);
+assert.match(v2Css, /\.v2-deck__card\{[\s\S]*?display:grid;[\s\S]*?place-items:center/);
+assert.match(v2Css, /\.v2-deck__card strong\{[\s\S]*?text-align:center/);
+assert.doesNotMatch(v2Css, /transform:rotate\(-90deg\)/);
+assert.match(v2Css, /\.v2-e-card\{[\s\S]*?height:50%;[\s\S]*?place-items:center/);
 assert.match(v2Css, /box-shadow:-18px 12px 34px rgba\(0,0,0,.18\)/);
 assert.match(v2Css, /box-shadow:-9px 8px 14px -11px rgba\(0,0,0,.34\)/);
 assert.match(v2Css, /\.v2-z \.entity-card\{transform:translateY\(-2px\)/);
-assert.match(v2Css, /\.v2-app\.is-revealing-deck \.v2-deck/);
+assert.match(v2Css, /\.v2-app\.is-revealing-deck \.v2-fe-deck/);
+assert.match(v2Css, /\.v2-app\.is-deck-open > \.v2-app__stage > \.v2-z:not\(\.v2-z--layer\)/);
 assert.match(accountMobileCss, /\.app-shell\.app-shell--booking\{[\s\S]*?background:var\(--v2-base\)/);
 assert.match(coreJs, /setThemeColor\('#2F3338'\)/);
 assert.match(coreJs, /setThemeColor\('#F5F5F3'\)/);
