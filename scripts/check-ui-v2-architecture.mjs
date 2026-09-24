@@ -12,6 +12,10 @@ const consentSettings = fs.readFileSync('online-booking/consent-settings.js', 'u
 const inputs = fs.readFileSync('ui/inputs/index.js', 'utf8');
 const accountMobileCss = fs.readFileSync('ui/shell/account-mobile.css', 'utf8');
 const core = fs.readFileSync('core.js', 'utf8');
+const finance = fs.readFileSync('main/finance/finance.js', 'utf8');
+const journal = fs.readFileSync('journal/journal.js', 'utf8');
+const settings = fs.readFileSync('settings/settings.js', 'utf8');
+const firstRun = fs.readFileSync('first-run/runtime.js', 'utf8');
 
 const failures = [];
 const expect = (condition, message) => { if (!condition) failures.push(message); };
@@ -72,6 +76,22 @@ expect(accountMobileCss.includes('background:var(--v2-base)'), 'Public booking s
 expect(core.includes("setThemeColor('#2F3338')") && core.includes("setThemeColor('#F5F5F3')"), 'Public booking must tint browser chrome to H and restore the workspace theme afterwards.');
 expect(booking.includes('v2LegalCards(') && booking.includes('v2Sticker({'), 'Legal checkpoint must use the shared sticker system.');
 expect(!booking.includes('data-booking-workplaces-back') && !booking.includes('data-booking-confirm-back'), 'V2 booking flow must not restore legacy back buttons.');
+
+expect(core.includes("className: 'v2-app--workspace'") && core.includes('secondaryDeck'), 'Professional workspace must use the shared V2 shell with optional second F deck.');
+for (const marker of ["{ id: 'people', label: 'Клиенты'", "{ id: 'finance', label: 'Финансы'", "{ id: 'timetable', label: 'График'", "{ id: 'journal', label: 'Журнал'", "{ id: 'profile', label: 'Профиль'", "{ id: 'settings', label: 'Настройки'"]) {
+  expect(core.includes(marker), `Workspace root F is missing ${marker}.`);
+}
+expect(!core.includes('bottomNavigation(') && !core.includes("renderMain } from './main/main.js'"), 'Workspace V2 must not retain legacy bottom navigation or Main hub routing.');
+expect(core.includes("kind: 'chat'") && core.includes("data: 'data-v2-workspace-chat'"), 'Chat must live in Header D instead of root F.');
+expect(ui.includes("secondaryDeck = ''") && ui.includes("role = ''") && ui.includes('data-v2-deck-role'), 'Shared V2 must own both F levels through the same deck component.');
+expect(css.includes('.v2-app--workspace .v2-deck--secondary{left:var(--v2-z-open-x)}') && css.includes('--v2-z-double-open-x:'), 'Workspace F2 must be separated from F1 by the shared GAP and move Z farther right.');
+expect(finance.includes('export function financeNavigationItems()') && finance.includes('export function renderFinanceSection('), 'Finance F2 must route to the existing Finance screens.');
+for (const label of ['Касса', 'ДДС', 'Доход / Расход', 'Статьи', 'Прочие операции', 'Z-отчёт']) expect(finance.includes(`label: '${label}'`), `Finance F2 is missing ${label}.`);
+expect(journal.includes('export function journalNavigationItems()') && journal.includes('export function renderJournalView(') && journal.includes('externalNavigation'), 'Journal F2 must route the existing Day/Month/List views without duplicating them.');
+expect(settings.includes('export function settingsNavigationItems()') && settings.includes('export async function renderSettingsSection(') && settings.includes("key !== 'profile'"), 'Settings F2 must route existing settings children while Profile stays a root F folder.');
+expect(firstRun.includes("return 'people';") && firstRun.includes("return 'finance';") && firstRun.includes('data-v2-secondary-item'), 'DEMO navigation must follow the migrated V2 workspace entry points without changing its business progression.');
+expect(firstRun.includes("book:v2-navigation-request") && firstRun.includes('this.navTarget(step)'), 'DEMO must reveal the real V2 deck before pointing to a root or second-level folder.');
+expect(finance.includes('openFinanceOperation(root, movements, element.dataset.financeOperation, onBack)'), 'Finance DDS must preserve its F2 back callback through operation detail/cancel refresh.');
 
 expect(account.includes('v2FDeck('), 'End-user root must use shared F deck.');
 expect(account.includes('initV2DeckSwipe(root'), 'End-user F deck must page horizontally with the shared interaction.');
