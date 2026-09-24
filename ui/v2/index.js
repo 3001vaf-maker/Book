@@ -158,10 +158,41 @@ export function v2LegalCards(items = []) {
   </article>`).join('')}</div>`;
 }
 
+export function v2ZLayer(content = '', { className = '' } = {}) {
+  return `<main class="v2-z v2-z--layer ${text(className)}" data-v2-z-layer>${content}</main>`;
+}
+
+export function mountV2ZLayer(root, html, { onClose = null } = {}) {
+  const app = root?.closest?.('[data-v2-app]') || document.querySelector('[data-v2-app]');
+  const stage = app?.querySelector?.('.v2-app__stage');
+  if (!stage) return null;
+  const template = document.createElement('template');
+  template.innerHTML = String(html || '').trim();
+  const node = template.content.firstElementChild;
+  if (!node?.matches?.('[data-v2-z-layer]')) return null;
+  stage.querySelectorAll('[data-v2-z-layer]').forEach((layer) => layer.remove());
+  stage.appendChild(node);
+  const notify = () => window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+  let disposeSwipe = () => {};
+  const close = () => {
+    disposeSwipe();
+    if (node.isConnected) node.remove();
+    notify();
+    onClose?.();
+  };
+  node.addEventListener('click', (event) => {
+    if (event.target.closest?.('[data-v2-z-close]')) close();
+  });
+  disposeSwipe = initV2Swipe(node, { onRight: close, revealDeck: false });
+  node.v2Close = close;
+  notify();
+  return node;
+}
+
 export function v2Layer(content = '', { kind = 'standard', title = '', className = '' } = {}) {
   const allowed = new Set(['quick', 'standard', 'system']);
   const resolved = allowed.has(kind) ? kind : 'standard';
-  return `<div class="v2-layer-backdrop" data-v2-layer><section class="v2-layer v2-layer--${resolved} ${text(className)}" role="dialog" aria-modal="true" aria-label="${text(title)}"><button type="button" class="v2-layer__close" data-v2-layer-close aria-label="Закрыть">×</button>${title ? `<header class="v2-layer__header"><h2>${text(title)}</h2></header>` : ''}${content}</section></div>`;
+  return `<div class="v2-layer-backdrop" data-v2-layer><section class="v2-layer v2-layer--${resolved} ${text(className)}" role="dialog" aria-modal="true" aria-label="${text(title)}" tabindex="-1"><button type="button" class="v2-layer__close" data-v2-layer-close aria-label="Закрыть">×</button>${title ? `<header class="v2-layer__header"><h2>${text(title)}</h2></header>` : ''}${content}</section></div>`;
 }
 
 export function mountV2Layer(html) {
@@ -171,17 +202,18 @@ export function mountV2Layer(html) {
   if (!node?.matches('[data-v2-layer]')) return null;
   document.body.appendChild(node);
   const close = () => node.remove();
+  node.v2Close = close;
   node.addEventListener('click', (event) => {
-    if (event.target === node || event.target.closest('[data-v2-layer-close]')) close();
+    if (event.target === node || event.target.closest('[data-v2-layer-close]')) node.v2Close?.();
   });
   return node;
 }
 
-export function initV2Swipe(root, { onRight = null, onLeft = null, threshold = 72, maxDrag = 180 } = {}) {
+export function initV2Swipe(root, { onRight = null, onLeft = null, threshold = 72, maxDrag = 180, revealDeck = true } = {}) {
   const surface = root?.matches?.('[data-v2-z]') ? root : root?.querySelector?.('[data-v2-z]');
   if (!surface) return () => {};
   const app = surface.closest?.('[data-v2-app]');
-  const hasDeck = Boolean(app?.querySelector?.('[data-v2-deck]'));
+  const hasDeck = revealDeck && Boolean(app?.querySelector?.('[data-v2-deck]'));
   let pointerId = null;
   let startX = 0;
   let startY = 0;

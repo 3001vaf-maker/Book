@@ -10,6 +10,17 @@ export function pageHeader(title, subtitle = '', meta = '') {
   return `<header class="page-header"><div class="page-header__main"><h1>${escapeHtml(title)}</h1>${subtitle ? `<p>${escapeHtml(subtitle)}</p>` : ''}</div>${meta ? `<div class="page-header__meta">${meta}</div>` : ''}</header>`;
 }
 
+
+/**
+ * Canonical workspace Header context.
+ * It supplies A/B/D metadata to the shared workspace shell without drawing a
+ * second visible header inside Z.
+ */
+export function workspaceHeaderContext({ title = '', a = null, hideD = false } = {}) {
+  const action = a ? `<button type="button" class="workspace-header-context__action" data-workspace-context-action data-workspace-a-kind="${escapeHtml(a.kind || 'settings')}" data-workspace-a-image="${escapeHtml(a.image || '')}" data-workspace-a-initials="${escapeHtml(a.initials || '')}" aria-label="${escapeHtml(a.aria || 'Настройки контекста')}"></button>` : '';
+  return `<div class="workspace-header-context" data-workspace-header-context data-workspace-title="${escapeHtml(title)}" data-workspace-hide-d="${hideD ? 'true' : 'false'}">${action}</div>`;
+}
+
 /**
  * Canonical clickable control placed inside page headers.
  * It owns only the stable Header Control shell and knows nothing about the

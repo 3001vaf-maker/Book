@@ -5,8 +5,8 @@ import {
   escapeHtml,
   listEntries,
   listEntry,
-  mountV2Layer,
-  v2Layer,
+  mountModal,
+  modal,
 } from '../ui/ui.js';
 
 function consentRows(consents = []) {
@@ -26,7 +26,7 @@ function confirmRevoke(consent, onConfirm) {
     ${button('Отозвать согласие', { variant: 'danger', data: 'data-confirm-consent-revoke' })}
     ${button('Отмена', { variant: 'secondary', data: 'data-cancel-consent-revoke' })}
   </div>`;
-  const layer = mountV2Layer(v2Layer(content, { kind: 'quick', title }));
+  const layer = mountModal(document.body, modal(content, { variant: 'compact', title }));
   layer?.querySelector('[data-cancel-consent-revoke]')?.addEventListener('click', () => layer.remove());
   layer?.querySelector('[data-confirm-consent-revoke]')?.addEventListener('click', async (event) => {
     event.currentTarget.disabled = true;
@@ -45,14 +45,14 @@ export async function openAccountConsentSettings(state, { onChanged } = {}) {
   try {
     consentState = await getAccountConsentState(state.tenantId);
   } catch (error) {
-    return mountV2Layer(v2Layer(emptyState('Согласия недоступны', error instanceof Error ? error.message : 'Не удалось загрузить согласия'), { kind: 'standard', title: 'Согласия' }));
+    return mountModal(document.body, modal(emptyState('Согласия недоступны', error instanceof Error ? error.message : 'Не удалось загрузить согласия'), { variant: 'large', title: 'Согласия' }));
   }
 
   const consents = Array.isArray(consentState?.consents) ? consentState.consents : [];
   const content = consents.length
     ? `<div class="form-grid">${listEntries(consentRows(consents))}<div class="muted">Нажмите на действующее согласие, чтобы отозвать его.</div></div>`
     : emptyState('Согласий пока нет', 'Здесь появятся согласия, которые вы давали в Book.');
-  const layer = mountV2Layer(v2Layer(content, { kind: 'standard', title: 'Согласия' }));
+  const layer = mountModal(document.body, modal(content, { variant: 'large', title: 'Согласия' }));
 
   layer?.querySelectorAll('[data-account-consent-revoke]').forEach((node) => node.addEventListener('click', () => {
     const consent = consents[Number(node.dataset.accountConsentRevoke)];

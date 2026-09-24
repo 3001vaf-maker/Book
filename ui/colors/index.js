@@ -36,7 +36,7 @@ export function initColorPickers(root, colors = COLOR_PALETTE) {
     if (!value || !swatch || !open) return;
     open.onclick = () => {
       const palette = paletteColors.map((color) => `<button type="button" class="color-picker__option ${color === value.value ? 'is-selected' : ''}" data-color-option="${escapeHtml(color)}" aria-label="Цвет ${escapeHtml(color)}"><span style="background:${escapeHtml(color)}"></span></button>`).join('');
-      const m = mountModal(root, modal(`<div class="compact-form"><div class="modal-title"><h2>Выбор цвета</h2></div><div class="color-picker__palette" data-color-palette>${palette}</div></div>`, { title: 'Выбор цвета' }));
+      const m = mountModal(root, modal(`<div class="compact-form"><div class="color-picker__palette" data-color-palette>${palette}</div></div>`, { variant: 'compact', title: 'Выбор цвета' }));
       m?.querySelectorAll('[data-color-option]').forEach((option) => option.addEventListener('click', () => {
         value.value = option.dataset.colorOption || paletteColors[0];
         swatch.style.background = value.value;
