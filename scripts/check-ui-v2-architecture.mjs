@@ -55,7 +55,6 @@ for (const name of [
   'v2LegalCards',
   'v2ZLayer',
   'mountV2ZLayer',
-  'v2Layer',
   'initV2Swipe',
   'initV2StickerSwipe',
   'initV2DeckSwipe',
@@ -134,6 +133,8 @@ expect(inputs.includes('openPhotoCrop(') && inputs.includes('croppedSquare(') &&
 expect(headerUi.includes('export function workspaceHeaderContext') && facade.includes('workspaceHeaderContext'), 'Canonical Header owner must own workspace context metadata.');
 expect(!ui.includes('v2WorkspaceContext'), 'Shared V2 must not duplicate the canonical Header context owner.');
 expect(ui.includes('export function v2ZLayer') && ui.includes('export function mountV2ZLayer'), 'Shared V2 must own stacked Z layers.');
+expect(ui.includes('export function v2Layer') && ui.includes('export function mountV2Layer'), 'Shared V2 may keep modal geometry primitives internally for ui/modals.');
+expect(!facade.includes('v2Layer') && !facade.includes('mountV2Layer'), 'ui/ui.js must not expose internal V2 modal primitives alongside the canonical modal owner.');
 expect(core.includes('activeWorkspaceSurface(surface)') && core.includes("context?.dataset.workspaceHideD === 'true'") && core.includes("[data-workspace-context-action]"), 'Workspace Header must follow the top Z layer and consume the canonical Header context owner.');
 
 expect(modals.includes("import { mountV2Layer, v2Layer } from '../v2/index.js';")
@@ -148,6 +149,10 @@ for (const [name, source] of [
   ['shared inputs', inputs],
   ['shared time', timeUi],
   ['shared colors', colorUi],
+  ['end-user account shell', account],
+  ['personal-data', personalData],
+  ['password-settings', passwordSettings],
+  ['consent-settings', consentSettings],
 ]) {
   expect(source.includes('modal(') && source.includes('mountModal('), `${name} must consume the sole shared modal owner.`);
   expect(!source.includes('mountV2Layer(') && !source.includes('v2Layer('), `${name} must not bypass ui/modals with a parallel V2 modal path.`);
@@ -161,10 +166,6 @@ expect(account.includes("className: 'v2-app--chat'"), 'End-user Chat must share 
 expect(account.includes("attachmentTrigger: 'external'"), 'Chat attachment action must live in Header D.');
 expect(!account.includes('accountBottomNavigation') && !account.includes('bindBottomNavigation'), 'End-user V2 must not contain bottom navigation.');
 expect(!account.includes('<style>') && !booking.includes('<style>'), 'Feature code must not create local V2 style owners.');
-for (const [name, source] of [['personal-data', personalData], ['password-settings', passwordSettings], ['consent-settings', consentSettings]]) {
-  expect(source.includes('v2Layer') && source.includes('mountV2Layer'), `${name} must use shared V2 layers.`);
-  expect(!source.includes('mountModal(') && !source.includes('modal('), `${name} must not reopen the legacy rounded modal shell.`);
-}
 
 if (failures.length) {
   failures.forEach((message) => console.error(`ui v2 architecture: ${message}`));
