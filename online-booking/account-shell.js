@@ -388,6 +388,8 @@ function bindDeck(root, state, handlers) {
     onActiveChange: (id) => {
       state.accountDeckActive = id;
       state.accountDeckOpen = true;
+      state.accountChatOpen = false;
+      state.accountTab = id === 'history' ? 'history' : 'representatives';
       void handlers.render();
     },
   });
@@ -396,6 +398,8 @@ function bindDeck(root, state, handlers) {
     if (id !== String(state.accountDeckActive || '')) {
       state.accountDeckActive = id;
       state.accountDeckOpen = true;
+      state.accountChatOpen = false;
+      state.accountTab = id === 'history' ? 'history' : 'representatives';
       void handlers.render();
       return;
     }
