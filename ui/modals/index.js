@@ -4,12 +4,13 @@ import { mountV2Layer, v2Layer } from '../v2/index.js';
 
 let modalLevel = 0;
 
-const MODAL_VARIANTS = new Set(['list', 'large', 'medium', 'compact', 'quick', 'bottom']);
+const MODAL_VARIANTS = new Set(['list', 'large', 'medium', 'compact', 'quick', 'top', 'standard', 'bottom', 'technical']);
 const MODAL_SURFACES = new Set(['app']);
 
 function v2Kind(variant = '') {
-  if (variant === 'quick' || variant === 'bottom') return 'quick';
-  if (variant === 'compact') return 'system';
+  if (variant === 'top' || variant === 'compact') return 'top';
+  if (variant === 'quick' || variant === 'bottom') return 'bottom';
+  if (variant === 'technical') return 'technical';
   return 'standard';
 }
 
@@ -34,7 +35,7 @@ export function modal(content, { title = '', className = '', variant = '', surfa
 }
 
 export function mountModal(root, html) {
-  const m = mountV2Layer(html);
+  const m = mountV2Layer(html, { root });
   if (!m) return null;
   modalLevel += 1;
   m.dataset.modalLevel = String(modalLevel);
@@ -60,7 +61,7 @@ export function mountModal(root, html) {
   return m;
 }
 
-export function openNotice({ title = 'Внимание', message = '', action = 'ОК', variant = 'compact', surface = 'app' } = {}) {
+export function openNotice({ title = 'Внимание', message = '', action = 'ОК', variant = 'technical', surface = 'app' } = {}) {
   const content = `<div class="modal-title"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(message)}</p></div><div class="modal-actions">${button(escapeHtml(action), { data: 'data-notice-close' })}</div>`;
   const m = mountModal(document.body, modal(content, { variant, surface, title }));
   if (!m) return null;
