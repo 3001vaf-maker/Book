@@ -16,9 +16,12 @@ export function pageHeader(title, subtitle = '', meta = '') {
  * It supplies A/B/D metadata to the shared workspace shell without drawing a
  * second visible header inside Z.
  */
-export function workspaceHeaderContext({ title = '', a = null, hideD = false } = {}) {
-  const action = a ? `<button type="button" class="workspace-header-context__action" data-workspace-context-action data-workspace-a-kind="${escapeHtml(a.kind || 'settings')}" data-workspace-a-image="${escapeHtml(a.image || '')}" data-workspace-a-image-position="${escapeHtml(a.imagePosition || '')}" data-workspace-a-initials="${escapeHtml(a.initials || '')}" aria-label="${escapeHtml(a.aria || 'Настройки контекста')}"></button>` : '';
-  return `<div class="workspace-header-context" data-workspace-header-context data-workspace-title="${escapeHtml(title)}" data-workspace-hide-d="${hideD ? 'true' : 'false'}">${action}</div>`;
+export function workspaceHeaderContext({ title = '', a = null, back = null, hideD = false } = {}) {
+  const actionData = a?.data ? ` ${String(a.data).trim()}` : '';
+  const backData = back?.data ? ` ${String(back.data).trim()}` : '';
+  const action = a ? `<button type="button" class="workspace-header-context__action" data-workspace-context-action${actionData} data-workspace-a-kind="${escapeHtml(a.kind || 'settings')}" data-workspace-a-image="${escapeHtml(a.image || '')}" data-workspace-a-image-position="${escapeHtml(a.imagePosition || '')}" data-workspace-a-initials="${escapeHtml(a.initials || '')}" aria-label="${escapeHtml(a.aria || 'Настройки контекста')}"></button>` : '';
+  const backSource = back ? `<button type="button" class="workspace-header-context__back-source" data-workspace-back-source${backData} aria-label="${escapeHtml(back.aria || 'Назад')}"></button>` : '';
+  return `<div class="workspace-header-context" data-workspace-header-context data-workspace-title="${escapeHtml(title)}" data-workspace-hide-d="${hideD ? 'true' : 'false'}">${backSource}${action}</div>`;
 }
 
 /**

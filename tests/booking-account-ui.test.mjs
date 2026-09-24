@@ -35,6 +35,8 @@ const entityCardCss = fs.readFileSync('ui/cards/entity-card.css', 'utf8');
 const infoUi = fs.readFileSync('ui/info/index.js', 'utf8');
 const infoCss = fs.readFileSync('ui/info/info.css', 'utf8');
 const timeUi = fs.readFileSync('ui/time/index.js', 'utf8');
+const headerUi = fs.readFileSync('ui/header/index.js', 'utf8');
+const journalListUi = fs.readFileSync('journal/список.js', 'utf8');
 
 // Public booking selection comes first. UI Reference V2 is the end-user target.
 assert.match(booking, /renderAccount/);
@@ -184,9 +186,16 @@ assert.match(onlineBookingService, /emails: uniqueStrings/);
 assert.match(onlineBookingService, /telegram: text\(source\.telegram\)/);
 assert.match(onlineBookingService, /links,/);
 
-// Online booking settings use the shared Book shell and three focused screens.
-assert.match(bookingSettingsUi, /appShell\(\{/);
-assert.match(bookingSettingsUi, /appHeader\(\{/);
+// Online booking settings stay inside the single Shared workspace Z and expose only header/action sources.
+assert.match(bookingSettingsUi, /workspaceHeaderContext\(\{/);
+assert.match(bookingSettingsUi, /back: \{ data: 'data-online-booking-back'/);
+assert.match(bookingSettingsUi, /data-v2-primary-action/);
+assert.match(bookingSettingsUi, /data-v2-primary-visible="false"/);
+assert.doesNotMatch(bookingSettingsUi, /\bappShell\s*\(/);
+assert.doesNotMatch(bookingSettingsUi, /\bappHeader\s*\(/);
+assert.doesNotMatch(bookingSettingsUi, /app-content--book-shell/);
+assert.match(headerUi, /data-workspace-back-source/);
+assert.match(headerUi, /actionData/);
 assert.match(bookingSettingsUi, /folderList\(\[/);
 assert.match(bookingSettingsUi, /Приветствие/);
 assert.match(bookingSettingsUi, /Внешний вид/);
@@ -248,6 +257,8 @@ assert.match(v2Ui, /commit\(finalDx < 0 \? 1 : -1\)/);
 assert.match(v2Ui, /is-next-ready/);
 assert.match(v2Ui, /addEventListener\('transitionend'/);
 assert.match(v2Ui, /const eDeck = host\.querySelector\?\.\('\[data-v2-e-list\]'\)/);
+assert.doesNotMatch(v2Ui, /if \(cards\.length < 2\) return \(\) => \{\};/);
+assert.match(v2Ui, /if \(cards\.length > 1\) \{/);
 assert.match(v2Ui, /const commitE = \(direction\) =>/);
 assert.match(v2Ui, /eDeck\.addEventListener\('pointermove', eMove/);
 assert.match(v2Ui, /--v2-e-drag-x/);
@@ -311,6 +322,9 @@ assert.match(accountMobileCss, /\.app-shell\.app-shell--booking\s*\{[\s\S]*?widt
 assert.match(shellUi, /messageThread/);
 assert.match(shellUi, /attachmentTrigger = 'composer'/);
 assert.match(shellCss, /\.message-composer\{position:fixed/);
+
+assert.doesNotMatch(journalListUi, /getBoundingPersonRect/);
+assert.match(journalListUi, /getBoundingClientRect\(\)/);
 
 assert.match(bookingUi, /Утро/);
 assert.match(bookingUi, /День/);
