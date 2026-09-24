@@ -1,6 +1,7 @@
 import { escapeHtml } from '../utils/escape-html.js';
 import { button } from '../buttons/index.js';
 import { select } from '../selectors/index.js';
+import { mountV2Layer, v2Layer } from '../v2/index.js';
 import { phoneCountryOptions, phoneInputState } from '../../core/phone/index.js';
 
 let phoneInputId = 0;
@@ -121,6 +122,64 @@ export function photoField({ name = 'photo', value = '' } = {}) {
   return `<div class="photo-field" data-photo-field><span class="photo-field__label">Фото</span><label class="photo-field__control">${preview}<span class="photo-field__action">${value ? 'Изменить фото' : 'Добавить фото'}</span><input type="file" accept="image/*" data-photo-input></label>${value ? button('Удалить фото', { className: 'photo-field__remove', data: 'data-photo-remove', variant: 'secondary' }) : ''}<input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(value)}" data-photo-value></div>`;
 }
 
+function croppedSquare(src, xPercent = 50, yPercent = 50) {
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.onload = () => {
+      const size = Math.min(image.naturalWidth, image.naturalHeight);
+      const maxX = Math.max(0, image.naturalWidth - size);
+      const maxY = Math.max(0, image.naturalHeight - size);
+      const sx = maxX * Math.max(0, Math.min(100, Number(xPercent) || 50)) / 100;
+      const sy = maxY * Math.max(0, Math.min(100, Number(yPercent) || 50)) / 100;
+      const canvas = document.createElement('canvas');
+      canvas.width = 960;
+      canvas.height = 960;
+      const context = canvas.getContext('2d');
+      context?.drawImage(image, sx, sy, size, size, 0, 0, 960, 960);
+      resolve(canvas.toDataURL('image/jpeg', .9));
+    };
+    image.onerror = () => resolve(src);
+    image.src = src;
+  });
+}
+
+function openPhotoCrop(fieldRoot, src) {
+  const html = v2Layer(`<div class="photo-cropper" data-photo-cropper>
+    <div class="photo-cropper__preview" data-photo-crop-preview></div>
+    <label class="field"><span>По горизонтали</span><input type="range" min="0" max="100" value="50" data-photo-crop-x></label>
+    <label class="field"><span>По вертикали</span><input type="range" min="0" max="100" value="50" data-photo-crop-y></label>
+    ${button('Использовать фото',{data:'data-photo-crop-save'})}
+  </div>`,{kind:'standard',title:'Кадрирование'});
+  const layer = mountV2Layer(html);
+  if (!layer) return;
+  const preview = layer.querySelector('[data-photo-crop-preview]');
+  const x = layer.querySelector('[data-photo-crop-x]');
+  const y = layer.querySelector('[data-photo-crop-y]');
+  if (preview) preview.style.backgroundImage = `url("${src.replaceAll('"','%22')}")`;
+  const sync = () => {
+    if (!preview) return;
+    preview.style.backgroundPosition = `${x?.value || 50}% ${y?.value || 50}%`;
+  };
+  x?.addEventListener('input', sync);
+  y?.addEventListener('input', sync);
+  sync();
+  layer.querySelector('[data-photo-crop-save]')?.addEventListener('click', async () => {
+    const cropped = await croppedSquare(src, x?.value, y?.value);
+    const value = fieldRoot.querySelector('[data-photo-value]');
+    const fieldPreview = fieldRoot.querySelector('.photo-field__preview');
+    const action = fieldRoot.querySelector('.photo-field__action');
+    if (!value || !fieldPreview || !action) return;
+    value.value = cropped;
+    fieldPreview.classList.remove('photo-field__preview--empty');
+    fieldPreview.style.backgroundImage = `url("${cropped.replaceAll('"','%22')}")`;
+    fieldPreview.textContent = '';
+    action.textContent = 'Изменить фото';
+    if (!fieldRoot.querySelector('[data-photo-remove]')) fieldRoot.insertAdjacentHTML('beforeend', button('Удалить фото', { className: 'photo-field__remove', data: 'data-photo-remove', variant: 'secondary' }));
+    value.dispatchEvent(new Event('change', { bubbles: true }));
+    layer.remove();
+  });
+}
+
 export function initPhotoField(root) {
   root.querySelectorAll('[data-photo-field]').forEach((fieldRoot) => {
     const input = fieldRoot.querySelector('[data-photo-input]');
@@ -135,13 +194,7 @@ export function initPhotoField(root) {
       const reader = new FileReader();
       reader.addEventListener('load', () => {
         const src = String(reader.result || '');
-        value.value = src;
-        preview.classList.remove('photo-field__preview--empty');
-        preview.style.backgroundImage = `url('${src.replaceAll("'", '%27')}')`;
-        preview.textContent = '';
-        action.textContent = 'Изменить фото';
-        if (!fieldRoot.querySelector('[data-photo-remove]')) fieldRoot.insertAdjacentHTML('beforeend', button('Удалить фото', { className: 'photo-field__remove', data: 'data-photo-remove', variant: 'secondary' }));
-        value.dispatchEvent(new Event('change', { bubbles: true }));
+        if (src) openPhotoCrop(fieldRoot, src);
       });
       reader.readAsDataURL(file);
     });
