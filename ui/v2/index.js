@@ -158,6 +158,42 @@ export function v2LegalCards(items = []) {
   </article>`).join('')}</div>`;
 }
 
+export function v2WorkspaceContext({ title = '', a = null, hideD = false } = {}) {
+  const aMarkup = a ? `<button type="button" class="v2-workspace-context__action" data-v2-context-action data-v2-a-kind="${text(a.kind || 'settings')}" data-v2-a-image="${text(a.image || '')}" data-v2-a-initials="${text(a.initials || '')}" aria-label="${text(a.aria || 'Настройки контекста')}"></button>` : '';
+  return `<div class="v2-workspace-context" data-v2-workspace-context data-v2-title="${text(title)}" data-v2-hide-d="${hideD ? 'true' : 'false'}">${aMarkup}</div>`;
+}
+
+export function v2ZLayer(content = '', { className = '' } = {}) {
+  return `<main class="v2-z v2-z--layer ${text(className)}" data-v2-z-layer>${content}</main>`;
+}
+
+export function mountV2ZLayer(root, html, { onClose = null } = {}) {
+  const app = root?.closest?.('[data-v2-app]') || document.querySelector('[data-v2-app]');
+  const stage = app?.querySelector?.('.v2-app__stage');
+  if (!stage) return null;
+  const template = document.createElement('template');
+  template.innerHTML = String(html || '').trim();
+  const node = template.content.firstElementChild;
+  if (!node?.matches?.('[data-v2-z-layer]')) return null;
+  stage.querySelectorAll('[data-v2-z-layer]').forEach((layer) => layer.remove());
+  stage.appendChild(node);
+  const notify = () => window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+  let disposeSwipe = () => {};
+  const close = () => {
+    disposeSwipe();
+    if (node.isConnected) node.remove();
+    notify();
+    onClose?.();
+  };
+  node.addEventListener('click', (event) => {
+    if (event.target.closest?.('[data-v2-z-close]')) close();
+  });
+  disposeSwipe = initV2Swipe(node, { onRight: close, revealDeck: false });
+  node.v2Close = close;
+  notify();
+  return node;
+}
+
 export function v2Layer(content = '', { kind = 'standard', title = '', className = '' } = {}) {
   const allowed = new Set(['quick', 'standard', 'system']);
   const resolved = allowed.has(kind) ? kind : 'standard';
@@ -177,11 +213,11 @@ export function mountV2Layer(html) {
   return node;
 }
 
-export function initV2Swipe(root, { onRight = null, onLeft = null, threshold = 72, maxDrag = 180 } = {}) {
+export function initV2Swipe(root, { onRight = null, onLeft = null, threshold = 72, maxDrag = 180, revealDeck = true } = {}) {
   const surface = root?.matches?.('[data-v2-z]') ? root : root?.querySelector?.('[data-v2-z]');
   if (!surface) return () => {};
   const app = surface.closest?.('[data-v2-app]');
-  const hasDeck = Boolean(app?.querySelector?.('[data-v2-deck]'));
+  const hasDeck = revealDeck && Boolean(app?.querySelector?.('[data-v2-deck]'));
   let pointerId = null;
   let startX = 0;
   let startY = 0;
