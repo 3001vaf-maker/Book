@@ -34,6 +34,11 @@ if (!/let\s+disposeView\s*=/.test(coreSource) || !/disposeView\(\);/.test(coreSo
   errors.push('core.js: route render lifecycle must dispose the previous view before replacement');
 }
 
+if (!/const\s+backLabel\s*=\s*backSource\.getAttribute\('aria-label'\)\s*\|\|\s*'Назад';/.test(coreSource)
+  || !/if\s*\(control\.getAttribute\('aria-label'\)\s*!==\s*backLabel\)\s*\{\s*control\.setAttribute\('aria-label',\s*backLabel\);/s.test(coreSource)) {
+  errors.push('core.js: workspace back aria-label writes must be idempotent to avoid MutationObserver feedback loops');
+}
+
 if (errors.length) {
   console.error('runtime lifecycle check: FAILED');
   for (const error of errors) console.error(`- ${error}`);
