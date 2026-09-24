@@ -42,24 +42,10 @@
   background:var(--booking-light);
   color:var(--booking-dark);
 }
-.booking-account--account .ui-button{
-  border-radius:var(--radius-control);
-  background:var(--booking-dark);
-  color:#fff;
-}
-.booking-account--account .ui-button--secondary{
-  background:var(--booking-light);
-  color:var(--booking-dark);
-}
-.booking-account--account .ui-button:disabled{
-  opacity:.42;
-}
 .booking-account--account .app-header .ui-button.app-header__control{
   border-radius:var(--radius-control);
 }
-.booking-account--account .list-entry,
-.booking-account--account .app-setting-toggle,
-.booking-account--account .message-composer__input{
+ .booking-account--account .app-setting-toggle{
   border-radius:var(--radius-card);
 }
 .booking-account--account .message-bubble{
