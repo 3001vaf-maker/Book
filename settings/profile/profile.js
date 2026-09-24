@@ -1,4 +1,4 @@
-import { actionBlock, button, collectRepeatedField, entityCard, escapeHtml, field, initPhotoField, initRepeatedFields, mountV2Layer, mountV2ZLayer, page, photoField, repeatedField, select, textareaField, v2HorizontalRail, v2Section, v2WorkspaceContext, v2Layer, v2ZLayer, workplaceCountText } from '../../ui/ui.js';
+import { actionBlock, button, collectRepeatedField, entityCard, escapeHtml, field, initPhotoField, initRepeatedFields, mountV2Layer, mountV2ZLayer, page, photoField, repeatedField, select, textareaField, v2HorizontalRail, v2Section, v2WorkspaceContext, v2Layer, v2ZLayer, workplaceAddButton, workplaceCountText } from '../../ui/ui.js';
 import { getBookLimit } from '../../core/access.js';
 import { addCustomProfession, getCustomProfessions, getProfile, saveProfile as saveProfileData } from './data.js';
 import { getWorkplaces } from './workplaces/data.js';
@@ -212,11 +212,19 @@ function renderOnboarding(root,navigateBack,options={}){
   root.innerHTML=page([
     profileSettingsForm(p,options,{embedded:true}),
     v2Section('Рабочие пространства',workplaceRail()),
-    actionBlock(button('Добавить рабочее пространство',{data:'data-add-workplace'}))
+    actionBlock(workplaceAddButton())
   ]);
   bindProfileSettings(root,p,navigateBack,options,()=>{});
   root.querySelector('[data-add-workplace]')?.addEventListener('click',()=>openWorkplace(root,null,navigateBack,options));
   root.querySelectorAll('[data-workplace]').forEach(el=>el.addEventListener('click',()=>openWorkplace(root,getWorkplaces().find(w=>w.key===el.dataset.workplace)||null,navigateBack,options)));
+}
+
+function promotePrimaryWorkplaceAction(root){
+  const control=root.querySelector('[data-add-workplace]');
+  if(!control)return;
+  control.setAttribute('data-v2-primary-action','');
+  control.dataset.v2PrimaryLabel='Добавить';
+  control.setAttribute('aria-label','Добавить рабочее пространство');
 }
 
 function renderProfile(root,navigateBack,options={}){
@@ -229,8 +237,9 @@ function renderProfile(root,navigateBack,options={}){
     profileContext(p),
     profileCard(p),
     v2Section('Рабочие пространства',workplaceRail()),
-    button('Добавить',{data:'data-add-workplace data-v2-primary-action data-v2-primary-label="Добавить"',aria:'Добавить рабочее пространство'})
+    workplaceAddButton()
   ]);
+  promotePrimaryWorkplaceAction(root);
   root.querySelector('[data-v2-context-action]')?.addEventListener('click',()=>openProfileSettings(root,navigateBack,options));
   root.querySelector('[data-add-workplace]')?.addEventListener('click',()=>openWorkplace(root,null,navigateBack,options));
   root.querySelectorAll('[data-workplace]').forEach(el=>el.addEventListener('click',()=>openWorkplace(root,getWorkplaces().find(w=>w.key===el.dataset.workplace)||null,navigateBack,options)));
