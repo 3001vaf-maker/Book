@@ -220,10 +220,17 @@ function sourceText(node, fallback = '') {
 function primarySource(surface) {
   const shellAction = surface.querySelector('.app-header__slot--action button');
   if (shellAction) return shellAction;
+
+  const pageAction = surface.querySelector('.page-header-action button');
+  if (pageAction) return pageAction;
+
   if (state.activeSection === 'people') return surface.querySelector('[data-add]');
   if (state.activeSection === 'timetable') return surface.querySelector('[data-timetable-apply]');
   if (state.activeSection === 'profile') return surface.querySelector('[data-save-profile]');
-  return null;
+
+  const submitButtons = [...surface.querySelectorAll('form button[type="submit"]')]
+    .filter((button) => !button.closest('[data-v2-layer], .modal-layer, .modal-backdrop'));
+  return submitButtons.length === 1 ? submitButtons[0] : null;
 }
 
 function primaryLabel(source) {
@@ -240,6 +247,29 @@ function primaryVisible(source) {
   return true;
 }
 
+function syncWorkspaceBack(surface, backSource) {
+  let control = surface.querySelector(':scope > [data-v2-workspace-back]');
+  if (!backSource) {
+    control?.remove();
+    return;
+  }
+  if (!control) {
+    surface.insertAdjacentHTML('afterbegin', '<button type="button" class="v2-workspace-back" data-v2-workspace-back aria-label="Назад">‹</button>');
+    control = surface.querySelector(':scope > [data-v2-workspace-back]');
+  }
+  control.setAttribute('aria-label', backSource.getAttribute('aria-label') || 'Назад');
+  control.onclick = () => backSource.click();
+}
+
+function syncWorkspacePrimarySource(surface, source) {
+  surface.querySelectorAll('.v2-workspace-source-hidden').forEach((node) => {
+    if (node !== source) node.classList.remove('v2-workspace-source-hidden');
+  });
+  if (source && !source.classList.contains('v2-workspace-source-hidden')) {
+    source.classList.add('v2-workspace-source-hidden');
+  }
+}
+
 function syncWorkspaceHeader(surface) {
   if (!surface?.isConnected) return;
   const root = activeRootSection();
@@ -252,15 +282,17 @@ function syncWorkspaceHeader(surface) {
   );
   const backSource = surface.querySelector('.app-header__slot--back button');
   const contextSource = surface.querySelector('.page-header__meta button, .app-header__slot--settings button');
-  const aSource = backSource || contextSource;
+  const aSource = contextSource;
   const cSource = primarySource(surface);
   const cVisible = primaryVisible(cSource);
+  syncWorkspaceBack(surface, backSource);
+  syncWorkspacePrimarySource(surface, cVisible ? cSource : null);
   const header = app.querySelector('[data-v2-header]');
   if (!header) return;
 
   header.outerHTML = v2Header({
     a: aSource ? {
-      kind: backSource ? 'back' : 'settings',
+      kind: 'settings',
       data: 'data-v2-workspace-a',
       aria: aSource.getAttribute('aria-label') || sourceText(aSource, 'Контекст раздела'),
     } : null,
