@@ -25,6 +25,14 @@ const firstRun = fs.readFileSync('first-run/runtime.js', 'utf8');
 const profile = fs.readFileSync('settings/profile/profile.js', 'utf8');
 const style = fs.readFileSync('css/style.css', 'utf8');
 const entityCardCss = fs.readFileSync('ui/cards/entity-card.css', 'utf8');
+const buttonCss = fs.readFileSync('ui/buttons/buttons.css', 'utf8');
+const segmentUi = fs.readFileSync('ui/selection/segment-control.js', 'utf8');
+const segmentCss = fs.readFileSync('ui/selection/segment-control.css', 'utf8');
+const infoUi = fs.readFileSync('ui/info/index.js', 'utf8');
+const infoCss = fs.readFileSync('ui/info/info.css', 'utf8');
+const inputsCss = fs.readFileSync('ui/inputs/inputs.css', 'utf8');
+const listCss = fs.readFileSync('ui/lists/list.css', 'utf8');
+const listEntryCss = fs.readFileSync('ui/lists/list-entry.css', 'utf8');
 
 function cssFilesUnder(directory) {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -59,7 +67,20 @@ const legacySystemBrown = /#(?:3B302B|7A6F69|B8AEA8|E7E1DB|E8E1DC|D7CEC7|968982|
 const failures = [];
 const expect = (condition, message) => { if (!condition) failures.push(message); };
 for (const file of sharedCssFiles) {
-  expect(!legacySystemBrown.test(fs.readFileSync(file, 'utf8')), `Legacy system brown must not remain in Shared UI CSS: ${file}.`);
+  const source = fs.readFileSync(file, 'utf8');
+  expect(!legacySystemBrown.test(source), `Legacy system brown must not remain in Shared UI CSS: ${file}.`);
+  if (file !== 'ui/buttons/buttons.css') {
+    expect(!/\.ui-button--(?:secondary|outline)\s*\{|\.ui-button:disabled\s*\{/.test(source), `Shared Button states must not be re-owned outside ui/buttons/buttons.css: ${file}.`);
+  }
+  if (file !== 'ui/selection/segment-control.css') {
+    expect(!/(^|\})\.segment-control\s*\{|(^|\})\.segment-control button(?:\.is-active)?\s*\{/.test(source), `Segmented-control base styling must not be re-owned outside ui/selection/segment-control.css: ${file}.`);
+  }
+  if (file !== 'ui/cards/entity-card.css') {
+    expect(!/--entity-card-(?:depth|mid|light|surface)\s*:/.test(source), `Entity Card surface tokens must stay owned by ui/cards/entity-card.css: ${file}.`);
+  }
+  if (file !== 'ui/info/info.css') {
+    expect(!/\.ui-info__(?:trigger|panel)\s*\{/.test(source), `Info UI styling must stay owned by ui/info/info.css: ${file}.`);
+  }
 }
 for (const file of runtimeJsFiles) {
   if (file === 'ui/v2/index.js' || file === 'ui/modals/index.js') continue;
@@ -89,17 +110,20 @@ for (const name of [
 
 expect(css.includes('--v2-base:var(--surface-dark)') && style.includes('--surface-dark:#2F3338'), 'V2 BASE must resolve through the shared H dark-surface token #2F3338.');
 expect(/\.v2-z\{[\s\S]*?border-radius:var\(--v2-z-radius\) 0 0 0/.test(css), 'Z may round only the upper-left corner.');
-expect(/\.v2-layer--quick\{[\s\S]*?border-radius:0/.test(css), 'QUICK must remain rectangular.');
-expect(/\.v2-layer--standard\{[\s\S]*?border-radius:0/.test(css), 'STANDARD must remain rectangular.');
-expect(/\.v2-layer--system\{[\s\S]*?border-radius:var\(--v2-z-radius\) 0 0 0/.test(css), 'SYSTEM may repeat only the upper-left UZ corner.');
+expect(/\.v2-layer--top\{[\s\S]*?border-radius:var\(--v2-z-radius\) 0 0 0/.test(css), 'TOP modal must live inside Z and repeat only the Z upper-left radius.');
+expect(/\.v2-layer--standard\{[\s\S]*?inset:0;[\s\S]*?border-radius:var\(--v2-z-radius\) 0 0 0/.test(css), 'STANDARD modal must be a full-height Z-contained sheet with only the upper-left radius.');
+expect(/\.v2-layer--bottom\{[\s\S]*?bottom:0;[\s\S]*?border-radius:0/.test(css), 'BOTTOM modal must stay straight inside the lower part of Z.');
+expect(/\.v2-layer--technical\{[\s\S]*?top:50%;[\s\S]*?border-radius:0;[\s\S]*?box-shadow:0 18px 46px/.test(css), 'TECHNICAL modal must float above the whole system with all straight edges and an all-side shadow.');
+expect(css.includes('.v2-layer-backdrop--contained{position:fixed;inset:0') && css.includes('.v2-layer-backdrop--technical{position:fixed;inset:0'), 'Shared modal geometry must distinguish Z-contained work modals from rare technical overlays.');
 expect(/\.v2-deck__card\{[\s\S]*?border-radius:0 var\(--v2-z-radius\) 0 0/.test(css), 'F cards must mirror Z toward the left.');
 expect(css.includes('--v2-z-open-x:min(33.333vw,130px)') && css.includes('--v2-deck-width:calc(var(--v2-z-open-x) - var(--v2-gap))') && css.includes('--v2-gap:20px'), 'Opened Z must move about one third of the app width while F remains smaller and separated by H.');
 expect(css.includes('--v2-deck-top:34px') && css.includes('top:var(--v2-deck-top)'), 'F must start lower than Z to preserve layer hierarchy.');
 expect(css.includes('opacity:0') && css.includes('.v2-app.is-deck-open .v2-fe-deck') && css.includes('.v2-app.is-revealing-deck .v2-fe-deck'), 'Closed FE must disappear into H and reveal physically during Z1 swipe.');
 expect(css.includes('box-shadow:-18px 12px 34px rgba(0,0,0,.18)') && css.includes('cubic-bezier(.22,.78,.18,1)'), 'Opened Z must read as the floating face of the active F card.');
 expect(css.includes('border:1px solid rgba(17,17,17,.32)') && css.includes('inset -1px 0 0 rgba(17,17,17,.12)'), 'F cards must keep a visible contour so adjacent layers do not merge.');
-expect(/\.v2-deck__card\{[\s\S]*?display:grid;[\s\S]*?place-items:center/.test(css) && /\.v2-deck__card strong\{[\s\S]*?text-align:center/.test(css) && !css.includes('transform:rotate(-90deg)'), 'F folder names must be centered and readable on each F card.');
-expect(/\.v2-e-card\{[\s\S]*?height:50%;[\s\S]*?place-items:center/.test(css) && css.includes('--v2-e-pull:') && css.includes('.v2-app.is-deck-open .v2-e-card'), 'E must be a shorter nested card deck that slides out from under F.');
+expect(/\.v2-deck__card strong\{[\s\S]*?font-size:18px;[\s\S]*?transform:translate\(-50%,-50%\) rotate\(-90deg\)/.test(css), 'F folder names must be large, vertical, bottom-up, and centered on the visible F surface.');
+expect(css.includes('--v2-e-top-gap:72px') && /\.v2-e-deck\{[\s\S]*?top:calc\(var\(--v2-deck-top\) \+ var\(--v2-e-top-gap\)\);[\s\S]*?bottom:0/.test(css) && /\.v2-e-card\{[\s\S]*?bottom:0;/.test(css) && !/\.v2-e-card\{[\s\S]*?height:50%/.test(css), 'E must start below F and continue to the bottom instead of rendering as a hanging half-height fragment.');
+expect(/\.v2-e-card strong\{[\s\S]*?left:calc\(100% - \(var\(--v2-e-pull\) \/ 2\)\);[\s\S]*?font-size:17px;[\s\S]*?rotate\(-90deg\)/.test(css), 'E folder names must be vertical and centered in the visible protruding part of E.');
 expect(css.includes('.v2-legal-cards{display:flex;gap:10px;overflow-x:auto'), 'Legal document stickers must use the shared horizontal rail.');
 expect(css.includes('.v2-legal-card{\n  flex:0 0 min(86%,320px);\n  height:96px;'), 'Legal document stickers must share one base height and horizontal width.');
 expect(css.includes('.booking-account--account .v2-app .booking-time-grid{grid-template-columns:repeat(3,minmax(0,1fr))}'), 'V2 time slots must stay three per row.');
@@ -118,6 +142,8 @@ expect(ui.includes('const activeIndex = Math.max(0, values.findIndex') && ui.inc
 expect(ui.includes('.slice(0, 7)') && ui.includes('data-v2-f-index="${index}"') && !ui.includes('data-v2-f-level'), 'F cards must be peer folders with real names, not visual F1/F2/F3 levels.');
 expect(ui.includes('const nextIndex = (activeIndex + direction + cards.length) % cards.length') && ui.includes('commit(finalDx < 0 ? 1 : -1)') && ui.includes("'is-next-ready'"), 'F paging must reveal the next folder immediately under the outgoing physical card.');
 expect(ui.includes('threshold = 42') && ui.includes("addEventListener('transitionend'") && ui.includes('requestAnimationFrame') && !ui.includes('settleTimer') && !ui.includes('}, 210);'), 'F paging must continue from the finger into one transition without the legacy 210 ms reset/pause/rerender sequence.');
+expect(ui.includes("const eDeck = host.querySelector?.('[data-v2-e-list]')") && ui.includes('const commitE = (direction) =>') && ui.includes("eDeck.addEventListener('pointermove', eMove") && ui.includes('--v2-e-drag-x'), 'Shared FE gesture owner must provide an independent physical swipe for E.');
+expect(core.includes('eActiveId: childActive') && core.includes('onEActiveChange: (id) => selectSecondary(id)'), 'Workspace must route E paging through the Shared FE owner instead of a local section handler.');
 expect(css.includes('box-shadow:-9px 8px 14px -11px rgba(0,0,0,.34)') && css.includes('.v2-z .entity-card{transform:translateY(-2px)') && css.includes('.v2-rail-card{') && css.includes('transform:translateY(-2px)'), 'Z stickers must lift at the edges while large cards float above the Z surface.');
 expect(css.includes('touch-action:pan-y'), 'Shared V2 surfaces must allow vertical scrolling without fighting horizontal swipe.');
 expect(account.includes("state.accountTab = id === 'history' ? 'history' : 'representatives';"), 'Changing the active F folder must immediately change Z to that folder face while the deck stays open.');
@@ -166,7 +192,15 @@ expect(accountControlsUi.includes("data-service-email") && accountControlsUi.inc
 expect(!accountControlsUi.includes('История согласий') && !accountControlsUi.includes('historyMarkup') && !accountControlsUi.includes('openConsentHistory') && !accountControlsUi.includes('data-consent-history'), 'Profile Settings must not expose consent history.');
 
 expect(style.includes('--text:#111111') && style.includes('--button-secondary:#D8D3CF') && style.includes('--text-secondary:#777A7D'), 'Shared palette must use the approved black and neutral tokens.');
-expect(entityCardCss.includes('--entity-card-h:var(--v2-base,var(--surface-dark))') && entityCardCss.includes('--entity-card-neutral:var(--v2-disabled,var(--button-secondary))') && entityCardCss.includes('linear-gradient(135deg,var(--entity-card-h) 0%,var(--entity-card-neutral) 100%)') && !/#D7CEC7|#968982|#E7E1DB|#B8AEA8|rgba\(59,48,43/.test(entityCardCss), 'Shared entity cards must use the canonical H-to-neutral gradient without legacy brown.');
+expect(buttonCss.includes('border:1px solid var(--white)') && buttonCss.includes('.ui-button--secondary,.ui-button--outline{border-color:var(--text);background:var(--white);color:var(--text)}') && buttonCss.includes('.ui-button:disabled{'), 'Shared Button owner must keep primary black/white, secondary white/black, rounded, with a separate disabled state.');
+expect(buttonCss.includes('.v2-app .ui-button{border-radius:14px}') && !buttonCss.includes('.v2-app .ui-button,.v2-app .icon-button'), 'V2 must not flatten the main Shared button geometry.');
+expect(segmentUi.includes('filter(Boolean).map') && segmentUi.includes('--segment-count:') && !segmentUi.includes('.slice(0, 3)'), 'Shared segmented-control owner must support 2, 3, and larger option sets without parallel variants.');
+expect(segmentCss.includes('border:1px solid var(--text)') && segmentCss.includes('border-radius:14px') && segmentCss.includes('background:var(--white)') && segmentCss.includes('button.is-active{') && segmentCss.includes('background:var(--text)') && segmentCss.includes('color:var(--white)') && !/(^|})\.segment-control\s*\{/.test(style), 'Segmented control styling must live only in its Shared owner with black active and white inactive states.');
+expect(infoUi.includes('export function infoUI') && infoUi.includes('export function initInfoUI') && facade.includes('infoUI') && facade.includes('initInfoUI'), 'Shared Info UI owner must be exposed through ui/ui.js.');
+expect(infoCss.includes('width:24px') && infoCss.includes('border:1px solid #111') && infoCss.includes('border-radius:0') && infoCss.includes('.ui-info--inverse'), 'Info UI must use the approved small square i control and inverse contrast on dark surfaces.');
+expect(inputsCss.includes('.field input,.field select,.field textarea') && !inputsCss.includes('border-radius:12px') && listCss.includes('border-radius:0') && listEntryCss.includes('border-radius:0'), 'Shared working inputs, selects and list rows must remain straight.');
+expect(entityCardCss.includes('--entity-card-depth:#2C2A28') && entityCardCss.includes('--entity-card-mid:#817A73') && entityCardCss.includes('--entity-card-light:#D7D1CA') && entityCardCss.includes('radial-gradient(circle at 78% 18%') && !entityCardCss.includes('--entity-card-neutral') && !entityCardCss.includes('var(--v2-disabled') && !entityCardCss.includes('var(--button-secondary)'), 'Photo-less Entity Card must own a warm Shared gradient and must never derive its surface from disabled/system gray.');
+expect(entityCardCss.includes('.entity-card.has-image .entity-card__background') && entityCardCss.includes('var(--entity-card-image)'), 'Entity Card with photo must keep the photo as the base with only a soft readability veil.');
 expect(inputs.includes('data-photo-crop-x-value') && inputs.includes('data-photo-crop-y-value') && inputs.includes('setOriginal(src)') && !inputs.includes('croppedSquare('), 'Shared photo owner must preserve the original image and store crop position metadata instead of replacing the original with a cropped blob.');
 expect(headerUi.includes('export function workspaceHeaderContext') && facade.includes('workspaceHeaderContext'), 'Canonical Header owner must own workspace context metadata.');
 expect(!ui.includes('v2WorkspaceContext'), 'Shared V2 must not duplicate the canonical Header context owner.');
@@ -177,9 +211,12 @@ expect(core.includes('activeWorkspaceSurface(surface)') && core.includes("contex
 
 expect(modals.includes("import { mountV2Layer, v2Layer } from '../v2/index.js';")
   && modals.includes('v2Layer(content')
-  && modals.includes('mountV2Layer(html)')
+  && modals.includes('mountV2Layer(html, { root })')
+  && modals.includes("variant = 'technical'")
   && !modals.includes('<div class="modal-backdrop"'),
-  'ui/modals must be a compatibility facade over the single shared V2 layer owner, not a parallel modal shell.');
+  'ui/modals must remain the sole public modal owner and route work modals into active Z while reserving technical overlays for system cases.');
+expect(timeUi.includes("variant:'top'"), 'Time Picker must use the Shared TOP modal instead of a global/system overlay.');
+expect(ui.includes("const allowed = new Set(['top', 'standard', 'bottom', 'technical'])") && ui.includes("const technical = kind === 'technical'") && ui.includes('activeV2ModalSurface(root)'), 'Internal V2 modal geometry must expose exactly the approved top/standard/bottom/technical model.');
 for (const [name, source] of [
   ['profile', profile],
   ['profile workplaces', workplacesUi],

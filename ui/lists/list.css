@@ -5,7 +5,7 @@
   min-width:0;
   overflow:hidden;
   border:1px solid var(--border);
-  border-radius:18px;
+  border-radius:0;
   background:var(--white)
 }
 
@@ -32,9 +32,9 @@
 }
 
 .ui-list__item:last-child{border-bottom:0}
-.ui-list__item.is-first.is-last{border-radius:17px}
-.ui-list__item.is-first:not(.is-last){border-radius:17px 17px 0 0}
-.ui-list__item.is-last:not(.is-first){border-radius:0 0 17px 17px}
+.ui-list__item.is-first.is-last{border-radius:0}
+.ui-list__item.is-first:not(.is-last){border-radius:0 17px 0 0}
+.ui-list__item.is-last:not(.is-first){border-radius:0}
 button.ui-list__item{cursor:pointer}
 button.ui-list__item:focus-visible{outline:2px solid var(--active);outline-offset:-2px}
 .ui-list__item.is-selected{background:var(--active)}

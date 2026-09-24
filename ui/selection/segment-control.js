@@ -1,7 +1,7 @@
 import { escapeHtml } from '../utils/escape-html.js';
 
 export function segmentControl(items = [], { value = '', name = '', aria = 'Выбор' } = {}) {
-  const options = (Array.isArray(items) ? items : []).slice(0, 3).map((item) => {
+  const options = (Array.isArray(items) ? items : []).filter(Boolean).map((item) => {
     const normalized = typeof item === 'string' ? { value: item, label: item } : (item || {});
     return {
       value: String(normalized.value ?? ''),
@@ -11,7 +11,7 @@ export function segmentControl(items = [], { value = '', name = '', aria = 'Вы
   const current = String(value ?? options[0]?.value ?? '');
   const countClass = options.length === 1 ? ' segment-control--one' : options.length === 2 ? ' segment-control--two-equal' : '';
   const hidden = name ? `<input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(current)}" data-segment-value>` : '';
-  return `<div class="segment-control${countClass}" data-segment-control role="group" aria-label="${escapeHtml(aria)}">${options.map((item) => `<button type="button" data-segment-option="${escapeHtml(item.value)}" class="${item.value === current ? 'is-active' : ''}">${escapeHtml(item.label)}</button>`).join('')}${hidden}</div>`;
+  return `<div class="segment-control${countClass}" style="--segment-count:${Math.max(1, options.length)}" data-segment-control role="group" aria-label="${escapeHtml(aria)}">${options.map((item) => `<button type="button" data-segment-option="${escapeHtml(item.value)}" class="${item.value === current ? 'is-active' : ''}" aria-pressed="${item.value === current ? 'true' : 'false'}">${escapeHtml(item.label)}</button>`).join('')}${hidden}</div>`;
 }
 
 export function initSegmentControls(root) {
@@ -21,7 +21,11 @@ export function initSegmentControls(root) {
     host.addEventListener('click', (event) => {
       const button = event.target.closest('[data-segment-option]');
       if (!button || !host.contains(button)) return;
-      host.querySelectorAll('[data-segment-option]').forEach((item) => item.classList.toggle('is-active', item === button));
+      host.querySelectorAll('[data-segment-option]').forEach((item) => {
+        const active = item === button;
+        item.classList.toggle('is-active', active);
+        item.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
       const input = host.querySelector('[data-segment-value]');
       if (input) {
         input.value = button.dataset.segmentOption || '';

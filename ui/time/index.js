@@ -34,7 +34,7 @@ function open(host){
   const initialHour=hours.includes(current.h)?current.h:hours[0];
   const initialMinute=minutes.includes(current.min)?current.min:minutes[0];
   const content=`<div class="modal-title"><h2>${esc(host.querySelector('.time-picker__label')?.textContent||'Время')}</h2></div><div class="time-wheel" data-time-wheel><div class="time-wheel__column" data-time-wheel-column="hours"><span class="time-wheel__label">Часы</span><div class="time-wheel__viewport">${wheel({values:hours,selected:initialHour,type:'hours'})}</div></div><div class="time-wheel__column" data-time-wheel-column="minutes"><span class="time-wheel__label">Минуты</span><div class="time-wheel__viewport">${wheel({values:minutes,selected:initialMinute,type:'minutes'})}</div></div></div>${button('Сохранить',{data:'data-time-save'})}`;
-  const modalRoot=mountModal(document.body,modal(content,{variant:'compact',title:host.querySelector('.time-picker__label')?.textContent||'Время'}));
+  const modalRoot=mountModal(document.body,modal(content,{variant:'top',title:host.querySelector('.time-picker__label')?.textContent||'Время'}));
   if(!modalRoot)return;
 
   const nearestItem=(viewport)=>{

@@ -1,0 +1,32 @@
+.segment-control{
+  --segment-count:3;
+  display:grid;
+  grid-template-columns:repeat(var(--segment-count),minmax(0,1fr));
+  gap:2px;
+  padding:3px;
+  margin-bottom:18px;
+  border:1px solid var(--text);
+  border-radius:14px;
+  background:var(--white);
+  overflow:hidden;
+}
+.segment-control--one{--segment-count:1}
+.segment-control--two-equal{--segment-count:2}
+.segment-control button{
+  min-width:0;
+  min-height:42px;
+  border:0;
+  border-radius:10px;
+  padding:0 10px;
+  background:var(--white);
+  color:var(--text);
+  font:inherit;
+  text-align:center;
+}
+.segment-control button.is-active{
+  background:var(--text);
+  color:var(--white);
+  font-weight:650;
+}
+.segment-control button:focus-visible{outline:2px solid var(--text);outline-offset:2px}
+.segment-control button:disabled{background:var(--button-secondary);color:var(--text-secondary)}
