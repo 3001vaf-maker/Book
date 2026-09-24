@@ -95,11 +95,11 @@ expect(/\.v2-layer--system\{[\s\S]*?border-radius:var\(--v2-z-radius\) 0 0 0/.te
 expect(/\.v2-deck__card\{[\s\S]*?border-radius:0 var\(--v2-z-radius\) 0 0/.test(css), 'F cards must mirror Z toward the left.');
 expect(css.includes('--v2-z-open-x:min(33.333vw,130px)') && css.includes('--v2-deck-width:calc(var(--v2-z-open-x) - var(--v2-gap))') && css.includes('--v2-gap:20px'), 'Opened Z must move about one third of the app width while F remains smaller and separated by H.');
 expect(css.includes('--v2-deck-top:34px') && css.includes('top:var(--v2-deck-top)'), 'F must start lower than Z to preserve layer hierarchy.');
-expect(css.includes('opacity:0') && css.includes('.v2-app.is-deck-open .v2-deck') && css.includes('.v2-app.is-revealing-deck .v2-deck'), 'Closed F must disappear into H and reveal physically during Z swipe.');
+expect(css.includes('opacity:0') && css.includes('.v2-app.is-deck-open .v2-fe-deck') && css.includes('.v2-app.is-revealing-deck .v2-fe-deck'), 'Closed FE must disappear into H and reveal physically during Z1 swipe.');
 expect(css.includes('box-shadow:-18px 12px 34px rgba(0,0,0,.18)') && css.includes('cubic-bezier(.22,.78,.18,1)'), 'Opened Z must read as the floating face of the active F card.');
 expect(css.includes('border:1px solid rgba(17,17,17,.32)') && css.includes('inset -1px 0 0 rgba(17,17,17,.12)'), 'F cards must keep a visible contour so adjacent layers do not merge.');
-expect(css.includes('transform:rotate(-90deg)') && css.includes('transform-origin:left bottom'), 'F folder names must read vertically from bottom to top.');
-expect(css.includes('.v2-e-list{') && css.includes('flex-direction:column'), 'E must remain a distinct long vertical list, not F geometry.');
+expect(/\.v2-deck__card\{[\s\S]*?display:grid;[\s\S]*?place-items:center/.test(css) && /\.v2-deck__card strong\{[\s\S]*?text-align:center/.test(css) && !css.includes('transform:rotate(-90deg)'), 'F folder names must be centered and readable on each F card.');
+expect(/\.v2-e-card\{[\s\S]*?height:50%;[\s\S]*?place-items:center/.test(css) && css.includes('--v2-e-pull:') && css.includes('.v2-app.is-deck-open .v2-e-card'), 'E must be a shorter nested card deck that slides out from under F.');
 expect(css.includes('.v2-legal-cards{display:flex;gap:10px;overflow-x:auto'), 'Legal document stickers must use the shared horizontal rail.');
 expect(css.includes('.v2-legal-card{\n  flex:0 0 min(86%,320px);\n  height:96px;'), 'Legal document stickers must share one base height and horizontal width.');
 expect(css.includes('.booking-account--account .v2-app .booking-time-grid{grid-template-columns:repeat(3,minmax(0,1fr))}'), 'V2 time slots must stay three per row.');
@@ -112,12 +112,12 @@ expect(inputs.includes('export function passwordField') && inputs.includes('expo
 expect(booking.includes('passwordField({') && booking.includes('initPasswordFields(root)'), 'Auth and Registration must use the shared password reveal control.');
 expect(booking.includes("step: 'workplaces'") && booking.includes("step: 'confirmation'"), 'Booking must remain a V2 Z-stack flow.');
 expect(booking.includes('initV2Swipe(root'), 'Booking Z-stack must use the shared physical swipe.');
-expect(ui.includes("axis = Math.abs(nextX) > Math.abs(nextY) * 1.25 ? 'horizontal' : 'vertical'"), 'Shared V2 swipe must axis-lock before moving the surface.');
+expect(ui.includes("axis = Math.abs(nextX) >= Math.abs(nextY) * 1.08 ? 'horizontal' : 'vertical'"), 'Shared Z swipe must axis-lock without randomly rejecting a horizontal gesture.');
 expect(ui.includes("app?.classList.add('is-revealing-deck')") && ui.includes("app?.classList.remove('is-revealing-deck')"), 'Z swipe must reveal and reset the F stack physically.');
 expect(ui.includes('const activeIndex = Math.max(0, values.findIndex') && ui.includes('const visualDepth = (index - activeIndex + count) % count') && ui.includes('const depthStepX = count > 1 ? Math.min(10, 18 / (count - 1)) : 0') && ui.includes('const depthY = visualDepth * 8'), 'F must render every existing folder as a visible cyclic stack behind the active folder.');
-expect(ui.includes('.slice(0, 7)') && ui.includes('data-v2-f-level="F${index + 1}"'), 'F deck must support the explicit F1-F7 hierarchy.');
-expect(ui.includes('const direction = finalDx < 0 ? 1 : -1') && ui.includes('const nextIndex = (activeIndex + direction + cards.length) % cards.length') && ui.includes("'is-cycling-under'"), 'F paging must move exactly one folder and wrap as a physical cyclic deck.');
-expect(ui.includes('threshold = 42') && ui.includes('settleTimer = setTimeout') && ui.includes('}, 210);'), 'F paging must use a forgiving snap threshold and finish the card-under-stack motion before rerender.');
+expect(ui.includes('.slice(0, 7)') && ui.includes('data-v2-f-index="${index}"') && !ui.includes('data-v2-f-level'), 'F cards must be peer folders with real names, not visual F1/F2/F3 levels.');
+expect(ui.includes('const nextIndex = (activeIndex + direction + cards.length) % cards.length') && ui.includes('commit(finalDx < 0 ? 1 : -1)') && ui.includes("'is-next-ready'"), 'F paging must reveal the next folder immediately under the outgoing physical card.');
+expect(ui.includes('threshold = 42') && ui.includes("addEventListener('transitionend'") && ui.includes('requestAnimationFrame') && !ui.includes('settleTimer') && !ui.includes('}, 210);'), 'F paging must continue from the finger into one transition without the legacy 210 ms reset/pause/rerender sequence.');
 expect(css.includes('box-shadow:-9px 8px 14px -11px rgba(0,0,0,.34)') && css.includes('.v2-z .entity-card{transform:translateY(-2px)') && css.includes('.v2-rail-card{') && css.includes('transform:translateY(-2px)'), 'Z stickers must lift at the edges while large cards float above the Z surface.');
 expect(css.includes('touch-action:pan-y'), 'Shared V2 surfaces must allow vertical scrolling without fighting horizontal swipe.');
 expect(account.includes("state.accountTab = id === 'history' ? 'history' : 'representatives';"), 'Changing the active F folder must immediately change Z to that folder face while the deck stays open.');
@@ -126,7 +126,7 @@ expect(core.includes("setThemeColor('#2F3338')") && core.includes("setThemeColor
 expect(booking.includes('v2LegalCards(') && booking.includes('v2Sticker({'), 'Legal checkpoint must use the shared sticker system.');
 expect(!booking.includes('data-booking-workplaces-back') && !booking.includes('data-booking-confirm-back'), 'V2 booking flow must not restore legacy back buttons.');
 
-expect(core.includes("className: 'v2-app--workspace'") && core.includes('secondaryDeck'), 'Professional workspace must use the shared V2 shell with optional second F deck.');
+expect(core.includes("className: 'v2-app--workspace'") && core.includes('v2EList(childItems') && core.includes('eDeck,'), 'Professional workspace must render second-level navigation as E inside the shared FE shell.');
 for (const marker of ["{ id: 'people', label: 'Клиенты'", "{ id: 'finance', label: 'Финансы'", "{ id: 'timetable', label: 'График'", "{ id: 'journal', label: 'Журнал'", "{ id: 'profile', label: 'Профиль'", "{ id: 'settings', label: 'Настройки'"]) {
   expect(core.includes(marker), `Workspace root F is missing ${marker}.`);
 }
@@ -136,16 +136,16 @@ expect(core.includes("[data-workspace-context-action]") && core.includes('aSourc
 expect(core.includes("[data-v2-primary-action]") && core.includes("surface.querySelector('.page-header-action button')") && core.includes("form button[type=\"submit\"]") && core.includes('syncWorkspacePrimarySource'), 'Workspace Header C must reuse the shared or existing primary action instead of duplicating module logic.');
 expect(css.includes('.v2-workspace-source-hidden{display:none!important}') && css.includes('.v2-workspace-back{'), 'Workspace V2 must hide only the proxied original action and keep local Back on the Z surface.');
 expect(css.includes('.v2-primary-source-only{display:none!important}'), 'Header C may proxy a single hidden source without duplicating the visible action in Z body.');
-expect(ui.includes("secondaryDeck = ''") && ui.includes("role = ''") && ui.includes('data-v2-deck-role'), 'Shared V2 must own both F levels through the same deck component.');
-expect(css.includes('.v2-app--workspace .v2-deck--secondary{left:var(--v2-z-open-x)}') && css.includes('--v2-z-double-open-x:'), 'Workspace F2 must be separated from F1 by the shared GAP and move Z farther right.');
-expect(css.includes('.v2-app--workspace.is-deck-open .v2-deck--secondary + .v2-z'), 'Workspace Z double shift must be structurally bound to a real second F deck, not only to a helper class.');
-expect(finance.includes('export function financeNavigationItems()') && finance.includes('export function renderFinanceSection('), 'Finance F2 must route to the existing Finance screens.');
-for (const label of ['Касса', 'ДДС', 'Доход / Расход', 'Статьи', 'Прочие операции', 'Z-отчёт']) expect(finance.includes(`label: '${label}'`), `Finance F2 is missing ${label}.`);
-expect(journal.includes('export function journalNavigationItems()') && journal.includes('export function renderJournalView(') && journal.includes('externalNavigation'), 'Journal F2 must route the existing Day/Month/List views without duplicating them.');
-expect(settings.includes('export function settingsNavigationItems()') && settings.includes('export async function renderSettingsSection(') && settings.includes("key !== 'profile'"), 'Settings F2 must route existing settings children while Profile stays a root F folder.');
+expect(ui.includes("eDeck = ''") && ui.includes('class="v2-fe-deck"') && ui.includes('data-v2-fe'), 'Shared V2 shell must own F and its nested E as one FE deck.');
+expect(css.includes('.v2-e-deck{') && css.includes('.v2-app.has-e-deck.is-deck-open > .v2-app__stage > .v2-z:not(.v2-z--layer)') && !css.includes('.v2-deck--secondary') && !css.includes('--v2-z-double-open-x:'), 'E must remain nested under F instead of becoming a second F strip.');
+expect(css.includes('.v2-app.is-deck-open > .v2-app__stage > .v2-z:not(.v2-z--layer)') && ui.includes('const isTopmost = () =>') && ui.includes('return layers.length === 0;'), 'Deck-open state may move only Z1; Z2 must remain independent and own the topmost swipe.');
+expect(finance.includes('export function financeNavigationItems()') && finance.includes('export function renderFinanceSection('), 'Finance E navigation must route to the existing Finance screens.');
+for (const label of ['Касса', 'ДДС', 'Доход / Расход', 'Статьи', 'Прочие операции', 'Z-отчёт']) expect(finance.includes(`label: '${label}'`), `Finance E is missing ${label}.`);
+expect(journal.includes('export function journalNavigationItems()') && journal.includes('export function renderJournalView(') && journal.includes('externalNavigation'), 'Journal E must route the existing Day/Month/List views without duplicating them.');
+expect(settings.includes('export function settingsNavigationItems()') && settings.includes('export async function renderSettingsSection(') && settings.includes("key !== 'profile'"), 'Settings E must route existing settings children while Profile stays a root F folder.');
 expect(firstRun.includes("return 'people';") && firstRun.includes("return 'finance';") && firstRun.includes('data-v2-secondary-item'), 'DEMO navigation must follow the migrated V2 workspace entry points without changing its business progression.');
 expect(firstRun.includes("book:v2-navigation-request") && firstRun.includes('this.navTarget(step)'), 'DEMO must reveal the real V2 deck before pointing to a root or second-level folder.');
-expect(finance.includes('openFinanceOperation(root, movements, element.dataset.financeOperation, onBack)'), 'Finance DDS must preserve its F2 back callback through operation detail/cancel refresh.');
+expect(finance.includes('openFinanceOperation(root, movements, element.dataset.financeOperation, onBack)'), 'Finance DDS must preserve its E back callback through operation detail/cancel refresh.');
 
 expect(profile.includes('workspaceHeaderContext({') && profile.includes("hideD:true") && profile.includes("kind:'avatar'"), 'Profile must feed Header A/B/D through the canonical Header owner.');
 expect(profile.includes("v2Section('Рабочие пространства',workplaceRail())") && profile.includes('v2HorizontalRail('), 'Profile root Z must contain the profile card plus a horizontal workplace rail.');
