@@ -291,7 +291,7 @@ function syncWorkspaceHeader(surface) {
     contextRoot.querySelector('.page-header h1, .app-header__title'),
     fallbackTitle,
   );
-  const backSource = contextRoot.querySelector('.app-header__slot--back button');
+  const backSource = contextRoot.querySelector('[data-workspace-back-source], .app-header__slot--back button');
   const contextSource = contextRoot.querySelector('[data-workspace-context-action], .page-header__meta button, .app-header__slot--settings button');
   const aSource = contextSource;
   const cSource = primarySource(contextRoot);

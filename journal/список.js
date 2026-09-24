@@ -57,8 +57,8 @@ function scrollToFocus(root, selector) {
   requestAnimationFrame(() => {
     const node = root.querySelector(selector);
     if (!node) return;
-    const rootTop = root.getBoundingPersonRect().top;
-    const nodeTop = node.getBoundingPersonRect().top;
+    const rootTop = root.getBoundingClientRect().top;
+    const nodeTop = node.getBoundingClientRect().top;
     root.scrollTop += nodeTop - rootTop;
   });
 }

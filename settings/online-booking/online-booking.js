@@ -10,8 +10,6 @@ import {
   saveBookingSettings,
 } from '../../core/booking-settings/index.js';
 import {
-  appHeader,
-  appShell,
   bookingThemePreview,
   colorPicker,
   copyIconButton,
@@ -29,6 +27,7 @@ import {
   settingsPanel,
   textareaField,
   twoColumnLayout,
+  workspaceHeaderContext,
 } from '../../ui/ui.js';
 import { getWorkplaces } from '../profile/workplaces/data.js';
 
@@ -110,7 +109,7 @@ function settingsDraft(form, baseSettings = getBookingSettings()) {
 
 function setSaveVisible(root, visible) {
   const save = root.querySelector('[data-online-booking-save]');
-  if (save) save.hidden = !visible;
+  if (save) save.dataset.v2PrimaryVisible = visible ? 'true' : 'false';
 }
 
 function mountScreen(root, {
@@ -120,16 +119,19 @@ function mountScreen(root, {
   onSave = null,
   settings = null,
 } = {}) {
-  root.innerHTML = appShell({
-    className: 'app-view-shell--online-booking',
-    header: appHeader({
-      title,
-      back: { data: 'data-online-booking-back', aria: 'Назад' },
-      action: onSave ? { label: 'Сохранить', data: 'data-online-booking-save', aria: 'Сохранить изменения' } : null,
-      settings,
-    }),
-    body,
+  const context = workspaceHeaderContext({
+    title,
+    back: { data: 'data-online-booking-back', aria: 'Назад' },
+    a: settings ? {
+      kind: 'settings',
+      data: settings.data || '',
+      aria: settings.aria || 'Настройки',
+    } : null,
   });
+  const primary = onSave
+    ? '<button type="button" class="v2-primary-source-only" data-online-booking-save data-v2-primary-action data-v2-primary-label="Сохранить" data-v2-primary-visible="false" aria-label="Сохранить изменения"></button>'
+    : '';
+  root.innerHTML = `${context}${primary}<div class="online-booking-workspace-screen">${body}</div>`;
 
   root.querySelector('[data-online-booking-back]')?.addEventListener('click', onBack);
   if (onSave) {
@@ -139,7 +141,6 @@ function mountScreen(root, {
 }
 
 function exitOnlineBooking(root, navigateBack) {
-  root.classList.remove('app-content--book-shell');
   navigateBack();
 }
 
@@ -366,7 +367,6 @@ function renderUnavailable(root, navigateBack, title, message) {
 }
 
 export function render(root, navigateBack = () => {}) {
-  root.classList.add('app-content--book-shell');
   mountScreen(root, {
     title: 'Онлайн-запись',
     onBack: () => exitOnlineBooking(root, navigateBack),

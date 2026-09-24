@@ -21,6 +21,9 @@ const core = fs.readFileSync('core.js', 'utf8');
 const finance = fs.readFileSync('main/finance/finance.js', 'utf8');
 const journal = fs.readFileSync('journal/journal.js', 'utf8');
 const settings = fs.readFileSync('settings/settings.js', 'utf8');
+const onlineBookingSettings = fs.readFileSync('settings/online-booking/online-booking.js', 'utf8');
+const onlineBookingSettingsCss = fs.readFileSync('settings/online-booking/online-booking.css', 'utf8');
+const journalList = fs.readFileSync('journal/список.js', 'utf8');
 const firstRun = fs.readFileSync('first-run/runtime.js', 'utf8');
 const profile = fs.readFileSync('settings/profile/profile.js', 'utf8');
 const style = fs.readFileSync('css/style.css', 'utf8');
@@ -59,7 +62,21 @@ const runtimeJsFiles = [
   ...jsFilesUnder('settings'),
   ...jsFilesUnder('main'),
   ...jsFilesUnder('journal'),
+  ...jsFilesUnder('timetable'),
   ...jsFilesUnder('first-run'),
+];
+
+const workspaceJsFiles = [
+  ...jsFilesUnder('settings'),
+  ...jsFilesUnder('main'),
+  ...jsFilesUnder('journal'),
+  ...jsFilesUnder('timetable'),
+];
+const workspaceCssFiles = [
+  ...cssFilesUnder('settings'),
+  ...cssFilesUnder('main'),
+  ...cssFilesUnder('journal'),
+  ...cssFilesUnder('timetable'),
 ];
 
 const legacySystemBrown = /#(?:3B302B|7A6F69|B8AEA8|E7E1DB|E8E1DC|D7CEC7|968982|E9E6E2|D8D0CA)\b|rgba\(59,48,43,[^)]+\)|rgba\(30,25,22,[^)]+\)/i;
@@ -86,6 +103,18 @@ for (const file of runtimeJsFiles) {
   if (file === 'ui/v2/index.js' || file === 'ui/modals/index.js') continue;
   const source = fs.readFileSync(file, 'utf8');
   expect(!/\b(?:v2Layer|mountV2Layer)\s*\(/.test(source), `Runtime code must use canonical modal()/mountModal() instead of parallel V2 modal primitives: ${file}.`);
+}
+
+for (const file of workspaceJsFiles) {
+  const source = fs.readFileSync(file, 'utf8');
+  expect(!/\b(?:appShell|appHeader)\s*\(/.test(source), `Workspace screens must render inside the single Shared Z shell instead of nesting a second app shell/header: ${file}.`);
+  expect(!/app-content--book-shell/.test(source), `Workspace screens must not switch to a legacy full-screen shell class inside Z: ${file}.`);
+}
+for (const file of workspaceCssFiles) {
+  const source = fs.readFileSync(file, 'utf8');
+  expect(!/position\s*:\s*fixed/.test(source), `Workspace feature CSS must not create a local fixed layer above Shared Z: ${file}.`);
+  expect(!/(?:min-|max-)?height\s*:\s*(?:var\(--visual-vh\s*,\s*)?100dvh/.test(source), `Workspace feature CSS must not create its own viewport-height screen inside Shared Z: ${file}.`);
+  expect(!/touch-action\s*:/.test(source), `Workspace feature CSS must not re-own touch gesture policy inside Shared Z: ${file}.`);
 }
 
 
@@ -143,6 +172,7 @@ expect(ui.includes('.slice(0, 7)') && ui.includes('data-v2-f-index="${index}"') 
 expect(ui.includes('const nextIndex = (activeIndex + direction + cards.length) % cards.length') && ui.includes('commit(finalDx < 0 ? 1 : -1)') && ui.includes("'is-next-ready'"), 'F paging must reveal the next folder immediately under the outgoing physical card.');
 expect(ui.includes('threshold = 42') && ui.includes("addEventListener('transitionend'") && ui.includes('requestAnimationFrame') && !ui.includes('settleTimer') && !ui.includes('}, 210);'), 'F paging must continue from the finger into one transition without the legacy 210 ms reset/pause/rerender sequence.');
 expect(ui.includes("const eDeck = host.querySelector?.('[data-v2-e-list]')") && ui.includes('const commitE = (direction) =>') && ui.includes("eDeck.addEventListener('pointermove', eMove") && ui.includes('--v2-e-drag-x'), 'Shared FE gesture owner must provide an independent physical swipe for E.');
+expect(!ui.includes('if (cards.length < 2) return () => {};') && ui.includes('if (cards.length > 1) {'), 'Shared FE owner must keep E swipe available even when access leaves only one F folder.');
 expect(core.includes('eActiveId: childActive') && core.includes('onEActiveChange: (id) => selectSecondary(id)'), 'Workspace must route E paging through the Shared FE owner instead of a local section handler.');
 expect(css.includes('box-shadow:-9px 8px 14px -11px rgba(0,0,0,.34)') && css.includes('.v2-z .entity-card{transform:translateY(-2px)') && css.includes('.v2-rail-card{') && css.includes('transform:translateY(-2px)'), 'Z stickers must lift at the edges while large cards float above the Z surface.');
 expect(css.includes('touch-action:pan-y'), 'Shared V2 surfaces must allow vertical scrolling without fighting horizontal swipe.');
@@ -169,6 +199,11 @@ expect(finance.includes('export function financeNavigationItems()') && finance.i
 for (const label of ['Касса', 'ДДС', 'Доход / Расход', 'Статьи', 'Прочие операции', 'Z-отчёт']) expect(finance.includes(`label: '${label}'`), `Finance E is missing ${label}.`);
 expect(journal.includes('export function journalNavigationItems()') && journal.includes('export function renderJournalView(') && journal.includes('externalNavigation'), 'Journal E must route the existing Day/Month/List views without duplicating them.');
 expect(settings.includes('export function settingsNavigationItems()') && settings.includes('export async function renderSettingsSection(') && settings.includes("key !== 'profile'"), 'Settings E must route existing settings children while Profile stays a root F folder.');
+expect(onlineBookingSettings.includes('workspaceHeaderContext({') && onlineBookingSettings.includes("back: { data: 'data-online-booking-back'") && onlineBookingSettings.includes('data-v2-primary-action'), 'Online booking settings must feed Header/Back/Save through Shared workspace sources instead of drawing a second shell.');
+expect(!/\b(?:appShell|appHeader)\s*\(/.test(onlineBookingSettings) && !onlineBookingSettings.includes('app-content--book-shell'), 'Online booking settings must not recreate a full-screen shell inside Z.');
+expect(!/(?:min-|max-)?height\s*:\s*(?:var\(--visual-vh\s*,\s*)?100dvh|position\s*:\s*fixed|touch-action\s*:/.test(onlineBookingSettingsCss), 'Online booking settings CSS must stay content-only inside Shared Z.');
+expect(core.includes("[data-workspace-back-source], .app-header__slot--back button"), 'Workspace Header owner must proxy canonical back sources without requiring a nested appHeader.');
+expect(!journalList.includes('getBoundingPersonRect') && journalList.includes('getBoundingClientRect()'), 'Journal List scroll must use the real DOM geometry API.');
 expect(firstRun.includes("return 'people';") && firstRun.includes("return 'finance';") && firstRun.includes('data-v2-secondary-item'), 'DEMO navigation must follow the migrated V2 workspace entry points without changing its business progression.');
 expect(firstRun.includes("book:v2-navigation-request") && firstRun.includes('this.navTarget(step)'), 'DEMO must reveal the real V2 deck before pointing to a root or second-level folder.');
 expect(finance.includes('openFinanceOperation(root, movements, element.dataset.financeOperation, onBack)'), 'Finance DDS must preserve its E back callback through operation detail/cancel refresh.');

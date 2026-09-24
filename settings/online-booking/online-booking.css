@@ -1,5 +1,4 @@
-.app-content.app-content--book-shell{padding:0}
-.app-view-shell--online-booking .app-view-shell__screen{gap:14px}
+.online-booking-workspace-screen{display:grid;align-content:start;gap:14px}
 .online-booking-link-stack{display:grid;gap:14px}
 .online-booking-info-row{display:flex;justify-content:flex-end;min-height:44px}
 .online-booking-info-row .icon-button{width:44px;height:44px;font-size:18px}
