@@ -158,11 +158,6 @@ export function v2LegalCards(items = []) {
   </article>`).join('')}</div>`;
 }
 
-export function v2WorkspaceContext({ title = '', a = null, hideD = false } = {}) {
-  const aMarkup = a ? `<button type="button" class="v2-workspace-context__action" data-v2-context-action data-v2-a-kind="${text(a.kind || 'settings')}" data-v2-a-image="${text(a.image || '')}" data-v2-a-initials="${text(a.initials || '')}" aria-label="${text(a.aria || 'Настройки контекста')}"></button>` : '';
-  return `<div class="v2-workspace-context" data-v2-workspace-context data-v2-title="${text(title)}" data-v2-hide-d="${hideD ? 'true' : 'false'}">${aMarkup}</div>`;
-}
-
 export function v2ZLayer(content = '', { className = '' } = {}) {
   return `<main class="v2-z v2-z--layer ${text(className)}" data-v2-z-layer>${content}</main>`;
 }
