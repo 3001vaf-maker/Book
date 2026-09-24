@@ -100,6 +100,20 @@ export async function saveWorkplaces(values) {
   return getWorkplaces();
 }
 
+export async function reorderWorkplaces(keys) {
+  requireServerReady();
+  const orderedKeys = [...new Set((Array.isArray(keys) ? keys : []).map((value) => String(value || '')).filter(Boolean))];
+  if (orderedKeys.length !== workplacesState.length) throw new Error('Некорректный порядок рабочих пространств');
+  const response = await apiRequest('/profile/workplaces-order', {
+    method: 'PUT',
+    body: JSON.stringify({ keys: orderedKeys }),
+  });
+  const payload = await responseJson(response, 'Не удалось сохранить порядок рабочих пространств');
+  hydrateWorkplacesFromServer(payload.workplaces);
+  notifyWorkplacesChanged({ action: 'workplaces-reordered' });
+  return getWorkplaces();
+}
+
 export async function upsertWorkplace(workplace) {
   requireServerReady();
   const item = normalizeWorkplace(workplace);
