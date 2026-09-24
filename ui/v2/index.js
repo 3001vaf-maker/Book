@@ -57,11 +57,16 @@ export function v2EList(items = [], { data = 'data-v2-e-item' } = {}) {
 export function v2FDeck(items = [], { active = '', data = 'data-v2-deck-item' } = {}) {
   const values = (Array.isArray(items) ? items : []).filter(Boolean);
   if (!values.length) return '';
+  const activeId = String(active || values[0]?.id || '0');
+  const activeIndex = Math.max(0, values.findIndex((item, index) => String(item.id || index) === activeId));
   return `<div class="v2-deck" data-v2-deck>${values.map((item, index) => {
     const id = String(item.id || index);
-    const isActive = id === String(active || values[0]?.id || '0');
-    const depth = Math.min(index, 4);
-    return `<button type="button" class="v2-deck__card${isActive ? ' is-active' : ''}" style="--v2-depth:${depth}" ${data}="${text(id)}" data-v2-deck-index="${index}" aria-label="${text(item.aria || item.label || '')}"><strong>${text(item.label || '')}</strong></button>`;
+    const isActive = id === activeId;
+    const depth = (index - activeIndex + values.length) % values.length;
+    const visualDepth = Math.min(depth, 4);
+    const depthX = visualDepth * 6;
+    const depthY = visualDepth * 12;
+    return `<button type="button" class="v2-deck__card${isActive ? ' is-active' : ''}" style="--v2-depth:${visualDepth};--v2-depth-x:${depthX}px;--v2-depth-y:${depthY}px" ${data}="${text(id)}" data-v2-deck-index="${index}" aria-label="${text(item.aria || item.label || '')}"><strong>${text(item.label || '')}</strong></button>`;
   }).join('')}</div>`;
 }
 
@@ -165,6 +170,8 @@ export function mountV2Layer(html) {
 export function initV2Swipe(root, { onRight = null, onLeft = null, threshold = 72, maxDrag = 180 } = {}) {
   const surface = root?.matches?.('[data-v2-z]') ? root : root?.querySelector?.('[data-v2-z]');
   if (!surface) return () => {};
+  const app = surface.closest?.('[data-v2-app]');
+  const hasDeck = Boolean(app?.querySelector?.('[data-v2-deck]'));
   let pointerId = null;
   let startX = 0;
   let startY = 0;
@@ -174,6 +181,7 @@ export function initV2Swipe(root, { onRight = null, onLeft = null, threshold = 7
   const reset = () => {
     surface.style.removeProperty('--v2-drag-x');
     surface.classList.remove('is-dragging');
+    app?.classList.remove('is-revealing-deck');
     pointerId = null;
     dx = 0;
     axis = 'pending';
@@ -203,6 +211,11 @@ export function initV2Swipe(root, { onRight = null, onLeft = null, threshold = 7
     if (axis !== 'horizontal') return;
     const allowedX = nextX > 0 ? (onRight ? nextX : 0) : (onLeft ? nextX : 0);
     dx = Math.max(-maxDrag, Math.min(maxDrag, allowedX));
+    if (hasDeck && dx > 0 && onRight && !app?.classList.contains('is-deck-open')) {
+      app?.classList.add('is-revealing-deck');
+    } else if (dx <= 0) {
+      app?.classList.remove('is-revealing-deck');
+    }
     if (dx !== 0) {
       surface.classList.add('is-dragging');
       surface.style.setProperty('--v2-drag-x', `${dx}px`);
