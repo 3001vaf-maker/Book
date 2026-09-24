@@ -25,6 +25,11 @@ export class PlatformNoticeController {
     return this.notices.pushSubscriptionState(request.auth!.platformAccountId, endpoint);
   }
 
+  @Get('push/subscription')
+  pushSubscription(@Req() request: AuthenticatedRequest, @Query('endpoint') endpoint: string) {
+    return this.notices.pushSubscriptionState(request.auth!.platformAccountId, endpoint);
+  }
+
   @Post('push/subscription')
   savePushSubscription(@Req() request: AuthenticatedRequest, @Body() body: unknown) {
     return this.notices.savePushSubscription(
