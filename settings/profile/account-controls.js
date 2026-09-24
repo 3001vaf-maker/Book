@@ -1,5 +1,5 @@
 import { apiRequest } from '../../core/auth.js';
-import { button, emptyState, escapeHtml, list, mountV2Layer, page, pageHeader, v2Document, v2Layer, v2LegalCards, v2Section } from '../../ui/ui.js';
+import { button, emptyState, escapeHtml, list, modal, mountModal, page, pageHeader, v2Document, v2LegalCards, v2Section } from '../../ui/ui.js';
 import { getDocuments } from '../documents/data.js';
 
 async function request(path, options = {}) {
@@ -70,18 +70,15 @@ function findDocument(item) {
 function openConsentDocument(item) {
   const document = findDocument(item);
   const content = document?.text || `Статус: ${actionText(item.action)}\nВерсия: ${item.eventVersion || item.currentVersion || '—'}\nДата: ${moment(item.occurredAt)}`;
-  mountV2Layer(v2Layer(v2Document({
+  mountModal(document.body,modal(v2Document({
     title:item.title || 'Документ',
     version:document?.version || item.currentVersion || item.eventVersion || '',
     content,
-  }),{kind:'standard',title:item.title || 'Документ'}));
+  }),{variant:'large',title:item.title || 'Документ'}));
 }
 
 function openConsentHistory(state) {
-  mountV2Layer(v2Layer(historyMarkup(Array.isArray(state.history)?state.history:[]),{
-    kind:'standard',
-    title:'История согласий',
-  }));
+  mountModal(document.body,modal(historyMarkup(Array.isArray(state.history)?state.history:[]),{variant:'large',title:'История согласий'}));
 }
 
 function renderPanelState(root,state){
