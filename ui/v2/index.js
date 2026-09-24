@@ -152,7 +152,7 @@ export function v2LegalCards(items = []) {
   return `<div class="v2-legal-cards">${(Array.isArray(items) ? items : []).map((item, index) => `<article class="v2-legal-card">
     <button type="button" class="v2-legal-card__document"${dataAttributes(item.openData)} aria-label="${text(item.openAria || item.title || 'Документ')}">
       <strong>${text(item.title || 'Документ')}</strong>
-      <span>${text(item.required ? 'обязательное' : 'необязательное')}</span>
+      <span>${text(item.status || (item.required ? 'обязательное' : 'необязательное'))}</span>
     </button>
     <button type="button" class="v2-legal-card__toggle${item.checked ? ' is-on' : ''}"${dataAttributes(item.toggleData)} aria-pressed="${item.checked ? 'true' : 'false'}" aria-label="${text(item.toggleAria || item.title || 'Согласие')}"><span></span></button>
   </article>`).join('')}</div>`;
