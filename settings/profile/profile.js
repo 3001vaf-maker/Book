@@ -1,4 +1,4 @@
-import { actionBlock, button, collectRepeatedField, entityCard, escapeHtml, field, initPhotoField, initRepeatedFields, modal, mountModal, mountV2ZLayer, page, photoField, repeatedField, select, textareaField, v2HorizontalRail, v2Section, v2WorkspaceContext, v2ZLayer, workplaceAddButton, workplaceCountText } from '../../ui/ui.js';
+import { actionBlock, button, collectRepeatedField, entityCard, escapeHtml, field, initPhotoField, initRepeatedFields, modal, mountModal, mountV2ZLayer, page, photoField, repeatedField, select, textareaField, v2HorizontalRail, v2Section, workspaceHeaderContext, v2ZLayer, workplaceAddButton, workplaceCountText } from '../../ui/ui.js';
 import { getBookLimit } from '../../core/access.js';
 import { addCustomProfession, getCustomProfessions, getProfile, saveProfile as saveProfileData } from './data.js';
 import { getWorkplaces } from './workplaces/data.js';
@@ -13,7 +13,7 @@ const professionOptions=()=>[{value:'',label:'Выберите професси�
 export function render(root,navigateBack=()=>{},options={}){renderProfile(root,navigateBack,options)}
 
 function profileContext(p,title='Профиль'){
-  return v2WorkspaceContext({
+  return workspaceHeaderContext({
     title,
     a:{kind:'avatar',image:p.photo||'',initials:initial(p),aria:'Настройки профиля'},
     hideD:true,
@@ -185,7 +185,7 @@ function openProfileSettings(root,navigateBack,options={}){
     profileSettingsForm(p,options)
   ]),{className:'v2-profile-settings-layer'}));
   if(!layer)return;
-  layer.querySelector('[data-v2-context-action]')?.addEventListener('click',()=>{});
+  layer.querySelector('[data-workspace-context-action]')?.addEventListener('click',()=>{});
   bindProfileSettings(layer,p,navigateBack,options,()=>{
     layer.v2Close?.();
     renderProfile(root,navigateBack,options);
@@ -240,7 +240,7 @@ function renderProfile(root,navigateBack,options={}){
     workplaceAddButton()
   ]);
   promotePrimaryWorkplaceAction(root);
-  root.querySelector('[data-v2-context-action]')?.addEventListener('click',()=>openProfileSettings(root,navigateBack,options));
+  root.querySelector('[data-workspace-context-action]')?.addEventListener('click',()=>openProfileSettings(root,navigateBack,options));
   root.querySelector('[data-add-workplace]')?.addEventListener('click',()=>openWorkplace(root,null,navigateBack,options));
   root.querySelectorAll('[data-workplace]').forEach(el=>el.addEventListener('click',()=>openWorkplace(root,getWorkplaces().find(w=>w.key===el.dataset.workplace)||null,navigateBack,options)));
 }
