@@ -1,5 +1,4 @@
 .profile-account-controls{margin-top:18px}
-.account-controls-history-link{display:flex;justify-content:flex-start;margin:0 0 22px}
 .account-controls-service-list{display:grid;gap:8px}
 .account-controls-service-row{display:grid;grid-template-columns:26px minmax(0,1fr);gap:12px;align-items:start;padding:12px 0;border-bottom:1px solid var(--border)}
 .account-controls-service-row:last-of-type{border-bottom:0}
@@ -8,3 +7,5 @@
 .account-controls-service-row input:checked::after{content:"✓";color:#fff;font-size:15px;font-weight:800;line-height:1}
 .account-controls-service-row strong,.account-controls-service-row small{display:block}
 .account-controls-service-row small{margin-top:4px;color:var(--text-secondary);font-weight:400}
+
+.account-controls-service-row input:disabled{background:var(--surface-soft);border-color:var(--text-muted);opacity:.65}.account-controls-service-row:has(input:disabled){color:var(--text-secondary)}

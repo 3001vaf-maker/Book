@@ -4,11 +4,11 @@ import { mountV2Layer, v2Layer } from '../v2/index.js';
 
 let modalLevel = 0;
 
-const MODAL_VARIANTS = new Set(['list', 'large', 'medium', 'compact', 'bottom']);
+const MODAL_VARIANTS = new Set(['list', 'large', 'medium', 'compact', 'quick', 'bottom']);
 const MODAL_SURFACES = new Set(['app']);
 
 function v2Kind(variant = '') {
-  if (variant === 'bottom') return 'quick';
+  if (variant === 'quick' || variant === 'bottom') return 'quick';
   if (variant === 'compact') return 'system';
   return 'standard';
 }

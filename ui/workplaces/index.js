@@ -15,9 +15,15 @@ export function workplaceCountText(count = 0) {
   return `${Math.max(0, Number(count) || 0)} р.м.`;
 }
 
-export function workplaceAddButton({ data = 'data-add-workplace' } = {}) {
-  return button('+ Добавить рабочее место', {
-    variant: 'secondary',
+export function workplaceAddButton({
+  data = 'data-add-workplace',
+  label = '+ Добавить рабочее место',
+  className = '',
+  variant = 'secondary',
+} = {}) {
+  return button(label, {
+    variant,
+    className,
     data,
     aria: 'Добавить рабочее место',
   });

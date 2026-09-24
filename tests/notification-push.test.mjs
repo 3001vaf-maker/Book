@@ -15,6 +15,7 @@ const platformNoticeService = fs.readFileSync('server/src/platform-notice/platfo
 const platformNoticeController = fs.readFileSync('server/src/platform-notice/platform-notice.controller.ts', 'utf8');
 const platformPushMigration = fs.readFileSync('server/prisma/migrations/20260922173000_platform_push_subscription/migration.sql', 'utf8');
 const adminUi = fs.readFileSync('admin/admin.js', 'utf8');
+const platformNoticesUi = fs.readFileSync('core/platform-notices.js', 'utf8');
 
 assert.match(core, /params\.get\('tg_entry'\)/);
 assert.doesNotMatch(core, /params\.get\('tg'\)|params\.get\('telegram'\)/);
@@ -51,6 +52,13 @@ assert.match(platformNoticeService, /createForPlatformAdmins/);
 assert.match(platformNoticeService, /webpush\.sendNotification/);
 assert.match(platformNoticeController, /push\/configuration/);
 assert.match(platformNoticeController, /push\/subscription/);
+assert.match(platformNoticeController, /@Get\('push\/subscription'\)/);
+assert.match(platformNoticeService, /pushSubscriptionState/);
+assert.match(platformNoticeService, /PlatformPushSubscription/);
+assert.match(platformNoticesUi, /getPlatformPushState/);
+assert.match(platformNoticesUi, /platform-notices\/push\/subscription\?endpoint=/);
+assert.match(platformNoticesUi, /enablePlatformPush/);
+assert.match(platformNoticesUi, /disablePlatformPush/);
 assert.match(adminUi, /navigator\.serviceWorker\.register\('\/service-worker\.js'/);
 assert.match(adminUi, /Notification\.requestPermission/);
 assert.match(adminUi, /data-live-request-count/);

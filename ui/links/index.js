@@ -5,12 +5,12 @@ import { select } from '../selectors/index.js';
 export const LINK_TYPES = ['Instagram', 'ВКонтакте', 'YouTube', 'Facebook', 'Сайт', 'Другое'];
 
 function linkRow(link = {}) {
-  return `<div class="array-group link-row" data-link-row>${select({ name:'linkType', value:link.type||'Instagram', options:LINK_TYPES })}<div class="array-row"><input name="linkUrl" value="${escapeHtml(link.url||'')}" placeholder="URL"><button type="button" class="remove-button" data-remove-link aria-label="Удалить ссылку">×</button></div></div>`;
+  return `<div class="link-row" data-link-row>${select({ name:'linkType', value:link.type||'Instagram', options:LINK_TYPES })}<input class="link-row__url" name="linkUrl" value="${escapeHtml(link.url||'')}" placeholder="Ссылка"><button type="button" class="remove-button" data-remove-link aria-label="Удалить ссылку">×</button></div>`;
 }
 
 export function links({ links: values = [], name = 'links' } = {}) {
   const rows = values.length ? values : [{ type: 'Instagram', url: '' }];
-  return `<div class="ui-links array-group" data-links="${escapeHtml(name)}"><div data-links-list>${rows.map(linkRow).join('')}</div>${button('+ Добавить ссылку',{variant:'secondary',data:`data-add-link="${escapeHtml(name)}"`})}</div>`;
+  return `<div class="ui-links" data-links="${escapeHtml(name)}"><div data-links-list>${rows.map(linkRow).join('')}</div>${button('+',{className:'ui-links__add',data:`data-add-link="${escapeHtml(name)}"`,aria:'Добавить ссылку'})}</div>`;
 }
 
 export function initLinks(root) {
@@ -21,11 +21,13 @@ export function initLinks(root) {
       const remove = event.target.closest('[data-remove-link]');
       if (remove) {
         remove.closest('[data-link-row]')?.remove();
+        host.dispatchEvent(new Event('change', { bubbles: true }));
         return;
       }
       const add = event.target.closest('[data-add-link]');
       if (!add) return;
       host.querySelector('[data-links-list]')?.insertAdjacentHTML('beforeend', linkRow());
+      host.dispatchEvent(new Event('change', { bubbles: true }));
     });
   });
 }

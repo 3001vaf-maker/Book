@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PlatformNoticeService } from './platform-notice.service';
@@ -18,6 +18,11 @@ export class PlatformNoticeController {
   @Get('push/configuration')
   pushConfiguration() {
     return this.notices.pushConfiguration();
+  }
+
+  @Get('push/subscription')
+  pushSubscription(@Req() request: AuthenticatedRequest, @Query('endpoint') endpoint: string) {
+    return this.notices.pushSubscriptionState(request.auth!.platformAccountId, endpoint);
   }
 
   @Post('push/subscription')

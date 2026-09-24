@@ -2,6 +2,12 @@
 .password-field__control{position:relative;min-width:0}.password-field__control input{padding-right:48px}.password-field__toggle{position:absolute;top:50%;right:6px;width:38px;height:38px;transform:translateY(-50%);border:0;border-radius:0;display:grid;place-items:center;background:transparent;color:var(--text);padding:8px}.password-field__toggle svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .password-field__control{position:relative;min-width:0}.password-field__control input{padding-right:48px}.password-field__toggle{position:absolute;top:50%;right:6px;width:38px;height:38px;transform:translateY(-50%);border:0;border-radius:0;display:grid;place-items:center;background:transparent;color:var(--text);padding:8px}.password-field__toggle svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 
-.v2-app .field input,.v2-app .field textarea,.v2-app .phone-input__national,.v2-app .photo-field__control{border-radius:0}
+.v2-app .field input,.v2-app .field textarea,.v2-app .array-row input,.v2-app .array-row select,.v2-app .phone-input__national,.v2-app .locked-value,.v2-app .photo-field__control{border-radius:0}
 .v2-app .photo-field__action{border-radius:0}
 .photo-cropper{display:grid;gap:16px}.photo-cropper__preview{width:min(100%,320px);aspect-ratio:1;margin:0 auto;border-radius:50%;background-size:cover;background-position:center;background-color:var(--button-secondary);box-shadow:0 0 0 1px var(--border)}.photo-cropper input[type="range"]{width:100%}
+
+.array-row__add{width:40px;min-width:40px;min-height:40px;height:40px;padding:0;font-size:22px;line-height:1}.v2-app .array-row__add{border-radius:0}
+
+.photo-field__tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.photo-field__tools.is-hidden{display:none}.photo-field__crop-panel[hidden]{display:none!important}.photo-field__crop-panel{padding:12px 0 2px;border-top:1px solid var(--border)}
+
+.ui-links{display:grid;gap:8px}.ui-links [data-links-list]{display:grid;gap:8px}.link-row{display:grid;grid-template-columns:minmax(96px,.8fr) minmax(0,1.5fr) 40px;gap:7px;align-items:end}.link-row .ui-select{min-width:0}.link-row__url{width:100%;min-width:0;min-height:46px;border:1px solid var(--border);border-radius:0;padding:10px 12px;background:var(--white);color:var(--text);outline:none}.ui-links__add{width:40px;min-width:40px;height:40px;min-height:40px;padding:0;justify-self:end;font-size:22px}.v2-app .ui-links__add{border-radius:0}@media(max-width:360px){.link-row{grid-template-columns:minmax(82px,.75fr) minmax(0,1.25fr) 40px}}
