@@ -184,7 +184,6 @@ for (const [name, source] of [
   ['profile', profile],
   ['profile workplaces', workplacesUi],
   ['profile account controls', accountControlsUi],
-  ['shared inputs', inputs],
   ['shared time', timeUi],
   ['shared colors', colorUi],
   ['end-user account shell', account],
@@ -195,6 +194,8 @@ for (const [name, source] of [
   expect(source.includes('modal(') && source.includes('mountModal('), `${name} must consume the sole shared modal owner.`);
   expect(!source.includes('mountV2Layer(') && !source.includes('v2Layer('), `${name} must not bypass ui/modals with a parallel V2 modal path.`);
 }
+expect(!inputs.includes('modal(') && !inputs.includes('mountModal('), 'Shared photo/input owner must keep crop inline and must not open a modal.');
+expect(!inputs.includes('mountV2Layer(') && !inputs.includes('v2Layer('), 'Shared inputs must not bypass canonical owners with local V2 layers.');
 
 
 
