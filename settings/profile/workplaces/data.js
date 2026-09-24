@@ -11,11 +11,18 @@ function normalizeLinks(values) {
     .map((value) => ({ type: String(value.type || ''), url: String(value.url || '') }));
 }
 
+function cropPosition(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? Math.max(0, Math.min(100, Math.round(numeric))) : 50;
+}
+
 export function normalizeWorkplace(workplace = {}) {
   return {
     key: String(workplace.key || ''),
     profileId: String(workplace.profileId || 'profile'),
     photo: String(workplace.photo || ''),
+    photoCropX: cropPosition(workplace.photoCropX),
+    photoCropY: cropPosition(workplace.photoCropY),
     name: String(workplace.name || ''),
     color: String(workplace.color || ''),
     city: String(workplace.city || ''),
