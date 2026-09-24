@@ -16,6 +16,9 @@ const finance = fs.readFileSync('main/finance/finance.js', 'utf8');
 const journal = fs.readFileSync('journal/journal.js', 'utf8');
 const settings = fs.readFileSync('settings/settings.js', 'utf8');
 const firstRun = fs.readFileSync('first-run/runtime.js', 'utf8');
+const profile = fs.readFileSync('settings/profile/profile.js', 'utf8');
+const style = fs.readFileSync('css/style.css', 'utf8');
+const entityCardCss = fs.readFileSync('ui/cards/entity-card.css', 'utf8');
 
 const failures = [];
 const expect = (condition, message) => { if (!condition) failures.push(message); };
@@ -29,6 +32,9 @@ for (const name of [
   'v2Sticker',
   'v2Document',
   'v2LegalCards',
+  'v2WorkspaceContext',
+  'v2ZLayer',
+  'mountV2ZLayer',
   'v2Layer',
   'initV2Swipe',
   'initV2StickerSwipe',
@@ -38,7 +44,7 @@ for (const name of [
   expect(facade.includes(name), `ui/ui.js must expose ${name}().`);
 }
 
-expect(css.includes('--v2-base:#2F3338'), 'V2 BASE must remain #2F3338.');
+expect(css.includes('--v2-base:var(--surface-dark)') && style.includes('--surface-dark:#2F3338'), 'V2 BASE must resolve through the shared H dark-surface token #2F3338.');
 expect(/\.v2-z\{[\s\S]*?border-radius:var\(--v2-z-radius\) 0 0 0/.test(css), 'Z may round only the upper-left corner.');
 expect(/\.v2-layer--quick\{[\s\S]*?border-radius:0/.test(css), 'QUICK must remain rectangular.');
 expect(/\.v2-layer--standard\{[\s\S]*?border-radius:0/.test(css), 'STANDARD must remain rectangular.');
@@ -51,8 +57,8 @@ expect(css.includes('box-shadow:-18px 12px 34px rgba(0,0,0,.18)') && css.include
 expect(css.includes('border:1px solid rgba(17,17,17,.32)') && css.includes('inset -1px 0 0 rgba(17,17,17,.12)'), 'F cards must keep a visible contour so adjacent layers do not merge.');
 expect(css.includes('transform:rotate(-90deg)') && css.includes('transform-origin:left bottom'), 'F folder names must read vertically from bottom to top.');
 expect(css.includes('.v2-e-list{') && css.includes('flex-direction:column'), 'E must remain a distinct long vertical list, not F geometry.');
-expect(css.includes('.v2-legal-cards{display:grid;gap:12px}'), 'Legal document cards must have an explicit equal gap.');
-expect(css.includes('.v2-legal-card{\n  height:96px;'), 'Legal document cards must share one base height.');
+expect(css.includes('.v2-legal-cards{display:flex;gap:10px;overflow-x:auto'), 'Legal document stickers must use the shared horizontal rail.');
+expect(css.includes('.v2-legal-card{\n  flex:0 0 min(86%,320px);\n  height:96px;'), 'Legal document stickers must share one base height and horizontal width.');
 expect(css.includes('.booking-account--account .v2-app .booking-time-grid{grid-template-columns:repeat(3,minmax(0,1fr))}'), 'V2 time slots must stay three per row.');
 expect(css.includes('.booking-account--account .v2-app .booking-time-slot{border-radius:0'), 'V2 time slots must remain rectangular.');
 expect(!/\.booking-account--account \.v2-app \.calendar__date\{[^}]*border-radius/.test(css), 'V2 must not redesign Calendar geometry.');
@@ -83,8 +89,8 @@ for (const marker of ["{ id: 'people', label: 'Клиенты'", "{ id: 'finance
 }
 expect(!core.includes('bottomNavigation(') && !core.includes("renderMain } from './main/main.js'"), 'Workspace V2 must not retain legacy bottom navigation or Main hub routing.');
 expect(core.includes("kind: 'chat'") && core.includes("data: 'data-v2-workspace-chat'"), 'Chat must live in Header D instead of root F.');
-expect(core.includes('const aSource = contextSource;') && core.includes('function syncWorkspaceBack(') && !core.includes("kind: backSource ? 'back' : 'settings'"), 'Workspace Header A must stay contextual; local Back must remain inside Z instead of taking A.');
-expect(core.includes("surface.querySelector('.page-header-action button')") && core.includes("form button[type=\"submit\"]") && core.includes('syncWorkspacePrimarySource'), 'Workspace Header C must reuse the existing primary action instead of duplicating module logic.');
+expect(core.includes("[data-v2-context-action]") && core.includes('aSource.dataset.v2AKind') && core.includes('function syncWorkspaceBack(') && !core.includes("kind: backSource ? 'back' : 'settings'"), 'Workspace Header A must consume the shared context contract; local Back must remain inside Z instead of taking A.');
+expect(core.includes("[data-v2-primary-action]") && core.includes("surface.querySelector('.page-header-action button')") && core.includes("form button[type=\"submit\"]") && core.includes('syncWorkspacePrimarySource'), 'Workspace Header C must reuse the shared or existing primary action instead of duplicating module logic.');
 expect(css.includes('.v2-workspace-source-hidden{display:none!important}') && css.includes('.v2-workspace-back{'), 'Workspace V2 must hide only the proxied original action and keep local Back on the Z surface.');
 expect(ui.includes("secondaryDeck = ''") && ui.includes("role = ''") && ui.includes('data-v2-deck-role'), 'Shared V2 must own both F levels through the same deck component.');
 expect(css.includes('.v2-app--workspace .v2-deck--secondary{left:var(--v2-z-open-x)}') && css.includes('--v2-z-double-open-x:'), 'Workspace F2 must be separated from F1 by the shared GAP and move Z farther right.');
@@ -96,6 +102,18 @@ expect(settings.includes('export function settingsNavigationItems()') && setting
 expect(firstRun.includes("return 'people';") && firstRun.includes("return 'finance';") && firstRun.includes('data-v2-secondary-item'), 'DEMO navigation must follow the migrated V2 workspace entry points without changing its business progression.');
 expect(firstRun.includes("book:v2-navigation-request") && firstRun.includes('this.navTarget(step)'), 'DEMO must reveal the real V2 deck before pointing to a root or second-level folder.');
 expect(finance.includes('openFinanceOperation(root, movements, element.dataset.financeOperation, onBack)'), 'Finance DDS must preserve its F2 back callback through operation detail/cancel refresh.');
+
+expect(profile.includes('v2WorkspaceContext({') && profile.includes("hideD:true") && profile.includes("kind:'avatar'"), 'Profile must feed Header A/B/D through the shared V2 context contract.');
+expect(profile.includes("v2Section('Рабочие пространства',workplaceRail())") && profile.includes('v2HorizontalRail('), 'Profile root Z must contain the profile card plus a horizontal workplace rail.');
+expect(!profile.includes('accordion(') && !profile.includes('initAccordions('), 'Regular Profile UI must not retain the legacy accordion.');
+expect(profile.includes('mountV2ZLayer(root,v2ZLayer(') && profile.includes("'Настройки профиля'"), 'Profile settings must open as a shared second Z layer.');
+expect(profile.includes('data-v2-primary-action') && profile.includes('data-add-workplace'), 'Profile root C must proxy the existing add-workplace action.');
+expect(style.includes('--text:#111111') && style.includes('--button-secondary:#D8D3CF') && style.includes('--text-secondary:#777A7D'), 'Shared palette must use the approved black and neutral tokens.');
+expect(entityCardCss.includes('background:var(--surface-dark)') && !/#D7CEC7|#968982|#E7E1DB|#B8AEA8|rgba\(59,48,43/.test(entityCardCss), 'Shared entity cards must not retain the legacy system brown palette.');
+expect(inputs.includes('openPhotoCrop(') && inputs.includes('croppedSquare(') && inputs.includes('mountV2Layer'), 'Shared photo owner must provide the common crop flow.');
+expect(ui.includes('export function v2WorkspaceContext') && ui.includes('export function v2ZLayer') && ui.includes('export function mountV2ZLayer'), 'Shared V2 must own context metadata and stacked Z layers.');
+expect(core.includes('activeWorkspaceSurface(surface)') && core.includes("context?.dataset.v2HideD === 'true'"), 'Workspace Header must follow the top Z layer and allow context-owned D visibility.');
+
 
 expect(account.includes('v2FDeck('), 'End-user root must use shared F deck.');
 expect(account.includes('initV2DeckSwipe(root'), 'End-user F deck must page horizontally with the shared interaction.');
