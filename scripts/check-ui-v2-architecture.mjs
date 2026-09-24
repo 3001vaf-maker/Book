@@ -204,7 +204,14 @@ expect(!/\b(?:appShell|appHeader)\s*\(/.test(onlineBookingSettings) && !onlineBo
 expect(!/(?:min-|max-)?height\s*:\s*(?:var\(--visual-vh\s*,\s*)?100dvh|position\s*:\s*fixed|touch-action\s*:/.test(onlineBookingSettingsCss), 'Online booking settings CSS must stay content-only inside Shared Z.');
 expect(core.includes("[data-workspace-back-source], .app-header__slot--back button"), 'Workspace Header owner must proxy canonical back sources without requiring a nested appHeader.');
 expect(!journalList.includes('getBoundingPersonRect') && journalList.includes('getBoundingClientRect()'), 'Journal List scroll must use the real DOM geometry API.');
-expect(firstRun.includes("return 'people';") && firstRun.includes("return 'finance';") && firstRun.includes('data-v2-secondary-item'), 'DEMO navigation must follow the migrated V2 workspace entry points without changing its business progression.');
+expect(firstRun.includes("return 'people';") && firstRun.includes("return 'finance';") && firstRun.includes("if (SETTINGS_STEPS.has(step.key)) return 'settings';") && firstRun.includes('data-v2-secondary-item'), 'DEMO navigation must follow the migrated V2 workspace entry points without changing its business progression.');
+expect(firstRun.includes("if (SETTINGS_STEPS.has(step.key)) {\n      await this.renderWorkspaceStep(step);") && !firstRun.includes('async renderSettingsStep('), 'DEMO Settings steps must reuse the real Shared V2 workspace instead of rendering a parallel focused shell.');
+for (const marker of ['data-v2-secondary-item="online-booking"', 'data-v2-secondary-item="communications"', 'data-v2-secondary-item="integrations"', 'data-v2-secondary-item="tags"', 'data-v2-secondary-item="documents"']) {
+  expect(firstRun.includes(marker), `DEMO Settings routing must use the real V2 E folder: ${marker}.`);
+}
+expect(firstRun.includes("ONLINE_BOOKING_STEPS.has(step.key) && onlineBookingFolder"), 'DEMO online-booking substeps must navigate into the real E folder before treating the substep as entered.');
+expect(!firstRun.includes("step.key === 'procedures' || step.key === 'products' || SETTINGS_STEPS.has(step.key)"), 'DEMO Settings must not bypass active workspace-section recovery inside syncCurrent().');
+expect(firstRun.includes("const requiredSection = this.workspaceSection(step);") && firstRun.includes("if (activeSection !== requiredSection)"), 'DEMO Settings must retain the normal workspace recovery path when the user leaves the required F section.');
 expect(firstRun.includes("book:v2-navigation-request") && firstRun.includes('this.navTarget(step)'), 'DEMO must reveal the real V2 deck before pointing to a root or second-level folder.');
 expect(finance.includes('openFinanceOperation(root, movements, element.dataset.financeOperation, onBack)'), 'Finance DDS must preserve its E back callback through operation detail/cancel refresh.');
 
