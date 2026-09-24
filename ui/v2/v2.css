@@ -10,6 +10,7 @@
   --v2-taupe:var(--text-muted);
   --v2-smoke:var(--surface-dark);
   --v2-z-radius:34px;
+  --v2-z-layer-offset:12px;
   --v2-gap:20px;
   --v2-edge:16px;
   --v2-z-open-x:min(33.333vw,130px);
@@ -111,7 +112,7 @@
 .v2-z--layer{
   position:absolute;
   z-index:7;
-  inset:0 0 0 var(--v2-edge);
+  inset:0 0 0 calc(var(--v2-edge) + var(--v2-z-layer-offset));
   width:auto;
   height:100%;
   min-height:100%;
