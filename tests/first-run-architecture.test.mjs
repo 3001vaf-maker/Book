@@ -121,6 +121,15 @@ assert.match(runtime, /observer\.observe\(this\.app, \{ childList: true, subtree
 assert.match(runtime, /first-run-pulse/);
 assert.match(runtime, /online-booking-welcome/);
 assert.match(runtime, /finance-dds/);
+assert.match(runtime, /if \(SETTINGS_STEPS\.has\(step\.key\)\) \{\s*await this\.renderWorkspaceStep\(step\);/);
+assert.doesNotMatch(runtime, /async renderSettingsStep\(/);
+assert.match(runtime, /if \(SETTINGS_STEPS\.has\(step\.key\)\) return 'settings';/);
+assert.match(runtime, /data-v2-secondary-item="online-booking"/);
+assert.match(runtime, /data-v2-secondary-item="communications"/);
+assert.match(runtime, /data-v2-secondary-item="integrations"/);
+assert.match(runtime, /data-v2-secondary-item="tags"/);
+assert.match(runtime, /data-v2-secondary-item="documents"/);
+assert.match(runtime, /ONLINE_BOOKING_STEPS\.has\(step\.key\) && onlineBookingFolder/);
 assert.doesNotMatch(firstRun, /RKN_GUIDE_PDF|rknGuide|PDFDocument|TenantDocumentArchiveService/);
 assert.doesNotMatch(firstRunController, /rkn-guide|StreamableFile/);
 assert.doesNotMatch(firstRunModule, /TenantDocumentArchiveModule/);
