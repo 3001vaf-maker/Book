@@ -55,18 +55,20 @@ export function v2EList(items = [], { data = 'data-v2-e-item' } = {}) {
 }
 
 export function v2FDeck(items = [], { active = '', data = 'data-v2-deck-item' } = {}) {
-  const values = (Array.isArray(items) ? items : []).filter(Boolean);
+  const values = (Array.isArray(items) ? items : []).filter(Boolean).slice(0, 7);
   if (!values.length) return '';
   const activeId = String(active || values[0]?.id || '0');
   const activeIndex = Math.max(0, values.findIndex((item, index) => String(item.id || index) === activeId));
-  return `<div class="v2-deck" data-v2-deck>${values.map((item, index) => {
+  return `<div class="v2-deck" data-v2-deck data-v2-deck-count="${values.length}">${values.map((item, index) => {
     const id = String(item.id || index);
-    const isActive = id === activeId;
-    const depth = (index - activeIndex + values.length) % values.length;
-    const visualDepth = Math.min(depth, 4);
-    const depthX = visualDepth * 6;
-    const depthY = visualDepth * 12;
-    return `<button type="button" class="v2-deck__card${isActive ? ' is-active' : ''}" style="--v2-depth:${visualDepth};--v2-depth-x:${depthX}px;--v2-depth-y:${depthY}px" ${data}="${text(id)}" data-v2-deck-index="${index}" aria-label="${text(item.aria || item.label || '')}"><strong>${text(item.label || '')}</strong></button>`;
+    const relation = index - activeIndex;
+    const isActive = relation === 0;
+    const isBefore = relation < 0;
+    const visualDepth = Math.min(Math.max(relation, 0), 6);
+    const depthX = visualDepth * 16;
+    const depthY = visualDepth * 16;
+    const classes = ['v2-deck__card', isActive ? 'is-active' : '', isBefore ? 'is-before' : 'is-after'].filter(Boolean).join(' ');
+    return `<button type="button" class="${classes}" style="--v2-depth:${visualDepth};--v2-depth-x:${depthX}px;--v2-depth-y:${depthY}px" ${data}="${text(id)}" data-v2-deck-index="${index}" data-v2-f-level="F${index + 1}" aria-label="${text(item.aria || item.label || '')}"><strong>${text(item.label || '')}</strong></button>`;
   }).join('')}</div>`;
 }
 
@@ -307,7 +309,7 @@ export function initV2StickerSwipe(root, { onRight = null, onLeft = null, thresh
   };
 }
 
-export function initV2DeckSwipe(root, { activeId = '', onActiveChange = null, threshold = 58 } = {}) {
+export function initV2DeckSwipe(root, { activeId = '', onActiveChange = null, threshold = 42, maxDrag = 150 } = {}) {
   const deck = root?.matches?.('[data-v2-deck]') ? root : root?.querySelector?.('[data-v2-deck]');
   if (!deck) return () => {};
   const cards = [...deck.querySelectorAll('.v2-deck__card')];
@@ -317,7 +319,8 @@ export function initV2DeckSwipe(root, { activeId = '', onActiveChange = null, th
   let startX = 0;
   let startY = 0;
   let dx = 0;
-  let horizontal = false;
+  let axis = 'pending';
+  let suppressNextClick = false;
 
   const activeCard = () => cards[activeIndex] || cards[0];
   const reset = () => {
@@ -326,49 +329,73 @@ export function initV2DeckSwipe(root, { activeId = '', onActiveChange = null, th
     card?.classList.remove('is-dragging');
     pointerId = null;
     dx = 0;
-    horizontal = false;
+    axis = 'pending';
   };
   const down = (event) => {
-    const card = activeCard();
-    if (!card || !event.target.closest('.v2-deck__card.is-active')) return;
+    if (!event.target.closest('.v2-deck__card')) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     pointerId = event.pointerId;
     startX = event.clientX;
     startY = event.clientY;
-    card.setPointerCapture?.(pointerId);
+    dx = 0;
+    axis = 'pending';
   };
   const move = (event) => {
     if (event.pointerId !== pointerId) return;
     const nextX = event.clientX - startX;
     const nextY = event.clientY - startY;
-    if (!horizontal && Math.abs(nextX) > 10) horizontal = Math.abs(nextX) > Math.abs(nextY) * 1.15;
-    if (!horizontal) return;
-    dx = Math.max(-190, Math.min(190, nextX));
+    if (axis === 'pending') {
+      if (Math.max(Math.abs(nextX), Math.abs(nextY)) < 8) return;
+      axis = Math.abs(nextX) > Math.abs(nextY) * 1.15 ? 'horizontal' : 'vertical';
+      if (axis === 'vertical') {
+        pointerId = null;
+        return;
+      }
+      deck.setPointerCapture?.(event.pointerId);
+    }
+    if (axis !== 'horizontal') return;
+    const canMoveLeft = activeIndex < cards.length - 1;
+    const canMoveRight = activeIndex > 0;
+    const requested = Math.max(-maxDrag, Math.min(maxDrag, nextX));
+    dx = requested < 0
+      ? (canMoveLeft ? requested : requested * 0.22)
+      : (canMoveRight ? requested : requested * 0.22);
     const card = activeCard();
     card?.classList.add('is-dragging');
     card?.style.setProperty('--v2-deck-drag-x', `${dx}px`);
+    if (Math.abs(nextX) > 8) suppressNextClick = true;
     event.preventDefault();
   };
   const up = (event) => {
     if (event.pointerId !== pointerId) return;
     const finalDx = dx;
+    const finalAxis = axis;
     reset();
-    if (Math.abs(finalDx) < threshold) return;
-    const direction = finalDx < 0 ? 1 : -1;
-    const nextIndex = (activeIndex + direction + cards.length) % cards.length;
+    if (finalAxis !== 'horizontal' || Math.abs(finalDx) < threshold) return;
+    const nextIndex = finalDx < 0 ? activeIndex + 1 : activeIndex - 1;
+    if (nextIndex < 0 || nextIndex >= cards.length) return;
+    activeIndex = nextIndex;
     const next = cards[nextIndex];
     const id = next?.getAttribute('data-account-deck-item') || next?.getAttribute('data-v2-deck-item') || '';
     if (id) onActiveChange?.(id);
+  };
+  const click = (event) => {
+    if (!suppressNextClick) return;
+    suppressNextClick = false;
+    event.preventDefault();
+    event.stopPropagation();
   };
 
   deck.addEventListener('pointerdown', down);
   deck.addEventListener('pointermove', move, { passive: false });
   deck.addEventListener('pointerup', up);
   deck.addEventListener('pointercancel', reset);
+  deck.addEventListener('click', click, true);
   return () => {
     deck.removeEventListener('pointerdown', down);
     deck.removeEventListener('pointermove', move);
     deck.removeEventListener('pointerup', up);
     deck.removeEventListener('pointercancel', reset);
+    deck.removeEventListener('click', click, true);
   };
 }
