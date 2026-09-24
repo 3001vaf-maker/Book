@@ -55,20 +55,6 @@ export class PlatformNoticeService {
     return { subscribed: Boolean(rows[0]), enabled: this.pushConfig().enabled };
   }
 
-  async pushSubscriptionState(platformAccountId: string, endpointValue: unknown) {
-    const config = this.pushConfig();
-    const endpoint = text(endpointValue);
-    if (!endpoint) return { subscribed: false, enabled: config.enabled };
-    const rows = await this.prisma.$queryRaw<Array<{ id: string }>>`
-      SELECT "id"
-      FROM "PlatformPushSubscription"
-      WHERE "platformAccountId" = ${platformAccountId}
-        AND "endpoint" = ${endpoint}
-      LIMIT 1
-    `;
-    return { subscribed: rows.length > 0, enabled: config.enabled };
-  }
-
   async savePushSubscription(platformAccountId: string, input: unknown, userAgent = '') {
     const config = this.pushConfig();
     if (!config.enabled) return { subscribed: false, enabled: false };
