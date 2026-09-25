@@ -70,6 +70,8 @@ assert.match(graphSource, /hideD:\s*true/);
 assert.match(graphSource, /className:\s*'v2-primary-source-only'/);
 assert.match(graphSource, /data-v2-primary-visible="false"/);
 assert.match(graphSource, /applyButton\.dataset\.v2PrimaryVisible\s*=\s*'true'/);
+assert.match(graphSource, /v2PrimaryLabel\s*=\s*makeOff\s*\?\s*'Выходной'\s*:\s*'Рабочий'/);
+assert.match(graphSource, /v2PrimaryVariant\s*=\s*makeOff\s*\?\s*'danger'\s*:\s*''/);
 assert.doesNotMatch(graphSource, /calendar-workspace__actions|data-timetable-actions|actionBlock\(/);
 assert.doesNotMatch(graphSource, /openTimetableDayEditor/);
 assert.doesNotMatch(graphSource, /function\s+openAggregateDayEditor/);

@@ -119,6 +119,9 @@ export function renderTimetable(root) {
       selectionMode = null;
       applyButton.disabled = true;
       applyButton.dataset.v2PrimaryVisible = 'false';
+      applyButton.dataset.v2PrimaryLabel = 'Применить';
+      applyButton.dataset.v2PrimaryVariant = '';
+      applyButton.setAttribute('aria-label', 'Применить');
       notifyContext();
       return;
     }
@@ -126,9 +129,16 @@ export function renderTimetable(root) {
     if (allMode) {
       setWorkplaceContext({ date: selectedDate });
       selectionMode = 'add-workplace';
+      applyButton.dataset.v2PrimaryLabel = 'Применить';
+      applyButton.dataset.v2PrimaryVariant = '';
+      applyButton.setAttribute('aria-label', 'Применить');
     } else {
       setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: selectedDate });
       selectionMode = isWorkingDate(dates[0]) ? 'make-off' : 'make-working';
+      const makeOff = selectionMode === 'make-off';
+      applyButton.dataset.v2PrimaryLabel = makeOff ? 'Выходной' : 'Рабочий';
+      applyButton.dataset.v2PrimaryVariant = makeOff ? 'danger' : '';
+      applyButton.setAttribute('aria-label', makeOff ? 'Сделать выходным' : 'Сделать рабочим');
     }
     applyButton.disabled = false;
     applyButton.dataset.v2PrimaryVisible = 'true';

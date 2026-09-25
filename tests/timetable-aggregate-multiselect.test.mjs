@@ -38,6 +38,12 @@ assert.match(
   'Apply must be absent when no dates are selected',
 );
 
+assert.match(
+  source,
+  /selectionMode\s*=\s*isWorkingDate\(dates\[0\]\)\s*\?\s*['"]make-off['"]\s*:\s*['"]make-working['"][\s\S]*?v2PrimaryLabel\s*=\s*makeOff\s*\?\s*['"]Выходной['"]\s*:\s*['"]Рабочий['"][\s\S]*?v2PrimaryVariant\s*=\s*makeOff\s*\?\s*['"]danger['"]\s*:\s*['"]['"]/,
+  'workplace Graph must show Рабочий in default C and Выходной in red danger C according to the selected action',
+);
+
 assert.doesNotMatch(
   source,
   /openTimetableDayEditor/,
