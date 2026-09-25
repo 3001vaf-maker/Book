@@ -1,4 +1,4 @@
-import { button, entityCard, entityCardStack, initCalendar, initMultiSelect, modal, mountModal, timePicker, initTimePickers, twoColumnLayout, escapeHtml, mountV2ZLayer, v2ZLayer, workspaceHeaderContext, ALL_WORKPLACES_ID, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js';
+import { button, entityCard, initCalendar, initMultiSelect, modal, mountModal, timePicker, initTimePickers, twoColumnLayout, escapeHtml, mountV2ZLayer, v2HorizontalRail, v2ZLayer, workspaceHeaderContext, ALL_WORKPLACES_ID, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js';
 import { getWorkplaces, resolveWorkplaceTime, getWorkingDayIndicators, getWorkingDayTotalMinutes, getWorkplaceMonthStats, getAllWorkplacesMonthStats, getWorkplaceMonthStatsMap } from '../core/workplace-time.js';
 import { getDays, saveDays, getDay, getDayTime, createDay, updateDayTime, removeDay, getDayRemovalConflicts, getScheduleConflicts, findSuggestedInterval } from '../core/day/index.js';
 import { getWorkingTimeUsageConflicts, isValidRange } from '../core/time/index.js';
@@ -43,16 +43,12 @@ export function renderTimetable(root) {
     const summary = formatMonthStats(stats);
     return entityCard({
       title: workplace?.name || 'Без названия',
-      subtitle: workplace?.city || workplace?.address || '',
       image: workplace?.photo || '',
       initial: (workplace?.name || '?').slice(0, 1).toUpperCase(),
-      meta: [
-        { value: workplace?.city || '—', label: 'город' },
-        { value: `${workplace?.from || '—'}–${workplace?.to || '—'}`, label: 'график' },
-        { value: String(summary.days), label: 'дней' },
-        { value: summary.duration, label: 'в графике' },
+      topRightMeta: [
+        { value: `${summary.days} дней`, row: 1 },
+        { value: summary.duration, row: 2 },
       ],
-      metricsLayout: 'grid',
       interactive: true,
       data,
       aria: aria || `Открыть рабочее пространство ${workplace?.name || ''}`,
@@ -64,11 +60,10 @@ export function renderTimetable(root) {
     const summary = formatMonthStats(stats);
     return entityCard({
       title: 'Общий график',
-      meta: [
-        { value: String(summary.days), label: 'дней' },
-        { value: summary.duration, label: 'в графике' },
+      topRightMeta: [
+        { value: `${summary.days} дней`, row: 1 },
+        { value: summary.duration, row: 2 },
       ],
-      metricsLayout: 'grid',
       interactive: true,
       data,
       aria,
@@ -124,6 +119,9 @@ export function renderTimetable(root) {
       selectionMode = null;
       applyButton.disabled = true;
       applyButton.dataset.v2PrimaryVisible = 'false';
+      applyButton.dataset.v2PrimaryLabel = 'Применить';
+      applyButton.dataset.v2PrimaryVariant = '';
+      applyButton.setAttribute('aria-label', 'Применить');
       notifyContext();
       return;
     }
@@ -131,9 +129,16 @@ export function renderTimetable(root) {
     if (allMode) {
       setWorkplaceContext({ date: selectedDate });
       selectionMode = 'add-workplace';
+      applyButton.dataset.v2PrimaryLabel = 'Применить';
+      applyButton.dataset.v2PrimaryVariant = '';
+      applyButton.setAttribute('aria-label', 'Применить');
     } else {
       setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: selectedDate });
       selectionMode = isWorkingDate(dates[0]) ? 'make-off' : 'make-working';
+      const makeOff = selectionMode === 'make-off';
+      applyButton.dataset.v2PrimaryLabel = makeOff ? 'Выходной' : 'Рабочий';
+      applyButton.dataset.v2PrimaryVariant = makeOff ? 'danger' : '';
+      applyButton.setAttribute('aria-label', makeOff ? 'Сделать выходным' : 'Сделать рабочим');
     }
     applyButton.disabled = false;
     applyButton.dataset.v2PrimaryVisible = 'true';
@@ -432,7 +437,7 @@ export function renderTimetable(root) {
         disabled: true,
       },
       hideD: true,
-    })}${entityCardStack(cards)}`, { className: 'timetable-workplace-picker-layer' }), { stack: true });
+    })}${v2HorizontalRail(cards.join(''), { className: 'timetable-workplace-card-rail' })}`, { className: 'timetable-workplace-picker-layer' }), { stack: true });
     if (!layer) return;
     layer.querySelectorAll('[data-timetable-apply-workplace]').forEach((card) => {
       card.addEventListener('click', () => {
@@ -497,7 +502,7 @@ export function renderTimetable(root) {
         disabled: true,
       },
       hideD: true,
-    })}${entityCardStack(cards)}`, { className: 'timetable-settings-layer' }), { stack: true });
+    })}${v2HorizontalRail(cards.join(''), { className: 'timetable-settings-card-rail' })}`, { className: 'timetable-settings-layer' }), { stack: true });
     if (!layer) return;
     layer.querySelectorAll('[data-timetable-settings-select]').forEach((card) => {
       card.addEventListener('click', () => {
