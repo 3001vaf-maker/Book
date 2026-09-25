@@ -248,7 +248,7 @@ function initV2LayerDismissGesture(node, { kind = 'standard', onDismiss = null, 
   const down = (event) => {
     if (dismissing) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
-    if (!vertical && event.target.closest?.('button,input,select,textarea,a,[contenteditable="true"],[data-v2-layer-gesture-ignore]')) return;
+    if (!vertical && event.target.closest?.('input,select,textarea,[contenteditable="true"],[data-v2-layer-gesture-ignore]')) return;
     pointerId = event.pointerId;
     startX = event.clientX;
     startY = event.clientY;
