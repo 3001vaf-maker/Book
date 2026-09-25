@@ -924,6 +924,7 @@ async function renderGlobalClientHome(root, state) {
     onOpenRelationship: (tenantId) => {
       const params = new URLSearchParams();
       params.set('booking', tenantId);
+      params.set('entry', 'account');
       location.assign(`${location.pathname}?${params.toString()}`);
     },
     onOpenRecord: (request) => {
@@ -931,15 +932,8 @@ async function renderGlobalClientHome(root, state) {
       if (!tenantId) return;
       const params = new URLSearchParams();
       params.set('booking', tenantId);
+      params.set('entry', 'account');
       location.assign(`${location.pathname}?${params.toString()}`);
-    },
-    onPersonalData: () => {
-      state.error = 'Редактирование глобального профиля будет подключено к этому экрану.';
-      renderGlobalClientHome(root, state);
-    },
-    onPassword: () => {
-      state.error = 'Изменение пароля будет подключено к этому экрану.';
-      renderGlobalClientHome(root, state);
     },
     onLogout: () => {
       clearAccount('');
@@ -1162,7 +1156,7 @@ export async function renderGlobalClient(root) {
   }
 }
 
-export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = '', onExitToAccount = null } = {}) {
+export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = '', entry = '', onExitToAccount = null } = {}) {
   const state = {
     tenantId: String(tenantId || ''),
     lockedWorkplaceKey: String(workplaceKey || ''),
@@ -1184,7 +1178,7 @@ export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = 
     lastRequest: null,
     repeatSelection: null,
     identityDestination: 'booking',
-    bookingOrigin: 'welcome',
+    bookingOrigin: entry === 'account' ? 'profile' : 'welcome',
     accountTab: 'home',
     accountDeckOpen: false,
     accountChatOpen: false,
@@ -1192,6 +1186,7 @@ export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = 
     bookingStep: '',
     accountRequests: [],
     onExitToAccount,
+    entry: String(entry || ''),
   };
 
   renderFlowPage(root, state, { title: 'Онлайн-запись', subtitle: 'Загрузка…', center: true });
@@ -1204,6 +1199,19 @@ export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = 
     await refreshContext(state);
     const account = await getAccount(state.tenantId);
     if (account) state.account = account;
+    if (state.entry === 'account' && state.account) {
+      const platformState = await getAccountPlatformState(state.tenantId);
+      state.accountTerms = platformState?.document || null;
+      state.accountTermsAccepted = Boolean(platformState?.accepted);
+      if (!platformState?.accepted) {
+        state.identityDestination = 'profile';
+        renderLegalSticker(root, state);
+        return;
+      }
+      state.accountTab = 'home';
+      await renderAccountHome(root, state);
+      return;
+    }
     renderWelcome(root, state);
   } catch (error) {
     renderFlowPage(root, state, {
