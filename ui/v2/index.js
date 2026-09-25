@@ -448,6 +448,89 @@ export function initV2Swipe(root, { onRight = null, onLeft = null, threshold = 7
   };
 }
 
+export function setV2DeckOpen(root, open) {
+  const app = root?.matches?.('[data-v2-app]')
+    ? root
+    : root?.closest?.('[data-v2-app]') || root?.querySelector?.('[data-v2-app]');
+  if (!app) return false;
+  const next = Boolean(open);
+  app.classList.toggle('is-deck-open', next);
+  app.classList.remove('is-revealing-deck');
+  return next;
+}
+
+export function initV2WorkspaceInteraction(root, {
+  activeId = '',
+  eActiveId = '',
+  deckOpen = false,
+  onRootSelect = null,
+  onSecondarySelect = null,
+  onDeckOpenChange = null,
+} = {}) {
+  const app = root?.matches?.('[data-v2-app]')
+    ? root
+    : root?.closest?.('[data-v2-app]') || root?.querySelector?.('[data-v2-app]');
+  if (!app) return () => {};
+
+  const deck = app.querySelector('[data-v2-deck]');
+  const z = app.querySelector('.v2-app__stage > [data-v2-z]');
+  const disposers = [];
+
+  const setOpen = (open, notify = true) => {
+    const next = setV2DeckOpen(app, open);
+    if (notify) onDeckOpenChange?.(next);
+    return next;
+  };
+
+  setOpen(deckOpen, false);
+
+  if (deck) {
+    disposers.push(initV2DeckSwipe(deck, {
+      activeId,
+      eActiveId,
+      onActiveChange: (id) => {
+        setOpen(true);
+        onRootSelect?.(id);
+      },
+      onEActiveChange: (id) => {
+        setOpen(true);
+        onSecondarySelect?.(id);
+      },
+    }));
+
+    const onDeckClick = (event) => {
+      const rootItem = event.target.closest('[data-v2-deck-item]');
+      if (rootItem && deck.contains(rootItem)) {
+        const id = String(rootItem.getAttribute('data-v2-deck-item') || '');
+        if (id) {
+          setOpen(true);
+          onRootSelect?.(id);
+        }
+        return;
+      }
+      const secondaryItem = event.target.closest('[data-v2-secondary-item], [data-v2-e-item]');
+      if (secondaryItem && app.contains(secondaryItem)) {
+        const id = String(secondaryItem.getAttribute('data-v2-secondary-item') || secondaryItem.getAttribute('data-v2-e-item') || '');
+        if (id) {
+          setOpen(true);
+          onSecondarySelect?.(id);
+        }
+      }
+    };
+    app.querySelector('[data-v2-fe]')?.addEventListener('click', onDeckClick);
+    disposers.push(() => app.querySelector('[data-v2-fe]')?.removeEventListener('click', onDeckClick));
+  }
+
+  if (z) {
+    disposers.push(initV2Swipe(z, {
+      onRight: () => setOpen(true),
+      onLeft: () => setOpen(false),
+    }));
+  }
+
+  return () => disposers.forEach((dispose) => dispose?.());
+}
+
 export function initV2StickerSwipe(root, { onRight = null, onLeft = null, threshold = 64, maxDrag = 180 } = {}) {
   const surface = root?.matches?.('[data-v2-sticker]') ? root : root?.querySelector?.('[data-v2-sticker]');
   if (!surface) return () => {};
