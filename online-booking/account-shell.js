@@ -31,7 +31,8 @@ import {
   v2Section,
   v2Shell,
   initV2Swipe,
-  initV2DeckSwipe,
+  initV2WorkspaceInteraction,
+  setV2DeckOpen,
   mountModal,
 } from '../ui/ui.js';
 import { openAccountConsentSettings } from './consent-settings.js';
@@ -382,43 +383,29 @@ function renderV2Shell(root, state, { header, body = '', deck = true, className 
   root.innerHTML = `<section class="${accountThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${shell}</section>`;
 }
 
-function bindDeck(root, state, handlers) {
-  initV2DeckSwipe(root, {
-    activeId: state.accountDeckActive || 'representatives',
-    onActiveChange: (id) => {
-      state.accountDeckActive = id;
-      state.accountDeckOpen = true;
-      state.accountChatOpen = false;
-      state.accountTab = id === 'history' ? 'history' : 'representatives';
-      void handlers.render();
-    },
-  });
-  root.querySelectorAll('[data-account-deck-item]').forEach((node) => node.addEventListener('click', () => {
-    const id = String(node.dataset.accountDeckItem || '');
-    if (id !== String(state.accountDeckActive || '')) {
-      state.accountDeckActive = id;
-      state.accountDeckOpen = true;
-      state.accountChatOpen = false;
-      state.accountTab = id === 'history' ? 'history' : 'representatives';
-      void handlers.render();
-      return;
-    }
-    state.accountDeckOpen = false;
-    state.accountChatOpen = false;
-    state.accountTab = id === 'history' ? 'history' : 'representatives';
-    void handlers.render();
-  }));
+function setAccountDeckOpen(root, state, open) {
+  state.accountDeckOpen = Boolean(open);
+  setV2DeckOpen(root, state.accountDeckOpen);
 }
 
-function bindRootSwipe(root, state, handlers) {
-  initV2Swipe(root, {
-    onRight: () => {
-      state.accountDeckOpen = !state.accountDeckOpen;
-      void handlers.render();
+function bindWorkspaceInteraction(root, state, handlers, { bindZ = true } = {}) {
+  return initV2WorkspaceInteraction(root, {
+    activeId: state.accountDeckActive || 'representatives',
+    deckOpen: state.accountDeckOpen,
+    bindZ,
+    onDeckOpenChange: (open) => {
+      state.accountDeckOpen = open;
     },
-    onLeft: () => {
-      if (!state.accountDeckOpen) return;
-      state.accountDeckOpen = false;
+    onRootSelect: (id) => {
+      const next = id === 'history' ? 'history' : 'representatives';
+      if (id === String(state.accountDeckActive || '') && next === state.accountTab) {
+        setAccountDeckOpen(root, state, true);
+        return;
+      }
+      state.accountDeckActive = id;
+      state.accountDeckOpen = true;
+      state.accountChatOpen = false;
+      state.accountTab = next;
       void handlers.render();
     },
   });
@@ -496,8 +483,7 @@ async function renderHome(root, state, handlers) {
     header,
     body: `${v2Section('Предстоящие визиты', upcoming)}${v2Section('Представители / пространства', representative)}`,
   });
-  bindDeck(root, state, handlers);
-  bindRootSwipe(root, state, handlers);
+  bindWorkspaceInteraction(root, state, handlers);
   root.querySelector('[data-account-profile-settings]')?.addEventListener('click', () => openProfileSettings(state, {
     onPersonalData: handlers.onPersonalData,
     onPassword: handlers.onPassword,
@@ -534,8 +520,7 @@ async function renderRepresentatives(root, state, handlers) {
     header,
     body: representativeCard(state),
   });
-  bindDeck(root, state, handlers);
-  bindRootSwipe(root, state, handlers);
+  bindWorkspaceInteraction(root, state, handlers);
   root.querySelector('[data-account-open-representative]')?.addEventListener('click', () => {
     state.accountTab = 'representative';
     state.accountDeckOpen = false;
@@ -580,8 +565,7 @@ async function renderRepresentative(root, state, handlers) {
     header,
     body: `${metrics ? v2Section('Взаимодействие', metrics) : ''}${upcoming ? v2Section('Предстоящие визиты', upcoming) : ''}${programs ? v2Section('Программы', programs) : ''}`,
   });
-  bindDeck(root, state, handlers);
-  bindRootSwipe(root, state, handlers);
+  bindWorkspaceInteraction(root, state, handlers);
   root.querySelector('[data-account-booking]')?.addEventListener('click', handlers.onStartBooking);
   root.querySelector('[data-account-open-chat-direct]')?.addEventListener('click', () => {
     state.accountTab = 'messages';
@@ -610,8 +594,7 @@ async function renderHistory(root, state, handlers) {
     d: { kind: 'chat', data: 'data-account-open-chat-root', aria: 'Чат', badge: state.accountUnreadCount || 0 },
   });
   renderV2Shell(root, state, { header, body });
-  bindDeck(root, state, handlers);
-  bindRootSwipe(root, state, handlers);
+  bindWorkspaceInteraction(root, state, handlers);
   root.querySelectorAll('[data-account-history]').forEach((node) => node.addEventListener('click', () => {
     const request = requests[Number(node.dataset.accountHistory)];
     if (!request) return;
@@ -649,7 +632,7 @@ async function renderHistoryDetail(root, state, handlers) {
     d: { kind: 'chat', data: 'data-account-history-chat', aria: 'Чат', badge: state.accountUnreadCount || 0 },
   });
   renderV2Shell(root, state, { header, body: historyDetailBody(state, request) });
-  bindDeck(root, state, handlers);
+  bindWorkspaceInteraction(root, state, handlers, { bindZ: false });
   initV2Swipe(root, {
     onRight: () => {
       state.accountTab = state.accountHistoryReturn || 'history';
@@ -717,7 +700,7 @@ async function renderMessages(root, state, handlers) {
   });
   const body = `${messages.length ? messageThread(messages, { viewer: 'account' }) : emptyState('Сообщений пока нет', 'Напишите первое сообщение.')}${messageComposer({ attachments: true, attachmentTrigger: 'external' })}`;
   renderV2Shell(root, state, { header, body, deck: true, className: 'v2-app--chat' });
-  bindDeck(root, state, handlers);
+  bindWorkspaceInteraction(root, state, handlers, { bindZ: false });
   initV2Swipe(root, {
     onRight: () => {
       state.accountChatOpen = false;

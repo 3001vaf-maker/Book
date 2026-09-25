@@ -19,7 +19,7 @@ import { canUseBookCapability, getBookAccess, loadBookAccess } from './core/acce
 import { startServerBookingSync } from './online-booking/server-sync.js';
 import { renderOnlineBooking } from './online-booking/booking.js';
 import { startAccountRuntime } from './online-booking/account-runtime.js';
-import { initV2DeckSwipe, initV2Swipe, v2EList, v2FDeck, v2Header, v2Shell } from './ui/ui.js';
+import { initV2WorkspaceInteraction, setV2DeckOpen, v2EList, v2FDeck, v2Header, v2Shell } from './ui/ui.js';
 import { clearLegacyBusinessStorage } from './core/legacy-browser-business.js';
 import { FirstRunRuntime, bindDemoBadgeAction, demoBadgeMarkup, startPlatformSessionTracking } from './first-run/runtime.js';
 import { startPlatformNotices } from './core/platform-notices.js';
@@ -182,7 +182,7 @@ function ensureSecondary(section) {
 
 function setNavigationOpen(open) {
   state.navigationOpen = Boolean(open);
-  app.querySelector('[data-v2-app]')?.classList.toggle('is-deck-open', state.navigationOpen);
+  setV2DeckOpen(app, state.navigationOpen);
 }
 
 function navigate(section, { navigationOpen = state.navigationOpen, updateHash = true, chatPersonKey = '' } = {}) {
@@ -409,30 +409,22 @@ function renderWorkspace() {
 
   const shell = app.querySelector('[data-v2-app]');
   const surface = app.querySelector('[data-v2-workspace-surface]');
-  const z = app.querySelector('[data-v2-z]');
   const disposers = [];
   let moduleDispose = () => {};
   let disposed = false;
   const renderVersion = ++workspaceRenderVersion;
 
-  app.querySelectorAll('[data-v2-root-item]').forEach((control) => {
-    control.addEventListener('click', () => navigate(control.dataset.v2RootItem, { navigationOpen: true }));
-  });
-  app.querySelectorAll('[data-v2-secondary-item]').forEach((control) => {
-    control.addEventListener('click', () => selectSecondary(control.dataset.v2SecondaryItem));
-  });
   app.querySelector('[data-v2-workspace-chat]')?.addEventListener('click', () => navigate('chat', { navigationOpen: false }));
 
-  const rootDeckNode = shell?.querySelector('[data-v2-deck-role="root"]');
-  if (rootDeckNode) disposers.push(initV2DeckSwipe(rootDeckNode, {
+  if (shell) disposers.push(initV2WorkspaceInteraction(shell, {
     activeId: root,
-    onActiveChange: (id) => navigate(id, { navigationOpen: true }),
     eActiveId: childActive,
-    onEActiveChange: (id) => selectSecondary(id),
-  }));
-  if (z) disposers.push(initV2Swipe(z, {
-    onRight: () => setNavigationOpen(true),
-    onLeft: () => setNavigationOpen(false),
+    deckOpen: state.navigationOpen,
+    onDeckOpenChange: (open) => {
+      state.navigationOpen = open;
+    },
+    onRootSelect: (id) => navigate(id, { navigationOpen: true }),
+    onSecondarySelect: (id) => selectSecondary(id),
   }));
 
   const onV2ContextChanged = () => syncWorkspaceHeader(surface);
