@@ -47,10 +47,23 @@ if (!/colorPicker\(\{name:'workplaceColor'[^}]*required:true/.test(workplaceEdit
 
 if (!/resolveDateIndicators/.test(calendarUi) || !/calendar__date-indicator/.test(calendarUi)) fail('ui/calendar/calendar.js', 'Calendar must own generic date indicator manifestation');
 if (!/mode\s*===\s*['"]date['"]\s*\?\s*dateIndicatorsMarkup/.test(calendarUi)) fail('ui/calendar/calendar.js', 'date indicators must belong to the full Calendar and stay out of MonthDayPicker mode');
-if (!/\.calendar__date-indicator\b/.test(calendarCss)) fail('ui/calendar/calendar.css', 'Calendar indicator presentation must live in Calendar CSS');
+if (/outline:2px|#C9A895|#DCC4B4/.test(calendarUi)) fail('ui/calendar/calendar.js', 'Calendar date visual states must not be hardcoded inline; Shared Calendar CSS is the sole owner');
+if (!/\.calendar__month-button\{[^}]*width:48px;[^}]*height:48px;[^}]*border:2px solid var\(--border\);[^}]*border-radius:8px;[^}]*background:transparent;[^}]*font-size:24px/s.test(calendarCss)) fail('ui/calendar/calendar.css', 'Calendar navigation arrows must be 48x48 with 24px glyph, 8px radius, transparent fill and 2px shared-border outline');
+if (!/\.calendar__month\{[^}]*font-size:16px;[^}]*font-weight:700/.test(calendarCss)) fail('ui/calendar/calendar.css', 'Calendar month heading must remain 16px / 700');
+if (!/\.calendar__weekdays span\{[^}]*font-size:12px;[^}]*font-weight:650/.test(calendarCss)) fail('ui/calendar/calendar.css', 'Calendar weekday heading must remain 12px / 650');
+if (!/\.calendar__grid\{[^}]*grid-auto-rows:minmax\(74px,auto\);[^}]*gap:2px/.test(calendarCss)) fail('ui/calendar/calendar.css', 'Calendar cells must keep 74px minimum height and 2px grid gap');
+if (!/\.calendar__date:not\(\.is-neighbor\)\{[^}]*border:1px solid var\(--border\);[^}]*background:var\(--white\)/.test(calendarCss)) fail('ui/calendar/calendar.css', 'Current-month Calendar cells must own the shared white surface and 1px border');
+if (!/\.calendar__date-number\{[^}]*font-size:16px;[^}]*font-weight:400/.test(calendarCss)) fail('ui/calendar/calendar.css', 'Ordinary Calendar date number must be 16px / 400');
+if (!/\.calendar__date\.is-working \.calendar__date-number\{font-weight:800\}/.test(calendarCss)) fail('ui/calendar/calendar.css', 'Working dates must use the stronger 800 weight');
+if (!/\.calendar__date\.is-weekend \.calendar__date-number\{color:#FF1111\}/.test(calendarCss)) fail('ui/calendar/calendar.css', 'Weekend dates must use the shared red #FF1111');
+if (!/\.calendar__date\.is-neighbor \.calendar__date-number\{color:var\(--text-muted\)\}/.test(calendarCss)) fail('ui/calendar/calendar.css', 'Neighbor-month dates must use shared muted text');
+if (!/\.calendar__date\.is-today\{border-color:#B3ACA8;background:#E3E0DE\}/.test(calendarCss)) fail('ui/calendar/calendar.css', 'Today must use #E3E0DE fill with #B3ACA8 border');
+if (!/\.calendar__date\.is-selected\{box-shadow:inset 0 0 0 2px var\(--text\)\}/.test(calendarCss)) fail('ui/calendar/calendar.css', 'Selected date must have exactly one 2px shared-text frame');
+if (!/\.calendar__date-content\{[^}]*font-size:11px/.test(calendarCss)) fail('ui/calendar/calendar.css', 'Calendar inner date content must remain 11px');
+if (!/\.calendar__date-indicator\{[^}]*width:7px;[^}]*height:7px;[^}]*border:1px solid rgba\(0,0,0,.18\);[^}]*border-radius:50%/.test(calendarCss)) fail('ui/calendar/calendar.css', 'Calendar indicator must remain a 7x7 circle with the canonical border');
 for (const path of allCss) {
   if (path === 'ui/calendar/calendar.css') continue;
-  if (/\.calendar__date-indicator\b/.test(read(path))) fail(path, 'Calendar date indicator CSS belongs only to ui/calendar/calendar.css');
+  if (/\.calendar__(?:month-button|month\b|weekdays\b|grid\b|date(?:\b|[.:])|date-number\b|date-content\b|date-indicator\b)/.test(read(path))) fail(path, 'Shared Calendar visual presentation belongs only to ui/calendar/calendar.css');
 }
 
 if (!/indicatorColor/.test(listUi) || !/ui-list__indicator/.test(listUi)) fail('ui/lists/list.js', 'generic List must support a generic color indicator');
@@ -83,17 +96,18 @@ if (/journal\/|timetable\/|settings\/|ui\//.test(availability)) fail('core/avail
 if (!/ALL_WORKPLACES_ID/.test(graph) || !/function\s+openTimetableSettingsZ2\(\)/.test(graph)) fail('timetable/timetable.js', 'Graph must expose aggregate and workplace Z1 manifestations through its Z2 settings selector');
 if (!/getWorkingDayTotalMinutes/.test(graph)) fail('timetable/timetable.js', 'aggregate Graph dates must show summed duration instead of a false continuous interval');
 if (!/resolveDateIndicators/.test(graph) || /calendar__date-indicator/.test(graph)) fail('timetable/timetable.js', 'Graph must pass indicator data to Calendar instead of drawing indicators locally');
-if (!/workspaceHeaderContext\(\{[\s\S]*?title:\s*title\s*\|\|\s*\(allMode\s*\?\s*'Общий график'\s*:\s*'Профиль'\)/.test(graph)) fail('timetable/timetable.js', 'Graph Z1 must have exactly Profile and Aggregate header manifestations');
+if (!/title:\s*title\s*\|\|\s*\(allMode\s*\?\s*'Общий график'\s*:\s*\(workplace\?\.name\s*\|\|\s*'Рабочее пространство'\)\)/.test(graph)) fail('timetable/timetable.js', 'Graph Z1 title must be Aggregate label or the selected Profile workplace name');
 if (!/kind:\s*'logo'/.test(graph) || !/data-timetable-settings-open/.test(graph)) fail('timetable/timetable.js', 'Graph A must feed only its workday count into the Shared Header logo owner');
-if (!/title:\s*'Настройки графика'/.test(graph) || !/miniCardStack\(cards\)/.test(graph) || !/mountV2ZLayer\(root,\s*v2ZLayer/.test(graph)) fail('timetable/timetable.js', 'Graph A must open Settings as shared Z2 with vertical Shared Mini Cards');
+if (!/title:\s*'Настройки графика'/.test(graph) || !/entityCardStack\(cards\)/.test(graph) || !/workplaceGraphCard/.test(graph) || !/aggregateGraphCard/.test(graph) || !/mountV2ZLayer\(root,\s*v2ZLayer/.test(graph)) fail('timetable/timetable.js', 'Graph A must open Settings as a right-side shared Z2 with vertical Entity Cards');
+if (!/workplace\?\.photo/.test(graph) || !/workplace\?\.city/.test(graph) || !/workplace\?\.from/.test(graph) || !/workplace\?\.to/.test(graph) || !/summary\.days/.test(graph) || !/summary\.duration/.test(graph)) fail('timetable/timetable.js', 'Graph workplace cards must preserve Profile workplace data and add Graph day/hour data');
 if (!/disabled:\s*true/.test(graph) || !/hideD:\s*true/.test(graph)) fail('timetable/timetable.js', 'Graph Settings Z2 must keep A inactive and D absent');
 if (/title:\s*['"]Рабочий график['"]/.test(graph)) fail('timetable/timetable.js', 'Graph must not retain the legacy Header Control manifestation for settings');
-if (!/actionsRoot\.hidden\s*=\s*false/.test(graph)) fail('timetable/timetable.js', 'aggregate Graph mode must keep the shared Apply action available');
+if (!/className:\s*'v2-primary-source-only'/.test(graph) || /calendar-workspace__actions|data-timetable-actions|actionBlock\(/.test(graph)) fail('timetable/timetable.js', 'Graph Apply must exist only as a hidden Shared Header C source and must never render a body action');
 if (!/data-v2-primary-visible="false"/.test(graph) || !/applyButton\.dataset\.v2PrimaryVisible\s*=\s*'true'/.test(graph)) fail('timetable/timetable.js', 'Graph C must be absent without date selection and appear only after selection');
 if (/selection\s*=\s*isAllMode\(\)\s*\?\s*null/.test(graph)) fail('timetable/timetable.js', 'aggregate Graph mode must not disable Calendar multi-select');
 if (!/selection\s*=\s*initMultiSelect\(calendarRoot,\s*\{\s*onChange:\s*syncApplyButton\s*\}\)/.test(graph)) fail('timetable/timetable.js', 'Graph must use shared multi-select in both workplace and aggregate modes');
-if (!/function\s+openAggregateWorkplaceApply\(dates\)/.test(graph) || !/includeAggregate:\s*false/.test(graph)) fail('timetable/timetable.js', 'aggregate Apply must open workplace selection before creating working days');
-if (!/if\s*\(isAllMode\(\)\)\s*\{\s*openAggregateWorkplaceApply\(dates\);\s*return;\s*\}/s.test(graph)) fail('timetable/timetable.js', 'aggregate Apply must route selected dates into workplace selection');
+if (!/function\s+openAggregateWorkplaceApply\(dates\)/.test(graph) || !/data-timetable-apply-workplace/.test(graph) || !/entityCardStack\(cards\)/.test(graph) || /openWorkplaceControl\s*\(/.test(graph)) fail('timetable/timetable.js', 'aggregate Apply must open Profile-backed workplace Entity Cards in a right-side Z layer, never a List');
+if (!/if\s*\(isAllMode\(\)\)\s*\{\s*openAggregateWorkplaceApply\(dates\);\s*return;\s*\}/s.test(graph)) fail('timetable/timetable.js', 'aggregate Apply must route selected dates into workplace card selection');
 if (/openTimetableDayEditor/.test(graph)) fail('timetable/timetable.js', 'aggregate Graph date click must not jump directly into the single-day editor');
 if (/function\s+openAggregateDayEditor/.test(graph)) fail('timetable/timetable.js', 'Graph page must not keep a second local day-editor implementation');
 if (/journal\//.test(graph)) fail('timetable/timetable.js', 'Graph page must not depend on Journal implementation');
