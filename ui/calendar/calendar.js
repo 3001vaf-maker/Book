@@ -113,16 +113,11 @@ function buildCalendar({ displayedMonth, workingDates = [], renderDateContent = 
       isToday ? 'is-today' : '',
       isSelected ? 'is-selected' : '',
     ].filter(Boolean).join(' ');
-    const style = [
-      isCurrentMonth ? 'border:1px solid var(--border);border-radius:8px;background:var(--white)' : '',
-      isToday ? 'border:1px solid #C9A895;background:#DCC4B4' : '',
-      isSelected ? 'outline:2px solid var(--text);outline-offset:-2px' : '',
-    ].filter(Boolean).join(';');
     const dateMeta = { date, dateKey: key, isCurrentMonth, isWeekend, isWorking, isToday, isSelected };
     const content = renderDateContent(dateMeta);
     const indicators = mode === 'date' ? dateIndicatorsMarkup(resolveDateIndicators(dateMeta)) : '';
 
-    cells.push(`<button type="button" class="${classes}"${style ? ` style="${style}"` : ''} data-calendar-date="${key}" data-calendar-current-month="${isCurrentMonth}" aria-pressed="${isSelected ? 'true' : 'false'}"><span class="calendar__date-number">${date.getDate()}</span>${content ? `<span class="calendar__date-content">${content}</span>` : '<span class="calendar__date-content" aria-hidden="true"></span>'}${indicators}</button>`);
+    cells.push(`<button type="button" class="${classes}" data-calendar-date="${key}" data-calendar-current-month="${isCurrentMonth}" aria-pressed="${isSelected ? 'true' : 'false'}"><span class="calendar__date-number">${date.getDate()}</span>${content ? `<span class="calendar__date-content">${content}</span>` : '<span class="calendar__date-content" aria-hidden="true"></span>'}${indicators}</button>`);
   }
 
   return `<section class="calendar" data-calendar data-calendar-mode="${mode}">${calendarHeader({ label: monthLabel(displayedMonth, mode), prevAriaLabel: 'Предыдущий месяц', nextAriaLabel: 'Следующий месяц', prevAttribute: 'data-calendar-prev', nextAttribute: 'data-calendar-next' })}<div class="calendar__weekdays" aria-hidden="true">${['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((day) => `<span>${day}</span>`).join('')}</div><div class="calendar__grid">${cells.join('')}</div></section>`;
