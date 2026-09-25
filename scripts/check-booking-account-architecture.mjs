@@ -6,8 +6,6 @@ const consentSettings = fs.readFileSync('online-booking/consent-settings.js', 'u
 const settings = fs.readFileSync('settings/online-booking/online-booking.js', 'utf8');
 const serverSync = fs.readFileSync('online-booking/server-sync.js', 'utf8');
 const bookingUi = fs.readFileSync('ui/booking/index.js', 'utf8');
-const shellUi = fs.readFileSync('ui/shell/index.js', 'utf8');
-const shellCss = fs.readFileSync('ui/shell/shell.css', 'utf8');
 const chatUi = fs.readFileSync('ui/chat/index.js', 'utf8');
 const chatCss = fs.readFileSync('ui/chat/chat.css', 'utf8');
 const settingsUi = fs.readFileSync('ui/settings/index.js', 'utf8');
@@ -30,6 +28,11 @@ const v2Css = fs.readFileSync('ui/v2/v2.css', 'utf8');
 
 const failures = [];
 const expect = (condition, message) => { if (!condition) failures.push(message); };
+const expectLegacyShellRemoved = () => {
+  expect(!fs.existsSync('ui/shell/index.js'), 'Legacy ui/shell/index.js must be removed after V2 migration.');
+  expect(!fs.existsSync('ui/shell/shell.css'), 'Legacy ui/shell/shell.css must be removed after V2 migration.');
+};
+expectLegacyShellRemoved();
 
 expect(booking.includes("from '../core/booking-settings/index.js'"), 'Public booking must consume canonical booking settings.');
 expect(booking.includes('v2Shell({'), 'Booking workflow must use the shared V2 App Shell.');
@@ -91,9 +94,6 @@ expect(settings.includes("label: 'Отменить'") && settings.includes("labe
 expect(settings.includes('twoColumnLayout(') && settings.includes("ariaLabel: 'Цвета фона'") && settings.includes("ariaLabel: 'Цвета интерфейса'"), 'Appearance colors must use the shared two-column layout.');
 expect(settings.includes('BOOKING_SLOT_STEPS.map') && settings.includes("value === 60 ? '1 час'"), 'Time screen must use the canonical 5/10/15/30/60 slot select.');
 expect(serverSync.includes("apiRequest('/business-state')"), 'Open Book must refresh from canonical server business state.');
-expect(shellUi.includes('appHeader'), 'Shared UI must own stable A/title/B/C header.');
-expect(shellUi.includes("variant: 'secondary'"), 'Shared header secondary controls must use the canonical light button role.');
-expect(shellUi.includes('accountBottomNavigation'), 'Legacy Shared UI may keep bottom navigation for non-migrated contours during staged V2 migration.');
 expect(v2Ui.includes('v2Header') && v2Ui.includes('v2Shell') && v2Ui.includes('v2FDeck'), 'Shared ui/v2 must own V2 H / Z / F geometry.');
 expect(v2Css.includes('.v2-z') && v2Css.includes('border-radius:var(--v2-z-radius) 0 0 0'), 'Shared V2 CSS must keep only the Z upper-left corner rounded.');
 expect(!accountShell.includes('accountBottomNavigation') && !accountShell.includes('bindBottomNavigation'), 'The migrated end-user contour must not use bottom navigation.');
@@ -102,15 +102,10 @@ expect(chatUi.includes('message-composer--plain') && chatUi.includes('message-co
 expect(settingsUi.includes('settingsPanel') && settingsUi.includes('settingToggle'), 'Shared ui/settings must own settings panels and toggles.');
 expect(receiptUi.includes('readOnlyReceipt'), 'Shared ui/receipt must own read-only receipt sheets.');
 expect(formsUi.includes('formView') && formsUi.includes('formError'), 'Shared ui/forms must own reusable form shells and form errors.');
-expect(!shellUi.includes('messageComposer') && !shellUi.includes('messageThread') && !shellUi.includes('settingsPanel') && !shellUi.includes('settingToggle') && !shellUi.includes('readOnlyReceipt'), 'Legacy ui/shell must not own migrated Chat, Settings or Receipt UI.');
-expect(!shellCss.includes('.message-thread{') && !shellCss.includes('.message-composer{') && !shellCss.includes('.app-settings-panel') && !shellCss.includes('.read-only-sheet') && !shellCss.includes('.app-view-shell--chat'), 'Legacy ui/shell CSS must not own migrated Chat, Settings or Receipt styles.');
 expect(!uiFacade.includes('messageComposer') && !uiFacade.includes('messageThread') && !uiFacade.includes('settingsPanel') && !uiFacade.includes('settingToggle') && !uiFacade.includes('readOnlyReceipt'), 'Migrated owners must be imported directly, not re-exported through ui/ui.js.');
 expect(accountShell.includes("from '../ui/chat/index.js'") && accountShell.includes("from '../ui/settings/index.js'") && accountShell.includes("from '../ui/receipt/index.js'"), 'End-user account must consume Chat, Settings and Receipt owners directly.');
 expect(booking.includes("from '../ui/forms/index.js'"), 'End-user booking must consume Shared Forms directly.');
 expect(settings.includes("from '../../ui/settings/index.js'"), 'Professional online-booking settings must consume Shared Settings directly.');
-expect(shellUi.includes('app-view-shell--has-media'), 'Shared shell must know whether S/media is present for remaining non-migrated contours.');
-expect(shellCss.includes('--shell-icon-slot'), 'Shared shell CSS must own remaining legacy header control sizing.');
-expect(shellCss.includes('grid-template-columns:auto minmax(0,1fr) auto auto'), 'Remaining legacy A/J/B/C header must redistribute unused space instead of reserving empty fixed columns.');
 expect(chatCss.includes('.message-composer{position:fixed') && chatCss.includes('.message-thread{'), 'Shared ui/chat CSS must own composer and thread geometry.');
 expect(settingsCss.includes('.app-settings-panel') && settingsCss.includes('.app-setting-toggle'), 'Shared ui/settings CSS must own settings geometry.');
 expect(receiptCss.includes('.read-only-sheet'), 'Shared ui/receipt CSS must own receipt geometry.');
@@ -138,7 +133,7 @@ expect(rootHtml.includes('ui/forms/forms.css'), 'Book must load canonical Shared
 
 expect(referenceHtml.includes('reference.css') && referenceHtml.includes('reference-controls'), 'The Book UI reference must keep lab controls outside the 390px application shell.');
 expect(referenceCss.includes('.ui-reference-toolbar') && referenceCss.includes('position:fixed'), 'Reference-only controls must remain outside the Book phone surface.');
-expect(referenceUi.includes("bottomNavigation('settings')"), 'The Book UI reference must render the same five-slot bottom navigation used by the profile application.');
+expect(referenceUi.includes('v2Shell({') && referenceUi.includes('v2Header({'), 'The UI reference must use the canonical V2 shell/header, not a legacy shell.');
 expect(referenceUi.includes("['profile', 'Карточка — без S']") && referenceUi.includes("['profile-media', 'Карточка — с S']") && referenceUi.includes("['chat', 'Чат']") && referenceUi.includes("['form', 'Форма']"), 'Reference must expose multiple UI screen forms and S/no-S states.');
 expect(referenceUi.includes("'Сохранить', 'Далее', 'Готово', 'Добавить', 'Создать'"), 'Reference must expose canonical B label fit checks.');
 expect(referenceUi.includes('modal(') && referenceUi.includes('mountModal('), 'Reference must exercise the real shared modal component.');
