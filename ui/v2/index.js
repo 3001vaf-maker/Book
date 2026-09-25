@@ -466,6 +466,7 @@ export function initV2WorkspaceInteraction(root, {
   onRootSelect = null,
   onSecondarySelect = null,
   onDeckOpenChange = null,
+  bindZ = true,
 } = {}) {
   const app = root?.matches?.('[data-v2-app]')
     ? root
@@ -521,7 +522,7 @@ export function initV2WorkspaceInteraction(root, {
     disposers.push(() => app.querySelector('[data-v2-fe]')?.removeEventListener('click', onDeckClick));
   }
 
-  if (z) {
+  if (z && bindZ) {
     disposers.push(initV2Swipe(z, {
       onRight: () => setOpen(true),
       onLeft: () => setOpen(false),
