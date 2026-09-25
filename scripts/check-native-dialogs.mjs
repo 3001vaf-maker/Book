@@ -2,8 +2,8 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 const root = process.cwd();
-const runtimeRoots = ['main', 'settings', 'timetable', 'journal', 'ui', 'core', 'chat'];
-const forbidden = /\b(?:window\.)?(?:alert|confirm)\s*\(/;
+const runtimeRoots = ['main', 'settings', 'timetable', 'journal', 'ui', 'core', 'chat', 'online-booking'];
+const forbidden = /(?:\b(?:window\.)?(?:alert|confirm|prompt)\s*\(|\.\s*(?:reportValidity|setCustomValidity)\s*\()/;
 const errors = [];
 
 function walk(dir) {
@@ -24,7 +24,7 @@ const files = [
 
 for (const file of files) {
   if (!forbidden.test(readFileSync(file, 'utf8'))) continue;
-  errors.push(`${relative(root, file)}: native alert/confirm is forbidden; use shared Book modal UI`);
+  errors.push(`${relative(root, file)}: native browser/system message UI is forbidden; use shared V2 UI`);
 }
 
 if (errors.length) {
