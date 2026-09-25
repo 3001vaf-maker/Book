@@ -567,10 +567,11 @@ function settingsCards(person) {
     <section class="people-settings-section" aria-label="Фото">
       ${miniCard({
         title: 'Фото',
-        value: person.photo ? 'Изменить' : 'Добавить',
+        value: name(person),
         subtitle: person.photo ? 'Фото сохранено' : 'Фото не добавлено',
         image: person.photo || '',
-        initials: person.photo ? '' : initials(person),
+        surface: 'photo',
+        actionLabel: person.photo ? 'Изменить' : 'Добавить',
         interactive: true,
         data: 'data-person-photo-card',
         aria: person.photo ? 'Изменить фото' : 'Добавить фото',
