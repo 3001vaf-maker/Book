@@ -4,7 +4,6 @@ import fs from 'node:fs';
 const chat = fs.readFileSync('ui/chat/chat.css', 'utf8');
 const v2 = fs.readFileSync('ui/v2/v2.css', 'utf8');
 const account = fs.readFileSync('online-booking/account-shell.js', 'utf8');
-const notifications = fs.readFileSync('online-booking/notifications.js', 'utf8');
 assert.equal(fs.existsSync('ui/shell/shell.css'), false);
 
 assert.match(chat, /\.message-composer\{[^}]*position:fixed[^}]*grid-template-columns:minmax\(0,1fr\) 46px/s);
@@ -19,6 +18,6 @@ assert.match(account, /kind: 'attachment'/);
 assert.match(account, /className: 'v2-app--chat'/);
 assert.match(account, /settingsPanel\(/);
 assert.doesNotMatch(account, /createElement\('style'\)|<style>/);
-assert.doesNotMatch(notifications, /createElement\('style'\)|<style>|white-space:nowrap/);
+assert.equal(fs.existsSync('online-booking/notifications.js'), false, 'Legacy notification bridge must stay removed');
 
 console.log('mobile notification and messages layout regression test passed');
