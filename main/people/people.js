@@ -84,7 +84,7 @@ function consentStatus(fact) {
 
 function consentMoment(fact) {
   const value = fact?.eventAt || fact?.revokedAt || fact?.acceptedAt || fact?.createdAt || '';
-  return shortDateTime(value, '—');
+  return shortDateTime(value,'—');
 }
 
 function consentSource(source) {
