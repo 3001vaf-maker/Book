@@ -80,11 +80,16 @@ if (!/getAvailabilityGrid/.test(availability) || !/checkTimeAvailability/.test(a
 if (!/createTimeGrid/.test(availability) || !/getTimeUsagesForScope/.test(availability)) fail('core/availability.js', 'Availability must compose TimeGrid with the neutral occupancy contract');
 if (/journal\/|timetable\/|settings\/|ui\//.test(availability)) fail('core/availability.js', 'Availability must not depend on feature or UI implementations');
 
-if (!/ALL_WORKPLACES_ID/.test(graph) || !/includeAggregate:\s*true/.test(graph)) fail('timetable/timetable.js', 'Graph must expose the aggregate workplace schedule through its Workplace control');
+if (!/ALL_WORKPLACES_ID/.test(graph) || !/function\s+openTimetableSettingsZ2\(\)/.test(graph)) fail('timetable/timetable.js', 'Graph must expose aggregate and workplace Z1 manifestations through its Z2 settings selector');
 if (!/getWorkingDayTotalMinutes/.test(graph)) fail('timetable/timetable.js', 'aggregate Graph dates must show summed duration instead of a false continuous interval');
 if (!/resolveDateIndicators/.test(graph) || /calendar__date-indicator/.test(graph)) fail('timetable/timetable.js', 'Graph must pass indicator data to Calendar instead of drawing indicators locally');
-if (!/openWorkplaceControl\s*\(\s*\{[\s\S]*?title:\s*['"]Рабочий график['"]/.test(graph)) fail('timetable/timetable.js', 'Graph must own and pass its visible Header Control title');
+if (!/workspaceHeaderContext\(\{[\s\S]*?title:\s*title\s*\|\|\s*\(allMode\s*\?\s*'Общий график'\s*:\s*'Профиль'\)/.test(graph)) fail('timetable/timetable.js', 'Graph Z1 must have exactly Profile and Aggregate header manifestations');
+if (!/kind:\s*'logo'/.test(graph) || !/data-timetable-settings-open/.test(graph)) fail('timetable/timetable.js', 'Graph A must feed only its workday count into the Shared Header logo owner');
+if (!/title:\s*'Настройки графика'/.test(graph) || !/miniCardStack\(cards\)/.test(graph) || !/mountV2ZLayer\(root,\s*v2ZLayer/.test(graph)) fail('timetable/timetable.js', 'Graph A must open Settings as shared Z2 with vertical Shared Mini Cards');
+if (!/disabled:\s*true/.test(graph) || !/hideD:\s*true/.test(graph)) fail('timetable/timetable.js', 'Graph Settings Z2 must keep A inactive and D absent');
+if (/title:\s*['"]Рабочий график['"]/.test(graph)) fail('timetable/timetable.js', 'Graph must not retain the legacy Header Control manifestation for settings');
 if (!/actionsRoot\.hidden\s*=\s*false/.test(graph)) fail('timetable/timetable.js', 'aggregate Graph mode must keep the shared Apply action available');
+if (!/data-v2-primary-visible="false"/.test(graph) || !/applyButton\.dataset\.v2PrimaryVisible\s*=\s*'true'/.test(graph)) fail('timetable/timetable.js', 'Graph C must be absent without date selection and appear only after selection');
 if (/selection\s*=\s*isAllMode\(\)\s*\?\s*null/.test(graph)) fail('timetable/timetable.js', 'aggregate Graph mode must not disable Calendar multi-select');
 if (!/selection\s*=\s*initMultiSelect\(calendarRoot,\s*\{\s*onChange:\s*syncApplyButton\s*\}\)/.test(graph)) fail('timetable/timetable.js', 'Graph must use shared multi-select in both workplace and aggregate modes');
 if (!/function\s+openAggregateWorkplaceApply\(dates\)/.test(graph) || !/includeAggregate:\s*false/.test(graph)) fail('timetable/timetable.js', 'aggregate Apply must open workplace selection before creating working days');

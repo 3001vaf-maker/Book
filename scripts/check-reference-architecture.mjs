@@ -135,11 +135,11 @@ const graphSource = text(timetableController);
 if (/\bopenWorkplace(?:Picker|Time)?Modal\b/.test(graphSource)) {
   report(timetableController, 'Graph must not create a parallel Workplace modal; use its canonical Workplace control');
 }
-if (!/\bheaderControl\s*\(/.test(graphSource) || !/\bworkplaceContent\s*\(/.test(graphSource)) {
-  report(timetableController, 'Graph must compose neutral Workplace content inside the shared Header Control');
+if (!/\bworkspaceHeaderContext\s*\(/.test(graphSource) || !/\bmountV2ZLayer\s*\(/.test(graphSource) || !/\bminiCardStack\s*\(/.test(graphSource)) {
+  report(timetableController, 'Graph header/settings navigation must compose the Shared workspace Header, Z layer, and Mini Card stack owners');
 }
 if (!/\bopenWorkplaceControl\s*\(/.test(graphSource)) {
-  report(timetableController, 'Graph must use its canonical Workplace manifestation');
+  report(timetableController, 'Graph aggregate Apply must keep using its canonical Workplace manifestation');
 }
 
 const journalSource = text(journalController);

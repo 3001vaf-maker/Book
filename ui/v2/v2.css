@@ -47,8 +47,11 @@
 .v2-header__slot.is-empty{width:0;min-width:0;overflow:hidden}
 .v2-header__title{min-width:0;margin:0;font-size:18px;line-height:1.1;font-weight:760;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.v2-header__title-control{width:100%;border:0;padding:0;background:transparent;color:#fff;text-align:left}
 .v2-header__control{position:relative;min-width:42px;height:42px;border:0;padding:0 12px;display:grid;place-items:center;background:#fff;color:var(--v2-ink);font:inherit;font-weight:760}
+.v2-header__control--logo{width:48px;min-width:48px;height:48px;border:2px solid #fff;border-radius:50%;padding:0;background:transparent;color:#fff;font-size:14px;font-weight:850;line-height:1}
+.v2-header__control--logo:disabled{border-color:#fff;background:transparent;color:#fff;opacity:1}
 .v2-header__control--avatar{width:48px;height:48px;border-radius:50%;padding:0;overflow:hidden}
 .v2-header__control--settings,.v2-header__control--chat,.v2-header__control--contacts,.v2-header__control--attachment,.v2-header__control--back{width:42px;border-radius:50%;padding:0}
+.v2-header__slot--c .v2-header__control--text{border:1px solid #fff;background:#111;color:#fff}
 .v2-header__back{font-size:32px;line-height:1;font-weight:400;transform:translateY(-1px)}
 .v2-header__control--text{border-radius:12px;white-space:nowrap}
 .v2-header__control--danger{background:var(--v2-danger);color:#fff}
