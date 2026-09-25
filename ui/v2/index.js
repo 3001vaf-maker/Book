@@ -76,19 +76,19 @@ export function v2FDeck(items = [], { active = '', data = 'data-v2-deck-item', c
   const activeId = String(active || values[0]?.id || '0');
   const activeIndex = Math.max(0, values.findIndex((item, index) => String(item.id || index) === activeId));
   const count = values.length;
-  const depthStepX = count > 1 ? Math.min(10, 18 / (count - 1)) : 0;
+  const tabStep = 44;
   const deckClasses = ['v2-deck', className].filter(Boolean).join(' ');
   const roleData = role ? ` data-v2-deck-role="${text(role)}"` : '';
   return `<div class="${text(deckClasses)}" data-v2-deck data-v2-deck-count="${count}"${roleData}>${values.map((item, index) => {
     const id = String(item.id || index);
     const visualDepth = (index - activeIndex + count) % count;
     const isActive = visualDepth === 0;
-    const depthX = Number((visualDepth * depthStepX).toFixed(2));
-    const depthY = visualDepth * 8;
-    const stackZ = Math.max(1, count - visualDepth);
+    const tabOrder = count - 1 - visualDepth;
+    const depthY = tabOrder * tabStep;
+    const stackZ = tabOrder + 1;
     const classes = ['v2-deck__card', isActive ? 'is-active' : 'is-stacked'].filter(Boolean).join(' ');
     const customData = data && data !== 'data-v2-deck-item' ? ` ${data}="${text(id)}"` : '';
-    return `<button type="button" class="${classes}" style="--v2-depth:${visualDepth};--v2-depth-x:${depthX}px;--v2-depth-y:${depthY}px;--v2-stack-z:${stackZ}" data-v2-deck-item="${text(id)}"${customData} data-v2-f-index="${index}" aria-label="${text(item.aria || item.label || '')}"><strong data-v2-f-handle>${text(item.label || '')}</strong></button>`;
+    return `<button type="button" class="${classes}" style="--v2-depth:${visualDepth};--v2-depth-x:0px;--v2-depth-y:${depthY}px;--v2-stack-z:${stackZ}" data-v2-deck-item="${text(id)}"${customData} data-v2-f-index="${index}" aria-label="${text(item.aria || item.label || '')}"><strong data-v2-f-handle>${text(item.label || '')}</strong></button>`;
   }).join('')}</div>`;
 }
 
@@ -571,7 +571,6 @@ export function initV2WorkspaceInteraction(root, {
       role = 'e';
       card = eCard;
       index = eCards.indexOf(eCard);
-      if (index !== eActiveIndex && !event.target.closest?.('[data-v2-e-handle]')) return;
     } else if (fCard && deck?.contains(fCard)) {
       role = 'f';
       card = fCard;
