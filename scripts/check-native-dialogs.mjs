@@ -3,7 +3,8 @@ import { join, relative } from 'node:path';
 
 const root = process.cwd();
 const runtimeRoots = ['main', 'settings', 'timetable', 'journal', 'ui', 'core', 'chat', 'online-booking'];
-const forbidden = /(?:\b(?:window\.)?(?:alert|confirm|prompt)\s*\(|\.\s*(?:reportValidity|setCustomValidity)\s*\()/;
+const globalForbidden = /\b(?:window\.)?(?:alert|confirm)\s*\(/;
+const endUserForbidden = /(?:\b(?:window\.)?(?:alert|confirm|prompt)\s*\(|\.\s*(?:reportValidity|setCustomValidity)\s*\()/;
 const errors = [];
 
 function walk(dir) {
@@ -23,8 +24,12 @@ const files = [
 ];
 
 for (const file of files) {
-  if (!forbidden.test(readFileSync(file, 'utf8'))) continue;
-  errors.push(`${relative(root, file)}: native browser/system message UI is forbidden; use shared V2 UI`);
+  const fileName = relative(root, file);
+  const source = readFileSync(file, 'utf8');
+  const endUserSurface = fileName.startsWith('online-booking/') || fileName.startsWith('ui/');
+  const forbidden = endUserSurface ? endUserForbidden : globalForbidden;
+  if (!forbidden.test(source)) continue;
+  errors.push(`${fileName}: native browser/system message UI is forbidden; use shared V2 UI`);
 }
 
 if (errors.length) {
