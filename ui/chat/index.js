@@ -37,6 +37,21 @@ export function messageThread(messages = [], options = {}) {
   return `<div class="message-thread" data-message-thread>${values.map((message) => messageBubble(message, options)).join('')}</div>`;
 }
 
+export function initMessageComposer(root = document) {
+  root.querySelectorAll?.('[data-message-composer]').forEach((form) => {
+    const input = form.querySelector('.message-composer__input');
+    if (!input || input.dataset.messageComposerReady === 'true') return;
+    input.dataset.messageComposerReady = 'true';
+    const resize = () => {
+      input.style.height = 'auto';
+      input.style.height = `${Math.min(input.scrollHeight, 116)}px`;
+      input.style.overflowY = input.scrollHeight > 116 ? 'auto' : 'hidden';
+    };
+    input.addEventListener('input', resize);
+    requestAnimationFrame(resize);
+  });
+}
+
 export function messageComposer({ placeholder = 'Написать сообщение...', data = 'data-message-composer', sendData = 'data-message-send', attachments = false, attachmentTrigger = 'composer' } = {}) {
   const externalAttachmentTrigger = attachments && attachmentTrigger === 'external';
   const composerClass = attachments && !externalAttachmentTrigger ? 'message-composer message-composer--with-attachments' : 'message-composer message-composer--plain';
