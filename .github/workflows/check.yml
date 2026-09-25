@@ -420,6 +420,7 @@ jobs:
           mkdir -p /tmp/global-account-migrations
           mv server/prisma/migrations/20260921130000_global_account_identity /tmp/global-account-migrations/
           mv server/prisma/migrations/20260921143000_account_terms /tmp/global-account-migrations/
+          mv server/prisma/migrations/20260925170000_global_account_tenant_link /tmp/global-account-migrations/
           (
             cd server
             DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' npx prisma migrate deploy
@@ -567,6 +568,7 @@ jobs:
           set -euo pipefail
           mv /tmp/global-account-migrations/20260921130000_global_account_identity server/prisma/migrations/
           mv /tmp/global-account-migrations/20260921143000_account_terms server/prisma/migrations/
+          mv /tmp/global-account-migrations/20260925170000_global_account_tenant_link server/prisma/migrations/
           (
             cd server
             DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' npx prisma migrate deploy
