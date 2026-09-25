@@ -130,7 +130,7 @@
 .v2-z--layer{
   position:absolute;
   z-index:7;
-  inset:0 0 0 calc(var(--v2-edge) + var(--v2-z-layer-shift,var(--v2-z-layer-offset)));
+  inset:0 0 0 calc(var(--v2-edge) + var(--v2-z-layer-offset));
   width:auto;
   height:100%;
   min-height:100%;
@@ -138,6 +138,7 @@
   transform:translate3d(var(--v2-drag-x,0px),0,0);
   animation:v2-z-layer-in .24s cubic-bezier(.22,.78,.18,1) both;
 }
+.v2-z--layer[data-v2-z-depth]{inset:0 0 0 calc(var(--v2-edge) + var(--v2-z-layer-shift))}
 .v2-z--layer.is-dragging{transition:none;animation:none}
 
 .v2-app--workspace .v2-workspace-surface{min-height:100%}
