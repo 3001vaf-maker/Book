@@ -23,8 +23,14 @@ assert.match(
 
 assert.match(
   source,
-  /if\s*\(allMode\)\s*\{[\s\S]*?selectionMode\s*=\s*['"]add-workplace['"][\s\S]*?applyButton\.disabled\s*=\s*false[\s\S]*?applyLabel\.textContent\s*=\s*['"]Применить['"]/,
-  'selected aggregate dates must enable Apply without changing the calendar mode',
+  /if\s*\(allMode\)\s*\{[\s\S]*?selectionMode\s*=\s*['"]add-workplace['"][\s\S]*?applyButton\.disabled\s*=\s*false[\s\S]*?applyButton\.dataset\.v2PrimaryVisible\s*=\s*['"]true['"]/,
+  'selected aggregate dates must enable and reveal Apply without changing the calendar mode',
+);
+
+assert.match(
+  source,
+  /if\s*\(!dates\.length\)\s*\{[\s\S]*?applyButton\.dataset\.v2PrimaryVisible\s*=\s*['"]false['"]/,
+  'Apply must be absent when no dates are selected',
 );
 
 assert.doesNotMatch(

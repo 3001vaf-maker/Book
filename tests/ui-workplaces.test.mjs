@@ -56,7 +56,17 @@ assert.match(dayControlSource, /openCatalog\(\{ workplaces: available, title: ca
 
 const graphSource = readFileSync(new URL('../timetable/timetable.js', import.meta.url), 'utf8');
 assert.match(graphSource, /openWorkplaceControl/);
-assert.match(graphSource, /title:\s*'Рабочий график'/);
+assert.doesNotMatch(graphSource, /title:\s*'Рабочий график'/);
+assert.match(graphSource, /title:\s*title\s*\|\|\s*\(allMode\s*\?\s*'Общий график'\s*:\s*'Профиль'\)/);
+assert.match(graphSource, /kind:\s*'logo'/);
+assert.match(graphSource, /function\s+openTimetableSettingsZ2\(\)/);
+assert.match(graphSource, /title:\s*'Настройки графика'/);
+assert.match(graphSource, /miniCardStack\(cards\)/);
+assert.match(graphSource, /mountV2ZLayer\(root,\s*v2ZLayer/);
+assert.match(graphSource, /disabled:\s*true/);
+assert.match(graphSource, /hideD:\s*true/);
+assert.match(graphSource, /data-v2-primary-visible="false"/);
+assert.match(graphSource, /applyButton\.dataset\.v2PrimaryVisible\s*=\s*'true'/);
 assert.doesNotMatch(graphSource, /openTimetableDayEditor/);
 assert.doesNotMatch(graphSource, /function\s+openAggregateDayEditor/);
 assert.match(graphSource, /actionsRoot\.hidden\s*=\s*false/);

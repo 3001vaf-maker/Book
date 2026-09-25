@@ -318,6 +318,7 @@ function syncWorkspaceHeader(surface) {
       initials: aSource.dataset.workspaceAInitials || '',
       data: 'data-v2-workspace-a',
       aria: aSource.getAttribute('aria-label') || sourceText(aSource, 'Контекст раздела'),
+      disabled: Boolean(aSource.disabled),
     } : null,
     b: title,
     c: cVisible ? {
