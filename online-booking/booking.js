@@ -187,6 +187,7 @@ function renderLegalSticker(root, state) {
       else if (state.account) void renderAccountHome(root, state);
       else renderAccountDetails(root, state);
     },
+    onLeft: () => { exitBookingContext(state); },
   });
 
   root.querySelector('[data-legal-platform-document]')?.addEventListener('click', () => {
@@ -371,6 +372,12 @@ function backFromFirstBookingStep(root, state) {
   renderWelcome(root, state);
 }
 
+function exitBookingContext(state) {
+  if (!state.account || typeof state.onExitToAccount !== 'function') return false;
+  state.onExitToAccount();
+  return true;
+}
+
 function renderWelcome(root, state) {
   const profile = state.context.profile || {};
   const owner = [profile.name, profile.surname].filter(Boolean).join(' ').trim();
@@ -386,7 +393,12 @@ function renderWelcome(root, state) {
     body: state.settings.welcomeText ? `<p>${escapeHtml(state.settings.welcomeText).replaceAll('\n', '<br>')}</p>` : '',
     className: 'v2-sticker-screen--welcome',
   })}</section>`;
-  initV2StickerSwipe(root, { onRight: continueFlow, onLeft: continueFlow });
+  initV2StickerSwipe(root, {
+    onRight: continueFlow,
+    onLeft: () => {
+      if (!exitBookingContext(state)) continueFlow();
+    },
+  });
 }
 
 function renderAccountEntry(root, state) {
@@ -415,6 +427,7 @@ function renderAccountEntry(root, state) {
       if (state.identityDestination === 'booking' && state.from) renderConfirmation(root, state);
       else nextBookingStep(root, state);
     },
+    onLeft: () => { exitBookingContext(state); },
   });
 
   initPasswordFields(root);
@@ -609,7 +622,10 @@ function renderWorkplaces(root, state) {
     body: content || emptyState('Нет доступных пространств', 'Рабочие пространства для онлайн-записи не найдены.'),
     step: 'workplaces',
   });
-  initV2Swipe(root, { onRight: () => backFromFirstBookingStep(root, state) });
+  initV2Swipe(root, {
+    onRight: () => backFromFirstBookingStep(root, state),
+    onLeft: () => { exitBookingContext(state); },
+  });
   root.querySelectorAll('[data-booking-workplace]').forEach((node) => node.addEventListener('click', () => {
     state.workplaceKey = node.dataset.bookingWorkplace || '';
     state.procedureIds = [];
@@ -642,6 +658,7 @@ function renderProcedures(root, state) {
       if (state.lockedWorkplaceKey) backFromFirstBookingStep(root, state);
       else renderWorkplaces(root, state);
     },
+    onLeft: () => { exitBookingContext(state); },
   });
   root.querySelectorAll('[data-booking-procedure]').forEach((node) => node.addEventListener('click', () => {
     const id = String(node.dataset.bookingProcedure || '');
@@ -671,7 +688,10 @@ function renderDates(root, state) {
     body: dates.length ? '<div data-booking-calendar></div>' : emptyState('Свободных дат нет', 'В графике пока нет доступных дат.'),
     step: 'dates',
   });
-  initV2Swipe(root, { onRight: () => renderProcedures(root, state) });
+  initV2Swipe(root, {
+    onRight: () => renderProcedures(root, state),
+    onLeft: () => { exitBookingContext(state); },
+  });
   const calendarRoot = root.querySelector('[data-booking-calendar]');
   if (!calendarRoot) return;
   initCalendar(calendarRoot, {
@@ -702,7 +722,10 @@ function renderTimes(root, state) {
       : emptyState('Свободного времени нет', 'На эту дату нет интервала для выбранных услуг.')}${errorBlock(state.error)}`,
     step: 'times',
   });
-  initV2Swipe(root, { onRight: () => renderDates(root, state) });
+  initV2Swipe(root, {
+    onRight: () => renderDates(root, state),
+    onLeft: () => { exitBookingContext(state); },
+  });
   root.querySelectorAll('[data-booking-time]').forEach((node) => {
     if (String(node.dataset.bookingTime || '') === String(state.from || '')) node.classList.add('is-selected');
     node.addEventListener('click', () => {
@@ -748,6 +771,7 @@ function renderConfirmation(root, state) {
       state.error = '';
       renderTimes(root, state);
     },
+    onLeft: () => { exitBookingContext(state); },
   });
   root.querySelector('[data-booking-confirm]')?.addEventListener('click', async (event) => {
     event.currentTarget.disabled = true;
@@ -1138,7 +1162,7 @@ export async function renderGlobalClient(root) {
   }
 }
 
-export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = '' } = {}) {
+export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = '', onExitToAccount = null } = {}) {
   const state = {
     tenantId: String(tenantId || ''),
     lockedWorkplaceKey: String(workplaceKey || ''),
@@ -1167,6 +1191,7 @@ export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = 
     accountChatReturn: '',
     bookingStep: '',
     accountRequests: [],
+    onExitToAccount,
   };
 
   renderFlowPage(root, state, { title: 'Онлайн-запись', subtitle: 'Загрузка…', center: true });
