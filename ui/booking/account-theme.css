@@ -1,0 +1,35 @@
+.booking-account--account{
+  --text:var(--booking-dark);
+  --button-secondary:var(--booking-light);
+  --active:var(--booking-light);
+  width:100%;
+  min-height:var(--visual-vh,100dvh);
+  background:linear-gradient(145deg,var(--booking-bg-start),var(--booking-bg-end));
+}
+
+.booking-account--account.booking-shape--soft{
+  --radius-control:18px;
+  --radius-card:22px;
+  --radius-panel:22px;
+}
+.booking-account--account.booking-shape--round{
+  --radius-control:999px;
+  --radius-card:28px;
+  --radius-panel:28px;
+}
+.booking-account--account.booking-shape--straight{
+  --radius-control:4px;
+  --radius-card:4px;
+  --radius-panel:4px;
+}
+.booking-account--account.booking-shape--cut{
+  --radius-control:0;
+  --radius-card:0;
+  --radius-panel:0;
+}
+
+.booking-account--account.booking-shape--cut .entity-card,
+.booking-account--account.booking-shape--cut .list-entry,
+.booking-account--account.booking-shape--cut .ui-button{
+  clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);
+}
