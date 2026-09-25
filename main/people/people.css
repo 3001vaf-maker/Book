@@ -1,8 +1,8 @@
 .people-z1{display:grid;gap:0}.people-search{padding:0 0 12px}.people-search .field>span{display:none}.people-search-divider{height:1px;margin:0 0 14px;background:#D7D7D7}.people-list-host{min-width:0}
 .people-list-settings{display:grid;gap:16px}.people-list-settings__actions{display:grid;gap:8px}.people-list-settings__actions .ui-button--secondary{border-color:#111;background:#fff;color:#111}
-.people-overview{display:grid;gap:18px}.people-metrics.v2-rail{gap:10px;padding-top:3px}.people-metrics.v2-rail>*{flex:0 0 44%;max-width:156px}.people-metric-card.v2-rail-card{min-height:96px;padding:12px}.people-metric-card.v2-rail-card strong{font-size:16px}.people-metric-card.v2-rail-card span{font-size:11px;line-height:1.2}
+.people-add-choice{display:grid;gap:8px}.people-add-choice .ui-button--secondary{border-color:#111;background:#fff;color:#111}
+.people-overview{display:grid;gap:18px}.people-metrics.v2-rail{gap:10px;padding-top:3px}.people-metrics.v2-rail>*{flex:0 0 84px;width:84px;max-width:84px}.people-metric-card.v2-rail-card{box-sizing:border-box;width:84px;height:84px;min-height:84px;padding:10px;align-content:space-between}.people-metric-card.v2-rail-card strong{font-size:14px;line-height:1.05;overflow-wrap:anywhere}.people-metric-card.v2-rail-card span{font-size:10px;line-height:1.15}
 .people-card-wrap{min-width:0}.people-card-wrap .entity-card--hero{margin-bottom:0}
-.people-person-settings{display:grid;gap:12px}.people-uei-sheet{display:grid;gap:12px}.people-uei-sheet .ui-uei{display:grid;gap:12px}
+.people-person-settings{display:grid;gap:18px}.people-settings-section{min-width:0}.people-uei-sheet{display:grid;gap:12px}.people-uei-sheet .ui-uei{display:grid;gap:12px}.people-photo-editor{display:grid;gap:16px}
 .people-edit-form{display:grid;gap:0}.people-edit-form .v2-section{margin-bottom:22px}.people-edit-form .v2-section:last-of-type{margin-bottom:0}
 .people-create-layer .form-grid{padding-top:4px}
-@media(max-width:360px){.people-metrics.v2-rail>*{flex-basis:46%;}.people-metric-card.v2-rail-card{padding:10px}}
