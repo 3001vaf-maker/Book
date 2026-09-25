@@ -247,8 +247,6 @@ function primarySource(surface) {
   const explicit = surface.querySelector('[data-v2-primary-action]');
   if (explicit) return explicit;
 
-  const shellAction = surface.querySelector('.app-header__slot--action button');
-  if (shellAction) return shellAction;
 
   const pageAction = surface.querySelector('.page-header-action button');
   if (pageAction) return pageAction;
@@ -317,11 +315,11 @@ function syncWorkspaceHeader(surface) {
     ? 'Чат'
     : rootDefinition(root)?.label || '';
   const title = context?.dataset.workspaceTitle || sourceText(
-    contextRoot.querySelector('.page-header h1, .app-header__title'),
+    contextRoot.querySelector('.page-header h1'),
     fallbackTitle,
   );
-  const backSource = contextRoot.querySelector('[data-workspace-back-source], .app-header__slot--back button');
-  const contextSource = contextRoot.querySelector('[data-workspace-context-action], .page-header__meta button, .app-header__slot--settings button');
+  const backSource = contextRoot.querySelector('[data-workspace-back-source]');
+  const contextSource = contextRoot.querySelector('[data-workspace-context-action], .page-header__meta button');
   const aSource = contextSource;
   const dSource = contextRoot.querySelector('[data-workspace-d-action]');
   const cSource = primarySource(contextRoot);
