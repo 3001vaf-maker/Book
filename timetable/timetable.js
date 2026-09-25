@@ -1,4 +1,4 @@
-import { actionBlock, button, initCalendar, initMultiSelect, modal, mountModal, timePicker, initTimePickers, twoColumnLayout, escapeHtml, miniCard, miniCardStack, mountV2ZLayer, openWorkplaceControl, v2ZLayer, workspaceHeaderContext, ALL_WORKPLACES_ID, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js';
+import { button, entityCard, entityCardStack, initCalendar, initMultiSelect, modal, mountModal, timePicker, initTimePickers, twoColumnLayout, escapeHtml, mountV2ZLayer, v2ZLayer, workspaceHeaderContext, ALL_WORKPLACES_ID, getWorkplaceContext, setWorkplaceContext } from '../ui/ui.js';
 import { getWorkplaces, resolveWorkplaceTime, getWorkingDayIndicators, getWorkingDayTotalMinutes, getWorkplaceMonthStats, getAllWorkplacesMonthStats, getWorkplaceMonthStatsMap } from '../core/workplace-time.js';
 import { getDays, saveDays, getDay, getDayTime, createDay, updateDayTime, removeDay, getDayRemovalConflicts, getScheduleConflicts, findSuggestedInterval } from '../core/day/index.js';
 import { getWorkingTimeUsageConflicts, isValidRange } from '../core/time/index.js';
@@ -39,14 +39,52 @@ export function renderTimetable(root) {
     byWorkplace: getWorkplaceMonthStatsMap(workingDays, workplaces, month),
   });
 
+  const workplaceGraphCard = (workplace, stats, { data = '', aria = '' } = {}) => {
+    const summary = formatMonthStats(stats);
+    return entityCard({
+      title: workplace?.name || 'Без названия',
+      subtitle: workplace?.city || workplace?.address || '',
+      image: workplace?.photo || '',
+      initial: (workplace?.name || '?').slice(0, 1).toUpperCase(),
+      meta: [
+        { value: workplace?.city || '—', label: 'город' },
+        { value: `${workplace?.from || '—'}–${workplace?.to || '—'}`, label: 'график' },
+        { value: String(summary.days), label: 'дней' },
+        { value: summary.duration, label: 'в графике' },
+      ],
+      metricsLayout: 'grid',
+      interactive: true,
+      data,
+      aria: aria || `Открыть рабочее пространство ${workplace?.name || ''}`,
+      className: 'entity-card--hero entity-card--rail entity-card--top-light',
+    });
+  };
+
+  const aggregateGraphCard = (stats, { data = '', aria = 'Открыть общий график' } = {}) => {
+    const summary = formatMonthStats(stats);
+    return entityCard({
+      title: 'Общий график',
+      meta: [
+        { value: String(summary.days), label: 'дней' },
+        { value: summary.duration, label: 'в графике' },
+      ],
+      metricsLayout: 'grid',
+      interactive: true,
+      data,
+      aria,
+      className: 'entity-card--hero entity-card--rail entity-card--top-light',
+    });
+  };
+
   const headerContextMarkup = (month, { inactiveA = false, title = '' } = {}) => {
     const allMode = selectedWorkplaceId === ALL_WORKPLACES_ID;
     const stats = allMode
       ? getAllWorkplacesMonthStats(workingDays, workplaces, month)
       : getWorkplaceMonthStats(workingDays, workplaces, selectedWorkplaceId, month);
     const summary = formatMonthStats(stats);
+    const workplace = workplaces.find((item) => String(item?.key || '') === String(selectedWorkplaceId || '')) || null;
     return workspaceHeaderContext({
-      title: title || (allMode ? 'Общий график' : 'Профиль'),
+      title: title || (allMode ? 'Общий график' : (workplace?.name || 'Рабочее пространство')),
       a: {
         kind: 'logo',
         label: String(summary.days),
@@ -58,11 +96,13 @@ export function renderTimetable(root) {
     });
   };
 
-  root.innerHTML = `<div class="calendar-workspace">${headerContextMarkup(initialMonth)}<div data-timetable-calendar data-calendar-workspace-host></div><div data-timetable-actions>${actionBlock(button('<span data-timetable-apply-label>Применить</span>', { data: 'data-timetable-apply disabled data-v2-primary-visible="false"' }), { className: 'calendar-workspace__actions' })}</div></div>`;
+  root.innerHTML = `<div class="calendar-workspace">${headerContextMarkup(initialMonth)}<div data-timetable-calendar data-calendar-workspace-host></div>${button('Применить', {
+    className: 'v2-primary-source-only',
+    data: 'data-timetable-apply data-v2-primary-action data-v2-primary-label="Применить" data-v2-primary-visible="false" disabled',
+    aria: 'Применить',
+  })}</div>`;
   const calendarRoot = root.querySelector('[data-timetable-calendar]');
-  const actionsRoot = root.querySelector('[data-timetable-actions]');
   const applyButton = root.querySelector('[data-timetable-apply]');
-  const applyLabel = root.querySelector('[data-timetable-apply-label]');
   let calendar; let selection; let selectionMode = null;
 
   const bindHeaderContext = () => {
@@ -80,8 +120,6 @@ export function renderTimetable(root) {
   const isWorkingDate = (date) => !isAllMode() && datesForWorkplace(workingDays, selectedWorkplaceId).includes(date);
   const syncApplyButton = (dates) => {
     const allMode = isAllMode();
-    if (actionsRoot) actionsRoot.hidden = false;
-    applyLabel.textContent = 'Применить';
     if (!dates.length) {
       selectionMode = null;
       applyButton.disabled = true;
@@ -375,21 +413,39 @@ export function renderTimetable(root) {
   }
 
   function openAggregateWorkplaceApply(dates) {
-    openWorkplaceControl({
-      workplaces,
-      workplaceId: '',
+    const month = calendar?.getDisplayedMonth() || initialMonth;
+    const monthStats = statsForMonth(month);
+    const cards = workplaces.map((workplace) => {
+      const key = String(workplace?.key || '');
+      return workplaceGraphCard(workplace, monthStats.byWorkplace[key], {
+        data: `data-timetable-apply-workplace="${escapeHtml(key)}"`,
+        aria: `Добавить рабочее пространство ${workplace?.name || ''}`,
+      });
+    });
+    const activeSummary = formatMonthStats(monthStats.aggregate);
+    const layer = mountV2ZLayer(root, v2ZLayer(`${workspaceHeaderContext({
       title: 'Добавить рабочее пространство',
-      includeAggregate: false,
-      onSelect: (workplaceId) => {
-        const targetId = String(workplaceId || '');
+      a: {
+        kind: 'logo',
+        label: String(activeSummary.days),
+        aria: `Рабочих дней: ${activeSummary.days}`,
+        disabled: true,
+      },
+      hideD: true,
+    })}${entityCardStack(cards)}`, { className: 'timetable-workplace-picker-layer' }), { stack: true });
+    if (!layer) return;
+    layer.querySelectorAll('[data-timetable-apply-workplace]').forEach((card) => {
+      card.addEventListener('click', () => {
+        const targetId = String(card.dataset.timetableApplyWorkplace || '');
         if (!targetId) return;
+        layer.v2Close?.();
         const base = resolveWorkplaceTime(workplaces, targetId);
         if (!base) {
           openWorkingTimePicker(dates, targetId);
           return;
         }
         applyWorkingDays(dates, base, targetId);
-      },
+      });
     });
   }
 
@@ -422,24 +478,13 @@ export function renderTimetable(root) {
     const activeStats = isAllMode() ? monthStats.aggregate : monthStats.byWorkplace[selectedWorkplaceId];
     const activeSummary = formatMonthStats(activeStats);
     const cards = [
-      miniCard({
-        title: 'Общий график',
-        value: `${formatMonthStats(monthStats.aggregate).days} дней`,
-        subtitle: formatMonthStats(monthStats.aggregate).duration,
-        interactive: true,
+      aggregateGraphCard(monthStats.aggregate, {
         data: `data-timetable-settings-select="${ALL_WORKPLACES_ID}"`,
-        aria: 'Открыть общий график',
       }),
       ...workplaces.map((workplace) => {
         const key = String(workplace?.key || '');
-        const summary = formatMonthStats(monthStats.byWorkplace[key]);
-        return miniCard({
-          title: workplace?.name || 'Без названия',
-          value: `${summary.days} дней`,
-          subtitle: summary.duration,
-          interactive: true,
+        return workplaceGraphCard(workplace, monthStats.byWorkplace[key], {
           data: `data-timetable-settings-select="${escapeHtml(key)}"`,
-          aria: `Открыть рабочее пространство ${workplace?.name || ''}`,
         });
       }),
     ];
@@ -452,7 +497,7 @@ export function renderTimetable(root) {
         disabled: true,
       },
       hideD: true,
-    })}${miniCardStack(cards)}`, { className: 'timetable-settings-layer' }), { stack: true });
+    })}${entityCardStack(cards)}`, { className: 'timetable-settings-layer' }), { stack: true });
     if (!layer) return;
     layer.querySelectorAll('[data-timetable-settings-select]').forEach((card) => {
       card.addEventListener('click', () => {
