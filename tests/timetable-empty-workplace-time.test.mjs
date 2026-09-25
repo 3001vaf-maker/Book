@@ -24,7 +24,7 @@ assert.match(source, /if \(!base\) \{\s*openWorkingTimePicker\(dates\);\s*return
 assert.match(source, /timePicker\(\{ name: 'timetableWorkingFrom'/);
 assert.match(source, /timePicker\(\{ name: 'timetableWorkingTo'/);
 assert.match(source, /if \(!isValidRange\(from, to\)\)/);
-assert.match(source, /applyWorkingDays\(dates, \{ from, to \}\)/);
+assert.match(source, /applyWorkingDays\(dates, \{ from, to \}, workplaceId\)/);
 assert.match(source, /Постоянное расписание рабочего места не изменится/);
 assert.doesNotMatch(source, /workplace\.(?:from|to)\s*=/);
 
