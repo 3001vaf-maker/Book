@@ -18,7 +18,9 @@ function headerControl(slot = {}, role = '') {
   const kind = slot.kind || 'text';
   const variantClass = slot.variant === 'danger' ? ' v2-header__control--danger' : '';
   let body = label;
-  if (kind === 'avatar') {
+  if (kind === 'logo') {
+    body = label;
+  } else if (kind === 'avatar') {
     body = image
       ? `<span class="v2-header__avatar" style="--v2-avatar:url('${text(image)}');--v2-avatar-position:${text(slot.imagePosition || '50% 50%')}" aria-hidden="true"></span>`
       : `<span class="v2-header__avatar v2-header__avatar--initials" aria-hidden="true">${initials}</span>`;
