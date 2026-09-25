@@ -511,6 +511,16 @@ function settingsCards(person) {
   </div>`;
 }
 
+function refreshPersonIdentityPresentation(modalRoot, key) {
+  const person = getAllPeople().find((item) => item.key === key);
+  const surface = modalRoot?.parentElement?.matches?.('[data-v2-z-layer]') ? modalRoot.parentElement : null;
+  if (!person || !surface) return;
+  const metrics = surface.querySelector('.people-metrics');
+  if (metrics) metrics.outerHTML = metricRail(person);
+  const id = surface.querySelector('[data-person-card] .entity-card__id');
+  if (id) id.textContent = person.uei || '';
+}
+
 function bindSettingsCards(modalRoot, key, { onIdentityChange = null } = {}) {
   const person = getAllPeople().find((item) => item.key === key);
   if (!person) {
@@ -528,7 +538,7 @@ function bindSettingsCards(modalRoot, key, { onIdentityChange = null } = {}) {
         return;
       }
       bindSettingsCards(modalRoot, person.key, { onIdentityChange });
-      onIdentityChange?.(person.key);
+      refreshPersonIdentityPresentation(modalRoot, person.key);
     });
   });
   host.querySelectorAll('[data-person-consent]').forEach((row) => {
