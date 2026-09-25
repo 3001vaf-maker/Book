@@ -78,11 +78,6 @@ export function formValidationMessage(form) {
   if (!form?.elements) return '';
   const controls = [...form.elements];
   controls.forEach((control) => control?.removeAttribute?.('aria-invalid'));
-  const invalid = controls.find((control) => control?.willValidate && !control.validity?.valid);
-  if (!invalid) return '';
-
-  invalid.setAttribute?.('aria-invalid', 'true');
-  invalid.focus?.({ preventScroll: true });
 
   const phone = controls.find((control) => control?.matches?.('[data-phone-national]') && control.required && control.closest?.('[data-phone-input]')?.dataset.phoneComplete !== 'true');
   if (phone) {
@@ -90,7 +85,12 @@ export function formValidationMessage(form) {
     phone.focus?.({ preventScroll: true });
     return 'Введите номер телефона полностью.';
   }
-  if (invalid.matches?.('[data-phone-national]')) return 'Введите номер телефона полностью.';
+
+  const invalid = controls.find((control) => control?.willValidate && !control.validity?.valid);
+  if (!invalid) return '';
+
+  invalid.setAttribute?.('aria-invalid', 'true');
+  invalid.focus?.({ preventScroll: true });
   if (invalid.validity?.valueMissing) return 'Заполните обязательные поля.';
   if (invalid.type === 'email' && invalid.validity?.typeMismatch) return 'Введите корректный email.';
   if (invalid.validity?.tooLong) return 'Сократите введённый текст.';
