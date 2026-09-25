@@ -1,6 +1,41 @@
 import { button, field, mountModal, modal, phoneField } from '../../ui/ui.js';
 import { createPerson, getAllPeople, savePeople } from './data.js';
 
+export function personCreateForm(preset = {}) {
+  return `<form class="form-grid" data-person-create-form>
+    ${field({ label: 'Имя', name: 'name', value: preset.name || '', required: true })}
+    ${field({ label: 'Фамилия', name: 'surname', value: preset.surname || '' })}
+    ${phoneField({ label: 'Телефон', name: 'phone', value: preset.phone || '' })}
+    <div class="form-error" data-error></div>
+    ${button('Сохранить', { type: 'submit' })}
+  </form>`;
+}
+
+export function bindPersonCreateForm(root, { onCreated = () => {} } = {}) {
+  const form = root?.querySelector?.('[data-person-create-form]');
+  if (!form || form.dataset.personCreateReady === 'true') return;
+  form.dataset.personCreateReady = 'true';
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const data = new FormData(form);
+    const all = getAllPeople();
+    try {
+      const person = createPerson(
+        String(data.get('name') || '').trim(),
+        String(data.get('surname') || '').trim(),
+        String(data.get('phone') || '').trim(),
+      );
+      if (!person.name) throw Error('Имя обязательно.');
+      all.push(person);
+      savePeople(all);
+      onCreated(person);
+    } catch (error) {
+      const node = form.querySelector('[data-error]');
+      if (node) node.textContent = error instanceof Error ? error.message : 'Не удалось создать';
+    }
+  });
+}
+
 export function openPersonCreate({
   root = document.body,
   preset = {},
@@ -8,29 +43,13 @@ export function openPersonCreate({
   surface = '',
   onCreated = () => {},
 } = {}) {
-  const html = `<form data-person-create-form><div class="modal-title"><h2>Создать</h2></div>${field({ label: 'Имя', name: 'name', value: preset.name || '', required: true })}${field({ label: 'Фамилия', name: 'surname', value: preset.surname || '' })}${phoneField({ label: 'Телефон', name: 'phone', value: preset.phone || '' })}<div class="form-error" data-error></div>${button('Сохранить', { type: 'submit' })}</form>`;
-  const m = mountModal(root, modal(html, { variant, surface }));
+  const m = mountModal(root, modal(personCreateForm(preset), { variant, surface, title: 'Создать' }));
   if (!m) return null;
-
-  m.querySelector('[data-person-create-form]')?.addEventListener('submit', (event) => {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const all = getAllPeople();
-    try {
-      const person = createPerson(
-        String(form.get('name') || '').trim(),
-        String(form.get('surname') || '').trim(),
-        String(form.get('phone') || '').trim(),
-      );
-      if (!person.name) throw Error('Имя обязательно.');
-      all.push(person);
-      savePeople(all);
+  bindPersonCreateForm(m, {
+    onCreated: (person) => {
       m.remove();
       onCreated(person);
-    } catch (error) {
-      event.currentTarget.querySelector('[data-error]').textContent = error.message;
-    }
+    },
   });
-
   return m;
 }
