@@ -20,19 +20,18 @@ import {
   listEntries,
   listEntry,
   mediaRail,
-  messageComposer,
-  messageThread,
   modal,
   monthDayPicker,
   mountModal,
-  readOnlyReceipt,
   repeatedField,
   segmentControl,
   select,
-  settingToggle,
   textareaField,
   twoColumnLayout,
 } from '../ui.js';
+import { messageComposer, messageThread } from '../chat/index.js';
+import { readOnlyReceipt } from '../receipt/index.js';
+import { settingToggle } from '../settings/index.js';
 
 const app = document.querySelector('#app');
 const controls = document.querySelector('#reference-controls');
