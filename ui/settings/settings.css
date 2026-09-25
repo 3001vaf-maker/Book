@@ -1,0 +1,12 @@
+.app-settings-panel{display:grid;gap:8px}
+.app-settings-panel .ui-button.app-settings-panel__button{justify-content:flex-start;text-align:left}
+.app-setting-toggle{width:100%;min-height:48px;border:1px solid var(--border);border-radius:13px;padding:8px 10px 8px 13px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;background:var(--white);color:var(--text);font:inherit;font-size:14px;font-weight:650;text-align:left}
+.app-setting-toggle__switch{position:relative;width:42px;height:24px;border-radius:999px;background:var(--text-muted);transition:background .16s ease}
+.app-setting-toggle__switch span{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--white);box-shadow:0 1px 4px rgba(0,0,0,.18);transition:transform .16s ease}
+.app-setting-toggle.is-on .app-setting-toggle__switch{background:var(--text)}
+.app-setting-toggle.is-on .app-setting-toggle__switch span{transform:translateX(18px)}
+.app-setting-toggle:disabled{opacity:.5}
+.booking-account--account .app-setting-toggle{border-radius:var(--radius-card)}
+.booking-account--account .app-setting-toggle__switch{background:color-mix(in srgb,var(--booking-dark) 35%,var(--booking-light))}
+.booking-account--account .app-setting-toggle.is-on .app-setting-toggle__switch{background:var(--booking-dark)}
+.booking-account--account.booking-shape--cut .app-setting-toggle{clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px)}
