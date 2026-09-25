@@ -16,8 +16,8 @@
   --v2-f-open-x:min(30vw,117px);
   --v2-fe-open-x:min(40vw,156px);
   --v2-deck-width:calc(var(--v2-f-open-x) - var(--v2-gap));
-  --v2-e-pull:calc(var(--v2-fe-open-x) - var(--v2-f-open-x));
-  --v2-e-top-gap:72px;
+  --v2-e-pull:var(--v2-card-handle);
+  --v2-e-max-height:calc(66.666% - 24px);
   --v2-deck-top:34px;
   --v2-card-handle:48px;
   --v2-card-handle-min:44px;
@@ -150,14 +150,15 @@
   width:var(--v2-deck-width);
   pointer-events:none;
 }
-.v2-app.has-e-deck .v2-deck{width:calc(var(--v2-fe-open-x) - var(--v2-gap))}
 .v2-e-deck{
   position:absolute;
   z-index:1;
-  top:calc(var(--v2-deck-top) + var(--v2-e-top-gap));
+  top:auto;
   bottom:0;
   left:0;
   width:var(--v2-deck-width);
+  height:var(--v2-e-max-height);
+  max-height:var(--v2-e-max-height);
   pointer-events:none;
 }
 .v2-front > .v2-z--layer{
@@ -213,7 +214,7 @@
   cursor:grab;
   transform:translate3d(var(--v2-pick-x,0px),var(--v2-pick-y,0px),0);
   box-shadow:7px 7px 20px rgba(0,0,0,.12),inset -1px 0 0 rgba(17,17,17,.12);
-  pointer-events:auto;
+  pointer-events:none;
   transition:transform .20s cubic-bezier(.22,.78,.18,1),top .20s cubic-bezier(.22,.78,.18,1),height .20s cubic-bezier(.22,.78,.18,1),box-shadow .20s ease;
   will-change:transform,top,height;
 }
@@ -247,6 +248,8 @@
   font-weight:800;
   text-align:left;
   transform:none;
+  pointer-events:auto;
+  touch-action:none;
 }
 .v2-deck.is-dragging .v2-deck__card.is-active{transition:none}
 .v2-deck__card.is-picked.is-dragging{transition:none}
@@ -270,7 +273,7 @@
   box-shadow:8px 8px 20px rgba(0,0,0,.13),inset -1px 0 0 rgba(17,17,17,.12);
   transform:translate3d(var(--v2-e-depth-x,0px),var(--v2-pick-y,0px),0);
   transition:transform .20s cubic-bezier(.22,.78,.18,1),top .20s cubic-bezier(.22,.78,.18,1),opacity .16s ease,box-shadow .20s ease;
-  pointer-events:auto;
+  pointer-events:none;
   z-index:var(--v2-e-stack-z,1);
   will-change:transform,top;
 }
@@ -314,6 +317,7 @@
   font-weight:800;
   text-align:center;
   transform:none;
+  pointer-events:auto;
   touch-action:none;
 }
 
