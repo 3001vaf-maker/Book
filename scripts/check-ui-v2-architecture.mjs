@@ -36,6 +36,10 @@ const infoCss = fs.readFileSync('ui/info/info.css', 'utf8');
 const inputsCss = fs.readFileSync('ui/inputs/inputs.css', 'utf8');
 const listCss = fs.readFileSync('ui/lists/list.css', 'utf8');
 const listEntryCss = fs.readFileSync('ui/lists/list-entry.css', 'utf8');
+const selectorsUi = fs.readFileSync('ui/selectors/index.js', 'utf8');
+const selectorsCss = fs.readFileSync('ui/selectors/selectors.css', 'utf8');
+const miniCardUi = fs.readFileSync('ui/cards/mini-card.js', 'utf8');
+const miniCardCss = fs.readFileSync('ui/cards/mini-card.css', 'utf8');
 
 function cssFilesUnder(directory) {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -241,6 +245,10 @@ expect(segmentCss.includes('border:1px solid var(--text)') && segmentCss.include
 expect(infoUi.includes('export function infoUI') && infoUi.includes('export function initInfoUI') && facade.includes('infoUI') && facade.includes('initInfoUI'), 'Shared Info UI owner must be exposed through ui/ui.js.');
 expect(infoCss.includes('width:24px') && infoCss.includes('border:1px solid #111') && infoCss.includes('border-radius:0') && infoCss.includes('.ui-info--inverse'), 'Info UI must use the approved small square i control and inverse contrast on dark surfaces.');
 expect(inputsCss.includes('.field input,.field select,.field textarea') && !inputsCss.includes('border-radius:12px') && listCss.includes('border-radius:0') && listEntryCss.includes('border-radius:0'), 'Shared working inputs, selects and list rows must remain straight.');
+expect(!listCss.includes('border-radius:0 17px') && listCss.includes('.ui-list__item.is-first:not(.is-last){border-radius:0}'), 'Shared List must keep the approved fully straight row geometry without the legacy rounded first row.');
+expect(selectorsUi.includes("import { modal, mountModal } from '../modals/index.js';") && selectorsUi.includes("variant: 'quick'") && !selectorsUi.includes('document.body.appendChild(surface)'), 'Shared Select must manifest through the canonical bottom Modal owner instead of a fixed body overlay.');
+expect(!/\.ui-selector\s*\{[^}]*position\s*:\s*fixed/s.test(selectorsCss), 'Shared Select must not own a parallel fixed overlay.');
+expect(miniCardUi.includes('export function miniCardRail') && miniCardCss.includes('--mini-card-width:168px') && miniCardCss.includes('--mini-card-height:112px') && miniCardCss.includes('border-radius:16px'), 'Shared Mini Card must keep one fixed 168x112 rounded geometry and one horizontal rail owner.');
 expect(entityCardCss.includes('--entity-card-depth:#2C2A28') && entityCardCss.includes('--entity-card-mid:#817A73') && entityCardCss.includes('--entity-card-light:#D7D1CA') && entityCardCss.includes('radial-gradient(circle at 78% 18%') && !entityCardCss.includes('--entity-card-neutral') && !entityCardCss.includes('var(--v2-disabled') && !entityCardCss.includes('var(--button-secondary)'), 'Photo-less Entity Card must own a warm Shared gradient and must never derive its surface from disabled/system gray.');
 expect(entityCardCss.includes('.entity-card.has-image .entity-card__background') && entityCardCss.includes('var(--entity-card-image)'), 'Entity Card with photo must keep the photo as the base with only a soft readability veil.');
 expect(inputs.includes('data-photo-crop-x-value') && inputs.includes('data-photo-crop-y-value') && inputs.includes('setOriginal(src)') && !inputs.includes('croppedSquare('), 'Shared photo owner must preserve the original image and store crop position metadata instead of replacing the original with a cropped blob.');
@@ -259,6 +267,7 @@ expect(modals.includes("import { mountV2Layer, v2Layer } from '../v2/index.js';"
   'ui/modals must remain the sole public modal owner and route work modals into active Z while reserving technical overlays for system cases.');
 expect(timeUi.includes("variant:'top'"), 'Time Picker must use the Shared TOP modal instead of a global/system overlay.');
 expect(ui.includes("const allowed = new Set(['top', 'standard', 'bottom', 'technical'])") && ui.includes("const technical = kind === 'technical'") && ui.includes('activeV2ModalSurface(root)'), 'Internal V2 modal geometry must expose exactly the approved top/standard/bottom/technical model.');
+expect(ui.includes('function initV2LayerDismissGesture') && ui.includes("kind === 'top' ? Math.min(0, raw) : Math.max(0, raw)") && ui.includes('stopPointerPropagation') && ui.includes("resolved === 'technical'"), 'Shared Modal must own origin-directed dismissal, isolate pointer gestures from lower Z/F/E, and reserve X for technical overlays only.');
 for (const [name, source] of [
   ['profile', profile],
   ['profile workplaces', workplacesUi],
