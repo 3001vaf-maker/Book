@@ -55,25 +55,32 @@ assert.match(dayControlSource, /\+ Добавить рабочее простр�
 assert.match(dayControlSource, /openCatalog\(\{ workplaces: available, title: catalogTitle, onSelect: onAdd \}\)/);
 
 const graphSource = readFileSync(new URL('../timetable/timetable.js', import.meta.url), 'utf8');
-assert.match(graphSource, /openWorkplaceControl/);
+assert.doesNotMatch(graphSource, /openWorkplaceControl\s*\(/);
 assert.doesNotMatch(graphSource, /title:\s*'Рабочий график'/);
-assert.match(graphSource, /title:\s*title\s*\|\|\s*\(allMode\s*\?\s*'Общий график'\s*:\s*'Профиль'\)/);
+assert.match(graphSource, /title:\s*title\s*\|\|\s*\(allMode\s*\?\s*'Общий график'\s*:\s*\(workplace\?\.name\s*\|\|\s*'Рабочее пространство'\)\)/);
 assert.match(graphSource, /kind:\s*'logo'/);
 assert.match(graphSource, /function\s+openTimetableSettingsZ2\(\)/);
 assert.match(graphSource, /title:\s*'Настройки графика'/);
-assert.match(graphSource, /miniCardStack\(cards\)/);
+assert.match(graphSource, /entityCardStack\(cards\)/);
+assert.match(graphSource, /workplaceGraphCard/);
+assert.match(graphSource, /aggregateGraphCard/);
 assert.match(graphSource, /mountV2ZLayer\(root,\s*v2ZLayer/);
 assert.match(graphSource, /disabled:\s*true/);
 assert.match(graphSource, /hideD:\s*true/);
+assert.match(graphSource, /className:\s*'v2-primary-source-only'/);
 assert.match(graphSource, /data-v2-primary-visible="false"/);
 assert.match(graphSource, /applyButton\.dataset\.v2PrimaryVisible\s*=\s*'true'/);
+assert.doesNotMatch(graphSource, /calendar-workspace__actions|data-timetable-actions|actionBlock\(/);
 assert.doesNotMatch(graphSource, /openTimetableDayEditor/);
 assert.doesNotMatch(graphSource, /function\s+openAggregateDayEditor/);
-assert.match(graphSource, /actionsRoot\.hidden\s*=\s*false/);
 assert.match(graphSource, /selection\s*=\s*initMultiSelect\(calendarRoot,\s*\{\s*onChange:\s*syncApplyButton\s*\}\)/);
 assert.match(graphSource, /function\s+openAggregateWorkplaceApply\(dates\)/);
+assert.match(graphSource, /data-timetable-apply-workplace/);
 assert.match(graphSource, /openAggregateWorkplaceApply\(dates\);\s*return;/);
-assert.match(graphSource, /includeAggregate:\s*false/);
+assert.match(graphSource, /workplace\?\.photo/);
+assert.match(graphSource, /workplace\?\.city/);
+assert.match(graphSource, /summary\.days/);
+assert.match(graphSource, /summary\.duration/);
 assert.doesNotMatch(graphSource, /journal\//);
 assert.doesNotMatch(graphSource, /canCorrectTime|onSaveTime/);
 
