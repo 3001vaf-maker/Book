@@ -385,7 +385,15 @@ async function renderThreads(root, state) {
   }
 }
 
-export function renderChat(root) {
+export function renderChat(root, { personKey = '' } = {}) {
   const state = { view: 'threads', thread: null, recipient: null };
+  const person = personKey ? personByKey(personKey) : null;
+  if (person && phoneOf(person)) {
+    void openThread(root, state, {
+      personPhone: phoneOf(person),
+      uei: person.uei || '',
+    });
+    return;
+  }
   void renderThreads(root, state);
 }
