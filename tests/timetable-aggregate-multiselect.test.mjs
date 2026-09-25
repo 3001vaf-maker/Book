@@ -63,8 +63,8 @@ assert.match(
 );
 assert.match(
   source,
-  /entityCardStack\(cards\)/,
-  'aggregate Apply workplace picker must use a vertical Shared Entity Card stack',
+  /v2HorizontalRail\(cards\.join\(''\)/,
+  'aggregate Apply workplace picker must use a horizontal Shared Entity Card rail',
 );
 assert.doesNotMatch(
   source,
