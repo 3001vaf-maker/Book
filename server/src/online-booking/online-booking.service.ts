@@ -209,7 +209,7 @@ export class OnlineBookingService {
       create: { accountId: account.id, tenantId },
       update: { updatedAt: new Date() },
     });
-    return this.bindAccountTenant(tenantId, account);
+    return this.personIdentity.bindFirstAccess(tenantId, account as any);
   }
 
   private async globalAccountView(accountId: string) {
@@ -746,7 +746,7 @@ export class OnlineBookingService {
     if (next.length < 8) throw new BadRequestException('Новый пароль должен содержать минимум 8 символов');
     const account = await this.prisma.account.findUnique({ where: { id: accountId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
-    if (!(await compare(next ? current : '', account.passwordHash))) throw new BadRequestException('Текущий пароль указан неверно');
+    if (!(await compare(current, account.passwordHash))) throw new BadRequestException('Текущий пароль указан неверно');
     if (await compare(next, account.passwordHash)) throw new BadRequestException('Новый пароль должен отличаться от текущего');
     await this.prisma.account.update({ where: { id: account.id }, data: { passwordHash: await hash(next, 12) } });
     return { changed: true };
