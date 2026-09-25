@@ -17,7 +17,9 @@ const core = fs.readFileSync('core.js', 'utf8');
 const dockerfile = fs.readFileSync('Dockerfile', 'utf8');
 const reset = fs.readFileSync('server/scripts/reset-test-account-before-global-migration.mjs', 'utf8');
 
-const accountModel = schema.slice(schema.indexOf('model Account {'), schema.indexOf('model BookingRequest {'));
+const accountStart = schema.indexOf('model Account {');
+const accountEnd = schema.indexOf('model AccountTenantLink {', accountStart);
+const accountModel = schema.slice(accountStart, accountEnd);
 
 assert.doesNotMatch(accountModel, /\btenantId\s+String\b/, 'End-human Account must not be owned by one Tenant');
 assert.match(accountModel, /createdViaTenantId\s+String\?/, 'Account may retain only provenance of the Tenant where it was first created');
