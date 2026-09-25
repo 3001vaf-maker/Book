@@ -66,6 +66,78 @@ export class OnlineBookingController {
     return this.accountDocuments.publicTerms();
   }
 
+  @Post('account/prepare')
+  prepareGlobalAccount(@Body() body: { identifier?: unknown; email?: unknown; phone?: unknown }) {
+    return this.booking.prepareGlobalAccount(body || {});
+  }
+
+  @Post('account/register')
+  registerGlobalAccount(@Body() body: Record<string, any>) {
+    return this.booking.registerGlobalAccount(body || {});
+  }
+
+  @Post('account/login')
+  loginGlobalAccount(@Body() body: { identifier?: unknown; email?: unknown; password?: unknown }) {
+    return this.booking.loginGlobalAccount(body?.identifier ?? body?.email ?? '', body?.password ?? '');
+  }
+
+  @UseGuards(AccountGuard)
+  @Get('account/me')
+  globalAccount(@Req() request: AccountRequest) {
+    return this.booking.getGlobalAccount(request.accountAuth!.accountId);
+  }
+
+  @UseGuards(AccountGuard)
+  @Put('account/me')
+  updateGlobalAccount(@Req() request: AccountRequest, @Body() body: Record<string, any>) {
+    return this.booking.updateGlobalAccount(request.accountAuth!.accountId, body || {});
+  }
+
+  @UseGuards(AccountGuard)
+  @Get('account/platform-state')
+  globalAccountPlatformState(@Req() request: AccountRequest) {
+    return this.accountDocuments.state(request.accountAuth!.accountId);
+  }
+
+  @UseGuards(AccountGuard)
+  @Post('account/platform-terms')
+  acceptGlobalAccountTerms(
+    @Req() request: AccountRequest,
+    @Body() body: { accountTerms?: unknown },
+  ) {
+    return this.accountDocuments.accept(
+      request.accountAuth!.accountId,
+      body?.accountTerms,
+      'account',
+      { entry: 'global-account' },
+    );
+  }
+
+  @UseGuards(AccountGuard)
+  @Put('account/password')
+  changeGlobalAccountPassword(
+    @Req() request: AccountRequest,
+    @Body() body: { currentPassword?: unknown; newPassword?: unknown },
+  ) {
+    return this.booking.changeGlobalAccountPassword(
+      request.accountAuth!.accountId,
+      body?.currentPassword,
+      body?.newPassword,
+    );
+  }
+
+  @UseGuards(AccountGuard)
+  @Get('account/relationships')
+  globalAccountRelationships(@Req() request: AccountRequest) {
+    return this.booking.globalAccountRelationships(request.accountAuth!.accountId);
+  }
+
+  @UseGuards(AccountGuard)
+  @Get('account/records')
+  globalAccountRecords(@Req() request: AccountRequest) {
+    return this.booking.globalAccountRecords(request.accountAuth!.accountId);
+  }
+
   @UseGuards(AccountGuard)
   @Get(':tenantId/account/platform-state')
   accountPlatformState(@Req() request: AccountRequest) {

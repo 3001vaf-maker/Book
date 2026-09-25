@@ -1,16 +1,24 @@
 import {
   acceptAccountTerms,
+  acceptGlobalAccountTerms,
   clearAccount,
   createBookingRequest,
   getAccount,
   getAccountConsentState,
+  getGlobalAccount,
+  getGlobalAccountPlatformState,
+  getGlobalAccountRecords,
+  getGlobalAccountRelationships,
   getAccountPlatformState,
   getAccountTerms,
   getBookingContext,
   getRememberedAccountEmail,
   loginAccount,
+  loginGlobalAccount,
   prepareAccount,
+  prepareGlobalAccount,
   registerAccount,
+  registerGlobalAccount,
   submitAccountConsents,
 } from '../core/account/index.js';
 import { normalizeBookingSettings } from '../core/booking-settings/index.js';
@@ -44,7 +52,7 @@ import {
   getBookingWorkplace,
   requiredBookingDocuments,
 } from './model.js';
-import { renderAccount } from './account-shell.js';
+import { renderAccount, renderGlobalAccount } from './account-shell.js';
 
 function formatDate(value) {
   const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -145,7 +153,7 @@ function legalTitle(document = {}) {
 }
 
 function renderLegalSticker(root, state) {
-  const tenantDocuments = requiredBookingDocuments(state.context);
+  const tenantDocuments = state.platformOnlyLegal ? [] : requiredBookingDocuments(state.context);
   const platformDocument = state.accountTerms && !state.accountTermsAccepted
     ? { ...state.accountTerms, platform: true, required: true }
     : null;
@@ -179,6 +187,7 @@ function renderLegalSticker(root, state) {
       else if (state.account) void renderAccountHome(root, state);
       else renderAccountDetails(root, state);
     },
+    onLeft: () => { exitBookingContext(state); },
   });
 
   root.querySelector('[data-legal-platform-document]')?.addEventListener('click', () => {
@@ -224,6 +233,7 @@ function renderLegalSticker(root, state) {
         state.accountTermsAccepted = Boolean(accepted?.accepted);
       }
       if (tenantDocuments.length) await saveTenantConsents(state);
+      state.platformOnlyLegal = false;
       state.error = '';
       if (state.identityDestination === 'booking') await finalizeBookingRequest(root, state);
       else await renderAccountHome(root, state);
@@ -363,6 +373,12 @@ function backFromFirstBookingStep(root, state) {
   renderWelcome(root, state);
 }
 
+function exitBookingContext(state) {
+  if (!state.account || typeof state.onExitToAccount !== 'function') return false;
+  state.onExitToAccount();
+  return true;
+}
+
 function renderWelcome(root, state) {
   const profile = state.context.profile || {};
   const owner = [profile.name, profile.surname].filter(Boolean).join(' ').trim();
@@ -378,7 +394,12 @@ function renderWelcome(root, state) {
     body: state.settings.welcomeText ? `<p>${escapeHtml(state.settings.welcomeText).replaceAll('\n', '<br>')}</p>` : '',
     className: 'v2-sticker-screen--welcome',
   })}</section>`;
-  initV2StickerSwipe(root, { onRight: continueFlow, onLeft: continueFlow });
+  initV2StickerSwipe(root, {
+    onRight: continueFlow,
+    onLeft: () => {
+      if (!exitBookingContext(state)) continueFlow();
+    },
+  });
 }
 
 function renderAccountEntry(root, state) {
@@ -407,6 +428,7 @@ function renderAccountEntry(root, state) {
       if (state.identityDestination === 'booking' && state.from) renderConfirmation(root, state);
       else nextBookingStep(root, state);
     },
+    onLeft: () => { exitBookingContext(state); },
   });
 
   initPasswordFields(root);
@@ -549,16 +571,24 @@ async function continueAfterIdentity(root, state) {
     const platformState = await getAccountPlatformState(state.tenantId);
     state.accountTerms = platformState?.document || state.accountTerms;
     state.accountTermsAccepted = Boolean(platformState?.accepted);
-    const consentState = await refreshTenantConsentState(state);
 
-    if (!platformState?.accepted || !consentState.pdnActive) {
+    if (!platformState?.accepted) {
+      state.platformOnlyLegal = state.identityDestination === 'profile';
       renderLegalSticker(root, state);
       return;
     }
 
     if (state.identityDestination === 'profile') {
+      state.platformOnlyLegal = false;
       state.accountTab = 'home';
       await renderAccountHome(root, state);
+      return;
+    }
+
+    state.platformOnlyLegal = false;
+    const consentState = await refreshTenantConsentState(state);
+    if (!consentState.pdnActive) {
+      renderLegalSticker(root, state);
       return;
     }
 
@@ -601,7 +631,10 @@ function renderWorkplaces(root, state) {
     body: content || emptyState('Нет доступных пространств', 'Рабочие пространства для онлайн-записи не найдены.'),
     step: 'workplaces',
   });
-  initV2Swipe(root, { onRight: () => backFromFirstBookingStep(root, state) });
+  initV2Swipe(root, {
+    onRight: () => backFromFirstBookingStep(root, state),
+    onLeft: () => { exitBookingContext(state); },
+  });
   root.querySelectorAll('[data-booking-workplace]').forEach((node) => node.addEventListener('click', () => {
     state.workplaceKey = node.dataset.bookingWorkplace || '';
     state.procedureIds = [];
@@ -634,6 +667,7 @@ function renderProcedures(root, state) {
       if (state.lockedWorkplaceKey) backFromFirstBookingStep(root, state);
       else renderWorkplaces(root, state);
     },
+    onLeft: () => { exitBookingContext(state); },
   });
   root.querySelectorAll('[data-booking-procedure]').forEach((node) => node.addEventListener('click', () => {
     const id = String(node.dataset.bookingProcedure || '');
@@ -663,7 +697,10 @@ function renderDates(root, state) {
     body: dates.length ? '<div data-booking-calendar></div>' : emptyState('Свободных дат нет', 'В графике пока нет доступных дат.'),
     step: 'dates',
   });
-  initV2Swipe(root, { onRight: () => renderProcedures(root, state) });
+  initV2Swipe(root, {
+    onRight: () => renderProcedures(root, state),
+    onLeft: () => { exitBookingContext(state); },
+  });
   const calendarRoot = root.querySelector('[data-booking-calendar]');
   if (!calendarRoot) return;
   initCalendar(calendarRoot, {
@@ -694,7 +731,10 @@ function renderTimes(root, state) {
       : emptyState('Свободного времени нет', 'На эту дату нет интервала для выбранных услуг.')}${errorBlock(state.error)}`,
     step: 'times',
   });
-  initV2Swipe(root, { onRight: () => renderDates(root, state) });
+  initV2Swipe(root, {
+    onRight: () => renderDates(root, state),
+    onLeft: () => { exitBookingContext(state); },
+  });
   root.querySelectorAll('[data-booking-time]').forEach((node) => {
     if (String(node.dataset.bookingTime || '') === String(state.from || '')) node.classList.add('is-selected');
     node.addEventListener('click', () => {
@@ -740,6 +780,7 @@ function renderConfirmation(root, state) {
       state.error = '';
       renderTimes(root, state);
     },
+    onLeft: () => { exitBookingContext(state); },
   });
   root.querySelector('[data-booking-confirm]')?.addEventListener('click', async (event) => {
     event.currentTarget.disabled = true;
@@ -845,7 +886,286 @@ async function refreshContext(state) {
   state.settings = normalizeBookingSettings(state.context.settings);
 }
 
-export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = '' } = {}) {
+
+function globalAccountState() {
+  return {
+    tenantId: '',
+    context: {},
+    settings: normalizeBookingSettings(),
+    accountDraft: {},
+    contactErrors: {},
+    account: null,
+    accountTerms: null,
+    accountTermsAccepted: false,
+    relationships: [],
+    accountRecords: [],
+    error: '',
+    accountTab: 'home',
+    accountDeckOpen: false,
+    accountDeckActive: 'representatives',
+  };
+}
+
+function globalTermsFact(state) {
+  const document = state.accountTerms || {};
+  return {
+    key: String(document.key || ''),
+    version: Math.max(1, Number(document.version || 1)),
+    accepted: Boolean(state.accountTermsAccepted),
+    acceptedAt: new Date().toISOString(),
+  };
+}
+
+async function renderGlobalClientHome(root, state) {
+  const [account, relationships, records] = await Promise.all([
+    getGlobalAccount(),
+    getGlobalAccountRelationships().catch(() => []),
+    getGlobalAccountRecords().catch(() => []),
+  ]);
+  if (!account) {
+    renderGlobalClientEntry(root, state);
+    return;
+  }
+  state.account = account;
+  state.relationships = Array.isArray(relationships) ? relationships : [];
+  state.accountRecords = Array.isArray(records) ? records : [];
+  await renderGlobalAccount(root, state, {
+    onOpenRelationship: (tenantId) => {
+      const params = new URLSearchParams();
+      params.set('booking', tenantId);
+      params.set('entry', 'account');
+      location.assign(`${location.pathname}?${params.toString()}`);
+    },
+    onOpenRecord: (request) => {
+      const tenantId = String(request?.tenantId || '');
+      if (!tenantId) return;
+      const params = new URLSearchParams();
+      params.set('booking', tenantId);
+      params.set('entry', 'account');
+      location.assign(`${location.pathname}?${params.toString()}`);
+    },
+    onLogout: () => {
+      clearAccount('');
+      state.account = null;
+      state.relationships = [];
+      state.accountRecords = [];
+      state.error = '';
+      renderGlobalClientEntry(root, state);
+    },
+  });
+}
+
+async function continueGlobalIdentity(root, state) {
+  const platformState = await getGlobalAccountPlatformState();
+  state.accountTerms = platformState?.document || state.accountTerms;
+  state.accountTermsAccepted = Boolean(platformState?.accepted);
+  if (!platformState?.accepted) {
+    renderGlobalClientLegal(root, state);
+    return;
+  }
+  await renderGlobalClientHome(root, state);
+}
+
+function renderGlobalClientEntry(root, state) {
+  const rememberedIdentifier = state.accountDraft?.identifier
+    || state.accountDraft?.email
+    || getRememberedAccountEmail('')
+    || '';
+  const form = `<form data-global-account-entry>
+    ${field({ label: 'Телефон или email', name: 'identifier', value: rememberedIdentifier, required: true, autocomplete: 'username' })}
+    ${passwordField({ label: 'Пароль', name: 'password', required: true, autocomplete: 'current-password' })}
+    ${errorBlock(state.error)}
+    ${button('Войти', { type: 'submit' })}
+    <button type="button" class="v2-sticker-link" data-global-account-register>Зарегистрироваться</button>
+  </form>`;
+  root.innerHTML = `<section class="${flowThemeClasses(state)}">${v2Sticker({
+    title: 'Вход',
+    body: form,
+    className: 'v2-sticker-screen--auth',
+  })}</section>`;
+  initPasswordFields(root);
+  const authForm = root.querySelector('[data-global-account-entry]');
+  root.querySelector('[data-global-account-register]')?.addEventListener('click', async () => {
+    const data = new FormData(authForm);
+    const identifier = String(data.get('identifier') || '').trim();
+    state.accountDraft = {
+      ...(state.accountDraft || {}),
+      identifier,
+      ...(identifier.includes('@') ? { email: identifier.toLowerCase() } : {}),
+    };
+    state.error = '';
+    try {
+      state.accountTerms = await getAccountTerms();
+      state.accountTermsAccepted = false;
+      renderGlobalClientDetails(root, state);
+    } catch (error) {
+      state.error = error instanceof Error ? error.message : 'Не удалось открыть регистрацию';
+      renderGlobalClientEntry(root, state);
+    }
+  });
+  authForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const data = new FormData(authForm);
+    const identifier = String(data.get('identifier') || '').trim();
+    const password = String(data.get('password') || '');
+    try {
+      const prepared = await prepareGlobalAccount({ identifier });
+      if (!prepared.exists) {
+        state.accountDraft = {
+          ...(state.accountDraft || {}),
+          identifier,
+          ...(prepared.identifierType === 'EMAIL' ? { email: identifier.toLowerCase() } : {}),
+          ...(prepared.identifierType === 'PHONE' ? { phone: identifier } : {}),
+        };
+        state.error = 'Аккаунт не найден. Выберите «Зарегистрироваться».';
+        renderGlobalClientEntry(root, state);
+        return;
+      }
+      const payload = await loginGlobalAccount(identifier, password);
+      state.account = payload.account;
+      state.error = '';
+      await continueGlobalIdentity(root, state);
+    } catch (error) {
+      state.error = error instanceof Error ? error.message : 'Не удалось войти';
+      renderGlobalClientEntry(root, state);
+    }
+  });
+}
+
+function renderGlobalClientDetails(root, state) {
+  const draft = state.accountDraft || {};
+  const contactErrors = state.contactErrors || {};
+  renderFlowPage(root, state, {
+    title: 'Регистрация',
+    action: { label: 'Подтвердить', data: 'data-global-account-submit' },
+    step: 'registration',
+    body: `<form data-global-account-form>
+      ${field({ label: 'Имя', name: 'name', value: draft.name || '', required: true, autocomplete: 'given-name' })}
+      ${field({ label: 'Фамилия', name: 'surname', value: draft.surname || '', autocomplete: 'family-name' })}
+      ${phoneField({ label: 'Телефон', name: 'phone', value: draft.phone || '', required: true })}
+      ${errorBlock(contactErrors.phone || '')}
+      ${field({ label: 'Email', name: 'email', value: draft.email || '', type: 'email', required: true, autocomplete: 'email' })}
+      ${errorBlock(contactErrors.email || '')}
+      ${passwordField({ label: 'Пароль', name: 'password', required: true, autocomplete: 'new-password' })}
+      ${passwordField({ label: 'Повтор пароля', name: 'repeatPassword', required: true, autocomplete: 'new-password' })}
+      ${errorBlock(state.error)}
+    </form>`,
+  });
+  initPasswordFields(root);
+  const form = root.querySelector('[data-global-account-form]');
+  root.querySelector('[data-global-account-submit]')?.addEventListener('click', () => form?.requestSubmit());
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const data = new FormData(form);
+    const email = String(data.get('email') || '').trim().toLowerCase();
+    const phone = String(data.get('phone') || '').trim();
+    const password = String(data.get('password') || '');
+    const repeatPassword = String(data.get('repeatPassword') || '');
+    if (password !== repeatPassword) {
+      state.error = 'Пароли не совпадают.';
+      renderGlobalClientDetails(root, state);
+      return;
+    }
+    state.accountDraft = {
+      ...(state.accountDraft || {}),
+      name: String(data.get('name') || '').trim(),
+      surname: String(data.get('surname') || '').trim(),
+      email,
+      phone,
+      password,
+    };
+    try {
+      const prepared = await prepareGlobalAccount({ email, phone });
+      const conflict = 'Этот контакт уже зарегистрирован. Войдите в учетную запись.';
+      state.contactErrors = {
+        email: prepared?.conflicts?.email ? conflict : '',
+        phone: prepared?.conflicts?.phone ? conflict : '',
+      };
+      if (state.contactErrors.email || state.contactErrors.phone) {
+        state.error = '';
+        renderGlobalClientDetails(root, state);
+        return;
+      }
+      if (!state.accountTerms) state.accountTerms = await getAccountTerms();
+      state.accountTermsAccepted = false;
+      renderGlobalClientLegal(root, state);
+    } catch (error) {
+      state.error = error instanceof Error ? error.message : 'Не удалось проверить контакты';
+      renderGlobalClientDetails(root, state);
+    }
+  });
+}
+
+function renderGlobalClientLegal(root, state) {
+  const document = state.accountTerms;
+  if (!document) {
+    void getAccountTerms().then((terms) => {
+      state.accountTerms = terms;
+      renderGlobalClientLegal(root, state);
+    });
+    return;
+  }
+  const cards = v2LegalCards([{
+    title: document.title || 'Условия использования учетной записи',
+    required: true,
+    checked: Boolean(state.accountTermsAccepted),
+    openData: 'data-global-platform-document',
+    toggleData: 'data-global-platform-toggle',
+    openAria: 'Открыть Условия использования учетной записи',
+    toggleAria: 'Принять Условия использования учетной записи',
+  }]);
+  root.innerHTML = `<section class="${flowThemeClasses(state)}">${v2Sticker({
+    title: 'Документы',
+    body: `${cards}${button('Продолжить', { data: 'data-global-platform-continue', disabled: !state.accountTermsAccepted })}${errorBlock(state.error)}`,
+    className: 'v2-sticker-screen--legal',
+  })}</section>`;
+  root.querySelector('[data-global-platform-document]')?.addEventListener('click', () => {
+    renderExpandedDocument(root, state, document, () => renderGlobalClientLegal(root, state));
+  });
+  root.querySelector('[data-global-platform-toggle]')?.addEventListener('click', () => {
+    state.accountTermsAccepted = !state.accountTermsAccepted;
+    renderGlobalClientLegal(root, state);
+  });
+  root.querySelector('[data-global-platform-continue]')?.addEventListener('click', async () => {
+    if (!state.accountTermsAccepted) return;
+    try {
+      if (!state.account) {
+        const payload = await registerGlobalAccount({
+          ...state.accountDraft,
+          password: state.accountDraft.password,
+          accountTerms: globalTermsFact(state),
+        });
+        state.account = payload.account;
+      } else {
+        await acceptGlobalAccountTerms(globalTermsFact(state));
+      }
+      state.error = '';
+      await renderGlobalClientHome(root, state);
+    } catch (error) {
+      state.error = error instanceof Error ? error.message : 'Не удалось сохранить документ';
+      renderGlobalClientLegal(root, state);
+    }
+  });
+}
+
+export async function renderGlobalClient(root) {
+  const state = globalAccountState();
+  renderFlowPage(root, state, { title: 'Профиль', subtitle: 'Загрузка…', center: true });
+  try {
+    const account = await getGlobalAccount();
+    if (!account) {
+      renderGlobalClientEntry(root, state);
+      return;
+    }
+    state.account = account;
+    await continueGlobalIdentity(root, state);
+  } catch (error) {
+    state.error = error instanceof Error ? error.message : 'Не удалось открыть профиль';
+    renderGlobalClientEntry(root, state);
+  }
+}
+
+export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = '', entry = '', onExitToAccount = null } = {}) {
   const state = {
     tenantId: String(tenantId || ''),
     lockedWorkplaceKey: String(workplaceKey || ''),
@@ -867,13 +1187,16 @@ export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = 
     lastRequest: null,
     repeatSelection: null,
     identityDestination: 'booking',
-    bookingOrigin: 'welcome',
+    bookingOrigin: entry === 'account' ? 'profile' : 'welcome',
     accountTab: 'home',
     accountDeckOpen: false,
     accountChatOpen: false,
     accountChatReturn: '',
     bookingStep: '',
     accountRequests: [],
+    onExitToAccount,
+    entry: String(entry || ''),
+    platformOnlyLegal: false,
   };
 
   renderFlowPage(root, state, { title: 'Онлайн-запись', subtitle: 'Загрузка…', center: true });
@@ -886,6 +1209,15 @@ export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = 
     await refreshContext(state);
     const account = await getAccount(state.tenantId);
     if (account) state.account = account;
+    if (state.entry === 'account') {
+      state.identityDestination = 'profile';
+      if (!state.account) {
+        renderAccountEntry(root, state);
+        return;
+      }
+      await continueAfterIdentity(root, state);
+      return;
+    }
     renderWelcome(root, state);
   } catch (error) {
     renderFlowPage(root, state, {

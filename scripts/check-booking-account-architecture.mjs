@@ -47,7 +47,7 @@ expect(!booking.includes('registrationMode'), 'Legacy registration consent mode 
 expect(!booking.includes('renderRegistrationAgreements'), 'Tenant consent must not be modeled as registration agreements.');
 expect(!booking.includes('saveRegistrationConsents'), 'Tenant consent must not be saved as registration consent.');
 expect(booking.includes('getAccountPlatformState(state.tenantId)') && booking.includes('refreshTenantConsentState(state)'), 'Existing Account legal gate must check both platform terms and Tenant consent state.');
-expect(booking.includes("if (!platformState?.accepted || !consentState.pdnActive) {") && booking.includes('renderLegalSticker(root, state);'), 'Missing platform or Tenant legal state must open one V2 Legal Sticker checkpoint.');
+expect(booking.includes("if (!platformState?.accepted) {") && booking.includes("if (!consentState.pdnActive) {") && booking.includes('renderLegalSticker(root, state);'), 'Platform terms and Tenant legal state must remain independent gates that use the V2 Legal Sticker checkpoint.');
 expect(!booking.includes('if (payload.personExisted)'), 'Person matching must not decide whether booking continues or Profile opens.');
 expect(!booking.includes('data-booking-workplaces-next') && !booking.includes('data-booking-dates-next') && !booking.includes('data-booking-times-next'), 'Workplace, date and time must auto-advance without artificial C «Далее» actions.');
 expect(booking.includes("state.workplaceKey = node.dataset.bookingWorkplace || '';") && booking.includes('renderProcedures(root, state);'), 'Choosing a workplace must immediately open services.');
@@ -60,10 +60,10 @@ expect(booking.includes("state.accountChatReturn = 'booking'"), 'Chat opened fro
 
 expect(booking.includes('renderWorkplaces') && booking.includes('renderProcedures') && booking.includes('renderDates') && booking.includes('renderTimes') && booking.includes('renderConfirmation'), 'Booking itself must preserve workplace -> services -> date -> time -> confirmation.');
 expect(booking.includes("step: 'workplaces'") && booking.includes("step: 'procedures'") && booking.includes("step: 'dates'") && booking.includes("step: 'times'") && booking.includes("step: 'confirmation'"), 'Booking must preserve the canonical V2 Z-stack steps.');
-expect(booking.includes("initV2Swipe(root, { onRight: () => backFromFirstBookingStep(root, state) })"), 'Swipe right from the first Z must leave booking at the correct boundary.');
+expect(booking.includes("onRight: () => backFromFirstBookingStep(root, state)") && booking.includes("onLeft: () => { exitBookingContext(state); }"), 'The first booking Z must preserve swipe-back and allow exit to the global account.');
 expect(booking.includes("if (state.lockedWorkplaceKey) backFromFirstBookingStep(root, state);"), 'Swipe right from services on a locked-workplace link must leave booking.');
-expect(booking.includes("initV2Swipe(root, { onRight: () => renderProcedures(root, state) })"), 'Date swipe must return to services.');
-expect(booking.includes("initV2Swipe(root, { onRight: () => renderDates(root, state) })"), 'Time swipe must return to date.');
+expect(booking.includes("onRight: () => renderProcedures(root, state)"), 'Date swipe must return to services.');
+expect(booking.includes("onRight: () => renderDates(root, state)"), 'Time swipe must return to date.');
 expect(booking.includes("renderTimes(root, state);") && booking.includes("step: 'confirmation'"), 'Confirmation swipe must return to time.');
 expect(!booking.includes('data-booking-workplaces-back') && !booking.includes('data-booking-dates-back') && !booking.includes('data-booking-times-back') && !booking.includes('data-booking-confirm-back'), 'V2 booking flow must not restore legacy back buttons.');
 expect(booking.includes('function backFromFirstBookingStep') && booking.includes("state.bookingOrigin === 'profile'") && booking.includes('renderWelcome(root, state);'), 'The first booking swipe boundary must return to Profile only when booking started there; otherwise it must return to Welcome.');

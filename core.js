@@ -17,7 +17,7 @@ import { configureTimeUsageSource, configureSoftTimeUsageReleaseSource } from '.
 import { getCurrentAccount, login } from './core/auth.js';
 import { canUseBookCapability, getBookAccess, loadBookAccess } from './core/access.js';
 import { startServerBookingSync } from './online-booking/server-sync.js';
-import { renderOnlineBooking } from './online-booking/booking.js';
+import { renderGlobalClient, renderOnlineBooking } from './online-booking/booking.js';
 import { startAccountRuntime } from './online-booking/account-runtime.js';
 import { initV2WorkspaceInteraction, setV2DeckOpen, v2EList, v2FDeck, v2Header, v2Shell } from './ui/ui.js';
 import { clearLegacyBusinessStorage } from './core/legacy-browser-business.js';
@@ -108,6 +108,7 @@ function bookingRoute() {
     tenantId,
     workplaceKey: String(params.get('workplace') || '').trim(),
     telegramEntry: String(params.get('tg_entry') || '').trim(),
+    entry: String(params.get('entry') || '').trim(),
   };
 }
 
@@ -118,7 +119,29 @@ async function renderPublicBooking(route) {
   app.classList.add('app-shell--booking');
   app.innerHTML = '<main class="booking-content" id="app-content"></main>';
   disposeView = await startAccountRuntime(route);
-  await renderOnlineBooking(document.querySelector('#app-content'), route);
+  await renderOnlineBooking(document.querySelector('#app-content'), {
+    ...route,
+    onExitToAccount: () => {
+      history.replaceState({}, '', location.pathname);
+      void renderGlobalClientRoot();
+    },
+  });
+  syncViewport();
+}
+
+function isEndUserAppHost() {
+  const host = String(location.hostname || '').toLowerCase();
+  return host === 'client.va-tools.ru' || host.startsWith('client.');
+}
+
+async function renderGlobalClientRoot() {
+  workspaceReady = false;
+  disposeView();
+  disposeView = () => {};
+  setThemeColor('#2F3338');
+  app.classList.add('app-shell--booking');
+  app.innerHTML = '<main class="booking-content" id="app-content"></main>';
+  await renderGlobalClient(document.querySelector('#app-content'));
   syncViewport();
 }
 
@@ -819,6 +842,8 @@ syncViewport();
 const publicBooking = bookingRoute();
 if (publicBooking) {
   await renderPublicBooking(publicBooking);
+} else if (isEndUserAppHost()) {
+  await renderGlobalClientRoot();
 } else {
   try {
     const currentAccount = await getCurrentAccount();

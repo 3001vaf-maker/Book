@@ -67,6 +67,106 @@ export async function getAccountTerms() {
   );
 }
 
+export async function getGlobalAccountPlatformState() {
+  return jsonResponse(
+    await request('/online-booking/account/platform-state', { auth: true }),
+    'Не удалось проверить Условия использования учетной записи',
+  );
+}
+
+export async function acceptGlobalAccountTerms(accountTerms) {
+  return jsonResponse(
+    await request('/online-booking/account/platform-terms', {
+      auth: true,
+      method: 'POST',
+      body: JSON.stringify({ accountTerms }),
+    }),
+    'Не удалось сохранить принятие Условий использования учетной записи',
+  );
+}
+
+export async function prepareGlobalAccount(input) {
+  const body = input && typeof input === 'object' && !Array.isArray(input)
+    ? input
+    : { identifier: String(input || '').trim() };
+  return jsonResponse(
+    await request('/online-booking/account/prepare', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+    'Не удалось проверить аккаунт',
+  );
+}
+
+export async function registerGlobalAccount(data) {
+  const payload = await jsonResponse(
+    await request('/online-booking/account/register', {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
+    }),
+    'Не удалось создать аккаунт',
+  );
+  return storeSession('', payload);
+}
+
+export async function loginGlobalAccount(identifier, password) {
+  const payload = await jsonResponse(
+    await request('/online-booking/account/login', {
+      method: 'POST',
+      body: JSON.stringify({ identifier, password }),
+    }),
+    'Не удалось войти',
+  );
+  return storeSession('', payload);
+}
+
+export async function getGlobalAccount() {
+  const token = getAccountToken('');
+  if (!token) return null;
+  const response = await request('/online-booking/account/me', { auth: true });
+  if (response.status === 401) {
+    clearAccount('');
+    return null;
+  }
+  return jsonResponse(response, 'Не удалось открыть аккаунт');
+}
+
+export async function updateGlobalAccount(data) {
+  return jsonResponse(
+    await request('/online-booking/account/me', {
+      auth: true,
+      method: 'PUT',
+      body: JSON.stringify(data || {}),
+    }),
+    'Не удалось обновить аккаунт',
+  );
+}
+
+export async function changeGlobalAccountPassword(currentPassword, newPassword) {
+  return jsonResponse(
+    await request('/online-booking/account/password', {
+      auth: true,
+      method: 'PUT',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    }),
+    'Не удалось изменить пароль',
+  );
+}
+
+export async function getGlobalAccountRelationships() {
+  return jsonResponse(
+    await request('/online-booking/account/relationships', { auth: true }),
+    'Не удалось загрузить связи аккаунта',
+  );
+}
+
+export async function getGlobalAccountRecords() {
+  return jsonResponse(
+    await request('/online-booking/account/records', { auth: true }),
+    'Не удалось загрузить историю аккаунта',
+  );
+}
+
 export async function getAccountPlatformState(tenantId) {
   return jsonResponse(
     await request(`/online-booking/${encodeURIComponent(tenantId)}/account/platform-state`, { tenantId, auth: true }),

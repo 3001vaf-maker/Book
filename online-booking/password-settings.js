@@ -1,4 +1,4 @@
-import { changeAccountPassword } from '../core/account/index.js';
+import { changeAccountPassword, changeGlobalAccountPassword } from '../core/account/index.js';
 import { button, initPasswordFields, modal, mountModal, passwordField } from '../ui/ui.js';
 
 export function openAccountPasswordSettings(state) {
@@ -32,7 +32,8 @@ export function openAccountPasswordSettings(state) {
     if (submit) submit.disabled = true;
     if (errorNode) errorNode.textContent = '';
     try {
-      await changeAccountPassword(state.tenantId, currentPassword, newPassword);
+      if (state.globalAccount) await changeGlobalAccountPassword(currentPassword, newPassword);
+      else await changeAccountPassword(state.tenantId, currentPassword, newPassword);
       layer.remove();
       mountModal(document.body, modal('<p>Новый пароль сохранён.</p>', { variant: 'compact', title: 'Пароль изменён' }));
     } catch (error) {

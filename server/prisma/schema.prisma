@@ -50,6 +50,7 @@ model Tenant {
   profiles                 Profile[]
   bookingPublication       BookingPublication?
   createdAccounts          Account[]                   @relation("AccountCreatedViaTenant")
+  accountLinks             AccountTenantLink[]
   bookingRequests          BookingRequest[]
   businessStateMeta        BusinessStateMeta?
   people                   Person[]
@@ -218,9 +219,25 @@ model Account {
 
   createdViaTenant Tenant?          @relation("AccountCreatedViaTenant", fields: [createdViaTenantId], references: [id], onDelete: SetNull)
   contacts         AccountContact[]
+  tenantLinks      AccountTenantLink[]
   requests         BookingRequest[]
 
   @@index([createdViaTenantId])
+}
+
+model AccountTenantLink {
+  id        String   @id @default(cuid())
+  accountId String
+  tenantId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, tenantId])
+  @@index([tenantId, accountId])
+  @@index([accountId, updatedAt])
 }
 
 model AccountContact {

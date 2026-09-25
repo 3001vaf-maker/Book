@@ -117,8 +117,15 @@ function financeStatus(request = {}) {
 }
 
 function workplaceName(state, request = {}) {
-  const workplaces = Array.isArray(state.context?.workplaces) ? state.context.workplaces : [];
-  return workplaces.find((item) => String(item?.key || '') === String(request.workplaceId || ''))?.name || 'Пространство';
+  const tenantId = String(request?.tenantId || state.tenantId || '');
+  const relationship = (Array.isArray(state.relationships) ? state.relationships : [])
+    .find((item) => String(item?.tenantId || '') === tenantId);
+  const workplaces = Array.isArray(relationship?.context?.workplaces)
+    ? relationship.context.workplaces
+    : Array.isArray(state.context?.workplaces) ? state.context.workplaces : [];
+  return workplaces.find((item) => String(item?.key || '') === String(request.workplaceId || ''))?.name
+    || [relationship?.context?.profile?.name, relationship?.context?.profile?.surname].filter(Boolean).join(' ').trim()
+    || 'Пространство';
 }
 
 function profileDisplayName(state) {
@@ -443,12 +450,13 @@ async function openChatSettings(state) {
 }
 
 function openProfileSettings(state, { onPersonalData, onPassword, onConsents, onLogout }) {
-  const layer = mountModal(document.body, modal(settingsPanel([
+  const items = [
     { label: 'Личные данные', data: 'data-account-personal-data' },
     { label: 'Изменить пароль', data: 'data-account-change-password' },
-    { label: 'Согласия', data: 'data-account-consents' },
+    ...(onConsents ? [{ label: 'Согласия', data: 'data-account-consents' }] : []),
     { label: 'Выход', data: 'data-account-logout', variant: 'danger' },
-  ]), { variant: 'large', title: 'Настройки профиля' }));
+  ];
+  const layer = mountModal(document.body, modal(settingsPanel(items), { variant: 'large', title: 'Настройки профиля' }));
   layer?.querySelector('[data-account-personal-data]')?.addEventListener('click', () => {
     layer.remove();
     onPersonalData?.();
@@ -769,6 +777,131 @@ async function renderMessages(root, state, handlers) {
     const screen = root.querySelector('[data-v2-z]');
     if (screen) screen.scrollTop = screen.scrollHeight;
   });
+}
+
+
+function relationshipTitle(relationship = {}) {
+  const profile = relationship?.context?.profile || {};
+  return [profile.name, profile.surname].filter(Boolean).join(' ').trim() || 'Профиль';
+}
+
+function relationshipCard(relationship = {}) {
+  const profile = relationship?.context?.profile || {};
+  const title = relationshipTitle(relationship);
+  return entityCard({
+    title,
+    subtitle: String(profile.profession || '').trim(),
+    image: String(profile.photo || ''),
+    initial: title.slice(0, 1).toUpperCase(),
+    interactive: true,
+    data: `data-global-relationship="${escapeHtml(String(relationship.tenantId || ''))}"`,
+    aria: `Открыть ${title}`,
+    className: 'entity-card--compact',
+  });
+}
+
+function globalRecordsForTenant(state, tenantId) {
+  return (Array.isArray(state.accountRecords) ? state.accountRecords : [])
+    .filter((request) => String(request?.tenantId || '') === String(tenantId || ''));
+}
+
+function bindGlobalProfileSettings(root, state, handlers) {
+  root.querySelector('[data-account-profile-settings]')?.addEventListener('click', () => openProfileSettings(state, {
+    onPersonalData: () => openAccountPersonalData(state, { onSaved: () => handlers.render?.() }),
+    onPassword: () => openAccountPasswordSettings(state),
+    onConsents: null,
+    onLogout: handlers.onLogout,
+  }));
+}
+
+function bindGlobalRelationships(root, state, handlers) {
+  root.querySelectorAll('[data-global-relationship]').forEach((node) => node.addEventListener('click', () => {
+    const tenantId = String(node.dataset.globalRelationship || '');
+    if (tenantId) handlers.onOpenRelationship?.(tenantId);
+  }));
+}
+
+async function renderGlobalHome(root, state, handlers) {
+  const relationships = Array.isArray(state.relationships) ? state.relationships : [];
+  const requests = futureRequests(state.accountRecords || []);
+  const upcoming = requests.length
+    ? v2HorizontalRail(requests.map((request, index) => visitCard(state, request, index)).join(''))
+    : emptyState('Предстоящих визитов нет', 'Новые записи появятся здесь.');
+  const representatives = relationships.length
+    ? v2HorizontalRail(relationships.map(relationshipCard).join(''))
+    : emptyState('Связей пока нет', 'Откройте ссылку нужного профиля, чтобы начать взаимодействие.');
+  const header = v2Header({
+    a: { kind: 'avatar', label: accountName(state), image: accountPhoto(state), data: 'data-account-profile-settings', aria: 'Настройки профиля' },
+    b: accountName(state),
+  });
+  renderV2Shell(root, state, {
+    header,
+    body: `${v2Section('Предстоящие визиты', upcoming)}${v2Section('Представители / пространства', representatives)}`,
+  });
+  bindWorkspaceInteraction(root, state, handlers);
+  bindGlobalProfileSettings(root, state, handlers);
+  bindGlobalRelationships(root, state, handlers);
+  root.querySelectorAll('[data-account-upcoming]').forEach((node) => node.addEventListener('click', () => {
+    const request = requests[Number(node.dataset.accountUpcoming)];
+    if (request?.tenantId) handlers.onOpenRecord?.(request);
+  }));
+}
+
+async function renderGlobalRepresentatives(root, state, handlers) {
+  const relationships = Array.isArray(state.relationships) ? state.relationships : [];
+  const header = v2Header({
+    a: { kind: 'avatar', label: accountName(state), image: accountPhoto(state), data: 'data-account-profile-settings', aria: 'Настройки профиля' },
+    b: 'Представители',
+  });
+  renderV2Shell(root, state, {
+    header,
+    body: relationships.length
+      ? relationships.map(relationshipCard).join('')
+      : emptyState('Связей пока нет', 'Откройте ссылку нужного профиля, чтобы начать взаимодействие.'),
+  });
+  bindWorkspaceInteraction(root, state, handlers);
+  bindGlobalProfileSettings(root, state, handlers);
+  bindGlobalRelationships(root, state, handlers);
+}
+
+async function renderGlobalHistory(root, state, handlers) {
+  const requests = (Array.isArray(state.accountRecords) ? state.accountRecords : [])
+    .slice()
+    .sort((a, b) => requestMoment(a).localeCompare(requestMoment(b)));
+  const header = v2Header({
+    a: { kind: 'avatar', label: accountName(state), image: accountPhoto(state), data: 'data-account-profile-settings', aria: 'Настройки профиля' },
+    b: 'История',
+  });
+  renderV2Shell(root, state, {
+    header,
+    body: requests.length
+      ? listEntries(requests.map((request, index) => historyEntry(request, index)))
+      : emptyState('История пока пустая', 'Здесь появятся ваши записи и визиты.'),
+  });
+  bindWorkspaceInteraction(root, state, handlers);
+  bindGlobalProfileSettings(root, state, handlers);
+  root.querySelectorAll('[data-account-history]').forEach((node) => node.addEventListener('click', () => {
+    const request = requests[Number(node.dataset.accountHistory)];
+    if (request?.tenantId) handlers.onOpenRecord?.(request);
+  }));
+}
+
+export async function renderGlobalAccount(root, state, callbacks = {}) {
+  state.globalAccount = true;
+  state.accountTab ||= 'home';
+  state.accountDeckOpen = Boolean(state.accountDeckOpen);
+  state.accountDeckActive ||= state.accountTab === 'history' ? 'history' : 'representatives';
+
+  const handlers = {
+    render: () => renderGlobalAccount(root, state, callbacks),
+    onOpenRelationship: callbacks.onOpenRelationship,
+    onOpenRecord: callbacks.onOpenRecord,
+    onLogout: callbacks.onLogout,
+  };
+
+  if (state.accountTab === 'history') return renderGlobalHistory(root, state, handlers);
+  if (state.accountTab === 'representatives') return renderGlobalRepresentatives(root, state, handlers);
+  return renderGlobalHome(root, state, handlers);
 }
 
 export async function renderAccount(root, state, callbacks = {}) {

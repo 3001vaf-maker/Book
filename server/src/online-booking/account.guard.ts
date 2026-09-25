@@ -21,7 +21,6 @@ export class AccountGuard implements CanActivate {
       const payload = await this.jwt.verifyAsync<AccountToken>(token);
       if (payload.kind !== 'account' || !payload.sub) throw new Error('invalid account token');
       const tenantId = String(request.params?.tenantId || '').trim();
-      if (!tenantId) throw new Error('missing tenant context');
       request.accountAuth = { accountId: payload.sub, tenantId };
       return true;
     } catch {
