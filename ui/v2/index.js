@@ -514,6 +514,14 @@ export function initV2WorkspaceInteraction(root, {
   const fId = (card) => String(card?.getAttribute('data-account-deck-item') || card?.getAttribute('data-v2-deck-item') || '');
   const eId = (card) => String(card?.getAttribute('data-v2-secondary-item') || card?.getAttribute('data-v2-e-item') || '');
 
+  const syncEGeometry = () => {
+    if (!eDeck || !fCards.length) return;
+    const activeCard = fCards[fActiveIndex] || fCards[0];
+    const activeHeight = Number(activeCard?.getBoundingClientRect?.().height || 0);
+    if (!(activeHeight > 0)) return;
+    eDeck.style.setProperty('--v2-e-height', `${Math.floor(activeHeight * (2 / 3))}px`);
+  };
+
   const ownsHorizontalGesture = (target) => {
     let node = target?.nodeType === 1 ? target : target?.parentElement;
     while (node && node !== z && node !== stage) {
@@ -573,6 +581,7 @@ export function initV2WorkspaceInteraction(root, {
   };
 
   setOpen(open, false);
+  syncEGeometry();
 
   const down = (event) => {
     if (gesture) return;
@@ -589,6 +598,7 @@ export function initV2WorkspaceInteraction(root, {
       role = 'e';
       card = eCard;
       index = eCards.indexOf(eCard);
+      if (!event.target.closest?.('[data-v2-e-handle]')) return;
     } else if (fCard && deck?.contains(fCard)) {
       role = 'f';
       card = fCard;
@@ -801,6 +811,8 @@ export function initV2WorkspaceInteraction(root, {
   stage.addEventListener('pointerup', up);
   stage.addEventListener('pointercancel', cancel);
   stage.addEventListener('click', suppressClick, true);
+  window.addEventListener('resize', syncEGeometry, { passive: true });
+  window.visualViewport?.addEventListener('resize', syncEGeometry, { passive: true });
 
   return () => {
     if (suppressTimer) window.clearTimeout(suppressTimer);
@@ -810,6 +822,8 @@ export function initV2WorkspaceInteraction(root, {
     stage.removeEventListener('pointerup', up);
     stage.removeEventListener('pointercancel', cancel);
     stage.removeEventListener('click', suppressClick, true);
+    window.removeEventListener('resize', syncEGeometry);
+    window.visualViewport?.removeEventListener('resize', syncEGeometry);
   };
 }
 
