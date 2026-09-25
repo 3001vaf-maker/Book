@@ -19,21 +19,38 @@ export function miniCard({
   value = '',
   subtitle = '',
   rows = [],
+  image = '',
+  imagePosition = '50% 50%',
+  initials = '',
   interactive = false,
   data = '',
   aria = '',
   className = '',
 } = {}) {
   const tag = interactive ? 'button' : 'section';
-  const classes = ['mini-card', interactive ? 'mini-card--interactive' : '', className].filter(Boolean).join(' ');
+  const classes = ['mini-card', interactive ? 'mini-card--interactive' : '', image ? 'has-image' : '', className].filter(Boolean).join(' ');
   const actionAttrs = interactive ? ` type="button"${attrs(data, aria || title)}` : '';
   const rowItems = Array.isArray(rows) ? rows : [];
+  const media = image
+    ? `<span class="mini-card__media" style="--mini-card-image:url('${escapeHtml(image)}');--mini-card-image-position:${escapeHtml(imagePosition)}" aria-hidden="true"></span>`
+    : initials
+      ? `<span class="mini-card__media mini-card__media--initials" aria-hidden="true">${escapeHtml(initials)}</span>`
+      : '';
+
   return `<${tag} class="${escapeHtml(classes)}"${actionAttrs}>
     <div class="mini-card__head">
-      <strong class="mini-card__title">${escapeHtml(title)}</strong>
-      ${value ? `<strong class="mini-card__value">${escapeHtml(value)}</strong>` : ''}
-      ${subtitle ? `<span class="mini-card__subtitle">${escapeHtml(subtitle)}</span>` : ''}
+      <span class="mini-card__copy">
+        <strong class="mini-card__title">${escapeHtml(title)}</strong>
+        ${value ? `<strong class="mini-card__value">${escapeHtml(value)}</strong>` : ''}
+        ${subtitle ? `<span class="mini-card__subtitle">${escapeHtml(subtitle)}</span>` : ''}
+      </span>
+      ${media}
     </div>
     ${rowItems.length ? `<div class="mini-card__rows">${rowItems.map(rowMarkup).join('')}</div>` : ''}
   </${tag}>`;
+}
+
+export function miniCardRail(cards = [], { className = '' } = {}) {
+  const items = Array.isArray(cards) ? cards : [];
+  return `<div class="mini-card-rail${className ? ` ${escapeHtml(className)}` : ''}" data-mini-card-rail>${items.join('')}</div>`;
 }

@@ -1,4 +1,5 @@
 import { escapeHtml } from '../utils/escape-html.js';
+import { modal, mountModal } from '../modals/index.js';
 
 let selectorEventsReady = false;
 let selectorId = 0;
@@ -11,7 +12,9 @@ function normalizeOptions(options = []) {
 }
 
 function closeSelector(surface) {
-  surface?.remove();
+  const modalRoot = surface?.closest?.('[data-modal]');
+  if (modalRoot?.v2Close) modalRoot.v2Close();
+  else surface?.remove?.();
 }
 
 function commitSelectorValue(surface, value, label) {
@@ -21,6 +24,7 @@ function commitSelectorValue(surface, value, label) {
   input.value = String(value ?? '');
   const valueNode = trigger.querySelector('.ui-select__value');
   if (valueNode) valueNode.textContent = String(label ?? value ?? '');
+  input.dispatchEvent(new Event('input', { bubbles: true }));
   input.dispatchEvent(new Event('change', { bubbles: true }));
   closeSelector(surface);
 }
@@ -57,12 +61,6 @@ function ensureSelectorEvents() {
     if (!search) return;
     const surface = search.closest('[data-ui-selector]');
     if (surface) filterSelector(surface, search.value);
-  });
-
-  document.addEventListener('click', (event) => {
-    const surface = event.target.closest?.('[data-ui-selector]');
-    if (!surface || event.target.closest?.('[data-ui-select-option]') || event.target.closest?.('[data-ui-selector-search]')) return;
-    if (event.target === surface || event.target.closest?.('[data-ui-selector-dismiss]')) closeSelector(surface);
   });
 
   document.addEventListener('keydown', (event) => {
@@ -102,20 +100,18 @@ function openSelector(trigger) {
   const allowCustom = trigger.dataset.allowCustom === 'true';
   const placeholder = trigger.dataset.placeholder || 'Начните вводить';
 
-  const surface = document.createElement('div');
-  surface.className = 'ui-selector';
-  surface.dataset.uiSelector = '';
-  surface.dataset.inputId = input.id;
-  surface.dataset.options = JSON.stringify(options);
-  surface.dataset.allowCustom = allowCustom ? 'true' : 'false';
-  surface.innerHTML = `
-    <div class="ui-selector__backdrop" data-ui-selector-dismiss></div>
+  const content = `<div class="ui-selector" data-ui-selector data-input-id="${escapeHtml(input.id)}">
     <div class="ui-selector__wheel${searchable ? ' is-searchable' : ''}" role="listbox" aria-label="Выбор значения">
       ${searchable ? `<div class="ui-selector__search-wrap"><input class="ui-selector__search" type="search" data-ui-selector-search placeholder="${escapeHtml(placeholder)}" autocomplete="off"></div>` : ''}
       <div class="ui-selector__viewport">${optionMarkup}</div>
-    </div>`;
+    </div>
+  </div>`;
 
-  document.body.appendChild(surface);
+  const modalRoot = mountModal(trigger, modal(content, { variant: 'quick', title: 'Выбор' }));
+  const surface = modalRoot?.querySelector('[data-ui-selector]');
+  if (!surface) return;
+  surface.dataset.options = JSON.stringify(options);
+  surface.dataset.allowCustom = allowCustom ? 'true' : 'false';
 
   if (searchable) {
     const search = surface.querySelector('[data-ui-selector-search]');

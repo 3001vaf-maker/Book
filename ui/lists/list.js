@@ -38,7 +38,7 @@ export function list({ items = [], className = '' } = {}) {
       ? `<span class="ui-list__indicator" style="--ui-list-indicator:${escapeHtml(indicatorColor)}"${indicatorLabel ? ` role="img" aria-label="${escapeHtml(indicatorLabel)}" title="${escapeHtml(indicatorLabel)}"` : ' aria-hidden="true"'}></span>`
       : '';
     const overline = item.overline
-      ? `<span class="ui-list__title">${escapeHtml(item.overline)}</span>`
+      ? `<span class="ui-list__overline">${escapeHtml(item.overline)}</span>`
       : '';
 
     return `<${tag} class="${classes}"${interactive ? ` type="button"` : ''}${attrs}>` +

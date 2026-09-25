@@ -103,6 +103,6 @@ function open(host){
     hidden.value=value;
     host.querySelector('[data-time-open]').textContent=value;
     hidden.dispatchEvent(new Event('change',{bubbles:true}));
-    modalRoot.remove();
+    modalRoot.v2Close?.();
   });
 }

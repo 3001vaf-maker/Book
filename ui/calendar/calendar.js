@@ -216,7 +216,7 @@ function openMonthDayPicker(host) {
       if (visible) visible.textContent = monthDayLabel(value);
       hidden.dispatchEvent(new Event('input', { bubbles: true }));
       hidden.dispatchEvent(new Event('change', { bubbles: true }));
-      modalRoot.remove();
+      modalRoot.v2Close?.();
     },
   });
 
@@ -226,7 +226,7 @@ function openMonthDayPicker(host) {
     if (visible) visible.textContent = 'Выберите дату';
     hidden.dispatchEvent(new Event('input', { bubbles: true }));
     hidden.dispatchEvent(new Event('change', { bubbles: true }));
-    modalRoot.remove();
+    modalRoot.v2Close?.();
   });
 }
 
