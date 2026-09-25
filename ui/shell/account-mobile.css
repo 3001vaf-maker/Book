@@ -7,8 +7,7 @@
 }
 
 .app-shell.app-shell--booking .booking-content,
-.app-shell.app-shell--booking .booking-account,
-.app-shell.app-shell--booking .app-view-shell{
+.app-shell.app-shell--booking .booking-account{
   width:100%;
   max-width:100%;
   min-width:0;
