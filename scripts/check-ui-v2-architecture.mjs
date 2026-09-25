@@ -16,7 +16,7 @@ const timeUi = fs.readFileSync('ui/time/index.js', 'utf8');
 const colorUi = fs.readFileSync('ui/colors/index.js', 'utf8');
 const workplacesUi = fs.readFileSync('settings/profile/workplaces/workplaces.js', 'utf8');
 const accountControlsUi = fs.readFileSync('settings/profile/account-controls.js', 'utf8');
-const accountMobileCss = fs.readFileSync('ui/shell/account-mobile.css', 'utf8');
+const accountMobileCss = fs.readFileSync('ui/booking/account-mobile.css', 'utf8');
 const core = fs.readFileSync('core.js', 'utf8');
 const finance = fs.readFileSync('main/finance/finance.js', 'utf8');
 const journal = fs.readFileSync('journal/journal.js', 'utf8');
@@ -216,6 +216,7 @@ for (const marker of ["{ id: 'people', label: 'Клиенты'", "{ id: 'finance
   expect(core.includes(marker), `Workspace root F is missing ${marker}.`);
 }
 expect(!core.includes('bottomNavigation(') && !core.includes("renderMain } from './main/main.js'"), 'Workspace V2 must not retain legacy bottom navigation or Main hub routing.');
+expect(!fs.existsSync('main/main.js'), 'Legacy Main hub file must be physically removed.');
 expect(core.includes("kind: 'chat'") && core.includes("data: 'data-v2-workspace-chat'"), 'Chat must live in Header D instead of root F.');
 expect(core.includes("[data-workspace-context-action]") && core.includes('aSource.dataset.workspaceAKind') && core.includes('function syncWorkspaceBack(') && !core.includes("kind: backSource ? 'back' : 'settings'"), 'Workspace Header A must consume the canonical Header context; local Back must remain inside Z instead of taking A.');
 expect(core.includes("[data-v2-primary-action]") && core.includes("surface.querySelector('.page-header-action button')") && core.includes("form button[type=\"submit\"]") && core.includes('syncWorkspacePrimarySource'), 'Workspace Header C must reuse the shared or existing primary action instead of duplicating module logic.');
@@ -231,7 +232,8 @@ expect(settings.includes('export function settingsNavigationItems()') && setting
 expect(onlineBookingSettings.includes('workspaceHeaderContext({') && onlineBookingSettings.includes("back: { data: 'data-online-booking-back'") && onlineBookingSettings.includes('data-v2-primary-action'), 'Online booking settings must feed Header/Back/Save through Shared workspace sources instead of drawing a second shell.');
 expect(!/\b(?:appShell|appHeader)\s*\(/.test(onlineBookingSettings) && !onlineBookingSettings.includes('app-content--book-shell'), 'Online booking settings must not recreate a full-screen shell inside Z.');
 expect(!/(?:min-|max-)?height\s*:\s*(?:var\(--visual-vh\s*,\s*)?100dvh|position\s*:\s*fixed|touch-action\s*:/.test(onlineBookingSettingsCss), 'Online booking settings CSS must stay content-only inside Shared Z.');
-expect(core.includes("[data-workspace-back-source], .app-header__slot--back button"), 'Workspace Header owner must proxy canonical back sources without requiring a nested appHeader.');
+expect(core.includes("contextRoot.querySelector('[data-workspace-back-source]')"), 'Workspace Header owner must proxy the canonical back source directly.');
+expect(!core.includes('.app-header__'), 'Legacy app-header compatibility selectors must not return.');
 expect(!journalList.includes('getBoundingPersonRect') && journalList.includes('getBoundingClientRect()'), 'Journal List scroll must use the real DOM geometry API.');
 expect(firstRun.includes("return 'people';") && firstRun.includes("return 'finance';") && firstRun.includes("if (SETTINGS_STEPS.has(step.key)) return 'settings';") && firstRun.includes('data-v2-secondary-item'), 'DEMO navigation must follow the migrated V2 workspace entry points without changing its business progression.');
 expect(firstRun.includes("if (SETTINGS_STEPS.has(step.key)) {\n      await this.renderWorkspaceStep(step);") && !firstRun.includes('async renderSettingsStep('), 'DEMO Settings steps must reuse the real Shared V2 workspace instead of rendering a parallel focused shell.');

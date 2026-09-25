@@ -62,14 +62,14 @@ hydrateFinanceFromServer(canonicalFinanceState({
 }));
 assert.equal(getWalletTotalBalance(), 130);
 
-const mainSource = readFileSync(new URL('../main/main.js', import.meta.url), 'utf8');
+const coreSource = readFileSync(new URL('../core.js', import.meta.url), 'utf8');
 const financeSource = readFileSync(new URL('../main/finance/finance.js', import.meta.url), 'utf8');
 const settingsSource = readFileSync(new URL('../settings/settings.js', import.meta.url), 'utf8');
 const walletSource = readFileSync(new URL('../settings/wallets/wallets.js', import.meta.url), 'utf8');
 const folderSource = readFileSync(new URL('../ui/cards/folder-card.js', import.meta.url), 'utf8');
 
-assert.match(mainSource, /title: 'Финансы'/);
-assert.match(mainSource, /\.\/finance\/finance\.js/);
+assert.match(coreSource, /from '\.\/main\/finance\/finance\.js'/);
+assert.match(coreSource, /section === 'finance'.*renderFinanceSection/s);
 assert.match(financeSource, /getLedgerEntries/);
 assert.match(financeSource, /getWalletTotalBalance/);
 assert.match(financeSource, /title: 'Касса'/);

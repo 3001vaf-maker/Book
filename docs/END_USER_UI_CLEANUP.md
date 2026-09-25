@@ -41,7 +41,7 @@ Stage 1 must not:
 
 ## Stage 2 — move active local UI into Shared UI
 
-Status: IMPLEMENTED AND VERIFIED on `staging`. Merge to `main` only after the final exact-head CI/PR checks are green.
+Status: DONE in `main@c8f0b5d49858eb405cdb88db1e8e3c4c5540a37a`.
 
 Goal: remove local/legacy presentation owners without changing business flows.
 
@@ -69,25 +69,42 @@ Verified before final documentation commit:
 
 ## Stage 3 — remove proven dead legacy renderers
 
-Status: NOT STARTED.
+Status: IMPLEMENTED on `staging`; exact-head verification pending.
 
-After repository-wide usage checks, remove unused old shell/header/bottom-navigation/booking renderers. Never delete an owner while any active contour still imports it.
+Completed after repository-wide runtime usage checks:
+- physically removed `ui/shell/index.js`; no compatibility bridge remains;
+- physically removed `ui/navigation/navigation.js`; the old bottom navigation is gone;
+- physically removed dead `main/main.js`; live `main/people/*` and `main/finance/*` remain and are routed directly from `core.js`;
+- removed legacy `.app-header` fallback selectors from `core.js`;
+- moved the UI reference from old `appShell/appHeader/mediaRail` to current V2 owners;
+- reduced `ui/booking/index.js` to the five runtime-used owners: `bookingThemeStyle`, `bookingChoiceCards`, `bookingDocument`, `bookingTimeGroups`, `bookingThemePreview`;
+- no database/data migration was added;
+- `ui/v2`, FE/Z gesture code and History behavior were not changed.
 
 ## Stage 4 — remove proven dead legacy CSS
 
-Status: NOT STARTED.
+Status: IMPLEMENTED on `staging`; exact-head verification pending.
 
-Only after Stage 3 and usage verification, remove legacy CSS no longer referenced. Re-run visual and interaction checks after each removal group.
+Completed:
+- physically removed `ui/shell/shell.css`;
+- physically removed `ui/navigation/navigation.css`;
+- moved live end-user theme/mobile styles out of the removed shell owner into `ui/booking/account-theme.css` and `ui/booking/account-mobile.css`;
+- removed dead old shell/header/navigation selectors from those live style files;
+- removed dead booking frame/panel/header/actions/agreement/personal-data/history presentation rules while preserving live choice/document/time/theme rules;
+- removed all root HTML links to deleted styles.
 
 ## Stage 5 — permanent architecture guards
 
-Status: NOT STARTED.
+Status: IMPLEMENTED on `staging`; exact-head verification pending.
 
-Add CI rules preventing:
+CI now prevents:
 - native browser/system message UI;
 - raw server error text in end-user presentation;
-- new local copies of Shared UI;
-- reintroduction of dead legacy owners into the end-user contour.
+- duplicate/local Shared Chat, Settings, Receipt and Form owners;
+- reintroduction of legacy `ui/shell`;
+- reintroduction of legacy bottom navigation;
+- reintroduction of the old Main hub;
+- reintroduction of legacy `.app-header` compatibility selectors.
 
 ## Branch discipline
 
@@ -95,4 +112,4 @@ Add CI rules preventing:
 
 For this emergency pre-distribution Stage 1, `staging` was reset to the current stable `main` before changes. The previous divergent staging head was preserved as `backup/staging-before-end-user-stage1-20260925`.
 
-Do not merge Stage 1 to `main` until the required CI and four-domain verification is complete.
+For every runtime cleanup stage: verify the exact `staging` head with the full CI and four-domain smoke matrix, then merge that verified head to `main`. Do not start another post-merge verification cycle.

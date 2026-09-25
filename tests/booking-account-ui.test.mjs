@@ -18,13 +18,11 @@ const consentPolicy = fs.readFileSync('server/src/tenant-document-archive/consen
 const telegramBot = fs.readFileSync('server/src/communication/telegram-bot.service.ts', 'utf8');
 const inputsUi = fs.readFileSync('ui/inputs/index.js', 'utf8');
 const repeatedFields = fs.readFileSync('ui/repeated-fields/index.js', 'utf8');
-const shellUi = fs.readFileSync('ui/shell/index.js', 'utf8');
-const shellCss = fs.readFileSync('ui/shell/shell.css', 'utf8');
 const chatUi = fs.readFileSync('ui/chat/index.js', 'utf8');
 const chatCss = fs.readFileSync('ui/chat/chat.css', 'utf8');
 const styleCss = fs.readFileSync('css/style.css', 'utf8');
-const accountMobileCss = fs.readFileSync('ui/shell/account-mobile.css', 'utf8');
-const accountThemeCss = fs.readFileSync('ui/shell/account-theme.css', 'utf8');
+const accountMobileCss = fs.readFileSync('ui/booking/account-mobile.css', 'utf8');
+const accountThemeCss = fs.readFileSync('ui/booking/account-theme.css', 'utf8');
 const indexHtml = fs.readFileSync('index.html', 'utf8');
 const bookingUi = fs.readFileSync('ui/booking/index.js', 'utf8');
 const v2Ui = fs.readFileSync('ui/v2/index.js', 'utf8');
@@ -335,8 +333,8 @@ assert.match(accountMobileCss, /\.app-shell\.app-shell--booking\s*\{[\s\S]*?widt
 assert.match(chatUi, /messageThread/);
 assert.match(chatUi, /attachmentTrigger = 'composer'/);
 assert.match(chatCss, /\.message-composer\{position:fixed/);
-assert.doesNotMatch(shellUi, /messageThread|messageComposer/);
-assert.doesNotMatch(shellCss, /\.message-composer\{|\.message-thread\{/);
+assert.equal(fs.existsSync('ui/shell/index.js'), false);
+assert.equal(fs.existsSync('ui/shell/shell.css'), false);
 
 assert.doesNotMatch(journalListUi, /getBoundingPersonRect/);
 assert.match(journalListUi, /getBoundingClientRect\(\)/);

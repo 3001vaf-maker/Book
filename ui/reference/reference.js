@@ -1,8 +1,5 @@
 import {
   accordion,
-  appHeader,
-  appShell,
-  bottomNavigation,
   button,
   columnLayout,
   dateNavigator,
@@ -19,7 +16,6 @@ import {
   list,
   listEntries,
   listEntry,
-  mediaRail,
   modal,
   monthDayPicker,
   mountModal,
@@ -28,6 +24,10 @@ import {
   select,
   textareaField,
   twoColumnLayout,
+  v2Header,
+  v2HorizontalRail,
+  v2RailCard,
+  v2Shell,
 } from '../ui.js';
 import { initMessageComposer, messageComposer, messageThread } from '../chat/index.js';
 import { readOnlyReceipt } from '../receipt/index.js';
@@ -150,17 +150,15 @@ function genericCard() {
 }
 
 function profileScreen(withMedia = false) {
+  const rail = withMedia ? v2HorizontalRail([
+    v2RailCard({ title: 'Элемент 1', subtitle: 'S' }),
+    v2RailCard({ title: 'Элемент 2', subtitle: 'S' }),
+    v2RailCard({ title: 'Элемент 3', subtitle: 'S' }),
+  ].join('')) : '';
   return {
-    className: 'app-view-shell--profile',
-    media: withMedia ? mediaRail([
-      { label: 'Элемент 1' },
-      { label: 'Элемент 2' },
-      { label: 'Элемент 3' },
-      { label: 'Элемент 4' },
-      { label: 'Элемент 5' },
-      { label: 'Элемент 6' },
-    ]) : '',
-    body: genericCard(),
+    className: '',
+    media: '',
+    body: `${rail}${genericCard()}`,
   };
 }
 
@@ -372,13 +370,13 @@ function currentTitle() {
 
 function header() {
   const hasA = state.headerMode.includes('A');
-  const hasB = state.headerMode.includes('B');
-  const hasC = state.headerMode.includes('C');
-  return appHeader({
-    title: currentTitle(),
-    back: hasA ? { aria: 'Назад' } : null,
-    action: hasB ? { label: state.actionLabel, data: 'data-reference-header-action', aria: state.actionLabel } : null,
-    settings: hasC ? { data: 'data-reference-settings', aria: 'Настройки' } : null,
+  const hasC = state.headerMode.includes('B');
+  const hasD = state.headerMode.includes('C');
+  return v2Header({
+    a: hasA ? { kind: 'settings', data: 'data-reference-settings', aria: 'Настройки' } : null,
+    b: currentTitle(),
+    c: hasC ? { kind: 'text', label: state.actionLabel, data: 'data-reference-header-action', aria: state.actionLabel } : null,
+    d: hasD ? { kind: 'chat', aria: 'Чат' } : null,
   });
 }
 
@@ -482,12 +480,10 @@ function bindReferenceEvents() {
 
 function renderPhone() {
   const screen = currentScreen();
-  app.innerHTML = appShell({
+  app.innerHTML = v2Shell({
     header: header(),
-    media: screen.media,
     body: screen.body,
-    className: screen.className,
-    bottomNavigation: bottomNavigation('settings'),
+    className: 'v2-app--workspace',
   });
   bindReferenceEvents();
 }
