@@ -1,5 +1,6 @@
 import {
   accountErrorMessage,
+  isAccountSystemError,
   clearAccount,
   getAccount,
   getAccountChat,
@@ -927,7 +928,18 @@ export async function renderAccount(root, state, callbacks = {}) {
     state.accountUnreadCount = Number(notifications?.unreadCount || 0);
     state.error = '';
   } catch (error) {
-    state.error = accountErrorMessage(error, 'Не удалось загрузить аккаунт');
+    const message = accountErrorMessage(error, 'Не удалось загрузить аккаунт');
+    if (isAccountSystemError(error)) {
+      state.error = '';
+      openNotice({
+        title: 'Аккаунт недоступен',
+        message,
+        action: 'Закрыть',
+        variant: 'technical',
+      });
+    } else {
+      state.error = message;
+    }
   }
 
   const handlers = {
