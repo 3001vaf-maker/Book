@@ -53,8 +53,9 @@ assert.match(accountApi, /export async function getAccountTerms\(/);
 assert.match(accountApi, /export async function getAccountPlatformState\(/);
 assert.match(accountApi, /export async function acceptAccountTerms\(/);
 
-assert.match(bookingUi, /function renderAccountTerms\(/);
-assert.match(bookingUi, /function renderTenantAgreements\(/);
+assert.match(bookingUi, /function renderLegalSticker\(/);
+assert.doesNotMatch(bookingUi, /function renderAccountTerms\(/);
+assert.doesNotMatch(bookingUi, /function renderTenantAgreements\(/);
 assert.match(bookingUi, /accountTerms: currentAccountTermsFact\(state\)/);
 assert.match(bookingUi, /const platformState = await getAccountPlatformState\(state\.tenantId\)/);
 assert.match(bookingUi, /const consentState = await refreshTenantConsentState\(state\)/);
