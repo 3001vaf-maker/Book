@@ -17,8 +17,6 @@ const formsCss = fs.readFileSync('ui/forms/forms.css', 'utf8');
 const uiFacade = fs.readFileSync('ui/ui.js', 'utf8');
 const styleCss = fs.readFileSync('css/style.css', 'utf8');
 const accountMobileCss = fs.readFileSync('ui/booking/account-mobile.css', 'utf8');
-const navigationUi = fs.readFileSync('ui/navigation/navigation.js', 'utf8');
-const navigationCss = fs.readFileSync('ui/navigation/navigation.css', 'utf8');
 const referenceUi = fs.readFileSync('ui/reference/reference.js', 'utf8');
 const referenceHtml = fs.readFileSync('ui/reference/index.html', 'utf8');
 const referenceCss = fs.readFileSync('ui/reference/reference.css', 'utf8');
@@ -121,11 +119,9 @@ expect(accountShell.includes("label: 'Согласия'"), 'Account account and 
 expect(consentSettings.includes('revokeAccountConsent'), 'Account consent settings must use the canonical server-backed revoke flow.');
 expect(bookingUi.includes('bookingChoiceCards'), 'Shared booking UI must continue to own booking choice controls.');
 
-expect(navigationUi.includes("{ id: 'main', label: 'Главная'") && navigationUi.includes("{ id: 'timetable', label: 'График'") && navigationUi.includes("{ id: 'journal', label: 'Журнал'") && navigationUi.includes("{ id: 'chat', label: 'Чат'") && navigationUi.includes("{ id: 'settings', label: 'Настройки'"), 'Book bottom navigation must keep the canonical five destinations.');
-expect(navigationUi.includes('class="nav-label"'), 'Bottom navigation labels must use the canonical label class.');
-expect(navigationCss.includes('grid-template-columns:repeat(5,minmax(0,1fr))'), 'Book bottom navigation must divide the available width into five equal slots.');
-expect(navigationCss.includes('font-size:10px') && navigationCss.includes('white-space:nowrap'), 'All five bottom navigation labels must share a compact single-line label rule.');
-expect(rootHtml.includes('ui/navigation/navigation.css'), 'Book must load the canonical navigation stylesheet.');
+expect(!fs.existsSync('ui/navigation/navigation.js'), 'Legacy bottom navigation owner must be physically removed.');
+expect(!fs.existsSync('ui/navigation/navigation.css'), 'Legacy bottom navigation stylesheet must be physically removed.');
+expect(!rootHtml.includes('ui/navigation/navigation.css'), 'Book must not load removed bottom navigation styles.');
 expect(rootHtml.includes('ui/chat/chat.css'), 'Book must load canonical Shared Chat styles.');
 expect(rootHtml.includes('ui/settings/settings.css'), 'Book must load canonical Shared Settings styles.');
 expect(rootHtml.includes('ui/receipt/receipt.css'), 'Book must load canonical Shared Receipt styles.');
