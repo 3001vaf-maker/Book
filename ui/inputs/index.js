@@ -75,6 +75,23 @@ export function passwordField({ label = 'Пароль', name = 'password', value
   return `<div class="field password-field" data-password-field><span>${escapeHtml(labelText(label, required))}</span><div class="password-field__control"><input name="${escapeHtml(name)}" type="password" value="${escapeHtml(value)}"${required ? ' required' : ''} autocomplete="${escapeHtml(autocomplete)}" data-password-input><button type="button" class="password-field__toggle" data-password-toggle aria-label="Показать пароль" aria-pressed="false">${eye}</button></div></div>`;
 }
 
+export function formValidationMessage(form) {
+  if (!form?.elements) return '';
+  const controls = [...form.elements];
+  controls.forEach((control) => control?.removeAttribute?.('aria-invalid'));
+  const invalid = controls.find((control) => control?.willValidate && !control.validity?.valid);
+  if (!invalid) return '';
+
+  invalid.setAttribute?.('aria-invalid', 'true');
+  invalid.focus?.({ preventScroll: true });
+
+  if (invalid.matches?.('[data-phone-national]')) return 'Введите номер телефона полностью.';
+  if (invalid.validity?.valueMissing) return 'Заполните обязательные поля.';
+  if (invalid.type === 'email' && invalid.validity?.typeMismatch) return 'Введите корректный email.';
+  if (invalid.validity?.tooLong) return 'Сократите введённый текст.';
+  return 'Проверьте введённые данные.';
+}
+
 export function initPasswordFields(root = document) {
   root?.querySelectorAll?.('[data-password-field]').forEach((host) => {
     const input = host.querySelector('[data-password-input]');
