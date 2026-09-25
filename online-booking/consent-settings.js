@@ -1,12 +1,12 @@
-import { getAccountConsentState, revokeAccountConsent } from '../core/account/index.js';
+import { accountErrorMessage, getAccountConsentState, revokeAccountConsent } from '../core/account/index.js';
 import {
   button,
   emptyState,
-  escapeHtml,
   listEntries,
   listEntry,
   mountModal,
   modal,
+  openNotice,
 } from '../ui/ui.js';
 
 function consentRows(consents = []) {
@@ -35,7 +35,12 @@ function confirmRevoke(consent, onConfirm) {
       layer.remove();
     } catch (error) {
       event.currentTarget.disabled = false;
-      event.currentTarget.insertAdjacentHTML('beforebegin', `<div class="form-error" role="alert">${escapeHtml(error instanceof Error ? error.message : 'Не удалось отозвать согласие')}</div>`);
+      openNotice({
+        title: 'Согласие не отозвано',
+        message: accountErrorMessage(error, 'Не удалось отозвать согласие'),
+        action: 'Закрыть',
+        variant: 'technical',
+      });
     }
   });
 }
@@ -45,13 +50,18 @@ export async function openAccountConsentSettings(state, { onChanged } = {}) {
   try {
     consentState = await getAccountConsentState(state.tenantId);
   } catch (error) {
-    return mountModal(document.body, modal(emptyState('Согласия недоступны', error instanceof Error ? error.message : 'Не удалось загрузить согласия'), { variant: 'large', title: 'Согласия' }));
+    return openNotice({
+      title: 'Согласия недоступны',
+      message: accountErrorMessage(error, 'Не удалось загрузить согласия'),
+      action: 'Закрыть',
+      variant: 'technical',
+    });
   }
 
   const consents = Array.isArray(consentState?.consents) ? consentState.consents : [];
   const content = consents.length
     ? `<div class="form-grid">${listEntries(consentRows(consents))}<div class="muted">Нажмите на действующее согласие, чтобы отозвать его.</div></div>`
-    : emptyState('Согласий пока нет', 'Здесь появятся согласия, которые вы давали в Book.');
+    : emptyState('Согласий пока нет', 'Здесь появятся согласия, которые вы давали.');
   const layer = mountModal(document.body, modal(content, { variant: 'large', title: 'Согласия' }));
 
   layer?.querySelectorAll('[data-account-consent-revoke]').forEach((node) => node.addEventListener('click', () => {

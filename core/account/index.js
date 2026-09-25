@@ -48,9 +48,44 @@ async function request(path, { tenantId = '', auth = false, ...options } = {}) {
   return fetch(`${API_BASE}${path}`, { ...options, headers });
 }
 
+const TECHNICAL_ACCOUNT_MESSAGE = /(?:\b(?:Account|tenant|Prisma|Exception|Error|stack|SQL|token|undefined|null|Book)\b|\bid\b|\.js\b|\.ts\b|\/api\/|\{.*\}|\[.*\])/i;
+
+function safeAccountApiMessage(value, fallbackMessage) {
+  const raw = Array.isArray(value) ? value[0] : value;
+  const message = String(raw || '').trim();
+  const system = !message
+    || message.length > 240
+    || message.includes('\n')
+    || TECHNICAL_ACCOUNT_MESSAGE.test(message)
+    || !/[А-Яа-яЁё]/.test(message);
+  return { message: system ? fallbackMessage : message, system };
+}
+
+class AccountRequestError extends Error {
+  constructor(message, { system = false } = {}) {
+    super(message);
+    this.name = 'AccountRequestError';
+    this.userSafe = true;
+    this.system = Boolean(system);
+  }
+}
+
+export function accountErrorMessage(error, fallbackMessage) {
+  return error instanceof AccountRequestError && error.userSafe === true
+    ? error.message
+    : fallbackMessage;
+}
+
+export function isAccountSystemError(error) {
+  return !(error instanceof AccountRequestError) || error.system === true;
+}
+
 async function jsonResponse(response, fallbackMessage) {
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload?.message || fallbackMessage);
+  if (!response.ok) {
+    const safe = safeAccountApiMessage(payload?.message, fallbackMessage);
+    throw new AccountRequestError(safe.message, { system: safe.system });
+  }
   return payload;
 }
 

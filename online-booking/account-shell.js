@@ -1,4 +1,6 @@
 import {
+  accountErrorMessage,
+  isAccountSystemError,
   clearAccount,
   getAccount,
   getAccountChat,
@@ -27,6 +29,7 @@ import {
   v2Header,
   v2HorizontalRail,
   modal,
+  openNotice,
   v2RailCard,
   v2Section,
   v2Shell,
@@ -293,13 +296,15 @@ function bindMessageAttachments(form) {
       const next = (await Promise.all(files.map(fileAttachment))).filter(Boolean);
       selected.splice(0, selected.length, ...next);
       redraw();
-      input.setCustomValidity('');
     } catch (error) {
       selected.splice(0, selected.length);
       redraw();
-      input.setCustomValidity(error instanceof Error ? error.message : 'Не удалось прикрепить файл');
-      input.reportValidity();
-      input.setCustomValidity('');
+      openNotice({
+        title: 'Файл не прикреплён',
+        message: error instanceof Error ? error.message : 'Не удалось прикрепить файл',
+        action: 'Закрыть',
+        variant: 'technical',
+      });
     }
   });
   return () => [...selected];
@@ -768,9 +773,12 @@ async function renderMessages(root, state, handlers) {
       await handlers.render();
     } catch (error) {
       if (submit) submit.disabled = false;
-      input?.setCustomValidity?.(error instanceof Error ? error.message : 'Не удалось отправить');
-      input?.reportValidity?.();
-      input?.setCustomValidity?.('');
+      openNotice({
+        title: 'Сообщение не отправлено',
+        message: accountErrorMessage(error, 'Не удалось отправить сообщение'),
+        action: 'Закрыть',
+        variant: 'technical',
+      });
     }
   });
   requestAnimationFrame(() => {
@@ -920,7 +928,18 @@ export async function renderAccount(root, state, callbacks = {}) {
     state.accountUnreadCount = Number(notifications?.unreadCount || 0);
     state.error = '';
   } catch (error) {
-    state.error = error instanceof Error ? error.message : 'Не удалось загрузить аккаунт';
+    const message = accountErrorMessage(error, 'Не удалось загрузить аккаунт');
+    if (isAccountSystemError(error)) {
+      state.error = '';
+      openNotice({
+        title: 'Аккаунт недоступен',
+        message,
+        action: 'Закрыть',
+        variant: 'technical',
+      });
+    } else {
+      state.error = message;
+    }
   }
 
   const handlers = {

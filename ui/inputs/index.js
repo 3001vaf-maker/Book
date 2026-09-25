@@ -38,8 +38,7 @@ function syncPhoneHost(host, rawValue, { detectCountry = true } = {}) {
 
   nationalInput.value = state.displayNational;
   valueInput.value = state.canonical;
-  const requiredError = nationalInput.required && !state.complete;
-  nationalInput.setCustomValidity(requiredError ? 'Введите номер телефона полностью.' : '');
+  host.dataset.phoneComplete = state.complete ? 'true' : 'false';
 }
 
 function ensurePhoneEvents() {
@@ -75,6 +74,29 @@ export function passwordField({ label = 'Пароль', name = 'password', value
   return `<div class="field password-field" data-password-field><span>${escapeHtml(labelText(label, required))}</span><div class="password-field__control"><input name="${escapeHtml(name)}" type="password" value="${escapeHtml(value)}"${required ? ' required' : ''} autocomplete="${escapeHtml(autocomplete)}" data-password-input><button type="button" class="password-field__toggle" data-password-toggle aria-label="Показать пароль" aria-pressed="false">${eye}</button></div></div>`;
 }
 
+export function formValidationMessage(form) {
+  if (!form?.elements) return '';
+  const controls = [...form.elements];
+  controls.forEach((control) => control?.removeAttribute?.('aria-invalid'));
+
+  const phone = controls.find((control) => control?.matches?.('[data-phone-national]') && control.required && control.closest?.('[data-phone-input]')?.dataset.phoneComplete !== 'true');
+  if (phone) {
+    phone.setAttribute?.('aria-invalid', 'true');
+    phone.focus?.({ preventScroll: true });
+    return 'Введите номер телефона полностью.';
+  }
+
+  const invalid = controls.find((control) => control?.willValidate && !control.validity?.valid);
+  if (!invalid) return '';
+
+  invalid.setAttribute?.('aria-invalid', 'true');
+  invalid.focus?.({ preventScroll: true });
+  if (invalid.validity?.valueMissing) return 'Заполните обязательные поля.';
+  if (invalid.type === 'email' && invalid.validity?.typeMismatch) return 'Введите корректный email.';
+  if (invalid.validity?.tooLong) return 'Сократите введённый текст.';
+  return 'Проверьте введённые данные.';
+}
+
 export function initPasswordFields(root = document) {
   root?.querySelectorAll?.('[data-password-field]').forEach((host) => {
     const input = host.querySelector('[data-password-input]');
@@ -103,7 +125,7 @@ export function phoneInput({ name = 'phone', value = '', required = false, aria 
     data: 'data-phone-country',
     searchable: true,
   }).replace(/(<span class="ui-select__value">)[\s\S]*?(<\/span>)/, `$1${escapeHtml(phoneCountryLabel(state.countryIso))}$2`);
-  return `<div class="phone-input" data-phone-input>${countrySelect}<input class="phone-input__national" type="tel" value="${escapeHtml(state.displayNational)}" placeholder="903 123-45-67" inputmode="tel" autocomplete="tel" data-phone-national aria-label="${escapeHtml(aria)}"${required ? ' required' : ''}><input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(state.canonical)}" data-phone-value></div>`;
+  return `<div class="phone-input" data-phone-input data-phone-complete="${state.complete ? 'true' : 'false'}">${countrySelect}<input class="phone-input__national" type="tel" value="${escapeHtml(state.displayNational)}" placeholder="903 123-45-67" inputmode="tel" autocomplete="tel" data-phone-national aria-label="${escapeHtml(aria)}"${required ? ' required' : ''}><input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(state.canonical)}" data-phone-value></div>`;
 }
 
 export function phoneField({ label = 'Телефон', name = 'phone', value = '', required = false } = {}) {

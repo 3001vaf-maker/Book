@@ -1,8 +1,8 @@
-import { changeAccountPassword, changeGlobalAccountPassword } from '../core/account/index.js';
-import { button, initPasswordFields, modal, mountModal, passwordField } from '../ui/ui.js';
+import { accountErrorMessage, changeAccountPassword, changeGlobalAccountPassword } from '../core/account/index.js';
+import { button, formValidationMessage, initPasswordFields, modal, mountModal, openNotice, passwordField } from '../ui/ui.js';
 
 export function openAccountPasswordSettings(state) {
-  const content = `<form class="form-grid" data-account-password-form>
+  const content = `<form class="form-grid" data-account-password-form novalidate>
     ${passwordField({ label: 'Текущий пароль', name: 'currentPassword', required: true, autocomplete: 'current-password' })}
     ${passwordField({ label: 'Новый пароль', name: 'newPassword', required: true, autocomplete: 'new-password' })}
     ${passwordField({ label: 'Повторите новый пароль', name: 'repeatPassword', required: true, autocomplete: 'new-password' })}
@@ -16,6 +16,11 @@ export function openAccountPasswordSettings(state) {
   const errorNode = layer.querySelector('[data-account-password-error]');
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
+    const validationError = formValidationMessage(form);
+    if (validationError) {
+      if (errorNode) errorNode.textContent = validationError;
+      return;
+    }
     const data = new FormData(form);
     const currentPassword = String(data.get('currentPassword') || '');
     const newPassword = String(data.get('newPassword') || '');
@@ -35,10 +40,20 @@ export function openAccountPasswordSettings(state) {
       if (state.globalAccount) await changeGlobalAccountPassword(currentPassword, newPassword);
       else await changeAccountPassword(state.tenantId, currentPassword, newPassword);
       layer.remove();
-      mountModal(document.body, modal('<p>Новый пароль сохранён.</p>', { variant: 'compact', title: 'Пароль изменён' }));
+      openNotice({
+        title: 'Пароль изменён',
+        message: 'Новый пароль сохранён.',
+        action: 'Закрыть',
+        variant: 'technical',
+      });
     } catch (error) {
-      if (errorNode) errorNode.textContent = error instanceof Error ? error.message : 'Не удалось изменить пароль';
       if (submit) submit.disabled = false;
+      openNotice({
+        title: 'Пароль не изменён',
+        message: accountErrorMessage(error, 'Не удалось изменить пароль'),
+        action: 'Закрыть',
+        variant: 'technical',
+      });
     }
   });
   return layer;
