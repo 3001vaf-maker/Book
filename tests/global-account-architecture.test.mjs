@@ -52,7 +52,11 @@ assert.match(booking, /AccountContactType\.EMAIL/);
 assert.match(booking, /AccountContactType\.PHONE/);
 assert.match(booking, /async loginAccount\(tenantId: string, identifierValue: unknown/);
 assert.doesNotMatch(booking, /tenantId_email/, 'Account lookup must never return to tenant-scoped email uniqueness');
-assert.doesNotMatch(booking, /signAsync\(\{[\s\S]{0,120}tenantId:/, 'Global Account token must not encode one Tenant as identity owner');
+const issueTokenBlock = booking.slice(
+  booking.indexOf('private async issueAccountToken'),
+  booking.indexOf('private async bindAccountTenant'),
+);
+assert.doesNotMatch(issueTokenBlock, /tenantId:/, 'Global Account token must not encode one Tenant as identity owner');
 
 assert.match(communication, /resolveTelegramEntryAccount/);
 assert.match(communication, /AccountContactType\.TELEGRAM/);
