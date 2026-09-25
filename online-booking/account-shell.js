@@ -34,7 +34,7 @@ import {
   setV2DeckOpen,
   mountModal,
 } from '../ui/ui.js';
-import { initMessageComposer, messageComposer, messageThread } from '../ui/chat/index.js';
+import { bindMessageAttachments, initMessageComposer, messageComposer, messageThread } from '../ui/chat/index.js';
 import { settingsPanel } from '../ui/settings/index.js';
 import { readOnlyReceipt } from '../ui/receipt/index.js';
 import { openAccountConsentSettings } from './consent-settings.js';
@@ -264,49 +264,6 @@ function messageTime(value) {
   const date = new Date(value || 0);
   if (!Number.isFinite(date.getTime())) return '';
   return new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' }).format(date);
-}
-
-async function fileAttachment(file) {
-  if (!(file instanceof File)) return null;
-  if (!/^(image|video)\//i.test(file.type || '') && String(file.type || '').toLowerCase() !== 'application/pdf') throw new Error('Можно прикрепить фото, видео или PDF');
-  if (file.size > 8 * 1024 * 1024) throw new Error('Один файл должен быть не больше 8 МБ');
-  const dataUrl = await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ''));
-    reader.onerror = () => reject(new Error('Не удалось прочитать файл'));
-    reader.readAsDataURL(file);
-  });
-  return { name: file.name || 'Файл', type: file.type || '', size: file.size || 0, dataUrl };
-}
-
-function bindMessageAttachments(form) {
-  const selected = [];
-  const input = form?.querySelector('[data-message-attachment-input]');
-  const trigger = form?.querySelector('[data-message-attachment]');
-  const preview = form?.querySelector('[data-message-attachment-preview]');
-  const redraw = () => {
-    if (!preview) return;
-    preview.innerHTML = selected.map((item) => `<span class="message-composer__attachment-chip">${escapeHtml(item.name || 'Медиа')}</span>`).join('');
-  };
-  trigger?.addEventListener('click', () => input?.click());
-  input?.addEventListener('change', async () => {
-    const files = [...(input.files || [])].slice(0, 3);
-    try {
-      const next = (await Promise.all(files.map(fileAttachment))).filter(Boolean);
-      selected.splice(0, selected.length, ...next);
-      redraw();
-    } catch (error) {
-      selected.splice(0, selected.length);
-      redraw();
-      openNotice({
-        title: 'Файл не прикреплён',
-        message: error instanceof Error ? error.message : 'Не удалось прикрепить файл',
-        action: 'Закрыть',
-        variant: 'technical',
-      });
-    }
-  });
-  return () => [...selected];
 }
 
 async function loadMessages(state) {
