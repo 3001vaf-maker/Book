@@ -190,6 +190,14 @@ expect(booking.includes('v2LegalCards(') && booking.includes('v2Sticker({'), 'Le
 expect(!booking.includes('data-booking-workplaces-back') && !booking.includes('data-booking-confirm-back'), 'V2 booking flow must not restore legacy back buttons.');
 
 expect(core.includes("className: 'v2-app--workspace'") && core.includes('v2EList(childItems') && core.includes('eDeck,'), 'Professional workspace must render second-level navigation as E inside the shared FE shell.');
+expect(core.includes('v2Shell({') && account.includes('v2Shell({'), 'Professional and end-user contours must both render through the Shared H/F/E/Z shell owner.');
+expect(core.includes('v2Header({') && account.includes('v2Header({'), 'Professional and end-user contours must both render Header A/B/C/D through the Shared Header owner.');
+expect(ui.includes('export function v2Shell') && ui.includes('data-v2-app') && ui.includes('data-v2-fe') && ui.includes('data-v2-z'), 'Shared shell owner must own H, FE and Z structural layers.');
+expect(ui.includes('export function v2Header') && ui.includes("headerControl(a, 'a')") && ui.includes("headerControl(c, 'c')") && ui.includes("headerControl(d, 'd')") && ui.includes('v2-header__title'), 'Shared Header owner must own A, B, C and D.');
+expect(css.includes('--v2-base:var(--surface-dark)') && css.includes('.v2-header{') && css.includes('.v2-app__stage{') && css.includes('.v2-fe-deck{') && css.includes('.v2-z{'), 'H/F/E/Z geometry and Header geometry must stay in the shared V2 stylesheet.');
+expect(!account.includes('appHeader(') && !account.includes('appShell('), 'End-user account must not create a parallel local H/Header/Z shell.');
+expect(!core.includes('appHeader(') && !core.includes('appShell('), 'Professional workspace must not create a parallel local H/Header/Z shell.');
+
 for (const marker of ["{ id: 'people', label: 'Клиенты'", "{ id: 'finance', label: 'Финансы'", "{ id: 'timetable', label: 'График'", "{ id: 'journal', label: 'Журнал'", "{ id: 'profile', label: 'Профиль'", "{ id: 'settings', label: 'Настройки'"]) {
   expect(core.includes(marker), `Workspace root F is missing ${marker}.`);
 }
