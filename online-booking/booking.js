@@ -1,6 +1,7 @@
 import {
   acceptAccountTerms,
   accountErrorMessage,
+  isAccountSystemError,
   acceptGlobalAccountTerms,
   clearAccount,
   createBookingRequest,
@@ -36,6 +37,7 @@ import {
   initPasswordFields,
   initV2StickerSwipe,
   initV2Swipe,
+  openNotice,
   passwordField,
   phoneField,
   v2Document,
@@ -91,6 +93,18 @@ function discountedTotal(subtotal, discountPercent) {
 
 function errorBlock(message = '') {
   return message ? `<div class="form-error" role="alert">${escapeHtml(message)}</div>` : '';
+}
+
+function accountFlowError(error, fallbackMessage) {
+  const message = accountErrorMessage(error, fallbackMessage);
+  if (!isAccountSystemError(error)) return message;
+  openNotice({
+    title: 'Не удалось выполнить действие',
+    message,
+    action: 'Закрыть',
+    variant: 'technical',
+  });
+  return '';
 }
 
 function currentTenantConsentFacts(state) {
@@ -240,7 +254,7 @@ function renderLegalSticker(root, state) {
       if (state.identityDestination === 'booking') await finalizeBookingRequest(root, state);
       else await renderAccountHome(root, state);
     } catch (error) {
-      state.error = accountErrorMessage(error, 'Не удалось сохранить документы');
+      state.error = accountFlowError(error, 'Не удалось сохранить документы');
       renderLegalSticker(root, state);
     }
   });
@@ -416,7 +430,6 @@ function renderAccountEntry(root, state) {
     ${errorBlock(state.error)}
     ${button('Войти', { type: 'submit' })}
     <button type="button" class="v2-sticker-link" data-booking-register>Зарегистрироваться</button>
-    <button type="button" class="v2-sticker-link" data-booking-forgot>Забыли пароль?</button>
   </form>`;
   root.innerHTML = `<section class="${flowThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${v2Sticker({
     title: 'Вход',
@@ -448,13 +461,9 @@ function renderAccountEntry(root, state) {
       await loadAccountTerms(state);
       renderAccountDetails(root, state);
     } catch (error) {
-      state.error = accountErrorMessage(error, 'Не удалось открыть регистрацию');
+      state.error = accountFlowError(error, 'Не удалось открыть регистрацию');
       renderAccountEntry(root, state);
     }
-  });
-  root.querySelector('[data-booking-forgot]')?.addEventListener('click', () => {
-    state.error = 'Восстановление пароля пока недоступно.';
-    renderAccountEntry(root, state);
   });
   authForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -488,7 +497,7 @@ function renderAccountEntry(root, state) {
       state.error = '';
       await continueAfterIdentity(root, state);
     } catch (error) {
-      state.error = accountErrorMessage(error, 'Не удалось войти');
+      state.error = accountFlowError(error, 'Не удалось войти');
       renderAccountEntry(root, state);
     }
   });
@@ -569,7 +578,7 @@ function renderAccountDetails(root, state) {
       if (!state.accountTerms) await loadAccountTerms(state);
       renderLegalSticker(root, state);
     } catch (error) {
-      state.error = accountErrorMessage(error, 'Не удалось проверить контакты');
+      state.error = accountFlowError(error, 'Не удалось проверить контакты');
       renderAccountDetails(root, state);
     }
   });
@@ -608,7 +617,7 @@ async function continueAfterIdentity(root, state) {
 
     await finalizeBookingRequest(root, state);
   } catch (error) {
-    state.error = accountErrorMessage(error, 'Не удалось проверить юридический статус');
+    state.error = accountFlowError(error, 'Не удалось проверить юридический статус');
     try {
       if (!state.accountTerms) await loadAccountTerms(state);
       await refreshTenantConsentState(state).catch(() => ({ pdnActive: false }));
@@ -849,7 +858,7 @@ async function finalizeBookingRequest(root, state) {
       renderTimes(root, state);
       return;
     }
-    state.error = accountErrorMessage(error, 'Не удалось подтвердить запись');
+    state.error = accountFlowError(error, 'Не удалось подтвердить запись');
     renderConfirmation(root, state);
   }
 }
@@ -1013,7 +1022,7 @@ function renderGlobalClientEntry(root, state) {
       state.accountTermsAccepted = false;
       renderGlobalClientDetails(root, state);
     } catch (error) {
-      state.error = accountErrorMessage(error, 'Не удалось открыть регистрацию');
+      state.error = accountFlowError(error, 'Не удалось открыть регистрацию');
       renderGlobalClientEntry(root, state);
     }
   });
@@ -1046,7 +1055,7 @@ function renderGlobalClientEntry(root, state) {
       state.error = '';
       await continueGlobalIdentity(root, state);
     } catch (error) {
-      state.error = accountErrorMessage(error, 'Не удалось войти');
+      state.error = accountFlowError(error, 'Не удалось войти');
       renderGlobalClientEntry(root, state);
     }
   });
@@ -1116,7 +1125,7 @@ function renderGlobalClientDetails(root, state) {
       state.accountTermsAccepted = false;
       renderGlobalClientLegal(root, state);
     } catch (error) {
-      state.error = accountErrorMessage(error, 'Не удалось проверить контакты');
+      state.error = accountFlowError(error, 'Не удалось проверить контакты');
       renderGlobalClientDetails(root, state);
     }
   });
@@ -1168,7 +1177,7 @@ function renderGlobalClientLegal(root, state) {
       state.error = '';
       await renderGlobalClientHome(root, state);
     } catch (error) {
-      state.error = accountErrorMessage(error, 'Не удалось сохранить документ');
+      state.error = accountFlowError(error, 'Не удалось сохранить документ');
       renderGlobalClientLegal(root, state);
     }
   });
@@ -1186,7 +1195,7 @@ export async function renderGlobalClient(root) {
     state.account = account;
     await continueGlobalIdentity(root, state);
   } catch (error) {
-    state.error = accountErrorMessage(error, 'Не удалось открыть профиль');
+    state.error = accountFlowError(error, 'Не удалось открыть профиль');
     renderGlobalClientEntry(root, state);
   }
 }
@@ -1248,7 +1257,7 @@ export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = 
   } catch (error) {
     renderFlowPage(root, state, {
       title: 'Онлайн-запись',
-      body: emptyState('Запись недоступна', accountErrorMessage(error, 'Не удалось открыть онлайн-запись.')),
+      body: emptyState('Запись недоступна', accountFlowError(error, 'Не удалось открыть онлайн-запись.')),
       center: true,
     });
   }
