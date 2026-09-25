@@ -41,14 +41,31 @@ Stage 1 must not:
 
 ## Stage 2 — move active local UI into Shared UI
 
-Status: IN PROGRESS on `staging`.
+Status: IMPLEMENTED AND VERIFIED on `staging`. Merge to `main` only after the final exact-head CI/PR checks are green.
 
-Move reusable local form/error/chat/settings/receipt presentation from end-user files into canonical Shared UI owners. Preserve behavior and visual output.
+Goal: remove local/legacy presentation owners without changing business flows.
 
-Substages:
-- 2A Chat: move message bubble/thread/composer code and styles from legacy `ui/shell` into canonical `ui/chat`; no visual or behavioral change.
-- 2B Settings/receipt: move active settings/toggle/read-only receipt owners out of legacy shell.
-- 2C Forms/errors: move reusable local end-user form/error presentation into Shared UI without changing flows.
+Completed:
+- `ui/chat` is the single Chat UI owner for both end-user and professional contours: bubbles, thread, composer, attachments, attachment validation, growing text area and Chat-specific geometry.
+- End-user and professional Chat import `ui/chat` directly. No Chat bridge remains in `ui/ui.js`.
+- Professional Chat now uses the same V2 visual shell as end-user Chat; professional-only functions remain professional-only.
+- Chat Header A owns Chat settings. Shared Header C/D own contextual actions/attachments.
+- Chat text input grows with content up to its max height; native blue focus rings are suppressed.
+- `ui/settings` is the single owner for settings panels/toggles used by migrated contours.
+- `ui/receipt` is the single owner for read-only receipt/report sheets used by the end-user contour.
+- `ui/forms` is the single owner for reusable form shells and form-error presentation in the end-user identity/profile flows and professional Chat management forms.
+- Legacy Chat/Settings/Receipt code and their migrated CSS were physically removed from `ui/shell`; no compatibility wrapper was left behind.
+- Old Chat shell geometry `.app-view-shell--chat` was removed after proving it had no runtime consumer.
+- Architecture checks and regression tests were updated to require the new owners and reject reintroduction of the removed legacy ownership.
+
+Verified before final documentation commit:
+- syntax and architecture checks: green;
+- full regression test suite: green;
+- server build: green;
+- migration/recovery jobs: green;
+- staging backend: green;
+- all four production domains: green;
+- staging frontend: green.
 
 ## Stage 3 — remove proven dead legacy renderers
 
