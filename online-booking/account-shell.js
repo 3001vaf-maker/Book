@@ -395,11 +395,13 @@ function setAccountDeckOpen(root, state, open) {
   setV2DeckOpen(root, state.accountDeckOpen);
 }
 
-function bindWorkspaceInteraction(root, state, handlers, { bindZ = true } = {}) {
+function bindWorkspaceInteraction(root, state, handlers, { bindZ = true, onZRight = null, onZLeft = null } = {}) {
   return initV2WorkspaceInteraction(root, {
     activeId: state.accountDeckActive || 'representatives',
     deckOpen: state.accountDeckOpen,
     bindZ,
+    onZRight,
+    onZLeft,
     onDeckOpenChange: (open) => {
       state.accountDeckOpen = open;
     },
@@ -640,9 +642,8 @@ async function renderHistoryDetail(root, state, handlers) {
     d: { kind: 'chat', data: 'data-account-history-chat', aria: 'Чат', badge: state.accountUnreadCount || 0 },
   });
   renderV2Shell(root, state, { header, body: historyDetailBody(state, request) });
-  bindWorkspaceInteraction(root, state, handlers, { bindZ: false });
-  initV2Swipe(root, {
-    onRight: () => {
+  bindWorkspaceInteraction(root, state, handlers, {
+    onZRight: () => {
       state.accountTab = state.accountHistoryReturn || 'history';
       state.accountHistoryRequestId = '';
       state.accountHistoryRequestMoment = '';
@@ -708,9 +709,8 @@ async function renderMessages(root, state, handlers) {
   });
   const body = `${messages.length ? messageThread(messages, { viewer: 'account' }) : emptyState('Сообщений пока нет', 'Напишите первое сообщение.')}${messageComposer({ attachments: true, attachmentTrigger: 'external' })}`;
   renderV2Shell(root, state, { header, body, deck: true, className: 'v2-app--chat' });
-  bindWorkspaceInteraction(root, state, handlers, { bindZ: false });
-  initV2Swipe(root, {
-    onRight: () => {
+  bindWorkspaceInteraction(root, state, handlers, {
+    onZRight: () => {
       state.accountChatOpen = false;
       if (state.accountChatReturn === 'booking' && handlers.onChatBack) {
         state.accountChatReturn = '';
