@@ -1,16 +1,24 @@
 import {
   acceptAccountTerms,
+  acceptGlobalAccountTerms,
   clearAccount,
   createBookingRequest,
   getAccount,
   getAccountConsentState,
+  getGlobalAccount,
+  getGlobalAccountPlatformState,
+  getGlobalAccountRecords,
+  getGlobalAccountRelationships,
   getAccountPlatformState,
   getAccountTerms,
   getBookingContext,
   getRememberedAccountEmail,
   loginAccount,
+  loginGlobalAccount,
   prepareAccount,
+  prepareGlobalAccount,
   registerAccount,
+  registerGlobalAccount,
   submitAccountConsents,
 } from '../core/account/index.js';
 import { normalizeBookingSettings } from '../core/booking-settings/index.js';
@@ -44,7 +52,7 @@ import {
   getBookingWorkplace,
   requiredBookingDocuments,
 } from './model.js';
-import { renderAccount } from './account-shell.js';
+import { renderAccount, renderGlobalAccount } from './account-shell.js';
 
 function formatDate(value) {
   const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -843,6 +851,291 @@ async function renderAccountHome(root, state) {
 async function refreshContext(state) {
   state.context = await getBookingContext(state.tenantId, state.lockedWorkplaceKey);
   state.settings = normalizeBookingSettings(state.context.settings);
+}
+
+
+function globalAccountState() {
+  return {
+    tenantId: '',
+    context: {},
+    settings: normalizeBookingSettings(),
+    accountDraft: {},
+    contactErrors: {},
+    account: null,
+    accountTerms: null,
+    accountTermsAccepted: false,
+    relationships: [],
+    accountRecords: [],
+    error: '',
+    accountTab: 'home',
+    accountDeckOpen: false,
+    accountDeckActive: 'representatives',
+  };
+}
+
+function globalTermsFact(state) {
+  const document = state.accountTerms || {};
+  return {
+    key: String(document.key || ''),
+    version: Math.max(1, Number(document.version || 1)),
+    accepted: Boolean(state.accountTermsAccepted),
+    acceptedAt: new Date().toISOString(),
+  };
+}
+
+async function renderGlobalClientHome(root, state) {
+  const [account, relationships, records] = await Promise.all([
+    getGlobalAccount(),
+    getGlobalAccountRelationships().catch(() => []),
+    getGlobalAccountRecords().catch(() => []),
+  ]);
+  if (!account) {
+    renderGlobalClientEntry(root, state);
+    return;
+  }
+  state.account = account;
+  state.relationships = Array.isArray(relationships) ? relationships : [];
+  state.accountRecords = Array.isArray(records) ? records : [];
+  await renderGlobalAccount(root, state, {
+    onOpenRelationship: (tenantId) => {
+      const params = new URLSearchParams();
+      params.set('booking', tenantId);
+      location.assign(`${location.pathname}?${params.toString()}`);
+    },
+    onOpenRecord: (request) => {
+      const tenantId = String(request?.tenantId || '');
+      if (!tenantId) return;
+      const params = new URLSearchParams();
+      params.set('booking', tenantId);
+      location.assign(`${location.pathname}?${params.toString()}`);
+    },
+    onPersonalData: () => {
+      state.error = 'Редактирование глобального профиля будет подключено к этому экрану.';
+      renderGlobalClientHome(root, state);
+    },
+    onPassword: () => {
+      state.error = 'Изменение пароля будет подключено к этому экрану.';
+      renderGlobalClientHome(root, state);
+    },
+    onLogout: () => {
+      clearAccount('');
+      state.account = null;
+      state.relationships = [];
+      state.accountRecords = [];
+      state.error = '';
+      renderGlobalClientEntry(root, state);
+    },
+  });
+}
+
+async function continueGlobalIdentity(root, state) {
+  const platformState = await getGlobalAccountPlatformState();
+  state.accountTerms = platformState?.document || state.accountTerms;
+  state.accountTermsAccepted = Boolean(platformState?.accepted);
+  if (!platformState?.accepted) {
+    renderGlobalClientLegal(root, state);
+    return;
+  }
+  await renderGlobalClientHome(root, state);
+}
+
+function renderGlobalClientEntry(root, state) {
+  const rememberedIdentifier = state.accountDraft?.identifier
+    || state.accountDraft?.email
+    || getRememberedAccountEmail('')
+    || '';
+  const form = `<form data-global-account-entry>
+    ${field({ label: 'Телефон или email', name: 'identifier', value: rememberedIdentifier, required: true, autocomplete: 'username' })}
+    ${passwordField({ label: 'Пароль', name: 'password', required: true, autocomplete: 'current-password' })}
+    ${errorBlock(state.error)}
+    ${button('Войти', { type: 'submit' })}
+    <button type="button" class="v2-sticker-link" data-global-account-register>Зарегистрироваться</button>
+  </form>`;
+  root.innerHTML = `<section class="${flowThemeClasses(state)}">${v2Sticker({
+    title: 'Вход',
+    body: form,
+    className: 'v2-sticker-screen--auth',
+  })}</section>`;
+  initPasswordFields(root);
+  const authForm = root.querySelector('[data-global-account-entry]');
+  root.querySelector('[data-global-account-register]')?.addEventListener('click', async () => {
+    const data = new FormData(authForm);
+    const identifier = String(data.get('identifier') || '').trim();
+    state.accountDraft = {
+      ...(state.accountDraft || {}),
+      identifier,
+      ...(identifier.includes('@') ? { email: identifier.toLowerCase() } : {}),
+    };
+    state.error = '';
+    try {
+      state.accountTerms = await getAccountTerms();
+      state.accountTermsAccepted = false;
+      renderGlobalClientDetails(root, state);
+    } catch (error) {
+      state.error = error instanceof Error ? error.message : 'Не удалось открыть регистрацию';
+      renderGlobalClientEntry(root, state);
+    }
+  });
+  authForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const data = new FormData(authForm);
+    const identifier = String(data.get('identifier') || '').trim();
+    const password = String(data.get('password') || '');
+    try {
+      const prepared = await prepareGlobalAccount({ identifier });
+      if (!prepared.exists) {
+        state.accountDraft = {
+          ...(state.accountDraft || {}),
+          identifier,
+          ...(prepared.identifierType === 'EMAIL' ? { email: identifier.toLowerCase() } : {}),
+          ...(prepared.identifierType === 'PHONE' ? { phone: identifier } : {}),
+        };
+        state.error = 'Аккаунт не найден. Выберите «Зарегистрироваться».';
+        renderGlobalClientEntry(root, state);
+        return;
+      }
+      const payload = await loginGlobalAccount(identifier, password);
+      state.account = payload.account;
+      state.error = '';
+      await continueGlobalIdentity(root, state);
+    } catch (error) {
+      state.error = error instanceof Error ? error.message : 'Не удалось войти';
+      renderGlobalClientEntry(root, state);
+    }
+  });
+}
+
+function renderGlobalClientDetails(root, state) {
+  const draft = state.accountDraft || {};
+  const contactErrors = state.contactErrors || {};
+  renderFlowPage(root, state, {
+    title: 'Регистрация',
+    action: { label: 'Подтвердить', data: 'data-global-account-submit' },
+    step: 'registration',
+    body: `<form data-global-account-form>
+      ${field({ label: 'Имя', name: 'name', value: draft.name || '', required: true, autocomplete: 'given-name' })}
+      ${field({ label: 'Фамилия', name: 'surname', value: draft.surname || '', autocomplete: 'family-name' })}
+      ${phoneField({ label: 'Телефон', name: 'phone', value: draft.phone || '', required: true })}
+      ${errorBlock(contactErrors.phone || '')}
+      ${field({ label: 'Email', name: 'email', value: draft.email || '', type: 'email', required: true, autocomplete: 'email' })}
+      ${errorBlock(contactErrors.email || '')}
+      ${passwordField({ label: 'Пароль', name: 'password', required: true, autocomplete: 'new-password' })}
+      ${passwordField({ label: 'Повтор пароля', name: 'repeatPassword', required: true, autocomplete: 'new-password' })}
+      ${errorBlock(state.error)}
+    </form>`,
+  });
+  initPasswordFields(root);
+  const form = root.querySelector('[data-global-account-form]');
+  root.querySelector('[data-global-account-submit]')?.addEventListener('click', () => form?.requestSubmit());
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const data = new FormData(form);
+    const email = String(data.get('email') || '').trim().toLowerCase();
+    const phone = String(data.get('phone') || '').trim();
+    const password = String(data.get('password') || '');
+    const repeatPassword = String(data.get('repeatPassword') || '');
+    if (password !== repeatPassword) {
+      state.error = 'Пароли не совпадают.';
+      renderGlobalClientDetails(root, state);
+      return;
+    }
+    state.accountDraft = {
+      ...(state.accountDraft || {}),
+      name: String(data.get('name') || '').trim(),
+      surname: String(data.get('surname') || '').trim(),
+      email,
+      phone,
+      password,
+    };
+    try {
+      const prepared = await prepareGlobalAccount({ email, phone });
+      const conflict = 'Этот контакт уже зарегистрирован. Войдите в учетную запись.';
+      state.contactErrors = {
+        email: prepared?.conflicts?.email ? conflict : '',
+        phone: prepared?.conflicts?.phone ? conflict : '',
+      };
+      if (state.contactErrors.email || state.contactErrors.phone) {
+        state.error = '';
+        renderGlobalClientDetails(root, state);
+        return;
+      }
+      if (!state.accountTerms) state.accountTerms = await getAccountTerms();
+      state.accountTermsAccepted = false;
+      renderGlobalClientLegal(root, state);
+    } catch (error) {
+      state.error = error instanceof Error ? error.message : 'Не удалось проверить контакты';
+      renderGlobalClientDetails(root, state);
+    }
+  });
+}
+
+function renderGlobalClientLegal(root, state) {
+  const document = state.accountTerms;
+  if (!document) {
+    void getAccountTerms().then((terms) => {
+      state.accountTerms = terms;
+      renderGlobalClientLegal(root, state);
+    });
+    return;
+  }
+  const cards = v2LegalCards([{
+    title: document.title || 'Условия использования учетной записи',
+    required: true,
+    checked: Boolean(state.accountTermsAccepted),
+    openData: 'data-global-platform-document',
+    toggleData: 'data-global-platform-toggle',
+    openAria: 'Открыть Условия использования учетной записи',
+    toggleAria: 'Принять Условия использования учетной записи',
+  }]);
+  root.innerHTML = `<section class="${flowThemeClasses(state)}">${v2Sticker({
+    title: 'Документы',
+    body: `${cards}${button('Продолжить', { data: 'data-global-platform-continue', disabled: !state.accountTermsAccepted })}${errorBlock(state.error)}`,
+    className: 'v2-sticker-screen--legal',
+  })}</section>`;
+  root.querySelector('[data-global-platform-document]')?.addEventListener('click', () => {
+    renderExpandedDocument(root, state, document, () => renderGlobalClientLegal(root, state));
+  });
+  root.querySelector('[data-global-platform-toggle]')?.addEventListener('click', () => {
+    state.accountTermsAccepted = !state.accountTermsAccepted;
+    renderGlobalClientLegal(root, state);
+  });
+  root.querySelector('[data-global-platform-continue]')?.addEventListener('click', async () => {
+    if (!state.accountTermsAccepted) return;
+    try {
+      if (!state.account) {
+        const payload = await registerGlobalAccount({
+          ...state.accountDraft,
+          password: state.accountDraft.password,
+          accountTerms: globalTermsFact(state),
+        });
+        state.account = payload.account;
+      } else {
+        await acceptGlobalAccountTerms(globalTermsFact(state));
+      }
+      state.error = '';
+      await renderGlobalClientHome(root, state);
+    } catch (error) {
+      state.error = error instanceof Error ? error.message : 'Не удалось сохранить документ';
+      renderGlobalClientLegal(root, state);
+    }
+  });
+}
+
+export async function renderGlobalClient(root) {
+  const state = globalAccountState();
+  renderFlowPage(root, state, { title: 'Профиль', subtitle: 'Загрузка…', center: true });
+  try {
+    const account = await getGlobalAccount();
+    if (!account) {
+      renderGlobalClientEntry(root, state);
+      return;
+    }
+    state.account = account;
+    await continueGlobalIdentity(root, state);
+  } catch (error) {
+    state.error = error instanceof Error ? error.message : 'Не удалось открыть профиль';
+    renderGlobalClientEntry(root, state);
+  }
 }
 
 export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = '' } = {}) {
