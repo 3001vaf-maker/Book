@@ -66,7 +66,7 @@ export function v2EList(items = [], { active = '', data = 'data-v2-e-item' } = {
     const stackZ = Math.max(1, count - visualDepth);
     const classes = ['v2-e-card', isActive ? 'is-active' : 'is-stacked'].filter(Boolean).join(' ');
     const itemData = data ? ` ${data}="${text(id)}"` : '';
-    return `<button type="button" class="${classes}" style="--v2-e-depth-x:${depthX}px;--v2-e-depth-y:${depthY}px;--v2-e-stack-z:${stackZ}"${itemData} data-v2-e-index="${index}" aria-label="${text(item.aria || item.label || '')}"><strong>${text(item.label || '')}</strong></button>`;
+    return `<button type="button" class="${classes}" style="--v2-e-depth-x:${depthX}px;--v2-e-depth-y:${depthY}px;--v2-e-stack-z:${stackZ}"${itemData} data-v2-e-index="${index}" aria-label="${text(item.aria || item.label || '')}"><strong data-v2-e-handle>${text(item.label || '')}</strong></button>`;
   }).join('')}</div>`;
 }
 
@@ -88,7 +88,7 @@ export function v2FDeck(items = [], { active = '', data = 'data-v2-deck-item', c
     const stackZ = Math.max(1, count - visualDepth);
     const classes = ['v2-deck__card', isActive ? 'is-active' : 'is-stacked'].filter(Boolean).join(' ');
     const customData = data && data !== 'data-v2-deck-item' ? ` ${data}="${text(id)}"` : '';
-    return `<button type="button" class="${classes}" style="--v2-depth:${visualDepth};--v2-depth-x:${depthX}px;--v2-depth-y:${depthY}px;--v2-stack-z:${stackZ}" data-v2-deck-item="${text(id)}"${customData} data-v2-f-index="${index}" aria-label="${text(item.aria || item.label || '')}"><strong>${text(item.label || '')}</strong></button>`;
+    return `<button type="button" class="${classes}" style="--v2-depth:${visualDepth};--v2-depth-x:${depthX}px;--v2-depth-y:${depthY}px;--v2-stack-z:${stackZ}" data-v2-deck-item="${text(id)}"${customData} data-v2-f-index="${index}" aria-label="${text(item.aria || item.label || '')}"><strong data-v2-f-handle>${text(item.label || '')}</strong></button>`;
   }).join('')}</div>`;
 }
 
@@ -107,9 +107,11 @@ export function v2Shell({
     ${header}
     <div class="v2-app__stage">
       ${feDeck}
-      <main class="v2-z" ${zData}>
+      <div class="v2-front" data-v2-front>
+        <main class="v2-z" ${zData}>
 ${body}
 </main>
+      </div>
     </div>
   </section>`;
 }
@@ -181,23 +183,25 @@ export function v2ZLayer(content = '', { className = '' } = {}) {
 export function mountV2ZLayer(root, html, { onClose = null, stack = false } = {}) {
   const app = root?.closest?.('[data-v2-app]') || document.querySelector('[data-v2-app]');
   const stage = app?.querySelector?.('.v2-app__stage');
-  if (!stage) return null;
+  const front = app?.querySelector?.('[data-v2-front]');
+  const host = front || stage;
+  if (!host) return null;
   const template = document.createElement('template');
   template.innerHTML = String(html || '').trim();
   const node = template.content.firstElementChild;
   if (!node?.matches?.('[data-v2-z-layer]')) return null;
-  if (!stack) stage.querySelectorAll('[data-v2-z-layer]').forEach((layer) => layer.remove());
-  const depth = stage.querySelectorAll('[data-v2-z-layer]').length + 1;
+  if (!stack) host.querySelectorAll('[data-v2-z-layer]').forEach((layer) => layer.remove());
+  const depth = host.querySelectorAll('[data-v2-z-layer]').length + 1;
   node.dataset.v2ZDepth = String(depth);
   node.style.setProperty('--v2-z-layer-shift', `${depth * 12}px`);
-  stage.appendChild(node);
+  host.appendChild(node);
   app?.classList.add('has-z-layer');
   const notify = () => window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
   let disposeSwipe = () => {};
   const close = () => {
     disposeSwipe();
     if (node.isConnected) node.remove();
-    app?.classList.toggle('has-z-layer', Boolean(stage.querySelector('[data-v2-z-layer]')));
+    app?.classList.toggle('has-z-layer', Boolean(host.querySelector('[data-v2-z-layer]')));
     notify();
     onClose?.();
   };
@@ -319,7 +323,7 @@ function activeV2ModalSurface(root = null) {
   const app = root?.closest?.('[data-v2-app]') || document.querySelector('[data-v2-app]');
   const layers = [...(app?.querySelectorAll?.('[data-v2-z-layer]') || [])];
   return layers.at(-1)
-    || app?.querySelector?.('.v2-app__stage > [data-v2-z]')
+    || app?.querySelector?.('[data-v2-front] > [data-v2-z]')
     || document.querySelector('.app-content')
     || document.querySelector('#app');
 }
@@ -478,70 +482,309 @@ export function initV2WorkspaceInteraction(root, {
   onRootSelect = null,
   onSecondarySelect = null,
   onDeckOpenChange = null,
+  onZRight = null,
+  onZLeft = null,
   bindZ = true,
+  threshold = 42,
+  maxDrag = 180,
 } = {}) {
   const app = root?.matches?.('[data-v2-app]')
     ? root
     : root?.closest?.('[data-v2-app]') || root?.querySelector?.('[data-v2-app]');
   if (!app) return () => {};
 
+  const stage = app.querySelector('.v2-app__stage');
+  const front = app.querySelector('[data-v2-front]');
   const deck = app.querySelector('[data-v2-deck]');
-  const z = app.querySelector('.v2-app__stage > [data-v2-z]');
-  const disposers = [];
+  const eDeck = app.querySelector('[data-v2-e-list]');
+  const z = app.querySelector('[data-v2-front] > [data-v2-z]');
+  if (!stage || !front) return () => {};
 
-  const setOpen = (open, notify = true) => {
-    const next = setV2DeckOpen(app, open);
-    if (notify) onDeckOpenChange?.(next);
-    return next;
+  const fCards = [...(deck?.querySelectorAll?.('.v2-deck__card') || [])];
+  const eCards = [...(eDeck?.querySelectorAll?.('.v2-e-card') || [])];
+  let fActiveIndex = Math.max(0, fCards.findIndex((card) => String(card.getAttribute('data-account-deck-item') || card.getAttribute('data-v2-deck-item') || '') === String(activeId || '')));
+  let eActiveIndex = Math.max(0, eCards.findIndex((card) => String(card.getAttribute('data-v2-secondary-item') || card.getAttribute('data-v2-e-item') || '') === String(eActiveId || '')));
+  let open = Boolean(deckOpen);
+  let gesture = null;
+  let suppressNextClick = false;
+  let suppressTimer = 0;
+
+  const fId = (card) => String(card?.getAttribute('data-account-deck-item') || card?.getAttribute('data-v2-deck-item') || '');
+  const eId = (card) => String(card?.getAttribute('data-v2-secondary-item') || card?.getAttribute('data-v2-e-item') || '');
+
+  const markSuppressClick = () => {
+    suppressNextClick = true;
+    if (suppressTimer) window.clearTimeout(suppressTimer);
+    suppressTimer = window.setTimeout(() => {
+      suppressNextClick = false;
+      suppressTimer = 0;
+    }, 350);
   };
 
-  setOpen(deckOpen, false);
+  const clearMotion = () => {
+    app.classList.remove('is-revealing-deck');
+    front.classList.remove('is-dragging');
+    front.style.removeProperty('--v2-front-drag-x');
+    deck?.classList.remove('is-dragging');
+    deck?.style.removeProperty('--v2-fe-drag-x');
+    eDeck?.classList.remove('is-dragging');
+    eDeck?.style.removeProperty('--v2-e-drag-y');
+    fCards.forEach((card) => {
+      card.classList.remove('is-dragging', 'is-picked');
+      card.style.removeProperty('--v2-pick-x');
+    });
+    eCards.forEach((card) => {
+      card.classList.remove('is-dragging', 'is-picked');
+      card.style.removeProperty('--v2-pick-y');
+    });
+  };
 
-  if (deck) {
-    disposers.push(initV2DeckSwipe(deck, {
-      activeId,
-      eActiveId,
-      onActiveChange: (id) => {
-        setOpen(true);
-        onRootSelect?.(id);
-      },
-      onEActiveChange: (id) => {
-        setOpen(true);
-        onSecondarySelect?.(id);
-      },
-    }));
+  const setOpen = (nextOpen, notify = true) => {
+    open = setV2DeckOpen(app, nextOpen);
+    clearMotion();
+    if (notify) onDeckOpenChange?.(open);
+    return open;
+  };
 
-    const onDeckClick = (event) => {
-      const rootItem = event.target.closest('[data-v2-deck-item]');
-      if (rootItem && deck.contains(rootItem)) {
-        const id = String(rootItem.getAttribute('data-v2-deck-item') || '');
-        if (id) {
-          setOpen(true);
-          onRootSelect?.(id);
+  const endGesture = () => {
+    if (gesture?.captured && gesture.pointerId != null) {
+      try { stage.releasePointerCapture?.(gesture.pointerId); } catch {}
+    }
+    gesture = null;
+    clearMotion();
+  };
+
+  setOpen(open, false);
+
+  const down = (event) => {
+    if (gesture) return;
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    if (event.target.closest?.('[data-v2-layer], [data-v2-z-layer]')) return;
+
+    const eCard = event.target.closest?.('.v2-e-card');
+    const fCard = event.target.closest?.('.v2-deck__card');
+    let role = '';
+    let card = null;
+    let index = -1;
+
+    if (eCard && eDeck?.contains(eCard)) {
+      role = 'e';
+      card = eCard;
+      index = eCards.indexOf(eCard);
+      if (index !== eActiveIndex && !event.target.closest?.('[data-v2-e-handle]')) return;
+    } else if (fCard && deck?.contains(fCard)) {
+      role = 'f';
+      card = fCard;
+      index = fCards.indexOf(fCard);
+      if (index !== fActiveIndex && !event.target.closest?.('[data-v2-f-handle]')) return;
+    } else if (bindZ && z?.contains(event.target)) {
+      role = 'z';
+    } else {
+      return;
+    }
+
+    gesture = {
+      pointerId: event.pointerId,
+      role,
+      card,
+      index,
+      startX: event.clientX,
+      startY: event.clientY,
+      dx: 0,
+      dy: 0,
+      axis: 'pending',
+      cancelled: false,
+      captured: false,
+      openAtStart: open,
+    };
+
+    if ((role === 'f' && index !== fActiveIndex) || (role === 'e' && index !== eActiveIndex)) {
+      card?.classList.add('is-picked');
+    }
+  };
+
+  const move = (event) => {
+    if (!gesture || event.pointerId !== gesture.pointerId || gesture.cancelled) return;
+    const dx = event.clientX - gesture.startX;
+    const dy = event.clientY - gesture.startY;
+    gesture.dx = dx;
+    gesture.dy = dy;
+
+    if (gesture.axis === 'pending') {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 6) return;
+      if (gesture.role === 'f') {
+        gesture.axis = Math.abs(dx) >= Math.abs(dy) * 0.72 ? 'horizontal' : 'vertical';
+        if (gesture.axis !== 'horizontal') {
+          gesture.cancelled = true;
+          clearMotion();
+          return;
         }
+      } else if (gesture.role === 'e') {
+        gesture.axis = Math.abs(dy) >= Math.abs(dx) * 0.72 ? 'vertical' : 'horizontal';
+        if (gesture.axis !== 'vertical') {
+          gesture.cancelled = true;
+          clearMotion();
+          return;
+        }
+      } else {
+        gesture.axis = Math.abs(dx) >= Math.abs(dy) * 1.08 ? 'horizontal' : 'vertical';
+        if (gesture.axis !== 'horizontal') {
+          gesture.cancelled = true;
+          clearMotion();
+          return;
+        }
+      }
+      stage.setPointerCapture?.(event.pointerId);
+      gesture.captured = true;
+    }
+
+    if (gesture.role === 'f') {
+      const dragX = Math.max(-maxDrag, Math.min(maxDrag, dx));
+      gesture.card?.classList.add('is-dragging');
+      if (gesture.index === fActiveIndex) {
+        deck?.classList.add('is-dragging');
+        deck?.style.setProperty('--v2-fe-drag-x', `${dragX}px`);
+      } else {
+        gesture.card?.style.setProperty('--v2-pick-x', `${dragX}px`);
+      }
+      markSuppressClick();
+      event.preventDefault();
+      return;
+    }
+
+    if (gesture.role === 'e') {
+      const dragY = Math.max(-maxDrag, Math.min(maxDrag, dy));
+      gesture.card?.classList.add('is-dragging');
+      if (gesture.index === eActiveIndex) {
+        eDeck?.classList.add('is-dragging');
+        eDeck?.style.setProperty('--v2-e-drag-y', `${dragY}px`);
+      } else {
+        gesture.card?.style.setProperty('--v2-pick-y', `${dragY}px`);
+      }
+      markSuppressClick();
+      event.preventDefault();
+      return;
+    }
+
+    const defaultDeckMotion = gesture.openAtStart
+      ? (!onZLeft && dx < 0)
+      : (!onZRight && dx > 0);
+    if (defaultDeckMotion) {
+      const dragX = gesture.openAtStart
+        ? Math.max(-maxDrag, Math.min(0, dx))
+        : Math.min(maxDrag, Math.max(0, dx));
+      front.classList.add('is-dragging');
+      front.style.setProperty('--v2-front-drag-x', `${dragX}px`);
+      if (!gesture.openAtStart && dragX > 0) app.classList.add('is-revealing-deck');
+    }
+    markSuppressClick();
+    event.preventDefault();
+  };
+
+  const up = (event) => {
+    if (!gesture || event.pointerId !== gesture.pointerId) return;
+    const current = gesture;
+    const distance = Math.max(Math.abs(current.dx), Math.abs(current.dy));
+
+    if (current.role === 'f' && !current.cancelled) {
+      if (current.index >= 0 && current.index !== fActiveIndex) {
+        const id = fId(current.card);
+        markSuppressClick();
+        setOpen(true);
+        endGesture();
+        if (id) onRootSelect?.(id);
         return;
       }
-      const secondaryItem = event.target.closest('[data-v2-secondary-item], [data-v2-e-item]');
-      if (secondaryItem && app.contains(secondaryItem)) {
-        const id = String(secondaryItem.getAttribute('data-v2-secondary-item') || secondaryItem.getAttribute('data-v2-e-item') || '');
-        if (id) {
-          setOpen(true);
-          onSecondarySelect?.(id);
-        }
+      if (current.axis === 'horizontal' && Math.abs(current.dx) >= threshold && fCards.length > 1) {
+        const direction = current.dx < 0 ? 1 : -1;
+        const nextIndex = (fActiveIndex + direction + fCards.length) % fCards.length;
+        const id = fId(fCards[nextIndex]);
+        markSuppressClick();
+        setOpen(true);
+        endGesture();
+        if (id) onRootSelect?.(id);
+        return;
       }
-    };
-    app.querySelector('[data-v2-fe]')?.addEventListener('click', onDeckClick);
-    disposers.push(() => app.querySelector('[data-v2-fe]')?.removeEventListener('click', onDeckClick));
-  }
+    }
 
-  if (z && bindZ) {
-    disposers.push(initV2Swipe(z, {
-      onRight: () => setOpen(true),
-      onLeft: () => setOpen(false),
-    }));
-  }
+    if (current.role === 'e' && !current.cancelled) {
+      if (current.index >= 0 && current.index !== eActiveIndex) {
+        const id = eId(current.card);
+        markSuppressClick();
+        setOpen(true);
+        endGesture();
+        if (id) onSecondarySelect?.(id);
+        return;
+      }
+      if (current.axis === 'vertical' && Math.abs(current.dy) >= threshold && eCards.length > 1) {
+        const direction = current.dy > 0 ? 1 : -1;
+        const nextIndex = (eActiveIndex + direction + eCards.length) % eCards.length;
+        const id = eId(eCards[nextIndex]);
+        markSuppressClick();
+        setOpen(true);
+        endGesture();
+        if (id) onSecondarySelect?.(id);
+        return;
+      }
+    }
 
-  return () => disposers.forEach((dispose) => dispose?.());
+    if (current.role === 'z' && !current.cancelled) {
+      if (current.openAtStart && distance < 7) {
+        markSuppressClick();
+        setOpen(false);
+        endGesture();
+        return;
+      }
+      if (current.axis === 'horizontal' && current.dx >= threshold) {
+        markSuppressClick();
+        endGesture();
+        if (onZRight) onZRight();
+        else if (!current.openAtStart) setOpen(true);
+        return;
+      }
+      if (current.axis === 'horizontal' && current.dx <= -threshold) {
+        markSuppressClick();
+        endGesture();
+        if (onZLeft) onZLeft();
+        else if (current.openAtStart) setOpen(false);
+        return;
+      }
+    }
+
+    endGesture();
+  };
+
+  const cancel = (event) => {
+    if (!gesture || (event?.pointerId != null && event.pointerId !== gesture.pointerId)) return;
+    endGesture();
+  };
+
+  const suppressClick = (event) => {
+    if (!suppressNextClick) return;
+    suppressNextClick = false;
+    if (suppressTimer) {
+      window.clearTimeout(suppressTimer);
+      suppressTimer = 0;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  stage.addEventListener('pointerdown', down);
+  stage.addEventListener('pointermove', move, { passive: false });
+  stage.addEventListener('pointerup', up);
+  stage.addEventListener('pointercancel', cancel);
+  stage.addEventListener('click', suppressClick, true);
+
+  return () => {
+    if (suppressTimer) window.clearTimeout(suppressTimer);
+    endGesture();
+    stage.removeEventListener('pointerdown', down);
+    stage.removeEventListener('pointermove', move);
+    stage.removeEventListener('pointerup', up);
+    stage.removeEventListener('pointercancel', cancel);
+    stage.removeEventListener('click', suppressClick, true);
+  };
 }
 
 export function initV2StickerSwipe(root, { onRight = null, onLeft = null, threshold = 64, maxDrag = 180 } = {}) {
