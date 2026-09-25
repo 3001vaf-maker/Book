@@ -84,8 +84,12 @@ if (!/ALL_WORKPLACES_ID/.test(graph) || !/includeAggregate:\s*true/.test(graph))
 if (!/getWorkingDayTotalMinutes/.test(graph)) fail('timetable/timetable.js', 'aggregate Graph dates must show summed duration instead of a false continuous interval');
 if (!/resolveDateIndicators/.test(graph) || /calendar__date-indicator/.test(graph)) fail('timetable/timetable.js', 'Graph must pass indicator data to Calendar instead of drawing indicators locally');
 if (!/openWorkplaceControl\s*\(\s*\{[\s\S]*?title:\s*['"]Рабочий график['"]/.test(graph)) fail('timetable/timetable.js', 'Graph must own and pass its visible Header Control title');
-if (!/actionsRoot\.hidden\s*=\s*allMode/.test(graph)) fail('timetable/timetable.js', 'aggregate Graph mode must hide the working-day apply action');
-if (!/openTimetableDayEditor/.test(graph)) fail('timetable/timetable.js', 'aggregate date click must call the Timetable-owned day editor');
+if (!/actionsRoot\.hidden\s*=\s*false/.test(graph)) fail('timetable/timetable.js', 'aggregate Graph mode must keep the shared Apply action available');
+if (/selection\s*=\s*isAllMode\(\)\s*\?\s*null/.test(graph)) fail('timetable/timetable.js', 'aggregate Graph mode must not disable Calendar multi-select');
+if (!/selection\s*=\s*initMultiSelect\(calendarRoot,\s*\{\s*onChange:\s*syncApplyButton\s*\}\)/.test(graph)) fail('timetable/timetable.js', 'Graph must use shared multi-select in both workplace and aggregate modes');
+if (!/function\s+openAggregateWorkplaceApply\(dates\)/.test(graph) || !/includeAggregate:\s*false/.test(graph)) fail('timetable/timetable.js', 'aggregate Apply must open workplace selection before creating working days');
+if (!/if\s*\(isAllMode\(\)\)\s*\{\s*openAggregateWorkplaceApply\(dates\);\s*return;\s*\}/s.test(graph)) fail('timetable/timetable.js', 'aggregate Apply must route selected dates into workplace selection');
+if (/openTimetableDayEditor/.test(graph)) fail('timetable/timetable.js', 'aggregate Graph date click must not jump directly into the single-day editor');
 if (/function\s+openAggregateDayEditor/.test(graph)) fail('timetable/timetable.js', 'Graph page must not keep a second local day-editor implementation');
 if (/journal\//.test(graph)) fail('timetable/timetable.js', 'Graph page must not depend on Journal implementation');
 if (/canCorrectTime|onSaveTime/.test(graph)) fail('timetable/timetable.js', 'Graph Header Workplace List must not receive time-correction callbacks');
