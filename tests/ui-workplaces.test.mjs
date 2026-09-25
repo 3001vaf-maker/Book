@@ -57,9 +57,13 @@ assert.match(dayControlSource, /openCatalog\(\{ workplaces: available, title: ca
 const graphSource = readFileSync(new URL('../timetable/timetable.js', import.meta.url), 'utf8');
 assert.match(graphSource, /openWorkplaceControl/);
 assert.match(graphSource, /title:\s*'Рабочий график'/);
-assert.match(graphSource, /openTimetableDayEditor/);
+assert.doesNotMatch(graphSource, /openTimetableDayEditor/);
 assert.doesNotMatch(graphSource, /function\s+openAggregateDayEditor/);
-assert.match(graphSource, /actionsRoot\.hidden\s*=\s*allMode/);
+assert.match(graphSource, /actionsRoot\.hidden\s*=\s*false/);
+assert.match(graphSource, /selection\s*=\s*initMultiSelect\(calendarRoot,\s*\{\s*onChange:\s*syncApplyButton\s*\}\)/);
+assert.match(graphSource, /function\s+openAggregateWorkplaceApply\(dates\)/);
+assert.match(graphSource, /openAggregateWorkplaceApply\(dates\);\s*return;/);
+assert.match(graphSource, /includeAggregate:\s*false/);
 assert.doesNotMatch(graphSource, /journal\//);
 assert.doesNotMatch(graphSource, /canCorrectTime|onSaveTime/);
 
