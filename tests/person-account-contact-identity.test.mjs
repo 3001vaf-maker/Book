@@ -35,7 +35,12 @@ const updateBlock = booking.slice(
   booking.indexOf('async changeAccountPassword('),
 );
 assert.match(updateBlock, /replaceAccountContacts/);
-assert.match(updateBlock, /personIdentity\.bindFirstAccess/);
+assert.match(updateBlock, /bindAccountTenant/);
+const bindAccountTenantBlock = booking.slice(
+  booking.indexOf('private async bindAccountTenant'),
+  booking.indexOf('private async globalAccountView'),
+);
+assert.match(bindAccountTenantBlock, /personIdentity\.bindFirstAccess/, 'Tenant Account binding must still delegate to the canonical Person identity owner.');
 assert.match(updateBlock, /personIdentity\.syncLinkedPeople/);
 
 assert.match(controller, /bindTelegramEntry[\s\S]*syncAccountPersonContacts/);
