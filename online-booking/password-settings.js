@@ -1,5 +1,7 @@
 import { accountErrorMessage, changeAccountPassword, changeGlobalAccountPassword } from '../core/account/index.js';
-import { button, formValidationMessage, initPasswordFields, modal, mountModal, openNotice, passwordField } from '../ui/ui.js';
+import { button } from '../ui/buttons/index.js';
+import { formValidationMessage, initPasswordFields, passwordField } from '../ui/inputs/index.js';
+import { modal, mountModal, openNotice } from '../ui/modals/index.js';
 import { formError, formView } from '../ui/forms/index.js';
 
 export function openAccountPasswordSettings(state) {
