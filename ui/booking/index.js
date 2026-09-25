@@ -39,16 +39,6 @@ export function bookingChoiceCards(items = [], { multiple = false } = {}) {
   }).join('')}</div>`;
 }
 
-function paragraphs(text = '') {
-  const value = String(text || '').trim();
-  if (!value) return '<p>Текст документа не заполнен.</p>';
-  return value.split(/\n{2,}/).map((part) => `<p>${escapeHtml(part).replaceAll('\n', '<br>')}</p>`).join('');
-}
-
-export function bookingDocument({ title = 'Документ', version = 1, text = '' } = {}) {
-  return `<div class="booking-document-stage"><article class="booking-document"><header><span>Версия ${escapeHtml(version)}</span><h2>${escapeHtml(title)}</h2></header><div class="booking-document__body">${paragraphs(text)}</div></article></div>`;
-}
-
 function minuteOf(value = '') {
   const match = String(value).match(/^(\d{1,2}):(\d{2})$/);
   return match ? Number(match[1]) * 60 + Number(match[2]) : 0;

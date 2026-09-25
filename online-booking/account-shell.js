@@ -135,21 +135,6 @@ function profileDisplayName(state) {
   return [profile.name, profile.surname].filter(Boolean).join(' ').trim() || 'Профиль';
 }
 
-function mediaItems(state) {
-  const news = Array.isArray(state.context?.news) ? state.context.news : [];
-  const reels = Array.isArray(state.context?.reels) ? state.context.reels : [];
-  return [...news, ...reels];
-}
-
-function nearestVisit(requests = []) {
-  const valid = (Array.isArray(requests) ? requests : []).filter((request) => !isCancelled(request));
-  const now = nowMoment();
-  const future = valid.filter((request) => requestMoment(request) >= now).sort((a, b) => requestMoment(a).localeCompare(requestMoment(b)));
-  if (future.length) return { request: future[0], label: 'Предстоящая запись' };
-  const past = valid.filter((request) => requestMoment(request) < now).sort((a, b) => requestMoment(b).localeCompare(requestMoment(a)));
-  return { request: past[0] || null, label: 'Последний визит' };
-}
-
 function aggregateFinance(requests = [], account = {}) {
   const completed = (Array.isArray(requests) ? requests : []).filter((request) => !isCancelled(request) && requestMoment(request) < nowMoment());
   const totals = completed.reduce((sum, request) => {
@@ -763,11 +748,6 @@ function relationshipCard(relationship = {}) {
     aria: `Открыть ${title}`,
     className: 'entity-card--compact',
   });
-}
-
-function globalRecordsForTenant(state, tenantId) {
-  return (Array.isArray(state.accountRecords) ? state.accountRecords : [])
-    .filter((request) => String(request?.tenantId || '') === String(tenantId || ''));
 }
 
 function bindGlobalProfileSettings(root, state, handlers) {

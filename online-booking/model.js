@@ -117,11 +117,3 @@ export function requiredBookingDocuments(context = {}) {
   return (Array.isArray(context.documents) ? context.documents : []).filter((document) => Boolean(document?.personConsent));
 }
 
-export function hasRequiredBookingConsents(context = {}, consents = []) {
-  const accepted = Array.isArray(consents) ? consents : [];
-  return requiredBookingDocuments(context).filter((document) => document.required).every((document) => accepted.some((fact) => (
-    String(fact?.documentId || '') === String(document.id || '')
-    && Number(fact?.documentVersion || 1) === Number(document.version || 1)
-    && Boolean(fact?.accepted)
-  )));
-}

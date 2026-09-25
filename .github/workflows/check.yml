@@ -875,7 +875,6 @@ jobs:
               && curl -fsS http://localhost:8080/core.js >/dev/null 2>&1 \
               && curl -fsS http://localhost:8080/core/environment.js >/dev/null 2>&1 \
               && curl -fsS http://localhost:8080/service-worker.js >/dev/null 2>&1 \
-              && curl -fsS http://localhost:8080/online-booking/notifications.js >/dev/null 2>&1 \
               && curl -fsS http://localhost:8080/core/notifications/web-push.js >/dev/null 2>&1 \
               && curl -fsS http://localhost:8080/api/health >/dev/null 2>&1; then
               break

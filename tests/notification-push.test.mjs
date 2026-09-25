@@ -4,7 +4,6 @@ import fs from 'node:fs';
 const core = fs.readFileSync('core.js', 'utf8');
 const booking = fs.readFileSync('online-booking/booking.js', 'utf8');
 const accountShell = fs.readFileSync('online-booking/account-shell.js', 'utf8');
-const notifications = fs.readFileSync('online-booking/notifications.js', 'utf8');
 const accountRuntime = fs.readFileSync('online-booking/account-runtime.js', 'utf8');
 const browserPush = fs.readFileSync('core/notifications/web-push.js', 'utf8');
 const serviceWorker = fs.readFileSync('service-worker.js', 'utf8');
@@ -29,7 +28,7 @@ assert.match(accountShell, /notificationMessages/);
 assert.match(accountShell, /label: 'Push'/);
 assert.match(accountShell, /enableWebPush/);
 assert.match(accountShell, /disableWebPush/);
-assert.doesNotMatch(notifications, /<style>|createElement\('style'\)|booking-notifications-button/);
+assert.equal(fs.existsSync('online-booking/notifications.js'), false, 'Legacy notification bridge must stay removed');
 
 assert.match(browserPush, /serviceWorker\.register\('\/service-worker\.js'/);
 assert.match(browserPush, /PushManager/);
