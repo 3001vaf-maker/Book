@@ -89,15 +89,6 @@
   will-change:transform;
 }
 .v2-front.is-dragging{transition:none}
-.v2-app.is-deck-open .v2-front{
-  transform:translate3d(calc(var(--v2-f-open-x) + var(--v2-front-drag-x,0px)),0,0);
-}
-.v2-app.has-e-deck.is-deck-open .v2-front{
-  transform:translate3d(calc(var(--v2-fe-open-x) + var(--v2-front-drag-x,0px)),0,0);
-}
-.v2-app.is-deck-open .v2-front > .v2-z:not(.v2-z--layer){
-  box-shadow:-18px 12px 34px rgba(0,0,0,.18);
-}
 .v2-z{
   position:relative;
   touch-action:pan-y;
@@ -113,11 +104,25 @@
   background:var(--v2-white);
   color:var(--v2-ink);
   box-shadow:-6px 2px 18px rgba(0,0,0,.10);
-  transform:translate3d(var(--v2-drag-x,0px),0,0);
-  transition:transform .32s cubic-bezier(.22,.78,.18,1),box-shadow .32s ease;
-  will-change:transform;
 }
-.v2-z.is-dragging{transition:none}
+.v2-app.is-deck-open > .v2-app__stage > .v2-front{
+  transform:translate3d(var(--v2-f-open-x),0,0);
+}
+.v2-app.has-e-deck.is-deck-open > .v2-app__stage > .v2-front{
+  transform:translate3d(var(--v2-fe-open-x),0,0);
+}
+.v2-app.is-deck-open > .v2-app__stage > .v2-front.is-dragging{
+  transform:translate3d(calc(var(--v2-f-open-x) + var(--v2-front-drag-x,0px)),0,0);
+}
+.v2-app.has-e-deck.is-deck-open > .v2-app__stage > .v2-front.is-dragging{
+  transform:translate3d(calc(var(--v2-fe-open-x) + var(--v2-front-drag-x,0px)),0,0);
+}
+.v2-app:not(.is-deck-open).is-revealing-deck > .v2-app__stage > .v2-front.is-dragging{
+  transform:translate3d(var(--v2-front-drag-x,0px),0,0);
+}
+.v2-app.is-deck-open > .v2-app__stage > .v2-front > .v2-z{
+  box-shadow:-18px 12px 34px rgba(0,0,0,.18);
+}
 
 .v2-fe-deck{
   position:absolute;
@@ -126,14 +131,14 @@
   width:var(--v2-fe-open-x);
   pointer-events:none;
   opacity:0;
-  transform:translate3d(-36px,0,0);
-  transition:transform .28s cubic-bezier(.22,.78,.18,1),opacity .14s ease;
-  will-change:transform,opacity;
+  transform:none;
+  transition:opacity .14s ease;
+  will-change:opacity;
 }
 .v2-app.is-deck-open .v2-fe-deck,
 .v2-app.is-revealing-deck .v2-fe-deck{
   opacity:1;
-  transform:translate3d(0,0,0);
+  transform:none;
 }
 .v2-deck{
   position:absolute;
@@ -144,6 +149,7 @@
   width:var(--v2-deck-width);
   pointer-events:none;
 }
+.v2-app.has-e-deck .v2-deck{width:calc(var(--v2-fe-open-x) - var(--v2-gap))}
 .v2-e-deck{
   position:absolute;
   z-index:1;
@@ -153,7 +159,7 @@
   width:var(--v2-deck-width);
   pointer-events:none;
 }
-.v2-z--layer{
+.v2-front > .v2-z--layer{
   position:absolute;
   z-index:7;
   inset:0 0 0 calc(var(--v2-edge) + var(--v2-z-layer-offset));
@@ -287,17 +293,20 @@
 .v2-app.is-revealing-deck .v2-e-card.is-next-ready{
   z-index:11;
   top:0;
-  transform:translate3d(calc(var(--v2-e-pull) + var(--v2-fe-drag-x,0px)),0,0);
+  transform:translate3d(var(--v2-e-pull),0,0);
 }
 .v2-e-deck.is-dragging .v2-e-card.is-active,.v2-e-card.is-picked.is-dragging{transition:none;cursor:grabbing}
 .v2-e-deck.is-settling .v2-e-card{pointer-events:none}
 .v2-e-card strong{
   position:absolute;
-  left:calc(100% - (var(--v2-e-pull) / 2));
-  top:50%;
-  display:block;
-  width:min(52vh,320px);
-  max-width:calc(var(--visual-vh,100dvh) - 230px);
+  left:calc(100% - var(--v2-e-pull));
+  right:0;
+  top:0;
+  min-width:var(--v2-card-handle-min);
+  min-height:var(--v2-card-handle);
+  display:flex;
+  align-items:center;
+  justify-content:center;
   overflow:hidden;
   white-space:nowrap;
   text-overflow:ellipsis;
@@ -305,8 +314,8 @@
   line-height:1;
   font-weight:800;
   text-align:center;
-  transform:translate(-50%,-50%) rotate(-90deg);
-  transform-origin:center;
+  transform:none;
+  touch-action:none;
 }
 
 .v2-section{display:grid;gap:10px;margin-bottom:24px}
@@ -417,6 +426,7 @@
 .v2-flow-title{margin:0 0 5px;font-size:22px;line-height:1.1}.v2-flow-subtitle{margin:0 0 18px;color:var(--v2-muted);font-size:13px}
 
 @media(max-width:360px){
+  :root{--v2-card-handle:44px;--v2-e-pull:44px}
   .v2-header{grid-template-columns:48px minmax(0,1fr) auto 42px;padding-left:8px;padding-right:8px}
   .v2-header__title{font-size:16px}
   .v2-header__control--text{padding:0 9px;font-size:12px}
