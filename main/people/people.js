@@ -121,8 +121,8 @@ function currentConsentFacts(person, documentId) {
   const telegrams = new Set(members.flatMap((item) => Array.isArray(item.telegrams) ? item.telegrams : []).map((value) => String(value || '').trim()).filter(Boolean));
   const relevant = getConsents().filter((fact) => {
     if (fact.documentId !== documentId) return false;
-    if (documentId === 'pdn-consent') return fact.subjectType === 'ACCOUNT' && accounts.has(String(fact.subjectKey || ''));
-    if (documentId !== 'messages-consent' || fact.subjectType !== 'CONTACT_POINT') return false;
+    if (documentId === 'pdn-consent') return fact.subjectType==='ACCOUNT' && accounts.has(String(fact.subjectKey || ''));
+    if (documentId !== 'messages-consent' || fact.subjectType!=='CONTACT_POINT') return false;
     if (fact.contactType === 'PHONE') return phones.has(canonicalPhone(fact.contactValue));
     if (fact.contactType === 'EMAIL') return emails.has(String(fact.contactValue || '').trim().toLowerCase());
     if (fact.contactType === 'TELEGRAM') return telegrams.has(String(fact.contactValue || '').trim());
