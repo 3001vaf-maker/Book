@@ -45,24 +45,6 @@
 .booking-account--account .app-header .ui-button.app-header__control{
   border-radius:var(--radius-control);
 }
- .booking-account--account .app-setting-toggle{
-  border-radius:var(--radius-card);
-}
-.booking-account--account .message-bubble{
-  border-radius:var(--radius-control);
-}
-.booking-account--account .message-bubble--incoming{
-  border-bottom-left-radius:max(4px,calc(var(--radius-control) / 3));
-}
-.booking-account--account .message-bubble--outgoing{
-  border-bottom-right-radius:max(4px,calc(var(--radius-control) / 3));
-}
-.booking-account--account .app-setting-toggle__switch{
-  background:color-mix(in srgb,var(--booking-dark) 35%,var(--booking-light));
-}
-.booking-account--account .app-setting-toggle.is-on .app-setting-toggle__switch{
-  background:var(--booking-dark);
-}
 
 .booking-account--account .app-view-shell--booking-flow{
   min-height:var(--visual-vh,100dvh);
@@ -105,10 +87,6 @@
 .booking-account--account.booking-shape--cut .entity-card,
 .booking-account--account.booking-shape--cut .list-entry,
 .booking-account--account.booking-shape--cut .ui-button,
-.booking-account--account.booking-shape--cut .message-bubble,
-.booking-account--account.booking-shape--cut .message-composer__input,
-.booking-account--account.booking-shape--cut .message-composer__attach,
-.booking-account--account.booking-shape--cut .app-setting-toggle,
 .booking-account--account.booking-shape--cut .nav-item.is-active{
   clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);
 }

@@ -21,6 +21,7 @@ import {
   repeatedField,
   select,
 } from '../ui/ui.js';
+import { formError, formView } from '../ui/forms/index.js';
 
 function profileData(account = {}) {
   return account.profileData && typeof account.profileData === 'object' ? account.profileData : {};
@@ -133,7 +134,7 @@ function initBirthDate(root) {
 
 function editorMarkup(account = {}) {
   const profile = profileData(account);
-  return `<form data-account-personal-form novalidate>
+  return formView(`
     ${accordion([{
       title: 'Личные данные',
       content: `<div class="form-grid">
@@ -159,9 +160,9 @@ function editorMarkup(account = {}) {
         <div class="array-group"><span class="array-label">Ссылки</span>${links({ links: Array.isArray(profile.links) ? profile.links : [], name: 'accountProfileLinks' })}</div>
       </div>`,
     }], { openFirst: true })}
-    <div class="form-error" data-account-personal-error role="alert"></div>
+    ${formError('', { data: 'data-account-personal-error', keepEmpty: true })}
     ${button('Сохранить', { type: 'submit' })}
-  </form>`;
+  `, { data: 'data-account-personal-form' });
 }
 
 export function openAccountPersonalData(state, { onSaved } = {}) {

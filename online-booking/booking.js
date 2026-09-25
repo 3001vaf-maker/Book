@@ -47,6 +47,7 @@ import {
   v2Shell,
   v2Sticker,
 } from '../ui/ui.js';
+import { formError, formView } from '../ui/forms/index.js';
 import {
   bookingProcedureCost,
   bookingSelection,
@@ -89,10 +90,6 @@ function accountDiscount(account = {}) {
 
 function discountedTotal(subtotal, discountPercent) {
   return Math.max(0, Number(subtotal || 0) * (1 - Number(discountPercent || 0) / 100));
-}
-
-function errorBlock(message = '') {
-  return message ? `<div class="form-error" role="alert">${escapeHtml(message)}</div>` : '';
 }
 
 function accountFlowError(error, fallbackMessage) {
@@ -191,7 +188,7 @@ function renderLegalSticker(root, state) {
   const action = button('Продолжить', { data: 'data-legal-continue', disabled: !canContinue });
   root.innerHTML = `<section class="${flowThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${v2Sticker({
     title: 'Документы',
-    body: `${cards}${errorBlock(state.error)}`,
+    body: `${cards}${formError(state.error)}`,
     action,
     className: 'v2-sticker-screen--legal',
   })}</section>`;
@@ -424,14 +421,14 @@ function renderAccountEntry(root, state) {
     || state.accountDraft?.email
     || getRememberedAccountEmail(state.tenantId)
     || '';
-  const form = `<form data-booking-entry-form novalidate>
+  const form = formView(`
     ${field({ label: 'Телефон или email', name: 'identifier', value: rememberedIdentifier, required: true, autocomplete: 'username' })}
     ${passwordField({ label: 'Пароль', name: 'password', required: true, autocomplete: 'current-password' })}
-    ${errorBlock(state.error)}
+    ${formError(state.error)}
     ${button('Войти', { type: 'submit' })}
     <button type="button" class="v2-sticker-link" data-booking-register>Зарегистрироваться</button>
     <button type="button" class="v2-sticker-link" data-booking-forgot>Забыли пароль?</button>
-  </form>`;
+  `, { data: 'data-booking-entry-form' });
   root.innerHTML = `<section class="${flowThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${v2Sticker({
     title: 'Вход',
     body: form,
@@ -520,17 +517,17 @@ function renderAccountDetails(root, state) {
     title: 'Регистрация',
     action: { label: 'Подтвердить', data: 'data-booking-account-submit' },
     step: 'registration',
-    body: `<form data-booking-account-form novalidate>
+    body: formView(`
       ${field({ label: 'Имя', name: 'name', value: draft.name || '', required: true, autocomplete: 'given-name' })}
       ${field({ label: 'Фамилия', name: 'surname', value: draft.surname || '', autocomplete: 'family-name' })}
       ${phoneField({ label: 'Телефон', name: 'phone', value: draft.phone || '', required: true })}
-      ${errorBlock(contactErrors.phone || '')}
+      ${formError(contactErrors.phone || '')}
       ${field({ label: 'Email', name: 'email', value: draft.email || '', type: 'email', required: true, autocomplete: 'email' })}
-      ${errorBlock(contactErrors.email || '')}
+      ${formError(contactErrors.email || '')}
       ${passwordField({ label: 'Пароль', name: 'password', required: true, autocomplete: 'new-password' })}
       ${passwordField({ label: 'Повтор пароля', name: 'repeatPassword', required: true, autocomplete: 'new-password' })}
-      ${errorBlock(state.error)}
-    </form>`,
+      ${formError(state.error)}
+    `, { data: 'data-booking-account-form' }),
   });
   initV2Swipe(root, {
     onRight: () => {
@@ -634,7 +631,7 @@ async function continueAfterIdentity(root, state) {
     } catch {
       renderFlowPage(root, state, {
         title: 'Проверка учетной записи',
-        body: errorBlock(state.error),
+        body: formError(state.error),
         step: state.bookingStep || 'times',
       });
       initV2Swipe(root, {
@@ -760,7 +757,7 @@ function renderTimes(root, state) {
     subtitle: formatDate(state.date),
     body: `${slots.length
       ? bookingTimeGroups(slots, { data: 'data-booking-time' })
-      : emptyState('Свободного времени нет', 'На эту дату нет интервала для выбранных услуг.')}${errorBlock(state.error)}`,
+      : emptyState('Свободного времени нет', 'На эту дату нет интервала для выбранных услуг.')}${formError(state.error)}`,
     step: 'times',
   });
   initV2Swipe(root, {
@@ -804,7 +801,7 @@ function renderConfirmation(root, state) {
   renderFlowPage(root, state, {
     title: 'Подтверждение',
     action: { label: 'Подтвердить', data: 'data-booking-confirm' },
-    body: `${confirmationCard(state)}${errorBlock(state.error)}`,
+    body: `${confirmationCard(state)}${formError(state.error)}`,
     step: 'confirmation',
   });
   initV2Swipe(root, {
@@ -1003,13 +1000,13 @@ function renderGlobalClientEntry(root, state) {
     || state.accountDraft?.email
     || getRememberedAccountEmail('')
     || '';
-  const form = `<form data-global-account-entry novalidate>
+  const form = formView(`
     ${field({ label: 'Телефон или email', name: 'identifier', value: rememberedIdentifier, required: true, autocomplete: 'username' })}
     ${passwordField({ label: 'Пароль', name: 'password', required: true, autocomplete: 'current-password' })}
-    ${errorBlock(state.error)}
+    ${formError(state.error)}
     ${button('Войти', { type: 'submit' })}
     <button type="button" class="v2-sticker-link" data-global-account-register>Зарегистрироваться</button>
-  </form>`;
+  `, { data: 'data-global-account-entry' });
   root.innerHTML = `<section class="${flowThemeClasses(state)}">${v2Sticker({
     title: 'Вход',
     body: form,
@@ -1077,17 +1074,17 @@ function renderGlobalClientDetails(root, state) {
     title: 'Регистрация',
     action: { label: 'Подтвердить', data: 'data-global-account-submit' },
     step: 'registration',
-    body: `<form data-global-account-form novalidate>
+    body: formView(`
       ${field({ label: 'Имя', name: 'name', value: draft.name || '', required: true, autocomplete: 'given-name' })}
       ${field({ label: 'Фамилия', name: 'surname', value: draft.surname || '', autocomplete: 'family-name' })}
       ${phoneField({ label: 'Телефон', name: 'phone', value: draft.phone || '', required: true })}
-      ${errorBlock(contactErrors.phone || '')}
+      ${formError(contactErrors.phone || '')}
       ${field({ label: 'Email', name: 'email', value: draft.email || '', type: 'email', required: true, autocomplete: 'email' })}
-      ${errorBlock(contactErrors.email || '')}
+      ${formError(contactErrors.email || '')}
       ${passwordField({ label: 'Пароль', name: 'password', required: true, autocomplete: 'new-password' })}
       ${passwordField({ label: 'Повтор пароля', name: 'repeatPassword', required: true, autocomplete: 'new-password' })}
-      ${errorBlock(state.error)}
-    </form>`,
+      ${formError(state.error)}
+    `, { data: 'data-global-account-form' }),
   });
   initPasswordFields(root);
   const form = root.querySelector('[data-global-account-form]');
@@ -1160,7 +1157,7 @@ function renderGlobalClientLegal(root, state) {
   }]);
   root.innerHTML = `<section class="${flowThemeClasses(state)}">${v2Sticker({
     title: 'Документы',
-    body: `${cards}${button('Продолжить', { data: 'data-global-platform-continue', disabled: !state.accountTermsAccepted })}${errorBlock(state.error)}`,
+    body: `${cards}${button('Продолжить', { data: 'data-global-platform-continue', disabled: !state.accountTermsAccepted })}${formError(state.error)}`,
     className: 'v2-sticker-screen--legal',
   })}</section>`;
   root.querySelector('[data-global-platform-document]')?.addEventListener('click', () => {

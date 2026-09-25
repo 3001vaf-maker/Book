@@ -345,6 +345,7 @@ function syncWorkspaceHeader(surface) {
     } : null,
     b: title,
     c: cVisible ? {
+      kind: cSource.dataset.workspaceCKind || 'text',
       label: primaryLabel(cSource),
       variant: cSource.dataset.v2PrimaryVariant || (cSource.classList.contains('ui-button--danger') ? 'danger' : ''),
       data: 'data-v2-workspace-primary',

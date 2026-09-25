@@ -1,0 +1,11 @@
+.read-only-sheet{width:100%;min-width:0;display:grid;gap:18px;padding:8px 0 2px}
+.read-only-sheet__header{display:grid;gap:10px;text-align:center}
+.read-only-sheet__header h2{margin:0;font-size:20px}
+.read-only-sheet__meta{display:grid;gap:3px;font-size:13px}
+.read-only-sheet__meta strong{font-size:14px}
+.read-only-sheet__items,.read-only-sheet__totals{display:grid;border-top:1px solid var(--border);padding-top:10px}
+.read-only-sheet__row{min-width:0;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:baseline;padding:7px 0;font-size:13px}
+.read-only-sheet__row span{overflow-wrap:anywhere}
+.read-only-sheet__row strong{text-align:right;white-space:nowrap}
+.read-only-sheet__row.is-strong{font-weight:800}
+.read-only-sheet__action{padding-top:2px}
