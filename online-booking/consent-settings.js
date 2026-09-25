@@ -1,8 +1,13 @@
 import { accountErrorMessage, getAccountConsentState, revokeAccountConsent } from '../core/account/index.js';
-import { button } from '../ui/buttons/index.js';
-import { listEntries, listEntry } from '../ui/lists/list-entry.js';
-import { modal, mountModal, openNotice } from '../ui/modals/index.js';
-import { emptyState } from '../ui/states/index.js';
+import {
+  button,
+  emptyState,
+  listEntries,
+  listEntry,
+  mountModal,
+  modal,
+  openNotice,
+} from '../ui/ui.js';
 
 function consentRows(consents = []) {
   return (Array.isArray(consents) ? consents : []).map((item, index) => listEntry({
