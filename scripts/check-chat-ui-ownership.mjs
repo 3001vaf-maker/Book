@@ -5,8 +5,6 @@ const accountChat = fs.readFileSync('online-booking/account-shell.js', 'utf8');
 const chatApi = fs.readFileSync('core/communications/chat.js', 'utf8');
 const controller = fs.readFileSync('server/src/communication/communication.controller.ts', 'utf8');
 const dispatch = fs.readFileSync('server/src/communication/communication-dispatch.service.ts', 'utf8');
-const shellUi = fs.readFileSync('ui/shell/index.js', 'utf8');
-const shellCss = fs.readFileSync('ui/shell/shell.css', 'utf8');
 const chatUi = fs.readFileSync('ui/chat/index.js', 'utf8');
 const chatCss = fs.readFileSync('ui/chat/chat.css', 'utf8');
 const v2Css = fs.readFileSync('ui/v2/v2.css', 'utf8');
@@ -38,8 +36,8 @@ expect(chatUi.includes('Math.min(input.scrollHeight, 116)') && chatCss.includes(
 expect(chatCss.includes('.message-attachment--file'), 'Shared ui/chat CSS must render file/PDF attachments.');
 expect(chatCss.includes('.v2-app .message-composer') && chatCss.includes('.v2-app--chat .v2-z'), 'Shared ui/chat CSS must own V2 Chat composer geometry.');
 expect(chatCss.includes('.message-composer__input:focus-visible') && chatCss.includes('outline:none'), 'Shared Chat must suppress native blue focus rings.');
-expect(!shellUi.includes('messageBubble') && !shellUi.includes('messageThread') && !shellUi.includes('messageComposer'), 'Legacy ui/shell must not own Chat components.');
-expect(!shellCss.includes('.message-thread{') && !shellCss.includes('.message-composer{') && !shellCss.includes('.app-view-shell--chat'), 'Legacy ui/shell CSS must not own Chat component or Chat screen geometry.');
+expect(!fs.existsSync('ui/shell/index.js'), 'Legacy ui/shell owner must be physically removed.');
+expect(!fs.existsSync('ui/shell/shell.css'), 'Legacy ui/shell CSS must be physically removed.');
 
 expect(chatApi.includes('attachments = []') && chatApi.includes('body, attachments'), 'Professional communication API must carry attachments.');
 expect(controller.includes('attachments?: unknown'), 'Professional chat controller must accept attachments.');
