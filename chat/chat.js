@@ -22,11 +22,11 @@ import {
   modal,
   mountModal,
   openNotice,
-  settingsPanel,
   textareaField,
   workspaceHeaderContext,
 } from '../ui/ui.js';
-import { messageComposer, messageThread } from '../ui/chat/index.js';
+import { initMessageComposer, messageComposer, messageThread } from '../ui/chat/index.js';
+import { settingsPanel } from '../ui/settings/index.js';
 
 function personNameByPhone(phone, uei = '') {
   const people = findPeopleByPhone(phone);
@@ -68,6 +68,7 @@ function renderChatSurface(root, {
     hideD: !d,
   })}${body}`;
   root.querySelector('[data-chat-settings]')?.addEventListener('click', openProfileChatSettings);
+  initMessageComposer(root);
 }
 
 async function fileAttachment(file) {
