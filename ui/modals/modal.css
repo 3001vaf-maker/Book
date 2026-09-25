@@ -1,7 +1,7 @@
 .modal-sheet{overscroll-behavior:contain}
 .modal-sheet:focus{outline:none}
 .modal-title{padding-right:0;margin-bottom:18px}.modal--technical .modal-title{padding-right:44px}.modal-title h2{margin:0;font-size:23px}.modal-title p{margin:6px 0 0;color:var(--text-secondary);font-size:14px}
-.modal-actions{display:grid;gap:8px}.compact-form{display:grid;gap:12px}.compact-form .modal-title{margin-bottom:2px}.form-error{color:var(--danger);font-size:13px;line-height:1.35}
+.modal-actions{display:grid;gap:8px}.compact-form{display:grid;gap:12px}.compact-form .modal-title{margin-bottom:2px}
 .modal-sheet input,.modal-sheet select,.modal-sheet textarea{font-size:16px;max-width:100%;min-width:0}.modal-sheet input:focus,.modal-sheet select:focus,.modal-sheet textarea:focus{font-size:16px}
 .modal-sheet.modal--surface-app{background:var(--app-bg)}
 .modal-sheet.modal--bottom{height:88px;max-height:88px;padding:0;background:var(--surface-soft);overflow:hidden}
