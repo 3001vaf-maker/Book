@@ -5,7 +5,10 @@ const accountChat = fs.readFileSync('online-booking/account-shell.js', 'utf8');
 const chatApi = fs.readFileSync('core/communications/chat.js', 'utf8');
 const controller = fs.readFileSync('server/src/communication/communication.controller.ts', 'utf8');
 const dispatch = fs.readFileSync('server/src/communication/communication-dispatch.service.ts', 'utf8');
+const shellUi = fs.readFileSync('ui/shell/index.js', 'utf8');
 const shellCss = fs.readFileSync('ui/shell/shell.css', 'utf8');
+const chatUi = fs.readFileSync('ui/chat/index.js', 'utf8');
+const chatCss = fs.readFileSync('ui/chat/chat.css', 'utf8');
 const v2Css = fs.readFileSync('ui/v2/v2.css', 'utf8');
 const v2Ui = fs.readFileSync('ui/v2/index.js', 'utf8');
 
@@ -32,12 +35,17 @@ expect(v2Css.includes('.v2-app--chat .v2-z') && v2Css.includes('.v2-header'), 'V
 
 expect(chatApi.includes('attachments = []') && chatApi.includes('body, attachments'), 'Profile communication API must carry attachments.');
 expect(profileChat.includes("application/pdf") && accountChat.includes("application/pdf"), 'Both Chat contours must accept PDF attachments through the shared attachment control.');
-expect(shellCss.includes('.message-attachment--file'), 'Shared Chat UI must render file/PDF attachments.');
+expect(chatUi.includes('messageBubble') && chatUi.includes('messageThread') && chatUi.includes('messageComposer'), 'Shared ui/chat must own message bubbles, thread and composer.');
+expect(chatUi.includes("message-composer--plain") && chatUi.includes("message-composer--with-attachments"), 'Shared ui/chat must own both composer layouts.');
+expect(chatCss.includes('.message-attachment--file'), 'Shared ui/chat CSS must render file/PDF attachments.');
+expect(!shellUi.includes('messageBubble') && !shellUi.includes('messageThread') && !shellUi.includes('messageComposer'), 'Legacy ui/shell must not own Chat components.');
+expect(!shellCss.includes('.message-thread{') && !shellCss.includes('.message-composer{'), 'Legacy ui/shell CSS must not own Chat component styles.');
 expect(controller.includes('attachments?: unknown'), 'Profile chat controller must accept attachments.');
 expect(dispatch.includes('Array.isArray(input?.attachments)') && dispatch.includes("channel: 'IN_APP'") && dispatch.includes('attachments,'), 'Profile media messages must be persisted into the shared Book chat thread.');
 
 expect(shellCss.includes('.app-content.app-content--shell{padding:0}'), 'Shared shell CSS must neutralize outer profile page padding for Book shell views.');
-expect(shellCss.includes('.app-view-shell--chat') && shellCss.includes('.message-composer{position:fixed'), 'Shared shell CSS must remain the single geometry owner for Book Chat.');
+expect(shellCss.includes('.app-view-shell--chat'), 'Legacy profile shell may keep only its shell-level Chat screen geometry.');
+expect(chatCss.includes('.message-composer{position:fixed'), 'Shared ui/chat CSS must own canonical composer geometry.');
 
 if (failures.length) {
   failures.forEach((message) => console.error(`chat ui ownership: ${message}`));
