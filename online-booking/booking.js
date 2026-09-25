@@ -79,10 +79,6 @@ function selectedSubtotal(context, workplaceKey, ids) {
   return bookingSelection(context, workplaceKey, ids).reduce((sum, procedure) => sum + numericCost(bookingProcedureCost(procedure, workplaceKey)), 0);
 }
 
-function accountName(account = {}) {
-  return [account.name, account.surname].filter(Boolean).join(' ') || 'Аккаунт';
-}
-
 function accountDiscount(account = {}) {
   const value = Number(account?.discountPercent || 0);
   return Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
@@ -255,14 +251,6 @@ function renderLegalSticker(root, state) {
       renderLegalSticker(root, state);
     }
   });
-}
-
-function renderAccountTerms(root, state) {
-  renderLegalSticker(root, state);
-}
-
-function renderTenantAgreements(root, state) {
-  renderLegalSticker(root, state);
 }
 
 function resetBookingChoice(state) {
