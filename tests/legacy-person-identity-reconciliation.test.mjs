@@ -29,7 +29,12 @@ assert.match(bindFirstAccess, /const contacts = await this\.contactsForAccount\(
 assert.match(bindFirstAccess, /createBoundPerson\(tenantId, account, contacts\)/, 'New Person creation is allowed only after grouped contact matching returns no existing Person');
 
 const myRecords = onlineBooking.slice(onlineBooking.indexOf('async getMyRecords('), onlineBooking.indexOf('async ownerAccounts('));
-assert.match(myRecords, /await this\.personIdentity\.bindFirstAccess\(tenantId, account as any\)/, 'Account must resolve its tenant Person binding before Record history is read');
+assert.match(myRecords, /await this\.bindAccountTenant\(tenantId, account\)/, 'Account must resolve its tenant Person binding before Record history is read');
+const tenantBinding = onlineBooking.slice(
+  onlineBooking.indexOf('private async bindAccountTenant'),
+  onlineBooking.indexOf('private async globalAccountView'),
+);
+assert.match(tenantBinding, /personIdentity\.bindFirstAccess\(tenantId, account as any\)/, 'Canonical tenant binding helper must delegate to PersonIdentityService.');
 assert.match(myRecords, /bookingIdentityForAccount\(tenantId, accountId\)/, 'Account Record history must resolve canonical identity after Person attachment');
 assert.match(myRecords, /identity\?\.memberPeople/, 'Account Record history must include all canonical UEI member People');
 assert.match(myRecords, /this\.records\.listForPeople\(tenantId, people\)/, 'Pre-existing and online-created Records must be read from the one canonical Record owner');
