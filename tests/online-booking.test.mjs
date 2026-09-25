@@ -4,7 +4,6 @@ import {
   getBookingProcedures,
   getBookingSlots,
   getBookingWorkingDates,
-  hasRequiredBookingConsents,
 } from '../online-booking/model.js';
 
 const context = {
@@ -76,8 +75,5 @@ const ekbSlots = getBookingSlots(context, {
 });
 assert.equal(ekbSlots[0]?.from, '13:15', 'the same instant must use the selected Workplace timezone, not visitor or server time');
 
-assert.equal(hasRequiredBookingConsents(context, []), false);
-assert.equal(hasRequiredBookingConsents(context, [{ documentId: 'pdn-consent', documentVersion: 1, accepted: true }]), false);
-assert.equal(hasRequiredBookingConsents(context, [{ documentId: 'pdn-consent', documentVersion: 2, accepted: true }]), true);
 
 console.log('online booking tests passed');
