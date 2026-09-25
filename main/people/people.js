@@ -14,9 +14,9 @@ import {
   initTags,
   initUEI,
   links,
-  listEntries,
-  listEntry,
+  list,
   miniCard,
+  miniCardRail,
   modal,
   monthDayPicker,
   mountModal,
@@ -182,19 +182,19 @@ function listMarkup(items, query = '') {
       ? emptyState('Ничего не найдено', 'Проверьте имя или UEI.')
       : emptyState('Клиентов пока нет', 'Добавьте человека кнопкой «+».');
   }
-  return listEntries(items.map((person) => {
-    const display = personDisplay(person);
-    return listEntry({
-      overline: display.uei,
-      title: display.name,
-      subtitle: display.phone,
-      image: person.photo || '',
-      initial: initial(person),
-      interactive: true,
-      data: `data-person="${escapeHtml(person.key)}"`,
-      aria: `Открыть ${display.name}`,
-    });
-  }));
+  return list({
+    items: items.map((person) => {
+      const display = personDisplay(person);
+      return {
+        overline: display.uei,
+        title: display.name,
+        secondary: display.phone,
+        interactive: true,
+        data: `data-person="${escapeHtml(person.key)}"`,
+        aria: `Открыть ${display.name}`,
+      };
+    }),
+  });
 }
 
 function refreshPeopleList(root) {
@@ -241,7 +241,7 @@ export function renderPeople(root, options = {}) {
   refreshPeopleList(root);
   root.querySelector('[data-people-search]')?.addEventListener('input', () => refreshPeopleList(root));
   root.querySelector('[data-people-list-settings]')?.addEventListener('click', () => openListSettings(root, options));
-  root.querySelector('[data-add]')?.addEventListener('click', () => openCreateZ2(root, options));
+  root.querySelector('[data-add]')?.addEventListener('click', () => openAddMenu(root, options));
 }
 
 function openListSettings(root, options = {}) {
@@ -309,10 +309,51 @@ function importCsv(file, onDone) {
   reader.readAsText(file, 'utf-8');
 }
 
-function openCreateZ2(root, options = {}) {
+function openAddMenu(root, options = {}) {
+  const allowReal = canUseRealPersonalData();
+  const layer = mountModal(root, modal(`<div class="modal-title"><h2>Добавить клиента</h2></div>
+    <div class="modal-actions people-add-choice">
+      ${button('Из контактов', { variant: 'secondary', data: 'data-add-from-contacts' })}
+      ${button('Ввести вручную', { variant: 'secondary', data: 'data-add-manual' })}
+    </div>
+    <div class="form-error" data-add-choice-error></div>`, {
+    title: 'Добавить клиента',
+    variant: 'quick',
+    surface: 'app',
+  }));
+  if (!layer) return null;
+
+  layer.querySelector('[data-add-manual]')?.addEventListener('click', () => {
+    layer.v2Close?.();
+    openCreateZ2(root, options);
+  });
+  layer.querySelector('[data-add-from-contacts]')?.addEventListener('click', async () => {
+    const error = layer.querySelector('[data-add-choice-error]');
+    if (!allowReal) {
+      if (error) error.textContent = 'Добавление реальных контактов недоступно в текущем режиме.';
+      return;
+    }
+    if (!navigator.contacts?.select) {
+      if (error) error.textContent = 'Доступ к системным контактам не поддерживается этим браузером.';
+      return;
+    }
+    try {
+      const contact = (await navigator.contacts.select(['name', 'tel'], { multiple: false }))[0];
+      if (!contact) return;
+      layer.v2Close?.();
+      openCreateZ2(root, options, {
+        name: contact.name?.[0] || '',
+        phone: contact.tel?.[0] || '',
+      });
+    } catch {}
+  });
+  return layer;
+}
+
+function openCreateZ2(root, options = {}, preset = {}) {
   const layer = mountV2ZLayer(root, v2ZLayer(page([
     workspaceHeaderContext({ title: 'Новый клиент', hideD: true }),
-    personCreateForm(),
+    personCreateForm(preset),
   ]), { className: 'people-create-layer' }), { stack: true });
   if (!layer) return null;
   const submit = layer.querySelector('[data-person-create-form] button[type="submit"]');
@@ -350,10 +391,11 @@ function personContext(person) {
   });
 }
 
-function bindPersonContext(root, person, options = {}, { onIdentityChange = null } = {}) {
+function bindPersonContext(root, person, options = {}, { onIdentityChange = null, onPersonChange = null } = {}) {
   root.querySelector('[data-person-settings]')?.addEventListener('click', () => {
     openPersonSettings(root, person.key, {
       onIdentityChange: (nextKey) => onIdentityChange?.(nextKey),
+      onPersonChange: (nextKey) => onPersonChange?.(nextKey),
     });
   });
   root.querySelector('[data-person-direct-chat]')?.addEventListener('click', () => {
@@ -406,6 +448,7 @@ function renderPersonOverview(layer, baseRoot, key, options = {}) {
   ]);
   bindPersonContext(layer, person, options, {
     onIdentityChange: (nextKey) => renderPersonOverview(layer, baseRoot, nextKey || key, options),
+    onPersonChange: (nextKey) => renderPersonOverview(layer, baseRoot, nextKey || key, options),
   });
   layer.querySelector('[data-person-card]')?.addEventListener('click', () => {
     openPersonEdit(layer, baseRoot, person.key, options, {
@@ -492,22 +535,50 @@ function settingsCards(person) {
   const pdn = personConsentState(person, 'pdn-consent');
   const messages = personConsentState(person, 'messages-consent');
   const members = person.uei ? getMembers(person.uei).length : 0;
-  return `<div class="people-person-settings">
-    ${miniCard({
-      title: 'UEI',
-      value: person.uei || 'Не присвоен',
-      subtitle: members > 1 ? `Связано профилей: ${members}` : 'Идентификатор человека',
+  const consentCards = [
+    miniCard({
+      title: 'Согласие ПДН',
+      value: pdn.active ? '✓' : '—',
+      subtitle: consentStatus(pdn.fact),
       interactive: true,
-      data: 'data-person-uei-card',
-      aria: 'Настроить UEI',
-    })}
-    ${miniCard({
-      title: 'Согласия',
-      rows: [
-        { label: 'Согласие ПДН', checked: pdn.active, data: 'data-person-consent="pdn-consent"', aria: 'Открыть согласие ПДН' },
-        { label: 'Согласие на рассылки', checked: messages.active, data: 'data-person-consent="messages-consent"', aria: 'Открыть согласие на рассылки' },
-      ],
-    })}
+      data: 'data-person-consent="pdn-consent"',
+      aria: 'Открыть согласие ПДН',
+    }),
+    miniCard({
+      title: 'Согласие на рассылки',
+      value: messages.active ? '✓' : '—',
+      subtitle: consentStatus(messages.fact),
+      interactive: true,
+      data: 'data-person-consent="messages-consent"',
+      aria: 'Открыть согласие на рассылки',
+    }),
+  ];
+  return `<div class="people-person-settings">
+    <section class="people-settings-section" aria-label="UEI">
+      ${miniCard({
+        title: 'UEI',
+        value: person.uei || 'Не присвоен',
+        subtitle: members > 1 ? `Связано профилей: ${members}` : 'Идентификатор человека',
+        interactive: true,
+        data: 'data-person-uei-card',
+        aria: 'Настроить UEI',
+      })}
+    </section>
+    <section class="people-settings-section" aria-label="Фото">
+      ${miniCard({
+        title: 'Фото',
+        value: person.photo ? 'Изменить' : 'Добавить',
+        subtitle: person.photo ? 'Фото сохранено' : 'Фото не добавлено',
+        image: person.photo || '',
+        initials: person.photo ? '' : initials(person),
+        interactive: true,
+        data: 'data-person-photo-card',
+        aria: person.photo ? 'Изменить фото' : 'Добавить фото',
+      })}
+    </section>
+    <section class="people-settings-section" aria-label="Согласия">
+      ${miniCardRail(consentCards, { className: 'people-consent-cards' })}
+    </section>
   </div>`;
 }
 
@@ -521,7 +592,7 @@ function refreshPersonIdentityPresentation(modalRoot, key) {
   if (id) id.textContent = person.uei || '';
 }
 
-function bindSettingsCards(modalRoot, key, { onIdentityChange = null } = {}) {
+function bindSettingsCards(modalRoot, key, { onIdentityChange = null, onSettingsChange = null } = {}) {
   const person = getAllPeople().find((item) => item.key === key);
   if (!person) {
     modalRoot.v2Close?.();
@@ -537,8 +608,15 @@ function bindSettingsCards(modalRoot, key, { onIdentityChange = null } = {}) {
         onIdentityChange?.(nextKey);
         return;
       }
-      bindSettingsCards(modalRoot, person.key, { onIdentityChange });
+      bindSettingsCards(modalRoot, person.key, { onIdentityChange, onSettingsChange });
       refreshPersonIdentityPresentation(modalRoot, person.key);
+      onSettingsChange?.();
+    });
+  });
+  host.querySelector('[data-person-photo-card]')?.addEventListener('click', () => {
+    openPersonPhotoEditor(modalRoot, person.key, () => {
+      bindSettingsCards(modalRoot, person.key, { onIdentityChange, onSettingsChange });
+      onSettingsChange?.();
     });
   });
   host.querySelectorAll('[data-person-consent]').forEach((row) => {
@@ -546,14 +624,50 @@ function bindSettingsCards(modalRoot, key, { onIdentityChange = null } = {}) {
   });
 }
 
-function openPersonSettings(root, key, { onIdentityChange = null } = {}) {
+function openPersonSettings(root, key, { onIdentityChange = null, onPersonChange = null } = {}) {
   const layer = mountModal(root, modal('<div data-person-settings-host></div>', {
     title: 'Настройки клиента',
     variant: 'standard',
     surface: 'app',
   }));
   if (!layer) return null;
-  bindSettingsCards(layer, key, { onIdentityChange });
+  let changed = false;
+  const close = layer.v2Close;
+  layer.v2Close = () => {
+    const wasConnected = layer.isConnected;
+    close?.();
+    if (wasConnected && changed) onPersonChange?.(key);
+  };
+  bindSettingsCards(layer, key, {
+    onIdentityChange,
+    onSettingsChange: () => { changed = true; },
+  });
+  return layer;
+}
+
+function openPersonPhotoEditor(root, key, onSaved = () => {}) {
+  const all = getAllPeople();
+  const person = all.find((item) => item.key === key);
+  if (!person) return null;
+  const layer = mountModal(root, modal(`<div class="people-photo-editor">
+    ${photoField({ name: 'photo', value: person.photo || '' })}
+    <div class="modal-actions">${button('Сохранить', { data: 'data-person-photo-save' })}</div>
+  </div>`, {
+    title: 'Фото',
+    variant: 'standard',
+    surface: 'app',
+  }));
+  if (!layer) return null;
+  initPhotoField(layer);
+  layer.querySelector('[data-person-photo-save]')?.addEventListener('click', () => {
+    const current = getAllPeople();
+    const next = current.find((item) => item.key === key);
+    if (!next) return;
+    next.photo = layer.querySelector('[data-photo-value]')?.value || '';
+    savePeople(current);
+    layer.v2Close?.();
+    onSaved(next);
+  });
   return layer;
 }
 
@@ -662,8 +776,7 @@ function openPersonUeiQuick(root, key, onChanged = () => {}) {
 
 function personDataFields(person, all) {
   return [
-    v2Section('Личные данные', `<div class="form-grid">
-      ${photoField({ name: 'photo', value: person.photo || '' })}
+    v2Section('Персональные данные', `<div class="form-grid">
       ${field({ label: 'Имя', name: 'name', value: person.name, required: true })}
       ${field({ label: 'Фамилия', name: 'surname', value: person.surname })}
       ${select({ label: 'Пол', name: 'gender', value: person.gender || '', options: [
@@ -709,7 +822,6 @@ function savePersonData(root, key) {
   if (!memberKeys.length) memberKeys.push(key);
   person.name = root.querySelector('[name="name"]')?.value.trim() || person.name;
   person.surname = root.querySelector('[name="surname"]')?.value.trim() || '';
-  person.photo = root.querySelector('[data-photo-value]')?.value || '';
   person.gender = root.querySelector('[name="gender"]')?.value || '';
   person.birthDate = root.querySelector('[name="birthDate"]')?.value || '';
   const rawDiscount = Number(String(root.querySelector('[name="discountPercent"]')?.value || '0').replace(',', '.'));
@@ -766,7 +878,6 @@ function openPersonEdit(parentLayer, baseRoot, key, options = {}, callbacks = {}
   ]), { className: 'people-edit-layer' }), { stack: true });
   if (!layer) return null;
 
-  initPhotoField(layer);
   initMonthDayPickers(layer);
   initLinks(layer);
   initTags(layer);
@@ -820,6 +931,17 @@ function openPersonEdit(parentLayer, baseRoot, key, options = {}, callbacks = {}
       if (!nextKey || nextKey === key) return;
       layer.v2Close?.();
       renderPersonOverview(parentLayer, baseRoot, nextKey, options);
+    },
+    onPersonChange: (nextKey) => {
+      const resolvedKey = nextKey || key;
+      const nextPerson = getAllPeople().find((item) => item.key === resolvedKey);
+      const context = layer.querySelector('[data-workspace-context-action]');
+      if (nextPerson && context) {
+        context.dataset.workspaceAImage = nextPerson.photo || '';
+        context.dataset.workspaceAInitials = initials(nextPerson);
+        notifyContext();
+      }
+      renderPersonOverview(parentLayer, baseRoot, resolvedKey, options);
     },
   });
   syncAction();
