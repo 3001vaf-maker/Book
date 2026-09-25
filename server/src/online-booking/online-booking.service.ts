@@ -204,11 +204,6 @@ export class OnlineBookingService {
   }
 
   private async bindAccountTenant(tenantId: string, account: any) {
-    await this.prisma.accountTenantLink.upsert({
-      where: { accountId_tenantId: { accountId: account.id, tenantId } },
-      create: { accountId: account.id, tenantId },
-      update: { updatedAt: new Date() },
-    });
     return this.personIdentity.bindFirstAccess(tenantId, account as any);
   }
 
