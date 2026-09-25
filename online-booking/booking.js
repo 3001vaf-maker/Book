@@ -24,29 +24,29 @@ import {
   submitAccountConsents,
 } from '../core/account/index.js';
 import { normalizeBookingSettings } from '../core/booking-settings/index.js';
-import { bookingChoiceCards, bookingThemeStyle, bookingTimeGroups } from '../ui/booking/index.js';
-import { button } from '../ui/buttons/index.js';
-import { initCalendar } from '../ui/calendar/index.js';
 import {
+  bookingChoiceCards,
+  bookingThemeStyle,
+  bookingTimeGroups,
+  button,
+  emptyState,
+  escapeHtml,
   field,
   formValidationMessage,
+  initCalendar,
   initPasswordFields,
-  passwordField,
-  phoneField,
-} from '../ui/inputs/index.js';
-import { openNotice } from '../ui/modals/index.js';
-import { emptyState } from '../ui/states/index.js';
-import { escapeHtml } from '../ui/utils/escape-html.js';
-import {
   initV2StickerSwipe,
   initV2Swipe,
+  openNotice,
+  passwordField,
+  phoneField,
   v2Document,
   v2Header,
   v2LegalCards,
   v2ServiceStickers,
   v2Shell,
   v2Sticker,
-} from '../ui/v2/index.js';
+} from '../ui/ui.js';
 import { formError, formView } from '../ui/forms/index.js';
 import {
   bookingProcedureCost,
