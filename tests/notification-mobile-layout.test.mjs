@@ -1,22 +1,18 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-const shell = fs.readFileSync('ui/shell/shell.css', 'utf8');
 const chat = fs.readFileSync('ui/chat/chat.css', 'utf8');
 const v2 = fs.readFileSync('ui/v2/v2.css', 'utf8');
 const account = fs.readFileSync('online-booking/account-shell.js', 'utf8');
 const notifications = fs.readFileSync('online-booking/notifications.js', 'utf8');
+assert.equal(fs.existsSync('ui/shell/shell.css'), false);
 
-assert.match(shell, /\.app-view-shell\{[^}]*overflow-x:hidden/s);
-assert.doesNotMatch(shell, /\.app-view-shell--chat|\.message-composer|\.message-thread/);
 assert.match(chat, /\.message-composer\{[^}]*position:fixed[^}]*grid-template-columns:minmax\(0,1fr\) 46px/s);
 assert.match(chat, /\.message-composer--with-attachments\{[^}]*grid-template-columns:44px minmax\(0,1fr\) 46px/s);
 assert.match(chat, /\.message-composer__attach\{[^}]*width:44px[^}]*height:44px/s);
 assert.match(chat, /\.message-bubble\{[^}]*max-width:82%/s);
 assert.match(chat, /\.v2-app--chat \.v2-z[^}]*padding-bottom:92px/s);
 assert.match(v2, /\.v2-z\{/s);
-assert.match(shell, /\.app-header\{[^}]*grid-template-columns:auto minmax\(0,1fr\) auto auto/s);
-assert.match(shell, /\.app-header__slot\.is-empty\{[^}]*width:0/s);
 assert.match(account, /messageComposer\(\{ attachments: true, attachmentTrigger: 'external' \}\)/);
 assert.match(account, /bindMessageAttachments\(form\)/);
 assert.match(account, /kind: 'attachment'/);
