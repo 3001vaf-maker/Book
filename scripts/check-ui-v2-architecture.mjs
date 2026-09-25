@@ -137,6 +137,8 @@ for (const name of [
   'initV2Swipe',
   'initV2StickerSwipe',
   'initV2DeckSwipe',
+  'initV2WorkspaceInteraction',
+  'setV2DeckOpen',
 ]) {
   expect(ui.includes(`export function ${name}`), `Shared UI V2 owner must export ${name}().`);
   expect(facade.includes(name), `ui/ui.js must expose ${name}().`);
@@ -178,16 +180,24 @@ expect(ui.includes('const nextIndex = (activeIndex + direction + cards.length) %
 expect(ui.includes('threshold = 42') && ui.includes("addEventListener('transitionend'") && ui.includes('requestAnimationFrame') && !ui.includes('settleTimer') && !ui.includes('}, 210);'), 'F paging must continue from the finger into one transition without the legacy 210 ms reset/pause/rerender sequence.');
 expect(ui.includes("const eDeck = host.querySelector?.('[data-v2-e-list]')") && ui.includes('const commitE = (direction) =>') && ui.includes("eDeck.addEventListener('pointermove', eMove") && ui.includes('--v2-e-drag-x'), 'Shared FE gesture owner must provide an independent physical swipe for E.');
 expect(!ui.includes('if (cards.length < 2) return () => {};') && ui.includes('if (cards.length > 1) {'), 'Shared FE owner must keep E swipe available even when access leaves only one F folder.');
-expect(core.includes('eActiveId: childActive') && core.includes('onEActiveChange: (id) => selectSecondary(id)'), 'Workspace must route E paging through the Shared FE owner instead of a local section handler.');
+expect(core.includes('initV2WorkspaceInteraction(shell') && core.includes('eActiveId: childActive') && core.includes('onSecondarySelect: (id) => selectSecondary(id)'), 'Workspace must route F/E/Z interaction through the single Shared workspace owner.');
 expect(css.includes('box-shadow:-9px 8px 14px -11px rgba(0,0,0,.34)') && css.includes('.v2-z .entity-card{transform:translateY(-2px)') && css.includes('.v2-rail-card{') && css.includes('transform:translateY(-2px)'), 'Z stickers must lift at the edges while large cards float above the Z surface.');
 expect(css.includes('touch-action:pan-y'), 'Shared V2 surfaces must allow vertical scrolling without fighting horizontal swipe.');
-expect(account.includes("state.accountTab = id === 'history' ? 'history' : 'representatives';"), 'Changing the active F folder must immediately change Z to that folder face while the deck stays open.');
+expect(account.includes("const next = id === 'history' ? 'history' : 'representatives';") && account.includes('initV2WorkspaceInteraction(root'), 'Changing the active end-user F folder must route through the Shared workspace owner and immediately change Z to that folder face.');
 expect(accountMobileCss.includes('background:var(--v2-base)'), 'Public booking shell safe area must continue the H base.');
 expect(core.includes("setThemeColor('#2F3338')") && core.includes("setThemeColor('#F5F5F3')"), 'Public booking must tint browser chrome to H and restore the workspace theme afterwards.');
 expect(booking.includes('v2LegalCards(') && booking.includes('v2Sticker({'), 'Legal checkpoint must use the shared sticker system.');
 expect(!booking.includes('data-booking-workplaces-back') && !booking.includes('data-booking-confirm-back'), 'V2 booking flow must not restore legacy back buttons.');
 
 expect(core.includes("className: 'v2-app--workspace'") && core.includes('v2EList(childItems') && core.includes('eDeck,'), 'Professional workspace must render second-level navigation as E inside the shared FE shell.');
+expect(core.includes('v2Shell({') && account.includes('v2Shell({'), 'Professional and end-user contours must both render through the Shared H/F/E/Z shell owner.');
+expect(core.includes('v2Header({') && account.includes('v2Header({'), 'Professional and end-user contours must both render Header A/B/C/D through the Shared Header owner.');
+expect(ui.includes('export function v2Shell') && ui.includes('data-v2-app') && ui.includes('data-v2-fe') && ui.includes('data-v2-z'), 'Shared shell owner must own H, FE and Z structural layers.');
+expect(ui.includes('export function v2Header') && ui.includes("headerControl(a, 'a')") && ui.includes("headerControl(c, 'c')") && ui.includes("headerControl(d, 'd')") && ui.includes('v2-header__title'), 'Shared Header owner must own A, B, C and D.');
+expect(css.includes('--v2-base:var(--surface-dark)') && css.includes('.v2-header{') && css.includes('.v2-app__stage{') && css.includes('.v2-fe-deck{') && css.includes('.v2-z{'), 'H/F/E/Z geometry and Header geometry must stay in the shared V2 stylesheet.');
+expect(!account.includes('appHeader(') && !account.includes('appShell('), 'End-user account must not create a parallel local H/Header/Z shell.');
+expect(!core.includes('appHeader(') && !core.includes('appShell('), 'Professional workspace must not create a parallel local H/Header/Z shell.');
+
 for (const marker of ["{ id: 'people', label: 'Клиенты'", "{ id: 'finance', label: 'Финансы'", "{ id: 'timetable', label: 'График'", "{ id: 'journal', label: 'Журнал'", "{ id: 'profile', label: 'Профиль'", "{ id: 'settings', label: 'Настройки'"]) {
   expect(core.includes(marker), `Workspace root F is missing ${marker}.`);
 }
@@ -298,7 +308,9 @@ expect(!inputs.includes('mountV2Layer(') && !inputs.includes('v2Layer('), 'Share
 
 
 expect(account.includes('v2FDeck('), 'End-user root must use shared F deck.');
-expect(account.includes('initV2DeckSwipe(root'), 'End-user F deck must page horizontally with the shared interaction.');
+expect(account.includes('initV2WorkspaceInteraction(root'), 'End-user F/E/Z interaction must use the single Shared workspace owner.');
+expect(!account.includes('initV2DeckSwipe(root') && !account.includes('function bindRootSwipe') && !account.includes('function bindDeck('), 'End-user account must not re-own F/Z gesture binding beside the Shared workspace owner.');
+expect(core.includes('initV2WorkspaceInteraction(shell') && !core.includes('initV2DeckSwipe(rootDeckNode') && !core.includes('initV2Swipe(z'), 'Professional workspace must consume the same Shared workspace interaction owner as the end-user account.');
 expect(account.includes("className: 'v2-app--chat'"), 'End-user Chat must share V2 H + Z geometry.');
 expect(account.includes("attachmentTrigger: 'external'"), 'Chat attachment action must live in Header D.');
 expect(!account.includes('accountBottomNavigation') && !account.includes('bindBottomNavigation'), 'End-user V2 must not contain bottom navigation.');
