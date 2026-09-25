@@ -430,6 +430,7 @@ function renderAccountEntry(root, state) {
     ${errorBlock(state.error)}
     ${button('Войти', { type: 'submit' })}
     <button type="button" class="v2-sticker-link" data-booking-register>Зарегистрироваться</button>
+    <button type="button" class="v2-sticker-link" data-booking-forgot>Забыли пароль?</button>
   </form>`;
   root.innerHTML = `<section class="${flowThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${v2Sticker({
     title: 'Вход',
@@ -464,6 +465,14 @@ function renderAccountEntry(root, state) {
       state.error = accountFlowError(error, 'Не удалось открыть регистрацию');
       renderAccountEntry(root, state);
     }
+  });
+  root.querySelector('[data-booking-forgot]')?.addEventListener('click', () => {
+    openNotice({
+      title: 'Восстановление пароля',
+      message: 'Восстановление пароля пока недоступно.',
+      action: 'Закрыть',
+      variant: 'technical',
+    });
   });
   authForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
