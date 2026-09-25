@@ -24,11 +24,11 @@ import {
   mountModal,
   select,
   setCopyButtonCopied,
-  settingsPanel,
   textareaField,
   twoColumnLayout,
   workspaceHeaderContext,
 } from '../../ui/ui.js';
+import { settingsPanel } from '../../ui/settings/index.js';
 import { getWorkplaces } from '../profile/workplaces/data.js';
 
 const APPEARANCE_INFO = 'Вы задаёте настроение страницы. Расстановка экранов, календарь и логика записи остаются едиными. Карточка рабочего пространства берётся из заполненной карточки рабочего пространства.';
