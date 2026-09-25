@@ -57,16 +57,17 @@ export function v2EList(items = [], { active = '', data = 'data-v2-e-item' } = {
   const activeId = String(active || values[0]?.id || '0');
   const activeIndex = Math.max(0, values.findIndex((item, index) => String(item.id || index) === activeId));
   const count = values.length;
+  const tabStep = 48;
   return `<div class="v2-e-deck" data-v2-e-list data-v2-e-count="${count}">${values.map((item, index) => {
     const id = String(item.id || index);
     const visualDepth = (index - activeIndex + count) % count;
     const isActive = visualDepth === 0;
-    const depthX = visualDepth * 8;
-    const depthY = visualDepth * 10;
-    const stackZ = Math.max(1, count - visualDepth);
+    const tabOrder = count - 1 - visualDepth;
+    const depthY = tabOrder * tabStep;
+    const stackZ = tabOrder + 1;
     const classes = ['v2-e-card', isActive ? 'is-active' : 'is-stacked'].filter(Boolean).join(' ');
     const itemData = data ? ` ${data}="${text(id)}"` : '';
-    return `<button type="button" class="${classes}" style="--v2-e-depth-x:${depthX}px;--v2-e-depth-y:${depthY}px;--v2-e-stack-z:${stackZ}"${itemData} data-v2-e-index="${index}" aria-label="${text(item.aria || item.label || '')}"><strong>${text(item.label || '')}</strong></button>`;
+    return `<button type="button" class="${classes}" style="--v2-e-depth-x:0px;--v2-e-depth-y:${depthY}px;--v2-e-stack-z:${stackZ}"${itemData} data-v2-e-index="${index}" aria-label="${text(item.aria || item.label || '')}"><strong data-v2-e-handle>${text(item.label || '')}</strong></button>`;
   }).join('')}</div>`;
 }
 
@@ -76,19 +77,19 @@ export function v2FDeck(items = [], { active = '', data = 'data-v2-deck-item', c
   const activeId = String(active || values[0]?.id || '0');
   const activeIndex = Math.max(0, values.findIndex((item, index) => String(item.id || index) === activeId));
   const count = values.length;
-  const depthStepX = count > 1 ? Math.min(10, 18 / (count - 1)) : 0;
+  const tabStep = 48;
   const deckClasses = ['v2-deck', className].filter(Boolean).join(' ');
   const roleData = role ? ` data-v2-deck-role="${text(role)}"` : '';
   return `<div class="${text(deckClasses)}" data-v2-deck data-v2-deck-count="${count}"${roleData}>${values.map((item, index) => {
     const id = String(item.id || index);
     const visualDepth = (index - activeIndex + count) % count;
     const isActive = visualDepth === 0;
-    const depthX = Number((visualDepth * depthStepX).toFixed(2));
-    const depthY = visualDepth * 8;
-    const stackZ = Math.max(1, count - visualDepth);
+    const tabOrder = count - 1 - visualDepth;
+    const depthY = tabOrder * tabStep;
+    const stackZ = tabOrder + 1;
     const classes = ['v2-deck__card', isActive ? 'is-active' : 'is-stacked'].filter(Boolean).join(' ');
     const customData = data && data !== 'data-v2-deck-item' ? ` ${data}="${text(id)}"` : '';
-    return `<button type="button" class="${classes}" style="--v2-depth:${visualDepth};--v2-depth-x:${depthX}px;--v2-depth-y:${depthY}px;--v2-stack-z:${stackZ}" data-v2-deck-item="${text(id)}"${customData} data-v2-f-index="${index}" aria-label="${text(item.aria || item.label || '')}"><strong>${text(item.label || '')}</strong></button>`;
+    return `<button type="button" class="${classes}" style="--v2-depth:${visualDepth};--v2-depth-x:0px;--v2-depth-y:${depthY}px;--v2-stack-z:${stackZ}" data-v2-deck-item="${text(id)}"${customData} data-v2-f-index="${index}" aria-label="${text(item.aria || item.label || '')}"><strong data-v2-f-handle>${text(item.label || '')}</strong></button>`;
   }).join('')}</div>`;
 }
 
@@ -107,9 +108,11 @@ export function v2Shell({
     ${header}
     <div class="v2-app__stage">
       ${feDeck}
-      <main class="v2-z" ${zData}>
+      <div class="v2-front" data-v2-front>
+        <main class="v2-z" ${zData}>
 ${body}
 </main>
+      </div>
     </div>
   </section>`;
 }
@@ -181,23 +184,25 @@ export function v2ZLayer(content = '', { className = '' } = {}) {
 export function mountV2ZLayer(root, html, { onClose = null, stack = false } = {}) {
   const app = root?.closest?.('[data-v2-app]') || document.querySelector('[data-v2-app]');
   const stage = app?.querySelector?.('.v2-app__stage');
-  if (!stage) return null;
+  const front = app?.querySelector?.('[data-v2-front]');
+  const host = front || stage;
+  if (!host) return null;
   const template = document.createElement('template');
   template.innerHTML = String(html || '').trim();
   const node = template.content.firstElementChild;
   if (!node?.matches?.('[data-v2-z-layer]')) return null;
-  if (!stack) stage.querySelectorAll('[data-v2-z-layer]').forEach((layer) => layer.remove());
-  const depth = stage.querySelectorAll('[data-v2-z-layer]').length + 1;
+  if (!stack) host.querySelectorAll('[data-v2-z-layer]').forEach((layer) => layer.remove());
+  const depth = host.querySelectorAll('[data-v2-z-layer]').length + 1;
   node.dataset.v2ZDepth = String(depth);
   node.style.setProperty('--v2-z-layer-shift', `${depth * 12}px`);
-  stage.appendChild(node);
+  host.appendChild(node);
   app?.classList.add('has-z-layer');
   const notify = () => window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
   let disposeSwipe = () => {};
   const close = () => {
     disposeSwipe();
     if (node.isConnected) node.remove();
-    app?.classList.toggle('has-z-layer', Boolean(stage.querySelector('[data-v2-z-layer]')));
+    app?.classList.toggle('has-z-layer', Boolean(host.querySelector('[data-v2-z-layer]')));
     notify();
     onClose?.();
   };
@@ -319,7 +324,7 @@ function activeV2ModalSurface(root = null) {
   const app = root?.closest?.('[data-v2-app]') || document.querySelector('[data-v2-app]');
   const layers = [...(app?.querySelectorAll?.('[data-v2-z-layer]') || [])];
   return layers.at(-1)
-    || app?.querySelector?.('.v2-app__stage > [data-v2-z]')
+    || app?.querySelector?.('[data-v2-front] > [data-v2-z]')
     || document.querySelector('.app-content')
     || document.querySelector('#app');
 }
@@ -478,70 +483,334 @@ export function initV2WorkspaceInteraction(root, {
   onRootSelect = null,
   onSecondarySelect = null,
   onDeckOpenChange = null,
+  onZRight = null,
+  onZLeft = null,
   bindZ = true,
+  threshold = 42,
+  directPickThreshold = 14,
+  maxDrag = 180,
 } = {}) {
   const app = root?.matches?.('[data-v2-app]')
     ? root
     : root?.closest?.('[data-v2-app]') || root?.querySelector?.('[data-v2-app]');
   if (!app) return () => {};
 
+  const stage = app.querySelector('.v2-app__stage');
+  const front = app.querySelector('[data-v2-front]');
   const deck = app.querySelector('[data-v2-deck]');
-  const z = app.querySelector('.v2-app__stage > [data-v2-z]');
-  const disposers = [];
+  const eDeck = app.querySelector('[data-v2-e-list]');
+  const z = app.querySelector('[data-v2-front] > [data-v2-z]');
+  if (!stage || !front) return () => {};
 
-  const setOpen = (open, notify = true) => {
-    const next = setV2DeckOpen(app, open);
-    if (notify) onDeckOpenChange?.(next);
-    return next;
+  const fCards = [...(deck?.querySelectorAll?.('.v2-deck__card') || [])];
+  const eCards = [...(eDeck?.querySelectorAll?.('.v2-e-card') || [])];
+  let fActiveIndex = Math.max(0, fCards.findIndex((card) => String(card.getAttribute('data-account-deck-item') || card.getAttribute('data-v2-deck-item') || '') === String(activeId || '')));
+  let eActiveIndex = Math.max(0, eCards.findIndex((card) => String(card.getAttribute('data-v2-secondary-item') || card.getAttribute('data-v2-e-item') || '') === String(eActiveId || '')));
+  let open = Boolean(deckOpen);
+  let gesture = null;
+  let suppressNextClick = false;
+  let suppressTimer = 0;
+
+  const fId = (card) => String(card?.getAttribute('data-account-deck-item') || card?.getAttribute('data-v2-deck-item') || '');
+  const eId = (card) => String(card?.getAttribute('data-v2-secondary-item') || card?.getAttribute('data-v2-e-item') || '');
+
+  const ownsHorizontalGesture = (target) => {
+    let node = target?.nodeType === 1 ? target : target?.parentElement;
+    while (node && node !== z && node !== stage) {
+      if (node.matches?.('[data-v2-stage-gesture-ignore],input,textarea,select,[contenteditable="true"],[draggable="true"]')) return true;
+      const style = window.getComputedStyle?.(node);
+      const overflowX = style?.overflowX || '';
+      if ((overflowX === 'auto' || overflowX === 'scroll') && Number(node.scrollWidth || 0) > Number(node.clientWidth || 0) + 2) return true;
+      const touchAction = String(style?.touchAction || '').toLowerCase();
+      if (touchAction === 'none' || touchAction.includes('pan-x')) return true;
+      node = node.parentElement;
+    }
+    return false;
   };
 
-  setOpen(deckOpen, false);
+  const markSuppressClick = () => {
+    suppressNextClick = true;
+    if (suppressTimer) window.clearTimeout(suppressTimer);
+    suppressTimer = window.setTimeout(() => {
+      suppressNextClick = false;
+      suppressTimer = 0;
+    }, 350);
+  };
 
-  if (deck) {
-    disposers.push(initV2DeckSwipe(deck, {
-      activeId,
-      eActiveId,
-      onActiveChange: (id) => {
-        setOpen(true);
-        onRootSelect?.(id);
-      },
-      onEActiveChange: (id) => {
-        setOpen(true);
-        onSecondarySelect?.(id);
-      },
-    }));
+  const clearMotion = () => {
+    app.classList.remove('is-revealing-deck');
+    front.classList.remove('is-dragging');
+    front.style.removeProperty('--v2-front-drag-x');
+    deck?.classList.remove('is-dragging');
+    deck?.style.removeProperty('--v2-fe-drag-x');
+    deck?.style.removeProperty('--v2-fe-drag-y');
+    eDeck?.classList.remove('is-dragging');
+    eDeck?.style.removeProperty('--v2-e-drag-y');
+    fCards.forEach((card) => {
+      card.classList.remove('is-dragging', 'is-picked');
+      card.style.removeProperty('--v2-pick-x');
+      card.style.removeProperty('--v2-pick-y');
+    });
+    eCards.forEach((card) => {
+      card.classList.remove('is-dragging', 'is-picked');
+      card.style.removeProperty('--v2-pick-y');
+    });
+  };
 
-    const onDeckClick = (event) => {
-      const rootItem = event.target.closest('[data-v2-deck-item]');
-      if (rootItem && deck.contains(rootItem)) {
-        const id = String(rootItem.getAttribute('data-v2-deck-item') || '');
-        if (id) {
-          setOpen(true);
-          onRootSelect?.(id);
+  const setOpen = (nextOpen, notify = true) => {
+    open = setV2DeckOpen(app, nextOpen);
+    clearMotion();
+    if (notify) onDeckOpenChange?.(open);
+    return open;
+  };
+
+  const endGesture = () => {
+    if (gesture?.captured && gesture.pointerId != null) {
+      try { stage.releasePointerCapture?.(gesture.pointerId); } catch {}
+    }
+    gesture = null;
+    clearMotion();
+  };
+
+  setOpen(open, false);
+
+  const down = (event) => {
+    if (gesture) return;
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    if (event.target.closest?.('[data-v2-layer], [data-v2-z-layer]')) return;
+
+    const eCard = event.target.closest?.('.v2-e-card');
+    const fCard = event.target.closest?.('.v2-deck__card');
+    let role = '';
+    let card = null;
+    let index = -1;
+
+    if (eCard && eDeck?.contains(eCard)) {
+      role = 'e';
+      card = eCard;
+      index = eCards.indexOf(eCard);
+    } else if (fCard && deck?.contains(fCard)) {
+      role = 'f';
+      card = fCard;
+      index = fCards.indexOf(fCard);
+      if (index !== fActiveIndex && !event.target.closest?.('[data-v2-f-handle]')) return;
+    } else if (bindZ && z?.contains(event.target)) {
+      if (!open && ownsHorizontalGesture(event.target)) return;
+      role = 'z';
+    } else {
+      return;
+    }
+
+    gesture = {
+      pointerId: event.pointerId,
+      role,
+      card,
+      index,
+      startX: event.clientX,
+      startY: event.clientY,
+      dx: 0,
+      dy: 0,
+      axis: 'pending',
+      cancelled: false,
+      captured: false,
+      openAtStart: open,
+    };
+
+    if ((role === 'f' && index !== fActiveIndex) || (role === 'e' && index !== eActiveIndex)) {
+      card?.classList.add('is-picked');
+    }
+  };
+
+  const move = (event) => {
+    if (!gesture || event.pointerId !== gesture.pointerId || gesture.cancelled) return;
+    const dx = event.clientX - gesture.startX;
+    const dy = event.clientY - gesture.startY;
+    gesture.dx = dx;
+    gesture.dy = dy;
+
+    if (gesture.axis === 'pending') {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 6) return;
+
+      if (gesture.role === 'f') {
+        const leftOrDownLeft = dx < -5 && dy >= -8;
+        if (!leftOrDownLeft) {
+          gesture.cancelled = true;
+          clearMotion();
+          return;
         }
+        gesture.axis = 'f';
+      } else if (gesture.role === 'e') {
+        const downOnly = dy > 5 && Math.abs(dx) <= Math.max(18, dy * 1.5);
+        if (!downOnly) {
+          gesture.cancelled = true;
+          clearMotion();
+          return;
+        }
+        gesture.axis = 'e';
+      } else {
+        gesture.axis = Math.abs(dx) >= Math.abs(dy) * 1.08 ? 'horizontal' : 'vertical';
+        if (gesture.axis !== 'horizontal') {
+          gesture.cancelled = true;
+          clearMotion();
+          return;
+        }
+      }
+
+      stage.setPointerCapture?.(event.pointerId);
+      gesture.captured = true;
+    }
+
+    if (gesture.role === 'f') {
+      const dragX = Math.max(-maxDrag, Math.min(0, dx));
+      const dragY = Math.max(0, Math.min(maxDrag * 0.6, dy));
+      gesture.card?.classList.add('is-dragging');
+      if (gesture.index === fActiveIndex) {
+        deck?.classList.add('is-dragging');
+        deck?.style.setProperty('--v2-fe-drag-x', `${dragX}px`);
+        deck?.style.setProperty('--v2-fe-drag-y', `${dragY}px`);
+      } else {
+        gesture.card?.style.setProperty('--v2-pick-x', `${dragX}px`);
+        gesture.card?.style.setProperty('--v2-pick-y', `${dragY}px`);
+      }
+      markSuppressClick();
+      event.preventDefault();
+      return;
+    }
+
+    if (gesture.role === 'e') {
+      const dragY = Math.max(0, Math.min(maxDrag, dy));
+      gesture.card?.classList.add('is-dragging');
+      if (gesture.index === eActiveIndex) {
+        eDeck?.classList.add('is-dragging');
+        eDeck?.style.setProperty('--v2-e-drag-y', `${dragY}px`);
+      } else {
+        gesture.card?.style.setProperty('--v2-pick-y', `${dragY}px`);
+      }
+      markSuppressClick();
+      event.preventDefault();
+      return;
+    }
+
+    const defaultDeckMotion = gesture.openAtStart
+      ? (!onZLeft && dx < 0)
+      : (!onZRight && dx > 0);
+    if (defaultDeckMotion) {
+      const dragX = gesture.openAtStart
+        ? Math.max(-maxDrag, Math.min(0, dx))
+        : Math.min(maxDrag, Math.max(0, dx));
+      front.classList.add('is-dragging');
+      front.style.setProperty('--v2-front-drag-x', `${dragX}px`);
+      if (!gesture.openAtStart && dragX > 0) app.classList.add('is-revealing-deck');
+    }
+    if (Math.abs(dx) > 7) markSuppressClick();
+    event.preventDefault();
+  };
+
+  const up = (event) => {
+    if (!gesture || event.pointerId !== gesture.pointerId) return;
+    const current = gesture;
+    const distance = Math.max(Math.abs(current.dx), Math.abs(current.dy));
+
+    if (current.role === 'f' && !current.cancelled && current.axis === 'f') {
+      if (current.index >= 0 && current.index !== fActiveIndex) {
+        const directDistance = Math.hypot(Math.min(0, current.dx), Math.max(0, current.dy));
+        if (directDistance >= directPickThreshold) {
+          const id = fId(current.card);
+          markSuppressClick();
+          setOpen(true);
+          endGesture();
+          if (id) onRootSelect?.(id);
+          return;
+        }
+      } else if (current.dx <= -threshold && fCards.length > 1) {
+        const nextIndex = (fActiveIndex + 1) % fCards.length;
+        const id = fId(fCards[nextIndex]);
+        markSuppressClick();
+        setOpen(true);
+        endGesture();
+        if (id) onRootSelect?.(id);
         return;
       }
-      const secondaryItem = event.target.closest('[data-v2-secondary-item], [data-v2-e-item]');
-      if (secondaryItem && app.contains(secondaryItem)) {
-        const id = String(secondaryItem.getAttribute('data-v2-secondary-item') || secondaryItem.getAttribute('data-v2-e-item') || '');
-        if (id) {
+    }
+
+    if (current.role === 'e' && !current.cancelled && current.axis === 'e') {
+      if (current.index >= 0 && current.index !== eActiveIndex) {
+        if (current.dy >= directPickThreshold) {
+          const id = eId(current.card);
+          markSuppressClick();
           setOpen(true);
-          onSecondarySelect?.(id);
+          endGesture();
+          if (id) onSecondarySelect?.(id);
+          return;
         }
+      } else if (current.dy >= threshold && eCards.length > 1) {
+        const nextIndex = (eActiveIndex + 1) % eCards.length;
+        const id = eId(eCards[nextIndex]);
+        markSuppressClick();
+        setOpen(true);
+        endGesture();
+        if (id) onSecondarySelect?.(id);
+        return;
       }
-    };
-    app.querySelector('[data-v2-fe]')?.addEventListener('click', onDeckClick);
-    disposers.push(() => app.querySelector('[data-v2-fe]')?.removeEventListener('click', onDeckClick));
-  }
+    }
 
-  if (z && bindZ) {
-    disposers.push(initV2Swipe(z, {
-      onRight: () => setOpen(true),
-      onLeft: () => setOpen(false),
-    }));
-  }
+    if (current.role === 'z' && !current.cancelled) {
+      if (current.openAtStart && distance < 7) {
+        markSuppressClick();
+        setOpen(false);
+        endGesture();
+        return;
+      }
+      if (current.axis === 'horizontal' && current.dx >= threshold) {
+        markSuppressClick();
+        endGesture();
+        if (onZRight) onZRight();
+        else if (!current.openAtStart) setOpen(true);
+        return;
+      }
+      if (current.axis === 'horizontal' && current.dx <= -threshold) {
+        markSuppressClick();
+        endGesture();
+        if (onZLeft) onZLeft();
+        else if (current.openAtStart) setOpen(false);
+        return;
+      }
+    }
 
-  return () => disposers.forEach((dispose) => dispose?.());
+    endGesture();
+  };
+
+  const cancel = (event) => {
+    if (!gesture || (event?.pointerId != null && event.pointerId !== gesture.pointerId)) return;
+    endGesture();
+  };
+
+  const suppressClick = (event) => {
+    if (!suppressNextClick) return;
+    suppressNextClick = false;
+    if (suppressTimer) {
+      window.clearTimeout(suppressTimer);
+      suppressTimer = 0;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  stage.addEventListener('pointerdown', down);
+  stage.addEventListener('pointermove', move, { passive: false });
+  stage.addEventListener('pointerup', up);
+  stage.addEventListener('pointercancel', cancel);
+  stage.addEventListener('click', suppressClick, true);
+
+  return () => {
+    if (suppressTimer) window.clearTimeout(suppressTimer);
+    endGesture();
+    stage.removeEventListener('pointerdown', down);
+    stage.removeEventListener('pointermove', move);
+    stage.removeEventListener('pointerup', up);
+    stage.removeEventListener('pointercancel', cancel);
+    stage.removeEventListener('click', suppressClick, true);
+  };
 }
 
 export function initV2StickerSwipe(root, { onRight = null, onLeft = null, threshold = 64, maxDrag = 180 } = {}) {
@@ -606,307 +875,5 @@ export function initV2StickerSwipe(root, { onRight = null, onLeft = null, thresh
     surface.removeEventListener('pointermove', move);
     surface.removeEventListener('pointerup', up);
     surface.removeEventListener('pointercancel', reset);
-  };
-}
-
-export function initV2DeckSwipe(root, { activeId = '', onActiveChange = null, eActiveId = '', onEActiveChange = null, threshold = 42, maxDrag = 150 } = {}) {
-  const deck = root?.matches?.('[data-v2-deck]') ? root : root?.querySelector?.('[data-v2-deck]');
-  if (!deck) return () => {};
-  const cards = [...deck.querySelectorAll('.v2-deck__card')];
-  const host = deck.closest?.('[data-v2-fe]') || deck;
-  let activeIndex = Math.max(0, cards.findIndex((card) => String(card.getAttribute('data-account-deck-item') || card.getAttribute('data-v2-deck-item') || '') === String(activeId || '')));
-  let pointerId = null;
-  let startX = 0;
-  let startY = 0;
-  let dx = 0;
-  let axis = 'pending';
-  let suppressNextClick = false;
-  let settling = false;
-  let frameId = 0;
-  let transitionTarget = null;
-  let transitionHandler = null;
-
-  const activeCard = () => cards[activeIndex] || cards[0];
-
-  const clearTransitionListener = () => {
-    if (transitionTarget && transitionHandler) transitionTarget.removeEventListener('transitionend', transitionHandler);
-    transitionTarget = null;
-    transitionHandler = null;
-  };
-
-  const clearPointer = () => {
-    pointerId = null;
-    dx = 0;
-    axis = 'pending';
-  };
-
-  const returnToRest = () => {
-    const card = activeCard();
-    host.classList.remove('is-dragging');
-    card?.classList.remove('is-dragging');
-    host.style.removeProperty('--v2-fe-drag-x');
-  };
-
-  const down = (event) => {
-    if (settling) return;
-    if (!event.target.closest('.v2-deck__card')) return;
-    if (event.pointerType === 'mouse' && event.button !== 0) return;
-    pointerId = event.pointerId;
-    startX = event.clientX;
-    startY = event.clientY;
-    dx = 0;
-    axis = 'pending';
-  };
-
-  const move = (event) => {
-    if (event.pointerId !== pointerId) return;
-    const nextX = event.clientX - startX;
-    const nextY = event.clientY - startY;
-    if (axis === 'pending') {
-      if (Math.max(Math.abs(nextX), Math.abs(nextY)) < 6) return;
-      axis = Math.abs(nextX) >= Math.abs(nextY) * 1.05 ? 'horizontal' : 'vertical';
-      if (axis === 'vertical') {
-        pointerId = null;
-        return;
-      }
-      deck.setPointerCapture?.(event.pointerId);
-    }
-    if (axis !== 'horizontal') return;
-    dx = Math.max(-maxDrag, Math.min(maxDrag, nextX));
-    const card = activeCard();
-    host.classList.add('is-dragging');
-    card?.classList.add('is-dragging');
-    host.style.setProperty('--v2-fe-drag-x', `${dx}px`);
-    if (Math.abs(nextX) > 6) suppressNextClick = true;
-    event.preventDefault();
-  };
-
-  const commit = (direction) => {
-    const outgoing = activeCard();
-    const nextIndex = (activeIndex + direction + cards.length) % cards.length;
-    const next = cards[nextIndex];
-    if (!outgoing || !next) {
-      returnToRest();
-      return;
-    }
-    settling = true;
-    host.classList.remove('is-dragging');
-    host.classList.add('is-settling');
-    outgoing.classList.remove('is-dragging');
-    outgoing.classList.add('is-committing');
-    next.classList.add('is-next-ready');
-    outgoing.getBoundingClientRect();
-
-    const distance = Math.max(deck.getBoundingClientRect().width * 1.35, 180);
-    const targetX = direction > 0 ? -distance : distance;
-    clearTransitionListener();
-    transitionTarget = outgoing;
-    transitionHandler = (transitionEvent) => {
-      if (transitionEvent.target !== outgoing || transitionEvent.propertyName !== 'transform') return;
-      clearTransitionListener();
-      activeIndex = nextIndex;
-      const id = next.getAttribute('data-account-deck-item') || next.getAttribute('data-v2-deck-item') || '';
-      if (id && onActiveChange) {
-        onActiveChange(id);
-        if (!host.isConnected) return;
-        return;
-      }
-      settling = false;
-      host.classList.remove('is-settling');
-      host.style.removeProperty('--v2-fe-drag-x');
-      outgoing.classList.remove('is-committing');
-      next.classList.remove('is-next-ready');
-    };
-    outgoing.addEventListener('transitionend', transitionHandler);
-    frameId = requestAnimationFrame(() => {
-      frameId = 0;
-      host.style.setProperty('--v2-fe-drag-x', `${targetX}px`);
-    });
-  };
-
-  const up = (event) => {
-    if (event.pointerId !== pointerId) return;
-    const finalDx = dx;
-    const finalAxis = axis;
-    deck.releasePointerCapture?.(event.pointerId);
-    clearPointer();
-    if (finalAxis !== 'horizontal' || Math.abs(finalDx) < threshold) {
-      returnToRest();
-      return;
-    }
-    suppressNextClick = true;
-    commit(finalDx < 0 ? 1 : -1);
-  };
-
-  const cancel = (event) => {
-    if (event?.pointerId != null && event.pointerId !== pointerId) return;
-    clearPointer();
-    returnToRest();
-  };
-
-  const click = (event) => {
-    if (!suppressNextClick) return;
-    suppressNextClick = false;
-    event.preventDefault();
-    event.stopPropagation();
-  };
-
-  if (cards.length > 1) {
-    deck.addEventListener('pointerdown', down);
-    deck.addEventListener('pointermove', move, { passive: false });
-    deck.addEventListener('pointerup', up);
-    deck.addEventListener('pointercancel', cancel);
-    deck.addEventListener('click', click, true);
-  }
-
-  const eDeck = host.querySelector?.('[data-v2-e-list]');
-  const eCards = [...(eDeck?.querySelectorAll?.('.v2-e-card') || [])];
-  let ePointerId = null;
-  let eStartX = 0;
-  let eStartY = 0;
-  let eDx = 0;
-  let eAxis = 'pending';
-  let eSuppressNextClick = false;
-  let eSettling = false;
-  let eFrameId = 0;
-  let eTransitionTarget = null;
-  let eTransitionHandler = null;
-  let eActiveIndex = Math.max(0, eCards.findIndex((card) => String(card.getAttribute('data-v2-secondary-item') || card.getAttribute('data-v2-e-item') || '') === String(eActiveId || '')));
-
-  const eActiveCard = () => eCards[eActiveIndex] || eCards[0];
-  const clearETransition = () => {
-    if (eTransitionTarget && eTransitionHandler) eTransitionTarget.removeEventListener('transitionend', eTransitionHandler);
-    eTransitionTarget = null;
-    eTransitionHandler = null;
-  };
-  const clearEPointer = () => {
-    ePointerId = null;
-    eDx = 0;
-    eAxis = 'pending';
-  };
-  const returnEToRest = () => {
-    eDeck?.classList.remove('is-dragging');
-    eActiveCard()?.classList.remove('is-dragging');
-    eDeck?.style.removeProperty('--v2-e-drag-x');
-  };
-  const eDown = (event) => {
-    if (eSettling || !event.target.closest('.v2-e-card')) return;
-    if (event.pointerType === 'mouse' && event.button !== 0) return;
-    ePointerId = event.pointerId;
-    eStartX = event.clientX;
-    eStartY = event.clientY;
-    eDx = 0;
-    eAxis = 'pending';
-  };
-  const eMove = (event) => {
-    if (event.pointerId !== ePointerId) return;
-    const nextX = event.clientX - eStartX;
-    const nextY = event.clientY - eStartY;
-    if (eAxis === 'pending') {
-      if (Math.max(Math.abs(nextX), Math.abs(nextY)) < 6) return;
-      eAxis = Math.abs(nextX) >= Math.abs(nextY) * 1.05 ? 'horizontal' : 'vertical';
-      if (eAxis === 'vertical') {
-        ePointerId = null;
-        return;
-      }
-      eDeck?.setPointerCapture?.(event.pointerId);
-    }
-    if (eAxis !== 'horizontal') return;
-    eDx = Math.max(-maxDrag, Math.min(maxDrag, nextX));
-    eDeck?.classList.add('is-dragging');
-    eActiveCard()?.classList.add('is-dragging');
-    eDeck?.style.setProperty('--v2-e-drag-x', `${eDx}px`);
-    if (Math.abs(nextX) > 6) eSuppressNextClick = true;
-    event.preventDefault();
-  };
-  const commitE = (direction) => {
-    const outgoing = eActiveCard();
-    const nextIndex = (eActiveIndex + direction + eCards.length) % eCards.length;
-    const next = eCards[nextIndex];
-    if (!outgoing || !next) {
-      returnEToRest();
-      return;
-    }
-    eSettling = true;
-    eDeck.classList.remove('is-dragging');
-    eDeck.classList.add('is-settling');
-    outgoing.classList.remove('is-dragging');
-    outgoing.classList.add('is-committing');
-    next.classList.add('is-next-ready');
-    outgoing.getBoundingClientRect();
-    const distance = Math.max(eDeck.getBoundingClientRect().width * 1.2, 150);
-    const targetX = direction > 0 ? -distance : distance;
-    clearETransition();
-    eTransitionTarget = outgoing;
-    eTransitionHandler = (transitionEvent) => {
-      if (transitionEvent.target !== outgoing || transitionEvent.propertyName !== 'transform') return;
-      clearETransition();
-      eActiveIndex = nextIndex;
-      const id = next.getAttribute('data-v2-secondary-item') || next.getAttribute('data-v2-e-item') || '';
-      if (id && onEActiveChange) {
-        onEActiveChange(id);
-        if (!host.isConnected) return;
-        return;
-      }
-      eSettling = false;
-      eDeck.classList.remove('is-settling');
-      eDeck.style.removeProperty('--v2-e-drag-x');
-      outgoing.classList.remove('is-committing');
-      next.classList.remove('is-next-ready');
-    };
-    outgoing.addEventListener('transitionend', eTransitionHandler);
-    eFrameId = requestAnimationFrame(() => {
-      eFrameId = 0;
-      eDeck.style.setProperty('--v2-e-drag-x', `${targetX}px`);
-    });
-  };
-  const eUp = (event) => {
-    if (event.pointerId !== ePointerId) return;
-    const finalDx = eDx;
-    const finalAxis = eAxis;
-    eDeck?.releasePointerCapture?.(event.pointerId);
-    clearEPointer();
-    if (finalAxis !== 'horizontal' || Math.abs(finalDx) < threshold) {
-      returnEToRest();
-      return;
-    }
-    eSuppressNextClick = true;
-    commitE(finalDx < 0 ? 1 : -1);
-  };
-  const eCancel = (event) => {
-    if (event?.pointerId != null && event.pointerId !== ePointerId) return;
-    clearEPointer();
-    returnEToRest();
-  };
-  const eClick = (event) => {
-    if (!eSuppressNextClick) return;
-    eSuppressNextClick = false;
-    event.preventDefault();
-    event.stopPropagation();
-  };
-
-  if (eDeck && eCards.length > 1) {
-    eDeck.addEventListener('pointerdown', eDown);
-    eDeck.addEventListener('pointermove', eMove, { passive: false });
-    eDeck.addEventListener('pointerup', eUp);
-    eDeck.addEventListener('pointercancel', eCancel);
-    eDeck.addEventListener('click', eClick, true);
-  }
-
-  return () => {
-    if (frameId) cancelAnimationFrame(frameId);
-    if (eFrameId) cancelAnimationFrame(eFrameId);
-    clearTransitionListener();
-    clearETransition();
-    deck.removeEventListener('pointerdown', down);
-    deck.removeEventListener('pointermove', move);
-    deck.removeEventListener('pointerup', up);
-    deck.removeEventListener('pointercancel', cancel);
-    deck.removeEventListener('click', click, true);
-    eDeck?.removeEventListener('pointerdown', eDown);
-    eDeck?.removeEventListener('pointermove', eMove);
-    eDeck?.removeEventListener('pointerup', eUp);
-    eDeck?.removeEventListener('pointercancel', eCancel);
-    eDeck?.removeEventListener('click', eClick, true);
   };
 }
