@@ -21,8 +21,6 @@ import {
   escapeHtml,
   listEntries,
   listEntry,
-  messageComposer,
-  messageThread,
   readOnlyReceipt,
   settingsPanel,
   v2FDeck,
@@ -38,6 +36,7 @@ import {
   setV2DeckOpen,
   mountModal,
 } from '../ui/ui.js';
+import { messageComposer, messageThread } from '../ui/chat/index.js';
 import { openAccountConsentSettings } from './consent-settings.js';
 import { openAccountPasswordSettings } from './password-settings.js';
 import { openAccountPersonalData } from './personal-data.js';
