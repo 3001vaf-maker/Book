@@ -21,8 +21,6 @@ import {
   escapeHtml,
   listEntries,
   listEntry,
-  readOnlyReceipt,
-  settingsPanel,
   v2FDeck,
   v2Header,
   v2HorizontalRail,
@@ -36,7 +34,9 @@ import {
   setV2DeckOpen,
   mountModal,
 } from '../ui/ui.js';
-import { messageComposer, messageThread } from '../ui/chat/index.js';
+import { initMessageComposer, messageComposer, messageThread } from '../ui/chat/index.js';
+import { settingsPanel } from '../ui/settings/index.js';
+import { readOnlyReceipt } from '../ui/receipt/index.js';
 import { openAccountConsentSettings } from './consent-settings.js';
 import { openAccountPasswordSettings } from './password-settings.js';
 import { openAccountPersonalData } from './personal-data.js';
@@ -733,6 +733,7 @@ async function renderMessages(root, state, handlers) {
   });
   root.querySelectorAll('[data-account-chat-settings]').forEach((node) => node.addEventListener('click', () => void openChatSettings(state)));
 
+  initMessageComposer(root);
   const form = root.querySelector('[data-message-composer]');
   root.querySelector('[data-account-chat-attachment]')?.addEventListener('click', () => form?.querySelector('[data-message-attachment]')?.click());
   const getAttachments = bindMessageAttachments(form);
