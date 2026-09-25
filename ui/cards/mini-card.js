@@ -29,11 +29,11 @@ export function miniCard({
   const actionAttrs = interactive ? ` type="button"${attrs(data, aria || title)}` : '';
   const rowItems = Array.isArray(rows) ? rows : [];
   return `<${tag} class="${escapeHtml(classes)}"${actionAttrs}>
-    <span class="mini-card__head">
+    <div class="mini-card__head">
       <strong class="mini-card__title">${escapeHtml(title)}</strong>
       ${value ? `<strong class="mini-card__value">${escapeHtml(value)}</strong>` : ''}
       ${subtitle ? `<span class="mini-card__subtitle">${escapeHtml(subtitle)}</span>` : ''}
-    </span>
-    ${rowItems.length ? `<span class="mini-card__rows">${rowItems.map(rowMarkup).join('')}</span>` : ''}
+    </div>
+    ${rowItems.length ? `<div class="mini-card__rows">${rowItems.map(rowMarkup).join('')}</div>` : ''}
   </${tag}>`;
 }
