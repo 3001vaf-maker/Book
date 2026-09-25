@@ -5,3 +5,6 @@
 .entity-card__top-meta--action,.entity-card__identity-action,.entity-card__detail-row--action{appearance:none;-webkit-appearance:none;border:0;background:none;padding:0;font:inherit;color:inherit;cursor:pointer;outline:0!important;box-shadow:none!important;-webkit-tap-highlight-color:transparent}.entity-card__top-meta--action{text-align:inherit}.entity-card__identity-action{text-align:left}.entity-card__detail-row--action{width:100%;text-align:left}.entity-card__top-meta--action:focus,.entity-card__top-meta--action:focus-visible,.entity-card__top-meta--action:active,.entity-card__identity-action:focus,.entity-card__identity-action:focus-visible,.entity-card__identity-action:active,.entity-card__detail-row--action:focus,.entity-card__detail-row--action:focus-visible,.entity-card__detail-row--action:active{outline:0!important;box-shadow:none!important;border-color:transparent}
 
 .entity-card--rail{min-height:230px;margin-bottom:0}.entity-card--rail .entity-card__content{min-height:230px}.entity-card--rail .entity-card__title{font-size:clamp(22px,6vw,30px)}
+
+.entity-card-stack{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;width:100%;min-width:0;align-content:start}
+.entity-card-stack>.entity-card{margin-bottom:0}
