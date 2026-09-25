@@ -1,46 +1,817 @@
-import { accordion, actionBlock, agreementBlock, button, emptyState, entityCard, escapeHtml, field, iconButton, initAccordions, initPhotoField, initUEI, initMonthDayPickers, mountModal, modal, monthDayPicker, page, pageHeader, photoField, select, links, initLinks, collectLinks, tags, initTags, collectTags, listEntry, listEntries, repeatedField, initRepeatedFields, collectRepeatedEntries, shortDateTime, uei } from '../../ui/ui.js';
+import {
+  button,
+  collectLinks,
+  collectRepeatedEntries,
+  collectTags,
+  emptyState,
+  entityCard,
+  escapeHtml,
+  field,
+  initLinks,
+  initMonthDayPickers,
+  initPhotoField,
+  initRepeatedFields,
+  initTags,
+  initUEI,
+  links,
+  listEntries,
+  listEntry,
+  miniCard,
+  modal,
+  monthDayPicker,
+  mountModal,
+  mountV2ZLayer,
+  page,
+  photoField,
+  repeatedField,
+  select,
+  shortDateTime,
+  tags,
+  uei,
+  v2HorizontalRail,
+  v2RailCard,
+  v2Section,
+  v2ZLayer,
+  workspaceHeaderContext,
+} from '../../ui/ui.js';
 import { applyUEI, detachUEI, getMembers, getOptions, getUEI } from '../../core/uei.js';
 import { getTags } from '../../settings/tags/data.js';
 import { getDocuments } from '../../settings/documents/data.js';
 import { getConsents } from '../../settings/documents/consents.js';
 import { createPerson, getAllPeople, getPeople, savePeople } from './data.js';
-import { openPersonCreate } from './create.js';
+import { bindPersonCreateForm, personCreateForm } from './create.js';
 import { getPersonMetadata, formatPersonVisitDate } from './metadata.js';
 import { personDisplay } from './presentation.js';
 import { getPeopleSortMode, setPeopleSortMode } from './view-state.js';
 import { canUseRealPersonalData } from '../../core/access.js';
 
-const name=p=>[p.name,p.surname].filter(Boolean).join(' '), money=v=>new Intl.NumberFormat('ru-RU').format(Number(v||0))+' ₽';
-function sortItems(items,mode){return [...items].sort((a,b)=>{if(mode.startsWith('name')){const n=name(a).localeCompare(name(b),'ru');return mode==='nameDesc'?-n:n}const av=a.lastVisit?Date.parse(a.lastVisit):0,bv=b.lastVisit?Date.parse(b.lastVisit):0;return mode==='lastDesc'?bv-av:av-bv})}
-function initial(p){return name(p).slice(0,1).toUpperCase()||'?'}
-function sortOptions(){return [['nameAsc','Имя ↑'],['nameDesc','Имя ↓'],['lastAsc','Последнее посещение ↑'],['lastDesc','Последнее посещение ↓']].map(([value,label])=>({value,label}))}
-function consentStatus(fact){if(!fact)return'Не подписано';if(fact.status==='revoked')return'Отозвано';if(fact.status==='declined')return'Не подписано';return'Подписано'}
-function consentMoment(fact){const value=fact?.eventAt||fact?.revokedAt||fact?.acceptedAt||fact?.createdAt||'';return shortDateTime(value,'—')}
-function consentSource(source){if(source==='online-booking')return'Онлайн-запись';if(source==='online-booking-registration')return'Регистрация в системе';if(source==='manual')return'Вручную';return source||'—'}
-function consentEventTime(fact){const value=Date.parse(fact?.eventAt||fact?.revokedAt||fact?.acceptedAt||fact?.createdAt||0);return Number.isFinite(value)?value:0}
-function canonicalPhone(value){const digits=String(value||'').replace(/\D/g,'');if(digits.length===10)return`7${digits}`;if(digits.length===11&&digits.startsWith('8'))return`7${digits.slice(1)}`;return digits}
-function personIdentityMembers(person){const all=getAllPeople();if(!person?.uei)return[person];const members=all.filter(item=>item.uei===person.uei);return members.length?members:[person]}
-function currentConsentFacts(person,documentId){const members=personIdentityMembers(person);const accounts=new Set(members.flatMap(item=>Array.isArray(item.accounts)?item.accounts:[]).map(String).filter(Boolean));const phones=new Set(members.flatMap(item=>Array.isArray(item.phones)?item.phones:[]).map(canonicalPhone).filter(Boolean));const emails=new Set(members.flatMap(item=>Array.isArray(item.emails)?item.emails:[]).map(value=>String(value||'').trim().toLowerCase()).filter(Boolean));const telegrams=new Set(members.flatMap(item=>Array.isArray(item.telegrams)?item.telegrams:[]).map(value=>String(value||'').trim()).filter(Boolean));const relevant=getConsents().filter(fact=>{if(fact.documentId!==documentId)return false;if(documentId==='pdn-consent')return fact.subjectType==='ACCOUNT'&&accounts.has(String(fact.subjectKey||''));if(documentId!=='messages-consent'||fact.subjectType!=='CONTACT_POINT')return false;if(fact.contactType==='PHONE')return phones.has(canonicalPhone(fact.contactValue));if(fact.contactType==='EMAIL')return emails.has(String(fact.contactValue||'').trim().toLowerCase());if(fact.contactType==='TELEGRAM')return telegrams.has(String(fact.contactValue||'').trim());return false});const latestBySubject=new Map();for(const fact of relevant){const key=`${fact.subjectType}:${fact.subjectKey}:${fact.documentId}`;const previous=latestBySubject.get(key);if(!previous||consentEventTime(fact)>consentEventTime(previous))latestBySubject.set(key,fact)}return[...latestBySubject.values()]}
-function personConsentState(person,documentId){const facts=currentConsentFacts(person,documentId);const active=facts.filter(fact=>fact.status==='accepted').sort((a,b)=>consentEventTime(b)-consentEventTime(a));const inactive=facts.filter(fact=>fact.status!=='accepted').sort((a,b)=>consentEventTime(b)-consentEventTime(a));return{active:active.length>0,fact:active[0]||inactive[0]||null,count:facts.length}}
-function openPersonConsent(person,documentId){const documentItem=getDocuments().find(item=>item.id===documentId);const state=personConsentState(person,documentId);const fact=state.fact;const title=documentItem?.title||'Согласие';const status=state.active?'Подписано':consentStatus(fact);const version=fact?.documentVersion||documentItem?.version||1;const scope=documentId==='messages-consent'&&state.count>1?`<div><span>Контакты</span><strong>${escapeHtml(state.count)}</strong></div>`:'';const html=`<div class="modal-title"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(status)}</p></div><div class="entity-details"><div><span>Статус</span><strong>${escapeHtml(status)}</strong></div><div><span>Версия</span><strong>${escapeHtml(version)}</strong></div><div><span>Дата</span><strong>${escapeHtml(consentMoment(fact))}</strong></div><div><span>Источник</span><strong>${escapeHtml(consentSource(fact?.source))}</strong></div>${scope}</div>${fact?'':'<p class="muted">Подтверждение отсутствует.</p>'}`;mountModal(document.body,modal(html,{title,variant:'medium',surface:'app'}))}
-export function renderPeople(root){renderList(root)}
-export function openPerson({root=document.body,key,onClose}={}){if(!key)return null;const m=mountModal(root,modal('<div data-person-host></div>',{variant:'large',surface:'app'}));if(!m)return null;const host=m.querySelector('[data-person-host]');renderPerson(host,key,{embedded:true,onBack:()=>{m.remove();onClose?.()}});return m}
-function renderList(root){const items=getPeople(),mode=getPeopleSortMode();root.innerHTML=`${pageHeader('Люди','',items.length)}<div class="ui-list-toolbar"><div class="ui-list-toolbar__sort">${select({value:mode,options:sortOptions(),aria:'Сортировка',data:'data-sort'})}</div><div class="ui-list-toolbar__actions">${button('Excel',{className:'ui-button--secondary',data:'data-excel'})}${iconButton('+',{className:'icon-button--primary',data:'data-add',aria:'Добавить'})}</div></div>${listMarkup(sortItems(items,mode))}`;root.querySelector('[data-add]').onclick=()=>addMenu(root);root.querySelector('[data-excel]').onclick=()=>excelMenu(root);root.querySelector('[data-sort]').onchange=e=>{setPeopleSortMode(e.target.value);renderList(root)};root.querySelectorAll('[data-person]').forEach(b=>b.onclick=()=>renderPerson(root,b.dataset.person));}
-function listMarkup(items){if(!items.length)return emptyState('Людей пока нет','Добавьте человека кнопкой «+».');return listEntries(items.map(p=>{const display=personDisplay(p);return listEntry({overline:display.uei,title:display.name,subtitle:display.phone,image:p.photo||'',initial:initial(p),interactive:true,data:`data-person="${escapeHtml(p.key)}"`,aria:`Открыть профиль ${display.name}`})}))}
-function addMenu(root){const allowReal=canUseRealPersonalData();const m=mountModal(root,modal(`<div class="modal-title"><h2>Добавить</h2><p>${allowReal?'Выберите способ.':'В учебном режиме создавайте только вымышленные данные.'}</p></div><div class="modal-actions">${button('Создать',{data:'data-create'})}${allowReal?button('Добавить из контактов',{className:'ui-button--secondary',data:'data-contacts'}):''}</div>`,{variant:'compact'}));if(!m)return;m.querySelector('[data-create]').onclick=()=>{m.remove();createForm(root)};m.querySelector('[data-contacts]')?.addEventListener('click',()=>contacts(root,m))}
-function createForm(root,preset={}){openPersonCreate({root,preset,onCreated:()=>renderList(root)})}
-async function contacts(root,m){if(!navigator.contacts?.select){m.querySelector('.modal-title').insertAdjacentHTML('beforeend','<p class="form-error">Доступ к системным контактам не поддерживается этим браузером.</p>');return}try{const c=(await navigator.contacts.select(['name','tel'],{multiple:false}))[0];if(c){m.remove();createForm(root,{name:c.name?.[0]||'',phone:c.tel?.[0]||''})}}catch{}}
-function excelMenu(root){const allowReal=canUseRealPersonalData();const m=mountModal(root,modal(`<div class="modal-title"><h2>Excel</h2><p>${allowReal?'CSV с разделителем «;» совместим с Excel.':'Импорт реальных персональных данных недоступен во время первого знакомства и DEMO.'}</p></div><div class="modal-actions">${button('Выгрузить',{data:'data-export'})}${allowReal?button('Загрузить',{className:'ui-button--secondary',data:'data-import'}):''}${button('Шаблон',{className:'ui-button--secondary',data:'data-template'})}<input class="file-input" type="file" accept=".csv,text/csv" data-file></div>`,{variant:'compact'}));if(!m)return;m.querySelector('[data-export]').onclick=()=>{download(false);m.remove()};m.querySelector('[data-template]').onclick=()=>{download(true);m.remove()};m.querySelector('[data-import]')?.addEventListener('click',()=>m.querySelector('[data-file]').click());const file=m.querySelector('[data-file]');if(file)file.onchange=e=>importCsv(e.target.files?.[0],root,m)}
-function download(template){const h=['Имя','Фамилия','Телефон','Email'],rows=template?[]:getPeople().map(p=>[p.name,p.surname,p.phones?.[0],p.emails?.[0]]),text='\uFEFF'+[h,...rows].map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(';')).join('\r\n'),url=URL.createObjectURL(new Blob([text],{type:'text/csv;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download=template?'шаблон-люди.csv':'люди.csv';a.click();URL.revokeObjectURL(url)}
-function importCsv(file,root,m){if(!file)return;const r=new FileReader();r.onload=()=>{const rows=String(r.result).replace(/^\uFEFF/,'').split(/\r?\n/).filter(Boolean).map(x=>x.split(';').map(c=>c.replace(/^"|"$/g,'').replaceAll('""','"'))),all=getAllPeople();rows.slice(1).forEach(([n,s,phone,email])=>{if(!n||!phone)return;const p=createPerson(n,s,phone);if(email)p.emails=[email];all.push(p)});savePeople(all);m.remove();renderList(root)};r.readAsText(file,'utf-8')}
-function memberPeople(p,all){const members=getMembers(p.uei);if(members.length<=1)return[p];const ids=members.map(member=>member.startsWith('person:')?member.slice(7):member);return ids.map(id=>all.find(person=>person.key===id)).filter(Boolean)}
-function businessEntries(p,all,fieldName){const people=memberPeople(p,all),entries=[],seen=new Set();for(const person of people){for(const value of Array.isArray(person[fieldName])?person[fieldName]:[]){const text=String(value??'').trim();if(!text||seen.has(text))continue;seen.add(text);entries.push({value:text,source:person.key})}}return entries}
-function contactAnchor(person){const telegram=(person.telegrams||[]).map(v=>String(v||'').trim()).find(Boolean);if(telegram)return{value:person.key,label:telegram};const phone=(person.phones||[]).map(v=>String(v||'').trim()).find(Boolean);if(phone)return{value:person.key,label:phone};const email=(person.emails||[]).map(v=>String(v||'').trim()).find(Boolean);if(email)return{value:person.key,label:email};return null}
-function hasContact(person){return Boolean(contactAnchor(person))}
-function ueiData(p,all){const current=p.uei||getUEI('person',p.key)||'';const existing=getOptions('person',p.key);const members=getMembers(current);const detachable=members.map(member=>{const id=member.startsWith('person:')?member.slice(7):member;const person=all.find(x=>x.key===id);return person?contactAnchor(person):null}).filter(Boolean);return{value:current,existing,detachable,showApply:false}}
-function renderPerson(root,key,options={}){const all=getAllPeople(),p=all.find(x=>x.key===key);if(!p)return options.onBack?options.onBack():renderList(root);const currentUEI=p.uei||getUEI('person',p.key)||'';const memberCount=currentUEI?getMembers(currentUEI).length:0;const ueiValueLeft=currentUEI?`- ${currentUEI}`:'';const ueiCount=memberCount>1?String(memberCount):'';const items=[{title:'UEI',valueLeft:ueiValueLeft,value:ueiCount,content:uei(ueiData(p,all))},{title:'Личные данные',content:`<div class="form-grid">${photoField({name:'photo',value:p.photo||''})}${field({label:'Имя',name:'name',value:p.name,required:true})}${field({label:'Фамилия',name:'surname',value:p.surname})}${select({label:'Пол',name:'gender',value:p.gender||'',options:[{value:'',label:'Не указан'},{value:'female',label:'Женский'},{value:'male',label:'Мужской'}]})}${monthDayPicker({label:'Дата рождения',name:'birthDate',value:p.birthDate||''})}${field({label:'Скидка %',name:'discountPercent',value:p.discountPercent||'',type:'number',inputmode:'decimal'})}</div>`},{title:'Контактные данные',content:repeatedField({label:'Телефон',name:'phones',values:businessEntries(p,all,'phones'),type:'tel'})+repeatedField({label:'Telegram',name:'telegrams',values:businessEntries(p,all,'telegrams')})+repeatedField({label:'Email',name:'emails',values:businessEntries(p,all,'emails'),type:'email'})},{title:'Ссылки',content:links({links:p.links||[],name:'person-links'})},{title:'Ярлыки',content:tags({tags:getTags(),selected:p.tags||[],name:'person-tags'})}];const personMeta=getPersonMetadata(p.key);const meta=[{value:personMeta.recordCount,label:'записей'},{value:money(personMeta.paidTotal),label:'сумма'},{value:formatPersonVisitDate(personMeta.lastVisit),label:'посещение'}];const actions=options.embedded?button('Сохранить',{className:'accordion-save',data:'data-save'}):`${button('Сохранить',{className:'accordion-save',data:'data-save'})}${button('Назад',{className:'ui-button--secondary',data:'data-back'})}${button('Удалить',{variant:'danger',data:'data-delete'})}`;root.innerHTML=page([entityCard({id:p.uei,title:name(p),subtitle:p.phones?.[0]||'',image:p.photo||'',initial:initial(p),meta,className:'entity-card--hero'}),accordion(items),agreementBlock([{label:'Согласие ПДН',checked:personConsentState(p,'pdn-consent').active,interactive:true,data:'data-person-consent="pdn-consent"',aria:'Открыть статус согласия ПДН'},{label:'Согласие на рассылки',checked:personConsentState(p,'messages-consent').active,interactive:true,data:'data-person-consent="messages-consent"',aria:'Открыть статус согласия на рассылки'}]),actionBlock(actions)]);initPhotoField(root);initUEI(root);initMonthDayPickers(root);initLinks(root);initTags(root);initAccordions(root,{onDirty:()=>root.querySelector('[data-save]')?.classList.add('is-visible')});initRepeatedFields(root);root.querySelectorAll('[data-person-consent]').forEach(row=>row.addEventListener('click',()=>openPersonConsent(p,row.dataset.personConsent)));root.querySelector('[data-save]').onclick=()=>savePerson(root,p.key,options);root.querySelector('[data-back]')?.addEventListener('click',()=>options.onBack?options.onBack():renderList(root));root.querySelector('[data-delete]')?.addEventListener('click',()=>confirmDelete(root,p,options))}
-function confirmDelete(root,p,options={}){const m=mountModal(root,modal(`<div class="modal-title"><h2>Удалить?</h2><p>${escapeHtml(name(p)||'Человек')} будет удалён.</p></div><div class="modal-actions">${button('Удалить',{variant:'danger',data:'data-confirm-delete'})}${button('Отмена',{className:'ui-button--secondary',data:'data-cancel-delete'})}</div>`,{variant:'compact'}));if(!m)return;m.querySelector('[data-cancel-delete]').onclick=()=>m.remove();m.querySelector('[data-confirm-delete]').onclick=()=>deletePerson(root,p.key,m,options)}
-function deletePerson(root,key,m,options={}){const all=getAllPeople(),p=all.find(item=>item.key===key);if(!p){m?.remove();return options.onBack?options.onBack():renderList(root)}const current=getUEI('person',key)||p.uei||'';if(current)detachUEI({entityType:'person',entityId:key,uei:current,explicit:false});savePeople(all.filter(item=>item.key!==key));m?.remove();return options.onBack?options.onBack():renderList(root)}
-function saveBusinessEntries(all,ownerKey,fieldName,entries,memberKeys){const valuesBySource=new Map(memberKeys.map(key=>[key,[]]));for(const entry of entries){const source=memberKeys.includes(entry.source)?entry.source:ownerKey;if(!valuesBySource.has(source))valuesBySource.set(source,[]);if(!valuesBySource.get(source).includes(entry.value))valuesBySource.get(source).push(entry.value)}for(const key of memberKeys){const person=all.find(item=>item.key===key);if(person)person[fieldName]=valuesBySource.get(key)||[]}}
-function savePerson(root,key,options={}){const all=getAllPeople(),p=all.find(x=>x.key===key);if(!p)return;try{const oldUEI=p.uei;const memberKeys=(getMembers(oldUEI).map(member=>member.startsWith('person:')?member.slice(7):member));if(!memberKeys.length)memberKeys.push(key);p.name=root.querySelector('[name="name"]')?.value.trim()||p.name;p.surname=root.querySelector('[name="surname"]')?.value.trim()||'';p.photo=root.querySelector('[data-photo-value]')?.value||'';p.gender=root.querySelector('[name="gender"]')?.value||'';p.birthDate=root.querySelector('[name="birthDate"]')?.value||'';const rawDiscount=Number(String(root.querySelector('[name="discountPercent"]')?.value||'0').replace(',','.'));p.discountPercent=Number.isFinite(rawDiscount)?Math.max(0,Math.min(100,rawDiscount)):0;saveBusinessEntries(all,key,'phones',collectRepeatedEntries(root,'phones'),memberKeys);saveBusinessEntries(all,key,'telegrams',collectRepeatedEntries(root,'telegrams'),memberKeys);saveBusinessEntries(all,key,'emails',collectRepeatedEntries(root,'emails'),memberKeys);p.links=collectLinks(root,'person-links');p.tags=collectTags(root,'person-tags');const identifiers=[...(p.phones||[]),...(p.telegrams||[]),...(p.emails||[])];const value=root.querySelector('[name="uei"]')?.value||'';const linkValue=root.querySelector('[name="ueiLink"]')?.value||'';const detachValue=root.querySelector('[name="ueiDetach"]')?.value||'';if(detachValue){detachUEI({entityType:'person',entityId:detachValue,uei:oldUEI,explicit:true})}else if(linkValue&&!hasContact(p)){const targetMembers=getMembers(linkValue);const targetOwner=targetMembers[0]?.startsWith('person:')?targetMembers[0].slice(7):targetMembers[0];const remaining=all.filter(person=>person.key!==p.key);savePeople(remaining);renderPerson(root,targetOwner,options);return}else{applyUEI({entityType:'person',entityId:key,currentUEI:oldUEI,value,linkValue,identifiers})}savePeople(all);renderPerson(root,key,options)}catch(e){showError(e.message)}}
-function showError(message){mountModal(document.body,modal(`<div class="modal-title"><h2>Ошибка</h2><p>${escapeHtml(message)}</p></div>`,{variant:'compact'}))}
+const name = (person) => [person?.name, person?.surname].filter(Boolean).join(' ').trim() || 'Без имени';
+const money = (value) => new Intl.NumberFormat('ru-RU').format(Number(value || 0)) + ' ₽';
+const initial = (person) => name(person).slice(0, 1).toUpperCase() || '?';
+const initials = (person) => [person?.name, person?.surname].filter(Boolean).slice(0, 2).map((part) => String(part).slice(0, 1).toUpperCase()).join('') || '?';
+
+function notifyContext() {
+  window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+}
+
+function sortItems(items, mode) {
+  return [...items].sort((a, b) => {
+    if (mode.startsWith('name')) {
+      const compared = name(a).localeCompare(name(b), 'ru');
+      return mode === 'nameDesc' ? -compared : compared;
+    }
+    const av = a.lastVisit ? Date.parse(a.lastVisit) : 0;
+    const bv = b.lastVisit ? Date.parse(b.lastVisit) : 0;
+    return mode === 'lastDesc' ? bv - av : av - bv;
+  });
+}
+
+function sortOptions() {
+  return [
+    ['nameAsc', 'Имя ↑'],
+    ['nameDesc', 'Имя ↓'],
+    ['lastAsc', 'Последнее посещение ↑'],
+    ['lastDesc', 'Последнее посещение ↓'],
+  ].map(([value, label]) => ({ value, label }));
+}
+
+function consentStatus(fact) {
+  if (!fact) return 'Не подписано';
+  if (fact.status === 'revoked') return 'Отозвано';
+  if (fact.status === 'declined') return 'Не подписано';
+  return 'Подписано';
+}
+
+function consentMoment(fact) {
+  const value = fact?.eventAt || fact?.revokedAt || fact?.acceptedAt || fact?.createdAt || '';
+  return shortDateTime(value, '—');
+}
+
+function consentSource(source) {
+  if (source === 'online-booking') return 'Онлайн-запись';
+  if (source === 'online-booking-registration') return 'Регистрация в системе';
+  if (source === 'manual') return 'Вручную';
+  return source || '—';
+}
+
+function consentEventTime(fact) {
+  const value = Date.parse(fact?.eventAt || fact?.revokedAt || fact?.acceptedAt || fact?.createdAt || 0);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function canonicalPhone(value) {
+  const digits = String(value || '').replace(/\D/g, '');
+  if (digits.length === 10) return `7${digits}`;
+  if (digits.length === 11 && digits.startsWith('8')) return `7${digits.slice(1)}`;
+  return digits;
+}
+
+function personIdentityMembers(person) {
+  const all = getAllPeople();
+  if (!person?.uei) return [person];
+  const members = all.filter((item) => item.uei === person.uei);
+  return members.length ? members : [person];
+}
+
+function currentConsentFacts(person, documentId) {
+  const members = personIdentityMembers(person);
+  const accounts = new Set(members.flatMap((item) => Array.isArray(item.accounts) ? item.accounts : []).map(String).filter(Boolean));
+  const phones = new Set(members.flatMap((item) => Array.isArray(item.phones) ? item.phones : []).map(canonicalPhone).filter(Boolean));
+  const emails = new Set(members.flatMap((item) => Array.isArray(item.emails) ? item.emails : []).map((value) => String(value || '').trim().toLowerCase()).filter(Boolean));
+  const telegrams = new Set(members.flatMap((item) => Array.isArray(item.telegrams) ? item.telegrams : []).map((value) => String(value || '').trim()).filter(Boolean));
+  const relevant = getConsents().filter((fact) => {
+    if (fact.documentId !== documentId) return false;
+    if (documentId === 'pdn-consent') return fact.subjectType === 'ACCOUNT' && accounts.has(String(fact.subjectKey || ''));
+    if (documentId !== 'messages-consent' || fact.subjectType !== 'CONTACT_POINT') return false;
+    if (fact.contactType === 'PHONE') return phones.has(canonicalPhone(fact.contactValue));
+    if (fact.contactType === 'EMAIL') return emails.has(String(fact.contactValue || '').trim().toLowerCase());
+    if (fact.contactType === 'TELEGRAM') return telegrams.has(String(fact.contactValue || '').trim());
+    return false;
+  });
+  const latestBySubject = new Map();
+  for (const fact of relevant) {
+    const key = `${fact.subjectType}:${fact.subjectKey}:${fact.documentId}`;
+    const previous = latestBySubject.get(key);
+    if (!previous || consentEventTime(fact) > consentEventTime(previous)) latestBySubject.set(key, fact);
+  }
+  return [...latestBySubject.values()];
+}
+
+function personConsentState(person, documentId) {
+  const facts = currentConsentFacts(person, documentId);
+  const active = facts.filter((fact) => fact.status === 'accepted').sort((a, b) => consentEventTime(b) - consentEventTime(a));
+  const inactive = facts.filter((fact) => fact.status !== 'accepted').sort((a, b) => consentEventTime(b) - consentEventTime(a));
+  return { active: active.length > 0, fact: active[0] || inactive[0] || null, count: facts.length };
+}
+
+function openPersonConsent(root, person, documentId) {
+  const documentItem = getDocuments().find((item) => item.id === documentId);
+  const state = personConsentState(person, documentId);
+  const fact = state.fact;
+  const title = documentItem?.title || 'Согласие';
+  const status = state.active ? 'Подписано' : consentStatus(fact);
+  const version = fact?.documentVersion || documentItem?.version || 1;
+  const scope = documentId === 'messages-consent' && state.count > 1
+    ? `<div><span>Контакты</span><strong>${escapeHtml(state.count)}</strong></div>`
+    : '';
+  const html = `<div class="modal-title"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(status)}</p></div>
+    <div class="entity-details">
+      <div><span>Статус</span><strong>${escapeHtml(status)}</strong></div>
+      <div><span>Версия</span><strong>${escapeHtml(version)}</strong></div>
+      <div><span>Дата</span><strong>${escapeHtml(consentMoment(fact))}</strong></div>
+      <div><span>Источник</span><strong>${escapeHtml(consentSource(fact?.source))}</strong></div>
+      ${scope}
+    </div>
+    ${fact ? '' : '<p class="muted">Подтверждение отсутствует.</p>'}`;
+  mountModal(root, modal(html, { title, variant: 'standard', surface: 'app' }));
+}
+
+function filterPeople(items, query = '') {
+  const needle = String(query || '').trim().toLocaleLowerCase('ru');
+  if (!needle) return items;
+  return items.filter((person) => {
+    const display = personDisplay(person);
+    return display.name.toLocaleLowerCase('ru').includes(needle)
+      || String(display.uei || '').toLocaleLowerCase('ru').includes(needle);
+  });
+}
+
+function listMarkup(items, query = '') {
+  if (!items.length) {
+    return query
+      ? emptyState('Ничего не найдено', 'Проверьте имя или UEI.')
+      : emptyState('Клиентов пока нет', 'Добавьте человека кнопкой «+».');
+  }
+  return listEntries(items.map((person) => {
+    const display = personDisplay(person);
+    return listEntry({
+      overline: display.uei,
+      title: display.name,
+      subtitle: display.phone,
+      image: person.photo || '',
+      initial: initial(person),
+      interactive: true,
+      data: `data-person="${escapeHtml(person.key)}"`,
+      aria: `Открыть ${display.name}`,
+    });
+  }));
+}
+
+function refreshPeopleList(root) {
+  const host = root.querySelector('[data-people-list-host]');
+  if (!host) return;
+  const query = root.querySelector('[data-people-search]')?.value || '';
+  const items = filterPeople(sortItems(getPeople(), getPeopleSortMode()), query);
+  host.innerHTML = listMarkup(items, query);
+  host.querySelectorAll('[data-person]').forEach((node) => {
+    node.addEventListener('click', () => openPersonOverview(root, node.dataset.person, root.peopleOptions || {}));
+  });
+}
+
+function listContext(count) {
+  return workspaceHeaderContext({
+    title: 'Клиенты',
+    a: {
+      kind: 'text',
+      label: String(count),
+      data: 'data-people-list-settings',
+      aria: `Клиентов: ${count}. Сортировка и Excel`,
+    },
+  });
+}
+
+export function renderPeople(root, options = {}) {
+  root.peopleOptions = options;
+  const count = getPeople().length;
+  root.innerHTML = page([
+    listContext(count),
+    `<section class="people-z1">
+      <div class="people-search">
+        ${field({ name: 'peopleSearch', type: 'search', placeholder: 'Поиск по имени или UEI', autocomplete: 'off', data: 'data-people-search' })}
+      </div>
+      <div class="people-search-divider" aria-hidden="true"></div>
+      <div class="people-list-host" data-people-list-host></div>
+    </section>`,
+    button('+', {
+      className: 'v2-primary-source-only',
+      data: 'data-add data-v2-primary-action data-v2-primary-label="+"',
+      aria: 'Добавить клиента',
+    }),
+  ]);
+  refreshPeopleList(root);
+  root.querySelector('[data-people-search]')?.addEventListener('input', () => refreshPeopleList(root));
+  root.querySelector('[data-people-list-settings]')?.addEventListener('click', () => openListSettings(root, options));
+  root.querySelector('[data-add]')?.addEventListener('click', () => openCreateZ2(root, options));
+}
+
+function openListSettings(root, options = {}) {
+  const allowReal = canUseRealPersonalData();
+  const content = `<div class="people-list-settings">
+    ${select({ label: 'Сортировка', value: getPeopleSortMode(), options: sortOptions(), aria: 'Сортировка', data: 'data-people-sort-settings' })}
+    <div class="people-list-settings__actions">
+      ${button('Выгрузить', { variant: 'secondary', data: 'data-export' })}
+      ${button('Загрузить', { variant: 'secondary', data: 'data-import', disabled: !allowReal })}
+      ${button('Шаблон', { variant: 'secondary', data: 'data-template' })}
+      <input class="file-input" type="file" accept=".csv,text/csv" data-file>
+    </div>
+    ${allowReal ? '' : '<p class="muted">Импорт реальных персональных данных недоступен в текущем режиме.</p>'}
+  </div>`;
+  const layer = mountModal(root, modal(content, { title: 'Клиенты', variant: 'quick', surface: 'app' }));
+  if (!layer) return;
+  layer.querySelector('[data-people-sort-settings]')?.addEventListener('change', (event) => {
+    setPeopleSortMode(event.target.value);
+    refreshPeopleList(root);
+  });
+  layer.querySelector('[data-export]')?.addEventListener('click', () => downloadCsv(false));
+  layer.querySelector('[data-template]')?.addEventListener('click', () => downloadCsv(true));
+  layer.querySelector('[data-import]')?.addEventListener('click', () => layer.querySelector('[data-file]')?.click());
+  layer.querySelector('[data-file]')?.addEventListener('change', (event) => {
+    importCsv(event.target.files?.[0], () => {
+      layer.v2Close?.();
+      renderPeople(root, options);
+    });
+  });
+}
+
+function downloadCsv(template) {
+  const headers = ['Имя', 'Фамилия', 'Телефон', 'Email'];
+  const rows = template ? [] : getPeople().map((person) => [person.name, person.surname, person.phones?.[0], person.emails?.[0]]);
+  const text = '\uFEFF' + [headers, ...rows]
+    .map((row) => row.map((value) => `"${String(value ?? '').replaceAll('"', '""')}"`).join(';'))
+    .join('\r\n');
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = template ? 'шаблон-люди.csv' : 'люди.csv';
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function importCsv(file, onDone) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const rows = String(reader.result)
+      .replace(/^\uFEFF/, '')
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .map((line) => line.split(';').map((cell) => cell.replace(/^"|"$/g, '').replaceAll('""', '"')));
+    const all = getAllPeople();
+    rows.slice(1).forEach(([firstName, surname, phone, email]) => {
+      if (!firstName || !phone) return;
+      const person = createPerson(firstName, surname, phone);
+      if (email) person.emails = [email];
+      all.push(person);
+    });
+    savePeople(all);
+    onDone?.();
+  };
+  reader.readAsText(file, 'utf-8');
+}
+
+function openCreateZ2(root, options = {}) {
+  const layer = mountV2ZLayer(root, v2ZLayer(page([
+    workspaceHeaderContext({ title: 'Новый клиент', hideD: true }),
+    personCreateForm(),
+  ]), { className: 'people-create-layer' }), { stack: true });
+  if (!layer) return null;
+  const submit = layer.querySelector('[data-person-create-form] button[type="submit"]');
+  if (submit) {
+    submit.classList.add('v2-primary-source-only');
+    submit.dataset.v2PrimaryAction = '';
+    submit.dataset.v2PrimaryLabel = 'Сохранить';
+  }
+  bindPersonCreateForm(layer, {
+    onCreated: (person) => {
+      layer.v2Close?.();
+      renderPeople(root, options);
+      openPersonOverview(root, person.key, options);
+    },
+  });
+  notifyContext();
+  return layer;
+}
+
+function personContext(person) {
+  return workspaceHeaderContext({
+    title: name(person),
+    a: {
+      kind: 'avatar',
+      image: person.photo || '',
+      initials: initials(person),
+      data: 'data-person-settings',
+      aria: `Настройки ${name(person)}`,
+    },
+    d: {
+      kind: 'chat',
+      data: 'data-person-direct-chat',
+      aria: `Чат с ${name(person)}`,
+    },
+  });
+}
+
+function bindPersonContext(root, person, options = {}, { onIdentityChange = null } = {}) {
+  root.querySelector('[data-person-settings]')?.addEventListener('click', () => {
+    openPersonSettings(root, person.key, {
+      onIdentityChange: (nextKey) => onIdentityChange?.(nextKey),
+    });
+  });
+  root.querySelector('[data-person-direct-chat]')?.addEventListener('click', () => {
+    options.onDirectChat?.(person.key);
+  });
+}
+
+function metricRail(person) {
+  const meta = getPersonMetadata(person.key);
+  const items = [
+    { value: String(meta.recordCount), label: 'записей' },
+    { value: money(meta.paidTotal), label: 'сумма' },
+    { value: formatPersonVisitDate(meta.lastVisit), label: 'посещение' },
+  ];
+  return v2HorizontalRail(items.map((item) => v2RailCard({
+    title: item.value,
+    subtitle: item.label,
+    className: 'people-metric-card',
+  })).join(''), { className: 'people-metrics' });
+}
+
+function overviewCard(person) {
+  const display = personDisplay(person);
+  return entityCard({
+    id: display.uei,
+    title: display.name,
+    subtitle: display.phone,
+    image: person.photo || '',
+    initial: initial(person),
+    interactive: true,
+    data: 'data-person-card',
+    className: 'entity-card--hero',
+    aria: `Открыть данные ${display.name}`,
+  });
+}
+
+function renderPersonOverview(layer, baseRoot, key, options = {}) {
+  const person = getAllPeople().find((item) => item.key === key);
+  if (!person) {
+    layer.v2Close?.();
+    renderPeople(baseRoot, options);
+    return;
+  }
+  layer.innerHTML = page([
+    personContext(person),
+    `<section class="people-overview">
+      <div>${metricRail(person)}</div>
+      <div class="people-card-wrap">${overviewCard(person)}</div>
+    </section>`,
+  ]);
+  bindPersonContext(layer, person, options, {
+    onIdentityChange: (nextKey) => renderPersonOverview(layer, baseRoot, nextKey || key, options),
+  });
+  layer.querySelector('[data-person-card]')?.addEventListener('click', () => {
+    openPersonEdit(layer, baseRoot, person.key, options, {
+      onSaved: () => renderPersonOverview(layer, baseRoot, person.key, options),
+      onDeleted: () => {
+        layer.v2Close?.();
+        renderPeople(baseRoot, options);
+      },
+    });
+  });
+  notifyContext();
+}
+
+function openPersonOverview(root, key, options = {}) {
+  if (!key) return null;
+  const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'people-overview-layer' }), {
+    stack: true,
+    onClose: options.onClose || null,
+  });
+  if (!layer) return null;
+  renderPersonOverview(layer, root, key, options);
+  return layer;
+}
+
+export function openPerson({ root = document.body, key, onClose, onDirectChat } = {}) {
+  return openPersonOverview(root, key, { onClose, onDirectChat });
+}
+
+function memberPeople(person, all) {
+  const members = getMembers(person.uei);
+  if (members.length <= 1) return [person];
+  const ids = members.map((member) => member.startsWith('person:') ? member.slice(7) : member);
+  return ids.map((id) => all.find((item) => item.key === id)).filter(Boolean);
+}
+
+function businessEntries(person, all, fieldName) {
+  const people = memberPeople(person, all);
+  const entries = [];
+  const seen = new Set();
+  for (const member of people) {
+    for (const value of Array.isArray(member[fieldName]) ? member[fieldName] : []) {
+      const text = String(value ?? '').trim();
+      if (!text || seen.has(text)) continue;
+      seen.add(text);
+      entries.push({ value: text, source: member.key });
+    }
+  }
+  return entries;
+}
+
+function contactAnchor(person) {
+  const telegram = (person.telegrams || []).map((value) => String(value || '').trim()).find(Boolean);
+  if (telegram) return { value: person.key, label: telegram };
+  const phone = (person.phones || []).map((value) => String(value || '').trim()).find(Boolean);
+  if (phone) return { value: person.key, label: phone };
+  const email = (person.emails || []).map((value) => String(value || '').trim()).find(Boolean);
+  if (email) return { value: person.key, label: email };
+  return null;
+}
+
+function hasContact(person) {
+  return Boolean(contactAnchor(person));
+}
+
+function ueiData(person, all) {
+  const current = person.uei || getUEI('person', person.key) || '';
+  const existing = getOptions('person', person.key);
+  const members = getMembers(current);
+  const detachable = members.map((member) => {
+    const id = member.startsWith('person:') ? member.slice(7) : member;
+    const item = all.find((candidate) => candidate.key === id);
+    return item ? contactAnchor(item) : null;
+  }).filter(Boolean);
+  return {
+    value: current,
+    existing,
+    detachable,
+    memberCount: members.length,
+    showApply: false,
+  };
+}
+
+function settingsCards(person) {
+  const pdn = personConsentState(person, 'pdn-consent');
+  const messages = personConsentState(person, 'messages-consent');
+  const members = person.uei ? getMembers(person.uei).length : 0;
+  return `<div class="people-person-settings">
+    ${miniCard({
+      title: 'UEI',
+      value: person.uei || 'Не присвоен',
+      subtitle: members > 1 ? `Связано профилей: ${members}` : 'Идентификатор человека',
+      interactive: true,
+      data: 'data-person-uei-card',
+      aria: 'Настроить UEI',
+    })}
+    ${miniCard({
+      title: 'Согласия',
+      rows: [
+        { label: 'Согласие ПДН', checked: pdn.active, data: 'data-person-consent="pdn-consent"', aria: 'Открыть согласие ПДН' },
+        { label: 'Согласие на рассылки', checked: messages.active, data: 'data-person-consent="messages-consent"', aria: 'Открыть согласие на рассылки' },
+      ],
+    })}
+  </div>`;
+}
+
+function bindSettingsCards(modalRoot, key, { onIdentityChange = null } = {}) {
+  const person = getAllPeople().find((item) => item.key === key);
+  if (!person) {
+    modalRoot.v2Close?.();
+    return;
+  }
+  const host = modalRoot.querySelector('[data-person-settings-host]');
+  if (!host) return;
+  host.innerHTML = settingsCards(person);
+  host.querySelector('[data-person-uei-card]')?.addEventListener('click', () => {
+    openPersonUeiQuick(modalRoot, person.key, (nextKey) => {
+      if (nextKey && nextKey !== person.key) {
+        modalRoot.v2Close?.();
+        onIdentityChange?.(nextKey);
+        return;
+      }
+      bindSettingsCards(modalRoot, person.key, { onIdentityChange });
+      onIdentityChange?.(person.key);
+    });
+  });
+  host.querySelectorAll('[data-person-consent]').forEach((row) => {
+    row.addEventListener('click', () => openPersonConsent(modalRoot, person, row.dataset.personConsent));
+  });
+}
+
+function openPersonSettings(root, key, { onIdentityChange = null } = {}) {
+  const layer = mountModal(root, modal('<div data-person-settings-host></div>', {
+    title: 'Настройки клиента',
+    variant: 'standard',
+    surface: 'app',
+  }));
+  if (!layer) return null;
+  bindSettingsCards(layer, key, { onIdentityChange });
+  return layer;
+}
+
+function openPersonUeiQuick(root, key, onChanged = () => {}) {
+  const all = getAllPeople();
+  const person = all.find((item) => item.key === key);
+  if (!person) return;
+  const current = person.uei || getUEI('person', person.key) || '';
+  const identifiers = [...(person.phones || []), ...(person.telegrams || []), ...(person.emails || [])];
+  const layer = mountModal(root, modal(`<div class="people-uei-sheet">${uei(ueiData(person, all))}<div class="form-error" data-uei-error></div></div>`, {
+    title: 'UEI',
+    variant: 'quick',
+    surface: 'app',
+  }));
+  if (!layer) return;
+  initUEI(layer);
+  let committing = false;
+
+  const fail = (error) => {
+    committing = false;
+    const node = layer.querySelector('[data-uei-error]');
+    if (node) node.textContent = error instanceof Error ? error.message : 'Не удалось изменить UEI';
+  };
+
+  const finish = (nextKey = key) => {
+    if (committing) return;
+    committing = true;
+    try {
+      savePeople(all);
+      layer.v2Close?.();
+      onChanged(nextKey);
+    } catch (error) {
+      fail(error);
+    }
+  };
+
+  const assign = () => {
+    if (committing) return;
+    const value = String(layer.querySelector('[name="uei"]')?.value || '').trim();
+    if (!value) return;
+    try {
+      applyUEI({
+        entityType: 'person',
+        entityId: key,
+        currentUEI: current,
+        value,
+        linkValue: '',
+        identifiers,
+      });
+      finish(key);
+    } catch (error) {
+      fail(error);
+    }
+  };
+
+  const link = (linkValue) => {
+    if (committing || !linkValue) return;
+    try {
+      if (!hasContact(person)) {
+        const targetMembers = getMembers(linkValue);
+        const targetOwner = targetMembers[0]?.startsWith('person:') ? targetMembers[0].slice(7) : targetMembers[0];
+        savePeople(all.filter((item) => item.key !== person.key));
+        committing = true;
+        layer.v2Close?.();
+        onChanged(targetOwner || key);
+        return;
+      }
+      applyUEI({
+        entityType: 'person',
+        entityId: key,
+        currentUEI: current,
+        value: String(layer.querySelector('[name="uei"]')?.value || ''),
+        linkValue,
+        identifiers,
+      });
+      finish(key);
+    } catch (error) {
+      fail(error);
+    }
+  };
+
+  const detach = (entityId) => {
+    if (committing || !entityId) return;
+    try {
+      detachUEI({ entityType: 'person', entityId, uei: current, explicit: true });
+      finish(key);
+    } catch (error) {
+      fail(error);
+    }
+  };
+
+  const valueInput = layer.querySelector('[name="uei"]');
+  valueInput?.addEventListener('input', () => {
+    if (String(valueInput.value || '').trim().length === 4) assign();
+  });
+  valueInput?.addEventListener('change', assign);
+  valueInput?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      assign();
+    }
+  });
+  layer.querySelector('[name="ueiLink"]')?.addEventListener('change', (event) => link(event.target.value));
+  layer.querySelector('[name="ueiDetach"]')?.addEventListener('change', (event) => detach(event.target.value));
+}
+
+function personDataFields(person, all) {
+  return [
+    v2Section('Личные данные', `<div class="form-grid">
+      ${photoField({ name: 'photo', value: person.photo || '' })}
+      ${field({ label: 'Имя', name: 'name', value: person.name, required: true })}
+      ${field({ label: 'Фамилия', name: 'surname', value: person.surname })}
+      ${select({ label: 'Пол', name: 'gender', value: person.gender || '', options: [
+        { value: '', label: 'Не указан' },
+        { value: 'female', label: 'Женский' },
+        { value: 'male', label: 'Мужской' },
+      ] })}
+      ${monthDayPicker({ label: 'Дата рождения', name: 'birthDate', value: person.birthDate || '' })}
+      ${field({ label: 'Скидка %', name: 'discountPercent', value: person.discountPercent || '', type: 'number', inputmode: 'decimal' })}
+    </div>`),
+    v2Section('Контактные данные',
+      repeatedField({ label: 'Телефон', name: 'phones', values: businessEntries(person, all, 'phones'), type: 'tel' })
+      + repeatedField({ label: 'Telegram', name: 'telegrams', values: businessEntries(person, all, 'telegrams') })
+      + repeatedField({ label: 'Email', name: 'emails', values: businessEntries(person, all, 'emails'), type: 'email' })),
+    v2Section('Ссылки', links({ links: person.links || [], name: 'person-links' })),
+    v2Section('Ярлыки', tags({ tags: getTags(), selected: person.tags || [], name: 'person-tags' })),
+  ].join('');
+}
+
+function formSnapshot(form) {
+  if (!form) return '';
+  return JSON.stringify([...new FormData(form).entries()].map(([key, value]) => [key, typeof value === 'string' ? value : '']));
+}
+
+function saveBusinessEntries(all, ownerKey, fieldName, entries, memberKeys) {
+  const valuesBySource = new Map(memberKeys.map((key) => [key, []]));
+  for (const entry of entries) {
+    const source = memberKeys.includes(entry.source) ? entry.source : ownerKey;
+    if (!valuesBySource.has(source)) valuesBySource.set(source, []);
+    if (!valuesBySource.get(source).includes(entry.value)) valuesBySource.get(source).push(entry.value);
+  }
+  for (const key of memberKeys) {
+    const person = all.find((item) => item.key === key);
+    if (person) person[fieldName] = valuesBySource.get(key) || [];
+  }
+}
+
+function savePersonData(root, key) {
+  const all = getAllPeople();
+  const person = all.find((item) => item.key === key);
+  if (!person) throw new Error('Человек не найден');
+  const memberKeys = getMembers(person.uei).map((member) => member.startsWith('person:') ? member.slice(7) : member);
+  if (!memberKeys.length) memberKeys.push(key);
+  person.name = root.querySelector('[name="name"]')?.value.trim() || person.name;
+  person.surname = root.querySelector('[name="surname"]')?.value.trim() || '';
+  person.photo = root.querySelector('[data-photo-value]')?.value || '';
+  person.gender = root.querySelector('[name="gender"]')?.value || '';
+  person.birthDate = root.querySelector('[name="birthDate"]')?.value || '';
+  const rawDiscount = Number(String(root.querySelector('[name="discountPercent"]')?.value || '0').replace(',', '.'));
+  person.discountPercent = Number.isFinite(rawDiscount) ? Math.max(0, Math.min(100, rawDiscount)) : 0;
+  saveBusinessEntries(all, key, 'phones', collectRepeatedEntries(root, 'phones'), memberKeys);
+  saveBusinessEntries(all, key, 'telegrams', collectRepeatedEntries(root, 'telegrams'), memberKeys);
+  saveBusinessEntries(all, key, 'emails', collectRepeatedEntries(root, 'emails'), memberKeys);
+  person.links = collectLinks(root, 'person-links');
+  person.tags = collectTags(root, 'person-tags');
+  savePeople(all);
+  return getAllPeople().find((item) => item.key === key) || person;
+}
+
+function deletePersonByKey(key) {
+  const all = getAllPeople();
+  const person = all.find((item) => item.key === key);
+  if (!person) return;
+  const current = getUEI('person', key) || person.uei || '';
+  if (current) detachUEI({ entityType: 'person', entityId: key, uei: current, explicit: false });
+  savePeople(all.filter((item) => item.key !== key));
+}
+
+function confirmDelete(root, person, onDeleted) {
+  const layer = mountModal(root, modal(`<div class="modal-title"><h2>Удалить?</h2><p>${escapeHtml(name(person))} будет удалён.</p></div>
+    <div class="modal-actions">
+      ${button('Удалить', { variant: 'danger', data: 'data-confirm-delete' })}
+      ${button('Отмена', { variant: 'secondary', data: 'data-cancel-delete' })}
+    </div>`, { title: 'Удалить', variant: 'compact', surface: 'app' }));
+  if (!layer) return;
+  layer.querySelector('[data-cancel-delete]')?.addEventListener('click', () => layer.v2Close?.());
+  layer.querySelector('[data-confirm-delete]')?.addEventListener('click', () => {
+    deletePersonByKey(person.key);
+    layer.v2Close?.();
+    onDeleted?.();
+  });
+}
+
+function openPersonEdit(parentLayer, baseRoot, key, options = {}, callbacks = {}) {
+  const person = getAllPeople().find((item) => item.key === key);
+  if (!person) return null;
+  const all = getAllPeople();
+  const layer = mountV2ZLayer(parentLayer, v2ZLayer(page([
+    personContext(person),
+    `<form class="people-edit-form" data-person-edit-form>
+      ${personDataFields(person, all)}
+      ${button('Удалить', {
+        type: 'button',
+        className: 'v2-primary-source-only ui-button--danger',
+        data: 'data-person-z3-action data-v2-primary-action data-v2-primary-variant="danger"',
+        aria: 'Удалить клиента',
+      })}
+      <div class="form-error" data-person-edit-error></div>
+    </form>`,
+  ]), { className: 'people-edit-layer' }), { stack: true });
+  if (!layer) return null;
+
+  initPhotoField(layer);
+  initMonthDayPickers(layer);
+  initLinks(layer);
+  initTags(layer);
+  initRepeatedFields(layer);
+
+  const form = layer.querySelector('[data-person-edit-form]');
+  const action = layer.querySelector('[data-person-z3-action]');
+  const initialState = formSnapshot(form);
+
+  const isDirty = () => formSnapshot(form) !== initialState;
+  const syncAction = () => {
+    const dirty = isDirty();
+    if (!action) return;
+    action.textContent = dirty ? 'Сохранить' : 'Удалить';
+    action.classList.toggle('ui-button--danger', !dirty);
+    action.dataset.v2PrimaryVariant = dirty ? '' : 'danger';
+    action.setAttribute('aria-label', dirty ? 'Сохранить изменения' : 'Удалить клиента');
+    notifyContext();
+  };
+
+  const save = () => {
+    if (!isDirty()) return;
+    try {
+      savePersonData(layer, key);
+      layer.v2Close?.();
+      callbacks.onSaved?.();
+    } catch (error) {
+      const node = layer.querySelector('[data-person-edit-error]');
+      if (node) node.textContent = error instanceof Error ? error.message : 'Не удалось сохранить';
+    }
+  };
+
+  action?.addEventListener('click', () => {
+    if (isDirty()) {
+      save();
+      return;
+    }
+    confirmDelete(layer, person, () => {
+      layer.v2Close?.();
+      callbacks.onDeleted?.();
+    });
+  });
+  form?.addEventListener('input', syncAction);
+  form?.addEventListener('change', syncAction);
+  form?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    save();
+  });
+  bindPersonContext(layer, person, options, {
+    onIdentityChange: (nextKey) => {
+      if (!nextKey || nextKey === key) return;
+      layer.v2Close?.();
+      renderPersonOverview(parentLayer, baseRoot, nextKey, options);
+    },
+  });
+  syncAction();
+  return layer;
+}
