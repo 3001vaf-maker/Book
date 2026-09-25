@@ -118,7 +118,13 @@ async function renderPublicBooking(route) {
   app.classList.add('app-shell--booking');
   app.innerHTML = '<main class="booking-content" id="app-content"></main>';
   disposeView = await startAccountRuntime(route);
-  await renderOnlineBooking(document.querySelector('#app-content'), route);
+  await renderOnlineBooking(document.querySelector('#app-content'), {
+    ...route,
+    onExitToAccount: () => {
+      history.replaceState({}, '', location.pathname);
+      void renderGlobalClientRoot();
+    },
+  });
   syncViewport();
 }
 
