@@ -113,7 +113,7 @@ for (const file of runtimeJsFiles) {
 for (const file of runtimeJsFiles) {
   if (file === 'ui/v2/index.js' || file === 'ui/ui.js') continue;
   const source = fs.readFileSync(file, 'utf8');
-  expect(!/\\binitV2DeckSwipe\\s*\\(/.test(source), `Runtime code must not bind the legacy deck swipe owner outside Shared V2: ${file}.`);
+  expect(!/\binitV2DeckSwipe\s*\(/.test(source), `Runtime code must not bind the legacy deck swipe owner outside Shared V2: ${file}.`);
 }
 
 for (const file of workspaceJsFiles) {
@@ -187,7 +187,7 @@ expect(ui.includes("const leftOrDownLeft = dx < -5 && dy >= -8;") && ui.includes
 expect(ui.includes('directPickThreshold = 14') && ui.includes('directDistance >= directPickThreshold') && ui.includes('current.dy >= directPickThreshold'), 'F/E direct selection must require a physical pull and must not turn folder taps into click navigation.');
 expect(ui.includes("const downOnly = dy > 5") && ui.includes("gesture.axis = 'e'") && ui.includes("--v2-e-drag-y") && !ui.slice(ui.indexOf('export function initV2WorkspaceInteraction'), ui.indexOf('export function initV2StickerSwipe')).includes('--v2-e-drag-x'), 'E must be owned by the same workspace gesture owner and move only downward.');
 expect(ui.includes("stage.addEventListener('pointerdown', down)") && ui.includes("stage.addEventListener('pointermove', move") && !ui.slice(ui.indexOf('export function initV2WorkspaceInteraction'), ui.indexOf('export function initV2StickerSwipe')).includes('initV2DeckSwipe(') && !ui.slice(ui.indexOf('export function initV2WorkspaceInteraction'), ui.indexOf('export function initV2StickerSwipe')).includes('initV2Swipe('), 'Workspace F/E/Z must have one stage pointer owner with no delegated competing swipe owners.');
-expect(ui.includes('data-v2-front') && css.includes('.v2-fe-deck{') && css.includes('transform:none;') && !/\\.v2-app\\.is-deck-open[^\\{]*\\.v2-z[^\\{]*\\{[^}]*transform:/s.test(css), 'FE must stay pinned to the left while only the shared H+Z front layer moves; Z may not slide independently over cards.');
+expect(ui.includes('data-v2-front') && css.includes('.v2-fe-deck{') && css.includes('transform:none;') && !/\.v2-app\.is-deck-open[^\{]*\.v2-z[^\{]*\{[^}]*transform:/s.test(css), 'FE must stay pinned to the left while only the shared H+Z front layer moves; Z may not slide independently over cards.');
 expect(ui.includes('ownsHorizontalGesture') && ui.includes("overflowX === 'auto'") && ui.includes("touchAction.includes('pan-x')"), 'Closed Z must yield to nested horizontal rails instead of stealing their gestures.');
 expect(ui.includes("current.openAtStart && distance < 7") && ui.includes('setOpen(false);'), 'When FE is open, a tap on Z must open the page without activating controls underneath.');
 expect(core.includes('initV2WorkspaceInteraction(shell') && core.includes('eActiveId: childActive') && core.includes('onSecondarySelect: (id) => selectSecondary(id)'), 'Workspace must route F/E/Z interaction through the single Shared workspace owner.');
