@@ -108,6 +108,7 @@ function bookingRoute() {
     tenantId,
     workplaceKey: String(params.get('workplace') || '').trim(),
     telegramEntry: String(params.get('tg_entry') || '').trim(),
+    entry: String(params.get('entry') || '').trim(),
   };
 }
 
