@@ -22,22 +22,30 @@ export function miniCard({
   image = '',
   imagePosition = '50% 50%',
   initials = '',
+  surface = 'default',
+  actionLabel = '',
   interactive = false,
   data = '',
   aria = '',
   className = '',
 } = {}) {
   const tag = interactive ? 'button' : 'section';
-  const classes = ['mini-card', interactive ? 'mini-card--interactive' : '', image ? 'has-image' : '', className].filter(Boolean).join(' ');
+  const resolvedSurface = surface === 'photo' ? 'photo' : 'default';
+  const classes = ['mini-card', `mini-card--surface-${resolvedSurface}`, interactive ? 'mini-card--interactive' : '', image ? 'has-image' : '', className].filter(Boolean).join(' ');
+  const surfaceStyle = resolvedSurface === 'photo' && image
+    ? ` style="--mini-card-surface-image:url('${escapeHtml(image)}');--mini-card-image-position:${escapeHtml(imagePosition)}"`
+    : '';
   const actionAttrs = interactive ? ` type="button"${attrs(data, aria || title)}` : '';
   const rowItems = Array.isArray(rows) ? rows : [];
-  const media = image
-    ? `<span class="mini-card__media" style="--mini-card-image:url('${escapeHtml(image)}');--mini-card-image-position:${escapeHtml(imagePosition)}" aria-hidden="true"></span>`
-    : initials
-      ? `<span class="mini-card__media mini-card__media--initials" aria-hidden="true">${escapeHtml(initials)}</span>`
-      : '';
+  const media = resolvedSurface === 'default'
+    ? (image
+      ? `<span class="mini-card__media" style="--mini-card-image:url('${escapeHtml(image)}');--mini-card-image-position:${escapeHtml(imagePosition)}" aria-hidden="true"></span>`
+      : initials
+        ? `<span class="mini-card__media mini-card__media--initials" aria-hidden="true">${escapeHtml(initials)}</span>`
+        : '')
+    : '';
 
-  return `<${tag} class="${escapeHtml(classes)}"${actionAttrs}>
+  return `<${tag} class="${escapeHtml(classes)}"${surfaceStyle}${actionAttrs}>
     <div class="mini-card__head">
       <span class="mini-card__copy">
         <strong class="mini-card__title">${escapeHtml(title)}</strong>
@@ -46,6 +54,7 @@ export function miniCard({
       </span>
       ${media}
     </div>
+    ${actionLabel ? `<span class="mini-card__context-action">${escapeHtml(actionLabel)}</span>` : ''}
     ${rowItems.length ? `<div class="mini-card__rows">${rowItems.map(rowMarkup).join('')}</div>` : ''}
   </${tag}>`;
 }
