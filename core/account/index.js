@@ -142,6 +142,17 @@ export async function updateGlobalAccount(data) {
   );
 }
 
+export async function changeGlobalAccountPassword(currentPassword, newPassword) {
+  return jsonResponse(
+    await request('/online-booking/account/password', {
+      auth: true,
+      method: 'PUT',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    }),
+    'Не удалось изменить пароль',
+  );
+}
+
 export async function getGlobalAccountRelationships() {
   return jsonResponse(
     await request('/online-booking/account/relationships', { auth: true }),
