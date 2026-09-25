@@ -1,26 +1,23 @@
 import { accountErrorMessage, updateAccount, updateGlobalAccount } from '../core/account/index.js';
+import { accordion, initAccordions } from '../ui/accordion/accordion.js';
+import { button } from '../ui/buttons/index.js';
+import { initCalendar } from '../ui/calendar/index.js';
 import {
-  accordion,
-  button,
-  collectLinks,
-  collectRepeatedField,
-  escapeHtml,
   field,
   formValidationMessage,
-  initAccordions,
-  initCalendar,
-  initLinks,
   initPhotoField,
-  initRepeatedFields,
-  links,
-  mountModal,
-  modal,
-  openNotice,
   phoneField,
   photoField,
+} from '../ui/inputs/index.js';
+import { collectLinks, initLinks, links } from '../ui/links/index.js';
+import { modal, mountModal, openNotice } from '../ui/modals/index.js';
+import {
+  collectRepeatedField,
+  initRepeatedFields,
   repeatedField,
-  select,
-} from '../ui/ui.js';
+} from '../ui/repeated-fields/index.js';
+import { select } from '../ui/selectors/index.js';
+import { escapeHtml } from '../ui/utils/escape-html.js';
 import { formError, formView } from '../ui/forms/index.js';
 
 function profileData(account = {}) {
