@@ -369,6 +369,7 @@ export function initV2Swipe(root, { onRight = null, onLeft = null, threshold = 7
   let startY = 0;
   let dx = 0;
   let axis = 'pending';
+  let suppressNextClick = false;
 
   const isTopmost = () => {
     const layers = [...(app?.querySelectorAll?.('[data-v2-z-layer]') || [])];
@@ -393,6 +394,7 @@ export function initV2Swipe(root, { onRight = null, onLeft = null, threshold = 7
     startY = event.clientY;
     dx = 0;
     axis = 'pending';
+    suppressNextClick = false;
   };
   const move = (event) => {
     if (event.pointerId !== pointerId) return;
@@ -418,6 +420,7 @@ export function initV2Swipe(root, { onRight = null, onLeft = null, threshold = 7
     if (dx !== 0) {
       surface.classList.add('is-dragging');
       surface.style.setProperty('--v2-drag-x', `${dx}px`);
+      if (Math.abs(nextX) > 7) suppressNextClick = true;
     }
     event.preventDefault();
   };
@@ -436,15 +439,24 @@ export function initV2Swipe(root, { onRight = null, onLeft = null, threshold = 7
     app?.classList.remove('is-revealing-deck');
   };
 
+  const click = (event) => {
+    if (!suppressNextClick) return;
+    suppressNextClick = false;
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
   surface.addEventListener('pointerdown', down);
   surface.addEventListener('pointermove', move, { passive: false });
   surface.addEventListener('pointerup', up);
   surface.addEventListener('pointercancel', reset);
+  surface.addEventListener('click', click, true);
   return () => {
     surface.removeEventListener('pointerdown', down);
     surface.removeEventListener('pointermove', move);
     surface.removeEventListener('pointerup', up);
     surface.removeEventListener('pointercancel', reset);
+    surface.removeEventListener('click', click, true);
   };
 }
 
