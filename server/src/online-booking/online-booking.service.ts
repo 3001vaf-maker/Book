@@ -203,6 +203,21 @@ export class OnlineBookingService {
     }, { expiresIn: '365d' });
   }
 
+  private async bindAccountTenant(tenantId: string, account: any) {
+    await this.prisma.accountTenantLink.upsert({
+      where: { accountId_tenantId: { accountId: account.id, tenantId } },
+      create: { accountId: account.id, tenantId },
+      update: { updatedAt: new Date() },
+    });
+    return this.bindAccountTenant(tenantId, account);
+  }
+
+  private async globalAccountView(accountId: string) {
+    const account = await this.prisma.account.findUnique({ where: { id: accountId } });
+    if (!account) throw new UnauthorizedException('Аккаунт не найден');
+    return publicAccount(account);
+  }
+
   private async assertContactsAvailable(
     contacts: AccountContactFact[],
     accountId = '',
@@ -386,7 +401,7 @@ export class OnlineBookingService {
       'online-booking-registration',
       { tenantContext: tenantId },
     );
-    const binding = await this.personIdentity.bindFirstAccess(tenantId, account as any);
+    const binding = await this.bindAccountTenant(tenantId, account);
     return {
       accessToken: await this.issueAccountToken(account),
       account: await this.accountView(tenantId, account),
@@ -406,7 +421,7 @@ export class OnlineBookingService {
     if (!account || !(await compare(text(password), account.passwordHash))) {
       throw new UnauthorizedException('Неверный телефон, email или пароль');
     }
-    const binding = await this.personIdentity.bindFirstAccess(tenantId, account as any);
+    const binding = await this.bindAccountTenant(tenantId, account);
     return {
       accessToken: await this.issueAccountToken(account),
       account: await this.accountView(tenantId, account),
@@ -418,7 +433,7 @@ export class OnlineBookingService {
     await this.firstRun.assertRealOperationsAllowed(tenantId);
     const account = await this.prisma.account.findUnique({ where: { id: accountId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
-    const binding = await this.personIdentity.bindFirstAccess(tenantId, account as any);
+    const binding = await this.bindAccountTenant(tenantId, account);
     return {
       accessToken: await this.issueAccountToken(account),
       account: await this.accountView(tenantId, account),
@@ -430,7 +445,7 @@ export class OnlineBookingService {
     await this.firstRun.assertRealOperationsAllowed(tenantId);
     const account = await this.prisma.account.findUnique({ where: { id: accountId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
-    await this.personIdentity.bindFirstAccess(tenantId, account as any);
+    await this.bindAccountTenant(tenantId, account);
     return this.accountView(tenantId, account);
   }
 
@@ -438,7 +453,7 @@ export class OnlineBookingService {
     await this.firstRun.assertRealOperationsAllowed(tenantId);
     const account = await this.prisma.account.findUnique({ where: { id: accountId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
-    await this.personIdentity.bindFirstAccess(tenantId, account as any);
+    await this.bindAccountTenant(tenantId, account);
     const identity = await this.businessState.bookingIdentityForAccount(tenantId, accountId);
     return {
       phone: account.phone,
@@ -477,7 +492,7 @@ export class OnlineBookingService {
         },
       });
     });
-    await this.personIdentity.bindFirstAccess(tenantId, updated as any);
+    await this.bindAccountTenant(tenantId, updated);
     await this.personIdentity.syncLinkedPeople(updated as any);
     return this.accountView(tenantId, updated);
   }
@@ -531,7 +546,7 @@ export class OnlineBookingService {
     const to = this.time.minutesToTime(start + duration);
     if (!to) throw new BadRequestException('Выбранное время недоступно');
 
-    const binding = await this.personIdentity.bindFirstAccess(tenantId, account as any);
+    const binding = await this.bindAccountTenant(tenantId, account);
     const person = binding.person;
     const identity = await this.businessState.bookingIdentityForAccount(tenantId, account.id);
     const pricingPerson = identity?.person || person;
@@ -588,12 +603,196 @@ export class OnlineBookingService {
     await this.firstRun.assertRealOperationsAllowed(tenantId);
     const account = await this.prisma.account.findUnique({ where: { id: accountId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
-    await this.personIdentity.bindFirstAccess(tenantId, account as any);
+    await this.bindAccountTenant(tenantId, account);
     const identity = await this.businessState.bookingIdentityForAccount(tenantId, accountId);
     const people = identity?.memberPeople?.length
       ? identity.memberPeople
       : identity?.person ? [identity.person] : [];
     return this.records.listForPeople(tenantId, people);
+  }
+
+
+  async prepareGlobalAccount(input: unknown) {
+    const source = objectValue(input);
+    const identifierValue = text(source.identifier || (typeof input === 'string' ? input : ''));
+    const email = emailValue(source.email);
+    const phone = canonicalPhone(source.phone);
+    const contacts: Array<{ type: AccountContactType; value: string; field: 'identifier' | 'email' | 'phone' }> = [];
+    const identifier = accountLoginContact(identifierValue);
+    if (identifier) contacts.push({ ...identifier, field: 'identifier' });
+    if (email && email.includes('@')) contacts.push({ type: AccountContactType.EMAIL, value: email, field: 'email' });
+    if (phone) contacts.push({ type: AccountContactType.PHONE, value: phone, field: 'phone' });
+    if (!contacts.length) throw new BadRequestException('Введите телефон или email');
+
+    const unique = [...new Map(contacts.map((contact) => [`${contact.type}:${contact.value}`, contact])).values()];
+    const rows = await this.prisma.accountContact.findMany({
+      where: { OR: unique.map((contact) => ({ type: contact.type, value: contact.value })) },
+      select: { type: true, value: true },
+    });
+    const occupied = new Set(rows.map((row) => `${row.type}:${row.value}`));
+    const conflicts = {
+      identifier: unique.some((contact) => contact.field === 'identifier' && occupied.has(`${contact.type}:${contact.value}`)),
+      email: unique.some((contact) => contact.field === 'email' && occupied.has(`${contact.type}:${contact.value}`)),
+      phone: unique.some((contact) => contact.field === 'phone' && occupied.has(`${contact.type}:${contact.value}`)),
+    };
+    return {
+      exists: conflicts.identifier || conflicts.email || conflicts.phone,
+      conflicts,
+      identifierType: identifier?.type || '',
+    };
+  }
+
+  async registerGlobalAccount(body: Record<string, any>) {
+    const email = emailValue(body.email);
+    const password = text(body.password);
+    const name = text(body.name);
+    const phone = text(body.phone);
+    const telegramId = text(body.telegramId);
+    const profileData = normalizeProfileData(body.profileData);
+    const accountTerms = objectValue(body.accountTerms);
+    if (!email || !email.includes('@')) throw new BadRequestException('Введите корректный email');
+    if (password.length < 6) throw new BadRequestException('Пароль должен содержать не менее 6 символов');
+    if (!name) throw new BadRequestException('Введите имя');
+    if (!/^\+\d{8,15}$/.test(phone)) throw new BadRequestException('Введите телефон полностью');
+
+    const currentTerms = await this.accountDocuments.publicTerms();
+    if (!accountTerms.accepted
+      || text(accountTerms.key) !== currentTerms.key
+      || Number(accountTerms.version || 0) !== currentTerms.version) {
+      throw new BadRequestException('Необходимо принять актуальные Условия использования учетной записи');
+    }
+
+    const contacts = accountContactFacts({ email, phone, telegramId, profileData });
+    const account = await this.prisma.$transaction(async (tx) => {
+      await this.assertContactsAvailable(contacts, '', tx);
+      const created = await tx.account.create({
+        data: {
+          email,
+          passwordHash: await hash(password, 12),
+          name,
+          surname: text(body.surname),
+          phone,
+          telegramId,
+          profileData: profileData as Prisma.InputJsonValue,
+        },
+      });
+      await this.replaceAccountContacts(tx, created.id, contacts);
+      return created;
+    });
+
+    await this.accountDocuments.accept(
+      account.id,
+      accountTerms,
+      'account-registration',
+      { entry: 'global-account' },
+    );
+    return {
+      accessToken: await this.issueAccountToken(account),
+      account: publicAccount(account),
+    };
+  }
+
+  async loginGlobalAccount(identifierValue: unknown, password: unknown) {
+    const identifier = accountLoginContact(identifierValue);
+    if (!identifier) throw new BadRequestException('Введите телефон или email');
+    const contact = await this.prisma.accountContact.findUnique({
+      where: { type_value: { type: identifier.type, value: identifier.value } },
+      include: { account: true },
+    });
+    const account = contact?.account || null;
+    if (!account || !(await compare(text(password), account.passwordHash))) {
+      throw new UnauthorizedException('Неверный телефон, email или пароль');
+    }
+    return {
+      accessToken: await this.issueAccountToken(account),
+      account: publicAccount(account),
+    };
+  }
+
+  async getGlobalAccount(accountId: string) {
+    return this.globalAccountView(accountId);
+  }
+
+  async updateGlobalAccount(accountId: string, body: Record<string, any>) {
+    const account = await this.prisma.account.findUnique({ where: { id: accountId } });
+    if (!account) throw new UnauthorizedException('Аккаунт не найден');
+    const phone = text(body.phone) || account.phone;
+    if (!/^\+\d{8,15}$/.test(phone)) throw new BadRequestException('Введите телефон полностью');
+    const profileData = body.profileData == null
+      ? normalizeProfileData(account.profileData)
+      : normalizeProfileData({ ...objectValue(account.profileData), ...objectValue(body.profileData) });
+    const telegramId = text(body.telegramId) || account.telegramId;
+    const contacts = accountContactFacts({ email: account.email, phone, telegramId, profileData });
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await this.replaceAccountContacts(tx, account.id, contacts);
+      return tx.account.update({
+        where: { id: account.id },
+        data: {
+          name: text(body.name) || account.name,
+          surname: body.surname == null ? account.surname : text(body.surname),
+          phone,
+          telegramId,
+          profileData: profileData as Prisma.InputJsonValue,
+        },
+      });
+    });
+    await this.personIdentity.syncLinkedPeople(updated as any);
+    return publicAccount(updated);
+  }
+
+  async changeGlobalAccountPassword(accountId: string, currentPassword: unknown, newPassword: unknown) {
+    const current = String(currentPassword ?? '');
+    const next = String(newPassword ?? '');
+    if (next.length < 8) throw new BadRequestException('Новый пароль должен содержать минимум 8 символов');
+    const account = await this.prisma.account.findUnique({ where: { id: accountId } });
+    if (!account) throw new UnauthorizedException('Аккаунт не найден');
+    if (!(await compare(next ? current : '', account.passwordHash))) throw new BadRequestException('Текущий пароль указан неверно');
+    if (await compare(next, account.passwordHash)) throw new BadRequestException('Новый пароль должен отличаться от текущего');
+    await this.prisma.account.update({ where: { id: account.id }, data: { passwordHash: await hash(next, 12) } });
+    return { changed: true };
+  }
+
+  async globalAccountRelationships(accountId: string) {
+    await this.globalAccountView(accountId);
+    const links = await this.prisma.accountTenantLink.findMany({
+      where: { accountId },
+      orderBy: { updatedAt: 'desc' },
+    });
+    const relationships = await Promise.all(links.map(async (link) => {
+      try {
+        const data = await this.bookingSource(link.tenantId);
+        return {
+          tenantId: link.tenantId,
+          linkedAt: link.createdAt,
+          context: {
+            tenantId: link.tenantId,
+            profile: objectValue(data.profile),
+            settings: objectValue(data.bookingSettings),
+            workplaces: arrayValue(data.workplaces),
+          },
+        };
+      } catch {
+        return null;
+      }
+    }));
+    return relationships.filter(Boolean);
+  }
+
+  async globalAccountRecords(accountId: string) {
+    await this.globalAccountView(accountId);
+    const links = await this.prisma.accountTenantLink.findMany({
+      where: { accountId },
+      orderBy: { updatedAt: 'desc' },
+    });
+    const groups = await Promise.all(links.map(async (link) => {
+      try {
+        const rows = await this.getMyRecords(link.tenantId, accountId);
+        return arrayValue(rows).map((row) => ({ ...row, tenantId: link.tenantId }));
+      } catch {
+        return [];
+      }
+    }));
+    return groups.flat();
   }
 
   async ownerAccounts(tenantId: string) {
