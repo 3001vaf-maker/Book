@@ -48,9 +48,34 @@ async function request(path, { tenantId = '', auth = false, ...options } = {}) {
   return fetch(`${API_BASE}${path}`, { ...options, headers });
 }
 
+const TECHNICAL_ACCOUNT_MESSAGE = /(?:\\b(?:Account|tenant|Prisma|Exception|Error|stack|SQL|token|undefined|null|Book)\\b|\\bid\\b|\\.js\\b|\\.ts\\b|\\/api\\/|\\{.*\\}|\\[.*\\])/i;
+
+function safeAccountApiMessage(value, fallbackMessage) {
+  const raw = Array.isArray(value) ? value[0] : value;
+  const message = String(raw || '').trim();
+  if (!message || message.length > 240 || message.includes('\\n') || TECHNICAL_ACCOUNT_MESSAGE.test(message)) {
+    return fallbackMessage;
+  }
+  return /[А-Яа-яЁё]/.test(message) ? message : fallbackMessage;
+}
+
+class AccountRequestError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'AccountRequestError';
+    this.userSafe = true;
+  }
+}
+
+export function accountErrorMessage(error, fallbackMessage) {
+  return error instanceof AccountRequestError && error.userSafe === true
+    ? error.message
+    : fallbackMessage;
+}
+
 async function jsonResponse(response, fallbackMessage) {
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload?.message || fallbackMessage);
+  if (!response.ok) throw new AccountRequestError(safeAccountApiMessage(payload?.message, fallbackMessage));
   return payload;
 }
 
