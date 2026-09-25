@@ -16,6 +16,7 @@ function headerControl(slot = {}, role = '') {
   const image = String(slot.image || '').trim();
   const initials = text(slot.initials || (slot.label || '').split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase());
   const kind = slot.kind || 'text';
+  const variantClass = slot.variant === 'danger' ? ' v2-header__control--danger' : '';
   let body = label;
   if (kind === 'avatar') {
     body = image
@@ -32,7 +33,7 @@ function headerControl(slot = {}, role = '') {
   } else if (kind === 'back') {
     body = '<span class="v2-header__back" aria-hidden="true">‹</span>';
   }
-  return `<div class="v2-header__slot v2-header__slot--${role}"><button type="button" class="v2-header__control v2-header__control--${kind}"${dataAttributes(slot.data)} aria-label="${aria}"${slot.disabled ? ' disabled' : ''}>${body}${badge}</button></div>`;
+  return `<div class="v2-header__slot v2-header__slot--${role}"><button type="button" class="v2-header__control v2-header__control--${kind}${variantClass}"${dataAttributes(slot.data)} aria-label="${aria}"${slot.disabled ? ' disabled' : ''}>${body}${badge}</button></div>`;
 }
 
 export function v2Header({ a = null, b = '', c = null, d = null } = {}) {
@@ -174,7 +175,7 @@ export function v2ZLayer(content = '', { className = '' } = {}) {
   return `<main class="v2-z v2-z--layer ${text(className)}" data-v2-z-layer>${content}</main>`;
 }
 
-export function mountV2ZLayer(root, html, { onClose = null } = {}) {
+export function mountV2ZLayer(root, html, { onClose = null, stack = false } = {}) {
   const app = root?.closest?.('[data-v2-app]') || document.querySelector('[data-v2-app]');
   const stage = app?.querySelector?.('.v2-app__stage');
   if (!stage) return null;
@@ -182,7 +183,10 @@ export function mountV2ZLayer(root, html, { onClose = null } = {}) {
   template.innerHTML = String(html || '').trim();
   const node = template.content.firstElementChild;
   if (!node?.matches?.('[data-v2-z-layer]')) return null;
-  stage.querySelectorAll('[data-v2-z-layer]').forEach((layer) => layer.remove());
+  if (!stack) stage.querySelectorAll('[data-v2-z-layer]').forEach((layer) => layer.remove());
+  const depth = stage.querySelectorAll('[data-v2-z-layer]').length + 1;
+  node.dataset.v2ZDepth = String(depth);
+  node.style.setProperty('--v2-z-layer-shift', `${depth * 12}px`);
   stage.appendChild(node);
   app?.classList.add('has-z-layer');
   const notify = () => window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
