@@ -1,5 +1,6 @@
 import {
   acceptAccountTerms,
+  accountErrorMessage,
   acceptGlobalAccountTerms,
   clearAccount,
   createBookingRequest,
@@ -30,6 +31,7 @@ import {
   emptyState,
   escapeHtml,
   field,
+  formValidationMessage,
   initCalendar,
   initPasswordFields,
   initV2StickerSwipe,
@@ -238,7 +240,7 @@ function renderLegalSticker(root, state) {
       if (state.identityDestination === 'booking') await finalizeBookingRequest(root, state);
       else await renderAccountHome(root, state);
     } catch (error) {
-      state.error = error instanceof Error ? error.message : 'Не удалось сохранить документы';
+      state.error = accountErrorMessage(error, 'Не удалось сохранить документы');
       renderLegalSticker(root, state);
     }
   });
@@ -408,7 +410,7 @@ function renderAccountEntry(root, state) {
     || state.accountDraft?.email
     || getRememberedAccountEmail(state.tenantId)
     || '';
-  const form = `<form data-booking-entry-form>
+  const form = `<form data-booking-entry-form novalidate>
     ${field({ label: 'Телефон или email', name: 'identifier', value: rememberedIdentifier, required: true, autocomplete: 'username' })}
     ${passwordField({ label: 'Пароль', name: 'password', required: true, autocomplete: 'current-password' })}
     ${errorBlock(state.error)}
@@ -446,16 +448,22 @@ function renderAccountEntry(root, state) {
       await loadAccountTerms(state);
       renderAccountDetails(root, state);
     } catch (error) {
-      state.error = error instanceof Error ? error.message : 'Не удалось открыть регистрацию';
+      state.error = accountErrorMessage(error, 'Не удалось открыть регистрацию');
       renderAccountEntry(root, state);
     }
   });
   root.querySelector('[data-booking-forgot]')?.addEventListener('click', () => {
-    state.error = 'Восстановление пароля будет подключено отдельным flow.';
+    state.error = 'Восстановление пароля пока недоступно.';
     renderAccountEntry(root, state);
   });
   authForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
+    const validationError = formValidationMessage(authForm);
+    if (validationError) {
+      state.error = validationError;
+      renderAccountEntry(root, state);
+      return;
+    }
     const data = new FormData(authForm);
     const identifier = String(data.get('identifier') || '').trim();
     const password = String(data.get('password') || '');
@@ -480,7 +488,7 @@ function renderAccountEntry(root, state) {
       state.error = '';
       await continueAfterIdentity(root, state);
     } catch (error) {
-      state.error = error instanceof Error ? error.message : 'Не удалось войти';
+      state.error = accountErrorMessage(error, 'Не удалось войти');
       renderAccountEntry(root, state);
     }
   });
@@ -494,7 +502,7 @@ function renderAccountDetails(root, state) {
     title: 'Регистрация',
     action: { label: 'Подтвердить', data: 'data-booking-account-submit' },
     step: 'registration',
-    body: `<form data-booking-account-form>
+    body: `<form data-booking-account-form novalidate>
       ${field({ label: 'Имя', name: 'name', value: draft.name || '', required: true, autocomplete: 'given-name' })}
       ${field({ label: 'Фамилия', name: 'surname', value: draft.surname || '', autocomplete: 'family-name' })}
       ${phoneField({ label: 'Телефон', name: 'phone', value: draft.phone || '', required: true })}
@@ -518,6 +526,12 @@ function renderAccountDetails(root, state) {
   root.querySelector('[data-booking-account-submit]')?.addEventListener('click', () => form?.requestSubmit());
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
+    const validationError = formValidationMessage(form);
+    if (validationError) {
+      state.error = validationError;
+      renderAccountDetails(root, state);
+      return;
+    }
     const data = new FormData(form);
     const email = String(data.get('email') || '').trim().toLowerCase();
     const phone = String(data.get('phone') || '').trim();
@@ -555,7 +569,7 @@ function renderAccountDetails(root, state) {
       if (!state.accountTerms) await loadAccountTerms(state);
       renderLegalSticker(root, state);
     } catch (error) {
-      state.error = error instanceof Error ? error.message : 'Не удалось проверить контакты';
+      state.error = accountErrorMessage(error, 'Не удалось проверить контакты');
       renderAccountDetails(root, state);
     }
   });
@@ -594,7 +608,7 @@ async function continueAfterIdentity(root, state) {
 
     await finalizeBookingRequest(root, state);
   } catch (error) {
-    state.error = error instanceof Error ? error.message : 'Не удалось проверить юридический статус';
+    state.error = accountErrorMessage(error, 'Не удалось проверить юридический статус');
     try {
       if (!state.accountTerms) await loadAccountTerms(state);
       await refreshTenantConsentState(state).catch(() => ({ pdnActive: false }));
@@ -835,7 +849,7 @@ async function finalizeBookingRequest(root, state) {
       renderTimes(root, state);
       return;
     }
-    state.error = error instanceof Error ? error.message : 'Не удалось подтвердить запись';
+    state.error = accountErrorMessage(error, 'Не удалось подтвердить запись');
     renderConfirmation(root, state);
   }
 }
@@ -971,7 +985,7 @@ function renderGlobalClientEntry(root, state) {
     || state.accountDraft?.email
     || getRememberedAccountEmail('')
     || '';
-  const form = `<form data-global-account-entry>
+  const form = `<form data-global-account-entry novalidate>
     ${field({ label: 'Телефон или email', name: 'identifier', value: rememberedIdentifier, required: true, autocomplete: 'username' })}
     ${passwordField({ label: 'Пароль', name: 'password', required: true, autocomplete: 'current-password' })}
     ${errorBlock(state.error)}
@@ -999,12 +1013,18 @@ function renderGlobalClientEntry(root, state) {
       state.accountTermsAccepted = false;
       renderGlobalClientDetails(root, state);
     } catch (error) {
-      state.error = error instanceof Error ? error.message : 'Не удалось открыть регистрацию';
+      state.error = accountErrorMessage(error, 'Не удалось открыть регистрацию');
       renderGlobalClientEntry(root, state);
     }
   });
   authForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
+    const validationError = formValidationMessage(authForm);
+    if (validationError) {
+      state.error = validationError;
+      renderGlobalClientEntry(root, state);
+      return;
+    }
     const data = new FormData(authForm);
     const identifier = String(data.get('identifier') || '').trim();
     const password = String(data.get('password') || '');
@@ -1026,7 +1046,7 @@ function renderGlobalClientEntry(root, state) {
       state.error = '';
       await continueGlobalIdentity(root, state);
     } catch (error) {
-      state.error = error instanceof Error ? error.message : 'Не удалось войти';
+      state.error = accountErrorMessage(error, 'Не удалось войти');
       renderGlobalClientEntry(root, state);
     }
   });
@@ -1039,7 +1059,7 @@ function renderGlobalClientDetails(root, state) {
     title: 'Регистрация',
     action: { label: 'Подтвердить', data: 'data-global-account-submit' },
     step: 'registration',
-    body: `<form data-global-account-form>
+    body: `<form data-global-account-form novalidate>
       ${field({ label: 'Имя', name: 'name', value: draft.name || '', required: true, autocomplete: 'given-name' })}
       ${field({ label: 'Фамилия', name: 'surname', value: draft.surname || '', autocomplete: 'family-name' })}
       ${phoneField({ label: 'Телефон', name: 'phone', value: draft.phone || '', required: true })}
@@ -1056,6 +1076,12 @@ function renderGlobalClientDetails(root, state) {
   root.querySelector('[data-global-account-submit]')?.addEventListener('click', () => form?.requestSubmit());
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
+    const validationError = formValidationMessage(form);
+    if (validationError) {
+      state.error = validationError;
+      renderGlobalClientDetails(root, state);
+      return;
+    }
     const data = new FormData(form);
     const email = String(data.get('email') || '').trim().toLowerCase();
     const phone = String(data.get('phone') || '').trim();
@@ -1090,7 +1116,7 @@ function renderGlobalClientDetails(root, state) {
       state.accountTermsAccepted = false;
       renderGlobalClientLegal(root, state);
     } catch (error) {
-      state.error = error instanceof Error ? error.message : 'Не удалось проверить контакты';
+      state.error = accountErrorMessage(error, 'Не удалось проверить контакты');
       renderGlobalClientDetails(root, state);
     }
   });
@@ -1142,7 +1168,7 @@ function renderGlobalClientLegal(root, state) {
       state.error = '';
       await renderGlobalClientHome(root, state);
     } catch (error) {
-      state.error = error instanceof Error ? error.message : 'Не удалось сохранить документ';
+      state.error = accountErrorMessage(error, 'Не удалось сохранить документ');
       renderGlobalClientLegal(root, state);
     }
   });
@@ -1160,7 +1186,7 @@ export async function renderGlobalClient(root) {
     state.account = account;
     await continueGlobalIdentity(root, state);
   } catch (error) {
-    state.error = error instanceof Error ? error.message : 'Не удалось открыть профиль';
+    state.error = accountErrorMessage(error, 'Не удалось открыть профиль');
     renderGlobalClientEntry(root, state);
   }
 }
@@ -1222,7 +1248,7 @@ export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = 
   } catch (error) {
     renderFlowPage(root, state, {
       title: 'Онлайн-запись',
-      body: emptyState('Запись недоступна', error instanceof Error ? error.message : 'Не удалось открыть онлайн-запись.'),
+      body: emptyState('Запись недоступна', accountErrorMessage(error, 'Не удалось открыть онлайн-запись.')),
       center: true,
     });
   }
