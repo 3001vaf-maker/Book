@@ -153,7 +153,7 @@ function legalTitle(document = {}) {
 }
 
 function renderLegalSticker(root, state) {
-  const tenantDocuments = requiredBookingDocuments(state.context);
+  const tenantDocuments = state.platformOnlyLegal ? [] : requiredBookingDocuments(state.context);
   const platformDocument = state.accountTerms && !state.accountTermsAccepted
     ? { ...state.accountTerms, platform: true, required: true }
     : null;
@@ -233,6 +233,7 @@ function renderLegalSticker(root, state) {
         state.accountTermsAccepted = Boolean(accepted?.accepted);
       }
       if (tenantDocuments.length) await saveTenantConsents(state);
+      state.platformOnlyLegal = false;
       state.error = '';
       if (state.identityDestination === 'booking') await finalizeBookingRequest(root, state);
       else await renderAccountHome(root, state);
@@ -570,16 +571,24 @@ async function continueAfterIdentity(root, state) {
     const platformState = await getAccountPlatformState(state.tenantId);
     state.accountTerms = platformState?.document || state.accountTerms;
     state.accountTermsAccepted = Boolean(platformState?.accepted);
-    const consentState = await refreshTenantConsentState(state);
 
-    if (!platformState?.accepted || !consentState.pdnActive) {
+    if (!platformState?.accepted) {
+      state.platformOnlyLegal = state.identityDestination === 'profile';
       renderLegalSticker(root, state);
       return;
     }
 
     if (state.identityDestination === 'profile') {
+      state.platformOnlyLegal = false;
       state.accountTab = 'home';
       await renderAccountHome(root, state);
+      return;
+    }
+
+    state.platformOnlyLegal = false;
+    const consentState = await refreshTenantConsentState(state);
+    if (!consentState.pdnActive) {
+      renderLegalSticker(root, state);
       return;
     }
 
@@ -1187,6 +1196,7 @@ export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = 
     accountRequests: [],
     onExitToAccount,
     entry: String(entry || ''),
+    platformOnlyLegal: false,
   };
 
   renderFlowPage(root, state, { title: 'Онлайн-запись', subtitle: 'Загрузка…', center: true });
@@ -1199,17 +1209,13 @@ export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = 
     await refreshContext(state);
     const account = await getAccount(state.tenantId);
     if (account) state.account = account;
-    if (state.entry === 'account' && state.account) {
-      const platformState = await getAccountPlatformState(state.tenantId);
-      state.accountTerms = platformState?.document || null;
-      state.accountTermsAccepted = Boolean(platformState?.accepted);
-      if (!platformState?.accepted) {
-        state.identityDestination = 'profile';
-        renderLegalSticker(root, state);
+    if (state.entry === 'account') {
+      state.identityDestination = 'profile';
+      if (!state.account) {
+        renderAccountEntry(root, state);
         return;
       }
-      state.accountTab = 'home';
-      await renderAccountHome(root, state);
+      await continueAfterIdentity(root, state);
       return;
     }
     renderWelcome(root, state);
