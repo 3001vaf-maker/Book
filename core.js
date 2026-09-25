@@ -174,13 +174,7 @@ function defaultSection() {
 }
 
 function normalizeRequestedSection(section) {
-  const value = String(section || '').trim();
-  if (value === 'main') {
-    if (sectionAllowed('people')) return 'people';
-    if (sectionAllowed('finance')) return 'finance';
-    return defaultSection();
-  }
-  return value;
+  return String(section || '').trim();
 }
 
 function activeRootSection() {
