@@ -8,6 +8,8 @@ const serverSync = fs.readFileSync('online-booking/server-sync.js', 'utf8');
 const bookingUi = fs.readFileSync('ui/booking/index.js', 'utf8');
 const shellUi = fs.readFileSync('ui/shell/index.js', 'utf8');
 const shellCss = fs.readFileSync('ui/shell/shell.css', 'utf8');
+const chatUi = fs.readFileSync('ui/chat/index.js', 'utf8');
+const chatCss = fs.readFileSync('ui/chat/chat.css', 'utf8');
 const styleCss = fs.readFileSync('css/style.css', 'utf8');
 const accountMobileCss = fs.readFileSync('ui/shell/account-mobile.css', 'utf8');
 const navigationUi = fs.readFileSync('ui/navigation/navigation.js', 'utf8');
@@ -88,13 +90,15 @@ expect(shellUi.includes('accountBottomNavigation'), 'Legacy Shared UI may keep b
 expect(v2Ui.includes('v2Header') && v2Ui.includes('v2Shell') && v2Ui.includes('v2FDeck'), 'Shared ui/v2 must own V2 H / Z / F geometry.');
 expect(v2Css.includes('.v2-z') && v2Css.includes('border-radius:var(--v2-z-radius) 0 0 0'), 'Shared V2 CSS must keep only the Z upper-left corner rounded.');
 expect(!accountShell.includes('accountBottomNavigation') && !accountShell.includes('bindBottomNavigation'), 'The migrated end-user contour must not use bottom navigation.');
-expect(shellUi.includes('messageComposer'), 'Shared UI must own messenger composer.');
-expect(shellUi.includes('message-composer--plain') && shellUi.includes('message-composer--with-attachments'), 'Shared messenger composer must own both profile/plain and attachment layouts.');
+expect(chatUi.includes('messageComposer'), 'Shared ui/chat must own messenger composer.');
+expect(chatUi.includes('message-composer--plain') && chatUi.includes('message-composer--with-attachments'), 'Shared ui/chat composer must own both profile/plain and attachment layouts.');
+expect(!shellUi.includes('messageComposer') && !shellUi.includes('messageThread'), 'Legacy ui/shell must not own messenger components.');
 expect(shellUi.includes('readOnlyReceipt'), 'Shared UI must own read-only receipt sheet.');
 expect(shellUi.includes('app-view-shell--has-media'), 'Shared shell must know whether S/media is present.');
 expect(shellCss.includes('--shell-icon-slot'), 'Shared shell CSS must own stable header control sizing.');
 expect(shellCss.includes('grid-template-columns:auto minmax(0,1fr) auto auto'), 'Shared A/J/B/C header must redistribute unused space instead of reserving empty fixed columns.');
-expect(shellCss.includes('.app-view-shell--chat') && shellCss.includes('.message-composer{position:fixed'), 'Shared shell CSS must keep chat composer fixed while the thread scrolls.');
+expect(shellCss.includes('.app-view-shell--chat'), 'Legacy profile shell may keep shell-level Chat layout only.');
+expect(chatCss.includes('.message-composer{position:fixed') && chatCss.includes('.message-thread{'), 'Shared ui/chat CSS must own composer and thread geometry.');
 expect(styleCss.includes('--app-max-width:390px'), 'Book must use one shared 390px application width for profile and account surfaces.');
 expect(!accountMobileCss.includes('--app-max-width:'), 'Account shell must inherit the shared Book application width instead of redefining it.');
 expect(!accountMobileCss.includes('max-width:none'), 'Account application must never disable its phone-width limit.');
@@ -111,6 +115,7 @@ expect(navigationUi.includes('class="nav-label"'), 'Bottom navigation labels mus
 expect(navigationCss.includes('grid-template-columns:repeat(5,minmax(0,1fr))'), 'Book bottom navigation must divide the available width into five equal slots.');
 expect(navigationCss.includes('font-size:10px') && navigationCss.includes('white-space:nowrap'), 'All five bottom navigation labels must share a compact single-line label rule.');
 expect(rootHtml.includes('ui/navigation/navigation.css'), 'Book must load the canonical navigation stylesheet.');
+expect(rootHtml.includes('ui/chat/chat.css'), 'Book must load canonical Shared Chat styles.');
 
 expect(referenceHtml.includes('reference.css') && referenceHtml.includes('reference-controls'), 'The Book UI reference must keep lab controls outside the 390px application shell.');
 expect(referenceCss.includes('.ui-reference-toolbar') && referenceCss.includes('position:fixed'), 'Reference-only controls must remain outside the Book phone surface.');
