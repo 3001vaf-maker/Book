@@ -38,7 +38,7 @@ export class BookingConsentController {
   @Get(':tenantId/account/consent-state')
   async state(@Req() request: AccountRequest) {
     const auth = request.accountAuth!;
-    return this.consentPolicy.accountConsentState(auth.tenantId, auth.accountId);
+    return consentState;
   }
 
   @UseGuards(AccountGuard)
@@ -46,6 +46,14 @@ export class BookingConsentController {
   async accept(@Req() request: AccountRequest, @Body() body: { consents?: unknown }) {
     const auth = request.accountAuth!;
     await this.consentPolicy.acceptAccountConsents(auth.tenantId, auth.accountId, body?.consents || [], 'online-booking-account');
+    const consentState = await this.consentPolicy.accountConsentState(auth.tenantId, auth.accountId);
+    if (consentState?.pdnActive) {
+      await this.prisma.accountTenantLink.upsert({
+        where: { accountId_tenantId: { accountId: auth.accountId, tenantId: auth.tenantId } },
+        create: { accountId: auth.accountId, tenantId: auth.tenantId },
+        update: { updatedAt: new Date() },
+      });
+    }
     if (acceptedMessages(body?.consents)) {
       const contacts = await this.currentContactPoints(request);
       for (const contact of contacts) {
