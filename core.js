@@ -327,7 +327,7 @@ function syncWorkspaceHeader(surface) {
       aria: cSource.getAttribute('aria-label') || primaryLabel(cSource),
       disabled: Boolean(cSource.disabled),
     } : null,
-    d: !hideD && (dSource || sectionAllowed('chat')) ? {
+    d: !hideD && sectionAllowed('chat') ? {
       kind: dSource?.dataset.workspaceDKind || 'chat',
       data: 'data-v2-workspace-chat',
       aria: dSource?.getAttribute('aria-label') || (state.activeSection === 'chat' ? 'Вернуться из чата' : 'Чат'),
