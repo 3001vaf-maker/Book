@@ -807,8 +807,8 @@ function globalRecordsForTenant(state, tenantId) {
 
 function bindGlobalProfileSettings(root, state, handlers) {
   root.querySelector('[data-account-profile-settings]')?.addEventListener('click', () => openProfileSettings(state, {
-    onPersonalData: handlers.onPersonalData,
-    onPassword: handlers.onPassword,
+    onPersonalData: () => openAccountPersonalData(state, { onSaved: () => handlers.render?.() }),
+    onPassword: () => openAccountPasswordSettings(state),
     onConsents: null,
     onLogout: handlers.onLogout,
   }));
@@ -896,8 +896,6 @@ export async function renderGlobalAccount(root, state, callbacks = {}) {
     render: () => renderGlobalAccount(root, state, callbacks),
     onOpenRelationship: callbacks.onOpenRelationship,
     onOpenRecord: callbacks.onOpenRecord,
-    onPersonalData: callbacks.onPersonalData,
-    onPassword: callbacks.onPassword,
     onLogout: callbacks.onLogout,
   };
 
