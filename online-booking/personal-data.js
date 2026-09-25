@@ -1,4 +1,4 @@
-import { updateAccount } from '../core/account/index.js';
+import { updateAccount, updateGlobalAccount } from '../core/account/index.js';
 import {
   accordion,
   button,
@@ -181,7 +181,7 @@ export function openAccountPersonalData(state, { onSaved } = {}) {
     if (errorNode) errorNode.textContent = '';
     try {
       const currentProfile = profileData(state.account || {});
-      const account = await updateAccount(state.tenantId, {
+      const payload = {
         name: data.get('name'),
         surname: data.get('surname'),
         phone: data.get('phone'),
@@ -195,7 +195,10 @@ export function openAccountPersonalData(state, { onSaved } = {}) {
           birthDate: String(data.get('birthDate') || ''),
           links: collectLinks(form, 'accountProfileLinks').slice(0, 8),
         },
-      });
+      };
+      const account = state.globalAccount
+        ? await updateGlobalAccount(payload)
+        : await updateAccount(state.tenantId, payload);
       state.account = account;
       layer.remove();
       await onSaved?.(account);
