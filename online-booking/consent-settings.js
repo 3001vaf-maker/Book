@@ -2,7 +2,6 @@ import { accountErrorMessage, getAccountConsentState, revokeAccountConsent } fro
 import {
   button,
   emptyState,
-  escapeHtml,
   listEntries,
   listEntry,
   mountModal,
