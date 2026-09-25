@@ -13,24 +13,27 @@ import {
 import { formatPhone } from '../core/phone/index.js';
 import { projectRecordStatuses } from '../core/record/index.js';
 import { disableWebPush, enableWebPush, getWebPushState } from '../core/notifications/web-push.js';
-import { bookingThemeStyle } from '../ui/booking/index.js';
-import { button } from '../ui/buttons/index.js';
-import { entityCard } from '../ui/cards/index.js';
-import { listEntries, listEntry } from '../ui/lists/list-entry.js';
-import { modal, mountModal, openNotice } from '../ui/modals/index.js';
-import { emptyState } from '../ui/states/index.js';
-import { escapeHtml } from '../ui/utils/escape-html.js';
 import {
-  initV2Swipe,
-  initV2WorkspaceInteraction,
-  setV2DeckOpen,
+  bookingThemeStyle,
+  button,
+  emptyState,
+  entityCard,
+  escapeHtml,
+  listEntries,
+  listEntry,
   v2FDeck,
   v2Header,
   v2HorizontalRail,
+  modal,
+  openNotice,
   v2RailCard,
   v2Section,
   v2Shell,
-} from '../ui/v2/index.js';
+  initV2Swipe,
+  initV2WorkspaceInteraction,
+  setV2DeckOpen,
+  mountModal,
+} from '../ui/ui.js';
 import { bindMessageAttachments, initMessageComposer, messageComposer, messageThread } from '../ui/chat/index.js';
 import { settingsPanel } from '../ui/settings/index.js';
 import { readOnlyReceipt } from '../ui/receipt/index.js';
