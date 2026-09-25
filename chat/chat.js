@@ -27,6 +27,7 @@ import {
 } from '../ui/ui.js';
 import { initMessageComposer, messageComposer, messageThread } from '../ui/chat/index.js';
 import { settingsPanel } from '../ui/settings/index.js';
+import { formView } from '../ui/forms/index.js';
 
 function personNameByPhone(phone, uei = '') {
   const people = findPeopleByPhone(phone);
@@ -262,12 +263,12 @@ async function chooseGroup(root, state) {
 
 async function editGroup(group = null) {
   const people = peopleList();
-  const content = `<form class="form-grid" data-group-form>
+  const content = formView(`
     ${field({ label: 'Название группы', name: 'name', value: group?.name || '', required: true })}
     ${checkList(people.map((person) => ({ value: person.key, label: personName(person), secondary: phoneOf(person), checked: (group?.personKeys || []).includes(person.key) })))}
     ${button('Сохранить', { type: 'submit' })}
     ${group?.id ? button('Удалить группу', { type: 'button', variant: 'danger', data: 'data-group-delete' }) : ''}
-  </form>`;
+  `, { className: 'form-grid', data: 'data-group-form' });
   const layer = mountModal(document.body, modal(content, { title: group ? group.name : 'Новая группа', variant: 'large', surface: 'app' }));
   if (!layer) return;
   initCheckList(layer);
@@ -300,12 +301,12 @@ async function manageGroups() {
 }
 
 async function editTemplate(template = null) {
-  const content = `<form class="form-grid" data-template-form>
+  const content = formView(`
     ${field({ label: 'Название шаблона', name: 'name', value: template?.name || '', required: true })}
     ${textareaField({ label: 'Текст сообщения', name: 'body', value: template?.body || '', required: true, rows: 6 })}
     ${button('Сохранить', { type: 'submit' })}
     ${template?.id ? button('Удалить шаблон', { type: 'button', variant: 'danger', data: 'data-template-delete' }) : ''}
-  </form>`;
+  `, { className: 'form-grid', data: 'data-template-form' });
   const layer = mountModal(document.body, modal(content, { title: template ? template.name : 'Новый шаблон', variant: 'large', surface: 'app' }));
   const form = layer?.querySelector('[data-template-form]');
   form?.addEventListener('submit', async (event) => {
