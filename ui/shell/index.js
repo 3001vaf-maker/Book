@@ -105,31 +105,3 @@ export function personSummaryCard({
     <div class="person-summary-card__rows">${details.map((item, index) => `<button type="button" class="person-summary-card__row"${item.data ? ` ${item.data}` : ''} data-profile-row="${index}"><span>${text(item.label)}</span><strong>${text(item.value)}</strong></button>`).join('')}</div>
   </article>`;
 }
-
-export function settingToggle({ label = '', checked = false, data = '', disabled = false } = {}) {
-  return `<button type="button" class="app-setting-toggle${checked ? ' is-on' : ''}" ${data} aria-pressed="${checked ? 'true' : 'false'}"${disabled ? ' disabled' : ''}><span>${text(label)}</span><span class="app-setting-toggle__switch" aria-hidden="true"><span></span></span></button>`;
-}
-
-export function settingsPanel(items = []) {
-  return `<div class="app-settings-panel">${(Array.isArray(items) ? items : []).filter(Boolean).map((item) => {
-    if (item.type === 'toggle') return settingToggle(item);
-    return button(text(item.label || ''), { className: 'app-settings-panel__button', data: item.data || '', aria: item.aria || item.label || '', variant: item.variant || '' });
-  }).join('')}</div>`;
-}
-
-export function readOnlyReceipt({
-  title = '',
-  status = '',
-  date = '',
-  time = '',
-  items = [],
-  totals = [],
-  action = null,
-} = {}) {
-  return `<section class="read-only-sheet" data-read-only-sheet>
-    <header class="read-only-sheet__header"><h2>${text(title)}</h2><div class="read-only-sheet__meta"><strong>${text(status)}</strong><span>${text(date)}</span><span>${text(time)}</span></div></header>
-    <div class="read-only-sheet__items">${(Array.isArray(items) ? items : []).map((item) => `<div class="read-only-sheet__row"><span>${text(item.label)}</span><strong>${text(item.value)}</strong></div>`).join('')}</div>
-    <div class="read-only-sheet__totals">${(Array.isArray(totals) ? totals : []).map((item) => `<div class="read-only-sheet__row${item.strong ? ' is-strong' : ''}"><span>${text(item.label)}</span><strong>${text(item.value)}</strong></div>`).join('')}</div>
-    ${action ? `<div class="read-only-sheet__action">${button(text(action.label || ''), { data: action.data || '', aria: action.aria || action.label || '' })}</div>` : ''}
-  </section>`;
-}
