@@ -19,7 +19,7 @@
 | View navigation | `ui/view-navigation/` | `viewNavigation`, `initViewNavigation` |
 | Calendar / Date | `ui/calendar/` | `calendar`, `initCalendar`, `monthDayPicker`, `initMonthDayPickers`, `dateNavigator`, `initDateNavigator` |
 | Selection | `ui/selection/` | `initMultiSelect`, `segmentControl`, `initSegmentControls` |
-| Entity / Folder cards | `ui/cards/` | `entityCard`, `miniCard`, `miniCardRail`, `folderCard`, `folderList` |
+| Entity / Folder cards | `ui/cards/` | `entityCard`, `miniCard`, `miniCardRail`, `miniCardStack`, `folderCard`, `folderList` |
 | Lists | `ui/lists/` | `list`, `listEntry`, `listEntries` |
 | Selectors | `ui/selectors/` | `select`, `searchableSelect` (проявление через нижний Shared Modal) |
 | Links | `ui/links/` | `links`, `initLinks`, `collectLinks` |
