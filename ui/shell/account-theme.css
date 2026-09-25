@@ -28,65 +28,8 @@
   --radius-panel:0;
 }
 
-.booking-account--account .app-view-shell{
-  background:transparent;
-  color:var(--text);
-}
-.booking-account--account .app-header{
-  background:color-mix(in srgb,var(--booking-bg-start) 88%,#fff);
-}
-.booking-account--account .bottom-nav.bottom-nav--account{
-  background:color-mix(in srgb,var(--booking-bg-start) 90%,#fff);
-}
-.booking-account--account .nav-item.is-active{
-  background:var(--booking-light);
-  color:var(--booking-dark);
-}
-.booking-account--account .app-header .ui-button.app-header__control{
-  border-radius:var(--radius-control);
-}
-
-.booking-account--account .app-view-shell--booking-flow{
-  min-height:var(--visual-vh,100dvh);
-  padding-bottom:calc(24px + env(safe-area-inset-bottom));
-}
-.booking-account--account .app-view-shell--booking-flow .app-view-shell__screen{
-  width:100%;
-  max-width:100%;
-  padding-top:18px;
-  padding-bottom:24px;
-}
-.booking-account--account .app-view-shell--booking-flow-center .app-view-shell__screen{
-  min-height:calc(var(--visual-vh,100dvh) - 64px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-  align-content:center;
-}
-
-.booking-account--account .app-view-shell--profile{
-  display:grid;
-  grid-template-rows:auto auto minmax(0,1fr);
-  min-height:var(--visual-vh,100dvh);
-}
-.booking-account--account .app-view-shell--profile .app-view-shell__media{
-  min-height:64px;
-}
-.booking-account--account .app-view-shell--profile .app-media-rail--placeholder{
-  min-height:58px;
-}
-.booking-account--account .app-view-shell--profile .app-view-shell__screen{
-  min-height:0;
-  align-content:center;
-  place-items:center;
-  padding-top:12px;
-  padding-bottom:12px;
-}
-.booking-account--account .app-view-shell--profile .entity-card--hero{
-  width:100%;
-  margin:0;
-}
-
 .booking-account--account.booking-shape--cut .entity-card,
 .booking-account--account.booking-shape--cut .list-entry,
-.booking-account--account.booking-shape--cut .ui-button,
-.booking-account--account.booking-shape--cut .nav-item.is-active{
+.booking-account--account.booking-shape--cut .ui-button{
   clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);
 }
