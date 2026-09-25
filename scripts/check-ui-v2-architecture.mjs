@@ -110,6 +110,12 @@ for (const file of runtimeJsFiles) {
   expect(!/\b(?:v2Layer|mountV2Layer)\s*\(/.test(source), `Runtime code must use canonical modal()/mountModal() instead of parallel V2 modal primitives: ${file}.`);
 }
 
+for (const file of runtimeJsFiles) {
+  if (file === 'ui/v2/index.js' || file === 'ui/ui.js') continue;
+  const source = fs.readFileSync(file, 'utf8');
+  expect(!/\\binitV2DeckSwipe\\s*\\(/.test(source), `Runtime code must not bind the legacy deck swipe owner outside Shared V2: ${file}.`);
+}
+
 for (const file of workspaceJsFiles) {
   const source = fs.readFileSync(file, 'utf8');
   expect(!/\b(?:appShell|appHeader)\s*\(/.test(source), `Workspace screens must render inside the single Shared Z shell instead of nesting a second app shell/header: ${file}.`);
@@ -152,14 +158,14 @@ expect(/\.v2-layer--bottom\{[\s\S]*?bottom:0;[\s\S]*?border-radius:0/.test(css),
 expect(/\.v2-layer--technical\{[\s\S]*?top:50%;[\s\S]*?border-radius:0;[\s\S]*?box-shadow:0 18px 46px/.test(css), 'TECHNICAL modal must float above the whole system with all straight edges and an all-side shadow.');
 expect(css.includes('.v2-layer-backdrop--contained{position:fixed;inset:0') && css.includes('.v2-layer-backdrop--technical{position:fixed;inset:0'), 'Shared modal geometry must distinguish Z-contained work modals from rare technical overlays.');
 expect(/\.v2-deck__card\{[\s\S]*?border-radius:0 var\(--v2-z-radius\) 0 0/.test(css), 'F cards must mirror Z toward the left.');
-expect(css.includes('--v2-z-open-x:min(33.333vw,130px)') && css.includes('--v2-deck-width:calc(var(--v2-z-open-x) - var(--v2-gap))') && css.includes('--v2-gap:20px'), 'Opened Z must move about one third of the app width while F remains smaller and separated by H.');
+expect(css.includes('--v2-f-open-x:min(30vw,117px)') && css.includes('--v2-fe-open-x:min(40vw,156px)') && css.includes('--v2-deck-width:calc(var(--v2-f-open-x) - var(--v2-gap))'), 'F must expose about 30% without E and the full FE hierarchy about 40% when E exists.');
 expect(css.includes('--v2-deck-top:34px') && css.includes('top:var(--v2-deck-top)'), 'F must start lower than Z to preserve layer hierarchy.');
 expect(css.includes('opacity:0') && css.includes('.v2-app.is-deck-open .v2-fe-deck') && css.includes('.v2-app.is-revealing-deck .v2-fe-deck'), 'Closed FE must disappear into H and reveal physically during Z1 swipe.');
-expect(css.includes('box-shadow:-18px 12px 34px rgba(0,0,0,.18)') && css.includes('cubic-bezier(.22,.78,.18,1)'), 'Opened Z must read as the floating face of the active F card.');
+expect(css.includes('.v2-front{') && css.includes('background:var(--v2-base)') && css.includes('.v2-app.is-deck-open > .v2-app__stage > .v2-front') && css.includes('box-shadow:-18px 12px 34px rgba(0,0,0,.18)'), 'H and Z must move as one front layer while FE remains behind H.');
 expect(css.includes('border:1px solid rgba(17,17,17,.32)') && css.includes('inset -1px 0 0 rgba(17,17,17,.12)'), 'F cards must keep a visible contour so adjacent layers do not merge.');
-expect(/\.v2-deck__card strong\{[\s\S]*?font-size:18px;[\s\S]*?transform:translate\(-50%,-50%\) rotate\(-90deg\)/.test(css), 'F folder names must be large, vertical, bottom-up, and centered on the visible F surface.');
+expect(css.includes('--v2-card-handle:48px') && css.includes('--v2-card-handle-min:44px') && /\.v2-deck__card strong\{[\s\S]*?height:var\(--v2-card-handle\);[\s\S]*?transform:none/.test(css), 'F handle must be horizontal and 48px by default, never below 44px on narrow screens.');
 expect(css.includes('--v2-e-top-gap:72px') && /\.v2-e-deck\{[\s\S]*?top:calc\(var\(--v2-deck-top\) \+ var\(--v2-e-top-gap\)\);[\s\S]*?bottom:0/.test(css) && /\.v2-e-card\{[\s\S]*?bottom:0;/.test(css) && !/\.v2-e-card\{[\s\S]*?height:50%/.test(css), 'E must start below F and continue to the bottom instead of rendering as a hanging half-height fragment.');
-expect(/\.v2-e-card strong\{[\s\S]*?left:calc\(100% - \(var\(--v2-e-pull\) \/ 2\)\);[\s\S]*?font-size:17px;[\s\S]*?rotate\(-90deg\)/.test(css), 'E folder names must be vertical and centered in the visible protruding part of E.');
+expect(/\.v2-e-card strong\{[\s\S]*?min-width:var\(--v2-card-handle-min\);[\s\S]*?height:var\(--v2-card-handle\);[\s\S]*?transform:none/.test(css), 'E handle must stay directly reachable with a 44px minimum target and horizontal label.');
 expect(css.includes('.v2-legal-cards{display:flex;gap:10px;overflow-x:auto'), 'Legal document stickers must use the shared horizontal rail.');
 expect(css.includes('.v2-legal-card{\n  flex:0 0 min(86%,320px);\n  height:96px;'), 'Legal document stickers must share one base height and horizontal width.');
 expect(css.includes('.booking-account--account .v2-app .booking-time-grid{grid-template-columns:repeat(3,minmax(0,1fr))}'), 'V2 time slots must stay three per row.');
@@ -175,12 +181,15 @@ expect(booking.includes('initV2Swipe(root'), 'Booking Z-stack must use the share
 expect(ui.includes("axis = Math.abs(nextX) >= Math.abs(nextY) * 1.08 ? 'horizontal' : 'vertical'"), 'Shared Z swipe must axis-lock without randomly rejecting a horizontal gesture.');
 expect(ui.includes("app?.classList.add('is-revealing-deck')") && ui.includes("app?.classList.remove('is-revealing-deck')"), 'Z swipe must reveal and reset the F stack physically.');
 expect(ui.includes('let suppressNextClick = false;') && ui.includes("surface.addEventListener('click', click, true)") && ui.includes('event.preventDefault();') && ui.includes('event.stopPropagation();'), 'Shared Z swipe must suppress the accidental interactive click generated after a horizontal drag.');
-expect(ui.includes('const activeIndex = Math.max(0, values.findIndex') && ui.includes('const visualDepth = (index - activeIndex + count) % count') && ui.includes('const depthStepX = count > 1 ? Math.min(10, 18 / (count - 1)) : 0') && ui.includes('const depthY = visualDepth * 8'), 'F must render every existing folder as a visible cyclic stack behind the active folder.');
+expect(ui.includes('const tabStep = 48;') && ui.includes('const tabOrder = count - 1 - visualDepth;') && ui.includes('const depthY = tabOrder * tabStep;'), 'F and E must render as exposed 48px hierarchy tabs instead of hidden depth-only stacks.');
 expect(ui.includes('.slice(0, 7)') && ui.includes('data-v2-f-index="${index}"') && !ui.includes('data-v2-f-level'), 'F cards must be peer folders with real names, not visual F1/F2/F3 levels.');
-expect(ui.includes('const nextIndex = (activeIndex + direction + cards.length) % cards.length') && ui.includes('commit(finalDx < 0 ? 1 : -1)') && ui.includes("'is-next-ready'"), 'F paging must reveal the next folder immediately under the outgoing physical card.');
-expect(ui.includes('threshold = 42') && ui.includes("addEventListener('transitionend'") && ui.includes('requestAnimationFrame') && !ui.includes('settleTimer') && !ui.includes('}, 210);'), 'F paging must continue from the finger into one transition without the legacy 210 ms reset/pause/rerender sequence.');
-expect(ui.includes("const eDeck = host.querySelector?.('[data-v2-e-list]')") && ui.includes('const commitE = (direction) =>') && ui.includes("eDeck.addEventListener('pointermove', eMove") && ui.includes('--v2-e-drag-x'), 'Shared FE gesture owner must provide an independent physical swipe for E.');
-expect(!ui.includes('if (cards.length < 2) return () => {};') && ui.includes('if (cards.length > 1) {'), 'Shared FE owner must keep E swipe available even when access leaves only one F folder.');
+expect(ui.includes("const leftOrDownLeft = dx < -5 && dy >= -8;") && ui.includes('current.dx <= -threshold') && ui.includes('const nextIndex = (fActiveIndex + 1) % fCards.length'), 'F must move only left/down-left and must never detach to the right.');
+expect(ui.includes('directPickThreshold = 14') && ui.includes('directDistance >= directPickThreshold') && ui.includes('current.dy >= directPickThreshold'), 'F/E direct selection must require a physical pull and must not turn folder taps into click navigation.');
+expect(ui.includes("const downOnly = dy > 5") && ui.includes("gesture.axis = 'e'") && ui.includes("--v2-e-drag-y") && !ui.slice(ui.indexOf('export function initV2WorkspaceInteraction'), ui.indexOf('export function initV2StickerSwipe')).includes('--v2-e-drag-x'), 'E must be owned by the same workspace gesture owner and move only downward.');
+expect(ui.includes("stage.addEventListener('pointerdown', down)") && ui.includes("stage.addEventListener('pointermove', move") && !ui.slice(ui.indexOf('export function initV2WorkspaceInteraction'), ui.indexOf('export function initV2StickerSwipe')).includes('initV2DeckSwipe(') && !ui.slice(ui.indexOf('export function initV2WorkspaceInteraction'), ui.indexOf('export function initV2StickerSwipe')).includes('initV2Swipe('), 'Workspace F/E/Z must have one stage pointer owner with no delegated competing swipe owners.');
+expect(ui.includes('data-v2-front') && css.includes('.v2-fe-deck{') && css.includes('transform:none;') && !/\\.v2-app\\.is-deck-open[^\\{]*\\.v2-z[^\\{]*\\{[^}]*transform:/s.test(css), 'FE must stay pinned to the left while only the shared H+Z front layer moves; Z may not slide independently over cards.');
+expect(ui.includes('ownsHorizontalGesture') && ui.includes("overflowX === 'auto'") && ui.includes("touchAction.includes('pan-x')"), 'Closed Z must yield to nested horizontal rails instead of stealing their gestures.');
+expect(ui.includes("current.openAtStart && distance < 7") && ui.includes('setOpen(false);'), 'When FE is open, a tap on Z must open the page without activating controls underneath.');
 expect(core.includes('initV2WorkspaceInteraction(shell') && core.includes('eActiveId: childActive') && core.includes('onSecondarySelect: (id) => selectSecondary(id)'), 'Workspace must route F/E/Z interaction through the single Shared workspace owner.');
 expect(css.includes('box-shadow:-9px 8px 14px -11px rgba(0,0,0,.34)') && css.includes('.v2-z .entity-card{transform:translateY(-2px)') && css.includes('.v2-rail-card{') && css.includes('transform:translateY(-2px)'), 'Z stickers must lift at the edges while large cards float above the Z surface.');
 expect(css.includes('touch-action:pan-y'), 'Shared V2 surfaces must allow vertical scrolling without fighting horizontal swipe.');
