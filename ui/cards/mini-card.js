@@ -54,3 +54,8 @@ export function miniCardRail(cards = [], { className = '' } = {}) {
   const items = Array.isArray(cards) ? cards : [];
   return `<div class="mini-card-rail${className ? ` ${escapeHtml(className)}` : ''}" data-mini-card-rail>${items.join('')}</div>`;
 }
+
+export function miniCardStack(cards = [], { className = '' } = {}) {
+  const items = Array.isArray(cards) ? cards : [];
+  return `<div class="mini-card-stack${className ? ` ${escapeHtml(className)}` : ''}" data-mini-card-stack>${items.join('')}</div>`;
+}
