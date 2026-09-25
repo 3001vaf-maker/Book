@@ -65,9 +65,19 @@ assert.match(peopleCss, /width:84px/);
 assert.match(peopleCss, /height:84px/);
 
 assert.match(miniCard, /export function miniCardRail/);
-assert.match(miniCardCss, /--mini-card-width:168px/);
-assert.match(miniCardCss, /--mini-card-height:112px/);
+assert.match(miniCardCss, /--mini-card-width:238px/);
+assert.match(miniCardCss, /--mini-card-height:144px/);
+assert.match(miniCardCss, /border:2px solid #111/);
 assert.match(miniCardCss, /border-radius:16px/);
+assert.match(miniCardCss, /padding:16px/);
+assert.match(miniCardCss, /word-break:normal/);
+assert.match(miniCardCss, /overflow-wrap:normal/);
+assert.match(miniCardCss, /mini-card--surface-photo/);
+assert.match(miniCardCss, /mini-card__context-action/);
+assert.match(miniCard, /surface = 'default'/);
+assert.match(miniCard, /actionLabel = ''/);
+assert.match(people, /surface:\s*'photo'/);
+assert.match(people, /actionLabel:\s*person\.photo \? 'Изменить' : 'Добавить'/);
 
 assert.match(selectors, /import \{ modal, mountModal \} from '\.\.\/modals\/index\.js'/);
 assert.match(selectors, /variant: 'quick'/);
