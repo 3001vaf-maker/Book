@@ -1,4 +1,4 @@
-import { updateAccount, updateGlobalAccount } from '../core/account/index.js';
+import { accountErrorMessage, updateAccount, updateGlobalAccount } from '../core/account/index.js';
 import {
   accordion,
   button,
@@ -6,6 +6,7 @@ import {
   collectRepeatedField,
   escapeHtml,
   field,
+  formValidationMessage,
   initAccordions,
   initCalendar,
   initLinks,
@@ -14,6 +15,7 @@ import {
   links,
   mountModal,
   modal,
+  openNotice,
   phoneField,
   photoField,
   repeatedField,
@@ -131,7 +133,7 @@ function initBirthDate(root) {
 
 function editorMarkup(account = {}) {
   const profile = profileData(account);
-  return `<form data-account-personal-form>
+  return `<form data-account-personal-form novalidate>
     ${accordion([{
       title: 'Личные данные',
       content: `<div class="form-grid">
@@ -175,6 +177,11 @@ export function openAccountPersonalData(state, { onSaved } = {}) {
   const errorNode = layer.querySelector('[data-account-personal-error]');
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
+    const validationError = formValidationMessage(form);
+    if (validationError) {
+      if (errorNode) errorNode.textContent = validationError;
+      return;
+    }
     const data = new FormData(form);
     const submit = form.querySelector('button[type="submit"]');
     if (submit) submit.disabled = true;
@@ -203,8 +210,13 @@ export function openAccountPersonalData(state, { onSaved } = {}) {
       layer.remove();
       await onSaved?.(account);
     } catch (error) {
-      if (errorNode) errorNode.textContent = error instanceof Error ? error.message : 'Не удалось сохранить данные';
       if (submit) submit.disabled = false;
+      openNotice({
+        title: 'Данные не сохранены',
+        message: accountErrorMessage(error, 'Не удалось сохранить данные'),
+        action: 'Закрыть',
+        variant: 'technical',
+      });
     }
   });
   return layer;
