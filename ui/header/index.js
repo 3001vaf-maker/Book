@@ -16,15 +16,18 @@ export function pageHeader(title, subtitle = '', meta = '') {
  * It supplies A/B/D metadata to the shared workspace shell without drawing a
  * second visible header inside Z.
  */
-export function workspaceHeaderContext({ title = '', a = null, d = null, back = null, hideD = false } = {}) {
+export function workspaceHeaderContext({ title = '', a = null, c = null, d = null, back = null, hideD = false } = {}) {
   const actionData = a?.data ? ` ${String(a.data).trim()}` : '';
+  const cData = c?.data ? ` ${String(c.data).trim()}` : '';
   const dData = d?.data ? ` ${String(d.data).trim()}` : '';
   const backData = back?.data ? ` ${String(back.data).trim()}` : '';
   const actionDisabled = a?.disabled ? ' disabled' : '';
+  const cDisabled = c?.disabled ? ' disabled' : '';
   const action = a ? `<button type="button" class="workspace-header-context__action" data-workspace-context-action${actionData} data-workspace-a-kind="${escapeHtml(a.kind || 'settings')}" data-workspace-a-label="${escapeHtml(a.label || '')}" data-workspace-a-image="${escapeHtml(a.image || '')}" data-workspace-a-image-position="${escapeHtml(a.imagePosition || '')}" data-workspace-a-initials="${escapeHtml(a.initials || '')}" aria-label="${escapeHtml(a.aria || 'Настройки контекста')}"${actionDisabled}></button>` : '';
+  const cAction = c ? `<button type="button" class="workspace-header-context__c-action" data-v2-primary-action data-v2-primary-label="${escapeHtml(c.label || '')}" data-workspace-c-kind="${escapeHtml(c.kind || 'text')}"${cData} aria-label="${escapeHtml(c.aria || c.label || 'Действие')}"${cDisabled}></button>` : '';
   const dAction = d ? `<button type="button" class="workspace-header-context__d-action" data-workspace-d-action${dData} data-workspace-d-kind="${escapeHtml(d.kind || 'chat')}" aria-label="${escapeHtml(d.aria || 'Действие справа')}"></button>` : '';
   const backSource = back ? `<button type="button" class="workspace-header-context__back-source" data-workspace-back-source${backData} aria-label="${escapeHtml(back.aria || 'Назад')}"></button>` : '';
-  return `<div class="workspace-header-context" data-workspace-header-context data-workspace-title="${escapeHtml(title)}" data-workspace-hide-d="${hideD ? 'true' : 'false'}">${backSource}${action}${dAction}</div>`;
+  return `<div class="workspace-header-context" data-workspace-header-context data-workspace-title="${escapeHtml(title)}" data-workspace-hide-d="${hideD ? 'true' : 'false'}">${backSource}${action}${cAction}${dAction}</div>`;
 }
 
 /**
