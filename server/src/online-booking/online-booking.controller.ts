@@ -114,6 +114,19 @@ export class OnlineBookingController {
   }
 
   @UseGuards(AccountGuard)
+  @Put('account/password')
+  changeGlobalAccountPassword(
+    @Req() request: AccountRequest,
+    @Body() body: { currentPassword?: unknown; newPassword?: unknown },
+  ) {
+    return this.booking.changeGlobalAccountPassword(
+      request.accountAuth!.accountId,
+      body?.currentPassword,
+      body?.newPassword,
+    );
+  }
+
+  @UseGuards(AccountGuard)
   @Get('account/relationships')
   globalAccountRelationships(@Req() request: AccountRequest) {
     return this.booking.globalAccountRelationships(request.accountAuth!.accountId);
