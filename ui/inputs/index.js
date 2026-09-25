@@ -38,8 +38,7 @@ function syncPhoneHost(host, rawValue, { detectCountry = true } = {}) {
 
   nationalInput.value = state.displayNational;
   valueInput.value = state.canonical;
-  const requiredError = nationalInput.required && !state.complete;
-  nationalInput.setCustomValidity(requiredError ? 'Введите номер телефона полностью.' : '');
+  host.dataset.phoneComplete = state.complete ? 'true' : 'false';
 }
 
 function ensurePhoneEvents() {
@@ -85,6 +84,12 @@ export function formValidationMessage(form) {
   invalid.setAttribute?.('aria-invalid', 'true');
   invalid.focus?.({ preventScroll: true });
 
+  const phone = controls.find((control) => control?.matches?.('[data-phone-national]') && control.required && control.closest?.('[data-phone-input]')?.dataset.phoneComplete !== 'true');
+  if (phone) {
+    phone.setAttribute?.('aria-invalid', 'true');
+    phone.focus?.({ preventScroll: true });
+    return 'Введите номер телефона полностью.';
+  }
   if (invalid.matches?.('[data-phone-national]')) return 'Введите номер телефона полностью.';
   if (invalid.validity?.valueMissing) return 'Заполните обязательные поля.';
   if (invalid.type === 'email' && invalid.validity?.typeMismatch) return 'Введите корректный email.';
@@ -120,7 +125,7 @@ export function phoneInput({ name = 'phone', value = '', required = false, aria 
     data: 'data-phone-country',
     searchable: true,
   }).replace(/(<span class="ui-select__value">)[\s\S]*?(<\/span>)/, `$1${escapeHtml(phoneCountryLabel(state.countryIso))}$2`);
-  return `<div class="phone-input" data-phone-input>${countrySelect}<input class="phone-input__national" type="tel" value="${escapeHtml(state.displayNational)}" placeholder="903 123-45-67" inputmode="tel" autocomplete="tel" data-phone-national aria-label="${escapeHtml(aria)}"${required ? ' required' : ''}><input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(state.canonical)}" data-phone-value></div>`;
+  return `<div class="phone-input" data-phone-input data-phone-complete="${state.complete ? 'true' : 'false'}">${countrySelect}<input class="phone-input__national" type="tel" value="${escapeHtml(state.displayNational)}" placeholder="903 123-45-67" inputmode="tel" autocomplete="tel" data-phone-national aria-label="${escapeHtml(aria)}"${required ? ' required' : ''}><input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(state.canonical)}" data-phone-value></div>`;
 }
 
 export function phoneField({ label = 'Телефон', name = 'phone', value = '', required = false } = {}) {
