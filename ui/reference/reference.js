@@ -29,7 +29,7 @@ import {
   textareaField,
   twoColumnLayout,
 } from '../ui.js';
-import { messageComposer, messageThread } from '../chat/index.js';
+import { initMessageComposer, messageComposer, messageThread } from '../chat/index.js';
 import { readOnlyReceipt } from '../receipt/index.js';
 import { settingToggle } from '../settings/index.js';
 
@@ -171,7 +171,7 @@ function chatScreen() {
     { id: '3', direction: 'system', body: 'Системная строка', time: '10:12' },
   ];
   return {
-    className: 'app-view-shell--chat',
+    className: '',
     media: '',
     body: `${messageThread(messages, { viewer: 'profile' })}${messageComposer({ attachments: state.chatAttachments })}`,
   };
@@ -467,6 +467,7 @@ function bindReferenceEvents() {
     render();
   });
   app.querySelector('[data-message-composer]')?.addEventListener('submit', (event) => event.preventDefault());
+  initMessageComposer(app);
   app.querySelector('[data-reference-info]')?.addEventListener('click', openInfoReference);
   app.querySelectorAll('[data-reference-modal]').forEach((control) => control.addEventListener('click', () => openModalReference(control.dataset.referenceModal)));
 
