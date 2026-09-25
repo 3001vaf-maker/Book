@@ -57,16 +57,17 @@ export function v2EList(items = [], { active = '', data = 'data-v2-e-item' } = {
   const activeId = String(active || values[0]?.id || '0');
   const activeIndex = Math.max(0, values.findIndex((item, index) => String(item.id || index) === activeId));
   const count = values.length;
+  const tabStep = 48;
   return `<div class="v2-e-deck" data-v2-e-list data-v2-e-count="${count}">${values.map((item, index) => {
     const id = String(item.id || index);
     const visualDepth = (index - activeIndex + count) % count;
     const isActive = visualDepth === 0;
-    const depthX = visualDepth * 8;
-    const depthY = visualDepth * 10;
-    const stackZ = Math.max(1, count - visualDepth);
+    const tabOrder = count - 1 - visualDepth;
+    const depthY = tabOrder * tabStep;
+    const stackZ = tabOrder + 1;
     const classes = ['v2-e-card', isActive ? 'is-active' : 'is-stacked'].filter(Boolean).join(' ');
     const itemData = data ? ` ${data}="${text(id)}"` : '';
-    return `<button type="button" class="${classes}" style="--v2-e-depth-x:${depthX}px;--v2-e-depth-y:${depthY}px;--v2-e-stack-z:${stackZ}"${itemData} data-v2-e-index="${index}" aria-label="${text(item.aria || item.label || '')}"><strong data-v2-e-handle>${text(item.label || '')}</strong></button>`;
+    return `<button type="button" class="${classes}" style="--v2-e-depth-x:0px;--v2-e-depth-y:${depthY}px;--v2-e-stack-z:${stackZ}"${itemData} data-v2-e-index="${index}" aria-label="${text(item.aria || item.label || '')}"><strong data-v2-e-handle>${text(item.label || '')}</strong></button>`;
   }).join('')}</div>`;
 }
 
@@ -76,7 +77,7 @@ export function v2FDeck(items = [], { active = '', data = 'data-v2-deck-item', c
   const activeId = String(active || values[0]?.id || '0');
   const activeIndex = Math.max(0, values.findIndex((item, index) => String(item.id || index) === activeId));
   const count = values.length;
-  const tabStep = 44;
+  const tabStep = 48;
   const deckClasses = ['v2-deck', className].filter(Boolean).join(' ');
   const roleData = role ? ` data-v2-deck-role="${text(role)}"` : '';
   return `<div class="${text(deckClasses)}" data-v2-deck data-v2-deck-count="${count}"${roleData}>${values.map((item, index) => {
@@ -486,6 +487,7 @@ export function initV2WorkspaceInteraction(root, {
   onZLeft = null,
   bindZ = true,
   threshold = 42,
+  directPickThreshold = 14,
   maxDrag = 180,
 } = {}) {
   const app = root?.matches?.('[data-v2-app]')
@@ -512,6 +514,20 @@ export function initV2WorkspaceInteraction(root, {
   const fId = (card) => String(card?.getAttribute('data-account-deck-item') || card?.getAttribute('data-v2-deck-item') || '');
   const eId = (card) => String(card?.getAttribute('data-v2-secondary-item') || card?.getAttribute('data-v2-e-item') || '');
 
+  const ownsHorizontalGesture = (target) => {
+    let node = target?.nodeType === 1 ? target : target?.parentElement;
+    while (node && node !== z && node !== stage) {
+      if (node.matches?.('[data-v2-stage-gesture-ignore],input,textarea,select,[contenteditable="true"],[draggable="true"]')) return true;
+      const style = window.getComputedStyle?.(node);
+      const overflowX = style?.overflowX || '';
+      if ((overflowX === 'auto' || overflowX === 'scroll') && Number(node.scrollWidth || 0) > Number(node.clientWidth || 0) + 2) return true;
+      const touchAction = String(style?.touchAction || '').toLowerCase();
+      if (touchAction === 'none' || touchAction.includes('pan-x')) return true;
+      node = node.parentElement;
+    }
+    return false;
+  };
+
   const markSuppressClick = () => {
     suppressNextClick = true;
     if (suppressTimer) window.clearTimeout(suppressTimer);
@@ -527,11 +543,13 @@ export function initV2WorkspaceInteraction(root, {
     front.style.removeProperty('--v2-front-drag-x');
     deck?.classList.remove('is-dragging');
     deck?.style.removeProperty('--v2-fe-drag-x');
+    deck?.style.removeProperty('--v2-fe-drag-y');
     eDeck?.classList.remove('is-dragging');
     eDeck?.style.removeProperty('--v2-e-drag-y');
     fCards.forEach((card) => {
       card.classList.remove('is-dragging', 'is-picked');
       card.style.removeProperty('--v2-pick-x');
+      card.style.removeProperty('--v2-pick-y');
     });
     eCards.forEach((card) => {
       card.classList.remove('is-dragging', 'is-picked');
@@ -577,6 +595,7 @@ export function initV2WorkspaceInteraction(root, {
       index = fCards.indexOf(fCard);
       if (index !== fActiveIndex && !event.target.closest?.('[data-v2-f-handle]')) return;
     } else if (bindZ && z?.contains(event.target)) {
+      if (!open && ownsHorizontalGesture(event.target)) return;
       role = 'z';
     } else {
       return;
@@ -611,20 +630,23 @@ export function initV2WorkspaceInteraction(root, {
 
     if (gesture.axis === 'pending') {
       if (Math.max(Math.abs(dx), Math.abs(dy)) < 6) return;
+
       if (gesture.role === 'f') {
-        gesture.axis = Math.abs(dx) >= Math.abs(dy) * 0.72 ? 'horizontal' : 'vertical';
-        if (gesture.axis !== 'horizontal') {
+        const leftOrDownLeft = dx < -5 && dy >= -8;
+        if (!leftOrDownLeft) {
           gesture.cancelled = true;
           clearMotion();
           return;
         }
+        gesture.axis = 'f';
       } else if (gesture.role === 'e') {
-        gesture.axis = Math.abs(dy) >= Math.abs(dx) * 0.72 ? 'vertical' : 'horizontal';
-        if (gesture.axis !== 'vertical') {
+        const downOnly = dy > 5 && Math.abs(dx) <= Math.max(18, dy * 1.5);
+        if (!downOnly) {
           gesture.cancelled = true;
           clearMotion();
           return;
         }
+        gesture.axis = 'e';
       } else {
         gesture.axis = Math.abs(dx) >= Math.abs(dy) * 1.08 ? 'horizontal' : 'vertical';
         if (gesture.axis !== 'horizontal') {
@@ -633,18 +655,22 @@ export function initV2WorkspaceInteraction(root, {
           return;
         }
       }
+
       stage.setPointerCapture?.(event.pointerId);
       gesture.captured = true;
     }
 
     if (gesture.role === 'f') {
-      const dragX = Math.max(-maxDrag, Math.min(maxDrag, dx));
+      const dragX = Math.max(-maxDrag, Math.min(0, dx));
+      const dragY = Math.max(0, Math.min(maxDrag * 0.6, dy));
       gesture.card?.classList.add('is-dragging');
       if (gesture.index === fActiveIndex) {
         deck?.classList.add('is-dragging');
         deck?.style.setProperty('--v2-fe-drag-x', `${dragX}px`);
+        deck?.style.setProperty('--v2-fe-drag-y', `${dragY}px`);
       } else {
         gesture.card?.style.setProperty('--v2-pick-x', `${dragX}px`);
+        gesture.card?.style.setProperty('--v2-pick-y', `${dragY}px`);
       }
       markSuppressClick();
       event.preventDefault();
@@ -652,7 +678,7 @@ export function initV2WorkspaceInteraction(root, {
     }
 
     if (gesture.role === 'e') {
-      const dragY = Math.max(-maxDrag, Math.min(maxDrag, dy));
+      const dragY = Math.max(0, Math.min(maxDrag, dy));
       gesture.card?.classList.add('is-dragging');
       if (gesture.index === eActiveIndex) {
         eDeck?.classList.add('is-dragging');
@@ -676,7 +702,7 @@ export function initV2WorkspaceInteraction(root, {
       front.style.setProperty('--v2-front-drag-x', `${dragX}px`);
       if (!gesture.openAtStart && dragX > 0) app.classList.add('is-revealing-deck');
     }
-    markSuppressClick();
+    if (Math.abs(dx) > 7) markSuppressClick();
     event.preventDefault();
   };
 
@@ -685,18 +711,19 @@ export function initV2WorkspaceInteraction(root, {
     const current = gesture;
     const distance = Math.max(Math.abs(current.dx), Math.abs(current.dy));
 
-    if (current.role === 'f' && !current.cancelled) {
+    if (current.role === 'f' && !current.cancelled && current.axis === 'f') {
       if (current.index >= 0 && current.index !== fActiveIndex) {
-        const id = fId(current.card);
-        markSuppressClick();
-        setOpen(true);
-        endGesture();
-        if (id) onRootSelect?.(id);
-        return;
-      }
-      if (current.axis === 'horizontal' && Math.abs(current.dx) >= threshold && fCards.length > 1) {
-        const direction = current.dx < 0 ? 1 : -1;
-        const nextIndex = (fActiveIndex + direction + fCards.length) % fCards.length;
+        const directDistance = Math.hypot(Math.min(0, current.dx), Math.max(0, current.dy));
+        if (directDistance >= directPickThreshold) {
+          const id = fId(current.card);
+          markSuppressClick();
+          setOpen(true);
+          endGesture();
+          if (id) onRootSelect?.(id);
+          return;
+        }
+      } else if (current.dx <= -threshold && fCards.length > 1) {
+        const nextIndex = (fActiveIndex + 1) % fCards.length;
         const id = fId(fCards[nextIndex]);
         markSuppressClick();
         setOpen(true);
@@ -706,18 +733,18 @@ export function initV2WorkspaceInteraction(root, {
       }
     }
 
-    if (current.role === 'e' && !current.cancelled) {
+    if (current.role === 'e' && !current.cancelled && current.axis === 'e') {
       if (current.index >= 0 && current.index !== eActiveIndex) {
-        const id = eId(current.card);
-        markSuppressClick();
-        setOpen(true);
-        endGesture();
-        if (id) onSecondarySelect?.(id);
-        return;
-      }
-      if (current.axis === 'vertical' && Math.abs(current.dy) >= threshold && eCards.length > 1) {
-        const direction = current.dy > 0 ? 1 : -1;
-        const nextIndex = (eActiveIndex + direction + eCards.length) % eCards.length;
+        if (current.dy >= directPickThreshold) {
+          const id = eId(current.card);
+          markSuppressClick();
+          setOpen(true);
+          endGesture();
+          if (id) onSecondarySelect?.(id);
+          return;
+        }
+      } else if (current.dy >= threshold && eCards.length > 1) {
+        const nextIndex = (eActiveIndex + 1) % eCards.length;
         const id = eId(eCards[nextIndex]);
         markSuppressClick();
         setOpen(true);
