@@ -20,7 +20,7 @@ A/B/C/D/Z/F/E geometry, folder hierarchy and gesture behavior are out of scope f
 
 ## Stage 1 — safety before external distribution
 
-Status: IN PROGRESS on `staging`.
+Status: DONE in `main@cad049020c656add2a649df65f0f7dbe3e6d620a`.
 
 Goal: remove accidental browser/system/technical output without changing application geometry or business flows.
 
@@ -41,9 +41,14 @@ Stage 1 must not:
 
 ## Stage 2 — move active local UI into Shared UI
 
-Status: NOT STARTED.
+Status: IN PROGRESS on `staging`.
 
 Move reusable local form/error/chat/settings/receipt presentation from end-user files into canonical Shared UI owners. Preserve behavior and visual output.
+
+Substages:
+- 2A Chat: move message bubble/thread/composer code and styles from legacy `ui/shell` into canonical `ui/chat`; no visual or behavioral change.
+- 2B Settings/receipt: move active settings/toggle/read-only receipt owners out of legacy shell.
+- 2C Forms/errors: move reusable local end-user form/error presentation into Shared UI without changing flows.
 
 ## Stage 3 — remove proven dead legacy renderers
 
