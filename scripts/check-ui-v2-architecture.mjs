@@ -27,6 +27,7 @@ const journalList = fs.readFileSync('journal/список.js', 'utf8');
 const firstRun = fs.readFileSync('first-run/runtime.js', 'utf8');
 const profile = fs.readFileSync('settings/profile/profile.js', 'utf8');
 const style = fs.readFileSync('css/style.css', 'utf8');
+const entityCardUi = fs.readFileSync('ui/cards/index.js', 'utf8');
 const entityCardCss = fs.readFileSync('ui/cards/entity-card.css', 'utf8');
 const buttonCss = fs.readFileSync('ui/buttons/buttons.css', 'utf8');
 const segmentUi = fs.readFileSync('ui/selection/segment-control.js', 'utf8');
@@ -254,6 +255,7 @@ expect(miniCardUi.includes("surface = 'default'") && miniCardUi.includes("surfac
 expect(miniCardUi.includes('export function miniCardStack') && facade.includes('miniCardStack') && miniCardCss.includes('.mini-card-stack'), 'Shared Mini Card owner must also provide the canonical vertical stack composition.');
 expect(entityCardCss.includes('--entity-card-depth:#2C2A28') && entityCardCss.includes('--entity-card-mid:#817A73') && entityCardCss.includes('--entity-card-light:#D7D1CA') && entityCardCss.includes('radial-gradient(circle at 78% 18%') && !entityCardCss.includes('--entity-card-neutral') && !entityCardCss.includes('var(--v2-disabled') && !entityCardCss.includes('var(--button-secondary)'), 'Photo-less Entity Card must own a warm Shared gradient and must never derive its surface from disabled/system gray.');
 expect(entityCardCss.includes('.entity-card.has-image .entity-card__background') && entityCardCss.includes('var(--entity-card-image)'), 'Entity Card with photo must keep the photo as the base with only a soft readability veil.');
+expect(entityCardUi.includes('export function entityCardStack') && facade.includes('entityCardStack') && entityCardCss.includes('.entity-card-stack{display:grid'), 'Shared Entity Card owner must provide the canonical vertical card stack.');
 expect(inputs.includes('data-photo-crop-x-value') && inputs.includes('data-photo-crop-y-value') && inputs.includes('setOriginal(src)') && !inputs.includes('croppedSquare('), 'Shared photo owner must preserve the original image and store crop position metadata instead of replacing the original with a cropped blob.');
 expect(headerUi.includes('export function workspaceHeaderContext') && facade.includes('workspaceHeaderContext'), 'Canonical Header owner must own workspace context metadata.');
 expect(ui.includes("kind === 'logo'") && css.includes('.v2-header__slot--a .v2-header__control') && css.includes('width:48px') && css.includes('height:48px') && css.includes('border:2px solid #fff') && css.includes('background:var(--v2-base)') && css.includes('.v2-header__slot--a .v2-header__avatar--initials{background:transparent;color:#fff}'), 'Shared Header A must keep one 48x48 H circle with a 2px white outline while section data alone changes its content.');
