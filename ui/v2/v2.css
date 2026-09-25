@@ -17,7 +17,7 @@
   --v2-fe-open-x:min(40vw,156px);
   --v2-deck-width:calc(var(--v2-f-open-x) - var(--v2-gap));
   --v2-e-pull:var(--v2-card-handle);
-  --v2-e-top-gap:72px;
+  --v2-e-max-height:calc(66.666% - 24px);
   --v2-deck-top:34px;
   --v2-card-handle:48px;
   --v2-card-handle-min:44px;
@@ -153,10 +153,12 @@
 .v2-e-deck{
   position:absolute;
   z-index:1;
-  top:calc(var(--v2-deck-top) + var(--v2-e-top-gap));
+  top:auto;
   bottom:0;
   left:0;
   width:var(--v2-deck-width);
+  height:var(--v2-e-max-height);
+  max-height:var(--v2-e-max-height);
   pointer-events:none;
 }
 .v2-front > .v2-z--layer{
