@@ -17,8 +17,13 @@ assert.match(
 
 assert.match(
   source,
-  /if\s*\(actionsRoot\)\s*actionsRoot\.hidden\s*=\s*false/,
-  'aggregate Graph must keep Apply available',
+  /className:\s*['"]v2-primary-source-only['"]/,
+  'Graph Apply must exist only as a hidden source for Shared Header C',
+);
+assert.doesNotMatch(
+  source,
+  /calendar-workspace__actions|data-timetable-actions|actionBlock\(/,
+  'Graph must never render a second Apply button in the calendar body',
 );
 
 assert.match(
@@ -53,8 +58,18 @@ assert.match(
 
 assert.match(
   source,
-  /includeAggregate:\s*false/,
-  'aggregate Apply workplace picker must select a real workplace, not the aggregate row',
+  /data-timetable-apply-workplace/,
+  'aggregate Apply workplace picker must expose real workplace cards',
+);
+assert.match(
+  source,
+  /entityCardStack\(cards\)/,
+  'aggregate Apply workplace picker must use a vertical Shared Entity Card stack',
+);
+assert.doesNotMatch(
+  source,
+  /openWorkplaceControl\s*\(/,
+  'aggregate Apply must not fall back to the legacy workplace List',
 );
 
 assert.match(

@@ -409,12 +409,6 @@
   --danger:var(--v2-danger);
 }
 
-.booking-account--account .v2-app .calendar__month-button{background:#fff;color:#111}
-.booking-account--account .v2-app .calendar__date.is-weekend .calendar__date-number{color:#111}
-.booking-account--account .v2-app .calendar__date.is-weekend.is-neighbor .calendar__date-number{color:#A7A7A7}
-.booking-account--account .v2-app .calendar__date.is-today{background:#F0EEE9}
-.booking-account--account .v2-app .calendar__date.is-selected{box-shadow:inset 0 0 0 2px #111}
-.booking-account--account .v2-app .calendar__date.is-today.is-selected{background:#F0EEE9}
 .booking-account--account .v2-app .booking-time-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
 .booking-account--account .v2-app .booking-time-slot{border-radius:0;background:var(--v2-beige);border-color:#111;color:#111;transform:translateY(-1px);box-shadow:-8px 7px 12px -10px rgba(0,0,0,.30),8px 7px 12px -10px rgba(0,0,0,.30),0 1px 2px rgba(0,0,0,.07)}.booking-account--account .v2-app .booking-time-slot.is-selected{background:#111;color:#fff}
 .booking-account--account .v2-app .message-composer{bottom:env(safe-area-inset-bottom);width:min(calc(100% - 36px),calc(var(--app-max-width) - 36px));background:linear-gradient(180deg,rgba(255,255,255,0),#fff 24%)}
