@@ -21,13 +21,12 @@ import {
   initCheckList,
   listEntries,
   listEntry,
-  messageComposer,
-  messageThread,
   modal,
   mountModal,
   settingsPanel,
   textareaField,
 } from '../ui/ui.js';
+import { messageComposer, messageThread } from '../ui/chat/index.js';
 
 function personNameByPhone(phone, uei = '') {
   const people = findPeopleByPhone(phone);
