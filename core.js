@@ -42,6 +42,7 @@ const state = {
   activeSection: 'people',
   lastRootSection: 'people',
   navigationOpen: false,
+  chatPersonKey: '',
   secondary: {
     finance: 'cash',
     journal: 'day',
@@ -184,16 +185,18 @@ function setNavigationOpen(open) {
   app.querySelector('[data-v2-app]')?.classList.toggle('is-deck-open', state.navigationOpen);
 }
 
-function navigate(section, { navigationOpen = state.navigationOpen, updateHash = true } = {}) {
+function navigate(section, { navigationOpen = state.navigationOpen, updateHash = true, chatPersonKey = '' } = {}) {
   if (!workspaceReady) return;
   const next = normalizeRequestedSection(section);
   if (!sectionAllowed(next)) return;
   if (next === 'chat') {
     if (state.activeSection !== 'chat') state.lastRootSection = activeRootSection();
     state.activeSection = 'chat';
+    state.chatPersonKey = String(chatPersonKey || '');
     state.navigationOpen = false;
   } else {
     state.activeSection = next;
+    state.chatPersonKey = '';
     state.lastRootSection = next;
     state.navigationOpen = Boolean(navigationOpen);
     ensureSecondary(next);
@@ -297,6 +300,7 @@ function syncWorkspaceHeader(surface) {
   const backSource = contextRoot.querySelector('[data-workspace-back-source], .app-header__slot--back button');
   const contextSource = contextRoot.querySelector('[data-workspace-context-action], .page-header__meta button, .app-header__slot--settings button');
   const aSource = contextSource;
+  const dSource = contextRoot.querySelector('[data-workspace-d-action]');
   const cSource = primarySource(contextRoot);
   const cVisible = primaryVisible(cSource);
   const hideD = context?.dataset.workspaceHideD === 'true';
@@ -308,6 +312,7 @@ function syncWorkspaceHeader(surface) {
   header.outerHTML = v2Header({
     a: aSource ? {
       kind: aSource.dataset.workspaceAKind || 'settings',
+      label: aSource.dataset.workspaceALabel || '',
       image: aSource.dataset.workspaceAImage || '',
       imagePosition: aSource.dataset.workspaceAImagePosition || '',
       initials: aSource.dataset.workspaceAInitials || '',
@@ -317,20 +322,25 @@ function syncWorkspaceHeader(surface) {
     b: title,
     c: cVisible ? {
       label: primaryLabel(cSource),
+      variant: cSource.dataset.v2PrimaryVariant || (cSource.classList.contains('ui-button--danger') ? 'danger' : ''),
       data: 'data-v2-workspace-primary',
       aria: cSource.getAttribute('aria-label') || primaryLabel(cSource),
       disabled: Boolean(cSource.disabled),
     } : null,
-    d: !hideD && sectionAllowed('chat') ? {
-      kind: 'chat',
+    d: !hideD && (dSource || sectionAllowed('chat')) ? {
+      kind: dSource?.dataset.workspaceDKind || 'chat',
       data: 'data-v2-workspace-chat',
-      aria: state.activeSection === 'chat' ? 'Вернуться из чата' : 'Чат',
+      aria: dSource?.getAttribute('aria-label') || (state.activeSection === 'chat' ? 'Вернуться из чата' : 'Чат'),
     } : null,
   });
 
   app.querySelector('[data-v2-workspace-a]')?.addEventListener('click', () => aSource?.click());
   app.querySelector('[data-v2-workspace-primary]')?.addEventListener('click', () => cSource?.click());
   app.querySelector('[data-v2-workspace-chat]')?.addEventListener('click', () => {
+    if (dSource) {
+      dSource.click();
+      return;
+    }
     if (state.activeSection === 'chat') navigate(state.lastRootSection, { navigationOpen: false });
     else navigate('chat', { navigationOpen: false });
   });
@@ -339,7 +349,9 @@ function syncWorkspaceHeader(surface) {
 function renderActiveWorkspaceSurface(surface) {
   const section = state.activeSection;
   const openNavigation = () => setNavigationOpen(true);
-  if (section === 'people') return renderPeople(surface);
+  if (section === 'people') return renderPeople(surface, {
+    onDirectChat: (personKey) => navigate('chat', { navigationOpen: false, chatPersonKey: personKey }),
+  });
   if (section === 'finance') return renderFinanceSection(surface, ensureSecondary('finance'), { onBack: openNavigation });
   if (section === 'timetable') return renderTimetable(surface);
   if (section === 'journal') {
@@ -353,7 +365,7 @@ function renderActiveWorkspaceSurface(surface) {
   }
   if (section === 'profile') return renderProfile(surface, openNavigation);
   if (section === 'settings') return renderSettingsSection(surface, ensureSecondary('settings'), { onBack: openNavigation });
-  if (section === 'chat') return renderChat(surface);
+  if (section === 'chat') return renderChat(surface, { personKey: state.chatPersonKey });
   return renderPeople(surface);
 }
 
@@ -440,7 +452,7 @@ function renderWorkspace() {
     subtree: true,
     characterData: true,
     attributes: true,
-    attributeFilter: ['class', 'disabled', 'aria-label', 'data-v2-primary-visible'],
+    attributeFilter: ['class', 'disabled', 'aria-label', 'data-v2-primary-visible', 'data-v2-primary-label', 'data-v2-primary-variant'],
   });
 
   const result = surface ? renderActiveWorkspaceSurface(surface) : null;
