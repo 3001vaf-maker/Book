@@ -54,8 +54,8 @@
 .v2-header__control{position:relative;min-width:42px;height:42px;border:0;padding:0 12px;display:grid;place-items:center;background:#fff;color:var(--v2-ink);font:inherit;font-weight:760}
 
 /* A is one immutable Shared Header control. Only its data changes by section. */
-.v2-header__slot--a .v2-header__control{box-sizing:border-box;width:48px;min-width:48px;max-width:48px;height:48px;min-height:48px;max-height:48px;border:2px solid #fff;border-radius:50%;padding:0;overflow:hidden;background:var(--v2-base);color:#fff}
-.v2-header__slot--a .v2-header__control:disabled{border-color:#fff;background:var(--v2-base);color:#fff;opacity:1}
+.v2-header__slot--a .v2-header__control{box-sizing:border-box;width:48px;min-width:48px;max-width:48px;height:48px;min-height:48px;max-height:48px;border:2px solid var(--v2-yellow);border-radius:50%;padding:0;overflow:hidden;background:var(--v2-base);color:#fff}
+.v2-header__slot--a .v2-header__control:disabled{border-color:var(--v2-yellow);background:var(--v2-base);color:#fff;opacity:1}
 .v2-header__control--logo{font-size:14px;font-weight:850;line-height:1}
 .v2-header__control--avatar{overflow:hidden}
 .v2-header__slot--a .v2-header__avatar--initials{background:transparent;color:#fff}
@@ -64,6 +64,7 @@
 
 /* C is always the active action: black, white outline, white text unless an explicit special variant is supplied. */
 .v2-header__slot--c .v2-header__control{box-sizing:border-box;width:max-content;min-width:42px;height:42px;padding:0 12px;border:1px solid #fff;border-radius:12px;background:#111;color:#fff;white-space:nowrap}
+.v2-header__slot--c .v2-header__control--white{border-color:#111;background:#fff;color:#111}
 .v2-header__slot--c .v2-header__control--danger{border-color:var(--v2-danger);background:var(--v2-danger);color:#fff}
 .v2-header__slot--c .v2-header__control:disabled{border-color:#B7B7B7;background:var(--v2-disabled);color:#777}
 
@@ -77,11 +78,12 @@
 .v2-header__icon{width:22px;height:22px;display:grid;place-items:center}.v2-header__icon svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.v2-header__icon--chat svg{width:24px;height:24px;fill:currentColor;stroke:none}
 .v2-header__badge{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;display:grid;place-items:center;background:var(--v2-danger);color:#fff;font-size:10px;font-weight:850}
 
-.v2-app__stage{position:relative;min-height:calc(var(--visual-vh,100dvh) - 72px);background:var(--v2-base);overflow:hidden}
+.v2-app__stage{position:relative;height:calc(var(--visual-vh,100dvh) - 72px);min-height:calc(var(--visual-vh,100dvh) - 72px);background:var(--v2-base);overflow:hidden}
 .v2-front{
   position:relative;
   z-index:3;
   width:100%;
+  height:calc(var(--visual-vh,100dvh) - 72px);
   min-height:calc(var(--visual-vh,100dvh) - 72px);
   background:var(--v2-base);
   transform:translate3d(var(--v2-front-drag-x,0px),0,0);
@@ -93,7 +95,9 @@
   position:relative;
   touch-action:pan-y;
   z-index:3;
+  box-sizing:border-box;
   width:calc(100% - var(--v2-edge));
+  height:calc(var(--visual-vh,100dvh) - 72px);
   min-height:calc(var(--visual-vh,100dvh) - 72px);
   margin-left:var(--v2-edge);
   overflow-x:hidden;
@@ -388,6 +392,8 @@
 .v2-legal-card__toggle.is-on span::after{transform:translateX(18px)}
 
 .v2-layer-backdrop{z-index:1200;background:rgba(47,51,56,.42);pointer-events:auto}
+.v2-z:not(.v2-z--layer).has-v2-layer{transform:translateZ(0);overflow:hidden}
+.v2-z.has-v2-layer{overflow:hidden}
 .v2-layer-backdrop--contained{position:fixed;inset:0;width:auto;margin:0}
 .v2-layer-backdrop--technical{position:fixed;inset:0;width:min(100%,var(--app-max-width));margin:0 auto;background:var(--v2-base)}
 .v2-layer{position:absolute;box-sizing:border-box;overflow:auto;background:#fff;color:var(--v2-ink)}
