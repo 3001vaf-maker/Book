@@ -478,6 +478,18 @@ function openProfileSettings(state, { onPersonalData, onPassword, onConsents, on
   });
 }
 
+function openRepresentativeSettings(state) {
+  const layer = mountModal(document.body, modal(settingsPanel([
+    { label: 'Согласия', data: 'data-representative-consents' },
+  ]), { variant: 'large', title: 'Настройки' }));
+  layer?.querySelector('[data-representative-consents]')?.addEventListener('click', () => {
+    layer.remove();
+    void openAccountConsentSettings(state);
+  });
+  return layer;
+}
+
+
 async function renderHome(root, state, handlers) {
   const account = state.account || {};
   const requests = futureRequests(state.accountRecords || []);
@@ -567,7 +579,7 @@ async function renderRepresentative(root, state, handlers) {
     ? v2HorizontalRail(rows.map((row, index) => v2RailCard({ title: row.label, subtitle: row.value, data: `data-account-program="${index}"`, aria: `Открыть программу ${row.label}` })).join(''))
     : '';
   const header = v2Header({
-    a: { kind: 'avatar', label: profileDisplayName(state), image: representativePhoto(state), disabled: true },
+    a: { kind: 'avatar', label: profileDisplayName(state), image: representativePhoto(state), data: 'data-account-representative-settings', aria: 'Настройки' },
     b: profileDisplayName(state),
     c: { kind: 'text', label: 'Записаться', data: 'data-account-booking', aria: 'Записаться' },
     d: { kind: 'chat', data: 'data-account-open-chat-direct', aria: 'Чат' },
@@ -577,6 +589,7 @@ async function renderRepresentative(root, state, handlers) {
     body: `${metrics ? v2Section('Взаимодействие', metrics) : ''}${upcoming ? v2Section('Предстоящие визиты', upcoming) : ''}${programs ? v2Section('Программы', programs) : ''}`,
   });
   bindWorkspaceInteraction(root, state, handlers);
+  root.querySelector('[data-account-representative-settings]')?.addEventListener('click', () => openRepresentativeSettings(state));
   root.querySelector('[data-account-booking]')?.addEventListener('click', handlers.onStartBooking);
   root.querySelector('[data-account-open-chat-direct]')?.addEventListener('click', () => {
     state.accountTab = 'messages';
