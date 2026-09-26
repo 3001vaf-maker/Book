@@ -943,11 +943,7 @@ async function renderGlobalHome(root, state, handlers) {
 function contactsBody(relationships = [], query = '') {
   const needle = String(query || '').trim().toLocaleLowerCase('ru');
   const filtered = needle
-    ? relationships.filter((relationship) => {
-        const title = relationshipTitle(relationship).toLocaleLowerCase('ru');
-        const profession = String(relationship?.context?.profile?.profession || '').toLocaleLowerCase('ru');
-        return title.includes(needle) || profession.includes(needle);
-      })
+    ? relationships.filter((relationship) => relationshipTitle(relationship).toLocaleLowerCase('ru').includes(needle))
     : relationships;
   if (!filtered.length) {
     return emptyState(needle ? 'Ничего не найдено' : 'Контактов пока нет', needle ? 'Измени запрос поиска.' : 'Новые контакты появятся здесь.');
