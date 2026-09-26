@@ -24,7 +24,7 @@ expect(!profileChat.includes('function bindMessageAttachments') && !profileChat.
 expect(!profileChat.includes('<style>') && !profileChat.includes("document.createElement('style')"), 'Professional Chat must not own local styles.');
 
 expect(accountChat.includes('v2Header({') && accountChat.includes('v2Shell'), 'End-user Chat must use the shared V2 H + Z shell.');
-expect(accountChat.includes("className: 'v2-app--chat'"), 'End-user Chat must use the canonical V2 Chat shell class.');
+expect(accountChat.includes("mode === 'thread' ? 'v2-app--chat' : 'v2-app--chat-list'"), 'End-user Chat must use the canonical V2 Chat shell classes.');
 expect(accountChat.includes("from '../core/chat/runtime.js'") && accountChat.includes('mountChatThread(') && accountChat.includes('mountChatList('), 'End-user Chat must use the neutral Core Chat runtime.');
 expect(accountChat.includes('openEndUserContacts(') && accountChat.includes('getGlobalAccountRelationships'), 'End-user Chat C contacts must use the account professional-contact relationships.');
 expect(!accountChat.includes('bindMessageAttachments(form)') && !accountChat.includes('messageThread(') && !accountChat.includes('messageComposer('), 'End-user account shell must not own Chat thread/composer behavior.');
