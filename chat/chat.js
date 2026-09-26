@@ -25,7 +25,8 @@ import {
   textareaField,
   workspaceHeaderContext,
 } from '../ui/ui.js';
-import { bindMessageAttachments, initMessageComposer, messageComposer, messageThread } from '../ui/chat/index.js';
+import { bindMessageAttachments, initMessageComposer, messageComposer } from '../ui/chat/index.js';
+import { mountChatList, mountChatThread } from '../core/chat/runtime.js';
 import { settingsPanel } from '../ui/settings/index.js';
 import { formView } from '../ui/forms/index.js';
 
@@ -50,12 +51,9 @@ function messageTime(value) {
   return new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' }).format(date);
 }
 
-function withTimes(messages = []) {
-  return (Array.isArray(messages) ? messages : []).map((message) => ({ ...message, time: messageTime(message.createdAt) }));
-}
-
 function renderChatSurface(root, {
   title = 'Чат',
+  a = { kind: 'settings', data: 'data-chat-settings', aria: 'Настройки чата' },
   c = null,
   d = null,
   body = '',
@@ -63,12 +61,11 @@ function renderChatSurface(root, {
   root.classList.add('v2-workspace-surface--chat');
   root.innerHTML = `${workspaceHeaderContext({
     title,
-    a: { kind: 'settings', data: 'data-chat-settings', aria: 'Настройки чата' },
+    a,
     c,
     d,
     hideD: !d,
   })}${body}`;
-  root.querySelector('[data-chat-settings]')?.addEventListener('click', openProfileChatSettings);
   initMessageComposer(root);
 }
 
@@ -78,6 +75,30 @@ function peopleList() {
 
 function personByKey(key) {
   return peopleList().find((person) => String(person.key) === String(key)) || null;
+}
+
+function openProfessionalContacts(root, state) {
+  const people = peopleList();
+  const layer = mountModal(document.body, modal(
+    people.length
+      ? listEntries(people.map((person, index) => listEntry({
+          title: personName(person),
+          subtitle: phoneOf(person),
+          data: `data-chat-contact="${index}"`,
+          aria: `Открыть диалог с ${personName(person)}`,
+        })))
+      : emptyState('Контактов пока нет', 'База людей пока пустая.'),
+    { title: 'Контакты', variant: 'large', surface: 'app' },
+  ));
+  layer?.querySelectorAll('[data-chat-contact]').forEach((node) => node.addEventListener('click', () => {
+    const person = people[Number(node.dataset.chatContact)];
+    if (!person) return;
+    layer.remove();
+    void openThread(root, state, {
+      personPhone: phoneOf(person),
+      uei: person.uei || '',
+    });
+  }));
 }
 
 function recipientLabel(recipient = {}) {
@@ -309,55 +330,32 @@ async function openThread(root, state, thread) {
 
   renderChatSurface(root, {
     title,
-    c: { kind: 'contacts', data: 'data-chat-back', aria: 'К диалогам' },
+    c: { kind: 'contacts', data: 'data-chat-contacts', aria: 'Контакты' },
     body: emptyState('Загрузка', 'Получаем переписку.'),
   });
-  root.querySelector('[data-chat-back]')?.addEventListener('click', () => void renderThreads(root, state));
 
   try {
-    const messages = withTimes(await getCommunicationThread({ phone, uei }));
-    renderChatSurface(root, {
+    const messages = await getCommunicationThread({ phone, uei });
+    mountChatThread(root, {
       title,
-      c: { kind: 'contacts', data: 'data-chat-back', aria: 'К диалогам' },
-      d: { kind: 'attachment', data: 'data-chat-attachment', aria: 'Вложения' },
-      body: `${messages.length ? messageThread(messages, { viewer: 'profile' }) : emptyState('Сообщений пока нет', 'Напишите человеку первое сообщение.')}${messageComposer({ placeholder: 'Написать сообщение...', attachments: true, attachmentTrigger: 'external' })}`,
-    });
-    root.querySelector('[data-chat-back]')?.addEventListener('click', () => void renderThreads(root, state));
-    const form = root.querySelector('[data-message-composer]');
-    root.querySelector('[data-chat-attachment]')?.addEventListener('click', () => form?.querySelector('[data-message-attachment]')?.click());
-    const getAttachments = bindMessageAttachments(form);
-    form?.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      const input = form.querySelector('[name="message"]');
-      const body = String(input?.value || '').trim();
-      const attachments = getAttachments();
-      if (!body && !attachments.length) return;
-      const submit = form.querySelector('button[type="submit"]');
-      if (submit) submit.disabled = true;
-      try {
+      messages,
+      viewer: 'profile',
+      surface: (surface) => renderChatSurface(root, surface),
+      onSettings: openProfileChatSettings,
+      onContacts: () => openProfessionalContacts(root, state),
+      onSend: async ({ body, attachments }) => {
         await sendCommunicationMessage({ phone, uei, body, attachments });
         await openThread(root, state, thread);
-      } catch {
-        if (submit) submit.disabled = false;
-        openNotice({
-          title: 'Сообщение не отправлено',
-          message: 'Не удалось отправить сообщение',
-          action: 'Закрыть',
-          variant: 'technical',
-        });
-      }
-    });
-    requestAnimationFrame(() => {
-      const z = root.closest('[data-v2-z]');
-      if (z) z.scrollTop = z.scrollHeight;
+      },
     });
   } catch {
     renderChatSurface(root, {
       title,
-      c: { kind: 'contacts', data: 'data-chat-back', aria: 'К диалогам' },
+      c: { kind: 'contacts', data: 'data-chat-contacts', aria: 'Контакты' },
       body: emptyState('Чат недоступен', 'Не удалось загрузить переписку.'),
     });
-    root.querySelector('[data-chat-back]')?.addEventListener('click', () => void renderThreads(root, state));
+    root.querySelector('[data-chat-settings]')?.addEventListener('click', openProfileChatSettings);
+    root.querySelector('[data-chat-contacts]')?.addEventListener('click', () => openProfessionalContacts(root, state));
     openNotice({
       title: 'Чат недоступен',
       message: 'Не удалось загрузить переписку',
@@ -370,40 +368,35 @@ async function openThread(root, state, thread) {
 async function renderThreads(root, state) {
   state.view = 'threads';
   state.thread = null;
-  const headerC = { kind: 'contacts', data: 'data-chat-new', aria: 'Новое сообщение' };
   renderChatSurface(root, {
     title: 'Чат',
-    c: headerC,
+    c: { kind: 'contacts', data: 'data-chat-contacts', aria: 'Контакты' },
     body: emptyState('Загрузка', 'Получаем диалоги.'),
   });
-  root.querySelector('[data-chat-new]')?.addEventListener('click', () => recipientOptions(root, state));
 
   try {
     const threads = await getCommunicationThreads();
-    const items = threads.map((thread, index) => listEntry({
-      title: personNameByPhone(thread.personPhone, thread.uei),
-      subtitle: thread.body || (Array.isArray(thread.attachments) && thread.attachments.length ? 'Медиа' : 'Открыть диалог'),
-      rightTop: messageTime(thread.createdAt),
-      data: `data-chat-thread="${index}"`,
-      aria: `Открыть диалог с ${personNameByPhone(thread.personPhone, thread.uei)}`,
-    }));
-    renderChatSurface(root, {
+    mountChatList(root, {
       title: 'Чат',
-      c: headerC,
-      body: items.length ? listEntries(items) : emptyState('Чат пока пуст', 'Сообщения и системные уведомления людей появятся здесь.'),
+      threads,
+      surface: (surface) => renderChatSurface(root, surface),
+      onSettings: openProfileChatSettings,
+      onContacts: () => openProfessionalContacts(root, state),
+      onOpenThread: (thread) => void openThread(root, state, thread),
+      threadTitle: (thread) => personNameByPhone(thread.personPhone, thread.uei),
+      threadSubtitle: (thread) => thread.body || (Array.isArray(thread.attachments) && thread.attachments.length ? 'Медиа' : 'Открыть диалог'),
+      threadTime: (thread) => messageTime(thread.createdAt),
+      emptyTitle: 'Чат пока пуст',
+      emptyText: 'Сообщения и системные уведомления людей появятся здесь.',
     });
-    root.querySelector('[data-chat-new]')?.addEventListener('click', () => recipientOptions(root, state));
-    root.querySelectorAll('[data-chat-thread]').forEach((element) => element.addEventListener('click', () => {
-      const thread = threads[Number(element.dataset.chatThread)];
-      if (thread) void openThread(root, state, thread);
-    }));
   } catch {
     renderChatSurface(root, {
       title: 'Чат',
-      c: headerC,
+      c: { kind: 'contacts', data: 'data-chat-contacts', aria: 'Контакты' },
       body: emptyState('Чат недоступен', 'Не удалось загрузить диалоги.'),
     });
-    root.querySelector('[data-chat-new]')?.addEventListener('click', () => recipientOptions(root, state));
+    root.querySelector('[data-chat-settings]')?.addEventListener('click', openProfileChatSettings);
+    root.querySelector('[data-chat-contacts]')?.addEventListener('click', () => openProfessionalContacts(root, state));
     openNotice({
       title: 'Чат недоступен',
       message: 'Не удалось загрузить диалоги',
