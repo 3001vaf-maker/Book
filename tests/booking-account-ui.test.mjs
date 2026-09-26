@@ -110,6 +110,9 @@ assert.match(accountShell, /GLOBAL_ACCOUNT_ROOTS = Object\.freeze\(\[[\s\S]*?id:
 assert.match(accountShell, /async function renderGlobalProfile\(/);
 assert.match(accountShell, /async function renderGlobalProfileSettings\(/);
 assert.match(accountShell, /openGlobalConsentSettingsByContact/);
+assert.match(accountShell, /function openRepresentativeSettings\(/);
+assert.match(accountShell, /data-account-representative-settings/);
+assert.match(accountShell, /data-representative-consents/);
 assert.match(accountShell, /data-account-consent-contact/);
 assert.match(accountShell, /openAccountConsentSettings\(\{ \.\.\.state, tenantId \}/);
 assert.match(accountShell, /label: 'Согласия', data: 'data-account-consents'/);
