@@ -16,7 +16,8 @@ function headerControl(slot = {}, role = '') {
   const image = String(slot.image || '').trim();
   const initials = text(slot.initials || (slot.label || '').split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase());
   const kind = slot.kind || 'text';
-  const variantClass = slot.variant === 'danger' ? ' v2-header__control--danger' : '';
+  const variant = slot.variant === 'danger' ? 'danger' : (slot.variant === 'white' || slot.variant === 'secondary' ? 'white' : '');
+  const variantClass = variant ? ` v2-header__control--${variant}` : '';
   let body = label;
   if (kind === 'logo') {
     body = label;
@@ -339,6 +340,7 @@ export function mountV2Layer(html, { root = null } = {}) {
   const host = technical ? document.body : activeV2ModalSurface(root);
   if (!host) return null;
   node.classList.add(technical ? 'v2-layer-backdrop--technical' : 'v2-layer-backdrop--contained');
+  if (!technical && host.matches?.('[data-v2-z], [data-v2-z-layer]')) host.classList.add('has-v2-layer');
   host.appendChild(node);
 
   let disposeGesture = () => {};
@@ -350,6 +352,9 @@ export function mountV2Layer(html, { root = null } = {}) {
   const close = () => {
     disposeGesture();
     if (node.isConnected) node.remove();
+    if (!technical && host.matches?.('[data-v2-z], [data-v2-z-layer]') && !host.querySelector('[data-v2-layer]')) {
+      host.classList.remove('has-v2-layer');
+    }
   };
   node.v2Close = close;
   disposeGesture = initV2LayerDismissGesture(node, {
