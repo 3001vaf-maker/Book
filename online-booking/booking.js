@@ -957,18 +957,11 @@ async function renderGlobalClientHome(root, state) {
   state.relationships = Array.isArray(relationships) ? relationships : [];
   state.accountRecords = Array.isArray(records) ? records : [];
   await renderGlobalAccount(root, state, {
-    onOpenRelationship: (tenantId) => {
+    onStartBooking: (tenantId) => {
+      const id = String(tenantId || '');
+      if (!id) return;
       const params = new URLSearchParams();
-      params.set('booking', tenantId);
-      params.set('entry', 'account');
-      location.assign(`${location.pathname}?${params.toString()}`);
-    },
-    onOpenRecord: (request) => {
-      const tenantId = String(request?.tenantId || '');
-      if (!tenantId) return;
-      const params = new URLSearchParams();
-      params.set('booking', tenantId);
-      params.set('entry', 'account');
+      params.set('booking', id);
       location.assign(`${location.pathname}?${params.toString()}`);
     },
     onOpenChat: (tenantId) => {
