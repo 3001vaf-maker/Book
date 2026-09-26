@@ -899,8 +899,6 @@ async function renderGlobalProfileSettings(root, state, handlers) {
     body: settingsPanel([
       { label: 'Личные данные', data: 'data-account-personal-data' },
       { label: 'Изменить пароль', data: 'data-account-change-password' },
-      { label: 'Согласия', data: 'data-account-consents' },
-      { label: 'Уведомления', data: 'data-account-notifications' },
       { label: 'Выход', data: 'data-account-logout', variant: 'danger' },
     ]),
   });
@@ -916,10 +914,6 @@ async function renderGlobalProfileSettings(root, state, handlers) {
     onSaved: () => handlers.render?.(),
   }));
   root.querySelector('[data-account-change-password]')?.addEventListener('click', () => openAccountPasswordSettings(state));
-  root.querySelector('[data-account-consents]')?.addEventListener('click', () => openAccountConsentSettings(state, {
-    onChanged: () => handlers.render?.(),
-  }));
-  root.querySelector('[data-account-notifications]')?.addEventListener('click', () => void openChatSettings(state));
   root.querySelector('[data-account-logout]')?.addEventListener('click', () => handlers.onLogout?.());
 }
 
