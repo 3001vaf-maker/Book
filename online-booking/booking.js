@@ -929,7 +929,7 @@ function globalAccountState() {
     error: '',
     accountTab: 'home',
     accountDeckOpen: false,
-    accountDeckActive: 'representatives',
+    accountDeckActive: 'home',
   };
 }
 
