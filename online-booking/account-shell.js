@@ -987,7 +987,10 @@ async function renderGlobalHome(root, state, handlers) {
   bindGlobalChatButton(root, state, handlers);
   root.querySelectorAll('[data-account-upcoming]').forEach((node) => node.addEventListener('click', () => {
     const request = requests[Number(node.dataset.accountUpcoming)];
-    if (request?.tenantId) handlers.onOpenRecord?.(request);
+    if (!request) return;
+    selectHistoryRequest(state, request, 'home');
+    state.accountDeckActive = 'history';
+    void handlers.render();
   }));
 }
 
@@ -1108,7 +1111,10 @@ async function renderGlobalContactDetail(root, state, handlers) {
 
   root.querySelectorAll('[data-account-upcoming]').forEach((node) => node.addEventListener('click', () => {
     const request = requests[Number(node.dataset.accountUpcoming)];
-    if (request) handlers.onOpenRecord?.(request);
+    if (!request) return;
+    selectHistoryRequest(state, request, 'contact-detail');
+    state.accountDeckActive = 'history';
+    void handlers.render();
   }));
 }
 
@@ -1131,8 +1137,61 @@ async function renderGlobalHistory(root, state, handlers) {
   bindGlobalChatButton(root, state, handlers);
   root.querySelectorAll('[data-account-history]').forEach((node) => node.addEventListener('click', () => {
     const request = requests[Number(node.dataset.accountHistory)];
-    if (request?.tenantId) handlers.onOpenRecord?.(request);
+    if (!request) return;
+    selectHistoryRequest(state, request, 'history');
+    state.accountDeckActive = 'history';
+    void handlers.render();
   }));
+}
+
+async function renderGlobalHistoryDetail(root, state, handlers) {
+  const request = currentHistoryRequest(state);
+  if (!request) {
+    state.accountTab = state.accountHistoryReturn === 'contact-detail' ? 'contact-detail' : (state.accountHistoryReturn === 'home' ? 'home' : 'history');
+    state.accountDeckActive = accountRootForTab(state);
+    await handlers.render();
+    return;
+  }
+
+  const tenantId = String(request?.tenantId || '');
+  const relationship = (Array.isArray(state.relationships) ? state.relationships : [])
+    .find((item) => String(item?.tenantId || '') === tenantId);
+  const title = relationshipTitle(relationship || {});
+  const profile = relationship?.context?.profile || {};
+  const canRepeat = requestProcedures(request).length > 0;
+
+  const header = v2Header({
+    a: { kind: 'avatar', label: title, image: String(profile.photo || ''), data: 'data-global-history-contact-settings', aria: 'Настройки' },
+    b: workplaceName(state, request),
+    c: canRepeat ? { kind: 'text', label: 'Записаться', data: 'data-global-history-repeat', aria: 'Записаться снова' } : null,
+    d: { kind: 'chat', data: 'data-global-history-chat', aria: 'Чат' },
+  });
+
+  renderV2Shell(root, state, { header, body: historyDetailBody(state, request) });
+
+  bindWorkspaceInteraction(root, state, handlers, {
+    onZRight: () => {
+      const returnTab = state.accountHistoryReturn || 'history';
+      state.accountTab = returnTab;
+      state.accountDeckActive = accountRootForTab(state);
+      state.accountHistoryRequestId = '';
+      state.accountHistoryRequestMoment = '';
+      void handlers.render();
+    },
+  });
+
+  root.querySelector('[data-global-history-contact-settings]')?.addEventListener('click', () => {
+    if (!tenantId) return;
+    const layer = mountModal(document.body, modal(settingsPanel([
+      { label: 'Согласия', data: 'data-global-history-consents' },
+    ]), { variant: 'large', title: 'Настройки' }));
+    layer?.querySelector('[data-global-history-consents]')?.addEventListener('click', () => {
+      layer.remove();
+      void openAccountConsentSettings(state, { tenantId });
+    });
+  });
+  root.querySelector('[data-global-history-repeat]')?.addEventListener('click', () => handlers.onStartBooking?.(tenantId, request));
+  root.querySelector('[data-global-history-chat]')?.addEventListener('click', () => handlers.onOpenChat?.(tenantId));
 }
 
 export async function renderGlobalAccount(root, state, callbacks = {}) {
@@ -1143,7 +1202,6 @@ export async function renderGlobalAccount(root, state, callbacks = {}) {
 
   const handlers = {
     render: () => renderGlobalAccount(root, state, callbacks),
-    onOpenRecord: callbacks.onOpenRecord,
     onOpenChat: callbacks.onOpenChat,
     onStartBooking: callbacks.onStartBooking,
     onLogout: callbacks.onLogout,
@@ -1154,6 +1212,7 @@ export async function renderGlobalAccount(root, state, callbacks = {}) {
   if (state.accountTab === 'profile') return renderGlobalProfile(root, state, handlers);
   if (state.accountTab === 'contact-detail') return renderGlobalContactDetail(root, state, handlers);
   if (state.accountTab === 'contacts') return renderGlobalContacts(root, state, handlers);
+  if (state.accountTab === 'history-detail') return renderGlobalHistoryDetail(root, state, handlers);
   if (state.accountTab === 'history') return renderGlobalHistory(root, state, handlers);
   return renderGlobalHome(root, state, handlers);
 }
