@@ -45,10 +45,12 @@ function confirmRevoke(consent, onConfirm) {
   });
 }
 
-export async function openAccountConsentSettings(state, { onChanged } = {}) {
+export async function openAccountConsentSettings(state, { tenantId = state?.tenantId, onChanged } = {}) {
+  const scopeTenantId = String(tenantId || '');
+  if (!scopeTenantId) return openNotice({ title: 'Согласия недоступны', message: 'Не выбран контакт.', action: 'Закрыть', variant: 'technical' });
   let consentState;
   try {
-    consentState = await getAccountConsentState(state.tenantId);
+    consentState = await getAccountConsentState(scopeTenantId);
   } catch (error) {
     return openNotice({
       title: 'Согласия недоступны',
@@ -68,10 +70,10 @@ export async function openAccountConsentSettings(state, { onChanged } = {}) {
     const consent = consents[Number(node.dataset.accountConsentRevoke)];
     if (!consent?.accepted || !consent?.documentId) return;
     confirmRevoke(consent, async () => {
-      await revokeAccountConsent(state.tenantId, consent.documentId);
+      await revokeAccountConsent(scopeTenantId, consent.documentId);
       layer.remove();
       await onChanged?.(consent.documentId);
-      await openAccountConsentSettings(state, { onChanged });
+      await openAccountConsentSettings(state, { tenantId: scopeTenantId, onChanged });
     });
   }));
   return layer;
