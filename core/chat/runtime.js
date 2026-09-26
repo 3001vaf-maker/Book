@@ -69,7 +69,7 @@ export function mountChatThread(root, {
   if (typeof onSend !== 'function') throw new Error('Chat send owner is required');
   const normalized = normalizeChatMessages(messages);
   const a = onSettings ? { kind: 'settings', data: 'data-chat-settings', aria: 'Настройки чата' } : null;
-  const c = onContacts ? { kind: 'contacts', data: 'data-chat-contacts', aria: 'К диалогам' } : null;
+  const c = onContacts ? { kind: 'contacts', data: 'data-chat-contacts', aria: 'Контакты' } : null;
   const d = { kind: 'attachment', data: 'data-chat-attachment', aria: 'Вложения' };
   const body = `${normalized.length ? messageThread(normalized, { viewer }) : emptyState('Сообщений пока нет', 'Напишите первое сообщение.')}${messageComposer({ attachments: true, attachmentTrigger: 'external' })}`;
   surface({
