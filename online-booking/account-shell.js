@@ -362,7 +362,7 @@ function accountDeck(state) {
   const fallback = state.accountTab === 'history' ? 'history' : 'representatives';
   state.accountDeckActive ||= fallback;
   return v2FDeck([
-    { id: 'representatives', label: 'Контакты' },
+    { id: 'representatives', label: 'Обзор' },
     { id: 'history', label: 'История' },
   ], { active: state.accountDeckActive, data: 'data-account-deck-item' });
 }
@@ -511,7 +511,7 @@ async function renderHome(root, state, handlers) {
 async function renderRepresentatives(root, state, handlers) {
   const header = v2Header({
     a: { kind: 'avatar', label: accountName(state), image: accountPhoto(state), data: 'data-account-profile-settings', aria: 'Настройки профиля' },
-    b: 'Контакты',
+    b: 'Обзор',
     d: { kind: 'chat', data: 'data-account-open-chat-root', aria: 'Чат', badge: state.accountUnreadCount || 0 },
   });
   renderV2Shell(root, state, {
