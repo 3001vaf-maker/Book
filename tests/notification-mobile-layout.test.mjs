@@ -17,7 +17,7 @@ assert.match(account, /mountChatThread\(/);
 assert.doesNotMatch(account, /messageComposer\(|bindMessageAttachments\(form\)/);
 assert.match(chatRuntime, /kind: 'attachment'/);
 assert.match(chatRuntime, /messageComposer\(\{ attachments: true, attachmentTrigger: 'external' \}\)/);
-assert.match(account, /className: 'v2-app--chat'/);
+assert.match(account, /mode === 'thread' \? 'v2-app--chat' : 'v2-app--chat-list'/);
 assert.match(account, /settingsPanel\(/);
 assert.doesNotMatch(account, /createElement\('style'\)|<style>/);
 assert.equal(fs.existsSync('online-booking/notifications.js'), false, 'Legacy notification bridge must stay removed');
