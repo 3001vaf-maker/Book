@@ -3,7 +3,7 @@ import fs from 'node:fs';
 
 const chat = fs.readFileSync('ui/chat/chat.css', 'utf8');
 const v2 = fs.readFileSync('ui/v2/v2.css', 'utf8');
-const account = fs.readFileSync('online-booking/account-shell.js', 'utf8');
+const account = fs.readFileSync('online-booking/account-shell.js', 'utf8');\nconst chatRuntime = fs.readFileSync('core/chat/runtime.js', 'utf8');
 assert.equal(fs.existsSync('ui/shell/shell.css'), false);
 
 assert.match(chat, /\.message-composer\{[^}]*position:fixed[^}]*grid-template-columns:minmax\(0,1fr\) 46px/s);
