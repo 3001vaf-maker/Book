@@ -362,7 +362,7 @@ function accountDeck(state) {
   const fallback = state.accountTab === 'history' ? 'history' : 'representatives';
   state.accountDeckActive ||= fallback;
   return v2FDeck([
-    { id: 'representatives', label: 'Представители' },
+    { id: 'representatives', label: 'Контакты' },
     { id: 'history', label: 'История' },
   ], { active: state.accountDeckActive, data: 'data-account-deck-item' });
 }
@@ -479,7 +479,7 @@ async function renderHome(root, state, handlers) {
   });
   renderV2Shell(root, state, {
     header,
-    body: `${v2Section('Предстоящие визиты', upcoming)}${v2Section('Представители / пространства', representative)}`,
+    body: `${v2Section('Предстоящие визиты', upcoming)}${v2Section('Контакты', representative)}`,
   });
   bindWorkspaceInteraction(root, state, handlers);
   root.querySelector('[data-account-profile-settings]')?.addEventListener('click', () => openProfileSettings(state, {
@@ -511,7 +511,7 @@ async function renderHome(root, state, handlers) {
 async function renderRepresentatives(root, state, handlers) {
   const header = v2Header({
     a: { kind: 'avatar', label: accountName(state), image: accountPhoto(state), data: 'data-account-profile-settings', aria: 'Настройки профиля' },
-    b: 'Представители',
+    b: 'Контакты',
     d: { kind: 'chat', data: 'data-account-open-chat-root', aria: 'Чат', badge: state.accountUnreadCount || 0 },
   });
   renderV2Shell(root, state, {
@@ -852,12 +852,12 @@ async function renderGlobalHome(root, state, handlers) {
     : emptyState('Связей пока нет', 'Откройте ссылку нужного профиля, чтобы начать взаимодействие.');
   const header = v2Header({
     a: { kind: 'avatar', label: accountName(state), image: accountPhoto(state), data: 'data-account-profile-settings', aria: 'Настройки профиля' },
-    b: accountName(state),
+    b: 'Обзор',
     d: { kind: 'chat', data: 'data-account-open-chat-root', aria: 'Чат' },
   });
   renderV2Shell(root, state, {
     header,
-    body: `${v2Section('Предстоящие визиты', upcoming)}${v2Section('Представители / пространства', representatives)}`,
+    body: `${v2Section('Предстоящие визиты', upcoming)}${v2Section('Контакты', representatives)}`,
   });
   bindWorkspaceInteraction(root, state, handlers);
   bindGlobalProfileSettings(root, state, handlers);
