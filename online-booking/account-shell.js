@@ -831,6 +831,28 @@ function bindGlobalProfileSettingsEntry(root, state, handlers) {
   });
 }
 
+function openGlobalConsentSettingsByContact(state, handlers) {
+  const relationships = Array.isArray(state.relationships) ? state.relationships : [];
+  const content = relationships.length
+    ? listEntries(relationships.map((relationship, index) => listEntry({
+        title: relationshipTitle(relationship),
+        subtitle: 'Согласия',
+        data: `data-account-consent-contact="${index}"`,
+        aria: `Открыть согласия ${relationshipTitle(relationship)}`,
+      })))
+    : emptyState('Контактов пока нет', 'Согласия появятся после связи с контактом.');
+  const layer = mountModal(document.body, modal(content, { variant: 'large', title: 'Согласия' }));
+  layer?.querySelectorAll('[data-account-consent-contact]').forEach((node) => node.addEventListener('click', () => {
+    const relationship = relationships[Number(node.dataset.accountConsentContact)];
+    const tenantId = String(relationship?.tenantId || '');
+    if (!tenantId) return;
+    layer.remove();
+    void openAccountConsentSettings({ ...state, tenantId }, {
+      onChanged: () => handlers.render?.(),
+    });
+  }));
+}
+
 async function renderGlobalMessages(root, state, handlers) {
   const relationships = Array.isArray(state.relationships) ? state.relationships : [];
   mountChatList(root, {
@@ -899,6 +921,7 @@ async function renderGlobalProfileSettings(root, state, handlers) {
     body: settingsPanel([
       { label: 'Личные данные', data: 'data-account-personal-data' },
       { label: 'Изменить пароль', data: 'data-account-change-password' },
+      { label: 'Согласия', data: 'data-account-consents' },
       { label: 'Выход', data: 'data-account-logout', variant: 'danger' },
     ]),
   });
@@ -914,6 +937,7 @@ async function renderGlobalProfileSettings(root, state, handlers) {
     onSaved: () => handlers.render?.(),
   }));
   root.querySelector('[data-account-change-password]')?.addEventListener('click', () => openAccountPasswordSettings(state));
+  root.querySelector('[data-account-consents]')?.addEventListener('click', () => openGlobalConsentSettingsByContact(state, handlers));
   root.querySelector('[data-account-logout]')?.addEventListener('click', () => handlers.onLogout?.());
 }
 
