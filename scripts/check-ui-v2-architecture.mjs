@@ -326,10 +326,16 @@ expect(!inputs.includes('mountV2Layer(') && !inputs.includes('v2Layer('), 'Share
 
 
 expect(account.includes('v2FDeck('), 'End-user root must use shared F deck.');
+expect(account.includes("id: 'profile', label: 'Профиль'")
+  && account.includes("id: 'home', label: 'Обзор'")
+  && account.includes("id: 'contacts', label: 'Контакты'")
+  && account.includes("id: 'history', label: 'История'")
+  && !account.includes("id: 'representatives'"),
+  'End-user F owner must expose exactly Profile / Overview / Contacts / History and no legacy two-folder deck.');
 expect(account.includes('initV2WorkspaceInteraction(root'), 'End-user F/E/Z interaction must use the single Shared workspace owner.');
 expect(!account.includes('initV2DeckSwipe(root') && !account.includes('function bindRootSwipe') && !account.includes('function bindDeck('), 'End-user account must not re-own F/Z gesture binding beside the Shared workspace owner.');
 expect(core.includes('initV2WorkspaceInteraction(shell') && !core.includes('initV2DeckSwipe(rootDeckNode') && !core.includes('initV2Swipe(z'), 'Professional workspace must consume the same Shared workspace interaction owner as the end-user account.');
-expect(account.includes("mode === 'thread' ? 'v2-app--chat' : 'v2-app--chat-list'"), 'End-user Chat must share V2 H + Z geometry.');
+expect(account.includes("selected ? 'v2-app--chat' : 'v2-app--chat-list'"), 'End-user Chat must share V2 H + Z geometry inside the single global account owner.');
 expect(chatRuntime.includes("attachmentTrigger: 'external'") && chatRuntime.includes("kind: 'attachment'"), 'Chat attachment action must live in neutral Core Chat Header D.');
 expect(!account.includes('accountBottomNavigation') && !account.includes('bindBottomNavigation'), 'End-user V2 must not contain bottom navigation.');
 expect(!account.includes('<style>') && !booking.includes('<style>'), 'Feature code must not create local V2 style owners.');
