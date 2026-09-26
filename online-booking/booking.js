@@ -597,7 +597,9 @@ async function continueAfterIdentity(root, state) {
 
     if (state.identityDestination === 'profile') {
       state.platformOnlyLegal = false;
-      state.accountTab = 'home';
+      state.accountTab = state.entry === 'chat' ? 'messages' : 'home';
+      state.accountChatOpen = state.entry === 'chat';
+      state.accountChatReturn = state.entry === 'chat' ? 'deck' : '';
       await renderAccountHome(root, state);
       return;
     }
@@ -961,6 +963,14 @@ async function renderGlobalClientHome(root, state) {
       params.set('entry', 'account');
       location.assign(`${location.pathname}?${params.toString()}`);
     },
+    onOpenChat: (tenantId) => {
+      const id = String(tenantId || '');
+      if (!id) return;
+      const params = new URLSearchParams();
+      params.set('booking', id);
+      params.set('entry', 'chat');
+      location.assign(`${location.pathname}?${params.toString()}`);
+    },
     onLogout: () => {
       clearAccount('');
       state.account = null;
@@ -1216,7 +1226,7 @@ export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = 
     lastRequest: null,
     repeatSelection: null,
     identityDestination: 'booking',
-    bookingOrigin: entry === 'account' ? 'profile' : 'welcome',
+    bookingOrigin: entry === 'account' || entry === 'chat' ? 'profile' : 'welcome',
     accountTab: 'home',
     accountDeckOpen: false,
     accountChatOpen: false,
@@ -1238,7 +1248,7 @@ export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = 
     await refreshContext(state);
     const account = await getAccount(state.tenantId);
     if (account) state.account = account;
-    if (state.entry === 'account') {
+    if (state.entry === 'account' || state.entry === 'chat') {
       state.identityDestination = 'profile';
       if (!state.account) {
         renderAccountEntry(root, state);

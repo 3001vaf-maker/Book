@@ -74,6 +74,11 @@ assert.match(bookingUi, /export async function renderGlobalClient\(/, 'Client ho
 assert.match(bookingUi, /state\.platformOnlyLegal = state\.identityDestination === 'profile'/, 'Profile entry must keep platform terms separate from tenant legal documents');
 assert.match(bookingUi, /onExitToAccount/, 'Booking context must be escapable back to the global client profile');
 assert.match(accountShell, /export async function renderGlobalAccount\(/, 'Global Account must reuse the shared client shell');
+assert.match(accountShell, /async function renderGlobalMessages\(/, 'Global Account must expose the shared chat list');
+assert.match(accountShell, /data-account-open-chat-root/, 'Global Account header must expose chat directly');
+assert.match(accountShell, /onOpenChat: callbacks\.onOpenChat/, 'Global Account chat selection must be routed explicitly');
+assert.match(bookingUi, /params\.set\('entry', 'chat'\)/, 'Global chat must open the selected tenant conversation directly');
+assert.match(bookingUi, /state\.entry === 'chat'/, 'Tenant account flow must enter the conversation without an intermediate profile step');
 assert.match(core, /isEndUserAppHost\(\)/);
 assert.match(core, /renderGlobalClientRoot\(\)/);
 assert.match(core, /params\.get\('entry'\)/, 'Global profile must distinguish account entry from an external booking link');

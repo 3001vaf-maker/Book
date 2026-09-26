@@ -766,6 +766,51 @@ function bindGlobalRelationships(root, state, handlers) {
   }));
 }
 
+function bindGlobalChatButton(root, state, handlers) {
+  root.querySelector('[data-account-open-chat-root]')?.addEventListener('click', () => {
+    state.accountTab = 'messages';
+    state.accountDeckOpen = false;
+    void handlers.render();
+  });
+}
+
+async function renderGlobalMessages(root, state, handlers) {
+  const relationships = Array.isArray(state.relationships) ? state.relationships : [];
+  const rows = relationships.map((relationship) => {
+    const profile = relationship?.context?.profile || {};
+    const title = relationshipTitle(relationship);
+    return listEntry({
+      title,
+      subtitle: String(profile.profession || '').trim(),
+      data: `data-global-chat-relationship="${escapeHtml(String(relationship.tenantId || ''))}"`,
+      aria: `Открыть диалог с ${title}`,
+    });
+  });
+  const header = v2Header({
+    a: { kind: 'avatar', label: accountName(state), image: accountPhoto(state), data: 'data-account-profile-settings', aria: 'Настройки профиля' },
+    b: 'Чат',
+  });
+  renderV2Shell(root, state, {
+    header,
+    body: rows.length ? listEntries(rows) : emptyState('Диалогов пока нет', 'После появления связи диалог будет доступен здесь.'),
+    deck: false,
+    className: 'v2-app--chat-list',
+  });
+  bindGlobalProfileSettings(root, state, handlers);
+  initV2Swipe(root, {
+    onRight: () => {
+      state.accountTab = 'home';
+      state.accountDeckOpen = true;
+      state.accountDeckActive ||= 'representatives';
+      void handlers.render();
+    },
+  });
+  root.querySelectorAll('[data-global-chat-relationship]').forEach((node) => node.addEventListener('click', () => {
+    const tenantId = String(node.dataset.globalChatRelationship || '');
+    if (tenantId) handlers.onOpenChat?.(tenantId);
+  }));
+}
+
 async function renderGlobalHome(root, state, handlers) {
   const relationships = Array.isArray(state.relationships) ? state.relationships : [];
   const requests = futureRequests(state.accountRecords || []);
@@ -778,6 +823,7 @@ async function renderGlobalHome(root, state, handlers) {
   const header = v2Header({
     a: { kind: 'avatar', label: accountName(state), image: accountPhoto(state), data: 'data-account-profile-settings', aria: 'Настройки профиля' },
     b: accountName(state),
+    d: { kind: 'chat', data: 'data-account-open-chat-root', aria: 'Чат' },
   });
   renderV2Shell(root, state, {
     header,
@@ -786,6 +832,7 @@ async function renderGlobalHome(root, state, handlers) {
   bindWorkspaceInteraction(root, state, handlers);
   bindGlobalProfileSettings(root, state, handlers);
   bindGlobalRelationships(root, state, handlers);
+  bindGlobalChatButton(root, state, handlers);
   root.querySelectorAll('[data-account-upcoming]').forEach((node) => node.addEventListener('click', () => {
     const request = requests[Number(node.dataset.accountUpcoming)];
     if (request?.tenantId) handlers.onOpenRecord?.(request);
@@ -797,6 +844,7 @@ async function renderGlobalRepresentatives(root, state, handlers) {
   const header = v2Header({
     a: { kind: 'avatar', label: accountName(state), image: accountPhoto(state), data: 'data-account-profile-settings', aria: 'Настройки профиля' },
     b: 'Представители',
+    d: { kind: 'chat', data: 'data-account-open-chat-root', aria: 'Чат' },
   });
   renderV2Shell(root, state, {
     header,
@@ -807,6 +855,7 @@ async function renderGlobalRepresentatives(root, state, handlers) {
   bindWorkspaceInteraction(root, state, handlers);
   bindGlobalProfileSettings(root, state, handlers);
   bindGlobalRelationships(root, state, handlers);
+  bindGlobalChatButton(root, state, handlers);
 }
 
 async function renderGlobalHistory(root, state, handlers) {
@@ -816,6 +865,7 @@ async function renderGlobalHistory(root, state, handlers) {
   const header = v2Header({
     a: { kind: 'avatar', label: accountName(state), image: accountPhoto(state), data: 'data-account-profile-settings', aria: 'Настройки профиля' },
     b: 'История',
+    d: { kind: 'chat', data: 'data-account-open-chat-root', aria: 'Чат' },
   });
   renderV2Shell(root, state, {
     header,
@@ -825,6 +875,7 @@ async function renderGlobalHistory(root, state, handlers) {
   });
   bindWorkspaceInteraction(root, state, handlers);
   bindGlobalProfileSettings(root, state, handlers);
+  bindGlobalChatButton(root, state, handlers);
   root.querySelectorAll('[data-account-history]').forEach((node) => node.addEventListener('click', () => {
     const request = requests[Number(node.dataset.accountHistory)];
     if (request?.tenantId) handlers.onOpenRecord?.(request);
@@ -841,9 +892,11 @@ export async function renderGlobalAccount(root, state, callbacks = {}) {
     render: () => renderGlobalAccount(root, state, callbacks),
     onOpenRelationship: callbacks.onOpenRelationship,
     onOpenRecord: callbacks.onOpenRecord,
+    onOpenChat: callbacks.onOpenChat,
     onLogout: callbacks.onLogout,
   };
 
+  if (state.accountTab === 'messages') return renderGlobalMessages(root, state, handlers);
   if (state.accountTab === 'history') return renderGlobalHistory(root, state, handlers);
   if (state.accountTab === 'representatives') return renderGlobalRepresentatives(root, state, handlers);
   return renderGlobalHome(root, state, handlers);
