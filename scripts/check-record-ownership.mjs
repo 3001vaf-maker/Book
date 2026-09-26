@@ -96,8 +96,11 @@ if (/recordSnapshot|manualRecordViews|initialRequestSnapshot|function\s+rangesOv
 if (!/this\.records\.create/.test(serverBooking) || !/this\.records\.publicOccupancy/.test(serverBooking)) {
   errors.push('Online Booking must call canonical RecordService');
 }
-if (/recordSnapshot/.test(accountShell) || !/getAccountRecords/.test(accountShell)) {
-  errors.push('Account history must consume canonical Records, never BookingRequest snapshots');
+if (/recordSnapshot/.test(accountShell)
+  || !/globalAccountRecords\(accountId/.test(serverBooking)
+  || !/const rows = await this\.getMyRecords\(link\.tenantId, accountId\)/.test(serverBooking)
+  || !/return this\.records\.listForPeople\(tenantId, people\)/.test(serverBooking)) {
+  errors.push('Account history must consume canonical Records through the global account Record projection, never BookingRequest snapshots');
 }
 if (!/model Record\s*\{/.test(prismaSchema)
   || !/model RecordEvent\s*\{/.test(prismaSchema)
