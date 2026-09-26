@@ -714,7 +714,12 @@ async function renderGlobalContactDetail(root, state, handlers) {
   });
 
   root.querySelector('[data-global-contact-booking]')?.addEventListener('click', () => handlers.onStartBooking?.(tenantId));
-  root.querySelector('[data-global-contact-chat]')?.addEventListener('click', () => handlers.onOpenChat?.(tenantId));
+  root.querySelector('[data-global-contact-chat]')?.addEventListener('click', () => {
+    state.accountSelectedChatTenantId = tenantId;
+    state.accountTab = 'messages';
+    state.accountDeckOpen = false;
+    void handlers.render();
+  });
 
   root.querySelectorAll('[data-account-upcoming]').forEach((node) => node.addEventListener('click', () => {
     const request = requests[Number(node.dataset.accountUpcoming)];
@@ -798,7 +803,12 @@ async function renderGlobalHistoryDetail(root, state, handlers) {
     });
   });
   root.querySelector('[data-global-history-repeat]')?.addEventListener('click', () => handlers.onStartBooking?.(tenantId, request));
-  root.querySelector('[data-global-history-chat]')?.addEventListener('click', () => handlers.onOpenChat?.(tenantId));
+  root.querySelector('[data-global-history-chat]')?.addEventListener('click', () => {
+    state.accountSelectedChatTenantId = tenantId;
+    state.accountTab = 'messages';
+    state.accountDeckOpen = false;
+    void handlers.render();
+  });
 }
 
 export async function renderGlobalAccount(root, state, callbacks = {}) {
@@ -809,7 +819,6 @@ export async function renderGlobalAccount(root, state, callbacks = {}) {
 
   const handlers = {
     render: () => renderGlobalAccount(root, state, callbacks),
-    onOpenChat: callbacks.onOpenChat,
     onStartBooking: callbacks.onStartBooking,
     onLogout: callbacks.onLogout,
   };
