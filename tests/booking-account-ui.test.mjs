@@ -116,7 +116,11 @@ assert.doesNotMatch(accountShell, /async function renderGlobalRepresentatives\(/
 assert.match(accountShell, /async function renderGlobalHome\([\s\S]*?futureRequests\(state\.accountRecords \|\| \[\]\)/);
 assert.match(accountShell, /async function renderGlobalContacts\([\s\S]*?const relationships = Array\.isArray\(state\.relationships\)/);
 assert.match(accountShell, /async function renderGlobalHistory\([\s\S]*?state\.accountRecords/);
-assert.doesNotMatch(accountShell, /renderGlobalHome\([\s\S]*?relationshipCard\(relationship\)/);
+const globalHomeBlock = accountShell.slice(
+  accountShell.indexOf('async function renderGlobalHome'),
+  accountShell.indexOf('function contactsBody'),
+);
+assert.doesNotMatch(globalHomeBlock, /relationshipCard\(/);
 assert.doesNotMatch(accountShell, /accountBottomNavigation/);
 assert.doesNotMatch(accountShell, /bindBottomNavigation/);
 assert.match(accountShell, /mountChatThread\(/);
