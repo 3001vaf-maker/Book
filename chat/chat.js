@@ -140,6 +140,7 @@ async function renderCompose(root, state, recipient) {
       ${messageComposer({ placeholder: 'Написать сообщение...', attachments: allowsAttachments, attachmentTrigger: allowsAttachments ? 'external' : 'composer' })}
     `,
   });
+  root.querySelector('[data-chat-settings]')?.addEventListener('click', openProfileChatSettings);
   root.querySelector('[data-profile-compose-back]')?.addEventListener('click', () => void renderThreads(root, state));
   const form = root.querySelector('[data-message-composer]');
   const input = form?.querySelector('[name="message"]');
