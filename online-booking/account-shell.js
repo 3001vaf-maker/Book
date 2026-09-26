@@ -12,7 +12,6 @@ import { formatPhone } from '../core/phone/index.js';
 import { projectRecordStatuses } from '../core/record/index.js';
 import { disableWebPush, enableWebPush, getWebPushState } from '../core/notifications/web-push.js';
 import {
-  button,
   emptyState,
   entityCard,
   escapeHtml,
@@ -337,44 +336,6 @@ async function openChatSettings(state) {
   };
   bind();
 }
-
-function openProfileSettings(state, { onPersonalData, onPassword, onConsents, onLogout }) {
-  const items = [
-    { label: 'Личные данные', data: 'data-account-personal-data' },
-    { label: 'Изменить пароль', data: 'data-account-change-password' },
-    ...(onConsents ? [{ label: 'Согласия', data: 'data-account-consents' }] : []),
-    { label: 'Выход', data: 'data-account-logout', variant: 'danger' },
-  ];
-  const layer = mountModal(document.body, modal(settingsPanel(items), { variant: 'large', title: 'Настройки профиля' }));
-  layer?.querySelector('[data-account-personal-data]')?.addEventListener('click', () => {
-    layer.remove();
-    onPersonalData?.();
-  });
-  layer?.querySelector('[data-account-change-password]')?.addEventListener('click', () => {
-    layer.remove();
-    onPassword?.();
-  });
-  layer?.querySelector('[data-account-consents]')?.addEventListener('click', () => {
-    layer.remove();
-    onConsents?.();
-  });
-  layer?.querySelector('[data-account-logout]')?.addEventListener('click', () => {
-    layer.remove();
-    onLogout?.();
-  });
-}
-
-function openRepresentativeSettings(state) {
-  const layer = mountModal(document.body, modal(settingsPanel([
-    { label: 'Согласия', data: 'data-representative-consents' },
-  ]), { variant: 'large', title: 'Настройки' }));
-  layer?.querySelector('[data-representative-consents]')?.addEventListener('click', () => {
-    layer.remove();
-    void openAccountConsentSettings(state);
-  });
-  return layer;
-}
-
 
 function relationshipTitle(relationship = {}) {
   const profile = relationship?.context?.profile || {};
