@@ -84,9 +84,6 @@ assert.match(booking, /accountTerms: currentAccountTermsFact\(state\)/);
 assert.match(booking, /saveTenantConsents\(state\)/);
 assert.match(booking, /getAccountPlatformState/);
 assert.match(booking, /getAccountConsentState/);
-assert.match(booking, /state\.accountTab = 'representative'/);
-assert.match(booking, /onChatBack: \(\) => resumeBookingStep\(root, state\)/);
-assert.match(booking, /state\.accountChatReturn = 'booking'/);
 const globalAccountHomeBlock = booking.slice(
   booking.indexOf('async function renderGlobalClientHome'),
   booking.indexOf('async function continueGlobalIdentity'),
@@ -104,6 +101,10 @@ const bookingBackBlock = booking.slice(
   booking.indexOf('function renderWelcome'),
 );
 assert.doesNotMatch(bookingBackBlock, /renderAccountEntry\(root, state\);/);
+assert.doesNotMatch(booking, /renderAccountHome\(/);
+assert.doesNotMatch(booking, /import \{ renderAccount,/);
+assert.match(booking, /exitBookingContext\(state, \{ tab: 'contact-detail', tenantId: state\.tenantId \}\)/);
+assert.match(booking, /exitBookingContext\(state, \{ tab: 'messages', tenantId: state\.tenantId \}\)/);
 
 // End-user account is the first consumer of shared UI Reference V2.
 assert.match(accountShell, /v2Header\(\{/);
@@ -117,9 +118,6 @@ assert.match(accountShell, /GLOBAL_ACCOUNT_ROOTS = Object\.freeze\(\[[\s\S]*?id:
 assert.match(accountShell, /async function renderGlobalProfile\(/);
 assert.match(accountShell, /async function renderGlobalProfileSettings\(/);
 assert.match(accountShell, /openGlobalConsentSettingsByContact/);
-assert.match(accountShell, /function openRepresentativeSettings\(/);
-assert.match(accountShell, /data-account-representative-settings/);
-assert.match(accountShell, /data-representative-consents/);
 assert.match(accountShell, /data-account-consent-contact/);
 assert.match(accountShell, /openAccountConsentSettings\(state, \{[\s\S]*?tenantId/);
 assert.match(accountShell, /label: 'Согласия', data: 'data-account-consents'/);
@@ -131,6 +129,13 @@ assert.doesNotMatch(accountShell, /onOpenRelationship: callbacks\.onOpenRelation
 assert.match(accountShell, /relationships\.length <= 15/);
 assert.match(accountShell, /data-account-contact-search/);
 assert.doesNotMatch(accountShell, /async function renderGlobalRepresentatives\(/);
+assert.doesNotMatch(accountShell, /export async function renderAccount\(/);
+assert.doesNotMatch(accountShell, /async function renderHome\(/);
+assert.doesNotMatch(accountShell, /async function renderRepresentatives\(/);
+assert.doesNotMatch(accountShell, /async function renderRepresentative\(/);
+assert.doesNotMatch(accountShell, /async function renderHistory\(/);
+assert.doesNotMatch(accountShell, /async function renderMessages\(/);
+assert.doesNotMatch(accountShell, /label: 'Обзор'\s*\},\s*\{ id: 'history'/);
 assert.match(accountShell, /async function renderGlobalHome\([\s\S]*?futureRequests\(state\.accountRecords \|\| \[\]\)/);
 assert.match(accountShell, /async function renderGlobalContacts\([\s\S]*?const relationships = Array\.isArray\(state\.relationships\)/);
 assert.match(accountShell, /async function renderGlobalHistory\([\s\S]*?state\.accountRecords/);
@@ -144,9 +149,9 @@ assert.doesNotMatch(accountShell, /bindBottomNavigation/);
 assert.match(accountShell, /mountChatThread\(/);
 assert.match(chatRuntime, /kind: 'contacts'/);
 assert.match(accountShell, /mountChatList\(/);
-assert.match(accountShell, /mode === 'thread' \? 'v2-app--chat' : 'v2-app--chat-list'/);
-assert.match(accountShell, /sendAccountChatMessage\(state\.tenantId, body, attachments\)/);
-assert.match(accountShell, /getAccountRecords\(state\.tenantId\)\.catch\(\(\) => \[\]\)/);
+assert.match(accountShell, /selected \? 'v2-app--chat' : 'v2-app--chat-list'/);
+assert.match(accountShell, /sendAccountChatMessage\(selectedTenantId, body, attachments\)/);
+assert.match(accountShell, /loadMessages\(state, selectedTenantId\)/);
 assert.match(accountShell, /getAccountChatSettings\(state\.tenantId\)/);
 assert.doesNotMatch(accountShell, /messageComposer\(|messageThread\(|bindMessageAttachments\(/);
 assert.match(accountShell, /projectRecordStatuses/);
@@ -161,9 +166,9 @@ assert.match(accountShell, /openAccountPasswordSettings/);
 assert.match(accountShell, /openAccountConsentSettings/);
 assert.match(accountShell, /mountModal\(document\.body, modal/);
 assert.doesNotMatch(accountShell, /mountV2Layer\(|v2Layer\(/);
-assert.match(accountShell, /function renderHistoryDetail/);
-assert.match(accountShell, /label: 'Записаться', data: 'data-account-history-repeat'/);
-assert.match(accountShell, /state\.accountChatReturn === 'booking'/);
+assert.match(accountShell, /async function renderGlobalHistoryDetail/);
+assert.match(accountShell, /label: 'Записаться', data: 'data-global-history-repeat'/);
+assert.match(accountShell, /state\.accountSelectedChatTenantId/);
 assert.match(accountShell, /state\.accountDeckOpen = true/);
 assert.doesNotMatch(accountShell, /requestMoment\(request\)\s*[<>]=?\s*nowMoment\(\)\s*\?\s*'Задолженность'/);
 assert.doesNotMatch(accountShell, /bookingThemeStyle/);
