@@ -361,8 +361,8 @@ const GLOBAL_ACCOUNT_ROOTS = Object.freeze([
 function accountRootForTab(state) {
   if (!state?.globalAccount) return state?.accountTab === 'history' ? 'history' : 'representatives';
   if (state.accountTab === 'profile' || state.accountTab === 'profile-settings') return 'profile';
-  if (state.accountTab === 'contacts') return 'contacts';
-  if (state.accountTab === 'history') return 'history';
+  if (state.accountTab === 'contacts' || state.accountTab === 'contact-detail') return 'contacts';
+  if (state.accountTab === 'history' || state.accountTab === 'history-detail') return 'history';
   return 'home';
 }
 
@@ -823,7 +823,12 @@ function profileSummary(state) {
 function bindGlobalRelationships(root, state, handlers) {
   root.querySelectorAll('[data-global-relationship]').forEach((node) => node.addEventListener('click', () => {
     const tenantId = String(node.dataset.globalRelationship || '');
-    if (tenantId) handlers.onOpenRelationship?.(tenantId);
+    if (!tenantId) return;
+    state.accountSelectedContactTenantId = tenantId;
+    state.accountTab = 'contact-detail';
+    state.accountDeckActive = 'contacts';
+    state.accountDeckOpen = false;
+    void handlers.render();
   }));
 }
 
@@ -868,7 +873,8 @@ function openGlobalConsentSettingsByContact(state, handlers) {
     const tenantId = String(relationship?.tenantId || '');
     if (!tenantId) return;
     layer.remove();
-    void openAccountConsentSettings({ ...state, tenantId }, {
+    void openAccountConsentSettings(state, {
+      tenantId,
       onChanged: () => handlers.render?.(),
     });
   }));
@@ -1030,6 +1036,82 @@ async function renderGlobalContacts(root, state, handlers) {
   });
 }
 
+function selectedGlobalRelationship(state) {
+  const tenantId = String(state.accountSelectedContactTenantId || '');
+  return (Array.isArray(state.relationships) ? state.relationships : [])
+    .find((relationship) => String(relationship?.tenantId || '') === tenantId) || null;
+}
+
+function globalContactRecords(state, tenantId) {
+  return (Array.isArray(state.accountRecords) ? state.accountRecords : [])
+    .filter((request) => String(request?.tenantId || '') === String(tenantId || ''));
+}
+
+async function renderGlobalContactDetail(root, state, handlers) {
+  const relationship = selectedGlobalRelationship(state);
+  if (!relationship) {
+    state.accountTab = 'contacts';
+    state.accountDeckActive = 'contacts';
+    await handlers.render();
+    return;
+  }
+
+  const tenantId = String(relationship.tenantId || '');
+  const profile = relationship?.context?.profile || {};
+  const title = relationshipTitle(relationship);
+  const records = globalContactRecords(state, tenantId);
+  const requests = futureRequests(records);
+  const hasInteractionHistory = records.some((request) => !isCancelled(request) && requestMoment(request) < nowMoment());
+
+  const upcoming = requests.length
+    ? v2HorizontalRail(requests.map((request, index) => visitCard(state, request, index)).join(''))
+    : '';
+  const activity = hasInteractionHistory
+    ? v2HorizontalRail([
+        v2RailCard({ title: String(records.length), subtitle: 'Действия' }),
+      ].join(''))
+    : '';
+
+  const header = v2Header({
+    a: { kind: 'avatar', label: title, image: String(profile.photo || ''), data: 'data-global-contact-settings', aria: 'Настройки' },
+    b: title,
+    c: { kind: 'text', label: 'Записаться', data: 'data-global-contact-booking', aria: 'Записаться' },
+    d: { kind: 'chat', data: 'data-global-contact-chat', aria: 'Чат' },
+  });
+
+  renderV2Shell(root, state, {
+    header,
+    body: `${activity ? v2Section('Взаимодействие', activity) : ''}${upcoming ? v2Section('Предстоящие визиты', upcoming) : ''}`,
+  });
+
+  bindWorkspaceInteraction(root, state, handlers, {
+    onZRight: () => {
+      state.accountTab = 'contacts';
+      state.accountDeckActive = 'contacts';
+      state.accountSelectedContactTenantId = '';
+      void handlers.render();
+    },
+  });
+
+  root.querySelector('[data-global-contact-settings]')?.addEventListener('click', () => {
+    const layer = mountModal(document.body, modal(settingsPanel([
+      { label: 'Согласия', data: 'data-global-contact-consents' },
+    ]), { variant: 'large', title: 'Настройки' }));
+    layer?.querySelector('[data-global-contact-consents]')?.addEventListener('click', () => {
+      layer.remove();
+      void openAccountConsentSettings(state, { tenantId });
+    });
+  });
+
+  root.querySelector('[data-global-contact-booking]')?.addEventListener('click', () => handlers.onStartBooking?.(tenantId));
+  root.querySelector('[data-global-contact-chat]')?.addEventListener('click', () => handlers.onOpenChat?.(tenantId));
+
+  root.querySelectorAll('[data-account-upcoming]').forEach((node) => node.addEventListener('click', () => {
+    const request = requests[Number(node.dataset.accountUpcoming)];
+    if (request) handlers.onOpenRecord?.(request);
+  }));
+}
+
 async function renderGlobalHistory(root, state, handlers) {
   const requests = (Array.isArray(state.accountRecords) ? state.accountRecords : [])
     .slice()
@@ -1061,15 +1143,16 @@ export async function renderGlobalAccount(root, state, callbacks = {}) {
 
   const handlers = {
     render: () => renderGlobalAccount(root, state, callbacks),
-    onOpenRelationship: callbacks.onOpenRelationship,
     onOpenRecord: callbacks.onOpenRecord,
     onOpenChat: callbacks.onOpenChat,
+    onStartBooking: callbacks.onStartBooking,
     onLogout: callbacks.onLogout,
   };
 
   if (state.accountTab === 'messages') return renderGlobalMessages(root, state, handlers);
   if (state.accountTab === 'profile-settings') return renderGlobalProfileSettings(root, state, handlers);
   if (state.accountTab === 'profile') return renderGlobalProfile(root, state, handlers);
+  if (state.accountTab === 'contact-detail') return renderGlobalContactDetail(root, state, handlers);
   if (state.accountTab === 'contacts') return renderGlobalContacts(root, state, handlers);
   if (state.accountTab === 'history') return renderGlobalHistory(root, state, handlers);
   return renderGlobalHome(root, state, handlers);
