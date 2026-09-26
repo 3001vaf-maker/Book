@@ -873,7 +873,7 @@ async function renderGlobalRepresentatives(root, state, handlers) {
   const relationships = Array.isArray(state.relationships) ? state.relationships : [];
   const header = v2Header({
     a: { kind: 'avatar', label: accountName(state), image: accountPhoto(state), data: 'data-account-profile-settings', aria: 'Настройки профиля' },
-    b: 'Представители',
+    b: 'Обзор',
     d: { kind: 'chat', data: 'data-account-open-chat-root', aria: 'Чат' },
   });
   renderV2Shell(root, state, {
