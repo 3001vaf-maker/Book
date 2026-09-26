@@ -15,7 +15,6 @@ import { formatPhone } from '../core/phone/index.js';
 import { projectRecordStatuses } from '../core/record/index.js';
 import { disableWebPush, enableWebPush, getWebPushState } from '../core/notifications/web-push.js';
 import {
-  bookingThemeStyle,
   button,
   emptyState,
   entityCard,
@@ -262,13 +261,6 @@ async function loadMessages(state) {
     .map((item) => ({ ...item, time: messageTime(item.createdAt) }));
 }
 
-function accountThemeClasses(state) {
-  const theme = state.settings?.theme && typeof state.settings.theme === 'object' ? state.settings.theme : {};
-  const shape = ['soft', 'round', 'straight', 'cut'].includes(theme.shape) ? theme.shape : 'soft';
-  const choiceStyle = ['cards', 'compact', 'list'].includes(theme.choiceStyle) ? theme.choiceStyle : 'cards';
-  return `booking-account booking-account--account booking-account--v2 booking-shape--${shape} booking-choice-style--${choiceStyle}`;
-}
-
 function accountName(state) {
   const account = state.account || {};
   return [account.name, account.surname].filter(Boolean).join(' ').trim() || 'Профиль';
@@ -375,7 +367,7 @@ function renderV2Shell(root, state, { header, body = '', deck = true, className 
     deckOpen: Boolean(state.accountDeckOpen && deck),
     className,
   });
-  root.innerHTML = `<section class="${accountThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${shell}</section>`;
+  root.innerHTML = shell;
 }
 
 function setAccountDeckOpen(root, state, open) {

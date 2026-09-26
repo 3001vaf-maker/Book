@@ -135,6 +135,10 @@ assert.match(accountShell, /label: 'Записаться', data: 'data-account-h
 assert.match(accountShell, /state\.accountChatReturn === 'booking'/);
 assert.match(accountShell, /state\.accountDeckOpen = true/);
 assert.doesNotMatch(accountShell, /requestMoment\(request\)\s*[<>]=?\s*nowMoment\(\)\s*\?\s*'Задолженность'/);
+assert.doesNotMatch(accountShell, /bookingThemeStyle/);
+assert.doesNotMatch(accountShell, /booking-shape--|booking-choice-style--/);
+assert.doesNotMatch(accountShell, /accountThemeClasses/);
+assert.match(accountShell, /root\.innerHTML = shell;/);
 
 // Personal-data modal uses the Book controls, including Book calendar.
 assert.match(personalData, /photoField\(\{ name: 'photo'/);
