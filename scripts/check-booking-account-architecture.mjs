@@ -81,6 +81,9 @@ expect(booking.includes('function backFromFirstBookingStep') && booking.includes
 expect(!booking.slice(booking.indexOf('function backFromFirstBookingStep'), booking.indexOf('function renderWelcome')).includes('renderAccountEntry(root, state);'), 'Backing out of booking must never force Auth Sticker.');
 
 expect(booking.includes('renderAccount('), 'Authenticated account must use the unified account shell.');
+const globalAccountHomeBlock = booking.slice(booking.indexOf('async function renderGlobalClientHome'), booking.indexOf('async function continueGlobalIdentity'));
+expect(!globalAccountHomeBlock.includes("params.set('entry', 'account')") && !globalAccountHomeBlock.includes('onOpenRelationship:') && !globalAccountHomeBlock.includes('onOpenRecord:'), 'Global account must not bridge Contacts or History into the legacy tenant account contour.');
+expect(globalAccountHomeBlock.includes('onStartBooking: (tenantId)') && globalAccountHomeBlock.includes("params.set('booking', id)"), 'Leaving the global account for a tenant must be reserved for the explicit booking action.');
 expect(!booking.includes('step: 15'), 'Public booking must not hardcode a 15 minute slot step.');
 expect(settings.includes("from '../../core/booking-settings/index.js'"), 'Online booking settings must use canonical booking settings owner.');
 expect(!/\b(?:appShell|appHeader)\s*\(/.test(settings) && !settings.includes('app-content--book-shell'), 'Online booking settings must not create a second full-screen shell inside Shared Z.');
@@ -113,9 +116,16 @@ expect(styleCss.includes('--app-max-width:390px'), 'Book must use one shared 390
 expect(!accountMobileCss.includes('--app-max-width:'), 'Account shell must inherit the shared Book application width instead of redefining it.');
 expect(!accountMobileCss.includes('max-width:none'), 'Account application must never disable its phone-width limit.');
 expect(!accountShell.includes("document.createElement('style')") && !accountShell.includes('<style>'), 'Account features must not own local CSS.');
+expect(!accountShell.includes('bookingThemeStyle'), 'Authenticated end-user surfaces must not inject representative booking theme styles into Shared V2.');
+expect(!accountShell.includes('booking-shape--') && !accountShell.includes('booking-choice-style--'), 'Authenticated end-user surfaces must not select local shape or choice-style variants for Shared UI.');
+expect(!accountShell.includes('accountThemeClasses'), 'Authenticated end-user surfaces must not own a local shell theme classifier.');
+expect(accountShell.includes('root.innerHTML = shell;'), 'Authenticated end-user surfaces must render the canonical Shared V2 shell directly without a local visual wrapper.');
 expect(chatRuntime.includes("messageComposer({ attachments: true, attachmentTrigger: 'external' })") && chatRuntime.includes("kind: 'attachment'"), 'Core Chat runtime must own the shared composer and Header D attachment control.');
 expect(!accountShell.includes('messageComposer(') && !accountShell.includes('messageThread(') && !accountShell.includes('bindMessageAttachments('), 'End-user account shell must not duplicate Chat runtime behavior.');
 expect(accountShell.includes('function renderHistoryDetail') && accountShell.includes("label: 'Записаться', data: 'data-account-history-repeat'"), 'V2 history detail must expose repeat booking in Header C.');
+expect(accountShell.includes('async function renderGlobalContactDetail') && accountShell.includes("state.accountTab = 'contact-detail'"), 'Global Contacts F must own contact Z3 instead of navigating to a second account contour.');
+expect(accountShell.includes('async function renderGlobalHistoryDetail') && !accountShell.includes('onOpenRelationship: callbacks.onOpenRelationship'), 'Global History must own record detail locally and must not restore the old relationship bridge.');
+expect(consentSettings.includes("tenantId = state?.tenantId") && consentSettings.includes('getAccountConsentState(scopeTenantId)') && consentSettings.includes('revokeAccountConsent(scopeTenantId, consent.documentId)'), 'Consent settings must be the single tenant-scoped owner used from both contact settings and Profile aggregation.');
 expect(accountShell.includes("state.accountChatReturn === 'booking'") && accountShell.includes('state.accountDeckOpen = true'), 'Chat must return to booking only when opened from booking; otherwise swipe returns to F level.');
 expect(accountShell.includes("label: 'Согласия'"), 'Account account and chat settings must expose consent controls.');
 expect(consentSettings.includes('revokeAccountConsent'), 'Account consent settings must use the canonical server-backed revoke flow.');
