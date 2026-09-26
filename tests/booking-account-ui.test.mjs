@@ -87,6 +87,13 @@ assert.match(booking, /getAccountConsentState/);
 assert.match(booking, /state\.accountTab = 'representative'/);
 assert.match(booking, /onChatBack: \(\) => resumeBookingStep\(root, state\)/);
 assert.match(booking, /state\.accountChatReturn = 'booking'/);
+const globalAccountHomeBlock = booking.slice(
+  booking.indexOf('async function renderGlobalClientHome'),
+  booking.indexOf('async function continueGlobalIdentity'),
+);
+assert.doesNotMatch(globalAccountHomeBlock, /entry', 'account'/);
+assert.doesNotMatch(globalAccountHomeBlock, /onOpenRelationship|onOpenRecord/);
+assert.match(globalAccountHomeBlock, /onStartBooking: \(tenantId\)/);
 assert.match(booking, /slotStillAvailable/);
 assert.match(booking, /Выбранное время уже недоступно/);
 assert.doesNotMatch(booking, /consentState\.allowed/);
@@ -106,8 +113,32 @@ assert.match(accountShell, /v2Section\(/);
 assert.match(accountShell, /v2HorizontalRail\(/);
 assert.match(accountShell, /entityCard\(\{/);
 assert.match(accountShell, /data-account-deck-item/);
-assert.match(accountShell, /'Контакты'/);
-assert.match(accountShell, /'История'/);
+assert.match(accountShell, /GLOBAL_ACCOUNT_ROOTS = Object\.freeze\(\[[\s\S]*?id: 'profile', label: 'Профиль'[\s\S]*?id: 'home', label: 'Обзор'[\s\S]*?id: 'contacts', label: 'Контакты'[\s\S]*?id: 'history', label: 'История'/);
+assert.match(accountShell, /async function renderGlobalProfile\(/);
+assert.match(accountShell, /async function renderGlobalProfileSettings\(/);
+assert.match(accountShell, /openGlobalConsentSettingsByContact/);
+assert.match(accountShell, /function openRepresentativeSettings\(/);
+assert.match(accountShell, /data-account-representative-settings/);
+assert.match(accountShell, /data-representative-consents/);
+assert.match(accountShell, /data-account-consent-contact/);
+assert.match(accountShell, /openAccountConsentSettings\(state, \{[\s\S]*?tenantId/);
+assert.match(accountShell, /label: 'Согласия', data: 'data-account-consents'/);
+assert.match(accountShell, /async function renderGlobalContacts\(/);
+assert.match(accountShell, /async function renderGlobalContactDetail\(/);
+assert.match(accountShell, /state\.accountTab = 'contact-detail'/);
+assert.match(accountShell, /async function renderGlobalHistoryDetail\(/);
+assert.doesNotMatch(accountShell, /onOpenRelationship: callbacks\.onOpenRelationship/);
+assert.match(accountShell, /relationships\.length <= 15/);
+assert.match(accountShell, /data-account-contact-search/);
+assert.doesNotMatch(accountShell, /async function renderGlobalRepresentatives\(/);
+assert.match(accountShell, /async function renderGlobalHome\([\s\S]*?futureRequests\(state\.accountRecords \|\| \[\]\)/);
+assert.match(accountShell, /async function renderGlobalContacts\([\s\S]*?const relationships = Array\.isArray\(state\.relationships\)/);
+assert.match(accountShell, /async function renderGlobalHistory\([\s\S]*?state\.accountRecords/);
+const globalHomeBlock = accountShell.slice(
+  accountShell.indexOf('async function renderGlobalHome'),
+  accountShell.indexOf('function contactsBody'),
+);
+assert.doesNotMatch(globalHomeBlock, /relationshipCard\(/);
 assert.doesNotMatch(accountShell, /accountBottomNavigation/);
 assert.doesNotMatch(accountShell, /bindBottomNavigation/);
 assert.match(accountShell, /mountChatThread\(/);
@@ -170,8 +201,8 @@ assert.match(passwordSettings, /Новый пароль/);
 assert.match(passwordSettings, /Повторите новый пароль/);
 assert.match(passwordSettings, /changeAccountPassword\(state\.tenantId/);
 assert.match(passwordSettings, /newPassword !== repeatPassword/);
-assert.match(consentSettings, /getAccountConsentState\(state\.tenantId\)/);
-assert.match(consentSettings, /revokeAccountConsent\(state\.tenantId, consent\.documentId\)/);
+assert.match(consentSettings, /getAccountConsentState\(scopeTenantId\)/);
+assert.match(consentSettings, /revokeAccountConsent\(scopeTenantId, consent\.documentId\)/);
 assert.match(consentSettings, /Отозвать согласие/);
 assert.match(consentSettings, /Отмена/);
 assert.match(accountApi, /account\/password/);
