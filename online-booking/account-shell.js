@@ -847,12 +847,20 @@ function bindGlobalProfileSettingsEntry(root, state, handlers) {
 function openGlobalConsentSettingsByContact(state, handlers) {
   const relationships = Array.isArray(state.relationships) ? state.relationships : [];
   const content = relationships.length
-    ? listEntries(relationships.map((relationship, index) => listEntry({
-        title: relationshipTitle(relationship),
-        subtitle: 'Согласия',
-        data: `data-account-consent-contact="${index}"`,
-        aria: `Открыть согласия ${relationshipTitle(relationship)}`,
-      })))
+    ? relationships.map((relationship, index) => {
+        const profile = relationship?.context?.profile || {};
+        const title = relationshipTitle(relationship);
+        return entityCard({
+          title,
+          subtitle: 'Согласия',
+          image: String(profile.photo || ''),
+          initial: title.slice(0, 1).toUpperCase(),
+          interactive: true,
+          data: `data-account-consent-contact="${index}"`,
+          aria: `Открыть согласия ${title}`,
+          className: 'entity-card--compact',
+        });
+      }).join('')
     : emptyState('Контактов пока нет', 'Согласия появятся после связи с контактом.');
   const layer = mountModal(document.body, modal(content, { variant: 'large', title: 'Согласия' }));
   layer?.querySelectorAll('[data-account-consent-contact]').forEach((node) => node.addEventListener('click', () => {
