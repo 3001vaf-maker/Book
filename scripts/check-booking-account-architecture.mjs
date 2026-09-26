@@ -6,7 +6,8 @@ const consentSettings = fs.readFileSync('online-booking/consent-settings.js', 'u
 const settings = fs.readFileSync('settings/online-booking/online-booking.js', 'utf8');
 const serverSync = fs.readFileSync('online-booking/server-sync.js', 'utf8');
 const bookingUi = fs.readFileSync('ui/booking/index.js', 'utf8');
-const chatUi = fs.readFileSync('ui/chat/index.js', 'utf8');\nconst chatRuntime = fs.readFileSync('core/chat/runtime.js', 'utf8');
+const chatUi = fs.readFileSync('ui/chat/index.js', 'utf8');
+const chatRuntime = fs.readFileSync('core/chat/runtime.js', 'utf8');
 const chatCss = fs.readFileSync('ui/chat/chat.css', 'utf8');
 const settingsUi = fs.readFileSync('ui/settings/index.js', 'utf8');
 const settingsCss = fs.readFileSync('ui/settings/settings.css', 'utf8');
@@ -112,7 +113,8 @@ expect(styleCss.includes('--app-max-width:390px'), 'Book must use one shared 390
 expect(!accountMobileCss.includes('--app-max-width:'), 'Account shell must inherit the shared Book application width instead of redefining it.');
 expect(!accountMobileCss.includes('max-width:none'), 'Account application must never disable its phone-width limit.');
 expect(!accountShell.includes("document.createElement('style')") && !accountShell.includes('<style>'), 'Account features must not own local CSS.');
-expect(chatRuntime.includes("messageComposer({ attachments: true, attachmentTrigger: 'external' })") && chatRuntime.includes("kind: 'attachment'"), 'Core Chat runtime must own the shared composer and Header D attachment control.');\nexpect(!accountShell.includes('messageComposer(') && !accountShell.includes('messageThread(') && !accountShell.includes('bindMessageAttachments('), 'End-user account shell must not duplicate Chat runtime behavior.');
+expect(chatRuntime.includes("messageComposer({ attachments: true, attachmentTrigger: 'external' })") && chatRuntime.includes("kind: 'attachment'"), 'Core Chat runtime must own the shared composer and Header D attachment control.');
+expect(!accountShell.includes('messageComposer(') && !accountShell.includes('messageThread(') && !accountShell.includes('bindMessageAttachments('), 'End-user account shell must not duplicate Chat runtime behavior.');
 expect(accountShell.includes('function renderHistoryDetail') && accountShell.includes("label: 'Записаться', data: 'data-account-history-repeat'"), 'V2 history detail must expose repeat booking in Header C.');
 expect(accountShell.includes("state.accountChatReturn === 'booking'") && accountShell.includes('state.accountDeckOpen = true'), 'Chat must return to booking only when opened from booking; otherwise swipe returns to F level.');
 expect(accountShell.includes("label: 'Согласия'"), 'Account account and chat settings must expose consent controls.');
