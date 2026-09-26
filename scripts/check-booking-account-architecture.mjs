@@ -113,6 +113,10 @@ expect(styleCss.includes('--app-max-width:390px'), 'Book must use one shared 390
 expect(!accountMobileCss.includes('--app-max-width:'), 'Account shell must inherit the shared Book application width instead of redefining it.');
 expect(!accountMobileCss.includes('max-width:none'), 'Account application must never disable its phone-width limit.');
 expect(!accountShell.includes("document.createElement('style')") && !accountShell.includes('<style>'), 'Account features must not own local CSS.');
+expect(!accountShell.includes('bookingThemeStyle'), 'Authenticated end-user surfaces must not inject representative booking theme styles into Shared V2.');
+expect(!accountShell.includes('booking-shape--') && !accountShell.includes('booking-choice-style--'), 'Authenticated end-user surfaces must not select local shape or choice-style variants for Shared UI.');
+expect(!accountShell.includes('accountThemeClasses'), 'Authenticated end-user surfaces must not own a local shell theme classifier.');
+expect(accountShell.includes('root.innerHTML = shell;'), 'Authenticated end-user surfaces must render the canonical Shared V2 shell directly without a local visual wrapper.');
 expect(chatRuntime.includes("messageComposer({ attachments: true, attachmentTrigger: 'external' })") && chatRuntime.includes("kind: 'attachment'"), 'Core Chat runtime must own the shared composer and Header D attachment control.');
 expect(!accountShell.includes('messageComposer(') && !accountShell.includes('messageThread(') && !accountShell.includes('bindMessageAttachments('), 'End-user account shell must not duplicate Chat runtime behavior.');
 expect(accountShell.includes('function renderHistoryDetail') && accountShell.includes("label: 'Записаться', data: 'data-account-history-repeat'"), 'V2 history detail must expose repeat booking in Header C.');
