@@ -6,7 +6,7 @@ const consentSettings = fs.readFileSync('online-booking/consent-settings.js', 'u
 const settings = fs.readFileSync('settings/online-booking/online-booking.js', 'utf8');
 const serverSync = fs.readFileSync('online-booking/server-sync.js', 'utf8');
 const bookingUi = fs.readFileSync('ui/booking/index.js', 'utf8');
-const chatUi = fs.readFileSync('ui/chat/index.js', 'utf8');
+const chatUi = fs.readFileSync('ui/chat/index.js', 'utf8');\nconst chatRuntime = fs.readFileSync('core/chat/runtime.js', 'utf8');
 const chatCss = fs.readFileSync('ui/chat/chat.css', 'utf8');
 const settingsUi = fs.readFileSync('ui/settings/index.js', 'utf8');
 const settingsCss = fs.readFileSync('ui/settings/settings.css', 'utf8');
@@ -101,7 +101,7 @@ expect(settingsUi.includes('settingsPanel') && settingsUi.includes('settingToggl
 expect(receiptUi.includes('readOnlyReceipt'), 'Shared ui/receipt must own read-only receipt sheets.');
 expect(formsUi.includes('formView') && formsUi.includes('formError'), 'Shared ui/forms must own reusable form shells and form errors.');
 expect(!uiFacade.includes('messageComposer') && !uiFacade.includes('messageThread') && !uiFacade.includes('settingsPanel') && !uiFacade.includes('settingToggle') && !uiFacade.includes('readOnlyReceipt'), 'Migrated owners must be imported directly, not re-exported through ui/ui.js.');
-expect(accountShell.includes("from '../ui/chat/index.js'") && accountShell.includes("from '../ui/settings/index.js'") && accountShell.includes("from '../ui/receipt/index.js'"), 'End-user account must consume Chat, Settings and Receipt owners directly.');
+expect(accountShell.includes("from '../core/chat/runtime.js'") && accountShell.includes("from '../ui/settings/index.js'") && accountShell.includes("from '../ui/receipt/index.js'"), 'End-user account must consume neutral Core Chat runtime plus direct Settings and Receipt owners.');
 expect(booking.includes("from '../ui/forms/index.js'"), 'End-user booking must consume Shared Forms directly.');
 expect(settings.includes("from '../../ui/settings/index.js'"), 'Professional online-booking settings must consume Shared Settings directly.');
 expect(chatCss.includes('.message-composer{position:fixed') && chatCss.includes('.message-thread{'), 'Shared ui/chat CSS must own composer and thread geometry.');
@@ -112,7 +112,7 @@ expect(styleCss.includes('--app-max-width:390px'), 'Book must use one shared 390
 expect(!accountMobileCss.includes('--app-max-width:'), 'Account shell must inherit the shared Book application width instead of redefining it.');
 expect(!accountMobileCss.includes('max-width:none'), 'Account application must never disable its phone-width limit.');
 expect(!accountShell.includes("document.createElement('style')") && !accountShell.includes('<style>'), 'Account features must not own local CSS.');
-expect(accountShell.includes("messageComposer({ attachments: true, attachmentTrigger: 'external' })"), 'End-user Chat must use the shared composer while Header D owns the media attachment control.');
+expect(chatRuntime.includes("messageComposer({ attachments: true, attachmentTrigger: 'external' })") && chatRuntime.includes("kind: 'attachment'"), 'Core Chat runtime must own the shared composer and Header D attachment control.');\nexpect(!accountShell.includes('messageComposer(') && !accountShell.includes('messageThread(') && !accountShell.includes('bindMessageAttachments('), 'End-user account shell must not duplicate Chat runtime behavior.');
 expect(accountShell.includes('function renderHistoryDetail') && accountShell.includes("label: 'Записаться', data: 'data-account-history-repeat'"), 'V2 history detail must expose repeat booking in Header C.');
 expect(accountShell.includes("state.accountChatReturn === 'booking'") && accountShell.includes('state.accountDeckOpen = true'), 'Chat must return to booking only when opened from booking; otherwise swipe returns to F level.');
 expect(accountShell.includes("label: 'Согласия'"), 'Account account and chat settings must expose consent controls.');
