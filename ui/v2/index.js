@@ -199,8 +199,35 @@ export function mountV2ZLayer(root, html, { onClose = null, stack = false } = {}
   host.appendChild(node);
   app?.classList.add('has-z-layer');
   const notify = () => window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+  const contextObserver = new MutationObserver((mutations) => {
+    if (mutations.some((mutation) => mutation.type === 'childList'
+      || (mutation.type === 'attributes' && [
+        'class',
+        'disabled',
+        'aria-label',
+        'data-v2-primary-visible',
+        'data-v2-primary-label',
+        'data-v2-primary-variant',
+      ].includes(mutation.attributeName)))) {
+      notify();
+    }
+  });
+  contextObserver.observe(node, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: [
+      'class',
+      'disabled',
+      'aria-label',
+      'data-v2-primary-visible',
+      'data-v2-primary-label',
+      'data-v2-primary-variant',
+    ],
+  });
   let disposeSwipe = () => {};
   const close = () => {
+    contextObserver.disconnect();
     disposeSwipe();
     if (node.isConnected) node.remove();
     app?.classList.toggle('has-z-layer', Boolean(host.querySelector('[data-v2-z-layer]')));

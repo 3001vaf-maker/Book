@@ -150,6 +150,14 @@ for (const name of [
   expect(facade.includes(name), `ui/ui.js must expose ${name}().`);
 }
 
+expect(ui.includes('const contextObserver = new MutationObserver')
+  && ui.includes("'data-v2-primary-visible'")
+  && ui.includes("'data-v2-primary-label'")
+  && ui.includes("'data-v2-primary-variant'")
+  && ui.includes('contextObserver.observe(node')
+  && ui.includes('contextObserver.disconnect()'),
+  'Shared Z-layer owner must resync Header C when dynamic primary-action state changes inside Z2/Z3.');
+
 expect(css.includes('--v2-base:var(--surface-dark)') && style.includes('--surface-dark:#2F3338'), 'V2 BASE must resolve through the shared H dark-surface token #2F3338.');
 expect(/\.v2-z\{[\s\S]*?border-radius:var\(--v2-z-radius\) 0 0 0/.test(css), 'Z may round only the upper-left corner.');
 expect(/\.v2-app__stage\{[\s\S]*?height:calc\(var\(--visual-vh,100dvh\) - 72px\)/.test(css) && /\.v2-front\{[\s\S]*?height:calc\(var\(--visual-vh,100dvh\) - 72px\)/.test(css) && /\.v2-z\{[\s\S]*?box-sizing:border-box;[\s\S]*?height:calc\(var\(--visual-vh,100dvh\) - 72px\);[\s\S]*?overflow-y:auto/.test(css), 'Shared Z must consume only the stage below A/B/C/D and scroll excess content inside itself.');
