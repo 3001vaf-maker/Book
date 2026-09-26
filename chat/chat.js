@@ -132,7 +132,7 @@ async function renderCompose(root, state, recipient) {
   const allowsAttachments = recipient.mode === 'one';
   renderChatSurface(root, {
     title: 'Новое сообщение',
-    c: { kind: 'contacts', data: 'data-profile-compose-back', aria: 'К диалогам' },
+    c: { kind: 'contacts', data: 'data-chat-contacts', aria: 'Контакты' },
     d: allowsAttachments ? { kind: 'attachment', data: 'data-profile-compose-attachment', aria: 'Вложения' } : null,
     body: `
       <div class="action-block"><strong>Кому: ${recipientLabel(recipient)}</strong></div>
@@ -141,7 +141,7 @@ async function renderCompose(root, state, recipient) {
     `,
   });
   root.querySelector('[data-chat-settings]')?.addEventListener('click', openProfileChatSettings);
-  root.querySelector('[data-profile-compose-back]')?.addEventListener('click', () => void renderThreads(root, state));
+  root.querySelector('[data-chat-contacts]')?.addEventListener('click', () => openProfessionalContacts(root, state));
   const form = root.querySelector('[data-message-composer]');
   const input = form?.querySelector('[name="message"]');
   root.querySelector('[data-profile-compose-attachment]')?.addEventListener('click', () => form?.querySelector('[data-message-attachment]')?.click());
