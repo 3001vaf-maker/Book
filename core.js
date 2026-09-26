@@ -121,9 +121,9 @@ async function renderPublicBooking(route) {
   disposeView = await startAccountRuntime(route);
   await renderOnlineBooking(document.querySelector('#app-content'), {
     ...route,
-    onExitToAccount: () => {
+    onExitToAccount: (target = {}) => {
       history.replaceState({}, '', location.pathname);
-      void renderGlobalClientRoot();
+      void renderGlobalClientRoot(target);
     },
   });
   syncViewport();
@@ -134,14 +134,14 @@ function isEndUserAppHost() {
   return host === 'client.va-tools.ru' || host.startsWith('client.');
 }
 
-async function renderGlobalClientRoot() {
+async function renderGlobalClientRoot(initial = {}) {
   workspaceReady = false;
   disposeView();
   disposeView = () => {};
   setThemeColor('#2F3338');
   app.classList.add('app-shell--booking');
   app.innerHTML = '<main class="booking-content" id="app-content"></main>';
-  await renderGlobalClient(document.querySelector('#app-content'));
+  await renderGlobalClient(document.querySelector('#app-content'), initial);
   syncViewport();
 }
 
