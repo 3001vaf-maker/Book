@@ -57,7 +57,7 @@ import {
   getBookingWorkplace,
   requiredBookingDocuments,
 } from './model.js';
-import { renderAccount, renderGlobalAccount } from './account-shell.js';
+import { renderGlobalAccount } from './account-shell.js';
 
 function formatDate(value) {
   const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -193,7 +193,10 @@ function renderLegalSticker(root, state) {
     onRight: () => {
       state.error = '';
       if (state.identityDestination === 'booking' && state.from) renderConfirmation(root, state);
-      else if (state.account) void renderAccountHome(root, state);
+      else if (state.account && state.identityDestination === 'profile') exitBookingContext(state, {
+        tab: state.entry === 'chat' ? 'messages' : 'contact-detail',
+        tenantId: state.tenantId,
+      });
       else renderAccountDetails(root, state);
     },
     onLeft: () => { exitBookingContext(state); },
@@ -245,7 +248,10 @@ function renderLegalSticker(root, state) {
       state.platformOnlyLegal = false;
       state.error = '';
       if (state.identityDestination === 'booking') await finalizeBookingRequest(root, state);
-      else await renderAccountHome(root, state);
+      else exitBookingContext(state, {
+        tab: state.entry === 'chat' ? 'messages' : 'contact-detail',
+        tenantId: state.tenantId,
+      });
     } catch (error) {
       state.error = accountFlowError(error, 'Не удалось сохранить документы');
       renderLegalSticker(root, state);
@@ -307,11 +313,7 @@ function renderFlowPage(root, state, {
   });
   root.innerHTML = `<section class="${flowThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${shell}</section>`;
   root.querySelector('[data-booking-flow-chat]')?.addEventListener('click', () => {
-    state.accountTab = 'messages';
-    state.accountChatOpen = true;
-    state.accountChatReturn = 'booking';
-    state.accountDeckOpen = false;
-    void renderAccountHome(root, state);
+    exitBookingContext(state, { tab: 'messages', tenantId: state.tenantId });
   });
 }
 
@@ -323,7 +325,7 @@ function resumeBookingStep(root, state) {
   if (state.bookingStep === 'confirmation') return renderConfirmation(root, state);
   if (state.bookingStep === 'registration') return renderAccountDetails(root, state);
   if (state.bookingStep === 'auth') return renderAccountEntry(root, state);
-  return renderAccountHome(root, state);
+  return exitBookingContext(state, { tab: 'contact-detail', tenantId: state.tenantId });
 }
 
 function requestProcedures(request = {}) {
@@ -367,16 +369,16 @@ function backFromFirstBookingStep(root, state) {
   state.error = '';
   state.repeatSelection = null;
   if (state.bookingOrigin === 'profile' && state.account) {
-    void renderAccountHome(root, state);
+    exitBookingContext(state, { tab: 'contact-detail', tenantId: state.tenantId });
     return;
   }
   state.identityDestination = 'booking';
   renderWelcome(root, state);
 }
 
-function exitBookingContext(state) {
+function exitBookingContext(state, target = {}) {
   if (!state.account || typeof state.onExitToAccount !== 'function') return false;
-  state.onExitToAccount();
+  state.onExitToAccount(target);
   return true;
 }
 
@@ -597,10 +599,10 @@ async function continueAfterIdentity(root, state) {
 
     if (state.identityDestination === 'profile') {
       state.platformOnlyLegal = false;
-      state.accountTab = state.entry === 'chat' ? 'messages' : 'home';
-      state.accountChatOpen = state.entry === 'chat';
-      state.accountChatReturn = state.entry === 'chat' ? 'deck' : '';
-      await renderAccountHome(root, state);
+      exitBookingContext(state, {
+        tab: state.entry === 'chat' ? 'messages' : 'contact-detail',
+        tenantId: state.tenantId,
+      });
       return;
     }
 
@@ -840,11 +842,7 @@ async function finalizeBookingRequest(root, state) {
     state.notice = 'Запись отправлена в журнал.';
     state.error = '';
     await refreshContext(state);
-    state.accountTab = 'representative';
-    state.accountChatOpen = false;
-    state.accountChatReturn = '';
-    state.accountDeckOpen = false;
-    await renderAccountHome(root, state);
+    exitBookingContext(state, { tab: 'contact-detail', tenantId: state.tenantId });
   } catch (error) {
     await refreshContext(state).catch(() => {});
     if (state.from && !slotStillAvailable()) {
@@ -859,54 +857,6 @@ async function finalizeBookingRequest(root, state) {
   }
 }
 
-async function startBookingFromAccount(root, state) {
-  resetBookingChoice(state);
-  state.identityDestination = 'booking';
-  state.bookingOrigin = 'profile';
-  nextBookingStep(root, state);
-}
-
-async function repeatBooking(root, state, request) {
-  const procedureIds = requestProcedures(request).map((item) => String(item?.id || '')).filter(Boolean);
-  state.repeatSelection = {
-    workplaceKey: String(request?.workplaceId || ''),
-    procedureIds,
-  };
-  state.date = '';
-  state.from = '';
-  state.to = '';
-  state.identityDestination = 'booking';
-  state.bookingOrigin = 'profile';
-  continueRepeat(root, state);
-}
-
-async function renderAccountHome(root, state) {
-  await renderAccount(root, state, {
-    onStartBooking: () => void startBookingFromAccount(root, state),
-    onRepeat: (request) => void repeatBooking(root, state, request),
-    onChatBack: () => resumeBookingStep(root, state),
-    onOpenChat: (tenantId) => {
-      const id = String(tenantId || '');
-      if (!id) return;
-      const params = new URLSearchParams();
-      params.set('booking', id);
-      params.set('entry', 'chat');
-      location.assign(`${location.pathname}?${params.toString()}`);
-    },
-    onLogout: () => {
-      clearAccount(state.tenantId);
-      state.account = null;
-      state.error = '';
-      state.accountTab = 'home';
-      state.accountChatOpen = false;
-      state.accountChatReturn = '';
-      seedTenantConsents(state, []);
-      state.accountTerms = null;
-      state.accountTermsAccepted = false;
-      renderWelcome(root, state);
-    },
-  });
-}
 
 async function refreshContext(state) {
   state.context = await getBookingContext(state.tenantId, state.lockedWorkplaceKey);
@@ -914,7 +864,7 @@ async function refreshContext(state) {
 }
 
 
-function globalAccountState() {
+function globalAccountState(initial = {}) {
   return {
     tenantId: '',
     context: {},
@@ -927,9 +877,11 @@ function globalAccountState() {
     relationships: [],
     accountRecords: [],
     error: '',
-    accountTab: 'home',
+    accountTab: String(initial.tab || 'home'),
     accountDeckOpen: false,
-    accountDeckActive: 'home',
+    accountDeckActive: String(initial.tab === 'profile' ? 'profile' : initial.tab === 'history' ? 'history' : initial.tab === 'contacts' || initial.tab === 'contact-detail' ? 'contacts' : 'home'),
+    accountSelectedContactTenantId: String(initial.tab === 'contact-detail' ? initial.tenantId || '' : ''),
+    accountSelectedChatTenantId: String(initial.tab === 'messages' ? initial.tenantId || '' : ''),
   };
 }
 
@@ -962,14 +914,6 @@ async function renderGlobalClientHome(root, state) {
       if (!id) return;
       const params = new URLSearchParams();
       params.set('booking', id);
-      location.assign(`${location.pathname}?${params.toString()}`);
-    },
-    onOpenChat: (tenantId) => {
-      const id = String(tenantId || '');
-      if (!id) return;
-      const params = new URLSearchParams();
-      params.set('booking', id);
-      params.set('entry', 'chat');
       location.assign(`${location.pathname}?${params.toString()}`);
     },
     onLogout: () => {
@@ -1188,8 +1132,8 @@ function renderGlobalClientLegal(root, state) {
   });
 }
 
-export async function renderGlobalClient(root) {
-  const state = globalAccountState();
+export async function renderGlobalClient(root, initial = {}) {
+  const state = globalAccountState(initial);
   renderFlowPage(root, state, { title: 'Профиль', subtitle: 'Загрузка…', center: true });
   try {
     const account = await getGlobalAccount();
@@ -1228,12 +1172,7 @@ export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = 
     repeatSelection: null,
     identityDestination: 'booking',
     bookingOrigin: entry === 'account' || entry === 'chat' ? 'profile' : 'welcome',
-    accountTab: 'home',
-    accountDeckOpen: false,
-    accountChatOpen: false,
-    accountChatReturn: '',
     bookingStep: '',
-    accountRequests: [],
     onExitToAccount,
     entry: String(entry || ''),
     platformOnlyLegal: false,

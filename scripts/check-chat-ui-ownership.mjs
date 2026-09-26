@@ -24,9 +24,9 @@ expect(!profileChat.includes('function bindMessageAttachments') && !profileChat.
 expect(!profileChat.includes('<style>') && !profileChat.includes("document.createElement('style')"), 'Professional Chat must not own local styles.');
 
 expect(accountChat.includes('v2Header({') && accountChat.includes('v2Shell'), 'End-user Chat must use the shared V2 H + Z shell.');
-expect(accountChat.includes("mode === 'thread' ? 'v2-app--chat' : 'v2-app--chat-list'"), 'End-user Chat must use the canonical V2 Chat shell classes.');
+expect(accountChat.includes("selected ? 'v2-app--chat' : 'v2-app--chat-list'"), 'End-user Chat must use the canonical V2 Chat shell classes.');
 expect(accountChat.includes("from '../core/chat/runtime.js'") && accountChat.includes('mountChatThread(') && accountChat.includes('mountChatList('), 'End-user Chat must use the neutral Core Chat runtime.');
-expect(accountChat.includes('openEndUserContacts(') && accountChat.includes('getGlobalAccountRelationships'), 'End-user Chat C contacts must use the account professional-contact relationships.');
+expect(accountChat.includes('const relationships = Array.isArray(state.relationships)') && accountChat.includes("state.accountTab = 'contacts'"), 'End-user Chat C contacts must use the global account relationship set and route to Contacts.');
 expect(!accountChat.includes('bindMessageAttachments(form)') && !accountChat.includes('messageThread(') && !accountChat.includes('messageComposer('), 'End-user account shell must not own Chat thread/composer behavior.');
 expect(!accountChat.includes('accountBottomNavigation') && !accountChat.includes('bindBottomNavigation'), 'End-user V2 Chat must not restore bottom navigation.');
 expect(!accountChat.includes('<style>') && !accountChat.includes("document.createElement('style')"), 'End-user Chat must not own local styles.');
@@ -34,7 +34,7 @@ expect(!accountChat.includes('<style>') && !accountChat.includes("document.creat
 expect(chatRuntime.includes('export function mountChatList') && chatRuntime.includes('export function mountChatThread'), 'Core Chat runtime must own shared list/thread behavior.');
 expect(chatRuntime.includes("kind: 'contacts'") && chatRuntime.includes("kind: 'attachment'"), 'Core Chat runtime must own Header C contacts and D attachment roles.');
 expect(chatRuntime.includes('bindMessageAttachments(form)') && chatRuntime.includes('messageComposer(') && chatRuntime.includes('messageThread('), 'Core Chat runtime must own composer, attachments, and thread rendering.');
-expect(accountChat.includes("b: 'Обзор'") && accountChat.includes("v2Section('Контакты'"), 'End-user account home must expose Overview with professional Contacts.');
+expect(accountChat.includes("b: 'Обзор'") && accountChat.includes("v2Section('Предстоящие визиты'") && !accountChat.includes("v2Section('Контакты'"), 'End-user Overview must contain upcoming activity only; Contacts must remain their own F root.');
 
 expect(chatUi.includes('messageBubble') && chatUi.includes('messageThread') && chatUi.includes('messageComposer'), 'Shared ui/chat must own message bubbles, thread and composer.');
 expect(chatUi.includes('bindMessageAttachments') && chatUi.includes('initMessageComposer'), 'Shared ui/chat must own attachments and growing composer behavior.');

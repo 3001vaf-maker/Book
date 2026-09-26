@@ -76,9 +76,10 @@ assert.match(bookingUi, /onExitToAccount/, 'Booking context must be escapable ba
 assert.match(accountShell, /export async function renderGlobalAccount\(/, 'Global Account must reuse the shared client shell');
 assert.match(accountShell, /async function renderGlobalMessages\(/, 'Global Account must expose the shared chat list');
 assert.match(accountShell, /data-account-open-chat-root/, 'Global Account header must expose chat directly');
-assert.match(accountShell, /onOpenChat: callbacks\.onOpenChat/, 'Global Account chat selection must be routed explicitly');
-assert.match(bookingUi, /params\.set\('entry', 'chat'\)/, 'Global chat must open the selected tenant conversation directly');
-assert.match(bookingUi, /state\.entry === 'chat'/, 'Tenant account flow must enter the conversation without an intermediate profile step');
+assert.match(accountShell, /state\.accountSelectedChatTenantId/, 'Global Account must own selected chat contact state directly');
+assert.doesNotMatch(accountShell, /onOpenChat: callbacks\.onOpenChat/, 'Global Account chat must not bridge into a second tenant account UI');
+assert.doesNotMatch(bookingUi, /params\.set\('entry', 'chat'\)/, 'Global chat must not navigate through a tenant chat route');
+assert.match(bookingUi, /exitBookingContext\(state, \{ tab: 'messages', tenantId: state\.tenantId \}\)/, 'Tenant flow may hand off to the global Chat owner for the selected contact');
 assert.match(core, /isEndUserAppHost\(\)/);
 assert.match(core, /renderGlobalClientRoot\(\)/);
 assert.match(core, /params\.get\('entry'\)/, 'Global profile must distinguish account entry from an external booking link');
