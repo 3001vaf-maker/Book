@@ -5,6 +5,7 @@ const css = fs.readFileSync('ui/v2/v2.css', 'utf8');
 const facade = fs.readFileSync('ui/ui.js', 'utf8');
 const booking = fs.readFileSync('online-booking/booking.js', 'utf8');
 const account = fs.readFileSync('online-booking/account-shell.js', 'utf8');
+const chatRuntime = fs.readFileSync('core/chat/runtime.js', 'utf8');
 const calendar = fs.readFileSync('ui/calendar/calendar.css', 'utf8');
 const personalData = fs.readFileSync('online-booking/personal-data.js', 'utf8');
 const passwordSettings = fs.readFileSync('online-booking/password-settings.js', 'utf8');
@@ -327,8 +328,8 @@ expect(account.includes('v2FDeck('), 'End-user root must use shared F deck.');
 expect(account.includes('initV2WorkspaceInteraction(root'), 'End-user F/E/Z interaction must use the single Shared workspace owner.');
 expect(!account.includes('initV2DeckSwipe(root') && !account.includes('function bindRootSwipe') && !account.includes('function bindDeck('), 'End-user account must not re-own F/Z gesture binding beside the Shared workspace owner.');
 expect(core.includes('initV2WorkspaceInteraction(shell') && !core.includes('initV2DeckSwipe(rootDeckNode') && !core.includes('initV2Swipe(z'), 'Professional workspace must consume the same Shared workspace interaction owner as the end-user account.');
-expect(account.includes("className: 'v2-app--chat'"), 'End-user Chat must share V2 H + Z geometry.');
-expect(account.includes("attachmentTrigger: 'external'"), 'Chat attachment action must live in Header D.');
+expect(account.includes("mode === 'thread' ? 'v2-app--chat' : 'v2-app--chat-list'"), 'End-user Chat must share V2 H + Z geometry.');
+expect(chatRuntime.includes("attachmentTrigger: 'external'") && chatRuntime.includes("kind: 'attachment'"), 'Chat attachment action must live in neutral Core Chat Header D.');
 expect(!account.includes('accountBottomNavigation') && !account.includes('bindBottomNavigation'), 'End-user V2 must not contain bottom navigation.');
 expect(!account.includes('<style>') && !booking.includes('<style>'), 'Feature code must not create local V2 style owners.');
 

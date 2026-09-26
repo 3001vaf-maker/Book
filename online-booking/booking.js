@@ -885,6 +885,14 @@ async function renderAccountHome(root, state) {
     onStartBooking: () => void startBookingFromAccount(root, state),
     onRepeat: (request) => void repeatBooking(root, state, request),
     onChatBack: () => resumeBookingStep(root, state),
+    onOpenChat: (tenantId) => {
+      const id = String(tenantId || '');
+      if (!id) return;
+      const params = new URLSearchParams();
+      params.set('booking', id);
+      params.set('entry', 'chat');
+      location.assign(`${location.pathname}?${params.toString()}`);
+    },
     onLogout: () => {
       clearAccount(state.tenantId);
       state.account = null;
