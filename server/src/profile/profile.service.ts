@@ -234,7 +234,7 @@ export class ProfileService {
     for (const value of values) {
       const name = normalizeProfessionName(value);
       const normalizedName = normalizeProfessionKey(name);
-      if (!name || !normalizedName || name.length > 120 || unique.has(normalizedName)) continue;
+      if (!name || !normalizedName || normalizedName === 'другая' || name.length > 120 || unique.has(normalizedName)) continue;
       unique.set(normalizedName, name);
     }
     const now = new Date();
