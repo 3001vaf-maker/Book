@@ -21,6 +21,7 @@ type ProfileInput = {
   profession: string;
   experience: string;
   professionAbout: string;
+  cardAppearance: Record<string, unknown>;
 };
 
 type LinkInput = { type: string; url: string };
@@ -42,6 +43,7 @@ type WorkplaceInput = {
   to: string;
   links: LinkInput[];
   about: string;
+  cardAppearance: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
 };
@@ -66,6 +68,10 @@ function cropPosition(value: unknown, fallback = 50) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return fallback;
   return Math.max(0, Math.min(100, Math.round(numeric)));
+}
+
+function objectValue(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
 function normalizeLinks(value: unknown): LinkInput[] {
@@ -94,6 +100,7 @@ function normalizeProfile(value: unknown): ProfileInput {
     profession: stringValue(source.profession),
     experience: stringValue(source.experience),
     professionAbout: stringValue(source.professionAbout),
+    cardAppearance: objectValue(source.cardAppearance),
   };
 }
 
@@ -116,6 +123,7 @@ function normalizeWorkplace(value: unknown): WorkplaceInput {
     to: stringValue(source.to, '18:00') || '18:00',
     links: normalizeLinks(source.links),
     about: stringValue(source.about),
+    cardAppearance: objectValue(source.cardAppearance),
     createdAt: stringValue(source.createdAt),
     updatedAt: stringValue(source.updatedAt),
   };
@@ -150,6 +158,7 @@ function profileData(profile: ProfileInput, customProfessions: string[]) {
     profession: profile.profession,
     experience: profile.experience,
     professionAbout: profile.professionAbout,
+    cardAppearance: profile.cardAppearance as Prisma.InputJsonValue,
     customProfessions: customProfessions as Prisma.InputJsonValue,
   };
 }
@@ -172,6 +181,7 @@ function workplaceData(workplace: WorkplaceInput, position: number) {
     to: workplace.to,
     links: workplace.links as Prisma.InputJsonValue,
     about: workplace.about,
+    cardAppearance: workplace.cardAppearance as Prisma.InputJsonValue,
     sourceCreatedAt: workplace.createdAt,
     sourceUpdatedAt: workplace.updatedAt,
   };
@@ -195,6 +205,7 @@ function workplaceDto(workplace: WorkplaceRow): WorkplaceInput {
     to: workplace.to,
     links: normalizeLinks(workplace.links),
     about: workplace.about,
+    cardAppearance: objectValue(workplace.cardAppearance),
     createdAt: workplace.sourceCreatedAt,
     updatedAt: workplace.sourceUpdatedAt,
   };
@@ -241,6 +252,7 @@ export class ProfileService {
       profession: row.profession,
       experience: row.experience,
       professionAbout: row.professionAbout,
+      cardAppearance: objectValue(row.cardAppearance),
     };
 
     return {
@@ -581,6 +593,7 @@ export class ProfileService {
         photo: row.photo,
         profession: row.profession,
         about: row.about,
+        cardAppearance: objectValue(row.cardAppearance),
       },
       workplaces: row.workplaces.map(workplaceDto),
       updatedAt: row.updatedAt,
