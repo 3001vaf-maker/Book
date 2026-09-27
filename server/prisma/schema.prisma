@@ -180,6 +180,7 @@ model Workplace {
   sourceUpdatedAt String   @default("")
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
 
   profile Profile @relation(fields: [profileId, tenantId], references: [id, tenantId], onDelete: Cascade)
 
