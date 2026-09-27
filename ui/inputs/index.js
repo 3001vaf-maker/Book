@@ -140,6 +140,45 @@ function photoCropPosition(value) {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? Math.max(0, Math.min(100, Math.round(numeric))) : 50;
 }
+function photoFileDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    if (!file) {
+      resolve('');
+      return;
+    }
+    const reader = new FileReader();
+    reader.addEventListener('load', () => resolve(String(reader.result || '')), { once: true });
+    reader.addEventListener('error', () => reject(reader.error || new Error('Не удалось прочитать фото')), { once: true });
+    reader.readAsDataURL(file);
+  });
+}
+
+export function selectPhotoFile({ accept = 'image/*' } = {}) {
+  return new Promise((resolve, reject) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = accept;
+    input.hidden = true;
+    document.body.appendChild(input);
+
+    const cleanup = () => input.remove();
+    input.addEventListener('change', async () => {
+      try {
+        resolve(await photoFileDataUrl(input.files?.[0]));
+      } catch (error) {
+        reject(error);
+      } finally {
+        cleanup();
+      }
+    }, { once: true });
+    input.addEventListener('cancel', () => {
+      cleanup();
+      resolve('');
+    }, { once: true });
+    input.click();
+  });
+}
+
 
 export function photoField({
   name = 'photo',
@@ -228,18 +267,14 @@ export function initPhotoField(root) {
       value.dispatchEvent(new Event('change', { bubbles: true }));
     };
 
-    input.addEventListener('change', () => {
+    input.addEventListener('change', async () => {
       const file = input.files?.[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.addEventListener('load', () => {
-        const src = String(reader.result || '');
-        if (!src) return;
-        setOriginal(src);
-        setCrop(50, 50);
-        if (cropPanel) cropPanel.hidden = false;
-      });
-      reader.readAsDataURL(file);
+      const src = await photoFileDataUrl(file).catch(() => '');
+      if (!src) return;
+      setOriginal(src);
+      setCrop(50, 50);
+      if (cropPanel) cropPanel.hidden = false;
     });
 
     fieldRoot.querySelector('[data-photo-crop-toggle]')?.addEventListener('click', () => {
