@@ -314,6 +314,10 @@ expect(modals.includes("import { mountV2Layer, v2Layer } from '../v2/index.js';"
 expect(timeUi.includes("variant:'top'"), 'Time Picker must use the Shared TOP modal instead of a global/system overlay.');
 expect(ui.includes("const allowed = new Set(['top', 'standard', 'bottom', 'technical'])") && ui.includes("const technical = kind === 'technical'") && ui.includes('activeV2ModalSurface(root)'), 'Internal V2 modal geometry must expose exactly the approved top/standard/bottom/technical model.');
 expect(ui.includes('function initV2LayerDismissGesture') && ui.includes("kind === 'top' ? Math.min(0, raw) : Math.max(0, raw)") && ui.includes('stopPointerPropagation') && ui.includes("resolved === 'technical'"), 'Shared Modal must own origin-directed dismissal, isolate pointer gestures from lower Z/F/E, and reserve X for technical overlays only.');
+expect(ui.includes("if (app.querySelector('[data-v2-z-layer]')) return;"), 'Shared workspace owner must block F/E/base-Z gestures while any stacked Z2/Z3 is active.');
+expect(ui.includes("const locksHeader = Boolean(app && kind === 'standard')") && ui.includes("header.inert = true") && ui.includes("header.classList.add('is-modal-locked')"), 'Shared standard modal-Z must keep Header A-D visible but inactive.');
+expect(css.includes('.v2-header.is-modal-locked{pointer-events:none}'), 'Shared Header must expose one modal-lock visual interaction state.');
+
 for (const [name, source] of [
   ['profile', profile],
   ['profile workplaces', workplacesUi],
