@@ -23,14 +23,14 @@ export class WorkplaceLimitGuard implements CanActivate {
 
     const existing = await this.prisma.workplace.findUnique({
       where: { tenantId_key: { tenantId, key } },
-      select: { id: true },
+      select: { id: true, deletedAt: true },
     });
-    if (existing) return true;
+    if (existing && !existing.deletedAt) return true;
 
     const capability = await this.access.resolveCapability(tenantId, 'workplaces.max');
     if (capability.limit === null) return true;
 
-    const currentCount = await this.prisma.workplace.count({ where: { tenantId } });
+    const currentCount = await this.prisma.workplace.count({ where: { tenantId, deletedAt: null } });
     if (currentCount >= capability.limit) {
       throw new ForbiddenException({
         code: 'WORKPLACE_LIMIT',

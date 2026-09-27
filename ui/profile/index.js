@@ -1,0 +1,165 @@
+import { button } from '../buttons/index.js';
+import { formError, formView } from '../forms/index.js';
+import { formValidationMessage, initPasswordFields, passwordField, selectPhotoFile } from '../inputs/index.js';
+import { modal, mountModal, openNotice } from '../modals/index.js';
+import { settingsPanel } from '../settings/index.js';
+import { v2Document } from '../v2/index.js';
+
+function actionData(id = '') {
+  return `data-shared-profile-action="${String(id || '').trim()}"`;
+}
+
+export function openSharedProfileSettingsMenu({
+  title = 'Настройки профиля',
+  actions = [],
+  data = 'data-shared-profile-settings-menu',
+} = {}) {
+  const items = (Array.isArray(actions) ? actions : []).filter((item) => item?.id && item?.label);
+  const body = `<div ${data}>${settingsPanel(items.map((item) => ({
+    label: item.label,
+    variant: item.variant || 'outline',
+    data: actionData(item.id),
+  })))}</div>`;
+  const layer = mountModal(document.body, modal(body, {
+    variant: 'bottom',
+    title,
+    className: 'modal--profile-settings-sheet',
+  }));
+  if (!layer) return null;
+
+  items.forEach((item) => {
+    layer.querySelector(`[data-shared-profile-action="${CSS.escape(String(item.id))}"]`)?.addEventListener('click', () => {
+      layer.v2Close?.();
+      void item.onSelect?.();
+    });
+  });
+  return layer;
+}
+
+export async function openSharedPhotoAction({
+  photo = '',
+  title = 'Фото',
+  onReplace = async () => {},
+  onDelete = async () => {},
+  onError = () => {},
+} = {}) {
+  const choose = async () => {
+    try {
+      const src = await selectPhotoFile();
+      if (!src) return false;
+      await onReplace(src);
+      return true;
+    } catch (error) {
+      onError(error);
+      return false;
+    }
+  };
+
+  if (!String(photo || '').trim()) return choose();
+
+  const body = `<div class="form-grid">
+    ${button('Заменить фото', { variant: 'outline', data: 'data-shared-photo-replace' })}
+    ${button('Удалить фото', { variant: 'outline', className: 'ui-button--delete-outline', data: 'data-shared-photo-delete' })}
+  </div>`;
+  const layer = mountModal(document.body, modal(body, {
+    variant: 'bottom',
+    title,
+    className: 'modal--photo-sheet',
+  }));
+  if (!layer) return null;
+
+  layer.querySelector('[data-shared-photo-replace]')?.addEventListener('click', () => {
+    layer.v2Close?.();
+    void choose();
+  });
+  layer.querySelector('[data-shared-photo-delete]')?.addEventListener('click', async () => {
+    try {
+      await onDelete();
+      layer.v2Close?.();
+    } catch (error) {
+      onError(error);
+    }
+  });
+  return layer;
+}
+
+export function openSharedPasswordAction({
+  title = 'Изменить пароль',
+  onSubmit = async () => {},
+  successTitle = 'Пароль изменён',
+  successMessage = 'Новый пароль сохранён.',
+  errorTitle = 'Пароль не изменён',
+  errorMessage = 'Не удалось изменить пароль',
+} = {}) {
+  const content = formView(`
+    ${passwordField({ label: 'Текущий пароль', name: 'currentPassword', required: true, autocomplete: 'current-password' })}
+    ${passwordField({ label: 'Новый пароль', name: 'newPassword', required: true, autocomplete: 'new-password' })}
+    ${passwordField({ label: 'Повторите новый пароль', name: 'repeatPassword', required: true, autocomplete: 'new-password' })}
+    ${formError('', { data: 'data-shared-password-error', keepEmpty: true })}
+    ${button('Сохранить пароль', { type: 'submit' })}
+  `, { className: 'form-grid', data: 'data-shared-password-form' });
+  const layer = mountModal(document.body, modal(content, {
+    variant: 'bottom',
+    title,
+    className: 'modal--password-sheet',
+  }));
+  if (!layer) return null;
+
+  initPasswordFields(layer);
+  const form = layer.querySelector('[data-shared-password-form]');
+  const errorNode = layer.querySelector('[data-shared-password-error]');
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const validationError = formValidationMessage(form);
+    if (validationError) {
+      if (errorNode) errorNode.textContent = validationError;
+      return;
+    }
+
+    const data = new FormData(form);
+    const currentPassword = String(data.get('currentPassword') || '');
+    const newPassword = String(data.get('newPassword') || '');
+    const repeatPassword = String(data.get('repeatPassword') || '');
+    if (newPassword.length < 8) {
+      if (errorNode) errorNode.textContent = 'Новый пароль должен содержать минимум 8 символов.';
+      return;
+    }
+    if (newPassword !== repeatPassword) {
+      if (errorNode) errorNode.textContent = 'Новые пароли не совпадают.';
+      return;
+    }
+
+    const submit = form.querySelector('button[type="submit"]');
+    if (submit) submit.disabled = true;
+    if (errorNode) errorNode.textContent = '';
+    try {
+      await onSubmit({ currentPassword, newPassword });
+      layer.v2Close?.();
+      openNotice({ title: successTitle, message: successMessage, action: 'Закрыть', variant: 'technical' });
+    } catch (error) {
+      if (submit) submit.disabled = false;
+      if (errorNode) errorNode.textContent = error instanceof Error ? error.message : errorMessage;
+      openNotice({ title: errorTitle, message: error instanceof Error ? error.message : errorMessage, action: 'Закрыть', variant: 'technical' });
+    }
+  });
+  return layer;
+}
+
+
+export function setSharedProfilePrimary(source, { visible = false, label = 'Сохранить', disabled = false } = {}) {
+  if (!source) return;
+  source.dataset.v2PrimaryVisible = visible ? 'true' : 'false';
+  source.dataset.v2PrimaryLabel = String(label || 'Сохранить');
+  source.setAttribute('aria-label', String(label || 'Сохранить'));
+  source.disabled = Boolean(disabled);
+  window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+}
+
+
+export function openSharedConsentDocument({ title = 'Документ', version = '', content = '', className = '' } = {}) {
+  return mountModal(document.body, modal(v2Document({ title, version, content }), {
+    variant: 'technical',
+    title,
+    className,
+  }));
+}

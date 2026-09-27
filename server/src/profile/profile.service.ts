@@ -211,7 +211,7 @@ export class ProfileService {
   private async bundle(tenantId: string, platformAccountId: string) {
     const row = await this.prisma.profile.findUnique({
       where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
-      include: { workplaces: { orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] } },
+      include: { workplaces: { where: { deletedAt: null }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] } },
     });
     if (!row) {
       return {
@@ -336,7 +336,7 @@ export class ProfileService {
   async reorderWorkplaces(tenantId: string, platformAccountId: string, body: unknown) {
     const profile = await this.prisma.profile.findUnique({
       where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
-      include: { workplaces: { orderBy: [{ position: 'asc' }, { createdAt: 'asc' }], select: { id: true, key: true } } },
+      include: { workplaces: { where: { deletedAt: null }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }], select: { id: true, key: true } } },
     });
     if (!profile?.migrationVerifiedAt) throw new ConflictException('Перенос Profile + Workplaces ещё не подтверждён');
 
@@ -359,7 +359,7 @@ export class ProfileService {
   async upsertWorkplace(tenantId: string, platformAccountId: string, key: string, body: unknown) {
     const profile = await this.prisma.profile.findUnique({
       where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
-      include: { workplaces: { select: { position: true } } },
+      include: { workplaces: { where: { deletedAt: null }, select: { position: true } } },
     });
     if (!profile?.migrationVerifiedAt) throw new ConflictException('Перенос Profile + Workplaces ещё не подтверждён');
 
@@ -384,7 +384,7 @@ export class ProfileService {
         profileId: profile.id,
         ...workplaceData(normalized, position),
       },
-      update: workplaceData(normalized, position),
+      update: { ...workplaceData(normalized, position), deletedAt: null },
     });
     return this.bundle(tenantId, platformAccountId);
   }
@@ -394,7 +394,10 @@ export class ProfileService {
     if (!profile?.migrationVerifiedAt) throw new ConflictException('Перенос Profile + Workplaces ещё не подтверждён');
     const existing = await this.prisma.workplace.findUnique({ where: { tenantId_key: { tenantId, key } } });
     if (!existing || existing.profileId !== profile.id) throw new NotFoundException('Рабочее место не найдено');
-    await this.prisma.workplace.delete({ where: { tenantId_key: { tenantId, key } } });
+    await this.prisma.workplace.update({
+      where: { tenantId_key: { tenantId, key } },
+      data: { deletedAt: new Date() },
+    });
     return this.bundle(tenantId, platformAccountId);
   }
 
@@ -407,9 +410,11 @@ export class ProfileService {
         title: string;
         requiredForRegistration: boolean;
         currentVersion: number;
+        currentText: string;
         latestAction: string | null;
         latestOccurredAt: Date | null;
         latestVersion: number | null;
+        latestText: string | null;
       }>>`
         SELECT
           d."id" AS "documentId",
@@ -418,19 +423,21 @@ export class ProfileService {
           d."title",
           d."requiredForRegistration",
           current_v."version" AS "currentVersion",
+          current_v."contentSnapshot" AS "currentText",
           latest_event."action" AS "latestAction",
           latest_event."occurredAt" AS "latestOccurredAt",
-          latest_event."documentVersion" AS "latestVersion"
+          latest_event."documentVersion" AS "latestVersion",
+          latest_event."contentSnapshot" AS "latestText"
         FROM "PlatformDocument" d
         JOIN LATERAL (
-          SELECT "version"
+          SELECT "version","contentSnapshot"
           FROM "PlatformDocumentVersion"
           WHERE "documentId" = d."id"
           ORDER BY "version" DESC
           LIMIT 1
         ) current_v ON true
         LEFT JOIN LATERAL (
-          SELECT e."action", e."occurredAt", v."version" AS "documentVersion"
+          SELECT e."action", e."occurredAt", v."version" AS "documentVersion", v."contentSnapshot"
           FROM "PlatformConsentEvent" e
           JOIN "PlatformDocumentVersion" v ON v."id" = e."documentVersionId"
           WHERE e."platformAccountId" = ${platformAccountId}
@@ -472,16 +479,21 @@ export class ProfileService {
     `;
 
     return {
-      consents: documents.map((document) => ({
-        key: document.key,
-        title: document.title,
-        requiredForRegistration: document.requiredForRegistration,
-        currentVersion: document.currentVersion,
-        action: document.latestAction || 'DECLINED',
-        eventVersion: document.latestVersion,
-        occurredAt: document.latestOccurredAt?.toISOString() || '',
-        active: document.latestAction === 'CONSENTED',
-      })),
+      consents: documents.map((document) => {
+        const active = document.latestAction === 'CONSENTED' && document.latestVersion === document.currentVersion;
+        return {
+          key: document.key,
+          title: document.title,
+          requiredForRegistration: document.requiredForRegistration,
+          currentVersion: document.currentVersion,
+          action: active ? 'CONSENTED' : (document.latestAction || 'DECLINED'),
+          eventVersion: document.latestVersion,
+          displayVersion: active ? document.latestVersion : document.currentVersion,
+          documentText: active ? (document.latestText || document.currentText) : document.currentText,
+          occurredAt: document.latestOccurredAt?.toISOString() || '',
+          active,
+        };
+      }),
       history: history.map((event) => ({
         ...event,
         occurredAt: event.occurredAt.toISOString(),

@@ -106,3 +106,27 @@ function open(host){
     modalRoot.v2Close?.();
   });
 }
+
+
+export function openTimeRangeAction({ from = '09:00', to = '18:00', title = 'График работы', onSave = () => {} } = {}) {
+  const content = `<form class="form-grid" data-shared-time-range-form>
+    <label class="field"><span>С</span><input type="time" name="from" value="${esc(text(from))}" required></label>
+    <label class="field"><span>До</span><input type="time" name="to" value="${esc(text(to))}" required></label>
+    ${button('Сохранить', { type: 'submit' })}
+  </form>`;
+  const layer = mountModal(document.body, modal(content, {
+    variant: 'bottom',
+    title,
+    className: 'modal--time-range-sheet',
+  }));
+  const form = layer?.querySelector('[data-shared-time-range-form]');
+  form?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const data = new FormData(form);
+    const nextFrom = text(data.get('from'));
+    const nextTo = text(data.get('to'));
+    layer.v2Close?.();
+    onSave({ from: nextFrom, to: nextTo });
+  });
+  return layer;
+}

@@ -17,3 +17,6 @@
 .modal-sheet.modal--bottom.modal--photo-sheet{height:auto;min-height:138px;max-height:38%;padding:20px 18px calc(18px + env(safe-area-inset-bottom));background:var(--white);overflow:auto}
 
 .modal-sheet.modal--bottom.modal--profile-settings-sheet{height:auto;min-height:320px;max-height:64%;padding:20px 18px calc(18px + env(safe-area-inset-bottom));background:var(--white);overflow:auto}
+
+.modal-sheet.modal--bottom.modal--color-sheet{height:auto;min-height:260px;max-height:54%;padding:20px 18px calc(18px + env(safe-area-inset-bottom));background:var(--white);overflow:auto}
+.modal-sheet.modal--bottom.modal--time-range-sheet{height:auto;min-height:260px;max-height:54%;padding:20px 18px calc(18px + env(safe-area-inset-bottom));background:var(--white);overflow:auto}

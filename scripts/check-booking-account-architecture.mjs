@@ -25,6 +25,7 @@ const referenceCss = fs.readFileSync('ui/reference/reference.css', 'utf8');
 const rootHtml = fs.readFileSync('index.html', 'utf8');
 const v2Ui = fs.readFileSync('ui/v2/index.js', 'utf8');
 const v2Css = fs.readFileSync('ui/v2/v2.css', 'utf8');
+const sharedProfile = fs.readFileSync('ui/profile/index.js', 'utf8');
 
 const failures = [];
 const expect = (condition, message) => { if (!condition) failures.push(message); };
@@ -138,8 +139,8 @@ expect(!accountShell.includes('export async function renderAccount(')
 expect(accountShell.includes('async function renderGlobalHistoryDetail') && !accountShell.includes('onOpenRelationship: callbacks.onOpenRelationship'), 'Global History must own record detail locally and must not restore the old relationship bridge.');
 expect(consentSettings.includes("tenantId = state?.tenantId") && consentSettings.includes('getAccountConsentState(scopeTenantId)') && consentSettings.includes('revokeAccountConsent(scopeTenantId, consent.documentId)'), 'Consent settings must be the single tenant-scoped owner used from both contact settings and Profile aggregation.');
 expect(accountShell.includes('state.accountSelectedChatTenantId') && accountShell.includes('selectedTenantId'), 'End-user Chat must live inside the global account and select a contact without a tenant-account bridge.');
-expect(accountShell.includes("label: 'Согласия / Уведомления'") && accountShell.includes("data: 'data-account-controls'"), 'End-user Profile settings must expose the combined Consents / Notifications modal-Z entry.');
-expect(accountShell.includes("label: 'Фото'") && accountShell.includes("label: 'Удалить профиль'") && accountShell.includes("variant: 'critical'"), 'End-user Profile settings must expose separate Photo and critical Profile deletion actions.');
+expect(accountShell.includes("id:'controls',label:'Согласия / Уведомления'") && accountShell.includes('openSharedProfileSettingsMenu({'), 'End-user Profile settings must expose the combined Consents / Notifications entry through the Shared Profile menu owner.');
+expect(accountShell.includes("id:'photo',label:'Фото'") && accountShell.includes("id:'delete',label:'Удалить профиль',variant:'critical'"), 'End-user Profile settings must expose separate Photo and critical Profile deletion actions through the Shared Profile menu owner.');
 expect(accountShell.includes('data-account-profile-card') && accountShell.includes('openAccountPersonalDataZ(root, state'), 'End-user personal-data editing must start from the Profile entity card, not Header A settings.');
 expect(consentSettings.includes('revokeAccountConsent'), 'Account consent settings must use the canonical server-backed revoke flow.');
 expect(bookingUi.includes('bookingChoiceCards'), 'Shared booking UI must continue to own booking choice controls.');
@@ -169,9 +170,10 @@ expect(referenceUi.includes("button('Фото', { variant: 'outline'") && refere
 expect(referenceUi.includes("data: 'data-reference-profile-card'") && referenceUi.includes("openPersonalDataReference"), 'Reference personal-data editing must originate from the Profile card.');
 expect(referenceUi.includes("variant: 'bottom'") && referenceUi.includes('data-reference-settings-menu') && referenceUi.includes('data-reference-personal-z'), 'Reference Header A settings must use bottom modal while Profile personal-data editing stays on stacked Z2.');
 expect(accountShell.includes("className: 'entity-card--hero account-profile-card'") && accountShell.includes('title: fullName') && accountShell.includes('subtitle: phone'), 'End-user Profile Z1 must use one full canonical card with one-line full name and phone.');
-expect(accountShell.includes("className: 'modal--profile-settings-sheet'") && !accountShell.includes('openGlobalProfileSettingsZ') && !accountShell.includes('data-account-profile-settings-z'), 'End-user Header A settings must use the bottom modal only; legacy settings Z must be physically absent.');
+expect(accountShell.includes('openSharedProfileSettingsMenu({') && !accountShell.includes('openGlobalProfileSettingsZ') && !accountShell.includes('data-account-profile-settings-z'), 'End-user Header A settings must consume the Shared bottom-menu owner; legacy settings Z must be physically absent.');
 expect(personalData.includes("v2Section('Личные данные', fields)") && !personalData.includes('accordion(') && !personalData.includes('initAccordions'), 'End-user personal-data Z2 must use flat Shared UI and must not retain the legacy accordion owner.');
-expect(!accountShell.includes("document.createElement('input')") && !accountShell.includes('new FileReader(') && accountShell.includes('selectPhotoFile()'), 'End-user Profile must consume the Shared photo picker instead of owning file input logic.');
+expect(!accountShell.includes("document.createElement('input')") && !accountShell.includes('new FileReader(') && accountShell.includes('openSharedPhotoAction(') && sharedProfile.includes('selectPhotoFile()'), 'End-user Profile must consume the Shared photo owner instead of owning file input logic.');
+expect(sharedProfile.includes('openSharedProfileSettingsMenu') && sharedProfile.includes('openSharedPhotoAction') && sharedProfile.includes('openSharedPasswordAction') && sharedProfile.includes('openSharedConsentDocument'), 'Both profile contours must share one Profile UI owner.');
 expect(!referenceUi.includes('apiRequest(') && !referenceUi.includes('fetch(') && !referenceUi.includes('localStorage') && !referenceUi.includes('sessionStorage') && !referenceUi.includes("from '../../core/") && !referenceUi.includes("from '../core/"), 'Reference must remain free of API, persistence and business-layer dependencies.');
 
 if (failures.length) {

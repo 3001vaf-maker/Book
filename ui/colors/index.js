@@ -47,3 +47,20 @@ export function initColorPickers(root, colors = COLOR_PALETTE) {
     };
   });
 }
+
+
+export function openColorPickerAction({ value = '', title = 'Выбор цвета', onSelect = () => {} } = {}) {
+  const selected = exactHex(value);
+  const palette = COLOR_PALETTE.map((color) => `<button type="button" class="color-picker__option ${color === selected ? 'is-selected' : ''}" data-shared-color-option="${escapeHtml(color)}" aria-label="Цвет ${escapeHtml(color)}"><span style="background:${escapeHtml(color)}"></span></button>`).join('');
+  const layer = mountModal(document.body, modal(`<div class="color-picker__palette" data-color-palette>${palette}</div>`, {
+    variant: 'bottom',
+    title,
+    className: 'modal--color-sheet',
+  }));
+  layer?.querySelectorAll('[data-shared-color-option]').forEach((option) => option.addEventListener('click', () => {
+    const next = option.dataset.sharedColorOption || COLOR_PALETTE[0];
+    layer.v2Close?.();
+    onSelect(next);
+  }));
+  return layer;
+}
