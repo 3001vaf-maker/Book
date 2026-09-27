@@ -2,7 +2,6 @@ import { apiRequest } from '../../core/auth.js';
 import { disablePlatformPush, enablePlatformPush, getPlatformPushState } from '../../core/platform-notices.js';
 import { emptyState, escapeHtml, modal, mountModal, v2Document, v2LegalCards, v2Section } from '../../ui/ui.js';
 import { notificationSettings } from '../../ui/settings/index.js';
-import { getDocuments } from '../documents/data.js';
 
 async function request(path, options = {}) {
   const response = await apiRequest(path, options);
@@ -74,27 +73,21 @@ function serviceMarkup(state, pushState) {
   ]);
 }
 
-function findDocument(item) {
-  const title = String(item?.title || '').trim();
-  return getDocuments().find((document) => document.title === title) || null;
-}
-
 function openConsentDocument(item) {
-  const document = findDocument(item);
-  const content = document?.text || `Статус: ${actionText(item.action)}\nВерсия: ${item.eventVersion || item.currentVersion || '—'}\nДата: ${moment(item.occurredAt)}`;
+  const content = String(item?.documentText || '').trim();
   mountModal(document.body,modal(v2Document({
     title:item.title || 'Документ',
-    version:document?.version || item.currentVersion || item.eventVersion || '',
+    version:item.displayVersion || item.currentVersion || item.eventVersion || '',
     content,
-  }),{variant:'large',title:item.title || 'Документ'}));
+  }),{variant:'technical',title:item.title || 'Документ'}));
 }
 
 async function renderPanelState(root,state,pushState=null){
   const consents=Array.isArray(state.consents)?state.consents:[];
   const push=pushState || await getPlatformPushState().catch(()=>({supported:false,enabled:false,subscribed:false}));
   root.innerHTML=`
+    ${v2Section('Уведомления',serviceMarkup(state,push))}
     ${v2Section('Согласия',consentCards(consents))}
-    ${v2Section('Сервисные уведомления',serviceMarkup(state,push))}
   `;
 
   root.querySelectorAll('[data-account-consent-open]').forEach((control)=>{
@@ -173,4 +166,16 @@ export async function renderAccountControlsPanel(root){
   }catch(error){
     root.innerHTML=emptyState('Раздел недоступен',error instanceof Error?error.message:'Не удалось загрузить данные');
   }
+}
+
+
+export function openAccountControlsModal() {
+  const layer = mountModal(document.body, modal('<div data-profile-account-controls-panel></div>', {
+    variant: 'standard',
+    title: 'Согласия / Уведомления',
+    className: 'modal--account-controls',
+  }));
+  const host = layer?.querySelector('[data-profile-account-controls-panel]');
+  if (host) void renderAccountControlsPanel(host);
+  return layer;
 }
