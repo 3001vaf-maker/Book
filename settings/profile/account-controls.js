@@ -1,6 +1,6 @@
 import { apiRequest } from '../../core/auth.js';
 import { disablePlatformPush, enablePlatformPush, getPlatformPushState } from '../../core/platform-notices.js';
-import { emptyState, escapeHtml, modal, mountModal, v2Document, v2LegalCards, v2Section } from '../../ui/ui.js';
+import { emptyState, escapeHtml, modal, mountModal, openSharedConsentDocument, v2LegalCards, v2Section } from '../../ui/ui.js';
 import { notificationSettings } from '../../ui/settings/index.js';
 
 async function request(path, options = {}) {
@@ -74,12 +74,11 @@ function serviceMarkup(state, pushState) {
 }
 
 function openConsentDocument(item) {
-  const content = String(item?.documentText || '').trim();
-  mountModal(document.body,modal(v2Document({
+  return openSharedConsentDocument({
     title:item.title || 'Документ',
     version:item.displayVersion || item.currentVersion || item.eventVersion || '',
-    content,
-  }),{variant:'technical',title:item.title || 'Документ'}));
+    content:String(item?.documentText || '').trim(),
+  });
 }
 
 async function renderPanelState(root,state,pushState=null){
