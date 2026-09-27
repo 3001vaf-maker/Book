@@ -1,5 +1,10 @@
-import fs from 'node:fs';
+im
+expect(architectureDictionary.includes('Shared manifestation invariance') && architectureDictionary.includes('один и тот же Shared UI-owner всегда проявляется одинаково'), 'Architecture contract must keep one invariant manifestation per Shared UI owner across all contexts.');
+expect(designDictionary.includes('Один Shared UI-компонент имеет **одно и то же проявление везде**'), 'Design contract must forbid profile/workplace/feature-specific manifestations of the same Shared UI owner.');
+port fs from 'node:fs';
 
+const architectureDictionary = fs.readFileSync('ARCHITECTURE_DICTIONARY.md', 'utf8');
+const designDictionary = fs.readFileSync('DESIGN_DICTIONARY.md', 'utf8');
 const ui = fs.readFileSync('ui/v2/index.js', 'utf8');
 const css = fs.readFileSync('ui/v2/v2.css', 'utf8');
 const facade = fs.readFileSync('ui/ui.js', 'utf8');
