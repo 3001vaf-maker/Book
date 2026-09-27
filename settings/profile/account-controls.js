@@ -1,6 +1,7 @@
 import { apiRequest } from '../../core/auth.js';
 import { disablePlatformPush, enablePlatformPush, getPlatformPushState } from '../../core/platform-notices.js';
 import { emptyState, escapeHtml, modal, mountModal, v2Document, v2LegalCards, v2Section } from '../../ui/ui.js';
+import { notificationSettings } from '../../ui/settings/index.js';
 import { getDocuments } from '../documents/data.js';
 
 async function request(path, options = {}) {
@@ -49,21 +50,28 @@ function serviceMarkup(state, pushState) {
   const pushSupported = Boolean(pushState?.supported && pushState?.enabled);
   const pushEnabled = Boolean(pushState?.subscribed);
 
-  return `<div class="account-controls-service-list" aria-label="Куда получать сервисные уведомления">
-    <label class="account-controls-service-row">
-      <input type="checkbox" data-service-telegram ${telegramEnabled ? 'checked' : ''} ${telegramAvailable ? '' : 'disabled'}>
-      <span><strong>Telegram</strong><small>${telegramAvailable ? 'Канал подключён.' : 'Канал платформенного аккаунта не подключён.'}</small></span>
-    </label>
-    <label class="account-controls-service-row">
-      <input type="checkbox" data-service-email ${emailEnabled ? 'checked' : ''}>
-      <span><strong>Email</strong><small>Сервисные сообщения на email учётной записи.</small></span>
-    </label>
-    <label class="account-controls-service-row">
-      <input type="checkbox" data-service-push ${pushEnabled ? 'checked' : ''} ${pushSupported ? '' : 'disabled'}>
-      <span><strong>Push</strong><small>${pushSupported ? 'Push-уведомления на этом устройстве.' : 'Push на этом устройстве сейчас недоступен.'}</small></span>
-    </label>
-    <div class="muted" data-controls-status></div>
-  </div>`;
+  return notificationSettings([
+    {
+      label: 'Telegram',
+      description: telegramAvailable ? 'Канал подключён.' : 'Канал платформенного аккаунта не подключён.',
+      checked: telegramEnabled,
+      disabled: !telegramAvailable,
+      data: 'data-service-telegram',
+    },
+    {
+      label: 'Email',
+      description: 'Сервисные сообщения на email учётной записи.',
+      checked: emailEnabled,
+      data: 'data-service-email',
+    },
+    {
+      label: 'Push',
+      description: pushSupported ? 'Push-уведомления на этом устройстве.' : 'Push на этом устройстве сейчас недоступен.',
+      checked: pushEnabled,
+      disabled: !pushSupported,
+      data: 'data-service-push',
+    },
+  ]);
 }
 
 function findDocument(item) {

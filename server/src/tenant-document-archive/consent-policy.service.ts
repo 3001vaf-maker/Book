@@ -167,6 +167,7 @@ export class ConsentPolicyService {
     const data = snapshot.data || {};
     return {
       documents: Array.isArray(data.documents) ? data.documents : [],
+      history: Array.isArray(data.history) ? data.history : [],
     };
   }
 
@@ -310,6 +311,60 @@ export class ConsentPolicyService {
     return event ? publicEvent(event) : null;
   }
 
+  async revokeAllForAccount(
+    tenantId: string,
+    accountIdValue: unknown,
+    contactsValue: Array<{ type?: unknown; value?: unknown }> = [],
+    source = 'account-delete',
+  ) {
+    const accountId = text(accountIdValue);
+    if (!accountId) throw new BadRequestException('Не указан аккаунт');
+
+    const contacts = arrayValue(contactsValue)
+      .map((item) => {
+        const type = contactPointType(item?.type);
+        const value = contactPointValue(type, item?.value);
+        return { type, value, subjectKey: contactSubjectKey(type, value) };
+      })
+      .filter((item) => item.type && item.value && item.subjectKey);
+
+    const rows = await this.consentRows(tenantId);
+    const contactBySubject = new Map(contacts.map((item) => [item.subjectKey, item]));
+    const subjects = new Set([accountId, ...contacts.map((item) => item.subjectKey)]);
+    const latest = new Map<string, TenantConsentEventRow>();
+
+    for (const event of [...rows].reverse()) {
+      if (!subjects.has(event.subjectKey)) continue;
+      if (event.subjectType === 'ACCOUNT' && event.subjectKey !== accountId) continue;
+      if (event.subjectType === 'CONTACT_POINT' && !contactBySubject.has(event.subjectKey)) continue;
+      const key = `${event.subjectType}:${event.subjectKey}:${event.documentId}`;
+      if (!latest.has(key)) latest.set(key, event);
+    }
+
+    for (const event of latest.values()) {
+      if (event.status !== 'accepted') continue;
+      const now = new Date();
+      const contact = event.subjectType === 'CONTACT_POINT'
+        ? contactBySubject.get(event.subjectKey)
+        : null;
+      await this.insertEvent({
+        tenantId,
+        subjectType: event.subjectType,
+        subjectKey: event.subjectKey,
+        contactType: contact?.type || event.contactType,
+        contactValue: contact?.value || event.contactValue,
+        documentId: event.documentId,
+        documentVersion: Math.max(1, Number(event.documentVersion || 1)),
+        status: 'revoked',
+        revokedAt: now,
+        source,
+        occurredAt: now,
+      });
+    }
+
+    return { revoked: true };
+  }
+
   async accountConsentProjection(tenantId: string, accountIdValue: unknown) {
     const accountId = text(accountIdValue);
     const current = await this.state(tenantId);
@@ -327,16 +382,31 @@ export class ConsentPolicyService {
         const documentId = text(document?.id);
         const documentVersion = Math.max(1, Number(document?.version || 1));
         const latest = rows.find((event) => event.documentId === documentId) || null;
+        const latestAccepted = rows.find((event) => event.documentId === documentId && event.status === 'accepted') || null;
         const status = latest?.status || 'missing';
         const accepted = Boolean(latest && status === 'accepted' && latest.documentVersion === documentVersion);
+        const displayVersion = accepted
+          ? Math.max(1, Number(latestAccepted?.documentVersion || documentVersion))
+          : documentVersion;
+        const historicalSnapshot = accepted
+          ? current.history.find((entry: any) => (
+              text(entry?.documentId) === documentId
+              && Math.max(1, Number(entry?.documentVersion || 1)) === displayVersion
+              && entry?.snapshot
+            ))?.snapshot
+          : null;
+        const displayDocument = historicalSnapshot || document;
         return {
           documentId,
           documentVersion,
-          title: text(document?.title) || 'Документ',
+          displayVersion,
+          title: text(displayDocument?.title) || text(document?.title) || 'Документ',
           required: Boolean(document?.required),
           status,
           accepted,
+          documentText: text(displayDocument?.text ?? displayDocument?.content),
           eventAt: latest?.occurredAt.toISOString() || '',
+          acceptedAt: latestAccepted?.acceptedAt?.toISOString() || '',
           source: text(latest?.source),
           eventId: text(latest?.id),
         };

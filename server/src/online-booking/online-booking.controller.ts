@@ -94,6 +94,12 @@ export class OnlineBookingController {
   }
 
   @UseGuards(AccountGuard)
+  @Delete('account/me')
+  deleteGlobalAccount(@Req() request: AccountRequest) {
+    return this.booking.deleteGlobalAccount(request.accountAuth!.accountId);
+  }
+
+  @UseGuards(AccountGuard)
   @Get('account/platform-state')
   globalAccountPlatformState(@Req() request: AccountRequest) {
     return this.accountDocuments.state(request.accountAuth!.accountId);

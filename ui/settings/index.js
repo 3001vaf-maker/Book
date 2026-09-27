@@ -15,3 +15,14 @@ export function settingsPanel(items = []) {
     return button(text(item.label || ''), { className: 'app-settings-panel__button', data: item.data || '', aria: item.aria || item.label || '', variant: item.variant || '' });
   }).join('')}</div>`;
 }
+
+
+export function notificationSettings(items = []) {
+  return `<div class="app-notification-list">${(Array.isArray(items) ? items : []).filter(Boolean).map((item) => `
+    <label class="app-notification-row${item.disabled ? ' is-disabled' : ''}">
+      <input type="checkbox" ${item.data || ''} ${item.checked ? 'checked' : ''} ${item.disabled ? 'disabled' : ''}>
+      <span><strong>${text(item.label || '')}</strong>${item.description ? `<small>${text(item.description)}</small>` : ''}</span>
+    </label>`).join('')}
+    <div class="muted" data-notification-status></div>
+  </div>`;
+}

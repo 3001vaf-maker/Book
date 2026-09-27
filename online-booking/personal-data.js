@@ -10,14 +10,14 @@ import {
   initAccordions,
   initCalendar,
   initLinks,
-  initPhotoField,
   initRepeatedFields,
   links,
   mountModal,
   modal,
+  mountV2ZLayer,
+  v2ZLayer,
   openNotice,
   phoneField,
-  photoField,
   repeatedField,
   select,
 } from '../ui/ui.js';
@@ -138,7 +138,6 @@ function editorMarkup(account = {}) {
     ${accordion([{
       title: 'Личные данные',
       content: `<div class="form-grid">
-        ${photoField({ name: 'photo', value: profile.photo || '' })}
         ${field({ label: 'Имя', name: 'name', value: account.name || '', required: true, autocomplete: 'given-name' })}
         ${field({ label: 'Фамилия', name: 'surname', value: account.surname || '', autocomplete: 'family-name' })}
         ${phoneField({ label: 'Телефон', name: 'phone', value: account.phone || '', required: true })}
@@ -161,21 +160,33 @@ function editorMarkup(account = {}) {
       </div>`,
     }], { openFirst: true })}
     ${formError('', { data: 'data-account-personal-error', keepEmpty: true })}
-    ${button('Сохранить', { type: 'submit' })}
   `, { data: 'data-account-personal-form' });
 }
 
-export function openAccountPersonalData(state, { onSaved } = {}) {
-  const layer = mountModal(document.body, modal(editorMarkup(state.account || {}), { variant: 'large', title: 'Личные данные' }));
+function formSignature(form) {
+  return JSON.stringify([...new FormData(form).entries()].map(([key, value]) => [key, String(value)]));
+}
+
+export function openAccountPersonalDataZ(root, state, { onSaved, onDirtyChange, onClosed } = {}) {
+  const layer = mountV2ZLayer(root, v2ZLayer(editorMarkup(state.account || {}), { className: 'account-personal-data-z' }), {
+    stack: true,
+    onClose: () => {
+      onDirtyChange?.(false);
+      onClosed?.();
+    },
+  });
   if (!layer) return null;
   initAccordions(layer);
-  initPhotoField(layer);
   initRepeatedFields(layer);
   initLinks(layer);
   initBirthDate(layer);
 
   const form = layer.querySelector('[data-account-personal-form]');
   const errorNode = layer.querySelector('[data-account-personal-error]');
+  const initialSignature = form ? formSignature(form) : '';
+  const syncDirty = () => onDirtyChange?.(Boolean(form && formSignature(form) !== initialSignature));
+  form?.addEventListener('input', syncDirty);
+  form?.addEventListener('change', syncDirty);
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const validationError = formValidationMessage(form);
@@ -184,8 +195,6 @@ export function openAccountPersonalData(state, { onSaved } = {}) {
       return;
     }
     const data = new FormData(form);
-    const submit = form.querySelector('button[type="submit"]');
-    if (submit) submit.disabled = true;
     if (errorNode) errorNode.textContent = '';
     try {
       const currentProfile = profileData(state.account || {});
@@ -195,7 +204,6 @@ export function openAccountPersonalData(state, { onSaved } = {}) {
         phone: data.get('phone'),
         profileData: {
           ...currentProfile,
-          photo: String(data.get('photo') || ''),
           phones: unique(collectRepeatedField(form, 'additionalPhone')),
           emails: unique(collectRepeatedField(form, 'additionalEmail').map((value) => String(value).toLowerCase())),
           telegram: String(data.get('telegram') || '').trim(),
@@ -208,10 +216,10 @@ export function openAccountPersonalData(state, { onSaved } = {}) {
         ? await updateGlobalAccount(payload)
         : await updateAccount(state.tenantId, payload);
       state.account = account;
-      layer.remove();
+      onDirtyChange?.(false);
+      layer.v2Close?.();
       await onSaved?.(account);
     } catch (error) {
-      if (submit) submit.disabled = false;
       openNotice({
         title: 'Данные не сохранены',
         message: accountErrorMessage(error, 'Не удалось сохранить данные'),
@@ -220,5 +228,6 @@ export function openAccountPersonalData(state, { onSaved } = {}) {
       });
     }
   });
+  layer.v2Submit = () => form?.requestSubmit();
   return layer;
 }
