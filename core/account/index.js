@@ -177,6 +177,18 @@ export async function updateGlobalAccount(data) {
   );
 }
 
+export async function deleteGlobalAccount() {
+  const result = await jsonResponse(
+    await request('/online-booking/account/me', {
+      auth: true,
+      method: 'DELETE',
+    }),
+    'Не удалось удалить профиль',
+  );
+  clearAccount('');
+  return result;
+}
+
 export async function changeGlobalAccountPassword(currentPassword, newPassword) {
   return jsonResponse(
     await request('/online-booking/account/password', {
