@@ -9,6 +9,8 @@ const migration = readFileSync(new URL('../settings/profile/migration.js', impor
 const serverService = readFileSync(new URL('../server/src/profile/profile.service.ts', import.meta.url), 'utf8');
 const schema = readFileSync(new URL('../server/prisma/schema.prisma', import.meta.url), 'utf8');
 const workplaceTimeZoneMigration = readFileSync(new URL('../server/prisma/migrations/20260920113000_workplace_timezone/migration.sql', import.meta.url), 'utf8');
+const workplaceSoftDeleteMigration = readFileSync(new URL('../server/prisma/migrations/20260927124500_workplace_soft_delete/migration.sql', import.meta.url), 'utf8');
+const workplaceLimitGuard = readFileSync(new URL('../server/src/profile/workplace-limit.guard.ts', import.meta.url), 'utf8');
 
 assert.doesNotMatch(auth, /prepareProductionWorkspace|localStorage\.removeItem/);
 assert.doesNotMatch(core, /workspace-sync|syncWorkspaceBeforeRender|startWorkspaceSync/);
@@ -42,5 +44,11 @@ assert.match(serverService, /migrationVerifiedAt/);
 assert.match(serverService, /id:\s*row\.id/);
 assert.match(serverService, /platformAccountId:\s*row\.platformAccountId/);
 assert.match(serverService, /ConflictException\('Проверка переноса Profile \+ Workplaces не пройдена'\)/);
+assert.match(schema, /deletedAt\s+DateTime\?/);
+assert.match(workplaceSoftDeleteMigration, /ADD COLUMN IF NOT EXISTS "deletedAt"/);
+assert.match(serverService, /data: \{ deletedAt: new Date\(\) \}/);
+assert.doesNotMatch(serverService, /prisma\.workplace\.delete\(/);
+assert.match(serverService, /where: \{ deletedAt: null \}/);
+assert.match(workplaceLimitGuard, /deletedAt: null/);
 
 console.log('profile server owner tests: OK');
