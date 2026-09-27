@@ -128,6 +128,9 @@ function genericCard() {
     id: 'ID 0000',
     title: 'Заголовок карточки',
     subtitle: 'Подзаголовок',
+    interactive: true,
+    data: 'data-reference-profile-card',
+    aria: 'Редактировать данные профиля',
     className: 'entity-card--hero ui-reference-generic-card',
     topMeta: [
       { value: 'Зона 1', label: 'Подпись', row: 1 },
@@ -384,10 +387,11 @@ function settingsMarkup() {
   return `<div class="ui-reference-modal-content">
     <div class="modal-title"><h2>Настройки профиля</h2><p>Эталон расположения и вида действий.</p></div>
     <div class="form-grid">
-      ${button('Личные данные', { variant: 'outline', data: 'data-reference-personal' })}
-      ${button('Согласия', { variant: 'outline', data: 'data-reference-consents' })}
-      ${button('Изменить пароль', { data: 'data-reference-password' })}
+      ${button('Фото', { variant: 'outline', data: 'data-reference-photo' })}
+      ${button('Изменить пароль', { variant: 'outline', data: 'data-reference-password' })}
+      ${button('Согласия / Уведомления', { variant: 'outline', data: 'data-reference-consents' })}
       ${button('Выход', { variant: 'danger', data: 'data-reference-logout' })}
+      ${button('Удалить профиль', { variant: 'critical', data: 'data-reference-delete' })}
     </div>
   </div>`;
 }
@@ -395,10 +399,11 @@ function settingsMarkup() {
 function openSettingsReference() {
   const host = mountModal(document.body, modal(settingsMarkup(), { variant: 'medium', surface: 'app', title: 'Настройки профиля' }));
   if (!host) return;
-  host.querySelector('[data-reference-personal]')?.addEventListener('click', () => openPersonalDataReference());
+  host.querySelector('[data-reference-photo]')?.addEventListener('click', (event) => event.preventDefault());
   host.querySelector('[data-reference-consents]')?.addEventListener('click', () => openConsentReference());
   host.querySelector('[data-reference-password]')?.addEventListener('click', () => openPasswordReference());
   host.querySelector('[data-reference-logout]')?.addEventListener('click', (event) => event.preventDefault());
+  host.querySelector('[data-reference-delete]')?.addEventListener('click', (event) => event.preventDefault());
 }
 
 function openPersonalDataReference() {
@@ -422,12 +427,13 @@ function openPersonalDataReference() {
 
 function openConsentReference() {
   const content = `<div class="ui-reference-modal-content">
-    <div class="modal-title"><h2>Согласия</h2><p>Пример строк состояния без изменения реальных данных.</p></div>
+    <div class="modal-title"><h2>Согласия / Уведомления</h2><p>Два системных раздела в одном модальном Z.</p></div>
+    ${settingToggle({ label: 'Push', checked: true })}
+    ${settingToggle({ label: 'Email', checked: true })}
     ${settingToggle({ label: 'Согласие 1', checked: true })}
     ${settingToggle({ label: 'Согласие 2', checked: false })}
-    <div class="ui-reference-modal-actions">${button('Закрыть', { variant: 'outline', data: 'data-modal-close' })}</div>
   </div>`;
-  mountModal(document.body, modal(content, { variant: 'medium', surface: 'app', title: 'Согласия' }));
+  mountModal(document.body, modal(content, { variant: 'standard', surface: 'app', title: 'Согласия / Уведомления' }));
 }
 
 function openPasswordReference() {
@@ -459,6 +465,7 @@ function openModalReference(variant) {
 
 function bindReferenceEvents() {
   app.querySelector('[data-reference-settings]')?.addEventListener('click', openSettingsReference);
+  app.querySelector('[data-reference-profile-card]')?.addEventListener('click', openPersonalDataReference);
   app.querySelector('[data-reference-header-action]')?.addEventListener('click', () => {
     const index = ACTION_LABELS.indexOf(state.actionLabel);
     state.actionLabel = ACTION_LABELS[(index + 1) % ACTION_LABELS.length];
