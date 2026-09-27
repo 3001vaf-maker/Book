@@ -735,6 +735,48 @@ export class OnlineBookingService {
     return publicAccount(updated);
   }
 
+  async deleteGlobalAccount(accountId: string) {
+    const account = await this.prisma.account.findUnique({
+      where: { id: accountId },
+      include: { contacts: true, tenantLinks: true },
+    });
+    if (!account) throw new UnauthorizedException('Аккаунт не найден');
+
+    const contacts = account.contacts.map((contact) => ({
+      type: String(contact.type || ''),
+      value: String(contact.value || ''),
+    }));
+
+    for (const link of account.tenantLinks) {
+      await this.consentPolicy.revokeAllForAccount(
+        link.tenantId,
+        account.id,
+        contacts,
+        'account-delete',
+      );
+    }
+
+    const deletedAt = new Date().toISOString();
+    await this.prisma.$transaction(async (tx) => {
+      await tx.accountContact.deleteMany({ where: { accountId: account.id } });
+      await tx.accountTenantLink.deleteMany({ where: { accountId: account.id } });
+      await tx.account.update({
+        where: { id: account.id },
+        data: {
+          email: `deleted+${account.id}@invalid.local`,
+          name: '',
+          surname: '',
+          phone: '',
+          telegramId: '',
+          profileData: { deletedAt } as Prisma.InputJsonValue,
+          passwordHash: await hash(`deleted:${account.id}:${deletedAt}`, 12),
+        },
+      });
+    });
+
+    return { deleted: true };
+  }
+
   async changeGlobalAccountPassword(accountId: string, currentPassword: unknown, newPassword: unknown) {
     const current = String(currentPassword ?? '');
     const next = String(newPassword ?? '');
