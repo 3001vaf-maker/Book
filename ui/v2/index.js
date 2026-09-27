@@ -633,6 +633,7 @@ export function initV2WorkspaceInteraction(root, {
     if (gesture) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     if (event.target.closest?.('[data-v2-layer], [data-v2-z-layer]')) return;
+    if (app.querySelector('[data-v2-z-layer]')) return;
 
     const eCard = event.target.closest?.('.v2-e-card');
     const fCard = event.target.closest?.('.v2-deck__card');
