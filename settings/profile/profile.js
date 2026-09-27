@@ -1,5 +1,6 @@
-import { actionBlock, button, collectRepeatedField, entityCard, escapeHtml, field, initPhotoField, initRepeatedFields, modal, mountModal, mountV2ZLayer, page, photoField, repeatedField, select, textareaField, v2HorizontalRail, v2Section, workspaceHeaderContext, v2ZLayer, workplaceAddButton, workplaceCountText } from '../../ui/ui.js';
+import { actionBlock, button, collectRepeatedField, entityCard, escapeHtml, field, initRepeatedFields, modal, mountModal, mountV2ZLayer, openSharedPhotoAction, openSharedProfileSettingsMenu, openSharedPasswordAction, page, repeatedField, select, setSharedProfilePrimary, textareaField, v2HorizontalRail, v2Section, workspaceHeaderContext, v2ZLayer, workplaceAddButton, workplaceCountText } from '../../ui/ui.js';
 import { getBookLimit } from '../../core/access.js';
+import { changePassword, logout } from '../../core/auth.js';
 import { addCustomProfession, getCustomProfessions, getProfile, saveProfile as saveProfileData } from './data.js';
 import { getWorkplaces } from './workplaces/data.js';
 import { bindWorkplaceForm, openWorkplaceModal, workplaceForm } from './workplaces/workplaces.js';
@@ -14,11 +15,10 @@ const professionOptions=()=>[{value:'',label:'Выберите професси�
 
 export function render(root,navigateBack=()=>{},options={}){renderProfile(root,navigateBack,options)}
 
-function profileContext(p,title='Профиль'){
+function profileContext(p,title=fullName(p)){
   return workspaceHeaderContext({
     title,
     a:{kind:'avatar',image:p.photo||'',imagePosition:avatarPosition(p),initials:initial(p),aria:'Настройки профиля'},
-    hideD:true,
   });
 }
 
@@ -68,14 +68,7 @@ function workplaceRail(){
 
 function profileDataFields(p,emails){
   return `<div class="v2-profile-data-grid">
-    ${v2Section('Личные данные',`<div class="form-grid">${photoField({
-      name:'profilePhoto',
-      value:p.photo||'',
-      cropX:p.photoCropX,
-      cropY:p.photoCropY,
-      cropXName:'profilePhotoCropX',
-      cropYName:'profilePhotoCropY',
-    })}${field({label:'Имя',name:'profileName',value:p.name,placeholder:'Ваше имя',required:true})}${field({label:'Фамилия',name:'profileSurname',value:p.surname,placeholder:'Ваша фамилия'})}${textareaField({label:'О себе',name:'profileAbout',value:p.about||'',placeholder:'Коротко о себе'})}</div>`)}
+    ${v2Section('Личные данные',`<div class="form-grid">${field({label:'Имя',name:'profileName',value:p.name,placeholder:'Ваше имя',required:true})}${field({label:'Фамилия',name:'profileSurname',value:p.surname,placeholder:'Ваша фамилия'})}${textareaField({label:'О себе',name:'profileAbout',value:p.about||'',placeholder:'Коротко о себе'})}</div>`)}
     ${v2Section('Контактные данные',repeatedField({label:'Телефон',name:'profilePhones',values:p.phones?.length?p.phones:[p.phone||''],type:'tel'})+repeatedField({label:'Telegram',name:'profileTelegrams',values:p.telegrams||[]})+repeatedField({label:'Email',name:'profileEmails',values:emails,type:'email'}))}
     ${v2Section('Профессиональные данные',`<div class="form-grid">${select({label:'Профессия *',name:'profession',value:p.profession||'',options:professionOptions()})}${select({label:'Опыт работы',name:'experience',value:p.experience||'',options:[{value:'',label:'Не указан'},...EXPERIENCES.map(v=>({value:v,label:v}))]})}${textareaField({label:'О профессии',name:'professionAbout',value:p.professionAbout||'',placeholder:'Расскажите о своей профессии'})}</div>`)}
   </div>`;
@@ -156,9 +149,9 @@ function collectProfileData(root){
     telegrams:collectRepeatedField(root,'profileTelegrams'),
     emails:collectRepeatedField(root,'profileEmails'),
     about:root.querySelector('[name="profileAbout"]')?.value.trim()||'',
-    photo:root.querySelector('[data-photo-value]')?.value||'',
-    photoCropX:Number(root.querySelector('[name="profilePhotoCropX"]')?.value||50),
-    photoCropY:Number(root.querySelector('[name="profilePhotoCropY"]')?.value||50),
+    photo:current.photo||'',
+    photoCropX:Number(current.photoCropX||50),
+    photoCropY:Number(current.photoCropY||50),
     profession:root.querySelector('[name="profession"]')?.value||'',
     experience:root.querySelector('[name="experience"]')?.value||'',
     professionAbout:root.querySelector('[name="professionAbout"]')?.value.trim()||''
@@ -193,7 +186,6 @@ export async function saveOnboardingProfile(root){
 }
 
 function bindProfileData(layer,p,options,onSaved){
-  initPhotoField(layer);
   initRepeatedFields(layer);
   const form=layer.querySelector('[data-profile-data-form]');
   const primary=layer.querySelector('[data-save-profile][data-v2-primary-action]');
@@ -201,7 +193,7 @@ function bindProfileData(layer,p,options,onSaved){
 
   const syncDirty=()=>{
     if(!primary||!form)return;
-    primary.dataset.v2PrimaryVisible=formSnapshot(form)!==initial?'true':'false';
+    setSharedProfilePrimary(primary,{visible:formSnapshot(form)!==initial,label:'Сохранить'});
   };
 
   layer.querySelector('[name="profession"]')?.addEventListener('change',e=>{if(e.target.value==='Другая')openCustomProfessionModal(layer)});
@@ -210,12 +202,19 @@ function bindProfileData(layer,p,options,onSaved){
 
   const save=async()=>{
     const data=collectProfileData(layer);
-    if(!data.name||!data.phones.length||!data.profession||data.profession==='Другая')return false;
+    if(!data.name||!data.phones.length||!data.profession||data.profession==='Другая'){
+      const target=layer.querySelector('[data-profile-error]');
+      if(target)target.textContent='Имя, телефон и профессия обязательны.';
+      return false;
+    }
     try{
+      setSharedProfilePrimary(primary,{visible:true,label:'Сохранить',disabled:true});
       await saveProfileData(data);
+      setSharedProfilePrimary(primary,{visible:false,label:'Сохранить',disabled:false});
       onSaved?.();
       return true;
     }catch(error){
+      setSharedProfilePrimary(primary,{visible:true,label:'Сохранить',disabled:false});
       const target=layer.querySelector('[data-profile-error]');
       if(target)target.textContent=error instanceof Error?error.message:'Не удалось сохранить профиль';
       else showProfileError(error instanceof Error?error.message:'Не удалось сохранить профиль');
@@ -242,17 +241,51 @@ function openProfileData(root,navigateBack,options={}){
   });
 }
 
+function refreshProfilePhotoPresentation(root,p){
+  root.querySelectorAll('[data-workspace-context-action]').forEach((source)=>{
+    source.dataset.workspaceAImage=p.photo||'';
+    source.dataset.workspaceAImagePosition=avatarPosition(p);
+  });
+  const card=root.querySelector('[data-profile-card]');
+  if(card){
+    card.classList.toggle('has-image',Boolean(p.photo));
+    if(p.photo) card.style.setProperty('--entity-card-image',`url('${String(p.photo).replaceAll("'","%27")}')`);
+    else card.style.removeProperty('--entity-card-image');
+  }
+  window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+}
+
+async function saveProfilePhoto(root,value){
+  const current=getProfile();
+  const saved=await saveProfileData({
+    ...current,
+    photo:String(value||''),
+    photoCropX:50,
+    photoCropY:50,
+  });
+  refreshProfilePhotoPresentation(root,saved);
+  return saved;
+}
+
+function openProfilePhoto(root){
+  const p=getProfile();
+  return openSharedPhotoAction({
+    photo:p.photo||'',
+    onReplace:(src)=>saveProfilePhoto(root,src),
+    onDelete:()=>saveProfilePhoto(root,''),
+    onError:(error)=>showProfileError(error instanceof Error?error.message:'Не удалось изменить фото'),
+  });
+}
+
 function openProfileSettings(root,navigateBack,options={}){
   const p=getProfile();
-  const layer=mountV2ZLayer(root,v2ZLayer(page([
-    profileContext(p,'Настройки профиля'),
-    '<div data-profile-account-controls-panel></div>'
-  ]),{className:'v2-profile-settings-layer'}));
-  if(!layer)return;
-  layer.querySelector('[data-workspace-context-action]')?.addEventListener('click',()=>{});
-  import('./account-controls.js').then(({renderAccountControlsPanel})=>{
-    const host=layer.querySelector('[data-profile-account-controls-panel]');
-    if(host)renderAccountControlsPanel(host);
+  return openSharedProfileSettingsMenu({
+    actions:[
+      {id:'photo',label:'Фото',onSelect:()=>openProfilePhoto(root)},
+      {id:'password',label:'Изменить пароль',onSelect:()=>openSharedPasswordAction({onSubmit:({currentPassword,newPassword})=>changePassword(currentPassword,newPassword)})},
+      {id:'controls',label:'Согласия / Уведомления',onSelect:()=>import('./account-controls.js').then(({openAccountControlsModal})=>openAccountControlsModal())},
+      {id:'logout',label:'Выход',variant:'danger',onSelect:()=>logout()},
+    ],
   });
 }
 
