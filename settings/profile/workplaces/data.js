@@ -3,6 +3,7 @@ import { normalizePhoneForStorage } from '../../../core/phone/index.js';
 
 const WORKPLACE_FALLBACK_COLOR = '#212529';
 let workplacesState = [];
+let referenceDataState = { cities: [], currencies: [], defaults: { currency: '', from: '', to: '', timeZone: '' } };
 let serverReady = false;
 
 function normalizeLinks(values) {
@@ -16,7 +17,28 @@ function cropPosition(value) {
   return Number.isFinite(numeric) ? Math.max(0, Math.min(100, Math.round(numeric))) : 50;
 }
 
+function normalizeReferenceData(value = {}) {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  const defaults = source.defaults && typeof source.defaults === 'object' && !Array.isArray(source.defaults) ? source.defaults : {};
+  return {
+    cities: [...new Set((Array.isArray(source.cities) ? source.cities : []).map((item) => String(item || '').trim()).filter(Boolean))],
+    currencies: (Array.isArray(source.currencies) ? source.currencies : [])
+      .map((item) => ({
+        value: String(item?.value || '').trim(),
+        label: String(item?.label || item?.value || '').trim(),
+      }))
+      .filter((item) => item.value),
+    defaults: {
+      currency: String(defaults.currency || ''),
+      from: String(defaults.from || ''),
+      to: String(defaults.to || ''),
+      timeZone: String(defaults.timeZone || ''),
+    },
+  };
+}
+
 export function normalizeWorkplace(workplace = {}) {
+  const defaults = referenceDataState.defaults;
   return {
     key: String(workplace.key || ''),
     profileId: String(workplace.profileId || 'profile'),
@@ -28,10 +50,10 @@ export function normalizeWorkplace(workplace = {}) {
     city: String(workplace.city || ''),
     address: String(workplace.address || ''),
     phone: normalizePhoneForStorage(workplace.phone),
-    currency: String(workplace.currency || 'RUB'),
-    timeZone: String(workplace.timeZone || ''),
-    from: String(workplace.from || '09:00'),
-    to: String(workplace.to || '18:00'),
+    currency: String(workplace.currency || defaults.currency || ''),
+    timeZone: String(workplace.timeZone || defaults.timeZone || ''),
+    from: String(workplace.from || defaults.from || ''),
+    to: String(workplace.to || defaults.to || ''),
     links: normalizeLinks(workplace.links),
     about: String(workplace.about || ''),
     cardAppearance: workplace.cardAppearance && typeof workplace.cardAppearance === 'object' && !Array.isArray(workplace.cardAppearance) ? workplace.cardAppearance : {},
@@ -45,7 +67,7 @@ function withPresentationFallback(workplace) {
 }
 
 function requireServerReady() {
-  if (!serverReady) throw new Error('Profile + Workplaces ещё не готовы к серверной записи');
+  if (!serverReady) throw new Error('Данные профиля ещё загружаются. Повторите через несколько секунд.');
 }
 
 function notifyWorkplacesChanged(detail = {}) {
@@ -60,9 +82,16 @@ async function responseJson(response, fallbackMessage) {
   return payload;
 }
 
-export function hydrateWorkplacesFromServer(values = []) {
+export function hydrateWorkplacesFromServer(values = [], referenceData = null) {
+  if (referenceData && typeof referenceData === 'object' && !Array.isArray(referenceData)) {
+    referenceDataState = normalizeReferenceData(referenceData);
+  }
   workplacesState = (Array.isArray(values) ? values : []).map(normalizeWorkplace);
   return getWorkplaces();
+}
+
+export function getWorkplaceReferenceData() {
+  return normalizeReferenceData(referenceDataState);
 }
 
 export function setWorkplacesServerReady(value) {
@@ -86,16 +115,16 @@ export async function saveWorkplaces(values) {
   for (const key of currentKeys) {
     if (nextKeys.has(key)) continue;
     const response = await apiRequest(`/profile/workplaces/${encodeURIComponent(key)}`, { method: 'DELETE' });
-    const payload = await responseJson(response, 'Не удалось удалить рабочее место');
-    hydrateWorkplacesFromServer(payload.workplaces);
+    const payload = await responseJson(response, 'Не удалось удалить рабочее пространство');
+    hydrateWorkplacesFromServer(payload.workplaces, payload.workplaceReferenceData);
   }
   for (const workplace of next) {
     const response = await apiRequest(`/profile/workplaces/${encodeURIComponent(workplace.key)}`, {
       method: 'PUT',
       body: JSON.stringify(workplace),
     });
-    const payload = await responseJson(response, 'Не удалось сохранить рабочее место');
-    hydrateWorkplacesFromServer(payload.workplaces);
+    const payload = await responseJson(response, 'Не удалось сохранить рабочее пространство');
+    hydrateWorkplacesFromServer(payload.workplaces, payload.workplaceReferenceData);
   }
   notifyWorkplacesChanged({ action: 'workplaces-saved' });
   return getWorkplaces();
@@ -110,7 +139,7 @@ export async function reorderWorkplaces(keys) {
     body: JSON.stringify({ keys: orderedKeys }),
   });
   const payload = await responseJson(response, 'Не удалось сохранить порядок рабочих пространств');
-  hydrateWorkplacesFromServer(payload.workplaces);
+  hydrateWorkplacesFromServer(payload.workplaces, payload.workplaceReferenceData);
   notifyWorkplacesChanged({ action: 'workplaces-reordered' });
   return getWorkplaces();
 }
@@ -118,13 +147,13 @@ export async function reorderWorkplaces(keys) {
 export async function upsertWorkplace(workplace) {
   requireServerReady();
   const item = normalizeWorkplace(workplace);
-  if (!item.key) throw new Error('У рабочего места отсутствует key');
+  if (!item.key) throw new Error('Не удалось определить рабочее пространство');
   const response = await apiRequest(`/profile/workplaces/${encodeURIComponent(item.key)}`, {
     method: 'PUT',
     body: JSON.stringify(item),
   });
-  const payload = await responseJson(response, 'Не удалось сохранить рабочее место');
-  hydrateWorkplacesFromServer(payload.workplaces);
+  const payload = await responseJson(response, 'Не удалось сохранить рабочее пространство');
+  hydrateWorkplacesFromServer(payload.workplaces, payload.workplaceReferenceData);
   notifyWorkplacesChanged({ action: 'workplace-saved', workplaceId: item.key });
   return getWorkplaces().find((value) => value.key === item.key) || null;
 }
@@ -135,8 +164,8 @@ export async function deleteWorkplace(key) {
   if (!target) return false;
   const response = await apiRequest(`/profile/workplaces/${encodeURIComponent(target)}`, { method: 'DELETE' });
   if (response.status === 404) return false;
-  const payload = await responseJson(response, 'Не удалось удалить рабочее место');
-  hydrateWorkplacesFromServer(payload.workplaces);
+  const payload = await responseJson(response, 'Не удалось удалить рабочее пространство');
+  hydrateWorkplacesFromServer(payload.workplaces, payload.workplaceReferenceData);
   notifyWorkplacesChanged({ action: 'workplace-deleted', workplaceId: target });
   return true;
 }

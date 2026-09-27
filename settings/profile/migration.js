@@ -9,8 +9,8 @@ async function responseJson(response, fallbackMessage) {
 }
 
 function hydrate(bundle, ready) {
-  hydrateProfileFromServer(bundle?.profile || {}, bundle?.customProfessions || []);
-  hydrateWorkplacesFromServer(bundle?.workplaces || []);
+  hydrateProfileFromServer(bundle?.profile || {}, bundle?.customProfessions || [], bundle?.professionCatalog || []);
+  hydrateWorkplacesFromServer(bundle?.workplaces || [], bundle?.workplaceReferenceData || {});
   setProfileServerReady(ready);
   setWorkplacesServerReady(ready);
 }
@@ -20,7 +20,7 @@ export async function initializeProfileWorkplaces(account = {}) {
   setWorkplacesServerReady(false);
 
   const remoteResponse = await apiRequest('/profile');
-  const remote = await responseJson(remoteResponse, 'Не удалось загрузить Profile + Workplaces');
+  const remote = await responseJson(remoteResponse, 'Не удалось загрузить данные профиля');
 
   if (remote?.verified) {
     hydrate(remote, true);
@@ -34,7 +34,7 @@ export async function initializeProfileWorkplaces(account = {}) {
 
   const bootstrapResponse = await apiRequest('/profile/bootstrap', { method: 'POST' });
   const bootstrapped = await responseJson(bootstrapResponse, 'Не удалось создать серверный профиль');
-  if (!bootstrapped?.verified) throw new Error('Серверный профиль не подтверждён');
+  if (!bootstrapped?.verified) throw new Error('Не удалось подготовить профиль. Обновите страницу и повторите.');
   hydrate(bootstrapped, true);
   return { source: 'server-bootstrap', verified: true };
 }
