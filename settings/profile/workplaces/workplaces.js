@@ -1,4 +1,4 @@
-import { actionBlock, button, collectLinks, colorPicker, details, emptyState, entityCard, escapeHtml, field, initColorPickers, initLinks, initPhotoField, initTimePickers, links, listEntries, listEntry, mountModal, modal, page, phoneField, photoField, searchableSelect, select, textareaField, timePicker } from '../../../ui/ui.js';
+import { actionBlock, button, collectLinks, colorPicker, details, emptyState, entityCard, escapeHtml, field, initColorPickers, initLinks, initPhotoField, initTimePickers, links, listEntries, listEntry, mountModal, modal, openColorPickerAction, openSharedPhotoAction, openSharedProfileSettingsMenu, openTimeRangeAction, page, phoneField, photoField, searchableSelect, select, setSharedProfilePrimary, textareaField, timePicker } from '../../../ui/ui.js';
 import { getProfile } from '../data.js';
 import { deleteWorkplace as deleteWorkplaceData, getWorkplaces, upsertWorkplace } from './data.js';
 
@@ -37,33 +37,40 @@ export function initWorkplaceListDeletion(root,onDeleted=()=>{}) {
 
 export function workplaceForm(existing=null,{sourceOnly=false,bodyActions=false}={}){
   const w=existing||emptyWorkplace();
-  const primaryLabel=existing?'Удалить':'Сохранить';
   const primary=sourceOnly
-    ? button(primaryLabel,{
+    ? button('Сохранить',{
         className:'v2-primary-source-only',
-        data:`data-workplace-primary data-v2-primary-action data-v2-primary-label="${primaryLabel}" data-v2-primary-visible="true"`,
-        aria:primaryLabel,
+        data:`data-workplace-primary data-v2-primary-action data-v2-primary-label="Сохранить" data-v2-primary-visible="${existing?'false':'true'}"`,
+        aria:'Сохранить',
       })
     : '';
   const body=bodyActions
     ? actionBlock(`${button('Сохранить',{type:'submit'})}${existing?button('Удалить',{variant:'danger',data:'data-delete-workplace-form'}):''}`)
     : '';
+  const settingsFields=bodyActions
+    ? `${photoField({
+        name:'workplacePhoto',
+        value:w.photo||'',
+        cropX:w.photoCropX,
+        cropY:w.photoCropY,
+        cropXName:'workplacePhotoCropX',
+        cropYName:'workplacePhotoCropY',
+      })}
+      ${colorPicker({name:'workplaceColor',value:w.color||'',required:true})}
+      <div class="work-time-row"><span class="work-time-row__label">График работы</span><div class="work-time-row__fields">${timePicker({label:'С',name:'workplaceFrom',value:w.from||'09:00'})}${timePicker({label:'До',name:'workplaceTo',value:w.to||'18:00'})}</div></div>`
+    : `<input type="hidden" name="workplacePhoto" value="${escapeHtml(w.photo||'')}">
+      <input type="hidden" name="workplacePhotoCropX" value="${Number(w.photoCropX||50)}">
+      <input type="hidden" name="workplacePhotoCropY" value="${Number(w.photoCropY||50)}">
+      <input type="hidden" name="workplaceColor" value="${escapeHtml(w.color||'')}">
+      <input type="hidden" name="workplaceFrom" value="${escapeHtml(w.from||'09:00')}">
+      <input type="hidden" name="workplaceTo" value="${escapeHtml(w.to||'18:00')}">`;
   return `<form class="compact-form workplace-form" data-workplace-form>
-    ${photoField({
-      name:'workplacePhoto',
-      value:w.photo||'',
-      cropX:w.photoCropX,
-      cropY:w.photoCropY,
-      cropXName:'workplacePhotoCropX',
-      cropYName:'workplacePhotoCropY',
-    })}
+    ${settingsFields}
     ${field({label:'Название',name:'workplaceName',value:w.name,placeholder:'Название рабочего пространства',required:true})}
-    ${colorPicker({name:'workplaceColor',value:w.color||'',required:true})}
     ${searchableSelect({label:'Город',name:'workplaceCity',value:w.city||'',options:CITIES,placeholder:'Город',required:true})}
     ${field({label:'Адрес',name:'workplaceAddress',value:w.address,placeholder:'Адрес'})}
     ${phoneField({label:'Телефон',name:'workplacePhone',value:w.phone||''})}
     ${select({label:'Валюта',name:'workplaceCurrency',value:w.currency||'RUB',options:[{value:'RUB',label:'RUB — ₽'},{value:'EUR',label:'EUR — €'},{value:'USD',label:'USD — $'},{value:'GBP',label:'GBP — £'}]})}
-    <div class="work-time-row"><span class="work-time-row__label">График работы</span><div class="work-time-row__fields">${timePicker({label:'С',name:'workplaceFrom',value:w.from||'09:00'})}${timePicker({label:'До',name:'workplaceTo',value:w.to||'18:00'})}</div></div>
     <div class="array-group"><span class="array-label">Ссылки</span>${links({links:w.links||[],name:'workplace-links'})}</div>
     ${textareaField({label:'О рабочем пространстве',name:'workplaceAbout',value:w.about||'',placeholder:'Коротко о рабочем пространстве'})}
     <div class="form-error" data-workplace-error></div>
@@ -71,7 +78,6 @@ export function workplaceForm(existing=null,{sourceOnly=false,bodyActions=false}
     ${body}
   </form>`;
 }
-
 function formSnapshot(form){
   if(!form)return '';
   return JSON.stringify([...new FormData(form).entries()].map(([key,value])=>[key,typeof value==='string'?value:'']));
@@ -126,9 +132,9 @@ async function saveWorkplace(root,existing,onDone){
 export function bindWorkplaceForm(root,existing=null,{onSaved=()=>{},onDeleted=()=>{}}={}){
   const form=root.querySelector('[data-workplace-form]');
   if(!form)return ()=>{};
-  initPhotoField(root);
-  initColorPickers(root);
-  initTimePickers(root);
+  if(root.querySelector('[data-photo-field]'))initPhotoField(root);
+  if(root.querySelector('[data-color-picker]'))initColorPickers(root);
+  if(root.querySelector('[data-time-picker]'))initTimePickers(root);
   initLinks(root);
 
   const primary=root.querySelector('[data-workplace-primary]');
@@ -137,10 +143,7 @@ export function bindWorkplaceForm(root,existing=null,{onSaved=()=>{},onDeleted=(
 
   const syncPrimary=()=>{
     if(!primary)return;
-    const label=existing&&!dirty?'Удалить':'Сохранить';
-    primary.dataset.v2PrimaryLabel=label;
-    primary.dataset.v2PrimaryVisible='true';
-    primary.setAttribute('aria-label',label);
+    setSharedProfilePrimary(primary,{visible:dirty,label:'Сохранить'});
   };
   const syncDirty=()=>{
     dirty=!existing||formSnapshot(form)!==initial;
@@ -151,16 +154,12 @@ export function bindWorkplaceForm(root,existing=null,{onSaved=()=>{},onDeleted=(
   form.addEventListener('change',syncDirty);
   form.addEventListener('submit',async(event)=>{
     event.preventDefault();
-    await saveWorkplace(root,existing,onSaved);
+    if(primary)setSharedProfilePrimary(primary,{visible:true,label:'Сохранить',disabled:true});
+    const saved=await saveWorkplace(root,existing,onSaved);
+    if(!saved&&primary)setSharedProfilePrimary(primary,{visible:true,label:'Сохранить',disabled:false});
   });
 
-  primary?.addEventListener('click',async()=>{
-    if(existing&&!dirty){
-      confirmDeleteWorkplace(root,existing.key,onDeleted);
-      return;
-    }
-    await saveWorkplace(root,existing,onSaved);
-  });
+  primary?.addEventListener('click',()=>form.requestSubmit());
 
   root.querySelector('[data-delete-workplace-form]')?.addEventListener('click',(event)=>{
     event.preventDefault();
@@ -172,6 +171,82 @@ export function bindWorkplaceForm(root,existing=null,{onSaved=()=>{},onDeleted=(
     form.removeEventListener('input',syncDirty);
     form.removeEventListener('change',syncDirty);
   };
+}
+
+function setWorkplaceDraft(root,name,value){
+  const input=root.querySelector(`[name="${CSS.escape(name)}"]`);
+  if(!input)return;
+  input.value=String(value??'');
+  input.dispatchEvent(new Event('change',{bubbles:true}));
+}
+
+function syncWorkplaceAvatar(root,photo){
+  const source=root.querySelector('[data-workspace-context-action]');
+  if(source){
+    source.dataset.workspaceAImage=String(photo||'');
+    source.dataset.workspaceAImagePosition='50% 50%';
+    window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+  }
+}
+
+export function openWorkplaceSettingsMenu(root,existing=null,{onDeleted=()=>{}}={}){
+  const form=root.querySelector('[data-workplace-form]');
+  if(!form)return null;
+  const data=()=>new FormData(form);
+  const actions=[
+    {
+      id:'photo',
+      label:'Фото',
+      onSelect:()=>openSharedPhotoAction({
+        photo:String(data().get('workplacePhoto')||''),
+        onReplace:(src)=>{
+          setWorkplaceDraft(root,'workplacePhoto',src);
+          setWorkplaceDraft(root,'workplacePhotoCropX',50);
+          setWorkplaceDraft(root,'workplacePhotoCropY',50);
+          syncWorkplaceAvatar(root,src);
+        },
+        onDelete:()=>{
+          setWorkplaceDraft(root,'workplacePhoto','');
+          setWorkplaceDraft(root,'workplacePhotoCropX',50);
+          setWorkplaceDraft(root,'workplacePhotoCropY',50);
+          syncWorkplaceAvatar(root,'');
+        },
+      }),
+    },
+    {
+      id:'color',
+      label:'Выбор цвета',
+      onSelect:()=>openColorPickerAction({
+        value:String(data().get('workplaceColor')||''),
+        onSelect:(value)=>setWorkplaceDraft(root,'workplaceColor',value),
+      }),
+    },
+    {
+      id:'schedule',
+      label:'График работы',
+      onSelect:()=>openTimeRangeAction({
+        from:String(data().get('workplaceFrom')||'09:00'),
+        to:String(data().get('workplaceTo')||'18:00'),
+        onSave:({from,to})=>{
+          setWorkplaceDraft(root,'workplaceFrom',from);
+          setWorkplaceDraft(root,'workplaceTo',to);
+        },
+      }),
+    },
+  ];
+  if(existing){
+    actions.push({
+      id:'delete',
+      label:'Удалить пространство',
+      variant:'critical',
+      onSelect:()=>confirmDeleteWorkplace(root,existing.key,onDeleted),
+    });
+  }
+  return openSharedProfileSettingsMenu({
+    title:'Настройки пространства',
+    actions,
+    data:'data-workplace-settings-menu',
+  });
 }
 
 export function openWorkplaceModal(root, existing = null, onDone = () => {}) {
@@ -187,7 +262,7 @@ export function openWorkplaceModal(root, existing = null, onDone = () => {}) {
 
 export function confirmDeleteWorkplace(root,key,onDeleted=()=>{}){
   const w=getWorkplaces().find(x=>x.key===key);if(!w)return;
-  const m=mountModal(root,modal(`<div class="modal-title"><h2>Удалить?</h2><p>${escapeHtml(w.name||'Рабочее пространство')} будет удалено.</p></div><div class="form-error" data-workplace-delete-error></div><div class="modal-actions">${button('Удалить',{variant:'danger',data:'data-confirm-delete-workplace'})}${button('Отмена',{variant:'secondary',data:'data-cancel-delete-workplace'})}</div>`,{variant:'compact',title:'Удаление рабочего пространства'}));
+  const m=mountModal(root,modal(`<div class="modal-title"><h2>Удалить пространство?</h2><p>${escapeHtml(w.name||'Рабочее пространство')} будет убрано из активных пространств. Исторические данные сохранятся.</p></div><div class="form-error" data-workplace-delete-error></div><div class="modal-actions">${button('Удалить',{variant:'danger',data:'data-confirm-delete-workplace'})}${button('Отмена',{variant:'secondary',data:'data-cancel-delete-workplace'})}</div>`,{variant:'compact',title:'Удаление рабочего пространства'}));
   if(!m)return;
   m.querySelector('[data-cancel-delete-workplace]').onclick=()=>m.v2Close?.();
   m.querySelector('[data-confirm-delete-workplace]').onclick=async()=>{
