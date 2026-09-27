@@ -1,38 +1,69 @@
-import { accountErrorMessage, getAccountConsentState, revokeAccountConsent } from '../core/account/index.js';
+import {
+  accountErrorMessage,
+  getAccountConsentState,
+  revokeAccountConsent,
+  submitAccountConsents,
+} from '../core/account/index.js';
 import {
   button,
   emptyState,
-  listEntries,
-  listEntry,
+  escapeHtml,
   mountModal,
   modal,
   openNotice,
+  v2Document,
+  v2LegalCards,
 } from '../ui/ui.js';
 
-function consentRows(consents = []) {
-  return (Array.isArray(consents) ? consents : []).map((item, index) => listEntry({
-    title: item?.title || item?.documentId || 'Согласие',
-    subtitle: item?.accepted ? 'Дано' : item?.status === 'revoked' ? 'Отозвано' : 'Не дано',
-    rightTop: item?.required ? 'Обязательное' : '',
-    data: item?.accepted ? `data-account-consent-revoke="${index}"` : '',
-    aria: item?.accepted ? `Отозвать согласие ${item?.title || item?.documentId || ''}` : '',
+function statusText(item = {}) {
+  if (item.accepted) return 'Дано';
+  if (item.status === 'revoked') return 'Отозвано';
+  return 'Не дано';
+}
+
+function openConsentDocument(item = {}) {
+  const title = String(item.title || item.documentId || 'Согласие');
+  const version = item.displayVersion || item.documentVersion || 1;
+  const content = String(item.documentText || item.text || '');
+  return mountModal(document.body, modal(v2Document({
+    title,
+    version,
+    content,
+  }), {
+    variant: 'technical',
+    title,
+    className: 'account-consent-document',
   }));
+}
+
+function consentCards(consents = []) {
+  if (!consents.length) return emptyState('Согласий пока нет', 'Здесь появятся доступные согласия.');
+  return v2LegalCards(consents.map((item, index) => ({
+    title: item?.title || item?.documentId || 'Согласие',
+    status: statusText(item),
+    required: Boolean(item?.required),
+    checked: Boolean(item?.accepted),
+    openData: `data-account-consent-document="${index}"`,
+    openAria: `Открыть документ ${item?.title || item?.documentId || ''}`,
+    toggleData: `data-account-consent-toggle="${index}"`,
+    toggleAria: `${item?.accepted ? 'Отозвать' : 'Дать'} согласие: ${item?.title || item?.documentId || ''}`,
+  })));
 }
 
 function confirmRevoke(consent, onConfirm) {
   const title = String(consent?.title || consent?.documentId || 'Согласие');
   const content = `<div class="form-grid">
     <div class="muted">После отзыва функции, которым необходимо это согласие, будут недоступны до повторного согласия.</div>
-    ${button('Отозвать согласие', { variant: 'danger', data: 'data-confirm-consent-revoke' })}
-    ${button('Отмена', { variant: 'secondary', data: 'data-cancel-consent-revoke' })}
+    ${button('Отозвать согласие', { variant: 'critical', data: 'data-confirm-consent-revoke' })}
+    ${button('Отмена', { variant: 'outline', data: 'data-cancel-consent-revoke' })}
   </div>`;
   const layer = mountModal(document.body, modal(content, { variant: 'compact', title }));
-  layer?.querySelector('[data-cancel-consent-revoke]')?.addEventListener('click', () => layer.remove());
+  layer?.querySelector('[data-cancel-consent-revoke]')?.addEventListener('click', () => layer.v2Close?.());
   layer?.querySelector('[data-confirm-consent-revoke]')?.addEventListener('click', async (event) => {
     event.currentTarget.disabled = true;
     try {
       await onConfirm?.();
-      layer.remove();
+      layer.v2Close?.();
     } catch (error) {
       event.currentTarget.disabled = false;
       openNotice({
@@ -47,7 +78,10 @@ function confirmRevoke(consent, onConfirm) {
 
 export async function openAccountConsentSettings(state, { tenantId = state?.tenantId, onChanged } = {}) {
   const scopeTenantId = String(tenantId || '');
-  if (!scopeTenantId) return openNotice({ title: 'Согласия недоступны', message: 'Не выбран контакт.', action: 'Закрыть', variant: 'technical' });
+  if (!scopeTenantId) {
+    return openNotice({ title: 'Согласия недоступны', message: 'Не выбран контакт.', action: 'Закрыть', variant: 'technical' });
+  }
+
   let consentState;
   try {
     consentState = await getAccountConsentState(scopeTenantId);
@@ -61,20 +95,54 @@ export async function openAccountConsentSettings(state, { tenantId = state?.tena
   }
 
   const consents = Array.isArray(consentState?.consents) ? consentState.consents : [];
-  const content = consents.length
-    ? `<div class="form-grid">${listEntries(consentRows(consents))}<div class="muted">Нажмите на действующее согласие, чтобы отозвать его.</div></div>`
-    : emptyState('Согласий пока нет', 'Здесь появятся согласия, которые вы давали.');
-  const layer = mountModal(document.body, modal(content, { variant: 'large', title: 'Согласия' }));
+  const content = `<div class="account-consent-sheet" data-v2-stage-gesture-ignore>
+    ${consentCards(consents)}
+  </div>`;
+  const layer = mountModal(document.body, modal(content, {
+    variant: 'bottom',
+    title: 'Согласия',
+    className: 'modal--consent-sheet',
+  }));
 
-  layer?.querySelectorAll('[data-account-consent-revoke]').forEach((node) => node.addEventListener('click', () => {
-    const consent = consents[Number(node.dataset.accountConsentRevoke)];
-    if (!consent?.accepted || !consent?.documentId) return;
-    confirmRevoke(consent, async () => {
-      await revokeAccountConsent(scopeTenantId, consent.documentId);
-      layer.remove();
+  layer?.querySelectorAll('[data-account-consent-document]').forEach((node) => node.addEventListener('click', () => {
+    const item = consents[Number(node.dataset.accountConsentDocument)];
+    if (item) openConsentDocument(item);
+  }));
+
+  layer?.querySelectorAll('[data-account-consent-toggle]').forEach((node) => node.addEventListener('click', async () => {
+    const consent = consents[Number(node.dataset.accountConsentToggle)];
+    if (!consent?.documentId) return;
+    if (consent.accepted) {
+      confirmRevoke(consent, async () => {
+        await revokeAccountConsent(scopeTenantId, consent.documentId);
+        layer.v2Close?.();
+        await onChanged?.(consent.documentId);
+        await openAccountConsentSettings(state, { tenantId: scopeTenantId, onChanged });
+      });
+      return;
+    }
+
+    node.disabled = true;
+    try {
+      await submitAccountConsents(scopeTenantId, [{
+        documentId: consent.documentId,
+        documentVersion: Math.max(1, Number(consent.documentVersion || 1)),
+        accepted: true,
+        acceptedAt: new Date().toISOString(),
+      }]);
+      layer.v2Close?.();
       await onChanged?.(consent.documentId);
       await openAccountConsentSettings(state, { tenantId: scopeTenantId, onChanged });
-    });
+    } catch (error) {
+      node.disabled = false;
+      openNotice({
+        title: 'Согласие не сохранено',
+        message: accountErrorMessage(error, 'Не удалось сохранить согласие'),
+        action: 'Закрыть',
+        variant: 'technical',
+      });
+    }
   }));
+
   return layer;
 }
