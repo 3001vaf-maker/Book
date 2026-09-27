@@ -2,6 +2,7 @@ import fs from 'node:fs';
 
 const booking = fs.readFileSync('online-booking/booking.js', 'utf8');
 const accountShell = fs.readFileSync('online-booking/account-shell.js', 'utf8');
+const personalData = fs.readFileSync('online-booking/personal-data.js', 'utf8');
 const consentSettings = fs.readFileSync('online-booking/consent-settings.js', 'utf8');
 const settings = fs.readFileSync('settings/online-booking/online-booking.js', 'utf8');
 const serverSync = fs.readFileSync('online-booking/server-sync.js', 'utf8');
