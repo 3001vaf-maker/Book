@@ -28,7 +28,13 @@ WITH observed AS (
 
   SELECT trim(custom_value) AS "name"
   FROM "Profile" p
-  CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(p."customProfessions", '[]'::jsonb)) AS custom_value
+  CROSS JOIN LATERAL jsonb_array_elements_text(
+    CASE
+      WHEN jsonb_typeof(COALESCE(p."customProfessions", '[]'::jsonb)) = 'array'
+        THEN COALESCE(p."customProfessions", '[]'::jsonb)
+      ELSE '[]'::jsonb
+    END
+  ) AS custom_value
   WHERE trim(custom_value) <> ''
 ),
 cleaned AS (
