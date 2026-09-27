@@ -1,13 +1,11 @@
 import { accountErrorMessage, updateAccount, updateGlobalAccount } from '../core/account/index.js';
 import {
-  accordion,
   button,
   collectLinks,
   collectRepeatedField,
   escapeHtml,
   field,
   formValidationMessage,
-  initAccordions,
   initCalendar,
   initLinks,
   initRepeatedFields,
@@ -16,6 +14,7 @@ import {
   modal,
   mountV2ZLayer,
   v2ZLayer,
+  v2Section,
   openNotice,
   phoneField,
   repeatedField,
@@ -134,33 +133,31 @@ function initBirthDate(root) {
 
 function editorMarkup(account = {}) {
   const profile = profileData(account);
+  const fields = `<div class="form-grid">
+    ${field({ label: 'Имя', name: 'name', value: account.name || '', required: true, autocomplete: 'given-name' })}
+    ${field({ label: 'Фамилия', name: 'surname', value: account.surname || '', autocomplete: 'family-name' })}
+    ${phoneField({ label: 'Телефон', name: 'phone', value: account.phone || '', required: true })}
+    ${repeatedField({ label: 'Дополнительные телефоны', name: 'additionalPhone', values: profile.phones || [], type: 'tel', addLabel: '+ Телефон', showEmptyRow: false })}
+    ${field({ label: 'Email', name: 'email', value: account.email || '', type: 'email', readonly: true })}
+    ${repeatedField({ label: 'Дополнительные email', name: 'additionalEmail', values: profile.emails || [], type: 'email', placeholder: 'name@example.com', addLabel: '+ Email', showEmptyRow: false })}
+    ${field({ label: 'Telegram', name: 'telegram', value: profile.telegram || '', placeholder: '@username', maxlength: 100 })}
+    ${select({
+      label: 'Пол',
+      name: 'gender',
+      value: profile.gender || '',
+      options: [
+        { value: '', label: 'Не указан' },
+        { value: 'male', label: 'Мужской' },
+        { value: 'female', label: 'Женский' },
+      ],
+    })}
+    ${birthDateField(profile.birthDate || '')}
+    <div class="array-group"><span class="array-label">Ссылки</span>${links({ links: Array.isArray(profile.links) ? profile.links : [], name: 'accountProfileLinks' })}</div>
+  </div>`;
   return formView(`
-    ${accordion([{
-      title: 'Личные данные',
-      content: `<div class="form-grid">
-        ${field({ label: 'Имя', name: 'name', value: account.name || '', required: true, autocomplete: 'given-name' })}
-        ${field({ label: 'Фамилия', name: 'surname', value: account.surname || '', autocomplete: 'family-name' })}
-        ${phoneField({ label: 'Телефон', name: 'phone', value: account.phone || '', required: true })}
-        ${repeatedField({ label: 'Дополнительные телефоны', name: 'additionalPhone', values: profile.phones || [], type: 'tel', addLabel: '+ Телефон', showEmptyRow: false })}
-        ${field({ label: 'Email', name: 'email', value: account.email || '', type: 'email', readonly: true })}
-        ${repeatedField({ label: 'Дополнительные email', name: 'additionalEmail', values: profile.emails || [], type: 'email', placeholder: 'name@example.com', addLabel: '+ Email', showEmptyRow: false })}
-        ${field({ label: 'Telegram', name: 'telegram', value: profile.telegram || '', placeholder: '@username', maxlength: 100 })}
-        ${select({
-          label: 'Пол',
-          name: 'gender',
-          value: profile.gender || '',
-          options: [
-            { value: '', label: 'Не указан' },
-            { value: 'male', label: 'Мужской' },
-            { value: 'female', label: 'Женский' },
-          ],
-        })}
-        ${birthDateField(profile.birthDate || '')}
-        <div class="array-group"><span class="array-label">Ссылки</span>${links({ links: Array.isArray(profile.links) ? profile.links : [], name: 'accountProfileLinks' })}</div>
-      </div>`,
-    }], { openFirst: true })}
+    ${v2Section('Личные данные', fields)}
     ${formError('', { data: 'data-account-personal-error', keepEmpty: true })}
-  `, { data: 'data-account-personal-form' });
+  `, { className: 'account-personal-data-form', data: 'data-account-personal-form' });
 }
 
 function formSignature(form) {
@@ -176,7 +173,6 @@ export function openAccountPersonalDataZ(root, state, { onSaved, onDirtyChange, 
     },
   });
   if (!layer) return null;
-  initAccordions(layer);
   initRepeatedFields(layer);
   initLinks(layer);
   initBirthDate(layer);

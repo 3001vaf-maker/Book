@@ -127,30 +127,12 @@ function renderToolbar() {
 
 function genericCard() {
   return entityCard({
-    id: 'ID 0000',
-    title: 'Заголовок карточки',
-    subtitle: 'Подзаголовок',
+    title: 'Имя Фамилия',
+    subtitle: '+7 903 123-45-67',
     interactive: true,
     data: 'data-reference-profile-card',
     aria: 'Редактировать данные профиля',
     className: 'entity-card--hero ui-reference-generic-card',
-    topMeta: [
-      { value: 'Зона 1', label: 'Подпись', row: 1 },
-      { value: 'Строка', label: 'Подпись', row: 2, weight: 'regular' },
-    ],
-    topRightMeta: [
-      { value: 'Зона 2', label: 'Подпись', row: 2, weight: 'regular' },
-      { value: '00:00', row: 3 },
-    ],
-    meta: [
-      { value: '00', label: 'Показатель' },
-      { value: '00', label: 'Показатель' },
-      { value: '00', label: 'Показатель' },
-    ],
-    detailRows: [
-      { left: 'Строка интерфейса', right: 'Значение' },
-      { left: 'Строка интерфейса', right: 'Значение' },
-    ],
   });
 }
 
@@ -399,10 +381,13 @@ function settingsMarkup() {
 }
 
 function openSettingsReference() {
-  if (app.querySelector('[data-reference-settings-z]')) return;
-  const host = mountV2ZLayer(app, v2ZLayer(`<div data-reference-settings-z>${settingsMarkup()}</div>`, {
-    className: 'ui-reference-settings-z',
-  }), { stack: true });
+  if (document.querySelector('[data-reference-settings-menu]')) return;
+  const host = mountModal(document.body, modal(`<div data-reference-settings-menu>${settingsMarkup()}</div>`, {
+    variant: 'bottom',
+    surface: 'app',
+    title: 'Настройки профиля',
+    className: 'modal--profile-settings-sheet',
+  }));
   if (!host) return;
   host.querySelector('[data-reference-photo]')?.addEventListener('click', (event) => event.preventDefault());
   host.querySelector('[data-reference-consents]')?.addEventListener('click', () => openConsentReference());

@@ -2,6 +2,7 @@ import fs from 'node:fs';
 
 const booking = fs.readFileSync('online-booking/booking.js', 'utf8');
 const accountShell = fs.readFileSync('online-booking/account-shell.js', 'utf8');
+const personalData = fs.readFileSync('online-booking/personal-data.js', 'utf8');
 const consentSettings = fs.readFileSync('online-booking/consent-settings.js', 'utf8');
 const settings = fs.readFileSync('settings/online-booking/online-booking.js', 'utf8');
 const serverSync = fs.readFileSync('online-booking/server-sync.js', 'utf8');
@@ -166,7 +167,10 @@ const deleteIndex = referenceUi.indexOf("button('Удалить профиль'"
 expect(photoIndex >= 0 && photoIndex < passwordIndex && passwordIndex < consentIndex && consentIndex < logoutIndex && logoutIndex < deleteIndex, 'Reference profile settings must keep the approved action order.');
 expect(referenceUi.includes("button('Фото', { variant: 'outline'") && referenceUi.includes("button('Изменить пароль', { variant: 'outline'") && referenceUi.includes("button('Согласия / Уведомления', { variant: 'outline'") && referenceUi.includes("button('Выход', { variant: 'danger'") && referenceUi.includes("button('Удалить профиль', { variant: 'critical'"), 'Reference profile settings must keep the approved button variants.');
 expect(referenceUi.includes("data: 'data-reference-profile-card'") && referenceUi.includes("openPersonalDataReference"), 'Reference personal-data editing must originate from the Profile card.');
-expect(referenceUi.includes('mountV2ZLayer(app, v2ZLayer') && referenceUi.includes('data-reference-settings-z') && referenceUi.includes('data-reference-personal-z'), 'Reference Profile settings and personal-data editing must use stacked Z2 instead of legacy work modals.');
+expect(referenceUi.includes("variant: 'bottom'") && referenceUi.includes('data-reference-settings-menu') && referenceUi.includes('data-reference-personal-z'), 'Reference Header A settings must use bottom modal while Profile personal-data editing stays on stacked Z2.');
+expect(accountShell.includes("className: 'entity-card--hero account-profile-card'") && accountShell.includes('title: fullName') && accountShell.includes('subtitle: phone'), 'End-user Profile Z1 must use one full canonical card with one-line full name and phone.');
+expect(accountShell.includes("className: 'modal--profile-settings-sheet'") && !accountShell.includes('openGlobalProfileSettingsZ') && !accountShell.includes('data-account-profile-settings-z'), 'End-user Header A settings must use the bottom modal only; legacy settings Z must be physically absent.');
+expect(personalData.includes("v2Section('Личные данные', fields)") && !personalData.includes('accordion(') && !personalData.includes('initAccordions'), 'End-user personal-data Z2 must use flat Shared UI and must not retain the legacy accordion owner.');
 expect(!accountShell.includes("document.createElement('input')") && !accountShell.includes('new FileReader(') && accountShell.includes('selectPhotoFile()'), 'End-user Profile must consume the Shared photo picker instead of owning file input logic.');
 expect(!referenceUi.includes('apiRequest(') && !referenceUi.includes('fetch(') && !referenceUi.includes('localStorage') && !referenceUi.includes('sessionStorage') && !referenceUi.includes("from '../../core/") && !referenceUi.includes("from '../core/"), 'Reference must remain free of API, persistence and business-layer dependencies.');
 
