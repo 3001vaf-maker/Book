@@ -366,8 +366,15 @@ export function mountV2Layer(html, { root = null } = {}) {
   const technical = kind === 'technical';
   const host = technical ? document.body : activeV2ModalSurface(root);
   if (!host) return null;
+  const app = technical ? null : host.closest?.('[data-v2-app]');
+  const locksHeader = Boolean(app && kind === 'standard');
+  const header = locksHeader ? app.querySelector?.('[data-v2-header]') : null;
   node.classList.add(technical ? 'v2-layer-backdrop--technical' : 'v2-layer-backdrop--contained');
   if (!technical && host.matches?.('[data-v2-z], [data-v2-z-layer]')) host.classList.add('has-v2-layer');
+  if (header) {
+    header.inert = true;
+    header.classList.add('is-modal-locked');
+  }
   host.appendChild(node);
 
   let disposeGesture = () => {};
@@ -381,6 +388,13 @@ export function mountV2Layer(html, { root = null } = {}) {
     if (node.isConnected) node.remove();
     if (!technical && host.matches?.('[data-v2-z], [data-v2-z-layer]') && !host.querySelector('[data-v2-layer]')) {
       host.classList.remove('has-v2-layer');
+    }
+    if (locksHeader && app && !app.querySelector('[data-v2-layer-kind="standard"]')) {
+      const currentHeader = app.querySelector?.('[data-v2-header]');
+      if (currentHeader) {
+        currentHeader.inert = false;
+        currentHeader.classList.remove('is-modal-locked');
+      }
     }
   };
   node.v2Close = close;
