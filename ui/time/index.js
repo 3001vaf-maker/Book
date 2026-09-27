@@ -17,8 +17,10 @@ export function wheel({values,selected,type,formatter=(v)=>String(v).padStart(2,
   return Array.from({length:CYCLES},(_,cycle)=>base.map((value,index)=>`<button type="button" class="time-wheel__item${cycle===MIDDLE_CYCLE&&String(value)===String(selected)?' is-selected':''}" data-time-wheel-item data-time-wheel-type="${esc(type)}" data-value="${esc(value)}" data-cycle="${cycle}" data-index="${index}">${esc(formatter(value))}</button>`).join('')).join('');
 }
 
-export function timePicker({name,label,value='',minuteStep=15,min='00:00',max='23:59'}={}){
-  return `<div class="time-picker" data-time-picker="${esc(name)}" data-time-minute-step="${Number(minuteStep)||15}" data-time-min="${esc(min)}" data-time-max="${esc(max)}"><span class="time-picker__label">${esc(label)}</span><button type="button" class="time-picker__button" data-time-open>${text(value)}</button><input type="hidden" name="${esc(name)}" value="${text(value)}" data-time-value></div>`;
+export function timePicker({name,label,value='',minuteStep=15,min='00:00',max='23:59',showLabel=true}={}){
+  const labelText=String(label||'Время');
+  const visibleLabel=showLabel?`<span class="time-picker__label">${esc(labelText)}</span>`:'';
+  return `<div class="time-picker" data-time-picker="${esc(name)}" data-time-label="${esc(labelText)}" data-time-minute-step="${Number(minuteStep)||15}" data-time-min="${esc(min)}" data-time-max="${esc(max)}">${visibleLabel}<button type="button" class="time-picker__button" data-time-open aria-label="${esc(labelText)}">${text(value)}</button><input type="hidden" name="${esc(name)}" value="${text(value)}" data-time-value></div>`;
 }
 
 export function initTimePickers(root){root.querySelectorAll('[data-time-picker]').forEach(host=>host.querySelector('[data-time-open]')?.addEventListener('click',()=>open(host)))}
@@ -33,8 +35,9 @@ function open(host){
   const minutes=Array.from({length:Math.floor(59/step)+1},(_,i)=>i*step).filter(m=>m<=59);
   const initialHour=hours.includes(current.h)?current.h:hours[0];
   const initialMinute=minutes.includes(current.min)?current.min:minutes[0];
-  const content=`<div class="modal-title"><h2>${esc(host.querySelector('.time-picker__label')?.textContent||'Время')}</h2></div><div class="time-wheel" data-time-wheel><div class="time-wheel__column" data-time-wheel-column="hours"><span class="time-wheel__label">Часы</span><div class="time-wheel__viewport">${wheel({values:hours,selected:initialHour,type:'hours'})}</div></div><div class="time-wheel__column" data-time-wheel-column="minutes"><span class="time-wheel__label">Минуты</span><div class="time-wheel__viewport">${wheel({values:minutes,selected:initialMinute,type:'minutes'})}</div></div></div>${button('Сохранить',{data:'data-time-save'})}`;
-  const modalRoot=mountModal(document.body,modal(content,{variant:'top',title:host.querySelector('.time-picker__label')?.textContent||'Время'}));
+  const pickerLabel=host.dataset.timeLabel||host.querySelector('.time-picker__label')?.textContent||'Время';
+  const content=`<div class="modal-title"><h2>${esc(pickerLabel)}</h2></div><div class="time-wheel" data-time-wheel><div class="time-wheel__column" data-time-wheel-column="hours"><span class="time-wheel__label">Часы</span><div class="time-wheel__viewport">${wheel({values:hours,selected:initialHour,type:'hours'})}</div></div><div class="time-wheel__column" data-time-wheel-column="minutes"><span class="time-wheel__label">Минуты</span><div class="time-wheel__viewport">${wheel({values:minutes,selected:initialMinute,type:'minutes'})}</div></div></div>${button('Сохранить',{data:'data-time-save'})}`;
+  const modalRoot=mountModal(document.body,modal(content,{variant:'top',title:pickerLabel}));
   if(!modalRoot)return;
 
   const nearestItem=(viewport)=>{
@@ -110,9 +113,12 @@ function open(host){
 
 export function openTimeRangeAction({ from = '09:00', to = '18:00', title = 'График работы', onSave = () => {} } = {}) {
   const content = `<form class="form-grid" data-shared-time-range-form>
-    <div class="time-range-fields">
-      ${timePicker({ label: 'С', name: 'from', value: text(from) })}
-      ${timePicker({ label: 'До', name: 'to', value: text(to) })}
+    <div class="time-range-group">
+      <div class="time-range-title">С — до</div>
+      <div class="time-range-fields">
+        ${timePicker({ label: 'С', name: 'from', value: text(from), showLabel: false })}
+        ${timePicker({ label: 'До', name: 'to', value: text(to), showLabel: false })}
+      </div>
     </div>
     ${button('Сохранить', { type: 'submit' })}
   </form>`;
