@@ -167,6 +167,7 @@ export class ConsentPolicyService {
     const data = snapshot.data || {};
     return {
       documents: Array.isArray(data.documents) ? data.documents : [],
+      history: Array.isArray(data.history) ? data.history : [],
     };
   }
 
@@ -327,16 +328,30 @@ export class ConsentPolicyService {
         const documentId = text(document?.id);
         const documentVersion = Math.max(1, Number(document?.version || 1));
         const latest = rows.find((event) => event.documentId === documentId) || null;
+        const latestAccepted = rows.find((event) => event.documentId === documentId && event.status === 'accepted') || null;
         const status = latest?.status || 'missing';
         const accepted = Boolean(latest && status === 'accepted' && latest.documentVersion === documentVersion);
+        const displayVersion = Math.max(1, Number(latestAccepted?.documentVersion || documentVersion));
+        const historicalSnapshot = current.history
+          .find((entry: any) => (
+            text(entry?.documentId) === documentId
+            && Math.max(1, Number(entry?.documentVersion || 1)) === displayVersion
+            && entry?.snapshot
+          ))?.snapshot;
+        const displayDocument = historicalSnapshot
+          || (displayVersion === documentVersion ? document : null)
+          || document;
         return {
           documentId,
           documentVersion,
-          title: text(document?.title) || 'Документ',
+          displayVersion,
+          title: text(displayDocument?.title) || text(document?.title) || 'Документ',
           required: Boolean(document?.required),
           status,
           accepted,
+          documentText: text(displayDocument?.text ?? displayDocument?.content),
           eventAt: latest?.occurredAt.toISOString() || '',
+          acceptedAt: latestAccepted?.acceptedAt?.toISOString() || '',
           source: text(latest?.source),
           eventId: text(latest?.id),
         };
