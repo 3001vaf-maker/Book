@@ -11,6 +11,10 @@ const schema = readFileSync(new URL('../server/prisma/schema.prisma', import.met
 const workplaceTimeZoneMigration = readFileSync(new URL('../server/prisma/migrations/20260920113000_workplace_timezone/migration.sql', import.meta.url), 'utf8');
 const workplaceSoftDeleteMigration = readFileSync(new URL('../server/prisma/migrations/20260927124500_workplace_soft_delete/migration.sql', import.meta.url), 'utf8');
 const workplaceLimitGuard = readFileSync(new URL('../server/src/profile/workplace-limit.guard.ts', import.meta.url), 'utf8');
+const profileUi = readFileSync(new URL('../settings/profile/profile.js', import.meta.url), 'utf8');
+const workplaceUi = readFileSync(new URL('../settings/profile/workplaces/workplaces.js', import.meta.url), 'utf8');
+const workplaceTimeOwner = readFileSync(new URL('../server/src/time/workplace-time-zone.ts', import.meta.url), 'utf8');
+const professionCatalogMigration = readFileSync(new URL('../server/prisma/migrations/20260928203000_platform_profession_catalog/migration.sql', import.meta.url), 'utf8');
 
 assert.doesNotMatch(auth, /prepareProductionWorkspace|localStorage\.removeItem/);
 assert.doesNotMatch(core, /workspace-sync|syncWorkspaceBeforeRender|startWorkspaceSync/);
@@ -43,12 +47,34 @@ assert.match(schema, /migrationVerifiedAt\s+DateTime\?/);
 assert.match(serverService, /migrationVerifiedAt/);
 assert.match(serverService, /id:\s*row\.id/);
 assert.match(serverService, /platformAccountId:\s*row\.platformAccountId/);
-assert.match(serverService, /ConflictException\('Проверка переноса Profile \+ Workplaces не пройдена'\)/);
+assert.doesNotMatch(serverService, /Profile \+ Workplaces/);
+assert.doesNotMatch(profileData, /Profile \+ Workplaces/);
+assert.match(serverService, /platformProfession\.upsert/);
+assert.match(serverService, /professionCatalog/);
+assert.match(schema, /model PlatformProfession\s*\{/);
+assert.match(professionCatalogMigration, /CREATE TABLE "PlatformProfession"/);
+assert.match(professionCatalogMigration, /"normalizedName" <> 'другая'/);
 assert.match(schema, /deletedAt\s+DateTime\?/);
 assert.match(workplaceSoftDeleteMigration, /ADD COLUMN IF NOT EXISTS "deletedAt"/);
 assert.match(serverService, /data: \{ deletedAt: new Date\(\) \}/);
 assert.doesNotMatch(serverService, /prisma\.workplace\.delete\(/);
 assert.match(serverService, /where: \{ deletedAt: null \}/);
 assert.match(workplaceLimitGuard, /deletedAt: null/);
+
+assert.match(profileUi, /getProfessionCatalog/);
+assert.match(profileUi, /searchableSelect\(\{label:'Профессия'/);
+assert.doesNotMatch(profileUi, /const PROFESSIONS=/);
+assert.doesNotMatch(profileUi, /'Другая'/);
+
+assert.match(workplaceData, /getWorkplaceReferenceData/);
+assert.match(workplaceUi, /getWorkplaceReferenceData/);
+assert.doesNotMatch(workplaceUi, /const CITIES=/);
+assert.doesNotMatch(workplaceUi, /\|\|'RUB'/);
+assert.doesNotMatch(workplaceUi, /\|\|'09:00'/);
+assert.doesNotMatch(workplaceUi, /\|\|'18:00'/);
+assert.match(workplaceTimeOwner, /WORKPLACE_CITY_DIRECTORY/);
+assert.match(workplaceTimeOwner, /'Екатеринбург':?[^\n]*Asia\/Yekaterinburg|name: 'Екатеринбург'[^\n]*Asia\/Yekaterinburg/);
+assert.match(workplaceTimeOwner, /resolveWorkplaceTimeZone/);
+assert.match(workplaceTimeOwner, /workplaceReferenceData/);
 
 console.log('profile server owner tests: OK');
