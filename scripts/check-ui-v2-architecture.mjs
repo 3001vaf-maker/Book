@@ -27,6 +27,7 @@ const onlineBookingSettingsCss = fs.readFileSync('settings/online-booking/online
 const journalList = fs.readFileSync('journal/список.js', 'utf8');
 const firstRun = fs.readFileSync('first-run/runtime.js', 'utf8');
 const profile = fs.readFileSync('settings/profile/profile.js', 'utf8');
+const sharedProfile = fs.readFileSync('ui/profile/index.js', 'utf8');
 const style = fs.readFileSync('css/style.css', 'utf8');
 const entityCardUi = fs.readFileSync('ui/cards/index.js', 'utf8');
 const entityCardCss = fs.readFileSync('ui/cards/entity-card.css', 'utf8');
@@ -256,22 +257,26 @@ expect(firstRun.includes("const requiredSection = this.workspaceSection(step);")
 expect(firstRun.includes("book:v2-navigation-request") && firstRun.includes('this.navTarget(step)'), 'DEMO must reveal the real V2 deck before pointing to a root or second-level folder.');
 expect(finance.includes('openFinanceOperation(root, movements, element.dataset.financeOperation, onBack)'), 'Finance DDS must preserve its E back callback through operation detail/cancel refresh.');
 
-expect(profile.includes('workspaceHeaderContext({') && profile.includes("hideD:true") && profile.includes("kind:'avatar'"), 'Profile must feed Header A/B/D through the canonical Header owner.');
+expect(profile.includes('workspaceHeaderContext({') && profile.includes("kind:'avatar'") && !profile.includes("hideD:true"), 'Professional Profile must feed A/B and keep Shared D=Chat enabled instead of hiding D.');
+expect(profile.includes("function profileContext(p,title=fullName(p))"), 'Professional Profile root B must use the profile name while nested layers may use contextual titles.');
 expect(profile.includes("v2Section('Рабочие пространства',workplaceRail())") && profile.includes('v2HorizontalRail('), 'Profile root Z must contain the profile card plus a horizontal workplace rail.');
 expect(!profile.includes('accordion(') && !profile.includes('initAccordions('), 'Regular Profile UI must not retain the legacy accordion.');
-expect(profile.includes('mountV2ZLayer(root,v2ZLayer(') && profile.includes("'Настройки профиля'"), 'Profile settings must open as a shared second Z layer.');
-expect(profile.includes('data-v2-primary-action') && profile.includes('data-add-workplace'), 'Profile root C must proxy the existing add-workplace action.');
+expect(profile.includes('openSharedProfileSettingsMenu({') && profile.includes("id:'photo',label:'Фото'") && profile.includes("id:'password',label:'Изменить пароль'") && profile.includes("id:'controls',label:'Согласия / Уведомления'") && profile.includes("id:'logout',label:'Выход'") && !profile.includes("label:'Удалить профиль'"), 'Professional Header A must use the Shared bottom settings menu and must never expose deletion of the main profile.');
+expect(profile.includes('data-v2-primary-action') && profile.includes('data-add-workplace'), 'Profile root C must preserve the + add-workplace action.');
 
 expect(profile.includes("data:'data-profile-card'") && profile.includes("openProfileData(root") && profile.includes("'Данные профиля'"), 'Profile Card must open a dedicated Profile Data Z2.');
-expect(profile.includes("openProfileSettings(root") && profile.includes("'Настройки профиля'"), 'Header A must open a separate Profile Settings Z2.');
-expect(profile.includes("openWorkplaceZ2(root") && profile.includes("workplaceForm(existing,{sourceOnly:true})"), 'Workplace cards and create action must use the reusable workplace form inside Z2.');
+expect(profile.includes("openSharedPhotoAction({") && profile.includes("includePhoto?photoField({"), 'Professional working Profile must move photo editing to A while onboarding may keep the initial photo field.');
+expect(profile.includes("openWorkplaceZ2(root") && profile.includes("workplaceForm(existing,{sourceOnly:true})") && profile.includes("openWorkplaceSettingsMenu(layer,existing"), 'Workplace cards and create action must use reusable Z2 data with A-owned settings.');
 expect(profile.includes("className:'entity-card--hero entity-card--rail") && !profile.includes("entity-card--compact"), 'Workplaces in Profile must remain real Entity Cards, not compact substitutes.');
-expect(profile.includes("data-v2-primary-visible=\"false\"") && profile.includes("formSnapshot(form)!==initial"), 'Profile Data C=Save must appear reactively only after changes.');
-expect(workplacesUi.includes("data-v2-primary-label=\"") && workplacesUi.includes("existing&&!dirty?'Удалить':'Сохранить'"), 'Existing Workplace Z2 C must switch between Delete and Save based on dirty state.');
-expect(workplacesUi.includes("workplaceForm(existing,{bodyActions:true})") && workplacesUi.includes("workplaceForm(existing=null,{sourceOnly=false,bodyActions=false}={})"), 'Workplace must have one reusable form renderer with compatibility wrappers, not a second V2 form.');
+expect(profile.includes("data-v2-primary-visible=\"false\"") && profile.includes("setSharedProfilePrimary(primary,{visible:formSnapshot(form)!==initial,label:'Сохранить'})"), 'Profile Data C=Save must appear through the Shared contextual C owner only after changes.');
+expect(workplacesUi.includes("data-v2-primary-label=\"Сохранить\"") && !workplacesUi.includes("existing&&!dirty?'Удалить':'Сохранить'"), 'Workplace Z2 C must be Save-only; deletion belongs to A settings.');
+expect(workplacesUi.includes("id:'photo'") && workplacesUi.includes("id:'color'") && workplacesUi.includes("id:'schedule'") && workplacesUi.includes("id:'delete'") && workplacesUi.includes("label:'Удалить пространство'"), 'Existing Workplace A must own Photo, Color, Work schedule and confirmed deletion.');
+expect(workplacesUi.includes("workplaceForm(existing,{bodyActions:true})") && workplacesUi.includes("workplaceForm(existing=null,{sourceOnly=false,bodyActions=false}={})"), 'Workplace must keep one reusable form renderer; onboarding compatibility may retain inline initial settings.');
+expect(sharedProfile.includes('export function openSharedProfileSettingsMenu') && sharedProfile.includes('export async function openSharedPhotoAction') && sharedProfile.includes('export function openSharedPasswordAction') && sharedProfile.includes('export function setSharedProfilePrimary') && sharedProfile.includes('export function openSharedConsentDocument'), 'Professional and end-user profiles must share one Profile UI owner for A menu, photo, password, C and consent documents.');
 expect(css.includes('--v2-z-layer-offset:12px') && css.includes('inset:0 0 0 calc(var(--v2-edge) + var(--v2-z-layer-offset))'), 'Shared Z2 must leave a single 12px Z1 edge through the shared token.');
 expect(ui.includes("[data-v2-z], [data-v2-z-layer]") && ui.includes("revealDeck: false"), 'Shared swipe must own Z2 and close it without revealing F.');
 expect(accountControlsUi.includes("data-service-email") && accountControlsUi.includes("data-service-push") && accountControlsUi.includes("data-service-telegram"), 'Profile Settings must expose Telegram, Email and Push service channels.');
+expect(accountControlsUi.includes('openSharedConsentDocument') && !accountControlsUi.includes('v2Document('), 'Professional consent documents must use the Shared technical document owner.');
 expect(!accountControlsUi.includes('История согласий') && !accountControlsUi.includes('historyMarkup') && !accountControlsUi.includes('openConsentHistory') && !accountControlsUi.includes('data-consent-history'), 'Profile Settings must not expose consent history.');
 
 expect(style.includes('--text:#111111') && style.includes('--button-secondary:#D8D3CF') && style.includes('--text-secondary:#777A7D'), 'Shared palette must use the approved black and neutral tokens.');
