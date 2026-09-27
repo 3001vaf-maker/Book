@@ -20,3 +20,5 @@
 
 .modal-sheet.modal--bottom.modal--color-sheet{height:auto;min-height:260px;max-height:54%;padding:20px 18px calc(18px + env(safe-area-inset-bottom));background:var(--white);overflow:auto}
 .modal-sheet.modal--bottom.modal--time-range-sheet{height:auto;min-height:260px;max-height:54%;padding:20px 18px calc(18px + env(safe-area-inset-bottom));background:var(--white);overflow:auto}
+
+.modal-sheet.modal--bottom.modal--time-picker-sheet{height:auto;min-height:360px;max-height:72%;padding:20px 18px calc(18px + env(safe-area-inset-bottom));background:var(--white);overflow:auto}

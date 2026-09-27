@@ -1,5 +1,7 @@
 import fs from 'node:fs';
 
+const architectureDictionary = fs.readFileSync('ARCHITECTURE_DICTIONARY.md', 'utf8');
+const designDictionary = fs.readFileSync('DESIGN_DICTIONARY.md', 'utf8');
 const ui = fs.readFileSync('ui/v2/index.js', 'utf8');
 const css = fs.readFileSync('ui/v2/v2.css', 'utf8');
 const facade = fs.readFileSync('ui/ui.js', 'utf8');
@@ -90,6 +92,8 @@ const legacySystemBrown = /#(?:3B302B|7A6F69|B8AEA8|E7E1DB|E8E1DC|D7CEC7|968982|
 
 const failures = [];
 const expect = (condition, message) => { if (!condition) failures.push(message); };
+expect(architectureDictionary.includes('Shared manifestation invariance') && architectureDictionary.includes('один и тот же Shared UI-owner всегда проявляется одинаково'), 'Architecture contract must keep one invariant manifestation per Shared UI owner across all contexts.');
+expect(designDictionary.includes('Один Shared UI-компонент имеет **одно и то же проявление везде**'), 'Design contract must forbid profile/workplace/feature-specific manifestations of the same Shared UI owner.');
 for (const file of sharedCssFiles) {
   const source = fs.readFileSync(file, 'utf8');
   expect(!legacySystemBrown.test(source), `Legacy system brown must not remain in Shared UI CSS: ${file}.`);
@@ -318,7 +322,7 @@ expect(modals.includes("import { mountV2Layer, v2Layer } from '../v2/index.js';"
   && modals.includes("variant = 'technical'")
   && !modals.includes('<div class="modal-backdrop"'),
   'ui/modals must remain the sole public modal owner and route work modals into active Z while reserving technical overlays for system cases.');
-expect(timeUi.includes("variant:'top'"), 'Time Picker must use the Shared TOP modal instead of a global/system overlay.');
+expect(timeUi.includes("variant:'bottom'") && timeUi.includes("className:'modal--time-picker-sheet'"), 'Time Picker must use the Shared BOTTOM action modal; TOP/technical/native variants are forbidden for this ordinary picker.');
 expect(ui.includes("const allowed = new Set(['top', 'standard', 'bottom', 'technical'])") && ui.includes("const technical = kind === 'technical'") && ui.includes('activeV2ModalSurface(root)'), 'Internal V2 modal geometry must expose exactly the approved top/standard/bottom/technical model.');
 expect(ui.includes('function initV2LayerDismissGesture') && ui.includes("kind === 'top' ? Math.min(0, raw) : Math.max(0, raw)") && ui.includes('stopPointerPropagation') && ui.includes("resolved === 'technical'"), 'Shared Modal must own origin-directed dismissal, isolate pointer gestures from lower Z/F/E, and reserve X for technical overlays only.');
 expect(ui.includes("if (app.querySelector('[data-v2-z-layer]')) return;"), 'Shared workspace owner must block F/E/base-Z gestures while any stacked Z2/Z3 is active.');

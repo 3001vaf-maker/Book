@@ -19,6 +19,7 @@ const dayEditor = read('timetable/day-editor.js');
 const sharedTime = read('ui/time/index.js');
 const sharedTimeCss = read('ui/time/time.css');
 const architecture = read('ARCHITECTURE_DICTIONARY.md');
+const design = read('DESIGN_DICTIONARY.md');
 
 if (!/from ['"]\.\.\/core\/time\/index\.js['"]/.test(recordFlow)) fail('journal/record.js', 'Record creation must ask Core Availability');
 if (!/checkTimeAvailability/.test(recordFlow) || !/listAvailableStartTimes/.test(recordFlow) || !/listAvailableEndTimes/.test(recordFlow)) fail('journal/record.js', 'Record creation must use canonical Availability queries');
@@ -68,12 +69,15 @@ if (/time-range-title/.test(sharedTime)) fail('ui/time/index.js', 'Work-time ran
 if (!/time-range-fields/.test(sharedTime) || !/timePicker\(\{ label: 'С', name: 'from'/.test(sharedTime) || !/timePicker\(\{ label: 'До', name: 'to'/.test(sharedTime)) fail('ui/time/index.js', 'Work-time range must reuse the existing Shared timePicker twice on one row.');
 if (/type="time"/.test(sharedTime)) fail('ui/time/index.js', 'Shared Time range must never fall back to native input[type=time].');
 if (!/initTimePickers\(layer\)/.test(sharedTime)) fail('ui/time/index.js', 'Work-time range boxes must open the canonical Shared time wheel modal.');
-if (!/modal\(content,\{variant:'top'/.test(sharedTime)) fail('ui/time/index.js', 'Canonical time selection must use the Shared time modal, not a technical modal or native picker.');
+if (!/modal\(content,\{variant:'bottom'/.test(sharedTime) || !/className:'modal--time-picker-sheet'/.test(sharedTime)) fail('ui/time/index.js', 'Canonical time selection must use the Shared bottom modal, not a top, technical or native picker.');
+if (/modal\(content,\{variant:'top'/.test(sharedTime) || /variant:'technical'/.test(sharedTime)) fail('ui/time/index.js', 'Canonical time selection must never open from the top or use a technical modal.');
 if (!/\.time-range-fields\{display:grid;grid-template-columns:minmax\(0,1fr\) minmax\(0,1fr\)/.test(sharedTimeCss)) fail('ui/time/time.css', 'Work-time range boxes must stay in one horizontal row.');
 if (/\.time-range-fields \.time-picker__label\{display:none\}/.test(sharedTimeCss)) fail('ui/time/time.css', 'Work-time range must keep С and До visible above their own boxes.');
 
 if (!/## 14\. Journal → WorkPlan → Availability → TimeGrid → UI/.test(architecture)) fail('ARCHITECTURE_DICTIONARY.md', 'canonical scheduling ownership contract is missing');
 if (!/Обычное продуктовое ТЗ не является разрешением менять эту архитектуру/.test(architecture)) fail('ARCHITECTURE_DICTIONARY.md', 'architecture-change rule is missing');
+if (!/обычные прикладные модалы с выбором, настройкой или кнопкой действия всегда открываются снизу/.test(design)) fail('DESIGN_DICTIONARY.md', 'bottom action-modal rule is missing.');
+if (!/подпись `С` находится над левым полем, `До` — над правым/.test(design)) fail('DESIGN_DICTIONARY.md', 'canonical work-time range geometry is missing.');
 
 if (errors.length) {
   console.error('time UI ownership check: FAILED');
