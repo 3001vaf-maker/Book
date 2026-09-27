@@ -2,3 +2,5 @@
 .app-header .ui-button.app-header__control{min-width:0;width:100%;min-height:44px;height:44px;padding:0 8px}.app-header .ui-button.app-header__control--icon{width:44px;padding:0;line-height:1}.app-header .ui-button.app-header__control--action{width:max-content;max-width:var(--shell-action-max,104px);padding:0 9px}.app-view-shell__primary-action .ui-button{width:100%;min-height:48px}.message-composer .ui-button.message-composer__send{width:46px;min-width:46px;height:44px;min-height:44px;padding:0}.app-settings-panel .ui-button.app-settings-panel__button{width:100%}.read-only-sheet__action .ui-button{width:100%}
 
 .v2-app .ui-button{border-radius:14px}.v2-app .icon-button,.v2-app .sheet-icon-button,.v2-app .ui-button[data-record-from-price],.v2-app .remove-button{border-radius:0}
+
+.ui-button--delete-outline{border-color:#ff1111!important;background:#fff!important;color:#ff1111!important}
