@@ -319,7 +319,7 @@ export class ConsentPolicyService {
   ) {
     const accountId = text(accountIdValue);
     if (!accountId) throw new BadRequestException('Не указан аккаунт');
-    const current = await this.state(tenantId);
+
     const contacts = arrayValue(contactsValue)
       .map((item) => {
         const type = contactPointType(item?.type);
@@ -328,44 +328,40 @@ export class ConsentPolicyService {
       })
       .filter((item) => item.type && item.value && item.subjectKey);
 
-    for (const document of current.documents.filter((item: any) => Boolean(item?.personConsent))) {
-      const documentId = text(document?.id);
-      if (!documentId) continue;
-      const accountLatest = await this.latestEvent(tenantId, 'ACCOUNT', accountId, documentId);
-      if (accountLatest?.status === 'accepted') {
-        const now = new Date();
-        await this.insertEvent({
-          tenantId,
-          subjectType: 'ACCOUNT',
-          subjectKey: accountId,
-          documentId,
-          documentVersion: Math.max(1, Number(accountLatest.documentVersion || document?.version || 1)),
-          status: 'revoked',
-          revokedAt: now,
-          source,
-          occurredAt: now,
-        });
-      }
+    const rows = await this.consentRows(tenantId);
+    const contactBySubject = new Map(contacts.map((item) => [item.subjectKey, item]));
+    const subjects = new Set([accountId, ...contacts.map((item) => item.subjectKey)]);
+    const latest = new Map<string, TenantConsentEventRow>();
 
-      for (const contact of contacts) {
-        const latest = await this.latestEvent(tenantId, 'CONTACT_POINT', contact.subjectKey, documentId);
-        if (latest?.status !== 'accepted') continue;
-        const now = new Date();
-        await this.insertEvent({
-          tenantId,
-          subjectType: 'CONTACT_POINT',
-          subjectKey: contact.subjectKey,
-          contactType: contact.type,
-          contactValue: contact.value,
-          documentId,
-          documentVersion: Math.max(1, Number(latest.documentVersion || document?.version || 1)),
-          status: 'revoked',
-          revokedAt: now,
-          source,
-          occurredAt: now,
-        });
-      }
+    for (const event of [...rows].reverse()) {
+      if (!subjects.has(event.subjectKey)) continue;
+      if (event.subjectType === 'ACCOUNT' && event.subjectKey !== accountId) continue;
+      if (event.subjectType === 'CONTACT_POINT' && !contactBySubject.has(event.subjectKey)) continue;
+      const key = `${event.subjectType}:${event.subjectKey}:${event.documentId}`;
+      if (!latest.has(key)) latest.set(key, event);
     }
+
+    for (const event of latest.values()) {
+      if (event.status !== 'accepted') continue;
+      const now = new Date();
+      const contact = event.subjectType === 'CONTACT_POINT'
+        ? contactBySubject.get(event.subjectKey)
+        : null;
+      await this.insertEvent({
+        tenantId,
+        subjectType: event.subjectType,
+        subjectKey: event.subjectKey,
+        contactType: contact?.type || event.contactType,
+        contactValue: contact?.value || event.contactValue,
+        documentId: event.documentId,
+        documentVersion: Math.max(1, Number(event.documentVersion || 1)),
+        status: 'revoked',
+        revokedAt: now,
+        source,
+        occurredAt: now,
+      });
+    }
+
     return { revoked: true };
   }
 
