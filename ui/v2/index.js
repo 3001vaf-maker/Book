@@ -440,6 +440,7 @@ export function initV2Swipe(root, { onRight = null, onLeft = null, threshold = 7
   const down = (event) => {
     if (!isTopmost()) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
+    if (event.target.closest?.('button,input,select,textarea,label,[contenteditable="true"],[data-v2-stage-gesture-ignore]')) return;
     pointerId = event.pointerId;
     startX = event.clientX;
     startY = event.clientY;
