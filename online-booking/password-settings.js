@@ -10,7 +10,7 @@ export function openAccountPasswordSettings(state) {
     ${formError('', { data: 'data-account-password-error', keepEmpty: true })}
     ${button('Сохранить пароль', { type: 'submit' })}
   `, { className: 'form-grid', data: 'data-account-password-form' });
-  const layer = mountModal(document.body, modal(content, { variant: 'large', title: 'Изменить пароль' }));
+  const layer = mountModal(document.body, modal(content, { variant: 'bottom', title: 'Изменить пароль', className: 'modal--password-sheet' }));
   if (!layer) return null;
   initPasswordFields(layer);
   const form = layer.querySelector('[data-account-password-form]');
@@ -40,7 +40,7 @@ export function openAccountPasswordSettings(state) {
     try {
       if (state.globalAccount) await changeGlobalAccountPassword(currentPassword, newPassword);
       else await changeAccountPassword(state.tenantId, currentPassword, newPassword);
-      layer.remove();
+      layer.v2Close?.();
       openNotice({
         title: 'Пароль изменён',
         message: 'Новый пароль сохранён.',
