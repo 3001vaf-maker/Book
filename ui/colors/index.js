@@ -2,6 +2,7 @@ import { escapeHtml } from '../utils/escape-html.js';
 import { modal, mountModal } from '../modals/index.js';
 
 export const COLOR_PALETTE = Object.freeze([
+  '#FFFF00', '#FF1111', '#111111', '#777A7D', '#2C2A28', '#817A73', '#D7D1CA',
   '#F6D32D', '#F2C94C', '#F2994A', '#F08C46', '#E76F51',
   '#E63946', '#D62828', '#B42318', '#9B1C31', '#7F1D1D',
   '#FF6B9D', '#E64980', '#C2255C', '#A61E4D', '#7A284B',
@@ -36,13 +37,13 @@ export function initColorPickers(root, colors = COLOR_PALETTE) {
     if (!value || !swatch || !open) return;
     open.onclick = () => {
       const palette = paletteColors.map((color) => `<button type="button" class="color-picker__option ${color === value.value ? 'is-selected' : ''}" data-color-option="${escapeHtml(color)}" aria-label="Цвет ${escapeHtml(color)}"><span style="background:${escapeHtml(color)}"></span></button>`).join('');
-      const m = mountModal(root, modal(`<div class="compact-form"><div class="color-picker__palette" data-color-palette>${palette}</div></div>`, { variant: 'compact', title: 'Выбор цвета' }));
+      const m = mountModal(root, modal(`<div class="compact-form"><div class="color-picker__palette" data-color-palette>${palette}</div></div>`, { variant: 'bottom', title: 'Выбор цвета', className: 'modal--color-sheet' }));
       m?.querySelectorAll('[data-color-option]').forEach((option) => option.addEventListener('click', () => {
         value.value = option.dataset.colorOption || paletteColors[0];
         swatch.style.background = value.value;
         swatch.classList.remove('is-empty');
         value.dispatchEvent(new Event('change', { bubbles: true }));
-        m.remove();
+        m.v2Close?.();
       }));
     };
   });
