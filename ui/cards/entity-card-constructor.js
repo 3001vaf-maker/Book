@@ -1,5 +1,6 @@
 import { escapeHtml } from '../utils/escape-html.js';
 import { selectPhotoFile } from '../inputs/index.js';
+import { button } from '../buttons/index.js';
 
 export const ENTITY_CARD_LINE_COUNT = 9;
 export const ENTITY_CARD_DEFAULT_GRADIENT = Object.freeze({
@@ -96,8 +97,8 @@ function toolButton(label,key,active=false,title=''){return `<button type="butto
 function editorWorkspace(state,fields){
   if(state.tab==='photo'){
     return `<div class="entity-card-editor__photo">
-      <button type="button" class="ui-button ui-button--secondary" data-card-photo-select>${state.photo?'Заменить фото':'Добавить фото'}</button>
-      ${state.photo?'<button type="button" class="ui-button ui-button--secondary" data-card-photo-remove>Удалить фото</button>':''}
+      ${button(state.photo?'Заменить фото':'Добавить фото',{variant:'secondary',data:'data-card-photo-select'})}
+      ${state.photo?button('Удалить фото',{variant:'secondary',data:'data-card-photo-remove'}):''}
       <p>Фото заполняет карту. Если фото нет, используется градиентный фон.</p>
     </div>`;
   }
@@ -143,7 +144,7 @@ export function mountEntityCardConstructor(root,{appearance={},fields=[],photo='
       </div>
       <div class="entity-card-editor__workspace" data-card-workspace>${editorWorkspace(state,fields)}</div>
       <div class="form-error" data-card-error>${escapeHtml(state.error||'')}</div>
-      <button type="button" class="ui-button" data-card-save${state.saving?' disabled':''}>${state.saving?'Сохраняю…':'Сохранить'}</button>
+      ${button(state.saving?'Сохраняю…':'Сохранить',{data:'data-card-save',disabled:state.saving})}
     </div>`;
     bind();
   };
