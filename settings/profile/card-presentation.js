@@ -1,4 +1,4 @@
-import { normalizeEntityCardAppearance } from '../../ui/cards/entity-card-constructor.js';
+import { normalizeEntityCardAppearance } from '../../ui/ui.js';
 
 function phoneOf(value = {}) {
   return String(value?.phones?.[0] || value?.phone || '');
