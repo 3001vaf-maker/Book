@@ -2,6 +2,8 @@ import { escapeHtml } from '../utils/escape-html.js';
 import { selectPhotoFile } from '../inputs/index.js';
 import { button } from '../buttons/index.js';
 import { select } from '../selectors/index.js';
+import { colorPicker, initColorPickers } from '../colors/index.js';
+import { rangeField } from '../inputs/index.js';
 
 export const ENTITY_CARD_LINE_COUNT = 9;
 export const ENTITY_CARD_DEFAULT_GRADIENT = Object.freeze({
@@ -121,18 +123,18 @@ function fieldControl(line,fields){
 function editorWorkspace(state,fields){
   if(state.tab==='photo'){
     return `<div class="entity-card-editor__photo">
-      ${button(state.photo?'Заменить фото':'Добавить фото',{variant:'secondary',data:'data-card-photo-select'})}
-      ${state.photo?button('Удалить фото',{variant:'secondary',data:'data-card-photo-remove'}):''}
+      ${button(state.photo?'Заменить фото':'Добавить фото',{data:'data-card-photo-select'})}
+      ${state.photo?button('Удалить фото',{variant:'outline',className:'ui-button--delete-outline',data:'data-card-photo-remove'}):''}
       <p>Фото заполняет карту. Если фото нет, используется градиентный фон.</p>
     </div>`;
   }
   if(state.tab==='background'){
     const g=state.appearance.gradient;
     return `<div class="entity-card-editor__background">
-      <label><span>Цвет 1</span><input type="color" value="${escapeHtml(g.from)}" data-card-gradient="from"></label>
-      <label><span>Цвет 2</span><input type="color" value="${escapeHtml(g.mid)}" data-card-gradient="mid"></label>
-      <label><span>Цвет 3</span><input type="color" value="${escapeHtml(g.to)}" data-card-gradient="to"></label>
-      <label><span>Направление</span><input type="range" min="0" max="360" step="5" value="${g.angle}" data-card-gradient="angle"></label>
+      <div data-card-gradient-color="from">${colorPicker({name:'entityCardGradientFrom',value:g.from})}</div>
+      <div data-card-gradient-color="mid">${colorPicker({name:'entityCardGradientMid',value:g.mid})}</div>
+      <div data-card-gradient-color="to">${colorPicker({name:'entityCardGradientTo',value:g.to})}</div>
+      <div class="entity-card-editor__direction">${rangeField({label:'Направление',name:'entityCardGradientAngle',value:g.angle,min:0,max:360,step:5,data:'data-card-gradient-angle',aria:'Направление градиента'})}</div>
     </div>`;
   }
   const line=state.appearance.lines[state.line];
@@ -268,12 +270,21 @@ export function mountEntityCardConstructor(root,{appearance={},fields=[],photo='
       rerenderWorkspace();
     }));
 
-    root.querySelectorAll('[data-card-gradient]').forEach((input)=>input.addEventListener('input',()=>{
-      const key=input.dataset.cardGradient;
-      state.appearance.gradient[key]=key==='angle'?Number(input.value):input.value.toUpperCase();
+    initColorPickers(root);
+    root.querySelectorAll('[data-card-gradient-color]').forEach((holder)=>{
+      holder.querySelector('[data-color-value]')?.addEventListener('change',(event)=>{
+        const key=holder.dataset.cardGradientColor;
+        if(!key)return;
+        state.appearance.gradient[key]=String(event.target.value||'').toUpperCase();
+        updatePreview();
+        markDirty();
+      });
+    });
+    root.querySelector('[data-card-gradient-angle]')?.addEventListener('input',(event)=>{
+      state.appearance.gradient.angle=Number(event.target.value);
       updatePreview();
       markDirty();
-    }));
+    });
 
     root.querySelector('[data-card-photo-select]')?.addEventListener('click',async()=>{
       const src=await selectPhotoFile().catch(()=> '');
