@@ -294,7 +294,7 @@ function openWorkplaceZ2(root,existing,navigateBack,options={}){
     layer.v2Close?.();
     renderProfile(root,navigateBack,options);
   };
-  layer.querySelector('[data-workspace-context-action]')?.addEventListener('click',()=>openWorkplaceSettingsMenu(layer,existing,{onDeleted:closeAndRender}));
+  layer.querySelector('[data-workspace-context-action]')?.addEventListener('click',()=>openWorkplaceSettingsMenu(layer,existing,{onDeleted:closeAndRender,onAppearanceSaved:()=>renderProfile(root,navigateBack,options)}));
   bindWorkplaceForm(layer,existing,{
     onSaved:closeAndRender,
     onDeleted:closeAndRender,
