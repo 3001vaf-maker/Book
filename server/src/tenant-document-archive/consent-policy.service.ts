@@ -389,16 +389,17 @@ export class ConsentPolicyService {
         const latestAccepted = rows.find((event) => event.documentId === documentId && event.status === 'accepted') || null;
         const status = latest?.status || 'missing';
         const accepted = Boolean(latest && status === 'accepted' && latest.documentVersion === documentVersion);
-        const displayVersion = Math.max(1, Number(latestAccepted?.documentVersion || documentVersion));
-        const historicalSnapshot = current.history
-          .find((entry: any) => (
-            text(entry?.documentId) === documentId
-            && Math.max(1, Number(entry?.documentVersion || 1)) === displayVersion
-            && entry?.snapshot
-          ))?.snapshot;
-        const displayDocument = historicalSnapshot
-          || (displayVersion === documentVersion ? document : null)
-          || document;
+        const displayVersion = accepted
+          ? Math.max(1, Number(latestAccepted?.documentVersion || documentVersion))
+          : documentVersion;
+        const historicalSnapshot = accepted
+          ? current.history.find((entry: any) => (
+              text(entry?.documentId) === documentId
+              && Math.max(1, Number(entry?.documentVersion || 1)) === displayVersion
+              && entry?.snapshot
+            ))?.snapshot
+          : null;
+        const displayDocument = historicalSnapshot || document;
         return {
           documentId,
           documentVersion,
