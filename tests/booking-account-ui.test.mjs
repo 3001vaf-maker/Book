@@ -118,6 +118,12 @@ assert.match(accountShell, /GLOBAL_ACCOUNT_ROOTS = Object\.freeze\(\[[\s\S]*?id:
 assert.match(accountShell, /async function renderGlobalProfile\(/);
 assert.match(accountShell, /async function renderGlobalProfileSettings\(/);
 assert.match(accountShell, /data-account-profile-card/);
+assert.match(accountShell, /className: 'entity-card--hero account-profile-card'/);
+assert.match(accountShell, /title: fullName/);
+assert.match(accountShell, /subtitle: phone/);
+assert.match(accountShell, /modal--profile-settings-sheet/);
+assert.match(accountShell, /variant: 'bottom'/);
+assert.doesNotMatch(accountShell, /openGlobalProfileSettingsZ|data-account-profile-settings-z/);
 assert.match(accountShell, /openAccountPersonalDataZ\(root, state/);
 assert.match(accountShell, /data-account-profile-save/);
 assert.match(accountShell, /data-account-photo-settings/);
@@ -187,6 +193,8 @@ assert.match(accountShell, /root\.innerHTML = shell;/);
 // Personal data is a stacked Z editor. Photo is owned separately by Profile settings.
 assert.match(personalData, /openAccountPersonalDataZ\(root, state/);
 assert.match(personalData, /mountV2ZLayer\(root, v2ZLayer/);
+assert.match(personalData, /v2Section\('Личные данные', fields\)/);
+assert.doesNotMatch(personalData, /accordion\(|initAccordions/);
 assert.doesNotMatch(personalData, /photoField\(/);
 assert.doesNotMatch(personalData, /name: 'photo'/);
 assert.match(personalData, /addLabel: '\+ Телефон'/);
