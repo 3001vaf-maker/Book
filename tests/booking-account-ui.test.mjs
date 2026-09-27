@@ -121,6 +121,8 @@ assert.match(accountShell, /data-account-profile-card/);
 assert.match(accountShell, /openAccountPersonalDataZ\(root, state/);
 assert.match(accountShell, /data-account-profile-save/);
 assert.match(accountShell, /data-account-photo-settings/);
+assert.match(accountShell, /selectPhotoFile\(\)/);
+assert.doesNotMatch(accountShell, /document\.createElement\('input'\)|new FileReader\(/);
 assert.match(accountShell, /label: 'Согласия \/ Уведомления', data: 'data-account-controls'/);
 assert.match(accountShell, /data-account-consent-contact/);
 assert.match(accountShell, /miniCardRail\(/);
