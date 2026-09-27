@@ -19,6 +19,7 @@ const dayEditor = read('timetable/day-editor.js');
 const sharedTime = read('ui/time/index.js');
 const sharedTimeCss = read('ui/time/time.css');
 const architecture = read('ARCHITECTURE_DICTIONARY.md');
+const design = read('DESIGN_DICTIONARY.md');
 
 if (!/from ['"]\.\.\/core\/time\/index\.js['"]/.test(recordFlow)) fail('journal/record.js', 'Record creation must ask Core Availability');
 if (!/checkTimeAvailability/.test(recordFlow) || !/listAvailableStartTimes/.test(recordFlow) || !/listAvailableEndTimes/.test(recordFlow)) fail('journal/record.js', 'Record creation must use canonical Availability queries');
@@ -75,6 +76,8 @@ if (/\.time-range-fields \.time-picker__label\{display:none\}/.test(sharedTimeCs
 
 if (!/## 14\. Journal → WorkPlan → Availability → TimeGrid → UI/.test(architecture)) fail('ARCHITECTURE_DICTIONARY.md', 'canonical scheduling ownership contract is missing');
 if (!/Обычное продуктовое ТЗ не является разрешением менять эту архитектуру/.test(architecture)) fail('ARCHITECTURE_DICTIONARY.md', 'architecture-change rule is missing');
+if (!/обычные прикладные модалы с выбором, настройкой или кнопкой действия открываются снизу/.test(design)) fail('DESIGN_DICTIONARY.md', 'bottom action-modal rule is missing.');
+if (!/подпись `С` находится над левым полем, `До` — над правым/.test(design)) fail('DESIGN_DICTIONARY.md', 'canonical work-time range geometry is missing.');
 
 if (errors.length) {
   console.error('time UI ownership check: FAILED');
