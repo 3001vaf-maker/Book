@@ -1,6 +1,6 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { compare } from 'bcryptjs';
+import { compare, hash } from 'bcryptjs';
 import { PrismaService } from '../prisma.service';
 
 @Injectable()
@@ -40,6 +40,20 @@ export class AuthService {
       tenant: { id: membership.tenant.id, name: membership.tenant.name },
       role: membership.role,
     };
+  }
+
+  async changePassword(platformAccountId: string, currentPassword: unknown, newPassword: unknown) {
+    const account = await this.prisma.platformAccount.findUnique({ where: { id: platformAccountId } });
+    if (!account || !(await compare(String(currentPassword || ''), account.passwordHash))) {
+      throw new UnauthorizedException('Текущий пароль неверен');
+    }
+    const next = String(newPassword || '');
+    if (next.length < 8) throw new UnauthorizedException('Новый пароль должен содержать минимум 8 символов');
+    await this.prisma.platformAccount.update({
+      where: { id: platformAccountId },
+      data: { passwordHash: await hash(next, 12) },
+    });
+    return { changed: true };
   }
 
   async me(platformAccountId: string, tenantId: string) {
