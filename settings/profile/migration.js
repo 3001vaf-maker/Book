@@ -34,7 +34,7 @@ export async function initializeProfileWorkplaces(account = {}) {
 
   const bootstrapResponse = await apiRequest('/profile/bootstrap', { method: 'POST' });
   const bootstrapped = await responseJson(bootstrapResponse, 'Не удалось создать серверный профиль');
-  if (!bootstrapped?.verified) throw new Error('Серверный профиль не подтверждён');
+  if (!bootstrapped?.verified) throw new Error('Не удалось подготовить профиль. Обновите страницу и повторите.');
   hydrate(bootstrapped, true);
   return { source: 'server-bootstrap', verified: true };
 }
