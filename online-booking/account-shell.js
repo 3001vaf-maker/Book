@@ -7,13 +7,18 @@ import {
   getGlobalAccountRelationships,
   markAccountNotificationRead,
   sendAccountChatMessage,
+  updateGlobalAccount,
+  deleteGlobalAccount,
 } from '../core/account/index.js';
 import { formatPhone } from '../core/phone/index.js';
 import { projectRecordStatuses } from '../core/record/index.js';
 import { disableWebPush, enableWebPush, getWebPushState } from '../core/notifications/web-push.js';
 import {
+  button,
   emptyState,
   entityCard,
+  miniCard,
+  miniCardRail,
   escapeHtml,
   field,
   listEntries,
@@ -26,17 +31,19 @@ import {
   v2RailCard,
   v2Section,
   v2Shell,
+  v2ZLayer,
+  mountV2ZLayer,
   initV2Swipe,
   initV2WorkspaceInteraction,
   setV2DeckOpen,
   mountModal,
 } from '../ui/ui.js';
 import { mountChatList, mountChatThread } from '../core/chat/runtime.js';
-import { settingsPanel } from '../ui/settings/index.js';
+import { notificationSettings, settingsPanel } from '../ui/settings/index.js';
 import { readOnlyReceipt } from '../ui/receipt/index.js';
 import { openAccountConsentSettings } from './consent-settings.js';
 import { openAccountPasswordSettings } from './password-settings.js';
-import { openAccountPersonalData } from './personal-data.js';
+import { openAccountPersonalDataZ } from './personal-data.js';
 
 function money(value) {
   const number = Number(value || 0);
@@ -359,17 +366,17 @@ function relationshipCard(relationship = {}) {
 
 function profileSummary(state) {
   const account = state.account || {};
-  const profile = account.profileData && typeof account.profileData === 'object' ? account.profileData : {};
-  return readOnlyReceipt({
-    title: 'Личные данные',
-    items: [
-      { label: 'Имя', value: account.name || '—' },
-      { label: 'Фамилия', value: account.surname || '—' },
-      { label: 'Телефон', value: account.phone || '—' },
-      { label: 'Email', value: account.email || '—' },
-      { label: 'Telegram', value: profile.telegram || '—' },
-      { label: 'Дата рождения', value: profile.birthDate ? formatDate(profile.birthDate) : '—' },
-    ],
+  const name = String(account.name || '').trim() || 'Имя';
+  const surname = String(account.surname || '').trim();
+  const phone = formatPhone(account.phone || '') || String(account.phone || '') || '—';
+  return entityCard({
+    title: name,
+    subtitle: surname,
+    meta: [{ value: phone, label: 'Телефон' }],
+    interactive: true,
+    data: 'data-account-profile-card',
+    aria: 'Редактировать личные данные',
+    className: 'entity-card--compact account-profile-card',
   });
 }
 
@@ -395,42 +402,292 @@ function bindGlobalChatButton(root, state, handlers) {
 
 function bindGlobalProfileSettingsEntry(root, state, handlers) {
   root.querySelector('[data-account-profile-settings]')?.addEventListener('click', () => {
-    state.accountTab = 'profile-settings';
-    state.accountDeckActive = 'profile';
-    state.accountDeckOpen = false;
-    void handlers.render();
+    if (root.querySelector('[data-account-profile-settings-z]')) return;
+    openGlobalProfileSettingsZ(root, state, handlers);
   });
 }
 
-function openGlobalConsentSettingsByContact(state, handlers) {
+function syncGlobalProfileHeader(root, state, handlers) {
+  const current = root.querySelector('[data-v2-header]');
+  if (!current) return;
+  const layers = [...root.querySelectorAll('[data-v2-z-layer]')];
+  const top = layers.at(-1) || null;
+  const editor = top?.matches?.('.account-personal-data-z') ? top : null;
+  const dirty = editor?.dataset.accountDirty === 'true';
+
+  current.outerHTML = v2Header({
+    a: {
+      kind: 'avatar',
+      label: accountName(state),
+      image: accountPhoto(state),
+      data: 'data-account-profile-settings',
+      aria: 'Настройки профиля',
+    },
+    b: accountName(state),
+    c: dirty ? {
+      kind: 'text',
+      label: 'Сохранить',
+      data: 'data-account-profile-save',
+      aria: 'Сохранить изменения',
+    } : null,
+    d: { kind: 'chat', data: 'data-account-open-chat-root', aria: 'Чат' },
+  });
+  bindGlobalProfileSettingsEntry(root, state, handlers);
+  bindGlobalChatButton(root, state, handlers);
+  root.querySelector('[data-account-profile-save]')?.addEventListener('click', () => editor?.v2Submit?.());
+}
+
+function accountProfileData(state) {
+  return state.account?.profileData && typeof state.account.profileData === 'object'
+    ? state.account.profileData
+    : {};
+}
+
+async function saveAccountPhoto(state, value) {
+  const account = await updateGlobalAccount({
+    profileData: {
+      ...accountProfileData(state),
+      photo: String(value || ''),
+    },
+  });
+  state.account = account;
+  return account;
+}
+
+function chooseAccountPhoto(state, handlers) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.hidden = true;
+  document.body.appendChild(input);
+  const cleanup = () => input.remove();
+  input.addEventListener('change', () => {
+    const file = input.files?.[0];
+    if (!file) {
+      cleanup();
+      return;
+    }
+    const reader = new FileReader();
+    reader.addEventListener('load', async () => {
+      const src = String(reader.result || '');
+      cleanup();
+      if (!src) return;
+      try {
+        await saveAccountPhoto(state, src);
+        await handlers.render?.();
+      } catch (error) {
+        openNotice({
+          title: 'Фото не сохранено',
+          message: accountErrorMessage(error, 'Не удалось сохранить фото'),
+          action: 'Закрыть',
+          variant: 'technical',
+        });
+      }
+    });
+    reader.readAsDataURL(file);
+  }, { once: true });
+  input.addEventListener('cancel', cleanup, { once: true });
+  input.click();
+}
+
+function openAccountPhotoSettings(state, handlers) {
+  if (!accountPhoto(state)) {
+    chooseAccountPhoto(state, handlers);
+    return;
+  }
+  const content = `<div class="form-grid">
+    ${button('Заменить фото', { variant: 'outline', data: 'data-account-photo-replace' })}
+    ${button('Удалить фото', { variant: 'outline', className: 'ui-button--delete-outline', data: 'data-account-photo-delete' })}
+  </div>`;
+  const layer = mountModal(document.body, modal(content, {
+    variant: 'bottom',
+    title: 'Фото',
+    className: 'modal--photo-sheet',
+  }));
+  layer?.querySelector('[data-account-photo-replace]')?.addEventListener('click', () => {
+    layer.v2Close?.();
+    chooseAccountPhoto(state, handlers);
+  });
+  layer?.querySelector('[data-account-photo-delete]')?.addEventListener('click', async () => {
+    try {
+      await saveAccountPhoto(state, '');
+      layer.v2Close?.();
+      await handlers.render?.();
+    } catch (error) {
+      openNotice({
+        title: 'Фото не удалено',
+        message: accountErrorMessage(error, 'Не удалось удалить фото'),
+        action: 'Закрыть',
+        variant: 'technical',
+      });
+    }
+  });
+}
+
+async function loadGlobalNotificationState(state) {
   const relationships = Array.isArray(state.relationships) ? state.relationships : [];
-  const content = relationships.length
-    ? relationships.map((relationship, index) => {
+  const tenantIds = relationships.map((item) => String(item?.tenantId || '')).filter(Boolean);
+  const [pushStates, chatStates] = await Promise.all([
+    Promise.all(tenantIds.map((tenantId) => getWebPushState(tenantId).catch(() => ({
+      tenantId,
+      supported: false,
+      enabled: false,
+      subscribed: false,
+      permission: 'unsupported',
+    })))),
+    Promise.all(tenantIds.map((tenantId) => getAccountChatSettings(tenantId).catch(() => ({
+      telegram: { linked: false, enabled: false, username: '' },
+    })))),
+  ]);
+  return { tenantIds, pushStates, chatStates };
+}
+
+async function openGlobalAccountControls(root, state, handlers) {
+  const existing = root.querySelector('[data-account-controls-modal]');
+  if (existing) return existing;
+
+  const relationships = Array.isArray(state.relationships) ? state.relationships : [];
+  const notificationState = await loadGlobalNotificationState(state);
+  const pushSupported = notificationState.pushStates.some((item) => item?.supported && item?.enabled);
+  const pushSubscribed = notificationState.pushStates.some((item) => item?.subscribed);
+  const telegram = notificationState.chatStates.find((item) => item?.telegram?.linked)?.telegram || null;
+
+  const representatives = relationships.length
+    ? miniCardRail(relationships.map((relationship, index) => {
         const profile = relationship?.context?.profile || {};
         const title = relationshipTitle(relationship);
-        return entityCard({
+        return miniCard({
           title,
-          subtitle: 'Согласия',
+          subtitle: String(profile.profession || '').trim(),
           image: String(profile.photo || ''),
-          initial: title.slice(0, 1).toUpperCase(),
+          initials: title.slice(0, 1).toUpperCase(),
           interactive: true,
           data: `data-account-consent-contact="${index}"`,
           aria: `Открыть согласия ${title}`,
-          className: 'entity-card--compact',
+          actionLabel: 'Согласия',
         });
-      }).join('')
+      }))
     : emptyState('Контактов пока нет', 'Согласия появятся после связи с контактом.');
-  const layer = mountModal(document.body, modal(content, { variant: 'large', title: 'Согласия' }));
+
+  const content = `<div data-account-controls-modal>
+    ${v2Section('Уведомления', notificationSettings([
+      {
+        label: 'Telegram',
+        description: telegram ? `Подключён ${telegram.username || ''}`.trim() : 'Канал не подключён.',
+        checked: Boolean(telegram),
+        disabled: true,
+        data: 'data-account-notification-telegram',
+      },
+      {
+        label: 'Email',
+        description: state.account?.email ? `Сервисные сообщения на ${state.account.email}` : 'Email не указан.',
+        checked: Boolean(state.account?.email),
+        disabled: true,
+        data: 'data-account-notification-email',
+      },
+      {
+        label: 'Push',
+        description: pushSupported ? 'Push-уведомления на этом устройстве.' : 'Push на этом устройстве сейчас недоступны.',
+        checked: pushSubscribed,
+        disabled: !pushSupported,
+        data: 'data-account-notification-push',
+      },
+    ]))}
+    ${v2Section('Согласия', representatives)}
+  </div>`;
+
+  const layer = mountModal(document.body, modal(content, {
+    variant: 'standard',
+    title: 'Согласия / Уведомления',
+    className: 'modal--account-controls',
+  }));
+
+  layer?.querySelector('[data-account-notification-push]')?.addEventListener('change', async (event) => {
+    const control = event.currentTarget;
+    control.disabled = true;
+    const status = layer.querySelector('[data-notification-status]');
+    if (status) status.textContent = 'Сохраняем…';
+    try {
+      if (control.checked) {
+        for (const tenantId of notificationState.tenantIds) await enableWebPush(tenantId);
+      } else {
+        for (const tenantId of notificationState.tenantIds) await disableWebPush(tenantId);
+      }
+      if (status) status.textContent = 'Сохранено.';
+    } catch (error) {
+      control.checked = !control.checked;
+      if (status) status.textContent = accountErrorMessage(error, 'Не удалось изменить Push');
+    } finally {
+      control.disabled = !pushSupported;
+    }
+  });
+
   layer?.querySelectorAll('[data-account-consent-contact]').forEach((node) => node.addEventListener('click', () => {
     const relationship = relationships[Number(node.dataset.accountConsentContact)];
     const tenantId = String(relationship?.tenantId || '');
     if (!tenantId) return;
-    layer.remove();
     void openAccountConsentSettings(state, {
       tenantId,
       onChanged: () => handlers.render?.(),
     });
   }));
+
+  return layer;
+}
+
+function confirmDeleteAccount(state, handlers) {
+  const content = `<div class="form-grid">
+    <div class="muted">Все действующие согласия будут отозваны. Профиль станет недоступен, исторические данные сохранятся.</div>
+    ${button('Удалить профиль', { variant: 'critical', data: 'data-account-delete-confirm' })}
+    ${button('Отмена', { variant: 'outline', data: 'data-account-delete-cancel' })}
+  </div>`;
+  const layer = mountModal(document.body, modal(content, { variant: 'compact', title: 'Удалить профиль' }));
+  layer?.querySelector('[data-account-delete-cancel]')?.addEventListener('click', () => layer.v2Close?.());
+  layer?.querySelector('[data-account-delete-confirm]')?.addEventListener('click', async (event) => {
+    event.currentTarget.disabled = true;
+    try {
+      await deleteGlobalAccount();
+      layer.v2Close?.();
+      handlers.onLogout?.();
+    } catch (error) {
+      event.currentTarget.disabled = false;
+      openNotice({
+        title: 'Профиль не удалён',
+        message: accountErrorMessage(error, 'Не удалось удалить профиль'),
+        action: 'Закрыть',
+        variant: 'technical',
+      });
+    }
+  });
+}
+
+function openGlobalProfileSettingsZ(root, state, handlers) {
+  const existing = root.querySelector('[data-account-profile-settings-z]');
+  if (existing) return existing;
+
+  const body = `<div data-account-profile-settings-z>
+    ${settingsPanel([
+      { label: 'Фото', data: 'data-account-photo-settings', variant: 'outline' },
+      { label: 'Изменить пароль', data: 'data-account-change-password', variant: 'outline' },
+      { label: 'Согласия / Уведомления', data: 'data-account-controls', variant: 'outline' },
+      { label: 'Выход', data: 'data-account-logout', variant: 'danger' },
+      { label: 'Удалить профиль', data: 'data-account-delete', variant: 'critical' },
+    ])}
+  </div>`;
+
+  const layer = mountV2ZLayer(root, v2ZLayer(body, { className: 'account-profile-settings-z' }), {
+    stack: true,
+    onClose: () => syncGlobalProfileHeader(root, state, handlers),
+  });
+  if (!layer) return null;
+  syncGlobalProfileHeader(root, state, handlers);
+
+  layer.querySelector('[data-account-photo-settings]')?.addEventListener('click', () => openAccountPhotoSettings(state, handlers));
+  layer.querySelector('[data-account-change-password]')?.addEventListener('click', () => openAccountPasswordSettings(state));
+  layer.querySelector('[data-account-controls]')?.addEventListener('click', () => void openGlobalAccountControls(root, state, handlers));
+  layer.querySelector('[data-account-logout]')?.addEventListener('click', () => handlers.onLogout?.());
+  layer.querySelector('[data-account-delete]')?.addEventListener('click', () => confirmDeleteAccount(state, handlers));
+  return layer;
 }
 
 async function renderGlobalMessages(root, state, handlers) {
@@ -542,37 +799,26 @@ async function renderGlobalProfile(root, state, handlers) {
   bindWorkspaceInteraction(root, state, handlers);
   bindGlobalProfileSettingsEntry(root, state, handlers);
   bindGlobalChatButton(root, state, handlers);
+
+  root.querySelector('[data-account-profile-card]')?.addEventListener('click', () => {
+    if (root.querySelector('.account-personal-data-z')) return;
+    const editor = openAccountPersonalDataZ(root, state, {
+      onDirtyChange: (dirty) => {
+        if (editor) editor.dataset.accountDirty = dirty ? 'true' : 'false';
+        syncGlobalProfileHeader(root, state, handlers);
+      },
+      onClosed: () => syncGlobalProfileHeader(root, state, handlers),
+      onSaved: () => handlers.render?.(),
+    });
+    if (editor) editor.dataset.accountDirty = 'false';
+    syncGlobalProfileHeader(root, state, handlers);
+  });
 }
 
 async function renderGlobalProfileSettings(root, state, handlers) {
-  const header = v2Header({
-    a: { kind: 'avatar', label: accountName(state), image: accountPhoto(state), disabled: true },
-    b: 'Настройки профиля',
-    d: { kind: 'chat', data: 'data-account-open-chat-root', aria: 'Чат' },
-  });
-  renderV2Shell(root, state, {
-    header,
-    body: settingsPanel([
-      { label: 'Личные данные', data: 'data-account-personal-data' },
-      { label: 'Изменить пароль', data: 'data-account-change-password' },
-      { label: 'Согласия', data: 'data-account-consents' },
-      { label: 'Выход', data: 'data-account-logout', variant: 'danger' },
-    ]),
-  });
-  bindWorkspaceInteraction(root, state, handlers, {
-    onZRight: () => {
-      state.accountTab = 'profile';
-      state.accountDeckActive = 'profile';
-      void handlers.render();
-    },
-  });
-  bindGlobalChatButton(root, state, handlers);
-  root.querySelector('[data-account-personal-data]')?.addEventListener('click', () => openAccountPersonalData(state, {
-    onSaved: () => handlers.render?.(),
-  }));
-  root.querySelector('[data-account-change-password]')?.addEventListener('click', () => openAccountPasswordSettings(state));
-  root.querySelector('[data-account-consents]')?.addEventListener('click', () => openGlobalConsentSettingsByContact(state, handlers));
-  root.querySelector('[data-account-logout]')?.addEventListener('click', () => handlers.onLogout?.());
+  state.accountTab = 'profile';
+  await renderGlobalProfile(root, state, handlers);
+  openGlobalProfileSettingsZ(root, state, handlers);
 }
 
 async function renderGlobalHome(root, state, handlers) {
