@@ -117,10 +117,16 @@ assert.match(accountShell, /data-account-deck-item/);
 assert.match(accountShell, /GLOBAL_ACCOUNT_ROOTS = Object\.freeze\(\[[\s\S]*?id: 'profile', label: 'Профиль'[\s\S]*?id: 'home', label: 'Обзор'[\s\S]*?id: 'contacts', label: 'Контакты'[\s\S]*?id: 'history', label: 'История'/);
 assert.match(accountShell, /async function renderGlobalProfile\(/);
 assert.match(accountShell, /async function renderGlobalProfileSettings\(/);
-assert.match(accountShell, /openGlobalConsentSettingsByContact/);
+assert.match(accountShell, /data-account-profile-card/);
+assert.match(accountShell, /openAccountPersonalDataZ\(root, state/);
+assert.match(accountShell, /data-account-profile-save/);
+assert.match(accountShell, /data-account-photo-settings/);
+assert.match(accountShell, /label: 'Согласия \/ Уведомления', data: 'data-account-controls'/);
 assert.match(accountShell, /data-account-consent-contact/);
+assert.match(accountShell, /miniCardRail\(/);
 assert.match(accountShell, /openAccountConsentSettings\(state, \{[\s\S]*?tenantId/);
-assert.match(accountShell, /label: 'Согласия', data: 'data-account-consents'/);
+assert.match(accountShell, /label: 'Удалить профиль', data: 'data-account-delete', variant: 'critical'/);
+assert.doesNotMatch(accountShell, /label: 'Личные данные', data: 'data-account-personal-data'/);
 assert.match(accountShell, /async function renderGlobalContacts\(/);
 assert.match(accountShell, /async function renderGlobalContactDetail\(/);
 assert.match(accountShell, /state\.accountTab = 'contact-detail'/);
@@ -176,8 +182,11 @@ assert.doesNotMatch(accountShell, /booking-shape--|booking-choice-style--/);
 assert.doesNotMatch(accountShell, /accountThemeClasses/);
 assert.match(accountShell, /root\.innerHTML = shell;/);
 
-// Personal-data modal uses the Book controls, including Book calendar.
-assert.match(personalData, /photoField\(\{ name: 'photo'/);
+// Personal data is a stacked Z editor. Photo is owned separately by Profile settings.
+assert.match(personalData, /openAccountPersonalDataZ\(root, state/);
+assert.match(personalData, /mountV2ZLayer\(root, v2ZLayer/);
+assert.doesNotMatch(personalData, /photoField\(/);
+assert.doesNotMatch(personalData, /name: 'photo'/);
 assert.match(personalData, /addLabel: '\+ Телефон'/);
 assert.match(personalData, /addLabel: '\+ Email'/);
 assert.match(personalData, /showEmptyRow: false/);
@@ -188,7 +197,9 @@ assert.doesNotMatch(personalData, /label: 'Другой'/);
 assert.doesNotMatch(personalData, /type: 'date'/);
 assert.match(personalData, /initCalendar\(calendarHost/);
 assert.match(personalData, /links\(\{ links:/);
-assert.match(personalData, /button\('Сохранить', \{ type: 'submit' \}\)/);
+assert.doesNotMatch(personalData, /button\('Сохранить', \{ type: 'submit' \}\)/);
+assert.match(personalData, /layer\.v2Submit = \(\) => form\?\.requestSubmit\(\)/);
+assert.match(personalData, /formSignature\(form\)!==|formSignature\(form\) !== initialSignature/);
 assert.match(personalData, /updateAccount\(state\.tenantId/);
 assert.match(personalData, /profileData:/);
 assert.match(personalData, /phones: unique/);
@@ -210,10 +221,21 @@ assert.match(consentSettings, /getAccountConsentState\(scopeTenantId\)/);
 assert.match(consentSettings, /revokeAccountConsent\(scopeTenantId, consent\.documentId\)/);
 assert.match(consentSettings, /Отозвать согласие/);
 assert.match(consentSettings, /Отмена/);
+assert.match(consentSettings, /variant: 'bottom'/);
+assert.match(consentSettings, /v2LegalCards\(/);
+assert.match(consentSettings, /variant: 'technical'/);
+assert.match(consentSettings, /v2Document\(/);
+assert.match(consentSettings, /submitAccountConsents\(scopeTenantId/);
 assert.match(accountApi, /account\/password/);
+assert.match(accountApi, /deleteGlobalAccount/);
+assert.match(accountApi, /method: 'DELETE'/);
 assert.match(accountSettingsController, /@Put\(':tenantId\/account\/password'\)/);
 assert.match(accountSettingsController, /changeAccountPassword/);
 assert.match(onlineBookingService, /async changeAccountPassword/);
+assert.match(onlineBookingService, /async deleteGlobalAccount/);
+assert.match(onlineBookingService, /revokeAllForAccount/);
+assert.match(onlineBookingService, /accountContact\.deleteMany|accountContact\.deleteMany/);
+assert.match(onlineBookingController, /@Delete\('account\/me'\)/);
 const publicAccountBlock = onlineBookingService.slice(
   onlineBookingService.indexOf('function publicAccount('),
   onlineBookingService.indexOf('@Injectable()'),
