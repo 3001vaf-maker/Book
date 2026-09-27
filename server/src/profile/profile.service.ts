@@ -85,6 +85,8 @@ function normalizeProfile(value: unknown): ProfileInput {
   const phones = stringList(source.phones);
   const fallbackPhone = stringValue(source.phone).trim();
   const normalizedPhones = phones.length ? phones : fallbackPhone ? [fallbackPhone] : [];
+  const professionValue = stringValue(source.profession).trim();
+  const profession = professionValue.toLocaleLowerCase('ru-RU') === 'другая' ? '' : professionValue;
   return {
     key: stringValue(source.key, 'profile') || 'profile',
     name: stringValue(source.name),
@@ -97,7 +99,7 @@ function normalizeProfile(value: unknown): ProfileInput {
     photo: stringValue(source.photo),
     photoCropX: cropPosition(source.photoCropX),
     photoCropY: cropPosition(source.photoCropY),
-    profession: stringValue(source.profession),
+    profession,
     experience: stringValue(source.experience),
     professionAbout: stringValue(source.professionAbout),
     cardAppearance: objectValue(source.cardAppearance),
