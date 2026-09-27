@@ -43,7 +43,7 @@ export function initColorPickers(root, colors = COLOR_PALETTE) {
         swatch.style.background = value.value;
         swatch.classList.remove('is-empty');
         value.dispatchEvent(new Event('change', { bubbles: true }));
-        m.remove();
+        m.v2Close?.();
       }));
     };
   });
