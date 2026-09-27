@@ -7,3 +7,7 @@
 .modal-sheet.modal--bottom{height:88px;max-height:88px;padding:0;background:var(--surface-soft);overflow:hidden}
 .modal-backdrop:has(>.modal--bottom){background:transparent;pointer-events:none}.modal-backdrop:has(>.modal--bottom)>.modal--bottom{pointer-events:auto}
 .modal-bottom-action{width:100%;height:100%;border:0;background:transparent;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 18px;color:var(--text);text-align:left}.modal-bottom-action span{font-size:14px;color:var(--text-secondary)}.modal-bottom-action strong{font-size:18px;white-space:nowrap}.modal-bottom-action--partial{background:rgba(154,98,88,.14)}.modal-bottom-action--paid{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:0;text-align:center}.modal-bottom-action--paid strong{display:block;width:100%;font-size:18px;line-height:1.15;text-align:center}
+
+.modal-sheet.modal--bottom.modal--consent-sheet{height:auto;min-height:210px;max-height:46%;padding:18px;background:var(--white);overflow:hidden}
+.modal--consent-sheet .account-consent-sheet{min-width:0;overflow:hidden}
+.modal--consent-sheet .v2-legal-cards{margin:0;padding-bottom:6px}
