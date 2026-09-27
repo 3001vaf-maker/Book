@@ -446,7 +446,7 @@ export class ProfileService {
     const profile = await this.prisma.profile.findUnique({ where: { tenantId_platformAccountId: { tenantId, platformAccountId } } });
     if (!profile?.migrationVerifiedAt) throw new ConflictException('Данные профиля ещё не готовы. Обновите страницу и повторите.');
     const existing = await this.prisma.workplace.findUnique({ where: { tenantId_key: { tenantId, key } } });
-    if (!existing || existing.profileId !== profile.id) throw new NotFoundException('Рабочее место не найдено');
+    if (!existing || existing.profileId !== profile.id) throw new NotFoundException('Рабочее пространство не найдено');
     await this.prisma.workplace.update({
       where: { tenantId_key: { tenantId, key } },
       data: { deletedAt: new Date() },
