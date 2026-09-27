@@ -386,6 +386,7 @@ function mountV2ModalPortal(host) {
 
   const portal = document.createElement('div');
   portal.className = 'v2-layer-portal';
+  if (anchor === document.body) portal.classList.add('v2-layer-portal--viewport');
   portal.dataset.v2LayerPortal = '';
   anchor.appendChild(portal);
 
