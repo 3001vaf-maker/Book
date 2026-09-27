@@ -13,7 +13,7 @@ assert.deepEqual(normalized.lines[0], {
   bold:true, italic:true, underline:true, uppercase:true,
 });
 
-const profile={name:'Александр',surname:'Волоковых',profession:'Парикмахер',phone:'+79104193490'};
+const profile={name:'Александр',surname:'Волоковых',profession:'Практик',phone:'+79104193490'};
 const workplace={name:'Бьюти тория',from:'12:00',to:'21:00',city:'Москва'};
 const profileAppearance=profileCardAppearance(profile);
 const profileFields=profileCardFields(profile,[workplace]);
