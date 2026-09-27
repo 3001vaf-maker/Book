@@ -141,6 +141,7 @@ model Profile {
   profession          String      @default("")
   experience          String      @default("")
   professionAbout     String      @default("")
+  cardAppearance      Json        @default("{}")
   customProfessions   Json
   migrationVerifiedAt DateTime?
   createdAt           DateTime    @default(now())
@@ -176,6 +177,7 @@ model Workplace {
   to              String   @default("18:00")
   links           Json
   about           String   @default("")
+  cardAppearance  Json     @default("{}")
   sourceCreatedAt String   @default("")
   sourceUpdatedAt String   @default("")
   createdAt       DateTime @default(now())
