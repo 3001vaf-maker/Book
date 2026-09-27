@@ -311,6 +311,64 @@ export class ConsentPolicyService {
     return event ? publicEvent(event) : null;
   }
 
+  async revokeAllForAccount(
+    tenantId: string,
+    accountIdValue: unknown,
+    contactsValue: Array<{ type?: unknown; value?: unknown }> = [],
+    source = 'account-delete',
+  ) {
+    const accountId = text(accountIdValue);
+    if (!accountId) throw new BadRequestException('Не указан аккаунт');
+    const current = await this.state(tenantId);
+    const contacts = arrayValue(contactsValue)
+      .map((item) => {
+        const type = contactPointType(item?.type);
+        const value = contactPointValue(type, item?.value);
+        return { type, value, subjectKey: contactSubjectKey(type, value) };
+      })
+      .filter((item) => item.type && item.value && item.subjectKey);
+
+    for (const document of current.documents.filter((item: any) => Boolean(item?.personConsent))) {
+      const documentId = text(document?.id);
+      if (!documentId) continue;
+      const accountLatest = await this.latestEvent(tenantId, 'ACCOUNT', accountId, documentId);
+      if (accountLatest?.status === 'accepted') {
+        const now = new Date();
+        await this.insertEvent({
+          tenantId,
+          subjectType: 'ACCOUNT',
+          subjectKey: accountId,
+          documentId,
+          documentVersion: Math.max(1, Number(accountLatest.documentVersion || document?.version || 1)),
+          status: 'revoked',
+          revokedAt: now,
+          source,
+          occurredAt: now,
+        });
+      }
+
+      for (const contact of contacts) {
+        const latest = await this.latestEvent(tenantId, 'CONTACT_POINT', contact.subjectKey, documentId);
+        if (latest?.status !== 'accepted') continue;
+        const now = new Date();
+        await this.insertEvent({
+          tenantId,
+          subjectType: 'CONTACT_POINT',
+          subjectKey: contact.subjectKey,
+          contactType: contact.type,
+          contactValue: contact.value,
+          documentId,
+          documentVersion: Math.max(1, Number(latest.documentVersion || document?.version || 1)),
+          status: 'revoked',
+          revokedAt: now,
+          source,
+          occurredAt: now,
+        });
+      }
+    }
+    return { revoked: true };
+  }
+
   async accountConsentProjection(tenantId: string, accountIdValue: unknown) {
     const accountId = text(accountIdValue);
     const current = await this.state(tenantId);
