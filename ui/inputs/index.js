@@ -136,6 +136,10 @@ export function textareaField({ label = '', name = '', value = '', placeholder =
   return `<label class="field"><span>${escapeHtml(labelText(label, required))}</span><textarea name="${escapeHtml(name)}" rows="${escapeHtml(rows)}" placeholder="${escapeHtml(placeholder)}"${required ? ' required' : ''}${maxlength !== '' ? ` maxlength="${escapeHtml(maxlength)}"` : ''}>${escapeHtml(value)}</textarea></label>`;
 }
 
+export function rangeField({ label = '', name = '', value = 0, min = 0, max = 100, step = 1, data = '', aria = '' } = {}) {
+  return `<label class="field ui-range"><span>${escapeHtml(label)}</span><input type="range" name="${escapeHtml(name)}" value="${escapeHtml(value)}" min="${escapeHtml(min)}" max="${escapeHtml(max)}" step="${escapeHtml(step)}"${data ? ` ${data}` : ''}${aria ? ` aria-label="${escapeHtml(aria)}"` : ''}></label>`;
+}
+
 function photoCropPosition(value) {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? Math.max(0, Math.min(100, Math.round(numeric))) : 50;

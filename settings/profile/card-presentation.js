@@ -1,7 +1,19 @@
 import { normalizeEntityCardAppearance } from '../../ui/ui.js';
 
+function firstOf(value, key) {
+  return String(Array.isArray(value?.[key]) ? (value[key][0] || '') : '');
+}
+
 function phoneOf(value = {}) {
   return String(value?.phones?.[0] || value?.phone || '');
+}
+
+function emailOf(value = {}) {
+  return firstOf(value,'emails');
+}
+
+function telegramOf(value = {}) {
+  return firstOf(value,'telegrams');
 }
 
 function defaultLines(entries = []) {
@@ -23,10 +35,15 @@ export function profileCardFields(profile = {}, workplaces = []) {
     {value:'workTime',label:'График',text:first.from||first.to?`${first.from||'—'} - ${first.to||'—'}`:''},
     {value:'workplaceName',label:'Рабочее пространство',text:first.name||''},
     {value:'name',label:'Имя и фамилия',text:[profile.name,profile.surname].filter(Boolean).join(' ')},
+    {value:'firstName',label:'Имя',text:profile.name||''},
+    {value:'surname',label:'Фамилия',text:profile.surname||''},
     {value:'profession',label:'Профессия',text:profile.profession||''},
     {value:'phone',label:'Телефон',text:phoneOf(profile)},
+    {value:'email',label:'Email',text:emailOf(profile)},
+    {value:'telegram',label:'Telegram',text:telegramOf(profile)},
     {value:'experience',label:'Опыт',text:profile.experience||''},
     {value:'about',label:'О себе',text:profile.about||''},
+    {value:'professionAbout',label:'О профессии',text:profile.professionAbout||''},
     {value:'workplaceCount',label:'Количество пространств',text:String((Array.isArray(workplaces)?workplaces:[]).length||'')},
   ];
 }
@@ -39,9 +56,17 @@ export function workplaceCardFields(workplace = {}, profile = {}) {
     {value:'address',label:'Адрес',text:workplace.address||''},
     {value:'workplacePhone',label:'Телефон пространства',text:workplace.phone||''},
     {value:'currency',label:'Валюта',text:workplace.currency||''},
+    {value:'workplaceAbout',label:'О рабочем пространстве',text:workplace.about||''},
     {value:'profileName',label:'Имя и фамилия',text:[profile.name,profile.surname].filter(Boolean).join(' ')},
+    {value:'profileFirstName',label:'Имя',text:profile.name||''},
+    {value:'profileSurname',label:'Фамилия',text:profile.surname||''},
     {value:'profession',label:'Профессия',text:profile.profession||''},
     {value:'profilePhone',label:'Телефон профиля',text:phoneOf(profile)},
+    {value:'profileEmail',label:'Email',text:emailOf(profile)},
+    {value:'profileTelegram',label:'Telegram',text:telegramOf(profile)},
+    {value:'profileExperience',label:'Опыт',text:profile.experience||''},
+    {value:'profileAbout',label:'О себе',text:profile.about||''},
+    {value:'profileProfessionAbout',label:'О профессии',text:profile.professionAbout||''},
   ];
 }
 

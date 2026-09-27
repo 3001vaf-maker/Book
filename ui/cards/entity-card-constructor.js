@@ -1,6 +1,9 @@
 import { escapeHtml } from '../utils/escape-html.js';
 import { selectPhotoFile } from '../inputs/index.js';
 import { button } from '../buttons/index.js';
+import { select } from '../selectors/index.js';
+import { colorPicker, initColorPickers } from '../colors/index.js';
+import { rangeField } from '../inputs/index.js';
 
 export const ENTITY_CARD_LINE_COUNT = 9;
 export const ENTITY_CARD_DEFAULT_GRADIENT = Object.freeze({
@@ -91,51 +94,123 @@ export function entityVisualCard({appearance={},fields=[],image='',imagePosition
   return `<${tag} class="entity-visual-card${image?' has-image':''}${className?` ${escapeHtml(className)}`:''}" style="${style}"${attrs}><span class="entity-visual-card__surface" aria-hidden="true"></span><span class="entity-visual-card__grid">${rows}</span></${tag}>`;
 }
 
-function option(value,label,current){return `<option value="${escapeHtml(value)}"${value===current?' selected':''}>${escapeHtml(label)}</option>`}
-function toolButton(label,key,active=false,title=''){return `<button type="button" class="entity-card-editor__tool${active?' is-active':''}" data-card-tool="${escapeHtml(key)}"${title?` aria-label="${escapeHtml(title)}"`:''}>${escapeHtml(label)}</button>`}
+function toolButton(label,key,active=false,title='',className=''){
+  return `<button type="button" class="entity-card-editor__tool${active?' is-active':''}${className?` ${className}`:''}" data-card-tool="${escapeHtml(key)}"${title?` aria-label="${escapeHtml(title)}"`:''}>${label}</button>`;
+}
+
+function colorTool(value,label,active){
+  return toolButton(
+    `<span class="entity-card-editor__color-dot is-${escapeHtml(value)}" aria-hidden="true"></span>`,
+    `color:${value}`,
+    active,
+    label,
+    'entity-card-editor__tool--color',
+  );
+}
+
+function fieldControl(line,fields){
+  const registry=entityCardFieldRegistry(fields);
+  return select({
+    name:'entityCardLineField',
+    label:'Данные',
+    value:line.field,
+    options:[{value:'',label:'Пусто'},...registry.map((item)=>({value:item.value,label:item.label}))],
+    data:'data-card-line-field',
+    aria:'Данные строки карты',
+  });
+}
 
 function editorWorkspace(state,fields){
   if(state.tab==='photo'){
     return `<div class="entity-card-editor__photo">
-      ${button(state.photo?'Заменить фото':'Добавить фото',{variant:'secondary',data:'data-card-photo-select'})}
-      ${state.photo?button('Удалить фото',{variant:'secondary',data:'data-card-photo-remove'}):''}
+      ${button(state.photo?'Заменить фото':'Добавить фото',{data:'data-card-photo-select'})}
+      ${state.photo?button('Удалить фото',{variant:'outline',className:'ui-button--delete-outline',data:'data-card-photo-remove'}):''}
       <p>Фото заполняет карту. Если фото нет, используется градиентный фон.</p>
     </div>`;
   }
   if(state.tab==='background'){
     const g=state.appearance.gradient;
     return `<div class="entity-card-editor__background">
-      <label><span>Цвет 1</span><input type="color" value="${escapeHtml(g.from)}" data-card-gradient="from"></label>
-      <label><span>Цвет 2</span><input type="color" value="${escapeHtml(g.mid)}" data-card-gradient="mid"></label>
-      <label><span>Цвет 3</span><input type="color" value="${escapeHtml(g.to)}" data-card-gradient="to"></label>
-      <label><span>Направление</span><input type="range" min="0" max="360" step="5" value="${g.angle}" data-card-gradient="angle"></label>
+      <div data-card-gradient-color="from">${colorPicker({name:'entityCardGradientFrom',value:g.from})}</div>
+      <div data-card-gradient-color="mid">${colorPicker({name:'entityCardGradientMid',value:g.mid})}</div>
+      <div data-card-gradient-color="to">${colorPicker({name:'entityCardGradientTo',value:g.to})}</div>
+      <div class="entity-card-editor__direction">${rangeField({label:'Направление',name:'entityCardGradientAngle',value:g.angle,min:0,max:360,step:5,data:'data-card-gradient-angle',aria:'Направление градиента'})}</div>
     </div>`;
   }
   const line=state.appearance.lines[state.line];
-  const registry=entityCardFieldRegistry(fields);
   return `<div class="entity-card-editor__card-tools">
     <div class="entity-card-editor__line-picker">${Array.from({length:ENTITY_CARD_LINE_COUNT},(_,i)=>`<button type="button" class="${i===state.line?'is-active':''}" data-card-line-select="${i}">${i+1}</button>`).join('')}</div>
-    <label class="entity-card-editor__data"><span>Данные</span><select data-card-line-field>${option('','Пусто',line.field)}${registry.map((item)=>option(item.value,item.label,line.field)).join('')}</select></label>
-    <div class="entity-card-editor__toolbar" aria-label="Положение и шрифт">
-      ${['full','left','right'].map((value)=>toolButton(value==='full'?'Полная':value==='left'?'Лево':'Право',`zone:${value}`,line.zone===value)).join('')}
-      ${toolButton('←','align:left',line.align==='left','Слева')}
-      ${toolButton('↔','align:center',line.align==='center','По центру')}
-      ${toolButton('→','align:right',line.align==='right','Справа')}
-      ${['s','m','l','xl'].map((value)=>toolButton(value.toUpperCase(),`size:${value}`,line.size===value)).join('')}
-      ${toolButton('Ч','color:black',line.color==='black','Чёрный')}
-      ${toolButton('С','color:gray',line.color==='gray','Серый')}
-      ${toolButton('Б','color:white',line.color==='white','Белый')}
-      ${toolButton('B','bold',line.bold,'Жирный')}
-      ${toolButton('I','italic',line.italic,'Курсив')}
-      ${toolButton('U','underline',line.underline,'Подчёркнутый')}
-      ${toolButton('AA','uppercase',line.uppercase,'Верхний регистр')}
+    <div class="entity-card-editor__data">${fieldControl(line,fields)}</div>
+
+    <div class="entity-card-editor__tool-row entity-card-editor__tool-row--position" aria-label="Положение">
+      <div class="entity-card-editor__tool-group entity-card-editor__tool-group--three">
+        ${toolButton('Полная','zone:full',line.zone==='full','Полная строка')}
+        ${toolButton('Лево','zone:left',line.zone==='left','Левая половина')}
+        ${toolButton('Право','zone:right',line.zone==='right','Правая половина')}
+      </div>
+      <div class="entity-card-editor__tool-group entity-card-editor__tool-group--three">
+        ${toolButton('←','align:left',line.align==='left','Слева')}
+        ${toolButton('↔','align:center',line.align==='center','По центру')}
+        ${toolButton('→','align:right',line.align==='right','Справа')}
+      </div>
+    </div>
+
+    <div class="entity-card-editor__tool-row entity-card-editor__tool-row--visual" aria-label="Размер и цвет">
+      <div class="entity-card-editor__tool-group entity-card-editor__tool-group--four">
+        ${['s','m','l','xl'].map((value)=>toolButton(value.toUpperCase(),`size:${value}`,line.size===value,`Размер ${value.toUpperCase()}`)).join('')}
+      </div>
+      <div class="entity-card-editor__tool-group entity-card-editor__tool-group--three entity-card-editor__tool-group--colors">
+        ${colorTool('black','Чёрный',line.color==='black')}
+        ${colorTool('gray','Серый',line.color==='gray')}
+        ${colorTool('white','Белый',line.color==='white')}
+      </div>
+    </div>
+
+    <div class="entity-card-editor__tool-row entity-card-editor__tool-row--font" aria-label="Шрифт">
+      <div class="entity-card-editor__tool-group entity-card-editor__tool-group--four">
+        ${toolButton('B','bold',line.bold,'Жирный')}
+        ${toolButton('I','italic',line.italic,'Курсив')}
+        ${toolButton('U','underline',line.underline,'Подчёркнутый')}
+        ${toolButton('AA','uppercase',line.uppercase,'Верхний регистр')}
+      </div>
     </div>
   </div>`;
 }
 
 export function mountEntityCardConstructor(root,{appearance={},fields=[],photo='',photoPosition='50% 50%',onSave=async()=>{},onPhotoChange=()=>{}}={}) {
   if(!root)return null;
-  const state={appearance:normalizeEntityCardAppearance(appearance),photo:String(photo||''),photoPosition:String(photoPosition||'50% 50%'),tab:'card',line:0,saving:false,error:''};
+  const state={
+    appearance:normalizeEntityCardAppearance(appearance),
+    photo:String(photo||''),
+    photoPosition:String(photoPosition||'50% 50%'),
+    tab:'card',
+    line:0,
+    saving:false,
+    error:'',
+    dirty:false,
+    savedSnapshot:'',
+  };
+
+  const snapshot=()=>JSON.stringify({
+    appearance:normalizeEntityCardAppearance(state.appearance),
+    photo:state.photo,
+  });
+  state.savedSnapshot=snapshot();
+
+  const syncPrimary=()=>{
+    const source=root.querySelector('[data-card-save][data-v2-primary-action]');
+    if(!source)return;
+    source.dataset.v2PrimaryVisible=state.dirty?'true':'false';
+    source.dataset.v2PrimaryLabel='Сохранить';
+    source.disabled=Boolean(state.saving);
+    window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+  };
+
+  const markDirty=()=>{
+    state.dirty=snapshot()!==state.savedSnapshot;
+    syncPrimary();
+  };
+
   const render=()=>{
     root.innerHTML=`<div class="entity-card-editor" data-entity-card-editor>
       <div class="entity-card-editor__preview" data-card-preview>${entityVisualCard({appearance:state.appearance,fields,image:state.photo,imagePosition:state.photoPosition})}</div>
@@ -144,25 +219,44 @@ export function mountEntityCardConstructor(root,{appearance={},fields=[],photo='
       </div>
       <div class="entity-card-editor__workspace" data-card-workspace>${editorWorkspace(state,fields)}</div>
       <div class="form-error" data-card-error>${escapeHtml(state.error||'')}</div>
-      ${button(state.saving?'Сохраняю…':'Сохранить',{data:'data-card-save',disabled:state.saving})}
+      ${button('Сохранить',{
+        className:'v2-primary-source-only',
+        data:`data-card-save data-v2-primary-action data-v2-primary-label="Сохранить" data-v2-primary-visible="${state.dirty?'true':'false'}"`,
+        aria:'Сохранить вид карты',
+        disabled:state.saving,
+      })}
     </div>`;
     bind();
+    syncPrimary();
   };
+
   const updatePreview=()=>{
     const host=root.querySelector('[data-card-preview]');
     if(host)host.innerHTML=entityVisualCard({appearance:state.appearance,fields,image:state.photo,imagePosition:state.photoPosition});
   };
+
   const rerenderWorkspace=()=>{
     const workspace=root.querySelector('[data-card-workspace]');
     if(workspace)workspace.innerHTML=editorWorkspace(state,fields);
     bindWorkspace();
     updatePreview();
+    syncPrimary();
   };
+
   const bindWorkspace=()=>{
-    root.querySelectorAll('[data-card-line-select]').forEach((button)=>button.addEventListener('click',()=>{state.line=Number(button.dataset.cardLineSelect)||0;rerenderWorkspace()}));
-    root.querySelector('[data-card-line-field]')?.addEventListener('change',(event)=>{state.appearance.lines[state.line].field=event.target.value;updatePreview()});
-    root.querySelectorAll('[data-card-tool]').forEach((button)=>button.addEventListener('click',()=>{
-      const key=button.dataset.cardTool||'';
+    root.querySelectorAll('[data-card-line-select]').forEach((control)=>control.addEventListener('click',()=>{
+      state.line=Number(control.dataset.cardLineSelect)||0;
+      rerenderWorkspace();
+    }));
+
+    root.querySelector('input[data-card-line-field]')?.addEventListener('change',(event)=>{
+      state.appearance.lines[state.line].field=event.target.value;
+      updatePreview();
+      markDirty();
+    });
+
+    root.querySelectorAll('[data-card-tool]').forEach((control)=>control.addEventListener('click',()=>{
+      const key=control.dataset.cardTool||'';
       const line=state.appearance.lines[state.line];
       if(key.startsWith('zone:'))line.zone=key.slice(5);
       else if(key.startsWith('align:'))line.align=key.slice(6);
@@ -172,43 +266,69 @@ export function mountEntityCardConstructor(root,{appearance={},fields=[],photo='
       else if(key==='italic')line.italic=!line.italic;
       else if(key==='underline')line.underline=!line.underline;
       else if(key==='uppercase')line.uppercase=!line.uppercase;
+      markDirty();
       rerenderWorkspace();
     }));
-    root.querySelectorAll('[data-card-gradient]').forEach((input)=>input.addEventListener('input',()=>{
-      const key=input.dataset.cardGradient;
-      state.appearance.gradient[key]=key==='angle'?Number(input.value):input.value.toUpperCase();
+
+    initColorPickers(root);
+    root.querySelectorAll('[data-card-gradient-color]').forEach((holder)=>{
+      holder.querySelector('[data-color-value]')?.addEventListener('change',(event)=>{
+        const key=holder.dataset.cardGradientColor;
+        if(!key)return;
+        state.appearance.gradient[key]=String(event.target.value||'').toUpperCase();
+        updatePreview();
+        markDirty();
+      });
+    });
+    root.querySelector('[data-card-gradient-angle]')?.addEventListener('input',(event)=>{
+      state.appearance.gradient.angle=Number(event.target.value);
       updatePreview();
-    }));
+      markDirty();
+    });
+
     root.querySelector('[data-card-photo-select]')?.addEventListener('click',async()=>{
       const src=await selectPhotoFile().catch(()=> '');
       if(!src)return;
       state.photo=src;
       onPhotoChange(state.photo);
+      markDirty();
       render();
     });
+
     root.querySelector('[data-card-photo-remove]')?.addEventListener('click',()=>{
       state.photo='';
       onPhotoChange('');
+      markDirty();
       render();
     });
   };
-  const bind=()=>{
-    root.querySelectorAll('[data-card-tab]').forEach((button)=>button.addEventListener('click',()=>{state.tab=button.dataset.cardTab||'card';render()}));
-    bindWorkspace();
-    root.querySelector('[data-card-save]')?.addEventListener('click',async()=>{
-      if(state.saving)return;
-      state.saving=true;render();
-      try{
-        state.error='';
-        await onSave({appearance:normalizeEntityCardAppearance(state.appearance),photo:state.photo});
-      }catch(error){
-        state.error=error instanceof Error?error.message:'Не удалось сохранить вид карты';
-      }finally{
-        state.saving=false;
-        render();
-      }
-    });
+
+  const save=async()=>{
+    if(state.saving||!state.dirty)return;
+    state.saving=true;
+    state.error='';
+    syncPrimary();
+    try{
+      await onSave({appearance:normalizeEntityCardAppearance(state.appearance),photo:state.photo});
+      state.savedSnapshot=snapshot();
+      state.dirty=false;
+    }catch(error){
+      state.error=error instanceof Error?error.message:'Не удалось сохранить вид карты';
+    }finally{
+      state.saving=false;
+      render();
+    }
   };
+
+  const bind=()=>{
+    root.querySelectorAll('[data-card-tab]').forEach((control)=>control.addEventListener('click',()=>{
+      state.tab=control.dataset.cardTab||'card';
+      render();
+    }));
+    bindWorkspace();
+    root.querySelector('[data-card-save]')?.addEventListener('click',save);
+  };
+
   render();
-  return {getValue:()=>({appearance:normalizeEntityCardAppearance(state.appearance),photo:state.photo})};
+  return {getValue:()=>({appearance:normalizeEntityCardAppearance(state.appearance),photo:state.photo}),save};
 }
