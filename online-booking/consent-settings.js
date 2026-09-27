@@ -11,7 +11,7 @@ import {
   mountModal,
   modal,
   openNotice,
-  v2Document,
+  openSharedConsentDocument,
   v2LegalCards,
 } from '../ui/ui.js';
 
@@ -22,18 +22,12 @@ function statusText(item = {}) {
 }
 
 function openConsentDocument(item = {}) {
-  const title = String(item.title || item.documentId || 'Согласие');
-  const version = item.displayVersion || item.documentVersion || 1;
-  const content = String(item.documentText || item.text || '');
-  return mountModal(document.body, modal(v2Document({
-    title,
-    version,
-    content,
-  }), {
-    variant: 'technical',
-    title,
-    className: 'account-consent-document',
-  }));
+  return openSharedConsentDocument({
+    title:String(item.title || item.documentId || 'Согласие'),
+    version:item.displayVersion || item.documentVersion || 1,
+    content:String(item.documentText || item.text || ''),
+    className:'account-consent-document',
+  });
 }
 
 function consentCards(consents = []) {
