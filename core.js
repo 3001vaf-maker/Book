@@ -806,6 +806,23 @@ function renderLogin(message = '') {
   syncViewport();
 }
 
+window.addEventListener('book:auth-logout', () => {
+  authenticatedAccount = null;
+  firstRunRuntime?.dispose();
+  firstRunRuntime = null;
+  firstRunState = null;
+  disposePlatformNotices();
+  disposePlatformNotices = () => {};
+  disposePlatformSession();
+  disposePlatformSession = () => {};
+  if (demoBadgeTimer) {
+    window.clearInterval(demoBadgeTimer);
+    demoBadgeTimer = null;
+  }
+  history.replaceState({}, '', location.pathname);
+  renderLogin();
+});
+
 window.addEventListener('hashchange', () => {
   if (!workspaceReady) return;
   const section = normalizeRequestedSection(location.hash.slice(1));
