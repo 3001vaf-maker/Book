@@ -137,7 +137,9 @@ expect(!accountShell.includes('export async function renderAccount(')
 expect(accountShell.includes('async function renderGlobalHistoryDetail') && !accountShell.includes('onOpenRelationship: callbacks.onOpenRelationship'), 'Global History must own record detail locally and must not restore the old relationship bridge.');
 expect(consentSettings.includes("tenantId = state?.tenantId") && consentSettings.includes('getAccountConsentState(scopeTenantId)') && consentSettings.includes('revokeAccountConsent(scopeTenantId, consent.documentId)'), 'Consent settings must be the single tenant-scoped owner used from both contact settings and Profile aggregation.');
 expect(accountShell.includes('state.accountSelectedChatTenantId') && accountShell.includes('selectedTenantId'), 'End-user Chat must live inside the global account and select a contact without a tenant-account bridge.');
-expect(accountShell.includes("label: 'Согласия'"), 'Account account and chat settings must expose consent controls.');
+expect(accountShell.includes("label: 'Согласия / Уведомления'") && accountShell.includes("data: 'data-account-controls'"), 'End-user Profile settings must expose the combined Consents / Notifications modal-Z entry.');
+expect(accountShell.includes("label: 'Фото'") && accountShell.includes("label: 'Удалить профиль'") && accountShell.includes("variant: 'critical'"), 'End-user Profile settings must expose separate Photo and critical Profile deletion actions.');
+expect(accountShell.includes('data-account-profile-card') && accountShell.includes('openAccountPersonalDataZ(root, state'), 'End-user personal-data editing must start from the Profile entity card, not Header A settings.');
 expect(consentSettings.includes('revokeAccountConsent'), 'Account consent settings must use the canonical server-backed revoke flow.');
 expect(bookingUi.includes('bookingChoiceCards'), 'Shared booking UI must continue to own booking choice controls.');
 
@@ -155,13 +157,15 @@ expect(referenceUi.includes('v2Shell({') && referenceUi.includes('v2Header({'), 
 expect(referenceUi.includes("['profile', 'Карточка — без S']") && referenceUi.includes("['profile-media', 'Карточка — с S']") && referenceUi.includes("['chat', 'Чат']") && referenceUi.includes("['form', 'Форма']"), 'Reference must expose multiple UI screen forms and S/no-S states.');
 expect(referenceUi.includes("'Сохранить', 'Далее', 'Готово', 'Добавить', 'Создать'"), 'Reference must expose canonical B label fit checks.');
 expect(referenceUi.includes('modal(') && referenceUi.includes('mountModal('), 'Reference must exercise the real shared modal component.');
-expect(referenceUi.includes("button('Личные данные'") && referenceUi.includes("button('Согласия'") && referenceUi.includes("button('Изменить пароль'") && referenceUi.includes("button('Выход'"), 'Reference profile settings must include all approved actions.');
-const personalIndex = referenceUi.indexOf("button('Личные данные'");
-const consentIndex = referenceUi.indexOf("button('Согласия'");
+expect(referenceUi.includes("button('Фото'") && referenceUi.includes("button('Изменить пароль'") && referenceUi.includes("button('Согласия / Уведомления'") && referenceUi.includes("button('Выход'") && referenceUi.includes("button('Удалить профиль'"), 'Reference profile settings must include all approved actions.');
+const photoIndex = referenceUi.indexOf("button('Фото'");
 const passwordIndex = referenceUi.indexOf("button('Изменить пароль'");
+const consentIndex = referenceUi.indexOf("button('Согласия / Уведомления'");
 const logoutIndex = referenceUi.indexOf("button('Выход'");
-expect(personalIndex >= 0 && personalIndex < consentIndex && consentIndex < passwordIndex && passwordIndex < logoutIndex, 'Reference profile settings must keep the approved action order.');
-expect(referenceUi.includes("button('Личные данные', { variant: 'outline'") && referenceUi.includes("button('Согласия', { variant: 'outline'") && referenceUi.includes("button('Изменить пароль', {") && referenceUi.includes("button('Выход', { variant: 'danger'"), 'Reference profile settings must keep the approved button variants.');
+const deleteIndex = referenceUi.indexOf("button('Удалить профиль'");
+expect(photoIndex >= 0 && photoIndex < passwordIndex && passwordIndex < consentIndex && consentIndex < logoutIndex && logoutIndex < deleteIndex, 'Reference profile settings must keep the approved action order.');
+expect(referenceUi.includes("button('Фото', { variant: 'outline'") && referenceUi.includes("button('Изменить пароль', { variant: 'outline'") && referenceUi.includes("button('Согласия / Уведомления', { variant: 'outline'") && referenceUi.includes("button('Выход', { variant: 'danger'") && referenceUi.includes("button('Удалить профиль', { variant: 'critical'"), 'Reference profile settings must keep the approved button variants.');
+expect(referenceUi.includes("data: 'data-reference-profile-card'") && referenceUi.includes("openPersonalDataReference"), 'Reference personal-data editing must originate from the Profile card.');
 expect(!referenceUi.includes('apiRequest(') && !referenceUi.includes('fetch(') && !referenceUi.includes('localStorage') && !referenceUi.includes('sessionStorage') && !referenceUi.includes("from '../../core/") && !referenceUi.includes("from '../core/"), 'Reference must remain free of API, persistence and business-layer dependencies.');
 
 if (failures.length) {
