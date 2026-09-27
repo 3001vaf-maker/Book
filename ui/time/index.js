@@ -110,12 +110,9 @@ function open(host){
 
 export function openTimeRangeAction({ from = '09:00', to = '18:00', title = 'График работы', onSave = () => {} } = {}) {
   const content = `<form class="form-grid" data-shared-time-range-form>
-    <div class="time-range-group">
-      <div class="time-range-title">С - до</div>
-      <div class="time-range-fields">
-        ${timePicker({ label: 'С', name: 'from', value: text(from) })}
-        ${timePicker({ label: 'До', name: 'to', value: text(to) })}
-      </div>
+    <div class="time-range-fields">
+      ${timePicker({ label: 'С', name: 'from', value: text(from) })}
+      ${timePicker({ label: 'До', name: 'to', value: text(to) })}
     </div>
     ${button('Сохранить', { type: 'submit' })}
   </form>`;
