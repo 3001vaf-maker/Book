@@ -39,6 +39,7 @@ export function normalizeProfile(profile = {}) {
     profession: String(profile.profession || ''),
     experience: String(profile.experience || ''),
     professionAbout: String(profile.professionAbout || ''),
+    cardAppearance: profile.cardAppearance && typeof profile.cardAppearance === 'object' && !Array.isArray(profile.cardAppearance) ? profile.cardAppearance : {},
   };
 }
 
