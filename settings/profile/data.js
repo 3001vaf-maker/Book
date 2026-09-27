@@ -23,6 +23,8 @@ function cropPosition(value) {
 
 export function normalizeProfile(profile = {}) {
   const phones = normalizePhones(profile.phones?.length ? profile.phones : [profile.phone]);
+  const professionValue = String(profile.profession || '').trim();
+  const profession = professionValue.toLocaleLowerCase('ru-RU') === 'другая' ? '' : professionValue;
   return {
     id: String(profile.id || ''),
     platformAccountId: String(profile.platformAccountId || ''),
@@ -37,7 +39,7 @@ export function normalizeProfile(profile = {}) {
     photo: String(profile.photo || ''),
     photoCropX: cropPosition(profile.photoCropX),
     photoCropY: cropPosition(profile.photoCropY),
-    profession: String(profile.profession || ''),
+    profession,
     experience: String(profile.experience || ''),
     professionAbout: String(profile.professionAbout || ''),
     cardAppearance: profile.cardAppearance && typeof profile.cardAppearance === 'object' && !Array.isArray(profile.cardAppearance) ? profile.cardAppearance : {},
