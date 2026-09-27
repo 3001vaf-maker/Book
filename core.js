@@ -844,6 +844,7 @@ document.addEventListener('focusin', (event) => {
   const target = event.target;
   if (!(target instanceof HTMLElement)) return;
   if (!target.matches('input, select, textarea')) return;
+  if (target.closest('[data-v2-layer]')) return;
   window.setTimeout(() => target.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' }), 120);
 }, { passive: true });
 
