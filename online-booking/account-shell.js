@@ -628,7 +628,7 @@ async function openGlobalAccountControls(root, state, handlers) {
     if (!tenantId) return;
     void openAccountConsentSettings(state, {
       tenantId,
-      onChanged: () => handlers.render?.(),
+      onChanged: () => {},
     });
   }));
 
