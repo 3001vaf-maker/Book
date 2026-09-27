@@ -331,12 +331,12 @@ for (const [name, source] of [
   ['shared colors', colorUi],
   ['end-user account shell', account],
   ['personal-data', personalData],
-  ['password-settings', passwordSettings],
   ['consent-settings', consentSettings],
 ]) {
   expect(source.includes('modal(') && source.includes('mountModal('), `${name} must consume the sole shared modal owner.`);
   expect(!source.includes('mountV2Layer(') && !source.includes('v2Layer('), `${name} must not bypass ui/modals with a parallel V2 modal path.`);
 }
+expect(passwordSettings.includes('openSharedPasswordAction') && !passwordSettings.includes('modal(') && !passwordSettings.includes('mountModal('), 'End-user password settings must consume the Shared Profile password owner instead of owning a modal.');
 expect(!inputs.includes('modal(') && !inputs.includes('mountModal('), 'Shared photo/input owner must keep crop inline and must not open a modal.');
 expect(!inputs.includes('mountV2Layer(') && !inputs.includes('v2Layer('), 'Shared inputs must not bypass canonical owners with local V2 layers.');
 
