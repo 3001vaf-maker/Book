@@ -198,7 +198,7 @@ function workplaceDraftFromForm(root,existing=null){
     city:String(data.get('workplaceCity')||'').trim(),
     address:String(data.get('workplaceAddress')||'').trim(),
     phone:String(data.get('workplacePhone')||'').trim(),
-    currency:String(data.get('workplaceCurrency')||'RUB'),
+    currency:String(data.get('workplaceCurrency')||workplaceDefaults().currency||''),
     from:String(data.get('workplaceFrom')||''),
     to:String(data.get('workplaceTo')||''),
     photo:String(data.get('workplacePhoto')||''),
