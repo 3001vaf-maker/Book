@@ -1,43 +1,32 @@
-import { actionBlock, button, collectLinks, colorPicker, details, emptyState, entityVisualCard, escapeHtml, field, initColorPickers, initLinks, initPhotoField, initTimePickers, links, listEntries, listEntry, mountEntityCardConstructor, mountModal, mountV2ZLayer, modal, openColorPickerAction, openSharedProfileSettingsMenu, openTimeRangeAction, page, phoneField, photoField, searchableSelect, select, setSharedProfilePrimary, textareaField, timePicker, v2ZLayer, workspaceHeaderContext } from '../../../ui/ui.js';
+import { actionBlock, button, collectLinks, colorPicker, escapeHtml, field, initColorPickers, initLinks, initPhotoField, initTimePickers, links, mountEntityCardConstructor, mountModal, mountV2ZLayer, modal, openColorPickerAction, openSharedProfileSettingsMenu, openTimeRangeAction, page, phoneField, photoField, select, setSharedProfilePrimary, textareaField, timePicker, v2ZLayer, workspaceHeaderContext } from '../../../ui/ui.js';
 import { getProfile } from '../data.js';
-import { deleteWorkplace as deleteWorkplaceData, getWorkplaces, upsertWorkplace } from './data.js';
+import { deleteWorkplace as deleteWorkplaceData, getWorkplaceReferenceData, getWorkplaces, upsertWorkplace } from './data.js';
 import { workplaceCardAppearance, workplaceCardFields } from '../card-presentation.js';
 
-const CITIES=['Москва','Санкт-Петербург','Казань','Нижний Новгород','Екатеринбург','Новосибирск','Самара','Ростов-на-Дону','Краснодар','Сочи','Уфа','Воронеж','Пермь','Волгоград','Омск','Тула','Калининград'];
+function workplaceDefaults(){
+  return getWorkplaceReferenceData().defaults||{};
+}
 
 function emptyWorkplace(){
-  return {photo:'',photoCropX:50,photoCropY:50,name:'',color:'',city:'',address:'',phone:'',currency:'RUB',from:'09:00',to:'18:00',links:[],about:'',cardAppearance:{}};
-}
-
-export function workplaceList() {
-  const items = getWorkplaces();
-  if(!items.length)return emptyState('Рабочих мест пока нет','Добавьте первое рабочее место кнопкой «+».');
-  return listEntries(items.map(w=>listEntry({
-    title:w.name||'Без названия',
-    subtitle:w.city||'',
-    image:w.photo||'',
-    initial:(w.name||'?').slice(0,1).toUpperCase(),
-    rightTop:`с ${w.from||'—'}`,
-    rightBottom:`до ${w.to||'—'}`,
-    interactive:true,
-    data:`data-workplace="${escapeHtml(w.key)}"`,
-    aria:`Открыть рабочее место ${w.name||''}`,
-    deleteData:w.key,
-    deleteAria:`Удалить рабочее место ${w.name||''}`
-  })));
-}
-
-export function initWorkplaceListDeletion(root,onDeleted=()=>{}) {
-  root.querySelectorAll('[data-delete-action]').forEach(el=>el.addEventListener('click',e=>{
-    const row=e.target.closest('[data-workplace]');
-    if(!row)return;
-    e.stopPropagation();
-    confirmDeleteWorkplace(root,el.dataset.deleteAction,onDeleted);
-  }));
+  const defaults=workplaceDefaults();
+  return {
+    photo:'',photoCropX:50,photoCropY:50,name:'',color:'',city:'',address:'',phone:'',
+    currency:defaults.currency||'',
+    timeZone:defaults.timeZone||'',
+    from:defaults.from||'',
+    to:defaults.to||'',
+    links:[],about:'',cardAppearance:{},
+  };
 }
 
 export function workplaceForm(existing=null,{sourceOnly=false,bodyActions=false}={}){
+  const reference=getWorkplaceReferenceData();
+  const defaults=reference.defaults||{};
   const w=existing||emptyWorkplace();
+  const cities=[...new Set([w.city,...(reference.cities||[])].filter(Boolean))];
+  const currencies=(reference.currencies||[]).length
+    ? reference.currencies
+    : (w.currency?[{value:w.currency,label:w.currency}]:[]);
   const primary=sourceOnly
     ? button('Сохранить',{
         className:'v2-primary-source-only',
@@ -58,21 +47,21 @@ export function workplaceForm(existing=null,{sourceOnly=false,bodyActions=false}
         cropYName:'workplacePhotoCropY',
       })}
       ${colorPicker({name:'workplaceColor',value:w.color||'',required:true})}
-      <div class="work-time-row"><span class="work-time-row__label">График работы</span><div class="work-time-row__fields">${timePicker({label:'С',name:'workplaceFrom',value:w.from||'09:00'})}${timePicker({label:'До',name:'workplaceTo',value:w.to||'18:00'})}</div></div>`
+      <div class="work-time-row"><span class="work-time-row__label">График работы</span><div class="work-time-row__fields">${timePicker({label:'С',name:'workplaceFrom',value:w.from||defaults.from||''})}${timePicker({label:'До',name:'workplaceTo',value:w.to||defaults.to||''})}</div></div>`
     : `<input type="hidden" name="workplacePhoto" value="${escapeHtml(w.photo||'')}">
       <input type="hidden" name="workplacePhotoCropX" value="${Number(w.photoCropX||50)}">
       <input type="hidden" name="workplacePhotoCropY" value="${Number(w.photoCropY||50)}">
       <input type="hidden" name="workplaceColor" value="${escapeHtml(w.color||'')}">
-      <input type="hidden" name="workplaceFrom" value="${escapeHtml(w.from||'09:00')}">
-      <input type="hidden" name="workplaceTo" value="${escapeHtml(w.to||'18:00')}">`;
+      <input type="hidden" name="workplaceFrom" value="${escapeHtml(w.from||defaults.from||'')}">
+      <input type="hidden" name="workplaceTo" value="${escapeHtml(w.to||defaults.to||'')}">`;
   return `<form class="compact-form workplace-form" data-workplace-form>
     <input type="hidden" name="workplaceCardAppearance" value="${escapeHtml(JSON.stringify(w.cardAppearance||{}))}">
     ${settingsFields}
     ${field({label:'Название',name:'workplaceName',value:w.name,placeholder:'Название рабочего пространства',required:true})}
-    ${searchableSelect({label:'Город',name:'workplaceCity',value:w.city||'',options:CITIES,placeholder:'Город',required:true})}
+    ${select({label:'Город *',name:'workplaceCity',value:w.city||'',options:cities,placeholder:'Город',searchable:true,allowCustom:false})}
     ${field({label:'Адрес',name:'workplaceAddress',value:w.address,placeholder:'Адрес'})}
     ${phoneField({label:'Телефон',name:'workplacePhone',value:w.phone||''})}
-    ${select({label:'Валюта',name:'workplaceCurrency',value:w.currency||'RUB',options:[{value:'RUB',label:'RUB — ₽'},{value:'EUR',label:'EUR — €'},{value:'USD',label:'USD — $'},{value:'GBP',label:'GBP — £'}]})}
+    ${select({label:'Валюта',name:'workplaceCurrency',value:w.currency||defaults.currency||'',options:currencies})}
     <div class="array-group"><span class="array-label">Ссылки</span>${links({links:w.links||[],name:'workplace-links'})}</div>
     ${textareaField({label:'О рабочем пространстве',name:'workplaceAbout',value:w.about||'',placeholder:'Коротко о рабочем пространстве'})}
     <div class="form-error" data-workplace-error></div>
@@ -112,7 +101,7 @@ function collectWorkplaceForm(root,existing){
       city,
       address:String(data.get('workplaceAddress')||'').trim(),
       phone:String(data.get('workplacePhone')||'').trim(),
-      currency:String(data.get('workplaceCurrency')||'RUB'),
+      currency:String(data.get('workplaceCurrency')||workplaceDefaults().currency||''),
       from:String(data.get('workplaceFrom')||''),
       to:String(data.get('workplaceTo')||''),
       links:collectLinks(root,'workplace-links'),
@@ -209,7 +198,7 @@ function workplaceDraftFromForm(root,existing=null){
     city:String(data.get('workplaceCity')||'').trim(),
     address:String(data.get('workplaceAddress')||'').trim(),
     phone:String(data.get('workplacePhone')||'').trim(),
-    currency:String(data.get('workplaceCurrency')||'RUB'),
+    currency:String(data.get('workplaceCurrency')||workplaceDefaults().currency||''),
     from:String(data.get('workplaceFrom')||''),
     to:String(data.get('workplaceTo')||''),
     photo:String(data.get('workplacePhoto')||''),
@@ -281,8 +270,8 @@ export function openWorkplaceSettingsMenu(root,existing=null,{onDeleted=()=>{},o
       id:'schedule',
       label:'График работы',
       onSelect:()=>openTimeRangeAction({
-        from:String(data().get('workplaceFrom')||'09:00'),
-        to:String(data().get('workplaceTo')||'18:00'),
+        from:String(data().get('workplaceFrom')||workplaceDefaults().from||''),
+        to:String(data().get('workplaceTo')||workplaceDefaults().to||''),
         onSave:({from,to})=>{
           setWorkplaceDraft(root,'workplaceFrom',from);
           setWorkplaceDraft(root,'workplaceTo',to);
@@ -329,26 +318,4 @@ export function confirmDeleteWorkplace(root,key,onDeleted=()=>{}){
       if(error)error.textContent=deleteError instanceof Error?deleteError.message:'Не удалось удалить рабочее пространство';
     }
   };
-}
-
-export function renderWorkplace(root,key,navigateBack=()=>{}){
-  const w=getWorkplaces().find(x=>x.key===key);if(!w)return navigateBack();
-  const profile=getProfile();
-  const card=entityVisualCard({
-    appearance:workplaceCardAppearance(w),
-    fields:workplaceCardFields(w,profile),
-    image:w.photo||'',
-    imagePosition:`${Number(w.photoCropX||50)}% ${Number(w.photoCropY||50)}%`,
-  });
-  const info=details([
-    {label:'Город',value:w.city||'—'},
-    {label:'Адрес',value:w.address||'—'},
-    {label:'Валюта',value:w.currency||'—'},
-    w.about?{label:'О рабочем пространстве',value:w.about}:null,
-    w.links?.length?{label:'Ссылки',value:w.links.map(l=>`${l.type}: ${l.url}`).join(', ')}:null
-  ]);
-  root.innerHTML=page([card,info,actionBlock(`${button('Изменить',{data:'data-edit-workplace'})}${button('Назад',{variant:'secondary',data:'data-back-workplaces'})}${button('Удалить',{variant:'danger',data:'data-delete-workplace-card'})}`)]);
-  root.querySelector('[data-back-workplaces]').onclick=navigateBack;
-  root.querySelector('[data-edit-workplace]').onclick=()=>openWorkplaceModal(root,w,()=>renderWorkplace(root,key,navigateBack));
-  root.querySelector('[data-delete-workplace-card]').onclick=()=>confirmDeleteWorkplace(root,key,navigateBack);
 }

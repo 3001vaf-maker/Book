@@ -4,18 +4,22 @@ import { relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
-const professionSource = 'settings/profile/profile.js';
 const self = relative(root, fileURLToPath(import.meta.url)).replaceAll('\\', '/');
-const source = readFileSync(resolve(root, professionSource), 'utf8');
 
-const catalogMatch = source.match(/const PROFESSIONS=\[([\s\S]*?)\];/);
-assert.ok(catalogMatch, 'Profile profession catalog was not found');
-
-const catalogTerms = [...catalogMatch[1].matchAll(/'([^']+)'/g)]
-  .map((match) => match[1].trim())
-  .filter((value) => value && value !== 'Другая');
-
-const extraNeutralityTerms = [
+const protectedTerms = [
+  ['Парик', 'махер'].join(''),
+  ['Коло', 'рист'].join(''),
+  ['Бар', 'бер'].join(''),
+  ['Виза', 'жист'].join(''),
+  ['Сти', 'лист'].join(''),
+  ['Мани', 'кюр'].join(''),
+  ['Педи', 'кюр'].join(''),
+  ['Бро', 'вист'].join(''),
+  ['Лэш', 'мейкер'].join(''),
+  ['Косме', 'толог'].join(''),
+  ['Масса', 'жист'].join(''),
+  ['Наращивание ', 'волос'].join(''),
+  ['Перманентный ', 'макияж'].join(''),
   ['Тре', 'нер'].join(''),
   ['Убор', 'щик'].join(''),
   ['Вр', 'ач'].join(''),
@@ -29,10 +33,7 @@ const extraNeutralityTerms = [
   ['doc', 'tor'].join(''),
   ['teach', 'er'].join(''),
   ['consult', 'ant'].join(''),
-];
-
-const protectedTerms = [...new Set([...catalogTerms, ...extraNeutralityTerms])]
-  .map((value) => value.toLocaleLowerCase('ru-RU'));
+].map((value) => value.toLocaleLowerCase('ru-RU'));
 
 const extensions = new Set(['.js', '.mjs', '.ts', '.prisma', '.html', '.json']);
 const excludedPrefixes = [
@@ -54,7 +55,7 @@ function walk(dir) {
     if (excludedPrefixes.some((prefix) => rel === prefix.slice(0, -1) || rel.startsWith(prefix))) return [];
     const stat = statSync(full);
     if (stat.isDirectory()) return walk(full);
-    if (!extensions.has(extension(rel)) || rel === self || rel === professionSource) return [];
+    if (!extensions.has(extension(rel)) || rel === self) return [];
     return [rel];
   });
 }
