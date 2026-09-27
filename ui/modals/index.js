@@ -39,7 +39,10 @@ export function mountModal(root, html) {
   if (!m) return null;
   modalLevel += 1;
   m.dataset.modalLevel = String(modalLevel);
-  m.style.zIndex = String(1200 + modalLevel);
+  const layerZ = String(1200 + modalLevel);
+  const portal = m.parentElement?.matches?.('[data-v2-layer-portal]') ? m.parentElement : null;
+  if (portal) portal.style.zIndex = layerZ;
+  else m.style.zIndex = layerZ;
 
   const close = m.v2Close || (() => m.remove());
   const originalClose = close;
