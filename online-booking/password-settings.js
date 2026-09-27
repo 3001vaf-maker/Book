@@ -1,61 +1,15 @@
 import { accountErrorMessage, changeAccountPassword, changeGlobalAccountPassword } from '../core/account/index.js';
-import { button, formValidationMessage, initPasswordFields, modal, mountModal, openNotice, passwordField } from '../ui/ui.js';
-import { formError, formView } from '../ui/forms/index.js';
+import { openSharedPasswordAction } from '../ui/ui.js';
 
 export function openAccountPasswordSettings(state) {
-  const content = formView(`
-    ${passwordField({ label: 'Текущий пароль', name: 'currentPassword', required: true, autocomplete: 'current-password' })}
-    ${passwordField({ label: 'Новый пароль', name: 'newPassword', required: true, autocomplete: 'new-password' })}
-    ${passwordField({ label: 'Повторите новый пароль', name: 'repeatPassword', required: true, autocomplete: 'new-password' })}
-    ${formError('', { data: 'data-account-password-error', keepEmpty: true })}
-    ${button('Сохранить пароль', { type: 'submit' })}
-  `, { className: 'form-grid', data: 'data-account-password-form' });
-  const layer = mountModal(document.body, modal(content, { variant: 'bottom', title: 'Изменить пароль', className: 'modal--password-sheet' }));
-  if (!layer) return null;
-  initPasswordFields(layer);
-  const form = layer.querySelector('[data-account-password-form]');
-  const errorNode = layer.querySelector('[data-account-password-error]');
-  form?.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const validationError = formValidationMessage(form);
-    if (validationError) {
-      if (errorNode) errorNode.textContent = validationError;
-      return;
-    }
-    const data = new FormData(form);
-    const currentPassword = String(data.get('currentPassword') || '');
-    const newPassword = String(data.get('newPassword') || '');
-    const repeatPassword = String(data.get('repeatPassword') || '');
-    if (newPassword.length < 8) {
-      if (errorNode) errorNode.textContent = 'Новый пароль должен содержать минимум 8 символов.';
-      return;
-    }
-    if (newPassword !== repeatPassword) {
-      if (errorNode) errorNode.textContent = 'Новые пароли не совпадают.';
-      return;
-    }
-    const submit = form.querySelector('button[type="submit"]');
-    if (submit) submit.disabled = true;
-    if (errorNode) errorNode.textContent = '';
-    try {
-      if (state.globalAccount) await changeGlobalAccountPassword(currentPassword, newPassword);
-      else await changeAccountPassword(state.tenantId, currentPassword, newPassword);
-      layer.v2Close?.();
-      openNotice({
-        title: 'Пароль изменён',
-        message: 'Новый пароль сохранён.',
-        action: 'Закрыть',
-        variant: 'technical',
-      });
-    } catch (error) {
-      if (submit) submit.disabled = false;
-      openNotice({
-        title: 'Пароль не изменён',
-        message: accountErrorMessage(error, 'Не удалось изменить пароль'),
-        action: 'Закрыть',
-        variant: 'technical',
-      });
-    }
+  return openSharedPasswordAction({
+    onSubmit: async ({ currentPassword, newPassword }) => {
+      try {
+        if (state.globalAccount) await changeGlobalAccountPassword(currentPassword, newPassword);
+        else await changeAccountPassword(state.tenantId, currentPassword, newPassword);
+      } catch (error) {
+        throw new Error(accountErrorMessage(error, 'Не удалось изменить пароль'));
+      }
+    },
   });
-  return layer;
 }
