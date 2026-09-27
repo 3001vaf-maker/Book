@@ -25,6 +25,7 @@ assert.match(profileData, /apiRequest\('\/profile'/);
 assert.match(profileData, /hydrateProfileFromServer/);
 assert.match(profileData, /id:\s*String\(profile\.id\s*\|\|\s*''\)/);
 assert.match(profileData, /platformAccountId:\s*String\(profile\.platformAccountId\s*\|\|\s*''\)/);
+assert.match(profileData, /toLocaleLowerCase\('ru-RU'\) === 'другая'/);
 
 assert.doesNotMatch(workplaceData, /localStorage|readLegacyWorkplacesSnapshot/);
 assert.match(workplaceData, /apiRequest\(`\/profile\/workplaces\//);
@@ -50,6 +51,8 @@ assert.match(serverService, /platformAccountId:\s*row\.platformAccountId/);
 assert.doesNotMatch(serverService, /Profile \+ Workplaces/);
 assert.doesNotMatch(profileData, /Profile \+ Workplaces/);
 assert.match(serverService, /platformProfession\.upsert/);
+assert.match(serverService, /normalizedName === 'другая'/);
+assert.match(serverService, /professionValue\.toLocaleLowerCase\('ru-RU'\) === 'другая'/);
 assert.match(serverService, /professionCatalog/);
 assert.match(schema, /model PlatformProfession\s*\{/);
 assert.match(professionCatalogMigration, /CREATE TABLE "PlatformProfession"/);
@@ -75,6 +78,7 @@ assert.doesNotMatch(workplaceUi, /\|\|'18:00'/);
 assert.match(workplaceTimeOwner, /WORKPLACE_CITY_DIRECTORY/);
 assert.match(workplaceTimeOwner, /'Екатеринбург':?[^\n]*Asia\/Yekaterinburg|name: 'Екатеринбург'[^\n]*Asia\/Yekaterinburg/);
 assert.match(workplaceTimeOwner, /resolveWorkplaceTimeZone/);
+assert.match(workplaceTimeOwner, /CITY_BY_NAME\.get\(cityName\)\?\.timeZone/);
 assert.match(workplaceTimeOwner, /workplaceReferenceData/);
 
 console.log('profile server owner tests: OK');
