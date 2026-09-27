@@ -2,7 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { randomUUID } from 'node:crypto';
 import { Prisma, Workplace as WorkplaceRow } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
-import { resolveWorkplaceTimeZone } from '../time/workplace-time-zone';
+import { DEFAULT_WORKPLACE_CURRENCY, DEFAULT_WORKPLACE_SCHEDULE, resolveWorkplaceCurrency, resolveWorkplaceTimeZone, workplaceReferenceData } from '../time/workplace-time-zone';
 
 type ProfileInput = {
   id?: string;
@@ -85,6 +85,8 @@ function normalizeProfile(value: unknown): ProfileInput {
   const phones = stringList(source.phones);
   const fallbackPhone = stringValue(source.phone).trim();
   const normalizedPhones = phones.length ? phones : fallbackPhone ? [fallbackPhone] : [];
+  const professionValue = stringValue(source.profession).trim();
+  const profession = professionValue.toLocaleLowerCase('ru-RU') === 'другая' ? '' : professionValue;
   return {
     key: stringValue(source.key, 'profile') || 'profile',
     name: stringValue(source.name),
@@ -97,7 +99,7 @@ function normalizeProfile(value: unknown): ProfileInput {
     photo: stringValue(source.photo),
     photoCropX: cropPosition(source.photoCropX),
     photoCropY: cropPosition(source.photoCropY),
-    profession: stringValue(source.profession),
+    profession,
     experience: stringValue(source.experience),
     professionAbout: stringValue(source.professionAbout),
     cardAppearance: objectValue(source.cardAppearance),
@@ -117,10 +119,10 @@ function normalizeWorkplace(value: unknown): WorkplaceInput {
     city: stringValue(source.city),
     address: stringValue(source.address),
     phone: stringValue(source.phone),
-    currency: stringValue(source.currency, 'RUB') || 'RUB',
+    currency: resolveWorkplaceCurrency(source.city, source.currency || DEFAULT_WORKPLACE_CURRENCY),
     timeZone: resolveWorkplaceTimeZone(source.city, source.timeZone),
-    from: stringValue(source.from, '09:00') || '09:00',
-    to: stringValue(source.to, '18:00') || '18:00',
+    from: stringValue(source.from, DEFAULT_WORKPLACE_SCHEDULE.from) || DEFAULT_WORKPLACE_SCHEDULE.from,
+    to: stringValue(source.to, DEFAULT_WORKPLACE_SCHEDULE.to) || DEFAULT_WORKPLACE_SCHEDULE.to,
     links: normalizeLinks(source.links),
     about: stringValue(source.about),
     cardAppearance: objectValue(source.cardAppearance),
@@ -133,8 +135,8 @@ function normalizeBundle(value: unknown): ProfileBundleInput {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
   const workplaces = (Array.isArray(source.workplaces) ? source.workplaces : []).map(normalizeWorkplace);
   const keys = workplaces.map((item) => item.key);
-  if (keys.some((key) => !key)) throw new BadRequestException('У рабочего места отсутствует key');
-  if (new Set(keys).size !== keys.length) throw new BadRequestException('Дублирующиеся key рабочих мест');
+  if (keys.some((key) => !key)) throw new BadRequestException('Не удалось определить рабочее пространство');
+  if (new Set(keys).size !== keys.length) throw new BadRequestException('Обнаружены повторяющиеся рабочие пространства');
   return {
     profile: normalizeProfile(source.profile),
     customProfessions: stringList(source.customProfessions),
@@ -215,15 +217,48 @@ function canonical(value: ProfileBundleInput) {
   return JSON.stringify(value);
 }
 
+function normalizeProfessionName(value: unknown) {
+  return stringValue(value).trim().replace(/\s+/g, ' ');
+}
+
+function normalizeProfessionKey(value: unknown) {
+  return normalizeProfessionName(value).toLocaleLowerCase('ru-RU');
+}
+
+type ProfessionClient = Pick<Prisma.TransactionClient, 'platformProfession'>;
+
 @Injectable()
 export class ProfileService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private async observeProfessions(client: ProfessionClient, values: unknown[]) {
+    const unique = new Map<string, string>();
+    for (const value of values) {
+      const name = normalizeProfessionName(value);
+      const normalizedName = normalizeProfessionKey(name);
+      if (!name || !normalizedName || normalizedName === 'другая' || name.length > 120 || unique.has(normalizedName)) continue;
+      unique.set(normalizedName, name);
+    }
+    const now = new Date();
+    for (const [normalizedName, name] of unique) {
+      await client.platformProfession.upsert({
+        where: { normalizedName },
+        create: { normalizedName, name, firstSeenAt: now, lastSeenAt: now },
+        update: { lastSeenAt: now },
+      });
+    }
+  }
+
   private async bundle(tenantId: string, platformAccountId: string) {
-    const row = await this.prisma.profile.findUnique({
+    const [row, professionRows] = await Promise.all([
+      this.prisma.profile.findUnique({
       where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
-      include: { workplaces: { where: { deletedAt: null }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] } },
-    });
+        include: { workplaces: { where: { deletedAt: null }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] } },
+      }),
+      this.prisma.platformProfession.findMany({ orderBy: [{ name: 'asc' }], select: { name: true } }),
+    ]);
+    const professionCatalog = professionRows.map((item) => item.name);
+    const referenceData = workplaceReferenceData();
     if (!row) {
       return {
         migrated: false,
@@ -231,6 +266,8 @@ export class ProfileService {
         migrationVerifiedAt: null,
         profile: null,
         customProfessions: [],
+        professionCatalog,
+        workplaceReferenceData: referenceData,
         workplaces: [],
       };
     }
@@ -261,6 +298,8 @@ export class ProfileService {
       migrationVerifiedAt: row.migrationVerifiedAt,
       profile,
       customProfessions: stringList(row.customProfessions),
+      professionCatalog,
+      workplaceReferenceData: referenceData,
       workplaces: row.workplaces.map(workplaceDto),
     };
   }
@@ -287,6 +326,7 @@ export class ProfileService {
           })),
         });
       }
+      await this.observeProfessions(tx, [expected.profile.profession, ...expected.customProfessions]);
     });
 
     return this.bundle(tenantId, platformAccountId);
@@ -295,7 +335,7 @@ export class ProfileService {
   async verifyMigration(tenantId: string, platformAccountId: string, body: unknown) {
     const expected = normalizeBundle(body);
     const current = await this.bundle(tenantId, platformAccountId);
-    if (!current.migrated || !current.profile) throw new NotFoundException('Профиль ещё не перенесён');
+    if (!current.migrated || !current.profile) throw new NotFoundException('Профиль ещё не готов');
 
     const actual = normalizeBundle({
       profile: current.profile,
@@ -303,7 +343,7 @@ export class ProfileService {
       workplaces: current.workplaces,
     });
     if (canonical(actual) !== canonical(expected)) {
-      throw new ConflictException('Проверка переноса Profile + Workplaces не пройдена');
+      throw new ConflictException('Не удалось подтвердить данные профиля. Обновите страницу и повторите.');
     }
 
     await this.prisma.profile.update({
@@ -332,15 +372,18 @@ export class ProfileService {
 
   async updateProfile(tenantId: string, platformAccountId: string, body: unknown) {
     const current = await this.prisma.profile.findUnique({ where: { tenantId_platformAccountId: { tenantId, platformAccountId } } });
-    if (!current?.migrationVerifiedAt) throw new ConflictException('Перенос Profile + Workplaces ещё не подтверждён');
+    if (!current?.migrationVerifiedAt) throw new ConflictException('Данные профиля ещё не готовы. Обновите страницу и повторите.');
     const source = body && typeof body === 'object' && !Array.isArray(body) ? body as Record<string, unknown> : {};
     const profile = normalizeProfile(source.profile ?? source);
     const customProfessions = source.customProfessions === undefined
       ? stringList(current.customProfessions)
       : stringList(source.customProfessions);
-    await this.prisma.profile.update({
-      where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
-      data: profileData(profile, customProfessions),
+    await this.prisma.$transaction(async (tx) => {
+      await tx.profile.update({
+        where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
+        data: profileData(profile, customProfessions),
+      });
+      await this.observeProfessions(tx, [profile.profession, ...customProfessions]);
     });
     return this.bundle(tenantId, platformAccountId);
   }
@@ -350,7 +393,7 @@ export class ProfileService {
       where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
       include: { workplaces: { where: { deletedAt: null }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }], select: { id: true, key: true } } },
     });
-    if (!profile?.migrationVerifiedAt) throw new ConflictException('Перенос Profile + Workplaces ещё не подтверждён');
+    if (!profile?.migrationVerifiedAt) throw new ConflictException('Данные профиля ещё не готовы. Обновите страницу и повторите.');
 
     const source = body && typeof body === 'object' && !Array.isArray(body) ? body as Record<string, unknown> : {};
     const keys = Array.isArray(source.keys) ? source.keys.map((value) => stringValue(value).trim()).filter(Boolean) : [];
@@ -373,13 +416,13 @@ export class ProfileService {
       where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
       include: { workplaces: { where: { deletedAt: null }, select: { position: true } } },
     });
-    if (!profile?.migrationVerifiedAt) throw new ConflictException('Перенос Profile + Workplaces ещё не подтверждён');
+    if (!profile?.migrationVerifiedAt) throw new ConflictException('Данные профиля ещё не готовы. Обновите страницу и повторите.');
 
     const workplace = normalizeWorkplace({
       ...(body && typeof body === 'object' && !Array.isArray(body) ? body as Record<string, unknown> : {}),
       key,
     });
-    if (!workplace.key) throw new BadRequestException('У рабочего места отсутствует key');
+    if (!workplace.key) throw new BadRequestException('Не удалось определить рабочее пространство');
     const existing = await this.prisma.workplace.findUnique({ where: { tenantId_key: { tenantId, key: workplace.key } } });
     const now = new Date().toISOString();
     const position = existing ? existing.position : (profile.workplaces.reduce((max, item) => Math.max(max, item.position), -1) + 1);
@@ -403,9 +446,9 @@ export class ProfileService {
 
   async deleteWorkplace(tenantId: string, platformAccountId: string, key: string) {
     const profile = await this.prisma.profile.findUnique({ where: { tenantId_platformAccountId: { tenantId, platformAccountId } } });
-    if (!profile?.migrationVerifiedAt) throw new ConflictException('Перенос Profile + Workplaces ещё не подтверждён');
+    if (!profile?.migrationVerifiedAt) throw new ConflictException('Данные профиля ещё не готовы. Обновите страницу и повторите.');
     const existing = await this.prisma.workplace.findUnique({ where: { tenantId_key: { tenantId, key } } });
-    if (!existing || existing.profileId !== profile.id) throw new NotFoundException('Рабочее место не найдено');
+    if (!existing || existing.profileId !== profile.id) throw new NotFoundException('Рабочее пространство не найдено');
     await this.prisma.workplace.update({
       where: { tenantId_key: { tenantId, key } },
       data: { deletedAt: new Date() },
