@@ -28,6 +28,8 @@ import {
   v2HorizontalRail,
   v2RailCard,
   v2Shell,
+  v2ZLayer,
+  mountV2ZLayer,
 } from '../ui.js';
 import { initMessageComposer, messageComposer, messageThread } from '../chat/index.js';
 import { readOnlyReceipt } from '../receipt/index.js';
@@ -397,7 +399,10 @@ function settingsMarkup() {
 }
 
 function openSettingsReference() {
-  const host = mountModal(document.body, modal(settingsMarkup(), { variant: 'medium', surface: 'app', title: 'Настройки профиля' }));
+  if (app.querySelector('[data-reference-settings-z]')) return;
+  const host = mountV2ZLayer(app, v2ZLayer(`<div data-reference-settings-z>${settingsMarkup()}</div>`, {
+    className: 'ui-reference-settings-z',
+  }), { stack: true });
   if (!host) return;
   host.querySelector('[data-reference-photo]')?.addEventListener('click', (event) => event.preventDefault());
   host.querySelector('[data-reference-consents]')?.addEventListener('click', () => openConsentReference());
@@ -407,8 +412,9 @@ function openSettingsReference() {
 }
 
 function openPersonalDataReference() {
-  const content = `<div class="ui-reference-modal-content">
-    <div class="modal-title"><h2>Личные данные</h2><p>Набор общих полей без сохранения и серверной логики.</p></div>
+  if (app.querySelector('[data-reference-personal-z]')) return;
+  const content = `<div data-reference-personal-z class="ui-reference-modal-content">
+    <div class="modal-title"><h2>Личные данные</h2><p>Редактирование открывается из карточки профиля как Z2.</p></div>
     <div class="form-grid">
       ${field({ label: 'Имя', name: 'referenceName', value: 'Текст' })}
       ${repeatedField({ label: 'Телефон', name: 'referencePersonalPhone', values: ['+79031234567'], type: 'tel', addLabel: '+ Добавить телефон' })}
@@ -418,10 +424,9 @@ function openPersonalDataReference() {
         { value: 'two', label: 'Вариант с длинным названием для проверки' },
       ] })}
       ${textareaField({ label: 'Комментарий', name: 'referenceComment', placeholder: 'Текст' })}
-      <div class="ui-reference-modal-actions">${button('Сохранить')}${button('Отмена', { variant: 'outline', data: 'data-modal-close' })}</div>
     </div>
   </div>`;
-  const host = mountModal(document.body, modal(content, { variant: 'large', surface: 'app', title: 'Личные данные' }));
+  const host = mountV2ZLayer(app, v2ZLayer(content, { className: 'ui-reference-personal-z' }), { stack: true });
   if (host) initRepeatedFields(host);
 }
 
@@ -446,7 +451,7 @@ function openPasswordReference() {
       ${button('Сохранить')}
     </div>
   </div>`;
-  mountModal(document.body, modal(content, { variant: 'medium', surface: 'app', title: 'Изменить пароль' }));
+  mountModal(document.body, modal(content, { variant: 'bottom', surface: 'app', title: 'Изменить пароль' }));
 }
 
 function openInfoReference() {
