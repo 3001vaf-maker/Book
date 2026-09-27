@@ -37,7 +37,8 @@ import {
   initV2WorkspaceInteraction,
   setV2DeckOpen,
   mountModal,
-  selectPhotoFile,
+  openSharedPhotoAction,
+  openSharedProfileSettingsMenu,
 } from '../ui/ui.js';
 import { mountChatList, mountChatThread } from '../core/chat/runtime.js';
 import { notificationSettings, settingsPanel } from '../ui/settings/index.js';
@@ -453,53 +454,23 @@ async function saveAccountPhoto(state, value) {
   return account;
 }
 
-async function chooseAccountPhoto(state, handlers) {
-  try {
-    const src = await selectPhotoFile();
-    if (!src) return;
-    await saveAccountPhoto(state, src);
-    await handlers.render?.();
-  } catch (error) {
-    openNotice({
-      title: 'Фото не сохранено',
-      message: accountErrorMessage(error, 'Не удалось сохранить фото'),
-      action: 'Закрыть',
-      variant: 'technical',
-    });
-  }
-}
-
 function openAccountPhotoSettings(state, handlers) {
-  if (!accountPhoto(state)) {
-    void chooseAccountPhoto(state, handlers);
-    return;
-  }
-  const content = `<div class="form-grid">
-    ${button('Заменить фото', { variant: 'outline', data: 'data-account-photo-replace' })}
-    ${button('Удалить фото', { variant: 'outline', className: 'ui-button--delete-outline', data: 'data-account-photo-delete' })}
-  </div>`;
-  const layer = mountModal(document.body, modal(content, {
-    variant: 'bottom',
-    title: 'Фото',
-    className: 'modal--photo-sheet',
-  }));
-  layer?.querySelector('[data-account-photo-replace]')?.addEventListener('click', () => {
-    layer.v2Close?.();
-    void chooseAccountPhoto(state, handlers);
-  });
-  layer?.querySelector('[data-account-photo-delete]')?.addEventListener('click', async () => {
-    try {
-      await saveAccountPhoto(state, '');
-      layer.v2Close?.();
+  return openSharedPhotoAction({
+    photo:accountPhoto(state),
+    onReplace:async(src)=>{
+      await saveAccountPhoto(state,src);
       await handlers.render?.();
-    } catch (error) {
-      openNotice({
-        title: 'Фото не удалено',
-        message: accountErrorMessage(error, 'Не удалось удалить фото'),
-        action: 'Закрыть',
-        variant: 'technical',
-      });
-    }
+    },
+    onDelete:async()=>{
+      await saveAccountPhoto(state,'');
+      await handlers.render?.();
+    },
+    onError:(error)=>openNotice({
+      title:'Фото не сохранено',
+      message:accountErrorMessage(error,'Не удалось изменить фото'),
+      action:'Закрыть',
+      variant:'technical',
+    }),
   });
 }
 
@@ -641,44 +612,16 @@ function confirmDeleteAccount(state, handlers) {
 }
 
 function openGlobalProfileSettingsMenu(state, handlers) {
-  const body = `<div data-account-profile-settings-menu>
-    ${settingsPanel([
-      { label: 'Фото', data: 'data-account-photo-settings', variant: 'outline' },
-      { label: 'Изменить пароль', data: 'data-account-change-password', variant: 'outline' },
-      { label: 'Согласия / Уведомления', data: 'data-account-controls', variant: 'outline' },
-      { label: 'Выход', data: 'data-account-logout', variant: 'danger' },
-      { label: 'Удалить профиль', data: 'data-account-delete', variant: 'critical' },
-    ])}
-  </div>`;
-
-  const layer = mountModal(document.body, modal(body, {
-    variant: 'bottom',
-    title: 'Настройки профиля',
-    className: 'modal--profile-settings-sheet',
-  }));
-  if (!layer) return null;
-
-  const closeThen = (action) => {
-    layer.v2Close?.();
-    action?.();
-  };
-
-  layer.querySelector('[data-account-photo-settings]')?.addEventListener('click', () => {
-    closeThen(() => openAccountPhotoSettings(state, handlers));
+  return openSharedProfileSettingsMenu({
+    actions:[
+      {id:'photo',label:'Фото',onSelect:()=>openAccountPhotoSettings(state,handlers)},
+      {id:'password',label:'Изменить пароль',onSelect:()=>openAccountPasswordSettings(state)},
+      {id:'controls',label:'Согласия / Уведомления',onSelect:()=>void openGlobalAccountControls(document.body,state,handlers)},
+      {id:'logout',label:'Выход',variant:'danger',onSelect:()=>handlers.onLogout?.()},
+      {id:'delete',label:'Удалить профиль',variant:'critical',onSelect:()=>confirmDeleteAccount(state,handlers)},
+    ],
+    data:'data-account-profile-settings-menu',
   });
-  layer.querySelector('[data-account-change-password]')?.addEventListener('click', () => {
-    closeThen(() => openAccountPasswordSettings(state));
-  });
-  layer.querySelector('[data-account-controls]')?.addEventListener('click', () => {
-    closeThen(() => void openGlobalAccountControls(document.body, state, handlers));
-  });
-  layer.querySelector('[data-account-logout]')?.addEventListener('click', () => {
-    closeThen(() => handlers.onLogout?.());
-  });
-  layer.querySelector('[data-account-delete]')?.addEventListener('click', () => {
-    closeThen(() => confirmDeleteAccount(state, handlers));
-  });
-  return layer;
 }
 
 async function renderGlobalMessages(root, state, handlers) {
