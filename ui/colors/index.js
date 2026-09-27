@@ -2,6 +2,7 @@ import { escapeHtml } from '../utils/escape-html.js';
 import { modal, mountModal } from '../modals/index.js';
 
 export const COLOR_PALETTE = Object.freeze([
+  '#FFFF00', '#FF1111', '#111111', '#777A7D', '#2C2A28', '#817A73', '#D7D1CA',
   '#F6D32D', '#F2C94C', '#F2994A', '#F08C46', '#E76F51',
   '#E63946', '#D62828', '#B42318', '#9B1C31', '#7F1D1D',
   '#FF6B9D', '#E64980', '#C2255C', '#A61E4D', '#7A284B',
