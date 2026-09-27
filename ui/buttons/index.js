@@ -3,6 +3,7 @@ import { escapeHtml } from '../utils/escape-html.js';
 const BUTTON_VARIANTS = {
   secondary: 'ui-button--secondary',
   danger: 'ui-button--danger',
+  critical: 'ui-button--critical',
   outline: 'ui-button--outline',
 };
 
