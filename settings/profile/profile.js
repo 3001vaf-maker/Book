@@ -240,12 +240,10 @@ function openProfileData(root,navigateBack,options={}){
 function openProfileAppearance(root,navigateBack,options={}){
   const p=getProfile();
   const workplaces=getWorkplaces();
-  const layer=mountModal(document.body,modal('<div data-profile-card-constructor></div>',{
-    variant:'large',
-    surface:'app',
-    title:'Вид',
-    className:'modal--entity-card-constructor',
-  }));
+  const layer=mountV2ZLayer(root,v2ZLayer(page([
+    profileContext(p,'Вид'),
+    '<div data-profile-card-constructor></div>',
+  ]),{className:'v2-profile-appearance-layer'}),{stack:true});
   const host=layer?.querySelector('[data-profile-card-constructor]');
   if(!host)return layer;
   mountEntityCardConstructor(host,{
@@ -255,6 +253,7 @@ function openProfileAppearance(root,navigateBack,options={}){
     photoPosition:avatarPosition(p),
     onSave:async({appearance,photo})=>{
       await saveProfileData({...getProfile(),photo,cardAppearance:appearance});
+      layer.v2Close?.();
       renderProfile(root,navigateBack,options);
     },
   });
