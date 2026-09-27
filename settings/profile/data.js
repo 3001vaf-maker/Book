@@ -3,6 +3,7 @@ import { normalizePhoneForStorage } from '../../core/phone/index.js';
 
 let profileState = null;
 let customProfessionsState = [];
+let professionCatalogState = [];
 let serverReady = false;
 
 function normalizeList(values) {
@@ -44,7 +45,16 @@ export function normalizeProfile(profile = {}) {
 }
 
 function normalizeCustomProfessions(values) {
-  return normalizeList(values);
+  return [...new Set(normalizeList(values))];
+}
+
+function normalizeProfessionCatalog(values) {
+  const byKey = new Map();
+  for (const value of normalizeList(values)) {
+    const key = value.toLocaleLowerCase('ru-RU');
+    if (!byKey.has(key)) byKey.set(key, value);
+  }
+  return [...byKey.values()];
 }
 
 async function responseJson(response, fallbackMessage) {
@@ -54,7 +64,7 @@ async function responseJson(response, fallbackMessage) {
 }
 
 function requireServerReady() {
-  if (!serverReady) throw new Error('Profile + Workplaces ещё не готовы к серверной записи');
+  if (!serverReady) throw new Error('Данные профиля ещё загружаются. Повторите через несколько секунд.');
 }
 
 function notifyProfileChanged(detail = {}) {
@@ -62,9 +72,10 @@ function notifyProfileChanged(detail = {}) {
   window.dispatchEvent(new CustomEvent('book:profile-changed', { detail }));
 }
 
-export function hydrateProfileFromServer(profile = {}, customProfessions = []) {
+export function hydrateProfileFromServer(profile = {}, customProfessions = [], professionCatalog = []) {
   profileState = normalizeProfile(profile);
   customProfessionsState = normalizeCustomProfessions(customProfessions);
+  professionCatalogState = normalizeProfessionCatalog(professionCatalog);
   return profileState;
 }
 
@@ -88,7 +99,7 @@ export async function saveProfile(profile) {
     body: JSON.stringify({ profile: normalized, customProfessions: customProfessionsState }),
   });
   const payload = await responseJson(response, 'Не удалось сохранить профиль');
-  hydrateProfileFromServer(payload.profile, payload.customProfessions);
+  hydrateProfileFromServer(payload.profile, payload.customProfessions, payload.professionCatalog);
   notifyProfileChanged({ action: 'profile-saved' });
   return getProfile();
 }
@@ -97,19 +108,6 @@ export function getCustomProfessions() {
   return [...customProfessionsState];
 }
 
-export async function addCustomProfession(value) {
-  requireServerReady();
-  const profession = String(value || '').trim();
-  if (!profession) return getCustomProfessions();
-  const next = customProfessionsState.includes(profession)
-    ? customProfessionsState
-    : [...customProfessionsState, profession];
-  const response = await apiRequest('/profile', {
-    method: 'PUT',
-    body: JSON.stringify({ profile: getProfile(), customProfessions: next }),
-  });
-  const payload = await responseJson(response, 'Не удалось сохранить профессию');
-  hydrateProfileFromServer(payload.profile, payload.customProfessions);
-  notifyProfileChanged({ action: 'profession-saved' });
-  return getCustomProfessions();
+export function getProfessionCatalog() {
+  return [...professionCatalogState];
 }
