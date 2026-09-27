@@ -134,7 +134,7 @@ function editorWorkspace(state,fields){
 
 export function mountEntityCardConstructor(root,{appearance={},fields=[],photo='',photoPosition='50% 50%',onSave=async()=>{},onPhotoChange=()=>{}}={}) {
   if(!root)return null;
-  const state={appearance:normalizeEntityCardAppearance(appearance),photo:String(photo||''),photoPosition:String(photoPosition||'50% 50%'),tab:'card',line:0,saving:false};
+  const state={appearance:normalizeEntityCardAppearance(appearance),photo:String(photo||''),photoPosition:String(photoPosition||'50% 50%'),tab:'card',line:0,saving:false,error:''};
   const render=()=>{
     root.innerHTML=`<div class="entity-card-editor" data-entity-card-editor>
       <div class="entity-card-editor__preview" data-card-preview>${entityVisualCard({appearance:state.appearance,fields,image:state.photo,imagePosition:state.photoPosition})}</div>
@@ -142,6 +142,7 @@ export function mountEntityCardConstructor(root,{appearance={},fields=[],photo='
         ${[['photo','Фото'],['background','Фон'],['card','Карта']].map(([value,label])=>`<button type="button" class="${state.tab===value?'is-active':''}" data-card-tab="${value}" aria-pressed="${state.tab===value?'true':'false'}">${label}</button>`).join('')}
       </div>
       <div class="entity-card-editor__workspace" data-card-workspace>${editorWorkspace(state,fields)}</div>
+      <div class="form-error" data-card-error>${escapeHtml(state.error||'')}</div>
       <button type="button" class="ui-button" data-card-save${state.saving?' disabled':''}>${state.saving?'Сохраняю…':'Сохранить'}</button>
     </div>`;
     bind();
@@ -196,8 +197,15 @@ export function mountEntityCardConstructor(root,{appearance={},fields=[],photo='
     root.querySelector('[data-card-save]')?.addEventListener('click',async()=>{
       if(state.saving)return;
       state.saving=true;render();
-      try{await onSave({appearance:normalizeEntityCardAppearance(state.appearance),photo:state.photo});}
-      finally{state.saving=false;render();}
+      try{
+        state.error='';
+        await onSave({appearance:normalizeEntityCardAppearance(state.appearance),photo:state.photo});
+      }catch(error){
+        state.error=error instanceof Error?error.message:'Не удалось сохранить вид карты';
+      }finally{
+        state.saving=false;
+        render();
+      }
     });
   };
   render();
