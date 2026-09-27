@@ -157,6 +157,19 @@ model Profile {
   @@index([platformAccountId])
 }
 
+model PlatformProfession {
+  id             String   @id @default(cuid())
+  normalizedName String   @unique
+  name           String
+  firstSeenAt    DateTime @default(now())
+  lastSeenAt     DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([name])
+  @@index([lastSeenAt])
+}
+
 model Workplace {
   id              String   @id @default(cuid())
   tenantId        String
