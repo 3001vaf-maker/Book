@@ -211,7 +211,7 @@ export class ProfileService {
   private async bundle(tenantId: string, platformAccountId: string) {
     const row = await this.prisma.profile.findUnique({
       where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
-      include: { workplaces: { orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] } },
+      include: { workplaces: { where: { deletedAt: null }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] } },
     });
     if (!row) {
       return {
@@ -336,7 +336,7 @@ export class ProfileService {
   async reorderWorkplaces(tenantId: string, platformAccountId: string, body: unknown) {
     const profile = await this.prisma.profile.findUnique({
       where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
-      include: { workplaces: { orderBy: [{ position: 'asc' }, { createdAt: 'asc' }], select: { id: true, key: true } } },
+      include: { workplaces: { where: { deletedAt: null }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }], select: { id: true, key: true } } },
     });
     if (!profile?.migrationVerifiedAt) throw new ConflictException('Перенос Profile + Workplaces ещё не подтверждён');
 
@@ -359,7 +359,7 @@ export class ProfileService {
   async upsertWorkplace(tenantId: string, platformAccountId: string, key: string, body: unknown) {
     const profile = await this.prisma.profile.findUnique({
       where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
-      include: { workplaces: { select: { position: true } } },
+      include: { workplaces: { where: { deletedAt: null }, select: { position: true } } },
     });
     if (!profile?.migrationVerifiedAt) throw new ConflictException('Перенос Profile + Workplaces ещё не подтверждён');
 
@@ -384,7 +384,7 @@ export class ProfileService {
         profileId: profile.id,
         ...workplaceData(normalized, position),
       },
-      update: workplaceData(normalized, position),
+      update: { ...workplaceData(normalized, position), deletedAt: null },
     });
     return this.bundle(tenantId, platformAccountId);
   }
@@ -394,7 +394,10 @@ export class ProfileService {
     if (!profile?.migrationVerifiedAt) throw new ConflictException('Перенос Profile + Workplaces ещё не подтверждён');
     const existing = await this.prisma.workplace.findUnique({ where: { tenantId_key: { tenantId, key } } });
     if (!existing || existing.profileId !== profile.id) throw new NotFoundException('Рабочее место не найдено');
-    await this.prisma.workplace.delete({ where: { tenantId_key: { tenantId, key } } });
+    await this.prisma.workplace.update({
+      where: { tenantId_key: { tenantId, key } },
+      data: { deletedAt: new Date() },
+    });
     return this.bundle(tenantId, platformAccountId);
   }
 
