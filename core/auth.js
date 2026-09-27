@@ -60,3 +60,18 @@ export async function getCurrentAccount() {
 
   return response.json();
 }
+
+export async function changePassword(currentPassword, newPassword) {
+  const response = await apiRequest('/auth/password', {
+    method: 'PUT',
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.message || 'Не удалось изменить пароль');
+  return payload;
+}
+
+export function logout() {
+  clearAuthToken();
+  window.dispatchEvent(new CustomEvent('book:auth-logout'));
+}
