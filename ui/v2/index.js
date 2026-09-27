@@ -377,50 +377,90 @@ function unlockV2ModalSurface(host) {
   host.classList.remove('has-v2-layer');
 }
 
+export function v2ModalPortalGeometry(hostRect = {}, viewport = {}) {
+  const viewportLeft = Number(viewport.offsetLeft ?? 0);
+  const viewportTop = Number(viewport.offsetTop ?? 0);
+  const viewportWidth = Math.max(0, Number(viewport.width ?? window.innerWidth ?? 0));
+  const viewportHeight = Math.max(0, Number(viewport.height ?? window.innerHeight ?? 0));
+  const viewportRight = viewportLeft + viewportWidth;
+  const viewportBottom = viewportTop + viewportHeight;
+
+  const hostLeft = Number(hostRect.left ?? viewportLeft);
+  const hostTop = Number(hostRect.top ?? viewportTop);
+  const hostWidth = Math.max(0, Number(hostRect.width ?? 0));
+  const hostRight = Number(hostRect.right ?? (hostLeft + hostWidth));
+
+  const left = Math.max(viewportLeft, hostLeft);
+  const right = Math.min(viewportRight, hostRight);
+  const top = Math.max(viewportTop, hostTop);
+  const width = Math.max(0, right - left);
+  const height = Math.max(0, viewportBottom - top);
+
+  return { left, top, width, height, bottom: top + height };
+}
+
+function currentVisualViewport() {
+  const vv = window.visualViewport;
+  return {
+    offsetLeft: Number(vv?.offsetLeft ?? 0),
+    offsetTop: Number(vv?.offsetTop ?? 0),
+    width: Number(vv?.width ?? window.innerWidth ?? 0),
+    height: Number(vv?.height ?? window.innerHeight ?? 0),
+  };
+}
+
 function mountV2ModalPortal(host) {
-  const app = host?.closest?.('[data-v2-app]') || document.querySelector('[data-v2-app]');
-  const anchor = app?.querySelector?.('[data-v2-front]')
-    || app?.querySelector?.('.v2-app__stage')
-    || document.body;
-  if (!anchor || !host) return null;
+  if (!host) return null;
 
   const portal = document.createElement('div');
-  portal.className = 'v2-layer-portal';
-  if (anchor === document.body) portal.classList.add('v2-layer-portal--viewport');
+  portal.className = 'v2-layer-portal v2-layer-portal--viewport';
   portal.dataset.v2LayerPortal = '';
-  anchor.appendChild(portal);
+  document.body.appendChild(portal);
 
   const sync = () => {
     if (!portal.isConnected || !host.isConnected) return;
-    const hostRect = host.getBoundingClientRect();
-    const anchorRect = anchor === document.body
-      ? { left: 0, top: 0 }
-      : anchor.getBoundingClientRect();
-    portal.style.left = `${hostRect.left - anchorRect.left}px`;
-    portal.style.top = `${hostRect.top - anchorRect.top}px`;
-    portal.style.width = `${hostRect.width}px`;
-    portal.style.height = `${hostRect.height}px`;
+    const geometry = v2ModalPortalGeometry(host.getBoundingClientRect(), currentVisualViewport());
+    portal.style.left = `${geometry.left}px`;
+    portal.style.top = `${geometry.top}px`;
+    portal.style.width = `${geometry.width}px`;
+    portal.style.height = `${geometry.height}px`;
   };
 
-  sync();
-  requestAnimationFrame(sync);
-  requestAnimationFrame(() => requestAnimationFrame(sync));
+  let settleTimers = [];
+  const settle = () => {
+    sync();
+    requestAnimationFrame(sync);
+    requestAnimationFrame(() => requestAnimationFrame(sync));
+    settleTimers.forEach((timer) => window.clearTimeout(timer));
+    settleTimers = [
+      window.setTimeout(sync, 80),
+      window.setTimeout(sync, 180),
+      window.setTimeout(sync, 360),
+    ];
+  };
 
-  const resizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(sync) : null;
+  settle();
+
+  const resizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(settle) : null;
   resizeObserver?.observe(host);
-  if (anchor !== document.body) resizeObserver?.observe(anchor);
-  window.addEventListener('resize', sync);
-  window.visualViewport?.addEventListener('resize', sync);
-  window.visualViewport?.addEventListener('scroll', sync);
+  window.addEventListener('resize', settle);
+  window.visualViewport?.addEventListener('resize', settle);
+  window.visualViewport?.addEventListener('scroll', settle);
+  document.addEventListener('focusin', settle, true);
+  document.addEventListener('focusout', settle, true);
 
   return {
     portal,
-    sync,
+    sync: settle,
     dispose() {
       resizeObserver?.disconnect();
-      window.removeEventListener('resize', sync);
-      window.visualViewport?.removeEventListener('resize', sync);
-      window.visualViewport?.removeEventListener('scroll', sync);
+      settleTimers.forEach((timer) => window.clearTimeout(timer));
+      settleTimers = [];
+      window.removeEventListener('resize', settle);
+      window.visualViewport?.removeEventListener('resize', settle);
+      window.visualViewport?.removeEventListener('scroll', settle);
+      document.removeEventListener('focusin', settle, true);
+      document.removeEventListener('focusout', settle, true);
       if (portal.isConnected) portal.remove();
     },
   };
