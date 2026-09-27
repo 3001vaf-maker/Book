@@ -345,6 +345,8 @@ function initV2LayerDismissGesture(node, { kind = 'standard', onDismiss = null, 
   };
 }
 
+const v2ModalSurfaceLocks = new WeakMap();
+
 function activeV2ModalSurface(root = null) {
   if (root?.matches?.('[data-v2-z-layer], [data-v2-z]')) return root;
   const closest = root?.closest?.('[data-v2-z-layer], [data-v2-z]');
@@ -355,6 +357,73 @@ function activeV2ModalSurface(root = null) {
     || app?.querySelector?.('[data-v2-front] > [data-v2-z]')
     || document.querySelector('.app-content')
     || document.querySelector('#app');
+}
+
+function lockV2ModalSurface(host) {
+  if (!host?.classList) return;
+  const next = (v2ModalSurfaceLocks.get(host) || 0) + 1;
+  v2ModalSurfaceLocks.set(host, next);
+  host.classList.add('has-v2-layer');
+}
+
+function unlockV2ModalSurface(host) {
+  if (!host?.classList) return;
+  const next = Math.max(0, (v2ModalSurfaceLocks.get(host) || 1) - 1);
+  if (next) {
+    v2ModalSurfaceLocks.set(host, next);
+    return;
+  }
+  v2ModalSurfaceLocks.delete(host);
+  host.classList.remove('has-v2-layer');
+}
+
+function mountV2ModalPortal(host) {
+  const app = host?.closest?.('[data-v2-app]') || document.querySelector('[data-v2-app]');
+  const anchor = app?.querySelector?.('[data-v2-front]')
+    || app?.querySelector?.('.v2-app__stage')
+    || document.body;
+  if (!anchor || !host) return null;
+
+  const portal = document.createElement('div');
+  portal.className = 'v2-layer-portal';
+  if (anchor === document.body) portal.classList.add('v2-layer-portal--viewport');
+  portal.dataset.v2LayerPortal = '';
+  anchor.appendChild(portal);
+
+  const sync = () => {
+    if (!portal.isConnected || !host.isConnected) return;
+    const hostRect = host.getBoundingClientRect();
+    const anchorRect = anchor === document.body
+      ? { left: 0, top: 0 }
+      : anchor.getBoundingClientRect();
+    portal.style.left = `${hostRect.left - anchorRect.left}px`;
+    portal.style.top = `${hostRect.top - anchorRect.top}px`;
+    portal.style.width = `${hostRect.width}px`;
+    portal.style.height = `${hostRect.height}px`;
+  };
+
+  sync();
+  requestAnimationFrame(sync);
+  requestAnimationFrame(() => requestAnimationFrame(sync));
+
+  const resizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(sync) : null;
+  resizeObserver?.observe(host);
+  if (anchor !== document.body) resizeObserver?.observe(anchor);
+  window.addEventListener('resize', sync);
+  window.visualViewport?.addEventListener('resize', sync);
+  window.visualViewport?.addEventListener('scroll', sync);
+
+  return {
+    portal,
+    sync,
+    dispose() {
+      resizeObserver?.disconnect();
+      window.removeEventListener('resize', sync);
+      window.visualViewport?.removeEventListener('resize', sync);
+      window.visualViewport?.removeEventListener('scroll', sync);
+      if (portal.isConnected) portal.remove();
+    },
+  };
 }
 
 export function mountV2Layer(html, { root = null } = {}) {
@@ -369,13 +438,16 @@ export function mountV2Layer(html, { root = null } = {}) {
   const app = technical ? null : host.closest?.('[data-v2-app]');
   const locksHeader = Boolean(app && kind === 'standard');
   const header = locksHeader ? app.querySelector?.('[data-v2-header]') : null;
+  const portalOwner = technical ? null : mountV2ModalPortal(host);
+  const mountHost = portalOwner?.portal || host;
   node.classList.add(technical ? 'v2-layer-backdrop--technical' : 'v2-layer-backdrop--contained');
-  if (!technical && host.matches?.('[data-v2-z], [data-v2-z-layer]')) host.classList.add('has-v2-layer');
+  if (!technical && host.matches?.('[data-v2-z], [data-v2-z-layer]')) lockV2ModalSurface(host);
   if (header) {
     header.inert = true;
     header.classList.add('is-modal-locked');
   }
-  host.appendChild(node);
+  mountHost.appendChild(node);
+  node.v2Portal = portalOwner?.portal || null;
 
   let disposeGesture = () => {};
   const stopPointerPropagation = (event) => event.stopPropagation();
@@ -386,9 +458,8 @@ export function mountV2Layer(html, { root = null } = {}) {
   const close = () => {
     disposeGesture();
     if (node.isConnected) node.remove();
-    if (!technical && host.matches?.('[data-v2-z], [data-v2-z-layer]') && !host.querySelector('[data-v2-layer]')) {
-      host.classList.remove('has-v2-layer');
-    }
+    portalOwner?.dispose();
+    if (!technical && host.matches?.('[data-v2-z], [data-v2-z-layer]')) unlockV2ModalSurface(host);
     if (locksHeader && app && !app.querySelector('[data-v2-layer-kind="standard"]')) {
       const currentHeader = app.querySelector?.('[data-v2-header]');
       if (currentHeader) {

@@ -382,8 +382,11 @@ assert.match(v2Css, /\.v2-z\{[\s\S]*?box-sizing:border-box;[\s\S]*?height:calc\(
 assert.match(v2Css, /\.v2-header__slot--a \.v2-header__control\{[\s\S]*?border:2px solid var\(--v2-yellow\)/);
 assert.match(v2Css, /\.v2-header__slot--c \.v2-header__control--white\{border-color:#111;background:#fff;color:#111\}/);
 assert.match(v2Ui, /slot\.variant === 'white' \|\| slot\.variant === 'secondary'/);
-assert.match(v2Ui, /host\.classList\.add\('has-v2-layer'\)/);
-assert.match(v2Css, /\.v2-z:not\(\.v2-z--layer\)\.has-v2-layer\{transform:translateZ\(0\);overflow:hidden\}/);
+assert.match(v2Ui, /mountV2ModalPortal\(host\)/);
+assert.match(v2Ui, /lockV2ModalSurface\(host\)/);
+assert.match(v2Css, /\.v2-layer-portal\{position:absolute/);
+assert.match(v2Css, /\.v2-layer-portal>\.v2-layer-backdrop--contained\{position:absolute;inset:0/);
+assert.doesNotMatch(v2Css, /\.v2-z:not\(\.v2-z--layer\)\.has-v2-layer\{transform:translateZ\(0\)/);
 assert.match(v2Css, /\.v2-layer--top[\s\S]*?border-radius:var\(--v2-z-radius\) 0 0 0/);
 assert.match(v2Css, /\.v2-layer--standard[\s\S]*?inset:0;[\s\S]*?border-radius:var\(--v2-z-radius\) 0 0 0/);
 assert.match(v2Css, /\.v2-layer--bottom[\s\S]*?bottom:0;[\s\S]*?border-radius:0/);
