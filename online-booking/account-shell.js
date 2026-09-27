@@ -367,17 +367,15 @@ function relationshipCard(relationship = {}) {
 
 function profileSummary(state) {
   const account = state.account || {};
-  const name = String(account.name || '').trim() || 'Имя';
-  const surname = String(account.surname || '').trim();
+  const fullName = [account.name, account.surname].map((value) => String(value || '').trim()).filter(Boolean).join(' ') || 'Имя';
   const phone = formatPhone(account.phone || '') || String(account.phone || '') || '—';
   return entityCard({
-    title: name,
-    subtitle: surname,
-    meta: [{ value: phone, label: 'Телефон' }],
+    title: fullName,
+    subtitle: phone,
     interactive: true,
     data: 'data-account-profile-card',
     aria: 'Редактировать личные данные',
-    className: 'entity-card--compact account-profile-card',
+    className: 'entity-card--hero account-profile-card',
   });
 }
 
@@ -403,8 +401,8 @@ function bindGlobalChatButton(root, state, handlers) {
 
 function bindGlobalProfileSettingsEntry(root, state, handlers) {
   root.querySelector('[data-account-profile-settings]')?.addEventListener('click', () => {
-    if (root.querySelector('[data-account-profile-settings-z]')) return;
-    openGlobalProfileSettingsZ(root, state, handlers);
+    if (document.querySelector('[data-account-profile-settings-menu]')) return;
+    openGlobalProfileSettingsMenu(state, handlers);
   });
 }
 
@@ -642,11 +640,8 @@ function confirmDeleteAccount(state, handlers) {
   });
 }
 
-function openGlobalProfileSettingsZ(root, state, handlers) {
-  const existing = root.querySelector('[data-account-profile-settings-z]');
-  if (existing) return existing;
-
-  const body = `<div data-account-profile-settings-z>
+function openGlobalProfileSettingsMenu(state, handlers) {
+  const body = `<div data-account-profile-settings-menu>
     ${settingsPanel([
       { label: 'Фото', data: 'data-account-photo-settings', variant: 'outline' },
       { label: 'Изменить пароль', data: 'data-account-change-password', variant: 'outline' },
@@ -656,18 +651,33 @@ function openGlobalProfileSettingsZ(root, state, handlers) {
     ])}
   </div>`;
 
-  const layer = mountV2ZLayer(root, v2ZLayer(body, { className: 'account-profile-settings-z' }), {
-    stack: true,
-    onClose: () => syncGlobalProfileHeader(root, state, handlers),
-  });
+  const layer = mountModal(document.body, modal(body, {
+    variant: 'bottom',
+    title: 'Настройки профиля',
+    className: 'modal--profile-settings-sheet',
+  }));
   if (!layer) return null;
-  syncGlobalProfileHeader(root, state, handlers);
 
-  layer.querySelector('[data-account-photo-settings]')?.addEventListener('click', () => openAccountPhotoSettings(state, handlers));
-  layer.querySelector('[data-account-change-password]')?.addEventListener('click', () => openAccountPasswordSettings(state));
-  layer.querySelector('[data-account-controls]')?.addEventListener('click', () => void openGlobalAccountControls(root, state, handlers));
-  layer.querySelector('[data-account-logout]')?.addEventListener('click', () => handlers.onLogout?.());
-  layer.querySelector('[data-account-delete]')?.addEventListener('click', () => confirmDeleteAccount(state, handlers));
+  const closeThen = (action) => {
+    layer.v2Close?.();
+    action?.();
+  };
+
+  layer.querySelector('[data-account-photo-settings]')?.addEventListener('click', () => {
+    closeThen(() => openAccountPhotoSettings(state, handlers));
+  });
+  layer.querySelector('[data-account-change-password]')?.addEventListener('click', () => {
+    closeThen(() => openAccountPasswordSettings(state));
+  });
+  layer.querySelector('[data-account-controls]')?.addEventListener('click', () => {
+    closeThen(() => void openGlobalAccountControls(document.body, state, handlers));
+  });
+  layer.querySelector('[data-account-logout]')?.addEventListener('click', () => {
+    closeThen(() => handlers.onLogout?.());
+  });
+  layer.querySelector('[data-account-delete]')?.addEventListener('click', () => {
+    closeThen(() => confirmDeleteAccount(state, handlers));
+  });
   return layer;
 }
 
@@ -799,7 +809,7 @@ async function renderGlobalProfile(root, state, handlers) {
 async function renderGlobalProfileSettings(root, state, handlers) {
   state.accountTab = 'profile';
   await renderGlobalProfile(root, state, handlers);
-  openGlobalProfileSettingsZ(root, state, handlers);
+  openGlobalProfileSettingsMenu(state, handlers);
 }
 
 async function renderGlobalHome(root, state, handlers) {
