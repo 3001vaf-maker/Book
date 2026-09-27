@@ -76,7 +76,7 @@ if (/\.time-range-fields \.time-picker__label\{display:none\}/.test(sharedTimeCs
 
 if (!/## 14\. Journal → WorkPlan → Availability → TimeGrid → UI/.test(architecture)) fail('ARCHITECTURE_DICTIONARY.md', 'canonical scheduling ownership contract is missing');
 if (!/Обычное продуктовое ТЗ не является разрешением менять эту архитектуру/.test(architecture)) fail('ARCHITECTURE_DICTIONARY.md', 'architecture-change rule is missing');
-if (!/обычные прикладные модалы с выбором, настройкой или кнопкой действия открываются снизу/.test(design)) fail('DESIGN_DICTIONARY.md', 'bottom action-modal rule is missing.');
+if (!/обычные прикладные модалы с выбором, настройкой или кнопкой действия всегда открываются снизу/.test(design)) fail('DESIGN_DICTIONARY.md', 'bottom action-modal rule is missing.');
 if (!/подпись `С` находится над левым полем, `До` — над правым/.test(design)) fail('DESIGN_DICTIONARY.md', 'canonical work-time range geometry is missing.');
 
 if (errors.length) {
