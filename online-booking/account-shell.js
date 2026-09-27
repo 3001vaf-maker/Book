@@ -37,6 +37,7 @@ import {
   initV2WorkspaceInteraction,
   setV2DeckOpen,
   mountModal,
+  selectPhotoFile,
 } from '../ui/ui.js';
 import { mountChatList, mountChatThread } from '../core/chat/runtime.js';
 import { notificationSettings, settingsPanel } from '../ui/settings/index.js';
@@ -454,45 +455,25 @@ async function saveAccountPhoto(state, value) {
   return account;
 }
 
-function chooseAccountPhoto(state, handlers) {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = 'image/*';
-  input.hidden = true;
-  document.body.appendChild(input);
-  const cleanup = () => input.remove();
-  input.addEventListener('change', () => {
-    const file = input.files?.[0];
-    if (!file) {
-      cleanup();
-      return;
-    }
-    const reader = new FileReader();
-    reader.addEventListener('load', async () => {
-      const src = String(reader.result || '');
-      cleanup();
-      if (!src) return;
-      try {
-        await saveAccountPhoto(state, src);
-        await handlers.render?.();
-      } catch (error) {
-        openNotice({
-          title: 'Фото не сохранено',
-          message: accountErrorMessage(error, 'Не удалось сохранить фото'),
-          action: 'Закрыть',
-          variant: 'technical',
-        });
-      }
+async function chooseAccountPhoto(state, handlers) {
+  try {
+    const src = await selectPhotoFile();
+    if (!src) return;
+    await saveAccountPhoto(state, src);
+    await handlers.render?.();
+  } catch (error) {
+    openNotice({
+      title: 'Фото не сохранено',
+      message: accountErrorMessage(error, 'Не удалось сохранить фото'),
+      action: 'Закрыть',
+      variant: 'technical',
     });
-    reader.readAsDataURL(file);
-  }, { once: true });
-  input.addEventListener('cancel', cleanup, { once: true });
-  input.click();
+  }
 }
 
 function openAccountPhotoSettings(state, handlers) {
   if (!accountPhoto(state)) {
-    chooseAccountPhoto(state, handlers);
+    void chooseAccountPhoto(state, handlers);
     return;
   }
   const content = `<div class="form-grid">
@@ -506,7 +487,7 @@ function openAccountPhotoSettings(state, handlers) {
   }));
   layer?.querySelector('[data-account-photo-replace]')?.addEventListener('click', () => {
     layer.v2Close?.();
-    chooseAccountPhoto(state, handlers);
+    void chooseAccountPhoto(state, handlers);
   });
   layer?.querySelector('[data-account-photo-delete]')?.addEventListener('click', async () => {
     try {
