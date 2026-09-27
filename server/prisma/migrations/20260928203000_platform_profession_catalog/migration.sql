@@ -40,7 +40,7 @@ cleaned AS (
 deduplicated AS (
   SELECT "normalizedName", min("name") AS "name"
   FROM cleaned
-  WHERE "normalizedName" <> ''
+  WHERE "normalizedName" <> '' AND "normalizedName" <> 'другая'
   GROUP BY "normalizedName"
 )
 INSERT INTO "PlatformProfession" (
