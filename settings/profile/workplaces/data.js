@@ -34,6 +34,7 @@ export function normalizeWorkplace(workplace = {}) {
     to: String(workplace.to || '18:00'),
     links: normalizeLinks(workplace.links),
     about: String(workplace.about || ''),
+    cardAppearance: workplace.cardAppearance && typeof workplace.cardAppearance === 'object' && !Array.isArray(workplace.cardAppearance) ? workplace.cardAppearance : {},
     createdAt: String(workplace.createdAt || ''),
     updatedAt: String(workplace.updatedAt || ''),
   };
