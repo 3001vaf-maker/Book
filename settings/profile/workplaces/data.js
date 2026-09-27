@@ -115,7 +115,7 @@ export async function saveWorkplaces(values) {
   for (const key of currentKeys) {
     if (nextKeys.has(key)) continue;
     const response = await apiRequest(`/profile/workplaces/${encodeURIComponent(key)}`, { method: 'DELETE' });
-    const payload = await responseJson(response, 'Не удалось удалить рабочее место');
+    const payload = await responseJson(response, 'Не удалось удалить рабочее пространство');
     hydrateWorkplacesFromServer(payload.workplaces, payload.workplaceReferenceData);
   }
   for (const workplace of next) {
@@ -123,7 +123,7 @@ export async function saveWorkplaces(values) {
       method: 'PUT',
       body: JSON.stringify(workplace),
     });
-    const payload = await responseJson(response, 'Не удалось сохранить рабочее место');
+    const payload = await responseJson(response, 'Не удалось сохранить рабочее пространство');
     hydrateWorkplacesFromServer(payload.workplaces, payload.workplaceReferenceData);
   }
   notifyWorkplacesChanged({ action: 'workplaces-saved' });
@@ -152,7 +152,7 @@ export async function upsertWorkplace(workplace) {
     method: 'PUT',
     body: JSON.stringify(item),
   });
-  const payload = await responseJson(response, 'Не удалось сохранить рабочее место');
+  const payload = await responseJson(response, 'Не удалось сохранить рабочее пространство');
   hydrateWorkplacesFromServer(payload.workplaces, payload.workplaceReferenceData);
   notifyWorkplacesChanged({ action: 'workplace-saved', workplaceId: item.key });
   return getWorkplaces().find((value) => value.key === item.key) || null;
@@ -164,7 +164,7 @@ export async function deleteWorkplace(key) {
   if (!target) return false;
   const response = await apiRequest(`/profile/workplaces/${encodeURIComponent(target)}`, { method: 'DELETE' });
   if (response.status === 404) return false;
-  const payload = await responseJson(response, 'Не удалось удалить рабочее место');
+  const payload = await responseJson(response, 'Не удалось удалить рабочее пространство');
   hydrateWorkplacesFromServer(payload.workplaces, payload.workplaceReferenceData);
   notifyWorkplacesChanged({ action: 'workplace-deleted', workplaceId: target });
   return true;
