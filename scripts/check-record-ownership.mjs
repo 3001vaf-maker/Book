@@ -33,6 +33,7 @@ const journalRecordUi = read('journal/record.js');
 const journalRecordViewUi = read('journal/record-view.js');
 const journalBreakViewUi = read('journal/break-view.js');
 const sharedRecordUi = read('ui/record/runtime.js');
+const sharedRecordCss = read('ui/record/record.css');
 
 
 if (/availability|financial-model|getAllPeople|record-events|record-state|status\s*=|attendance|confirmed|cancelRecord|createRecord|updateRecord|moveRecord/.test(recordData)) {
@@ -147,8 +148,10 @@ if (!/v2-sticker-list/.test(sharedProcedureListSource)
   || !/v2-service-sticker/.test(sharedProcedureListSource)
   || !/v2-service-sticker__selector/.test(sharedProcedureListSource)
   || !/aria-pressed/.test(sharedProcedureListSource)
-  || !/✓/.test(sharedProcedureListSource)) {
-  errors.push('Shared Record procedure selection must render separate readable stickers with a visible selected checkmark');
+  || !/\.v2-sticker-list\{[^}]*gap:\s*10px/.test(sharedRecordCss)
+  || !/\.v2-service-sticker__text strong\{[^}]*white-space:\s*normal/.test(sharedRecordCss)
+  || !/\.v2-service-sticker\.is-selected \.v2-service-sticker__selector::after\{content:'✓'\}/.test(sharedRecordCss)) {
+  errors.push('Shared Record procedure selection must render separate readable stickers with visible spacing and a selected checkmark');
 }
 
 const procedureSettingsSource = journalRecordUi.slice(
@@ -159,6 +162,34 @@ if (!/button\('Добавить из прайса',[\s\S]*variant:\s*'secondary'
   || !/button\('\+ Добавить процедуру'/.test(procedureSettingsSource)
   || /const menu = list\(/.test(procedureSettingsSource)) {
   errors.push('Record procedure settings must use the canonical white "Добавить из прайса" button and black "+ Добавить процедуру" button');
+}
+
+const recordPricePickerSource = journalRecordUi.slice(
+  journalRecordUi.indexOf('function openPriceProcedurePicker'),
+  journalRecordUi.indexOf('function renderProceduresStep')
+);
+const recordConfirmationProcedurePickerSource = journalRecordUi.slice(
+  journalRecordUi.indexOf('function openConfirmationProcedurePicker'),
+  journalRecordUi.indexOf('function renderConfirmationStep')
+);
+const existingRecordProcedurePickerSource = journalRecordViewUi.slice(
+  journalRecordViewUi.indexOf('function openAddProcedurePicker'),
+  journalRecordViewUi.indexOf('function openSalePicker')
+);
+const onlineBookingProcedureSource = onlineBookingUi.slice(
+  onlineBookingUi.indexOf('function renderProcedures'),
+  onlineBookingUi.indexOf('function renderDates')
+);
+
+for (const [name, source] of [
+  ['Record workplace price picker', recordPricePickerSource],
+  ['Record confirmation add-procedure picker', recordConfirmationProcedurePickerSource],
+  ['Existing Record add-procedure picker', existingRecordProcedurePickerSource],
+  ['Online booking procedure picker', onlineBookingProcedureSource],
+]) {
+  if (!/recordProcedureList\(/.test(source)) {
+    errors.push(`${name} must consume the Shared Record procedure sticker owner`);
+  }
 }
 
 if (!/recordTimeRows\(values,\s*\{\s*data:\s*'data-record-time'/.test(journalRecordUi)
