@@ -176,10 +176,10 @@ const recordStartTimesSource = journalRecordUi.slice(
   journalRecordUi.indexOf('function recordStartTimes'),
   journalRecordUi.indexOf('function openRecordTimeNotice')
 );
-if (!/duration:\s*recordSlotStep\(\)/.test(recordStartTimesSource)
+if (!/duration:\s*1\b/.test(recordStartTimesSource)
   || !/step:\s*recordSlotStep\(\)/.test(recordStartTimesSource)
   || !/getBookingSettings\(\)\.slotStep/.test(journalRecordUi)) {
-  errors.push('Journal Record start-time selection must consume the canonical bookingSettings.slotStep owner');
+  errors.push('Journal Record start-time selection must use bookingSettings.slotStep only as the candidate step; procedure duration is validated after procedure selection');
 }
 
 if (!/kind:\s*'avatar'/.test(sharedRecordUi)
