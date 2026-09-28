@@ -35,6 +35,7 @@ import {
   initPasswordFields,
   initV2StickerSwipe,
   initV2Swipe,
+  mountV2ZLayer,
   openNotice,
   passwordField,
   phoneField,
@@ -42,6 +43,7 @@ import {
   v2Header,
   v2LegalCards,
   v2Shell,
+  v2ZLayer,
   recordWorkplaceCards,
   recordProcedureList,
   recordTimeRows,
@@ -348,6 +350,122 @@ function renderFlowPage(root, state, {
     className: center ? 'v2-app--flow-center' : 'v2-app--booking-flow',
   });
   root.innerHTML = `<section class="${flowThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${shell}</section>`;
+}
+
+function bookingHeaderMarkup(state, action = null, step = '') {
+  const professionalName = representativeName(state);
+  return v2Header({
+    a: {
+      kind: 'avatar',
+      label: professionalName,
+      image: representativePhoto(state),
+      initials: professionalName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase(),
+      disabled: true,
+      aria: `Профиль ${professionalName}`,
+    },
+    b: 'Запись',
+    c: action ? {
+      kind: 'text',
+      label: action.label || '',
+      data: action.data || '',
+      aria: action.aria || action.label || '',
+      disabled: Boolean(action.disabled),
+    } : null,
+    d: null,
+  });
+}
+
+function bookingActionForStep(state, step) {
+  if (step === 'procedures') {
+    return {
+      label: 'Далее',
+      data: 'data-booking-procedures-next',
+      disabled: state.procedureIds.length === 0,
+    };
+  }
+  if (step === 'confirmation') {
+    return { label: 'Подтвердить', data: 'data-booking-confirm' };
+  }
+  return null;
+}
+
+function syncBookingHeader(root, state, step = state.bookingStep) {
+  const app = root.querySelector('[data-v2-app]');
+  const header = app?.querySelector(':scope > [data-v2-header]');
+  if (!header) return;
+  header.outerHTML = bookingHeaderMarkup(state, bookingActionForStep(state, step), step);
+}
+
+function bookingStepHost(node) {
+  return node?.querySelector?.('[data-booking-step-host]') || null;
+}
+
+function currentBookingStepNode(root) {
+  const app = root.querySelector('[data-v2-app]');
+  const layers = [...(app?.querySelectorAll?.('[data-booking-step-layer]') || [])];
+  return layers.at(-1) || app?.querySelector?.('[data-booking-base-step]') || null;
+}
+
+function previousBookingStep(root) {
+  const app = root.querySelector('[data-v2-app]');
+  const layers = [...(app?.querySelectorAll?.('[data-booking-step-layer]') || [])];
+  if (layers.length) return String(layers.at(-1)?.dataset.bookingStep || '');
+  return String(app?.querySelector?.('[data-booking-base-step]')?.dataset.bookingStep || '');
+}
+
+function renderBookingStep(root, state, {
+  step,
+  body = '',
+  onFirstBack = null,
+} = {}) {
+  let app = root.querySelector('[data-v2-app]');
+  if (!app || !app.classList.contains('v2-app--booking-flow')) {
+    root.innerHTML = `<section class="${flowThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${v2Shell({
+      header: bookingHeaderMarkup(state, bookingActionForStep(state, step), step),
+      body: '<div data-booking-base-step data-booking-step-host></div>',
+      className: 'v2-app--booking-flow',
+    })}</section>`;
+    app = root.querySelector('[data-v2-app]');
+    const base = app?.querySelector('[data-booking-base-step]');
+    if (!base) return null;
+    base.dataset.bookingStep = step;
+    base.innerHTML = body;
+    state.bookingStep = step;
+    initV2Swipe(app.querySelector('[data-v2-z]'), {
+      onRight: () => onFirstBack?.(),
+      onLeft: () => { exitBookingContext(state); },
+    });
+    return base;
+  }
+
+  const active = currentBookingStepNode(root);
+  if (active && String(active.dataset.bookingStep || '') === String(step)) {
+    const host = bookingStepHost(active) || active;
+    host.innerHTML = body;
+    state.bookingStep = step;
+    syncBookingHeader(root, state, step);
+    return active;
+  }
+
+  const layer = mountV2ZLayer(root, v2ZLayer(
+    `<div data-booking-step-layer data-booking-step="${escapeHtml(step)}"><div data-booking-step-host>${body}</div></div>`,
+    { className: 'booking-step-z' },
+  ), {
+    stack: true,
+    onClose: () => {
+      const previous = previousBookingStep(root);
+      state.bookingStep = previous;
+      syncBookingHeader(root, state, previous);
+    },
+  });
+  if (!layer) return null;
+  const marker = layer.querySelector('[data-booking-step-layer]');
+  if (marker) marker.dataset.bookingStep = step;
+  layer.dataset.bookingStep = step;
+  layer.dataset.bookingStepLayer = '';
+  state.bookingStep = step;
+  syncBookingHeader(root, state, step);
+  return layer;
 }
 
 function resumeBookingStep(root, state) {
@@ -684,17 +802,12 @@ function renderWorkplaces(root, state) {
     data: 'data-booking-workplace',
     selected: state.workplaceKey,
   });
-  renderFlowPage(root, state, {
-    title: 'Рабочее пространство',
-    subtitle: 'Выберите, где хотите записаться',
-    body: content || emptyState('Нет доступных пространств', 'Рабочие пространства для онлайн-записи не найдены.'),
+  const layer = renderBookingStep(root, state, {
     step: 'workplaces',
+    body: content || emptyState('Нет доступных пространств', 'Рабочие пространства для онлайн-записи не найдены.'),
+    onFirstBack: () => backFromFirstBookingStep(root, state),
   });
-  initV2Swipe(root, {
-    onRight: () => backFromFirstBookingStep(root, state),
-    onLeft: () => { exitBookingContext(state); },
-  });
-  root.querySelectorAll('[data-booking-workplace]').forEach((node) => node.addEventListener('click', () => {
+  layer?.querySelectorAll('[data-booking-workplace]').forEach((node) => node.addEventListener('click', () => {
     state.workplaceKey = node.dataset.bookingWorkplace || '';
     state.procedureIds = [];
     state.date = '';
@@ -718,21 +831,12 @@ function renderProcedures(root, state) {
     data: 'data-booking-procedure',
     empty: 'Для этого рабочего пространства процедуры не настроены.',
   });
-  renderFlowPage(root, state, {
-    title: 'Услуги',
-    subtitle: 'Выберите всё, что хотите сделать',
-    action: { label: 'Далее', data: 'data-booking-procedures-next', disabled: state.procedureIds.length === 0 },
-    body: content || emptyState('Услуг нет', 'Для этого рабочего пространства услуги не настроены.'),
+  const layer = renderBookingStep(root, state, {
     step: 'procedures',
+    body: content || emptyState('Процедур нет', 'Для этого рабочего пространства процедуры не настроены.'),
+    onFirstBack: () => backFromFirstBookingStep(root, state),
   });
-  initV2Swipe(root, {
-    onRight: () => {
-      if (state.lockedWorkplaceKey) backFromFirstBookingStep(root, state);
-      else renderWorkplaces(root, state);
-    },
-    onLeft: () => { exitBookingContext(state); },
-  });
-  root.querySelectorAll('[data-booking-procedure]').forEach((node) => node.addEventListener('click', () => {
+  layer?.querySelectorAll('[data-booking-procedure]').forEach((node) => node.addEventListener('click', () => {
     const id = String(node.dataset.bookingProcedure || '');
     const next = new Set(state.procedureIds);
     if (next.has(id)) next.delete(id);
@@ -742,7 +846,7 @@ function renderProcedures(root, state) {
     state.from = '';
     renderProcedures(root, state);
   }));
-  root.querySelector('[data-booking-procedures-next]')?.addEventListener('click', () => {
+  root.querySelector('[data-v2-header] [data-booking-procedures-next]')?.addEventListener('click', () => {
     if (!state.procedureIds.length) return;
     state.date = '';
     state.from = '';
@@ -754,17 +858,11 @@ function renderDates(root, state) {
   const dates = getBookingWorkingDates(state.context, state.workplaceKey);
   const first = state.date || dates[0] || '2000-01-01';
   const firstDate = new Date(`${first}T00:00:00`);
-  renderFlowPage(root, state, {
-    title: 'Дата',
-    subtitle: 'Выберите удобный день',
-    body: dates.length ? '<div data-booking-calendar></div>' : emptyState('Свободных дат нет', 'В графике пока нет доступных дат.'),
+  const layer = renderBookingStep(root, state, {
     step: 'dates',
+    body: dates.length ? '<div data-booking-calendar></div>' : emptyState('Свободных дат нет', 'В графике пока нет доступных дат.'),
   });
-  initV2Swipe(root, {
-    onRight: () => renderProcedures(root, state),
-    onLeft: () => { exitBookingContext(state); },
-  });
-  const calendarRoot = root.querySelector('[data-booking-calendar]');
+  const calendarRoot = layer?.querySelector('[data-booking-calendar]');
   if (!calendarRoot) return;
   initCalendar(calendarRoot, {
     month: new Date(firstDate.getFullYear(), firstDate.getMonth(), 1),
@@ -786,19 +884,13 @@ function renderTimes(root, state) {
     procedureIds: state.procedureIds,
     step: state.settings.slotStep,
   });
-  renderFlowPage(root, state, {
-    title: 'Время',
-    subtitle: formatDate(state.date),
+  const layer = renderBookingStep(root, state, {
+    step: 'times',
     body: `${slots.length
       ? recordTimeRows(slots, { data: 'data-booking-time', accentEvery: 30 })
       : emptyState('Свободного времени нет', 'На эту дату нет интервала для выбранных процедур.')}${formError(state.error)}`,
-    step: 'times',
   });
-  initV2Swipe(root, {
-    onRight: () => renderDates(root, state),
-    onLeft: () => { exitBookingContext(state); },
-  });
-  root.querySelectorAll('[data-booking-time]').forEach((node) => {
+  layer?.querySelectorAll('[data-booking-time]').forEach((node) => {
     if (String(node.dataset.bookingTime || '') === String(state.from || '')) node.classList.add('is-selected');
     node.addEventListener('click', () => {
       const slot = slots.find((item) => item.from === node.dataset.bookingTime);
@@ -839,20 +931,11 @@ function confirmationCard(state) {
 }
 
 function renderConfirmation(root, state) {
-  renderFlowPage(root, state, {
-    title: 'Подтверждение',
-    action: { label: 'Подтвердить', data: 'data-booking-confirm' },
-    body: `${confirmationCard(state)}${formError(state.error)}`,
+  renderBookingStep(root, state, {
     step: 'confirmation',
+    body: `${confirmationCard(state)}${formError(state.error)}`,
   });
-  initV2Swipe(root, {
-    onRight: () => {
-      state.error = '';
-      renderTimes(root, state);
-    },
-    onLeft: () => { exitBookingContext(state); },
-  });
-  root.querySelector('[data-booking-confirm]')?.addEventListener('click', async (event) => {
+  root.querySelector('[data-v2-header] [data-booking-confirm]')?.addEventListener('click', async (event) => {
     event.currentTarget.disabled = true;
     state.identityDestination = 'booking';
     state.error = '';
