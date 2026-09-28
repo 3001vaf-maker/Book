@@ -197,6 +197,10 @@ if (!/lines:\s*\[/.test(sharedRecordUi)
   errors.push('Shared Record confirmation must use the Mini Card data-line owner and the canonical Время / Скидка / Сумма metrics');
 }
 
+if (!/step:\s*state\.settings\.slotStep/.test(onlineBookingUi)) {
+  errors.push('Online booking may keep its configured display slot step; specialist Record timing must remain independent from it');
+}
+
 if (!/recordWorkplaceCards\(/.test(onlineBookingUi)
   || !/recordProcedureList\(/.test(onlineBookingUi)
   || !/recordTimeRows\(/.test(onlineBookingUi)
