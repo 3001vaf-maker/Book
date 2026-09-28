@@ -472,7 +472,10 @@ function openConfirmationProcedurePicker({ workplaceId, selectedProcedures, onSe
 }
 
 function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, selectedPerson, selectedProcedures, onCreated }) {
-  modalRoot ||= mountRecordZ({ className: 'record-flow-z' });
+  modalRoot ||= mountRecordZ({
+    className: 'record-flow-z',
+    chatPersonKey: selectedPerson?.key || '',
+  });
   let currentDate = dateKey(date);
   let currentWorkplaceId = workplaceId;
   let currentFrom = from;
