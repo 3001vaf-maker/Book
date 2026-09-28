@@ -1,4 +1,5 @@
 import { renderPeople } from './main/people/people.js';
+import { openRecordCreationForPerson } from './journal/record.js';
 import { financeNavigationItems, renderFinanceSection } from './main/finance/finance.js';
 import { journalNavigationItems, renderJournalView } from './journal/journal.js';
 import { renderTimetable } from './timetable/timetable.js';
@@ -376,6 +377,11 @@ function renderActiveWorkspaceSurface(surface) {
   const openNavigation = () => setNavigationOpen(true);
   if (section === 'people') return renderPeople(surface, {
     onDirectChat: (personKey) => navigate('chat', { navigationOpen: false, chatPersonKey: personKey }),
+    onCreateRecord: (person) => openRecordCreationForPerson(person, {
+      onCreated: () => {
+        window.dispatchEvent(new CustomEvent('book:records-changed'));
+      },
+    }),
   });
   if (section === 'finance') return renderFinanceSection(surface, ensureSecondary('finance'), { onBack: openNavigation });
   if (section === 'timetable') return renderTimetable(surface);
