@@ -200,7 +200,7 @@ if (!/image:\s*representativePhoto\(state\)/.test(onlineBookingUi)
 }
 
 if (!/workplaceCardAppearance\(workplace\)/.test(onlineBookingUi)
-  || !/workplaceCardFields\(workplace, profile\)/.test(onlineBookingUi)
+  || !/workplaceCardFields\(workplace, workplace\.cardProfile \|\| profile\)/.test(onlineBookingUi)
   || !/entityVisualCard\(/.test(sharedRecordUi)
   || !/v2-profile-workplaces/.test(sharedRecordUi)) {
   errors.push('Booking workplace selection must render the exact saved workplace business-card owner used by Profile');
