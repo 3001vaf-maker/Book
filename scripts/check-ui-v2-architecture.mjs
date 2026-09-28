@@ -372,4 +372,20 @@ if (failures.length) {
   process.exit(1);
 }
 
+expect(
+  booking.includes("closeData: 'data-booking-welcome-u-close'")
+    && booking.includes("closeData: 'data-booking-u-close'")
+    && booking.includes("closeData: 'data-booking-legal-u-close'")
+    && booking.includes("closeData: 'data-u-document-close'")
+    && core.includes("closeData: 'data-specialist-u-close'"),
+  'Every U entry/information surface must expose the explicit Shared U close control.'
+);
+
+expect(
+  !/auth-view|auth-card/.test(core)
+    && core.includes("v2Sticker({")
+    && core.includes("className: 'v2-sticker-screen--auth'"),
+  'Specialist auth and technical entry states must use the Shared U owner, never the retired auth-card shell.'
+);
+
 console.log('ui v2 architecture check: OK');
