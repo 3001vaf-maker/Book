@@ -310,12 +310,26 @@ function renderFlowPage(root, state, {
   step = '',
 } = {}) {
   if (step) state.bookingStep = step;
-  const bookingStep = ['workplaces', 'procedures', 'dates', 'times', 'confirmation'].includes(step);
+  const bookingScreen = ['workplaces', 'procedures', 'dates', 'times', 'confirmation'].includes(step);
+  const registration = step === 'registration';
   const header = v2Header({
-    a: { kind: 'avatar', label: representativeName(state), image: representativePhoto(state), disabled: true },
-    b: bookingStep ? 'Запись' : (title || representativeName(state)),
+    a: registration ? {
+      kind: 'avatar',
+      label: '',
+      image: '',
+      initials: '',
+      disabled: true,
+      aria: 'Регистрация',
+    } : {
+      kind: 'avatar',
+      label: representativeName(state),
+      image: representativePhoto(state),
+      disabled: true,
+      aria: `Профиль ${representativeName(state)}`,
+    },
+    b: registration ? 'Регистрация' : bookingScreen ? 'Запись' : (title || representativeName(state)),
     c: action ? { kind: 'text', label: action.label || '', data: action.data || '', aria: action.aria || action.label || '', disabled: Boolean(action.disabled) } : null,
-    d: bookingStep ? null : (state.account ? { kind: 'chat', data: 'data-booking-flow-chat', aria: 'Чат' } : null),
+    d: bookingScreen ? null : (state.account ? { kind: 'chat', data: 'data-booking-flow-chat', aria: 'Чат' } : null),
   });
   const localTitle = title ? `<h2 class="v2-flow-title">${escapeHtml(title)}</h2>` : '';
   const shell = v2Shell({
@@ -659,7 +673,8 @@ function renderWorkplaces(root, state) {
     ...workplace,
     appearance: workplaceCardAppearance(workplace),
     fields: workplaceCardFields(workplace, profile),
-    imagePosition: `${Math.max(0, Math.min(100, Number(workplace.photoCropX ?? 50)))}% ${Math.max(0, Math.min(100, Number(workplace.photoCropY ?? 50)))}%`,
+    image: workplace.photo || '',
+    imagePosition: `${Number(workplace.photoCropX || 50)}% ${Number(workplace.photoCropY || 50)}%`,
   })), {
     data: 'data-booking-workplace',
   });
@@ -770,7 +785,7 @@ function renderTimes(root, state) {
     subtitle: formatDate(state.date),
     body: `${slots.length
       ? recordTimeRows(slots, { data: 'data-booking-time', accentEvery: 30 })
-      : emptyState('Свободного времени нет', 'На эту дату нет интервала для выбранных услуг.')}${formError(state.error)}`,
+      : emptyState('Свободного времени нет', 'На эту дату нет интервала для выбранных процедур.')}${formError(state.error)}`,
     step: 'times',
   });
   initV2Swipe(root, {
@@ -798,10 +813,9 @@ function confirmationCard(state) {
   const discount = accountDiscount(state.account);
   const total = discountedTotal(subtotal, discount);
   const duration = procedures.reduce((sum, procedure) => sum + Math.max(0, Number(procedure.duration || 0)), 0);
-  const profileData = state.account?.profileData || {};
-  const accountName = [profileData.name || state.account?.name, profileData.surname || state.account?.surname].filter(Boolean).join(' ').trim();
-  const accountPhone = String(profileData.phone || state.account?.phone || '');
-  const uei = String(state.account?.uei || '');
+  const accountName = [state.account?.name, state.account?.surname].filter(Boolean).join(' ').trim();
+  const accountPhone = String(state.account?.phone || state.account?.phones?.[0] || '');
+  const uei = String(state.account?.uei || state.account?.person?.uei || '');
   return recordConfirmationMiniCard({
     workplace: workplace.name || representativeName(state),
     date: formatDate(state.date),
@@ -809,7 +823,7 @@ function confirmationCard(state) {
     uei,
     name: accountName || 'Запись',
     phone: accountPhone,
-    duration: `${duration} мин`,
+    duration: duration ? `${duration} мин` : '—',
     discount: `${discount}%`,
     total: money(total),
     procedures: procedures.map((procedure) => ({
