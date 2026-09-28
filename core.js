@@ -19,7 +19,7 @@ import { canUseBookCapability, getBookAccess, loadBookAccess } from './core/acce
 import { startServerBookingSync } from './online-booking/server-sync.js';
 import { renderGlobalClient, renderOnlineBooking } from './online-booking/booking.js';
 import { startAccountRuntime } from './online-booking/account-runtime.js';
-import { field, passwordField, initPasswordFields, initV2WorkspaceInteraction, setV2DeckOpen, v2EList, v2FDeck, v2Header, v2Shell, v2Sticker } from './ui/ui.js';
+import { field, passwordField, initPasswordFields, openNotice, initV2WorkspaceInteraction, setV2DeckOpen, v2EList, v2FDeck, v2Header, v2Shell, v2Sticker } from './ui/ui.js';
 import { clearLegacyBusinessStorage } from './core/legacy-browser-business.js';
 import { FirstRunRuntime, bindDemoBadgeAction, demoBadgeMarkup, startPlatformSessionTracking } from './first-run/runtime.js';
 import { startPlatformNotices } from './core/platform-notices.js';
@@ -781,7 +781,12 @@ function renderLogin(message = '') {
     if (window.history.length > 1) window.history.back();
   });
   app.querySelector('[data-specialist-forgot]')?.addEventListener('click', () => {
-    window.alert('Восстановление пароля пока недоступно.');
+    openNotice({
+      title: 'Восстановление пароля',
+      message: 'Восстановление пароля пока недоступно.',
+      action: 'Закрыть',
+      variant: 'technical',
+    });
   });
 
   const form = app.querySelector('#auth-form');
