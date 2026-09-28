@@ -126,17 +126,19 @@ function openPriceProcedurePicker({ workplaceId, onAssigned }) {
   }
 
   const selectedIds = new Set();
-  const content = list({
-    items: available.map((procedure) => {
-      const cost = defaultCost(procedure, '');
-      return {
-        title: procedure.name || '',
-        secondary: [durationText(procedure.duration), cost !== '' ? `${cost} ₽` : ''],
-        interactive: true,
-        data: `data-record-price-procedure="${escapeHtml(procedure.id)}"`,
-        aria: `Подключить процедуру ${procedure.name || ''} к рабочему месту`,
-      };
-    }),
+  const content = recordProcedureList(available.map((procedure) => {
+    const cost = defaultCost(procedure, '');
+    return {
+      id: String(procedure.id || ''),
+      name: procedure.name || '',
+      durationText: durationText(procedure.duration),
+      costText: cost !== '' ? `${cost} ₽` : '',
+      aria: `Подключить процедуру ${procedure.name || ''} к рабочему месту`,
+    };
+  }), {
+    data: 'data-record-price-procedure',
+    selected: [],
+    empty: 'Процедур нет.',
   });
   const m = mountModal(document.body, modal(`<div class="modal-title"><h2>Из прайса</h2><p>Отметьте процедуры, которые выполняются в этом рабочем месте.</p></div><div data-record-price-list>${content}</div><div class="modal-actions">${button('Добавить', { data: 'data-record-price-save' })}</div>`, { variant: 'medium', surface: 'app' }));
   if (!m) return;
@@ -469,15 +471,16 @@ function openPhoneActions(phone) {
 function openConfirmationProcedurePicker({ workplaceId, selectedProcedures, onSelected }) {
   const selectedIds = new Set(selectedProcedures.map((item) => String(item?.procedure?.id || '')));
   const available = procedures().filter((procedure) => procedureForWorkplace(procedure, workplaceId) && !selectedIds.has(String(procedure.id || '')));
-  const content = list({
-    items: available.map((procedure) => ({
-      title: procedure.name || '',
-      secondary: [durationText(procedure.duration), defaultCost(procedure, workplaceId) !== '' ? `${defaultCost(procedure, workplaceId)} ₽` : ''],
-      interactive: true,
-      data: `data-record-confirm-add-procedure="${escapeHtml(procedure.id)}"`,
-      aria: `Добавить процедуру ${procedure.name || ''}`,
-    })),
-  }) || '<div class="muted">Других процедур для этого рабочего места нет.</div>';
+  const content = recordProcedureList(available.map((procedure) => ({
+    id: String(procedure.id || ''),
+    name: procedure.name || '',
+    durationText: durationText(procedure.duration),
+    costText: defaultCost(procedure, workplaceId) !== '' ? `${defaultCost(procedure, workplaceId)} ₽` : '',
+    aria: `Добавить процедуру ${procedure.name || ''}`,
+  })), {
+    data: 'data-record-confirm-add-procedure',
+    empty: 'Других процедур для этого рабочего места нет.',
+  });
   const m = mountModal(document.body, modal(`<div class="modal-title"><h2>Добавить процедуру</h2></div>${content}`, { variant: 'medium', surface: 'app' }));
   if (!m) return;
   m.querySelectorAll('[data-record-confirm-add-procedure]').forEach((node) => node.addEventListener('click', () => {
