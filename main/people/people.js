@@ -226,10 +226,10 @@ export function renderPeople(root, options = {}) {
   root.innerHTML = page([
     listContext(count),
     `<section class="people-z1">
-      <div class="people-search">
+      <div class="people-search ui-search-field">
         ${field({ name: 'peopleSearch', type: 'search', placeholder: 'Поиск по имени или UEI', autocomplete: 'off', data: 'data-people-search' })}
       </div>
-      <div class="people-search-divider" aria-hidden="true"></div>
+      <div class="people-search-divider ui-search-divider" aria-hidden="true"></div>
       <div class="people-list-host" data-people-list-host></div>
     </section>`,
     button('+', {
