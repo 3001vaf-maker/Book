@@ -757,7 +757,7 @@ function blockEndValues({ date, workplaceId, from }) {
 }
 
 function renderBlockEndStep(modalRoot, { date, workplaceId, from, onCreated }) {
-  modalRoot ||= mountRecordZ({ className: 'record-flow-z' });
+  modalRoot ||= mountRecordZ({ ...recordOwnerOptions(), className: 'record-flow-z' });
   const values = blockEndValues({ date, workplaceId, from });
   const host = renderRecordZ(modalRoot, `<div class="record-screen record-screen--time"><div class="record-modal-toolbar"><strong>До скольки занять</strong></div>${recordTimeRows({
     items: values,
@@ -773,7 +773,7 @@ function renderBlockEndStep(modalRoot, { date, workplaceId, from, onCreated }) {
 }
 
 function renderBreakConfirmationStep(modalRoot, { date, workplaceId, from, to, onCreated }) {
-  modalRoot ||= mountRecordZ({ className: 'record-flow-z' });
+  modalRoot ||= mountRecordZ({ ...recordOwnerOptions(), className: 'record-flow-z' });
   const host = recordZHost(modalRoot);
   if (!host) return;
   const workplace = findWorkplaceName(workplaceId);
