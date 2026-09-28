@@ -313,11 +313,19 @@ if (!/kind:\s*'avatar'/.test(sharedRecordUi)
   errors.push('Shared Record Header must always own A as avatar/photo, expose settings only by context, and show D only after a person is fixed');
 }
 
-if (!/lines:\s*\[/.test(sharedRecordUi)
-  || !/subtitle:\s*'Время'/.test(sharedRecordUi)
-  || !/subtitle:\s*'Скидка'/.test(sharedRecordUi)
-  || !/subtitle:\s*'Сумма'/.test(sharedRecordUi)) {
-  errors.push('Shared Record confirmation must use the Mini Card data-line owner and the canonical Время / Скидка / Сумма metrics');
+const sharedConfirmationSource = sharedRecordUi.slice(
+  sharedRecordUi.indexOf('export function recordConfirmationMiniCard'),
+  sharedRecordUi.indexOf('export function mountRecordZ')
+);
+if (!/record-confirmation-card__workplace/.test(sharedConfirmationSource)
+  || !/record-confirmation-card__discount/.test(sharedConfirmationSource)
+  || !/record-confirmation-card__duration/.test(sharedConfirmationSource)
+  || !/record-confirmation-card__total/.test(sharedConfirmationSource)
+  || /record-confirmation-view__metrics|v2RailCard\(/.test(sharedConfirmationSource)
+  || !/\.record-confirmation-view\{[^}]*gap:\s*20px/.test(sharedRecordCss)
+  || !/\.record-confirmation-card__top\{[^}]*grid-template-columns:minmax\(0,1fr\) auto/.test(sharedRecordCss)
+  || !/\.record-confirmation-card__bottom\{[^}]*grid-template-columns:minmax\(0,1fr\) auto/.test(sharedRecordCss)) {
+  errors.push('Shared Record confirmation must keep discount inside the card at top right, duration bottom left, total bottom right, and procedures separated below without metric cubes');
 }
 
 if (!/step:\s*state\.settings\.slotStep/.test(onlineBookingUi)) {
@@ -356,10 +364,9 @@ if (!/workplaceCardAppearance\(workplace\)/.test(onlineBookingUi)
 
 if (!/listEntry\(/.test(sharedRecordUi)
   || !/listEntries\(/.test(sharedRecordUi)
-  || !/miniCard\(/.test(sharedRecordUi)
-  || !/v2RailCard\(/.test(sharedRecordUi)
-  || !/timeSlots\(/.test(sharedRecordUi)) {
-  errors.push('Record UI must reuse the existing History list, Mini Card, metric cubes and Shared Time owners');
+  || !/timeSlots\(/.test(sharedRecordUi)
+  || !/recordConfirmationMiniCard\(/.test(onlineBookingUi)) {
+  errors.push('Record UI must reuse the existing History list and Shared Time owners while keeping one Shared confirmation-card owner for specialist and online booking');
 }
 
 if (errors.length) {
