@@ -139,6 +139,28 @@ if (!/recordTimeRows/.test(journalRecordUi)
   errors.push('journal/record.js must consume Shared Record time-row UI instead of drawing local time buttons');
 }
 
+const sharedProcedureListSource = sharedRecordUi.slice(
+  sharedRecordUi.indexOf('export function recordProcedureList'),
+  sharedRecordUi.indexOf('export function recordPersonList')
+);
+if (!/v2-sticker-list/.test(sharedProcedureListSource)
+  || !/v2-service-sticker/.test(sharedProcedureListSource)
+  || !/v2-service-sticker__selector/.test(sharedProcedureListSource)
+  || !/aria-pressed/.test(sharedProcedureListSource)
+  || !/✓/.test(sharedProcedureListSource)) {
+  errors.push('Shared Record procedure selection must render separate readable stickers with a visible selected checkmark');
+}
+
+const procedureSettingsSource = journalRecordUi.slice(
+  journalRecordUi.indexOf('bindRecordSettings(modalRoot, () => {', journalRecordUi.indexOf('function renderProceduresStep')),
+  journalRecordUi.indexOf('  render();', journalRecordUi.indexOf('function renderProceduresStep'))
+);
+if (!/button\('Добавить из прайса',[\s\S]*variant:\s*'secondary'/.test(procedureSettingsSource)
+  || !/button\('\+ Добавить процедуру'/.test(procedureSettingsSource)
+  || /const menu = list\(/.test(procedureSettingsSource)) {
+  errors.push('Record procedure settings must use the canonical white "Добавить из прайса" button and black "+ Добавить процедуру" button');
+}
+
 if (!/recordTimeRows\(values,\s*\{\s*data:\s*'data-record-time'/.test(journalRecordUi)
   || !/recordTimeRows\(values,\s*\{[\s\S]*?data:\s*'data-block-end'/.test(journalRecordUi)
   || /recordTimeRows\(\{\s*items:/.test(journalRecordUi)) {
