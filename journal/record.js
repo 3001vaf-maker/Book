@@ -57,7 +57,8 @@ function recordStartTimes({ date, workplaceId, from }) {
     workplaceId,
     from,
     to,
-    duration: recordSlotStep(),
+    // This step chooses only a start point. Procedure duration is unknown until the next step.
+    duration: 1,
     step: recordSlotStep(),
   });
 }
