@@ -10,9 +10,4 @@
 .record-time-chip:active,.record-time-chip.is-selected{background:var(--active)}
 .record-confirmation-view{display:grid;gap:12px;justify-items:start;width:100%}
 .record-confirmation-view__card{width:100%;display:flex;justify-content:flex-start}
-.record-confirmation-totals{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;border:1px solid #111;background:#fff}
-.record-confirmation-totals>div{min-width:0;min-height:58px;padding:10px 12px;display:grid;align-content:center;gap:4px}
-.record-confirmation-totals>div+div{border-left:1px solid #111}
-.record-confirmation-totals span{font-size:11px;color:var(--text-secondary)}
-.record-confirmation-totals strong{font-size:17px;line-height:1.1}
 .record-confirmation-view__metrics{width:100%}.record-confirmation-view__procedures{width:100%}
