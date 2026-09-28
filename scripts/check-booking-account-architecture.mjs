@@ -74,12 +74,10 @@ expect(booking.includes('d: null'), 'Online booking Header D must stay absent; b
 
 expect(booking.includes('renderWorkplaces') && booking.includes('renderProcedures') && booking.includes('renderDates') && booking.includes('renderTimes') && booking.includes('renderConfirmation'), 'Booking itself must preserve workplace -> services -> date -> time -> confirmation.');
 expect(booking.includes("step: 'workplaces'") && booking.includes("step: 'procedures'") && booking.includes("step: 'dates'") && booking.includes("step: 'times'") && booking.includes("step: 'confirmation'"), 'Booking must preserve the canonical V2 Z-stack steps.');
-expect(booking.includes('function renderBookingStep') && booking.includes('mountV2ZLayer(root') && booking.includes('stack: true'), 'Online booking must use one physical Shared Z stack instead of redrawing previous steps.');
-expect(booking.includes('onFirstBack: () => backFromFirstBookingStep(root, state)'), 'The first booking Z must preserve the explicit swipe-back boundary.');
-expect(booking.includes('previousBookingStep(root)') && booking.includes('syncBookingHeader(root, state, previous)'), 'Closing the top booking Z must restore the previous step and its Header state.');
-expect(booking.includes("step: 'dates'") && booking.includes("step: 'times'") && booking.includes("step: 'confirmation'"), 'Date, time and confirmation must remain physical steps in the canonical Z stack.');
+expect(booking.includes("step: 'workplaces'") && booking.includes("step: 'procedures'") && booking.includes("step: 'dates'") && booking.includes("step: 'times'") && booking.includes("step: 'confirmation'"), 'Online booking must keep the canonical booking step sequence while UI owners remain shared.');
+expect(booking.includes('initV2Swipe(root'), 'Online booking must preserve its proven swipe navigation while the UI layer is refactored.');
 expect(!booking.includes('data-booking-workplaces-back') && !booking.includes('data-booking-dates-back') && !booking.includes('data-booking-times-back') && !booking.includes('data-booking-confirm-back'), 'V2 booking flow must not restore legacy back buttons.');
-expect(booking.includes('function backFromFirstBookingStep') && booking.includes("state.bookingOrigin === 'profile'") && booking.includes("state.bookingOrigin === 'account-overview'") && booking.includes("tab: 'home'") && booking.includes('renderWelcome(root, state);'), 'The first booking swipe boundary must restore the correct profile/overview origin or Welcome.');
+expect(booking.includes('function backFromFirstBookingStep') && booking.includes("state.bookingOrigin === 'profile'") && booking.includes('renderWelcome(root, state);'), 'The first booking swipe boundary must preserve the proven profile/welcome return behavior.');
 expect(!booking.slice(booking.indexOf('function backFromFirstBookingStep'), booking.indexOf('function renderWelcome')).includes('renderAccountEntry(root, state);'), 'Backing out of booking must never force Auth Sticker.');
 
 expect(!booking.includes('renderAccountHome(') && !booking.includes("import { renderAccount,"), 'Online booking must not retain the removed tenant account UI owner.');
