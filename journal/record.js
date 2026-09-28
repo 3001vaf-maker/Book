@@ -12,6 +12,7 @@ import { checkTimeAvailability, listAvailableEndTimes, listAvailableStartTimes }
 import { timeToMinutes, minutesToTime } from '../core/time/index.js';
 import { getWorkplaces, getWorkplaceWorkingDates } from '../core/workplace-time.js';
 import { journalRecordActionContext } from './record-action-context.js';
+import { getBookingSettings } from '../core/booking-settings/index.js';
 
 const RECORD_MODES = [
   { id: 'record', label: 'Создать запись' },
@@ -21,6 +22,10 @@ const RECORD_MODES = [
 const people = () => getPeople();
 const procedures = () => getProcedures();
 const personName = (person) => personDisplay(person).name;
+
+function recordSlotStep() {
+  return getBookingSettings().slotStep;
+}
 
 function dateKey(date) {
   const d = date instanceof Date ? date : new Date(date);
@@ -38,8 +43,9 @@ function recordStartTimes({ date, workplaceId, from }) {
     workplaceId,
     from,
     to,
-    duration: 5,
-    step: 5,
+    // This step chooses only a start point. Procedure duration is unknown until the next step.
+    duration: 1,
+    step: recordSlotStep(),
   });
 }
 
