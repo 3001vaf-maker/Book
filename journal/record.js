@@ -1,4 +1,4 @@
-import { button, durationPicker, durationText, entityCard, escapeHtml, list, listEntry, stateView, initStateView, initCalendar, mountModal, modal, openNotice, initDurationPickers, initMultiSelect, viewNavigation, initViewNavigation, mountRecordZ, recordZHost, renderRecordZ, recordTimeRows, recordProcedureList, recordPersonList, recordConfirmationMiniCard, setRecordPrimaryAction, bindRecordSettings, closeRecordZStack } from '../ui/ui.js';
+import { button, durationPicker, durationText, entityCard, escapeHtml, list, listEntry, stateView, initStateView, initCalendar, mountModal, modal, openNotice, initDurationPickers, initMultiSelect, viewNavigation, initViewNavigation, openTimePickerAction, mountRecordZ, recordZHost, renderRecordZ, recordTimeRows, recordProcedureList, recordPersonList, recordConfirmationMiniCard, setRecordPrimaryAction, bindRecordSettings, closeRecordZStack } from '../ui/ui.js';
 import { createRecord } from '../core/record/index.js';
 import { createJournalBreak } from './break-service.js';
 import { getPeople } from '../main/people/data.js';
@@ -53,8 +53,8 @@ function recordStartTimes({ date, workplaceId, from }) {
     workplaceId,
     from,
     to,
-    duration: 1,
-    step: 1,
+    duration: 5,
+    step: 5,
   });
 }
 
@@ -419,30 +419,33 @@ function openConfirmationDateModal({ workplaceId, date, onSelected }) {
   });
 }
 
-function availableConfirmationTimes({ date, workplaceId, duration }) {
-  return listAvailableStartTimes({
-    date,
-    workplaceId,
-    duration: Math.max(1, Number(duration) || 0),
-    step: 1,
-  }).map((from) => ({ from, to: minutesToTime(timeToMinutes(from) + Math.max(1, Number(duration) || 0)) }));
-}
-
 function openConfirmationTimeModal({ date, workplaceId, from, duration, onSelected }) {
-  const options = availableConfirmationTimes({ date, workplaceId, duration });
-  const content = `<div class="modal-title"><h2>Выбор времени</h2></div>${recordTimeRows({
-    items: options.map((item) => item.from),
-    data: 'data-record-confirm-time-option',
-    empty: 'Свободного времени нет.',
-    accentEvery: 30,
-  })}`;
-  const m = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
-  if (!m) return;
-  m.querySelectorAll('[data-record-confirm-time-option]').forEach((node) => node.addEventListener('click', () => {
-    const selectedFrom = node.dataset.recordConfirmTimeOption || from;
-    m.remove();
-    onSelected?.(selectedFrom);
-  }));
+  const appointmentDuration = Math.max(1, Number(duration) || 0);
+  return openTimePickerAction({
+    value: from,
+    minuteStep: 1,
+    title: 'Время',
+    onSave: (nextFrom) => {
+      const start = timeToMinutes(nextFrom);
+      const nextTo = start == null ? '' : minutesToTime(start + appointmentDuration);
+      if (!nextFrom || !nextTo) return;
+      const availability = checkTimeAvailability({
+        date,
+        workplaceId,
+        from: nextFrom,
+        to: nextTo,
+      });
+      if (!availability.ok) {
+        openRecordTimeNotice(
+          availability.reason === 'occupied'
+            ? 'Это время уже занято. Выберите другое время.'
+            : 'Это время находится вне рабочего периода. Выберите другое время.',
+        );
+        return;
+      }
+      onSelected?.(nextFrom);
+    },
+  });
 }
 
 function openPhoneActions(phone) {
@@ -748,7 +751,7 @@ function blockEndValues({ date, workplaceId, from }) {
     date: dateKey(date),
     workplaceId,
     from,
-    step: 1,
+    step: 5,
   });
 }
 
