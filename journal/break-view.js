@@ -1,4 +1,4 @@
-import { button, entityCard, modal, mountModal, timeSlots } from '../ui/ui.js';
+import { entityCard, list, modal, mountModal, timeSlots, mountRecordZ, recordZHost, bindRecordSettings } from '../ui/ui.js';
 import { listAvailableEndTimes, listAvailableStartTimes } from '../core/time/index.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { moveJournalBreak, removeJournalBreak } from './break-service.js';
@@ -68,14 +68,15 @@ function openBreakTimeSlots(item, onSelected) {
 export function openBreakView(breakItem, { onClose = () => {} } = {}) {
   if (!breakItem?.id) return;
   let current = { ...breakItem };
-  const m = mountModal(document.body, modal('<div data-break-view-host></div>', { variant: 'large', surface: 'app' }));
-  if (!m) return;
-  const root = m.querySelector('[data-break-view-host]');
-
   const finish = () => onClose?.();
-  m.addEventListener('click', (event) => {
-    if (event.target === m || event.target.closest('[data-modal-close]')) queueMicrotask(finish);
+  const m = mountRecordZ({
+    title: 'Перерыв',
+    settings: true,
+    className: 'record-break-z',
+    onClose: () => queueMicrotask(finish),
   });
+  if (!m) return;
+  const root = recordZHost(m);
 
   const render = () => {
     const workplace = workplaceName(current.workplaceId);
@@ -90,7 +91,7 @@ export function openBreakView(breakItem, { onClose = () => {} } = {}) {
       ],
       className: 'entity-card--hero entity-card--top-dark',
     });
-    root.innerHTML = `<div class="record-screen record-screen--state-view">${card}<div class="record-modal-actions modal-actions">${button('Удалить перерыв', { data: 'data-break-delete', variant: 'danger' })}</div></div>`;
+    root.innerHTML = `<div class="record-screen record-screen--state-view">${card}</div>`;
 
     root.querySelector('[data-break-move]')?.addEventListener('click', () => {
       openBreakTimeSlots(current, ({ from, to }) => {
@@ -101,12 +102,22 @@ export function openBreakView(breakItem, { onClose = () => {} } = {}) {
       });
     });
 
-    root.querySelector('[data-break-delete]')?.addEventListener('click', () => {
-      if (!removeJournalBreak(current.id)) return;
-      m.remove();
-      finish();
-    });
+
   };
+
+  bindRecordSettings(m, () => {
+    const menu = list({
+      items: [
+        { title: 'Удалить перерыв', interactive: true, data: 'data-break-settings-delete', aria: 'Удалить перерыв' },
+      ],
+    });
+    const layer = mountModal(document.body, modal(menu, { variant: 'quick', surface: 'app' }));
+    layer?.querySelector('[data-break-settings-delete]')?.addEventListener('click', () => {
+      layer.v2Close?.();
+      if (!removeJournalBreak(current.id)) return;
+      m.v2Close?.();
+    });
+  });
 
   render();
 }
