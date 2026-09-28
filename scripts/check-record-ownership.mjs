@@ -176,9 +176,10 @@ const recordStartTimesSource = journalRecordUi.slice(
   journalRecordUi.indexOf('function recordStartTimes'),
   journalRecordUi.indexOf('function openRecordTimeNotice')
 );
-if (!/getBookingSettings\(\)\.slotStep/.test(recordStartTimesSource)
-  || /step:\s*5\b/.test(recordStartTimesSource)) {
-  errors.push('Journal Record start-time selection must read the canonical booking slotStep instead of owning a hard-coded time step');
+if (!/duration:\s*5\b/.test(recordStartTimesSource)
+  || !/step:\s*5\b/.test(recordStartTimesSource)
+  || /getBookingSettings\(\)\.slotStep/.test(recordStartTimesSource)) {
+  errors.push('Journal Record start-time selection must preserve the proven 5-minute specialist timing logic and must not depend on online booking slotStep');
 }
 
 if (!/recordWorkplaceCards\(/.test(onlineBookingUi)
