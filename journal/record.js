@@ -53,7 +53,7 @@ function recordStartTimes({ date, workplaceId, from }) {
     workplaceId,
     from,
     to,
-    duration: 5,
+    duration: 1,
     step: 5,
   });
 }
