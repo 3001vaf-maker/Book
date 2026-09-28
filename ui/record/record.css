@@ -2,3 +2,29 @@
 
 
 
+
+.v2-sticker-list{display:grid;gap:10px}
+.v2-service-sticker{
+  width:100%;
+  min-height:78px;
+  border:0;
+  border-radius:0;
+  padding:13px 14px;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto 28px;
+  gap:10px;
+  align-items:center;
+  background:var(--v2-beige);
+  color:var(--v2-ink);
+  text-align:left;
+  transform:translateY(-1px);
+  box-shadow:-9px 8px 14px -11px rgba(0,0,0,.34),9px 8px 14px -11px rgba(0,0,0,.34),0 1px 2px rgba(0,0,0,.08);
+  transition:transform .16s ease,box-shadow .16s ease;
+}
+.v2-service-sticker:active{transform:translateY(0);box-shadow:-6px 5px 10px -10px rgba(0,0,0,.28),6px 5px 10px -10px rgba(0,0,0,.28),0 1px 2px rgba(0,0,0,.06)}
+.v2-service-sticker__text{min-width:0;display:grid;gap:5px}
+.v2-service-sticker__text strong{font-size:16px;line-height:1.2;white-space:normal;overflow-wrap:anywhere}
+.v2-service-sticker__text span{font-size:14px;line-height:1.25}
+.v2-service-sticker__price{font-size:14px;font-weight:760;white-space:nowrap}
+.v2-service-sticker__selector{width:24px;height:24px;border:1px solid var(--v2-ink);display:grid;place-items:center;font-size:13px;font-weight:850}
+.v2-service-sticker.is-selected .v2-service-sticker__selector{background:var(--v2-ink);color:#fff}
