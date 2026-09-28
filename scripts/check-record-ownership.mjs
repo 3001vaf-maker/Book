@@ -193,9 +193,13 @@ if (/bookingChoiceCards\(|bookingTimeGroups\(|v2ServiceStickers\(|v2-confirmatio
   errors.push('Online booking must not restore parallel visual owners for canonical booking steps');
 }
 
-if (!/image:\s*representativePhoto\(state\)/.test(onlineBookingUi)
-  || !/bookingStep\s*\?\s*'Запись'/.test(onlineBookingUi)
-  || !/bookingStep\s*\?\s*null/.test(onlineBookingUi)) {
+const bookingHeaderSource = onlineBookingUi.slice(
+  onlineBookingUi.indexOf('function bookingHeaderMarkup'),
+  onlineBookingUi.indexOf('function bookingActionForStep')
+);
+if (!/image:\s*representativePhoto\(state\)/.test(bookingHeaderSource)
+  || !/b:\s*'Запись'/.test(bookingHeaderSource)
+  || !/d:\s*null/.test(bookingHeaderSource)) {
   errors.push('Online booking Header must use the professional photo in A, Запись in B, and no D chat on booking steps');
 }
 
