@@ -240,12 +240,10 @@ function renderProceduresStep(modalRoot, { date, workplaceId, from, to, onCreate
   };
 
   bindRecordSettings(modalRoot, () => {
-    const menu = list({
-      items: [
-        { title: 'Из прайса', interactive: true, data: 'data-record-settings-from-price', aria: 'Добавить из прайса' },
-        { title: 'Добавить процедуру', interactive: true, data: 'data-record-settings-add-procedure', aria: 'Добавить процедуру' },
-      ],
-    });
+    const menu = `<div class="modal-actions">
+      ${button('Добавить из прайса', { data: 'data-record-settings-from-price', variant: 'secondary' })}
+      ${button('+ Добавить процедуру', { data: 'data-record-settings-add-procedure' })}
+    </div>`;
     const m = mountModal(document.body, modal(menu, { variant: 'quick', surface: 'app' }));
     m?.querySelector('[data-record-settings-from-price]')?.addEventListener('click', () => {
       m.v2Close?.();
