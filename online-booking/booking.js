@@ -323,6 +323,7 @@ function renderFlowPage(root, state, {
   if (step) state.bookingStep = step;
   const professionalName = representativeName(state);
   const registration = step === 'registration';
+  const bookingScreen = ['workplaces', 'procedures', 'dates', 'times', 'confirmation'].includes(step);
   const header = v2Header({
     a: registration ? {
       kind: 'avatar',
@@ -339,7 +340,7 @@ function renderFlowPage(root, state, {
       disabled: true,
       aria: `Профиль ${professionalName}`,
     },
-    b: registration ? 'Регистрация' : 'Запись',
+    b: registration ? 'Регистрация' : bookingScreen ? 'Запись' : (title || 'Профиль'),
     c: action ? { kind: 'text', label: action.label || '', data: action.data || '', aria: action.aria || action.label || '', disabled: Boolean(action.disabled) } : null,
     d: null,
   });
@@ -433,7 +434,7 @@ function renderBookingStep(root, state, {
     state.bookingStep = step;
     initV2Swipe(app.querySelector('[data-v2-z]'), {
       onRight: () => onFirstBack?.(),
-      onLeft: () => { exitBookingContext(state); },
+      revealDeck: false,
     });
     return base;
   }
@@ -521,6 +522,10 @@ function backFromFirstBookingStep(root, state) {
     exitBookingContext(state, { tab: 'contact-detail', tenantId: state.tenantId });
     return;
   }
+  if (state.bookingOrigin === 'account-overview' && state.account) {
+    exitBookingContext(state, { tab: 'home' });
+    return;
+  }
   state.identityDestination = 'booking';
   renderWelcome(root, state);
 }
@@ -537,7 +542,7 @@ function renderWelcome(root, state) {
   const continueFlow = async () => {
     resetBookingChoice(state);
     state.identityDestination = 'booking';
-    state.bookingOrigin = 'welcome';
+    state.bookingOrigin = state.account ? 'account-overview' : 'welcome';
     if (!state.account) {
       renderWelcome(root, state);
       return;
@@ -764,6 +769,7 @@ async function continueAfterIdentity(root, state) {
     }
 
     state.platformOnlyLegal = false;
+    if (state.bookingOrigin === 'welcome') state.bookingOrigin = 'account-overview';
     const consentState = await refreshTenantConsentState(state);
     if (!consentState.pdnActive) {
       renderLegalSticker(root, state);
@@ -859,6 +865,7 @@ function renderDates(root, state) {
   const layer = renderBookingStep(root, state, {
     step: 'dates',
     body: dates.length ? '<div data-booking-calendar></div>' : emptyState('Свободных дат нет', 'В графике пока нет доступных дат.'),
+    onFirstBack: () => backFromFirstBookingStep(root, state),
   });
   const calendarRoot = layer?.querySelector('[data-booking-calendar]');
   if (!calendarRoot) return;
@@ -884,6 +891,7 @@ function renderTimes(root, state) {
   });
   const layer = renderBookingStep(root, state, {
     step: 'times',
+    onFirstBack: () => backFromFirstBookingStep(root, state),
     body: `${slots.length
       ? recordTimeRows(slots, { data: 'data-booking-time', accentEvery: 30 })
       : emptyState('Свободного времени нет', 'На эту дату нет интервала для выбранных процедур.')}${formError(state.error)}`,
@@ -932,6 +940,7 @@ function renderConfirmation(root, state) {
   renderBookingStep(root, state, {
     step: 'confirmation',
     body: `${confirmationCard(state)}${formError(state.error)}`,
+    onFirstBack: () => backFromFirstBookingStep(root, state),
   });
   root.querySelector('[data-v2-header] [data-booking-confirm]')?.addEventListener('click', async (event) => {
     event.currentTarget.disabled = true;
