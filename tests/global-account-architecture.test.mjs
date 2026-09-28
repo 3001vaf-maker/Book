@@ -79,7 +79,7 @@ assert.match(accountShell, /data-account-open-chat-root/, 'Global Account header
 assert.match(accountShell, /state\.accountSelectedChatTenantId/, 'Global Account must own selected chat contact state directly');
 assert.doesNotMatch(accountShell, /onOpenChat: callbacks\.onOpenChat/, 'Global Account chat must not bridge into a second tenant account UI');
 assert.doesNotMatch(bookingUi, /params\.set\('entry', 'chat'\)/, 'Global chat must not navigate through a tenant chat route');
-assert.match(bookingUi, /d:\s*null/, 'Online booking itself must keep Header D absent.');
+assert.match(bookingUi, /function bookingHeaderMarkup[\s\S]*?d:\s*null/, 'Online booking itself must keep Header D absent on booking steps.');
 assert.match(accountShell, /async function renderGlobalMessages\(/, 'Chat remains owned by the single global Account chat surface.');
 assert.doesNotMatch(bookingUi, /data-booking-flow-chat|kind:\s*'chat'/, 'Online booking must not restore a parallel tenant Chat control.');
 assert.match(core, /isEndUserAppHost\(\)/);
