@@ -159,12 +159,18 @@ export function recordConfirmationMiniCard({
 } = {}) {
   const card = miniCard({
     title: name || 'Запись',
+    titleData: name ? 'data-record-confirm-person-profile' : '',
+    titleAria: name ? `Открыть человека ${name}` : '',
     value: uei || '',
+    valueData: uei ? 'data-record-confirm-person-profile' : '',
+    valueAria: uei ? `Открыть человека ${name || uei}` : '',
     subtitle: phone || '',
+    subtitleData: phone ? 'data-record-confirm-phone' : '',
+    subtitleAria: phone ? `Действия с телефоном ${phone}` : '',
     rows: [
-      { label: 'Пространство', value: workplace || '—' },
-      { label: 'Дата', value: date || '—' },
-      { label: 'Занятый период', value: period || '—' },
+      { label: 'Пространство', value: workplace || '—', data: 'data-record-confirm-workplace', aria: `Изменить рабочее пространство ${workplace || ''}` },
+      { label: 'Дата', value: date || '—', data: 'data-record-confirm-date', aria: `Изменить дату ${date || ''}` },
+      { label: 'Занятый период', value: period || '—', data: 'data-record-confirm-time', aria: `Изменить время ${period || ''}` },
     ],
   });
 
