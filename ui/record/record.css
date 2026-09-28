@@ -27,4 +27,4 @@
 .v2-service-sticker__text span{font-size:14px;line-height:1.25}
 .v2-service-sticker__price{font-size:14px;font-weight:760;white-space:nowrap}
 .v2-service-sticker__selector{width:24px;height:24px;border:1px solid var(--v2-ink);display:grid;place-items:center;font-size:13px;font-weight:850}
-.v2-service-sticker.is-selected .v2-service-sticker__selector{background:var(--v2-ink);color:#fff}
+.v2-service-sticker.is-selected .v2-service-sticker__selector{background:var(--v2-ink);color:#fff}.v2-service-sticker.is-selected .v2-service-sticker__selector::after{content:'✓'}
