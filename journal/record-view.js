@@ -29,6 +29,7 @@ import { getProducts } from '../settings/service/products/data.js';
 import { getRecords } from '../core/record/index.js';
 import { updateRecord, cancelRecord, checkRecordTime } from '../core/record/index.js';
 import { journalRecordActionContext } from './record-action-context.js';
+import { getBookingSettings } from '../core/booking-settings/index.js';
 import { getProfile } from '../settings/profile/data.js';
 
 function recordOwnerOptions({ settings = false, chatPersonKey = '' } = {}) {
@@ -180,7 +181,7 @@ function openTimePicker(state, record, onSelected) {
     date: dateKey(state.date),
     workplaceId: state.workplaceId,
     duration,
-    step: 1,
+    step: getBookingSettings().slotStep,
     excludeId: record?.id || '',
   });
   const content = `<div class="record-editor-screen record-editor-screen--time"><div class="modal-title"><h2>Время</h2><p>Выберите новое время записи.</p></div>${timeSlots({ values, selected: state.from, data: 'data-record-view-time-option', ariaLabel: 'Выбрать время записи' })}</div>`;
