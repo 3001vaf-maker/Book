@@ -153,7 +153,7 @@ if (!/v2-sticker-list/.test(sharedProcedureListSource)
 
 const procedureSettingsSource = journalRecordUi.slice(
   journalRecordUi.indexOf('bindRecordSettings(modalRoot, () => {', journalRecordUi.indexOf('function renderProceduresStep')),
-  journalRecordUi.indexOf('  render();', journalRecordUi.indexOf('function renderProceduresStep'))
+  journalRecordUi.indexOf('function openProcedureSettings')
 );
 if (!/button\('Добавить из прайса',[\s\S]*variant:\s*'secondary'/.test(procedureSettingsSource)
   || !/button\('\+ Добавить процедуру'/.test(procedureSettingsSource)
