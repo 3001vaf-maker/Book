@@ -198,6 +198,10 @@ function renderLegalSticker(root, state) {
       tab: state.entry === 'chat' ? 'messages' : 'contact-detail',
       tenantId: state.tenantId,
     });
+    else if (state.account && state.identityDestination === 'booking') exitBookingContext(state, {
+      tab: 'home',
+      tenantId: state.tenantId,
+    });
     else renderAccountDetails(root, state);
   };
 
@@ -496,8 +500,11 @@ function nextBookingStep(root, state) {
 function backFromFirstBookingStep(root, state) {
   state.error = '';
   state.repeatSelection = null;
-  if (state.bookingOrigin === 'profile' && state.account) {
-    exitBookingContext(state, { tab: 'contact-detail', tenantId: state.tenantId });
+  if (state.account) {
+    exitBookingContext(state, {
+      tab: state.bookingOrigin === 'profile' ? 'contact-detail' : 'home',
+      tenantId: state.tenantId,
+    });
     return;
   }
   state.identityDestination = 'booking';
@@ -563,8 +570,11 @@ function renderAccountEntry(root, state) {
   initV2StickerSwipe(root, {
     onRight: () => {
       state.error = '';
-      if (state.identityDestination === 'booking' && state.from) renderConfirmation(root, state);
-      else nextBookingStep(root, state);
+      if (state.identityDestination === 'booking' && state.from) {
+        renderConfirmation(root, state);
+        return;
+      }
+      renderWelcome(root, state);
     },
     onLeft: () => { exitBookingContext(state); },
   });
