@@ -142,7 +142,7 @@ for (const [path, source] of [
 }
 
 if (!/data-record-owner-settings/.test(sharedRecordUi)
-  || !/data-v2-primary-action/.test(sharedRecordUi)
+  || !/(?:data-v2-primary-action|dataset\.v2PrimaryAction)/.test(sharedRecordUi)
   || !/mountV2ZLayer/.test(sharedRecordUi)) {
   errors.push('ui/record/runtime.js must remain the canonical Record Z/A/C presentation owner');
 }
