@@ -147,6 +147,14 @@ if (!/data-record-owner-settings/.test(sharedRecordUi)
   errors.push('ui/record/runtime.js must remain the canonical Record Z/A/C presentation owner');
 }
 
+const sharedV2Runtime = read('ui/v2/index.js');
+if (!/mountV2ZLayer/.test(sharedV2Runtime)
+  || !/stack\s*=\s*false/.test(sharedV2Runtime)
+  || !/initV2Swipe\(node,\s*\{\s*onRight:\s*close,\s*revealDeck:\s*false\s*\}\)/.test(sharedV2Runtime)
+  || !/book:v2-context-changed/.test(sharedV2Runtime)) {
+  errors.push('Shared Record Z stack must close one top sheet on right swipe and resync Header context after close');
+}
+
 const directDataImport = /(?:from\s+['"][^'"]*core\/record\/data\.js['"]|import\s*\(\s*['"][^'"]*core\/record\/data\.js['"]\s*\))/;
 for (const path of [...walk('journal'), ...walk('main'), ...walk('settings'), ...walk('tests')]) {
   const source = read(path);
