@@ -754,7 +754,7 @@ async function renderAuthenticated(account = authenticatedAccount) {
 }
 
 function renderLogin(message = '') {
-  setThemeColor('#2F3338');
+  setThemeColor('#F5F5F3');
   app.classList.remove('app-shell--booking');
   workspaceReady = false;
   disposeView();
