@@ -594,19 +594,89 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
     },
   });
 
-  const openPerson = () => {
-    const key = currentPerson?.key;
-    if (!key) return;
-    openPerson({
-      root: document.body,
-      key,
-      onClose: () => {
-        const updated = people().find((person) => person.key === key);
-        if (updated) currentPerson = updated;
-        render();
-      },
+  const openProcedureCorrections = () => {
+    const body = recordProcedureList(selectedProcedures.map((item, index) => ({
+      id: String(index),
+      name: item?.procedure?.name || '',
+      durationText: durationText(item?.duration),
+      costText: item?.cost === '' || item?.cost == null ? '' : `${item.cost} ₽`,
+      aria: `Изменить процедуру ${item?.procedure?.name || ''}`,
+    })), {
+      data: 'data-record-confirm-settings-procedure',
+      empty: 'Процедуры не выбраны.',
+    });
+    const m = mountModal(document.body, modal(
+      `<div class="modal-title"><h2>Процедуры</h2></div>${body}<div class="modal-actions">${button('+ Добавить процедуру', { data: 'data-record-confirm-settings-add', variant: 'secondary' })}</div>`,
+      { variant: 'medium', surface: 'app' },
+    ));
+    if (!m) return;
+    m.querySelector('[data-record-confirm-settings-add]')?.addEventListener('click', () => {
+      m.remove();
+      addProcedure();
+    });
+    m.querySelectorAll('[data-record-confirm-settings-procedure]').forEach((node) => node.addEventListener('click', () => {
+      const index = Number(node.dataset.recordConfirmSettingsProcedure);
+      const item = selectedProcedures[index];
+      if (!item) return;
+      m.remove();
+      openProcedureSettings({
+        procedure: item.procedure,
+        current: item,
+        onAdd: addProcedure,
+        onDelete: () => {
+          selectedProcedures.splice(index, 1);
+          currentTo = calculatedTo();
+          render();
+        },
+        onSave: (updated) => {
+          const previous = selectedProcedures[index];
+          selectedProcedures[index] = updated;
+          if (!fitsCurrentSlot()) {
+            selectedProcedures[index] = previous;
+            openRecordTimeNotice('Новая длительность процедуры не помещается в свободный интервал. Скорректируйте время записи.');
+            return;
+          }
+          currentTo = calculatedTo();
+          render();
+        },
+      });
+    }));
+  };
+
+  const openRecordSettings = () => {
+    const m = mountModal(document.body, modal(list({
+      items: [
+        { title: 'Пространство', interactive: true, data: 'data-record-confirm-settings-workplace' },
+        { title: 'Дата', interactive: true, data: 'data-record-confirm-settings-date' },
+        { title: 'Время', interactive: true, data: 'data-record-confirm-settings-time' },
+        { title: 'Процедуры', interactive: true, data: 'data-record-confirm-settings-procedures' },
+        { title: 'Сбросить', interactive: true, data: 'data-record-confirm-settings-reset' },
+      ],
+    }), { variant: 'quick', surface: 'app' }));
+    if (!m) return;
+    m.querySelector('[data-record-confirm-settings-workplace]')?.addEventListener('click', () => {
+      m.v2Close?.();
+      openConfirmationWorkplaceModal({ workplaceId: currentWorkplaceId, onSelected: chooseDateAfterWorkplace });
+    });
+    m.querySelector('[data-record-confirm-settings-date]')?.addEventListener('click', () => {
+      m.v2Close?.();
+      chooseDate();
+    });
+    m.querySelector('[data-record-confirm-settings-time]')?.addEventListener('click', () => {
+      m.v2Close?.();
+      chooseTime();
+    });
+    m.querySelector('[data-record-confirm-settings-procedures]')?.addEventListener('click', () => {
+      m.v2Close?.();
+      openProcedureCorrections();
+    });
+    m.querySelector('[data-record-confirm-settings-reset]')?.addEventListener('click', () => {
+      m.v2Close?.();
+      closeRecordZStack('record-flow-z');
     });
   };
+
+  bindRecordSettings(modalRoot, openRecordSettings);
 
   const render = () => {
     const host = recordZHost(modalRoot);
@@ -625,44 +695,14 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
       duration: durationText(duration()),
       discount: `${recordSettlementDiscountPercent(currentPerson)}%`,
       total: `${total} ₽`,
-      procedures: selectedProcedures.map((item, index) => ({
+      procedures: selectedProcedures.map((item) => ({
         name: item.procedure.name || '',
         durationText: durationText(item.duration),
         right: item.cost === '' || item.cost === null || item.cost === undefined ? '' : `${item.cost} ₽`,
-        data: `data-record-confirm-procedure="${index}"`,
       })),
     });
 
     host.innerHTML = `<div class="record-screen record-screen--state-view">${card}</div>`;
-
-    host.querySelector('[data-record-confirm-workplace]')?.addEventListener('click', () => {
-      openConfirmationWorkplaceModal({ workplaceId: currentWorkplaceId, onSelected: chooseDateAfterWorkplace });
-    });
-    host.querySelector('[data-record-confirm-date]')?.addEventListener('click', chooseDate);
-    host.querySelector('[data-record-confirm-time]')?.addEventListener('click', chooseTime);
-    host.querySelectorAll('[data-record-confirm-person-profile]').forEach((node) => node.addEventListener('click', openPerson));
-    host.querySelector('[data-record-confirm-phone]')?.addEventListener('click', () => openPhoneActions(person.phone));
-    host.querySelectorAll('[data-record-confirm-procedure]').forEach((node) => node.addEventListener('click', () => {
-      const index = Number(node.dataset.recordConfirmProcedure);
-      const item = selectedProcedures[index];
-      if (!item) return;
-      openProcedureSettings({
-        procedure: item.procedure,
-        current: item,
-        onAdd: addProcedure,
-        onSave: (updated) => {
-          const previous = selectedProcedures[index];
-          selectedProcedures[index] = updated;
-          if (!fitsCurrentSlot()) {
-            selectedProcedures[index] = previous;
-            openRecordTimeNotice('Новая длительность процедуры не помещается в свободный интервал. Скорректируйте время записи.');
-            return;
-          }
-          currentTo = calculatedTo();
-          render();
-        },
-      });
-    }));
 
     setRecordPrimaryAction(modalRoot, {
       label: 'Подтвердить',
