@@ -176,10 +176,11 @@ const recordStartTimesSource = journalRecordUi.slice(
   journalRecordUi.indexOf('function recordStartTimes'),
   journalRecordUi.indexOf('function openRecordTimeNotice')
 );
-if (!/duration:\s*recordSlotStep\(\)/.test(recordStartTimesSource)
-  || !/step:\s*recordSlotStep\(\)/.test(recordStartTimesSource)
-  || !/getBookingSettings\(\)\.slotStep/.test(journalRecordUi)) {
-  errors.push('Journal Record start-time selection must consume the canonical bookingSettings.slotStep owner');
+if (!/duration:\s*1\b/.test(recordStartTimesSource)
+  || !/step:\s*1\b/.test(recordStartTimesSource)
+  || /getBookingSettings\(\)\.slotStep/.test(recordStartTimesSource)
+  || /function\s+recordSlotStep\s*\(/.test(journalRecordUi)) {
+  errors.push('Journal Record availability must stay minute-resolution; display slot spacing must not become a booking rule');
 }
 
 if (!/kind:\s*'avatar'/.test(sharedRecordUi)
