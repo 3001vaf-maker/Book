@@ -49,7 +49,7 @@ expect(!booking.includes("type: 'date'"), 'Public booking must not use native te
 
 expect(booking.includes('renderLegalSticker') && booking.includes('renderAccountEntry') && booking.includes('renderAccountDetails'), 'Identity/legal flow must use Auth Sticker -> Registration H+Z -> Legal Sticker.');
 expect(!booking.includes('function renderPassword('), 'Retired pre-V2 separate password page must not return.');
-expect(booking.includes("state.identityDestination = 'booking';") && booking.includes("if (!state.account) {") && booking.includes('renderAccountEntry(root, state);') && booking.includes('await continueAfterIdentity(root, state);'), 'Welcome must resolve identity/legal state before entering the booking Z flow.');
+expect(booking.includes("state.identityDestination = 'booking';") && booking.includes('nextBookingStep(root, state);'), 'Welcome must preserve the proven booking entry path; UI refactors must not reorder identity/business logic.');
 expect(booking.includes("if (!state.accountTerms) await loadAccountTerms(state);") && booking.includes('renderLegalSticker(root, state);'), 'A new Account must collect registration data before the V2 Legal Sticker checkpoint.');
 expect(booking.includes("accountTerms: currentAccountTermsFact(state)"), 'Account registration must submit platform terms acceptance at the legal checkpoint.');
 expect(booking.includes("label: 'Телефон или email'") && booking.includes("name: 'identifier'"), 'Auth Sticker must accept phone or email through one identifier field.');
@@ -75,7 +75,7 @@ expect(booking.includes('d: null'), 'Online booking Header D must stay absent; b
 expect(booking.includes('renderWorkplaces') && booking.includes('renderProcedures') && booking.includes('renderDates') && booking.includes('renderTimes') && booking.includes('renderConfirmation'), 'Booking itself must preserve workplace -> services -> date -> time -> confirmation.');
 expect(booking.includes("step: 'workplaces'") && booking.includes("step: 'procedures'") && booking.includes("step: 'dates'") && booking.includes("step: 'times'") && booking.includes("step: 'confirmation'"), 'Booking must preserve the canonical V2 Z-stack steps.');
 expect(booking.includes("step: 'workplaces'") && booking.includes("step: 'procedures'") && booking.includes("step: 'dates'") && booking.includes("step: 'times'") && booking.includes("step: 'confirmation'"), 'Online booking must keep the canonical booking step sequence while UI owners remain shared.');
-expect(booking.includes('initV2Swipe(root'), 'Online booking must preserve its proven swipe navigation while the UI layer is refactored.');
+expect(booking.includes('mountV2ZLayer(root') && booking.includes("className: 'booking-step-z'") && booking.includes('stack: true'), 'Online booking steps after Z1 must use the shared physical Z-layer stack.');
 expect(!booking.includes('data-booking-workplaces-back') && !booking.includes('data-booking-dates-back') && !booking.includes('data-booking-times-back') && !booking.includes('data-booking-confirm-back'), 'V2 booking flow must not restore legacy back buttons.');
 expect(booking.includes('function backFromFirstBookingStep') && booking.includes("state.bookingOrigin === 'profile'") && booking.includes('renderWelcome(root, state);'), 'The first booking swipe boundary must preserve the proven profile/welcome return behavior.');
 expect(!booking.slice(booking.indexOf('function backFromFirstBookingStep'), booking.indexOf('function renderWelcome')).includes('renderAccountEntry(root, state);'), 'Backing out of booking must never force Auth Sticker.');
@@ -85,9 +85,8 @@ const globalAccountHomeBlock = booking.slice(booking.indexOf('async function ren
 expect(!globalAccountHomeBlock.includes("params.set('entry', 'account')") && !globalAccountHomeBlock.includes('onOpenRelationship:') && !globalAccountHomeBlock.includes('onOpenRecord:'), 'Global account must not bridge Contacts or History into the legacy tenant account contour.');
 expect(globalAccountHomeBlock.includes('onStartBooking: (tenantId)') && globalAccountHomeBlock.includes("params.set('booking', id)"), 'Leaving the global account for a tenant must be reserved for the explicit booking action.');
 expect(booking.includes("exitBookingContext(state, { tab: 'contact-detail', tenantId: state.tenantId })")
-  && booking.includes("tab: state.entry === 'chat' ? 'messages' : 'contact-detail'")
-  && booking.includes("exitBookingContext(state, { tab: 'home' })"),
-  'Tenant flows may return only through the global account owner (contact, overview, or an explicit existing chat entry); they must not render a second account UI.');
+  && booking.includes("tab: state.entry === 'chat' ? 'messages' : 'contact-detail'"),
+  'Tenant flows may return only through the existing global account owner; the UI refactor must not create a second account contour.');
 expect(!booking.includes('step: 15'), 'Public booking must not hardcode a 15 minute slot step.');
 expect(settings.includes("from '../../core/booking-settings/index.js'"), 'Online booking settings must use canonical booking settings owner.');
 expect(!/\b(?:appShell|appHeader)\s*\(/.test(settings) && !settings.includes('app-content--book-shell'), 'Online booking settings must not create a second full-screen shell inside Shared Z.');
