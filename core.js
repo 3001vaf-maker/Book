@@ -19,7 +19,7 @@ import { canUseBookCapability, getBookAccess, loadBookAccess } from './core/acce
 import { startServerBookingSync } from './online-booking/server-sync.js';
 import { renderGlobalClient, renderOnlineBooking } from './online-booking/booking.js';
 import { startAccountRuntime } from './online-booking/account-runtime.js';
-import { initV2WorkspaceInteraction, setV2DeckOpen, v2EList, v2FDeck, v2Header, v2Shell } from './ui/ui.js';
+import { field, passwordField, initPasswordFields, initV2WorkspaceInteraction, setV2DeckOpen, v2EList, v2FDeck, v2Header, v2Shell, v2Sticker } from './ui/ui.js';
 import { clearLegacyBusinessStorage } from './core/legacy-browser-business.js';
 import { FirstRunRuntime, bindDemoBadgeAction, demoBadgeMarkup, startPlatformSessionTracking } from './first-run/runtime.js';
 import { startPlatformNotices } from './core/platform-notices.js';
@@ -754,36 +754,39 @@ async function renderAuthenticated(account = authenticatedAccount) {
 }
 
 function renderLogin(message = '') {
-  setThemeColor('#F5F5F3');
+  setThemeColor('#2F3338');
   app.classList.remove('app-shell--booking');
   workspaceReady = false;
   disposeView();
   disposeView = () => {};
-  app.innerHTML = `
-    <main class="auth-view">
-      <section class="auth-card" aria-labelledby="auth-title">
-        <div class="auth-card__heading">
-          <h1>Рабочее пространство</h1>
-          <p>Вход в систему</p>
-        </div>
-        <form class="auth-form" id="auth-form">
-          <label class="field">
-            <span>Email</span>
-            <input name="email" type="email" autocomplete="username" required>
-          </label>
-          <label class="field">
-            <span>Пароль</span>
-            <input name="password" type="password" autocomplete="current-password" required>
-          </label>
-          <p class="auth-error" id="auth-error" role="alert">${message}</p>
-          <button class="ui-button" type="submit">Войти</button>
-        </form>
-      </section>
-    </main>`;
+
+  const body = `
+    <form class="auth-form" id="auth-form">
+      ${field({ label: 'Email', name: 'email', type: 'email', required: true, autocomplete: 'username' })}
+      ${passwordField({ label: 'Пароль', name: 'password', required: true, autocomplete: 'current-password' })}
+      <p class="auth-error" id="auth-error" role="alert">${message}</p>
+      <button type="button" class="v2-sticker-link" data-specialist-forgot>Забыли пароль?</button>
+    </form>`;
+
+  app.innerHTML = v2Sticker({
+    title: 'Вход',
+    body,
+    action: '<button class="ui-button" type="submit" form="auth-form">Войти</button>',
+    className: 'v2-sticker-screen--auth',
+    closeData: 'data-specialist-u-close',
+  });
+
+  initPasswordFields(app);
+  app.querySelector('[data-specialist-u-close]')?.addEventListener('click', () => {
+    if (window.history.length > 1) window.history.back();
+  });
+  app.querySelector('[data-specialist-forgot]')?.addEventListener('click', () => {
+    window.alert('Восстановление пароля пока недоступно.');
+  });
 
   const form = app.querySelector('#auth-form');
   const error = app.querySelector('#auth-error');
-  const button = form.querySelector('button[type="submit"]');
+  const button = app.querySelector('button[type="submit"][form="auth-form"]');
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
