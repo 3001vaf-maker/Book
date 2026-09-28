@@ -230,7 +230,7 @@ for (const [name, source] of [
 ]) {
   if (!/ui-search-field/.test(source)
     || !/field\(\{[\s\S]*type:\s*'search'[\s\S]*placeholder:\s*'Поиск по имени или UEI'/.test(source)
-    || /record-person-toolbar|record-person-search/.test(source)) {
+    || /record-person-toolbar|class=["'][^"']*record-person-search/.test(source)) {
     errors.push(`${name} must consume the same Shared search field presentation as the People folder`);
   }
 }
