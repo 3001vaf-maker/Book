@@ -176,10 +176,32 @@ const recordStartTimesSource = journalRecordUi.slice(
   journalRecordUi.indexOf('function recordStartTimes'),
   journalRecordUi.indexOf('function openRecordTimeNotice')
 );
-if (!/duration:\s*recordSlotStep\(\)/.test(recordStartTimesSource)
-  || !/step:\s*recordSlotStep\(\)/.test(recordStartTimesSource)
-  || !/getBookingSettings\(\)\.slotStep/.test(journalRecordUi)) {
-  errors.push('Journal Record start-time selection must consume the canonical bookingSettings.slotStep owner');
+if (!/duration:\s*5\b/.test(recordStartTimesSource)
+  || !/step:\s*5\b/.test(recordStartTimesSource)
+  || /getBookingSettings\(\)\.slotStep/.test(journalRecordUi)
+  || /function\s+recordSlotStep\s*\(/.test(journalRecordUi)) {
+  errors.push('Journal Record first-step quick time choices must preserve the specialist 5-minute helper and must not consume online-booking slotStep');
+}
+
+const confirmationTimeSource = journalRecordUi.slice(
+  journalRecordUi.indexOf('function openConfirmationTimeModal'),
+  journalRecordUi.indexOf('function openPhoneActions')
+);
+if (!/openTimePickerAction\(/.test(confirmationTimeSource)
+  || !/minuteStep:\s*1\b/.test(confirmationTimeSource)
+  || !/checkTimeAvailability\(/.test(confirmationTimeSource)) {
+  errors.push('Journal Record final time correction must use the canonical Shared Time picker at exact-minute resolution and validate the resulting interval');
+}
+
+const existingRecordTimeSource = journalRecordViewUi.slice(
+  journalRecordViewUi.indexOf('function openTimePicker'),
+  journalRecordViewUi.indexOf('function openPersonPicker')
+);
+if (!/openTimePickerAction\(/.test(existingRecordTimeSource)
+  || !/minuteStep:\s*1\b/.test(existingRecordTimeSource)
+  || !/checkRecordTime\(/.test(existingRecordTimeSource)
+  || /getBookingSettings\(\)\.slotStep/.test(journalRecordViewUi)) {
+  errors.push('Existing specialist Record time editing must use the canonical Shared Time picker at exact-minute resolution and stay independent from online-booking slotStep');
 }
 
 if (!/kind:\s*'avatar'/.test(sharedRecordUi)
@@ -194,6 +216,10 @@ if (!/lines:\s*\[/.test(sharedRecordUi)
   || !/subtitle:\s*'Скидка'/.test(sharedRecordUi)
   || !/subtitle:\s*'Сумма'/.test(sharedRecordUi)) {
   errors.push('Shared Record confirmation must use the Mini Card data-line owner and the canonical Время / Скидка / Сумма metrics');
+}
+
+if (!/step:\s*state\.settings\.slotStep/.test(onlineBookingUi)) {
+  errors.push('Online booking may keep its configured display slot step; specialist Record timing must remain independent from it');
 }
 
 if (!/recordWorkplaceCards\(/.test(onlineBookingUi)

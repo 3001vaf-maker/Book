@@ -27,10 +27,10 @@ if (!/getWorkplaceWorkingDates/.test(recordFlow)) fail('journal/record.js', 'Rec
 if (/from ['"]\.\.\/core\/day\.js['"]|isTimeRangeAvailable|getTimeUsages|getJournalBreaks|getRecords\(|getDayTime|getDay\(/.test(recordFlow)) fail('journal/record.js', 'Record creation must not rebuild occupancy or WorkPlan availability');
 if (/from ['"]\.\/break-data\.js['"]/.test(recordFlow)) fail('journal/record.js', 'Record creation must command Break through break-service.js');
 
-if (!/listAvailableStartTimes/.test(recordView)) fail('journal/record-view.js', 'Record editor must ask Core Availability for time choices');
+if (!/openTimePickerAction/.test(recordView) || !/checkRecordTime/.test(recordView)) fail('journal/record-view.js', 'Record editor must use the canonical Shared Time picker and validate the resulting interval through Core Record/Availability');
 if (!/getWorkplaceWorkingDates/.test(recordView)) fail('journal/record-view.js', 'Record editor must use the canonical WorkPlan date query');
 if (/from ['"]\.\.\/core\/day\.js['"]/.test(recordView)) fail('journal/record-view.js', 'Record editor must not read WorkPlan storage directly');
-if (!/timeSlots\(\{\s*values,\s*selected:/.test(recordView)) fail('journal/record-view.js', 'Record editor must pass canonical values to shared timeSlots');
+if (/listAvailableStartTimes|timeSlots\(\{\s*values,\s*selected:|getBookingSettings\(\)\.slotStep/.test(recordView)) fail('journal/record-view.js', 'Record editor exact-time correction must not be reduced to a generated slot list or online-booking slotStep');
 if (/timeSlots\(\{[^}]*\boccupied\b/.test(recordView) || /timeSlots\(\{[^}]*\bfrom:\s*workingTime/.test(recordView)) fail('journal/record-view.js', 'Record editor must not use a local availability contract');
 if (!/const startWorkplaceEdit/.test(recordView) || !/startDateEdit\(workplaceDraft/.test(recordView)) fail('journal/record-view.js', 'Workplace edit must require Date then Time');
 if (!/const startRecordDateEdit/.test(recordView) || !/startDateEdit\(\{ \.\.\.state \}/.test(recordView)) fail('journal/record-view.js', 'Date edit must require Time before applying');
@@ -64,6 +64,7 @@ if (/journal\/|timetable\/|settings\/|ui\//.test(availability)) fail('core/avail
 if (!/getDayDraftScheduleConflicts/.test(dayEditor)) fail('timetable/day-editor.js', 'Timetable Day Editor must ask WorkPlan for draft schedule conflicts');
 if (/rangesOverlap/.test(dayEditor)) fail('timetable/day-editor.js', 'Timetable Day Editor must not implement its own overlap algorithm');
 
+if (!/export function openTimePickerAction/.test(sharedTime) || !/return openPicker\(\{/.test(sharedTime)) fail('ui/time/index.js', 'Shared Time must expose one canonical direct time-picker action over the existing wheel owner.');
 if (!/export function openTimeRangeAction/.test(sharedTime)) fail('ui/time/index.js', 'Shared Time must own the work-time range action.');
 if (/time-range-title/.test(sharedTime)) fail('ui/time/index.js', 'Work-time range must not use one shared С - до title; each box owns its own label.');
 if (!/time-range-fields/.test(sharedTime) || !/timePicker\(\{ label: 'С', name: 'from'/.test(sharedTime) || !/timePicker\(\{ label: 'До', name: 'to'/.test(sharedTime)) fail('ui/time/index.js', 'Work-time range must reuse the existing Shared timePicker twice on one row.');
