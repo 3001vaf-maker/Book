@@ -26,6 +26,11 @@ const serverBusinessState = read('server/src/business-state/business-state.servi
 const serverBooking = read('server/src/online-booking/online-booking.service.ts');
 const accountShell = read('online-booking/account-shell.js');
 const prismaSchema = read('server/prisma/schema.prisma');
+const journalRecordUi = read('journal/record.js');
+const journalRecordViewUi = read('journal/record-view.js');
+const journalBreakViewUi = read('journal/break-view.js');
+const sharedRecordUi = read('ui/record/runtime.js');
+
 
 if (/availability|financial-model|getAllPeople|record-events|record-state|status\s*=|attendance|confirmed|cancelRecord|createRecord|updateRecord|moveRecord/.test(recordData)) {
   errors.push('core/record/data.js: Record data must remain persistence-only');
@@ -116,6 +121,30 @@ if (/recordEvent\.upsert/.test(serverBusinessState)
   || !/recordEvent\.create/.test(serverBusinessState)
   || !/Событие Record неизменяемо/.test(serverBusinessState)) {
   errors.push('RecordEvent persistence must be append-only and idempotent');
+}
+
+if (!/mountRecordZ/.test(journalRecordUi)
+  || !/setRecordPrimaryAction/.test(journalRecordUi)
+  || !/bindRecordSettings/.test(journalRecordUi)
+  || !/mountRecordZ/.test(journalRecordViewUi)
+  || !/mountRecordZ/.test(journalBreakViewUi)) {
+  errors.push('Specialist Record surfaces must consume the canonical Shared Record Z/A/C owner');
+}
+
+for (const [path, source] of [
+  ['journal/record.js', journalRecordUi],
+  ['journal/record-view.js', journalRecordViewUi],
+  ['journal/break-view.js', journalBreakViewUi],
+]) {
+  if (/record-modal-actions|record-modal--flow/.test(source)) {
+    errors.push(`${path}: Record Z must not own local action rows or a parallel large modal flow`);
+  }
+}
+
+if (!/data-record-owner-settings/.test(sharedRecordUi)
+  || !/data-v2-primary-action/.test(sharedRecordUi)
+  || !/mountV2ZLayer/.test(sharedRecordUi)) {
+  errors.push('ui/record/runtime.js must remain the canonical Record Z/A/C presentation owner');
 }
 
 const directDataImport = /(?:from\s+['"][^'"]*core\/record\/data\.js['"]|import\s*\(\s*['"][^'"]*core\/record\/data\.js['"]\s*\))/;
