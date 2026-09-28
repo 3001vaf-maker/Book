@@ -3,7 +3,7 @@ import { mountV2ZLayer, v2ZLayer } from '../v2/index.js';
 import { entityVisualCard } from '../cards/entity-card-constructor.js';
 import { miniCard } from '../cards/mini-card.js';
 import { listEntry, listEntries } from '../lists/list-entry.js';
-import { v2HorizontalRail } from '../v2/index.js';
+import { v2HorizontalRail, v2RailCard } from '../v2/index.js';
 
 function recordSurface() {
   return document.querySelector('[data-v2-workspace-surface]')
@@ -38,7 +38,7 @@ export function recordWorkplaceCards(items = [], {
     });
   });
   return cards.length
-    ? v2HorizontalRail(cards.join(''), { className: 'record-workplace-rail' })
+    ? v2HorizontalRail(cards.join(''), { className: 'v2-profile-workplaces' })
     : '';
 }
 
@@ -132,24 +132,38 @@ export function recordConfirmationMiniCard({
   name = '',
   phone = '',
   duration = '',
+  discount = '',
   total = '',
   procedures = [],
 } = {}) {
   const card = miniCard({
-    title: workplace || 'Пространство',
-    value: name || 'Запись',
+    title: name || 'Запись',
+    value: uei || '',
     subtitle: phone || '',
     rows: [
+      { label: 'Пространство', value: workplace || '—' },
       { label: 'Дата', value: date || '—' },
-      { label: 'Период', value: period || '—' },
-      { label: 'UEI', value: uei || '—' },
+      { label: 'Занятый период', value: period || '—' },
     ],
   });
 
-  const metrics = `<div class="record-confirmation-totals">
-    <div><span>Итог времени</span><strong>${escapeRecordText(duration || '—')}</strong></div>
-    <div><span>Итог суммы</span><strong>${escapeRecordText(total || '—')}</strong></div>
-  </div>`;
+  const metrics = v2HorizontalRail([
+    v2RailCard({
+      title: duration || '—',
+      subtitle: 'Часы',
+      className: 'people-metric-card',
+    }),
+    v2RailCard({
+      title: discount || '0%',
+      subtitle: 'Скидка',
+      className: 'people-metric-card',
+    }),
+    v2RailCard({
+      title: total || '—',
+      subtitle: 'Сумма итого',
+      className: 'people-metric-card',
+    }),
+  ].join(''), { className: 'people-metrics' });
 
   const rows = listEntries((Array.isArray(procedures) ? procedures : []).map((item = {}) => listEntry({
     columns: [
@@ -171,7 +185,7 @@ export function recordConfirmationMiniCard({
 
   return `<div class="record-confirmation-view">
     <div class="record-confirmation-view__card">${card}</div>
-    ${metrics}
+    <div class="record-confirmation-view__metrics">${metrics}</div>
     <div class="record-confirmation-view__procedures">${rows}</div>
   </div>`;
 }
