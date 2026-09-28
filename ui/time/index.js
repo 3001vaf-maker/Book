@@ -7,9 +7,9 @@ const text=v=>{const {h,min}=normalize(v);return `${String(h).padStart(2,'0')}:$
 const CYCLES=5;
 const MIDDLE_CYCLE=Math.floor(CYCLES/2);
 
-export function timeSlots({values=[],selected='',data='data-time-slot',ariaLabel='Выбрать время'}={}){
+export function timeSlots({values=[],selected='',data='data-time-slot',ariaLabel='Выбрать время',className=''}={}){
   const items=Array.isArray(values)?values:[];
-  return `<div class="time-slots" role="group" aria-label="${esc(ariaLabel)}">${items.map(value=>{const slot=typeof value==='object'?value:{value,label:value};const raw=slot.value??slot.from??slot.label??'';const label=slot.label??raw;const isSelected=String(raw)===String(selected);const emphasized=Boolean(slot.emphasized);return `<button type="button" class="time-slot${isSelected?' is-selected':''}${emphasized?' is-emphasized':''}" ${data}="${esc(raw)}" aria-pressed="${isSelected?'true':'false'}">${esc(label)}</button>`;}).join('')}</div>`;
+  return `<div class="time-slots${className?` ${esc(className)}`:'' }" role="group" aria-label="${esc(ariaLabel)}">${items.map(value=>{const slot=typeof value==='object'?value:{value,label:value};const raw=slot.value??slot.from??slot.label??'';const label=slot.label??raw;const isSelected=String(raw)===String(selected);const emphasized=Boolean(slot.emphasized);return `<button type="button" class="time-slot${isSelected?' is-selected':''}${emphasized?' is-emphasized':''}" ${data}="${esc(raw)}" aria-pressed="${isSelected?'true':'false'}">${esc(label)}</button>`;}).join('')}</div>`;
 }
 
 export function wheel({values,selected,type,formatter=(v)=>String(v).padStart(2,'0')}={}){
