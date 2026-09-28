@@ -217,6 +217,14 @@ expect(account.includes('GLOBAL_ACCOUNT_ROOTS') && account.includes("id: 'profil
 expect(accountMobileCss.includes('background:var(--v2-base)'), 'Public booking shell safe area must continue the H base.');
 expect(core.includes("setThemeColor('#2F3338')") && core.includes("setThemeColor('#F5F5F3')"), 'Public booking must tint browser chrome to H and restore the workspace theme afterwards.');
 expect(booking.includes('v2LegalCards(') && booking.includes('v2Sticker({'), 'Legal checkpoint must use the shared sticker system.');
+expect(
+  booking.includes("closeData: 'data-booking-welcome-u-close'")
+    && booking.includes("closeData: 'data-booking-u-close'")
+    && booking.includes("closeData: 'data-booking-legal-u-close'")
+    && booking.includes("closeData: 'data-u-document-close'")
+    && core.includes("closeData: 'data-specialist-u-close'"),
+  'Every U entry/information surface must expose the explicit Shared U close control.'
+);
 expect(!booking.includes('data-booking-workplaces-back') && !booking.includes('data-booking-confirm-back'), 'V2 booking flow must not restore legacy back buttons.');
 
 expect(core.includes("className: 'v2-app--workspace'") && core.includes('v2EList(childItems') && core.includes('eDeck,'), 'Professional workspace must render second-level navigation as E inside the shared FE shell.');
