@@ -5,6 +5,7 @@ import { miniCard } from '../cards/mini-card.js';
 import { listEntry, listEntries } from '../lists/list-entry.js';
 import { v2HorizontalRail, v2RailCard } from '../v2/index.js';
 import { timeSlots } from '../time/index.js';
+import { timeSlots } from '../time/index.js';
 
 function recordSurface() {
   return document.querySelector('[data-v2-workspace-surface]')
@@ -127,22 +128,21 @@ export function recordTimeRows(items = [], {
     if (!groups.has(hour)) groups.set(hour, []);
     groups.get(hour).push(value);
   });
-  return `<div class="record-time-hours">${[...groups.entries()].map(([hour, times]) => {
-    const valuesForHour = times.map((value) => {
-      const minute = Number(value.split(':')[1] || 0);
-      return {
-        value,
-        label: value,
-        emphasized: Number(accentEvery) > 0 && minute % Number(accentEvery) === 0,
-      };
-    });
-    const slots = timeSlots({ values: valuesForHour, data, ariaLabel: `Время ${hour}:00` });
-    const emphasized = times.filter((value) => {
-      const minute = Number(value.split(':')[1] || 0);
-      return Number(accentEvery) > 0 && minute % Number(accentEvery) === 0;
-    });
-    return `<div class="record-time-hour" data-record-time-hour="${escapeRecordText(hour)}" data-record-emphasized="${emphasized.map(escapeRecordText).join(',')}">${slots}</div>`;
-  }).join('')}</div>`;
+  return `<div class="record-time-hours">${[...groups.entries()].map(([hour, times]) => `
+    <div class="record-time-hour" data-record-time-hour="${escapeRecordText(hour)}">
+      ${timeSlots({
+        values: times.map((value) => {
+          const minute = Number(value.split(':')[1] || 0);
+          return {
+            value,
+            label: value,
+            emphasized: Number(accentEvery) > 0 && minute % Number(accentEvery) === 0,
+          };
+        }),
+        data,
+        ariaLabel: `Время ${hour}:00`,
+      })}
+    </div>`).join('')}</div>`;
 }
 
 export function recordConfirmationMiniCard({
