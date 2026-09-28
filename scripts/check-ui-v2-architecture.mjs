@@ -225,6 +225,12 @@ expect(
     && core.includes("closeData: 'data-specialist-u-close'"),
   'Every U entry/information surface must expose the explicit Shared U close control.'
 );
+expect(
+  !/auth-view|auth-card/.test(core)
+    && core.includes("v2Sticker({")
+    && core.includes("className: 'v2-sticker-screen--auth'"),
+  'Specialist auth and technical entry states must use the Shared U owner, never the retired auth-card shell.'
+);
 expect(!booking.includes('data-booking-workplaces-back') && !booking.includes('data-booking-confirm-back'), 'V2 booking flow must not restore legacy back buttons.');
 
 expect(core.includes("className: 'v2-app--workspace'") && core.includes('v2EList(childItems') && core.includes('eDeck,'), 'Professional workspace must render second-level navigation as E inside the shared FE shell.');
