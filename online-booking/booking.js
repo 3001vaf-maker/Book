@@ -870,7 +870,7 @@ function renderTimes(root, state) {
   const layer = renderBookingStep(root, state, {
     step: 'times',
     body: `${slots.length
-      ? recordTimeRows(slots, { data: 'data-booking-time', accentEvery: 30 })
+      ? recordTimeRows(slots, { data: 'data-booking-time', accentEvery: 0 })
       : emptyState('Свободного времени нет', 'На эту дату нет интервала для выбранных процедур.')}${formError(state.error)}`,
     onFirstBack: () => backFromFirstBookingStep(root, state),
   });
