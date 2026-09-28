@@ -509,15 +509,15 @@ function renderMigrationPending() {
   workspaceReady = false;
   disposeView();
   disposeView = () => {};
-  app.innerHTML = `
-    <main class="auth-view">
-      <section class="auth-card">
-        <div class="auth-card__heading">
-          <h1>Подготовка рабочего пространства</h1>
-          <p>Сервер ожидает безопасный перенос данных из основного браузера. Текущие данные не изменены.</p>
-        </div>
-      </section>
-    </main>`;
+  app.innerHTML = v2Sticker({
+    title: 'Подготовка рабочего пространства',
+    body: '<p>Сервер ожидает безопасный перенос данных из основного браузера. Текущие данные не изменены.</p>',
+    className: 'v2-sticker-screen--technical',
+    closeData: 'data-technical-u-close',
+  });
+  app.querySelector('[data-technical-u-close]')?.addEventListener('click', () => {
+    if (window.history.length > 1) window.history.back();
+  });
   syncViewport();
 }
 
@@ -527,16 +527,16 @@ function renderFirstRunUnavailable(error) {
   disposeView();
   disposeView = () => {};
   const message = error instanceof Error ? error.message : 'Не удалось продолжить знакомство с Book.';
-  app.innerHTML = `
-    <main class="auth-view">
-      <section class="auth-card">
-        <div class="auth-card__heading">
-          <h1>Не удалось открыть знакомство с Book</h1>
-          <p data-first-run-load-error></p>
-        </div>
-        <button class="ui-button" type="button" data-first-run-retry>Повторить</button>
-      </section>
-    </main>`;
+  app.innerHTML = v2Sticker({
+    title: 'Не удалось открыть знакомство',
+    body: '<p data-first-run-load-error></p>',
+    action: '<button class="ui-button" type="button" data-first-run-retry>Повторить</button>',
+    className: 'v2-sticker-screen--technical',
+    closeData: 'data-first-run-u-close',
+  });
+  app.querySelector('[data-first-run-u-close]')?.addEventListener('click', () => {
+    if (window.history.length > 1) window.history.back();
+  });
   app.querySelector('[data-first-run-load-error]').textContent = message;
   app.querySelector('[data-first-run-retry]')?.addEventListener('click', async (event) => {
     const control = event.currentTarget;
@@ -552,15 +552,15 @@ function renderSuspended() {
   workspaceReady = false;
   disposeView();
   disposeView = () => {};
-  app.innerHTML = `
-    <main class="auth-view">
-      <section class="auth-card">
-        <div class="auth-card__heading">
-          <h1>Рабочее пространство временно недоступно</h1>
-          <p>Доступ к этому рабочему пространству приостановлен владельцем платформы.</p>
-        </div>
-      </section>
-    </main>`;
+  app.innerHTML = v2Sticker({
+    title: 'Рабочее пространство временно недоступно',
+    body: '<p>Доступ к этому рабочему пространству приостановлен владельцем платформы.</p>',
+    className: 'v2-sticker-screen--technical',
+    closeData: 'data-suspended-u-close',
+  });
+  app.querySelector('[data-suspended-u-close]')?.addEventListener('click', () => {
+    if (window.history.length > 1) window.history.back();
+  });
   syncViewport();
 }
 
