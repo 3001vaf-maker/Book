@@ -17,6 +17,8 @@ import {
   button,
   emptyState,
   entityCard,
+  entityVisualCard,
+  normalizeEntityCardAppearance,
   miniCard,
   miniCardRail,
   escapeHtml,
@@ -366,17 +368,29 @@ function relationshipCard(relationship = {}) {
   });
 }
 
+const ACCOUNT_PROFILE_CARD_APPEARANCE = normalizeEntityCardAppearance({
+  lines: [
+    {}, {}, {}, {}, {}, {},
+    { field:'name', zone:'full', align:'left', size:'l', color:'white', bold:true },
+    { field:'phone', zone:'full', align:'left', size:'m', color:'white' },
+    {},
+  ],
+});
+
 function profileSummary(state) {
   const account = state.account || {};
   const fullName = [account.name, account.surname].map((value) => String(value || '').trim()).filter(Boolean).join(' ') || 'Имя';
   const phone = formatPhone(account.phone || '') || String(account.phone || '') || '—';
-  return entityCard({
-    title: fullName,
-    subtitle: phone,
+  return entityVisualCard({
+    appearance: ACCOUNT_PROFILE_CARD_APPEARANCE,
+    fields: [
+      { value:'name', label:'Имя и фамилия', text:fullName },
+      { value:'phone', label:'Телефон', text:phone },
+    ],
+    image: accountPhoto(state),
     interactive: true,
     data: 'data-account-profile-card',
     aria: 'Редактировать личные данные',
-    className: 'entity-card--hero account-profile-card',
   });
 }
 
