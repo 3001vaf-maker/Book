@@ -23,19 +23,26 @@ export function timePicker({name,label,value='',minuteStep=15,min='00:00',max='2
 
 export function initTimePickers(root){root.querySelectorAll('[data-time-picker]').forEach(host=>host.querySelector('[data-time-open]')?.addEventListener('click',()=>open(host)))}
 
-function open(host){
-  const hidden=host.querySelector('[data-time-value]');
-  const current=normalize(hidden?.value);
-  const step=Math.max(1,Math.min(59,Number(host.dataset.timeMinuteStep)||15));
-  const min=normalize(host.dataset.timeMin||'00:00');
-  const max=normalize(host.dataset.timeMax||'23:59');
+function openPicker({
+  currentValue='00:00',
+  minuteStep=15,
+  minValue='00:00',
+  maxValue='23:59',
+  title='Время',
+  onSave=()=>{},
+}={}){
+  const current=normalize(currentValue);
+  const step=Math.max(1,Math.min(59,Number(minuteStep)||15));
+  const min=normalize(minValue);
+  const max=normalize(maxValue);
   const hours=Array.from({length:24},(_,i)=>i).filter(h=>h>=min.h&&h<=max.h);
   const minutes=Array.from({length:Math.floor(59/step)+1},(_,i)=>i*step).filter(m=>m<=59);
+  if(!hours.length||!minutes.length)return null;
   const initialHour=hours.includes(current.h)?current.h:hours[0];
   const initialMinute=minutes.includes(current.min)?current.min:minutes[0];
-  const content=`<div class="modal-title"><h2>${esc(host.querySelector('.time-picker__label')?.textContent||'Время')}</h2></div><div class="time-wheel" data-time-wheel><div class="time-wheel__column" data-time-wheel-column="hours"><span class="time-wheel__label">Часы</span><div class="time-wheel__viewport">${wheel({values:hours,selected:initialHour,type:'hours'})}</div></div><div class="time-wheel__column" data-time-wheel-column="minutes"><span class="time-wheel__label">Минуты</span><div class="time-wheel__viewport">${wheel({values:minutes,selected:initialMinute,type:'minutes'})}</div></div></div>${button('Сохранить',{data:'data-time-save'})}`;
-  const modalRoot=mountModal(document.body,modal(content,{variant:'bottom',title:host.querySelector('.time-picker__label')?.textContent||'Время',className:'modal--time-picker-sheet'}));
-  if(!modalRoot)return;
+  const content=`<div class="modal-title"><h2>${esc(title)}</h2></div><div class="time-wheel" data-time-wheel><div class="time-wheel__column" data-time-wheel-column="hours"><span class="time-wheel__label">Часы</span><div class="time-wheel__viewport">${wheel({values:hours,selected:initialHour,type:'hours'})}</div></div><div class="time-wheel__column" data-time-wheel-column="minutes"><span class="time-wheel__label">Минуты</span><div class="time-wheel__viewport">${wheel({values:minutes,selected:initialMinute,type:'minutes'})}</div></div></div>${button('Сохранить',{data:'data-time-save'})}`;
+  const modalRoot=mountModal(document.body,modal(content,{variant:'bottom',title,className:'modal--time-picker-sheet'}));
+  if(!modalRoot)return null;
 
   const nearestItem=(viewport)=>{
     const items=[...viewport.querySelectorAll('[data-time-wheel-item]')];
@@ -100,13 +107,46 @@ function open(host){
     const minute=modalRoot.querySelector('[data-time-wheel-type="minutes"].is-selected')?.dataset.value;
     if(hour==null||minute==null)return;
     const value=`${String(Number(hour)).padStart(2,'0')}:${String(Number(minute)).padStart(2,'0')}`;
-    hidden.value=value;
-    host.querySelector('[data-time-open]').textContent=value;
-    hidden.dispatchEvent(new Event('change',{bubbles:true}));
+    onSave(value);
     modalRoot.v2Close?.();
+  });
+  return modalRoot;
+}
+
+function open(host){
+  const hidden=host.querySelector('[data-time-value]');
+  if(!hidden)return null;
+  return openPicker({
+    currentValue:hidden.value,
+    minuteStep:host.dataset.timeMinuteStep,
+    minValue:host.dataset.timeMin||'00:00',
+    maxValue:host.dataset.timeMax||'23:59',
+    title:host.querySelector('.time-picker__label')?.textContent||'Время',
+    onSave:(value)=>{
+      hidden.value=value;
+      host.querySelector('[data-time-open]').textContent=value;
+      hidden.dispatchEvent(new Event('change',{bubbles:true}));
+    },
   });
 }
 
+export function openTimePickerAction({
+  value='',
+  minuteStep=1,
+  min='00:00',
+  max='23:59',
+  title='Время',
+  onSave=()=>{},
+}={}){
+  return openPicker({
+    currentValue:text(value),
+    minuteStep,
+    minValue:min,
+    maxValue:max,
+    title,
+    onSave,
+  });
+}
 
 export function openTimeRangeAction({ from = '09:00', to = '18:00', title = 'График работы', onSave = () => {} } = {}) {
   const content = `<form class="form-grid" data-shared-time-range-form>
