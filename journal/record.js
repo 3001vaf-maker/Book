@@ -1,4 +1,4 @@
-import { button, durationPicker, durationText, entityCard, escapeHtml, list, listEntry, stateView, initStateView, initCalendar, mountModal, modal, openNotice, initDurationPickers, initMultiSelect, viewNavigation, initViewNavigation, workspaceHeaderContext, v2ZLayer, mountV2ZLayer } from '../ui/ui.js';
+import { button, durationPicker, durationText, entityCard, escapeHtml, list, listEntry, stateView, initStateView, initCalendar, mountModal, modal, openNotice, initDurationPickers, initMultiSelect, viewNavigation, initViewNavigation, mountRecordZ, renderRecordZ, setRecordPrimaryAction, bindRecordSettings, closeRecordZStack } from '../ui/ui.js';
 import { createRecord } from '../core/record/index.js';
 import { createJournalBreak } from './break-service.js';
 import { getPeople } from '../main/people/data.js';
@@ -43,78 +43,17 @@ function recordStartTimes({ date, workplaceId, from }) {
   });
 }
 
-function recordFlowSurface() {
-  return document.querySelector('[data-v2-workspace-surface]') || document.querySelector('[data-v2-app]') || document.body;
-}
-
-function pushRecordLayer({ settings = null } = {}) {
-  const context = workspaceHeaderContext({
-    title: 'Запись',
-    a: settings ? {
-      kind: 'settings',
-      label: 'Настройки записи',
-      data: 'data-record-flow-settings',
-      aria: 'Настройки записи',
-    } : null,
-  });
-  return mountV2ZLayer(recordFlowSurface(), v2ZLayer(`${context}<div data-record-flow-host></div>`, {
-    className: 'record-flow-z',
-  }), { stack: true });
-}
-
-function flowHost(layerRoot) {
-  return layerRoot?.querySelector('[data-record-flow-host]') || null;
-}
-
-function renderFlow(layerRoot, content) {
-  const host = flowHost(layerRoot);
-  if (!host) return null;
-  host.innerHTML = String(content || '');
-  return host;
-}
-
-function setRecordPrimaryAction(layerRoot, { label = '', variant = '', onClick = null } = {}) {
-  const context = layerRoot?.querySelector('[data-workspace-header-context]');
-  if (!context) return;
-  context.querySelector('[data-record-primary-source]')?.remove();
-  if (!label || typeof onClick !== 'function') {
-    window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
-    return;
-  }
-  const source = document.createElement('button');
-  source.type = 'button';
-  source.className = 'record-primary-source';
-  source.dataset.recordPrimarySource = '';
-  source.dataset.v2PrimaryAction = '';
-  source.dataset.v2PrimaryLabel = label;
-  if (variant) source.dataset.v2PrimaryVariant = variant;
-  source.setAttribute('aria-label', label);
-  source.addEventListener('click', onClick);
-  context.appendChild(source);
-  window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
-}
-
-function closeRecordLayers() {
-  const layers = [...document.querySelectorAll('[data-v2-z-layer].record-flow-z')].reverse();
-  layers.forEach((layer) => layer.v2Close?.());
-}
-
-function bindRecordSettings(layerRoot, onOpen) {
-  if (typeof onOpen !== 'function') return;
-  layerRoot?.querySelector('[data-record-flow-settings]')?.addEventListener('click', onOpen);
-}
-
 function openRecordTimeNotice(message) {
   openNotice({ title: 'Недостаточно времени', message });
 }
 
 function renderTimeStep(modalRoot, { date, workplaceId, from, to, onCreated }) {
-  modalRoot ||= pushRecordLayer();
+  modalRoot ||= mountRecordZ({ className: 'record-flow-z' });
   let activeMode = 'record';
   const values = recordStartTimes({ date: dateKey(date), workplaceId, from });
   const times = values.map((value) => `<button type="button" class="record-time-option${/:(00|15|30|45)$/.test(value) ? ' is-quarter' : ''}" data-record-time="${value}">${value}</button>`).join('');
   const toggle = viewNavigation({ views: RECORD_MODES, activeView: activeMode, className: 'segment-control--two', ariaLabel: 'Режим записи' });
-  const host = renderFlow(modalRoot, `<div class="record-screen record-screen--time">${toggle}<div class="record-time-list">${times || '<div class="muted">Нет свободного времени</div>'}</div></div>`);
+  const host = renderRecordZ(modalRoot, `<div class="record-screen record-screen--time">${toggle}<div class="record-time-list">${times || '<div class="muted">Нет свободного времени</div>'}</div></div>`);
   if (!host) return;
 
   host.querySelectorAll('[data-record-time]').forEach((node) => node.addEventListener('click', () => {
@@ -214,11 +153,11 @@ function openPriceProcedurePicker({ workplaceId, onAssigned }) {
 }
 
 function renderProceduresStep(modalRoot, { date, workplaceId, from, to, onCreated }) {
-  modalRoot ||= pushRecordLayer({ settings: true });
+  modalRoot ||= mountRecordZ({ settings: true, className: 'record-flow-z' });
   let items = procedures().filter((procedure) => procedureForWorkplace(procedure, workplaceId));
   const selected = new Map();
   let selectionController = null;
-  const host = renderFlow(modalRoot, `<div class="record-screen record-screen--procedures"><div class="record-modal-toolbar"><strong>Процедуры</strong></div><div data-record-procedures></div></div>`);
+  const host = renderRecordZ(modalRoot, `<div class="record-screen record-screen--procedures"><div class="record-modal-toolbar"><strong>Процедуры</strong></div><div data-record-procedures></div></div>`);
   if (!host) return;
 
   const syncActions = () => {
@@ -353,11 +292,11 @@ function openProcedureSettings({ procedure, current, onSave, onAdd }) {
 }
 
 function renderPersonStep(modalRoot, { date, workplaceId, from, to, procedures: selectedProcedures, onCreated, onSelected }) {
-  modalRoot ||= pushRecordLayer({ settings: true });
+  modalRoot ||= mountRecordZ({ settings: true, className: 'record-flow-z' });
   let all = people();
   let filtered = all;
   let selectedPerson = null;
-  const host = renderFlow(modalRoot, `<div class="record-screen record-screen--people"><div class="record-person-toolbar"><input class="record-person-search" data-record-person-search placeholder="🔍 Найти человека..." autocomplete="off"></div><div class="record-person-list" data-record-person-list></div></div>`);
+  const host = renderRecordZ(modalRoot, `<div class="record-screen record-screen--people"><div class="record-person-toolbar"><input class="record-person-search" data-record-person-search placeholder="🔍 Найти человека..." autocomplete="off"></div><div class="record-person-list" data-record-person-list></div></div>`);
   if (!host) return;
 
   const openSelectedPerson = (person) => {
@@ -530,7 +469,7 @@ function openConfirmationProcedurePicker({ workplaceId, selectedProcedures, onSe
 }
 
 function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, selectedPerson, selectedProcedures, onCreated }) {
-  modalRoot ||= pushRecordLayer();
+  modalRoot ||= mountRecordZ({ className: 'record-flow-z' });
   let currentDate = dateKey(date);
   let currentWorkplaceId = workplaceId;
   let currentFrom = from;
@@ -735,7 +674,7 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
           duration: itemDuration,
         })),
       });
-      closeRecordLayers();
+      closeRecordZStack('record-flow-z');
       onCreated?.();
       },
     });
@@ -754,9 +693,9 @@ function blockEndValues({ date, workplaceId, from }) {
 }
 
 function renderBlockEndStep(modalRoot, { date, workplaceId, from, onCreated }) {
-  modalRoot ||= pushRecordLayer();
+  modalRoot ||= mountRecordZ({ className: 'record-flow-z' });
   const values = blockEndValues({ date, workplaceId, from });
-  const host = renderFlow(modalRoot, `<div class="record-screen record-screen--time"><div class="record-modal-toolbar"><strong>До скольки занять</strong></div><div class="record-time-list">${values.map((value) => `<button type="button" class="record-time-option" data-block-end="${value}">${value}</button>`).join('') || '<div class="muted">Свободного времени нет.</div>'}</div></div>`);
+  const host = renderRecordZ(modalRoot, `<div class="record-screen record-screen--time"><div class="record-modal-toolbar"><strong>До скольки занять</strong></div><div class="record-time-list">${values.map((value) => `<button type="button" class="record-time-option" data-block-end="${value}">${value}</button>`).join('') || '<div class="muted">Свободного времени нет.</div>'}</div></div>`);
   if (!host) return;
   host.querySelectorAll('[data-block-end]').forEach((node) => node.addEventListener('click', () => {
     const to = node.dataset.blockEnd;
@@ -765,7 +704,7 @@ function renderBlockEndStep(modalRoot, { date, workplaceId, from, onCreated }) {
 }
 
 function renderBreakConfirmationStep(modalRoot, { date, workplaceId, from, to, onCreated }) {
-  modalRoot ||= pushRecordLayer();
+  modalRoot ||= mountRecordZ({ className: 'record-flow-z' });
   const host = flowHost(modalRoot);
   if (!host) return;
   const workplace = findWorkplaceName(workplaceId);
@@ -797,7 +736,7 @@ function renderBreakConfirmationStep(modalRoot, { date, workplaceId, from, to, o
       return;
     }
     if (!createJournalBreak({ workplaceId: String(workplaceId || ''), date: dateKey(date), from: String(from), to: String(to) })) return;
-    closeRecordLayers();
+    closeRecordZStack('record-flow-z');
     onCreated?.();
     },
   });
