@@ -213,6 +213,34 @@ function workplaceDto(workplace: WorkplaceRow): WorkplaceInput {
   };
 }
 
+function publicWorkplaceCardProfile(workplace: WorkplaceRow, profile: any) {
+  const appearance = objectValue(workplace.cardAppearance);
+  const lines = Array.isArray(appearance.lines)
+    ? appearance.lines.filter((line) => line && typeof line === 'object' && !Array.isArray(line)) as Record<string, unknown>[]
+    : [];
+  const selected = new Set(lines.map((line) => stringValue(line.field).trim()).filter(Boolean));
+  if (!selected.size) {
+    selected.add('profileName');
+    selected.add('profession');
+    selected.add('profilePhone');
+  }
+  const uses = (...fields: string[]) => fields.some((field) => selected.has(field));
+  const result: Record<string, unknown> = {};
+  if (uses('profileName', 'profileFirstName')) result.name = stringValue(profile?.name);
+  if (uses('profileName', 'profileSurname')) result.surname = stringValue(profile?.surname);
+  if (uses('profession')) result.profession = stringValue(profile?.profession);
+  if (uses('profilePhone')) {
+    result.phone = stringValue(profile?.phone);
+    result.phones = stringList(profile?.phones);
+  }
+  if (uses('profileEmail')) result.emails = stringList(profile?.emails);
+  if (uses('profileTelegram')) result.telegrams = stringList(profile?.telegrams);
+  if (uses('profileExperience')) result.experience = stringValue(profile?.experience);
+  if (uses('profileAbout')) result.about = stringValue(profile?.about);
+  if (uses('profileProfessionAbout')) result.professionAbout = stringValue(profile?.professionAbout);
+  return result;
+}
+
 function canonical(value: ProfileBundleInput) {
   return JSON.stringify(value);
 }
@@ -638,7 +666,10 @@ export class ProfileService {
         about: row.about,
         cardAppearance: objectValue(row.cardAppearance),
       },
-      workplaces: row.workplaces.map(workplaceDto),
+      workplaces: row.workplaces.map((workplace) => ({
+        ...workplaceDto(workplace),
+        cardProfile: publicWorkplaceCardProfile(workplace, row),
+      })),
       updatedAt: row.updatedAt,
     };
   }
