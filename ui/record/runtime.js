@@ -61,7 +61,7 @@ export function recordProcedureList(items = [], {
         ${duration ? `<span>${escapeRecordText(duration)}</span>` : ''}
       </span>
       <span class="v2-service-sticker__price">${escapeRecordText(cost)}</span>
-      <span class="v2-service-sticker__selector" aria-hidden="true">${on ? '✓' : ''}</span>
+      <span class="v2-service-sticker__selector" aria-hidden="true"></span>
     </button>`;
   });
   return rows.length
