@@ -9,3 +9,8 @@
 .record-screen--time .record-time-list{display:flex;flex-direction:column;gap:0;width:min(100%,430px);margin:0 auto;overflow:auto}.record-screen--time .record-time-option{display:flex;align-items:center;justify-content:center;width:100%;min-height:44px;aspect-ratio:auto;border:0;border-radius:0;background:var(--white);font-size:18px;font-weight:500;text-align:center;padding:0 16px;color:var(--text)}.record-screen--time .record-time-option.is-quarter{font-weight:800;background:var(--white);color:var(--text)}.record-screen--time .record-time-option:not(.is-quarter){color:var(--text-muted)}
 
 @media(max-width:360px){.time-range-fields{gap:8px}.time-slots{gap:8px}.time-slot{font-size:15px}}
+
+.time-slots--hour-rows{display:flex;grid-template-columns:none;gap:8px;width:100%;max-width:100%;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;scrollbar-width:none;padding:2px 0 6px}
+.time-slots--hour-rows::-webkit-scrollbar{display:none}
+.time-slots--hour-rows .time-slot{box-sizing:border-box;flex:0 0 calc((100% - 16px)/3);width:calc((100% - 16px)/3);min-width:calc((100% - 16px)/3);height:42px;min-height:42px;aspect-ratio:auto;border-radius:0;padding:0 8px;font-size:14px;font-weight:400;box-shadow:0 4px 10px rgba(0,0,0,.09)}
+.time-slots--hour-rows .time-slot.is-emphasized{font-weight:800}
