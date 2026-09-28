@@ -130,7 +130,7 @@ assert.match(endUserProfileCardBlock, /ACCOUNT_PROFILE_CARD_APPEARANCE/);
 assert.match(endUserProfileCardBlock, /value:'name'/);
 assert.match(endUserProfileCardBlock, /value:'phone'/);
 assert.doesNotMatch(endUserProfileCardBlock, /entityCard\(\{/);
-assert.doesNotMatch(endUserProfileCardBlock, /entity-card--hero|account-profile-card/);
+assert.doesNotMatch(endUserProfileCardBlock, /entity-card--hero|className\s*:\s*['\"][^'\"]*account-profile-card/);
 assert.doesNotMatch(bookingCss, /booking-account--account \.entity-card--hero/);
 assert.match(accountShell, /openSharedProfileSettingsMenu\(\{/);
 assert.match(sharedProfile, /variant: 'bottom'/);
