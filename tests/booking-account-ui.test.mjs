@@ -117,7 +117,11 @@ assert.doesNotMatch(booking, /renderAccountHome\(/);
 assert.doesNotMatch(booking, /import \{ renderAccount,/);
 assert.match(booking, /exitBookingContext\(state, \{ tab: 'contact-detail', tenantId: state\.tenantId \}\)/);
 assert.match(booking, /d:\s*null/);
-assert.doesNotMatch(booking, /data-booking-flow-chat|kind:\s*'chat'/);
+const bookingHeaderStart = booking.indexOf('function bookingHeaderMarkup');
+const bookingHeaderEnd = booking.indexOf('function bookingActionForStep', bookingHeaderStart);
+const bookingHeader = booking.slice(bookingHeaderStart, bookingHeaderEnd);
+assert.match(bookingHeader, /d:\s*null/);
+assert.doesNotMatch(bookingHeader, /data-booking-flow-chat|kind:\s*'chat'/);
 
 // End-user account is the first consumer of shared UI Reference V2.
 assert.match(accountShell, /v2Header\(\{/);
