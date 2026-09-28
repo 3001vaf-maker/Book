@@ -27,6 +27,8 @@ const journal = fs.readFileSync('journal/journal.js', 'utf8');
 const settings = fs.readFileSync('settings/settings.js', 'utf8');
 const onlineBookingSettings = fs.readFileSync('settings/online-booking/online-booking.js', 'utf8');
 const onlineBookingSettingsCss = fs.readFileSync('settings/online-booking/online-booking.css', 'utf8');
+const recordRuntime = fs.readFileSync('ui/record/runtime.js', 'utf8');
+const recordCss = fs.readFileSync('ui/record/record.css', 'utf8');
 const journalList = fs.readFileSync('journal/список.js', 'utf8');
 const firstRun = fs.readFileSync('first-run/runtime.js', 'utf8');
 const profile = fs.readFileSync('settings/profile/profile.js', 'utf8');
@@ -141,7 +143,6 @@ for (const name of [
   'v2EList',
   'v2FDeck',
   'v2Shell',
-  'v2ServiceStickers',
   'v2Sticker',
   'v2Document',
   'v2LegalCards',
@@ -186,16 +187,16 @@ expect(/\.v2-e-card\{[\s\S]*?pointer-events:none;/.test(css) && /\.v2-e-card str
 expect(/\.v2-e-card strong\{[\s\S]*?min-width:var\(--v2-card-handle-min\);[\s\S]*?height:var\(--v2-card-handle\);[\s\S]*?transform:none/.test(css), 'E handle must stay directly reachable with a 44px minimum target and horizontal label.');
 expect(css.includes('.v2-legal-cards{display:flex;gap:10px;overflow-x:auto'), 'Legal document stickers must use the shared horizontal rail.');
 expect(css.includes('.v2-legal-card{\n  flex:0 0 min(86%,320px);\n  height:96px;'), 'Legal document stickers must share one base height and horizontal width.');
-expect(css.includes('.booking-account--account .v2-app .booking-time-grid{grid-template-columns:repeat(3,minmax(0,1fr))}'), 'V2 time slots must stay three per row.');
-expect(css.includes('.booking-account--account .v2-app .booking-time-slot{border-radius:0'), 'V2 time slots must remain rectangular.');
+expect(recordRuntime.includes('export function recordTimeRows') && recordCss.includes('.record-time-track{display:flex') && recordCss.includes('overflow-x:auto'), 'Booking time must use the canonical horizontal Shared Record time rows.');
 expect(!/\.booking-account--account \.v2-app \.calendar__date\{[^}]*border-radius/.test(css), 'V2 must not redesign Calendar geometry.');
 expect(calendar.includes('.calendar__grid') && calendar.includes('.calendar__month-button'), 'Canonical Calendar owner must remain intact.');
 
-expect(booking.includes('v2ServiceStickers('), 'Booking services must use shared compact V2 stickers.');
+expect(booking.includes('recordWorkplaceCards(') && booking.includes('recordProcedureList(') && booking.includes('recordTimeRows(') && booking.includes('recordConfirmationMiniCard('), 'Online booking must consume the canonical Shared Record step owners.');
+expect(!/bookingChoiceCards\(|bookingTimeGroups\(|v2ServiceStickers\(|v2-confirmation/.test(booking), 'Online booking must not restore parallel local visual owners for canonical booking steps.');
 expect(inputs.includes('export function passwordField') && inputs.includes('export function initPasswordFields'), 'Password reveal control must belong to shared UI inputs.');
 expect(booking.includes('passwordField({') && booking.includes('initPasswordFields(root)'), 'Auth and Registration must use the shared password reveal control.');
 expect(booking.includes("step: 'workplaces'") && booking.includes("step: 'confirmation'"), 'Booking must remain a V2 Z-stack flow.');
-expect(booking.includes('initV2Swipe(root'), 'Booking Z-stack must use the shared physical swipe.');
+expect(booking.includes('mountV2ZLayer(root') && booking.includes("className: 'booking-step-z'") && booking.includes('stack: true'), 'Online booking steps after Z1 must use the shared physical Z-layer stack.');
 expect(ui.includes("axis = Math.abs(nextX) >= Math.abs(nextY) * 1.08 ? 'horizontal' : 'vertical'"), 'Shared Z swipe must axis-lock without randomly rejecting a horizontal gesture.');
 expect(ui.includes("app?.classList.add('is-revealing-deck')") && ui.includes("app?.classList.remove('is-revealing-deck')"), 'Z swipe must reveal and reset the F stack physically.');
 expect(ui.includes('let suppressNextClick = false;') && ui.includes("surface.addEventListener('click', click, true)") && ui.includes('event.preventDefault();') && ui.includes('event.stopPropagation();'), 'Shared Z swipe must suppress the accidental interactive click generated after a horizontal drag.');

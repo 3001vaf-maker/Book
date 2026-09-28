@@ -41,6 +41,8 @@ const infoCss = fs.readFileSync('ui/info/info.css', 'utf8');
 const timeUi = fs.readFileSync('ui/time/index.js', 'utf8');
 const headerUi = fs.readFileSync('ui/header/index.js', 'utf8');
 const journalListUi = fs.readFileSync('journal/список.js', 'utf8');
+const recordRuntime = fs.readFileSync('ui/record/runtime.js', 'utf8');
+const recordCss = fs.readFileSync('ui/record/record.css', 'utf8');
 
 // Public booking selection comes first. UI Reference V2 is the end-user target.
 assert.match(booking, /renderAccount/);
@@ -48,8 +50,14 @@ assert.match(booking, /v2Header\(\{/);
 assert.match(booking, /v2Shell\(\{/);
 assert.match(booking, /v2Sticker\(\{/);
 assert.match(booking, /v2LegalCards\(/);
-assert.match(booking, /v2ServiceStickers\(/);
-assert.match(booking, /initV2Swipe\(/);
+assert.match(booking, /recordWorkplaceCards\(/);
+assert.match(booking, /recordProcedureList\(/);
+assert.match(booking, /recordTimeRows\(/);
+assert.match(booking, /recordConfirmationMiniCard\(/);
+assert.doesNotMatch(booking, /bookingChoiceCards\(|bookingTimeGroups\(|v2ServiceStickers\(|v2-confirmation/);
+assert.match(booking, /mountV2ZLayer\(root/);
+assert.match(booking, /className: 'booking-step-z'/);
+assert.match(booking, /stack: true/);
 assert.match(booking, /initV2StickerSwipe\(/);
 assert.match(booking, /function renderLegalSticker/);
 assert.match(booking, /function renderAccountEntry/);
@@ -107,7 +115,8 @@ assert.doesNotMatch(bookingBackBlock, /renderAccountEntry\(root, state\);/);
 assert.doesNotMatch(booking, /renderAccountHome\(/);
 assert.doesNotMatch(booking, /import \{ renderAccount,/);
 assert.match(booking, /exitBookingContext\(state, \{ tab: 'contact-detail', tenantId: state\.tenantId \}\)/);
-assert.match(booking, /exitBookingContext\(state, \{ tab: 'messages', tenantId: state\.tenantId \}\)/);
+assert.match(booking, /d:\s*null/);
+assert.doesNotMatch(booking, /data-booking-flow-chat|kind:\s*'chat'/);
 
 // End-user account is the first consumer of shared UI Reference V2.
 assert.match(accountShell, /v2Header\(\{/);
@@ -413,8 +422,10 @@ assert.match(v2Css, /\.v2-layer--bottom[\s\S]*?bottom:0;[\s\S]*?border-radius:0/
 assert.match(v2Css, /\.v2-layer--technical[\s\S]*?border-radius:0;[\s\S]*?box-shadow:0 18px 46px/);
 assert.match(v2Css, /\.v2-legal-cards\{display:flex;gap:10px;overflow-x:auto/);
 assert.match(v2Css, /\.v2-deck__card[\s\S]*?border-radius:0 var\(--v2-z-radius\) 0 0/);
-assert.match(v2Css, /\.booking-account--account \.v2-app \.booking-time-grid\{grid-template-columns:repeat\(3,minmax\(0,1fr\)\)\}/);
-assert.match(v2Css, /\.booking-account--account \.v2-app \.booking-time-slot\{border-radius:0/);
+assert.match(recordRuntime, /export function recordTimeRows/);
+assert.match(recordCss, /\.record-time-track\{display:flex/);
+assert.match(recordCss, /overflow-x:auto/);
+assert.match(recordCss, /\.record-time-chip\.is-emphasized\{font-weight:800\}/);
 assert.match(indexHtml, /ui\/v2\/v2\.css/);
 assert.match(indexHtml, /ui\/selection\/segment-control\.css/);
 assert.match(indexHtml, /ui\/info\/info\.css/);
@@ -449,8 +460,10 @@ assert.equal(fs.existsSync('ui/shell/shell.css'), false);
 assert.doesNotMatch(journalListUi, /getBoundingPersonRect/);
 assert.match(journalListUi, /getBoundingClientRect\(\)/);
 
-assert.match(bookingUi, /Утро/);
-assert.match(bookingUi, /День/);
-assert.match(bookingUi, /Вечер/);
+assert.doesNotMatch(bookingUi, /bookingChoiceCards|bookingTimeGroups/);
+assert.match(recordRuntime, /recordWorkplaceCards/);
+assert.match(recordRuntime, /recordProcedureList/);
+assert.match(recordRuntime, /recordTimeRows/);
+assert.match(recordRuntime, /recordConfirmationMiniCard/);
 
 console.log('booking account UI tests passed');
