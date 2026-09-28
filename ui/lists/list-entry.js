@@ -36,13 +36,14 @@ export function listEntry({
   actionAria = '',
   actionIcon = '⚙',
   deleteData = '',
-  deleteAria = 'Удалить'
+  deleteAria = 'Удалить',
+  selected = false
 } = {}) {
   const columnValues = (Array.isArray(columns) ? columns : []).slice(0, 3);
   const columnMode = columnValues.length > 0;
   const tag = interactive ? 'button' : 'div';
   const attrs = interactive
-    ? `type="button" ${data} ${aria ? `aria-label="${escapeHtml(aria)}"` : ''}`
+    ? `type="button" ${data} aria-pressed="${selected ? 'true' : 'false'}" ${aria ? `aria-label="${escapeHtml(aria)}"` : ''}`
     : '';
   const style = image ? ` style="--list-entry-image:url('${escapeHtml(image)}')"` : '';
   const secondLine = subtitle || '\u00a0';
@@ -57,7 +58,7 @@ export function listEntry({
     ? `<span class="list-entry__delete" data-delete-action="${escapeHtml(deleteData)}" aria-label="${escapeHtml(deleteAria)}">×</span>`
     : '';
   const firstLine = overline ? `<strong>${escapeHtml(overline)}</strong>` : '';
-  const classes = ['list-entry', image ? 'has-image' : '', columnMode ? 'list-entry--columns' : '', className].filter(Boolean).join(' ');
+  const classes = ['list-entry', image ? 'has-image' : '', columnMode ? 'list-entry--columns' : '', selected ? 'is-selected' : '', className].filter(Boolean).join(' ');
 
   if (columnMode) {
     return `<${tag} class="${classes}"${attrs}${style}>
