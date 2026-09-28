@@ -198,6 +198,27 @@ if (!/recordTimeRows\(values,\s*\{\s*data:\s*'data-record-time'/.test(journalRec
   errors.push('journal/record.js must call Shared recordTimeRows(items, options) with the canonical positional contract');
 }
 
+const sharedPersonListSource = sharedRecordUi.slice(
+  sharedRecordUi.indexOf('export function recordPersonList'),
+  sharedRecordUi.indexOf('function timeValue')
+);
+if (!/overline:\s*item\.uei/.test(sharedPersonListSource)
+  || !/title:\s*item\.name/.test(sharedPersonListSource)
+  || !/subtitle:\s*item\.phone/.test(sharedPersonListSource)
+  || /columns:\s*\[/.test(sharedPersonListSource)) {
+  errors.push('Shared Record person selection must keep UEI / name / phone as three readable stacked lines');
+}
+
+const recordPersonStepSource = journalRecordUi.slice(
+  journalRecordUi.indexOf('function renderPersonStep'),
+  journalRecordUi.indexOf('function openConfirmationWorkplaceModal')
+);
+if (!/button\('\+ Добавить клиента',\s*\{\s*data:\s*'data-record-settings-add-person'\s*\}\)/.test(recordPersonStepSource)
+  || !/bindRecordSettings\(modalRoot/.test(recordPersonStepSource)
+  || /variant:\s*'secondary'[^\n]*data-record-settings-add-person/.test(recordPersonStepSource)) {
+  errors.push('Record person-step A settings must expose one canonical black "+ Добавить клиента" button');
+}
+
 for (const [path, source] of [
   ['journal/record.js', journalRecordUi],
   ['journal/record-view.js', journalRecordViewUi],
@@ -297,9 +318,11 @@ const bookingHeaderSource = onlineBookingUi.slice(
   onlineBookingUi.indexOf('function bookingActionForStep')
 );
 if (!/image:\s*representativePhoto\(state\)/.test(bookingHeaderSource)
+  || !/disabled:\s*true/.test(bookingHeaderSource)
   || !/b:\s*'Запись'/.test(bookingHeaderSource)
-  || !/d:\s*null/.test(bookingHeaderSource)) {
-  errors.push('Online booking Header must use the professional photo in A, Запись in B, and no D chat on booking steps');
+  || !/d:\s*null/.test(bookingHeaderSource)
+  || /data-record-owner-settings/.test(bookingHeaderSource)) {
+  errors.push('Online booking Header must keep A as a disabled professional avatar only, use Запись in B, and expose no D chat or specialist settings');
 }
 
 if (!/workplaceCardAppearance\(workplace\)/.test(onlineBookingUi)
