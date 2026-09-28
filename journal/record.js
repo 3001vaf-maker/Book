@@ -53,7 +53,7 @@ function recordStartTimes({ date, workplaceId, from }) {
     workplaceId,
     from,
     to,
-    duration: 1,
+    duration: 5,
     step: 5,
   });
 }
@@ -67,7 +67,7 @@ function renderTimeStep(modalRoot, { date, workplaceId, from, to, onCreated }) {
   let activeMode = 'record';
   const values = recordStartTimes({ date: dateKey(date), workplaceId, from });
   const toggle = viewNavigation({ views: RECORD_MODES, activeView: activeMode, className: 'segment-control--two', ariaLabel: 'Режим записи' });
-  const host = renderRecordZ(modalRoot, `<div class="record-screen record-screen--time">${toggle}${recordTimeRows({ items: values, data: 'data-record-time', accentEvery: 30 })}</div>`);
+  const host = renderRecordZ(modalRoot, `<div class="record-screen record-screen--time">${toggle}${recordTimeRows(values, { data: 'data-record-time', accentEvery: 30 })}</div>`);
   if (!host) return;
 
   host.querySelectorAll('[data-record-time]').forEach((node) => node.addEventListener('click', () => {
@@ -758,8 +758,7 @@ function blockEndValues({ date, workplaceId, from }) {
 function renderBlockEndStep(modalRoot, { date, workplaceId, from, onCreated }) {
   modalRoot ||= mountRecordZ({ ...recordOwnerOptions(), className: 'record-flow-z' });
   const values = blockEndValues({ date, workplaceId, from });
-  const host = renderRecordZ(modalRoot, `<div class="record-screen record-screen--time"><div class="record-modal-toolbar"><strong>До скольки занять</strong></div>${recordTimeRows({
-    items: values,
+  const host = renderRecordZ(modalRoot, `<div class="record-screen record-screen--time"><div class="record-modal-toolbar"><strong>До скольки занять</strong></div>${recordTimeRows(values, {
     data: 'data-block-end',
     empty: 'Свободного времени нет.',
     accentEvery: 30,

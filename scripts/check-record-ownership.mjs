@@ -139,6 +139,12 @@ if (!/recordTimeRows/.test(journalRecordUi)
   errors.push('journal/record.js must consume Shared Record time-row UI instead of drawing local time buttons');
 }
 
+if (!/recordTimeRows\(values,\s*\{\s*data:\s*'data-record-time'/.test(journalRecordUi)
+  || !/recordTimeRows\(values,\s*\{[\s\S]*?data:\s*'data-block-end'/.test(journalRecordUi)
+  || /recordTimeRows\(\{\s*items:/.test(journalRecordUi)) {
+  errors.push('journal/record.js must call Shared recordTimeRows(items, options) with the canonical positional contract');
+}
+
 for (const [path, source] of [
   ['journal/record.js', journalRecordUi],
   ['journal/record-view.js', journalRecordViewUi],
@@ -176,11 +182,11 @@ const recordStartTimesSource = journalRecordUi.slice(
   journalRecordUi.indexOf('function recordStartTimes'),
   journalRecordUi.indexOf('function openRecordTimeNotice')
 );
-if (!/duration:\s*1\b/.test(recordStartTimesSource)
+if (!/duration:\s*5\b/.test(recordStartTimesSource)
   || !/step:\s*5\b/.test(recordStartTimesSource)
   || /getBookingSettings\(\)\.slotStep/.test(journalRecordUi)
   || /function\s+recordSlotStep\s*\(/.test(journalRecordUi)) {
-  errors.push('Journal Record first-step quick choices must keep a compact 5-minute display cadence while checking only the candidate minute; online-booking slotStep must not participate');
+  errors.push('Journal Record first-step quick choices must preserve the proven specialist 5-minute helper and must not consume online-booking slotStep');
 }
 
 const confirmationTimeSource = journalRecordUi.slice(

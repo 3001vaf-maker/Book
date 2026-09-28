@@ -12,6 +12,9 @@ const dayEditor = readFileSync(new URL('../timetable/day-editor.js', import.meta
 assert.match(recordFlow, /checkTimeAvailability/);
 assert.match(recordFlow, /listAvailableStartTimes/);
 assert.match(recordFlow, /listAvailableEndTimes/);
+assert.match(recordFlow, /recordTimeRows\(values,\s*\{\s*data:\s*'data-record-time'/);
+assert.match(recordFlow, /recordTimeRows\(values,\s*\{[\s\S]*?data:\s*'data-block-end'/);
+assert.doesNotMatch(recordFlow, /recordTimeRows\(\{\s*items:/);
 assert.match(recordFlow, /getWorkplaceWorkingDates/);
 assert.doesNotMatch(recordFlow, /isTimeRangeAvailable|getTimeUsages|getJournalBreaks|getRecords\(|getDayTime|getDay\(/);
 assert.doesNotMatch(recordFlow, /from ['"]\.\.\/core\/day\.js['"]/);
