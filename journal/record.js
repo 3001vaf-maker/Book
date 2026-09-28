@@ -1,4 +1,4 @@
-import { button, durationPicker, durationText, entityCard, escapeHtml, list, listEntry, stateView, initStateView, initCalendar, mountModal, modal, openNotice, initDurationPickers, initMultiSelect, viewNavigation, initViewNavigation, mountRecordZ, recordZHost, renderRecordZ, recordTimeRows, recordProcedureList, recordConfirmationMiniCard, setRecordPrimaryAction, bindRecordSettings, closeRecordZStack } from '../ui/ui.js';
+import { button, durationPicker, durationText, entityCard, escapeHtml, list, listEntry, stateView, initStateView, initCalendar, mountModal, modal, openNotice, initDurationPickers, initMultiSelect, viewNavigation, initViewNavigation, mountRecordZ, recordZHost, renderRecordZ, recordTimeRows, recordProcedureList, recordPersonList, recordConfirmationMiniCard, setRecordPrimaryAction, bindRecordSettings, closeRecordZStack } from '../ui/ui.js';
 import { createRecord } from '../core/record/index.js';
 import { createJournalBreak } from './break-service.js';
 import { getPeople } from '../main/people/data.js';
@@ -319,20 +319,20 @@ function renderPersonStep(modalRoot, { date, workplaceId, from, to, procedures: 
   const render = () => {
     const listHost = host.querySelector('[data-record-person-list]');
     if (!listHost) return;
-    listHost.innerHTML = list({
-      items: filtered.map((person) => {
-        const display = personDisplay(person);
-        return {
-          overline: display.uei,
-          title: display.name,
-          secondary: display.phone,
-          interactive: true,
-          data: `data-record-person="${escapeHtml(person.key)}"`,
-          selected: selectedPerson?.key === person.key,
-          aria: `Выбрать человека ${display.name}`,
-        };
-      }),
-    }) || '<div class="muted">Люди не найдены.</div>';
+    listHost.innerHTML = recordPersonList(filtered.map((person) => {
+      const display = personDisplay(person);
+      return {
+        key: person.key,
+        name: display.name,
+        uei: display.uei,
+        phone: display.phone,
+        aria: `Выбрать человека ${display.name}`,
+      };
+    }), {
+      data: 'data-record-person',
+      selected: selectedPerson?.key || '',
+      empty: 'Люди не найдены.',
+    });
 
     listHost.querySelectorAll('[data-record-person]').forEach((row) => row.addEventListener('click', () => {
       openSelectedPerson(all.find((person) => person.key === row.dataset.recordPerson) || null);
@@ -595,6 +595,7 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
       total: `${total} ₽`,
       procedures: selectedProcedures.map((item, index) => ({
         name: item.procedure.name || '',
+        durationText: durationText(item.duration),
         right: item.cost === '' || item.cost === null || item.cost === undefined ? '' : `${item.cost} ₽`,
         data: `data-record-confirm-procedure="${index}"`,
       })),
