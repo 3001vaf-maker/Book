@@ -25,9 +25,7 @@ import {
 } from '../core/account/index.js';
 import { normalizeBookingSettings } from '../core/booking-settings/index.js';
 import {
-  bookingChoiceCards,
   bookingThemeStyle,
-  bookingTimeGroups,
   button,
   emptyState,
   escapeHtml,
@@ -43,8 +41,11 @@ import {
   v2Document,
   v2Header,
   v2LegalCards,
-  v2ServiceStickers,
   v2Shell,
+  recordWorkplaceCards,
+  recordProcedureList,
+  recordTimeRows,
+  recordConfirmationMiniCard,
   v2Sticker,
 } from '../ui/ui.js';
 import { formError, formView } from '../ui/forms/index.js';
@@ -308,11 +309,19 @@ function renderFlowPage(root, state, {
   step = '',
 } = {}) {
   if (step) state.bookingStep = step;
+  const accountName = [state.account?.name, state.account?.surname].filter(Boolean).join(' ').trim();
   const header = v2Header({
-    a: { kind: 'avatar', label: representativeName(state), image: representativePhoto(state), disabled: true },
-    b: representativeName(state),
+    a: {
+      kind: 'avatar',
+      label: accountName,
+      image: String(state.account?.photo || ''),
+      initials: accountName ? accountName.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase() : '',
+      disabled: true,
+      aria: state.account ? 'Профиль' : 'Профиль недоступен',
+    },
+    b: step === 'registration' ? 'Регистрация' : 'Запись',
     c: action ? { kind: 'text', label: action.label || '', data: action.data || '', aria: action.aria || action.label || '', disabled: Boolean(action.disabled) } : null,
-    d: state.account ? { kind: 'chat', data: 'data-booking-flow-chat', aria: 'Чат' } : null,
+    d: null,
   });
   const localTitle = title ? `<h2 class="v2-flow-title">${escapeHtml(title)}</h2>` : '';
   const shell = v2Shell({
@@ -321,9 +330,6 @@ function renderFlowPage(root, state, {
     className: center ? 'v2-app--flow-center' : 'v2-app--booking-flow',
   });
   root.innerHTML = `<section class="${flowThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${shell}</section>`;
-  root.querySelector('[data-booking-flow-chat]')?.addEventListener('click', () => {
-    exitBookingContext(state, { tab: 'messages', tenantId: state.tenantId });
-  });
 }
 
 function resumeBookingStep(root, state) {
@@ -651,14 +657,10 @@ async function continueAfterIdentity(root, state) {
 
 function renderWorkplaces(root, state) {
   const workplaces = Array.isArray(state.context.workplaces) ? state.context.workplaces : [];
-  const content = bookingChoiceCards(workplaces.map((workplace) => ({
-    title: workplace.name || 'Рабочее пространство',
-    secondary: [workplace.city || '', workplace.address || ''].filter(Boolean),
-    image: workplace.photo || '',
-    selected: String(state.workplaceKey || '') === String(workplace.key || ''),
-    data: `data-booking-workplace="${escapeHtml(workplace.key)}"`,
-    aria: `Выбрать рабочее пространство ${workplace.name || ''}`,
-  })), { multiple: false });
+  const content = recordWorkplaceCards(workplaces, {
+    data: 'data-booking-workplace',
+    selected: state.workplaceKey,
+  });
   renderFlowPage(root, state, {
     title: 'Рабочее пространство',
     subtitle: 'Выберите, где хотите записаться',
@@ -680,15 +682,19 @@ function renderWorkplaces(root, state) {
 
 function renderProcedures(root, state) {
   const procedures = getBookingProcedures(state.context, state.workplaceKey);
-  const content = v2ServiceStickers(procedures.map((procedure) => {
+  const content = recordProcedureList(procedures.map((procedure) => {
     const cost = bookingProcedureCost(procedure, state.workplaceKey);
     return {
       id: String(procedure.id || ''),
-      title: procedure.name || '',
-      secondary: [procedure.duration ? `${Number(procedure.duration)} мин` : '', procedure.description || ''].filter(Boolean).join(' · '),
-      right: cost !== '' ? money(cost) : '',
+      name: procedure.name || '',
+      durationText: procedure.duration ? `${Number(procedure.duration)} мин` : '',
+      costText: cost !== '' ? money(cost) : '',
     };
-  }), { selected: state.procedureIds, data: 'data-booking-procedure' });
+  }), {
+    selected: state.procedureIds,
+    data: 'data-booking-procedure',
+    empty: 'Для этого рабочего пространства процедуры не настроены.',
+  });
   renderFlowPage(root, state, {
     title: 'Услуги',
     subtitle: 'Выберите всё, что хотите сделать',
@@ -761,8 +767,8 @@ function renderTimes(root, state) {
     title: 'Время',
     subtitle: formatDate(state.date),
     body: `${slots.length
-      ? bookingTimeGroups(slots, { data: 'data-booking-time' })
-      : emptyState('Свободного времени нет', 'На эту дату нет интервала для выбранных услуг.')}${formError(state.error)}`,
+      ? recordTimeRows(slots, { data: 'data-booking-time', accentEvery: 30 })
+      : emptyState('Свободного времени нет', 'На эту дату нет интервала для выбранных процедур.')}${formError(state.error)}`,
     step: 'times',
   });
   initV2Swipe(root, {
@@ -789,17 +795,24 @@ function confirmationCard(state) {
   const subtotal = selectedSubtotal(state.context, state.workplaceKey, state.procedureIds);
   const discount = accountDiscount(state.account);
   const total = discountedTotal(subtotal, discount);
-  return `<section class="v2-confirmation">
-    <div class="v2-confirmation__profile">${escapeHtml(workplace.name || representativeName(state))}</div>
-    <div class="v2-confirmation__services">${procedures.map((procedure) => `<div class="v2-confirmation__service"><span>${escapeHtml(procedure.name || '')}</span><strong>${escapeHtml(money(bookingProcedureCost(procedure, state.workplaceKey)))}</strong></div>`).join('')}</div>
-    <div class="v2-confirmation__moment"><strong>${escapeHtml(formatDate(state.date))}</strong><span>${escapeHtml(state.from || '')}</span></div>
-    <div class="v2-confirmation__divider"></div>
-    <div class="v2-confirmation__totals">
-      <div class="v2-confirmation__row"><span>Стоимость</span><strong>${escapeHtml(money(subtotal))}</strong></div>
-      ${discount > 0 ? `<div class="v2-confirmation__row"><span>Скидка</span><strong>${escapeHtml(`${discount} %`)}</strong></div>` : ''}
-      <div class="v2-confirmation__row is-total"><span>Итого</span><strong>${escapeHtml(money(total))}</strong></div>
-    </div>
-  </section>`;
+  const duration = procedures.reduce((sum, procedure) => sum + Math.max(0, Number(procedure.duration || 0)), 0);
+  const accountName = [state.account?.name, state.account?.surname].filter(Boolean).join(' ').trim();
+  const accountPhone = String(state.account?.phone || state.account?.phones?.[0] || '');
+  const uei = String(state.account?.uei || state.account?.person?.uei || '');
+  return recordConfirmationMiniCard({
+    workplace: workplace.name || representativeName(state),
+    date: formatDate(state.date),
+    period: `${state.from || ''} - ${state.to || ''}`,
+    uei,
+    name: accountName || 'Запись',
+    phone: accountPhone,
+    duration: `${duration} мин`,
+    total: money(total),
+    procedures: procedures.map((procedure) => ({
+      name: procedure.name || '',
+      right: money(bookingProcedureCost(procedure, state.workplaceKey)),
+    })),
+  });
 }
 
 function renderConfirmation(root, state) {
