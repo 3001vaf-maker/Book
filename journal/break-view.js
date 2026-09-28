@@ -2,6 +2,7 @@ import { entityCard, list, modal, mountModal, timeSlots, mountRecordZ, recordZHo
 import { listAvailableEndTimes, listAvailableStartTimes } from '../core/time/index.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { moveJournalBreak, removeJournalBreak } from './break-service.js';
+import { getBookingSettings } from '../core/booking-settings/index.js';
 import { getProfile } from '../settings/profile/data.js';
 
 function recordOwnerOptions({ settings = false } = {}) {
@@ -29,8 +30,8 @@ function availableBreakStarts(item) {
   return listAvailableStartTimes({
     date: item.date,
     workplaceId: item.workplaceId,
-    duration: 1,
-    step: 1,
+    duration: getBookingSettings().slotStep,
+    step: getBookingSettings().slotStep,
     excludeId: item.id,
   });
 }
@@ -40,7 +41,7 @@ function availableBreakEnds(item, from) {
     date: item.date,
     workplaceId: item.workplaceId,
     from,
-    step: 1,
+    step: getBookingSettings().slotStep,
     excludeId: item.id,
   });
 }
