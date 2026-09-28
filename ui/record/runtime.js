@@ -55,21 +55,22 @@ export function recordProcedureList(items = [], {
       columns: [
         [
           { value: item.name || item.title || 'Процедура', strong: true },
-          { value: '', strong: true },
-          { value: '', strong: true },
+          { value: '' },
+          { value: '' },
         ],
         [
           { value: item.durationText || item.secondary || '', strong: true },
-          { value: selectedSet.has(id) ? 'Выбрано' : '', strong: true },
-          { value: '', strong: true },
+          { value: '' },
+          { value: '' },
         ],
         [
           { value: item.costText || item.right || '', strong: true },
-          { value: '', strong: true },
-          { value: '', strong: true },
+          { value: '' },
+          { value: '' },
         ],
       ],
       interactive: true,
+      selected: selectedSet.has(id),
       data: `${data}="${escapeRecordText(id)}"`,
       aria: item.aria || `Выбрать процедуру ${item.name || item.title || ''}`,
     });
@@ -79,6 +80,7 @@ export function recordProcedureList(items = [], {
 
 export function recordPersonList(items = [], {
   data = 'data-record-person',
+  selected = '',
   empty = 'Люди не найдены.',
 } = {}) {
   const rows = (Array.isArray(items) ? items : []).map((item = {}) => {
@@ -87,21 +89,22 @@ export function recordPersonList(items = [], {
       columns: [
         [
           { value: item.name || '', strong: true },
-          { value: '', strong: true },
-          { value: '', strong: true },
+          { value: '' },
+          { value: '' },
         ],
         [
           { value: item.uei || '', strong: true },
-          { value: '', strong: true },
-          { value: '', strong: true },
+          { value: '' },
+          { value: '' },
         ],
         [
           { value: item.phone || '', strong: true },
-          { value: '', strong: true },
-          { value: '', strong: true },
+          { value: '' },
+          { value: '' },
         ],
       ],
       interactive: true,
+      selected: String(selected || '') === key,
       data: `${data}="${escapeRecordText(key)}"`,
       aria: item.aria || `Выбрать ${item.name || ''}`,
     });
