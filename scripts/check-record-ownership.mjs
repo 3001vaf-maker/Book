@@ -176,11 +176,32 @@ const recordStartTimesSource = journalRecordUi.slice(
   journalRecordUi.indexOf('function recordStartTimes'),
   journalRecordUi.indexOf('function openRecordTimeNotice')
 );
-if (!/duration:\s*1\b/.test(recordStartTimesSource)
-  || !/step:\s*1\b/.test(recordStartTimesSource)
-  || /getBookingSettings\(\)\.slotStep/.test(recordStartTimesSource)
+if (!/duration:\s*5\b/.test(recordStartTimesSource)
+  || !/step:\s*5\b/.test(recordStartTimesSource)
+  || /getBookingSettings\(\)\.slotStep/.test(journalRecordUi)
   || /function\s+recordSlotStep\s*\(/.test(journalRecordUi)) {
-  errors.push('Journal Record availability must stay minute-resolution; display slot spacing must not become a booking rule');
+  errors.push('Journal Record first-step quick time choices must preserve the specialist 5-minute helper and must not consume online-booking slotStep');
+}
+
+const confirmationTimeSource = journalRecordUi.slice(
+  journalRecordUi.indexOf('function openConfirmationTimeModal'),
+  journalRecordUi.indexOf('function openPhoneActions')
+);
+if (!/openTimePickerAction\(/.test(confirmationTimeSource)
+  || !/minuteStep:\s*1\b/.test(confirmationTimeSource)
+  || !/checkTimeAvailability\(/.test(confirmationTimeSource)) {
+  errors.push('Journal Record final time correction must use the canonical Shared Time picker at exact-minute resolution and validate the resulting interval');
+}
+
+const existingRecordTimeSource = journalRecordViewUi.slice(
+  journalRecordViewUi.indexOf('function openTimePicker'),
+  journalRecordViewUi.indexOf('function openPersonPicker')
+);
+if (!/openTimePickerAction\(/.test(existingRecordTimeSource)
+  || !/minuteStep:\s*1\b/.test(existingRecordTimeSource)
+  || !/checkRecordTime\(/.test(existingRecordTimeSource)
+  || /getBookingSettings\(\)\.slotStep/.test(journalRecordViewUi)) {
+  errors.push('Existing specialist Record time editing must use the canonical Shared Time picker at exact-minute resolution and stay independent from online-booking slotStep');
 }
 
 if (!/kind:\s*'avatar'/.test(sharedRecordUi)
