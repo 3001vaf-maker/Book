@@ -43,7 +43,7 @@ const exactMinuteStarts = listAvailableStartTimes({
   from: '12:17',
   to: '12:30',
 });
-assert.equal(exactMinuteStarts[0], '12:30', 'occupied minutes must still be excluded even at minute resolution');
+assert.equal(exactMinuteStarts.length, 0, 'occupied minutes must still be excluded even at minute resolution');
 
 const freeExactMinuteStarts = listAvailableStartTimes({
   date: '2026-09-16',
