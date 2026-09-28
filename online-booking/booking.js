@@ -309,17 +309,25 @@ function renderFlowPage(root, state, {
   step = '',
 } = {}) {
   if (step) state.bookingStep = step;
-  const accountName = [state.account?.name, state.account?.surname].filter(Boolean).join(' ').trim();
+  const professionalName = representativeName(state);
+  const registration = step === 'registration';
   const header = v2Header({
-    a: {
+    a: registration ? {
       kind: 'avatar',
-      label: accountName,
-      image: String(state.account?.photo || ''),
-      initials: accountName ? accountName.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase() : '',
+      label: '',
+      image: '',
+      initials: '',
       disabled: true,
-      aria: state.account ? 'Профиль' : 'Профиль недоступен',
+      aria: 'Регистрация',
+    } : {
+      kind: 'avatar',
+      label: professionalName,
+      image: representativePhoto(state),
+      initials: professionalName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase(),
+      disabled: true,
+      aria: `Профиль ${professionalName}`,
     },
-    b: step === 'registration' ? 'Регистрация' : 'Запись',
+    b: registration ? 'Регистрация' : 'Запись',
     c: action ? { kind: 'text', label: action.label || '', data: action.data || '', aria: action.aria || action.label || '', disabled: Boolean(action.disabled) } : null,
     d: null,
   });
