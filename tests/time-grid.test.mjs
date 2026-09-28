@@ -46,4 +46,15 @@ assert.equal(starts.includes('15:00'), false);
 const ends = listTimeGridAvailableEnds(grid, { from: '14:00', step: 15, to: '16:00' });
 assert.deepEqual(ends, ['14:15', '14:30', '14:45', '15:00']);
 
+// Specialist Journal Record uses the proven 5-minute start grid.
+// UI refactors must never replace this with online-booking slotStep.
+const journalStarts = listTimeGridAvailableStarts(grid, {
+  duration: 5,
+  step: 5,
+  from: '12:00',
+  to: '13:00',
+});
+assert.deepEqual(journalStarts.slice(0, 6), ['12:00', '12:05', '12:10', '12:15', '12:20', '12:25']);
+assert.equal(journalStarts.includes('12:55'), true);
+
 console.log('time grid tests: OK');
