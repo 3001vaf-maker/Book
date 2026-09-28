@@ -12,6 +12,10 @@ import {
   mountModal,
   openNotice,
   timeSlots,
+  mountRecordZ,
+  recordZHost,
+  setRecordPrimaryAction,
+  bindRecordSettings,
 } from '../ui/ui.js';
 import { getRecordPaymentState, recordSettlementItems, repriceSettlement } from '../core/finance/index.js';
 import { listAvailableStartTimes } from '../core/time/index.js';
@@ -354,9 +358,15 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
   let baseline = stateSnapshot(state);
   let startTimer = null;
   let updatingFromView = false;
-  const m = mountModal(document.body, modal('<div data-record-view-host></div>', { variant: 'large', surface: 'app' }));
+  let finishClose = () => {};
+  const m = mountRecordZ({
+    title: 'Запись',
+    settings: true,
+    className: 'record-view-z',
+    onClose: () => finishClose(),
+  });
   if (!m) return;
-  const root = m.querySelector('[data-record-view-host]');
+  const root = recordZHost(m);
 
   const applyPatch = (patch) => {
     if (isPaid()) return;
@@ -545,13 +555,15 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       </div>
     </div>`;
     const dirty = stateSnapshot(state) !== baseline;
-    const confirmAction = !paid && dirty
-      ? `<div class="record-modal-actions modal-actions">${button('Подтвердить изменения', { data: 'data-record-view-confirm' })}</div>`
-      : '';
-    const saleAction = paid ? '' : `<div class="record-modal-actions modal-actions">${button('Продажа', { data: 'data-record-view-sale', variant: 'secondary' })}</div>`;
-    const cancelAction = paid ? '' : `<div class="record-modal-actions modal-actions">${button('Отменить запись', { data: 'data-record-view-cancel', variant: 'danger' })}</div>`;
-
-    root.innerHTML = `<div class="record-screen record-screen--state-view">${card}${statusControl}${confirmAction}${saleAction}${cancelAction}</div>`;
+    root.innerHTML = `<div class="record-screen record-screen--state-view">${card}${statusControl}</div>`;
+    if (!paid && dirty) {
+      setRecordPrimaryAction(m, {
+        label: 'Сохранить',
+        onClick: persistChanges,
+      });
+    } else {
+      setRecordPrimaryAction(m);
+    }
 
     root.querySelector('[data-record-view-workplace-edit]')?.addEventListener('click', () => {
       if (isPaid()) return;
@@ -611,21 +623,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       if (!next || next === current) return;
       applyPatch({ attendance: next });
     }));
-    root.querySelector('[data-record-view-confirm]')?.addEventListener('click', persistChanges);
-    root.querySelector('[data-record-view-sale]')?.addEventListener('click', () => {
-      if (isPaid()) return;
-      openSalePicker(state, (nextProducts) => {
-        state = { ...state, products: nextProducts };
-        persistChanges();
-      });
-    });
-    root.querySelector('[data-record-view-cancel]')?.addEventListener('click', () => {
-      if (isPaid()) return;
-      confirmCancel(record, () => {
-        finishClose();
-        m.remove();
-      });
-    });
+
   };
 
   const syncFromStoredRecord = ({ paid = isPaid() } = {}) => {
@@ -654,7 +652,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
   window.addEventListener('book:people-changed', onPeopleChanged);
 
   let closed = false;
-  const finishClose = () => {
+  finishClose = () => {
     if (closed) return;
     closed = true;
     if (startTimer) clearTimeout(startTimer);
@@ -665,8 +663,26 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     queueMicrotask(() => onClose?.());
   };
 
-  m.addEventListener('click', (event) => {
-    if (event.target === m || event.target.closest('[data-modal-close]')) finishClose();
+  bindRecordSettings(m, () => {
+    if (isPaid()) return;
+    const menu = list({
+      items: [
+        { title: 'Продажа', interactive: true, data: 'data-record-settings-sale', aria: 'Добавить продажу' },
+        { title: 'Отменить запись', interactive: true, data: 'data-record-settings-cancel', aria: 'Отменить запись' },
+      ],
+    });
+    const layer = mountModal(document.body, modal(menu, { variant: 'quick', surface: 'app' }));
+    layer?.querySelector('[data-record-settings-sale]')?.addEventListener('click', () => {
+      layer.v2Close?.();
+      openSalePicker(state, (nextProducts) => {
+        state = { ...state, products: nextProducts };
+        persistChanges();
+      });
+    });
+    layer?.querySelector('[data-record-settings-cancel]')?.addEventListener('click', () => {
+      layer.v2Close?.();
+      confirmCancel(record, () => m.v2Close?.());
+    });
   });
 
   render();
