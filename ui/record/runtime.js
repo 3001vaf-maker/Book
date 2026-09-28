@@ -77,23 +77,9 @@ export function recordPersonList(items = [], {
   const rows = (Array.isArray(items) ? items : []).map((item = {}) => {
     const key = String(item.key || item.id || '');
     return listEntry({
-      columns: [
-        [
-          { value: item.name || '', strong: true },
-          { value: '' },
-          { value: '' },
-        ],
-        [
-          { value: item.uei || '', strong: true },
-          { value: '' },
-          { value: '' },
-        ],
-        [
-          { value: item.phone || '', strong: true },
-          { value: '' },
-          { value: '' },
-        ],
-      ],
+      overline: item.uei || '',
+      title: item.name || '',
+      subtitle: item.phone || '',
       interactive: true,
       selected: String(selected || '') === key,
       data: `${data}="${escapeRecordText(key)}"`,
@@ -102,7 +88,6 @@ export function recordPersonList(items = [], {
   });
   return rows.length ? listEntries(rows) : `<div class="muted">${escapeRecordText(empty)}</div>`;
 }
-
 
 function timeValue(item) {
   return String(item && typeof item === 'object' ? (item.from ?? item.value ?? '') : item ?? '');
