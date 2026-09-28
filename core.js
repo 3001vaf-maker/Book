@@ -363,6 +363,14 @@ function syncWorkspaceHeader(surface) {
   });
 }
 
+window.addEventListener('book:record-chat-request', (event) => {
+  if (!workspaceReady) return;
+  navigate('chat', {
+    navigationOpen: false,
+    chatPersonKey: String(event?.detail?.personKey || ''),
+  });
+});
+
 function renderActiveWorkspaceSurface(surface) {
   const section = state.activeSection;
   const openNavigation = () => setNavigationOpen(true);
