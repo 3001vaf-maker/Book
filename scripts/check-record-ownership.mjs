@@ -176,11 +176,11 @@ const recordStartTimesSource = journalRecordUi.slice(
   journalRecordUi.indexOf('function recordStartTimes'),
   journalRecordUi.indexOf('function openRecordTimeNotice')
 );
-if (!/duration:\s*5\b/.test(recordStartTimesSource)
+if (!/duration:\s*1\b/.test(recordStartTimesSource)
   || !/step:\s*5\b/.test(recordStartTimesSource)
   || /getBookingSettings\(\)\.slotStep/.test(journalRecordUi)
   || /function\s+recordSlotStep\s*\(/.test(journalRecordUi)) {
-  errors.push('Journal Record first-step quick time choices must preserve the specialist 5-minute helper and must not consume online-booking slotStep');
+  errors.push('Journal Record first-step quick choices must keep a compact 5-minute display cadence while checking only the candidate minute; online-booking slotStep must not participate');
 }
 
 const confirmationTimeSource = journalRecordUi.slice(
