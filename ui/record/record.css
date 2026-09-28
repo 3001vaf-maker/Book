@@ -10,3 +10,8 @@
 .record-time-hour .time-slots::-webkit-scrollbar{display:none}
 .record-time-hour .time-slot{flex:0 0 auto;width:72px;min-width:72px;height:42px;aspect-ratio:auto}
 .record-time-hour[data-record-emphasized] .time-slot{font-weight:400}
+
+.record-time-hour .time-slots{display:flex;grid-template-columns:none;gap:8px;max-width:100%;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;scrollbar-width:none;padding:2px 0 6px}
+.record-time-hour .time-slots::-webkit-scrollbar{display:none}
+.record-time-hour .time-slot{flex:0 0 auto;width:auto;min-width:72px;height:42px;min-height:42px;aspect-ratio:auto;border-radius:10px;padding:0 12px;font-size:14px;font-weight:400}
+.record-time-hour .time-slot.is-emphasized{font-weight:800}
