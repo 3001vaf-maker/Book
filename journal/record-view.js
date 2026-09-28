@@ -14,6 +14,7 @@ import {
   openTimePickerAction,
   mountRecordZ,
   recordZHost,
+  recordProcedureList,
   setRecordPrimaryAction,
   bindRecordSettings,
 } from '../ui/ui.js';
@@ -235,14 +236,16 @@ function openPersonPicker(state, onSelected) {
 
 function openAddProcedurePicker(state, onSelected) {
   const available = procedures().filter((procedure) => workplaceAssignment(procedure, state.workplaceId));
-  const items = available.map((procedure) => ({
-    title: procedure.name || 'Процедура',
-    subtitle: durationText(Number(procedure.duration) || 0),
-    interactive: true,
-    data: `data-record-view-procedure-add-select="${escapeHtml(procedure.id || '')}"`,
+  const content = `<div class="modal-title"><h2>Добавить процедуру</h2></div>${recordProcedureList(available.map((procedure) => ({
+    id: String(procedure.id || ''),
+    name: procedure.name || 'Процедура',
+    durationText: durationText(Number(workplaceAssignment(procedure, state.workplaceId)?.duration ?? procedure.duration) || 0),
+    costText: defaultCost(procedure, state.workplaceId) !== '' ? formatMoney(defaultCost(procedure, state.workplaceId)) : '',
     aria: `Добавить процедуру ${procedure.name || ''}`,
-  }));
-  const content = `<div class="modal-title"><h2>Добавить процедуру</h2></div>${list({ items }) || '<div class="muted">Процедур нет.</div>'}`;
+  })), {
+    data: 'data-record-view-procedure-add-select',
+    empty: 'Процедур нет.',
+  })}`;
   const m = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
   if (!m) return;
   m.querySelectorAll('[data-record-view-procedure-add-select]').forEach((node) => node.addEventListener('click', () => {
