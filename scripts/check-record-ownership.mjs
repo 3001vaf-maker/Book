@@ -25,6 +25,9 @@ const serverRecord = read('server/src/record/record.service.ts');
 const serverBusinessState = read('server/src/business-state/business-state.service.ts');
 const serverBooking = read('server/src/online-booking/online-booking.service.ts');
 const accountShell = read('online-booking/account-shell.js');
+const onlineBookingUi = read('online-booking/booking.js');
+const peopleUi = read('main/people/people.js');
+const coreUi = read('core.js');
 const prismaSchema = read('server/prisma/schema.prisma');
 const journalRecordUi = read('journal/record.js');
 const journalRecordViewUi = read('journal/record-view.js');
@@ -131,9 +134,9 @@ if (!/mountRecordZ/.test(journalRecordUi)
   errors.push('Specialist Record surfaces must consume the canonical Shared Record Z/A/C owner');
 }
 
-if (!/recordTimeChoices/.test(journalRecordUi)
-  || /class=["'`]record-time-option/.test(journalRecordUi)) {
-  errors.push('journal/record.js must consume Shared Record time-choice UI instead of drawing local time buttons');
+if (!/recordTimeRows/.test(journalRecordUi)
+  || /class=["'`](?:record-time-option|record-time-chip)/.test(journalRecordUi)) {
+  errors.push('journal/record.js must consume Shared Record time-row UI instead of drawing local time buttons');
 }
 
 for (const [path, source] of [
@@ -166,6 +169,40 @@ for (const path of [...walk('journal'), ...walk('main'), ...walk('settings'), ..
   if (directDataImport.test(source)) {
     errors.push(`${path}: must use core/record/index.js instead of the private data atom`);
   }
+}
+
+
+if (!/getBookingSettings\(\)\.slotStep/.test(journalRecordUi)
+  || /step:\s*5\b/.test(journalRecordUi)) {
+  errors.push('Journal Record must read the canonical booking slotStep instead of owning a hard-coded time step');
+}
+
+if (!/recordWorkplaceCards\(/.test(onlineBookingUi)
+  || !/recordProcedureList\(/.test(onlineBookingUi)
+  || !/recordTimeRows\(/.test(onlineBookingUi)
+  || !/recordConfirmationMiniCard\(/.test(onlineBookingUi)) {
+  errors.push('Online booking must consume the same canonical Shared Record step owners as specialist booking');
+}
+
+if (/bookingChoiceCards\(|bookingTimeGroups\(|v2ServiceStickers\(|v2-confirmation/.test(onlineBookingUi)) {
+  errors.push('Online booking must not restore parallel visual owners for canonical booking steps');
+}
+
+if (!/image:\s*representativePhoto\(state\)/.test(onlineBookingUi)
+  || !/b:\s*'Запись'/.test(onlineBookingUi)
+  || !/d:\s*null/.test(onlineBookingUi)) {
+  errors.push('Online booking Header must use professional photo in A, title Запись in B, and no D chat');
+}
+
+if (!/openRecordCreationForPerson/.test(journalRecordUi)
+  || !/onCreateRecord\?\.\(person\)/.test(peopleUi)
+  || !/openRecordCreationForPerson\(person/.test(coreUi)) {
+  errors.push('Person profile Record action must enter the canonical Shared Record flow without a parallel implementation');
+}
+
+if (!/book:record-chat-request/.test(coreUi)
+  || !/mountV2ZLayer\(app,\s*v2ZLayer\('',\s*\{ className: 'record-chat-z' \}\),\s*\{ stack: true \}\)/.test(coreUi)) {
+  errors.push('Record D chat must open as a stacked Shared Z and preserve the active Record step underneath');
 }
 
 if (errors.length) {
