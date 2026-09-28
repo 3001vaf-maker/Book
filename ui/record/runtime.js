@@ -5,7 +5,6 @@ import { miniCard } from '../cards/mini-card.js';
 import { listEntry, listEntries } from '../lists/list-entry.js';
 import { v2HorizontalRail, v2RailCard } from '../v2/index.js';
 import { timeSlots } from '../time/index.js';
-import { timeSlots } from '../time/index.js';
 
 function recordSurface() {
   return document.querySelector('[data-v2-workspace-surface]')
@@ -141,6 +140,7 @@ export function recordTimeRows(items = [], {
         }),
         data,
         ariaLabel: `Время ${hour}:00`,
+        className: 'time-slots--hour-rows',
       })}
     </div>`).join('')}</div>`;
 }
