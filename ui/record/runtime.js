@@ -55,22 +55,18 @@ export function recordProcedureList(items = [], {
       columns: [
         [
           { value: item.name || item.title || 'Процедура', strong: true },
-          { value: '' },
-          { value: '' },
-        ],
-        [
+          { value: '', className: 'list-entry__line-spacer' },
           { value: item.durationText || item.secondary || '', strong: true },
-          { value: '' },
-          { value: '' },
         ],
         [
+          { value: '', className: 'list-entry__line-spacer' },
           { value: item.costText || item.right || '', strong: true },
-          { value: '' },
-          { value: '' },
+          { value: '', className: 'list-entry__line-spacer' },
         ],
       ],
       interactive: true,
       selected: selectedSet.has(id),
+      className: 'list-entry--record-procedure',
       data: `${data}="${escapeRecordText(id)}"`,
       aria: item.aria || `Выбрать процедуру ${item.name || item.title || ''}`,
     });
@@ -161,26 +157,20 @@ export function recordConfirmationMiniCard({
   procedures = [],
 } = {}) {
   const card = miniCard({
-    title: name || 'Запись',
-    titleData: name ? 'data-record-confirm-person-profile' : '',
-    titleAria: name ? `Открыть человека ${name}` : '',
-    value: uei || '',
-    valueData: uei ? 'data-record-confirm-person-profile' : '',
-    valueAria: uei ? `Открыть человека ${name || uei}` : '',
-    subtitle: phone || '',
-    subtitleData: phone ? 'data-record-confirm-phone' : '',
-    subtitleAria: phone ? `Действия с телефоном ${phone}` : '',
-    rows: [
-      { label: 'Пространство', value: workplace || '—', data: 'data-record-confirm-workplace', aria: `Изменить рабочее пространство ${workplace || ''}` },
-      { label: 'Дата', value: date || '—', data: 'data-record-confirm-date', aria: `Изменить дату ${date || ''}` },
-      { label: 'Занятый период', value: period || '—', data: 'data-record-confirm-time', aria: `Изменить время ${period || ''}` },
+    lines: [
+      { value: workplace || '—', align: 'left', strong: true },
+      { value: date || '—', align: 'right' },
+      { value: period || '—', align: 'right' },
+      { value: uei || '—', align: 'left' },
+      { value: name || '—', align: 'left', strong: true },
+      { value: phone || '—', align: 'left' },
     ],
   });
 
   const metrics = v2HorizontalRail([
     v2RailCard({
       title: duration || '—',
-      subtitle: 'Часы',
+      subtitle: 'Время',
       className: 'people-metric-card',
     }),
     v2RailCard({
@@ -190,7 +180,7 @@ export function recordConfirmationMiniCard({
     }),
     v2RailCard({
       title: total || '—',
-      subtitle: 'Сумма итого',
+      subtitle: 'Сумма',
       className: 'people-metric-card',
     }),
   ].join(''), { className: 'people-metrics' });
@@ -199,22 +189,17 @@ export function recordConfirmationMiniCard({
     columns: [
       [
         { value: item.name || item.title || 'Процедура', strong: true },
-        { value: '' },
-        { value: '' },
-      ],
-      [
+        { value: '', className: 'list-entry__line-spacer' },
         { value: item.durationText || '', strong: true },
-        { value: '' },
-        { value: '' },
       ],
       [
+        { value: '', className: 'list-entry__line-spacer' },
         { value: item.right || item.costText || '', strong: true },
-        { value: '' },
-        { value: '' },
+        { value: '', className: 'list-entry__line-spacer' },
       ],
     ],
-    interactive: Boolean(item.data),
-    data: item.data || '',
+    interactive: false,
+    className: 'list-entry--record-procedure',
     aria: item.aria || item.name || item.title || 'Процедура',
   })));
 
@@ -232,20 +217,32 @@ export function mountRecordZ({
   stack = true,
   onClose = null,
   chatPersonKey = '',
+  aImage = '',
+  aImagePosition = '',
+  aInitials = '',
 } = {}) {
   const context = workspaceHeaderContext({
     title,
-    a: settings ? {
-      kind: 'settings',
-      label: 'Настройки записи',
-      data: 'data-record-owner-settings',
-      aria: 'Настройки записи',
-    } : null,
-    d: {
+    hideD: !chatPersonKey,
+    a: {
+      kind: 'avatar',
+      label: 'Запись',
+      image: aImage,
+      imagePosition: aImagePosition,
+      initials: aInitials,
+      ...(settings ? {
+        data: 'data-record-owner-settings',
+        aria: 'Настройки записи',
+      } : {
+        disabled: true,
+        aria: 'Запись',
+      }),
+    },
+    d: chatPersonKey ? {
       kind: 'chat',
       data: 'data-record-owner-chat',
       aria: 'Чат',
-    },
+    } : null,
   });
   const classes = ['record-shared-z', className].filter(Boolean).join(' ');
   const layer = mountV2ZLayer(recordSurface(), v2ZLayer(

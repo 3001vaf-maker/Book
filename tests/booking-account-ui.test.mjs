@@ -106,13 +106,16 @@ assert.match(globalAccountHomeBlock, /onStartBooking: \(tenantId\)/);
 assert.match(booking, /slotStillAvailable/);
 assert.match(booking, /Выбранное время уже недоступно/);
 assert.doesNotMatch(booking, /consentState\.allowed/);
-assert.match(booking, /const account = await getAccount\(state\.tenantId\);[\s\S]*?if \(account\) state\.account = account;[\s\S]*?renderWelcome\(root, state\);/);
-assert.match(booking, /function backFromFirstBookingStep[\s\S]*?state\.bookingOrigin === 'profile'[\s\S]*?renderWelcome\(root, state\);/);
+assert.match(booking, /const account = await getAccount\(state\.tenantId\);[\s\S]*?if \(account\) state\.account = account;[\s\S]*?if \(state\.account\)[\s\S]*?await continueAfterIdentity\(root, state\);[\s\S]*?renderWelcome\(root, state\);/);
+assert.match(booking, /function backFromFirstBookingStep[\s\S]*?if \(state\.account\)[\s\S]*?tab: state\.bookingOrigin === 'profile' \? 'contact-detail' : 'home'/);
 const bookingBackBlock = booking.slice(
   booking.indexOf('function backFromFirstBookingStep'),
   booking.indexOf('function renderWelcome'),
 );
 assert.doesNotMatch(bookingBackBlock, /renderAccountEntry\(root, state\);/);
+assert.match(booking, /function renderWelcome[\s\S]*?if \(state\.account\)[\s\S]*?continueAfterIdentity\(root, state\)[\s\S]*?renderAccountEntry\(root, state\);/);
+assert.match(booking, /async function continueAfterIdentity[\s\S]*?const hasBookingSelection = Boolean\([\s\S]*?nextBookingStep\(root, state\);/);
+assert.match(booking, /data-legal-continue[\s\S]*?await continueAfterIdentity\(root, state\);/);
 assert.doesNotMatch(booking, /renderAccountHome\(/);
 assert.doesNotMatch(booking, /import \{ renderAccount,/);
 assert.match(booking, /exitBookingContext\(state, \{ tab: 'contact-detail', tenantId: state\.tenantId \}\)/);
