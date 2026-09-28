@@ -1,4 +1,4 @@
-import { button, durationPicker, durationText, entityCard, escapeHtml, list, listEntry, stateView, initStateView, initCalendar, mountModal, modal, openNotice, initDurationPickers, initMultiSelect, viewNavigation, initViewNavigation, mountRecordZ, recordZHost, renderRecordZ, recordTimeChoices, setRecordPrimaryAction, bindRecordSettings, closeRecordZStack } from '../ui/ui.js';
+import { button, durationPicker, durationText, entityCard, escapeHtml, list, listEntry, stateView, initStateView, initCalendar, mountModal, modal, openNotice, initDurationPickers, initMultiSelect, viewNavigation, initViewNavigation, mountRecordZ, recordZHost, renderRecordZ, recordTimeRows, recordProcedureList, recordConfirmationMiniCard, setRecordPrimaryAction, bindRecordSettings, closeRecordZStack } from '../ui/ui.js';
 import { createRecord } from '../core/record/index.js';
 import { createJournalBreak } from './break-service.js';
 import { getPeople } from '../main/people/data.js';
@@ -12,6 +12,7 @@ import { checkTimeAvailability, listAvailableEndTimes, listAvailableStartTimes }
 import { timeToMinutes, minutesToTime } from '../core/time/index.js';
 import { getWorkplaces, getWorkplaceWorkingDates } from '../core/workplace-time.js';
 import { journalRecordActionContext } from './record-action-context.js';
+import { getBookingSettings } from '../core/booking-settings/index.js';
 
 const RECORD_MODES = [
   { id: 'record', label: 'Создать запись' },
@@ -33,13 +34,14 @@ function recordStartTimes({ date, workplaceId, from }) {
   const hourEnd = Math.floor(start / 60) * 60 + 60;
   const to = minutesToTime(Math.min(hourEnd, 23 * 60 + 59));
   if (!to) return [];
+  const step = getBookingSettings().slotStep;
   return listAvailableStartTimes({
     date,
     workplaceId,
     from,
     to,
-    duration: 5,
-    step: 5,
+    duration: step,
+    step,
   });
 }
 
@@ -52,7 +54,7 @@ function renderTimeStep(modalRoot, { date, workplaceId, from, to, onCreated }) {
   let activeMode = 'record';
   const values = recordStartTimes({ date: dateKey(date), workplaceId, from });
   const toggle = viewNavigation({ views: RECORD_MODES, activeView: activeMode, className: 'segment-control--two', ariaLabel: 'Режим записи' });
-  const host = renderRecordZ(modalRoot, `<div class="record-screen record-screen--time">${toggle}${recordTimeChoices({ values, data: 'data-record-time' })}</div>`);
+  const host = renderRecordZ(modalRoot, `<div class="record-screen record-screen--time">${toggle}${recordTimeRows({ values, data: 'data-record-time', accentEvery: 30 })}</div>`);
   if (!host) return;
 
   host.querySelectorAll('[data-record-time]').forEach((node) => node.addEventListener('click', () => {
@@ -188,19 +190,19 @@ function renderProceduresStep(modalRoot, { date, workplaceId, from, to, onCreate
   const render = () => {
     const listHost = host.querySelector('[data-record-procedures]');
     if (!listHost) return;
-    listHost.innerHTML = list({
-      items: items.map((procedure) => {
-        const cost = defaultCost(procedure, workplaceId);
-        return {
-          title: procedure.name || '',
-          secondary: [durationText(procedure.duration), cost !== '' ? `${cost} ₽` : ''],
-          interactive: true,
-          data: `data-procedure-select="${escapeHtml(procedure.id)}"`,
-          aria: `Выбрать процедуру ${procedure.name || ''}`,
-          selected: selected.has(procedure.id),
-        };
-      }),
-    }) || '<div class="muted">Процедур для этого места работы пока нет.</div>';
+    listHost.innerHTML = recordProcedureList(items.map((procedure) => {
+      const cost = defaultCost(procedure, workplaceId);
+      return {
+        id: procedure.id,
+        name: procedure.name || '',
+        durationText: durationText(procedure.duration),
+        costText: cost !== '' ? `${cost} ₽` : '',
+      };
+    }), {
+      data: 'data-procedure-select',
+      selected: [...selected.keys()],
+      empty: 'Процедур для этого места работы пока нет.',
+    });
     syncActions();
     selectionController?.destroy();
     selectionController = initMultiSelect(listHost, {
@@ -404,17 +406,17 @@ function availableConfirmationTimes({ date, workplaceId, duration }) {
     date,
     workplaceId,
     duration: Math.max(1, Number(duration) || 0),
-    step: 15,
+    step: getBookingSettings().slotStep,
   }).map((from) => ({ from, to: minutesToTime(timeToMinutes(from) + Math.max(1, Number(duration) || 0)) }));
 }
 
 function openConfirmationTimeModal({ date, workplaceId, from, duration, onSelected }) {
   const options = availableConfirmationTimes({ date, workplaceId, duration });
-  const content = `<div class="modal-title"><h2>Выбор времени</h2></div>${recordTimeChoices({
-    values: options.map((item) => item.from),
+  const content = `<div class="modal-title"><h2>Выбор времени</h2></div>${recordTimeRows({
+    items: options.map((item) => item.from),
     data: 'data-record-confirm-time-option',
     empty: 'Свободного времени нет.',
-    quarterEmphasis: false,
+    accentEvery: 30,
   })}`;
   const m = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
   if (!m) return;
@@ -584,32 +586,20 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
     const workplace = findWorkplaceName(currentWorkplaceId);
     const formattedDate = formatConfirmationDate(currentDate);
     const total = totalCost();
-    const detailRows = [
-      { left: durationText(duration()), right: `${total} ₽`, weight: 'strong' },
-      ...selectedProcedures.map((item, index) => ({
-        left: item.procedure.name || '',
+    const card = recordConfirmationMiniCard({
+      workplace,
+      date: formattedDate,
+      period: `${currentFrom} - ${currentTo || ''}`,
+      uei: person.uei,
+      name: person.name,
+      phone: person.phone,
+      duration: durationText(duration()),
+      total: `${total} ₽`,
+      procedures: selectedProcedures.map((item, index) => ({
+        name: item.procedure.name || '',
         right: item.cost === '' || item.cost === null || item.cost === undefined ? '' : `${item.cost} ₽`,
         data: `data-record-confirm-procedure="${index}"`,
-        aria: `Изменить время процедуры ${item.procedure.name || ''}`,
       })),
-    ];
-    const card = entityCard({
-      id: person.uei,
-      title: person.name,
-      subtitle: person.phone,
-      idData: person.uei ? 'data-record-confirm-person-profile' : '',
-      idAria: person.uei ? `Открыть человека ${person.name}` : '',
-      titleData: 'data-record-confirm-person-profile',
-      titleAria: `Открыть человека ${person.name}`,
-      subtitleData: person.phone ? 'data-record-confirm-phone' : '',
-      subtitleAria: person.phone ? `Действия с телефоном ${person.phone}` : '',
-      topMeta: [{ value: workplace, row: 1, data: 'data-record-confirm-workplace', aria: `Изменить рабочее пространство ${workplace}` }],
-      topRightMeta: [
-        { value: formattedDate, row: 2, data: 'data-record-confirm-date', aria: `Изменить дату ${formattedDate}` },
-        { value: `${currentFrom} - ${currentTo || ''}`, row: 3, data: 'data-record-confirm-time', aria: `Изменить время ${currentFrom} - ${currentTo || ''}` },
-      ],
-      detailRows,
-      className: 'entity-card--hero entity-card--top-dark',
     });
 
     host.innerHTML = `<div class="record-screen record-screen--state-view">${card}</div>`;
@@ -698,11 +688,11 @@ function blockEndValues({ date, workplaceId, from }) {
 function renderBlockEndStep(modalRoot, { date, workplaceId, from, onCreated }) {
   modalRoot ||= mountRecordZ({ className: 'record-flow-z' });
   const values = blockEndValues({ date, workplaceId, from });
-  const host = renderRecordZ(modalRoot, `<div class="record-screen record-screen--time"><div class="record-modal-toolbar"><strong>До скольки занять</strong></div>${recordTimeChoices({
-    values,
+  const host = renderRecordZ(modalRoot, `<div class="record-screen record-screen--time"><div class="record-modal-toolbar"><strong>До скольки занять</strong></div>${recordTimeRows({
+    items: values,
     data: 'data-block-end',
     empty: 'Свободного времени нет.',
-    quarterEmphasis: false,
+    accentEvery: 30,
   })}</div>`);
   if (!host) return;
   host.querySelectorAll('[data-block-end]').forEach((node) => node.addEventListener('click', () => {
