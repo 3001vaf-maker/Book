@@ -183,6 +183,7 @@ if (!/duration:\s*recordSlotStep\(\)/.test(recordStartTimesSource)
 }
 
 if (!/kind:\s*'avatar'/.test(sharedRecordUi)
+  || !/hideD:\s*!chatPersonKey/.test(sharedRecordUi)
   || !/d:\s*chatPersonKey\s*\?/.test(sharedRecordUi)
   || !/settings\s*\?\s*\{/.test(sharedRecordUi)) {
   errors.push('Shared Record Header must always own A as avatar/photo, expose settings only by context, and show D only after a person is fixed');
