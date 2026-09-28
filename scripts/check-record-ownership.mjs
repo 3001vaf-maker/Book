@@ -131,9 +131,9 @@ if (!/mountRecordZ/.test(journalRecordUi)
   errors.push('Specialist Record surfaces must consume the canonical Shared Record Z/A/C owner');
 }
 
-if (!/recordTimeChoices/.test(journalRecordUi)
-  || /class=["'`]record-time-option/.test(journalRecordUi)) {
-  errors.push('journal/record.js must consume Shared Record time-choice UI instead of drawing local time buttons');
+if (!/recordTimeRows/.test(journalRecordUi)
+  || /class=["'`](?:record-time-option|record-time-chip)/.test(journalRecordUi)) {
+  errors.push('journal/record.js must consume Shared Record time-row UI instead of drawing local time buttons');
 }
 
 for (const [path, source] of [
