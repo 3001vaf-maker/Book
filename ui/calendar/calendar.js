@@ -1,5 +1,6 @@
 import { modal, mountModal } from '../modals/index.js';
 import { button } from '../buttons/index.js';
+import { select } from '../selectors/index.js';
 import { escapeHtml } from '../utils/escape-html.js';
 
 const MONTH_FORMATTER = new Intl.DateTimeFormat('ru-RU', { month: 'long', year: 'numeric' });
@@ -32,6 +33,22 @@ function parseMonthDay(value = '') {
   const date = new Date(MONTH_DAY_REFERENCE_YEAR, month - 1, day);
   if (date.getMonth() !== month - 1 || date.getDate() !== day) return null;
   return date;
+}
+
+function parseDateValue(value = '') {
+  const match = String(value || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(year, month - 1, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
+  return date;
+}
+
+function compactDateLabel(value = '') {
+  const date = value instanceof Date ? value : parseDateValue(value);
+  return date ? `${pad(date.getDate())}.${pad(date.getMonth() + 1)}.${date.getFullYear()}` : '';
 }
 
 function startOfMondayWeek(date) {
@@ -173,6 +190,160 @@ export function initCalendar(root, options = {}) {
     getDisplayedMonth: () => new Date(displayedMonth),
     getSelectedValue: () => selectedValue,
   };
+}
+
+export function datePicker({
+  name = '',
+  label = '',
+  value = '',
+  placeholder = 'Выберите дату',
+  min = '',
+  max = '',
+  minYear = null,
+  maxYear = null,
+  initialYear = null,
+  allowClear = true,
+  required = false,
+} = {}) {
+  const parsed = parseDateValue(value);
+  const normalized = parsed ? dateKey(parsed) : '';
+  const text = normalized ? compactDateLabel(normalized) : placeholder;
+  const attrs = [
+    'data-date-picker',
+    `data-date-picker-min="${escapeHtml(String(min || ''))}"`,
+    `data-date-picker-max="${escapeHtml(String(max || ''))}"`,
+    `data-date-picker-min-year="${escapeHtml(minYear == null ? '' : String(minYear))}"`,
+    `data-date-picker-max-year="${escapeHtml(maxYear == null ? '' : String(maxYear))}"`,
+    `data-date-picker-initial-year="${escapeHtml(initialYear == null ? '' : String(initialYear))}"`,
+    `data-date-picker-placeholder="${escapeHtml(placeholder)}"`,
+    `data-date-picker-allow-clear="${allowClear ? 'true' : 'false'}"`,
+  ].join(' ');
+  return `<label class="field" ${attrs}><span>${escapeHtml(label)}${required ? ' *' : ''}</span><button type="button" class="ui-select__control" data-date-picker-open><span class="ui-select__value">${escapeHtml(text)}</span><span class="ui-select__chevron" aria-hidden="true">⌄</span></button><input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(normalized)}" data-date-picker-value${required ? ' required' : ''}></label>`;
+}
+
+export function initDatePickers(root) {
+  root.querySelectorAll('[data-date-picker]').forEach((host) => {
+    const openButton = host.querySelector('[data-date-picker-open]');
+    if (!openButton || openButton.dataset.datePickerReady === 'true') return;
+    openButton.dataset.datePickerReady = 'true';
+    openButton.addEventListener('click', () => openDatePicker(host));
+  });
+}
+
+function dateYearOptions(minYear, maxYear) {
+  const low = Math.min(minYear, maxYear);
+  const high = Math.max(minYear, maxYear);
+  return Array.from({ length: high - low + 1 }, (_, index) => {
+    const year = high - index;
+    return { value: String(year), label: String(year) };
+  });
+}
+
+function openDatePicker(host) {
+  const hidden = host.querySelector('[data-date-picker-value]');
+  if (!hidden) return;
+
+  const now = new Date();
+  const current = parseDateValue(hidden.value);
+  const minDate = parseDateValue(host.dataset.datePickerMin || '');
+  const maxDate = parseDateValue(host.dataset.datePickerMax || '');
+  const minYearText = String(host.dataset.datePickerMinYear || '').trim();
+  const maxYearText = String(host.dataset.datePickerMaxYear || '').trim();
+  const initialYearText = String(host.dataset.datePickerInitialYear || '').trim();
+  const declaredMinYear = minYearText ? Number(minYearText) : Number.NaN;
+  const declaredMaxYear = maxYearText ? Number(maxYearText) : Number.NaN;
+  const declaredInitialYear = initialYearText ? Number(initialYearText) : Number.NaN;
+  const minYear = Number.isInteger(declaredMinYear)
+    ? declaredMinYear
+    : (minDate?.getFullYear() ?? now.getFullYear() - 100);
+  const maxYear = Number.isInteger(declaredMaxYear)
+    ? declaredMaxYear
+    : (maxDate?.getFullYear() ?? now.getFullYear() + 5);
+  const initialYear = Number.isInteger(declaredInitialYear)
+    ? Math.max(minYear, Math.min(maxYear, declaredInitialYear))
+    : Math.max(minYear, Math.min(maxYear, now.getFullYear()));
+  const placeholder = host.dataset.datePickerPlaceholder || 'Выберите дату';
+  const allowClear = host.dataset.datePickerAllowClear !== 'false';
+  let displayed = current
+    ? new Date(current.getFullYear(), current.getMonth(), 1)
+    : new Date(initialYear, now.getMonth(), 1);
+  let selectedValue = current ? dateKey(current) : '';
+
+  const content = `<div class="form-grid"><div data-date-picker-year></div><div data-date-picker-calendar></div>${allowClear && selectedValue ? button('Очистить дату', { variant: 'secondary', data: 'data-date-picker-clear' }) : ''}</div>`;
+  const modalRoot = mountModal(document.body, modal(content, { variant: 'standard', title: host.querySelector(':scope > span')?.textContent?.replace(/\s*\*$/, '') || 'Дата' }));
+  if (!modalRoot) return;
+  const yearHost = modalRoot.querySelector('[data-date-picker-year]');
+  const calendarHost = modalRoot.querySelector('[data-date-picker-calendar]');
+  if (!yearHost || !calendarHost) return;
+
+  const withinRange = (value) => {
+    const parsed = parseDateValue(value);
+    if (!parsed) return false;
+    const key = dateKey(parsed);
+    if (minDate && key < dateKey(minDate)) return false;
+    if (maxDate && key > dateKey(maxDate)) return false;
+    return parsed.getFullYear() >= minYear && parsed.getFullYear() <= maxYear;
+  };
+
+  const setVisible = (value) => {
+    const visible = host.querySelector('.ui-select__value');
+    if (visible) visible.textContent = value ? compactDateLabel(value) : placeholder;
+  };
+
+  const emit = () => {
+    hidden.dispatchEvent(new Event('input', { bubbles: true }));
+    hidden.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+
+  const commit = (value) => {
+    if (!withinRange(value)) return;
+    hidden.value = value;
+    setVisible(value);
+    emit();
+    modalRoot.v2Close?.();
+  };
+
+  const mountCalendar = () => {
+    initCalendar(calendarHost, {
+      selectedValue,
+      month: new Date(displayed.getFullYear(), displayed.getMonth(), 1),
+      onMonthChange: (month) => {
+        displayed = month;
+        setYearControl();
+      },
+      onDateSelect: (value) => {
+        selectedValue = value;
+        commit(value);
+      },
+    });
+  };
+
+  const setYearControl = () => {
+    yearHost.innerHTML = select({
+      label: 'Год',
+      name: 'sharedDatePickerYear',
+      value: String(displayed.getFullYear()),
+      options: dateYearOptions(minYear, maxYear),
+      aria: 'Год',
+    });
+    yearHost.querySelector('[name="sharedDatePickerYear"]')?.addEventListener('change', (event) => {
+      const year = Number(event.target.value);
+      if (!Number.isInteger(year)) return;
+      displayed = new Date(year, displayed.getMonth(), 1);
+      mountCalendar();
+    });
+  };
+
+  setYearControl();
+  mountCalendar();
+
+  modalRoot.querySelector('[data-date-picker-clear]')?.addEventListener('click', () => {
+    hidden.value = '';
+    selectedValue = '';
+    setVisible('');
+    emit();
+    modalRoot.v2Close?.();
+  });
 }
 
 export function monthDayPicker({ name = '', label = '', value = '' } = {}) {

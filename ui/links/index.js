@@ -8,9 +8,12 @@ function linkRow(link = {}) {
   return `<div class="link-row" data-link-row>${select({ name:'linkType', value:link.type||'Instagram', options:LINK_TYPES })}<input class="link-row__url" name="linkUrl" value="${escapeHtml(link.url||'')}" placeholder="Ссылка"><button type="button" class="remove-button" data-remove-link aria-label="Удалить ссылку">×</button></div>`;
 }
 
-export function links({ links: values = [], name = 'links' } = {}) {
+export function links({ links: values = [], name = 'links', label = '' } = {}) {
   const rows = values.length ? values : [{ type: 'Instagram', url: '' }];
-  return `<div class="ui-links" data-links="${escapeHtml(name)}"><div data-links-list>${rows.map(linkRow).join('')}</div>${button('+',{className:'ui-links__add',data:`data-add-link="${escapeHtml(name)}"`,aria:'Добавить ссылку'})}</div>`;
+  const content = `<div class="ui-links" data-links="${escapeHtml(name)}"><div data-links-list>${rows.map(linkRow).join('')}</div>${button('+',{className:'ui-links__add',data:`data-add-link="${escapeHtml(name)}"`,aria:'Добавить ссылку'})}</div>`;
+  return label
+    ? `<div class="array-group"><span class="array-label">${escapeHtml(label)}</span>${content}</div>`
+    : content;
 }
 
 export function initLinks(root) {
