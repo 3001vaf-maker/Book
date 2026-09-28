@@ -12,6 +12,7 @@ configureTimeUsageSource(({ date, workplaceId } = {}) => {
   return [
     { type: 'record', rigidity: 'hard', sourceId: 'record-1', from: '10:00', to: '11:00' },
     { type: 'break', rigidity: 'soft', sourceId: 'break-1', from: '12:00', to: '12:30' },
+    { type: 'record', rigidity: 'hard', sourceId: 'record-2', from: '12:31', to: '13:00' },
   ];
 });
 
@@ -34,5 +35,15 @@ assert.equal(starts.includes('09:30'), true);
 assert.equal(starts.includes('10:00'), false);
 assert.equal(starts.includes('11:00'), true);
 assert.equal(starts.includes('12:00'), false);
+
+const quickStarts = listAvailableStartTimes({
+  date: '2026-09-16',
+  workplaceId: 'studio',
+  duration: 1,
+  step: 5,
+  from: '12:30',
+  to: '13:00',
+});
+assert.deepEqual(quickStarts, ['12:30']);
 
 console.log('availability tests: OK');
