@@ -55,7 +55,8 @@ export function recordProcedureList(items = [], {
     const name = String(item.name || item.title || 'Процедура');
     const duration = String(item.durationText || item.secondary || '');
     const cost = String(item.costText || item.right || '');
-    return `<button type="button" class="v2-service-sticker${on ? ' is-selected' : ''}" style="--record-procedure-name-chars:${Math.min(80, name.length)}" ${data}="${escapeRecordText(id)}" aria-pressed="${on ? 'true' : 'false'}" aria-label="${escapeRecordText(item.aria || `Выбрать процедуру ${name}`)}">
+    const nameSize = Math.max(10, Math.min(16, 18 - (name.length * 0.22)));
+    return `<button type="button" class="v2-service-sticker${on ? ' is-selected' : ''}" style="--record-procedure-name-size:${nameSize.toFixed(2)}px" ${data}="${escapeRecordText(id)}" aria-pressed="${on ? 'true' : 'false'}" aria-label="${escapeRecordText(item.aria || `Выбрать процедуру ${name}`)}">
       <span class="v2-service-sticker__text">
         <strong>${escapeRecordText(name)}</strong>
         ${duration ? `<span>${escapeRecordText(duration)}</span>` : ''}
