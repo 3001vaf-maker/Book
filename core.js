@@ -19,7 +19,7 @@ import { canUseBookCapability, getBookAccess, loadBookAccess } from './core/acce
 import { startServerBookingSync } from './online-booking/server-sync.js';
 import { renderGlobalClient, renderOnlineBooking } from './online-booking/booking.js';
 import { startAccountRuntime } from './online-booking/account-runtime.js';
-import { field, passwordField, initPasswordFields, openNotice, initV2WorkspaceInteraction, setV2DeckOpen, v2EList, v2FDeck, v2Header, v2Shell, v2Sticker } from './ui/ui.js';
+import { field, passwordField, initPasswordFields, mountV2ZLayer, openNotice, initV2WorkspaceInteraction, setV2DeckOpen, v2EList, v2FDeck, v2Header, v2Shell, v2Sticker, v2ZLayer } from './ui/ui.js';
 import { clearLegacyBusinessStorage } from './core/legacy-browser-business.js';
 import { FirstRunRuntime, bindDemoBadgeAction, demoBadgeMarkup, startPlatformSessionTracking } from './first-run/runtime.js';
 import { startPlatformNotices } from './core/platform-notices.js';
@@ -85,6 +85,15 @@ window.addEventListener('book:profile-changed', scheduleRknGuideSync);
 window.addEventListener('book:server-mutation-completed', (event) => {
   const scopes = Array.isArray(event?.detail?.scopes) ? event.detail.scopes : [];
   if (scopes.includes('operational')) scheduleRknGuideSync();
+});
+
+window.addEventListener('book:record-chat-request', (event) => {
+  if (!workspaceReady) return;
+  const layer = mountV2ZLayer(app, v2ZLayer('', { className: 'record-chat-z' }), { stack: true });
+  if (!layer) return;
+  renderChat(layer, {
+    personKey: String(event?.detail?.personKey || ''),
+  });
 });
 
 function syncViewport() {
