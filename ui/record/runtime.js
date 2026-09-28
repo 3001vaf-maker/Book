@@ -66,6 +66,7 @@ export function recordProcedureList(items = [], {
       ],
       interactive: true,
       selected: selectedSet.has(id),
+      className: 'list-entry--record-procedure',
       data: `${data}="${escapeRecordText(id)}"`,
       aria: item.aria || `Выбрать процедуру ${item.name || item.title || ''}`,
     });
@@ -198,6 +199,7 @@ export function recordConfirmationMiniCard({
       ],
     ],
     interactive: false,
+    className: 'list-entry--record-procedure',
     aria: item.aria || item.name || item.title || 'Процедура',
   })));
 
