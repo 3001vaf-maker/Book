@@ -51,27 +51,22 @@ export function recordProcedureList(items = [], {
   const selectedSet = new Set((Array.isArray(selected) ? selected : []).map(String));
   const rows = (Array.isArray(items) ? items : []).map((item = {}) => {
     const id = String(item.id || '');
-    return listEntry({
-      columns: [
-        [
-          { value: item.name || item.title || 'Процедура', strong: true },
-          { value: '', className: 'list-entry__line-spacer' },
-          { value: item.durationText || item.secondary || '', strong: true },
-        ],
-        [
-          { value: '', className: 'list-entry__line-spacer' },
-          { value: item.costText || item.right || '', strong: true },
-          { value: '', className: 'list-entry__line-spacer' },
-        ],
-      ],
-      interactive: true,
-      selected: selectedSet.has(id),
-      className: 'list-entry--record-procedure',
-      data: `${data}="${escapeRecordText(id)}"`,
-      aria: item.aria || `Выбрать процедуру ${item.name || item.title || ''}`,
-    });
+    const on = selectedSet.has(id);
+    const name = String(item.name || item.title || 'Процедура');
+    const duration = String(item.durationText || item.secondary || '');
+    const cost = String(item.costText || item.right || '');
+    return `<button type="button" class="v2-service-sticker${on ? ' is-selected' : ''}" ${data}="${escapeRecordText(id)}" aria-pressed="${on ? 'true' : 'false'}" aria-label="${escapeRecordText(item.aria || `Выбрать процедуру ${name}`)}">
+      <span class="v2-service-sticker__text">
+        <strong>${escapeRecordText(name)}</strong>
+        ${duration ? `<span>${escapeRecordText(duration)}</span>` : ''}
+      </span>
+      <span class="v2-service-sticker__price">${escapeRecordText(cost)}</span>
+      <span class="v2-service-sticker__selector" aria-hidden="true">${on ? '✓' : ''}</span>
+    </button>`;
   });
-  return rows.length ? listEntries(rows) : `<div class="muted">${escapeRecordText(empty)}</div>`;
+  return rows.length
+    ? `<div class="v2-sticker-list v2-sticker-list--services">${rows.join('')}</div>`
+    : `<div class="muted">${escapeRecordText(empty)}</div>`;
 }
 
 export function recordPersonList(items = [], {
