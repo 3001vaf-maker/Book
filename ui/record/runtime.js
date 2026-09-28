@@ -223,6 +223,7 @@ export function mountRecordZ({
 } = {}) {
   const context = workspaceHeaderContext({
     title,
+    hideD: !chatPersonKey,
     a: {
       kind: 'avatar',
       label: 'Запись',
