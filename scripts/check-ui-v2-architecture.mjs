@@ -9,6 +9,7 @@ const booking = fs.readFileSync('online-booking/booking.js', 'utf8');
 const account = fs.readFileSync('online-booking/account-shell.js', 'utf8');
 const chatRuntime = fs.readFileSync('core/chat/runtime.js', 'utf8');
 const calendar = fs.readFileSync('ui/calendar/calendar.css', 'utf8');
+const calendarUi = fs.readFileSync('ui/calendar/calendar.js', 'utf8');
 const personalData = fs.readFileSync('online-booking/personal-data.js', 'utf8');
 const passwordSettings = fs.readFileSync('online-booking/password-settings.js', 'utf8');
 const consentSettings = fs.readFileSync('online-booking/consent-settings.js', 'utf8');
@@ -336,12 +337,15 @@ for (const [name, source] of [
   ['shared time', timeUi],
   ['shared colors', colorUi],
   ['end-user account shell', account],
-  ['personal-data', personalData],
   ['consent-settings', consentSettings],
 ]) {
   expect(source.includes('modal(') && source.includes('mountModal('), `${name} must consume the sole shared modal owner.`);
   expect(!source.includes('mountV2Layer(') && !source.includes('v2Layer('), `${name} must not bypass ui/modals with a parallel V2 modal path.`);
 }
+expect(personalData.includes('datePicker({label:\'Дата рождения\'') && personalData.includes('initDatePickers(layer)') && !personalData.includes('birthDateField') && !personalData.includes('openBirthDatePicker') && !personalData.includes('data-account-birth-') && !personalData.includes('ui-select__control') && !personalData.includes('mountModal(') && !personalData.includes('modal('), 'End-user Profile personal data must consume the Shared Date Picker owner and must not draw or mount a local date/select modal.');
+expect(calendarUi.includes('export function datePicker') && calendarUi.includes('export function initDatePickers') && calendarUi.includes('initCalendar(calendarHost') && calendarUi.includes('select({') && calendarUi.includes('mountModal(document.body, modal'), 'Shared Calendar owner must own full-date field, year select, calendar and modal manifestation.');
+const endUserProfileCard = account.slice(account.indexOf('function profileSummary'), account.indexOf('function bindGlobalRelationships'));
+expect(endUserProfileCard.includes('entityVisualCard({') && endUserProfileCard.includes('ACCOUNT_PROFILE_CARD_APPEARANCE') && !endUserProfileCard.includes('entityCard({') && !endUserProfileCard.includes('entity-card--hero') && !endUserProfileCard.includes('account-profile-card'), 'End-user Profile root card must consume the canonical Entity Visual Card and must not retain the legacy hero/local card manifestation.');
 expect(passwordSettings.includes('openSharedPasswordAction') && !passwordSettings.includes('modal(') && !passwordSettings.includes('mountModal('), 'End-user password settings must consume the Shared Profile password owner instead of owning a modal.');
 expect(!inputs.includes('modal(') && !inputs.includes('mountModal('), 'Shared photo/input owner must keep crop inline and must not open a modal.');
 expect(!inputs.includes('mountV2Layer(') && !inputs.includes('v2Layer('), 'Shared inputs must not bypass canonical owners with local V2 layers.');
