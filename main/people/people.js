@@ -444,11 +444,19 @@ function renderPersonOverview(layer, baseRoot, key, options = {}) {
     `<section class="people-overview">
       <div>${metricRail(person)}</div>
       <div class="people-card-wrap">${overviewCard(person)}</div>
+      ${button('Запись', {
+        className: 'v2-primary-source-only',
+        data: 'data-person-record data-v2-primary-action data-v2-primary-label="Запись"',
+        aria: 'Создать запись',
+      })}
     </section>`,
   ]);
   bindPersonContext(layer, person, options, {
     onIdentityChange: (nextKey) => renderPersonOverview(layer, baseRoot, nextKey || key, options),
     onPersonChange: (nextKey) => renderPersonOverview(layer, baseRoot, nextKey || key, options),
+  });
+  layer.querySelector('[data-person-record]')?.addEventListener('click', () => {
+    options.onCreateRecord?.(person);
   });
   layer.querySelector('[data-person-card]')?.addEventListener('click', () => {
     openPersonEdit(layer, baseRoot, person.key, options, {
