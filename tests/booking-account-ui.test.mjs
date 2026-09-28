@@ -478,10 +478,9 @@ assert.match(booking, /workplaceCardFields\(workplace, workplace\.cardProfile \|
 assert.match(recordRuntime, /entityVisualCard\(/);
 assert.match(recordRuntime, /listEntry\(/);
 assert.match(recordRuntime, /listEntries\(/);
-assert.match(recordRuntime, /record-confirmation-card__discount/);
-assert.match(recordRuntime, /record-confirmation-card__duration/);
-assert.match(recordRuntime, /record-confirmation-card__total/);
-assert.doesNotMatch(recordRuntime, /record-confirmation-view__metrics|v2RailCard\(/);
+assert.match(recordRuntime, /miniCard\(\{/);
+assert.match(recordRuntime, /className: 'record-confirmation-mini-card'/);
+assert.doesNotMatch(recordRuntime, /record-confirmation-card__|record-confirmation-view__metrics|v2RailCard\(/);
 assert.match(recordRuntime, /timeSlots\(/);
 
 console.log('booking account UI tests passed');
