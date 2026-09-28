@@ -152,8 +152,13 @@ function renderExpandedDocument(root, state, document, onBack) {
     version: document?.version || 1,
     content: document?.content ?? document?.text ?? '',
   });
-  root.innerHTML = `<section class="${flowThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${v2Sticker({ body: content, className: 'v2-sticker-screen--legal-document' })}</section>`;
+  root.innerHTML = `<section class="${flowThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${v2Sticker({
+    body: content,
+    className: 'v2-sticker-screen--legal-document',
+    closeData: 'data-u-document-close',
+  })}</section>`;
   initV2StickerSwipe(root, { onRight: onBack });
+  root.querySelector('[data-u-document-close]')?.addEventListener('click', () => onBack?.());
 }
 
 function legalTitle(document = {}) {
@@ -182,25 +187,29 @@ function renderLegalSticker(root, state) {
   })));
 
   const action = button('Продолжить', { data: 'data-legal-continue', disabled: !canContinue });
+  const closeLegal = () => {
+    state.error = '';
+    if (state.identityDestination === 'booking' && state.from) renderConfirmation(root, state);
+    else if (state.account && state.identityDestination === 'profile') exitBookingContext(state, {
+      tab: state.entry === 'chat' ? 'messages' : 'contact-detail',
+      tenantId: state.tenantId,
+    });
+    else renderAccountDetails(root, state);
+  };
+
   root.innerHTML = `<section class="${flowThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${v2Sticker({
     title: 'Документы',
     body: `${cards}${formError(state.error)}`,
     action,
     className: 'v2-sticker-screen--legal',
+    closeData: 'data-booking-legal-u-close',
   })}</section>`;
 
   initV2StickerSwipe(root, {
-    onRight: () => {
-      state.error = '';
-      if (state.identityDestination === 'booking' && state.from) renderConfirmation(root, state);
-      else if (state.account && state.identityDestination === 'profile') exitBookingContext(state, {
-        tab: state.entry === 'chat' ? 'messages' : 'contact-detail',
-        tenantId: state.tenantId,
-      });
-      else renderAccountDetails(root, state);
-    },
+    onRight: closeLegal,
     onLeft: () => { exitBookingContext(state); },
   });
+  root.querySelector('[data-booking-legal-u-close]')?.addEventListener('click', closeLegal);
 
   root.querySelector('[data-legal-platform-document]')?.addEventListener('click', () => {
     renderExpandedDocument(root, state, {
@@ -396,6 +405,7 @@ function renderWelcome(root, state) {
     title: state.settings.welcomeTitle || '',
     body: state.settings.welcomeText ? `<p>${escapeHtml(state.settings.welcomeText).replaceAll('\n', '<br>')}</p>` : '',
     className: 'v2-sticker-screen--welcome',
+    closeData: 'data-booking-welcome-u-close',
   })}</section>`;
   initV2StickerSwipe(root, {
     onRight: continueFlow,
@@ -403,6 +413,7 @@ function renderWelcome(root, state) {
       if (!exitBookingContext(state)) continueFlow();
     },
   });
+  root.querySelector('[data-booking-welcome-u-close]')?.addEventListener('click', continueFlow);
 }
 
 function renderAccountEntry(root, state) {
@@ -1117,7 +1128,9 @@ function renderGlobalClientLegal(root, state) {
     title: 'Документы',
     body: `${cards}${button('Продолжить', { data: 'data-global-platform-continue', disabled: !state.accountTermsAccepted })}${formError(state.error)}`,
     className: 'v2-sticker-screen--legal',
+    closeData: 'data-global-legal-u-close',
   })}</section>`;
+  root.querySelector('[data-global-legal-u-close]')?.addEventListener('click', () => renderGlobalClientDetails(root, state));
   root.querySelector('[data-global-platform-document]')?.addEventListener('click', () => {
     renderExpandedDocument(root, state, document, () => renderGlobalClientLegal(root, state));
   });
