@@ -8,7 +8,11 @@ globalThis.window = { dispatchEvent() {} };
 
 configureWorkplaceSource(() => [{ key: 'studio', name: 'Studio', from: '09:00', to: '18:00' }]);
 configureTimeUsageSource(({ date, workplaceId } = {}) => {
-  if (date !== '2026-09-16' || workplaceId !== 'studio') return [];
+  if (workplaceId !== 'studio') return [];
+  if (date === '2026-09-18') {
+    return [{ type: 'record', rigidity: 'hard', sourceId: 'record-tight-gap', from: '09:01', to: '10:00' }];
+  }
+  if (date !== '2026-09-16') return [];
   return [
     { type: 'record', rigidity: 'hard', sourceId: 'record-1', from: '10:00', to: '11:00' },
     { type: 'break', rigidity: 'soft', sourceId: 'break-1', from: '12:00', to: '12:30' },
@@ -17,6 +21,7 @@ configureTimeUsageSource(({ date, workplaceId } = {}) => {
 
 hydrateDaysFromServer([
   { date: '2026-09-16', workplaceId: 'studio', from: '09:00', to: '15:00' },
+  { date: '2026-09-18', workplaceId: 'studio', from: '09:00', to: '10:00' },
 ]);
 
 assert.equal(checkTimeAvailability({ date: '2026-09-16', workplaceId: 'studio', from: '09:00', to: '10:00' }).ok, true);
@@ -34,5 +39,10 @@ assert.equal(starts.includes('09:30'), true);
 assert.equal(starts.includes('10:00'), false);
 assert.equal(starts.includes('11:00'), true);
 assert.equal(starts.includes('12:00'), false);
+
+const startPointCandidates = listAvailableStartTimes({ date: '2026-09-18', workplaceId: 'studio', duration: 1, step: 15, from: '09:00', to: '10:00' });
+const durationCandidates = listAvailableStartTimes({ date: '2026-09-18', workplaceId: 'studio', duration: 15, step: 15, from: '09:00', to: '10:00' });
+assert.deepEqual(startPointCandidates, ['09:00']);
+assert.deepEqual(durationCandidates, []);
 
 console.log('availability tests: OK');
