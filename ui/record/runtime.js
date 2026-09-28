@@ -124,20 +124,6 @@ export function recordConfirmationMiniCard({
   return base.replace('</section>', `${metrics}${procedureRows}</section>`);
 }
 
-export function recordTimeChoices({
-  values = [],
-  data = 'data-record-time',
-  empty = 'Нет свободного времени',
-  quarterEmphasis = true,
-} = {}) {
-  const items = (Array.isArray(values) ? values : []).map((value) => {
-    const text = String(value || '');
-    const quarter = quarterEmphasis && /:(00|15|30|45)$/.test(text);
-    return `<button type="button" class="record-time-option${quarter ? ' is-quarter' : ''}" ${data}="${escapeRecordText(text)}">${escapeRecordText(text)}</button>`;
-  }).join('');
-  return `<div class="record-time-list">${items || `<div class="muted">${escapeRecordText(empty)}</div>`}</div>`;
-}
-
 export function mountRecordZ({
   title = 'Запись',
   settings = false,
