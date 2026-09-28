@@ -12,7 +12,6 @@ import { checkTimeAvailability, listAvailableEndTimes, listAvailableStartTimes }
 import { timeToMinutes, minutesToTime } from '../core/time/index.js';
 import { getWorkplaces, getWorkplaceWorkingDates } from '../core/workplace-time.js';
 import { journalRecordActionContext } from './record-action-context.js';
-import { getBookingSettings } from '../core/booking-settings/index.js';
 import { getProfile } from '../settings/profile/data.js';
 import { calculateSettlement, recordSettlementDiscountPercent } from '../core/finance/index.js';
 
@@ -25,9 +24,6 @@ const people = () => getPeople();
 const procedures = () => getProcedures();
 const personName = (person) => personDisplay(person).name;
 
-function recordSlotStep() {
-  return getBookingSettings().slotStep;
-}
 
 function recordOwnerOptions({ settings = false, chatPersonKey = '' } = {}) {
   const profile = getProfile();
@@ -57,8 +53,8 @@ function recordStartTimes({ date, workplaceId, from }) {
     workplaceId,
     from,
     to,
-    duration: recordSlotStep(),
-    step: recordSlotStep(),
+    duration: 5,
+    step: 5,
   });
 }
 
@@ -428,7 +424,7 @@ function availableConfirmationTimes({ date, workplaceId, duration }) {
     date,
     workplaceId,
     duration: Math.max(1, Number(duration) || 0),
-    step: recordSlotStep(),
+    step: 15,
   }).map((from) => ({ from, to: minutesToTime(timeToMinutes(from) + Math.max(1, Number(duration) || 0)) }));
 }
 
@@ -752,7 +748,7 @@ function blockEndValues({ date, workplaceId, from }) {
     date: dateKey(date),
     workplaceId,
     from,
-    step: recordSlotStep(),
+    step: 5,
   });
 }
 
