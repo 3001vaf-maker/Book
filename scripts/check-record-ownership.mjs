@@ -176,10 +176,23 @@ const recordStartTimesSource = journalRecordUi.slice(
   journalRecordUi.indexOf('function recordStartTimes'),
   journalRecordUi.indexOf('function openRecordTimeNotice')
 );
-if (!/duration:\s*5\b/.test(recordStartTimesSource)
-  || !/step:\s*5\b/.test(recordStartTimesSource)
-  || /getBookingSettings\(\)\.slotStep/.test(recordStartTimesSource)) {
-  errors.push('Journal Record start-time selection must preserve the proven 5-minute specialist timing logic and must not depend on online booking slotStep');
+if (!/duration:\s*recordSlotStep\(\)/.test(recordStartTimesSource)
+  || !/step:\s*recordSlotStep\(\)/.test(recordStartTimesSource)
+  || !/getBookingSettings\(\)\.slotStep/.test(journalRecordUi)) {
+  errors.push('Journal Record start-time selection must consume the canonical bookingSettings.slotStep owner');
+}
+
+if (!/kind:\s*'avatar'/.test(sharedRecordUi)
+  || !/d:\s*chatPersonKey\s*\?/.test(sharedRecordUi)
+  || !/settings\s*\?\s*\{/.test(sharedRecordUi)) {
+  errors.push('Shared Record Header must always own A as avatar/photo, expose settings only by context, and show D only after a person is fixed');
+}
+
+if (!/lines:\s*\[/.test(sharedRecordUi)
+  || !/subtitle:\s*'Время'/.test(sharedRecordUi)
+  || !/subtitle:\s*'Скидка'/.test(sharedRecordUi)
+  || !/subtitle:\s*'Сумма'/.test(sharedRecordUi)) {
+  errors.push('Shared Record confirmation must use the Mini Card data-line owner and the canonical Время / Скидка / Сумма metrics');
 }
 
 if (!/recordWorkplaceCards\(/.test(onlineBookingUi)
