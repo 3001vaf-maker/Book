@@ -1,4 +1,4 @@
-import { button, durationPicker, durationText, entityCard, escapeHtml, list, listEntry, stateView, initStateView, initCalendar, mountModal, modal, openNotice, initDurationPickers, initMultiSelect, viewNavigation, initViewNavigation, mountRecordZ, renderRecordZ, setRecordPrimaryAction, bindRecordSettings, closeRecordZStack } from '../ui/ui.js';
+import { button, durationPicker, durationText, entityCard, escapeHtml, list, listEntry, stateView, initStateView, initCalendar, mountModal, modal, openNotice, initDurationPickers, initMultiSelect, viewNavigation, initViewNavigation, mountRecordZ, recordZHost, renderRecordZ, setRecordPrimaryAction, bindRecordSettings, closeRecordZStack } from '../ui/ui.js';
 import { createRecord } from '../core/record/index.js';
 import { createJournalBreak } from './break-service.js';
 import { getPeople } from '../main/people/data.js';
@@ -575,7 +575,7 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
   };
 
   const render = () => {
-    const host = flowHost(modalRoot);
+    const host = recordZHost(modalRoot);
     if (!host) return;
     const person = personDisplay(currentPerson);
     const workplace = findWorkplaceName(currentWorkplaceId);
@@ -705,7 +705,7 @@ function renderBlockEndStep(modalRoot, { date, workplaceId, from, onCreated }) {
 
 function renderBreakConfirmationStep(modalRoot, { date, workplaceId, from, to, onCreated }) {
   modalRoot ||= mountRecordZ({ className: 'record-flow-z' });
-  const host = flowHost(modalRoot);
+  const host = recordZHost(modalRoot);
   if (!host) return;
   const workplace = findWorkplaceName(workplaceId);
   const formattedDate = formatConfirmationDate(date);
