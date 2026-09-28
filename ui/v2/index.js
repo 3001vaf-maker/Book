@@ -131,19 +131,6 @@ export function v2RailCard({ title = '', subtitle = '', meta = '', data = '', ar
   return `<button type="button" class="v2-rail-card ${text(className)}"${dataAttributes(data)} aria-label="${text(aria || title)}"><strong>${text(title)}</strong>${subtitle ? `<span>${text(subtitle)}</span>` : ''}${meta ? `<small>${text(meta)}</small>` : ''}</button>`;
 }
 
-export function v2ServiceStickers(items = [], { selected = [], data = 'data-v2-service' } = {}) {
-  const selectedSet = new Set((Array.isArray(selected) ? selected : []).map(String));
-  return `<div class="v2-sticker-list v2-sticker-list--services">${(Array.isArray(items) ? items : []).map((item) => {
-    const id = String(item.id || '');
-    const on = selectedSet.has(id);
-    return `<button type="button" class="v2-service-sticker${on ? ' is-selected' : ''}" ${data}="${text(id)}" aria-pressed="${on ? 'true' : 'false'}">
-      <span class="v2-service-sticker__text"><strong>${text(item.title || '')}</strong><span>${text(item.secondary || '')}</span></span>
-      <span class="v2-service-sticker__price">${text(item.right || '')}</span>
-      <span class="v2-service-sticker__selector" aria-hidden="true">${on ? '✓' : ''}</span>
-    </button>`;
-  }).join('')}</div>`;
-}
-
 export function v2Sticker({
   eyebrow = '',
   title = '',
