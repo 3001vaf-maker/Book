@@ -470,8 +470,8 @@ assert.doesNotMatch(journalListUi, /getBoundingPersonRect/);
 assert.match(journalListUi, /getBoundingClientRect\(\)/);
 
 assert.doesNotMatch(bookingUi, /bookingChoiceCards|bookingTimeGroups|v2ServiceStickers|v2-confirmation/);
-assert.match(bookingUi, /workplaceCardAppearance\(workplace\)/);
-assert.match(bookingUi, /workplaceCardFields\(workplace, workplace\.cardProfile \|\| profile\)/);
+assert.match(booking, /workplaceCardAppearance\(workplace\)/);
+assert.match(booking, /workplaceCardFields\(workplace, workplace\.cardProfile \|\| profile\)/);
 assert.match(recordRuntime, /entityVisualCard\(/);
 assert.match(recordRuntime, /listEntry\(/);
 assert.match(recordRuntime, /listEntries\(/);
