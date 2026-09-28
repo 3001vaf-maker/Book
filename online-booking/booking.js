@@ -448,7 +448,7 @@ function renderBookingStep(root, state, {
   }
 
   const layer = mountV2ZLayer(root, v2ZLayer(
-    `<div data-booking-step-layer data-booking-step="${escapeHtml(step)}"><div data-booking-step-host>${body}</div></div>`,
+    `<div data-booking-step-host>${body}</div>`,
     { className: 'booking-step-z' },
   ), {
     stack: true,
@@ -459,8 +459,6 @@ function renderBookingStep(root, state, {
     },
   });
   if (!layer) return null;
-  const marker = layer.querySelector('[data-booking-step-layer]');
-  if (marker) marker.dataset.bookingStep = step;
   layer.dataset.bookingStep = step;
   layer.dataset.bookingStepLayer = '';
   state.bookingStep = step;
