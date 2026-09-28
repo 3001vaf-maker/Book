@@ -152,8 +152,13 @@ function renderExpandedDocument(root, state, document, onBack) {
     version: document?.version || 1,
     content: document?.content ?? document?.text ?? '',
   });
-  root.innerHTML = `<section class="${flowThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${v2Sticker({ body: content, className: 'v2-sticker-screen--legal-document' })}</section>`;
+  root.innerHTML = `<section class="${flowThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${v2Sticker({
+    body: content,
+    className: 'v2-sticker-screen--legal-document',
+    closeData: 'data-u-document-close',
+  })}</section>`;
   initV2StickerSwipe(root, { onRight: onBack });
+  root.querySelector('[data-u-document-close]')?.addEventListener('click', () => onBack?.());
 }
 
 function legalTitle(document = {}) {
@@ -182,25 +187,29 @@ function renderLegalSticker(root, state) {
   })));
 
   const action = button('Продолжить', { data: 'data-legal-continue', disabled: !canContinue });
+  const closeLegal = () => {
+    state.error = '';
+    if (state.identityDestination === 'booking' && state.from) renderConfirmation(root, state);
+    else if (state.account && state.identityDestination === 'profile') exitBookingContext(state, {
+      tab: state.entry === 'chat' ? 'messages' : 'contact-detail',
+      tenantId: state.tenantId,
+    });
+    else renderAccountDetails(root, state);
+  };
+
   root.innerHTML = `<section class="${flowThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${v2Sticker({
     title: 'Документы',
     body: `${cards}${formError(state.error)}`,
     action,
     className: 'v2-sticker-screen--legal',
+    closeData: 'data-booking-legal-u-close',
   })}</section>`;
 
   initV2StickerSwipe(root, {
-    onRight: () => {
-      state.error = '';
-      if (state.identityDestination === 'booking' && state.from) renderConfirmation(root, state);
-      else if (state.account && state.identityDestination === 'profile') exitBookingContext(state, {
-        tab: state.entry === 'chat' ? 'messages' : 'contact-detail',
-        tenantId: state.tenantId,
-      });
-      else renderAccountDetails(root, state);
-    },
+    onRight: closeLegal,
     onLeft: () => { exitBookingContext(state); },
   });
+  root.querySelector('[data-booking-legal-u-close]')?.addEventListener('click', closeLegal);
 
   root.querySelector('[data-legal-platform-document]')?.addEventListener('click', () => {
     renderExpandedDocument(root, state, {
@@ -396,6 +405,7 @@ function renderWelcome(root, state) {
     title: state.settings.welcomeTitle || '',
     body: state.settings.welcomeText ? `<p>${escapeHtml(state.settings.welcomeText).replaceAll('\n', '<br>')}</p>` : '',
     className: 'v2-sticker-screen--welcome',
+    closeData: 'data-booking-welcome-u-close',
   })}</section>`;
   initV2StickerSwipe(root, {
     onRight: continueFlow,
@@ -403,6 +413,7 @@ function renderWelcome(root, state) {
       if (!exitBookingContext(state)) continueFlow();
     },
   });
+  root.querySelector('[data-booking-welcome-u-close]')?.addEventListener('click', continueFlow);
 }
 
 function renderAccountEntry(root, state) {
@@ -415,14 +426,15 @@ function renderAccountEntry(root, state) {
     ${field({ label: 'Телефон или email', name: 'identifier', value: rememberedIdentifier, required: true, autocomplete: 'username' })}
     ${passwordField({ label: 'Пароль', name: 'password', required: true, autocomplete: 'current-password' })}
     ${formError(state.error)}
-    ${button('Войти', { type: 'submit' })}
-    <button type="button" class="v2-sticker-link" data-booking-register>Зарегистрироваться</button>
     <button type="button" class="v2-sticker-link" data-booking-forgot>Забыли пароль?</button>
-  `, { data: 'data-booking-entry-form' });
+    <button type="button" class="v2-sticker-link" data-booking-register>Зарегистрироваться</button>
+  `, { data: 'id="booking-entry-form" data-booking-entry-form' });
   root.innerHTML = `<section class="${flowThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${v2Sticker({
     title: 'Вход',
     body: form,
+    action: '<button class="ui-button" type="submit" form="booking-entry-form">Войти</button>',
     className: 'v2-sticker-screen--auth',
+    closeData: 'data-booking-u-close',
   })}</section>`;
 
   initV2StickerSwipe(root, {
@@ -435,6 +447,7 @@ function renderAccountEntry(root, state) {
   });
 
   initPasswordFields(root);
+  root.querySelector('[data-booking-u-close]')?.addEventListener('click', () => renderWelcome(root, state));
   const authForm = root.querySelector('[data-booking-entry-form]');
   root.querySelector('[data-booking-register]')?.addEventListener('click', async () => {
     const data = new FormData(authForm);
@@ -947,15 +960,28 @@ function renderGlobalClientEntry(root, state) {
     ${field({ label: 'Телефон или email', name: 'identifier', value: rememberedIdentifier, required: true, autocomplete: 'username' })}
     ${passwordField({ label: 'Пароль', name: 'password', required: true, autocomplete: 'current-password' })}
     ${formError(state.error)}
-    ${button('Войти', { type: 'submit' })}
+    <button type="button" class="v2-sticker-link" data-global-account-forgot>Забыли пароль?</button>
     <button type="button" class="v2-sticker-link" data-global-account-register>Зарегистрироваться</button>
-  `, { data: 'data-global-account-entry' });
+  `, { data: 'id="global-account-entry" data-global-account-entry' });
   root.innerHTML = `<section class="${flowThemeClasses(state)}">${v2Sticker({
     title: 'Вход',
     body: form,
+    action: '<button class="ui-button" type="submit" form="global-account-entry">Войти</button>',
     className: 'v2-sticker-screen--auth',
+    closeData: 'data-global-account-u-close',
   })}</section>`;
   initPasswordFields(root);
+  root.querySelector('[data-global-account-u-close]')?.addEventListener('click', () => {
+    if (window.history.length > 1) window.history.back();
+  });
+  root.querySelector('[data-global-account-forgot]')?.addEventListener('click', () => {
+    openNotice({
+      title: 'Восстановление пароля',
+      message: 'Восстановление пароля пока недоступно.',
+      action: 'Закрыть',
+      variant: 'technical',
+    });
+  });
   const authForm = root.querySelector('[data-global-account-entry]');
   root.querySelector('[data-global-account-register]')?.addEventListener('click', async () => {
     const data = new FormData(authForm);
@@ -1102,7 +1128,9 @@ function renderGlobalClientLegal(root, state) {
     title: 'Документы',
     body: `${cards}${button('Продолжить', { data: 'data-global-platform-continue', disabled: !state.accountTermsAccepted })}${formError(state.error)}`,
     className: 'v2-sticker-screen--legal',
+    closeData: 'data-global-legal-u-close',
   })}</section>`;
+  root.querySelector('[data-global-legal-u-close]')?.addEventListener('click', () => renderGlobalClientDetails(root, state));
   root.querySelector('[data-global-platform-document]')?.addEventListener('click', () => {
     renderExpandedDocument(root, state, document, () => renderGlobalClientLegal(root, state));
   });
