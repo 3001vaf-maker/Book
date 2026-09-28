@@ -194,20 +194,24 @@ if (/bookingChoiceCards\(|bookingTimeGroups\(|v2ServiceStickers\(|v2-confirmatio
 }
 
 if (!/image:\s*representativePhoto\(state\)/.test(onlineBookingUi)
-  || !/b:\s*'Запись'/.test(onlineBookingUi)
-  || !/d:\s*null/.test(onlineBookingUi)) {
-  errors.push('Online booking Header must use professional photo in A, title Запись in B, and no D chat');
+  || !/bookingStep\s*\?\s*'Запись'/.test(onlineBookingUi)
+  || !/bookingStep\s*\?\s*null/.test(onlineBookingUi)) {
+  errors.push('Online booking Header must use the professional photo in A, Запись in B, and no D chat on booking steps');
 }
 
-if (!/openRecordCreationForPerson/.test(journalRecordUi)
-  || !/onCreateRecord\?\.\(person\)/.test(peopleUi)
-  || !/openRecordCreationForPerson\(person/.test(coreUi)) {
-  errors.push('Person profile Record action must enter the canonical Shared Record flow without a parallel implementation');
+if (!/workplaceCardAppearance\(workplace\)/.test(onlineBookingUi)
+  || !/workplaceCardFields\(workplace, profile\)/.test(onlineBookingUi)
+  || !/entityVisualCard\(/.test(sharedRecordUi)
+  || !/v2-profile-workplaces/.test(sharedRecordUi)) {
+  errors.push('Booking workplace selection must render the exact saved workplace business-card owner used by Profile');
 }
 
-if (!/book:record-chat-request/.test(coreUi)
-  || !/mountV2ZLayer\(app,\s*v2ZLayer\('',\s*\{ className: 'record-chat-z' \}\),\s*\{ stack: true \}\)/.test(coreUi)) {
-  errors.push('Record D chat must open as a stacked Shared Z and preserve the active Record step underneath');
+if (!/listEntry\(/.test(sharedRecordUi)
+  || !/listEntries\(/.test(sharedRecordUi)
+  || !/miniCard\(/.test(sharedRecordUi)
+  || !/v2RailCard\(/.test(sharedRecordUi)
+  || !/timeSlots\(/.test(sharedRecordUi)) {
+  errors.push('Record UI must reuse the existing History list, Mini Card, metric cubes and Shared Time owners');
 }
 
 if (errors.length) {
