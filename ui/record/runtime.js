@@ -1,8 +1,10 @@
 import { workspaceHeaderContext } from '../header/index.js';
 import { mountV2ZLayer, v2ZLayer } from '../v2/index.js';
-import { entityCard, entityCardStack } from '../cards/index.js';
+import { entityVisualCard } from '../cards/entity-card-constructor.js';
 import { miniCard } from '../cards/mini-card.js';
-import { list } from '../lists/list.js';
+import { listEntry, listEntries } from '../lists/list-entry.js';
+import { v2HorizontalRail, v2RailCard } from '../v2/index.js';
+import { timeSlots } from '../time/index.js';
 
 function recordSurface() {
   return document.querySelector('[data-v2-workspace-surface]')
@@ -22,24 +24,23 @@ function escapeRecordText(value = '') {
 
 export function recordWorkplaceCards(items = [], {
   data = 'data-record-workplace',
-  selected = '',
 } = {}) {
   const cards = (Array.isArray(items) ? items : []).map((item = {}) => {
     const key = String(item.key ?? item.id ?? '');
     const name = String(item.name || item.title || 'Рабочее пространство');
-    const secondary = [item.city, item.address].filter(Boolean).join(' · ');
-    return entityCard({
-      title: name,
-      subtitle: secondary,
-      image: String(item.photo || ''),
-      initial: name.slice(0, 1).toUpperCase(),
+    return entityVisualCard({
+      appearance: item.appearance || item.cardAppearance || {},
+      fields: Array.isArray(item.fields) ? item.fields : [],
+      image: String(item.photo || item.image || ''),
+      imagePosition: String(item.imagePosition || '50% 50%'),
       interactive: true,
       data: `${data}="${escapeRecordText(key)}"`,
-      className: `entity-card--compact record-workplace-card${String(selected) === key ? ' is-selected' : ''}`,
       aria: `Выбрать рабочее пространство ${name}`,
     });
   });
-  return entityCardStack(cards, { className: 'record-workplace-stack' });
+  return cards.length
+    ? v2HorizontalRail(cards.join(''), { className: 'v2-profile-workplaces' })
+    : '';
 }
 
 export function recordProcedureList(items = [], {
@@ -48,20 +49,69 @@ export function recordProcedureList(items = [], {
   empty = 'Процедур нет.',
 } = {}) {
   const selectedSet = new Set((Array.isArray(selected) ? selected : []).map(String));
-  const values = (Array.isArray(items) ? items : []).map((item = {}) => {
+  const rows = (Array.isArray(items) ? items : []).map((item = {}) => {
     const id = String(item.id || '');
-    return {
-      title: item.name || item.title || '',
-      secondary: item.durationText || item.secondary || '',
-      right: item.costText || item.right || '',
+    return listEntry({
+      columns: [
+        [
+          { value: item.name || item.title || 'Процедура', strong: true },
+          { value: '' },
+          { value: '' },
+        ],
+        [
+          { value: item.durationText || item.secondary || '', strong: true },
+          { value: '' },
+          { value: '' },
+        ],
+        [
+          { value: item.costText || item.right || '', strong: true },
+          { value: '' },
+          { value: '' },
+        ],
+      ],
       interactive: true,
-      data: `${data}="${escapeRecordText(id)}"`,
       selected: selectedSet.has(id),
+      data: `${data}="${escapeRecordText(id)}"`,
       aria: item.aria || `Выбрать процедуру ${item.name || item.title || ''}`,
-    };
+    });
   });
-  return values.length ? list({ items: values, className: 'record-procedure-list' }) : `<div class="muted">${escapeRecordText(empty)}</div>`;
+  return rows.length ? listEntries(rows) : `<div class="muted">${escapeRecordText(empty)}</div>`;
 }
+
+export function recordPersonList(items = [], {
+  data = 'data-record-person',
+  selected = '',
+  empty = 'Люди не найдены.',
+} = {}) {
+  const rows = (Array.isArray(items) ? items : []).map((item = {}) => {
+    const key = String(item.key || item.id || '');
+    return listEntry({
+      columns: [
+        [
+          { value: item.name || '', strong: true },
+          { value: '' },
+          { value: '' },
+        ],
+        [
+          { value: item.uei || '', strong: true },
+          { value: '' },
+          { value: '' },
+        ],
+        [
+          { value: item.phone || '', strong: true },
+          { value: '' },
+          { value: '' },
+        ],
+      ],
+      interactive: true,
+      selected: String(selected || '') === key,
+      data: `${data}="${escapeRecordText(key)}"`,
+      aria: item.aria || `Выбрать ${item.name || ''}`,
+    });
+  });
+  return rows.length ? listEntries(rows) : `<div class="muted">${escapeRecordText(empty)}</div>`;
+}
+
 
 function timeValue(item) {
   return String(item && typeof item === 'object' ? (item.from ?? item.value ?? '') : item ?? '');
@@ -82,11 +132,19 @@ export function recordTimeRows(items = [], {
   });
   return `<div class="record-time-hours">${[...groups.entries()].map(([hour, times]) => `
     <div class="record-time-hour" data-record-time-hour="${escapeRecordText(hour)}">
-      <div class="record-time-track">${times.map((value) => {
-        const minute = Number(value.split(':')[1] || 0);
-        const emphasized = Number(accentEvery) > 0 && minute % Number(accentEvery) === 0;
-        return `<button type="button" class="record-time-chip${emphasized ? ' is-emphasized' : ''}" ${data}="${escapeRecordText(value)}">${escapeRecordText(value)}</button>`;
-      }).join('')}</div>
+      ${timeSlots({
+        values: times.map((value) => {
+          const minute = Number(value.split(':')[1] || 0);
+          return {
+            value,
+            label: value,
+            emphasized: Number(accentEvery) > 0 && minute % Number(accentEvery) === 0,
+          };
+        }),
+        data,
+        ariaLabel: `Время ${hour}:00`,
+        className: 'time-slots--hour-rows',
+      })}
     </div>`).join('')}</div>`;
 }
 
@@ -98,30 +156,73 @@ export function recordConfirmationMiniCard({
   name = '',
   phone = '',
   duration = '',
+  discount = '',
   total = '',
   procedures = [],
 } = {}) {
-  const base = miniCard({
+  const card = miniCard({
     title: name || 'Запись',
+    titleData: name ? 'data-record-confirm-person-profile' : '',
+    titleAria: name ? `Открыть человека ${name}` : '',
     value: uei || '',
+    valueData: uei ? 'data-record-confirm-person-profile' : '',
+    valueAria: uei ? `Открыть человека ${name || uei}` : '',
     subtitle: phone || '',
+    subtitleData: phone ? 'data-record-confirm-phone' : '',
+    subtitleAria: phone ? `Действия с телефоном ${phone}` : '',
     rows: [
-      { label: 'Пространство', value: workplace || '—' },
-      { label: 'Дата', value: date || '—' },
-      { label: 'Период', value: period || '—' },
+      { label: 'Пространство', value: workplace || '—', data: 'data-record-confirm-workplace', aria: `Изменить рабочее пространство ${workplace || ''}` },
+      { label: 'Дата', value: date || '—', data: 'data-record-confirm-date', aria: `Изменить дату ${date || ''}` },
+      { label: 'Занятый период', value: period || '—', data: 'data-record-confirm-time', aria: `Изменить время ${period || ''}` },
     ],
-    className: 'record-confirmation-mini',
   });
-  const metrics = `<div class="record-confirmation-mini__metrics">
-    <div><span>Итог времени</span><strong>${escapeRecordText(duration || '—')}</strong></div>
-    <div><span>Итог суммы</span><strong>${escapeRecordText(total || '—')}</strong></div>
+
+  const metrics = v2HorizontalRail([
+    v2RailCard({
+      title: duration || '—',
+      subtitle: 'Часы',
+      className: 'people-metric-card',
+    }),
+    v2RailCard({
+      title: discount || '0%',
+      subtitle: 'Скидка',
+      className: 'people-metric-card',
+    }),
+    v2RailCard({
+      title: total || '—',
+      subtitle: 'Сумма итого',
+      className: 'people-metric-card',
+    }),
+  ].join(''), { className: 'people-metrics' });
+
+  const rows = listEntries((Array.isArray(procedures) ? procedures : []).map((item = {}) => listEntry({
+    columns: [
+      [
+        { value: item.name || item.title || 'Процедура', strong: true },
+        { value: '' },
+        { value: '' },
+      ],
+      [
+        { value: item.durationText || '', strong: true },
+        { value: '' },
+        { value: '' },
+      ],
+      [
+        { value: item.right || item.costText || '', strong: true },
+        { value: '' },
+        { value: '' },
+      ],
+    ],
+    interactive: Boolean(item.data),
+    data: item.data || '',
+    aria: item.aria || item.name || item.title || 'Процедура',
+  })));
+
+  return `<div class="record-confirmation-view">
+    <div class="record-confirmation-view__card">${card}</div>
+    <div class="record-confirmation-view__metrics">${metrics}</div>
+    <div class="record-confirmation-view__procedures">${rows}</div>
   </div>`;
-  const procedureRows = `<div class="record-confirmation-mini__procedures">${(Array.isArray(procedures) ? procedures : []).map((item = {}) => `
-    <div class="record-confirmation-mini__procedure"${item.data ? ` ${String(item.data).trim()}` : ''}>
-      <span>${escapeRecordText(item.name || item.title || '')}</span>
-      <strong>${escapeRecordText(item.right || item.costText || '')}</strong>
-    </div>`).join('')}</div>`;
-  return base.replace('</section>', `${metrics}${procedureRows}</section>`);
 }
 
 export function mountRecordZ({

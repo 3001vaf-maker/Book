@@ -1,5 +1,4 @@
 import { renderPeople } from './main/people/people.js';
-import { openRecordCreationForPerson } from './journal/record.js';
 import { financeNavigationItems, renderFinanceSection } from './main/finance/finance.js';
 import { journalNavigationItems, renderJournalView } from './journal/journal.js';
 import { renderTimetable } from './timetable/timetable.js';
@@ -86,6 +85,15 @@ window.addEventListener('book:profile-changed', scheduleRknGuideSync);
 window.addEventListener('book:server-mutation-completed', (event) => {
   const scopes = Array.isArray(event?.detail?.scopes) ? event.detail.scopes : [];
   if (scopes.includes('operational')) scheduleRknGuideSync();
+});
+
+window.addEventListener('book:record-chat-request', (event) => {
+  if (!workspaceReady) return;
+  const layer = mountV2ZLayer(app, v2ZLayer('', { className: 'record-chat-z' }), { stack: true });
+  if (!layer) return;
+  renderChat(layer, {
+    personKey: String(event?.detail?.personKey || ''),
+  });
 });
 
 function syncViewport() {
@@ -364,25 +372,11 @@ function syncWorkspaceHeader(surface) {
   });
 }
 
-window.addEventListener('book:record-chat-request', (event) => {
-  if (!workspaceReady) return;
-  const layer = mountV2ZLayer(app, v2ZLayer('', { className: 'record-chat-z' }), { stack: true });
-  if (!layer) return;
-  renderChat(layer, {
-    personKey: String(event?.detail?.personKey || ''),
-  });
-});
-
 function renderActiveWorkspaceSurface(surface) {
   const section = state.activeSection;
   const openNavigation = () => setNavigationOpen(true);
   if (section === 'people') return renderPeople(surface, {
     onDirectChat: (personKey) => navigate('chat', { navigationOpen: false, chatPersonKey: personKey }),
-    onCreateRecord: (person) => openRecordCreationForPerson(person, {
-      onCreated: () => {
-        window.dispatchEvent(new CustomEvent('book:records-changed'));
-      },
-    }),
   });
   if (section === 'finance') return renderFinanceSection(surface, ensureSecondary('finance'), { onBack: openNavigation });
   if (section === 'timetable') return renderTimetable(surface);

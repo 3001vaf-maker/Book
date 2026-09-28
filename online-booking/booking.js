@@ -61,6 +61,7 @@ import {
   requiredBookingDocuments,
 } from './model.js';
 import { renderGlobalAccount } from './account-shell.js';
+import { workplaceCardAppearance, workplaceCardFields } from '../settings/profile/card-presentation.js';
 
 function formatDate(value) {
   const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -192,18 +193,12 @@ function renderLegalSticker(root, state) {
   const action = button('Продолжить', { data: 'data-legal-continue', disabled: !canContinue });
   const closeLegal = () => {
     state.error = '';
-    if (state.identityDestination === 'booking') {
-      if (state.from) renderConfirmation(root, state);
-      else if (state.account) renderWelcome(root, state);
-      else renderAccountDetails(root, state);
-    } else if (state.account && state.identityDestination === 'profile') {
-      exitBookingContext(state, {
-        tab: state.entry === 'chat' ? 'messages' : 'contact-detail',
-        tenantId: state.tenantId,
-      });
-    } else {
-      renderAccountDetails(root, state);
-    }
+    if (state.identityDestination === 'booking' && state.from) renderConfirmation(root, state);
+    else if (state.account && state.identityDestination === 'profile') exitBookingContext(state, {
+      tab: state.entry === 'chat' ? 'messages' : 'contact-detail',
+      tenantId: state.tenantId,
+    });
+    else renderAccountDetails(root, state);
   };
 
   root.innerHTML = `<section class="${flowThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${v2Sticker({
@@ -265,15 +260,11 @@ function renderLegalSticker(root, state) {
       if (tenantDocuments.length) await saveTenantConsents(state);
       state.platformOnlyLegal = false;
       state.error = '';
-      if (state.identityDestination === 'booking') {
-        if (state.from) await finalizeBookingRequest(root, state);
-        else nextBookingStep(root, state);
-      } else {
-        exitBookingContext(state, {
-          tab: state.entry === 'chat' ? 'messages' : 'contact-detail',
-          tenantId: state.tenantId,
-        });
-      }
+      if (state.identityDestination === 'booking') await finalizeBookingRequest(root, state);
+      else exitBookingContext(state, {
+        tab: state.entry === 'chat' ? 'messages' : 'contact-detail',
+        tenantId: state.tenantId,
+      });
     } catch (error) {
       state.error = accountFlowError(error, 'Не удалось сохранить документы');
       renderLegalSticker(root, state);
@@ -321,9 +312,8 @@ function renderFlowPage(root, state, {
   step = '',
 } = {}) {
   if (step) state.bookingStep = step;
-  const professionalName = representativeName(state);
-  const registration = step === 'registration';
   const bookingScreen = ['workplaces', 'procedures', 'dates', 'times', 'confirmation'].includes(step);
+  const registration = step === 'registration';
   const header = v2Header({
     a: registration ? {
       kind: 'avatar',
@@ -334,15 +324,14 @@ function renderFlowPage(root, state, {
       aria: 'Регистрация',
     } : {
       kind: 'avatar',
-      label: professionalName,
+      label: representativeName(state),
       image: representativePhoto(state),
-      initials: professionalName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase(),
       disabled: true,
-      aria: `Профиль ${professionalName}`,
+      aria: `Профиль ${representativeName(state)}`,
     },
-    b: registration ? 'Регистрация' : bookingScreen ? 'Запись' : (title || 'Профиль'),
+    b: registration ? 'Регистрация' : bookingScreen ? 'Запись' : (title || representativeName(state)),
     c: action ? { kind: 'text', label: action.label || '', data: action.data || '', aria: action.aria || action.label || '', disabled: Boolean(action.disabled) } : null,
-    d: null,
+    d: bookingScreen ? null : (state.account ? { kind: 'chat', data: 'data-booking-flow-chat', aria: 'Чат' } : null),
   });
   const localTitle = title ? `<h2 class="v2-flow-title">${escapeHtml(title)}</h2>` : '';
   const shell = v2Shell({
@@ -351,18 +340,19 @@ function renderFlowPage(root, state, {
     className: center ? 'v2-app--flow-center' : 'v2-app--booking-flow',
   });
   root.innerHTML = `<section class="${flowThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${shell}</section>`;
+  root.querySelector('[data-booking-flow-chat]')?.addEventListener('click', () => {
+    exitBookingContext(state, { tab: 'messages', tenantId: state.tenantId });
+  });
 }
 
-function bookingHeaderMarkup(state, action = null, step = '') {
-  const professionalName = representativeName(state);
+function bookingHeaderMarkup(state, action = null) {
   return v2Header({
     a: {
       kind: 'avatar',
-      label: professionalName,
+      label: representativeName(state),
       image: representativePhoto(state),
-      initials: professionalName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase(),
       disabled: true,
-      aria: `Профиль ${professionalName}`,
+      aria: `Профиль ${representativeName(state)}`,
     },
     b: 'Запись',
     c: action ? {
@@ -394,11 +384,7 @@ function syncBookingHeader(root, state, step = state.bookingStep) {
   const app = root.querySelector('[data-v2-app]');
   const header = app?.querySelector(':scope > [data-v2-header]');
   if (!header) return;
-  header.outerHTML = bookingHeaderMarkup(state, bookingActionForStep(state, step), step);
-}
-
-function bookingStepHost(node) {
-  return node?.querySelector?.('[data-booking-step-host]') || null;
+  header.outerHTML = bookingHeaderMarkup(state, bookingActionForStep(state, step));
 }
 
 function currentBookingStepNode(root) {
@@ -422,8 +408,8 @@ function renderBookingStep(root, state, {
   let app = root.querySelector('[data-v2-app]');
   if (!app || !app.classList.contains('v2-app--booking-flow')) {
     root.innerHTML = `<section class="${flowThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${v2Shell({
-      header: bookingHeaderMarkup(state, bookingActionForStep(state, step), step),
-      body: '<div data-booking-base-step data-booking-step-host></div>',
+      header: bookingHeaderMarkup(state, bookingActionForStep(state, step)),
+      body: '<div data-booking-base-step></div>',
       className: 'v2-app--booking-flow',
     })}</section>`;
     app = root.querySelector('[data-v2-app]');
@@ -441,17 +427,13 @@ function renderBookingStep(root, state, {
 
   const active = currentBookingStepNode(root);
   if (active && String(active.dataset.bookingStep || '') === String(step)) {
-    const host = bookingStepHost(active) || active;
-    host.innerHTML = body;
+    active.innerHTML = body;
     state.bookingStep = step;
     syncBookingHeader(root, state, step);
     return active;
   }
 
-  const layer = mountV2ZLayer(root, v2ZLayer(
-    `<div data-booking-step-host>${body}</div>`,
-    { className: 'booking-step-z' },
-  ), {
+  const layer = mountV2ZLayer(root, v2ZLayer(body, { className: 'booking-step-z' }), {
     stack: true,
     onClose: () => {
       const previous = previousBookingStep(root);
@@ -522,10 +504,6 @@ function backFromFirstBookingStep(root, state) {
     exitBookingContext(state, { tab: 'contact-detail', tenantId: state.tenantId });
     return;
   }
-  if (state.bookingOrigin === 'account-overview' && state.account) {
-    exitBookingContext(state, { tab: 'home' });
-    return;
-  }
   state.identityDestination = 'booking';
   renderWelcome(root, state);
 }
@@ -539,15 +517,11 @@ function exitBookingContext(state, target = {}) {
 function renderWelcome(root, state) {
   const profile = state.context.profile || {};
   const owner = [profile.name, profile.surname].filter(Boolean).join(' ').trim();
-  const continueFlow = async () => {
+  const continueFlow = () => {
     resetBookingChoice(state);
     state.identityDestination = 'booking';
-    state.bookingOrigin = state.account ? 'account-overview' : 'welcome';
-    if (!state.account) {
-      renderWelcome(root, state);
-      return;
-    }
-    await continueAfterIdentity(root, state);
+    state.bookingOrigin = 'welcome';
+    nextBookingStep(root, state);
   };
   root.innerHTML = `<section class="${flowThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${v2Sticker({
     eyebrow: owner ? `Приглашение от ${owner}` : '',
@@ -589,8 +563,8 @@ function renderAccountEntry(root, state) {
   initV2StickerSwipe(root, {
     onRight: () => {
       state.error = '';
-      if (state.identityDestination === 'booking') renderWelcome(root, state);
-      else exitBookingContext(state, { tab: 'contact-detail', tenantId: state.tenantId });
+      if (state.identityDestination === 'booking' && state.from) renderConfirmation(root, state);
+      else nextBookingStep(root, state);
     },
     onLeft: () => { exitBookingContext(state); },
   });
@@ -769,15 +743,13 @@ async function continueAfterIdentity(root, state) {
     }
 
     state.platformOnlyLegal = false;
-    if (state.bookingOrigin === 'welcome') state.bookingOrigin = 'account-overview';
     const consentState = await refreshTenantConsentState(state);
     if (!consentState.pdnActive) {
       renderLegalSticker(root, state);
       return;
     }
 
-    if (state.from) await finalizeBookingRequest(root, state);
-    else nextBookingStep(root, state);
+    await finalizeBookingRequest(root, state);
   } catch (error) {
     state.error = accountFlowError(error, 'Не удалось проверить юридический статус');
     try {
@@ -802,9 +774,15 @@ async function continueAfterIdentity(root, state) {
 
 function renderWorkplaces(root, state) {
   const workplaces = Array.isArray(state.context.workplaces) ? state.context.workplaces : [];
-  const content = recordWorkplaceCards(workplaces, {
+  const profile = state.context?.profile || {};
+  const content = recordWorkplaceCards(workplaces.map((workplace) => ({
+    ...workplace,
+    appearance: workplaceCardAppearance(workplace),
+    fields: workplaceCardFields(workplace, workplace.cardProfile || profile),
+    image: workplace.photo || '',
+    imagePosition: `${Number(workplace.photoCropX || 50)}% ${Number(workplace.photoCropY || 50)}%`,
+  })), {
     data: 'data-booking-workplace',
-    selected: state.workplaceKey,
   });
   const layer = renderBookingStep(root, state, {
     step: 'workplaces',
@@ -891,10 +869,10 @@ function renderTimes(root, state) {
   });
   const layer = renderBookingStep(root, state, {
     step: 'times',
-    onFirstBack: () => backFromFirstBookingStep(root, state),
     body: `${slots.length
-      ? recordTimeRows(slots, { data: 'data-booking-time', accentEvery: 30 })
+      ? recordTimeRows(slots, { data: 'data-booking-time', accentEvery: 0 })
       : emptyState('Свободного времени нет', 'На эту дату нет интервала для выбранных процедур.')}${formError(state.error)}`,
+    onFirstBack: () => backFromFirstBookingStep(root, state),
   });
   layer?.querySelectorAll('[data-booking-time]').forEach((node) => {
     if (String(node.dataset.bookingTime || '') === String(state.from || '')) node.classList.add('is-selected');
@@ -927,10 +905,12 @@ function confirmationCard(state) {
     uei,
     name: accountName || 'Запись',
     phone: accountPhone,
-    duration: `${duration} мин`,
+    duration: duration ? `${duration} мин` : '—',
+    discount: `${discount}%`,
     total: money(total),
     procedures: procedures.map((procedure) => ({
       name: procedure.name || '',
+      durationText: procedure.duration ? `${Number(procedure.duration)} мин` : '',
       right: money(bookingProcedureCost(procedure, state.workplaceKey)),
     })),
   });
