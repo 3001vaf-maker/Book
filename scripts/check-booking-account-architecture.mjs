@@ -87,8 +87,9 @@ const globalAccountHomeBlock = booking.slice(booking.indexOf('async function ren
 expect(!globalAccountHomeBlock.includes("params.set('entry', 'account')") && !globalAccountHomeBlock.includes('onOpenRelationship:') && !globalAccountHomeBlock.includes('onOpenRecord:'), 'Global account must not bridge Contacts or History into the legacy tenant account contour.');
 expect(globalAccountHomeBlock.includes('onStartBooking: (tenantId)') && globalAccountHomeBlock.includes("params.set('booking', id)"), 'Leaving the global account for a tenant must be reserved for the explicit booking action.');
 expect(booking.includes("exitBookingContext(state, { tab: 'contact-detail', tenantId: state.tenantId })")
-  && booking.includes("exitBookingContext(state, { tab: 'messages', tenantId: state.tenantId })"),
-  'Tenant flows may return only to the global contact or global chat owner; they must not render a second account UI.');
+  && booking.includes("tab: state.entry === 'chat' ? 'messages' : 'contact-detail'")
+  && booking.includes("exitBookingContext(state, { tab: 'home' })"),
+  'Tenant flows may return only through the global account owner (contact, overview, or an explicit existing chat entry); they must not render a second account UI.');
 expect(!booking.includes('step: 15'), 'Public booking must not hardcode a 15 minute slot step.');
 expect(settings.includes("from '../../core/booking-settings/index.js'"), 'Online booking settings must use canonical booking settings owner.');
 expect(!/\b(?:appShell|appHeader)\s*\(/.test(settings) && !settings.includes('app-content--book-shell'), 'Online booking settings must not create a second full-screen shell inside Shared Z.');
