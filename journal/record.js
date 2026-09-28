@@ -368,15 +368,22 @@ function renderPersonStep(modalRoot, { date, workplaceId, from, to, procedures: 
     render();
   });
   bindRecordSettings(modalRoot, () => {
-    openPersonCreate({
-      root: document.body,
-      variant: 'large',
-      surface: 'app',
-      onCreated: (person) => {
-        all = people();
-        filtered = all;
-        openSelectedPerson(all.find((item) => item.key === person.key) || person);
-      },
+    const m = mountModal(document.body, modal(
+      `<div class="modal-actions">${button('+ Добавить клиента', { data: 'data-record-settings-add-person' })}</div>`,
+      { variant: 'quick', surface: 'app' },
+    ));
+    m?.querySelector('[data-record-settings-add-person]')?.addEventListener('click', () => {
+      m.v2Close?.();
+      openPersonCreate({
+        root: document.body,
+        variant: 'large',
+        surface: 'app',
+        onCreated: (person) => {
+          all = people();
+          filtered = all;
+          openSelectedPerson(all.find((item) => item.key === person.key) || person);
+        },
+      });
     });
   });
   render();
