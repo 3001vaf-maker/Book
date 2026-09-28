@@ -18,6 +18,12 @@ export function miniCard({
   title = '',
   value = '',
   subtitle = '',
+  titleData = '',
+  titleAria = '',
+  valueData = '',
+  valueAria = '',
+  subtitleData = '',
+  subtitleAria = '',
   rows = [],
   image = '',
   imagePosition = '50% 50%',
@@ -48,9 +54,9 @@ export function miniCard({
   return `<${tag} class="${escapeHtml(classes)}"${surfaceStyle}${actionAttrs}>
     <div class="mini-card__head">
       <span class="mini-card__copy">
-        <strong class="mini-card__title">${escapeHtml(title)}</strong>
-        ${value ? `<strong class="mini-card__value">${escapeHtml(value)}</strong>` : ''}
-        ${subtitle ? `<span class="mini-card__subtitle">${escapeHtml(subtitle)}</span>` : ''}
+        <strong class="mini-card__title"${attrs(titleData, titleAria)}>${escapeHtml(title)}</strong>
+        ${value ? `<strong class="mini-card__value"${attrs(valueData, valueAria)}>${escapeHtml(value)}</strong>` : ''}
+        ${subtitle ? `<span class="mini-card__subtitle"${attrs(subtitleData, subtitleAria)}>${escapeHtml(subtitle)}</span>` : ''}
       </span>
       ${media}
     </div>
