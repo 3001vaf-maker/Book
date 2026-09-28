@@ -78,7 +78,7 @@ assert.doesNotMatch(recordSource, /button\('Из прайса'/);
 assert.doesNotMatch(recordSource, /data-record-from-price/);
 assert.doesNotMatch(recordSource, /iconButton\('\+'/);
 assert.match(recordRuntimeSource, /data-record-owner-settings/);
-assert.match(recordRuntimeSource, /data-v2-primary-action/);
+assert.match(recordRuntimeSource, /(?:data-v2-primary-action|dataset\.v2PrimaryAction)/);
 assert.doesNotMatch(buttonCss, /data-record-from-price/);
 assert.doesNotMatch(recordCss, /data-record-from-price/);
 assert.doesNotMatch(recordSource, /saveProcedure/);
