@@ -247,9 +247,12 @@ function openDatePicker(host) {
   const current = parseDateValue(hidden.value);
   const minDate = parseDateValue(host.dataset.datePickerMin || '');
   const maxDate = parseDateValue(host.dataset.datePickerMax || '');
-  const declaredMinYear = Number(host.dataset.datePickerMinYear);
-  const declaredMaxYear = Number(host.dataset.datePickerMaxYear);
-  const declaredInitialYear = Number(host.dataset.datePickerInitialYear);
+  const minYearText = String(host.dataset.datePickerMinYear || '').trim();
+  const maxYearText = String(host.dataset.datePickerMaxYear || '').trim();
+  const initialYearText = String(host.dataset.datePickerInitialYear || '').trim();
+  const declaredMinYear = minYearText ? Number(minYearText) : Number.NaN;
+  const declaredMaxYear = maxYearText ? Number(maxYearText) : Number.NaN;
+  const declaredInitialYear = initialYearText ? Number(initialYearText) : Number.NaN;
   const minYear = Number.isInteger(declaredMinYear)
     ? declaredMinYear
     : (minDate?.getFullYear() ?? now.getFullYear() - 100);
