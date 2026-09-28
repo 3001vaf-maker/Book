@@ -34,6 +34,7 @@ const journalRecordViewUi = read('journal/record-view.js');
 const journalBreakViewUi = read('journal/break-view.js');
 const sharedRecordUi = read('ui/record/runtime.js');
 const sharedRecordCss = read('ui/record/record.css');
+const sharedInputsCss = read('ui/inputs/inputs.css');
 
 
 if (/availability|financial-model|getAllPeople|record-events|record-state|status\s*=|attendance|confirmed|cancelRecord|createRecord|updateRecord|moveRecord/.test(recordData)) {
@@ -217,6 +218,27 @@ if (!/button\('\+ Добавить клиента',\s*\{\s*data:\s*'data-record-
   || !/bindRecordSettings\(modalRoot/.test(recordPersonStepSource)
   || /variant:\s*'secondary'[^\n]*data-record-settings-add-person/.test(recordPersonStepSource)) {
   errors.push('Record person-step A settings must expose one canonical black "+ Добавить клиента" button');
+}
+
+const existingRecordPersonPickerSource = journalRecordViewUi.slice(
+  journalRecordViewUi.indexOf('function openPersonPicker'),
+  journalRecordViewUi.indexOf('function openAddProcedurePicker')
+);
+for (const [name, source] of [
+  ['Record person selection', recordPersonStepSource],
+  ['Existing Record person picker', existingRecordPersonPickerSource],
+]) {
+  if (!/ui-search-field/.test(source)
+    || !/field\(\{[\s\S]*type:\s*'search'[\s\S]*placeholder:\s*'Поиск по имени или UEI'/.test(source)
+    || /record-person-toolbar|record-person-search/.test(source)) {
+    errors.push(`${name} must consume the same Shared search field presentation as the People folder`);
+  }
+}
+if (!/ui-search-field/.test(peopleUi)
+  || !/placeholder:\s*'Поиск по имени или UEI'/.test(peopleUi)
+  || !/\.ui-search-field\{[^}]*padding:\s*0 0 12px/.test(sharedInputsCss)
+  || !/\.ui-search-divider\{[^}]*height:\s*1px/.test(sharedInputsCss)) {
+  errors.push('People and Record search must share one canonical search-field presentation');
 }
 
 for (const [path, source] of [
