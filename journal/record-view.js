@@ -4,6 +4,7 @@ import {
   durationText,
   entityCard,
   escapeHtml,
+  field,
   initCalendar,
   initDurationPickers,
   initMultiSelect,
@@ -14,6 +15,8 @@ import {
   openTimePickerAction,
   mountRecordZ,
   recordZHost,
+  recordProcedureList,
+  recordPersonList,
   setRecordPrimaryAction,
   bindRecordSettings,
 } from '../ui/ui.js';
@@ -205,7 +208,7 @@ function openTimePicker(state, record, onSelected) {
 }
 
 function openPersonPicker(state, onSelected) {
-  const content = `<div class="record-editor-screen record-editor-screen--people"><div class="record-person-toolbar"><input class="record-person-search" type="search" placeholder="Поиск человека" data-record-view-person-search></div><div class="record-person-list" data-record-view-person-list></div></div>`;
+  const content = `<div class="record-editor-screen record-editor-screen--people"><div class="ui-search-field">${field({ name: 'recordViewPersonSearch', type: 'search', placeholder: 'Поиск по имени или UEI', autocomplete: 'off', data: 'data-record-view-person-search' })}</div><div class="ui-search-divider" aria-hidden="true"></div><div class="record-person-list" data-record-view-person-list></div></div>`;
   const m = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app', className: 'record-editor-modal' }));
   if (!m) return;
   const render = (query = '') => {
@@ -216,10 +219,20 @@ function openPersonPicker(state, onSelected) {
     });
     const listRoot = m.querySelector('[data-record-view-person-list]');
     if (!listRoot) return;
-    listRoot.innerHTML = matches.map((person) => {
+    listRoot.innerHTML = recordPersonList(matches.map((person) => {
       const display = personDisplay(person);
-      return `<button type="button" class="entity-card entity-card--compact${String(person.key || '') === String(state.person?.key || '') ? ' is-selected' : ''}" data-record-view-person="${escapeHtml(person.key || '')}"><span>${escapeHtml(display.uei)}</span><strong>${escapeHtml(display.name)}</strong><small>${escapeHtml(display.phone)}</small></button>`;
-    }).join('') || '<div class="muted">Люди не найдены.</div>';
+      return {
+        key: person.key,
+        name: display.name,
+        uei: display.uei,
+        phone: display.phone,
+        aria: `Выбрать человека ${display.name}`,
+      };
+    }), {
+      data: 'data-record-view-person',
+      selected: state.person?.key || '',
+      empty: 'Люди не найдены.',
+    });
     listRoot.querySelectorAll('[data-record-view-person]').forEach((node) => node.addEventListener('click', () => {
       const person = people().find((item) => String(item.key || '') === String(node.dataset.recordViewPerson || ''));
       if (!person) return;
@@ -235,14 +248,16 @@ function openPersonPicker(state, onSelected) {
 
 function openAddProcedurePicker(state, onSelected) {
   const available = procedures().filter((procedure) => workplaceAssignment(procedure, state.workplaceId));
-  const items = available.map((procedure) => ({
-    title: procedure.name || 'Процедура',
-    subtitle: durationText(Number(procedure.duration) || 0),
-    interactive: true,
-    data: `data-record-view-procedure-add-select="${escapeHtml(procedure.id || '')}"`,
+  const content = `<div class="modal-title"><h2>Добавить процедуру</h2></div>${recordProcedureList(available.map((procedure) => ({
+    id: String(procedure.id || ''),
+    name: procedure.name || 'Процедура',
+    durationText: durationText(Number(workplaceAssignment(procedure, state.workplaceId)?.duration ?? procedure.duration) || 0),
+    costText: defaultCost(procedure, state.workplaceId) !== '' ? formatMoney(defaultCost(procedure, state.workplaceId)) : '',
     aria: `Добавить процедуру ${procedure.name || ''}`,
-  }));
-  const content = `<div class="modal-title"><h2>Добавить процедуру</h2></div>${list({ items }) || '<div class="muted">Процедур нет.</div>'}`;
+  })), {
+    data: 'data-record-view-procedure-add-select',
+    empty: 'Процедур нет.',
+  })}`;
   const m = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
   if (!m) return;
   m.querySelectorAll('[data-record-view-procedure-add-select]').forEach((node) => node.addEventListener('click', () => {

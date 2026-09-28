@@ -1,4 +1,4 @@
-import { button, durationPicker, durationText, entityCard, escapeHtml, list, listEntry, stateView, initStateView, initCalendar, mountModal, modal, openNotice, initDurationPickers, initMultiSelect, viewNavigation, initViewNavigation, openTimePickerAction, mountRecordZ, recordZHost, renderRecordZ, recordTimeRows, recordProcedureList, recordPersonList, recordConfirmationMiniCard, setRecordPrimaryAction, bindRecordSettings, closeRecordZStack } from '../ui/ui.js';
+import { button, durationPicker, durationText, entityCard, escapeHtml, field, list, listEntry, stateView, initStateView, initCalendar, mountModal, modal, openNotice, initDurationPickers, initMultiSelect, viewNavigation, initViewNavigation, openTimePickerAction, mountRecordZ, recordZHost, renderRecordZ, recordTimeRows, recordProcedureList, recordPersonList, recordConfirmationMiniCard, setRecordPrimaryAction, bindRecordSettings, closeRecordZStack } from '../ui/ui.js';
 import { createRecord } from '../core/record/index.js';
 import { createJournalBreak } from './break-service.js';
 import { getPeople } from '../main/people/data.js';
@@ -126,17 +126,19 @@ function openPriceProcedurePicker({ workplaceId, onAssigned }) {
   }
 
   const selectedIds = new Set();
-  const content = list({
-    items: available.map((procedure) => {
-      const cost = defaultCost(procedure, '');
-      return {
-        title: procedure.name || '',
-        secondary: [durationText(procedure.duration), cost !== '' ? `${cost} ₽` : ''],
-        interactive: true,
-        data: `data-record-price-procedure="${escapeHtml(procedure.id)}"`,
-        aria: `Подключить процедуру ${procedure.name || ''} к рабочему месту`,
-      };
-    }),
+  const content = recordProcedureList(available.map((procedure) => {
+    const cost = defaultCost(procedure, '');
+    return {
+      id: String(procedure.id || ''),
+      name: procedure.name || '',
+      durationText: durationText(procedure.duration),
+      costText: cost !== '' ? `${cost} ₽` : '',
+      aria: `Подключить процедуру ${procedure.name || ''} к рабочему месту`,
+    };
+  }), {
+    data: 'data-record-price-procedure',
+    selected: [],
+    empty: 'Процедур нет.',
   });
   const m = mountModal(document.body, modal(`<div class="modal-title"><h2>Из прайса</h2><p>Отметьте процедуры, которые выполняются в этом рабочем месте.</p></div><div data-record-price-list>${content}</div><div class="modal-actions">${button('Добавить', { data: 'data-record-price-save' })}</div>`, { variant: 'medium', surface: 'app' }));
   if (!m) return;
@@ -240,12 +242,10 @@ function renderProceduresStep(modalRoot, { date, workplaceId, from, to, onCreate
   };
 
   bindRecordSettings(modalRoot, () => {
-    const menu = list({
-      items: [
-        { title: 'Из прайса', interactive: true, data: 'data-record-settings-from-price', aria: 'Добавить из прайса' },
-        { title: 'Добавить процедуру', interactive: true, data: 'data-record-settings-add-procedure', aria: 'Добавить процедуру' },
-      ],
-    });
+    const menu = `<div class="modal-actions">
+      ${button('Добавить из прайса', { data: 'data-record-settings-from-price', variant: 'secondary' })}
+      ${button('+ Добавить процедуру', { data: 'data-record-settings-add-procedure' })}
+    </div>`;
     const m = mountModal(document.body, modal(menu, { variant: 'quick', surface: 'app' }));
     m?.querySelector('[data-record-settings-from-price]')?.addEventListener('click', () => {
       m.v2Close?.();
@@ -315,7 +315,7 @@ function renderPersonStep(modalRoot, { date, workplaceId, from, to, procedures: 
   let all = people();
   let filtered = all;
   let selectedPerson = null;
-  const host = renderRecordZ(modalRoot, `<div class="record-screen record-screen--people"><div class="record-person-toolbar"><input class="record-person-search" data-record-person-search placeholder="🔍 Найти человека..." autocomplete="off"></div><div class="record-person-list" data-record-person-list></div></div>`);
+  const host = renderRecordZ(modalRoot, `<div class="record-screen record-screen--people"><div class="ui-search-field">${field({ name: 'recordPersonSearch', type: 'search', placeholder: 'Поиск по имени или UEI', autocomplete: 'off', data: 'data-record-person-search' })}</div><div class="ui-search-divider" aria-hidden="true"></div><div class="record-person-list" data-record-person-list></div></div>`);
   if (!host) return;
 
   const openSelectedPerson = (person) => {
@@ -368,15 +368,22 @@ function renderPersonStep(modalRoot, { date, workplaceId, from, to, procedures: 
     render();
   });
   bindRecordSettings(modalRoot, () => {
-    openPersonCreate({
-      root: document.body,
-      variant: 'large',
-      surface: 'app',
-      onCreated: (person) => {
-        all = people();
-        filtered = all;
-        openSelectedPerson(all.find((item) => item.key === person.key) || person);
-      },
+    const m = mountModal(document.body, modal(
+      `<div class="modal-actions">${button('+ Добавить клиента', { data: 'data-record-settings-add-person' })}</div>`,
+      { variant: 'quick', surface: 'app' },
+    ));
+    m?.querySelector('[data-record-settings-add-person]')?.addEventListener('click', () => {
+      m.v2Close?.();
+      openPersonCreate({
+        root: document.body,
+        variant: 'large',
+        surface: 'app',
+        onCreated: (person) => {
+          all = people();
+          filtered = all;
+          openSelectedPerson(all.find((item) => item.key === person.key) || person);
+        },
+      });
     });
   });
   render();
@@ -471,15 +478,16 @@ function openPhoneActions(phone) {
 function openConfirmationProcedurePicker({ workplaceId, selectedProcedures, onSelected }) {
   const selectedIds = new Set(selectedProcedures.map((item) => String(item?.procedure?.id || '')));
   const available = procedures().filter((procedure) => procedureForWorkplace(procedure, workplaceId) && !selectedIds.has(String(procedure.id || '')));
-  const content = list({
-    items: available.map((procedure) => ({
-      title: procedure.name || '',
-      secondary: [durationText(procedure.duration), defaultCost(procedure, workplaceId) !== '' ? `${defaultCost(procedure, workplaceId)} ₽` : ''],
-      interactive: true,
-      data: `data-record-confirm-add-procedure="${escapeHtml(procedure.id)}"`,
-      aria: `Добавить процедуру ${procedure.name || ''}`,
-    })),
-  }) || '<div class="muted">Других процедур для этого рабочего места нет.</div>';
+  const content = recordProcedureList(available.map((procedure) => ({
+    id: String(procedure.id || ''),
+    name: procedure.name || '',
+    durationText: durationText(procedure.duration),
+    costText: defaultCost(procedure, workplaceId) !== '' ? `${defaultCost(procedure, workplaceId)} ₽` : '',
+    aria: `Добавить процедуру ${procedure.name || ''}`,
+  })), {
+    data: 'data-record-confirm-add-procedure',
+    empty: 'Других процедур для этого рабочего места нет.',
+  });
   const m = mountModal(document.body, modal(`<div class="modal-title"><h2>Добавить процедуру</h2></div>${content}`, { variant: 'medium', surface: 'app' }));
   if (!m) return;
   m.querySelectorAll('[data-record-confirm-add-procedure]').forEach((node) => node.addEventListener('click', () => {

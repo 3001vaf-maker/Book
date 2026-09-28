@@ -1,9 +1,8 @@
 import { workspaceHeaderContext } from '../header/index.js';
 import { mountV2ZLayer, v2ZLayer } from '../v2/index.js';
 import { entityVisualCard } from '../cards/entity-card-constructor.js';
-import { miniCard } from '../cards/mini-card.js';
 import { listEntry, listEntries } from '../lists/list-entry.js';
-import { v2HorizontalRail, v2RailCard } from '../v2/index.js';
+import { v2HorizontalRail } from '../v2/index.js';
 import { timeSlots } from '../time/index.js';
 
 function recordSurface() {
@@ -51,27 +50,22 @@ export function recordProcedureList(items = [], {
   const selectedSet = new Set((Array.isArray(selected) ? selected : []).map(String));
   const rows = (Array.isArray(items) ? items : []).map((item = {}) => {
     const id = String(item.id || '');
-    return listEntry({
-      columns: [
-        [
-          { value: item.name || item.title || 'Процедура', strong: true },
-          { value: '', className: 'list-entry__line-spacer' },
-          { value: item.durationText || item.secondary || '', strong: true },
-        ],
-        [
-          { value: '', className: 'list-entry__line-spacer' },
-          { value: item.costText || item.right || '', strong: true },
-          { value: '', className: 'list-entry__line-spacer' },
-        ],
-      ],
-      interactive: true,
-      selected: selectedSet.has(id),
-      className: 'list-entry--record-procedure',
-      data: `${data}="${escapeRecordText(id)}"`,
-      aria: item.aria || `Выбрать процедуру ${item.name || item.title || ''}`,
-    });
+    const on = selectedSet.has(id);
+    const name = String(item.name || item.title || 'Процедура');
+    const duration = String(item.durationText || item.secondary || '');
+    const cost = String(item.costText || item.right || '');
+    return `<button type="button" class="v2-service-sticker${on ? ' is-selected' : ''}" ${data}="${escapeRecordText(id)}" aria-pressed="${on ? 'true' : 'false'}" aria-label="${escapeRecordText(item.aria || `Выбрать процедуру ${name}`)}">
+      <span class="v2-service-sticker__text">
+        <strong>${escapeRecordText(name)}</strong>
+        ${duration ? `<span>${escapeRecordText(duration)}</span>` : ''}
+      </span>
+      <span class="v2-service-sticker__price">${escapeRecordText(cost)}</span>
+      <span class="v2-service-sticker__selector" aria-hidden="true"></span>
+    </button>`;
   });
-  return rows.length ? listEntries(rows) : `<div class="muted">${escapeRecordText(empty)}</div>`;
+  return rows.length
+    ? `<div class="v2-sticker-list v2-sticker-list--services">${rows.join('')}</div>`
+    : `<div class="muted">${escapeRecordText(empty)}</div>`;
 }
 
 export function recordPersonList(items = [], {
@@ -82,23 +76,9 @@ export function recordPersonList(items = [], {
   const rows = (Array.isArray(items) ? items : []).map((item = {}) => {
     const key = String(item.key || item.id || '');
     return listEntry({
-      columns: [
-        [
-          { value: item.name || '', strong: true },
-          { value: '' },
-          { value: '' },
-        ],
-        [
-          { value: item.uei || '', strong: true },
-          { value: '' },
-          { value: '' },
-        ],
-        [
-          { value: item.phone || '', strong: true },
-          { value: '' },
-          { value: '' },
-        ],
-      ],
+      overline: item.uei || '',
+      title: item.name || '',
+      subtitle: item.phone || '',
       interactive: true,
       selected: String(selected || '') === key,
       data: `${data}="${escapeRecordText(key)}"`,
@@ -107,7 +87,6 @@ export function recordPersonList(items = [], {
   });
   return rows.length ? listEntries(rows) : `<div class="muted">${escapeRecordText(empty)}</div>`;
 }
-
 
 function timeValue(item) {
   return String(item && typeof item === 'object' ? (item.from ?? item.value ?? '') : item ?? '');
@@ -156,35 +135,6 @@ export function recordConfirmationMiniCard({
   total = '',
   procedures = [],
 } = {}) {
-  const card = miniCard({
-    lines: [
-      { value: workplace || '—', align: 'left', strong: true },
-      { value: date || '—', align: 'right' },
-      { value: period || '—', align: 'right' },
-      { value: uei || '—', align: 'left' },
-      { value: name || '—', align: 'left', strong: true },
-      { value: phone || '—', align: 'left' },
-    ],
-  });
-
-  const metrics = v2HorizontalRail([
-    v2RailCard({
-      title: duration || '—',
-      subtitle: 'Время',
-      className: 'people-metric-card',
-    }),
-    v2RailCard({
-      title: discount || '0%',
-      subtitle: 'Скидка',
-      className: 'people-metric-card',
-    }),
-    v2RailCard({
-      title: total || '—',
-      subtitle: 'Сумма',
-      className: 'people-metric-card',
-    }),
-  ].join(''), { className: 'people-metrics' });
-
   const rows = listEntries((Array.isArray(procedures) ? procedures : []).map((item = {}) => listEntry({
     columns: [
       [
@@ -203,9 +153,34 @@ export function recordConfirmationMiniCard({
     aria: item.aria || item.name || item.title || 'Процедура',
   })));
 
+  const card = `<section class="record-confirmation-card" aria-label="Данные записи">
+    <div class="record-confirmation-card__top">
+      <strong class="record-confirmation-card__workplace">${escapeRecordText(workplace || '—')}</strong>
+      <strong class="record-confirmation-card__discount">${escapeRecordText(discount || '0%')}</strong>
+    </div>
+    <div class="record-confirmation-card__datetime">
+      <span>${escapeRecordText(date || '—')}</span>
+      <span>${escapeRecordText(period || '—')}</span>
+    </div>
+    <div class="record-confirmation-card__person">
+      <strong class="record-confirmation-card__uei">${escapeRecordText(uei || '—')}</strong>
+      <strong class="record-confirmation-card__name">${escapeRecordText(name || '—')}</strong>
+      <span class="record-confirmation-card__phone">${escapeRecordText(phone || '—')}</span>
+    </div>
+    <div class="record-confirmation-card__bottom">
+      <div class="record-confirmation-card__duration">
+        <strong>${escapeRecordText(duration || '—')}</strong>
+        <span>Время</span>
+      </div>
+      <div class="record-confirmation-card__total">
+        <strong>${escapeRecordText(total || '—')}</strong>
+        <span>Сумма</span>
+      </div>
+    </div>
+  </section>`;
+
   return `<div class="record-confirmation-view">
     <div class="record-confirmation-view__card">${card}</div>
-    <div class="record-confirmation-view__metrics">${metrics}</div>
     <div class="record-confirmation-view__procedures">${rows}</div>
   </div>`;
 }

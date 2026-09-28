@@ -19,3 +19,7 @@
 .field input[type="range"]::-moz-range-progress,.ui-range input[type="range"]::-moz-range-progress{height:4px;background:#111}
 .field input[type="range"]::-moz-range-thumb,.ui-range input[type="range"]::-moz-range-thumb{width:22px;height:22px;border:2px solid #111;border-radius:50%;background:#ffff00;box-shadow:none}
 .field input[type="range"]:focus-visible::-webkit-slider-thumb,.ui-range input[type="range"]:focus-visible::-webkit-slider-thumb{outline:2px solid #111;outline-offset:2px}
+
+.ui-search-field{padding:0 0 12px}
+.ui-search-field .field>span{display:none}
+.ui-search-divider{height:1px;margin:0 0 14px;background:#D7D7D7}
