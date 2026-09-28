@@ -29,6 +29,20 @@ import { getProducts } from '../settings/service/products/data.js';
 import { getRecords } from '../core/record/index.js';
 import { updateRecord, cancelRecord, checkRecordTime } from '../core/record/index.js';
 import { journalRecordActionContext } from './record-action-context.js';
+import { getBookingSettings } from '../core/booking-settings/index.js';
+import { getProfile } from '../settings/profile/data.js';
+
+function recordOwnerOptions({ settings = false, chatPersonKey = '' } = {}) {
+  const profile = getProfile();
+  const initials = [profile?.name, profile?.surname].filter(Boolean).map((value) => String(value).trim().charAt(0)).join('').slice(0, 2).toUpperCase();
+  return {
+    settings,
+    chatPersonKey,
+    aImage: String(profile?.photo || ''),
+    aImagePosition: `${Number(profile?.photoCropX ?? 50)}% ${Number(profile?.photoCropY ?? 50)}%`,
+    aInitials: initials,
+  };
+}
 
 const people = () => getAllPeople();
 const procedures = () => getProcedures();
@@ -167,7 +181,7 @@ function openTimePicker(state, record, onSelected) {
     date: dateKey(state.date),
     workplaceId: state.workplaceId,
     duration,
-    step: 15,
+    step: getBookingSettings().slotStep,
     excludeId: record?.id || '',
   });
   const content = `<div class="record-editor-screen record-editor-screen--time"><div class="modal-title"><h2>Время</h2><p>Выберите новое время записи.</p></div>${timeSlots({ values, selected: state.from, data: 'data-record-view-time-option', ariaLabel: 'Выбрать время записи' })}</div>`;
@@ -360,8 +374,8 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
   let updatingFromView = false;
   let finishClose = () => {};
   const m = mountRecordZ({
+    ...recordOwnerOptions({ settings: true, chatPersonKey: state.person?.key || '' }),
     title: 'Запись',
-    settings: true,
     className: 'record-view-z',
     onClose: () => finishClose(),
   });
