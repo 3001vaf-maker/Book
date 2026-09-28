@@ -4,6 +4,7 @@ import { entityVisualCard } from '../cards/entity-card-constructor.js';
 import { miniCard } from '../cards/mini-card.js';
 import { listEntry, listEntries } from '../lists/list-entry.js';
 import { v2HorizontalRail, v2RailCard } from '../v2/index.js';
+import { timeSlots } from '../time/index.js';
 
 function recordSurface() {
   return document.querySelector('[data-v2-workspace-surface]')
@@ -54,18 +55,22 @@ export function recordProcedureList(items = [], {
       columns: [
         [
           { value: item.name || item.title || 'Процедура', strong: true },
-          { value: item.durationText || item.secondary || '' },
-          { value: '' },
+          { value: '', strong: true },
+          { value: '', strong: true },
+        ],
+        [
+          { value: item.durationText || item.secondary || '', strong: true },
+          { value: selectedSet.has(id) ? 'Выбрано' : '', strong: true },
+          { value: '', strong: true },
         ],
         [
           { value: item.costText || item.right || '', strong: true },
-          { value: selectedSet.has(id) ? 'Выбрано' : '', muted: !selectedSet.has(id) },
-          { value: '' },
+          { value: '', strong: true },
+          { value: '', strong: true },
         ],
       ],
       interactive: true,
       data: `${data}="${escapeRecordText(id)}"`,
-      className: selectedSet.has(id) ? 'record-list-entry--selected' : '',
       aria: item.aria || `Выбрать процедуру ${item.name || item.title || ''}`,
     });
   });
@@ -74,7 +79,6 @@ export function recordProcedureList(items = [], {
 
 export function recordPersonList(items = [], {
   data = 'data-record-person',
-  selected = '',
   empty = 'Люди не найдены.',
 } = {}) {
   const rows = (Array.isArray(items) ? items : []).map((item = {}) => {
@@ -83,13 +87,22 @@ export function recordPersonList(items = [], {
       columns: [
         [
           { value: item.name || '', strong: true },
-          { value: item.uei || '' },
-          { value: item.phone || '' },
+          { value: '', strong: true },
+          { value: '', strong: true },
+        ],
+        [
+          { value: item.uei || '', strong: true },
+          { value: '', strong: true },
+          { value: '', strong: true },
+        ],
+        [
+          { value: item.phone || '', strong: true },
+          { value: '', strong: true },
+          { value: '', strong: true },
         ],
       ],
       interactive: true,
       data: `${data}="${escapeRecordText(key)}"`,
-      className: String(selected || '') === key ? 'record-list-entry--selected' : '',
       aria: item.aria || `Выбрать ${item.name || ''}`,
     });
   });
@@ -114,14 +127,22 @@ export function recordTimeRows(items = [], {
     if (!groups.has(hour)) groups.set(hour, []);
     groups.get(hour).push(value);
   });
-  return `<div class="record-time-hours">${[...groups.entries()].map(([hour, times]) => `
-    <div class="record-time-hour" data-record-time-hour="${escapeRecordText(hour)}">
-      <div class="record-time-track">${times.map((value) => {
-        const minute = Number(value.split(':')[1] || 0);
-        const emphasized = Number(accentEvery) > 0 && minute % Number(accentEvery) === 0;
-        return `<button type="button" class="record-time-chip${emphasized ? ' is-emphasized' : ''}" ${data}="${escapeRecordText(value)}">${escapeRecordText(value)}</button>`;
-      }).join('')}</div>
-    </div>`).join('')}</div>`;
+  return `<div class="record-time-hours">${[...groups.entries()].map(([hour, times]) => {
+    const valuesForHour = times.map((value) => {
+      const minute = Number(value.split(':')[1] || 0);
+      return {
+        value,
+        label: value,
+        emphasized: Number(accentEvery) > 0 && minute % Number(accentEvery) === 0,
+      };
+    });
+    const slots = timeSlots({ values: valuesForHour, data, ariaLabel: `Время ${hour}:00` });
+    const emphasized = times.filter((value) => {
+      const minute = Number(value.split(':')[1] || 0);
+      return Number(accentEvery) > 0 && minute % Number(accentEvery) === 0;
+    });
+    return `<div class="record-time-hour" data-record-time-hour="${escapeRecordText(hour)}" data-record-emphasized="${emphasized.map(escapeRecordText).join(',')}">${slots}</div>`;
+  }).join('')}</div>`;
 }
 
 export function recordConfirmationMiniCard({
