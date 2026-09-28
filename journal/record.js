@@ -34,14 +34,13 @@ function recordStartTimes({ date, workplaceId, from }) {
   const hourEnd = Math.floor(start / 60) * 60 + 60;
   const to = minutesToTime(Math.min(hourEnd, 23 * 60 + 59));
   if (!to) return [];
-  const step = getBookingSettings().slotStep;
   return listAvailableStartTimes({
     date,
     workplaceId,
     from,
     to,
-    duration: step,
-    step,
+    duration: 5,
+    step: 5,
   });
 }
 
@@ -422,7 +421,7 @@ function availableConfirmationTimes({ date, workplaceId, duration }) {
     date,
     workplaceId,
     duration: Math.max(1, Number(duration) || 0),
-    step: getBookingSettings().slotStep,
+    step: 15,
   }).map((from) => ({ from, to: minutesToTime(timeToMinutes(from) + Math.max(1, Number(duration) || 0)) }));
 }
 
