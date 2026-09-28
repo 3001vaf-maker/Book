@@ -672,7 +672,7 @@ function renderWorkplaces(root, state) {
   const content = recordWorkplaceCards(workplaces.map((workplace) => ({
     ...workplace,
     appearance: workplaceCardAppearance(workplace),
-    fields: workplaceCardFields(workplace, profile),
+    fields: workplaceCardFields(workplace, workplace.cardProfile || profile),
     image: workplace.photo || '',
     imagePosition: `${Number(workplace.photoCropX || 50)}% ${Number(workplace.photoCropY || 50)}%`,
   })), {
