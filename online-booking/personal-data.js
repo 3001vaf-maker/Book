@@ -51,7 +51,7 @@ function editorMarkup(account = {}) {
       ],
     })}
     ${datePicker({label:'Дата рождения',name:'birthDate',value:profile.birthDate||'',max:maxBirthDate,minYear:currentYear-110,maxYear:currentYear,initialYear:currentYear-30,allowClear:true})}
-    <div class="array-group"><span class="array-label">Ссылки</span>${links({ links: Array.isArray(profile.links) ? profile.links : [], name: 'accountProfileLinks' })}</div>
+    ${links({ label:'Ссылки', links:Array.isArray(profile.links)?profile.links:[], name:'accountProfileLinks' })}
   </div>`;
   return formView(`
     ${v2Section('Личные данные', fields)}
