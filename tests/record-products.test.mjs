@@ -59,7 +59,8 @@ assert.equal(getRecords().find((item) => item.id === record.id)?.finance?.planTo
 const recordViewSource = readFileSync(new URL('../journal/record-view.js', import.meta.url), 'utf8');
 const recordPaymentSource = readFileSync(new URL('../journal/record-payment.js', import.meta.url), 'utf8');
 const modalCss = readFileSync(new URL('../ui/modals/modal.css', import.meta.url), 'utf8');
-assert.match(recordViewSource, /button\('Продажа'/);
+assert.match(recordViewSource, /data-record-settings-sale/);
+assert.doesNotMatch(recordViewSource, /button\('Продажа'/);
 assert.match(recordViewSource, /data-record-sale-product/);
 assert.match(recordViewSource, /initMultiSelect/);
 assert.match(recordViewSource, /recordSettlementItems\(state\)/);

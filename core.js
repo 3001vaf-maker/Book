@@ -19,7 +19,7 @@ import { canUseBookCapability, getBookAccess, loadBookAccess } from './core/acce
 import { startServerBookingSync } from './online-booking/server-sync.js';
 import { renderGlobalClient, renderOnlineBooking } from './online-booking/booking.js';
 import { startAccountRuntime } from './online-booking/account-runtime.js';
-import { initV2WorkspaceInteraction, setV2DeckOpen, v2EList, v2FDeck, v2Header, v2Shell } from './ui/ui.js';
+import { field, passwordField, initPasswordFields, openNotice, initV2WorkspaceInteraction, setV2DeckOpen, v2EList, v2FDeck, v2Header, v2Shell, v2Sticker } from './ui/ui.js';
 import { clearLegacyBusinessStorage } from './core/legacy-browser-business.js';
 import { FirstRunRuntime, bindDemoBadgeAction, demoBadgeMarkup, startPlatformSessionTracking } from './first-run/runtime.js';
 import { startPlatformNotices } from './core/platform-notices.js';
@@ -509,15 +509,15 @@ function renderMigrationPending() {
   workspaceReady = false;
   disposeView();
   disposeView = () => {};
-  app.innerHTML = `
-    <main class="auth-view">
-      <section class="auth-card">
-        <div class="auth-card__heading">
-          <h1>Подготовка рабочего пространства</h1>
-          <p>Сервер ожидает безопасный перенос данных из основного браузера. Текущие данные не изменены.</p>
-        </div>
-      </section>
-    </main>`;
+  app.innerHTML = v2Sticker({
+    title: 'Подготовка рабочего пространства',
+    body: '<p>Сервер ожидает безопасный перенос данных из основного браузера. Текущие данные не изменены.</p>',
+    className: 'v2-sticker-screen--technical',
+    closeData: 'data-technical-u-close',
+  });
+  app.querySelector('[data-technical-u-close]')?.addEventListener('click', () => {
+    if (window.history.length > 1) window.history.back();
+  });
   syncViewport();
 }
 
@@ -527,16 +527,16 @@ function renderFirstRunUnavailable(error) {
   disposeView();
   disposeView = () => {};
   const message = error instanceof Error ? error.message : 'Не удалось продолжить знакомство с Book.';
-  app.innerHTML = `
-    <main class="auth-view">
-      <section class="auth-card">
-        <div class="auth-card__heading">
-          <h1>Не удалось открыть знакомство с Book</h1>
-          <p data-first-run-load-error></p>
-        </div>
-        <button class="ui-button" type="button" data-first-run-retry>Повторить</button>
-      </section>
-    </main>`;
+  app.innerHTML = v2Sticker({
+    title: 'Не удалось открыть знакомство',
+    body: '<p data-first-run-load-error></p>',
+    action: '<button class="ui-button" type="button" data-first-run-retry>Повторить</button>',
+    className: 'v2-sticker-screen--technical',
+    closeData: 'data-first-run-u-close',
+  });
+  app.querySelector('[data-first-run-u-close]')?.addEventListener('click', () => {
+    if (window.history.length > 1) window.history.back();
+  });
   app.querySelector('[data-first-run-load-error]').textContent = message;
   app.querySelector('[data-first-run-retry]')?.addEventListener('click', async (event) => {
     const control = event.currentTarget;
@@ -552,15 +552,15 @@ function renderSuspended() {
   workspaceReady = false;
   disposeView();
   disposeView = () => {};
-  app.innerHTML = `
-    <main class="auth-view">
-      <section class="auth-card">
-        <div class="auth-card__heading">
-          <h1>Рабочее пространство временно недоступно</h1>
-          <p>Доступ к этому рабочему пространству приостановлен владельцем платформы.</p>
-        </div>
-      </section>
-    </main>`;
+  app.innerHTML = v2Sticker({
+    title: 'Рабочее пространство временно недоступно',
+    body: '<p>Доступ к этому рабочему пространству приостановлен владельцем платформы.</p>',
+    className: 'v2-sticker-screen--technical',
+    closeData: 'data-suspended-u-close',
+  });
+  app.querySelector('[data-suspended-u-close]')?.addEventListener('click', () => {
+    if (window.history.length > 1) window.history.back();
+  });
   syncViewport();
 }
 
@@ -759,31 +759,39 @@ function renderLogin(message = '') {
   workspaceReady = false;
   disposeView();
   disposeView = () => {};
-  app.innerHTML = `
-    <main class="auth-view">
-      <section class="auth-card" aria-labelledby="auth-title">
-        <div class="auth-card__heading">
-          <h1>Рабочее пространство</h1>
-          <p>Вход в систему</p>
-        </div>
-        <form class="auth-form" id="auth-form">
-          <label class="field">
-            <span>Email</span>
-            <input name="email" type="email" autocomplete="username" required>
-          </label>
-          <label class="field">
-            <span>Пароль</span>
-            <input name="password" type="password" autocomplete="current-password" required>
-          </label>
-          <p class="auth-error" id="auth-error" role="alert">${message}</p>
-          <button class="ui-button" type="submit">Войти</button>
-        </form>
-      </section>
-    </main>`;
+
+  const body = `
+    <form class="auth-form" id="auth-form">
+      ${field({ label: 'Email', name: 'email', type: 'email', required: true, autocomplete: 'username' })}
+      ${passwordField({ label: 'Пароль', name: 'password', required: true, autocomplete: 'current-password' })}
+      <p class="auth-error" id="auth-error" role="alert">${message}</p>
+      <button type="button" class="v2-sticker-link" data-specialist-forgot>Забыли пароль?</button>
+    </form>`;
+
+  app.innerHTML = v2Sticker({
+    title: 'Вход',
+    body,
+    action: '<button class="ui-button" type="submit" form="auth-form">Войти</button>',
+    className: 'v2-sticker-screen--auth',
+    closeData: 'data-specialist-u-close',
+  });
+
+  initPasswordFields(app);
+  app.querySelector('[data-specialist-u-close]')?.addEventListener('click', () => {
+    if (window.history.length > 1) window.history.back();
+  });
+  app.querySelector('[data-specialist-forgot]')?.addEventListener('click', () => {
+    openNotice({
+      title: 'Восстановление пароля',
+      message: 'Восстановление пароля пока недоступно.',
+      action: 'Закрыть',
+      variant: 'technical',
+    });
+  });
 
   const form = app.querySelector('#auth-form');
   const error = app.querySelector('#auth-error');
-  const button = form.querySelector('button[type="submit"]');
+  const button = app.querySelector('button[type="submit"][form="auth-form"]');
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
