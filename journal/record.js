@@ -1,4 +1,4 @@
-import { button, durationPicker, durationText, entityCard, escapeHtml, list, listEntry, stateView, initStateView, initCalendar, mountModal, modal, openNotice, initDurationPickers, initMultiSelect, viewNavigation, initViewNavigation, mountRecordZ, recordZHost, renderRecordZ, recordTimeRows, recordProcedureList, recordConfirmationMiniCard, setRecordPrimaryAction, bindRecordSettings, closeRecordZStack } from '../ui/ui.js';
+import { button, durationPicker, durationText, entityCard, escapeHtml, list, listEntry, stateView, initStateView, initCalendar, mountModal, modal, openNotice, initDurationPickers, initMultiSelect, viewNavigation, initViewNavigation, mountRecordZ, recordZHost, renderRecordZ, recordTimeRows, recordWorkplaceCards, recordProcedureList, recordConfirmationMiniCard, setRecordPrimaryAction, bindRecordSettings, closeRecordZStack } from '../ui/ui.js';
 import { createRecord } from '../core/record/index.js';
 import { createJournalBreak } from './break-service.js';
 import { getPeople } from '../main/people/data.js';
@@ -153,8 +153,12 @@ function openPriceProcedurePicker({ workplaceId, onAssigned }) {
   });
 }
 
-function renderProceduresStep(modalRoot, { date, workplaceId, from, to, onCreated }) {
-  modalRoot ||= mountRecordZ({ settings: true, className: 'record-flow-z' });
+function renderProceduresStep(modalRoot, { date, workplaceId, from, to, onCreated, selectedPerson = null }) {
+  modalRoot ||= mountRecordZ({
+    settings: true,
+    className: 'record-flow-z',
+    chatPersonKey: selectedPerson?.key || '',
+  });
   let items = procedures().filter((procedure) => procedureForWorkplace(procedure, workplaceId));
   const selected = new Map();
   let selectionController = null;
@@ -174,6 +178,18 @@ function renderProceduresStep(modalRoot, { date, workplaceId, from, to, onCreate
         const end = minutesToTime(timeToMinutes(from) + duration);
         if (!checkTimeAvailability({ date: dateKey(date), workplaceId, from, to: end }).ok) {
           openRecordTimeNotice('Запись не может быть создана: выбранным процедурам не хватает свободного времени. Скорректируйте время записи.');
+          return;
+        }
+        if (selectedPerson) {
+          renderConfirmationStep(null, {
+            date,
+            workplaceId,
+            from,
+            to: end,
+            selectedPerson,
+            selectedProcedures: [...selected.values()],
+            onCreated,
+          });
           return;
         }
         renderPersonStep(null, {
@@ -474,7 +490,10 @@ function openConfirmationProcedurePicker({ workplaceId, selectedProcedures, onSe
 }
 
 function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, selectedPerson, selectedProcedures, onCreated }) {
-  modalRoot ||= mountRecordZ({ className: 'record-flow-z' });
+  modalRoot ||= mountRecordZ({
+    className: 'record-flow-z',
+    chatPersonKey: selectedPerson?.key || '',
+  });
   let currentDate = dateKey(date);
   let currentWorkplaceId = workplaceId;
   let currentFrom = from;
@@ -674,6 +693,85 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
   };
 
   render();
+}
+
+function renderPersonWorkplaceStep(modalRoot, { person, onCreated }) {
+  modalRoot ||= mountRecordZ({
+    className: 'record-flow-z',
+    chatPersonKey: person?.key || '',
+  });
+  const workplaces = getWorkplaces();
+  const host = renderRecordZ(modalRoot, `<div class="record-screen record-screen--workplaces">${recordWorkplaceCards(workplaces, {
+    data: 'data-record-person-workplace',
+  })}</div>`);
+  if (!host) return;
+  host.querySelectorAll('[data-record-person-workplace]').forEach((node) => node.addEventListener('click', () => {
+    const workplaceId = node.dataset.recordPersonWorkplace || '';
+    if (!workplaceId) return;
+    renderPersonDateStep(null, { person, workplaceId, onCreated });
+  }));
+}
+
+function renderPersonDateStep(modalRoot, { person, workplaceId, onCreated }) {
+  modalRoot ||= mountRecordZ({
+    className: 'record-flow-z',
+    chatPersonKey: person?.key || '',
+  });
+  const dates = getWorkplaceWorkingDates(workplaceId);
+  const first = dates[0] || dateKey(new Date());
+  const firstDate = new Date(`${first}T00:00:00`);
+  const host = renderRecordZ(modalRoot, `<div class="record-screen record-screen--date"><div data-record-person-calendar></div></div>`);
+  const calendarRoot = host?.querySelector('[data-record-person-calendar]');
+  if (!calendarRoot) return;
+  initCalendar(calendarRoot, {
+    month: new Date(firstDate.getFullYear(), firstDate.getMonth(), 1),
+    selectedValue: '',
+    workingDates: dates,
+    onDateSelect: (date) => {
+      if (!dates.includes(date)) return;
+      renderPersonTimeStep(null, { person, workplaceId, date, onCreated });
+    },
+  });
+}
+
+function renderPersonTimeStep(modalRoot, { person, workplaceId, date, onCreated }) {
+  modalRoot ||= mountRecordZ({
+    className: 'record-flow-z',
+    chatPersonKey: person?.key || '',
+  });
+  const step = getBookingSettings().slotStep;
+  const values = listAvailableStartTimes({
+    date,
+    workplaceId,
+    duration: step,
+    step,
+  });
+  const host = renderRecordZ(modalRoot, `<div class="record-screen record-screen--time">${recordTimeRows({
+    items: values,
+    data: 'data-record-person-time',
+    accentEvery: 30,
+  })}</div>`);
+  if (!host) return;
+  host.querySelectorAll('[data-record-person-time]').forEach((node) => node.addEventListener('click', () => {
+    const from = node.dataset.recordPersonTime || '';
+    if (!from) return;
+    renderProceduresStep(null, {
+      date,
+      workplaceId,
+      from,
+      to: '',
+      onCreated,
+      selectedPerson: person,
+    });
+  }));
+}
+
+export function openRecordCreationForPerson(person, options = {}) {
+  if (!person?.key) return null;
+  return renderPersonWorkplaceStep(null, {
+    person,
+    onCreated: options.onCreated,
+  });
 }
 
 function blockEndValues({ date, workplaceId, from }) {
