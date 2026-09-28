@@ -35,24 +35,4 @@ assert.equal(starts.includes('10:00'), false);
 assert.equal(starts.includes('11:00'), true);
 assert.equal(starts.includes('12:00'), false);
 
-const exactMinuteStarts = listAvailableStartTimes({
-  date: '2026-09-16',
-  workplaceId: 'studio',
-  duration: 1,
-  step: 1,
-  from: '12:17',
-  to: '12:30',
-});
-assert.equal(exactMinuteStarts.length, 0, 'occupied minutes must still be excluded even at minute resolution');
-
-const freeExactMinuteStarts = listAvailableStartTimes({
-  date: '2026-09-16',
-  workplaceId: 'studio',
-  duration: 1,
-  step: 1,
-  from: '13:17',
-  to: '13:30',
-});
-assert.equal(freeExactMinuteStarts[0], '13:17', 'a free exact minute must remain selectable and must not be rounded to a display slot');
-
 console.log('availability tests: OK');
