@@ -592,6 +592,7 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
       name: person.name,
       phone: person.phone,
       duration: durationText(duration()),
+      discount: `${Number(currentPerson?.discountPercent) || 0}%`,
       total: `${total} ₽`,
       procedures: selectedProcedures.map((item, index) => ({
         name: item.procedure.name || '',
