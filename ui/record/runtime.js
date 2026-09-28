@@ -144,6 +144,7 @@ export function mountRecordZ({
   className = '',
   stack = true,
   onClose = null,
+  chatPersonKey = '',
 } = {}) {
   const context = workspaceHeaderContext({
     title,
@@ -153,12 +154,23 @@ export function mountRecordZ({
       data: 'data-record-owner-settings',
       aria: 'Настройки записи',
     } : null,
+    d: {
+      kind: 'chat',
+      data: 'data-record-owner-chat',
+      aria: 'Чат',
+    },
   });
   const classes = ['record-shared-z', className].filter(Boolean).join(' ');
-  return mountV2ZLayer(recordSurface(), v2ZLayer(
+  const layer = mountV2ZLayer(recordSurface(), v2ZLayer(
     `${context}<div data-record-owner-host></div>`,
     { className: classes },
   ), { stack, onClose });
+  layer?.querySelector('[data-record-owner-chat]')?.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('book:record-chat-request', {
+      detail: { personKey: String(chatPersonKey || '') },
+    }));
+  });
+  return layer;
 }
 
 export function recordZHost(layerRoot) {
