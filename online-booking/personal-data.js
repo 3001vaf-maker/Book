@@ -1,17 +1,14 @@
 import { accountErrorMessage, updateAccount, updateGlobalAccount } from '../core/account/index.js';
 import {
-  button,
   collectLinks,
   collectRepeatedField,
-  escapeHtml,
+  datePicker,
   field,
   formValidationMessage,
-  initCalendar,
+  initDatePickers,
   initLinks,
   initRepeatedFields,
   links,
-  mountModal,
-  modal,
   mountV2ZLayer,
   v2ZLayer,
   v2Section,
@@ -30,109 +27,11 @@ function unique(values = [], limit = 5) {
   return [...new Set((Array.isArray(values) ? values : []).map((value) => String(value || '').trim()).filter(Boolean))].slice(0, limit);
 }
 
-function dateParts(value = '') {
-  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!match) return null;
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  const date = new Date(year, month - 1, day);
-  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
-  return { year, month, day, date };
-}
-
-function birthDateLabel(value = '') {
-  const parts = dateParts(value);
-  return parts ? `${String(parts.day).padStart(2, '0')}.${String(parts.month).padStart(2, '0')}.${parts.year}` : 'Выберите дату';
-}
-
-function birthDateField(value = '') {
-  return `<label class="field" data-account-birth-date><span>Дата рождения</span><button type="button" class="ui-select__control" data-account-birth-open><span class="ui-select__value">${escapeHtml(birthDateLabel(value))}</span><span class="ui-select__chevron" aria-hidden="true">⌄</span></button><input type="hidden" name="birthDate" value="${escapeHtml(String(value || ''))}" data-account-birth-value></label>`;
-}
-
-function yearOptions() {
-  const current = new Date().getFullYear();
-  return Array.from({ length: 111 }, (_, index) => {
-    const year = current - index;
-    return { value: String(year), label: String(year) };
-  });
-}
-
-function openBirthDatePicker(host) {
-  const hidden = host?.querySelector('[data-account-birth-value]');
-  if (!hidden) return;
-  const current = dateParts(hidden.value);
-  const today = new Date();
-  let displayed = current?.date || new Date(today.getFullYear() - 30, today.getMonth(), 1);
-  let selectedValue = current ? hidden.value : '';
-  const content = `<div class="form-grid"><div data-account-birth-year></div><div data-account-birth-calendar></div>${selectedValue ? button('Очистить дату', { variant: 'secondary', data: 'data-account-birth-clear' }) : ''}</div>`;
-  const layer = mountModal(document.body, modal(content, { variant: 'large', title: 'Дата рождения' }));
-  if (!layer) return;
-  const yearHost = layer.querySelector('[data-account-birth-year]');
-  const calendarHost = layer.querySelector('[data-account-birth-calendar]');
-  if (!yearHost || !calendarHost) return;
-
-  const setYearControl = () => {
-    yearHost.innerHTML = select({
-      label: 'Год',
-      name: 'accountBirthYear',
-      value: String(displayed.getFullYear()),
-      options: yearOptions(),
-      aria: 'Год рождения',
-    });
-    yearHost.querySelector('[name="accountBirthYear"]')?.addEventListener('change', (event) => {
-      const year = Number(event.target.value);
-      if (!Number.isInteger(year)) return;
-      displayed = new Date(year, displayed.getMonth(), 1);
-      mountCalendar();
-    });
-  };
-
-  const commit = (value) => {
-    if (!dateParts(value) || value > `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`) return;
-    hidden.value = value;
-    const visible = host.querySelector('.ui-select__value');
-    if (visible) visible.textContent = birthDateLabel(value);
-    hidden.dispatchEvent(new Event('input', { bubbles: true }));
-    hidden.dispatchEvent(new Event('change', { bubbles: true }));
-    layer.remove();
-  };
-
-  const mountCalendar = () => {
-    initCalendar(calendarHost, {
-      selectedValue,
-      month: new Date(displayed.getFullYear(), displayed.getMonth(), 1),
-      onMonthChange: (month) => {
-        displayed = month;
-        setYearControl();
-      },
-      onDateSelect: (value) => {
-        selectedValue = value;
-        commit(value);
-      },
-    });
-  };
-
-  setYearControl();
-  mountCalendar();
-  layer.querySelector('[data-account-birth-clear]')?.addEventListener('click', () => {
-    hidden.value = '';
-    const visible = host.querySelector('.ui-select__value');
-    if (visible) visible.textContent = 'Выберите дату';
-    hidden.dispatchEvent(new Event('input', { bubbles: true }));
-    hidden.dispatchEvent(new Event('change', { bubbles: true }));
-    layer.remove();
-  });
-}
-
-function initBirthDate(root) {
-  root.querySelectorAll('[data-account-birth-date]').forEach((host) => {
-    host.querySelector('[data-account-birth-open]')?.addEventListener('click', () => openBirthDatePicker(host));
-  });
-}
-
 function editorMarkup(account = {}) {
   const profile = profileData(account);
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const maxBirthDate = `${currentYear}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   const fields = `<div class="form-grid">
     ${field({ label: 'Имя', name: 'name', value: account.name || '', required: true, autocomplete: 'given-name' })}
     ${field({ label: 'Фамилия', name: 'surname', value: account.surname || '', autocomplete: 'family-name' })}
@@ -151,7 +50,7 @@ function editorMarkup(account = {}) {
         { value: 'female', label: 'Женский' },
       ],
     })}
-    ${birthDateField(profile.birthDate || '')}
+    ${datePicker({label:'Дата рождения',name:'birthDate',value:profile.birthDate||'',max:maxBirthDate,minYear:currentYear-110,maxYear:currentYear,initialYear:currentYear-30,allowClear:true})}
     <div class="array-group"><span class="array-label">Ссылки</span>${links({ links: Array.isArray(profile.links) ? profile.links : [], name: 'accountProfileLinks' })}</div>
   </div>`;
   return formView(`
@@ -175,7 +74,7 @@ export function openAccountPersonalDataZ(root, state, { onSaved, onDirtyChange, 
   if (!layer) return null;
   initRepeatedFields(layer);
   initLinks(layer);
-  initBirthDate(layer);
+  initDatePickers(layer);
 
   const form = layer.querySelector('[data-account-personal-form]');
   const errorNode = layer.querySelector('[data-account-personal-error]');
