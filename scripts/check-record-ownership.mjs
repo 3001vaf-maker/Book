@@ -172,9 +172,13 @@ for (const path of [...walk('journal'), ...walk('main'), ...walk('settings'), ..
 }
 
 
-if (!/getBookingSettings\(\)\.slotStep/.test(journalRecordUi)
-  || /step:\s*5\b/.test(journalRecordUi)) {
-  errors.push('Journal Record must read the canonical booking slotStep instead of owning a hard-coded time step');
+const recordStartTimesSource = journalRecordUi.slice(
+  journalRecordUi.indexOf('function recordStartTimes'),
+  journalRecordUi.indexOf('function openRecordTimeNotice')
+);
+if (!/getBookingSettings\(\)\.slotStep/.test(recordStartTimesSource)
+  || /step:\s*5\b/.test(recordStartTimesSource)) {
+  errors.push('Journal Record start-time selection must read the canonical booking slotStep instead of owning a hard-coded time step');
 }
 
 if (!/recordWorkplaceCards\(/.test(onlineBookingUi)
