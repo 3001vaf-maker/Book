@@ -49,7 +49,7 @@ import { readOnlyReceipt } from '../ui/receipt/index.js';
 import { openAccountConsentSettings } from './consent-settings.js';
 import { openAccountPasswordSettings } from './password-settings.js';
 import { openAccountPersonalDataZ } from './personal-data.js';
-import { workplaceCardAppearance, workplaceCardFields } from '../settings/profile/card-presentation.js';
+import { profileCardAppearance, profileCardFields, workplaceCardAppearance, workplaceCardFields } from '../settings/profile/card-presentation.js';
 
 function money(value) {
   const number = Number(value || 0);
@@ -355,27 +355,14 @@ function relationshipTitle(relationship = {}) {
   return [profile.name, profile.surname].filter(Boolean).join(' ').trim() || 'Профиль';
 }
 
-const CONTACT_PROFILE_CARD_APPEARANCE = normalizeEntityCardAppearance({
-  lines: [
-    {}, {}, {}, {}, {}, {},
-    { field:'name', zone:'full', align:'left', size:'l', color:'white', bold:true },
-    { field:'profession', zone:'full', align:'left', size:'m', color:'white' },
-    { field:'phone', zone:'full', align:'left', size:'m', color:'white' },
-  ],
-});
-
 function relationshipCard(relationship = {}) {
   const profile = relationship?.context?.profile || {};
   const title = relationshipTitle(relationship);
-  const phone = formatPhone(profile.phone || '') || String(profile.phone || '').trim();
   return entityVisualCard({
-    appearance: CONTACT_PROFILE_CARD_APPEARANCE,
-    fields: [
-      { value:'name', label:'Имя и фамилия', text:title },
-      { value:'profession', label:'Деятельность', text:String(profile.profession || '').trim() },
-      { value:'phone', label:'Телефон', text:phone },
-    ],
+    appearance: profileCardAppearance(profile),
+    fields: profileCardFields(profile, []),
     image: String(profile.photo || ''),
+    imagePosition: `${Number(profile.photoCropX || 50)}% ${Number(profile.photoCropY || 50)}%`,
     interactive: true,
     data: `data-global-relationship="${escapeHtml(String(relationship.tenantId || ''))}"`,
     aria: `Открыть ${title}`,
