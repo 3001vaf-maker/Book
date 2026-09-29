@@ -35,6 +35,10 @@ export function v2ListEntry({
   actionData = '',
   actionAria = '',
   actionIcon = '⚙',
+  toggleData = '',
+  toggleAria = '',
+  toggleChecked = false,
+  toggleDisabled = false,
   deleteData = '',
   deleteAria = 'Удалить',
   selected = false
@@ -53,6 +57,9 @@ export function v2ListEntry({
     : '';
   const action = actionData
     ? `<span class="list-entry__action" ${actionData} ${actionAria ? `aria-label="${escapeHtml(actionAria)}"` : ''} role="button" tabindex="0">${escapeHtml(actionIcon)}</span>`
+    : '';
+  const toggleAction = toggleData
+    ? `<button type="button" class="list-entry__toggle${toggleChecked ? ' is-on' : ''}" ${toggleData} aria-pressed="${toggleChecked ? 'true' : 'false'}"${toggleAria ? ` aria-label="${escapeHtml(toggleAria)}"` : ''}${toggleDisabled ? ' disabled' : ''}><span class="app-setting-toggle__switch${toggleChecked ? ' is-on' : ''}" aria-hidden="true"><span></span></span></button>`
     : '';
   const deleteAction = deleteData
     ? `<span class="list-entry__delete" data-delete-action="${escapeHtml(deleteData)}" aria-label="${escapeHtml(deleteAria)}">×</span>`
@@ -74,7 +81,7 @@ export function v2ListEntry({
     <span class="list-entry__background" aria-hidden="true">${image ? '' : `<span>${escapeHtml(initial)}</span>`}</span>
     <span class="list-entry__content">
       <span class="list-entry__main${swatch ? ' has-swatch' : ''}">${swatch}<span class="list-entry__text">${firstLine}<strong>${escapeHtml(title)}</strong><small>${escapeHtml(secondLine)}</small></span></span>
-      ${right}${action}${deleteAction}
+      ${right}${toggleAction}${action}${deleteAction}
     </span>
   </${tag}>`;
 }
