@@ -103,7 +103,7 @@ const globalAccountHomeBlock = booking.slice(
 );
 assert.doesNotMatch(globalAccountHomeBlock, /entry', 'account'/);
 assert.doesNotMatch(globalAccountHomeBlock, /onOpenRelationship|onOpenRecord/);
-assert.match(globalAccountHomeBlock, /onStartBooking: \(tenantId\)/);
+assert.match(globalAccountHomeBlock, /onStartBooking: \(tenantId, options = \{\}\)/);
 assert.match(booking, /slotStillAvailable/);
 assert.match(booking, /Выбранное время уже недоступно/);
 assert.doesNotMatch(booking, /consentState\.allowed/);
