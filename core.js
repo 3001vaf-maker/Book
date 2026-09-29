@@ -44,6 +44,7 @@ const state = {
   lastRootSection: 'people',
   navigationOpen: false,
   navigationLevel: 'f',
+  navigationEnterZ: false,
   chatPersonKey: '',
   secondary: {
     finance: 'cash',
@@ -287,6 +288,7 @@ function selectSecondary(id) {
   state.secondary[section] = id;
   state.navigationOpen = false;
   state.navigationLevel = 'f';
+  state.navigationEnterZ = true;
   renderWorkspace();
   history.replaceState({}, '', `#${section}`);
 }
@@ -479,9 +481,12 @@ function renderWorkspace() {
     eDeck,
     deckOpen: state.navigationOpen,
     eOpen: state.navigationOpen && state.navigationLevel === 'e',
+    zEnter: Boolean(state.navigationEnterZ),
     className: 'v2-app--workspace',
     body: '<section class="v2-workspace-surface" data-v2-workspace-surface></section>',
   });
+
+  state.navigationEnterZ = false;
 
   const shell = app.querySelector('[data-v2-app]');
   const surface = app.querySelector('[data-v2-workspace-surface]');
@@ -508,6 +513,7 @@ function renderWorkspace() {
     onRootSelect: (id) => {
       const hasE = secondaryItems(id).length > 0;
       state.navigationLevel = hasE ? 'e' : 'f';
+      state.navigationEnterZ = !hasE;
       navigate(id, { navigationOpen: hasE });
     },
     onSecondarySelect: (id) => selectSecondary(id),
