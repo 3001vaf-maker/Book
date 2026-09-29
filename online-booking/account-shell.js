@@ -49,6 +49,7 @@ import { readOnlyReceipt } from '../ui/receipt/index.js';
 import { openAccountConsentSettings } from './consent-settings.js';
 import { openAccountPasswordSettings } from './password-settings.js';
 import { openAccountPersonalDataZ } from './personal-data.js';
+import { workplaceCardAppearance, workplaceCardFields } from '../settings/profile/card-presentation.js';
 
 function money(value) {
   const number = Number(value || 0);
@@ -922,6 +923,146 @@ function openGlobalContactSettings(state, handlers, relationship) {
   });
 }
 
+function contactHeaderMarkup(relationship) {
+  const profile = relationship?.context?.profile || {};
+  const title = relationshipTitle(relationship);
+  return v2Header({
+    a: { kind: 'avatar', label: title, image: String(profile.photo || ''), data: 'data-global-contact-settings', aria: 'Настройки' },
+    b: title,
+    c: { kind: 'text', label: 'Записаться', data: 'data-global-contact-booking', aria: 'Записаться' },
+    d: { kind: 'chat', data: 'data-global-contact-chat', aria: 'Чат' },
+  });
+}
+
+function setGlobalAccountHeader(root, markup) {
+  const header = root.querySelector('[data-v2-header]');
+  if (header) header.outerHTML = markup;
+}
+
+function contactWorkplaces(relationship, records = []) {
+  const interacted = new Set((Array.isArray(records) ? records : [])
+    .map((request) => String(request?.workplaceId || request?.workplaceKey || '').trim())
+    .filter(Boolean));
+  return (Array.isArray(relationship?.context?.workplaces) ? relationship.context.workplaces : [])
+    .filter((workplace) => interacted.has(String(workplace?.key || '').trim()));
+}
+
+function contactWorkplaceRail(relationship, records = []) {
+  const profile = relationship?.context?.profile || {};
+  const workplaces = contactWorkplaces(relationship, records);
+  if (!workplaces.length) return '';
+  return v2HorizontalRail(workplaces.map((workplace) => entityVisualCard({
+    appearance: workplaceCardAppearance(workplace),
+    fields: workplaceCardFields(workplace, workplace.cardProfile || profile),
+    image: String(workplace.photo || ''),
+    imagePosition: `${Number(workplace.photoCropX || 50)}% ${Number(workplace.photoCropY || 50)}%`,
+    interactive: true,
+    data: `data-global-contact-workplace="${escapeHtml(String(workplace.key || ''))}"`,
+    aria: `Открыть ${String(workplace.name || 'рабочее пространство')}`,
+  })).join(''), { className: 'v2-profile-workplaces' });
+}
+
+function contactHistoryMiniCard(state, request, index, dataName = 'data-global-contact-history') {
+  const procedures = requestProcedures(request).map((item) => String(item?.name || '').trim()).filter(Boolean);
+  const pricing = requestPricing(request);
+  return miniCard({
+    title: workplaceName(state, request),
+    value: procedures[0] || 'Запись',
+    subtitle: [formatDate(request.date), request.from].filter(Boolean).join(' · '),
+    rows: [
+      { label: 'Сумма', value: money(pricing.total) },
+    ],
+    interactive: true,
+    data: `${dataName}="${index}"`,
+    aria: `Открыть запись ${formatDate(request.date)} ${request.from || ''}`,
+  });
+}
+
+function contactHistoryRail(state, records = [], dataName = 'data-global-contact-history') {
+  const rows = (Array.isArray(records) ? records : [])
+    .slice()
+    .sort((a, b) => requestMoment(b).localeCompare(requestMoment(a)));
+  return rows.length
+    ? miniCardRail(rows.map((request, index) => contactHistoryMiniCard(state, request, index, dataName)))
+    : '';
+}
+
+function bindContactHeaderActions(root, state, handlers, relationship, { workplaceKey = '', repeatRequest = null } = {}) {
+  const tenantId = String(relationship?.tenantId || '');
+  root.querySelector('[data-global-contact-settings]')?.addEventListener('click', () => {
+    openGlobalContactSettings(state, handlers, relationship);
+  });
+  root.querySelector('[data-global-contact-booking]')?.addEventListener('click', () => {
+    handlers.onStartBooking?.(tenantId, {
+      workplaceKey: String(workplaceKey || ''),
+      repeatRequest,
+    });
+  });
+  root.querySelector('[data-global-contact-chat]')?.addEventListener('click', () => {
+    state.accountSelectedChatTenantId = tenantId;
+    state.accountTab = 'messages';
+    state.accountDeckOpen = false;
+    void handlers.render();
+  });
+}
+
+function openGlobalContactHistoryLayer(root, state, handlers, relationship, request, restoreHeader) {
+  const tenantId = String(relationship?.tenantId || '');
+  const profile = relationship?.context?.profile || {};
+  const title = relationshipTitle(relationship);
+  const canRepeat = requestProcedures(request).length > 0;
+  const layer = mountV2ZLayer(root, v2ZLayer(historyDetailBody(state, request), { className: 'account-contact-history-z' }), {
+    stack: true,
+    onClose: () => restoreHeader?.(),
+  });
+  if (!layer) return null;
+
+  setGlobalAccountHeader(root, v2Header({
+    a: { kind: 'avatar', label: title, image: String(profile.photo || ''), data: 'data-global-contact-settings', aria: 'Настройки' },
+    b: workplaceName(state, request),
+    c: canRepeat ? { kind: 'text', label: 'Повторить', data: 'data-global-contact-booking', aria: 'Повторить процедуру' } : null,
+    d: { kind: 'chat', data: 'data-global-contact-chat', aria: 'Чат' },
+  }));
+  bindContactHeaderActions(root, state, handlers, relationship, { repeatRequest: request });
+  return layer;
+}
+
+function openGlobalContactWorkplaceLayer(root, state, handlers, relationship, workplace, records, restoreHeader) {
+  const key = String(workplace?.key || '');
+  if (!key) return null;
+  const rows = (Array.isArray(records) ? records : [])
+    .filter((request) => String(request?.workplaceId || request?.workplaceKey || '') === key)
+    .sort((a, b) => requestMoment(b).localeCompare(requestMoment(a)));
+  const body = rows.length
+    ? v2Section('История', miniCardRail(rows.map((request, index) => contactHistoryMiniCard(state, request, index, 'data-global-workplace-history'))))
+    : emptyState('История пока пустая', 'Записи этого пространства появятся здесь.');
+  const layer = mountV2ZLayer(root, v2ZLayer(body, { className: 'account-contact-workplace-z' }), {
+    stack: true,
+    onClose: () => restoreHeader?.(),
+  });
+  if (!layer) return null;
+
+  const profile = relationship?.context?.profile || {};
+  const title = relationshipTitle(relationship);
+  const showHeader = () => {
+    setGlobalAccountHeader(root, v2Header({
+      a: { kind: 'avatar', label: title, image: String(profile.photo || ''), data: 'data-global-contact-settings', aria: 'Настройки' },
+      b: String(workplace.name || title),
+      c: { kind: 'text', label: 'Записаться', data: 'data-global-contact-booking', aria: 'Записаться' },
+      d: { kind: 'chat', data: 'data-global-contact-chat', aria: 'Чат' },
+    }));
+    bindContactHeaderActions(root, state, handlers, relationship, { workplaceKey: key });
+  };
+  showHeader();
+
+  layer.querySelectorAll('[data-global-workplace-history]').forEach((node) => node.addEventListener('click', () => {
+    const request = rows[Number(node.dataset.globalWorkplaceHistory)];
+    if (!request) return;
+    openGlobalContactHistoryLayer(root, state, handlers, relationship, request, showHeader);
+  }));
+  return layer;
+}
+
 async function renderGlobalContactDetail(root, state, handlers) {
   const relationship = selectedGlobalRelationship(state);
   if (!relationship) {
@@ -932,60 +1073,45 @@ async function renderGlobalContactDetail(root, state, handlers) {
   }
 
   const tenantId = String(relationship.tenantId || '');
-  const profile = relationship?.context?.profile || {};
-  const title = relationshipTitle(relationship);
   const records = globalContactRecords(state, tenantId);
-  const requests = futureRequests(records);
-  const hasInteractionHistory = records.some((request) => !isCancelled(request) && requestMoment(request) < nowMoment());
+  await renderGlobalContacts(root, state, handlers);
 
-  const upcoming = requests.length
-    ? v2HorizontalRail(requests.map((request, index) => visitCard(state, request, index)).join(''))
-    : '';
-  const activity = hasInteractionHistory
-    ? v2HorizontalRail([
-        v2RailCard({ title: String(records.length), subtitle: 'Действия' }),
-      ].join(''))
-    : '';
+  const workplaces = contactWorkplaceRail(relationship, records);
+  const history = contactHistoryRail(state, records);
+  const body = [
+    workplaces ? v2Section('Рабочие пространства', workplaces) : '',
+    history ? v2Section('История', history) : '',
+  ].filter(Boolean).join('') || emptyState('Профиль пока пустой', 'Данные взаимодействия появятся здесь.');
 
-  const header = v2Header({
-    a: { kind: 'avatar', label: title, image: String(profile.photo || ''), data: 'data-global-contact-settings', aria: 'Настройки' },
-    b: title,
-    c: { kind: 'text', label: 'Записаться', data: 'data-global-contact-booking', aria: 'Записаться' },
-    d: { kind: 'chat', data: 'data-global-contact-chat', aria: 'Чат' },
-  });
+  const showContactHeader = () => {
+    setGlobalAccountHeader(root, contactHeaderMarkup(relationship));
+    bindContactHeaderActions(root, state, handlers, relationship);
+  };
 
-  renderV2Shell(root, state, {
-    header,
-    body: `${activity ? v2Section('Взаимодействие', activity) : ''}${upcoming ? v2Section('Предстоящие визиты', upcoming) : ''}`,
-  });
-
-  bindWorkspaceInteraction(root, state, handlers, {
-    onZRight: () => {
+  const layer = mountV2ZLayer(root, v2ZLayer(body, { className: 'account-contact-detail-z' }), {
+    stack: true,
+    onClose: () => {
       state.accountTab = 'contacts';
       state.accountDeckActive = 'contacts';
       state.accountSelectedContactTenantId = '';
       void handlers.render();
     },
   });
+  if (!layer) return;
+  showContactHeader();
 
-  root.querySelector('[data-global-contact-settings]')?.addEventListener('click', () => {
-    openGlobalContactSettings(state, handlers, relationship);
-  });
+  layer.querySelectorAll('[data-global-contact-workplace]').forEach((node) => node.addEventListener('click', () => {
+    const workplace = (Array.isArray(relationship?.context?.workplaces) ? relationship.context.workplaces : [])
+      .find((item) => String(item?.key || '') === String(node.dataset.globalContactWorkplace || ''));
+    if (!workplace) return;
+    openGlobalContactWorkplaceLayer(root, state, handlers, relationship, workplace, records, showContactHeader);
+  }));
 
-  root.querySelector('[data-global-contact-booking]')?.addEventListener('click', () => handlers.onStartBooking?.(tenantId));
-  root.querySelector('[data-global-contact-chat]')?.addEventListener('click', () => {
-    state.accountSelectedChatTenantId = tenantId;
-    state.accountTab = 'messages';
-    state.accountDeckOpen = false;
-    void handlers.render();
-  });
-
-  root.querySelectorAll('[data-account-upcoming]').forEach((node) => node.addEventListener('click', () => {
-    const request = requests[Number(node.dataset.accountUpcoming)];
+  const historyRows = records.slice().sort((a, b) => requestMoment(b).localeCompare(requestMoment(a)));
+  layer.querySelectorAll('[data-global-contact-history]').forEach((node) => node.addEventListener('click', () => {
+    const request = historyRows[Number(node.dataset.globalContactHistory)];
     if (!request) return;
-    selectHistoryRequest(state, request, 'contact-detail');
-    state.accountDeckActive = 'history';
-    void handlers.render();
+    openGlobalContactHistoryLayer(root, state, handlers, relationship, request, showContactHeader);
   }));
 }
 
