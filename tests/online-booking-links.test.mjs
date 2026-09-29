@@ -3,27 +3,55 @@ import { readFileSync } from 'node:fs';
 import { buildBookingLink } from '../core/booking-link/index.js';
 
 assert.equal(
-  buildBookingLink({ origin: 'https://example.com', pathname: '/Book/', tenantId: 'tenant-1' }),
-  'https://example.com/Book/?booking=tenant-1',
+  buildBookingLink({ origin: 'https://client.va-tools.ru', profileSlug: 'aleksandr' }),
+  'https://client.va-tools.ru/aleksandr',
 );
 assert.equal(
-  buildBookingLink({ origin: 'https://example.com', pathname: '/Book/', tenantId: 'tenant-1', workplaceKey: 'piter' }),
-  'https://example.com/Book/?booking=tenant-1&workplace=piter',
+  buildBookingLink({ origin: 'https://client.va-tools.ru', profileSlug: 'aleksandr', workplaceSlug: 'arbat' }),
+  'https://client.va-tools.ru/aleksandr/arbat',
 );
-assert.equal(buildBookingLink({ origin: 'https://example.com', pathname: '/Book/' }), '');
+assert.equal(buildBookingLink({ origin: 'https://client.va-tools.ru' }), '');
 
 const settingsSource = readFileSync(new URL('../settings/settings.js', import.meta.url), 'utf8');
 const bookingSource = readFileSync(new URL('../settings/online-booking/online-booking.js', import.meta.url), 'utf8');
 const buttonsSource = readFileSync(new URL('../ui/buttons/index.js', import.meta.url), 'utf8');
+const accountSource = readFileSync(new URL('../core/account/index.js', import.meta.url), 'utf8');
+const coreSource = readFileSync(new URL('../core.js', import.meta.url), 'utf8');
+const controllerSource = readFileSync(new URL('../server/src/online-booking/online-booking.controller.ts', import.meta.url), 'utf8');
+const serviceSource = readFileSync(new URL('../server/src/online-booking/online-booking.service.ts', import.meta.url), 'utf8');
+const profileServiceSource = readFileSync(new URL('../server/src/profile/profile.service.ts', import.meta.url), 'utf8');
+const schemaSource = readFileSync(new URL('../server/prisma/schema.prisma', import.meta.url), 'utf8');
 
 assert.match(settingsSource, /'online-booking', 'Онлайн-запись'/);
 assert.match(bookingSource, /getWorkplaces/);
+assert.match(bookingSource, /ACCOUNT_APP_ORIGIN/);
+assert.match(bookingSource, /\/online-booking\/owner\/route/);
+assert.match(bookingSource, /profileSlug/);
+assert.match(bookingSource, /workplaceSlug/);
 assert.match(bookingSource, /Общая ссылка/);
 assert.match(bookingSource, /Ссылка рабочего пространства/);
 assert.match(bookingSource, /copyIconButton/);
 assert.match(bookingSource, /copyTextToClipboard/);
 assert.match(bookingSource, /function selectedWorkplaceLink\(/);
+assert.doesNotMatch(bookingSource, /[?&]booking=/);
 assert.doesNotMatch(bookingSource, /workplaces\.map\(\s*\(item\)\s*=>\s*copyLinkField/);
+
+assert.match(accountSource, /export async function resolveBookingPublicRoute/);
+assert.match(accountSource, /\/online-booking\/route\//);
+assert.match(coreSource, /await bookingRoute\(\)/);
+assert.match(coreSource, /resolveBookingPublicRoute/);
+assert.match(coreSource, /params\.get\('booking'\)/, 'Legacy booking links must remain readable during migration');
+assert.match(controllerSource, /@Get\('owner\/route'\)/);
+assert.match(controllerSource, /@Get\('route\/:profileSlug'\)/);
+assert.match(serviceSource, /BookingPublicRouteType/);
+assert.match(serviceSource, /PROFILE_ROUTE_SCOPE/);
+assert.match(serviceSource, /ownerPublicRoute\(/);
+assert.match(serviceSource, /resolvePublicRoute\(/);
+assert.match(profileServiceSource, /publicBookingRouteSource\(/);
+assert.match(schemaSource, /model BookingPublicRoute/);
+assert.match(schemaSource, /@@unique\(\[scopeKey, slug\]\)/);
+assert.match(schemaSource, /@@unique\(\[entityType, entityId\]\)/);
+
 assert.match(buttonsSource, /export function copyIconButton/);
 assert.match(buttonsSource, /<svg viewBox="0 0 24 24"/);
 assert.match(buttonsSource, /export async function copyTextToClipboard/);
