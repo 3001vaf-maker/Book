@@ -150,9 +150,10 @@ if (!/v2-sticker-list/.test(sharedProcedureListSource)
   || !/v2-service-sticker__selector/.test(sharedProcedureListSource)
   || !/aria-pressed/.test(sharedProcedureListSource)
   || !/\.v2-sticker-list\{[^}]*gap:\s*10px/.test(sharedRecordCss)
-  || !/\.v2-service-sticker__text strong\{[^}]*white-space:\s*normal/.test(sharedRecordCss)
+  || !/--record-procedure-name-size/.test(sharedProcedureListSource)
+  || !/\.v2-service-sticker__text strong\{[^}]*white-space:\s*nowrap[^}]*text-overflow:\s*clip/.test(sharedRecordCss)
   || !/\.v2-service-sticker\.is-selected \.v2-service-sticker__selector::after\{content:'✓'\}/.test(sharedRecordCss)) {
-  errors.push('Shared Record procedure selection must render separate readable stickers with visible spacing and a selected checkmark');
+  errors.push('Shared Record procedure selection must render separate readable stickers, keep full procedure names on one line without ellipsis, preserve spacing, and show the selected checkmark');
 }
 
 const procedureSettingsSource = journalRecordUi.slice(
@@ -206,8 +207,11 @@ const sharedPersonListSource = sharedRecordUi.slice(
 if (!/overline:\s*item\.uei/.test(sharedPersonListSource)
   || !/title:\s*item\.name/.test(sharedPersonListSource)
   || !/subtitle:\s*item\.phone/.test(sharedPersonListSource)
-  || /columns:\s*\[/.test(sharedPersonListSource)) {
-  errors.push('Shared Record person selection must keep UEI / name / phone as three readable stacked lines');
+  || !/className:\s*'list-entry--record-person'/.test(sharedPersonListSource)
+  || /columns:\s*\[/.test(sharedPersonListSource)
+  || !/\.list-entry--record-person \.list-entry__background\{background:#fff;background-image:none\}/.test(sharedRecordCss)
+  || !/\.list-entry--record-person \.list-entry__content\{background:#fff\}/.test(sharedRecordCss)) {
+  errors.push('Shared Record person selection must keep UEI / name / phone as three readable stacked lines on a plain white card with no gradient');
 }
 
 const recordPersonStepSource = journalRecordUi.slice(
@@ -317,15 +321,15 @@ const sharedConfirmationSource = sharedRecordUi.slice(
   sharedRecordUi.indexOf('export function recordConfirmationMiniCard'),
   sharedRecordUi.indexOf('export function mountRecordZ')
 );
-if (!/record-confirmation-card__workplace/.test(sharedConfirmationSource)
-  || !/record-confirmation-card__discount/.test(sharedConfirmationSource)
-  || !/record-confirmation-card__duration/.test(sharedConfirmationSource)
-  || !/record-confirmation-card__total/.test(sharedConfirmationSource)
-  || /record-confirmation-view__metrics|v2RailCard\(/.test(sharedConfirmationSource)
+if (!/miniCard\(\{/.test(sharedConfirmationSource)
+  || !/className:\s*'record-confirmation-mini-card'/.test(sharedConfirmationSource)
+  || /record-confirmation-card__|record-confirmation-view__metrics|v2RailCard\(/.test(sharedConfirmationSource)
   || !/\.record-confirmation-view\{[^}]*gap:\s*20px/.test(sharedRecordCss)
-  || !/\.record-confirmation-card__top\{[^}]*grid-template-columns:minmax\(0,1fr\) auto/.test(sharedRecordCss)
-  || !/\.record-confirmation-card__bottom\{[^}]*grid-template-columns:minmax\(0,1fr\) auto/.test(sharedRecordCss)) {
-  errors.push('Shared Record confirmation must keep discount inside the card at top right, duration bottom left, total bottom right, and procedures separated below without metric cubes');
+  || !/\.record-confirmation-mini-card\.mini-card--lines\{[^}]*width:var\(--mini-card-width\)[^}]*height:var\(--mini-card-height\)/.test(sharedRecordCss)
+  || !/\.record-confirmation-mini-card \.mini-card__line:nth-child\(2\)\{grid-column:2;grid-row:1\}/.test(sharedRecordCss)
+  || !/\.record-confirmation-mini-card \.mini-card__line:nth-child\(8\)\{grid-column:1;grid-row:5\}/.test(sharedRecordCss)
+  || !/\.record-confirmation-mini-card \.mini-card__line:nth-child\(9\)\{grid-column:2;grid-row:5\}/.test(sharedRecordCss)) {
+  errors.push('Shared Record confirmation must keep the approved standard Mini Card dimensions, place discount top right, duration bottom left, total bottom right, and keep procedures separated below');
 }
 
 if (!/step:\s*state\.settings\.slotStep/.test(onlineBookingUi)) {
@@ -364,6 +368,7 @@ if (!/workplaceCardAppearance\(workplace\)/.test(onlineBookingUi)
 
 if (!/listEntry\(/.test(sharedRecordUi)
   || !/listEntries\(/.test(sharedRecordUi)
+  || !/miniCard\(/.test(sharedRecordUi)
   || !/timeSlots\(/.test(sharedRecordUi)
   || !/recordConfirmationMiniCard\(/.test(onlineBookingUi)) {
   errors.push('Record UI must reuse the existing History list and Shared Time owners while keeping one Shared confirmation-card owner for specialist and online booking');

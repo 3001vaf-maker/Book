@@ -23,29 +23,31 @@
 }
 .v2-service-sticker:active{transform:translateY(0);box-shadow:-6px 5px 10px -10px rgba(0,0,0,.28),6px 5px 10px -10px rgba(0,0,0,.28),0 1px 2px rgba(0,0,0,.06)}
 .v2-service-sticker__text{min-width:0;display:grid;gap:5px}
-.v2-service-sticker__text strong{font-size:16px;line-height:1.2;white-space:normal;overflow-wrap:anywhere}
+.v2-service-sticker__text strong{font-size:var(--record-procedure-name-size,16px);line-height:1.2;white-space:nowrap;overflow:visible;text-overflow:clip;overflow-wrap:normal;word-break:normal}
 .v2-service-sticker__text span{font-size:14px;line-height:1.25}
 .v2-service-sticker__price{font-size:14px;font-weight:760;white-space:nowrap}
 .v2-service-sticker__selector{width:24px;height:24px;border:1px solid var(--v2-ink);display:grid;place-items:center;font-size:13px;font-weight:850}
 .v2-service-sticker.is-selected .v2-service-sticker__selector{background:var(--v2-ink);color:#fff}.v2-service-sticker.is-selected .v2-service-sticker__selector::after{content:'✓'}
 
 .record-confirmation-view{display:grid;gap:20px;width:100%;min-width:0}
-.record-confirmation-view__card{width:100%;min-width:0}
-.record-confirmation-card{box-sizing:border-box;width:100%;min-width:0;min-height:310px;border:2px solid #111;border-radius:28px;padding:20px 18px 16px;display:grid;grid-template-rows:auto auto 1fr auto;gap:10px;background:#fff;color:#111;box-shadow:-8px 7px 12px -10px rgba(0,0,0,.28),8px 7px 12px -10px rgba(0,0,0,.28),0 1px 2px rgba(0,0,0,.07)}
-.record-confirmation-card__top{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:start}
-.record-confirmation-card__workplace,.record-confirmation-card__discount,.record-confirmation-card__uei,.record-confirmation-card__name,.record-confirmation-card__duration strong,.record-confirmation-card__total strong{font-weight:800}
-.record-confirmation-card__workplace{font-size:17px;line-height:1.2;overflow-wrap:anywhere}
-.record-confirmation-card__discount{font-size:16px;line-height:1.2;text-align:right;white-space:nowrap}
-.record-confirmation-card__datetime{justify-self:end;display:grid;gap:4px;text-align:right;font-size:16px;line-height:1.25}
-.record-confirmation-card__person{align-self:center;display:grid;gap:5px;min-width:0}
-.record-confirmation-card__uei{font-size:15px;line-height:1.2;overflow-wrap:anywhere}
-.record-confirmation-card__name{font-size:18px;line-height:1.2;overflow-wrap:anywhere}
-.record-confirmation-card__phone{font-size:16px;line-height:1.2;overflow-wrap:anywhere}
-.record-confirmation-card__bottom{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:end}
-.record-confirmation-card__duration,.record-confirmation-card__total{display:grid;gap:3px}
-.record-confirmation-card__duration{justify-items:start;text-align:left}
-.record-confirmation-card__total{justify-items:end;text-align:right}
-.record-confirmation-card__duration strong,.record-confirmation-card__total strong{font-size:20px;line-height:1.1}
-.record-confirmation-card__duration span,.record-confirmation-card__total span{font-size:12px;line-height:1.2;color:var(--text-secondary)}
-.record-confirmation-view__procedures{margin-top:2px;min-width:0}
+.record-confirmation-view__card{display:flex;justify-content:center;width:100%;min-width:0}
+.record-confirmation-mini-card.mini-card--lines{width:var(--mini-card-width);min-width:var(--mini-card-width);max-width:var(--mini-card-width);height:var(--mini-card-height);min-height:var(--mini-card-height);max-height:var(--mini-card-height);padding:12px 14px;grid-template-rows:1fr}
+.record-confirmation-mini-card .mini-card__lines{height:100%;display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:repeat(5,minmax(0,1fr));gap:0 8px;align-items:center}
+.record-confirmation-mini-card .mini-card__line{width:auto;font-size:12px;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:clip}
+.record-confirmation-mini-card .mini-card__line:nth-child(1){grid-column:1;grid-row:1}
+.record-confirmation-mini-card .mini-card__line:nth-child(2){grid-column:2;grid-row:1}
+.record-confirmation-mini-card .mini-card__line:nth-child(3){grid-column:2;grid-row:2}
+.record-confirmation-mini-card .mini-card__line:nth-child(4){grid-column:2;grid-row:3}
+.record-confirmation-mini-card .mini-card__line:nth-child(5){grid-column:1;grid-row:2}
+.record-confirmation-mini-card .mini-card__line:nth-child(6){grid-column:1;grid-row:3}
+.record-confirmation-mini-card .mini-card__line:nth-child(7){grid-column:1;grid-row:4}
+.record-confirmation-mini-card .mini-card__line:nth-child(8){grid-column:1;grid-row:5}
+.record-confirmation-mini-card .mini-card__line:nth-child(9){grid-column:2;grid-row:5}
+.record-confirmation-view__procedures{margin-top:0;min-width:0}
 .record-confirmation-view__procedures .list-entries{display:grid;gap:0}
+
+.list-entry--record-person{background:#fff}
+.list-entry--record-person .list-entry__background{background:#fff;background-image:none}
+.list-entry--record-person .list-entry__background>span{display:none}
+.list-entry--record-person .list-entry__content{background:#fff}
+.list-entry--record-person .list-entry__text{grid-template-rows:repeat(3,minmax(0,auto));gap:4px}
