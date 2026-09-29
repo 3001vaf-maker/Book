@@ -181,7 +181,9 @@ assert.match(contactsBlock, /const searchable = relationships\.length > 15/);
 assert.match(contactsBlock, /data-account-contact-search/);
 assert.match(contactsBlock, /profile\.profession/);
 assert.match(contactsBlock, /profile\.phone/);
-assert.doesNotMatch(contactsBlock, /entity-card--compact|v2HorizontalRail\(filtered|v2ListEntr/);
+assert.match(contactsBlock, /profileCardAppearance\(profile\)/);
+assert.match(contactsBlock, /profileCardFields\(profile, \[\]\)/);
+assert.doesNotMatch(contactsBlock, /CONTACT_PROFILE_CARD_APPEARANCE|entity-card--compact|v2HorizontalRail\(filtered|v2ListEntr/);
 
 const contactDetailBlock = accountShell.slice(
   accountShell.indexOf('function contactHeaderMarkup'),
