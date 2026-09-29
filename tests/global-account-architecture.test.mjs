@@ -38,6 +38,7 @@ assert.match(migration, /'TELEGRAM'::"AccountContactType"/);
 assert.match(accountApi, /const ACCOUNT_TOKEN_KEY = 'book\.account\.token'/);
 assert.doesNotMatch(accountApi, /function tokenKey\(tenantId\)/);
 assert.match(accountApi, /resolveAccountTelegramEntry/);
+assert.match(accountApi, /export async function deleteGlobalAccountRelationship\(tenantId\)/, 'Global Account must expose contact removal through the shared account API');
 
 assert.doesNotMatch(guard, /payload\.tenantId/, 'Account token must be global and Tenant context must come from the requested route');
 assert.match(guard, /request\.params\?\.tenantId/);
@@ -67,7 +68,15 @@ assert.match(runtime, /if \(entry && !getAccountToken\(tenant\)\)/);
 
 assert.match(controller, /@Get\('account\/me'\)/, 'Global client app must expose a tenant-free Account route');
 assert.match(controller, /@Get\('account\/relationships'\)/, 'Global client app must expose Account relationships');
+assert.match(controller, /@Delete\('account\/relationships\/:tenantId'\)/, 'Global client app must expose Account relationship removal');
 assert.match(controller, /@Get\('account\/records'\)/, 'Global client app must expose cross-tenant history');
+const deleteRelationshipStart = booking.indexOf('async deleteGlobalAccountRelationship');
+const deleteRelationshipEnd = booking.indexOf('async globalAccountRecords', deleteRelationshipStart);
+const deleteRelationshipBlock = booking.slice(deleteRelationshipStart, deleteRelationshipEnd);
+assert.match(deleteRelationshipBlock, /revokeAllForAccount/, 'Removing a contact must revoke all active consent for that professional relationship');
+assert.match(deleteRelationshipBlock, /accountTenantLink\.delete/, 'Removing a contact must delete only the Account/Tenant relationship');
+assert.doesNotMatch(deleteRelationshipBlock, /bookingRequest\.delete|records\.delete|record\.delete/i, 'Removing a contact must preserve historical records');
+
 assert.match(consentController, /accountTenantLink\.upsert/, 'A tenant relationship must be persisted only after tenant consent becomes active');
 assert.match(consentController, /consentState\?\.pdnActive/, 'Tenant relationship must be gated by active tenant PDN');
 assert.match(bookingUi, /export async function renderGlobalClient\(/, 'Client host must have a global Account entry flow');
