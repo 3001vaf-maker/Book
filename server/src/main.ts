@@ -79,8 +79,19 @@ async function bootstrap() {
       return response.status(404).send('Not Found');
     }
 
-    if (host === BOOK_HOST || host === ACCOUNT_HOST) {
+    if (host === BOOK_HOST) {
       return staticSite(request, response, () => response.status(404).send('Not Found'));
+    }
+
+    if (host === ACCOUNT_HOST) {
+      return staticSite(request, response, () => {
+        const segments = request.path.split('/').filter(Boolean);
+        const publicBookingPath = segments.length >= 1
+          && segments.length <= 2
+          && segments.every((segment) => !segment.includes('.'));
+        if (publicBookingPath) return response.sendFile(resolve(siteRoot, 'index.html'));
+        return response.status(404).send('Not Found');
+      });
     }
 
     return next();
