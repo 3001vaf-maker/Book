@@ -179,6 +179,8 @@ const contactsBlock = accountShell.slice(
 assert.match(contactsBlock, /entityCardStack\(filtered\.map\(relationshipCard\)\)/);
 assert.match(contactsBlock, /const searchable = relationships\.length > 15/);
 assert.match(contactsBlock, /data-account-contact-search/);
+assert.match(contactsBlock, /data: 'data-account-profile-settings'/);
+assert.doesNotMatch(contactsBlock, /disabled: true, aria: 'Настройки контактов'/);
 assert.match(contactsBlock, /profile\.profession/);
 assert.match(contactsBlock, /profile\.phone/);
 assert.match(contactsBlock, /profileCardAppearance\(profile\)/);
