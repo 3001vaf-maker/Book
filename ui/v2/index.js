@@ -145,7 +145,7 @@ ${body}
   </section>`;
 }
 
-export function v2Section(export function v2Section(title = '', content = '', { className = '' } = {}) {
+export function v2Section(title = '', content = '', { className = '' } = {}) {
   return `<section class="v2-section ${text(className)}"><h2 class="v2-section__title">${text(title)}</h2><div class="v2-section__content">${content}</div></section>`;
 }
 
@@ -980,7 +980,7 @@ export function initV2WorkspaceInteraction(root, {
   };
 }
 
-export function initV2StickerSwipe(export function initV2StickerSwipe(root, { onRight = null, onLeft = null, threshold = 64, maxDrag = 180 } = {}) {
+export function initV2StickerSwipe(root, { onRight = null, onLeft = null, threshold = 64, maxDrag = 180 } = {}) {
   const surface = root?.matches?.('[data-v2-sticker]') ? root : root?.querySelector?.('[data-v2-sticker]');
   if (!surface) return () => {};
   let pointerId = null;
