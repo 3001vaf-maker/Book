@@ -2,7 +2,7 @@ import { workspaceHeaderContext } from '../header/index.js';
 import { mountV2ZLayer, v2ZLayer } from '../v2/index.js';
 import { entityVisualCard } from '../cards/entity-card-constructor.js';
 import { miniCard } from '../cards/mini-card.js';
-import { listEntry, listEntries } from '../lists/list-entry.js';
+import { v2ListEntry, v2ListEntries } from '../lists/list-entry.js';
 import { v2HorizontalRail, v2RailCard } from '../v2/index.js';
 import { timeSlots } from '../time/index.js';
 
@@ -51,7 +51,7 @@ export function recordProcedureList(items = [], {
   const selectedSet = new Set((Array.isArray(selected) ? selected : []).map(String));
   const rows = (Array.isArray(items) ? items : []).map((item = {}) => {
     const id = String(item.id || '');
-    return listEntry({
+    return v2ListEntry({
       columns: [
         [
           { value: item.name || item.title || 'Процедура', strong: true },
@@ -75,7 +75,7 @@ export function recordProcedureList(items = [], {
       aria: item.aria || `Выбрать процедуру ${item.name || item.title || ''}`,
     });
   });
-  return rows.length ? listEntries(rows) : `<div class="muted">${escapeRecordText(empty)}</div>`;
+  return rows.length ? v2ListEntries(rows) : `<div class="muted">${escapeRecordText(empty)}</div>`;
 }
 
 export function recordPersonList(items = [], {
@@ -85,7 +85,7 @@ export function recordPersonList(items = [], {
 } = {}) {
   const rows = (Array.isArray(items) ? items : []).map((item = {}) => {
     const key = String(item.key || item.id || '');
-    return listEntry({
+    return v2ListEntry({
       columns: [
         [
           { value: item.name || '', strong: true },
@@ -109,7 +109,7 @@ export function recordPersonList(items = [], {
       aria: item.aria || `Выбрать ${item.name || ''}`,
     });
   });
-  return rows.length ? listEntries(rows) : `<div class="muted">${escapeRecordText(empty)}</div>`;
+  return rows.length ? v2ListEntries(rows) : `<div class="muted">${escapeRecordText(empty)}</div>`;
 }
 
 
@@ -195,7 +195,7 @@ export function recordConfirmationMiniCard({
     }),
   ].join(''), { className: 'people-metrics' });
 
-  const rows = listEntries((Array.isArray(procedures) ? procedures : []).map((item = {}) => listEntry({
+  const rows = v2ListEntries((Array.isArray(procedures) ? procedures : []).map((item = {}) => v2ListEntry({
     columns: [
       [
         { value: item.name || item.title || 'Процедура', strong: true },
