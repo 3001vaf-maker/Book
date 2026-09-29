@@ -15,9 +15,12 @@ const miniCardCss = readFileSync(new URL('../ui/cards/mini-card.css', import.met
 assert.match(people, /title:\s*'Клиенты'/);
 assert.match(people, /Поиск по имени или UEI/);
 assert.match(people, /data-people-list-settings/);
-assert.match(people, /return list\(\{/);
-assert.doesNotMatch(people, /\blistEntry\s*\(/);
-assert.doesNotMatch(people, /\blistEntries\s*\(/);
+assert.match(people, /return v2ListEntries\(items\.map/);
+assert.match(people, /v2ListEntry\(\{/);
+assert.match(people, /overline:\s*display\.uei/);
+assert.match(people, /title:\s*display\.name/);
+assert.match(people, /subtitle:\s*display\.phone/);
+assert.match(people, /className:\s*'list-entry--record-person'/);
 
 assert.match(people, /Из контактов/);
 assert.match(people, /Ввести вручную/);
