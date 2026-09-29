@@ -490,9 +490,9 @@ function openAccountPhotoSettings(state, handlers) {
   });
 }
 
-async function loadGlobalNotificationState(state) {
-  const relationships = Array.isArray(state.relationships) ? state.relationships : [];
-  const tenantIds = relationships.map((item) => String(item?.tenantId || '')).filter(Boolean);
+async function loadGlobalNotificationState(state, relationships = state.relationships) {
+  const scopedRelationships = Array.isArray(relationships) ? relationships : [];
+  const tenantIds = scopedRelationships.map((item) => String(item?.tenantId || '')).filter(Boolean);
   const [pushStates, chatStates] = await Promise.all([
     Promise.all(tenantIds.map((tenantId) => getWebPushState(tenantId).catch(() => ({
       tenantId,
@@ -508,18 +508,18 @@ async function loadGlobalNotificationState(state) {
   return { tenantIds, pushStates, chatStates };
 }
 
-async function openGlobalAccountControls(root, state, handlers) {
+async function openGlobalAccountControls(root, state, handlers, relationships = state.relationships) {
   const existing = root.querySelector('[data-account-controls-modal]');
   if (existing) return existing;
 
-  const relationships = Array.isArray(state.relationships) ? state.relationships : [];
-  const notificationState = await loadGlobalNotificationState(state);
+  const scopedRelationships = Array.isArray(relationships) ? relationships : [];
+  const notificationState = await loadGlobalNotificationState(state, scopedRelationships);
   const pushSupported = notificationState.pushStates.some((item) => item?.supported && item?.enabled);
   const pushSubscribed = notificationState.pushStates.some((item) => item?.subscribed);
   const telegram = notificationState.chatStates.find((item) => item?.telegram?.linked)?.telegram || null;
 
-  const representatives = relationships.length
-    ? miniCardRail(relationships.map((relationship, index) => {
+  const representatives = scopedRelationships.length
+    ? miniCardRail(scopedRelationships.map((relationship, index) => {
         const profile = relationship?.context?.profile || {};
         const title = relationshipTitle(relationship);
         return miniCard({
@@ -589,7 +589,7 @@ async function openGlobalAccountControls(root, state, handlers) {
   });
 
   layer?.querySelectorAll('[data-account-consent-contact]').forEach((node) => node.addEventListener('click', () => {
-    const relationship = relationships[Number(node.dataset.accountConsentContact)];
+    const relationship = scopedRelationships[Number(node.dataset.accountConsentContact)];
     const tenantId = String(relationship?.tenantId || '');
     if (!tenantId) return;
     void openAccountConsentSettings(state, {
@@ -891,7 +891,7 @@ function openGlobalContactSettings(state, handlers, relationship) {
       {
         id: 'controls',
         label: 'Согласия / Уведомления',
-        onSelect: () => void openAccountConsentSettings(state, { tenantId }),
+        onSelect: () => void openGlobalAccountControls(document.body, state, handlers, [relationship]),
       },
       {
         id: 'delete',
