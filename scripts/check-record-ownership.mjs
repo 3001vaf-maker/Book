@@ -33,6 +33,8 @@ const journalRecordUi = read('journal/record.js');
 const journalRecordViewUi = read('journal/record-view.js');
 const journalBreakViewUi = read('journal/break-view.js');
 const sharedRecordUi = read('ui/record/runtime.js');
+const sharedRecordCss = read('ui/record/record.css');
+const sharedInputsCss = read('ui/inputs/inputs.css');
 
 
 if (/availability|financial-model|getAllPeople|record-events|record-state|status\s*=|attendance|confirmed|cancelRecord|createRecord|updateRecord|moveRecord/.test(recordData)) {
@@ -139,6 +141,112 @@ if (!/recordTimeRows/.test(journalRecordUi)
   errors.push('journal/record.js must consume Shared Record time-row UI instead of drawing local time buttons');
 }
 
+const sharedProcedureListSource = sharedRecordUi.slice(
+  sharedRecordUi.indexOf('export function recordProcedureList'),
+  sharedRecordUi.indexOf('export function recordPersonList')
+);
+if (!/v2-sticker-list/.test(sharedProcedureListSource)
+  || !/v2-service-sticker/.test(sharedProcedureListSource)
+  || !/v2-service-sticker__selector/.test(sharedProcedureListSource)
+  || !/aria-pressed/.test(sharedProcedureListSource)
+  || !/\.v2-sticker-list\{[^}]*gap:\s*10px/.test(sharedRecordCss)
+  || !/--record-procedure-name-size/.test(sharedProcedureListSource)
+  || !/\.v2-service-sticker\{[^}]*background:#fff/.test(sharedRecordCss)
+  || /\.v2-service-sticker\{[^}]*background:var\(--v2-beige\)/.test(sharedRecordCss)
+  || !/\.v2-service-sticker__text strong\{[^}]*white-space:\s*nowrap[^}]*text-overflow:\s*clip/.test(sharedRecordCss)
+  || !/\.v2-service-sticker\.is-selected \.v2-service-sticker__selector::after\{content:'✓'\}/.test(sharedRecordCss)) {
+  errors.push('Shared Record procedure selection must use a neutral white sticker surface, keep full procedure names on one line without ellipsis, preserve spacing, and show the selected checkmark');
+}
+
+const procedureSettingsSource = journalRecordUi.slice(
+  journalRecordUi.indexOf('bindRecordSettings(modalRoot, () => {', journalRecordUi.indexOf('function renderProceduresStep')),
+  journalRecordUi.indexOf('function openProcedureSettings')
+);
+if (!/button\('Добавить из прайса',[\s\S]*variant:\s*'secondary'/.test(procedureSettingsSource)
+  || !/button\('\+ Добавить процедуру'/.test(procedureSettingsSource)
+  || /const menu = list\(/.test(procedureSettingsSource)) {
+  errors.push('Record procedure settings must use the canonical white "Добавить из прайса" button and black "+ Добавить процедуру" button');
+}
+
+const recordPricePickerSource = journalRecordUi.slice(
+  journalRecordUi.indexOf('function openPriceProcedurePicker'),
+  journalRecordUi.indexOf('function renderProceduresStep')
+);
+const recordConfirmationProcedurePickerSource = journalRecordUi.slice(
+  journalRecordUi.indexOf('function openConfirmationProcedurePicker'),
+  journalRecordUi.indexOf('function renderConfirmationStep')
+);
+const existingRecordProcedurePickerSource = journalRecordViewUi.slice(
+  journalRecordViewUi.indexOf('function openAddProcedurePicker'),
+  journalRecordViewUi.indexOf('function openSalePicker')
+);
+const onlineBookingProcedureSource = onlineBookingUi.slice(
+  onlineBookingUi.indexOf('function renderProcedures'),
+  onlineBookingUi.indexOf('function renderDates')
+);
+
+for (const [name, source] of [
+  ['Record workplace price picker', recordPricePickerSource],
+  ['Record confirmation add-procedure picker', recordConfirmationProcedurePickerSource],
+  ['Existing Record add-procedure picker', existingRecordProcedurePickerSource],
+  ['Online booking procedure picker', onlineBookingProcedureSource],
+]) {
+  if (!/recordProcedureList\(/.test(source)) {
+    errors.push(`${name} must consume the Shared Record procedure sticker owner`);
+  }
+}
+
+if (!/recordTimeRows\(values,\s*\{\s*data:\s*'data-record-time'/.test(journalRecordUi)
+  || !/recordTimeRows\(values,\s*\{[\s\S]*?data:\s*'data-block-end'/.test(journalRecordUi)
+  || /recordTimeRows\(\{\s*items:/.test(journalRecordUi)) {
+  errors.push('journal/record.js must call Shared recordTimeRows(items, options) with the canonical positional contract');
+}
+
+const sharedPersonListSource = sharedRecordUi.slice(
+  sharedRecordUi.indexOf('export function recordPersonList'),
+  sharedRecordUi.indexOf('function timeValue')
+);
+if (!/overline:\s*item\.uei/.test(sharedPersonListSource)
+  || !/title:\s*item\.name/.test(sharedPersonListSource)
+  || !/subtitle:\s*item\.phone/.test(sharedPersonListSource)
+  || !/className:\s*'list-entry--record-person'/.test(sharedPersonListSource)
+  || /columns:\s*\[/.test(sharedPersonListSource)
+  || !/\.list-entry--record-person \.list-entry__background\{background:#fff;background-image:none\}/.test(sharedRecordCss)
+  || !/\.list-entry--record-person \.list-entry__content\{background:#fff\}/.test(sharedRecordCss)) {
+  errors.push('Shared Record person selection must keep UEI / name / phone as three readable stacked lines on a plain white card with no gradient');
+}
+
+const recordPersonStepSource = journalRecordUi.slice(
+  journalRecordUi.indexOf('function renderPersonStep'),
+  journalRecordUi.indexOf('function openConfirmationWorkplaceModal')
+);
+if (!/button\('\+ Добавить клиента',\s*\{\s*data:\s*'data-record-settings-add-person'\s*\}\)/.test(recordPersonStepSource)
+  || !/bindRecordSettings\(modalRoot/.test(recordPersonStepSource)
+  || /variant:\s*'secondary'[^\n]*data-record-settings-add-person/.test(recordPersonStepSource)) {
+  errors.push('Record person-step A settings must expose one canonical black "+ Добавить клиента" button');
+}
+
+const existingRecordPersonPickerSource = journalRecordViewUi.slice(
+  journalRecordViewUi.indexOf('function openPersonPicker'),
+  journalRecordViewUi.indexOf('function openAddProcedurePicker')
+);
+for (const [name, source] of [
+  ['Record person selection', recordPersonStepSource],
+  ['Existing Record person picker', existingRecordPersonPickerSource],
+]) {
+  if (!/ui-search-field/.test(source)
+    || !/field\(\{[\s\S]*type:\s*'search'[\s\S]*placeholder:\s*'Поиск по имени или UEI'/.test(source)
+    || /record-person-toolbar|class=["'][^"']*record-person-search/.test(source)) {
+    errors.push(`${name} must consume the same Shared search field presentation as the People folder`);
+  }
+}
+if (!/ui-search-field/.test(peopleUi)
+  || !/placeholder:\s*'Поиск по имени или UEI'/.test(peopleUi)
+  || !/\.ui-search-field\{[^}]*padding:\s*0 0 12px/.test(sharedInputsCss)
+  || !/\.ui-search-divider\{[^}]*height:\s*1px/.test(sharedInputsCss)) {
+  errors.push('People and Record search must share one canonical search-field presentation');
+}
+
 for (const [path, source] of [
   ['journal/record.js', journalRecordUi],
   ['journal/record-view.js', journalRecordViewUi],
@@ -178,8 +286,56 @@ const recordStartTimesSource = journalRecordUi.slice(
 );
 if (!/duration:\s*5\b/.test(recordStartTimesSource)
   || !/step:\s*5\b/.test(recordStartTimesSource)
-  || /getBookingSettings\(\)\.slotStep/.test(recordStartTimesSource)) {
-  errors.push('Journal Record start-time selection must preserve the proven 5-minute specialist timing logic and must not depend on online booking slotStep');
+  || /getBookingSettings\(\)\.slotStep/.test(journalRecordUi)
+  || /function\s+recordSlotStep\s*\(/.test(journalRecordUi)) {
+  errors.push('Journal Record first-step quick choices must preserve the proven specialist 5-minute helper and must not consume online-booking slotStep');
+}
+
+const confirmationTimeSource = journalRecordUi.slice(
+  journalRecordUi.indexOf('function openConfirmationTimeModal'),
+  journalRecordUi.indexOf('function openPhoneActions')
+);
+if (!/openTimePickerAction\(/.test(confirmationTimeSource)
+  || !/minuteStep:\s*1\b/.test(confirmationTimeSource)
+  || !/checkTimeAvailability\(/.test(confirmationTimeSource)) {
+  errors.push('Journal Record final time correction must use the canonical Shared Time picker at exact-minute resolution and validate the resulting interval');
+}
+
+const existingRecordTimeSource = journalRecordViewUi.slice(
+  journalRecordViewUi.indexOf('function openTimePicker'),
+  journalRecordViewUi.indexOf('function openPersonPicker')
+);
+if (!/openTimePickerAction\(/.test(existingRecordTimeSource)
+  || !/minuteStep:\s*1\b/.test(existingRecordTimeSource)
+  || !/checkRecordTime\(/.test(existingRecordTimeSource)
+  || /getBookingSettings\(\)\.slotStep/.test(journalRecordViewUi)) {
+  errors.push('Existing specialist Record time editing must use the canonical Shared Time picker at exact-minute resolution and stay independent from online-booking slotStep');
+}
+
+if (!/kind:\s*'avatar'/.test(sharedRecordUi)
+  || !/hideD:\s*!chatPersonKey/.test(sharedRecordUi)
+  || !/d:\s*chatPersonKey\s*\?/.test(sharedRecordUi)
+  || !/settings\s*\?\s*\{/.test(sharedRecordUi)) {
+  errors.push('Shared Record Header must always own A as avatar/photo, expose settings only by context, and show D only after a person is fixed');
+}
+
+const sharedConfirmationSource = sharedRecordUi.slice(
+  sharedRecordUi.indexOf('export function recordConfirmationMiniCard'),
+  sharedRecordUi.indexOf('export function mountRecordZ')
+);
+if (!/miniCard\(\{/.test(sharedConfirmationSource)
+  || !/className:\s*'record-confirmation-mini-card'/.test(sharedConfirmationSource)
+  || /record-confirmation-card__|record-confirmation-view__metrics|v2RailCard\(/.test(sharedConfirmationSource)
+  || !/\.record-confirmation-view\{[^}]*gap:\s*20px/.test(sharedRecordCss)
+  || !/\.record-confirmation-mini-card\.mini-card--lines\{[^}]*width:var\(--mini-card-width\)[^}]*height:var\(--mini-card-height\)/.test(sharedRecordCss)
+  || !/\.record-confirmation-mini-card \.mini-card__line:nth-child\(2\)\{grid-column:2;grid-row:1\}/.test(sharedRecordCss)
+  || !/\.record-confirmation-mini-card \.mini-card__line:nth-child\(8\)\{grid-column:1;grid-row:5\}/.test(sharedRecordCss)
+  || !/\.record-confirmation-mini-card \.mini-card__line:nth-child\(9\)\{grid-column:2;grid-row:5\}/.test(sharedRecordCss)) {
+  errors.push('Shared Record confirmation must keep the approved standard Mini Card dimensions, place discount top right, duration bottom left, total bottom right, and keep procedures separated below');
+}
+
+if (!/step:\s*state\.settings\.slotStep/.test(onlineBookingUi)) {
+  errors.push('Online booking may keep its configured display slot step; specialist Record timing must remain independent from it');
 }
 
 if (!/recordWorkplaceCards\(/.test(onlineBookingUi)
@@ -198,9 +354,11 @@ const bookingHeaderSource = onlineBookingUi.slice(
   onlineBookingUi.indexOf('function bookingActionForStep')
 );
 if (!/image:\s*representativePhoto\(state\)/.test(bookingHeaderSource)
+  || !/disabled:\s*true/.test(bookingHeaderSource)
   || !/b:\s*'Запись'/.test(bookingHeaderSource)
-  || !/d:\s*null/.test(bookingHeaderSource)) {
-  errors.push('Online booking Header must use the professional photo in A, Запись in B, and no D chat on booking steps');
+  || !/d:\s*null/.test(bookingHeaderSource)
+  || /data-record-owner-settings/.test(bookingHeaderSource)) {
+  errors.push('Online booking Header must keep A as a disabled professional avatar only, use Запись in B, and expose no D chat or specialist settings');
 }
 
 if (!/workplaceCardAppearance\(workplace\)/.test(onlineBookingUi)
@@ -213,9 +371,9 @@ if (!/workplaceCardAppearance\(workplace\)/.test(onlineBookingUi)
 if (!/v2ListEntry\(/.test(sharedRecordUi)
   || !/v2ListEntries\(/.test(sharedRecordUi)
   || !/miniCard\(/.test(sharedRecordUi)
-  || !/v2RailCard\(/.test(sharedRecordUi)
-  || !/timeSlots\(/.test(sharedRecordUi)) {
-  errors.push('Record UI must reuse the existing History list, Mini Card, metric cubes and Shared Time owners');
+  || !/timeSlots\(/.test(sharedRecordUi)
+  || !/recordConfirmationMiniCard\(/.test(onlineBookingUi)) {
+  errors.push('Record UI must reuse the existing History list and Shared Time owners while keeping one Shared confirmation-card owner for specialist and online booking');
 }
 
 if (errors.length) {

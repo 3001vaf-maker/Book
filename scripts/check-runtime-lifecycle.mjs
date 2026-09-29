@@ -39,6 +39,23 @@ if (!/const\s+backLabel\s*=\s*backSource\.getAttribute\('aria-label'\)\s*\|\|\s*
   errors.push('core.js: workspace back aria-label writes must be idempotent to avoid MutationObserver feedback loops');
 }
 
+const dockerfile = readFileSync(join(root, 'Dockerfile'), 'utf8');
+const stagingCompose = readFileSync(join(root, 'docker-compose.staging.yml'), 'utf8');
+const databaseWait = readFileSync(join(root, 'server/scripts/wait-for-database.mjs'), 'utf8');
+
+if (!/node scripts\/wait-for-database\.mjs && node scripts\/recover-failed-prelaunch-migration\.mjs/.test(dockerfile)) {
+  errors.push('Dockerfile: production startup must wait for database readiness before migration recovery');
+}
+if (!/node scripts\/wait-for-database\.mjs && npx prisma migrate deploy/.test(stagingCompose)) {
+  errors.push('docker-compose.staging.yml: staging startup must use the same database readiness gate');
+}
+if (!/DATABASE_WAIT_ATTEMPTS/.test(databaseWait)
+  || !/DATABASE_WAIT_DELAY_MS/.test(databaseWait)
+  || !/SELECT 1/.test(databaseWait)
+  || !/attempt < attempts/.test(databaseWait)) {
+  errors.push('server/scripts/wait-for-database.mjs: database readiness must be bounded, retrying, and query-backed');
+}
+
 if (errors.length) {
   console.error('runtime lifecycle check: FAILED');
   for (const error of errors) console.error(`- ${error}`);

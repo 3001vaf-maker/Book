@@ -202,6 +202,10 @@ function renderLegalSticker(root, state) {
       tab: state.entry === 'chat' ? 'messages' : 'contact-detail',
       tenantId: state.tenantId,
     });
+    else if (state.account && state.identityDestination === 'booking') exitBookingContext(state, {
+      tab: 'home',
+      tenantId: state.tenantId,
+    });
     else renderAccountDetails(root, state);
   };
 
@@ -264,17 +268,7 @@ function renderLegalSticker(root, state) {
       if (tenantDocuments.length) await saveTenantConsents(state);
       state.platformOnlyLegal = false;
       state.error = '';
-      if (state.identityDestination === 'booking') {
-        await finalizeBookingRequest(root, state);
-      } else if (state.identityDestination === 'booking-start') {
-        state.identityDestination = 'booking';
-        nextBookingStep(root, state);
-      } else {
-        exitBookingContext(state, {
-          tab: state.entry === 'chat' ? 'messages' : 'contact-detail',
-          tenantId: state.tenantId,
-        });
-      }
+      await continueAfterIdentity(root, state);
     } catch (error) {
       state.error = accountFlowError(error, 'Не удалось сохранить документы');
       renderLegalSticker(root, state);
@@ -510,8 +504,11 @@ function nextBookingStep(root, state) {
 function backFromFirstBookingStep(root, state) {
   state.error = '';
   state.repeatSelection = null;
-  if (state.bookingOrigin === 'profile' && state.account) {
-    exitBookingContext(state, { tab: 'contact-detail', tenantId: state.tenantId });
+  if (state.account) {
+    exitBookingContext(state, {
+      tab: state.bookingOrigin === 'profile' ? 'contact-detail' : 'home',
+      tenantId: state.tenantId,
+    });
     return;
   }
   state.identityDestination = 'booking';
@@ -531,7 +528,11 @@ function renderWelcome(root, state) {
     resetBookingChoice(state);
     state.identityDestination = 'booking';
     state.bookingOrigin = 'welcome';
-    nextBookingStep(root, state);
+    if (state.account) {
+      void continueAfterIdentity(root, state);
+      return;
+    }
+    renderAccountEntry(root, state);
   };
   root.innerHTML = `<section class="${flowThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${v2Sticker({
     eyebrow: owner ? `Приглашение от ${owner}` : '',
@@ -573,8 +574,11 @@ function renderAccountEntry(root, state) {
   initV2StickerSwipe(root, {
     onRight: () => {
       state.error = '';
-      if (state.identityDestination === 'booking' && state.from) renderConfirmation(root, state);
-      else nextBookingStep(root, state);
+      if (state.identityDestination === 'booking' && state.from) {
+        renderConfirmation(root, state);
+        return;
+      }
+      renderWelcome(root, state);
     },
     onLeft: () => { exitBookingContext(state); },
   });
@@ -772,7 +776,18 @@ async function continueAfterIdentity(root, state) {
       return;
     }
 
-    await finalizeBookingRequest(root, state);
+    const hasBookingSelection = Boolean(
+      state.workplaceKey
+      && state.procedureIds.length
+      && state.date
+      && state.from
+      && state.to
+    );
+    if (hasBookingSelection) {
+      await finalizeBookingRequest(root, state);
+      return;
+    }
+    nextBookingStep(root, state);
   } catch (error) {
     state.error = accountFlowError(error, 'Не удалось проверить юридический статус');
     try {
@@ -1380,6 +1395,11 @@ export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = 
         renderAccountEntry(root, state);
         return;
       }
+      await continueAfterIdentity(root, state);
+      return;
+    }
+    if (state.account) {
+      state.identityDestination = 'booking';
       await continueAfterIdentity(root, state);
       return;
     }

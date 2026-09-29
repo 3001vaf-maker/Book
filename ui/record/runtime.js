@@ -3,7 +3,7 @@ import { mountV2ZLayer, v2ZLayer } from '../v2/index.js';
 import { entityVisualCard } from '../cards/entity-card-constructor.js';
 import { miniCard } from '../cards/mini-card.js';
 import { v2ListEntry, v2ListEntries } from '../lists/list-entry.js';
-import { v2HorizontalRail, v2RailCard } from '../v2/index.js';
+import { v2HorizontalRail } from '../v2/index.js';
 import { timeSlots } from '../time/index.js';
 
 function recordSurface() {
@@ -51,31 +51,23 @@ export function recordProcedureList(items = [], {
   const selectedSet = new Set((Array.isArray(selected) ? selected : []).map(String));
   const rows = (Array.isArray(items) ? items : []).map((item = {}) => {
     const id = String(item.id || '');
-    return v2ListEntry({
-      columns: [
-        [
-          { value: item.name || item.title || 'Процедура', strong: true },
-          { value: '' },
-          { value: '' },
-        ],
-        [
-          { value: item.durationText || item.secondary || '', strong: true },
-          { value: '' },
-          { value: '' },
-        ],
-        [
-          { value: item.costText || item.right || '', strong: true },
-          { value: '' },
-          { value: '' },
-        ],
-      ],
-      interactive: true,
-      selected: selectedSet.has(id),
-      data: `${data}="${escapeRecordText(id)}"`,
-      aria: item.aria || `Выбрать процедуру ${item.name || item.title || ''}`,
-    });
+    const on = selectedSet.has(id);
+    const name = String(item.name || item.title || 'Процедура');
+    const duration = String(item.durationText || item.secondary || '');
+    const cost = String(item.costText || item.right || '');
+    const nameSize = Math.max(10, Math.min(16, 18 - (name.length * 0.22)));
+    return `<button type="button" class="v2-service-sticker${on ? ' is-selected' : ''}" style="--record-procedure-name-size:${nameSize.toFixed(2)}px" ${data}="${escapeRecordText(id)}" aria-pressed="${on ? 'true' : 'false'}" aria-label="${escapeRecordText(item.aria || `Выбрать процедуру ${name}`)}">
+      <span class="v2-service-sticker__text">
+        <strong>${escapeRecordText(name)}</strong>
+        ${duration ? `<span>${escapeRecordText(duration)}</span>` : ''}
+      </span>
+      <span class="v2-service-sticker__price">${escapeRecordText(cost)}</span>
+      <span class="v2-service-sticker__selector" aria-hidden="true"></span>
+    </button>`;
   });
-  return rows.length ? v2ListEntries(rows) : `<div class="muted">${escapeRecordText(empty)}</div>`;
+  return rows.length
+    ? `<div class="v2-sticker-list v2-sticker-list--services">${rows.join('')}</div>`
+    : `<div class="muted">${escapeRecordText(empty)}</div>`;
 }
 
 export function recordPersonList(items = [], {
@@ -86,23 +78,11 @@ export function recordPersonList(items = [], {
   const rows = (Array.isArray(items) ? items : []).map((item = {}) => {
     const key = String(item.key || item.id || '');
     return v2ListEntry({
-      columns: [
-        [
-          { value: item.name || '', strong: true },
-          { value: '' },
-          { value: '' },
-        ],
-        [
-          { value: item.uei || '', strong: true },
-          { value: '' },
-          { value: '' },
-        ],
-        [
-          { value: item.phone || '', strong: true },
-          { value: '' },
-          { value: '' },
-        ],
-      ],
+      overline: item.uei || '',
+      title: item.name || '',
+      subtitle: item.phone || '',
+      initial: '',
+      className: 'list-entry--record-person',
       interactive: true,
       selected: String(selected || '') === key,
       data: `${data}="${escapeRecordText(key)}"`,
@@ -111,7 +91,6 @@ export function recordPersonList(items = [], {
   });
   return rows.length ? v2ListEntries(rows) : `<div class="muted">${escapeRecordText(empty)}</div>`;
 }
-
 
 function timeValue(item) {
   return String(item && typeof item === 'object' ? (item.from ?? item.value ?? '') : item ?? '');
@@ -160,67 +139,41 @@ export function recordConfirmationMiniCard({
   total = '',
   procedures = [],
 } = {}) {
-  const card = miniCard({
-    title: name || 'Запись',
-    titleData: name ? 'data-record-confirm-person-profile' : '',
-    titleAria: name ? `Открыть человека ${name}` : '',
-    value: uei || '',
-    valueData: uei ? 'data-record-confirm-person-profile' : '',
-    valueAria: uei ? `Открыть человека ${name || uei}` : '',
-    subtitle: phone || '',
-    subtitleData: phone ? 'data-record-confirm-phone' : '',
-    subtitleAria: phone ? `Действия с телефоном ${phone}` : '',
-    rows: [
-      { label: 'Пространство', value: workplace || '—', data: 'data-record-confirm-workplace', aria: `Изменить рабочее пространство ${workplace || ''}` },
-      { label: 'Дата', value: date || '—', data: 'data-record-confirm-date', aria: `Изменить дату ${date || ''}` },
-      { label: 'Занятый период', value: period || '—', data: 'data-record-confirm-time', aria: `Изменить время ${period || ''}` },
-    ],
-  });
-
-  const metrics = v2HorizontalRail([
-    v2RailCard({
-      title: duration || '—',
-      subtitle: 'Часы',
-      className: 'people-metric-card',
-    }),
-    v2RailCard({
-      title: discount || '0%',
-      subtitle: 'Скидка',
-      className: 'people-metric-card',
-    }),
-    v2RailCard({
-      title: total || '—',
-      subtitle: 'Сумма итого',
-      className: 'people-metric-card',
-    }),
-  ].join(''), { className: 'people-metrics' });
-
   const rows = v2ListEntries((Array.isArray(procedures) ? procedures : []).map((item = {}) => v2ListEntry({
     columns: [
       [
         { value: item.name || item.title || 'Процедура', strong: true },
-        { value: '' },
-        { value: '' },
-      ],
-      [
+        { value: '', className: 'list-entry__line-spacer' },
         { value: item.durationText || '', strong: true },
-        { value: '' },
-        { value: '' },
       ],
       [
+        { value: '', className: 'list-entry__line-spacer' },
         { value: item.right || item.costText || '', strong: true },
-        { value: '' },
-        { value: '' },
+        { value: '', className: 'list-entry__line-spacer' },
       ],
     ],
-    interactive: Boolean(item.data),
-    data: item.data || '',
+    interactive: false,
+    className: 'list-entry--record-procedure',
     aria: item.aria || item.name || item.title || 'Процедура',
   })));
 
+  const card = miniCard({
+    className: 'record-confirmation-mini-card',
+    lines: [
+      { value: workplace || '—', strong: true },
+      { value: discount || '0%', align: 'right', strong: true },
+      { value: date || '—', align: 'right' },
+      { value: period || '—', align: 'right' },
+      { value: uei || '—', strong: true },
+      { value: name || '—', strong: true },
+      { value: phone || '—' },
+      { value: duration || '—', strong: true },
+      { value: total || '—', align: 'right', strong: true },
+    ],
+  });
+
   return `<div class="record-confirmation-view">
     <div class="record-confirmation-view__card">${card}</div>
-    <div class="record-confirmation-view__metrics">${metrics}</div>
     <div class="record-confirmation-view__procedures">${rows}</div>
   </div>`;
 }
@@ -232,20 +185,32 @@ export function mountRecordZ({
   stack = true,
   onClose = null,
   chatPersonKey = '',
+  aImage = '',
+  aImagePosition = '',
+  aInitials = '',
 } = {}) {
   const context = workspaceHeaderContext({
     title,
-    a: settings ? {
-      kind: 'settings',
-      label: 'Настройки записи',
-      data: 'data-record-owner-settings',
-      aria: 'Настройки записи',
-    } : null,
-    d: {
+    hideD: !chatPersonKey,
+    a: {
+      kind: 'avatar',
+      label: 'Запись',
+      image: aImage,
+      imagePosition: aImagePosition,
+      initials: aInitials,
+      ...(settings ? {
+        data: 'data-record-owner-settings',
+        aria: 'Настройки записи',
+      } : {
+        disabled: true,
+        aria: 'Запись',
+      }),
+    },
+    d: chatPersonKey ? {
       kind: 'chat',
       data: 'data-record-owner-chat',
       aria: 'Чат',
-    },
+    } : null,
   });
   const classes = ['record-shared-z', className].filter(Boolean).join(' ');
   const layer = mountV2ZLayer(recordSurface(), v2ZLayer(

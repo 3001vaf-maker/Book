@@ -14,6 +14,17 @@ function rowMarkup(row = {}) {
   return `<div class="mini-card__row">${content}</div>`;
 }
 
+function lineMarkup(line = {}) {
+  const value = escapeHtml(line.value || '');
+  const align = line.align === 'right' ? 'right' : 'left';
+  const classes = ['mini-card__line', `mini-card__line--${align}`, line.strong ? 'is-strong' : ''].filter(Boolean).join(' ');
+  const content = `<span class="${classes}">${value || '&nbsp;'}</span>`;
+  if (line.data) {
+    return `<button type="button" class="mini-card__line-action"${attrs(line.data, line.aria || line.value)}>${content}</button>`;
+  }
+  return content;
+}
+
 export function miniCard({
   title = '',
   value = '',
@@ -25,6 +36,7 @@ export function miniCard({
   subtitleData = '',
   subtitleAria = '',
   rows = [],
+  lines = [],
   image = '',
   imagePosition = '50% 50%',
   initials = '',
@@ -43,6 +55,7 @@ export function miniCard({
     : '';
   const actionAttrs = interactive ? ` type="button"${attrs(data, aria || title)}` : '';
   const rowItems = Array.isArray(rows) ? rows : [];
+  const lineItems = Array.isArray(lines) ? lines : [];
   const media = resolvedSurface === 'default'
     ? (image
       ? `<span class="mini-card__media" style="--mini-card-image:url('${escapeHtml(image)}');--mini-card-image-position:${escapeHtml(imagePosition)}" aria-hidden="true"></span>`
@@ -51,17 +64,19 @@ export function miniCard({
         : '')
     : '';
 
-  return `<${tag} class="${escapeHtml(classes)}"${surfaceStyle}${actionAttrs}>
-    <div class="mini-card__head">
+  const resolvedClasses = [classes, lineItems.length ? 'mini-card--lines' : ''].filter(Boolean).join(' ');
+
+  return `<${tag} class="${escapeHtml(resolvedClasses)}"${surfaceStyle}${actionAttrs}>
+    ${lineItems.length ? `<div class="mini-card__lines">${lineItems.map(lineMarkup).join('')}</div>` : `<div class="mini-card__head">
       <span class="mini-card__copy">
         <strong class="mini-card__title"${attrs(titleData, titleAria)}>${escapeHtml(title)}</strong>
         ${value ? `<strong class="mini-card__value"${attrs(valueData, valueAria)}>${escapeHtml(value)}</strong>` : ''}
         ${subtitle ? `<span class="mini-card__subtitle"${attrs(subtitleData, subtitleAria)}>${escapeHtml(subtitle)}</span>` : ''}
       </span>
       ${media}
-    </div>
+    </div>`}
     ${actionLabel ? `<span class="mini-card__context-action">${escapeHtml(actionLabel)}</span>` : ''}
-    ${rowItems.length ? `<div class="mini-card__rows">${rowItems.map(rowMarkup).join('')}</div>` : ''}
+    ${!lineItems.length && rowItems.length ? `<div class="mini-card__rows">${rowItems.map(rowMarkup).join('')}</div>` : ''}
   </${tag}>`;
 }
 
