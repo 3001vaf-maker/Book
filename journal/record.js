@@ -1,4 +1,4 @@
-import { button, durationPicker, durationText, entityCard, escapeHtml, field, list, listEntry, stateView, initStateView, initCalendar, mountModal, modal, openNotice, initDurationPickers, initMultiSelect, viewNavigation, initViewNavigation, openTimePickerAction, mountRecordZ, recordZHost, renderRecordZ, recordTimeRows, recordProcedureList, recordPersonList, recordConfirmationMiniCard, setRecordPrimaryAction, bindRecordSettings, closeRecordZStack } from '../ui/ui.js';
+import { button, durationPicker, durationText, entityCard, escapeHtml, field, list, v2ListEntry, stateView, initStateView, initCalendar, mountModal, modal, openNotice, initDurationPickers, initMultiSelect, viewNavigation, initViewNavigation, openTimePickerAction, mountRecordZ, recordZHost, renderRecordZ, recordTimeRows, recordProcedureList, recordPersonList, recordConfirmationMiniCard, setRecordPrimaryAction, bindRecordSettings, closeRecordZStack } from '../ui/ui.js';
 import { createRecord } from '../core/record/index.js';
 import { createJournalBreak } from './break-service.js';
 import { getPeople } from '../main/people/data.js';

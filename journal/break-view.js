@@ -2,19 +2,6 @@ import { entityCard, list, modal, mountModal, timeSlots, mountRecordZ, recordZHo
 import { listAvailableEndTimes, listAvailableStartTimes } from '../core/time/index.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { moveJournalBreak, removeJournalBreak } from './break-service.js';
-import { getBookingSettings } from '../core/booking-settings/index.js';
-import { getProfile } from '../settings/profile/data.js';
-
-function recordOwnerOptions({ settings = false } = {}) {
-  const profile = getProfile();
-  const initials = [profile?.name, profile?.surname].filter(Boolean).map((value) => String(value).trim().charAt(0)).join('').slice(0, 2).toUpperCase();
-  return {
-    settings,
-    aImage: String(profile?.photo || ''),
-    aImagePosition: `${Number(profile?.photoCropX ?? 50)}% ${Number(profile?.photoCropY ?? 50)}%`,
-    aInitials: initials,
-  };
-}
 
 function formatDate(value) {
   const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -30,8 +17,8 @@ function availableBreakStarts(item) {
   return listAvailableStartTimes({
     date: item.date,
     workplaceId: item.workplaceId,
-    duration: getBookingSettings().slotStep,
-    step: getBookingSettings().slotStep,
+    duration: 5,
+    step: 5,
     excludeId: item.id,
   });
 }
@@ -41,7 +28,7 @@ function availableBreakEnds(item, from) {
     date: item.date,
     workplaceId: item.workplaceId,
     from,
-    step: getBookingSettings().slotStep,
+    step: 5,
     excludeId: item.id,
   });
 }
@@ -83,8 +70,8 @@ export function openBreakView(breakItem, { onClose = () => {} } = {}) {
   let current = { ...breakItem };
   const finish = () => onClose?.();
   const m = mountRecordZ({
-    ...recordOwnerOptions({ settings: true }),
     title: 'Перерыв',
+    settings: true,
     className: 'record-break-z',
     onClose: () => queueMicrotask(finish),
   });

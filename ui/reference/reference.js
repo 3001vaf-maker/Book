@@ -14,8 +14,8 @@ import {
   initRepeatedFields,
   initSegmentControls,
   list,
-  listEntries,
-  listEntry,
+  v2ListEntries,
+  v2ListEntry,
   modal,
   monthDayPicker,
   mountModal,
@@ -47,7 +47,7 @@ const SCREEN_OPTIONS = [
   ['form', 'Форма'],
   ['fields', 'Поля и телефон'],
   ['blocks', 'Блоки 1–3'],
-  ['lists', 'List / Entry List'],
+  ['lists', 'List / V2 List Entry'],
   ['receipt', 'Отчётный лист'],
   ['date', 'День / календарь'],
   ['folders', 'Папки'],
@@ -230,15 +230,15 @@ function listsScreen() {
       { title: 'Три зоны', secondary: 'Слева', right: ['Справа 1', 'Справа 2'] },
     ],
   });
-  const entries = listEntries([
-    listEntry({ columns: [[{ value: '1 столбец', strong: true }, 'Строка 2', 'Строка 3']], interactive: false }),
-    listEntry({ columns: [[{ value: 'Лево', strong: true }, 'Строка 2'], [{ value: 'Право', strong: true }, 'Строка 2', 'Строка 3']], interactive: false }),
-    listEntry({ columns: [[{ value: 'Лево', strong: true }, 'Строка 2'], [{ value: 'Центр', strong: true }, 'Строка 2'], [{ value: 'Право', strong: true }, 'Строка 2', 'Строка 3']], interactive: false }),
+  const entries = v2ListEntries([
+    v2ListEntry({ columns: [[{ value: '1 столбец', strong: true }, 'Строка 2', 'Строка 3']], interactive: false }),
+    v2ListEntry({ columns: [[{ value: 'Лево', strong: true }, 'Строка 2'], [{ value: 'Право', strong: true }, 'Строка 2', 'Строка 3']], interactive: false }),
+    v2ListEntry({ columns: [[{ value: 'Лево', strong: true }, 'Строка 2'], [{ value: 'Центр', strong: true }, 'Строка 2'], [{ value: 'Право', strong: true }, 'Строка 2', 'Строка 3']], interactive: false }),
   ]);
   return {
     className: '',
     media: '',
-    body: `<div class="ui-reference-list-stack">${section('List', simpleList)}${section('Entry List — 1 / 2 / 3 столбца', entries, 'Каждый столбец поддерживает до трёх строк.')}</div>`,
+    body: `<div class="ui-reference-list-stack">${section('List', simpleList)}${section('V2 List Entries — 1 / 2 / 3 столбца', entries, 'Каждый столбец поддерживает до трёх строк.')}</div>`,
   };
 }
 

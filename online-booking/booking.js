@@ -194,6 +194,10 @@ function renderLegalSticker(root, state) {
   const closeLegal = () => {
     state.error = '';
     if (state.identityDestination === 'booking' && state.from) renderConfirmation(root, state);
+    else if (state.identityDestination === 'booking-start' && state.account) exitBookingContext(state, {
+      tab: 'contact-detail',
+      tenantId: state.tenantId,
+    });
     else if (state.account && state.identityDestination === 'profile') exitBookingContext(state, {
       tab: state.entry === 'chat' ? 'messages' : 'contact-detail',
       tenantId: state.tenantId,
@@ -580,7 +584,13 @@ function renderAccountEntry(root, state) {
   });
 
   initPasswordFields(root);
-  root.querySelector('[data-booking-u-close]')?.addEventListener('click', () => renderWelcome(root, state));
+  root.querySelector('[data-booking-u-close]')?.addEventListener('click', () => {
+    if (state.entry === 'account-booking') {
+      exitBookingContext(state, { tab: 'contact-detail', tenantId: state.tenantId });
+      return;
+    }
+    renderWelcome(root, state);
+  });
   const authForm = root.querySelector('[data-booking-entry-form]');
   root.querySelector('[data-booking-register]')?.addEventListener('click', async () => {
     const data = new FormData(authForm);
@@ -738,8 +748,15 @@ async function continueAfterIdentity(root, state) {
     state.accountTermsAccepted = Boolean(platformState?.accepted);
 
     if (!platformState?.accepted) {
-      state.platformOnlyLegal = state.identityDestination === 'profile';
+      state.platformOnlyLegal = state.identityDestination === 'profile' || state.identityDestination === 'booking-start';
       renderLegalSticker(root, state);
+      return;
+    }
+
+    if (state.identityDestination === 'booking-start') {
+      state.platformOnlyLegal = false;
+      state.identityDestination = 'booking';
+      nextBookingStep(root, state);
       return;
     }
 
@@ -1049,11 +1066,26 @@ async function renderGlobalClientHome(root, state) {
   state.relationships = Array.isArray(relationships) ? relationships : [];
   state.accountRecords = Array.isArray(records) ? records : [];
   await renderGlobalAccount(root, state, {
-    onStartBooking: (tenantId) => {
+    onStartBooking: (tenantId, options = {}) => {
       const id = String(tenantId || '');
       if (!id) return;
+      const repeatRequest = options?.repeatRequest && typeof options.repeatRequest === 'object'
+        ? options.repeatRequest
+        : null;
+      const workplaceKey = String(
+        options?.workplaceKey
+        || repeatRequest?.workplaceId
+        || repeatRequest?.workplaceKey
+        || ''
+      ).trim();
+      const procedureIds = repeatRequest
+        ? requestProcedures(repeatRequest).map((item) => String(item?.id || '').trim()).filter(Boolean)
+        : [];
       const params = new URLSearchParams();
       params.set('booking', id);
+      params.set('entry', 'account-booking');
+      if (workplaceKey) params.set('workplace', workplaceKey);
+      if (procedureIds.length) params.set('procedures', procedureIds.join(','));
       location.assign(`${location.pathname}?${params.toString()}`);
     },
     onLogout: () => {
@@ -1304,7 +1336,7 @@ export async function renderGlobalClient(root, initial = {}) {
   }
 }
 
-export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = '', entry = '', onExitToAccount = null } = {}) {
+export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = '', procedureIds = [], entry = '', onExitToAccount = null } = {}) {
   const state = {
     tenantId: String(tenantId || ''),
     lockedWorkplaceKey: String(workplaceKey || ''),
@@ -1324,9 +1356,14 @@ export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = 
     error: '',
     notice: '',
     lastRequest: null,
-    repeatSelection: null,
-    identityDestination: 'booking',
-    bookingOrigin: entry === 'account' || entry === 'chat' ? 'profile' : 'welcome',
+    repeatSelection: Array.isArray(procedureIds) && procedureIds.length
+      ? {
+          workplaceKey: String(workplaceKey || ''),
+          procedureIds: [...new Set(procedureIds.map((value) => String(value || '').trim()).filter(Boolean))],
+        }
+      : null,
+    identityDestination: entry === 'account-booking' ? 'booking-start' : 'booking',
+    bookingOrigin: entry === 'account' || entry === 'chat' || entry === 'account-booking' ? 'profile' : 'welcome',
     bookingStep: '',
     onExitToAccount,
     entry: String(entry || ''),
@@ -1343,6 +1380,15 @@ export async function renderOnlineBooking(root, { tenantId = '', workplaceKey = 
     await refreshContext(state);
     const account = await getAccount(state.tenantId);
     if (account) state.account = account;
+    if (state.entry === 'account-booking') {
+      state.identityDestination = 'booking-start';
+      if (!state.account) {
+        renderAccountEntry(root, state);
+        return;
+      }
+      await continueAfterIdentity(root, state);
+      return;
+    }
     if (state.entry === 'account' || state.entry === 'chat') {
       state.identityDestination = 'profile';
       if (!state.account) {

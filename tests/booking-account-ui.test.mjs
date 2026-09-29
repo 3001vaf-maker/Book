@@ -11,6 +11,7 @@ const accountApi = fs.readFileSync('core/account/index.js', 'utf8');
 const onlineBookingController = fs.readFileSync('server/src/online-booking/online-booking.controller.ts', 'utf8');
 const accountSettingsController = fs.readFileSync('server/src/online-booking/account-settings.controller.ts', 'utf8');
 const onlineBookingService = fs.readFileSync('server/src/online-booking/online-booking.service.ts', 'utf8');
+const profileService = fs.readFileSync('server/src/profile/profile.service.ts', 'utf8');
 const communicationService = fs.readFileSync('server/src/communication/communication.service.ts', 'utf8');
 const communicationHistory = fs.readFileSync('server/src/communication/communication-history.service.ts', 'utf8');
 const messageAttachmentMigration = fs.readFileSync('server/prisma/migrations/20260914010000_message_attachments/migration.sql', 'utf8');
@@ -102,23 +103,27 @@ const globalAccountHomeBlock = booking.slice(
 );
 assert.doesNotMatch(globalAccountHomeBlock, /entry', 'account'/);
 assert.doesNotMatch(globalAccountHomeBlock, /onOpenRelationship|onOpenRecord/);
-assert.match(globalAccountHomeBlock, /onStartBooking: \(tenantId\)/);
+assert.match(globalAccountHomeBlock, /onStartBooking: \(tenantId, options = \{\}\)/);
 assert.match(booking, /slotStillAvailable/);
 assert.match(booking, /Выбранное время уже недоступно/);
 assert.doesNotMatch(booking, /consentState\.allowed/);
-assert.match(booking, /const account = await getAccount\(state\.tenantId\);[\s\S]*?if \(account\) state\.account = account;[\s\S]*?if \(state\.account\)[\s\S]*?await continueAfterIdentity\(root, state\);[\s\S]*?renderWelcome\(root, state\);/);
-assert.match(booking, /function backFromFirstBookingStep[\s\S]*?if \(state\.account\)[\s\S]*?tab: state\.bookingOrigin === 'profile' \? 'contact-detail' : 'home'/);
+assert.match(booking, /const account = await getAccount\(state\.tenantId\);[\s\S]*?if \(account\) state\.account = account;[\s\S]*?renderWelcome\(root, state\);/);
+assert.match(booking, /function backFromFirstBookingStep[\s\S]*?state\.bookingOrigin === 'profile'[\s\S]*?renderWelcome\(root, state\);/);
 const bookingBackBlock = booking.slice(
   booking.indexOf('function backFromFirstBookingStep'),
   booking.indexOf('function renderWelcome'),
 );
 assert.doesNotMatch(bookingBackBlock, /renderAccountEntry\(root, state\);/);
-assert.match(booking, /function renderWelcome[\s\S]*?if \(state\.account\)[\s\S]*?continueAfterIdentity\(root, state\)[\s\S]*?renderAccountEntry\(root, state\);/);
-assert.match(booking, /async function continueAfterIdentity[\s\S]*?const hasBookingSelection = Boolean\([\s\S]*?nextBookingStep\(root, state\);/);
-assert.match(booking, /data-legal-continue[\s\S]*?await continueAfterIdentity\(root, state\);/);
 assert.doesNotMatch(booking, /renderAccountHome\(/);
 assert.doesNotMatch(booking, /import \{ renderAccount,/);
 assert.match(booking, /exitBookingContext\(state, \{ tab: 'contact-detail', tenantId: state\.tenantId \}\)/);
+assert.match(booking, /params\.set\('entry', 'account-booking'\)/, 'Known contact booking must skip the welcome screen');
+assert.match(booking, /params\.set\('workplace', workplaceKey\)/, 'Workplace booking must preserve the selected workplace');
+assert.match(booking, /params\.set\('procedures', procedureIds\.join\(','\)\)/, 'Repeat booking must preserve selected procedures');
+assert.match(booking, /state\.entry === 'account-booking'/);
+assert.match(booking, /data-booking-u-close[\s\S]*?state\.entry === 'account-booking'[\s\S]*?exitBookingContext\(state, \{ tab: 'contact-detail', tenantId: state\.tenantId \}\)/, 'Closing auth from Contacts booking must return to the professional profile, not welcome');
+assert.match(booking, /state\.identityDestination === 'booking-start'[\s\S]*nextBookingStep\(root, state\)/);
+assert.match(coreJs, /procedureIds:\s*String\(params\.get\('procedures'\)/);
 assert.match(booking, /d:\s*null/);
 const bookingHeaderStart = booking.indexOf('function bookingHeaderMarkup');
 const bookingHeaderEnd = booking.indexOf('function bookingActionForStep', bookingHeaderStart);
@@ -132,7 +137,7 @@ assert.match(accountShell, /v2Shell\(\{/);
 assert.match(accountShell, /v2FDeck\(/);
 assert.match(accountShell, /v2Section\(/);
 assert.match(accountShell, /v2HorizontalRail\(/);
-assert.match(accountShell, /entityCard\(\{/);
+assert.match(accountShell, /entityVisualCard\(\{/);
 assert.match(accountShell, /data-account-deck-item/);
 assert.match(accountShell, /GLOBAL_ACCOUNT_ROOTS = Object\.freeze\(\[[\s\S]*?id: 'profile', label: 'Профиль'[\s\S]*?id: 'home', label: 'Обзор'[\s\S]*?id: 'contacts', label: 'Контакты'[\s\S]*?id: 'history', label: 'История'/);
 assert.match(accountShell, /async function renderGlobalProfile\(/);
@@ -159,6 +164,8 @@ assert.match(sharedProfile, /selectPhotoFile\(\)/);
 assert.doesNotMatch(accountShell, /document\.createElement\('input'\)|new FileReader\(/);
 assert.match(accountShell, /id:'controls',label:'Согласия \/ Уведомления'/);
 assert.match(accountShell, /data-account-consent-contact/);
+assert.match(accountShell, /async function openGlobalAccountControls\(root, state, handlers, relationships = state\.relationships\)/);
+assert.match(accountShell, /const scopedRelationships = Array\.isArray\(relationships\)/);
 assert.match(accountShell, /miniCardRail\(/);
 assert.match(accountShell, /openAccountConsentSettings\(state, \{[\s\S]*?tenantId/);
 assert.match(accountShell, /id:'delete',label:'Удалить профиль',variant:'critical'/);
@@ -168,8 +175,44 @@ assert.match(accountShell, /async function renderGlobalContactDetail\(/);
 assert.match(accountShell, /state\.accountTab = 'contact-detail'/);
 assert.match(accountShell, /async function renderGlobalHistoryDetail\(/);
 assert.doesNotMatch(accountShell, /onOpenRelationship: callbacks\.onOpenRelationship/);
-assert.match(accountShell, /relationships\.length <= 15/);
-assert.match(accountShell, /data-account-contact-search/);
+const contactsBlock = accountShell.slice(
+  accountShell.indexOf('function relationshipCard'),
+  accountShell.indexOf('function selectedGlobalRelationship'),
+);
+assert.match(contactsBlock, /entityCardStack\(filtered\.map\(relationshipCard\)\)/);
+assert.match(contactsBlock, /const searchable = relationships\.length > 15/);
+assert.match(contactsBlock, /data-account-contact-search/);
+assert.match(contactsBlock, /data: 'data-account-profile-settings'/);
+assert.doesNotMatch(contactsBlock, /disabled: true, aria: 'Настройки контактов'/);
+assert.match(contactsBlock, /profile\.profession/);
+assert.match(contactsBlock, /profile\.phone/);
+assert.match(contactsBlock, /profileCardAppearance\(profile\)/);
+assert.match(contactsBlock, /profileCardFields\(profile, \[\]\)/);
+assert.doesNotMatch(contactsBlock, /CONTACT_PROFILE_CARD_APPEARANCE|entity-card--compact|v2HorizontalRail\(filtered|v2ListEntr/);
+
+const contactDetailBlock = accountShell.slice(
+  accountShell.indexOf('function confirmDeleteGlobalContact'),
+  accountShell.indexOf('async function renderGlobalHistory'),
+);
+assert.match(contactDetailBlock, /mountV2ZLayer\(root, v2ZLayer\([\s\S]*stack:\s*true/, 'Contact profile must open as stacked Z over Contacts Z1');
+assert.match(contactDetailBlock, /v2Section\('Рабочие пространства'/);
+assert.match(contactDetailBlock, /v2Section\('История'/);
+assert.match(contactDetailBlock, /workplaceCardAppearance\(workplace\)/);
+assert.match(contactDetailBlock, /workplaceCardFields\(workplace, workplace\.cardProfile \|\| profile\)/);
+assert.match(contactDetailBlock, /miniCardRail\(/);
+assert.match(contactDetailBlock, /label:\s*'Согласия \/ Уведомления'/);
+assert.match(contactDetailBlock, /openGlobalAccountControls\(document\.body, state, handlers, \[relationship\]\)/, 'Contact controls must use the existing Shared notifications/consents owner scoped to that professional profile');
+assert.match(contactDetailBlock, /label:\s*'Удалить',[\s\S]*variant:\s*'critical'/);
+assert.match(contactDetailBlock, /button\('Удалить', \{ variant: 'danger'/);
+assert.match(contactDetailBlock, /button\('Отмена', \{ variant: 'secondary'/);
+assert.match(contactDetailBlock, /data-contact-delete-error/);
+assert.match(contactDetailBlock, /deleteGlobalAccountRelationship\(tenantId\)/);
+assert.match(contactDetailBlock, /label:\s*'Записаться'/);
+assert.match(contactDetailBlock, /label:\s*'Повторить'/);
+
+assert.match(profileService, /async accountRelationshipProfile\(tenantId: string\)[\s\S]*?phone: row\.phone/);
+assert.doesNotMatch(profileService.slice(profileService.indexOf('async publicBookingBundle')), /profile:\s*\{[\s\S]*?phone: row\.phone/, 'Public booking profile must not expose the professional phone just for Contacts');
+assert.match(onlineBookingService, /this\.profile\.accountRelationshipProfile\(link\.tenantId\)/);
 assert.doesNotMatch(accountShell, /async function renderGlobalRepresentatives\(/);
 assert.doesNotMatch(accountShell, /export async function renderAccount\(/);
 assert.doesNotMatch(accountShell, /async function renderHome\(/);
@@ -211,6 +254,12 @@ assert.doesNotMatch(accountShell, /mountV2Layer\(|v2Layer\(/);
 assert.match(accountShell, /async function renderGlobalHistoryDetail/);
 assert.match(accountShell, /label: 'Записаться', data: 'data-global-history-repeat'/);
 assert.match(accountShell, /state\.accountSelectedChatTenantId/);
+const rootChatBlock = accountShell.slice(
+  accountShell.indexOf('function bindGlobalChatButton'),
+  accountShell.indexOf('function bindGlobalProfileSettingsEntry'),
+);
+assert.match(rootChatBlock, /state\.accountSelectedChatTenantId = '';/, 'Root Header D must always open the chat contact list');
+assert.match(contactDetailBlock, /state\.accountSelectedChatTenantId = tenantId;/, 'Contact Header D must open chat with that professional profile');
 assert.match(accountShell, /state\.accountDeckOpen = true/);
 assert.doesNotMatch(accountShell, /requestMoment\(request\)\s*[<>]=?\s*nowMoment\(\)\s*\?\s*'Задолженность'/);
 assert.doesNotMatch(accountShell, /bookingThemeStyle/);
@@ -476,9 +525,9 @@ assert.doesNotMatch(bookingUi, /bookingChoiceCards|bookingTimeGroups|v2ServiceSt
 assert.match(booking, /workplaceCardAppearance\(workplace\)/);
 assert.match(booking, /workplaceCardFields\(workplace, workplace\.cardProfile \|\| profile\)/);
 assert.match(recordRuntime, /entityVisualCard\(/);
-assert.match(recordRuntime, /listEntry\(/);
-assert.match(recordRuntime, /listEntries\(/);
-assert.match(recordRuntime, /miniCard\(\{/);
+assert.match(recordRuntime, /v2ListEntry\(/);
+assert.match(recordRuntime, /v2ListEntries\(/);
+assert.match(recordRuntime, /miniCard\(/);
 assert.match(recordRuntime, /className: 'record-confirmation-mini-card'/);
 assert.doesNotMatch(recordRuntime, /record-confirmation-card__|record-confirmation-view__metrics|v2RailCard\(/);
 assert.match(recordRuntime, /timeSlots\(/);

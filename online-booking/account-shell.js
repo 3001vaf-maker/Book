@@ -9,6 +9,7 @@ import {
   sendAccountChatMessage,
   updateGlobalAccount,
   deleteGlobalAccount,
+  deleteGlobalAccountRelationship,
 } from '../core/account/index.js';
 import { formatPhone } from '../core/phone/index.js';
 import { projectRecordStatuses } from '../core/record/index.js';
@@ -16,15 +17,15 @@ import { disableWebPush, enableWebPush, getWebPushState } from '../core/notifica
 import {
   button,
   emptyState,
-  entityCard,
+  entityCardStack,
   entityVisualCard,
   normalizeEntityCardAppearance,
   miniCard,
   miniCardRail,
   escapeHtml,
   field,
-  listEntries,
-  listEntry,
+  v2ListEntries,
+  v2ListEntry,
   v2FDeck,
   v2Header,
   v2HorizontalRail,
@@ -48,6 +49,7 @@ import { readOnlyReceipt } from '../ui/receipt/index.js';
 import { openAccountConsentSettings } from './consent-settings.js';
 import { openAccountPasswordSettings } from './password-settings.js';
 import { openAccountPersonalDataZ } from './personal-data.js';
+import { profileCardAppearance, profileCardFields, workplaceCardAppearance, workplaceCardFields } from '../settings/profile/card-presentation.js';
 
 function money(value) {
   const number = Number(value || 0);
@@ -143,7 +145,7 @@ function historyEntry(request, index) {
   while (procedures.length < 3) procedures.push({ value: '' });
   const pricing = requestPricing(request);
   const finance = financeStatus(request);
-  return listEntry({
+  return v2ListEntry({
     columns: [
       procedures,
       [
@@ -356,15 +358,14 @@ function relationshipTitle(relationship = {}) {
 function relationshipCard(relationship = {}) {
   const profile = relationship?.context?.profile || {};
   const title = relationshipTitle(relationship);
-  return entityCard({
-    title,
-    subtitle: String(profile.profession || '').trim(),
+  return entityVisualCard({
+    appearance: profileCardAppearance(profile),
+    fields: profileCardFields(profile, []),
     image: String(profile.photo || ''),
-    initial: title.slice(0, 1).toUpperCase(),
+    imagePosition: `${Number(profile.photoCropX || 50)}% ${Number(profile.photoCropY || 50)}%`,
     interactive: true,
     data: `data-global-relationship="${escapeHtml(String(relationship.tenantId || ''))}"`,
     aria: `Открыть ${title}`,
-    className: 'entity-card--compact',
   });
 }
 
@@ -408,6 +409,7 @@ function bindGlobalRelationships(root, state, handlers) {
 
 function bindGlobalChatButton(root, state, handlers) {
   root.querySelector('[data-account-open-chat-root]')?.addEventListener('click', () => {
+    state.accountSelectedChatTenantId = '';
     state.accountTab = 'messages';
     state.accountDeckOpen = false;
     void handlers.render();
@@ -488,9 +490,9 @@ function openAccountPhotoSettings(state, handlers) {
   });
 }
 
-async function loadGlobalNotificationState(state) {
-  const relationships = Array.isArray(state.relationships) ? state.relationships : [];
-  const tenantIds = relationships.map((item) => String(item?.tenantId || '')).filter(Boolean);
+async function loadGlobalNotificationState(state, relationships = state.relationships) {
+  const scopedRelationships = Array.isArray(relationships) ? relationships : [];
+  const tenantIds = scopedRelationships.map((item) => String(item?.tenantId || '')).filter(Boolean);
   const [pushStates, chatStates] = await Promise.all([
     Promise.all(tenantIds.map((tenantId) => getWebPushState(tenantId).catch(() => ({
       tenantId,
@@ -506,18 +508,18 @@ async function loadGlobalNotificationState(state) {
   return { tenantIds, pushStates, chatStates };
 }
 
-async function openGlobalAccountControls(root, state, handlers) {
+async function openGlobalAccountControls(root, state, handlers, relationships = state.relationships) {
   const existing = root.querySelector('[data-account-controls-modal]');
   if (existing) return existing;
 
-  const relationships = Array.isArray(state.relationships) ? state.relationships : [];
-  const notificationState = await loadGlobalNotificationState(state);
+  const scopedRelationships = Array.isArray(relationships) ? relationships : [];
+  const notificationState = await loadGlobalNotificationState(state, scopedRelationships);
   const pushSupported = notificationState.pushStates.some((item) => item?.supported && item?.enabled);
   const pushSubscribed = notificationState.pushStates.some((item) => item?.subscribed);
   const telegram = notificationState.chatStates.find((item) => item?.telegram?.linked)?.telegram || null;
 
-  const representatives = relationships.length
-    ? miniCardRail(relationships.map((relationship, index) => {
+  const representatives = scopedRelationships.length
+    ? miniCardRail(scopedRelationships.map((relationship, index) => {
         const profile = relationship?.context?.profile || {};
         const title = relationshipTitle(relationship);
         return miniCard({
@@ -587,7 +589,7 @@ async function openGlobalAccountControls(root, state, handlers) {
   });
 
   layer?.querySelectorAll('[data-account-consent-contact]').forEach((node) => node.addEventListener('click', () => {
-    const relationship = relationships[Number(node.dataset.accountConsentContact)];
+    const relationship = scopedRelationships[Number(node.dataset.accountConsentContact)];
     const tenantId = String(relationship?.tenantId || '');
     if (!tenantId) return;
     void openAccountConsentSettings(state, {
@@ -795,32 +797,31 @@ async function renderGlobalHome(root, state, handlers) {
   }));
 }
 
+function relationshipSearchText(relationship = {}) {
+  const profile = relationship?.context?.profile || {};
+  return [
+    relationshipTitle(relationship),
+    profile.profession,
+    profile.phone,
+  ].map((value) => String(value || '').trim()).filter(Boolean).join(' ').toLocaleLowerCase('ru');
+}
+
 function contactsBody(relationships = [], query = '') {
   const needle = String(query || '').trim().toLocaleLowerCase('ru');
   const filtered = needle
-    ? relationships.filter((relationship) => relationshipTitle(relationship).toLocaleLowerCase('ru').includes(needle))
+    ? relationships.filter((relationship) => relationshipSearchText(relationship).includes(needle))
     : relationships;
   if (!filtered.length) {
     return emptyState(needle ? 'Ничего не найдено' : 'Контактов пока нет', needle ? 'Измени запрос поиска.' : 'Новые контакты появятся здесь.');
   }
-  if (relationships.length <= 15) return v2HorizontalRail(filtered.map(relationshipCard).join(''));
-  return listEntries(filtered.map((relationship) => {
-    const profile = relationship?.context?.profile || {};
-    const title = relationshipTitle(relationship);
-    return listEntry({
-      title,
-      subtitle: String(profile.profession || '').trim(),
-      data: `data-global-relationship="${escapeHtml(String(relationship.tenantId || ''))}"`,
-      aria: `Открыть ${title}`,
-    });
-  }));
+  return entityCardStack(filtered.map(relationshipCard));
 }
 
 async function renderGlobalContacts(root, state, handlers) {
   const relationships = Array.isArray(state.relationships) ? state.relationships : [];
   const searchable = relationships.length > 15;
   const header = v2Header({
-    a: { kind: 'settings', label: 'Настройки', disabled: true, aria: 'Настройки контактов' },
+    a: { kind: 'avatar', label: accountName(state), image: accountPhoto(state), data: 'data-account-profile-settings', aria: 'Настройки контактов' },
     b: 'Контакты',
     d: { kind: 'chat', data: 'data-account-open-chat-root', aria: 'Чат' },
   });
@@ -829,6 +830,7 @@ async function renderGlobalContacts(root, state, handlers) {
     body: `${searchable ? field({ name: 'accountContactSearch', type: 'search', placeholder: 'Поиск', autocomplete: 'off', data: 'data-account-contact-search' }) : ''}<div data-account-contact-list>${contactsBody(relationships)}</div>`,
   });
   bindWorkspaceInteraction(root, state, handlers);
+  bindGlobalProfileSettingsEntry(root, state, handlers);
   bindGlobalRelationships(root, state, handlers);
   bindGlobalChatButton(root, state, handlers);
   const search = root.querySelector('[data-account-contact-search]');
@@ -851,6 +853,197 @@ function globalContactRecords(state, tenantId) {
     .filter((request) => String(request?.tenantId || '') === String(tenantId || ''));
 }
 
+function confirmDeleteGlobalContact(state, handlers, relationship) {
+  const tenantId = String(relationship?.tenantId || '');
+  const title = relationshipTitle(relationship);
+  if (!tenantId) return;
+  const layer = mountModal(document.body, modal(`<div class="modal-title"><h2>Удалить контакт?</h2><p>${escapeHtml(title)} будет убран из Контактов. Все действующие согласия будут отозваны. Исторические данные сохранятся.</p></div><div class="form-error" data-contact-delete-error></div><div class="modal-actions">${button('Удалить', { variant: 'danger', data: 'data-confirm-delete-contact' })}${button('Отмена', { variant: 'secondary', data: 'data-cancel-delete-contact' })}</div>`, { variant: 'compact', title: 'Удаление контакта' }));
+  if (!layer) return;
+  layer.querySelector('[data-cancel-delete-contact]')?.addEventListener('click', () => layer.v2Close?.());
+  layer.querySelector('[data-confirm-delete-contact]')?.addEventListener('click', async (event) => {
+    event.currentTarget.disabled = true;
+    try {
+      await deleteGlobalAccountRelationship(tenantId);
+      state.relationships = (Array.isArray(state.relationships) ? state.relationships : [])
+        .filter((item) => String(item?.tenantId || '') !== tenantId);
+      state.accountRecords = (Array.isArray(state.accountRecords) ? state.accountRecords : [])
+        .filter((request) => String(request?.tenantId || '') !== tenantId);
+      state.accountSelectedContactTenantId = '';
+      state.accountSelectedChatTenantId = '';
+      state.accountTab = 'contacts';
+      state.accountDeckActive = 'contacts';
+      layer.v2Close?.();
+      await handlers.render?.();
+    } catch (error) {
+      event.currentTarget.disabled = false;
+      const errorNode = layer.querySelector('[data-contact-delete-error]');
+      if (errorNode) errorNode.textContent = accountErrorMessage(error, 'Не удалось удалить контакт');
+    }
+  });
+}
+
+function openGlobalContactSettings(state, handlers, relationship) {
+  const tenantId = String(relationship?.tenantId || '');
+  if (!tenantId) return null;
+  return openSharedProfileSettingsMenu({
+    title: 'Настройки',
+    actions: [
+      {
+        id: 'controls',
+        label: 'Согласия / Уведомления',
+        onSelect: () => void openGlobalAccountControls(document.body, state, handlers, [relationship]),
+      },
+      {
+        id: 'delete',
+        label: 'Удалить',
+        variant: 'critical',
+        onSelect: () => confirmDeleteGlobalContact(state, handlers, relationship),
+      },
+    ],
+    data: 'data-global-contact-settings-menu',
+  });
+}
+
+function contactHeaderMarkup(relationship) {
+  const profile = relationship?.context?.profile || {};
+  const title = relationshipTitle(relationship);
+  return v2Header({
+    a: { kind: 'avatar', label: title, image: String(profile.photo || ''), data: 'data-global-contact-settings', aria: 'Настройки' },
+    b: title,
+    c: { kind: 'text', label: 'Записаться', data: 'data-global-contact-booking', aria: 'Записаться' },
+    d: { kind: 'chat', data: 'data-global-contact-chat', aria: 'Чат' },
+  });
+}
+
+function setGlobalAccountHeader(root, markup) {
+  const header = root.querySelector('[data-v2-header]');
+  if (header) header.outerHTML = markup;
+}
+
+function contactWorkplaces(relationship, records = []) {
+  const interacted = new Set((Array.isArray(records) ? records : [])
+    .map((request) => String(request?.workplaceId || request?.workplaceKey || '').trim())
+    .filter(Boolean));
+  return (Array.isArray(relationship?.context?.workplaces) ? relationship.context.workplaces : [])
+    .filter((workplace) => interacted.has(String(workplace?.key || '').trim()));
+}
+
+function contactWorkplaceRail(relationship, records = []) {
+  const profile = relationship?.context?.profile || {};
+  const workplaces = contactWorkplaces(relationship, records);
+  if (!workplaces.length) return '';
+  return v2HorizontalRail(workplaces.map((workplace) => entityVisualCard({
+    appearance: workplaceCardAppearance(workplace),
+    fields: workplaceCardFields(workplace, workplace.cardProfile || profile),
+    image: String(workplace.photo || ''),
+    imagePosition: `${Number(workplace.photoCropX || 50)}% ${Number(workplace.photoCropY || 50)}%`,
+    interactive: true,
+    data: `data-global-contact-workplace="${escapeHtml(String(workplace.key || ''))}"`,
+    aria: `Открыть ${String(workplace.name || 'рабочее пространство')}`,
+  })).join(''), { className: 'v2-profile-workplaces' });
+}
+
+function contactHistoryMiniCard(state, request, index, dataName = 'data-global-contact-history') {
+  const procedures = requestProcedures(request).map((item) => String(item?.name || '').trim()).filter(Boolean);
+  const pricing = requestPricing(request);
+  return miniCard({
+    title: workplaceName(state, request),
+    value: procedures[0] || 'Запись',
+    subtitle: [formatDate(request.date), request.from].filter(Boolean).join(' · '),
+    rows: [
+      { label: 'Сумма', value: money(pricing.total) },
+    ],
+    interactive: true,
+    data: `${dataName}="${index}"`,
+    aria: `Открыть запись ${formatDate(request.date)} ${request.from || ''}`,
+  });
+}
+
+function contactHistoryRail(state, records = [], dataName = 'data-global-contact-history') {
+  const rows = (Array.isArray(records) ? records : [])
+    .slice()
+    .sort((a, b) => requestMoment(b).localeCompare(requestMoment(a)));
+  return rows.length
+    ? miniCardRail(rows.map((request, index) => contactHistoryMiniCard(state, request, index, dataName)))
+    : '';
+}
+
+function bindContactHeaderActions(root, state, handlers, relationship, { workplaceKey = '', repeatRequest = null } = {}) {
+  const tenantId = String(relationship?.tenantId || '');
+  root.querySelector('[data-global-contact-settings]')?.addEventListener('click', () => {
+    openGlobalContactSettings(state, handlers, relationship);
+  });
+  root.querySelector('[data-global-contact-booking]')?.addEventListener('click', () => {
+    handlers.onStartBooking?.(tenantId, {
+      workplaceKey: String(workplaceKey || ''),
+      repeatRequest,
+    });
+  });
+  root.querySelector('[data-global-contact-chat]')?.addEventListener('click', () => {
+    state.accountSelectedChatTenantId = tenantId;
+    state.accountTab = 'messages';
+    state.accountDeckOpen = false;
+    void handlers.render();
+  });
+}
+
+function openGlobalContactHistoryLayer(root, state, handlers, relationship, request, restoreHeader) {
+  const tenantId = String(relationship?.tenantId || '');
+  const profile = relationship?.context?.profile || {};
+  const title = relationshipTitle(relationship);
+  const canRepeat = requestProcedures(request).length > 0;
+  const layer = mountV2ZLayer(root, v2ZLayer(historyDetailBody(state, request), { className: 'account-contact-history-z' }), {
+    stack: true,
+    onClose: () => restoreHeader?.(),
+  });
+  if (!layer) return null;
+
+  setGlobalAccountHeader(root, v2Header({
+    a: { kind: 'avatar', label: title, image: String(profile.photo || ''), data: 'data-global-contact-settings', aria: 'Настройки' },
+    b: workplaceName(state, request),
+    c: canRepeat ? { kind: 'text', label: 'Повторить', data: 'data-global-contact-booking', aria: 'Повторить процедуру' } : null,
+    d: { kind: 'chat', data: 'data-global-contact-chat', aria: 'Чат' },
+  }));
+  bindContactHeaderActions(root, state, handlers, relationship, { repeatRequest: request });
+  return layer;
+}
+
+function openGlobalContactWorkplaceLayer(root, state, handlers, relationship, workplace, records, restoreHeader) {
+  const key = String(workplace?.key || '');
+  if (!key) return null;
+  const rows = (Array.isArray(records) ? records : [])
+    .filter((request) => String(request?.workplaceId || request?.workplaceKey || '') === key)
+    .sort((a, b) => requestMoment(b).localeCompare(requestMoment(a)));
+  const body = rows.length
+    ? v2Section('История', miniCardRail(rows.map((request, index) => contactHistoryMiniCard(state, request, index, 'data-global-workplace-history'))))
+    : emptyState('История пока пустая', 'Записи этого пространства появятся здесь.');
+  const layer = mountV2ZLayer(root, v2ZLayer(body, { className: 'account-contact-workplace-z' }), {
+    stack: true,
+    onClose: () => restoreHeader?.(),
+  });
+  if (!layer) return null;
+
+  const profile = relationship?.context?.profile || {};
+  const title = relationshipTitle(relationship);
+  const showHeader = () => {
+    setGlobalAccountHeader(root, v2Header({
+      a: { kind: 'avatar', label: title, image: String(profile.photo || ''), data: 'data-global-contact-settings', aria: 'Настройки' },
+      b: String(workplace.name || title),
+      c: { kind: 'text', label: 'Записаться', data: 'data-global-contact-booking', aria: 'Записаться' },
+      d: { kind: 'chat', data: 'data-global-contact-chat', aria: 'Чат' },
+    }));
+    bindContactHeaderActions(root, state, handlers, relationship, { workplaceKey: key });
+  };
+  showHeader();
+
+  layer.querySelectorAll('[data-global-workplace-history]').forEach((node) => node.addEventListener('click', () => {
+    const request = rows[Number(node.dataset.globalWorkplaceHistory)];
+    if (!request) return;
+    openGlobalContactHistoryLayer(root, state, handlers, relationship, request, showHeader);
+  }));
+  return layer;
+}
+
 async function renderGlobalContactDetail(root, state, handlers) {
   const relationship = selectedGlobalRelationship(state);
   if (!relationship) {
@@ -861,66 +1054,45 @@ async function renderGlobalContactDetail(root, state, handlers) {
   }
 
   const tenantId = String(relationship.tenantId || '');
-  const profile = relationship?.context?.profile || {};
-  const title = relationshipTitle(relationship);
   const records = globalContactRecords(state, tenantId);
-  const requests = futureRequests(records);
-  const hasInteractionHistory = records.some((request) => !isCancelled(request) && requestMoment(request) < nowMoment());
+  await renderGlobalContacts(root, state, handlers);
 
-  const upcoming = requests.length
-    ? v2HorizontalRail(requests.map((request, index) => visitCard(state, request, index)).join(''))
-    : '';
-  const activity = hasInteractionHistory
-    ? v2HorizontalRail([
-        v2RailCard({ title: String(records.length), subtitle: 'Действия' }),
-      ].join(''))
-    : '';
+  const workplaces = contactWorkplaceRail(relationship, records);
+  const history = contactHistoryRail(state, records);
+  const body = [
+    workplaces ? v2Section('Рабочие пространства', workplaces) : '',
+    history ? v2Section('История', history) : '',
+  ].filter(Boolean).join('') || emptyState('Профиль пока пустой', 'Данные взаимодействия появятся здесь.');
 
-  const header = v2Header({
-    a: { kind: 'avatar', label: title, image: String(profile.photo || ''), data: 'data-global-contact-settings', aria: 'Настройки' },
-    b: title,
-    c: { kind: 'text', label: 'Записаться', data: 'data-global-contact-booking', aria: 'Записаться' },
-    d: { kind: 'chat', data: 'data-global-contact-chat', aria: 'Чат' },
-  });
+  const showContactHeader = () => {
+    setGlobalAccountHeader(root, contactHeaderMarkup(relationship));
+    bindContactHeaderActions(root, state, handlers, relationship);
+  };
 
-  renderV2Shell(root, state, {
-    header,
-    body: `${activity ? v2Section('Взаимодействие', activity) : ''}${upcoming ? v2Section('Предстоящие визиты', upcoming) : ''}`,
-  });
-
-  bindWorkspaceInteraction(root, state, handlers, {
-    onZRight: () => {
+  const layer = mountV2ZLayer(root, v2ZLayer(body, { className: 'account-contact-detail-z' }), {
+    stack: true,
+    onClose: () => {
       state.accountTab = 'contacts';
       state.accountDeckActive = 'contacts';
       state.accountSelectedContactTenantId = '';
       void handlers.render();
     },
   });
+  if (!layer) return;
+  showContactHeader();
 
-  root.querySelector('[data-global-contact-settings]')?.addEventListener('click', () => {
-    const layer = mountModal(document.body, modal(settingsPanel([
-      { label: 'Согласия', data: 'data-global-contact-consents' },
-    ]), { variant: 'large', title: 'Настройки' }));
-    layer?.querySelector('[data-global-contact-consents]')?.addEventListener('click', () => {
-      layer.remove();
-      void openAccountConsentSettings(state, { tenantId });
-    });
-  });
+  layer.querySelectorAll('[data-global-contact-workplace]').forEach((node) => node.addEventListener('click', () => {
+    const workplace = (Array.isArray(relationship?.context?.workplaces) ? relationship.context.workplaces : [])
+      .find((item) => String(item?.key || '') === String(node.dataset.globalContactWorkplace || ''));
+    if (!workplace) return;
+    openGlobalContactWorkplaceLayer(root, state, handlers, relationship, workplace, records, showContactHeader);
+  }));
 
-  root.querySelector('[data-global-contact-booking]')?.addEventListener('click', () => handlers.onStartBooking?.(tenantId));
-  root.querySelector('[data-global-contact-chat]')?.addEventListener('click', () => {
-    state.accountSelectedChatTenantId = tenantId;
-    state.accountTab = 'messages';
-    state.accountDeckOpen = false;
-    void handlers.render();
-  });
-
-  root.querySelectorAll('[data-account-upcoming]').forEach((node) => node.addEventListener('click', () => {
-    const request = requests[Number(node.dataset.accountUpcoming)];
+  const historyRows = records.slice().sort((a, b) => requestMoment(b).localeCompare(requestMoment(a)));
+  layer.querySelectorAll('[data-global-contact-history]').forEach((node) => node.addEventListener('click', () => {
+    const request = historyRows[Number(node.dataset.globalContactHistory)];
     if (!request) return;
-    selectHistoryRequest(state, request, 'contact-detail');
-    state.accountDeckActive = 'history';
-    void handlers.render();
+    openGlobalContactHistoryLayer(root, state, handlers, relationship, request, showContactHeader);
   }));
 }
 
@@ -936,7 +1108,7 @@ async function renderGlobalHistory(root, state, handlers) {
   renderV2Shell(root, state, {
     header,
     body: requests.length
-      ? listEntries(requests.map((request, index) => historyEntry(request, index)))
+      ? v2ListEntries(requests.map((request, index) => historyEntry(request, index)))
       : emptyState('История пока пустая', 'Здесь появятся ваши записи и визиты.'),
   });
   bindWorkspaceInteraction(root, state, handlers);

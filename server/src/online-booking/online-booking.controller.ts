@@ -139,6 +139,15 @@ export class OnlineBookingController {
   }
 
   @UseGuards(AccountGuard)
+  @Delete('account/relationships/:tenantId')
+  deleteGlobalAccountRelationship(
+    @Param('tenantId') tenantId: string,
+    @Req() request: AccountRequest,
+  ) {
+    return this.booking.deleteGlobalAccountRelationship(request.accountAuth!.accountId, tenantId);
+  }
+
+  @UseGuards(AccountGuard)
   @Get('account/records')
   globalAccountRecords(@Req() request: AccountRequest) {
     return this.booking.globalAccountRecords(request.accountAuth!.accountId);

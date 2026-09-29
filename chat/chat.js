@@ -17,8 +17,8 @@ import {
   escapeHtml,
   field,
   initCheckList,
-  listEntries,
-  listEntry,
+  v2ListEntries,
+  v2ListEntry,
   modal,
   mountModal,
   openNotice,
@@ -81,7 +81,7 @@ function openProfessionalContacts(root, state) {
   const people = peopleList();
   const layer = mountModal(document.body, modal(
     people.length
-      ? listEntries(people.map((person, index) => listEntry({
+      ? v2ListEntries(people.map((person, index) => v2ListEntry({
           title: personName(person),
           subtitle: phoneOf(person),
           data: `data-chat-contact="${index}"`,
@@ -112,7 +112,7 @@ function recipientLabel(recipient = {}) {
 async function chooseTemplate(input) {
   const templates = await getBroadcastTemplates();
   if (!templates.length) return;
-  const layer = mountModal(document.body, modal(listEntries(templates.map((template, index) => listEntry({
+  const layer = mountModal(document.body, modal(v2ListEntries(templates.map((template, index) => v2ListEntry({
     title: template.name,
     subtitle: template.body,
     data: `data-chat-template="${index}"`,
@@ -197,7 +197,7 @@ function recipientOptions(root, state) {
 
 async function chooseOne(root, state) {
   const people = peopleList();
-  const layer = mountModal(document.body, modal(people.length ? listEntries(people.map((person, index) => listEntry({
+  const layer = mountModal(document.body, modal(people.length ? v2ListEntries(people.map((person, index) => v2ListEntry({
     title: personName(person),
     subtitle: phoneOf(person),
     data: `data-recipient-person="${index}"`,
@@ -226,7 +226,7 @@ async function chooseMany(root, state) {
 
 async function chooseGroup(root, state) {
   const groups = await getCommunicationGroups();
-  const layer = mountModal(document.body, modal(groups.length ? listEntries(groups.map((group, index) => listEntry({
+  const layer = mountModal(document.body, modal(groups.length ? v2ListEntries(groups.map((group, index) => v2ListEntry({
     title: group.name,
     subtitle: `${group.personKeys?.length || 0} людей`,
     data: `data-recipient-group-choice="${index}"`,
@@ -268,7 +268,7 @@ async function editGroup(group = null) {
 
 async function manageGroups() {
   const groups = await getCommunicationGroups();
-  const content = `<div class="form-grid">${button('Новая группа', { data: 'data-group-new' })}${groups.length ? listEntries(groups.map((group, index) => listEntry({ title: group.name, subtitle: `${group.personKeys?.length || 0} людей`, data: `data-group-edit="${index}"` }))) : emptyState('Групп пока нет', 'Создайте первую группу людей.')}</div>`;
+  const content = `<div class="form-grid">${button('Новая группа', { data: 'data-group-new' })}${groups.length ? v2ListEntries(groups.map((group, index) => v2ListEntry({ title: group.name, subtitle: `${group.personKeys?.length || 0} людей`, data: `data-group-edit="${index}"` }))) : emptyState('Групп пока нет', 'Создайте первую группу людей.')}</div>`;
   const layer = mountModal(document.body, modal(content, { title: 'Группы', variant: 'large', surface: 'app' }));
   layer?.querySelector('[data-group-new]')?.addEventListener('click', () => { layer.remove(); void editGroup(); });
   layer?.querySelectorAll('[data-group-edit]').forEach((node) => node.addEventListener('click', () => {
@@ -303,7 +303,7 @@ async function editTemplate(template = null) {
 
 async function manageTemplates() {
   const templates = await getBroadcastTemplates();
-  const content = `<div class="form-grid">${button('Новый шаблон', { data: 'data-template-new' })}${templates.length ? listEntries(templates.map((template, index) => listEntry({ title: template.name, subtitle: template.body, data: `data-template-edit="${index}"` }))) : emptyState('Шаблонов пока нет', 'Создайте первый шаблон сообщения.')}</div>`;
+  const content = `<div class="form-grid">${button('Новый шаблон', { data: 'data-template-new' })}${templates.length ? v2ListEntries(templates.map((template, index) => v2ListEntry({ title: template.name, subtitle: template.body, data: `data-template-edit="${index}"` }))) : emptyState('Шаблонов пока нет', 'Создайте первый шаблон сообщения.')}</div>`;
   const layer = mountModal(document.body, modal(content, { title: 'Шаблоны', variant: 'large', surface: 'app' }));
   layer?.querySelector('[data-template-new]')?.addEventListener('click', () => { layer.remove(); void editTemplate(); });
   layer?.querySelectorAll('[data-template-edit]').forEach((node) => node.addEventListener('click', () => {
