@@ -1,4 +1,4 @@
-import { actionBlock, button, collectCost, collectWorkplaceSelections, costCardMeta, costField, costListParts, details, emptyState, entityCard, escapeHtml, field, iconButton, initCostFields, initPhotoField, initWorkplaceSelectors, listEntries, listEntry, mountModal, modal, page, pageHeader, photoField, textareaField, workplaceCountText, workplaceSelector } from '../../../ui/ui.js';
+import { actionBlock, button, collectCost, collectWorkplaceSelections, costCardMeta, costField, costListParts, details, emptyState, entityCard, escapeHtml, field, iconButton, initCostFields, initPhotoField, initWorkplaceSelectors, v2ListEntries, v2ListEntry, mountModal, modal, page, pageHeader, photoField, textareaField, workplaceCountText, workplaceSelector } from '../../../ui/ui.js';
 import { getSettlementItemTotals } from '../../../core/finance/index.js';
 import { getWorkplaces } from '../../profile/workplaces/data.js';
 import { deleteProduct as deleteProductData, getProducts, pushProductHistory, saveProduct as saveProductData } from './data.js';
@@ -7,7 +7,7 @@ const money=(value)=>`${new Intl.NumberFormat('ru-RU').format(Number(value||0))}
 
 function renderList(root,navigateBack){
   const items=getProducts();
-  root.innerHTML=`<div class="entity-page-header">${pageHeader('Товары')}<div class="page-header-action">${iconButton('+',{className:'icon-button--primary',data:'data-add-product',aria:'Добавить товар'})}</div></div>${items.length?listEntries(items.map(renderRow)):emptyState('Товаров пока нет','Добавьте первый товар кнопкой «+».')}${actionBlock(button('Назад',{className:'ui-button--secondary',data:'data-back-products'}))}`;
+  root.innerHTML=`<div class="entity-page-header">${pageHeader('Товары')}<div class="page-header-action">${iconButton('+',{className:'icon-button--primary',data:'data-add-product',aria:'Добавить товар'})}</div></div>${items.length?v2ListEntries(items.map(renderRow)):emptyState('Товаров пока нет','Добавьте первый товар кнопкой «+».')}${actionBlock(button('Назад',{className:'ui-button--secondary',data:'data-back-products'}))}`;
   root.querySelector('[data-add-product]')?.addEventListener('click',()=>openForm(root,null,navigateBack));
   root.querySelectorAll('[data-product]').forEach(el=>el.addEventListener('click',()=>renderCard(root,el.dataset.product,navigateBack)));
   root.querySelectorAll('[data-delete-action]').forEach(el=>el.addEventListener('click',e=>{e.stopPropagation();confirmDelete(root,el.dataset.deleteAction,navigateBack,()=>renderList(root,navigateBack))}));
@@ -16,7 +16,7 @@ function renderList(root,navigateBack){
 
 function renderRow(p){
   const price=costListParts(p.cost),workplaceCount=(p.workplaces||[]).length;
-  return listEntry({title:p.name||'',subtitle:workplaceCountText(workplaceCount),image:p.photo||'',initial:(p.name||'?').slice(0,1).toUpperCase(),rightTop:price.rightTop||'',rightBottom:price.rightBottom||'',interactive:true,data:`data-product="${escapeHtml(p.id)}"`,aria:`Открыть товар ${p.name||''}`,deleteData:p.id,deleteAria:`Удалить товар ${p.name||''}`});
+  return v2ListEntry({title:p.name||'',subtitle:workplaceCountText(workplaceCount),image:p.photo||'',initial:(p.name||'?').slice(0,1).toUpperCase(),rightTop:price.rightTop||'',rightBottom:price.rightBottom||'',interactive:true,data:`data-product="${escapeHtml(p.id)}"`,aria:`Открыть товар ${p.name||''}`,deleteData:p.id,deleteAria:`Удалить товар ${p.name||''}`});
 }
 
 function openForm(root,existing=null,navigateBack=()=>{}){
