@@ -15,7 +15,7 @@ function emptyWorkplace(){
     timeZone:defaults.timeZone||'',
     from:defaults.from||'',
     to:defaults.to||'',
-    links:[],about:'',cardAppearance:{},
+    links:[],about:'',cardAppearance:{},visibleInPublicBooking:true,
   };
 }
 
@@ -56,6 +56,7 @@ export function workplaceForm(existing=null,{sourceOnly=false,bodyActions=false}
       <input type="hidden" name="workplaceTo" value="${escapeHtml(w.to||defaults.to||'')}">`;
   return `<form class="compact-form workplace-form" data-workplace-form>
     <input type="hidden" name="workplaceCardAppearance" value="${escapeHtml(JSON.stringify(w.cardAppearance||{}))}">
+    <input type="hidden" name="visibleInPublicBooking" value="${w.visibleInPublicBooking===false?'false':'true'}">
     ${settingsFields}
     ${field({label:'Название',name:'workplaceName',value:w.name,placeholder:'Название рабочего пространства',required:true})}
     ${select({label:'Город *',name:'workplaceCity',value:w.city||'',options:cities,placeholder:'Город',searchable:true,allowCustom:false})}
@@ -107,6 +108,7 @@ function collectWorkplaceForm(root,existing){
       links:collectLinks(root,'workplace-links'),
       about:String(data.get('workplaceAbout')||'').trim(),
       cardAppearance:parseCardAppearance(data.get('workplaceCardAppearance')),
+      visibleInPublicBooking:String(data.get('visibleInPublicBooking')||'true')!=='false',
       createdAt:existing?.createdAt||new Date().toISOString(),
       updatedAt:new Date().toISOString(),
     },
@@ -172,11 +174,11 @@ export function bindWorkplaceForm(root,existing=null,{onSaved=()=>{},onDeleted=(
   };
 }
 
-function setWorkplaceDraft(root,name,value){
+function setWorkplaceDraft(root,name,value,{notify=true}={}){
   const input=root.querySelector(`[name="${CSS.escape(name)}"]`);
   if(!input)return;
   input.value=String(value??'');
-  input.dispatchEvent(new Event('change',{bubbles:true}));
+  if(notify)input.dispatchEvent(new Event('change',{bubbles:true}));
 }
 
 function syncWorkplaceAvatar(root,photo){
@@ -205,6 +207,7 @@ function workplaceDraftFromForm(root,existing=null){
     photoCropX:Number(data.get('workplacePhotoCropX')||50),
     photoCropY:Number(data.get('workplacePhotoCropY')||50),
     cardAppearance:parseCardAppearance(data.get('workplaceCardAppearance')),
+    visibleInPublicBooking:String(data.get('visibleInPublicBooking')||'true')!=='false',
   };
 }
 
@@ -252,6 +255,29 @@ export function openWorkplaceSettingsMenu(root,existing=null,{onDeleted=()=>{},o
   const form=root.querySelector('[data-workplace-form]');
   if(!form)return null;
   const data=()=>new FormData(form);
+  const currentVisibility=()=>String(data().get('visibleInPublicBooking')||'true')!=='false';
+  const controls=[
+    {
+      id:'public-booking-visibility',
+      label:'Показывать в общей онлайн-записи',
+      checked:currentVisibility(),
+      onToggle:async(checked)=>{
+        const previous=currentVisibility();
+        try{
+          if(existing)await upsertWorkplace({...existing,visibleInPublicBooking:checked});
+          setWorkplaceDraft(root,'visibleInPublicBooking',checked?'true':'false',{notify:!existing});
+          return checked;
+        }catch(error){
+          setWorkplaceDraft(root,'visibleInPublicBooking',previous?'true':'false',{notify:false});
+          throw error;
+        }
+      },
+      onError:(error)=>{
+        const target=root.querySelector('[data-workplace-error]');
+        if(target)target.textContent=error instanceof Error?error.message:'Не удалось сохранить настройку онлайн-записи';
+      },
+    },
+  ];
   const actions=[
     {
       id:'appearance',
@@ -289,6 +315,7 @@ export function openWorkplaceSettingsMenu(root,existing=null,{onDeleted=()=>{},o
   }
   return openSharedProfileSettingsMenu({
     title:'Настройки пространства',
+    controls,
     actions,
     data:'data-workplace-settings-menu',
   });

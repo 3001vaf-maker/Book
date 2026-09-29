@@ -15,6 +15,9 @@ const profileUi = readFileSync(new URL('../settings/profile/profile.js', import.
 const workplaceUi = readFileSync(new URL('../settings/profile/workplaces/workplaces.js', import.meta.url), 'utf8');
 const workplaceTimeOwner = readFileSync(new URL('../server/src/time/workplace-time-zone.ts', import.meta.url), 'utf8');
 const professionCatalogMigration = readFileSync(new URL('../server/prisma/migrations/20260928203000_platform_profession_catalog/migration.sql', import.meta.url), 'utf8');
+const workplaceBookingVisibilityMigration = readFileSync(new URL('../server/prisma/migrations/20260929115000_workplace_public_booking_visibility/migration.sql', import.meta.url), 'utf8');
+const sharedProfileUi = readFileSync(new URL('../ui/profile/index.js', import.meta.url), 'utf8');
+const listEntryUi = readFileSync(new URL('../ui/lists/list-entry.js', import.meta.url), 'utf8');
 
 assert.doesNotMatch(auth, /prepareProductionWorkspace|localStorage\.removeItem/);
 assert.doesNotMatch(core, /workspace-sync|syncWorkspaceBeforeRender|startWorkspaceSync/);
@@ -58,6 +61,15 @@ assert.match(schema, /model PlatformProfession\s*\{/);
 assert.match(professionCatalogMigration, /CREATE TABLE "PlatformProfession"/);
 assert.match(professionCatalogMigration, /"normalizedName" <> 'другая'/);
 assert.match(schema, /deletedAt\s+DateTime\?/);
+assert.match(schema, /visibleInPublicBooking\s+Boolean\s+@default\(true\)/);
+assert.match(workplaceBookingVisibilityMigration, /"visibleInPublicBooking" BOOLEAN NOT NULL DEFAULT true/);
+assert.match(workplaceData, /visibleInPublicBooking:\s*workplace\.visibleInPublicBooking !== false/);
+assert.match(workplaceUi, /Показывать в общей онлайн-записи/);
+assert.match(workplaceUi, /controls,\s*actions/);
+assert.match(sharedProfileUi, /v2ListEntry/);
+assert.match(sharedProfileUi, /controlsMarkup.*settingsPanel/s);
+assert.match(listEntryUi, /toggleData/);
+assert.match(listEntryUi, /app-setting-toggle__switch/);
 assert.match(workplaceSoftDeleteMigration, /ADD COLUMN IF NOT EXISTS "deletedAt"/);
 assert.match(serverService, /data: \{ deletedAt: new Date\(\) \}/);
 assert.doesNotMatch(serverService, /prisma\.workplace\.delete\(/);

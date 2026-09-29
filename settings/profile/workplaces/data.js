@@ -57,6 +57,7 @@ export function normalizeWorkplace(workplace = {}) {
     links: normalizeLinks(workplace.links),
     about: String(workplace.about || ''),
     cardAppearance: workplace.cardAppearance && typeof workplace.cardAppearance === 'object' && !Array.isArray(workplace.cardAppearance) ? workplace.cardAppearance : {},
+    visibleInPublicBooking: workplace.visibleInPublicBooking !== false,
     createdAt: String(workplace.createdAt || ''),
     updatedAt: String(workplace.updatedAt || ''),
   };

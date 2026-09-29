@@ -3,6 +3,7 @@ import { formError, formView } from '../forms/index.js';
 import { formValidationMessage, initPasswordFields, passwordField, selectPhotoFile } from '../inputs/index.js';
 import { modal, mountModal, openNotice } from '../modals/index.js';
 import { settingsPanel } from '../settings/index.js';
+import { v2ListEntry, v2ListEntries } from '../lists/list-entry.js';
 import { v2Document } from '../v2/index.js';
 
 function actionData(id = '') {
@@ -11,11 +12,25 @@ function actionData(id = '') {
 
 export function openSharedProfileSettingsMenu({
   title = 'Настройки профиля',
+  controls = [],
   actions = [],
   data = 'data-shared-profile-settings-menu',
 } = {}) {
+  const controlItems = (Array.isArray(controls) ? controls : []).filter((item) => item?.id && item?.label);
   const items = (Array.isArray(actions) ? actions : []).filter((item) => item?.id && item?.label);
-  const body = `<div ${data}>${settingsPanel(items.map((item) => ({
+  const controlsMarkup = controlItems.length
+    ? v2ListEntries(controlItems.map((item) => v2ListEntry({
+        title: item.label,
+        subtitle: item.description || '',
+        interactive: false,
+        initial: '',
+        toggleData: `data-shared-profile-toggle="${String(item.id)}"`,
+        toggleAria: item.aria || item.label,
+        toggleChecked: Boolean(item.checked),
+        toggleDisabled: Boolean(item.disabled),
+      })))
+    : '';
+  const body = `<div ${data}>${controlsMarkup}${settingsPanel(items.map((item) => ({
     label: item.label,
     variant: item.variant || 'outline',
     data: actionData(item.id),
@@ -26,6 +41,25 @@ export function openSharedProfileSettingsMenu({
     className: 'modal--profile-settings-sheet',
   }));
   if (!layer) return null;
+
+  controlItems.forEach((item) => {
+    const control = layer.querySelector(`[data-shared-profile-toggle="${CSS.escape(String(item.id))}"]`);
+    control?.addEventListener('click', async () => {
+      const current = control.getAttribute('aria-pressed') === 'true';
+      control.disabled = true;
+      try {
+        const result = await item.onToggle?.(!current);
+        const checked = typeof result === 'boolean' ? result : !current;
+        control.setAttribute('aria-pressed', checked ? 'true' : 'false');
+        control.classList.toggle('is-on', checked);
+        control.querySelector('.app-setting-toggle__switch')?.classList.toggle('is-on', checked);
+      } catch (error) {
+        void item.onError?.(error);
+      } finally {
+        control.disabled = Boolean(item.disabled);
+      }
+    });
+  });
 
   items.forEach((item) => {
     layer.querySelector(`[data-shared-profile-action="${CSS.escape(String(item.id))}"]`)?.addEventListener('click', () => {

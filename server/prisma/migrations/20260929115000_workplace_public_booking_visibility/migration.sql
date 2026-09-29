@@ -1,0 +1,2 @@
+ALTER TABLE "Workplace"
+  ADD COLUMN IF NOT EXISTS "visibleInPublicBooking" BOOLEAN NOT NULL DEFAULT true;
