@@ -121,6 +121,7 @@ assert.match(booking, /params\.set\('entry', 'account-booking'\)/, 'Known contac
 assert.match(booking, /params\.set\('workplace', workplaceKey\)/, 'Workplace booking must preserve the selected workplace');
 assert.match(booking, /params\.set\('procedures', procedureIds\.join\(','\)\)/, 'Repeat booking must preserve selected procedures');
 assert.match(booking, /state\.entry === 'account-booking'/);
+assert.match(booking, /data-booking-u-close[\s\S]*?state\.entry === 'account-booking'[\s\S]*?exitBookingContext\(state, \{ tab: 'contact-detail', tenantId: state\.tenantId \}\)/, 'Closing auth from Contacts booking must return to the professional profile, not welcome');
 assert.match(booking, /state\.identityDestination === 'booking-start'[\s\S]*nextBookingStep\(root, state\)/);
 assert.match(coreJs, /procedureIds:\s*String\(params\.get\('procedures'\)/);
 assert.match(booking, /d:\s*null/);
