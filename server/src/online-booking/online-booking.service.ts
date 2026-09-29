@@ -415,15 +415,16 @@ export class OnlineBookingService {
   async getContext(tenantId: string, workplaceKey = '') {
     await this.firstRun.assertRealOperationsAllowed(tenantId);
     const data = await this.bookingSource(tenantId);
-    const allWorkplaces = arrayValue(data.workplaces);
+    const sourceWorkplaces = arrayValue(data.workplaces);
     const requestedWorkplace = text(workplaceKey);
     const selected = requestedWorkplace
-      ? allWorkplaces.find((item) => text(item?.key) === requestedWorkplace)
+      ? sourceWorkplaces.find((item) => text(item?.key) === requestedWorkplace)
       : null;
     if (requestedWorkplace && !selected) throw new NotFoundException('Рабочее пространство не найдено');
 
-    const allowedKeys = new Set((selected ? [selected] : allWorkplaces).map((item) => text(item?.key)).filter(Boolean));
-    const workplaces = selected ? [selected] : allWorkplaces;
+    const generalWorkplaces = sourceWorkplaces.filter((item) => item?.visibleInPublicBooking !== false);
+    const workplaces = selected ? [selected] : generalWorkplaces;
+    const allowedKeys = new Set(workplaces.map((item) => text(item?.key)).filter(Boolean));
     const procedures = arrayValue(data.procedures).filter((procedure) => {
       const assignments = arrayValue(procedure?.workplaces);
       return assignments.some((item) => allowedKeys.has(text(item?.workplaceId ?? item?.key ?? item?.id)));

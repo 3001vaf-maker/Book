@@ -44,6 +44,7 @@ type WorkplaceInput = {
   links: LinkInput[];
   about: string;
   cardAppearance: Record<string, unknown>;
+  visibleInPublicBooking: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -126,6 +127,7 @@ function normalizeWorkplace(value: unknown): WorkplaceInput {
     links: normalizeLinks(source.links),
     about: stringValue(source.about),
     cardAppearance: objectValue(source.cardAppearance),
+    visibleInPublicBooking: source.visibleInPublicBooking !== false,
     createdAt: stringValue(source.createdAt),
     updatedAt: stringValue(source.updatedAt),
   };
@@ -184,6 +186,7 @@ function workplaceData(workplace: WorkplaceInput, position: number) {
     links: workplace.links as Prisma.InputJsonValue,
     about: workplace.about,
     cardAppearance: workplace.cardAppearance as Prisma.InputJsonValue,
+    visibleInPublicBooking: workplace.visibleInPublicBooking,
     sourceCreatedAt: workplace.createdAt,
     sourceUpdatedAt: workplace.updatedAt,
   };
@@ -208,6 +211,7 @@ function workplaceDto(workplace: WorkplaceRow): WorkplaceInput {
     links: normalizeLinks(workplace.links),
     about: workplace.about,
     cardAppearance: objectValue(workplace.cardAppearance),
+    visibleInPublicBooking: workplace.visibleInPublicBooking,
     createdAt: workplace.sourceCreatedAt,
     updatedAt: workplace.sourceUpdatedAt,
   };
@@ -699,7 +703,7 @@ export class ProfileService {
   async publicBookingBundle(tenantId: string) {
     const row = await this.prisma.profile.findFirst({
       where: { tenantId, migrationVerifiedAt: { not: null } },
-      include: { workplaces: { orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] } },
+      include: { workplaces: { where: { deletedAt: null }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] } },
       orderBy: { createdAt: 'asc' },
     });
     if (!row) throw new ConflictException('Профиль для онлайн-записи ещё не готов');
