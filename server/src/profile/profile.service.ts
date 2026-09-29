@@ -661,6 +661,7 @@ export class ProfileService {
       profile: {
         name: row.name,
         surname: row.surname,
+        phone: row.phone,
         photo: row.photo,
         profession: row.profession,
         about: row.about,
