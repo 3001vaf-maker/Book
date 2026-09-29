@@ -151,9 +151,11 @@ if (!/v2-sticker-list/.test(sharedProcedureListSource)
   || !/aria-pressed/.test(sharedProcedureListSource)
   || !/\.v2-sticker-list\{[^}]*gap:\s*10px/.test(sharedRecordCss)
   || !/--record-procedure-name-size/.test(sharedProcedureListSource)
+  || !/\.v2-service-sticker\{[^}]*background:#fff/.test(sharedRecordCss)
+  || /\.v2-service-sticker\{[^}]*background:var\(--v2-beige\)/.test(sharedRecordCss)
   || !/\.v2-service-sticker__text strong\{[^}]*white-space:\s*nowrap[^}]*text-overflow:\s*clip/.test(sharedRecordCss)
   || !/\.v2-service-sticker\.is-selected \.v2-service-sticker__selector::after\{content:'✓'\}/.test(sharedRecordCss)) {
-  errors.push('Shared Record procedure selection must render separate readable stickers, keep full procedure names on one line without ellipsis, preserve spacing, and show the selected checkmark');
+  errors.push('Shared Record procedure selection must use a neutral white sticker surface, keep full procedure names on one line without ellipsis, preserve spacing, and show the selected checkmark');
 }
 
 const procedureSettingsSource = journalRecordUi.slice(
