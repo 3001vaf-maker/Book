@@ -727,10 +727,6 @@ export function initV2WorkspaceInteraction(root, {
       if (!scrollOwner && (overflowX === 'auto' || overflowX === 'scroll') && Number(node.scrollWidth || 0) > Number(node.clientWidth || 0) + 2) {
         scrollOwner = node;
       }
-      const touchAction = String(style?.touchAction || '').toLowerCase();
-      if ((touchAction === 'none' || touchAction.includes('pan-x')) && !scrollOwner) {
-        return { blocked: true, scrollOwner: null };
-      }
       node = node.parentElement;
     }
     return { blocked: false, scrollOwner };
