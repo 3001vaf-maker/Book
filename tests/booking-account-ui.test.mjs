@@ -204,7 +204,9 @@ assert.match(contactDetailBlock, /deleteGlobalAccountRelationship\(tenantId\)/);
 assert.match(contactDetailBlock, /label:\s*'Записаться'/);
 assert.match(contactDetailBlock, /label:\s*'Повторить'/);
 
-assert.match(profileService, /profile:\s*\{[\s\S]*?phone: row\.phone/);
+assert.match(profileService, /async accountRelationshipProfile\(tenantId: string\)[\s\S]*?phone: row\.phone/);
+assert.doesNotMatch(profileService.slice(profileService.indexOf('async publicBookingBundle')), /profile:\s*\{[\s\S]*?phone: row\.phone/, 'Public booking profile must not expose the professional phone just for Contacts');
+assert.match(onlineBookingService, /this\.profile\.accountRelationshipProfile\(link\.tenantId\)/);
 assert.doesNotMatch(accountShell, /async function renderGlobalRepresentatives\(/);
 assert.doesNotMatch(accountShell, /export async function renderAccount\(/);
 assert.doesNotMatch(accountShell, /async function renderHome\(/);
