@@ -306,12 +306,8 @@ function bindWorkspaceInteraction(root, state, handlers, { bindZ = true, onZRigh
     },
     onRootSelect: (id) => {
       const next = GLOBAL_ACCOUNT_ROOTS.some((item) => item.id === id) ? id : 'home';
-      if (id === String(state.accountDeckActive || '') && next === state.accountTab) {
-        setAccountDeckOpen(root, state, true);
-        return;
-      }
       state.accountDeckActive = id;
-      state.accountDeckOpen = true;
+      state.accountDeckOpen = false;
       state.accountChatOpen = false;
       state.accountTab = next;
       void handlers.render();
