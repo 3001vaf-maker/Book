@@ -26,7 +26,7 @@ for (const css of ['../layout/layout.css', '../accordion/accordion.css', '../cal
 for (const marker of [
   "['fields', 'Поля и телефон']",
   "['blocks', 'Блоки 1–3']",
-  "['lists', 'List / Entry List']",
+  "['lists', 'List / V2 List Entry']",
   "['receipt', 'Отчётный лист']",
   "['date', 'День / календарь']",
   "['folders', 'Папки']",
@@ -36,7 +36,7 @@ for (const marker of [
 
 expect(reference.includes("repeatedField({ label: 'Телефон'") && reference.includes("type: 'tel'"), 'Reference must show the canonical [+код][телефон][×] phone row.');
 expect(reference.includes("repeatedField({ label: 'Поле'") && reference.includes('initRepeatedFields(app)'), 'Reference must show the canonical [поле][×] repeated row.');
-expect(reference.includes('v2ListEntry({ columns:') && reference.includes('v2ListEntries(['), 'Reference must show canonical Entry List columns.');
+expect(reference.includes('v2ListEntry({ columns:') && reference.includes('v2ListEntries(['), 'Reference must show canonical V2 List Entry columns.');
 expect(reference.includes('readOnlyReceipt({'), 'Reference must show the canonical report/receipt sheet.');
 expect(reference.includes('monthDayPicker({') && reference.includes('initCalendar(calendarHost'), 'Reference must show both day field and calendar.');
 expect(reference.includes('folderList(['), 'Reference must show canonical folders.');
