@@ -16,15 +16,15 @@ import { disableWebPush, enableWebPush, getWebPushState } from '../core/notifica
 import {
   button,
   emptyState,
-  entityCard,
+  entityCardStack,
   entityVisualCard,
   normalizeEntityCardAppearance,
   miniCard,
   miniCardRail,
   escapeHtml,
   field,
-  listEntries,
-  listEntry,
+  v2ListEntries,
+  v2ListEntry,
   v2FDeck,
   v2Header,
   v2HorizontalRail,
@@ -143,7 +143,7 @@ function historyEntry(request, index) {
   while (procedures.length < 3) procedures.push({ value: '' });
   const pricing = requestPricing(request);
   const finance = financeStatus(request);
-  return listEntry({
+  return v2ListEntry({
     columns: [
       procedures,
       [
@@ -353,18 +353,30 @@ function relationshipTitle(relationship = {}) {
   return [profile.name, profile.surname].filter(Boolean).join(' ').trim() || 'Профиль';
 }
 
+const CONTACT_PROFILE_CARD_APPEARANCE = normalizeEntityCardAppearance({
+  lines: [
+    {}, {}, {}, {}, {}, {},
+    { field:'name', zone:'full', align:'left', size:'l', color:'white', bold:true },
+    { field:'profession', zone:'full', align:'left', size:'m', color:'white' },
+    { field:'phone', zone:'full', align:'left', size:'m', color:'white' },
+  ],
+});
+
 function relationshipCard(relationship = {}) {
   const profile = relationship?.context?.profile || {};
   const title = relationshipTitle(relationship);
-  return entityCard({
-    title,
-    subtitle: String(profile.profession || '').trim(),
+  const phone = formatPhone(profile.phone || '') || String(profile.phone || '').trim();
+  return entityVisualCard({
+    appearance: CONTACT_PROFILE_CARD_APPEARANCE,
+    fields: [
+      { value:'name', label:'Имя и фамилия', text:title },
+      { value:'profession', label:'Деятельность', text:String(profile.profession || '').trim() },
+      { value:'phone', label:'Телефон', text:phone },
+    ],
     image: String(profile.photo || ''),
-    initial: title.slice(0, 1).toUpperCase(),
     interactive: true,
     data: `data-global-relationship="${escapeHtml(String(relationship.tenantId || ''))}"`,
     aria: `Открыть ${title}`,
-    className: 'entity-card--compact',
   });
 }
 
@@ -795,25 +807,24 @@ async function renderGlobalHome(root, state, handlers) {
   }));
 }
 
+function relationshipSearchText(relationship = {}) {
+  const profile = relationship?.context?.profile || {};
+  return [
+    relationshipTitle(relationship),
+    profile.profession,
+    profile.phone,
+  ].map((value) => String(value || '').trim()).filter(Boolean).join(' ').toLocaleLowerCase('ru');
+}
+
 function contactsBody(relationships = [], query = '') {
   const needle = String(query || '').trim().toLocaleLowerCase('ru');
   const filtered = needle
-    ? relationships.filter((relationship) => relationshipTitle(relationship).toLocaleLowerCase('ru').includes(needle))
+    ? relationships.filter((relationship) => relationshipSearchText(relationship).includes(needle))
     : relationships;
   if (!filtered.length) {
     return emptyState(needle ? 'Ничего не найдено' : 'Контактов пока нет', needle ? 'Измени запрос поиска.' : 'Новые контакты появятся здесь.');
   }
-  if (relationships.length <= 15) return v2HorizontalRail(filtered.map(relationshipCard).join(''));
-  return listEntries(filtered.map((relationship) => {
-    const profile = relationship?.context?.profile || {};
-    const title = relationshipTitle(relationship);
-    return listEntry({
-      title,
-      subtitle: String(profile.profession || '').trim(),
-      data: `data-global-relationship="${escapeHtml(String(relationship.tenantId || ''))}"`,
-      aria: `Открыть ${title}`,
-    });
-  }));
+  return entityCardStack(filtered.map(relationshipCard));
 }
 
 async function renderGlobalContacts(root, state, handlers) {
@@ -936,7 +947,7 @@ async function renderGlobalHistory(root, state, handlers) {
   renderV2Shell(root, state, {
     header,
     body: requests.length
-      ? listEntries(requests.map((request, index) => historyEntry(request, index)))
+      ? v2ListEntries(requests.map((request, index) => historyEntry(request, index)))
       : emptyState('История пока пустая', 'Здесь появятся ваши записи и визиты.'),
   });
   bindWorkspaceInteraction(root, state, handlers);
