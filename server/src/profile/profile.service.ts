@@ -44,6 +44,7 @@ type WorkplaceInput = {
   links: LinkInput[];
   about: string;
   cardAppearance: Record<string, unknown>;
+  visibleInPublicBooking: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -126,6 +127,7 @@ function normalizeWorkplace(value: unknown): WorkplaceInput {
     links: normalizeLinks(source.links),
     about: stringValue(source.about),
     cardAppearance: objectValue(source.cardAppearance),
+    visibleInPublicBooking: source.visibleInPublicBooking !== false,
     createdAt: stringValue(source.createdAt),
     updatedAt: stringValue(source.updatedAt),
   };
@@ -184,6 +186,7 @@ function workplaceData(workplace: WorkplaceInput, position: number) {
     links: workplace.links as Prisma.InputJsonValue,
     about: workplace.about,
     cardAppearance: workplace.cardAppearance as Prisma.InputJsonValue,
+    visibleInPublicBooking: workplace.visibleInPublicBooking,
     sourceCreatedAt: workplace.createdAt,
     sourceUpdatedAt: workplace.updatedAt,
   };
@@ -208,6 +211,7 @@ function workplaceDto(workplace: WorkplaceRow): WorkplaceInput {
     links: normalizeLinks(workplace.links),
     about: workplace.about,
     cardAppearance: objectValue(workplace.cardAppearance),
+    visibleInPublicBooking: workplace.visibleInPublicBooking,
     createdAt: workplace.sourceCreatedAt,
     updatedAt: workplace.sourceUpdatedAt,
   };
