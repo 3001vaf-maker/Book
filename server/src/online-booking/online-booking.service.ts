@@ -797,13 +797,16 @@ export class OnlineBookingService {
     });
     const relationships = await Promise.all(links.map(async (link) => {
       try {
-        const data = await this.bookingSource(link.tenantId);
+        const [data, relationshipProfile] = await Promise.all([
+          this.bookingSource(link.tenantId),
+          this.profile.accountRelationshipProfile(link.tenantId),
+        ]);
         return {
           tenantId: link.tenantId,
           linkedAt: link.createdAt,
           context: {
             tenantId: link.tenantId,
-            profile: objectValue(data.profile),
+            profile: objectValue(relationshipProfile),
             settings: objectValue(data.bookingSettings),
             workplaces: arrayValue(data.workplaces),
           },
