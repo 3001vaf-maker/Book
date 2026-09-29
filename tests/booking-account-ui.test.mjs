@@ -473,8 +473,8 @@ assert.doesNotMatch(bookingUi, /bookingChoiceCards|bookingTimeGroups|v2ServiceSt
 assert.match(booking, /workplaceCardAppearance\(workplace\)/);
 assert.match(booking, /workplaceCardFields\(workplace, workplace\.cardProfile \|\| profile\)/);
 assert.match(recordRuntime, /entityVisualCard\(/);
-assert.match(recordRuntime, /listEntry\(/);
-assert.match(recordRuntime, /listEntries\(/);
+assert.match(recordRuntime, /v2ListEntry\(/);
+assert.match(recordRuntime, /v2ListEntries\(/);
 assert.match(recordRuntime, /miniCard\(/);
 assert.match(recordRuntime, /v2RailCard\(/);
 assert.match(recordRuntime, /timeSlots\(/);
