@@ -207,6 +207,16 @@ export async function getGlobalAccountRelationships() {
   );
 }
 
+export async function deleteGlobalAccountRelationship(tenantId) {
+  return jsonResponse(
+    await request(`/online-booking/account/relationships/${encodeURIComponent(String(tenantId || ''))}`, {
+      auth: true,
+      method: 'DELETE',
+    }),
+    'Не удалось удалить контакт',
+  );
+}
+
 export async function getGlobalAccountRecords() {
   return jsonResponse(
     await request('/online-booking/account/records', { auth: true }),
