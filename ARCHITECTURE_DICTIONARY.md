@@ -49,6 +49,22 @@ core/<domain>/
 
 Перед созданием нового общего UI необходимо проверить `UI_FUNCTIONS_DICTIONARY.md`.
 
+### Shared FEZ navigation
+
+F/E/Z navigation belongs only to the Shared V2 owner in `ui/v2` and is identical for the professional and end-user contours.
+
+- **H** is the navigation background.
+- **Z** keeps its canonical geometry and content. Opening navigation moves the entire existing Z/front fully to the right; navigation never redraws or locally restyles Z.
+- **F** is one horizontal playing-card layout of root sections on H.
+- A selected F card uses the canonical yellow selection outline.
+- An F card that owns nested sections shows the Shared nested-card indicator.
+- **E** is not a separate screen. It unfolds vertically through the selected F card while the horizontal F layer stays visible, forming one F/E cross on H.
+- Horizontal F motion changes the root-card focus. Vertical E motion changes the nested-card focus. Right-swipe from E collapses E back into F.
+- Tap on F without E opens the existing Z1. Tap on F with E opens the E cross. Tap on E opens the existing Z1.
+- Z2/Z3 and modals remain above this owner and block lower FEZ gestures while active.
+
+Functional screens may supply labels, children and state, but may not implement their own FEZ geometry or gesture controller.
+
 CSS принадлежит общему UI-компоненту в `ui/` либо глобальной оболочке приложения в `css/style.css`. Экран/фича не должна чинить ошибку ownership локальным CSS-обходом или копировать существующий компонент.
 
 Основные общие понятия UI:
