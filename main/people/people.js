@@ -29,6 +29,8 @@ import {
   tags,
   uei,
   v2HorizontalRail,
+  v2ListEntry,
+  v2ListEntries,
   v2RailCard,
   v2Section,
   v2ZLayer,
@@ -182,19 +184,19 @@ function listMarkup(items, query = '') {
       ? emptyState('Ничего не найдено', 'Проверьте имя или UEI.')
       : emptyState('Клиентов пока нет', 'Добавьте человека кнопкой «+».');
   }
-  return list({
-    items: items.map((person) => {
-      const display = personDisplay(person);
-      return {
-        overline: display.uei,
-        title: display.name,
-        secondary: display.phone,
-        interactive: true,
-        data: `data-person="${escapeHtml(person.key)}"`,
-        aria: `Открыть ${display.name}`,
-      };
-    }),
-  });
+  return v2ListEntries(items.map((person) => {
+    const display = personDisplay(person);
+    return v2ListEntry({
+      overline: display.uei,
+      title: display.name,
+      subtitle: display.phone,
+      initial: '',
+      className: 'list-entry--record-person',
+      interactive: true,
+      data: `data-person="${escapeHtml(person.key)}"`,
+      aria: `Открыть ${display.name}`,
+    });
+  }));
 }
 
 function refreshPeopleList(root) {
