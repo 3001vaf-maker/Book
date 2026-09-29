@@ -250,6 +250,12 @@ assert.doesNotMatch(accountShell, /mountV2Layer\(|v2Layer\(/);
 assert.match(accountShell, /async function renderGlobalHistoryDetail/);
 assert.match(accountShell, /label: 'Записаться', data: 'data-global-history-repeat'/);
 assert.match(accountShell, /state\.accountSelectedChatTenantId/);
+const rootChatBlock = accountShell.slice(
+  accountShell.indexOf('function bindGlobalChatButton'),
+  accountShell.indexOf('function bindGlobalProfileSettingsEntry'),
+);
+assert.match(rootChatBlock, /state\.accountSelectedChatTenantId = '';/, 'Root Header D must always open the chat contact list');
+assert.match(contactDetailBlock, /state\.accountSelectedChatTenantId = tenantId;/, 'Contact Header D must open chat with that professional profile');
 assert.match(accountShell, /state\.accountDeckOpen = true/);
 assert.doesNotMatch(accountShell, /requestMoment\(request\)\s*[<>]=?\s*nowMoment\(\)\s*\?\s*'Задолженность'/);
 assert.doesNotMatch(accountShell, /bookingThemeStyle/);
