@@ -284,9 +284,11 @@ function renderV2Shell(root, state, { header, body = '', deck = true, className 
     body,
     deck: deck ? accountDeck(state) : '',
     deckOpen: Boolean(state.accountDeckOpen && deck),
+    zEnter: Boolean(state.accountZEnter),
     className,
   });
   root.innerHTML = shell;
+  state.accountZEnter = false;
 }
 
 function setAccountDeckOpen(root, state, open) {
@@ -308,6 +310,7 @@ function bindWorkspaceInteraction(root, state, handlers, { bindZ = true, onZRigh
       const next = GLOBAL_ACCOUNT_ROOTS.some((item) => item.id === id) ? id : 'home';
       state.accountDeckActive = id;
       state.accountDeckOpen = false;
+      state.accountZEnter = true;
       state.accountChatOpen = false;
       state.accountTab = next;
       void handlers.render();
@@ -1177,6 +1180,7 @@ export async function renderGlobalAccount(root, state, callbacks = {}) {
   state.globalAccount = true;
   state.accountTab ||= 'home';
   state.accountDeckOpen = Boolean(state.accountDeckOpen);
+  state.accountZEnter = Boolean(state.accountZEnter);
   state.accountDeckActive ||= accountRootForTab(state);
 
   const handlers = {
