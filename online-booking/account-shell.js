@@ -9,6 +9,7 @@ import {
   sendAccountChatMessage,
   updateGlobalAccount,
   deleteGlobalAccount,
+  deleteGlobalAccountRelationship,
 } from '../core/account/index.js';
 import { formatPhone } from '../core/phone/index.js';
 import { projectRecordStatuses } from '../core/record/index.js';
@@ -862,6 +863,65 @@ function globalContactRecords(state, tenantId) {
     .filter((request) => String(request?.tenantId || '') === String(tenantId || ''));
 }
 
+function confirmDeleteGlobalContact(state, handlers, relationship) {
+  const tenantId = String(relationship?.tenantId || '');
+  const title = relationshipTitle(relationship);
+  if (!tenantId) return;
+  const layer = mountModal(document.body, modal(`<div class="modal-title"><h2>Удалить?</h2><p>${escapeHtml(title)} будет удалён из Контактов. Все действующие согласия с этим профилем будут отозваны. Исторические данные сохранятся.</p></div>
+    <div class="modal-actions">
+      ${button('Удалить', { variant: 'danger', data: 'data-confirm-delete-contact' })}
+      ${button('Отмена', { variant: 'secondary', data: 'data-cancel-delete-contact' })}
+    </div>`, { title: 'Удалить', variant: 'compact', surface: 'app' }));
+  if (!layer) return;
+  layer.querySelector('[data-cancel-delete-contact]')?.addEventListener('click', () => layer.v2Close?.());
+  layer.querySelector('[data-confirm-delete-contact]')?.addEventListener('click', async (event) => {
+    event.currentTarget.disabled = true;
+    try {
+      await deleteGlobalAccountRelationship(tenantId);
+      state.relationships = (Array.isArray(state.relationships) ? state.relationships : [])
+        .filter((item) => String(item?.tenantId || '') !== tenantId);
+      state.accountRecords = (Array.isArray(state.accountRecords) ? state.accountRecords : [])
+        .filter((request) => String(request?.tenantId || '') !== tenantId);
+      state.accountSelectedContactTenantId = '';
+      state.accountSelectedChatTenantId = '';
+      state.accountTab = 'contacts';
+      state.accountDeckActive = 'contacts';
+      layer.v2Close?.();
+      await handlers.render?.();
+    } catch (error) {
+      event.currentTarget.disabled = false;
+      openNotice({
+        title: 'Контакт не удалён',
+        message: accountErrorMessage(error, 'Не удалось удалить контакт'),
+        action: 'Закрыть',
+        variant: 'technical',
+      });
+    }
+  });
+}
+
+function openGlobalContactSettings(state, handlers, relationship) {
+  const tenantId = String(relationship?.tenantId || '');
+  if (!tenantId) return null;
+  return openSharedProfileSettingsMenu({
+    title: 'Настройки',
+    actions: [
+      {
+        id: 'controls',
+        label: 'Согласия / Уведомления',
+        onSelect: () => void openAccountConsentSettings(state, { tenantId }),
+      },
+      {
+        id: 'delete',
+        label: 'Удалить',
+        variant: 'danger',
+        onSelect: () => confirmDeleteGlobalContact(state, handlers, relationship),
+      },
+    ],
+    data: 'data-global-contact-settings-menu',
+  });
+}
+
 async function renderGlobalContactDetail(root, state, handlers) {
   const relationship = selectedGlobalRelationship(state);
   if (!relationship) {
@@ -909,13 +969,7 @@ async function renderGlobalContactDetail(root, state, handlers) {
   });
 
   root.querySelector('[data-global-contact-settings]')?.addEventListener('click', () => {
-    const layer = mountModal(document.body, modal(settingsPanel([
-      { label: 'Согласия', data: 'data-global-contact-consents' },
-    ]), { variant: 'large', title: 'Настройки' }));
-    layer?.querySelector('[data-global-contact-consents]')?.addEventListener('click', () => {
-      layer.remove();
-      void openAccountConsentSettings(state, { tenantId });
-    });
+    openGlobalContactSettings(state, handlers, relationship);
   });
 
   root.querySelector('[data-global-contact-booking]')?.addEventListener('click', () => handlers.onStartBooking?.(tenantId));
