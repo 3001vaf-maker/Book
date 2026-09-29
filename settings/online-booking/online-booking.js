@@ -1,5 +1,6 @@
 import { buildBookingLink } from '../../core/booking-link/index.js';
-import { getCurrentAccount } from '../../core/auth.js';
+import { apiRequest, getCurrentAccount } from '../../core/auth.js';
+import { ACCOUNT_APP_ORIGIN } from '../../core/environment.js';
 import {
   BOOKING_CHOICE_STYLES,
   BOOKING_SHAPES,
@@ -33,12 +34,27 @@ import { getWorkplaces } from '../profile/workplaces/data.js';
 
 const APPEARANCE_INFO = 'Вы задаёте настроение страницы. Расстановка экранов, календарь и логика записи остаются едиными. Карточка рабочего пространства берётся из заполненной карточки рабочего пространства.';
 
-function bookingLink(tenantId, workplaceKey = '') {
+let publicRouteState = { profileSlug: '', workplaces: [] };
+
+async function loadOwnerPublicRoute() {
+  const response = await apiRequest('/online-booking/owner/route');
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.message || 'Не удалось сформировать короткую ссылку онлайн-записи');
+  return {
+    profileSlug: String(payload?.profileSlug || '').trim(),
+    workplaces: (Array.isArray(payload?.workplaces) ? payload.workplaces : []).map((item) => ({
+      key: String(item?.key || ''),
+      name: String(item?.name || ''),
+      slug: String(item?.slug || '').trim(),
+    })),
+  };
+}
+
+function bookingLink(profileSlug, workplaceSlug = '') {
   return buildBookingLink({
-    origin: window.location.origin,
-    pathname: window.location.pathname,
-    tenantId,
-    workplaceKey,
+    origin: ACCOUNT_APP_ORIGIN,
+    profileSlug,
+    workplaceSlug,
   });
 }
 
@@ -60,10 +76,11 @@ function bindCopyButtons(root) {
   });
 }
 
-function selectedWorkplaceLink(workplaces, tenantId, key) {
+function selectedWorkplaceLink(workplaces, key) {
   const selected = workplaces.find((item) => item.key === key) || null;
-  if (!selected) return '';
-  return copyLinkField(selected.name || 'Ссылка рабочего пространства', bookingLink(tenantId, selected.key), 'workplace');
+  const route = publicRouteState.workplaces.find((item) => item.key === key) || null;
+  if (!selected || !route?.slug) return '';
+  return copyLinkField(selected.name || 'Ссылка рабочего пространства', bookingLink(publicRouteState.profileSlug, route.slug), 'workplace');
 }
 
 function settingsSignature(value) {
@@ -184,7 +201,7 @@ function renderReady(root, navigateBack, tenantId) {
       aria: 'Настройки онлайн-записи',
     },
     body: `<div class="online-booking-link-stack">
-      ${copyLinkField('Общая ссылка', bookingLink(tenantId), 'general')}
+      ${copyLinkField('Общая ссылка', bookingLink(publicRouteState.profileSlug), 'general')}
       ${select({
         label: 'Рабочее пространство',
         name: 'bookingWorkplace',
@@ -201,7 +218,7 @@ function renderReady(root, navigateBack, tenantId) {
   root.querySelector('input[name="bookingWorkplace"]')?.addEventListener('change', (event) => {
     const host = root.querySelector('[data-workplace-booking-link]');
     if (!host) return;
-    host.innerHTML = selectedWorkplaceLink(workplaces, tenantId, event.target.value);
+    host.innerHTML = selectedWorkplaceLink(workplaces, event.target.value);
     bindCopyButtons(host);
   });
 }
@@ -373,14 +390,15 @@ export function render(root, navigateBack = () => {}) {
     body: emptyState('Загрузка', 'Формируем ссылки онлайн-записи.'),
   });
 
-  void getCurrentAccount()
-    .then((account) => {
+  void Promise.all([getCurrentAccount(), loadOwnerPublicRoute()])
+    .then(([account, publicRoute]) => {
       const tenantId = String(account?.tenant?.id || '');
-      if (!tenantId) {
-        renderUnavailable(root, navigateBack, 'Ссылка недоступна', 'Не удалось определить рабочее пространство аккаунта.');
+      if (!tenantId || !publicRoute.profileSlug) {
+        renderUnavailable(root, navigateBack, 'Ссылка недоступна', 'Не удалось определить адрес онлайн-записи.');
         return;
       }
+      publicRouteState = publicRoute;
       renderReady(root, navigateBack, tenantId);
     })
-    .catch(() => renderUnavailable(root, navigateBack, 'Ссылка недоступна', 'Не удалось получить данные аккаунта.'));
+    .catch(() => renderUnavailable(root, navigateBack, 'Ссылка недоступна', 'Не удалось сформировать ссылку онлайн-записи.'));
 }

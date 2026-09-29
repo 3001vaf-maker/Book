@@ -1,14 +1,19 @@
-export function buildBookingLink({ origin = '', pathname = '/', tenantId = '', workplaceKey = '' } = {}) {
-  const tenant = String(tenantId || '').trim();
+function routeSegment(value) {
+  return String(value || '').trim();
+}
+
+export function buildBookingLink({ origin = '', profileSlug = '', workplaceSlug = '' } = {}) {
   const host = String(origin || '').trim();
-  if (!tenant || !host) return '';
+  const profile = routeSegment(profileSlug);
+  if (!host || !profile) return '';
 
-  const path = String(pathname || '/').split(/[?#]/)[0] || '/';
-  const url = new URL(path, host);
-  url.searchParams.set('booking', tenant);
+  const segments = [profile];
+  const workplace = routeSegment(workplaceSlug);
+  if (workplace) segments.push(workplace);
 
-  const workplace = String(workplaceKey || '').trim();
-  if (workplace) url.searchParams.set('workplace', workplace);
-
+  const url = new URL('/', host);
+  url.pathname = `/${segments.map((segment) => encodeURIComponent(segment)).join('/')}`;
+  url.search = '';
+  url.hash = '';
   return url.toString();
 }

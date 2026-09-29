@@ -669,6 +669,33 @@ export class ProfileService {
     };
   }
 
+  async publicBookingRouteSource(tenantId: string) {
+    const row = await this.prisma.profile.findFirst({
+      where: { tenantId, migrationVerifiedAt: { not: null } },
+      include: {
+        workplaces: {
+          where: { deletedAt: null },
+          orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+          select: { id: true, key: true, name: true },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (!row) throw new ConflictException('Профиль для онлайн-записи ещё не готов');
+    return {
+      profile: {
+        id: row.id,
+        name: row.name,
+        surname: row.surname,
+      },
+      workplaces: row.workplaces.map((workplace) => ({
+        id: workplace.id,
+        key: workplace.key,
+        name: workplace.name,
+      })),
+    };
+  }
+
   async publicBookingBundle(tenantId: string) {
     const row = await this.prisma.profile.findFirst({
       where: { tenantId, migrationVerifiedAt: { not: null } },
