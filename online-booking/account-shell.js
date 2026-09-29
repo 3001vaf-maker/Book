@@ -409,6 +409,7 @@ function bindGlobalRelationships(root, state, handlers) {
 
 function bindGlobalChatButton(root, state, handlers) {
   root.querySelector('[data-account-open-chat-root]')?.addEventListener('click', () => {
+    state.accountSelectedChatTenantId = '';
     state.accountTab = 'messages';
     state.accountDeckOpen = false;
     void handlers.render();
