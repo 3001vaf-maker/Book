@@ -650,6 +650,25 @@ export class ProfileService {
     return this.accountControls(tenantId, platformAccountId);
   }
 
+  async accountRelationshipProfile(tenantId: string) {
+    const row = await this.prisma.profile.findFirst({
+      where: { tenantId, migrationVerifiedAt: { not: null } },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (!row) throw new ConflictException('Профиль ещё не готов');
+    return {
+      name: row.name,
+      surname: row.surname,
+      phone: row.phone,
+      photo: row.photo,
+      photoCropX: row.photoCropX,
+      photoCropY: row.photoCropY,
+      profession: row.profession,
+      about: row.about,
+      cardAppearance: objectValue(row.cardAppearance),
+    };
+  }
+
   async publicBookingBundle(tenantId: string) {
     const row = await this.prisma.profile.findFirst({
       where: { tenantId, migrationVerifiedAt: { not: null } },

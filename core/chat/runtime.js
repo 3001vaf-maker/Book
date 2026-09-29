@@ -1,4 +1,4 @@
-import { emptyState, listEntries, listEntry, openNotice } from '../../ui/ui.js';
+import { emptyState, v2ListEntries, v2ListEntry, openNotice } from '../../ui/ui.js';
 import { bindMessageAttachments, initMessageComposer, messageComposer, messageThread } from '../../ui/chat/index.js';
 
 function chatTime(value) {
@@ -31,7 +31,7 @@ export function mountChatList(root, {
   const values = Array.isArray(threads) ? threads : [];
   const a = onSettings ? { kind: 'settings', data: 'data-chat-settings', aria: 'Настройки чата' } : null;
   const c = onContacts ? { kind: 'contacts', data: 'data-chat-contacts', aria: 'Контакты' } : null;
-  const items = values.map((thread, index) => listEntry({
+  const items = values.map((thread, index) => v2ListEntry({
     title: threadTitle(thread),
     subtitle: threadSubtitle(thread),
     rightTop: threadTime(thread),
@@ -44,7 +44,7 @@ export function mountChatList(root, {
     a,
     c,
     d: null,
-    body: items.length ? listEntries(items) : emptyState(emptyTitle, emptyText),
+    body: items.length ? v2ListEntries(items) : emptyState(emptyTitle, emptyText),
   });
   root.querySelector('[data-chat-settings]')?.addEventListener('click', () => onSettings?.());
   root.querySelector('[data-chat-contacts]')?.addEventListener('click', () => onContacts?.());

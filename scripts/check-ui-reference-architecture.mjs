@@ -7,6 +7,7 @@ const style = fs.readFileSync('css/style.css', 'utf8');
 const modalCss = fs.readFileSync('ui/modals/modal.css', 'utf8');
 const modalUi = fs.readFileSync('ui/modals/index.js', 'utf8');
 const v2Css = fs.readFileSync('ui/v2/v2.css', 'utf8');
+const v2ListUi = fs.readFileSync('ui/lists/list-entry.js', 'utf8');
 
 const failures = [];
 const expect = (condition, message) => { if (!condition) failures.push(message); };
@@ -14,6 +15,8 @@ const expect = (condition, message) => { if (!condition) failures.push(message);
 expect(style.includes('--app-max-width:390px'), 'Book UI reference requires the shared 390px Book width.');
 expect(facade.includes('segmentControl') && facade.includes('initSegmentControls'), 'Segmented control must be owned by Shared UI.');
 expect(facade.includes('columnLayout'), 'One-to-three column geometry must be owned by Shared UI.');
+expect(facade.includes('v2ListEntry') && facade.includes('v2ListEntries') && v2ListUi.includes('export function v2ListEntry') && v2ListUi.includes('export function v2ListEntries'), 'Shared V2 List API must use v2ListEntry / v2ListEntries names.');
+expect(!/\blistEntry\b/.test(facade) && !/\blistEntries\b/.test(facade) && !/export function listEntry\b/.test(v2ListUi) && !/export function listEntries\b/.test(v2ListUi), 'Legacy listEntry / listEntries API names must not return.');
 expect(modalUi.includes("import { mountV2Layer, v2Layer } from '../v2/index.js';") && v2Css.includes('width:min(100%,var(--app-max-width))') && !modalCss.includes('430px'), 'Modal variants must use the shared V2 layer owner inside the shared app width.');
 
 for (const css of ['../layout/layout.css', '../accordion/accordion.css', '../calendar/calendar.css', '../lists/list.css', '../lists/list-entry.css']) {
@@ -23,7 +26,7 @@ for (const css of ['../layout/layout.css', '../accordion/accordion.css', '../cal
 for (const marker of [
   "['fields', 'Поля и телефон']",
   "['blocks', 'Блоки 1–3']",
-  "['lists', 'List / Entry List']",
+  "['lists', 'List / V2 List Entry']",
   "['receipt', 'Отчётный лист']",
   "['date', 'День / календарь']",
   "['folders', 'Папки']",
@@ -33,7 +36,7 @@ for (const marker of [
 
 expect(reference.includes("repeatedField({ label: 'Телефон'") && reference.includes("type: 'tel'"), 'Reference must show the canonical [+код][телефон][×] phone row.');
 expect(reference.includes("repeatedField({ label: 'Поле'") && reference.includes('initRepeatedFields(app)'), 'Reference must show the canonical [поле][×] repeated row.');
-expect(reference.includes('listEntry({ columns:') && reference.includes('listEntries(['), 'Reference must show canonical Entry List columns.');
+expect(reference.includes('v2ListEntry({ columns:') && reference.includes('v2ListEntries(['), 'Reference must show canonical V2 List Entry columns.');
 expect(reference.includes('readOnlyReceipt({'), 'Reference must show the canonical report/receipt sheet.');
 expect(reference.includes('monthDayPicker({') && reference.includes('initCalendar(calendarHost'), 'Reference must show both day field and calendar.');
 expect(reference.includes('folderList(['), 'Reference must show canonical folders.');

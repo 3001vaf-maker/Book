@@ -1,4 +1,4 @@
-import { actionBlock, button, details, emptyState, entityCard, escapeHtml, field, iconButton, initPhotoField, listEntries, listEntry, mountModal, modal, openNotice, page, pageHeader, photoField, shortDateTime } from '../../ui/ui.js';
+import { actionBlock, button, details, emptyState, entityCard, escapeHtml, field, iconButton, initPhotoField, v2ListEntries, v2ListEntry, mountModal, modal, openNotice, page, pageHeader, photoField, shortDateTime } from '../../ui/ui.js';
 import { cancelFinanceOperation, getLedgerEntries } from '../../core/finance/index.js';
 import { deleteWallet as deleteWalletData, getWalletBalance, getWalletHistory, getWallets, saveWallet as saveWalletData, updateWallet } from './data.js';
 
@@ -39,7 +39,7 @@ function localDateTimeValue(date = new Date()) {
 
 function renderList(root, navigateBack) {
   const items = getWallets();
-  root.innerHTML = `<div class="entity-page-header">${pageHeader('Касса')}<div class="page-header-action">${iconButton('+', { className: 'icon-button--primary', data: 'data-add-wallet', aria: 'Добавить кошелёк' })}</div></div>${items.length ? listEntries(items.map(renderRow)) : emptyState('Кошельков пока нет', 'Добавьте первый кошелёк кнопкой «+».')}${actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-back-wallets' }))}`;
+  root.innerHTML = `<div class="entity-page-header">${pageHeader('Касса')}<div class="page-header-action">${iconButton('+', { className: 'icon-button--primary', data: 'data-add-wallet', aria: 'Добавить кошелёк' })}</div></div>${items.length ? v2ListEntries(items.map(renderRow)) : emptyState('Кошельков пока нет', 'Добавьте первый кошелёк кнопкой «+».')}${actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-back-wallets' }))}`;
   root.querySelector('[data-add-wallet]')?.addEventListener('click', () => openForm(root, null, navigateBack));
   root.querySelectorAll('[data-wallet]').forEach((element) => element.addEventListener('click', () => renderCard(root, element.dataset.wallet, navigateBack)));
   root.querySelector('[data-back-wallets]')?.addEventListener('click', navigateBack);
@@ -47,7 +47,7 @@ function renderList(root, navigateBack) {
 
 function renderRow(wallet) {
   const total = getWalletBalance(wallet.id);
-  return listEntry({
+  return v2ListEntry({
     title: wallet.name,
     subtitle: '',
     rightTop: formatMoney(total),
@@ -62,7 +62,7 @@ function renderRow(wallet) {
 function renderPaymentRow(payment, { interactive = true } = {}) {
   const amount = Number(payment?.total) || 0;
   const canOpen = interactive && Boolean(payment?.operationId);
-  return listEntry({
+  return v2ListEntry({
     title: operationName(payment),
     subtitle: [payment?.sourceDetails || '', payment?.lineName || '', operationMoment(payment)].filter(Boolean).join(' · '),
     rightTop: formatMoney(amount),
@@ -95,7 +95,7 @@ function openWalletOperation(root, operationId, wallet, navigateBack) {
     first?.note ? { label: 'Комментарий', value: first.note } : null,
     { label: 'Статус', value: first?.operationStatus === 'cancelled' ? 'Отменена' : 'Активна' },
   ]);
-  const rows = listEntries(entries.map((item) => renderPaymentRow(item, { interactive: false })));
+  const rows = v2ListEntries(entries.map((item) => renderPaymentRow(item, { interactive: false })));
   const cancel = canCancel
     ? `<div class="compact-form">
         ${field({ label: 'Фактическая дата и время отмены', name: 'walletCancelOccurredAt', type: 'datetime-local', value: localDateTimeValue(), required: true })}
@@ -162,7 +162,7 @@ function renderCard(root, id, navigateBack) {
     initial:(wallet.name||'?').slice(0,1).toUpperCase(),
     className:'entity-card--hero'
   });
-  const paymentList = payments.length ? listEntries(payments.map(renderPaymentRow)) : emptyState('Оплат пока нет', 'После оплаты через этот кошелёк операции появятся здесь.');
+  const paymentList = payments.length ? v2ListEntries(payments.map(renderPaymentRow)) : emptyState('Оплат пока нет', 'После оплаты через этот кошелёк операции появятся здесь.');
   const deleteButton=wallet.system?'':button('Удалить',{variant:'danger',data:'data-delete-wallet-card'});
   root.innerHTML=page([card,paymentList,actionBlock(`${button('Работа с кошельком',{data:'data-wallet-work'})}${button('Назад',{className:'ui-button--secondary',data:'data-back-wallet-card'})}${deleteButton}`)]);
   root.querySelectorAll('[data-wallet-operation]').forEach((element) => {

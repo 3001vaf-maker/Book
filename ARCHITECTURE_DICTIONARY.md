@@ -53,7 +53,7 @@ CSS принадлежит общему UI-компоненту в `ui/` либ�
 
 Основные общие понятия UI:
 - FOLDER UI;
-- LIST / LIST ITEM;
+- V2 LIST ENTRY / V2 LIST ENTRIES;
 - CARD;
 - FIELD / SELECT / TEXTAREA;
 - BUTTON / ICON BUTTON;

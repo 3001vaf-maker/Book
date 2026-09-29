@@ -1,4 +1,4 @@
-import { ALL_WORKPLACES_ID, emptyState, escapeHtml, listEntries, listEntry, shortDate } from '../ui/ui.js';
+import { ALL_WORKPLACES_ID, emptyState, escapeHtml, v2ListEntries, v2ListEntry, shortDate } from '../ui/ui.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getRecordPaymentState, recordAmountDue } from '../core/finance/index.js';
 import { getRecords } from '../core/record/index.js';
@@ -35,7 +35,7 @@ function recordId(record) {
 function recordEntry(record, workplaces, { focus = false, payment = null } = {}) {
   const classes = [recordStatusClass(record, payment), focus ? 'journal-list-focus' : ''].filter(Boolean).join(' ');
   const id = recordId(record);
-  return listEntry({
+  return v2ListEntry({
     overline: workplaceName(workplaces, record?.workplaceId),
     title: personName(record?.person),
     subtitle: record?.person?.phone || '',
@@ -84,7 +84,7 @@ function renderTimeMode(root, records, workplaces) {
   });
   if (splitIndex === ordered.length) entries.push(anchorEntry());
 
-  root.innerHTML = listEntries(entries);
+  root.innerHTML = v2ListEntries(entries);
   bindRecordClicks(root, ordered);
   scrollToFocus(root, '[data-journal-list-anchor]');
 }
@@ -108,7 +108,7 @@ function renderFlowMode(root, records, workplaces) {
     anchorEntry(),
     ...pending.map(({ record, payment }) => recordEntry(record, workplaces, { payment })),
   ];
-  root.innerHTML = listEntries(entries);
+  root.innerHTML = v2ListEntries(entries);
   bindRecordClicks(root, records);
   scrollToFocus(root, '[data-journal-list-anchor]');
 }

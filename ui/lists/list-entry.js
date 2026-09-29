@@ -10,15 +10,15 @@ function columnLines(lines = []) {
 }
 
 /**
- * Canonical compact entry used by entity lists.
- * List Entry is intentionally separate from entityCard(): it renders one
+ * Canonical V2 compact entry used by entity lists.
+ * V2 List Entry is intentionally separate from entityCard(): it renders one
  * item inside a list; entityCard() renders the opened entity.
  *
  * `columns` is the canonical dense 3-line list form. It supports up to
  * three columns, each with up to three lines, without creating a feature-
  * specific list component.
  */
-export function listEntry({
+export function v2ListEntry({
   overline = '',
   title = '',
   subtitle = '',
@@ -79,6 +79,6 @@ export function listEntry({
   </${tag}>`;
 }
 
-export function listEntries(items = []) {
+export function v2ListEntries(items = []) {
   return `<div class="list-entries">${(Array.isArray(items) ? items : []).join('')}</div>`;
 }

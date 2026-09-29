@@ -797,13 +797,16 @@ export class OnlineBookingService {
     });
     const relationships = await Promise.all(links.map(async (link) => {
       try {
-        const data = await this.bookingSource(link.tenantId);
+        const [data, relationshipProfile] = await Promise.all([
+          this.bookingSource(link.tenantId),
+          this.profile.accountRelationshipProfile(link.tenantId),
+        ]);
         return {
           tenantId: link.tenantId,
           linkedAt: link.createdAt,
           context: {
             tenantId: link.tenantId,
-            profile: objectValue(data.profile),
+            profile: objectValue(relationshipProfile),
             settings: objectValue(data.bookingSettings),
             workplaces: arrayValue(data.workplaces),
           },
@@ -813,6 +816,36 @@ export class OnlineBookingService {
       }
     }));
     return relationships.filter(Boolean);
+  }
+
+  async deleteGlobalAccountRelationship(accountId: string, tenantIdValue: unknown) {
+    const tenantId = text(tenantIdValue);
+    if (!tenantId) throw new BadRequestException('Не выбран контакт');
+    const account = await this.prisma.account.findUnique({
+      where: { id: accountId },
+      include: { contacts: true },
+    });
+    if (!account) throw new UnauthorizedException('Аккаунт не найден');
+
+    const link = await this.prisma.accountTenantLink.findUnique({
+      where: { accountId_tenantId: { accountId: account.id, tenantId } },
+    });
+    if (!link) return { deleted: true };
+
+    const contacts = account.contacts.map((contact) => ({
+      type: String(contact.type || ''),
+      value: String(contact.value || ''),
+    }));
+    await this.consentPolicy.revokeAllForAccount(
+      tenantId,
+      account.id,
+      contacts,
+      'account-contact-delete',
+    );
+    await this.prisma.accountTenantLink.delete({
+      where: { accountId_tenantId: { accountId: account.id, tenantId } },
+    });
+    return { deleted: true };
   }
 
   async globalAccountRecords(accountId: string) {

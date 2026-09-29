@@ -116,6 +116,7 @@ function bookingRoute() {
   return {
     tenantId,
     workplaceKey: String(params.get('workplace') || '').trim(),
+    procedureIds: String(params.get('procedures') || '').split(',').map((value) => value.trim()).filter(Boolean),
     telegramEntry: String(params.get('tg_entry') || '').trim(),
     entry: String(params.get('entry') || '').trim(),
   };

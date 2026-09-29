@@ -1,4 +1,4 @@
-import { actionBlock, button, costCardMeta, costListParts, durationText, emptyState, entityCard, escapeHtml, iconButton, listEntries, listEntry, mountModal, modal, page, pageHeader, workplaceCountText } from '../../../ui/ui.js';
+import { actionBlock, button, costCardMeta, costListParts, durationText, emptyState, entityCard, escapeHtml, iconButton, v2ListEntries, v2ListEntry, mountModal, modal, page, pageHeader, workplaceCountText } from '../../../ui/ui.js';
 import { getSettlementItemTotals } from '../../../core/finance/index.js';
 import { getRecords } from '../../../core/record/index.js';
 import { deleteProcedure as deleteProcedureData, getProcedures, reorderProcedures } from './data.js';
@@ -52,7 +52,7 @@ function openProcedureOrder(root, navigateBack) {
 
 function renderList(root, navigateBack) {
   const items = getProcedures();
-  root.innerHTML = `<div class="entity-page-header">${pageHeader('Процедуры')}<div class="page-header-action">${items.length > 1 ? iconButton('↕', { data: 'data-order-procedures', aria: 'Изменить порядок услуг' }) : ''}${iconButton('+', { className: 'icon-button--primary', data: 'data-add-procedure', aria: 'Добавить услугу' })}</div></div>${items.length ? listEntries(items.map(renderRow)) : emptyState('Процедур пока нет', 'Добавьте первую процедуру кнопкой «+».')}${actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-back-procedures' }))}`;
+  root.innerHTML = `<div class="entity-page-header">${pageHeader('Процедуры')}<div class="page-header-action">${items.length > 1 ? iconButton('↕', { data: 'data-order-procedures', aria: 'Изменить порядок услуг' }) : ''}${iconButton('+', { className: 'icon-button--primary', data: 'data-add-procedure', aria: 'Добавить услугу' })}</div></div>${items.length ? v2ListEntries(items.map(renderRow)) : emptyState('Процедур пока нет', 'Добавьте первую процедуру кнопкой «+».')}${actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-back-procedures' }))}`;
   root.querySelector('[data-order-procedures]')?.addEventListener('click', () => openProcedureOrder(root, navigateBack));
   root.querySelector('[data-add-procedure]')?.addEventListener('click', () => openProcedureForm({ root, onSaved: () => renderList(root, navigateBack) }));
   root.querySelectorAll('[data-procedure]').forEach((element) => element.addEventListener('click', () => renderCard(root, element.dataset.procedure, navigateBack)));
@@ -66,7 +66,7 @@ function renderList(root, navigateBack) {
 function renderRow(procedure) {
   const price = costListParts(procedure.cost);
   const workplaceCount = (procedure.workplaces || []).length;
-  return listEntry({
+  return v2ListEntry({
     title: procedure.name || '',
     subtitle: `${durationText(procedure.duration)} — ${workplaceCountText(workplaceCount)}`,
     image: procedure.photo || '',
