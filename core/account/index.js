@@ -243,6 +243,16 @@ export async function acceptAccountTerms(tenantId, accountTerms) {
   );
 }
 
+export async function resolveBookingPublicRoute(profileSlug, workplaceSlug = '') {
+  const params = new URLSearchParams();
+  if (workplaceSlug) params.set('workplace', workplaceSlug);
+  const suffix = params.toString() ? `?${params}` : '';
+  return jsonResponse(
+    await request(`/online-booking/route/${encodeURIComponent(String(profileSlug || '').trim())}${suffix}`),
+    'Ссылка онлайн-записи недействительна',
+  );
+}
+
 export async function getBookingContext(tenantId, workplaceKey = '') {
   const params = new URLSearchParams();
   if (workplaceKey) params.set('workplace', workplaceKey);
