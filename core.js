@@ -43,6 +43,7 @@ const state = {
   activeSection: 'people',
   lastRootSection: 'people',
   navigationOpen: false,
+  navigationLevel: 'f',
   chatPersonKey: '',
   secondary: {
     finance: 'cash',
@@ -218,7 +219,9 @@ function allowedSections() {
 }
 
 function allowedRootItems() {
-  return ROOT_SECTIONS.filter((item) => sectionAllowed(item.id)).map(({ id, label }) => ({ id, label }));
+  return ROOT_SECTIONS
+    .filter((item) => sectionAllowed(item.id))
+    .map(({ id, label }) => ({ id, label, childrenCount: secondaryItems(id).length }));
 }
 
 function defaultSection() {
@@ -251,6 +254,7 @@ function ensureSecondary(section) {
 
 function setNavigationOpen(open) {
   state.navigationOpen = Boolean(open);
+  if (!state.navigationOpen) state.navigationLevel = 'f';
   setV2DeckOpen(app, state.navigationOpen);
 }
 
@@ -263,11 +267,13 @@ function navigate(section, { navigationOpen = state.navigationOpen, updateHash =
     state.activeSection = 'chat';
     state.chatPersonKey = String(chatPersonKey || '');
     state.navigationOpen = false;
+    state.navigationLevel = 'f';
   } else {
     state.activeSection = next;
     state.chatPersonKey = '';
     state.lastRootSection = next;
     state.navigationOpen = Boolean(navigationOpen);
+    if (!state.navigationOpen) state.navigationLevel = 'f';
     ensureSecondary(next);
   }
   renderWorkspace();
@@ -279,7 +285,8 @@ function selectSecondary(id) {
   const items = secondaryItems(section);
   if (!items.some((item) => item.id === id)) return;
   state.secondary[section] = id;
-  state.navigationOpen = true;
+  state.navigationOpen = false;
+  state.navigationLevel = 'f';
   renderWorkspace();
   history.replaceState({}, '', `#${section}`);
 }
@@ -471,6 +478,7 @@ function renderWorkspace() {
     deck: rootDeck,
     eDeck,
     deckOpen: state.navigationOpen,
+    eOpen: state.navigationOpen && state.navigationLevel === 'e',
     className: 'v2-app--workspace',
     body: '<section class="v2-workspace-surface" data-v2-workspace-surface></section>',
   });
@@ -488,10 +496,20 @@ function renderWorkspace() {
     activeId: root,
     eActiveId: childActive,
     deckOpen: state.navigationOpen,
+    eOpen: state.navigationOpen && state.navigationLevel === 'e',
     onDeckOpenChange: (open) => {
       state.navigationOpen = open;
+      if (open) state.navigationLevel = 'f';
+      else state.navigationLevel = 'f';
     },
-    onRootSelect: (id) => navigate(id, { navigationOpen: true }),
+    onEOpenChange: (open) => {
+      state.navigationLevel = open ? 'e' : 'f';
+    },
+    onRootSelect: (id) => {
+      const hasE = secondaryItems(id).length > 0;
+      state.navigationLevel = hasE ? 'e' : 'f';
+      navigate(id, { navigationOpen: hasE });
+    },
     onSecondarySelect: (id) => selectSecondary(id),
   }));
 
