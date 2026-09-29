@@ -121,7 +121,7 @@ export function v2FDeck(items = [], { active = '', data = 'data-v2-deck-item', c
   }).join('')}</div>`;
 }
 
-export function v2Shell(export function v2Shell({
+export function v2Shell({
   header = '',
   body = '',
   deck = '',
@@ -981,7 +981,7 @@ export function initV2WorkspaceInteraction(root, {
   };
 }
 
-export function initV2StickerSwipe(export function initV2StickerSwipe(root, { onRight = null, onLeft = null, threshold = 64, maxDrag = 180 } = {}) {
+export function initV2StickerSwipe(root, { onRight = null, onLeft = null, threshold = 64, maxDrag = 180 } = {}) {
   const surface = root?.matches?.('[data-v2-sticker]') ? root : root?.querySelector?.('[data-v2-sticker]');
   if (!surface) return () => {};
   let pointerId = null;
