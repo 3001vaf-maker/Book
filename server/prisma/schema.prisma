@@ -197,6 +197,7 @@ model Workplace {
   links           Json
   about           String   @default("")
   cardAppearance  Json     @default("{}")
+  visibleInPublicBooking Boolean @default(true)
   sourceCreatedAt String   @default("")
   sourceUpdatedAt String   @default("")
   createdAt       DateTime @default(now())
