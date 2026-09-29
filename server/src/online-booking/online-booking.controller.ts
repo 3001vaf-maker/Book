@@ -44,6 +44,12 @@ export class OnlineBookingController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get('owner/route')
+  ownerPublicRoute(@Req() request: OwnerRequest) {
+    return this.booking.ownerPublicRoute(request.auth!.tenantId);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get('owner/accounts')
   ownerAccounts(@Req() request: OwnerRequest) {
     return this.booking.ownerAccounts(request.auth!.tenantId);
@@ -172,6 +178,11 @@ export class OnlineBookingController {
       'online-booking-account',
       { tenantContext: tenantId },
     );
+  }
+
+  @Get('route/:profileSlug')
+  publicRoute(@Param('profileSlug') profileSlug: string, @Query('workplace') workplace = '') {
+    return this.booking.resolvePublicRoute(profileSlug, workplace);
   }
 
   @Get(':tenantId/context')
