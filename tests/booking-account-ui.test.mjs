@@ -528,7 +528,8 @@ assert.match(recordRuntime, /entityVisualCard\(/);
 assert.match(recordRuntime, /v2ListEntry\(/);
 assert.match(recordRuntime, /v2ListEntries\(/);
 assert.match(recordRuntime, /miniCard\(/);
-assert.match(recordRuntime, /v2RailCard\(/);
+assert.match(recordRuntime, /className: 'record-confirmation-mini-card'/);
+assert.doesNotMatch(recordRuntime, /record-confirmation-card__|record-confirmation-view__metrics|v2RailCard\(/);
 assert.match(recordRuntime, /timeSlots\(/);
 
 console.log('booking account UI tests passed');
