@@ -60,6 +60,11 @@ function v2NavigationIcon(id = '') {
     contacts: '<circle cx="8" cy="9" r="3"></circle><circle cx="16" cy="9" r="3"></circle><path d="M3 20c.7-3.2 2.4-5 5-5s4.3 1.8 5 5M12 20c.6-2.8 2.1-4.4 4.4-4.4 2.2 0 3.7 1.6 4.3 4.4"></path>',
     finance: '<rect x="3" y="6" width="18" height="13" rx="2"></rect><path d="M3 10h18M15 15h3"></path>',
     cash: '<rect x="3" y="6" width="18" height="13" rx="2"></rect><path d="M3 10h18M15 15h3"></path>',
+    dds: '<path d="M4 6h16M4 12h16M4 18h16"></path><path d="m8 3-3 3 3 3M16 15l3 3-3 3"></path>',
+    'income-expense': '<path d="M7 4v16M17 4v16M3 8l4-4 4 4M13 16l4 4 4-4"></path>',
+    articles: '<path d="M5 5h14M5 10h14M5 15h9M5 20h9"></path>',
+    special: '<path d="M4 8h16M4 16h16M8 4 4 8l4 4M16 12l4 4-4 4"></path>',
+    'z-report': '<path d="M5 4h14L6 20h13"></path>',
     timetable: '<rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M7 3v4M17 3v4M3 10h18"></path>',
     home: '<path d="m3 11 9-7 9 7v9h-6v-6H9v6H3Z"></path>',
     journal: '<path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3Z"></path><path d="M8 4v16"></path>',
@@ -128,9 +133,10 @@ export function v2Shell({
   className = '',
   deckOpen = false,
   eOpen = false,
+  zEnter = false,
   zData = 'data-v2-z',
 } = {}) {
-  const classes = ['v2-app', deck ? 'v2-app--with-deck' : '', eDeck ? 'has-e-deck' : '', deckOpen ? 'is-deck-open' : '', deckOpen && eOpen && eDeck ? 'is-e-open' : '', className].filter(Boolean).join(' ');
+  const classes = ['v2-app', deck ? 'v2-app--with-deck' : '', eDeck ? 'has-e-deck' : '', deckOpen ? 'is-deck-open' : '', deckOpen && eOpen && eDeck ? 'is-e-open' : '', zEnter && !deckOpen ? 'is-z-entering' : '', className].filter(Boolean).join(' ');
   const feDeck = deck || eDeck ? `<div class="v2-fe-deck" data-v2-fe>${deck}${eDeck}</div>` : '';
   return `<section class="${classes}" data-v2-app>
     ${header}
@@ -774,10 +780,10 @@ export function initV2WorkspaceInteraction(root, {
     let card = null;
     let index = -1;
 
-    if (secondaryOpen && eCard && eDeck?.contains(eCard)) {
+    if (secondaryOpen && eDeck?.contains(event.target)) {
       role = 'e';
       card = eCard;
-      index = eCards.indexOf(eCard);
+      index = eCard ? eCards.indexOf(eCard) : eActiveIndex;
     } else if (open && fCard && deck?.contains(fCard)) {
       role = 'f';
       card = fCard;
@@ -850,6 +856,11 @@ export function initV2WorkspaceInteraction(root, {
         const dragX = Math.max(0, Math.min(maxDrag, dx));
         eDeck?.classList.add('is-dragging');
         eDeck?.style.setProperty('--v2-e-drag-x', `${dragX}px`);
+        if (dragX > threshold) {
+          const carry = Math.min(maxDrag, dragX - threshold);
+          deck?.classList.add('is-dragging');
+          deck?.style.setProperty('--v2-f-drag-x', `${carry}px`);
+        }
       } else {
         const dragY = Math.max(-maxDrag, Math.min(maxDrag, dy));
         eDeck?.classList.add('is-dragging');
@@ -885,9 +896,14 @@ export function initV2WorkspaceInteraction(root, {
 
     if (current.role === 'e' && !current.cancelled) {
       if (current.axis === 'horizontal' && current.dx >= threshold) {
+        const continueIntoF = current.dx >= threshold * 2 && fCards.length > 1;
         markSuppressClick();
         endGesture();
         setEOpen(false);
+        if (continueIntoF) {
+          fActiveIndex = (fActiveIndex - 1 + fCards.length) % fCards.length;
+          syncF();
+        }
         return;
       }
       if (current.axis === 'vertical' && Math.abs(current.dy) >= threshold && eCards.length > 1) {
