@@ -4,7 +4,6 @@ import {
   durationText,
   entityCard,
   escapeHtml,
-  field,
   initCalendar,
   initDurationPickers,
   initMultiSelect,
@@ -12,15 +11,14 @@ import {
   modal,
   mountModal,
   openNotice,
-  openTimePickerAction,
+  timeSlots,
   mountRecordZ,
   recordZHost,
-  recordProcedureList,
-  recordPersonList,
   setRecordPrimaryAction,
   bindRecordSettings,
 } from '../ui/ui.js';
 import { getRecordPaymentState, recordSettlementItems, repriceSettlement } from '../core/finance/index.js';
+import { listAvailableStartTimes } from '../core/time/index.js';
 import { getWorkplaces, getWorkplaceWorkingDates } from '../core/workplace-time.js';
 import { timeToMinutes, minutesToTime } from '../core/time/index.js';
 import { getAllPeople } from '../main/people/data.js';
@@ -31,19 +29,6 @@ import { getProducts } from '../settings/service/products/data.js';
 import { getRecords } from '../core/record/index.js';
 import { updateRecord, cancelRecord, checkRecordTime } from '../core/record/index.js';
 import { journalRecordActionContext } from './record-action-context.js';
-import { getProfile } from '../settings/profile/data.js';
-
-function recordOwnerOptions({ settings = false, chatPersonKey = '' } = {}) {
-  const profile = getProfile();
-  const initials = [profile?.name, profile?.surname].filter(Boolean).map((value) => String(value).trim().charAt(0)).join('').slice(0, 2).toUpperCase();
-  return {
-    settings,
-    chatPersonKey,
-    aImage: String(profile?.photo || ''),
-    aImagePosition: `${Number(profile?.photoCropX ?? 50)}% ${Number(profile?.photoCropY ?? 50)}%`,
-    aInitials: initials,
-  };
-}
 
 const people = () => getAllPeople();
 const procedures = () => getProcedures();
@@ -178,37 +163,27 @@ function openDatePicker(state, onSelected) {
 
 function openTimePicker(state, record, onSelected) {
   const duration = procedureTotalDuration(state.procedures) || 30;
-  return openTimePickerAction({
-    value: state.from,
-    minuteStep: 1,
-    title: 'Время',
-    onSave: (from) => {
-      const start = timeToMinutes(from);
-      const to = start == null ? '' : minutesToTime(start + duration);
-      if (!from || !to) return;
-      const check = checkRecordTime({
-        date: dateKey(state.date),
-        workplaceId: state.workplaceId,
-        from,
-        to,
-        excludeId: record?.id || '',
-      });
-      if (!check.ok) {
-        openNotice({
-          title: 'Недостаточно времени',
-          message: check.reason === 'occupied'
-            ? 'Это время уже занято. Выберите другое время.'
-            : 'Это время находится вне рабочего периода. Выберите другое время.',
-        });
-        return;
-      }
-      onSelected?.({ from, to });
-    },
+  const values = listAvailableStartTimes({
+    date: dateKey(state.date),
+    workplaceId: state.workplaceId,
+    duration,
+    step: 15,
+    excludeId: record?.id || '',
   });
+  const content = `<div class="record-editor-screen record-editor-screen--time"><div class="modal-title"><h2>Время</h2><p>Выберите новое время записи.</p></div>${timeSlots({ values, selected: state.from, data: 'data-record-view-time-option', ariaLabel: 'Выбрать время записи' })}</div>`;
+  const m = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app', className: 'record-editor-modal' }));
+  if (!m) return;
+  m.querySelectorAll('[data-record-view-time-option]').forEach((node) => node.addEventListener('click', () => {
+    const from = node.dataset.recordViewTimeOption;
+    const start = timeToMinutes(from);
+    if (!from || start == null) return;
+    m.remove();
+    onSelected?.({ from, to: minutesToTime(start + duration) });
+  }));
 }
 
 function openPersonPicker(state, onSelected) {
-  const content = `<div class="record-editor-screen record-editor-screen--people"><div class="ui-search-field">${field({ name: 'recordViewPersonSearch', type: 'search', placeholder: 'Поиск по имени или UEI', autocomplete: 'off', data: 'data-record-view-person-search' })}</div><div class="ui-search-divider" aria-hidden="true"></div><div class="record-person-list" data-record-view-person-list></div></div>`;
+  const content = `<div class="record-editor-screen record-editor-screen--people"><div class="record-person-toolbar"><input class="record-person-search" type="search" placeholder="Поиск человека" data-record-view-person-search></div><div class="record-person-list" data-record-view-person-list></div></div>`;
   const m = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app', className: 'record-editor-modal' }));
   if (!m) return;
   const render = (query = '') => {
@@ -219,20 +194,10 @@ function openPersonPicker(state, onSelected) {
     });
     const listRoot = m.querySelector('[data-record-view-person-list]');
     if (!listRoot) return;
-    listRoot.innerHTML = recordPersonList(matches.map((person) => {
+    listRoot.innerHTML = matches.map((person) => {
       const display = personDisplay(person);
-      return {
-        key: person.key,
-        name: display.name,
-        uei: display.uei,
-        phone: display.phone,
-        aria: `Выбрать человека ${display.name}`,
-      };
-    }), {
-      data: 'data-record-view-person',
-      selected: state.person?.key || '',
-      empty: 'Люди не найдены.',
-    });
+      return `<button type="button" class="entity-card entity-card--compact${String(person.key || '') === String(state.person?.key || '') ? ' is-selected' : ''}" data-record-view-person="${escapeHtml(person.key || '')}"><span>${escapeHtml(display.uei)}</span><strong>${escapeHtml(display.name)}</strong><small>${escapeHtml(display.phone)}</small></button>`;
+    }).join('') || '<div class="muted">Люди не найдены.</div>';
     listRoot.querySelectorAll('[data-record-view-person]').forEach((node) => node.addEventListener('click', () => {
       const person = people().find((item) => String(item.key || '') === String(node.dataset.recordViewPerson || ''));
       if (!person) return;
@@ -248,16 +213,14 @@ function openPersonPicker(state, onSelected) {
 
 function openAddProcedurePicker(state, onSelected) {
   const available = procedures().filter((procedure) => workplaceAssignment(procedure, state.workplaceId));
-  const content = `<div class="modal-title"><h2>Добавить процедуру</h2></div>${recordProcedureList(available.map((procedure) => ({
-    id: String(procedure.id || ''),
-    name: procedure.name || 'Процедура',
-    durationText: durationText(Number(workplaceAssignment(procedure, state.workplaceId)?.duration ?? procedure.duration) || 0),
-    costText: defaultCost(procedure, state.workplaceId) !== '' ? formatMoney(defaultCost(procedure, state.workplaceId)) : '',
+  const items = available.map((procedure) => ({
+    title: procedure.name || 'Процедура',
+    subtitle: durationText(Number(procedure.duration) || 0),
+    interactive: true,
+    data: `data-record-view-procedure-add-select="${escapeHtml(procedure.id || '')}"`,
     aria: `Добавить процедуру ${procedure.name || ''}`,
-  })), {
-    data: 'data-record-view-procedure-add-select',
-    empty: 'Процедур нет.',
-  })}`;
+  }));
+  const content = `<div class="modal-title"><h2>Добавить процедуру</h2></div>${list({ items }) || '<div class="muted">Процедур нет.</div>'}`;
   const m = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
   if (!m) return;
   m.querySelectorAll('[data-record-view-procedure-add-select]').forEach((node) => node.addEventListener('click', () => {
@@ -397,8 +360,8 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
   let updatingFromView = false;
   let finishClose = () => {};
   const m = mountRecordZ({
-    ...recordOwnerOptions({ settings: true, chatPersonKey: state.person?.key || '' }),
     title: 'Запись',
+    settings: true,
     className: 'record-view-z',
     onClose: () => finishClose(),
   });
