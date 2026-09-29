@@ -18,6 +18,11 @@ enum BookingRequestStatus {
   CANCELLED
 }
 
+enum BookingPublicRouteType {
+  PROFILE
+  WORKPLACE
+}
+
 enum AccountContactType {
   EMAIL
   PHONE
@@ -49,6 +54,7 @@ model Tenant {
   workspaceStates          WorkspaceState[]
   profiles                 Profile[]
   bookingPublication       BookingPublication?
+  bookingPublicRoutes      BookingPublicRoute[]
   createdAccounts          Account[]                   @relation("AccountCreatedViaTenant")
   accountLinks             AccountTenantLink[]
   bookingRequests          BookingRequest[]
@@ -269,6 +275,23 @@ model AccountContact {
 
   @@unique([type, value])
   @@index([accountId, type])
+}
+
+model BookingPublicRoute {
+  id         String                 @id @default(cuid())
+  tenantId   String
+  entityType BookingPublicRouteType
+  entityId   String
+  scopeKey   String
+  slug       String
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([entityType, entityId])
+  @@unique([scopeKey, slug])
+  @@index([tenantId, entityType])
 }
 
 model BookingRequest {
