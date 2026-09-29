@@ -117,6 +117,12 @@ assert.doesNotMatch(bookingBackBlock, /renderAccountEntry\(root, state\);/);
 assert.doesNotMatch(booking, /renderAccountHome\(/);
 assert.doesNotMatch(booking, /import \{ renderAccount,/);
 assert.match(booking, /exitBookingContext\(state, \{ tab: 'contact-detail', tenantId: state\.tenantId \}\)/);
+assert.match(booking, /params\.set\('entry', 'account-booking'\)/, 'Known contact booking must skip the welcome screen');
+assert.match(booking, /params\.set\('workplace', workplaceKey\)/, 'Workplace booking must preserve the selected workplace');
+assert.match(booking, /params\.set\('procedures', procedureIds\.join\(','\)\)/, 'Repeat booking must preserve selected procedures');
+assert.match(booking, /state\.entry === 'account-booking'/);
+assert.match(booking, /state\.identityDestination === 'booking-start'[\s\S]*nextBookingStep\(root, state\)/);
+assert.match(coreJs, /procedureIds:\s*String\(params\.get\('procedures'\)/);
 assert.match(booking, /d:\s*null/);
 const bookingHeaderStart = booking.indexOf('function bookingHeaderMarkup');
 const bookingHeaderEnd = booking.indexOf('function bookingActionForStep', bookingHeaderStart);
@@ -176,6 +182,25 @@ assert.match(contactsBlock, /data-account-contact-search/);
 assert.match(contactsBlock, /profile\.profession/);
 assert.match(contactsBlock, /profile\.phone/);
 assert.doesNotMatch(contactsBlock, /entity-card--compact|v2HorizontalRail\(filtered|v2ListEntr/);
+
+const contactDetailBlock = accountShell.slice(
+  accountShell.indexOf('function contactHeaderMarkup'),
+  accountShell.indexOf('async function renderGlobalHistory'),
+);
+assert.match(contactDetailBlock, /mountV2ZLayer\(root, v2ZLayer\([\s\S]*stack:\s*true/, 'Contact profile must open as stacked Z over Contacts Z1');
+assert.match(contactDetailBlock, /v2Section\('Рабочие пространства'/);
+assert.match(contactDetailBlock, /v2Section\('История'/);
+assert.match(contactDetailBlock, /workplaceCardAppearance\(workplace\)/);
+assert.match(contactDetailBlock, /workplaceCardFields\(workplace, workplace\.cardProfile \|\| profile\)/);
+assert.match(contactDetailBlock, /miniCardRail\(/);
+assert.match(contactDetailBlock, /label:\s*'Согласия \/ Уведомления'/);
+assert.match(contactDetailBlock, /label:\s*'Удалить',[\s\S]*variant:\s*'danger'/);
+assert.match(contactDetailBlock, /button\('Удалить', \{ variant: 'danger'/);
+assert.match(contactDetailBlock, /button\('Отмена', \{ variant: 'secondary'/);
+assert.match(contactDetailBlock, /deleteGlobalAccountRelationship\(tenantId\)/);
+assert.match(contactDetailBlock, /label:\s*'Записаться'/);
+assert.match(contactDetailBlock, /label:\s*'Повторить'/);
+
 assert.match(profileService, /profile:\s*\{[\s\S]*?phone: row\.phone/);
 assert.doesNotMatch(accountShell, /async function renderGlobalRepresentatives\(/);
 assert.doesNotMatch(accountShell, /export async function renderAccount\(/);
