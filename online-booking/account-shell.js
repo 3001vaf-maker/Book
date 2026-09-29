@@ -833,7 +833,7 @@ async function renderGlobalContacts(root, state, handlers) {
   const relationships = Array.isArray(state.relationships) ? state.relationships : [];
   const searchable = relationships.length > 15;
   const header = v2Header({
-    a: { kind: 'settings', label: 'Настройки', disabled: true, aria: 'Настройки контактов' },
+    a: { kind: 'avatar', label: accountName(state), image: accountPhoto(state), disabled: true, aria: 'Настройки контактов' },
     b: 'Контакты',
     d: { kind: 'chat', data: 'data-account-open-chat-root', aria: 'Чат' },
   });
