@@ -703,7 +703,7 @@ export class ProfileService {
   async publicBookingBundle(tenantId: string) {
     const row = await this.prisma.profile.findFirst({
       where: { tenantId, migrationVerifiedAt: { not: null } },
-      include: { workplaces: { orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] } },
+      include: { workplaces: { where: { deletedAt: null }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] } },
       orderBy: { createdAt: 'asc' },
     });
     if (!row) throw new ConflictException('Профиль для онлайн-записи ещё не готов');
