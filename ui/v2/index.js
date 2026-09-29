@@ -890,6 +890,7 @@ export function initV2WorkspaceInteraction(root, {
       fActiveIndex = (fActiveIndex + direction + fCards.length) % fCards.length;
       markSuppressClick();
       endGesture();
+      if (secondaryOpen) setEOpen(false);
       syncF();
       return;
     }
