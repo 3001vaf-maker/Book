@@ -6,7 +6,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { AccountContactType, BookingRequestStatus, Prisma } from '@prisma/client';
+import { AccountContactType, BookingPublicRouteType, BookingRequestStatus, Prisma } from '@prisma/client';
 import { compare, hash } from 'bcryptjs';
 import { AccountDocumentService } from '../document-registry/account-document.service';
 import { PrismaService } from '../prisma.service';
@@ -30,6 +30,41 @@ function arrayValue(value: unknown): any[] {
 
 function text(value: unknown) {
   return String(value ?? '').trim();
+}
+
+const PROFILE_ROUTE_SCOPE = 'profile';
+const PROFILE_ROUTE_RESERVED = new Set([
+  'admin',
+  'api',
+  'chat',
+  'core',
+  'css',
+  'journal',
+  'main',
+  'online-booking',
+  'settings',
+  'timetable',
+  'ui',
+]);
+
+const CYRILLIC_SLUG_MAP: Record<string, string> = {
+  а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z',
+  и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r',
+  с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'c', ч: 'ch', ш: 'sh',
+  щ: 'sch', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya',
+};
+
+function publicRouteSlug(value: unknown) {
+  const transliterated = [...text(value).toLocaleLowerCase('ru-RU')]
+    .map((character) => CYRILLIC_SLUG_MAP[character] ?? character)
+    .join('');
+  return transliterated
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/-{2,}/g, '-')
+    .slice(0, 64);
 }
 
 function emailValue(value: unknown) {
@@ -260,6 +295,121 @@ export class OnlineBookingService {
       update: { data: normalized as Prisma.InputJsonValue, revision: { increment: 1 } },
       select: { revision: true, updatedAt: true },
     });
+  }
+
+  private async ensurePublicRoute({
+    tenantId,
+    entityType,
+    entityId,
+    scopeKey,
+    preferred,
+    reserved = false,
+  }: {
+    tenantId: string;
+    entityType: BookingPublicRouteType;
+    entityId: string;
+    scopeKey: string;
+    preferred: unknown[];
+    reserved?: boolean;
+  }) {
+    const existing = await this.prisma.bookingPublicRoute.findUnique({
+      where: { entityType_entityId: { entityType, entityId } },
+    });
+    if (existing) return existing.slug;
+
+    const bases = [...new Set(preferred.map(publicRouteSlug).filter(Boolean))]
+      .filter((slug) => !reserved || !PROFILE_ROUTE_RESERVED.has(slug));
+    const fallback = entityType === BookingPublicRouteType.PROFILE
+      ? `profile-${entityId.slice(-8).toLowerCase()}`
+      : `workplace-${entityId.slice(-8).toLowerCase()}`;
+    if (!bases.length) bases.push(fallback);
+
+    for (const base of bases) {
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        const suffix = attempt === 0 ? '' : `-${attempt + 1}`;
+        const candidate = `${base.slice(0, Math.max(1, 64 - suffix.length))}${suffix}`;
+        try {
+          const created = await this.prisma.bookingPublicRoute.create({
+            data: { tenantId, entityType, entityId, scopeKey, slug: candidate },
+          });
+          return created.slug;
+        } catch (error) {
+          if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
+          const concurrent = await this.prisma.bookingPublicRoute.findUnique({
+            where: { entityType_entityId: { entityType, entityId } },
+          });
+          if (concurrent) return concurrent.slug;
+        }
+      }
+    }
+
+    throw new ConflictException('Не удалось сформировать короткую ссылку онлайн-записи');
+  }
+
+  async ownerPublicRoute(tenantId: string) {
+    const source = await this.profile.publicBookingRouteSource(tenantId);
+    const profileSlug = await this.ensurePublicRoute({
+      tenantId,
+      entityType: BookingPublicRouteType.PROFILE,
+      entityId: source.profile.id,
+      scopeKey: PROFILE_ROUTE_SCOPE,
+      preferred: [
+        source.profile.name,
+        [source.profile.name, source.profile.surname].filter(Boolean).join(' '),
+      ],
+      reserved: true,
+    });
+
+    const workplaces = [];
+    for (const workplace of source.workplaces) {
+      const slug = await this.ensurePublicRoute({
+        tenantId,
+        entityType: BookingPublicRouteType.WORKPLACE,
+        entityId: workplace.id,
+        scopeKey: `workplace:${tenantId}`,
+        preferred: [workplace.name],
+      });
+      workplaces.push({ key: workplace.key, name: workplace.name, slug });
+    }
+
+    return { profileSlug, workplaces };
+  }
+
+  async resolvePublicRoute(profileSlugValue: unknown, workplaceSlugValue: unknown = '') {
+    const profileSlug = publicRouteSlug(profileSlugValue);
+    if (!profileSlug) throw new NotFoundException('Ссылка онлайн-записи не найдена');
+
+    const profileRoute = await this.prisma.bookingPublicRoute.findUnique({
+      where: { scopeKey_slug: { scopeKey: PROFILE_ROUTE_SCOPE, slug: profileSlug } },
+    });
+    if (!profileRoute || profileRoute.entityType !== BookingPublicRouteType.PROFILE) {
+      throw new NotFoundException('Ссылка онлайн-записи не найдена');
+    }
+
+    const source = await this.profile.publicBookingRouteSource(profileRoute.tenantId);
+    if (source.profile.id !== profileRoute.entityId) {
+      throw new NotFoundException('Ссылка онлайн-записи не найдена');
+    }
+
+    const workplaceSlug = publicRouteSlug(workplaceSlugValue);
+    if (!workplaceSlug) {
+      return { tenantId: profileRoute.tenantId, workplaceKey: '' };
+    }
+
+    const workplaceRoute = await this.prisma.bookingPublicRoute.findUnique({
+      where: {
+        scopeKey_slug: {
+          scopeKey: `workplace:${profileRoute.tenantId}`,
+          slug: workplaceSlug,
+        },
+      },
+    });
+    const workplace = source.workplaces.find((item) => item.id === workplaceRoute?.entityId);
+    if (!workplaceRoute || workplaceRoute.entityType !== BookingPublicRouteType.WORKPLACE || !workplace) {
+      throw new NotFoundException('Рабочее пространство не найдено');
+    }
+
+    return { tenantId: profileRoute.tenantId, workplaceKey: workplace.key };
   }
 
   async getContext(tenantId: string, workplaceKey = '') {
