@@ -11,6 +11,7 @@ const accountApi = fs.readFileSync('core/account/index.js', 'utf8');
 const onlineBookingController = fs.readFileSync('server/src/online-booking/online-booking.controller.ts', 'utf8');
 const accountSettingsController = fs.readFileSync('server/src/online-booking/account-settings.controller.ts', 'utf8');
 const onlineBookingService = fs.readFileSync('server/src/online-booking/online-booking.service.ts', 'utf8');
+const profileService = fs.readFileSync('server/src/profile/profile.service.ts', 'utf8');
 const communicationService = fs.readFileSync('server/src/communication/communication.service.ts', 'utf8');
 const communicationHistory = fs.readFileSync('server/src/communication/communication-history.service.ts', 'utf8');
 const messageAttachmentMigration = fs.readFileSync('server/prisma/migrations/20260914010000_message_attachments/migration.sql', 'utf8');
@@ -129,7 +130,7 @@ assert.match(accountShell, /v2Shell\(\{/);
 assert.match(accountShell, /v2FDeck\(/);
 assert.match(accountShell, /v2Section\(/);
 assert.match(accountShell, /v2HorizontalRail\(/);
-assert.match(accountShell, /entityCard\(\{/);
+assert.match(accountShell, /entityVisualCard\(\{/);
 assert.match(accountShell, /data-account-deck-item/);
 assert.match(accountShell, /GLOBAL_ACCOUNT_ROOTS = Object\.freeze\(\[[\s\S]*?id: 'profile', label: 'Профиль'[\s\S]*?id: 'home', label: 'Обзор'[\s\S]*?id: 'contacts', label: 'Контакты'[\s\S]*?id: 'history', label: 'История'/);
 assert.match(accountShell, /async function renderGlobalProfile\(/);
@@ -165,8 +166,17 @@ assert.match(accountShell, /async function renderGlobalContactDetail\(/);
 assert.match(accountShell, /state\.accountTab = 'contact-detail'/);
 assert.match(accountShell, /async function renderGlobalHistoryDetail\(/);
 assert.doesNotMatch(accountShell, /onOpenRelationship: callbacks\.onOpenRelationship/);
-assert.match(accountShell, /relationships\.length <= 15/);
-assert.match(accountShell, /data-account-contact-search/);
+const contactsBlock = accountShell.slice(
+  accountShell.indexOf('function relationshipSearchText'),
+  accountShell.indexOf('function selectedGlobalRelationship'),
+);
+assert.match(contactsBlock, /entityCardStack\(filtered\.map\(relationshipCard\)\)/);
+assert.match(contactsBlock, /const searchable = relationships\.length > 15/);
+assert.match(contactsBlock, /data-account-contact-search/);
+assert.match(contactsBlock, /profile\.profession/);
+assert.match(contactsBlock, /profile\.phone/);
+assert.doesNotMatch(contactsBlock, /entity-card--compact|v2HorizontalRail\(filtered|v2ListEntr/);
+assert.match(profileService, /profile:\s*\{[\s\S]*?phone: row\.phone/);
 assert.doesNotMatch(accountShell, /async function renderGlobalRepresentatives\(/);
 assert.doesNotMatch(accountShell, /export async function renderAccount\(/);
 assert.doesNotMatch(accountShell, /async function renderHome\(/);
