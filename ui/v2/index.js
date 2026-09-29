@@ -97,8 +97,8 @@ export function v2EList(items = [], { active = '', data = 'data-v2-e-item' } = {
   const activeId = String(active || values[0]?.id || '0');
   const activeIndex = Math.max(0, values.findIndex((item, index) => String(item.id || index) === activeId));
   const center = (values.length - 1) / 2;
-  const step = 66;
-  return `<div class="v2-e-deck" data-v2-e-list data-v2-e-count="${values.length}">${values.map((item, index) => {
+  const step = 112;
+  return `<div class="v2-e-deck" data-v2-e-list data-v2-e-count="${values.length}" data-v2-e-step="${step}">${values.map((item, index) => {
     const id = String(item.id || index);
     const isActive = index === activeIndex;
     const offsetY = Math.round((index - center) * step);
@@ -112,7 +112,7 @@ export function v2FDeck(items = [], { active = '', data = 'data-v2-deck-item', c
   if (!values.length) return '';
   const activeId = String(active || values[0]?.id || '0');
   const activeIndex = Math.max(0, values.findIndex((item, index) => String(item.id || index) === activeId));
-  const step = 154;
+  const step = 272;
   const deckClasses = ['v2-deck', className].filter(Boolean).join(' ');
   const roleData = role ? ` data-v2-deck-role="${text(role)}"` : '';
   return `<div class="${text(deckClasses)}" data-v2-deck data-v2-deck-count="${values.length}" style="--v2-f-offset:${activeIndex * step}px"${roleData}>${values.map((item, index) => {
@@ -696,7 +696,12 @@ export function initV2WorkspaceInteraction(root, {
     });
   };
 
+  const eStep = () => Number(eDeck?.dataset?.v2EStep || 112) || 112;
+
   const syncE = () => {
+    const center = (eCards.length - 1) / 2;
+    const step = eStep();
+    eDeck?.style.setProperty('--v2-e-active-offset', `${Math.round((eActiveIndex - center) * step)}px`);
     eCards.forEach((card, index) => {
       const active = index === eActiveIndex;
       card.classList.toggle('is-active', active);
@@ -705,18 +710,25 @@ export function initV2WorkspaceInteraction(root, {
     });
   };
 
-  const ownsHorizontalGesture = (target) => {
+  const horizontalGestureContext = (target) => {
     let node = target?.nodeType === 1 ? target : target?.parentElement;
+    let scrollOwner = null;
     while (node && node !== z && node !== stage) {
-      if (node.matches?.('[data-v2-stage-gesture-ignore],input,textarea,select,[contenteditable="true"],[draggable="true"]')) return true;
+      if (node.matches?.('[data-v2-stage-gesture-ignore],input,textarea,select,[contenteditable="true"],[draggable="true"]')) {
+        return { blocked: true, scrollOwner: null };
+      }
       const style = window.getComputedStyle?.(node);
       const overflowX = style?.overflowX || '';
-      if ((overflowX === 'auto' || overflowX === 'scroll') && Number(node.scrollWidth || 0) > Number(node.clientWidth || 0) + 2) return true;
+      if (!scrollOwner && (overflowX === 'auto' || overflowX === 'scroll') && Number(node.scrollWidth || 0) > Number(node.clientWidth || 0) + 2) {
+        scrollOwner = node;
+      }
       const touchAction = String(style?.touchAction || '').toLowerCase();
-      if (touchAction === 'none' || touchAction.includes('pan-x')) return true;
+      if ((touchAction === 'none' || touchAction.includes('pan-x')) && !scrollOwner) {
+        return { blocked: true, scrollOwner: null };
+      }
       node = node.parentElement;
     }
-    return false;
+    return { blocked: false, scrollOwner };
   };
 
   const markSuppressClick = () => {
@@ -779,6 +791,7 @@ export function initV2WorkspaceInteraction(root, {
     let role = '';
     let card = null;
     let index = -1;
+    let horizontalContext = null;
 
     if (secondaryOpen && eDeck?.contains(event.target)) {
       role = 'e';
@@ -789,7 +802,8 @@ export function initV2WorkspaceInteraction(root, {
       card = fCard;
       index = fCards.indexOf(fCard);
     } else if (!open && bindZ && z?.contains(event.target)) {
-      if (ownsHorizontalGesture(event.target)) return;
+      horizontalContext = horizontalGestureContext(event.target);
+      if (horizontalContext.blocked) return;
       role = 'z';
     } else {
       return;
@@ -807,6 +821,9 @@ export function initV2WorkspaceInteraction(root, {
       axis: 'pending',
       cancelled: false,
       captured: false,
+      startTime: performance.now(),
+      zScrollTop: role === 'z' ? Number(z?.scrollTop || 0) : 0,
+      horizontalContext,
     };
   };
 
@@ -837,13 +854,28 @@ export function initV2WorkspaceInteraction(root, {
           gesture.cancelled = true;
           return;
         }
+        const owner = gesture.horizontalContext?.scrollOwner;
+        if (owner) {
+          const maxScrollLeft = Math.max(0, Number(owner.scrollWidth || 0) - Number(owner.clientWidth || 0));
+          const scrollLeft = Number(owner.scrollLeft || 0);
+          const childCanConsume = (dx > 0 && scrollLeft > 1) || (dx < 0 && scrollLeft < maxScrollLeft - 1);
+          if (childCanConsume) {
+            gesture.cancelled = true;
+            return;
+          }
+        }
       }
       stage.setPointerCapture?.(event.pointerId);
       gesture.captured = true;
     }
 
     if (gesture.role === 'f') {
-      const dragX = Math.max(-maxDrag, Math.min(maxDrag, dx));
+      const step = fStep();
+      const leftRoom = fActiveIndex * step;
+      const rightRoom = (fCards.length - 1 - fActiveIndex) * step;
+      let dragX = dx;
+      if (dragX > leftRoom) dragX = leftRoom + (dragX - leftRoom) * .28;
+      if (-dragX > rightRoom) dragX = -(rightRoom + (-dragX - rightRoom) * .28);
       deck?.classList.add('is-dragging');
       deck?.style.setProperty('--v2-f-drag-x', `${dragX}px`);
       markSuppressClick();
@@ -862,13 +894,22 @@ export function initV2WorkspaceInteraction(root, {
           deck?.style.setProperty('--v2-f-drag-x', `${carry}px`);
         }
       } else {
-        const dragY = Math.max(-maxDrag, Math.min(maxDrag, dy));
+        const step = eStep();
+        const upRoom = (eCards.length - 1 - eActiveIndex) * step;
+        const downRoom = eActiveIndex * step;
+        let dragY = dy;
+        if (dragY > downRoom) dragY = downRoom + (dragY - downRoom) * .28;
+        if (-dragY > upRoom) dragY = -(upRoom + (-dragY - upRoom) * .28);
         eDeck?.classList.add('is-dragging');
         eDeck?.style.setProperty('--v2-e-drag-y', `${dragY}px`);
       }
       markSuppressClick();
       event.preventDefault();
       return;
+    }
+
+    if (z && gesture.role === 'z' && gesture.axis === 'horizontal') {
+      z.scrollTop = gesture.zScrollTop;
     }
 
     if (dx > 0 && !onZRight) {
@@ -885,10 +926,18 @@ export function initV2WorkspaceInteraction(root, {
     if (!gesture || event.pointerId !== gesture.pointerId) return;
     const current = gesture;
 
-    if (current.role === 'f' && !current.cancelled && current.axis === 'horizontal' && Math.abs(current.dx) >= threshold && fCards.length > 1) {
-      const direction = current.dx < 0 ? 1 : -1;
-      fActiveIndex = (fActiveIndex + direction + fCards.length) % fCards.length;
-      markSuppressClick();
+    if (current.role === 'f' && !current.cancelled && current.axis === 'horizontal' && fCards.length > 1) {
+      const step = fStep();
+      const elapsed = Math.max(16, performance.now() - current.startTime);
+      const velocity = current.dx / elapsed;
+      const projected = current.dx + velocity * 180;
+      let delta = Math.round(-projected / step);
+      if (!delta && Math.abs(current.dx) >= threshold) delta = current.dx < 0 ? 1 : -1;
+      const nextIndex = Math.max(0, Math.min(fCards.length - 1, fActiveIndex + delta));
+      if (nextIndex !== fActiveIndex) {
+        fActiveIndex = nextIndex;
+        markSuppressClick();
+      }
       endGesture();
       if (secondaryOpen) setEOpen(false);
       syncF();
@@ -902,15 +951,25 @@ export function initV2WorkspaceInteraction(root, {
         endGesture();
         setEOpen(false);
         if (continueIntoF) {
-          fActiveIndex = (fActiveIndex - 1 + fCards.length) % fCards.length;
+          const carryDistance = Math.max(0, current.dx - threshold);
+          const carrySteps = Math.max(1, Math.round(carryDistance / fStep()));
+          fActiveIndex = Math.max(0, fActiveIndex - carrySteps);
           syncF();
         }
         return;
       }
-      if (current.axis === 'vertical' && Math.abs(current.dy) >= threshold && eCards.length > 1) {
-        const direction = current.dy < 0 ? 1 : -1;
-        eActiveIndex = (eActiveIndex + direction + eCards.length) % eCards.length;
-        markSuppressClick();
+      if (current.axis === 'vertical' && eCards.length > 1) {
+        const step = eStep();
+        const elapsed = Math.max(16, performance.now() - current.startTime);
+        const velocity = current.dy / elapsed;
+        const projected = current.dy + velocity * 160;
+        let delta = Math.round(-projected / step);
+        if (!delta && Math.abs(current.dy) >= threshold) delta = current.dy < 0 ? 1 : -1;
+        const nextIndex = Math.max(0, Math.min(eCards.length - 1, eActiveIndex + delta));
+        if (nextIndex !== eActiveIndex) {
+          eActiveIndex = nextIndex;
+          markSuppressClick();
+        }
         endGesture();
         syncE();
         return;
@@ -922,7 +981,10 @@ export function initV2WorkspaceInteraction(root, {
         markSuppressClick();
         endGesture();
         if (onZRight) onZRight();
-        else setOpen(true);
+        else {
+          setOpen(true);
+          if (eCards.length) setEOpen(true);
+        }
         return;
       }
       if (current.dx <= -threshold && onZLeft) {
