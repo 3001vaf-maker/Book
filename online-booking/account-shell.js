@@ -855,7 +855,7 @@ function confirmDeleteGlobalContact(state, handlers, relationship) {
   const tenantId = String(relationship?.tenantId || '');
   const title = relationshipTitle(relationship);
   if (!tenantId) return;
-  const layer = mountModal(document.body, modal(`<div class="modal-title"><h2>Удалить?</h2><p>${escapeHtml(title)} будет удалён из Контактов. Все действующие согласия с этим профилем будут отозваны. Исторические данные сохранятся.</p></div>
+  const layer = mountModal(document.body, modal(`<div class="modal-title"><h2>Удалить?</h2><p>${escapeHtml(title)} будет удалён.</p></div>
     <div class="modal-actions">
       ${button('Удалить', { variant: 'danger', data: 'data-confirm-delete-contact' })}
       ${button('Отмена', { variant: 'secondary', data: 'data-cancel-delete-contact' })}
