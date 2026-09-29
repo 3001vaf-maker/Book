@@ -14,8 +14,8 @@ import {
   initRepeatedFields,
   initSegmentControls,
   list,
-  listEntries,
-  listEntry,
+  v2ListEntries,
+  v2ListEntry,
   modal,
   monthDayPicker,
   mountModal,
@@ -230,10 +230,10 @@ function listsScreen() {
       { title: 'Три зоны', secondary: 'Слева', right: ['Справа 1', 'Справа 2'] },
     ],
   });
-  const entries = listEntries([
-    listEntry({ columns: [[{ value: '1 столбец', strong: true }, 'Строка 2', 'Строка 3']], interactive: false }),
-    listEntry({ columns: [[{ value: 'Лево', strong: true }, 'Строка 2'], [{ value: 'Право', strong: true }, 'Строка 2', 'Строка 3']], interactive: false }),
-    listEntry({ columns: [[{ value: 'Лево', strong: true }, 'Строка 2'], [{ value: 'Центр', strong: true }, 'Строка 2'], [{ value: 'Право', strong: true }, 'Строка 2', 'Строка 3']], interactive: false }),
+  const entries = v2ListEntries([
+    v2ListEntry({ columns: [[{ value: '1 столбец', strong: true }, 'Строка 2', 'Строка 3']], interactive: false }),
+    v2ListEntry({ columns: [[{ value: 'Лево', strong: true }, 'Строка 2'], [{ value: 'Право', strong: true }, 'Строка 2', 'Строка 3']], interactive: false }),
+    v2ListEntry({ columns: [[{ value: 'Лево', strong: true }, 'Строка 2'], [{ value: 'Центр', strong: true }, 'Строка 2'], [{ value: 'Право', strong: true }, 'Строка 2', 'Строка 3']], interactive: false }),
   ]);
   return {
     className: '',
