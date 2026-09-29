@@ -820,7 +820,7 @@ async function renderGlobalContacts(root, state, handlers) {
   const relationships = Array.isArray(state.relationships) ? state.relationships : [];
   const searchable = relationships.length > 15;
   const header = v2Header({
-    a: { kind: 'avatar', label: accountName(state), image: accountPhoto(state), disabled: true, aria: 'Настройки контактов' },
+    a: { kind: 'avatar', label: accountName(state), image: accountPhoto(state), data: 'data-account-profile-settings', aria: 'Настройки контактов' },
     b: 'Контакты',
     d: { kind: 'chat', data: 'data-account-open-chat-root', aria: 'Чат' },
   });
@@ -829,6 +829,7 @@ async function renderGlobalContacts(root, state, handlers) {
     body: `${searchable ? field({ name: 'accountContactSearch', type: 'search', placeholder: 'Поиск', autocomplete: 'off', data: 'data-account-contact-search' }) : ''}<div data-account-contact-list>${contactsBody(relationships)}</div>`,
   });
   bindWorkspaceInteraction(root, state, handlers);
+  bindGlobalProfileSettingsEntry(root, state, handlers);
   bindGlobalRelationships(root, state, handlers);
   bindGlobalChatButton(root, state, handlers);
   const search = root.querySelector('[data-account-contact-search]');
