@@ -210,8 +210,8 @@ if (!/workplaceCardAppearance\(workplace\)/.test(onlineBookingUi)
   errors.push('Booking workplace selection must render the exact saved workplace business-card owner used by Profile');
 }
 
-if (!/listEntry\(/.test(sharedRecordUi)
-  || !/listEntries\(/.test(sharedRecordUi)
+if (!/v2ListEntry\(/.test(sharedRecordUi)
+  || !/v2ListEntries\(/.test(sharedRecordUi)
   || !/miniCard\(/.test(sharedRecordUi)
   || !/v2RailCard\(/.test(sharedRecordUi)
   || !/timeSlots\(/.test(sharedRecordUi)) {
