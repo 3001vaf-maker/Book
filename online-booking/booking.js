@@ -580,7 +580,13 @@ function renderAccountEntry(root, state) {
   });
 
   initPasswordFields(root);
-  root.querySelector('[data-booking-u-close]')?.addEventListener('click', () => renderWelcome(root, state));
+  root.querySelector('[data-booking-u-close]')?.addEventListener('click', () => {
+    if (state.entry === 'account-booking') {
+      exitBookingContext(state, { tab: 'contact-detail', tenantId: state.tenantId });
+      return;
+    }
+    renderWelcome(root, state);
+  });
   const authForm = root.querySelector('[data-booking-entry-form]');
   root.querySelector('[data-booking-register]')?.addEventListener('click', async () => {
     const data = new FormData(authForm);
