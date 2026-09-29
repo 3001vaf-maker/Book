@@ -47,7 +47,7 @@ const SCREEN_OPTIONS = [
   ['form', 'Форма'],
   ['fields', 'Поля и телефон'],
   ['blocks', 'Блоки 1–3'],
-  ['lists', 'List / Entry List'],
+  ['lists', 'List / V2 List Entry'],
   ['receipt', 'Отчётный лист'],
   ['date', 'День / календарь'],
   ['folders', 'Папки'],
@@ -238,7 +238,7 @@ function listsScreen() {
   return {
     className: '',
     media: '',
-    body: `<div class="ui-reference-list-stack">${section('List', simpleList)}${section('Entry List — 1 / 2 / 3 столбца', entries, 'Каждый столбец поддерживает до трёх строк.')}</div>`,
+    body: `<div class="ui-reference-list-stack">${section('List', simpleList)}${section('V2 List Entries — 1 / 2 / 3 столбца', entries, 'Каждый столбец поддерживает до трёх строк.')}</div>`,
   };
 }
 
