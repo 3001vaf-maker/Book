@@ -173,7 +173,7 @@ assert.match(accountShell, /state\.accountTab = 'contact-detail'/);
 assert.match(accountShell, /async function renderGlobalHistoryDetail\(/);
 assert.doesNotMatch(accountShell, /onOpenRelationship: callbacks\.onOpenRelationship/);
 const contactsBlock = accountShell.slice(
-  accountShell.indexOf('function relationshipSearchText'),
+  accountShell.indexOf('function relationshipCard'),
   accountShell.indexOf('function selectedGlobalRelationship'),
 );
 assert.match(contactsBlock, /entityCardStack\(filtered\.map\(relationshipCard\)\)/);
@@ -186,7 +186,7 @@ assert.match(contactsBlock, /profileCardFields\(profile, \[\]\)/);
 assert.doesNotMatch(contactsBlock, /CONTACT_PROFILE_CARD_APPEARANCE|entity-card--compact|v2HorizontalRail\(filtered|v2ListEntr/);
 
 const contactDetailBlock = accountShell.slice(
-  accountShell.indexOf('function contactHeaderMarkup'),
+  accountShell.indexOf('function confirmDeleteGlobalContact'),
   accountShell.indexOf('async function renderGlobalHistory'),
 );
 assert.match(contactDetailBlock, /mountV2ZLayer\(root, v2ZLayer\([\s\S]*stack:\s*true/, 'Contact profile must open as stacked Z over Contacts Z1');
