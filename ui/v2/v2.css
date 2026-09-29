@@ -85,6 +85,8 @@
   transition:transform .28s cubic-bezier(.22,.78,.18,1);will-change:transform
 }
 .v2-front.is-dragging{transition:none}
+@keyframes v2-z-enter-from-right{from{transform:translate3d(calc(100% + var(--v2-edge)),0,0)}to{transform:translate3d(0,0,0)}}
+.v2-app.is-z-entering > .v2-app__stage > .v2-front{animation:v2-z-enter-from-right .28s cubic-bezier(.22,.78,.18,1) both}
 .v2-z{
   position:relative;touch-action:pan-y;z-index:3;box-sizing:border-box;width:calc(100% - var(--v2-edge));
   height:calc(var(--visual-vh,100dvh) - 72px);min-height:calc(var(--visual-vh,100dvh) - 72px);
