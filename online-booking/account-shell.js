@@ -855,11 +855,7 @@ function confirmDeleteGlobalContact(state, handlers, relationship) {
   const tenantId = String(relationship?.tenantId || '');
   const title = relationshipTitle(relationship);
   if (!tenantId) return;
-  const layer = mountModal(document.body, modal(`<div class="modal-title"><h2>Удалить?</h2><p>${escapeHtml(title)} будет удалён.</p></div>
-    <div class="modal-actions">
-      ${button('Удалить', { variant: 'danger', data: 'data-confirm-delete-contact' })}
-      ${button('Отмена', { variant: 'secondary', data: 'data-cancel-delete-contact' })}
-    </div>`, { title: 'Удалить', variant: 'compact', surface: 'app' }));
+  const layer = mountModal(document.body, modal(`<div class="modal-title"><h2>Удалить контакт?</h2><p>${escapeHtml(title)} будет убран из Контактов. Все действующие согласия будут отозваны. Исторические данные сохранятся.</p></div><div class="form-error" data-contact-delete-error></div><div class="modal-actions">${button('Удалить', { variant: 'danger', data: 'data-confirm-delete-contact' })}${button('Отмена', { variant: 'secondary', data: 'data-cancel-delete-contact' })}</div>`, { variant: 'compact', title: 'Удаление контакта' }));
   if (!layer) return;
   layer.querySelector('[data-cancel-delete-contact]')?.addEventListener('click', () => layer.v2Close?.());
   layer.querySelector('[data-confirm-delete-contact]')?.addEventListener('click', async (event) => {
@@ -878,12 +874,8 @@ function confirmDeleteGlobalContact(state, handlers, relationship) {
       await handlers.render?.();
     } catch (error) {
       event.currentTarget.disabled = false;
-      openNotice({
-        title: 'Контакт не удалён',
-        message: accountErrorMessage(error, 'Не удалось удалить контакт'),
-        action: 'Закрыть',
-        variant: 'technical',
-      });
+      const errorNode = layer.querySelector('[data-contact-delete-error]');
+      if (errorNode) errorNode.textContent = accountErrorMessage(error, 'Не удалось удалить контакт');
     }
   });
 }
@@ -902,7 +894,7 @@ function openGlobalContactSettings(state, handlers, relationship) {
       {
         id: 'delete',
         label: 'Удалить',
-        variant: 'danger',
+        variant: 'critical',
         onSelect: () => confirmDeleteGlobalContact(state, handlers, relationship),
       },
     ],
