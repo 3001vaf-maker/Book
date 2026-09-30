@@ -399,6 +399,44 @@ function openDeleteTenantModal(tenantId) {
   });
 }
 
+const INVITATION_TOOL_GROUP_LABELS = {
+  profile: 'Профиль',
+  work: 'Основные',
+  people: 'Основные',
+  finance: 'Финансы',
+  journal: 'Журнал',
+  settings: 'Настройки',
+};
+
+function invitationToolSelector() {
+  const groups = new Map();
+  state.capabilities.forEach((item) => {
+    if (item.valueType !== 'BOOLEAN') return;
+    const label = INVITATION_TOOL_GROUP_LABELS[item.groupKey] || item.groupKey || 'Инструменты';
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label).push(item);
+  });
+  return `<div class="admin-invite-tools" data-invite-tools>
+    <h4>Инструменты DEMO</h4>
+    <p class="admin-service-note">Сначала выберите инструменты. После этого можно сформировать ссылку или отправить приглашение.</p>
+    ${[...groups.entries()].map(([group, items]) => `<section class="admin-invite-tool-group">
+      <strong>${escapeHtml(group)}</strong>
+      <div class="admin-invite-tool-list">
+        ${items.map((item) => `<label class="admin-invite-tool">
+          <input type="checkbox" value="${escapeHtml(item.key)}" data-invite-tool>
+          <span>${escapeHtml(item.name)}</span>
+        </label>`).join('')}
+      </div>
+    </section>`).join('')}
+  </div>`;
+}
+
+function selectedInvitationTools(root) {
+  return [...root.querySelectorAll('[data-invite-tool]:checked')]
+    .map((input) => String(input.value || '').trim())
+    .filter(Boolean);
+}
+
 function renderTenants() {
   setActiveSection('Пользователи');
   const content = app.querySelector('[data-content]');
@@ -410,6 +448,7 @@ function renderTenants() {
         <h3>Пригласить пользователя</h3>
         <button class="admin-button secondary" type="button" data-create-invite-link>Регистрационная ссылка</button>
       </div>
+      ${invitationToolSelector()}
       <form class="admin-invite-grid" data-invite-form>
         <label class="admin-field"><span>Имя</span><input name="name" placeholder="Имя"></label>
         <label class="admin-field"><span>Email</span><input name="email" type="email" placeholder="name@example.com" required></label>
@@ -441,13 +480,19 @@ function renderTenants() {
   createLinkButton?.addEventListener('click', async () => {
     message.textContent = '';
     message.classList.remove('error');
+    const tools = selectedInvitationTools(content);
+    if (!tools.length) {
+      message.textContent = 'Сначала выберите хотя бы один инструмент.';
+      message.classList.add('error');
+      return;
+    }
     createLinkButton.disabled = true;
     createLinkButton.textContent = 'Создаём…';
     try {
       const result = await adminRequest('/invitations/link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: '{}',
+        body: JSON.stringify({ tools }),
       });
       const url = String(result?.url || '').trim();
       if (!url) throw new Error('Ссылка не получена');
@@ -484,13 +529,19 @@ function renderTenants() {
     message.classList.remove('error');
     const button = form.querySelector('button[type="submit"]');
     const data = new FormData(form);
+    const tools = selectedInvitationTools(content);
+    if (!tools.length) {
+      message.textContent = 'Сначала выберите хотя бы один инструмент.';
+      message.classList.add('error');
+      return;
+    }
     button.disabled = true;
     button.textContent = 'Отправляем…';
     try {
       await adminRequest('/invitations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: data.get('name'), email: data.get('email') }),
+        body: JSON.stringify({ name: data.get('name'), email: data.get('email'), tools }),
       });
       form.reset();
       message.textContent = 'Приглашение отправлено по email.';
