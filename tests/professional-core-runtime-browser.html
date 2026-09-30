@@ -135,26 +135,25 @@ const openF = async (pointerId, label) => {
 
 const centerAndTap = async (deck, target, pointerId, label) => {
   mark('select-' + label);
-  const axisY = deck.dataset.v2DeckAxis === 'y';
-  if (axisY) {
-    deck.scrollTop = Math.max(0, target.offsetTop - (deck.clientHeight - target.offsetHeight) / 2);
-  } else {
-    deck.scrollLeft = Math.max(0, target.offsetLeft - (deck.clientWidth - target.offsetWidth) / 2);
+
+  // Approved interaction contract: tapping a non-active card centres it only.
+  // The second tap on the centred active card performs navigation.
+  if (!target.classList.contains('is-active')) {
+    pointer(target,'pointerdown',190,390,pointerId);
+    pointer(target,'pointerup',190,390,pointerId);
+    target.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,clientX:190,clientY:390}));
+    for (let attempt=0; attempt<12 && !target.classList.contains('is-active'); attempt+=1) await wait(60);
   }
-  deck.dispatchEvent(new Event('scroll'));
-  await wait(220);
+
   const activeNow = deck.querySelector('[data-v2-card-item].is-active');
   ok(
     target.classList.contains('is-active'),
-    label + ' did not become centred active card'
+    label + ' did not become centred active card after neighbour tap'
       + ' active=' + String(activeNow?.dataset.v2CardItem || 'none')
-      + ' scroll=' + String(Math.round(axisY ? deck.scrollTop : deck.scrollLeft))
-      + ' targetOffset=' + String(Math.round(axisY ? target.offsetTop : target.offsetLeft))
-      + ' deckSize=' + String(Math.round(axisY ? deck.clientHeight : deck.clientWidth))
-      + ' cardSize=' + String(Math.round(axisY ? target.offsetHeight : target.offsetWidth))
   );
-  pointer(target,'pointerdown',190,390,pointerId);
-  pointer(target,'pointerup',190,390,pointerId);
+
+  pointer(target,'pointerdown',190,390,pointerId + 100);
+  pointer(target,'pointerup',190,390,pointerId + 100);
   target.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,clientX:190,clientY:390}));
   await wait(180);
   ok(shell() === initialShell, label + ' rebuilt the whole professional FEZ shell');
