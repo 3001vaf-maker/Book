@@ -57,7 +57,7 @@ const CAPABILITY_CATALOG: Array<{
   { key: 'workplaces.access', groupKey: 'profile', name: 'Рабочие пространства', valueType: CapabilityValueType.BOOLEAN, position: 10, starterEnabled: true },
   { key: 'workplaces.max', groupKey: 'system', name: 'Количество рабочих пространств', valueType: CapabilityValueType.LIMIT, position: 15, starterLimit: 1 },
   { key: 'timetable.access', groupKey: 'work', name: 'График', valueType: CapabilityValueType.BOOLEAN, position: 20, starterEnabled: false },
-  { key: 'people.access', groupKey: 'people', name: 'Клиенты', valueType: CapabilityValueType.BOOLEAN, position: 30, starterEnabled: true },
+  { key: 'people.access', groupKey: 'people', name: 'Люди', valueType: CapabilityValueType.BOOLEAN, position: 30, starterEnabled: true },
 
   { key: 'finance.cash.access', groupKey: 'finance', name: 'Касса', valueType: CapabilityValueType.BOOLEAN, position: 40, starterEnabled: false },
   { key: 'finance.dds.access', groupKey: 'finance', name: 'ДДС', valueType: CapabilityValueType.BOOLEAN, position: 50, starterEnabled: false },
@@ -70,7 +70,7 @@ const CAPABILITY_CATALOG: Array<{
   { key: 'journal.month.access', groupKey: 'journal', name: 'Месяц', valueType: CapabilityValueType.BOOLEAN, position: 110, starterEnabled: false },
   { key: 'journal.list.access', groupKey: 'journal', name: 'Список', valueType: CapabilityValueType.BOOLEAN, position: 120, starterEnabled: false },
 
-  { key: 'services.access', groupKey: 'settings', name: 'Сервис', valueType: CapabilityValueType.BOOLEAN, position: 130, starterEnabled: true },
+  { key: 'services.access', groupKey: 'settings', name: 'Услуги', valueType: CapabilityValueType.BOOLEAN, position: 130, starterEnabled: true },
   { key: 'online_booking.access', groupKey: 'settings', name: 'Онлайн-запись', valueType: CapabilityValueType.BOOLEAN, position: 140, starterEnabled: false },
   { key: 'notifications.access', groupKey: 'settings', name: 'Уведомления', valueType: CapabilityValueType.BOOLEAN, position: 150, starterEnabled: false },
   { key: 'integrations.access', groupKey: 'settings', name: 'Интеграции', valueType: CapabilityValueType.BOOLEAN, position: 160, starterEnabled: false },
