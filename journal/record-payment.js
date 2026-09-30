@@ -1,11 +1,10 @@
 import { button, details, field, initPaymentForm, initPaymentMethods, modal, mountModal, openNotice, paymentForm, paymentMethods, paymentReceipt, select, shortDate, shortTime } from '../ui/ui.js';
-import { calculateSettlement, getRecordPaymentState, recordSettlementItems } from '../core/finance/index.js';
+import { calculateSettlement, getRecordPaymentState, getWallets, recordSettlementItems } from '../core/finance/index.js';
 import { cancelPaymentOperation, getRefundsForPayment, recordPaymentIncome, recordRefundExpense, saveSettlementSnapshot } from '../core/finance/index.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { normalizeWorkplaceTimeZone, zonedDateTimeParts, zonedDateTimeToDate } from '../core/time/index.js';
-import { getAllPeople } from '../main/people/data.js';
-import { personDisplay } from '../main/people/presentation.js';
-import { getWallets } from '../main/finance/cash/data.js';
+import { getAllPeople } from '../people/data.js';
+import { personDisplay } from '../people/presentation.js';
 import { getRecord } from '../core/record/index.js';
 import { setRecordAttendance, updateRecord } from '../core/record/index.js';
 import { journalRecordActionContext } from './record-action-context.js';
