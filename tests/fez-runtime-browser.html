@@ -172,6 +172,29 @@ await nextFrame();
 ok(oldDisposed === 1 && !oldLayer.isConnected && replacement?.isConnected, 'non-stack Z replacement skipped disposal');
 replacement?.v2Close?.();
 
+// Generic base-Z owner (used by booking/auth/chat) must move the whole front with the finger.
+const genericHost = document.createElement('div');
+genericHost.innerHTML = v2Shell({ body:'<p>generic Z</p>', className:'v2-app--generic-runtime' });
+document.body.appendChild(genericHost);
+const genericApp = genericHost.querySelector('[data-v2-app]');
+const genericEdge = genericApp.querySelector('[data-v2-edge-swipe]');
+const genericFront = genericApp.querySelector('[data-v2-front]');
+let genericBack = 0;
+const disposeGeneric = (await import('/ui/v2/index.js')).initV2Swipe(genericApp.querySelector('[data-v2-z]'), {
+  onRight:() => { genericBack += 1; },
+  revealDeck:false,
+  threshold:28,
+});
+pointer(genericEdge, 'pointerdown', 10, 220, 25);
+pointer(genericEdge, 'pointermove', 44, 222, 25);
+ok(genericFront.classList.contains('is-dragging'), 'generic Z1 did not enter physical drag state');
+ok(genericFront.style.getPropertyValue('--v2-front-drag-x') !== '', 'generic Z1 did not move the shared front');
+pointer(genericEdge, 'pointerup', 44, 222, 25);
+await nextFrame();
+ok(genericBack === 1, 'generic Z1 edge swipe callback did not fire');
+disposeGeneric();
+genericHost.remove();
+
 const stickerHost = document.createElement('div');
 stickerHost.innerHTML = v2Sticker({ title:'Тест', body:'Тело' });
 document.body.appendChild(stickerHost);
