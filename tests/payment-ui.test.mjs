@@ -100,7 +100,7 @@ const financeUiSource = readFileSync(new URL('../main/finance/finance.js', impor
 const financeServiceSource = readFileSync(new URL('../core/finance/service.js', import.meta.url), 'utf8');
 const journalListSource = readFileSync(new URL('../journal/список.js', import.meta.url), 'utf8');
 const personMetadataSource = readFileSync(new URL('../main/people/metadata.js', import.meta.url), 'utf8');
-const walletSource = readFileSync(new URL('../settings/wallets/wallets.js', import.meta.url), 'utf8');
+const walletSource = readFileSync(new URL('../main/finance/cash/cash.js', import.meta.url), 'utf8');
 const documentsSource = readFileSync(new URL('../settings/documents/documents.js', import.meta.url), 'utf8');
 const peopleSource = readFileSync(new URL('../main/people/people.js', import.meta.url), 'utf8');
 
