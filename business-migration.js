@@ -2,7 +2,7 @@ import { apiRequest } from './core/auth.js';
 import { setBusinessServerReady } from './core/business-persistence.js';
 import { hydrateUEIFromServer } from './core/uei.js';
 import { hydrateRecordStateFromServer } from './core/record/index.js';
-import { hydratePeopleFromServer } from './main/people/data.js';
+import { hydratePeopleFromServer } from './core/people/data.js';
 
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
