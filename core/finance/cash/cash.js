@@ -86,8 +86,8 @@ function openWalletOperation(root, operationId, wallet) {
   const sourceDetails = [...new Set(entries.map((item) => String(item?.sourceDetails || '')).filter(Boolean))].join(', ');
   const context = details([
     { label: 'Фактическая дата и время', value: operationMoment(first) || '—' },
-    { label: 'Внесено в Book', value: recordedMoment(first) || '—' },
-    person ? { label: 'Клиент', value: person } : null,
+    { label: 'Внесено в систему', value: recordedMoment(first) || '—' },
+    person ? { label: 'Конечный пользователь', value: person } : null,
     sourceDetails ? { label: 'За что', value: sourceDetails } : null,
     first?.workplace ? { label: 'Рабочее место', value: first.workplace } : null,
     wallets ? { label: 'Кошелёк', value: wallets } : null,

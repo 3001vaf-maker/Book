@@ -225,8 +225,8 @@ if (!/renderFinanceArticles/.test(financeUI) || !/renderIncomeExpense/.test(fina
 if (!/renderSpecialFinanceOperations/.test(financeUI) || !/renderZReport/.test(financeUI)) {
   errors.push('Finance UI must expose special operations and Z-report');
 }
-if (!/Фактическая дата и время/.test(ddsUI) || !/Внесено в Book/.test(ddsUI)) {
-  errors.push('DDS/export must expose factual occurrence time separately from Book recording time');
+if (!/Фактическая дата и время/.test(ddsUI) || !/Внесено в систему/.test(ddsUI)) {
+  errors.push('DDS/export must expose factual occurrence time separately from system recording time');
 }
 const articlesUI = source('core/finance/articles.js');
 if (!/parentArticleId/.test(articlesUI) || !/economicType/.test(articlesUI)) {
