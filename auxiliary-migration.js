@@ -38,7 +38,7 @@ async function hydrateCanonicalFinance() {
 
 export async function initializeAuxiliaryState(account = {}) {
   const response = await apiRequest('/auxiliary-state');
-  const remote = await responseJson(response, 'Не удалось загрузить Финансы и связанные данные');
+  const remote = await responseJson(response, 'Не удалось загрузить связанные данные');
 
   if (remote?.verified) {
     hydrateAuxiliary(remote);
@@ -51,8 +51,8 @@ export async function initializeAuxiliaryState(account = {}) {
   }
 
   const bootstrapResponse = await apiRequest('/auxiliary-state/bootstrap', { method: 'POST' });
-  const bootstrapped = await responseJson(bootstrapResponse, 'Не удалось создать серверное хранилище Финансов');
-  if (!bootstrapped?.verified) throw new Error('Серверное хранилище Финансов не подтверждено');
+  const bootstrapped = await responseJson(bootstrapResponse, 'Не удалось создать серверное хранилище связанных данных');
+  if (!bootstrapped?.verified) throw new Error('Серверное хранилище связанных данных не подтверждено');
   hydrateAuxiliary(bootstrapped);
   await hydrateCanonicalFinance();
   return { source: 'server-bootstrap', verified: true };
