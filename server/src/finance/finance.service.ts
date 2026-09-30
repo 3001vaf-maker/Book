@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma.service';
@@ -909,6 +909,59 @@ export class FinanceService {
       for (const target of targets) {
         await this.createReversalFor(tx, tenantId, target.operationId, text(input.reason) || 'incorrect-entry', occurredAt);
         await tx.financeOperation.update({ where: { id: target.id }, data: { status: 'cancelled' } });
+      }
+    });
+
+    return this.snapshot(tenantId);
+  }
+
+  async hardDeleteWallet(tenantId: string, platformAccountId: string, walletId: string) {
+    const accountId = text(platformAccountId);
+    const id = text(walletId);
+    if (!id) throw new BadRequestException('Касса не найдена');
+    if (id === 'cash' || id === 'cashless') {
+      throw new BadRequestException('Системную кассу полностью удалить нельзя');
+    }
+
+    const admin = await this.prisma.platformAdmin.findUnique({
+      where: { platformAccountId: accountId },
+      select: { id: true },
+    });
+    if (!admin) throw new ForbiddenException('Полное удаление доступно только администратору платформы');
+
+    await this.serializable(async (tx) => {
+      const direct = await tx.financeOperation.findMany({
+        where: {
+          tenantId,
+          ledgerEntries: { some: { walletId: id } },
+        },
+        select: { operationId: true },
+      });
+      const operationIds = new Set(direct.map((row) => row.operationId));
+      let frontier = [...operationIds];
+
+      while (frontier.length) {
+        const related = await tx.financeOperation.findMany({
+          where: {
+            tenantId,
+            originalOperationId: { in: frontier },
+          },
+          select: { operationId: true },
+        });
+        const next = related
+          .map((row) => row.operationId)
+          .filter((operationId) => !operationIds.has(operationId));
+        next.forEach((operationId) => operationIds.add(operationId));
+        frontier = next;
+      }
+
+      if (operationIds.size) {
+        await tx.financeOperation.deleteMany({
+          where: {
+            tenantId,
+            operationId: { in: [...operationIds] },
+          },
+        });
       }
     });
 

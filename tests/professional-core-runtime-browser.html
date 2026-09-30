@@ -70,7 +70,47 @@
       verified:true, wallets:[], tags:[], products:[], productHistory:[],
     };
     if (path.endsWith('/finance')) return {
-      version:7, articles:[], settlements:[], operations:[], ledger:[], income:[], expense:[],
+      version:7,
+      articles:[],
+      settlements:[],
+      operations:[{
+        operationId:'runtime-payment',
+        kind:'payment',
+        status:'completed',
+        source:{type:'record',id:'runtime-record'},
+        originalOperationId:'',
+        occurredAt:'2026-09-30T12:30:00.000Z',
+        recordedAt:'2026-09-30T12:31:00.000Z',
+        data:{
+          workplace:'Студия Тест',
+          person:{uei:'UEI-RUNTIME',name:'Иван',surname:'Проверка'},
+          allocations:[{walletId:'cash',walletName:'Наличные',amount:1500}],
+          total:1500,
+          serviceAmount:1500,
+          tips:0,
+          settlement:{items:[{sourceType:'procedure',sourceId:'runtime-procedure',name:'Стрижка',price:1500,discountMoney:0,planAmount:1500}],serviceTotal:1500,discountTotal:0,planTotal:1500},
+        },
+      }],
+      ledger:[{
+        entryId:'runtime-ledger',
+        operationId:'runtime-payment',
+        walletId:'cash',
+        walletName:'Наличные',
+        direction:'IN',
+        economicType:'SERVICE_REVENUE',
+        amount:1500,
+        occurredAt:'2026-09-30T12:30:00.000Z',
+        recordedAt:'2026-09-30T12:31:00.000Z',
+        source:{type:'record',id:'runtime-record'},
+        component:'service',
+        relatedOperationId:'',
+        articleId:'',
+        articleName:'',
+        lineName:'',
+        quantity:null,
+        unitPrice:null,
+        note:'',
+      }],
     };
     if (path.endsWith('/saas-access/me')) return demoAccess;
     if (path.endsWith('/saas-access/demo/activate')) return demoAccess;
@@ -162,8 +202,83 @@ const tapAndOpen = async (deck, target, pointerId, label) => {
 await openF(1,'people');
 await tapAndOpen(fDeck(), fCard('finance'), 11, 'finance');
 ok(shell()?.classList.contains('is-deck-open') && shell()?.classList.contains('is-e-open'), 'Finance did not open real E deck');
+ok(Boolean(eCard('cash')), 'Finance E Cash missing');
 ok(Boolean(eCard('dds')), 'Finance E DDS missing');
-await tapAndOpen(eDeck(), eCard('dds'), 12, 'finance-dds');
+
+await tapAndOpen(eDeck(), eCard('cash'), 12, 'finance-cash');
+ok(!shell()?.classList.contains('is-deck-open'), 'Cash selection did not enter Z');
+ok(Boolean(shell()?.querySelector('[data-v2-workspace-a]')), 'Cash A/settings control missing');
+ok(shell()?.querySelector('[data-v2-workspace-primary]')?.textContent.trim() === '+', 'Cash C add control missing');
+ok(Boolean(shell()?.querySelector('[data-v2-workspace-chat]')), 'Cash D chat control missing');
+
+const systemCashCard = shell()?.querySelector('[data-wallet="cash"]');
+ok(Boolean(systemCashCard?.classList.contains('entity-visual-card')), 'Cash Z1 must use the canonical fixed entity card');
+ok(!shell()?.querySelector('.entity-card--hero'), 'Cash Z1 must not use the old hero card');
+systemCashCard?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(35);
+
+let cashZ2 = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
+ok(Boolean(cashZ2), 'Cash card did not open Z2');
+ok(cashZ2?.querySelector('[data-workspace-header-context]')?.dataset.workspaceTitle === 'Наличные', 'Cash Z2 B title is wrong');
+ok(Boolean(shell()?.querySelector('[data-v2-workspace-a]')), 'Cash Z2 A/settings control missing');
+const runtimeOperation = cashZ2?.querySelector('[data-wallet-operation="runtime-payment"]');
+ok(Boolean(runtimeOperation?.classList.contains('list-entry')), 'Cash operations must use the canonical client-style List Entry');
+ok(!cashZ2?.querySelector('.entity-card--compact'), 'Cash operations must not use compact entity cards');
+
+shell()?.querySelector('[data-v2-workspace-a]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(25);
+let cashSettings = document.querySelector('[data-shared-profile-settings-menu]');
+ok(Boolean(cashSettings?.querySelector('[data-shared-profile-action="appearance"]')), 'Cash settings must contain View');
+ok(!cashSettings?.textContent.includes('Удалить кассу'), 'System cash must not expose delete');
+ok(!cashSettings?.textContent.includes('Полное удаление'), 'System cash must not expose hard delete');
+cashSettings?.querySelector('[data-shared-profile-action="appearance"]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(25);
+let appearanceZ = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
+ok(Boolean(appearanceZ?.querySelector('[data-entity-card-editor]')), 'Cash View must open the shared entity card editor');
+let zEdge = edge();
+pointer(zEdge,'pointerdown',10,360,150);
+pointer(zEdge,'pointermove',82,362,150);
+pointer(zEdge,'pointerup',82,362,150);
+await wait(35);
+
+cashZ2 = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
+cashZ2?.querySelector('[data-wallet-operation="runtime-payment"]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(25);
+let operationZ3 = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
+const receipt = operationZ3?.querySelector('.payment-receipt');
+ok(Boolean(receipt), 'Cash operation did not open shared receipt in Z3');
+ok(receipt?.textContent.includes('Студия Тест'), 'Cash receipt workplace missing');
+ok(receipt?.textContent.includes('UEI-RUNTIME'), 'Cash receipt UEI missing');
+ok(receipt?.textContent.includes('Иван Проверка'), 'Cash receipt full name missing');
+ok(receipt?.textContent.includes('1 500 ₽') || receipt?.textContent.includes('1 500 ₽'), 'Cash receipt amount missing');
+ok(Boolean(receipt?.querySelector('.payment-receipt__amount--divided')), 'Cash receipt thin divider missing');
+ok(!receipt?.textContent.includes('Внесено в систему'), 'Cash receipt must not show system recording time');
+ok(!receipt?.textContent.includes('Конечный пользователь'), 'Cash receipt must not show end-user heading');
+ok(!receipt?.textContent.includes('Стрижка'), 'Cash receipt must not show what was paid for');
+ok(operationZ3?.querySelector('[data-workspace-header-context]')?.dataset.workspaceTitle === 'Оплата услуги', 'Cash Z3 B operation title is wrong');
+
+shell()?.querySelector('[data-v2-workspace-a]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(20);
+const operationSettings = document.querySelector('[data-shared-profile-settings-menu]');
+ok(Boolean(operationSettings?.querySelector('[data-shared-profile-action="delete-operation"]')), 'Cash operation A/settings must expose delete operation');
+operationSettings?.v2Close?.();
+
+zEdge = edge();
+pointer(zEdge,'pointerdown',10,360,151);
+pointer(zEdge,'pointermove',82,362,151);
+pointer(zEdge,'pointerup',82,362,151);
+await wait(35);
+zEdge = edge();
+pointer(zEdge,'pointerdown',10,360,152);
+pointer(zEdge,'pointermove',82,362,152);
+pointer(zEdge,'pointerup',82,362,152);
+await wait(35);
+ok(!shell()?.querySelector('[data-v2-z-layer]'), 'Cash Z2/Z3 stack did not return to Z1 by swipe');
+
+await openF(2,'cash');
+await tapAndOpen(fDeck(), fCard('finance'), 13, 'finance-after-cash');
+ok(shell()?.classList.contains('is-e-open'), 'Finance did not reopen E after Cash');
+await tapAndOpen(eDeck(), eCard('dds'), 14, 'finance-dds');
 ok(!shell()?.classList.contains('is-deck-open'), 'DDS selection did not enter Z');
 
 const openDdsSettings = async () => {
@@ -208,15 +323,15 @@ for (const [index, id, title] of [
   ok(Boolean(shell()?.querySelector('[data-v2-workspace-a]')), 'DDS A/settings was not restored after closing Z2: ' + id);
 }
 
-await openF(2,'dds');
-await tapAndOpen(fDeck(), fCard('journal'), 13, 'journal');
+await openF(3,'dds');
+await tapAndOpen(fDeck(), fCard('journal'), 15, 'journal');
 ok(shell()?.classList.contains('is-e-open'), 'Journal did not open real E deck');
 ok(Boolean(eCard('list')), 'Journal E List missing');
-await tapAndOpen(eDeck(), eCard('list'), 14, 'journal-list');
+await tapAndOpen(eDeck(), eCard('list'), 16, 'journal-list');
 ok(!shell()?.classList.contains('is-deck-open'), 'Journal List selection did not enter Z');
 
-await openF(3,'journal-list');
-await tapAndOpen(fDeck(), fCard('profile'), 15, 'profile');
+await openF(4,'journal-list');
+await tapAndOpen(fDeck(), fCard('profile'), 17, 'profile');
 ok(!shell()?.classList.contains('is-deck-open'), 'Profile F without E did not enter Z directly');
 
 // Repeat full roots to expose stale listeners/rAF from persistent shell reuse.

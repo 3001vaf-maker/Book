@@ -18,6 +18,18 @@ function walk(dir) {
   return files;
 }
 
+function walkEveryFile(dir) {
+  const files = [];
+  for (const name of readdirSync(dir)) {
+    if (ignored.has(name)) continue;
+    const file = join(dir, name);
+    const stat = statSync(file);
+    if (stat.isDirectory()) files.push(...walkEveryFile(file));
+    else files.push(file);
+  }
+  return files;
+}
+
 function rel(file) {
   return relative(root, file).replaceAll('\\', '/');
 }
@@ -214,6 +226,49 @@ if (!/getWalletDDSMovements/.test(walletData) || !/export function getWalletBala
 }
 if (/\bbalance\s*:/.test(walletData)) {
   errors.push('Wallet metadata must not persist an independent balance field');
+}
+
+const financeCss = walkEveryFile(join(root, 'core/finance'))
+  .map(rel)
+  .filter((path) => path.endsWith('.css'));
+if (financeCss.length) {
+  errors.push(`Finance must not own local CSS: ${financeCss.join(', ')}`);
+}
+
+const cashUI = source('core/finance/cash/cash.js');
+for (const token of ['workspaceHeaderContext', 'entityVisualCard', 'mountEntityCardConstructor', 'mountV2ZLayer', 'v2ListEntry', 'paymentReceipt']) {
+  if (!cashUI.includes(token)) errors.push(`Cash UI must use shared ${token}`);
+}
+if (!/data-add-wallet data-v2-primary-action data-v2-primary-label="\+"/.test(cashUI)) {
+  errors.push('Cash C must be the shared Header primary + action');
+}
+if (/entityCard--hero|\bentityCard\s*\(/.test(cashUI)) {
+  errors.push('Cash Z1 must use the fixed shared entity visual card, not a local/legacy card');
+}
+if (/Внесено в систему|Конечный пользователь|За что/.test(cashUI)) {
+  errors.push('Cash receipt must not expose recording time, end-user headings or paid-for detail');
+}
+if (!/operationKind === 'cancel'/.test(cashUI)
+  || !/operationStatus === 'cancelled'/.test(cashUI)
+  || !/economicType === 'REVERSAL'/.test(cashUI)) {
+  errors.push('Cash quick operation list must hide cancelled/deleted operations and reversals');
+}
+if (!/Math\.abs\(getWalletBalance\(id\)\) > 0\.009/.test(walletData)) {
+  errors.push('Ordinary cash deletion must require a zero balance and preserve Finance history');
+}
+if (!/export function deleteWalletPermanently/.test(walletData)) {
+  errors.push('Admin hard-delete flow must remove custom cash metadata only after the server purge');
+}
+
+const financeController = source('server/src/finance/finance.controller.ts');
+const financeServer = source('server/src/finance/finance.service.ts');
+if (!/wallets\/:walletId\/hard/.test(financeController)) {
+  errors.push('Finance server must expose the admin-only full cash deletion command');
+}
+if (!/platformAdmin\.findUnique/.test(financeServer)
+  || !/financeOperation\.deleteMany/.test(financeServer)
+  || !/id === 'cash' \|\| id === 'cashless'/.test(financeServer)) {
+  errors.push('Full cash deletion must be platform-admin gated, purge operation history, and protect system cash');
 }
 
 const financeUI = source('core/finance/finance.js');

@@ -55,6 +55,18 @@ export class FinanceController {
     return this.finance.archiveArticle(request.auth!.tenantId, articleId);
   }
 
+  @Delete('wallets/:walletId/hard')
+  hardDeleteWallet(
+    @Req() request: AuthenticatedRequest,
+    @Param('walletId') walletId: string,
+  ) {
+    return this.finance.hardDeleteWallet(
+      request.auth!.tenantId,
+      request.auth!.platformAccountId,
+      walletId,
+    );
+  }
+
   @Post('operations/manual')
   manual(@Req() request: AuthenticatedRequest, @Body() body: unknown) {
     return this.finance.recordManualOperation(request.auth!.tenantId, body);
