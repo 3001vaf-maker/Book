@@ -88,8 +88,6 @@ hydrateFinanceFromServer({
       note: '',
     },
   ],
-  income: [],
-  expense: [],
 });
 
 assert.equal(getFinanceArticles().length, 2);
