@@ -15,7 +15,7 @@ import {
   setRecordAttendance,
   updateRecord,
 } from '../core/record/index.js';
-import { getWalletBalance, hydrateWalletsFromServer } from '../settings/wallets/data.js';
+import { getWalletBalance, hydrateWalletsFromServer } from '../main/finance/cash/data.js';
 import {
   canonicalFinanceState,
   paymentFixture,
