@@ -225,6 +225,17 @@ if (!/renderZReport/.test(financeUI)) {
 if (/renderFinanceArticles|renderIncomeExpense|renderSpecialFinanceOperations/.test(financeUI)) {
   errors.push('Finance root must not expose DDS instruments as separate E folders');
 }
+if (!/workspaceHeaderContext/.test(ddsUI)
+  || !/data-finance-dds-settings/.test(ddsUI)
+  || !/data-finance-dds-tool/.test(ddsUI)) {
+  errors.push('DDS must expose its former Finance E instruments through the DDS A/settings control');
+}
+for (const label of ['Доход / Расход', 'Статьи', 'Прочие операции']) {
+  if (!ddsUI.includes(label)) errors.push(`DDS settings missing relocated instrument: ${label}`);
+}
+if (!/mountV2ZLayer/.test(ddsUI) || !/v2ZLayer/.test(ddsUI)) {
+  errors.push('DDS settings instruments must open as real stacked Z layers');
+}
 if (!/Фактическая дата и время/.test(ddsUI) || !/Внесено в систему/.test(ddsUI)) {
   errors.push('DDS/export must expose factual occurrence time separately from system recording time');
 }
