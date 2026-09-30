@@ -79,14 +79,14 @@ function renderReport(root, navigateBack, from, to) {
       ${button('Показать', { type: 'submit' })}
     </form>
     ${content}
-    ${actionBlock(button('Назад', { variant: 'secondary', data: 'data-z-report-back' }))}`;
+    `;
 
   root.querySelector('[data-z-report-form]')?.addEventListener('submit', (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     renderReport(root, navigateBack, String(data.get('from') || ''), String(data.get('to') || ''));
   });
-  root.querySelector('[data-z-report-back]')?.addEventListener('click', navigateBack);
+  
 }
 
 export function renderZReport(root, navigateBack = () => {}) {

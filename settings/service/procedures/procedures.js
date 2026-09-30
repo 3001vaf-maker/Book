@@ -52,7 +52,7 @@ function openProcedureOrder(root, navigateBack) {
 
 function renderList(root, navigateBack) {
   const items = getProcedures();
-  root.innerHTML = `<div class="entity-page-header">${pageHeader('Процедуры')}<div class="page-header-action">${items.length > 1 ? iconButton('↕', { data: 'data-order-procedures', aria: 'Изменить порядок услуг' }) : ''}${iconButton('+', { className: 'icon-button--primary', data: 'data-add-procedure', aria: 'Добавить услугу' })}</div></div>${items.length ? v2ListEntries(items.map(renderRow)) : emptyState('Процедур пока нет', 'Добавьте первую процедуру кнопкой «+».')}${actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-back-procedures' }))}`;
+  root.innerHTML = `<div class="entity-page-header">${pageHeader('Процедуры')}<div class="page-header-action">${items.length > 1 ? iconButton('↕', { data: 'data-order-procedures', aria: 'Изменить порядок услуг' }) : ''}${iconButton('+', { className: 'icon-button--primary', data: 'data-add-procedure', aria: 'Добавить услугу' })}</div></div>${items.length ? v2ListEntries(items.map(renderRow)) : emptyState('Процедур пока нет', 'Добавьте первую процедуру кнопкой «+».')}`;
   root.querySelector('[data-order-procedures]')?.addEventListener('click', () => openProcedureOrder(root, navigateBack));
   root.querySelector('[data-add-procedure]')?.addEventListener('click', () => openProcedureForm({ root, onSaved: () => renderList(root, navigateBack) }));
   root.querySelectorAll('[data-procedure]').forEach((element) => element.addEventListener('click', () => renderCard(root, element.dataset.procedure, navigateBack)));
@@ -60,7 +60,7 @@ function renderList(root, navigateBack) {
     event.stopPropagation();
     confirmDelete(root, element.dataset.deleteAction, navigateBack, () => renderList(root, navigateBack));
   }));
-  root.querySelector('[data-back-procedures]')?.addEventListener('click', navigateBack);
+  
 }
 
 function renderRow(procedure) {
@@ -103,7 +103,7 @@ function renderCard(root, id, navigateBack) {
   });
   root.innerHTML = page([
     card,
-    actionBlock(`${button('Редактировать процедуру', { data: 'data-edit-procedure' })}${button('Назад', { className: 'ui-button--secondary', data: 'data-back-procedures-card' })}${button('Удалить', { variant: 'danger', data: 'data-delete-card' })}`),
+    actionBlock(`${button('Редактировать процедуру', { data: 'data-edit-procedure' })}${button('Удалить', { variant: 'danger', data: 'data-delete-card' })}`),
   ]);
   root.querySelector('[data-edit-procedure]').onclick = () => openProcedureForm({
     root,
@@ -111,7 +111,7 @@ function renderCard(root, id, navigateBack) {
     onSaved: (saved) => renderCard(root, saved.id, navigateBack),
   });
   root.querySelector('[data-delete-card]').onclick = () => confirmDelete(root, id, navigateBack, () => renderList(root, navigateBack));
-  root.querySelector('[data-back-procedures-card]').onclick = () => renderList(root, navigateBack);
+  
 }
 
 function confirmDelete(root, id, navigateBack, onDeleted) {

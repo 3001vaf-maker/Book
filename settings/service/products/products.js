@@ -7,11 +7,11 @@ const money=(value)=>`${new Intl.NumberFormat('ru-RU').format(Number(value||0))}
 
 function renderList(root,navigateBack){
   const items=getProducts();
-  root.innerHTML=`<div class="entity-page-header">${pageHeader('Товары')}<div class="page-header-action">${iconButton('+',{className:'icon-button--primary',data:'data-add-product',aria:'Добавить товар'})}</div></div>${items.length?v2ListEntries(items.map(renderRow)):emptyState('Товаров пока нет','Добавьте первый товар кнопкой «+».')}${actionBlock(button('Назад',{className:'ui-button--secondary',data:'data-back-products'}))}`;
+  root.innerHTML=`<div class="entity-page-header">${pageHeader('Товары')}<div class="page-header-action">${iconButton('+',{className:'icon-button--primary',data:'data-add-product',aria:'Добавить товар'})}</div></div>${items.length?v2ListEntries(items.map(renderRow)):emptyState('Товаров пока нет','Добавьте первый товар кнопкой «+».')}`;
   root.querySelector('[data-add-product]')?.addEventListener('click',()=>openForm(root,null,navigateBack));
   root.querySelectorAll('[data-product]').forEach(el=>el.addEventListener('click',()=>renderCard(root,el.dataset.product,navigateBack)));
   root.querySelectorAll('[data-delete-action]').forEach(el=>el.addEventListener('click',e=>{e.stopPropagation();confirmDelete(root,el.dataset.deleteAction,navigateBack,()=>renderList(root,navigateBack))}));
-  root.querySelector('[data-back-products]')?.addEventListener('click',navigateBack);
+  
 }
 
 function renderRow(p){
@@ -51,10 +51,10 @@ function renderCard(root,id,navigateBack){
     p.about?{label:'Описание',value:p.about}:null,
     workplaceNames.length?{label:'Рабочие места',value:workplaceNames.join(', ')}:null
   ]);
-  root.innerHTML=page([card,info,actionBlock(`${button('Редактировать товар',{data:'data-edit-product'})}${button('Назад',{className:'ui-button--secondary',data:'data-back-products-card'})}${button('Удалить',{variant:'danger',data:'data-delete-card'})}`)]);
+  root.innerHTML=page([card,info,actionBlock(`${button('Редактировать товар',{data:'data-edit-product'})}${button('Удалить',{variant:'danger',data:'data-delete-card'})}`)]);
   root.querySelector('[data-edit-product]').onclick=()=>openForm(root,p,navigateBack);
   root.querySelector('[data-delete-card]').onclick=()=>confirmDelete(root,id,navigateBack,()=>renderList(root,navigateBack));
-  root.querySelector('[data-back-products-card]').onclick=()=>renderList(root,navigateBack);
+  
 }
 
 function confirmDelete(root,id,navigateBack,onDeleted){

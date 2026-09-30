@@ -14,10 +14,10 @@ function renderTelegramForm(root, navigateBack, state = {}) {
       <div class="muted">${statusText}</div>
       ${field({ label: connected ? 'Новый токен бота' : 'Токен бота', name: 'telegramBotToken', type: 'password', placeholder: connected ? 'Вставьте токен только для замены' : 'Вставьте токен из BotFather' })}
       <div class="muted" data-telegram-integration-status aria-live="polite"></div>
-      ${actionBlock(`${button(connected ? 'Заменить токен' : 'Подключить', { type: 'submit' })}${connected ? button('Отключить', { variant: 'secondary', data: 'data-telegram-disconnect' }) : ''}${button('Назад', { variant: 'secondary', data: 'data-telegram-back' })}`)}
+      ${actionBlock(`${button(connected ? 'Заменить токен' : 'Подключить', { type: 'submit' })}${connected ? button('Отключить', { variant: 'secondary', data: 'data-telegram-disconnect' }) : ''}`)}
     </form>`;
 
-  root.querySelector('[data-telegram-back]')?.addEventListener('click', navigateBack);
+  
   root.querySelector('[data-telegram-integration-form]')?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
@@ -37,15 +37,15 @@ function renderTelegramForm(root, navigateBack, state = {}) {
 function openTelegram(root, navigateBack) {
   root.innerHTML = `${pageHeader('Telegram')}${emptyState('Загрузка', 'Проверяем подключение бота.')}`;
   void getTelegramBotConnection().then((state) => renderTelegramForm(root, navigateBack, state)).catch((error) => {
-    root.innerHTML = `${pageHeader('Telegram')}${emptyState('Интеграция недоступна', error instanceof Error ? error.message : 'Не удалось загрузить Telegram')}${actionBlock(button('Назад', { variant: 'secondary', data: 'data-telegram-back' }))}`;
-    root.querySelector('[data-telegram-back]')?.addEventListener('click', navigateBack);
+    root.innerHTML = `${pageHeader('Telegram')}${emptyState('Интеграция недоступна', error instanceof Error ? error.message : 'Не удалось загрузить Telegram')}`;
+    
   });
 }
 
 function renderIntegrations(root, navigateBack) {
-  root.innerHTML = `${pageHeader('Интеграции')}${folderList([{ title: 'Telegram', data: 'data-integration-open="telegram"' }])}${actionBlock(button('Назад', { variant: 'secondary', data: 'data-integrations-back' }))}`;
+  root.innerHTML = `${pageHeader('Интеграции')}${folderList([{ title: 'Telegram', data: 'data-integration-open="telegram"' }])}`;
   root.querySelector('[data-integration-open="telegram"]')?.addEventListener('click', () => openTelegram(root, () => renderIntegrations(root, navigateBack)));
-  root.querySelector('[data-integrations-back]')?.addEventListener('click', navigateBack);
+  
 }
 
 export function render(root, navigateBack = () => {}) { renderIntegrations(root, navigateBack); }

@@ -3,7 +3,7 @@ import { createTag, getTags, saveTags } from './data.js';
 
 function renderList(root, navigateBack) {
   const items = getTags();
-  root.innerHTML = `<div class="entity-page-header">${pageHeader('Ярлыки')}<div class="page-header-action">${iconButton('+', { className: 'icon-button--primary', data: 'data-add-tag', aria: 'Добавить ярлык' })}</div></div>${items.length ? tagManagerList(items) : emptyState('Ярлыков пока нет', 'Добавьте первый ярлык кнопкой «+».')}${actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-back-tags' }))}`;
+  root.innerHTML = `<div class="entity-page-header">${pageHeader('Ярлыки')}<div class="page-header-action">${iconButton('+', { className: 'icon-button--primary', data: 'data-add-tag', aria: 'Добавить ярлык' })}</div></div>${items.length ? tagManagerList(items) : emptyState('Ярлыков пока нет', 'Добавьте первый ярлык кнопкой «+».')}`;
   root.querySelector('[data-add-tag]')?.addEventListener('click', () => openForm(root, navigateBack));
   root.querySelectorAll('[data-edit-tag]').forEach((element) => {
     element.addEventListener('click', () => {
@@ -20,7 +20,7 @@ function renderList(root, navigateBack) {
     event.stopPropagation();
     confirmDelete(root, element.dataset.deleteTag, navigateBack);
   }));
-  root.querySelector('[data-back-tags]')?.addEventListener('click', navigateBack);
+  
 }
 
 function openForm(root, navigateBack, existing = null) {

@@ -3,7 +3,7 @@ import { actionBlock, button, folderList, pageHeader } from '../../ui/ui.js';
 const children = [['recipes', 'Рецепты', '◫'], ['materials', 'Материалы', '◫']];
 
 function renderWarehouseFolders(root, navigateBack) {
-  root.innerHTML = `${pageHeader('Склад')}${folderList(children.map(([key, label]) => ({ title: label, data: `data-warehouse-open="${key}"` })))}${actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-warehouse-back' }))}`;
+  root.innerHTML = `${pageHeader('Склад')}${folderList(children.map(([key, label]) => ({ title: label, data: `data-warehouse-open="${key}"` })))}`;
   root.querySelectorAll('[data-warehouse-open]').forEach((element) => element.addEventListener('click', async () => {
     const key = element.dataset.warehouseOpen;
     if (key === 'recipes') {
@@ -14,7 +14,7 @@ function renderWarehouseFolders(root, navigateBack) {
       render(root, () => renderWarehouseFolders(root, navigateBack));
     }
   }));
-  root.querySelector('[data-warehouse-back]')?.addEventListener('click', navigateBack);
+  
 }
 
 export function render(root, navigateBack = () => {}) {

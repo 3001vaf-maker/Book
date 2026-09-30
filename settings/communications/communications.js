@@ -30,9 +30,9 @@ function renderRoutingForm(root, navigateBack, policy) {
       ${select({ label: 'Внешний канал 1', name: 'channel1', value: channels[0] || 'TELEGRAM', options: CHANNEL_OPTIONS })}
       ${select({ label: 'Внешний канал 2', name: 'channel2', value: channels[1] || '', options: CHANNEL_OPTIONS })}
       <div class="muted" data-communications-status aria-live="polite"></div>
-      ${actionBlock(`${button('Сохранить', { type: 'submit' })}${button('Назад', { variant: 'secondary', data: 'data-communications-routing-back' })}`)}
+      ${actionBlock(`${button('Сохранить', { type: 'submit' })}`)}
     </form>`;
-  root.querySelector('[data-communications-routing-back]')?.addEventListener('click', navigateBack);
+  
   root.querySelector('[data-communications-routing]')?.addEventListener('submit', async (event) => {
     event.preventDefault(); const form = event.currentTarget; const status = root.querySelector('[data-communications-status]'); const data = new FormData(form);
     try { await saveNotificationRouting('booking.created', { mode: String(data.get('mode') || 'always'), channels: normalizedExternalChannels(form) }); if (status) status.textContent = 'Сохранено.'; }
@@ -43,8 +43,8 @@ function renderRoutingForm(root, navigateBack, policy) {
 function openRouting(root, navigateBack) {
   root.innerHTML = `${pageHeader('Настройки уведомлений')}${emptyState('Загрузка', 'Получаем настройки каналов.')}`;
   void getNotificationRouting().then((items) => renderRoutingForm(root, navigateBack, policyFrom(items))).catch((error) => {
-    root.innerHTML = `${pageHeader('Настройки уведомлений')}${emptyState('Настройки недоступны', error instanceof Error ? error.message : 'Не удалось загрузить настройки')}${actionBlock(button('Назад', { variant: 'secondary', data: 'data-communications-routing-back' }))}`;
-    root.querySelector('[data-communications-routing-back]')?.addEventListener('click', navigateBack);
+    root.innerHTML = `${pageHeader('Настройки уведомлений')}${emptyState('Настройки недоступны', error instanceof Error ? error.message : 'Не удалось загрузить настройки')}`;
+    
   });
 }
 
@@ -54,10 +54,10 @@ function renderNotifications(root, navigateBack) {
   root.innerHTML = `${pageHeader('Уведомления')}${folderList([
     { title: 'Настройки уведомлений', data: 'data-communications-open="routing"' },
     { title: 'Рассылки', data: 'data-communications-open="broadcasts"' },
-  ])}${actionBlock(button('Назад', { variant: 'secondary', data: 'data-communications-back' }))}`;
+  ])}`;
   root.querySelector('[data-communications-open="routing"]')?.addEventListener('click', () => openRouting(root, () => renderNotifications(root, navigateBack)));
   root.querySelector('[data-communications-open="broadcasts"]')?.addEventListener('click', () => void openBroadcasts(root, () => renderNotifications(root, navigateBack)));
-  root.querySelector('[data-communications-back]')?.addEventListener('click', navigateBack);
+  
 }
 
 export function render(root, navigateBack = () => {}) { renderNotifications(root, navigateBack); }
