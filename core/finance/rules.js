@@ -110,7 +110,7 @@ export function repriceSettlement(sources = [], currentSettlement = null) {
 export function isStoredSettlement(value = null) {
   return Boolean(value && typeof value === 'object'
     && Array.isArray(value.items)
-    && Number.isFinite(Number(value.planTotal ?? value.dueTotal)));
+    && Number.isFinite(Number(value.planTotal)));
 }
 
 export function normalizeStoredSettlement(value = null) {
@@ -209,7 +209,7 @@ function movementItemAmount(movement = null, sourceTypeValue = '', sourceIdValue
   const id = String(sourceIdValue || '');
   const type = String(sourceTypeValue || '');
   if (!id || !items.length) return 0;
-  const settlementTotal = Math.max(0, financialNumber(settlementSnapshot?.planTotal ?? settlementSnapshot?.dueTotal));
+  const settlementTotal = Math.max(0, financialNumber(settlementSnapshot?.planTotal));
   if (!settlementTotal) return 0;
   const settlementItemTotal = items
     .filter((item) => String(item?.sourceId || '') === id
