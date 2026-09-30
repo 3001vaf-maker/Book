@@ -10,7 +10,7 @@ const TECHNICAL_STORAGE_OWNERS = new Set([
   'core/auth.js',
   'core/account/index.js',
   'core/workplace-context.js',
-  'main/people/view-state.js',
+  'core/people/view-state.js',
   'onboarding/onboarding.js',
 ]);
 
