@@ -26,8 +26,11 @@
     catch { return String(input || ''); }
   };
   const demoCapabilities = [
-    'profile.access','services.access','people.access','timetable.access','journal.access',
-    'online_booking.access','payments.access','finance.access','chat.access',
+    'profile.access','workplaces.access','services.access','people.access','timetable.access',
+    'finance.cash.access','finance.dds.access','finance.income_expense.access',
+    'finance.articles.access','finance.special.access','finance.z_report.access',
+    'journal.day.access','journal.month.access','journal.list.access',
+    'online_booking.access','payments.access','finance.access','journal.access','chat.access',
     'notifications.access','integrations.access','documents.access','tags.access',
   ].map((key) => ({ key, valueType:'BOOLEAN', enabled:true, limit:null, source:'DEMO' }));
   demoCapabilities.push({ key:'workplaces.max', valueType:'LIMIT', enabled:null, limit:null, source:'DEMO' });
