@@ -4,7 +4,6 @@ import { PrismaService } from '../prisma.service';
 
 type JsonObject = Record<string, any>;
 type AuxiliaryBundle = {
-  finance: JsonObject | null;
   wallets: JsonObject[];
   tags: JsonObject[];
   products: JsonObject[];
@@ -28,9 +27,6 @@ function text(value: unknown) {
 function normalize(value: unknown): AuxiliaryBundle {
   const source = objectValue(value);
   return {
-    finance: source.finance && typeof source.finance === 'object' && !Array.isArray(source.finance)
-      ? clone(objectValue(source.finance))
-      : null,
     wallets: (Array.isArray(source.wallets) ? source.wallets : []).map((item) => clone(objectValue(item))),
     tags: (Array.isArray(source.tags) ? source.tags : []).map((item) => clone(objectValue(item))),
     products: (Array.isArray(source.products) ? source.products : []).map((item) => clone(objectValue(item))),
@@ -113,11 +109,7 @@ export class AuxiliaryStateService {
     const row = await this.requireVerified(tenantId);
     const current = normalize(row.data);
     const value = objectValue(body).value;
-    if (key === 'finance') {
-      current.finance = value && typeof value === 'object' && !Array.isArray(value) ? clone(objectValue(value)) : null;
-    } else {
-      (current as any)[key] = Array.isArray(value) ? clone(value) : [];
-    }
+    (current as any)[key] = Array.isArray(value) ? clone(value) : [];
     await this.prisma.businessAuxiliaryState.update({ where: { tenantId }, data: { data: json(current) } });
     return current;
   }
