@@ -138,7 +138,6 @@ function mountScreen(root, {
 } = {}) {
   const context = workspaceHeaderContext({
     title,
-    back: { data: 'data-online-booking-back', aria: 'Назад' },
     a: settings ? {
       kind: 'settings',
       data: settings.data || '',
@@ -150,7 +149,6 @@ function mountScreen(root, {
     : '';
   root.innerHTML = `${context}${primary}<div class="online-booking-workspace-screen">${body}</div>`;
 
-  root.querySelector('[data-online-booking-back]')?.addEventListener('click', onBack);
   if (onSave) {
     setSaveVisible(root, false);
     root.querySelector('[data-online-booking-save]')?.addEventListener('click', onSave);
