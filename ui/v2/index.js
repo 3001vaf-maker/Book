@@ -743,6 +743,9 @@ export function initV2WorkspaceInteraction(root, {
     });
   };
 
+  setActiveCard(fCards, fActiveIndex);
+  setActiveCard(eCards, eActiveIndex);
+
   const updateDeckGeometry = (deck, cards, axis) => {
     if (!deck || !cards.length) return -1;
     const center = axis === 'y' ? Number(deck.clientHeight || 0) / 2 : Number(deck.clientWidth || 0) / 2;
@@ -1101,8 +1104,10 @@ export function initV2WorkspaceInteraction(root, {
   setOpen(open, false);
   setEOpen(secondaryOpen, false);
   queueOwnerFrame(() => {
-    if (open) centerCard(fCards[fActiveIndex], 'x');
-    scheduleGeometry(fDeck, fCards, 'x', (index) => { fActiveIndex = index; });
+    if (open) {
+      centerCard(fCards[fActiveIndex], 'x');
+      scheduleGeometry(fDeck, fCards, 'x', (index) => { fActiveIndex = index; });
+    }
     if (secondaryOpen) {
       centerCard(eCards[eActiveIndex], 'y');
       scheduleGeometry(eDeck, eCards, 'y', (index) => { eActiveIndex = index; });
