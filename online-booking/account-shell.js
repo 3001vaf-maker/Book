@@ -313,11 +313,6 @@ function renderV2Shell(root, state, { header, body = '', deck = true, className 
   state.accountZEnter = false;
 }
 
-function setAccountDeckOpen(root, state, open) {
-  state.accountDeckOpen = Boolean(open);
-  setV2DeckOpen(root, state.accountDeckOpen);
-}
-
 function bindWorkspaceInteraction(root, state, handlers, { bindZ = true, onZRight = null, onZLeft = null } = {}) {
   root.v2WorkspaceInteractionDispose?.();
   const dispose = initV2WorkspaceInteraction(root, {
