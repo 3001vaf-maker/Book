@@ -180,7 +180,7 @@ const recordServer = readFileSync(new URL('../server/src/record/record.service.t
 const financeData = readFileSync(new URL('../core/finance/data.js', import.meta.url), 'utf8');
 const financeService = readFileSync(new URL('../core/finance/service.js', import.meta.url), 'utf8');
 const financeRead = readFileSync(new URL('../core/finance/read.js', import.meta.url), 'utf8');
-const financeUi = readFileSync(new URL('../main/finance/finance.js', import.meta.url), 'utf8');
+const financeUi = readFileSync(new URL('../core/finance/finance.js', import.meta.url), 'utf8');
 const paymentUi = readFileSync(new URL('../journal/record-payment.js', import.meta.url), 'utf8');
 assert.match(serverFinance, /TransactionIsolationLevel\.Serializable/);
 assert.match(serverFinance, /saveSettlementWith\(tx/);
