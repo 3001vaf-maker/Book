@@ -62,9 +62,9 @@ hydrateFinanceFromServer(canonicalFinanceState({
 assert.equal(getWalletTotalBalance(), 130);
 
 const coreSource = readFileSync(new URL('../core.js', import.meta.url), 'utf8');
-const financeSource = readFileSync(new URL('../finance/finance.js', import.meta.url), 'utf8');
+const financeSource = readFileSync(new URL('../core/finance/finance.js', import.meta.url), 'utf8');
 const settingsSource = readFileSync(new URL('../settings/settings.js', import.meta.url), 'utf8');
-const walletSource = readFileSync(new URL('../finance/cash/cash.js', import.meta.url), 'utf8');
+const walletSource = readFileSync(new URL('../core/finance/cash/cash.js', import.meta.url), 'utf8');
 const folderSource = readFileSync(new URL('../ui/cards/folder-card.js', import.meta.url), 'utf8');
 
 assert.match(coreSource, /from '\.\/main\/finance\/finance\.js'/);
