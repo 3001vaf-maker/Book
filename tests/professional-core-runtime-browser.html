@@ -261,7 +261,7 @@ shell()?.querySelector('[data-v2-workspace-a]')?.dispatchEvent(new MouseEvent('c
 await wait(20);
 const operationSettings = document.querySelector('[data-shared-profile-settings-menu]');
 ok(Boolean(operationSettings?.querySelector('[data-shared-profile-action="delete-operation"]')), 'Cash operation A/settings must expose delete operation');
-operationSettings?.v2Close?.();
+operationSettings?.closest('[data-modal]')?.v2Close?.();
 
 zEdge = edge();
 pointer(zEdge,'pointerdown',10,360,151);
