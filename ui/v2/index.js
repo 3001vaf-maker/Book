@@ -137,6 +137,7 @@ export function v2Shell({
 ${body}
 </main>
       </div>
+      <div class="v2-edge-swipe-zone" data-v2-edge-swipe aria-hidden="true"></div>
     </div>
   </section>`;
 }
@@ -208,7 +209,10 @@ export function mountV2ZLayer(root, html, { onClose = null, stack = false } = {}
   template.innerHTML = String(html || '').trim();
   const node = template.content.firstElementChild;
   if (!node?.matches?.('[data-v2-z-layer]')) return null;
-  if (!stack) host.querySelectorAll('[data-v2-z-layer]').forEach((layer) => layer.remove());
+  if (!stack) host.querySelectorAll('[data-v2-z-layer]').forEach((layer) => {
+    if (typeof layer.v2Dispose === 'function') layer.v2Dispose();
+    else layer.remove();
+  });
   const depth = host.querySelectorAll('[data-v2-z-layer]').length + 1;
   node.dataset.v2ZDepth = String(depth);
   node.style.setProperty('--v2-z-layer-shift', `${depth * 12}px`);
@@ -242,18 +246,26 @@ export function mountV2ZLayer(root, html, { onClose = null, stack = false } = {}
     ],
   });
   let disposeSwipe = () => {};
-  const close = () => {
+  let disposed = false;
+  const dispose = () => {
+    if (disposed) return;
+    disposed = true;
     contextObserver.disconnect();
     disposeSwipe();
     if (node.isConnected) node.remove();
     app?.classList.toggle('has-z-layer', Boolean(host.querySelector('[data-v2-z-layer]')));
     notify();
+  };
+  const close = () => {
+    if (disposed) return;
+    dispose();
     onClose?.();
   };
   node.addEventListener('click', (event) => {
     if (event.target.closest?.('[data-v2-z-close]')) close();
   });
-  disposeSwipe = initV2Swipe(node, { onRight: close, revealDeck: false, threshold: 42 });
+  disposeSwipe = initV2Swipe(node, { onRight: close, revealDeck: false, threshold: 28, edgeWidth: 36 });
+  node.v2Dispose = dispose;
   node.v2Close = close;
   notify();
   return node;
@@ -516,10 +528,10 @@ export function mountV2Layer(html, { root = null } = {}) {
 export function initV2Swipe(root, {
   onRight = null,
   onLeft = null,
-  threshold = 42,
+  threshold = 28,
   maxDrag = 180,
   revealDeck = true,
-  edgeWidth = 24,
+  edgeWidth = 36,
 } = {}) {
   const surface = root?.matches?.('[data-v2-z], [data-v2-z-layer]')
     ? root
@@ -530,7 +542,8 @@ export function initV2Swipe(root, {
   const isLayer = surface.matches?.('[data-v2-z-layer]');
   const isBaseZ = surface.matches?.('[data-v2-z]') && !isLayer;
   const hasDeck = revealDeck && isBaseZ && Boolean(app?.querySelector?.('[data-v2-card-deck][data-v2-deck-level="f"]'));
-  const gestureHost = stage || surface;
+  const edgeHost = onRight ? app?.querySelector?.('[data-v2-edge-swipe]') : null;
+  const gestureHost = edgeHost || stage || surface;
   let pointerId = null;
   let startX = 0;
   let startY = 0;
@@ -559,8 +572,8 @@ export function initV2Swipe(root, {
     const stageRect = stage?.getBoundingClientRect?.() || surface.getBoundingClientRect?.();
     const leftEdge = Number(stageRect?.left || 0) + Number(edgeWidth || 24);
     const rightEdge = Number(stageRect?.right || 0) - Number(edgeWidth || 24);
-    const wantsRight = Boolean(onRight) && Number(event.clientX || 0) <= leftEdge;
-    const wantsLeft = Boolean(onLeft) && Number(event.clientX || 0) >= rightEdge;
+    const wantsRight = Boolean(onRight) && (Boolean(edgeHost) || Number(event.clientX || 0) <= leftEdge);
+    const wantsLeft = Boolean(onLeft) && !edgeHost && Number(event.clientX || 0) >= rightEdge;
     if (!wantsRight && !wantsLeft) return;
     pointerId = event.pointerId;
     startX = event.clientX;
@@ -656,9 +669,9 @@ export function initV2WorkspaceInteraction(root, {
   onZRight = null,
   onZLeft = null,
   bindZ = true,
-  threshold = 42,
+  threshold = 28,
   maxDrag = 180,
-  edgeWidth = 24,
+  edgeWidth = 36,
 } = {}) {
   const app = root?.matches?.('[data-v2-app]')
     ? root
@@ -670,6 +683,7 @@ export function initV2WorkspaceInteraction(root, {
   const fDeck = app.querySelector('[data-v2-card-deck][data-v2-deck-level="f"]');
   const eDeck = app.querySelector('[data-v2-card-deck][data-v2-deck-level="e"]');
   const z = app.querySelector('[data-v2-front] > [data-v2-z]');
+  const edgeHost = app.querySelector('[data-v2-edge-swipe]') || stage;
   if (!stage || !front) return () => {};
 
   const fCards = [...(fDeck?.querySelectorAll?.('[data-v2-card-item]') || [])];
@@ -938,7 +952,9 @@ export function initV2WorkspaceInteraction(root, {
 
   const clearZGesture = () => {
     if (zGesture?.captured && zGesture.id != null) {
-      try { stage.releasePointerCapture?.(zGesture.id); } catch {}
+      try {
+        if (edgeHost.hasPointerCapture?.(zGesture.id)) edgeHost.releasePointerCapture?.(zGesture.id);
+      } catch {}
     }
     zGesture = null;
     front.classList.remove('is-dragging');
@@ -950,8 +966,10 @@ export function initV2WorkspaceInteraction(root, {
     if (!bindZ || open || zGesture || app.querySelector('[data-v2-z-layer]')) return;
     if (event.target.closest?.('[data-v2-layer], [data-v2-z-layer]')) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
-    const rect = stage.getBoundingClientRect();
-    if (Number(event.clientX || 0) > rect.left + edgeWidth) return;
+    if (edgeHost === stage) {
+      const rect = stage.getBoundingClientRect();
+      if (Number(event.clientX || 0) > rect.left + edgeWidth) return;
+    }
     zGesture = {
       id:event.pointerId,
       x:event.clientX,
@@ -974,7 +992,7 @@ export function initV2WorkspaceInteraction(root, {
         return;
       }
       zGesture.axis = 'horizontal';
-      stage.setPointerCapture?.(event.pointerId);
+      edgeHost.setPointerCapture?.(event.pointerId);
       zGesture.captured = true;
     }
     if (z) z.scrollTop = zGesture.scrollTop;
@@ -997,15 +1015,15 @@ export function initV2WorkspaceInteraction(root, {
   };
   const zCancel = () => clearZGesture();
 
-  stage.addEventListener('pointerdown', zDown);
-  stage.addEventListener('pointermove', zMove, { passive:false });
-  stage.addEventListener('pointerup', zUp);
-  stage.addEventListener('pointercancel', zCancel);
+  edgeHost.addEventListener('pointerdown', zDown);
+  edgeHost.addEventListener('pointermove', zMove, { passive:false });
+  edgeHost.addEventListener('pointerup', zUp);
+  edgeHost.addEventListener('pointercancel', zCancel);
   disposers.push(() => {
-    stage.removeEventListener('pointerdown', zDown);
-    stage.removeEventListener('pointermove', zMove);
-    stage.removeEventListener('pointerup', zUp);
-    stage.removeEventListener('pointercancel', zCancel);
+    edgeHost.removeEventListener('pointerdown', zDown);
+    edgeHost.removeEventListener('pointermove', zMove);
+    edgeHost.removeEventListener('pointerup', zUp);
+    edgeHost.removeEventListener('pointercancel', zCancel);
   });
 
   setOpen(open, false);
@@ -1064,7 +1082,7 @@ export function initV2StickerSwipe(root, { onRight = null, onLeft = null, thresh
         pointerId = null;
         return;
       }
-      gestureHost.setPointerCapture?.(event.pointerId);
+      surface.setPointerCapture?.(event.pointerId);
     }
     if (axis !== 'horizontal') return;
     const allowedX = nextX > 0 ? (onRight ? nextX : 0) : (onLeft ? nextX : 0);
@@ -1078,6 +1096,9 @@ export function initV2StickerSwipe(root, { onRight = null, onLeft = null, thresh
   const up = (event) => {
     if (event.pointerId !== pointerId) return;
     const finalDx = dx;
+    try {
+      if (surface.hasPointerCapture?.(event.pointerId)) surface.releasePointerCapture?.(event.pointerId);
+    } catch {}
     reset();
     if (finalDx >= threshold) onRight?.();
     else if (finalDx <= -threshold) onLeft?.();
