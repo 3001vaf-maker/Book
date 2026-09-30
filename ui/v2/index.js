@@ -721,6 +721,16 @@ export function initV2WorkspaceInteraction(root, {
   let eDismissTimer = 0;
   const disposers = [];
   const scrollFrames = new Map();
+  const ownerFrames = new Set();
+
+  const queueOwnerFrame = (callback) => {
+    const frame = requestAnimationFrame(() => {
+      ownerFrames.delete(frame);
+      callback();
+    });
+    ownerFrames.add(frame);
+    return frame;
+  };
 
   const cardId = (card) => String(card?.getAttribute('data-v2-card-item') || '');
 
@@ -893,7 +903,7 @@ export function initV2WorkspaceInteraction(root, {
     eDeck?.style.removeProperty('--v2-e-dismiss-x');
     eDeck?.classList.remove('is-dragging');
     if (secondaryOpen) {
-      requestAnimationFrame(() => {
+      queueOwnerFrame(() => {
         centerCard(eCards[eActiveIndex], 'y');
         scheduleGeometry(eDeck, eCards, 'y', (index) => { eActiveIndex = index; });
       });
@@ -911,7 +921,7 @@ export function initV2WorkspaceInteraction(root, {
     front.classList.remove('is-dragging');
     front.style.removeProperty('--v2-front-drag-x');
     if (open) {
-      requestAnimationFrame(() => {
+      queueOwnerFrame(() => {
         centerCard(fCards[fActiveIndex], 'x');
         scheduleGeometry(fDeck, fCards, 'x', (index) => { fActiveIndex = index; });
       });
@@ -1090,7 +1100,7 @@ export function initV2WorkspaceInteraction(root, {
 
   setOpen(open, false);
   setEOpen(secondaryOpen, false);
-  requestAnimationFrame(() => {
+  queueOwnerFrame(() => {
     if (open) centerCard(fCards[fActiveIndex], 'x');
     scheduleGeometry(fDeck, fCards, 'x', (index) => { fActiveIndex = index; });
     if (secondaryOpen) {
@@ -1104,6 +1114,8 @@ export function initV2WorkspaceInteraction(root, {
     eCancel();
     for (const frame of scrollFrames.values()) cancelAnimationFrame(frame);
     scrollFrames.clear();
+    for (const frame of ownerFrames) cancelAnimationFrame(frame);
+    ownerFrames.clear();
     if (eDismissTimer) window.clearTimeout(eDismissTimer);
     eDismissTimer = 0;
     disposers.forEach((dispose) => dispose?.());
