@@ -28,7 +28,7 @@ globalThis.fetch = async (url, options = {}) => {
   return { ok: true, status: 200, json: async () => ({}) };
 };
 
-const peopleOwner = await import('../main/people/data.js');
+const peopleOwner = await import('../core/people/data.js');
 const uei = await import('../core/uei.js');
 const record = await import('../core/record/index.js');
 const persistence = await import('../core/business-persistence.js');
