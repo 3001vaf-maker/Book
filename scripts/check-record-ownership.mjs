@@ -272,7 +272,7 @@ if (!/mountV2ZLayer/.test(sharedV2Runtime)
 }
 
 const directDataImport = /(?:from\s+['"][^'"]*core\/record\/data\.js['"]|import\s*\(\s*['"][^'"]*core\/record\/data\.js['"]\s*\))/;
-for (const path of [...walk('journal'), ...walk('main'), ...walk('settings'), ...walk('tests')]) {
+for (const path of [...walk('journal'), ...walk('core/people'), ...walk('core/finance'), ...walk('settings'), ...walk('tests')]) {
   const source = read(path);
   if (directDataImport.test(source)) {
     errors.push(`${path}: must use core/record/index.js instead of the private data atom`);

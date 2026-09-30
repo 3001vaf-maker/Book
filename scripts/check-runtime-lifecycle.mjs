@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 const root = process.cwd();
-const featureRoots = ['main', 'settings', 'timetable', 'journal', 'chat'];
+const featureRoots = ['core/people', 'core/finance', 'settings', 'timetable', 'journal', 'chat'];
 const errors = [];
 
 function walk(dir) {

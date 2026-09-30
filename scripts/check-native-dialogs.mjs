@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 const root = process.cwd();
-const runtimeRoots = ['main', 'settings', 'timetable', 'journal', 'ui', 'core', 'chat', 'online-booking'];
+const runtimeRoots = ['settings', 'timetable', 'journal', 'ui', 'core', 'chat', 'online-booking'];
 const globalForbidden = /\b(?:window\.)?(?:alert|confirm)\s*\(/;
 const endUserForbidden = /(?:\b(?:window\.)?(?:alert|confirm|prompt)\s*\(|\.\s*(?:reportValidity|setCustomValidity)\s*\()/;
 const errors = [];
