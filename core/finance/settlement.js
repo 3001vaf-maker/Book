@@ -1,7 +1,7 @@
 // Settlement projects amount due, paid/refunded totals and outstanding amount for a concrete source.
 // This is operational calculation, NOT the reserved future Financial Model.
 // Low-level arithmetic lives in rules.js; money persistence lives in data/service.
-// Canonical Settlement snapshots live in Finance. record.finance is read only as legacy compatibility during migration.
+// Canonical Settlement snapshots live in Finance. record.finance is only a transient read projection.
 import { getStoredSettlement } from './data.js';
 import { getActiveDDSMovements, getActiveDDSMovementsForSource } from './read.js';
 import {
@@ -16,25 +16,13 @@ import {
   recordSettlementItems,
 } from './rules.js';
 
-function latestHistoricalSettlementForSource(type, id) {
-  const movements = getActiveDDSMovementsForSource(type, id)
-    .filter((movement) => movement?.finance && isStoredSettlement(movement.finance))
-    .sort((a, b) => String(a?.createdAt || '').localeCompare(String(b?.createdAt || '')));
-  if (!movements.length) return null;
-  return normalizeStoredSettlement(movements[movements.length - 1].finance);
-}
-
 export function resolveRecordSettlement(record = null, { discountPercent = 0 } = {}) {
   if (record?.id) {
     const owned = normalizeStoredSettlement(getStoredSettlement('record', record.id));
     if (owned) return owned;
   }
-  const legacyStored = normalizeStoredSettlement(record?.finance);
-  if (legacyStored) return legacyStored;
-  if (record?.id) {
-    const historical = latestHistoricalSettlementForSource('record', record.id);
-    if (historical) return historical;
-  }
+  const projected = normalizeStoredSettlement(record?.finance);
+  if (projected) return projected;
   return calculateSettlement(recordSettlementItems(record), { discountPercent });
 }
 
@@ -87,7 +75,7 @@ export function hydrateRecordSettlement(record = null) {
   const discountPercent = record?.personDiscountPercent == null
     ? recordSettlementDiscountPercent(record?.person)
     : clampFinancialPercent(record.personDiscountPercent);
-  const { personDiscountPercent: _legacyDiscount, ...cleanRecord } = record;
+  const { personDiscountPercent: _discountProjection, ...cleanRecord } = record;
   const normalizedRecord = {
     ...cleanRecord,
     procedures: Array.isArray(cleanRecord.procedures) ? cleanRecord.procedures : [],
