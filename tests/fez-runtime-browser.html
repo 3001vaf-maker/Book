@@ -115,6 +115,13 @@ click(active);
 await nextFrame();
 ok(firstOwnerCalls === 1, 'active F tap must fire exactly once');
 
+// A clean tap on a neighbouring card is also an immediate action.
+// No extra "centre first, tap again" state is allowed.
+const neighbour = app.querySelector('[data-v2-card-item="two"]');
+click(neighbour);
+await nextFrame();
+ok(firstOwnerCalls === 2, 'non-active clean F tap did not fire exactly once');
+
 mark('owner-rebind');
 dispose();
 let secondOwnerCalls = 0;
@@ -128,7 +135,7 @@ await nextFrame();
 const reboundActive = app.querySelector('[data-v2-card-item].is-active');
 click(reboundActive);
 await nextFrame();
-ok(firstOwnerCalls === 1 && secondOwnerCalls === 1, 'disposed FEZ owner remained active after rebind');
+ok(firstOwnerCalls === 2 && secondOwnerCalls === 1, 'disposed FEZ owner remained active after rebind');
 
 mark('f-native-scroll');
 // Real browser layout + scroll must drive the active card and continuous 3D variables.
