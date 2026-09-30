@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { calculateSettlement, hydrateFinanceFromServer } from '../core/finance/index.js';
 import { hydrateRecordStateFromServer } from '../core/record/index.js';
-import { getPersonMetadata } from '../people/metadata.js';
+import { getPersonMetadata } from '../core/people/metadata.js';
 import { canonicalFinanceState, paymentFixture, settlementRow } from './helpers/finance-canonical.mjs';
 
 hydrateRecordStateFromServer({
