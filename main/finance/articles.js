@@ -94,21 +94,21 @@ function row(item) {
   };
 }
 
-function renderList(root, navigateBack) {
+function renderList(root) {
   const items = getFinanceArticles();
   const rows = treeRows(items);
   root.innerHTML = `<div class="entity-page-header">${pageHeader('Статьи')}<div class="page-header-action">${iconButton('+', { className: 'icon-button--primary', data: 'data-add-finance-article', aria: 'Добавить статью' })}</div></div>${rows.length ? list({ items: rows.map(row) }) : emptyState('Статей пока нет', 'Добавьте первую статью кнопкой «+».')}`;
-  root.querySelector('[data-add-finance-article]')?.addEventListener('click', () => openForm(root, navigateBack));
+  root.querySelector('[data-add-finance-article]')?.addEventListener('click', () => openForm(root));
   root.querySelectorAll('[data-finance-article]').forEach((element) => {
     element.addEventListener('click', () => {
       const item = getFinanceArticles().find((row) => row.articleId === element.dataset.financeArticle);
-      if (item) openForm(root, navigateBack, item);
+      if (item) openForm(root, item);
     });
   });
   
 }
 
-function openForm(root, navigateBack, existing = null) {
+function openForm(root, existing = null) {
   const items = getFinanceArticles();
   const isSystem = Boolean(existing?.systemKey);
   const direction = existing?.direction || 'OUT';
@@ -136,15 +136,15 @@ function openForm(root, navigateBack, existing = null) {
     if (existing) await updateFinanceArticle(existing.articleId, payload);
     else await createFinanceArticle(payload);
     m.remove();
-    renderList(root, navigateBack);
+    renderList(root);
   });
   m.querySelector('[data-delete-finance-article]')?.addEventListener('click', async () => {
     await archiveFinanceArticle(existing.articleId);
     m.remove();
-    renderList(root, navigateBack);
+    renderList(root);
   });
 }
 
-export function renderFinanceArticles(root, navigateBack = () => {}) {
-  renderList(root, navigateBack);
+export function renderFinanceArticles(root) {
+  renderList(root);
 }
