@@ -210,7 +210,7 @@ expect(inputs.includes('export function passwordField') && inputs.includes('expo
 expect(booking.includes('passwordField({') && booking.includes('initPasswordFields(root)'), 'Auth and Registration must use the shared password reveal control.');
 expect(booking.includes("step: 'workplaces'") && booking.includes("step: 'confirmation'"), 'Booking must remain a V2 Z-stack flow.');
 expect(booking.includes('initV2Swipe(root'), 'Online booking must preserve the proven swipe controller while consuming Shared booking UI owners.');
-expect(ui.includes("axis = Math.abs(nextX) >= Math.abs(nextY) * 1.08 ? 'horizontal' : 'vertical'"), 'Shared Z swipe must axis-lock without randomly rejecting a horizontal gesture.');
+expect(ui.includes("const rightIntent = nextX > 0 && Math.abs(nextX) >= Math.abs(nextY) * .90") && ui.includes("axis = rightIntent || Math.abs(nextX) >= Math.abs(nextY) * 1.08 ? 'horizontal' : 'vertical'"), 'Shared Z swipe must favor deliberate rightward navigation while preserving generic horizontal axis locking.');
 expect(ui.includes("app?.classList.add('is-revealing-deck')") && ui.includes("app?.classList.remove('is-revealing-deck')"), 'Z swipe must reveal and reset the F stack physically.');
 expect(ui.includes('let suppressNextClick = false;') && ui.includes("surface.addEventListener('click', click, true)") && ui.includes('event.preventDefault();') && ui.includes('event.stopPropagation();'), 'Shared Z swipe must suppress the accidental interactive click generated after a horizontal drag.');
 expect(ui.includes('.slice(0, 7)') && ui.includes('data-v2-f-index="${index}"') && !ui.includes('data-v2-f-level'), 'F cards must be peer folders with real names, not visual F1/F2/F3 levels.');
