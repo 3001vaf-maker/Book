@@ -284,6 +284,8 @@ function renderV2Shell(root, state, { header, body = '', deck = true, className 
   const canReuseScene = Boolean(deck && shell?.querySelector('[data-v2-card-deck][data-v2-deck-level="f"]'));
 
   if (!canReuseScene) {
+    root.v2WorkspaceInteractionDispose?.();
+    root.v2WorkspaceInteractionDispose = null;
     root.innerHTML = v2Shell({
       header,
       body,
@@ -311,13 +313,9 @@ function renderV2Shell(root, state, { header, body = '', deck = true, className 
   state.accountZEnter = false;
 }
 
-function setAccountDeckOpen(root, state, open) {
-  state.accountDeckOpen = Boolean(open);
-  setV2DeckOpen(root, state.accountDeckOpen);
-}
-
 function bindWorkspaceInteraction(root, state, handlers, { bindZ = true, onZRight = null, onZLeft = null } = {}) {
-  return initV2WorkspaceInteraction(root, {
+  root.v2WorkspaceInteractionDispose?.();
+  const dispose = initV2WorkspaceInteraction(root, {
     activeId: state.accountDeckActive || accountRootForTab(state),
     deckOpen: state.accountDeckOpen,
     bindZ,
@@ -336,6 +334,11 @@ function bindWorkspaceInteraction(root, state, handlers, { bindZ = true, onZRigh
       void handlers.render();
     },
   });
+  root.v2WorkspaceInteractionDispose = dispose;
+  return () => {
+    if (root.v2WorkspaceInteractionDispose === dispose) root.v2WorkspaceInteractionDispose = null;
+    dispose?.();
+  };
 }
 
 async function openChatSettings(state) {

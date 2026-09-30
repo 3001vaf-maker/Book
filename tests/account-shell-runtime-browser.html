@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    :root{--surface-dark:#2f3338;--button-secondary:#d8d3cf;--text-muted:#817a73;--app-max-width:390px;--visual-vh:780px}
+    html,body{margin:0;width:390px;height:780px}
+    *{box-sizing:border-box}
+  </style>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/ui/v2/v2.css">
+</head>
+<body>
+<div id="root"></div>
+<pre id="result">pending</pre>
+<script type="module">
+import { renderGlobalAccount } from '/online-booking/account-shell.js';
+
+const root = document.querySelector('#root');
+const result = document.querySelector('#result');
+const failures = [];
+let stage = 'boot';
+const mark = (name) => {
+  stage = name;
+  result.textContent = 'running: ' + name;
+  document.documentElement.dataset.accountRuntimeStage = name;
+};
+const ok = (condition, message) => { if (!condition) failures.push(stage + ': ' + message); };
+const wait = (ms = 90) => new Promise((resolve) => window.setTimeout(resolve, ms));
+const pointer = (target, type, x, y, id = 1) => target.dispatchEvent(new PointerEvent(type, {
+  bubbles:true,cancelable:true,pointerId:id,pointerType:'touch',clientX:x,clientY:y,button:0,
+}));
+for (const name of ['setPointerCapture','releasePointerCapture']) {
+  Object.defineProperty(Element.prototype, name, { configurable:true, value(){ } });
+}
+Object.defineProperty(Element.prototype, 'hasPointerCapture', { configurable:true, value(){ return true; } });
+window.addEventListener('error', (event) => failures.push(stage + ': window error: ' + (event.error?.message || event.message)));
+window.addEventListener('unhandledrejection', (event) => failures.push(stage + ': rejection: ' + String(event.reason?.message || event.reason || 'unknown')));
+
+const state = {
+  account:{ id:'runtime-user', name:'Иван', surname:'Тестов', phone:'+79990000000', profileData:{} },
+  accountRecords:[],
+  relationships:[],
+  accountTab:'home',
+  accountDeckOpen:false,
+  accountDeckActive:'home',
+  accountZEnter:false,
+  accountChatOpen:false,
+};
+const callbacks = {};
+
+const shell = () => root.querySelector(':scope > [data-v2-app]');
+const edge = () => shell()?.querySelector('[data-v2-edge-swipe]');
+const fDeck = () => shell()?.querySelector('[data-v2-card-deck][data-v2-deck-level="f"]');
+const card = (id) => shell()?.querySelector('[data-v2-card-item="' + id + '"]');
+const ownerCount = () => Number(edge()?.dataset.v2EdgeOwners || 0);
+
+const edgeOpen = async (id) => {
+  mark('edge-open-' + id);
+  const e = edge();
+  pointer(e,'pointerdown',10,320,id);
+  pointer(e,'pointermove',46,322,id);
+  pointer(e,'pointerup',46,322,id);
+  await wait();
+  ok(shell()?.classList.contains('is-deck-open'), 'Z edge swipe did not open F');
+  ok(state.accountDeckOpen === true, 'account state did not record open F');
+};
+
+const selectRoot = async (id, pointerId) => {
+  mark('select-' + id);
+  const deck = fDeck();
+  const target = card(id);
+  const left = target.offsetLeft - (deck.clientWidth - target.offsetWidth) / 2;
+  deck.scrollLeft = Math.max(0,left);
+  deck.dispatchEvent(new Event('scroll'));
+  await wait(140);
+  ok(target.classList.contains('is-active'), id + ' did not become centred active F');
+  pointer(target,'pointerdown',180,380,pointerId);
+  pointer(target,'pointerup',180,380,pointerId);
+  target.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,clientX:180,clientY:380}));
+  await wait(140);
+  ok(state.accountTab === id, 'tap on active F did not navigate to ' + id);
+  ok(!shell()?.classList.contains('is-deck-open'), 'selected root left F open');
+  ok(ownerCount() === 1, 'FEZ owner count after render is ' + ownerCount() + ', expected 1');
+};
+
+mark('initial-render');
+await renderGlobalAccount(root,state,callbacks);
+await wait(120);
+const initialShell = shell();
+ok(Boolean(initialShell), 'real account shell did not render');
+ok(Boolean(fDeck()), 'real account F deck did not render');
+ok(ownerCount() === 1, 'initial account shell must have exactly one FEZ owner');
+ok(card('home')?.classList.contains('is-active'), 'home must be initial active F');
+
+await edgeOpen(1);
+await selectRoot('profile',11);
+ok(shell() === initialShell, 'profile navigation rebuilt the whole account shell');
+
+await edgeOpen(2);
+await selectRoot('contacts',12);
+ok(shell() === initialShell, 'contacts navigation rebuilt the whole account shell');
+
+await edgeOpen(3);
+await selectRoot('history',13);
+ok(shell() === initialShell, 'history navigation rebuilt the whole account shell');
+
+await edgeOpen(4);
+await selectRoot('home',14);
+ok(shell() === initialShell, 'home navigation rebuilt the whole account shell');
+
+// Repeat the cycle to expose handler accumulation that only appears after several renders.
+for (const [index,id] of ['profile','contacts','history','home','profile','home'].entries()) {
+  await edgeOpen(20 + index);
+  await selectRoot(id,40 + index);
+  ok(ownerCount() === 1, 'owner accumulation after repeated navigation to ' + id);
+}
+
+// Real profile Z2 must close one level from the same edge owner.
+mark('profile-z2');
+if (state.accountTab !== 'profile') {
+  await edgeOpen(70);
+  await selectRoot('profile',71);
+}
+const profileCard = root.querySelector('[data-account-profile-card]');
+ok(Boolean(profileCard), 'real profile card missing');
+profileCard?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(100);
+const z2 = root.querySelector('[data-v2-z-layer]');
+ok(Boolean(z2), 'profile editor Z2 did not mount');
+ok(ownerCount() === 2, 'Z2 must retain the shared edge owner in addition to base Z');
+const e = edge();
+pointer(e,'pointerdown',10,300,72);
+pointer(e,'pointermove',46,302,72);
+pointer(e,'pointerup',46,302,72);
+await wait(120);
+ok(!root.querySelector('[data-v2-z-layer]'), 'edge swipe did not close real profile Z2');
+ok(ownerCount() === 1, 'closing Z2 did not release exactly one edge owner');
+
+mark('finalize');
+if (failures.length) {
+  document.documentElement.dataset.accountRuntime = 'fail';
+  result.textContent = failures.join('\n');
+} else {
+  document.documentElement.dataset.accountRuntime = 'pass';
+  result.textContent = 'real end-user account shell runtime passed';
+}
+</script>
+</body>
+</html>

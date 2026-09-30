@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="theme-color" content="#2F3338">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    :root{--surface-dark:#2f3338;--button-secondary:#d8d3cf;--text-muted:#817a73;--app-max-width:390px;--visual-vh:780px;--visual-vw:390px}
+    html,body{margin:0;width:390px;height:780px}
+    *{box-sizing:border-box}
+  </style>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/ui/v2/v2.css">
+</head>
+<body>
+<div id="app"></div>
+<pre id="result">pending</pre>
+<script>
+(() => {
+  const json = (body, status = 200) => Promise.resolve(new Response(JSON.stringify(body), {
+    status,
+    headers:{'Content-Type':'application/json'},
+  }));
+  const pathname = (input) => {
+    try { return new URL(typeof input === 'string' ? input : input.url, location.href).pathname; }
+    catch { return String(input || ''); }
+  };
+  const payloadFor = (path, method) => {
+    if (path.endsWith('/auth/me')) return { account:{ email:'runtime@example.test', workspaceUnlocked:true }, user:{ workspaceUnlocked:true } };
+    if (path.endsWith('/profile')) return {
+      verified:true,
+      profile:{ name:'Иван', surname:'Проверка', profession:'Специалист' },
+      workplaces:[],
+      customProfessions:[],
+      professionCatalog:[],
+      workplaceReferenceData:{},
+    };
+    if (path.endsWith('/business-state')) return {
+      verified:true, people:[], uei:{entities:{},relations:{},revoked:[]}, records:[], recordEvents:[],
+    };
+    if (path.endsWith('/business-state/operational')) return {
+      verified:true, days:[], breaks:[], procedures:[], procedureHistory:[], bookingSettings:null,
+    };
+    if (path.endsWith('/tenant-document-archive/rkn-guide/ensure')) return { ready:false };
+    if (path.endsWith('/tenant-document-archive')) return {
+      verified:true, data:{ documents:[], consents:[], history:[] },
+    };
+    if (path.endsWith('/auxiliary-state')) return {
+      verified:true, wallets:[], tags:[], products:[], productHistory:[],
+    };
+    if (path.endsWith('/finance')) return {
+      version:7, articles:[], settlements:[], operations:[], ledger:[], income:[], expense:[],
+    };
+    if (path.endsWith('/saas-access/me')) return {
+      tenantId:'runtime-tenant', status:'ACTIVE', isOwnerBook:true, commercialMode:'LIVE',
+      capabilities:[], plan:null,
+    };
+    if (path.endsWith('/first-run/state')) return {
+      assigned:true, commercialMode:'LIVE', progress:{status:'COMPLETED'}, steps:[], demo:{},
+    };
+    if (path.endsWith('/first-run/session/start')) return { id:'' };
+    if (path.endsWith('/platform-notices')) return [];
+    if (method === 'PUT' || method === 'POST' || method === 'DELETE') return { ok:true, verified:true };
+    return {};
+  };
+  window.fetch = (input, init = {}) => {
+    const path = pathname(input);
+    const method = String(init.method || 'GET').toUpperCase();
+    return json(payloadFor(path, method));
+  };
+  sessionStorage.setItem('book.auth.token','runtime-token');
+})();
+</script>
+<script type="module">
+const result = document.querySelector('#result');
+const failures = [];
+let stage = 'boot';
+const mark = (name) => {
+  stage = name;
+  result.textContent = 'running: ' + name;
+  document.documentElement.dataset.professionalRuntimeStage = name;
+};
+const ok = (condition, message) => { if (!condition) failures.push(stage + ': ' + message); };
+const wait = (ms = 120) => new Promise((resolve) => window.setTimeout(resolve, ms));
+const pointer = (target, type, x, y, id = 1) => target?.dispatchEvent(new PointerEvent(type, {
+  bubbles:true,cancelable:true,pointerId:id,pointerType:'touch',clientX:x,clientY:y,button:0,
+}));
+for (const name of ['setPointerCapture','releasePointerCapture']) {
+  Object.defineProperty(Element.prototype, name, { configurable:true, value(){ } });
+}
+Object.defineProperty(Element.prototype, 'hasPointerCapture', { configurable:true, value(){ return true; } });
+window.addEventListener('error', (event) => failures.push(stage + ': window error: ' + (event.error?.message || event.message)));
+window.addEventListener('unhandledrejection', (event) => failures.push(stage + ': rejection: ' + String(event.reason?.message || event.reason || 'unknown')));
+
+mark('import-core');
+await import('/core.js');
+
+const app = document.querySelector('#app');
+const waitFor = async (predicate, label, attempts = 80) => {
+  for (let i=0;i<attempts;i+=1) {
+    if (predicate()) return true;
+    await wait(75);
+  }
+  failures.push(stage + ': timeout waiting for ' + label);
+  return false;
+};
+await waitFor(() => app.querySelector('[data-v2-app].v2-app--workspace'), 'professional workspace');
+
+const shell = () => app.querySelector(':scope > [data-v2-app].v2-app--workspace');
+const edge = () => shell()?.querySelector('[data-v2-edge-swipe]');
+const fDeck = () => shell()?.querySelector('[data-v2-card-deck][data-v2-deck-level="f"]');
+const eDeck = () => shell()?.querySelector('[data-v2-card-deck][data-v2-deck-level="e"]');
+const fCard = (id) => shell()?.querySelector('[data-v2-root-item="' + id + '"]');
+const eCard = (id) => shell()?.querySelector('[data-v2-secondary-item="' + id + '"]');
+const ownerCount = () => Number(edge()?.dataset.v2EdgeOwners || 0);
+const initialShell = shell();
+
+ok(Boolean(initialShell), 'real professional workspace did not boot');
+ok(Boolean(fCard('people')), 'real professional F People missing');
+ok(Boolean(fCard('finance')), 'real professional F Finance missing');
+ok(Boolean(fCard('journal')), 'real professional F Journal missing');
+ok(ownerCount() === 1, 'professional workspace must boot with one edge owner');
+
+const openF = async (pointerId, label) => {
+  mark('edge-to-f-' + label);
+  const e = edge();
+  pointer(e,'pointerdown',10,320,pointerId);
+  pointer(e,'pointermove',48,322,pointerId);
+  pointer(e,'pointerup',48,322,pointerId);
+  await wait(140);
+  ok(shell()?.classList.contains('is-deck-open'), 'edge swipe failed to open F');
+  ok(!shell()?.classList.contains('is-e-open'), 'root Z edge swipe incorrectly reopened E');
+  ok(ownerCount() === 1, 'edge owner count changed after opening F');
+};
+
+const centerAndTap = async (deck, target, pointerId, label) => {
+  mark('select-' + label);
+  const axisY = deck.dataset.v2DeckAxis === 'y';
+  if (axisY) {
+    deck.scrollTop = Math.max(0, target.offsetTop - (deck.clientHeight - target.offsetHeight) / 2);
+  } else {
+    deck.scrollLeft = Math.max(0, target.offsetLeft - (deck.clientWidth - target.offsetWidth) / 2);
+  }
+  deck.dispatchEvent(new Event('scroll'));
+  await wait(220);
+  const activeNow = deck.querySelector('[data-v2-card-item].is-active');
+  ok(
+    target.classList.contains('is-active'),
+    label + ' did not become centred active card'
+      + ' active=' + String(activeNow?.dataset.v2CardItem || 'none')
+      + ' scroll=' + String(Math.round(axisY ? deck.scrollTop : deck.scrollLeft))
+      + ' targetOffset=' + String(Math.round(axisY ? target.offsetTop : target.offsetLeft))
+      + ' deckSize=' + String(Math.round(axisY ? deck.clientHeight : deck.clientWidth))
+      + ' cardSize=' + String(Math.round(axisY ? target.offsetHeight : target.offsetWidth))
+  );
+  pointer(target,'pointerdown',190,390,pointerId);
+  pointer(target,'pointerup',190,390,pointerId);
+  target.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,clientX:190,clientY:390}));
+  await wait(180);
+  ok(shell() === initialShell, label + ' rebuilt the whole professional FEZ shell');
+  ok(ownerCount() === 1, label + ' left duplicate FEZ owners');
+};
+
+await openF(1,'people');
+await centerAndTap(fDeck(), fCard('finance'), 11, 'finance');
+ok(shell()?.classList.contains('is-deck-open') && shell()?.classList.contains('is-e-open'), 'Finance did not open real E deck');
+ok(Boolean(eCard('dds')), 'Finance E DDS missing');
+await centerAndTap(eDeck(), eCard('dds'), 12, 'finance-dds');
+ok(!shell()?.classList.contains('is-deck-open'), 'DDS selection did not enter Z');
+
+await openF(2,'dds');
+await centerAndTap(fDeck(), fCard('journal'), 13, 'journal');
+ok(shell()?.classList.contains('is-e-open'), 'Journal did not open real E deck');
+ok(Boolean(eCard('list')), 'Journal E List missing');
+await centerAndTap(eDeck(), eCard('list'), 14, 'journal-list');
+ok(!shell()?.classList.contains('is-deck-open'), 'Journal List selection did not enter Z');
+
+await openF(3,'journal-list');
+await centerAndTap(fDeck(), fCard('profile'), 15, 'profile');
+ok(!shell()?.classList.contains('is-deck-open'), 'Profile F without E did not enter Z directly');
+
+// Repeat full roots to expose stale listeners/rAF from persistent shell reuse.
+for (const [index,id] of ['people','finance','journal','profile','settings','people'].entries()) {
+  await openF(20 + index, 'repeat-' + id);
+  await centerAndTap(fDeck(), fCard(id), 40 + index, 'repeat-' + id);
+  if (id === 'finance' || id === 'journal' || id === 'settings') {
+    ok(shell()?.classList.contains('is-e-open'), id + ' repeat did not enter E');
+    // Collapse E by its own geometry before continuing to avoid choosing an arbitrary child.
+    const deck = eDeck();
+    pointer(deck,'pointerdown',190,390,70 + index);
+    pointer(deck,'pointermove',232,392,70 + index);
+    pointer(deck,'pointerup',232,392,70 + index);
+    await wait(140);
+    ok(!shell()?.classList.contains('is-e-open'), id + ' E did not collapse by right gesture');
+    // F is still open; choose a root without E to return to Z deterministically.
+    await centerAndTap(fDeck(), fCard('people'), 90 + index, id + '-to-people');
+  }
+}
+
+mark('finalize');
+if (failures.length) {
+  document.documentElement.dataset.professionalRuntime = 'fail';
+  result.textContent = failures.join('\n');
+} else {
+  document.documentElement.dataset.professionalRuntime = 'pass';
+  result.textContent = 'real professional core runtime passed';
+}
+</script>
+</body>
+</html>

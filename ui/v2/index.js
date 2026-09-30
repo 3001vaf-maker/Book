@@ -137,6 +137,7 @@ export function v2Shell({
 ${body}
 </main>
       </div>
+      <div class="v2-edge-swipe-zone" data-v2-edge-swipe aria-hidden="true"></div>
     </div>
   </section>`;
 }
@@ -208,7 +209,10 @@ export function mountV2ZLayer(root, html, { onClose = null, stack = false } = {}
   template.innerHTML = String(html || '').trim();
   const node = template.content.firstElementChild;
   if (!node?.matches?.('[data-v2-z-layer]')) return null;
-  if (!stack) host.querySelectorAll('[data-v2-z-layer]').forEach((layer) => layer.remove());
+  if (!stack) host.querySelectorAll('[data-v2-z-layer]').forEach((layer) => {
+    if (typeof layer.v2Dispose === 'function') layer.v2Dispose();
+    else layer.remove();
+  });
   const depth = host.querySelectorAll('[data-v2-z-layer]').length + 1;
   node.dataset.v2ZDepth = String(depth);
   node.style.setProperty('--v2-z-layer-shift', `${depth * 12}px`);
@@ -242,18 +246,26 @@ export function mountV2ZLayer(root, html, { onClose = null, stack = false } = {}
     ],
   });
   let disposeSwipe = () => {};
-  const close = () => {
+  let disposed = false;
+  const dispose = () => {
+    if (disposed) return;
+    disposed = true;
     contextObserver.disconnect();
     disposeSwipe();
     if (node.isConnected) node.remove();
     app?.classList.toggle('has-z-layer', Boolean(host.querySelector('[data-v2-z-layer]')));
     notify();
+  };
+  const close = () => {
+    if (disposed) return;
+    dispose();
     onClose?.();
   };
   node.addEventListener('click', (event) => {
     if (event.target.closest?.('[data-v2-z-close]')) close();
   });
-  disposeSwipe = initV2Swipe(node, { onRight: close, revealDeck: false, threshold: 42 });
+  disposeSwipe = initV2Swipe(node, { onRight: close, revealDeck: false, threshold: 28, edgeWidth: 36 });
+  node.v2Dispose = dispose;
   node.v2Close = close;
   notify();
   return node;
@@ -513,13 +525,31 @@ export function mountV2Layer(html, { root = null } = {}) {
   return node;
 }
 
+function retainV2EdgeHost(host) {
+  if (!host) return () => {};
+  const next = Number(host.dataset.v2EdgeOwners || 0) + 1;
+  host.dataset.v2EdgeOwners = String(next);
+  host.classList.add('is-active');
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    const count = Math.max(0, Number(host.dataset.v2EdgeOwners || 1) - 1);
+    if (count) host.dataset.v2EdgeOwners = String(count);
+    else {
+      delete host.dataset.v2EdgeOwners;
+      host.classList.remove('is-active');
+    }
+  };
+}
+
 export function initV2Swipe(root, {
   onRight = null,
   onLeft = null,
-  threshold = 42,
+  threshold = 28,
   maxDrag = 180,
   revealDeck = true,
-  edgeWidth = 24,
+  edgeWidth = 36,
 } = {}) {
   const surface = root?.matches?.('[data-v2-z], [data-v2-z-layer]')
     ? root
@@ -529,8 +559,13 @@ export function initV2Swipe(root, {
   const stage = app?.querySelector?.('.v2-app__stage') || surface.parentElement;
   const isLayer = surface.matches?.('[data-v2-z-layer]');
   const isBaseZ = surface.matches?.('[data-v2-z]') && !isLayer;
+  const front = app?.querySelector?.('[data-v2-front]');
+  const dragSurface = isBaseZ && front ? front : surface;
+  const dragProperty = isBaseZ && front ? '--v2-front-drag-x' : '--v2-drag-x';
   const hasDeck = revealDeck && isBaseZ && Boolean(app?.querySelector?.('[data-v2-card-deck][data-v2-deck-level="f"]'));
-  const gestureHost = stage || surface;
+  const edgeHost = onRight ? app?.querySelector?.('[data-v2-edge-swipe]') : null;
+  const gestureHost = edgeHost || stage || surface;
+  const releaseEdgeHost = retainV2EdgeHost(edgeHost);
   let pointerId = null;
   let startX = 0;
   let startY = 0;
@@ -545,8 +580,8 @@ export function initV2Swipe(root, {
   };
 
   const clear = () => {
-    surface.style.removeProperty('--v2-drag-x');
-    surface.classList.remove('is-dragging');
+    dragSurface.style.removeProperty(dragProperty);
+    dragSurface.classList.remove('is-dragging');
     app?.classList.remove('is-revealing-deck');
     pointerId = null;
     dx = 0;
@@ -557,10 +592,10 @@ export function initV2Swipe(root, {
     if (!isTopmost()) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     const stageRect = stage?.getBoundingClientRect?.() || surface.getBoundingClientRect?.();
-    const leftEdge = Number(stageRect?.left || 0) + Number(edgeWidth || 24);
-    const rightEdge = Number(stageRect?.right || 0) - Number(edgeWidth || 24);
-    const wantsRight = Boolean(onRight) && Number(event.clientX || 0) <= leftEdge;
-    const wantsLeft = Boolean(onLeft) && Number(event.clientX || 0) >= rightEdge;
+    const leftEdge = Number(stageRect?.left || 0) + Number(edgeWidth || 36);
+    const rightEdge = Number(stageRect?.right || 0) - Number(edgeWidth || 36);
+    const wantsRight = Boolean(onRight) && (Boolean(edgeHost) || Number(event.clientX || 0) <= leftEdge);
+    const wantsLeft = Boolean(onLeft) && !edgeHost && Number(event.clientX || 0) >= rightEdge;
     if (!wantsRight && !wantsLeft) return;
     pointerId = event.pointerId;
     startX = event.clientX;
@@ -575,8 +610,8 @@ export function initV2Swipe(root, {
     const nextX = event.clientX - startX;
     const nextY = event.clientY - startY;
     if (axis === 'pending') {
-      if (Math.max(Math.abs(nextX), Math.abs(nextY)) < 6) return;
-      const horizontal = Math.abs(nextX) >= Math.abs(nextY) * 1.05;
+      if (Math.max(Math.abs(nextX), Math.abs(nextY)) < 4) return;
+      const horizontal = Math.abs(nextX) >= Math.abs(nextY) * .72;
       const allowedDirection = (nextX > 0 && onRight) || (nextX < 0 && onLeft);
       if (!horizontal || !allowedDirection) {
         clear();
@@ -590,8 +625,8 @@ export function initV2Swipe(root, {
     if (hasDeck && dx > 0 && onRight && !app?.classList.contains('is-deck-open')) {
       app?.classList.add('is-revealing-deck');
     }
-    surface.classList.add('is-dragging');
-    surface.style.setProperty('--v2-drag-x', `${dx}px`);
+    dragSurface.classList.add('is-dragging');
+    dragSurface.style.setProperty(dragProperty, `${dx}px`);
     if (Math.abs(nextX) > 7) suppressNextClick = true;
     event.preventDefault();
   };
@@ -627,6 +662,7 @@ export function initV2Swipe(root, {
     gestureHost.removeEventListener('pointerup', up);
     gestureHost.removeEventListener('pointercancel', clear);
     gestureHost.removeEventListener('click', click, true);
+    releaseEdgeHost();
   };
 }
 
@@ -656,9 +692,9 @@ export function initV2WorkspaceInteraction(root, {
   onZRight = null,
   onZLeft = null,
   bindZ = true,
-  threshold = 42,
+  threshold = 28,
   maxDrag = 180,
-  edgeWidth = 24,
+  edgeWidth = 36,
 } = {}) {
   const app = root?.matches?.('[data-v2-app]')
     ? root
@@ -670,7 +706,9 @@ export function initV2WorkspaceInteraction(root, {
   const fDeck = app.querySelector('[data-v2-card-deck][data-v2-deck-level="f"]');
   const eDeck = app.querySelector('[data-v2-card-deck][data-v2-deck-level="e"]');
   const z = app.querySelector('[data-v2-front] > [data-v2-z]');
+  const edgeHost = app.querySelector('[data-v2-edge-swipe]') || stage;
   if (!stage || !front) return () => {};
+  const releaseEdgeHost = retainV2EdgeHost(bindZ && edgeHost?.matches?.('[data-v2-edge-swipe]') ? edgeHost : null);
 
   const fCards = [...(fDeck?.querySelectorAll?.('[data-v2-card-item]') || [])];
   const eCards = [...(eDeck?.querySelectorAll?.('[data-v2-card-item]') || [])];
@@ -680,9 +718,9 @@ export function initV2WorkspaceInteraction(root, {
   let secondaryOpen = Boolean(open && eOpen && eCards.length);
   let zGesture = null;
   let eGesture = null;
+  let eDismissTimer = 0;
   const disposers = [];
   const scrollFrames = new Map();
-
   const cardId = (card) => String(card?.getAttribute('data-v2-card-item') || '');
 
   const setActiveCard = (cards, index) => {
@@ -694,36 +732,54 @@ export function initV2WorkspaceInteraction(root, {
     });
   };
 
+  setActiveCard(fCards, fActiveIndex);
+  setActiveCard(eCards, eActiveIndex);
+
   const updateDeckGeometry = (deck, cards, axis) => {
     if (!deck || !cards.length) return -1;
     const center = axis === 'y' ? Number(deck.clientHeight || 0) / 2 : Number(deck.clientWidth || 0) / 2;
-    let nearestIndex = 0;
-    let nearestDistance = Number.POSITIVE_INFINITY;
-    cards.forEach((card, index) => {
+    const scroll = axis === 'y' ? Number(deck.scrollTop || 0) : Number(deck.scrollLeft || 0);
+
+    // Read all layout geometry first. Mixing offset reads with style writes card-by-card
+    // forces repeated layout work and makes the deck feel behind the finger.
+    const metrics = cards.map((card, index) => {
       const cardCenter = axis === 'y'
-        ? Number(card.offsetTop || 0) - Number(deck.scrollTop || 0) + Number(card.offsetHeight || 0) / 2
-        : Number(card.offsetLeft || 0) - Number(deck.scrollLeft || 0) + Number(card.offsetWidth || 0) / 2;
+        ? Number(card.offsetTop || 0) - scroll + Number(card.offsetHeight || 0) / 2
+        : Number(card.offsetLeft || 0) - scroll + Number(card.offsetWidth || 0) / 2;
       const span = Math.max(1, axis === 'y' ? Number(card.offsetHeight || 0) : Number(card.offsetWidth || 0));
       const signed = (cardCenter - center) / Math.max(1, span * .72);
       const absolute = Math.min(2.6, Math.abs(signed));
-      const depth = -Math.min(180, absolute * 82);
-      const scale = 1 - Math.min(.13, absolute * .055);
-      const opacity = 1 - Math.min(.38, absolute * .16);
-      const brightness = 1 - Math.min(.22, absolute * .09);
-      const rotation = Math.max(-13, Math.min(13, signed * (axis === 'y' ? -6.5 : 7.5)));
-      const shift = Math.max(-18, Math.min(18, signed * -8));
-      card.style.setProperty('--v2-card-depth', `${depth}px`);
-      card.style.setProperty('--v2-card-scale', scale.toFixed(4));
-      card.style.setProperty('--v2-card-opacity', opacity.toFixed(4));
-      card.style.setProperty('--v2-card-brightness', brightness.toFixed(4));
-      card.style.setProperty('--v2-card-rotation', `${rotation.toFixed(3)}deg`);
-      card.style.setProperty('--v2-card-shift', `${shift.toFixed(3)}px`);
-      card.style.setProperty('--v2-card-stack', String(Math.max(1, 100 - Math.round(absolute * 24))));
-      if (Math.abs(cardCenter - center) < nearestDistance) {
-        nearestDistance = Math.abs(cardCenter - center);
-        nearestIndex = index;
+      return {
+        card,
+        index,
+        distance: Math.abs(cardCenter - center),
+        depth: -Math.min(180, absolute * 82),
+        scale: 1 - Math.min(.13, absolute * .055),
+        opacity: 1 - Math.min(.38, absolute * .16),
+        brightness: 1 - Math.min(.22, absolute * .09),
+        rotation: Math.max(-13, Math.min(13, signed * (axis === 'y' ? -6.5 : 7.5))),
+        shift: Math.max(-18, Math.min(18, signed * -8)),
+        stack: Math.max(1, 100 - Math.round(absolute * 24)),
+      };
+    });
+
+    let nearestIndex = 0;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    metrics.forEach((metric) => {
+      const { card } = metric;
+      card.style.setProperty('--v2-card-depth', `${metric.depth}px`);
+      card.style.setProperty('--v2-card-scale', metric.scale.toFixed(4));
+      card.style.setProperty('--v2-card-opacity', metric.opacity.toFixed(4));
+      card.style.setProperty('--v2-card-brightness', metric.brightness.toFixed(4));
+      card.style.setProperty('--v2-card-rotation', `${metric.rotation.toFixed(3)}deg`);
+      card.style.setProperty('--v2-card-shift', `${metric.shift.toFixed(3)}px`);
+      card.style.setProperty('--v2-card-stack', String(metric.stack));
+      if (metric.distance < nearestDistance) {
+        nearestDistance = metric.distance;
+        nearestIndex = metric.index;
       }
     });
+
     setActiveCard(cards, nearestIndex);
     return nearestIndex;
   };
@@ -741,29 +797,46 @@ export function initV2WorkspaceInteraction(root, {
   };
 
   const centerCard = (card, axis, behavior = 'auto') => {
-    if (!card) return;
-    card.scrollIntoView({
-      behavior,
-      block: axis === 'y' ? 'center' : 'nearest',
-      inline: axis === 'x' ? 'center' : 'nearest',
-    });
+    const deck = card?.closest?.('[data-v2-card-deck]');
+    if (!card || !deck) return;
+    if (axis === 'y') {
+      const target = Math.max(0, Math.min(
+        Math.max(0, Number(deck.scrollHeight || 0) - Number(deck.clientHeight || 0)),
+        Number(card.offsetTop || 0) + Number(card.offsetHeight || 0) / 2 - Number(deck.clientHeight || 0) / 2,
+      ));
+      if (behavior === 'smooth') deck.scrollTo({ top:target, behavior:'smooth' });
+      else deck.scrollTop = target;
+      return;
+    }
+    const target = Math.max(0, Math.min(
+      Math.max(0, Number(deck.scrollWidth || 0) - Number(deck.clientWidth || 0)),
+      Number(card.offsetLeft || 0) + Number(card.offsetWidth || 0) / 2 - Number(deck.clientWidth || 0) / 2,
+    ));
+    if (behavior === 'smooth') deck.scrollTo({ left:target, behavior:'smooth' });
+    else deck.scrollLeft = target;
   };
 
-  const bindNativeDeck = (deck, cards, axis, getActiveIndex, setActiveIndex, onSelect) => {
+  const bindNativeDeck = (deck, cards, axis, getActiveIndex, setActiveIndex, onSelect, isEnabled = () => true) => {
     if (!deck || !cards.length) return;
     let pointer = null;
     let suppressClick = false;
     let settleTimer = 0;
 
-    const refresh = () => scheduleGeometry(deck, cards, axis, setActiveIndex);
+    const refresh = () => {
+      if (!isEnabled()) return;
+      scheduleGeometry(deck, cards, axis, setActiveIndex);
+    };
     const settle = () => {
+      if (!isEnabled()) return;
       if (settleTimer) window.clearTimeout(settleTimer);
       settleTimer = window.setTimeout(() => {
+        if (!isEnabled()) return;
         const next = updateDeckGeometry(deck, cards, axis);
         if (next >= 0) setActiveIndex(next);
       }, 90);
     };
     const down = (event) => {
+      if (!isEnabled()) return;
       if (event.pointerType === 'mouse' && event.button !== 0) return;
       pointer = {
         id: event.pointerId,
@@ -789,6 +862,7 @@ export function initV2WorkspaceInteraction(root, {
       suppressClick = true;
     };
     const click = (event) => {
+      if (!isEnabled()) return;
       const card = event.target.closest?.('[data-v2-card-item]');
       if (!card || !deck.contains(card)) return;
       if (suppressClick) {
@@ -830,15 +904,18 @@ export function initV2WorkspaceInteraction(root, {
   };
 
   const setEOpen = (nextOpen, notify = true) => {
+    if (eDismissTimer) {
+      window.clearTimeout(eDismissTimer);
+      eDismissTimer = 0;
+    }
     secondaryOpen = Boolean(open && nextOpen && eCards.length);
     app.classList.toggle('is-e-open', secondaryOpen);
     eDeck?.style.removeProperty('--v2-e-dismiss-x');
     eDeck?.classList.remove('is-dragging');
     if (secondaryOpen) {
-      requestAnimationFrame(() => {
-        centerCard(eCards[eActiveIndex], 'y');
-        scheduleGeometry(eDeck, eCards, 'y', (index) => { eActiveIndex = index; });
-      });
+      centerCard(eCards[eActiveIndex], 'y');
+      const index = updateDeckGeometry(eDeck, eCards, 'y');
+      if (index >= 0) eActiveIndex = index;
     }
     if (notify) onEOpenChange?.(secondaryOpen);
     return secondaryOpen;
@@ -853,10 +930,9 @@ export function initV2WorkspaceInteraction(root, {
     front.classList.remove('is-dragging');
     front.style.removeProperty('--v2-front-drag-x');
     if (open) {
-      requestAnimationFrame(() => {
-        centerCard(fCards[fActiveIndex], 'x');
-        scheduleGeometry(fDeck, fCards, 'x', (index) => { fActiveIndex = index; });
-      });
+      centerCard(fCards[fActiveIndex], 'x');
+      const index = updateDeckGeometry(fDeck, fCards, 'x');
+      if (index >= 0) fActiveIndex = index;
     }
     if (notify) onDeckOpenChange?.(open);
     return open;
@@ -875,6 +951,7 @@ export function initV2WorkspaceInteraction(root, {
     () => fActiveIndex,
     (index) => { fActiveIndex = index; },
     (id) => onRootSelect?.(id),
+    () => open && !secondaryOpen,
   );
   bindNativeDeck(
     eDeck,
@@ -883,6 +960,7 @@ export function initV2WorkspaceInteraction(root, {
     () => eActiveIndex,
     (index) => { eActiveIndex = index; },
     (id) => onSecondarySelect?.(id),
+    () => secondaryOpen,
   );
 
   const eDown = (event) => {
@@ -916,9 +994,27 @@ export function initV2WorkspaceInteraction(root, {
     try {
       if (eDeck.hasPointerCapture?.(event.pointerId)) eDeck.releasePointerCapture?.(event.pointerId);
     } catch {}
+
+    if (current.axis === 'horizontal' && current.dx >= threshold) {
+      // Continue from the finger position instead of snapping E back to x=0 first.
+      const currentX = Math.max(0, current.dx);
+      const exitX = Math.max(Number(stage.clientWidth || 0), currentX);
+      eDeck.style.setProperty('--v2-e-dismiss-x', `${currentX}px`);
+      eDeck.classList.remove('is-dragging');
+      void eDeck.offsetWidth;
+      secondaryOpen = false;
+      app.classList.remove('is-e-open');
+      eDeck.style.setProperty('--v2-e-dismiss-x', `${exitX}px`);
+      onEOpenChange?.(false);
+      eDismissTimer = window.setTimeout(() => {
+        eDismissTimer = 0;
+        if (!secondaryOpen) eDeck.style.removeProperty('--v2-e-dismiss-x');
+      }, 260);
+      return;
+    }
+
     eDeck.classList.remove('is-dragging');
     eDeck.style.removeProperty('--v2-e-dismiss-x');
-    if (current.axis === 'horizontal' && current.dx >= threshold) setEOpen(false);
   };
   const eCancel = () => {
     eGesture = null;
@@ -938,7 +1034,9 @@ export function initV2WorkspaceInteraction(root, {
 
   const clearZGesture = () => {
     if (zGesture?.captured && zGesture.id != null) {
-      try { stage.releasePointerCapture?.(zGesture.id); } catch {}
+      try {
+        if (edgeHost.hasPointerCapture?.(zGesture.id)) edgeHost.releasePointerCapture?.(zGesture.id);
+      } catch {}
     }
     zGesture = null;
     front.classList.remove('is-dragging');
@@ -950,8 +1048,10 @@ export function initV2WorkspaceInteraction(root, {
     if (!bindZ || open || zGesture || app.querySelector('[data-v2-z-layer]')) return;
     if (event.target.closest?.('[data-v2-layer], [data-v2-z-layer]')) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
-    const rect = stage.getBoundingClientRect();
-    if (Number(event.clientX || 0) > rect.left + edgeWidth) return;
+    if (edgeHost === stage) {
+      const rect = stage.getBoundingClientRect();
+      if (Number(event.clientX || 0) > rect.left + edgeWidth) return;
+    }
     zGesture = {
       id:event.pointerId,
       x:event.clientX,
@@ -968,13 +1068,13 @@ export function initV2WorkspaceInteraction(root, {
     const dy = event.clientY - zGesture.y;
     zGesture.dx = dx;
     if (zGesture.axis === 'pending') {
-      if (Math.max(Math.abs(dx), Math.abs(dy)) < 6) return;
-      if (dx <= 0 || Math.abs(dx) < Math.abs(dy) * 1.05) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 4) return;
+      if (dx <= 0 || Math.abs(dx) < Math.abs(dy) * .72) {
         clearZGesture();
         return;
       }
       zGesture.axis = 'horizontal';
-      stage.setPointerCapture?.(event.pointerId);
+      edgeHost.setPointerCapture?.(event.pointerId);
       zGesture.captured = true;
     }
     if (z) z.scrollTop = zGesture.scrollTop;
@@ -997,34 +1097,29 @@ export function initV2WorkspaceInteraction(root, {
   };
   const zCancel = () => clearZGesture();
 
-  stage.addEventListener('pointerdown', zDown);
-  stage.addEventListener('pointermove', zMove, { passive:false });
-  stage.addEventListener('pointerup', zUp);
-  stage.addEventListener('pointercancel', zCancel);
+  edgeHost.addEventListener('pointerdown', zDown);
+  edgeHost.addEventListener('pointermove', zMove, { passive:false });
+  edgeHost.addEventListener('pointerup', zUp);
+  edgeHost.addEventListener('pointercancel', zCancel);
   disposers.push(() => {
-    stage.removeEventListener('pointerdown', zDown);
-    stage.removeEventListener('pointermove', zMove);
-    stage.removeEventListener('pointerup', zUp);
-    stage.removeEventListener('pointercancel', zCancel);
+    edgeHost.removeEventListener('pointerdown', zDown);
+    edgeHost.removeEventListener('pointermove', zMove);
+    edgeHost.removeEventListener('pointerup', zUp);
+    edgeHost.removeEventListener('pointercancel', zCancel);
   });
 
   setOpen(open, false);
   setEOpen(secondaryOpen, false);
-  requestAnimationFrame(() => {
-    if (open) centerCard(fCards[fActiveIndex], 'x');
-    scheduleGeometry(fDeck, fCards, 'x', (index) => { fActiveIndex = index; });
-    if (secondaryOpen) {
-      centerCard(eCards[eActiveIndex], 'y');
-      scheduleGeometry(eDeck, eCards, 'y', (index) => { eActiveIndex = index; });
-    }
-  });
 
   return () => {
     clearZGesture();
     eCancel();
     for (const frame of scrollFrames.values()) cancelAnimationFrame(frame);
     scrollFrames.clear();
+    if (eDismissTimer) window.clearTimeout(eDismissTimer);
+    eDismissTimer = 0;
     disposers.forEach((dispose) => dispose?.());
+    releaseEdgeHost();
   };
 }
 
@@ -1064,7 +1159,7 @@ export function initV2StickerSwipe(root, { onRight = null, onLeft = null, thresh
         pointerId = null;
         return;
       }
-      gestureHost.setPointerCapture?.(event.pointerId);
+      surface.setPointerCapture?.(event.pointerId);
     }
     if (axis !== 'horizontal') return;
     const allowedX = nextX > 0 ? (onRight ? nextX : 0) : (onLeft ? nextX : 0);
@@ -1078,6 +1173,9 @@ export function initV2StickerSwipe(root, { onRight = null, onLeft = null, thresh
   const up = (event) => {
     if (event.pointerId !== pointerId) return;
     const finalDx = dx;
+    try {
+      if (surface.hasPointerCapture?.(event.pointerId)) surface.releasePointerCapture?.(event.pointerId);
+    } catch {}
     reset();
     if (finalDx >= threshold) onRight?.();
     else if (finalDx <= -threshold) onLeft?.();

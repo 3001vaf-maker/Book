@@ -330,23 +330,6 @@ function primaryVisible(source) {
   return true;
 }
 
-function syncWorkspaceBack(surface, backSource) {
-  let control = surface.querySelector(':scope > [data-v2-workspace-back]');
-  if (!backSource) {
-    control?.remove();
-    return;
-  }
-  if (!control) {
-    surface.insertAdjacentHTML('afterbegin', '<button type="button" class="v2-workspace-back" data-v2-workspace-back aria-label="Назад">‹</button>');
-    control = surface.querySelector(':scope > [data-v2-workspace-back]');
-  }
-  const backLabel = backSource.getAttribute('aria-label') || 'Назад';
-  if (control.getAttribute('aria-label') !== backLabel) {
-    control.setAttribute('aria-label', backLabel);
-  }
-  control.onclick = () => backSource.click();
-}
-
 function syncWorkspacePrimarySource(surface, source) {
   surface.querySelectorAll('.v2-workspace-source-hidden').forEach((node) => {
     if (node !== source) node.classList.remove('v2-workspace-source-hidden');
@@ -373,14 +356,12 @@ function syncWorkspaceHeader(surface) {
     contextRoot.querySelector('.page-header h1'),
     fallbackTitle,
   );
-  const backSource = contextRoot.querySelector('[data-workspace-back-source]');
   const contextSource = contextRoot.querySelector('[data-workspace-context-action], .page-header__meta button');
   const aSource = contextSource;
   const dSource = contextRoot.querySelector('[data-workspace-d-action]');
   const cSource = primarySource(contextRoot);
   const cVisible = primaryVisible(cSource);
   const hideD = context?.dataset.workspaceHideD === 'true';
-  syncWorkspaceBack(contextRoot, backSource);
   syncWorkspacePrimarySource(contextRoot, cVisible ? cSource : null);
   const header = app.querySelector('[data-v2-header]');
   if (!header) return;
@@ -498,6 +479,15 @@ function renderWorkspace() {
     if (currentHeader) currentHeader.outerHTML = headerMarkup;
 
     const feHost = shell.querySelector('[data-v2-fe]');
+    const currentF = feHost?.querySelector('[data-v2-card-deck][data-v2-deck-level="f"]');
+    const nextFIds = rootItems.map((item) => String(item.id || '')).join('|');
+    const currentFIds = [...(currentF?.querySelectorAll('[data-v2-card-item]') || [])]
+      .map((card) => String(card.dataset.v2CardItem || '')).join('|');
+    if (nextFIds !== currentFIds) {
+      if (currentF) currentF.outerHTML = rootDeck;
+      else if (rootDeck && feHost) feHost.insertAdjacentHTML('afterbegin', rootDeck);
+    }
+
     const currentE = feHost?.querySelector('[data-v2-card-deck][data-v2-deck-level="e"]');
     const nextEIds = childItems.map((item) => String(item.id || '')).join('|');
     const currentEIds = [...(currentE?.querySelectorAll('[data-v2-card-item]') || [])]
