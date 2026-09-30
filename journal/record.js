@@ -1,10 +1,10 @@
 import { button, durationPicker, durationText, entityCard, escapeHtml, field, list, v2ListEntry, stateView, initStateView, initCalendar, mountModal, modal, openNotice, initDurationPickers, initMultiSelect, viewNavigation, initViewNavigation, openTimePickerAction, mountRecordZ, recordZHost, renderRecordZ, recordTimeRows, recordProcedureList, recordPersonList, recordConfirmationMiniCard, setRecordPrimaryAction, bindRecordSettings, closeRecordZStack } from '../ui/ui.js';
 import { createRecord } from '../core/record/index.js';
 import { createJournalBreak } from './break-service.js';
-import { getPeople } from '../main/people/data.js';
-import { personDisplay } from '../main/people/presentation.js';
-import { openPersonCreate } from '../main/people/create.js';
-import { openPerson } from '../main/people/people.js';
+import { getPeople } from '../core/people/data.js';
+import { personDisplay } from '../core/people/presentation.js';
+import { openPersonCreate } from '../core/people/create.js';
+import { openPerson } from '../core/people/people.js';
 import { getProcedures } from '../settings/service/procedures/data.js';
 import { openProcedureForm } from '../settings/service/procedures/form.js';
 import { assignProceduresToWorkplace } from '../settings/service/procedures/service.js';
