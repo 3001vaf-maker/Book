@@ -1,5 +1,6 @@
 import { actionBlock, button, details, emptyState, field, folderCard, list, modal, mountModal, openNotice, pageHeader, shortDateTime } from '../../ui/ui.js';
 import { cancelFinanceOperation, getLedgerEntries } from '../../core/finance/index.js';
+import { canUseBookCapability } from '../../core/access.js';
 import { getWalletTotalBalance } from '../../settings/wallets/data.js';
 import { renderWallets } from '../../settings/wallets/wallets.js';
 import { renderFinanceArticles } from './articles.js';
@@ -192,16 +193,18 @@ function renderDDS(root, onBack = () => renderFinance(root)) {
 }
 
 const FINANCE_NAVIGATION = [
-  { id: 'cash', label: 'Касса' },
-  { id: 'dds', label: 'ДДС' },
-  { id: 'income-expense', label: 'Доход / Расход' },
-  { id: 'articles', label: 'Статьи' },
-  { id: 'special', label: 'Прочие операции' },
-  { id: 'z-report', label: 'Z-отчёт' },
+  { id: 'cash', label: 'Кассы', capability: 'finance.cash.access' },
+  { id: 'dds', label: 'ДДС', capability: 'finance.dds.access' },
+  { id: 'income-expense', label: 'Доход / Расход', capability: 'finance.income_expense.access' },
+  { id: 'articles', label: 'Статьи', capability: 'finance.articles.access' },
+  { id: 'special', label: 'Прочие операции', capability: 'finance.special.access' },
+  { id: 'z-report', label: 'Z-отчёт', capability: 'finance.z_report.access' },
 ];
 
 export function financeNavigationItems() {
-  return FINANCE_NAVIGATION.map((item) => ({ ...item }));
+  return FINANCE_NAVIGATION
+    .filter((item) => canUseBookCapability(item.capability))
+    .map(({ id, label }) => ({ id, label }));
 }
 
 export function renderFinanceSection(root, section = 'cash', { onBack = () => renderFinance(root) } = {}) {
