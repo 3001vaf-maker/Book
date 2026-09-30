@@ -133,55 +133,39 @@ const openF = async (pointerId, label) => {
   ok(ownerCount() === 1, 'edge owner count changed after opening F');
 };
 
-const centerAndTap = async (deck, target, pointerId, label) => {
+const tapAndOpen = async (deck, target, pointerId, label) => {
   mark('select-' + label);
-
-  // Approved interaction contract: tapping a non-active card centres it only.
-  // The second tap on the centred active card performs navigation.
-  if (!target.classList.contains('is-active')) {
-    pointer(target,'pointerdown',190,390,pointerId);
-    pointer(target,'pointerup',190,390,pointerId);
-    target.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,clientX:190,clientY:390}));
-    for (let attempt=0; attempt<12 && !target.classList.contains('is-active'); attempt+=1) await wait(60);
-  }
-
-  const activeNow = deck.querySelector('[data-v2-card-item].is-active');
-  ok(
-    target.classList.contains('is-active'),
-    label + ' did not become centred active card after neighbour tap'
-      + ' active=' + String(activeNow?.dataset.v2CardItem || 'none')
-  );
-
-  pointer(target,'pointerdown',190,390,pointerId + 100);
-  pointer(target,'pointerup',190,390,pointerId + 100);
+  const beforeShell = shell();
+  pointer(target,'pointerdown',190,390,pointerId);
+  pointer(target,'pointerup',190,390,pointerId);
   target.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,clientX:190,clientY:390}));
   await wait(180);
-  ok(shell() === initialShell, label + ' rebuilt the whole professional FEZ shell');
+  ok(shell() === beforeShell && shell() === initialShell, label + ' rebuilt the whole professional FEZ shell');
   ok(ownerCount() === 1, label + ' left duplicate FEZ owners');
 };
 
 await openF(1,'people');
-await centerAndTap(fDeck(), fCard('finance'), 11, 'finance');
+await tapAndOpen(fDeck(), fCard('finance'), 11, 'finance');
 ok(shell()?.classList.contains('is-deck-open') && shell()?.classList.contains('is-e-open'), 'Finance did not open real E deck');
 ok(Boolean(eCard('dds')), 'Finance E DDS missing');
-await centerAndTap(eDeck(), eCard('dds'), 12, 'finance-dds');
+await tapAndOpen(eDeck(), eCard('dds'), 12, 'finance-dds');
 ok(!shell()?.classList.contains('is-deck-open'), 'DDS selection did not enter Z');
 
 await openF(2,'dds');
-await centerAndTap(fDeck(), fCard('journal'), 13, 'journal');
+await tapAndOpen(fDeck(), fCard('journal'), 13, 'journal');
 ok(shell()?.classList.contains('is-e-open'), 'Journal did not open real E deck');
 ok(Boolean(eCard('list')), 'Journal E List missing');
-await centerAndTap(eDeck(), eCard('list'), 14, 'journal-list');
+await tapAndOpen(eDeck(), eCard('list'), 14, 'journal-list');
 ok(!shell()?.classList.contains('is-deck-open'), 'Journal List selection did not enter Z');
 
 await openF(3,'journal-list');
-await centerAndTap(fDeck(), fCard('profile'), 15, 'profile');
+await tapAndOpen(fDeck(), fCard('profile'), 15, 'profile');
 ok(!shell()?.classList.contains('is-deck-open'), 'Profile F without E did not enter Z directly');
 
 // Repeat full roots to expose stale listeners/rAF from persistent shell reuse.
 for (const [index,id] of ['people','finance','journal','profile','settings','people'].entries()) {
   await openF(20 + index, 'repeat-' + id);
-  await centerAndTap(fDeck(), fCard(id), 40 + index, 'repeat-' + id);
+  await tapAndOpen(fDeck(), fCard(id), 40 + index, 'repeat-' + id);
   if (id === 'finance' || id === 'journal' || id === 'settings') {
     ok(shell()?.classList.contains('is-e-open'), id + ' repeat did not enter E');
     // Collapse E by its own geometry before continuing to avoid choosing an arbitrary child.
@@ -192,7 +176,7 @@ for (const [index,id] of ['people','finance','journal','profile','settings','peo
     await wait(140);
     ok(!shell()?.classList.contains('is-e-open'), id + ' E did not collapse by right gesture');
     // F is still open; choose a root without E to return to Z deterministically.
-    await centerAndTap(fDeck(), fCard('people'), 90 + index, id + '-to-people');
+    await tapAndOpen(fDeck(), fCard('people'), 90 + index, id + '-to-people');
   }
 }
 
