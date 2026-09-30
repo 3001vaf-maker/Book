@@ -132,7 +132,6 @@ function setSaveVisible(root, visible) {
 function mountScreen(root, {
   title,
   body,
-  onBack,
   onSave = null,
   settings = null,
 } = {}) {
@@ -155,9 +154,6 @@ function mountScreen(root, {
   }
 }
 
-function exitOnlineBooking(root, navigateBack) {
-  navigateBack();
-}
 
 function openSections(root, navigateBack, tenantId) {
   const content = `<div class="modal-title"><h2>Настройки</h2></div>${folderList([
@@ -192,7 +188,6 @@ function renderReady(root, navigateBack, tenantId) {
 
   mountScreen(root, {
     title: 'Онлайн-запись',
-    onBack: () => exitOnlineBooking(root, navigateBack),
     settings: {
       label: '•••',
       data: 'data-online-booking-sections',
@@ -225,7 +220,6 @@ function renderWelcome(root, navigateBack, tenantId) {
   const saved = getBookingSettings();
   mountScreen(root, {
     title: 'Приветствие',
-    onBack: () => renderReady(root, navigateBack, tenantId),
     onSave: () => {
       const form = root.querySelector('[data-online-booking-welcome]');
       if (!form) return;
@@ -298,7 +292,6 @@ function renderAppearance(root, navigateBack, tenantId, initialSettings = null) 
 
   mountScreen(root, {
     title: 'Внешний вид',
-    onBack: () => renderReady(root, navigateBack, tenantId),
     onSave: () => {
       const form = root.querySelector('[data-online-booking-appearance]');
       if (!form) return;
@@ -348,7 +341,6 @@ function renderTime(root, navigateBack, tenantId) {
   const saved = getBookingSettings();
   mountScreen(root, {
     title: 'Время записи',
-    onBack: () => renderReady(root, navigateBack, tenantId),
     onSave: () => {
       const form = root.querySelector('[data-online-booking-time]');
       if (!form) return;
@@ -376,7 +368,6 @@ function renderTime(root, navigateBack, tenantId) {
 function renderUnavailable(root, navigateBack, title, message) {
   mountScreen(root, {
     title: 'Онлайн-запись',
-    onBack: () => exitOnlineBooking(root, navigateBack),
     body: emptyState(title, message),
   });
 }
@@ -384,7 +375,6 @@ function renderUnavailable(root, navigateBack, title, message) {
 export function render(root, navigateBack = () => {}) {
   mountScreen(root, {
     title: 'Онлайн-запись',
-    onBack: () => exitOnlineBooking(root, navigateBack),
     body: emptyState('Загрузка', 'Формируем ссылки онлайн-записи.'),
   });
 
