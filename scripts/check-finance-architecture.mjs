@@ -219,16 +219,16 @@ if (/\bbalance\s*:/.test(walletData)) {
 const financeUI = source('core/finance/finance.js');
 const ddsUI = source('core/finance/dds/index.js');
 if (!/getLedgerEntries/.test(ddsUI)) errors.push('DDS UI must render flat Ledger rows');
-if (!/renderFinanceArticles/.test(financeUI) || !/renderIncomeExpense/.test(financeUI)) {
-  errors.push('Finance UI must expose Articles and Income / Expense instruments');
+if (!/renderZReport/.test(financeUI)) {
+  errors.push('Finance root must expose Z-report');
 }
-if (!/renderSpecialFinanceOperations/.test(financeUI) || !/renderZReport/.test(financeUI)) {
-  errors.push('Finance UI must expose special operations and Z-report');
+if (/renderFinanceArticles|renderIncomeExpense|renderSpecialFinanceOperations/.test(financeUI)) {
+  errors.push('Finance root must not expose DDS instruments as separate E folders');
 }
 if (!/Фактическая дата и время/.test(ddsUI) || !/Внесено в систему/.test(ddsUI)) {
   errors.push('DDS/export must expose factual occurrence time separately from system recording time');
 }
-const articlesUI = source('core/finance/articles.js');
+const articlesUI = source('core/finance/dds/articles.js');
 if (!/parentArticleId/.test(articlesUI) || !/economicType/.test(articlesUI)) {
   errors.push('Articles UI must support hierarchy and separate economic character');
 }

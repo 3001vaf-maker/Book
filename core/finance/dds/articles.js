@@ -10,9 +10,9 @@ import {
   modal,
   pageHeader,
   select,
-} from '../../ui/ui.js';
-import { getFinanceArticles } from './data.js';
-import { archiveFinanceArticle, createFinanceArticle, updateFinanceArticle } from './service.js';
+} from '../../../ui/ui.js';
+import { getFinanceArticles } from '../data.js';
+import { archiveFinanceArticle, createFinanceArticle, updateFinanceArticle } from '../service.js';
 
 const ECONOMIC_OPTIONS = [
   { value: 'OPERATING_REVENUE', label: 'Операционный доход' },

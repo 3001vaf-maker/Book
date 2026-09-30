@@ -105,7 +105,7 @@ const schema = readFileSync(new URL('../server/prisma/schema.prisma', import.met
 const server = readFileSync(new URL('../server/src/finance/finance.service.ts', import.meta.url), 'utf8');
 const controller = readFileSync(new URL('../server/src/finance/finance.controller.ts', import.meta.url), 'utf8');
 const financeUi = readFileSync(new URL('../core/finance/finance.js', import.meta.url), 'utf8');
-const articlesUi = readFileSync(new URL('../core/finance/articles.js', import.meta.url), 'utf8');
+const articlesUi = readFileSync(new URL('../core/finance/dds/articles.js', import.meta.url), 'utf8');
 const incomeExpenseUi = readFileSync(new URL('../core/finance/dds/income-expense.js', import.meta.url), 'utf8');
 
 assert.match(schema, /model FinanceArticle/);
@@ -116,8 +116,9 @@ assert.match(server, /recordManualOperation/);
 assert.match(server, /quantity/);
 assert.match(server, /unitPrice/);
 assert.match(server, /articleId/);
-assert.match(financeUi, /Доход \/ Расход/);
-assert.match(financeUi, /Статьи/);
+assert.doesNotMatch(financeUi, /label: 'Доход \/ Расход'/);
+assert.doesNotMatch(financeUi, /label: 'Статьи'/);
+assert.doesNotMatch(financeUi, /label: 'Прочие операции'/);
 assert.match(articlesUi, /parentArticleId/);
 assert.match(articlesUi, /economicType/);
 assert.match(incomeExpenseUi, /lineQuantity/);
