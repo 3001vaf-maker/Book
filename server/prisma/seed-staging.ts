@@ -88,39 +88,6 @@ async function main() {
     },
   ];
 
-  const paidFinance = {
-    items: [{
-      sourceType: 'procedure',
-      sourceId: 'procedure-cut',
-      name: 'Стрижка',
-      price: 5000,
-      discountMode: 'percent',
-      discountPercent: 10,
-      discountMoney: 500,
-      planAmount: 4500,
-    }],
-    serviceTotal: 5000,
-    discountPercent: 10,
-    discountTotal: 500,
-    planTotal: 4500,
-  };
-
-  const futureFinance = {
-    items: [{
-      sourceType: 'procedure',
-      sourceId: 'procedure-color',
-      name: 'Окрашивание',
-      price: 8000,
-      discountMode: 'none',
-      discountPercent: 0,
-      discountMoney: 0,
-      planAmount: 8000,
-    }],
-    serviceTotal: 8000,
-    discountPercent: 0,
-    discountTotal: 0,
-    planTotal: 8000,
-  };
 
   const records = [
     {
@@ -323,128 +290,6 @@ async function main() {
       });
     }
 
-    await tx.financeSettlement.upsert({
-      where: {
-        tenantId_sourceType_sourceId: {
-          tenantId,
-          sourceType: 'record',
-          sourceId: 'staging-record-paid',
-        },
-      },
-      create: {
-        tenantId,
-        sourceType: 'record',
-        sourceId: 'staging-record-paid',
-        data: json(paidFinance),
-      },
-      update: { data: json(paidFinance) },
-    });
-    await tx.financeSettlement.upsert({
-      where: {
-        tenantId_sourceType_sourceId: {
-          tenantId,
-          sourceType: 'record',
-          sourceId: 'staging-record-future',
-        },
-      },
-      create: {
-        tenantId,
-        sourceType: 'record',
-        sourceId: 'staging-record-future',
-        data: json(futureFinance),
-      },
-      update: { data: json(futureFinance) },
-    });
-
-    const stagingPayment = await tx.financeOperation.upsert({
-      where: {
-        tenantId_operationId: {
-          tenantId,
-          operationId: 'staging-payment-1',
-        },
-      },
-      create: {
-        tenantId,
-        operationId: 'staging-payment-1',
-        kind: 'payment',
-        status: 'completed',
-        sourceType: 'record',
-        sourceId: 'staging-record-paid',
-        originalOperationId: '',
-        occurredAt: now,
-        data: json({
-          workplace: 'Тестовая студия',
-          person: { key: 'staging-person-anna', name: 'Анна Тест' },
-          allocations: [{
-            walletId: 'cashless',
-            walletName: 'Безналичные',
-            amount: 4500,
-          }],
-          total: 4500,
-          serviceAmount: 4500,
-          tips: 0,
-          settlement: paidFinance,
-        }),
-      },
-      update: {
-        status: 'completed',
-        occurredAt: now,
-        data: json({
-          workplace: 'Тестовая студия',
-          person: { key: 'staging-person-anna', name: 'Анна Тест' },
-          allocations: [{
-            walletId: 'cashless',
-            walletName: 'Безналичные',
-            amount: 4500,
-          }],
-          total: 4500,
-          serviceAmount: 4500,
-          tips: 0,
-          settlement: paidFinance,
-        }),
-      },
-    });
-
-    await tx.financeLedgerEntry.upsert({
-      where: {
-        tenantId_entryId: {
-          tenantId,
-          entryId: 'staging-ledger-service-1',
-        },
-      },
-      create: {
-        tenantId,
-        financeOperationId: stagingPayment.id,
-        entryId: 'staging-ledger-service-1',
-        walletId: 'cashless',
-        direction: 'IN',
-        economicType: 'SERVICE_REVENUE',
-        amount: 4500,
-        occurredAt: now,
-        sourceType: 'record',
-        sourceId: 'staging-record-paid',
-        data: json({
-          walletName: 'Безналичные',
-          component: 'service',
-          relatedOperationId: '',
-        }),
-      },
-      update: {
-        financeOperationId: stagingPayment.id,
-        walletId: 'cashless',
-        direction: 'IN',
-        economicType: 'SERVICE_REVENUE',
-        amount: 4500,
-        occurredAt: now,
-        sourceType: 'record',
-        sourceId: 'staging-record-paid',
-        data: json({
-          walletName: 'Безналичные',
-          component: 'service',
-          relatedOperationId: '',
-        }),
-      },
-    });
 
     await tx.businessOperationalState.upsert({
       where: { tenantId },
@@ -463,7 +308,7 @@ async function main() {
     });
   });
 
-  console.log('Staging fixtures created: profile, workplace, people, records, payment and wallets.');
+  console.log('Staging fixtures created: profile, workplace, people, records and wallets.');
 }
 
 main()
