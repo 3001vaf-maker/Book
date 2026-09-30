@@ -33,7 +33,7 @@ function walletName(id) {
   return getWallets().find((item) => item.id === id)?.name || '';
 }
 
-function openAction(root, action, navigateBack) {
+function openAction(root, action) {
   const wallets = walletOptions();
   if (!wallets.length) {
     openNotice({ message: 'Сначала добавьте кошелёк.' });
@@ -85,19 +85,19 @@ function openAction(root, action, navigateBack) {
     try {
       await recordSpecialFinanceOperation(payload);
       m.remove();
-      renderSpecialFinanceOperations(root, navigateBack);
+      renderSpecialFinanceOperations(root);
     } catch (error) {
       openNotice({ message: String(error?.message || 'Не удалось сохранить операцию') });
     }
   });
 }
 
-export function renderSpecialFinanceOperations(root, navigateBack = () => {}) {
+export function renderSpecialFinanceOperations(root) {
   root.innerHTML = `${pageHeader('Прочие операции')}${actionBlock(`${ACTIONS.map((action) => button(action.label, { data: `data-finance-special="${action.kind}"` })).join('')}`)}`;
   root.querySelectorAll('[data-finance-special]').forEach((element) => {
     element.addEventListener('click', () => {
       const action = ACTIONS.find((item) => item.kind === element.dataset.financeSpecial);
-      if (action) openAction(root, action, navigateBack);
+      if (action) openAction(root, action);
     });
   });
   
