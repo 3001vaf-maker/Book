@@ -10,7 +10,6 @@ function clone(value) {
 
 function normalize(value = {}) {
   return {
-    finance: value.finance && typeof value.finance === 'object' && !Array.isArray(value.finance) ? clone(value.finance) : null,
     wallets: Array.isArray(value.wallets) ? clone(value.wallets) : [],
     tags: Array.isArray(value.tags) ? clone(value.tags) : [],
     products: Array.isArray(value.products) ? clone(value.products) : [],
