@@ -1,9 +1,9 @@
 import { actionBlock, button, collectRepeatedField, entityVisualCard, escapeHtml, field, initPhotoField, initRepeatedFields, modal, mountModal, mountEntityCardConstructor, mountV2ZLayer, openSharedProfileSettingsMenu, openSharedPasswordAction, page, photoField, repeatedField, searchableSelect, select, setSharedProfilePrimary, textareaField, v2HorizontalRail, v2Section, workspaceHeaderContext, v2ZLayer, workplaceAddButton } from '../../ui/ui.js';
-import { getBookLimit } from '../../core/access.js';
+import { getBookAccess, getBookLimit, loadBookAccess, requestLiveMode } from '../../core/access.js';
 import { changePassword, logout } from '../../core/auth.js';
 import { getProfessionCatalog, getProfile, saveProfile as saveProfileData } from './data.js';
 import { getWorkplaces } from './workplaces/data.js';
-import { bindWorkplaceForm, openWorkplaceModal, openWorkplaceSettingsMenu, workplaceForm } from './workplaces/workplaces.js';
+import { bindWorkplaceForm, openWorkplaceSettingsMenu, workplaceForm } from './workplaces/workplaces.js';
 import { profileCardAppearance, profileCardFields, workplaceCardAppearance, workplaceCardFields } from './card-presentation.js';
 
 const EXPERIENCES=['Без опыта','До 1 года','1–3 года','3–5 лет','5–10 лет','10–15 лет','15–20 лет','Более 20 лет'];
@@ -12,6 +12,16 @@ const initial=p=>fullName(p).slice(0,1).toUpperCase()||'?';
 const crop=v=>Number.isFinite(Number(v))?Math.max(0,Math.min(100,Math.round(Number(v)))):50;
 const avatarPosition=p=>`${crop(p.photoCropX)}% ${crop(p.photoCropY)}%`;
 const professionOptions=(current='')=>[...new Set([current,...getProfessionCatalog()].map(value=>String(value||'').trim()).filter(Boolean))];
+
+function demoRemainingText(access){
+  const expiresAt=new Date(access?.demoExpiresAt||0).getTime();
+  if(!Number.isFinite(expiresAt)||!expiresAt)return 'DEMO';
+  const diff=Math.max(0,expiresAt-Date.now());
+  if(diff<=0)return 'DEMO завершено';
+  const hours=Math.ceil(diff/3_600_000);
+  if(hours<24)return `DEMO · осталось ${hours} ч.`;
+  return `DEMO · осталось ${Math.ceil(hours/24)} дн.`;
+}
 
 export function render(root,navigateBack=()=>{},options={}){renderProfile(root,navigateBack,options)}
 
@@ -127,27 +137,6 @@ async function persistDraft(root){
   return data;
 }
 
-export function isOnboardingProfileReady(root){
-  const data=collectProfileData(root);
-  return Boolean(data.name&&data.phones.length&&data.profession&&getWorkplaces().length);
-}
-
-export function isOnboardingProfileIdentityReady(root){
-  const data=collectProfileData(root);
-  return Boolean(data.name&&data.phones.length&&data.profession);
-}
-
-export async function saveOnboardingProfile(root){
-  if(!isOnboardingProfileReady(root))return false;
-  try{
-    await persistDraft(root);
-    return true;
-  }catch(error){
-    showProfileError(error instanceof Error?error.message:'Не удалось сохранить профиль');
-    return false;
-  }
-}
-
 function bindProfileData(layer,p,options,onSaved){
   if(layer.querySelector('[data-photo-field]'))initPhotoField(layer);
   initRepeatedFields(layer);
@@ -229,8 +218,26 @@ function openProfileAppearance(root,navigateBack,options={}){
 
 function openProfileSettings(root,navigateBack,options={}){
   const p=getProfile();
+  const access=getBookAccess();
+  const demoActions=access?.commercialMode==='DEMO'?[
+    {id:'demo-status',label:demoRemainingText(access),disabled:true},
+    {
+      id:'live-request',
+      label:access.liveRequestedAt?'Запрос LIVE отправлен':'Запросить LIVE',
+      disabled:Boolean(access.liveRequestedAt),
+      onSelect:async()=>{
+        try{
+          await requestLiveMode();
+          await loadBookAccess();
+        }catch(error){
+          showProfileError(error instanceof Error?error.message:'Не удалось отправить запрос LIVE');
+        }
+      },
+    },
+  ]:[];
   return openSharedProfileSettingsMenu({
     actions:[
+      ...demoActions,
       {id:'appearance',label:'Вид',onSelect:()=>openProfileAppearance(root,navigateBack,options)},
       {id:'password',label:'Изменить пароль',onSelect:()=>openSharedPasswordAction({onSubmit:({currentPassword,newPassword})=>changePassword(currentPassword,newPassword)})},
       {id:'controls',label:'Согласия / Уведомления',onSelect:()=>import('./account-controls.js').then(({openAccountControlsModal})=>openAccountControlsModal())},
@@ -268,34 +275,12 @@ function openWorkplaceZ2(root,existing,navigateBack,options={}){
 }
 
 function openWorkplace(root,existing,navigateBack,options={}){
-  const open=async()=>{
-    if(options.onboarding){
-      try{await persistDraft(root)}catch(error){showProfileError(error instanceof Error?error.message:'Не удалось сохранить профиль');return}
-    }
-    const workplaceLimit=getBookLimit('workplaces.max');
-    if(!existing&&workplaceLimit!==null&&getWorkplaces().length>=workplaceLimit){
-      openWorkplaceLimitModal(root,workplaceLimit);
-      return;
-    }
-    if(options.onboarding){
-      openWorkplaceModal(root,existing,()=>renderProfile(root,navigateBack,options));
-      return;
-    }
-    openWorkplaceZ2(root,existing,navigateBack,options);
-  };
-  open();
-}
-
-function renderOnboarding(root,navigateBack,options={}){
-  const p=getProfile();
-  root.innerHTML=page([
-    profileDataForm(p,options,{embedded:true}),
-    v2Section('Рабочие пространства',workplaceRail()),
-    actionBlock(workplaceAddButton())
-  ]);
-  bindProfileData(root,p,options,()=>{});
-  root.querySelector('[data-add-workplace]')?.addEventListener('click',()=>openWorkplace(root,null,navigateBack,options));
-  root.querySelectorAll('[data-workplace]').forEach(el=>el.addEventListener('click',()=>openWorkplace(root,getWorkplaces().find(w=>w.key===el.dataset.workplace)||null,navigateBack,options)));
+  const workplaceLimit=getBookLimit('workplaces.max');
+  if(!existing&&workplaceLimit!==null&&getWorkplaces().length>=workplaceLimit){
+    openWorkplaceLimitModal(root,workplaceLimit);
+    return;
+  }
+  openWorkplaceZ2(root,existing,navigateBack,options);
 }
 
 function rootAddSource(){
@@ -308,10 +293,6 @@ function rootAddSource(){
 }
 
 function renderProfile(root,navigateBack,options={}){
-  if(options.onboarding){
-    renderOnboarding(root,navigateBack,options);
-    return;
-  }
   const p=getProfile();
   root.innerHTML=page([
     profileContext(p),

@@ -18,7 +18,7 @@ import { PersonIdentityService } from './person-identity.service';
 import { TimeService } from '../time/time.service';
 import { RecordService } from '../record/record.service';
 import { ProcedureService } from '../procedure/procedure.service';
-import { FirstRunService } from '../first-run/first-run.service';
+import { SaasAccessService } from '../saas-access/saas-access.service';
 
 function objectValue(value: unknown): Record<string, any> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : {};
@@ -199,7 +199,7 @@ export class OnlineBookingService {
     private readonly time: TimeService,
     private readonly records: RecordService,
     private readonly procedures: ProcedureService,
-    private readonly firstRun: FirstRunService,
+    private readonly access: SaasAccessService,
   ) {}
 
   private async publication(tenantId: string) {
@@ -413,7 +413,7 @@ export class OnlineBookingService {
   }
 
   async getContext(tenantId: string, workplaceKey = '') {
-    await this.firstRun.assertRealOperationsAllowed(tenantId);
+    await this.access.assertRealOperationsAllowed(tenantId);
     const data = await this.bookingSource(tenantId);
     const sourceWorkplaces = arrayValue(data.workplaces);
     const requestedWorkplace = text(workplaceKey);
@@ -470,7 +470,7 @@ export class OnlineBookingService {
   }
 
   async prepareAccount(tenantId: string, input: unknown) {
-    await this.firstRun.assertRealOperationsAllowed(tenantId);
+    await this.access.assertRealOperationsAllowed(tenantId);
     const source = objectValue(input);
     const identifierValue = text(source.identifier || (typeof input === 'string' ? input : ''));
     const email = emailValue(source.email);
@@ -502,7 +502,7 @@ export class OnlineBookingService {
   }
 
   async registerAccount(tenantId: string, body: Record<string, any>) {
-    await this.firstRun.assertRealOperationsAllowed(tenantId);
+    await this.access.assertRealOperationsAllowed(tenantId);
     const email = emailValue(body.email);
     const password = text(body.password);
     const name = text(body.name);
@@ -556,7 +556,7 @@ export class OnlineBookingService {
   }
 
   async loginAccount(tenantId: string, identifierValue: unknown, password: unknown) {
-    await this.firstRun.assertRealOperationsAllowed(tenantId);
+    await this.access.assertRealOperationsAllowed(tenantId);
     const identifier = accountLoginContact(identifierValue);
     if (!identifier) throw new BadRequestException('Введите телефон или email');
     const contact = await this.prisma.accountContact.findUnique({
@@ -576,7 +576,7 @@ export class OnlineBookingService {
   }
 
   async resumeAccount(tenantId: string, accountId: string) {
-    await this.firstRun.assertRealOperationsAllowed(tenantId);
+    await this.access.assertRealOperationsAllowed(tenantId);
     const account = await this.prisma.account.findUnique({ where: { id: accountId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
     const binding = await this.bindAccountTenant(tenantId, account);
@@ -588,7 +588,7 @@ export class OnlineBookingService {
   }
 
   async getAccount(tenantId: string, accountId: string) {
-    await this.firstRun.assertRealOperationsAllowed(tenantId);
+    await this.access.assertRealOperationsAllowed(tenantId);
     const account = await this.prisma.account.findUnique({ where: { id: accountId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
     await this.bindAccountTenant(tenantId, account);
@@ -596,7 +596,7 @@ export class OnlineBookingService {
   }
 
   async accountTenantContactContext(tenantId: string, accountId: string) {
-    await this.firstRun.assertRealOperationsAllowed(tenantId);
+    await this.access.assertRealOperationsAllowed(tenantId);
     const account = await this.prisma.account.findUnique({ where: { id: accountId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
     await this.bindAccountTenant(tenantId, account);
@@ -608,7 +608,7 @@ export class OnlineBookingService {
   }
 
   async updateAccount(tenantId: string, accountId: string, body: Record<string, any>) {
-    await this.firstRun.assertRealOperationsAllowed(tenantId);
+    await this.access.assertRealOperationsAllowed(tenantId);
     const account = await this.prisma.account.findUnique({ where: { id: accountId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
 
@@ -650,7 +650,7 @@ export class OnlineBookingService {
   }
 
   async changeAccountPassword(tenantId: string, accountId: string, currentPassword: unknown, newPassword: unknown) {
-    await this.firstRun.assertRealOperationsAllowed(tenantId);
+    await this.access.assertRealOperationsAllowed(tenantId);
     const current = String(currentPassword ?? '');
     const next = String(newPassword ?? '');
     if (next.length < 8) throw new BadRequestException('Новый пароль должен содержать минимум 8 символов');
@@ -666,7 +666,7 @@ export class OnlineBookingService {
   }
 
   async createRequest(tenantId: string, accountId: string, body: Record<string, any>) {
-    await this.firstRun.assertRealOperationsAllowed(tenantId);
+    await this.access.assertRealOperationsAllowed(tenantId);
     const account = await this.prisma.account.findUnique({ where: { id: accountId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
     const data = await this.bookingSource(tenantId);
@@ -746,7 +746,7 @@ export class OnlineBookingService {
   }
 
   async getMyRecords(tenantId: string, accountId: string) {
-    await this.firstRun.assertRealOperationsAllowed(tenantId);
+    await this.access.assertRealOperationsAllowed(tenantId);
     const account = await this.prisma.account.findUnique({ where: { id: accountId } });
     if (!account) throw new UnauthorizedException('Аккаунт не найден');
     await this.bindAccountTenant(tenantId, account);

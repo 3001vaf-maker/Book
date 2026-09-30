@@ -18,7 +18,7 @@ assert.equal((invitation.match(/tx\.membership\.create/g) || []).length, 1);
 assert.equal((invitation.match(/tx\.profile\.create/g) || []).length, 1);
 assert.match(invitation, /if \(!name\) throw new BadRequestException\('Укажите имя'\)/);
 assert.match(invitation, /Укажите корректный номер телефона/);
-assert.match(invitation, /assignPreparedFromInvitation/);
+assert.doesNotMatch(invitation, /assignPreparedFromInvitation|prepareInvitationAssignment/);
 assert.doesNotMatch(invitation, /manual-invitation|@book\.invalid/i);
 
 assert.match(invitationController, /email\?: unknown/);
@@ -46,7 +46,7 @@ assert.match(inviteUi, /invitation\.requiresEmail/);
 assert.match(inviteUi, /name="name"/);
 assert.match(inviteUi, /name="surname"/);
 assert.match(inviteUi, /name="phone"/);
-assert.match(inviteUi, /14 дней с первого открытия профиля/);
+assert.match(inviteUi, /14 дней с первого входа в приложение/);
 assert.match(inviteUi, /name: data\.get\('name'\)/);
 assert.match(inviteUi, /phone: data\.get\('phone'\)/);
 assert.match(inviteUi, /\/tenant-invitations\/accept/);

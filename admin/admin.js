@@ -1,6 +1,5 @@
 import { apiRequest, clearAuthToken, getCurrentAccount, login } from '../core/auth.js';
 import { renderDocumentRegistry } from './document-registry/view.js';
-import { renderFirstRunAdmin } from './first-run.js';
 import { DOCUMENT_CATALOG } from './document-registry/catalog.js';
 
 const app = document.querySelector('#admin-app');
@@ -217,7 +216,6 @@ function renderShell() {
           <button data-section="overview">Обзор</button>
           <button data-section="owner" class="owner-link">Моё пространство</button>
           <button data-section="document-registry">Реестр документов</button>
-          <button data-section="first-run">Первое знакомство</button>
           <button data-section="tenants">Пользователи</button>
           <button data-section="live-requests" class="${liveRequestCount ? 'has-live-requests' : ''}">🔔 Запросы LIVE <span class="admin-live-count" data-live-request-count ${liveRequestCount ? '' : 'hidden'}>${liveRequestCount}</span></button>
           <button data-section="capabilities">Инструменты</button>
@@ -285,13 +283,6 @@ function renderCurrentSection() {
       escapeHtml,
       setTitle: setActiveSection,
       loadHistory: () => adminRequest('/document-registry/history'),
-    });
-  }
-  if (state.section === 'first-run') {
-    return renderFirstRunAdmin(app.querySelector('[data-content]'), {
-      request: adminRequest,
-      escapeHtml,
-      setTitle: setActiveSection,
     });
   }
   if (state.section === 'capabilities') return renderCapabilities();
@@ -603,14 +594,6 @@ function formatAdminMoment(value, fallback = '—') {
   }).format(date);
 }
 
-function activeTimeText(secondsValue) {
-  const seconds = Math.max(0, Number(secondsValue) || 0);
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  if (hours) return `${hours} ч ${minutes} мин`;
-  return `${minutes} мин`;
-}
-
 function orderedCapabilityCatalog(tenant) {
   const byKey = new Map(state.capabilities.map((item) => [item.key, item]));
   const order = Array.isArray(tenant.access?.capabilityOrder) ? tenant.access.capabilityOrder : [];
@@ -619,54 +602,6 @@ function orderedCapabilityCatalog(tenant) {
     if (!result.some((entry) => entry.key === item.key)) result.push(item);
   });
   return result;
-}
-
-function activityEventLabel(event, stepTitles) {
-  const stepTitle = stepTitles.get(event.stepKey) || event.stepKey || '';
-  if (event.eventType === 'INVITATION_ACTIVATED') return 'Открыта регистрационная ссылка';
-  if (event.eventType === 'ACCOUNT_CREATED') return 'Создана учётная запись';
-  if (event.eventType === 'FIRST_RUN_STARTED') return 'Начато первое знакомство';
-  if (event.eventType === 'STEP_MODAL_SHOWN') return stepTitle ? `Показана подсказка «${stepTitle}»` : 'Показана подсказка';
-  if (event.eventType === 'STEP_COMPLETED') return stepTitle ? `Завершён этап «${stepTitle}»` : 'Этап завершён';
-  if (event.eventType === 'STEP_SKIPPED') return stepTitle ? `Пропущен этап «${stepTitle}»` : 'Этап пропущен';
-  if (event.eventType === 'FIRST_RUN_COMPLETED') return 'Первое знакомство завершено';
-  if (event.eventType === 'SESSION_STARTED') return 'Вход в систему';
-  if (event.eventType === 'SESSION_ENDED') {
-    const reason = String(event.metadata?.reason || '');
-    return reason === 'LOGOUT' ? 'Выход из системы' : reason === 'TIMEOUT' ? 'Сеанс завершён по отсутствию активности' : 'Сеанс завершён';
-  }
-  if (event.eventType === 'LIVE_REQUESTED') return 'Пользователь запросил переход в LIVE';
-  if (event.eventType === 'LIVE_APPROVED_BY_ADMIN') return 'LIVE подтверждён администратором';
-  if (event.eventType === 'COMMERCIAL_MODE_CHANGED') return `Режим изменён: ${escapeHtml(event.metadata?.commercialMode || '')}`;
-  if (event.eventType === 'DEMO_EXTENDED') return 'DEMO продлено компанией';
-  if (event.eventType === 'DEMO_OPERATIONAL_DATA_CLEARED') return 'Учебные операционные данные очищены';
-  if (event.eventType === 'FINANCE_SECTION_OPENED') return 'Открыт финансовый раздел';
-  return event.eventType;
-}
-
-function activityMarkup(activity) {
-  const progress = activity?.progress || null;
-  const steps = Array.isArray(progress?.steps) ? progress.steps : [];
-  const stepTitles = new Map(steps.map((item) => [item.key, item.title]));
-  const currentTitle = stepTitles.get(progress?.currentStepKey) || progress?.currentStepKey || '—';
-  const sessions = Array.isArray(activity?.sessions) ? activity.sessions : [];
-  const events = Array.isArray(activity?.events) ? activity.events : [];
-  const firstSession = sessions.length ? sessions[sessions.length - 1] : null;
-  return `
-    <div class="admin-activity-summary">
-      <div><span>Первый вход</span><strong>${escapeHtml(firstSession ? formatAdminMoment(firstSession.startedAt) : 'Не входил')}</strong></div>
-      <div><span>Последняя активность</span><strong>${escapeHtml(activity?.lastActivityAt ? formatAdminMoment(activity.lastActivityAt) : 'Нет')}</strong></div>
-      <div><span>Сеансов</span><strong>${escapeHtml(sessions.length)}</strong></div>
-      <div><span>Активное время</span><strong>${escapeHtml(activeTimeText(activity?.totalActiveSeconds))}</strong></div>
-      <div><span>Обучение</span><strong>${escapeHtml(progress ? (progress.status === 'COMPLETED' ? 'Завершено' : currentTitle) : 'Не начато')}</strong></div>
-      <div><span>Версия сценария</span><strong>${escapeHtml(progress?.scenarioVersion || '—')}</strong></div>
-    </div>
-    <div class="admin-activity-timeline">
-      ${events.length ? events.map((event) => `<div class="admin-activity-event">
-        <time>${escapeHtml(formatAdminMoment(event.occurredAt))}</time>
-        <div>${escapeHtml(activityEventLabel(event, stepTitles))}</div>
-      </div>`).join('') : '<div class="admin-history-empty">Событий пока нет.</div>'}
-    </div>`;
 }
 
 function capabilityOrderRow(capability, resolved) {
@@ -687,7 +622,6 @@ function openAccessDrawer(tenantId) {
   const mode = String(tenant.access?.commercialMode || 'DEMO');
   const demoActivated = tenant.access?.demoActivatedAt || tenant.invitation?.activatedAt || '';
   const demoExpires = tenant.access?.demoExpiresAt || tenant.invitation?.demoExpiresAt || '';
-  const progress = tenant.firstRun || null;
   const liveRequestedAt = tenant.liveRequestedAt || '';
   const backdrop = document.createElement('div');
   backdrop.className = 'admin-drawer-backdrop';
@@ -704,7 +638,6 @@ function openAccessDrawer(tenantId) {
           <strong>${escapeHtml(mode)}</strong>
           <span>${demoActivated ? `DEMO активировано ${escapeHtml(formatAdminMoment(demoActivated))}` : 'DEMO ещё не активировано'}</span>
           <span>${demoExpires ? `Срок DEMO до ${escapeHtml(formatAdminMoment(demoExpires))}` : ''}</span>
-          <span>${progress ? (progress.status === 'COMPLETED' ? 'Первое знакомство завершено' : `Текущий этап: ${escapeHtml(progress.currentStepKey || '—')}`) : 'Первое знакомство ещё не начато'}</span>
         </div>
         <div class="admin-inline-actions">
           ${mode === 'DEMO' ? '<button class="admin-button secondary" data-extend-demo>Продлить DEMO на 14 дней</button>' : ''}
@@ -726,11 +659,6 @@ function openAccessDrawer(tenantId) {
       <section class="admin-section">
         <h4>Состояние пространства</h4>
         <button class="admin-button ${tenant.status === 'SUSPENDED' ? '' : 'danger'}" data-status>${tenant.status === 'SUSPENDED' ? 'Включить пространство' : 'Отключить пространство'}</button>
-      </section>
-
-      <section class="admin-section">
-        <h4>Журнал активности</h4>
-        <div data-activity><div class="admin-history-empty">Загрузка…</div></div>
       </section>
 
       ${tenant.ownerProfile?.email ? `
@@ -918,16 +846,6 @@ function openAccessDrawer(tenantId) {
       message.classList.add('error');
     }
   });
-
-  void adminRequest(`/tenants/${encodeURIComponent(tenantId)}/activity`)
-    .then((activity) => {
-      const host = backdrop.querySelector('[data-activity]');
-      if (host) host.innerHTML = activityMarkup(activity);
-    })
-    .catch((error) => {
-      const host = backdrop.querySelector('[data-activity]');
-      if (host) host.innerHTML = `<div class="admin-history-empty">${escapeHtml(error instanceof Error ? error.message : 'Не удалось загрузить активность')}</div>`;
-    });
 }
 
 function capabilityEditor(capability, resolved) {

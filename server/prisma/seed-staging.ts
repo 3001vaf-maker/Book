@@ -241,11 +241,6 @@ async function main() {
   };
 
   await prisma.$transaction(async (tx) => {
-    await tx.platformAccount.update({
-      where: { id: owner.id },
-      data: { workspaceUnlocked: true, onboardingStep: 99 },
-    });
-
     const profile = await tx.profile.upsert({
       where: { tenantId_platformAccountId: { tenantId, platformAccountId: owner.id } },
       create: {

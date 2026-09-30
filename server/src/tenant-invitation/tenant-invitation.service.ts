@@ -15,7 +15,7 @@ import { createHash, randomBytes } from 'crypto';
 import { hash as hashPassword } from 'bcryptjs';
 import { PrismaService } from '../prisma.service';
 import { TransactionalEmailService } from '../transactional-email/transactional-email.service';
-import { FirstRunService } from '../first-run/first-run.service';
+import { RegistrationDocumentService } from '../document-registry/registration-document.service';
 
 const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const STARTER_PLAN_KEY = 'starter-people';
@@ -91,7 +91,7 @@ export class TenantInvitationService {
     private readonly prisma: PrismaService,
     private readonly email: TransactionalEmailService,
     private readonly jwt: JwtService,
-    private readonly firstRun: FirstRunService,
+    private readonly registrationDocuments: RegistrationDocumentService,
   ) {}
 
   async ensureStarterPlan() {
@@ -205,14 +205,11 @@ export class TenantInvitationService {
     }>,
   ) {
     const passwordHash = await hashPassword(password, 12);
-    const preparedFirstRun = await this.firstRun.prepareInvitationAssignment(invitation.id, invitation.tenantId);
     const result = await this.prisma.$transaction(async (tx) => {
       const account = await tx.platformAccount.create({
         data: {
           email,
           passwordHash,
-          onboardingStep: 0,
-          workspaceUnlocked: false,
         },
       });
       const membership = await tx.membership.create({
@@ -246,13 +243,6 @@ export class TenantInvitationService {
           acceptedAt,
         },
       });
-      await this.firstRun.assignPreparedFromInvitation(
-        tx,
-        invitation.tenantId,
-        account.id,
-        preparedFirstRun,
-        acceptedAt,
-      );
 
       for (const document of registrationDocuments) {
         const eventId = randomBytes(18).toString('hex');
@@ -285,8 +275,6 @@ export class TenantInvitationService {
       account: {
         id: result.account.id,
         email: result.account.email,
-        onboardingStep: result.account.onboardingStep,
-        workspaceUnlocked: result.account.workspaceUnlocked,
       },
       tenant: { id: invitation.tenant.id, name: invitation.tenant.name },
       role: result.membership.role,
@@ -428,8 +416,7 @@ export class TenantInvitationService {
         expiresAt: '',
         days: 14,
       },
-      scenarioVersionId: invitation.firstRunScenarioVersionId || '',
-      documents: await this.firstRun.registrationDocuments(),
+      documents: await this.registrationDocuments.documents(),
       tenant: { id: invitation.tenant.id, name: invitation.tenant.name },
     };
   }
@@ -459,7 +446,7 @@ export class TenantInvitationService {
     if (!name) throw new BadRequestException('Укажите имя');
     if (!phone || !validRegistrationPhone(phone)) throw new BadRequestException('Укажите корректный номер телефона');
 
-    const registrationDocuments = await this.firstRun.validateRegistrationDocuments(input?.documents);
+    const registrationDocuments = await this.registrationDocuments.validate(input?.documents);
 
     const existingAccount = await this.prisma.platformAccount.findUnique({ where: { email } });
     if (existingAccount) throw new ConflictException('Учётная запись с таким email уже зарегистрирована');

@@ -7,6 +7,8 @@ let currentAccess = {
   commercialMode: '',
   demoActivatedAt: '',
   demoExpiresAt: '',
+  liveRequestedAt: '',
+  liveApprovedAt: '',
   plan: null,
   capabilities: [],
 };
@@ -16,6 +18,26 @@ function applyAccess(value) {
   currentAccess = value && typeof value === 'object' ? value : currentAccess;
   capabilityMap = new Map((Array.isArray(currentAccess.capabilities) ? currentAccess.capabilities : []).map((item) => [item.key, item]));
   return currentAccess;
+}
+
+export async function activateBookDemo() {
+  const response = await apiRequest('/saas-access/demo/activate', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.message || 'Не удалось открыть DEMO');
+  return applyAccess(payload);
+}
+
+export async function requestLiveMode() {
+  const response = await apiRequest('/saas-access/requests/live', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.message || 'Не удалось отправить запрос на LIVE');
+  return payload;
 }
 
 export async function loadBookAccess() {
@@ -51,7 +73,5 @@ export function getBookLimit(key) {
 
 export function canUseRealPersonalData() {
   if (currentAccess.status === 'SUSPENDED') return false;
-  if (currentAccess.commercialMode && currentAccess.commercialMode !== 'LIVE') return false;
-  return !(Array.isArray(currentAccess.capabilities)
-    && currentAccess.capabilities.some((item) => item?.source === 'FIRST_RUN'));
+  return currentAccess.commercialMode === 'LIVE';
 }

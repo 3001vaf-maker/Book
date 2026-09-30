@@ -40,7 +40,7 @@ async function main() {
   await prisma.$transaction(async (tx) => {
     const tenant = await tx.tenant.create({ data: { name: tenantName } });
     const account = await tx.platformAccount.create({
-      data: { email, passwordHash, workspaceUnlocked: true },
+      data: { email, passwordHash },
     });
     await tx.membership.create({
       data: { tenantId: tenant.id, platformAccountId: account.id, role: MembershipRole.OWNER },

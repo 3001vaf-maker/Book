@@ -284,7 +284,7 @@ const uiFacade = join(root, 'ui/ui.js');
 if (/export\s+function\b/.test(text(uiFacade))) report(uiFacade, 'ui/ui.js must remain a pure import/re-export facade');
 
 const profileController = join(root, 'settings/profile/profile.js');
-if (!/\bworkplaceAddButton\(\)/.test(text(profileController))) {
+if (!/\bworkplaceAddButton\s*\(/.test(text(profileController))) {
   report(profileController, 'Profile must use the shared workplace add button from ui/workplaces');
 }
 if (/iconButton\('\+'[^)]*data-add-workplace/.test(text(profileController))) {

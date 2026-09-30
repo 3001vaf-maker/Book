@@ -34,8 +34,6 @@ export class AuthService {
       account: {
         id: account.id,
         email: account.email,
-        onboardingStep: account.onboardingStep,
-        workspaceUnlocked: account.workspaceUnlocked,
       },
       tenant: { id: membership.tenant.id, name: membership.tenant.name },
       role: membership.role,
@@ -67,8 +65,6 @@ export class AuthService {
       account: {
         id: membership.account.id,
         email: membership.account.email,
-        onboardingStep: membership.account.onboardingStep,
-        workspaceUnlocked: membership.account.workspaceUnlocked,
       },
       tenant: { id: membership.tenant.id, name: membership.tenant.name },
       role: membership.role,

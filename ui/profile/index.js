@@ -34,6 +34,7 @@ export function openSharedProfileSettingsMenu({
     label: item.label,
     variant: item.variant || 'outline',
     data: actionData(item.id),
+    disabled: Boolean(item.disabled),
   })))}</div>`;
   const layer = mountModal(document.body, modal(body, {
     variant: 'bottom',
@@ -62,6 +63,7 @@ export function openSharedProfileSettingsMenu({
   });
 
   items.forEach((item) => {
+    if (item.disabled) return;
     layer.querySelector(`[data-shared-profile-action="${CSS.escape(String(item.id))}"]`)?.addEventListener('click', () => {
       layer.v2Close?.();
       void item.onSelect?.();
