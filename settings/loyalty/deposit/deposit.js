@@ -1,2 +1,2 @@
-import { actionBlock, button, emptyState, pageHeader } from '../../../ui/ui.js';
-export function render(root,navigateBack=()=>{}){root.innerHTML=`${pageHeader('Депозит')}${emptyState('Раздел подготовлен','Содержимое добавляется отдельным ТЗ.')}`;
+import { emptyState, pageHeader } from '../../../ui/ui.js';
+export function render(root){root.innerHTML=`${pageHeader('Депозит')}${emptyState('Раздел подготовлен','Содержимое добавляется отдельным ТЗ.')}`}
