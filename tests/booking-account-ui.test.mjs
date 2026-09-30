@@ -431,8 +431,9 @@ assert.match(v2Ui, /deck\.addEventListener\('scroll', refresh, \{ passive: true 
 assert.match(v2Ui, /deck\.addEventListener\('scroll', settle, \{ passive: true \}\)/);
 assert.match(v2Ui, /Math\.hypot\(dx, dy\) >= 9/);
 assert.match(v2Ui, /suppressClick = pointer\.dragged/);
-assert.match(v2Ui, /if \(index !== activeIndex\)/);
-assert.match(v2Ui, /centerCard\(card, axis, 'smooth'\)/);
+assert.match(v2Ui, /setActiveIndex\(index\)/);
+assert.match(v2Ui, /setActiveCard\(cards, index\)/);
+assert.doesNotMatch(v2Ui, /if \(index !== activeIndex\)/);
 assert.doesNotMatch(v2Ui, /const projected = current\.dx \+ velocity|const projected = current\.dy \+ velocity|deck\.scrollLeft = clampScroll/);
 
 assert.match(v2Ui, /const eDown = \(event\) =>/);
