@@ -7,7 +7,7 @@ import {
   openNotice,
   pageHeader,
 } from '../../ui/ui.js';
-import { getZReport } from './index.js';
+import { getZReport } from './read.js';
 
 function localDateValue(date = new Date()) {
   const shifted = new Date(date.getTime() - date.getTimezoneOffset() * 60000);

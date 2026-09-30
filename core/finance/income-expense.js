@@ -9,7 +9,9 @@ import {
   select,
   textareaField,
 } from '../../ui/ui.js';
-import { getFinanceArticles, getWallets, recordManualFinanceOperation } from './index.js';
+import { getFinanceArticles } from './data.js';
+import { getWallets } from './cash/data.js';
+import { recordManualFinanceOperation } from './service.js';
 
 
 function localDateTimeValue(date = new Date()) {

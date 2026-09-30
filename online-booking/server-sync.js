@@ -2,7 +2,7 @@ import { apiRequest } from '../core/auth.js';
 import { flushBusinessPersistence } from '../core/business-persistence.js';
 import { hydrateBookingSettingsFromServer } from '../core/booking-settings/index.js';
 import { hydrateDaysFromServer } from '../core/day/index.js';
-import { hydrateFinanceFromServer } from '../core/finance/index.js';
+import { hydrateFinanceFromServer, hydrateWalletsFromServer } from '../core/finance/index.js';
 import { hydrateRecordStateFromServer } from '../core/record/index.js';
 import { hydrateUEIFromServer } from '../core/uei.js';
 import { hydratePeopleFromServer } from '../core/people/data.js';
@@ -15,7 +15,6 @@ import { hydrateWorkplacesFromServer } from '../settings/profile/workplaces/data
 import { hydrateProceduresFromServer } from '../settings/service/procedures/data.js';
 import { hydrateProductsFromServer } from '../settings/service/products/data.js';
 import { hydrateTagsFromServer } from '../settings/tags/data.js';
-import { hydrateWalletsFromServer } from '../core/finance/cash/data.js';
 
 const POLL_MS = 4000;
 const ALL_SCOPES = Object.freeze(['business', 'operational', 'documents', 'profile', 'auxiliary', 'finance']);

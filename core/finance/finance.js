@@ -1,5 +1,6 @@
 import { button, details, emptyState, field, list, modal, mountModal, openNotice, pageHeader, shortDateTime } from '../../ui/ui.js';
-import { cancelFinanceOperation, getLedgerEntries } from './index.js';
+import { cancelFinanceOperation } from './service.js';
+import { getLedgerEntries } from './read.js';
 import { canUseBookCapability } from '../access.js';
 import { renderWallets } from './cash/cash.js';
 import { renderFinanceArticles } from './articles.js';

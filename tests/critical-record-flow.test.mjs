@@ -4,7 +4,9 @@ import { hydrateDaysFromServer } from '../core/day/index.js';
 import {
   calculateSettlement,
   getSettlementItemTotals,
+  getWalletBalance,
   hydrateFinanceFromServer,
+  hydrateWalletsFromServer,
 } from '../core/finance/index.js';
 import {
   createRecord,
@@ -15,7 +17,6 @@ import {
   setRecordAttendance,
   updateRecord,
 } from '../core/record/index.js';
-import { getWalletBalance, hydrateWalletsFromServer } from '../core/finance/cash/data.js';
 import {
   canonicalFinanceState,
   paymentFixture,

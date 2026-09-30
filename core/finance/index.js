@@ -41,3 +41,5 @@ export {
   saveWallet,
   updateWallet,
 } from './cash/data.js';
+
+export { financeNavigationItems, renderFinanceSection } from './finance.js';

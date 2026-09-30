@@ -9,7 +9,8 @@ import {
   select,
   textareaField,
 } from '../../ui/ui.js';
-import { getWallets, recordSpecialFinanceOperation } from './index.js';
+import { getWallets } from './cash/data.js';
+import { recordSpecialFinanceOperation } from './service.js';
 
 
 const ACTIONS = [
