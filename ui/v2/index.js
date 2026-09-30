@@ -525,6 +525,24 @@ export function mountV2Layer(html, { root = null } = {}) {
   return node;
 }
 
+function retainV2EdgeHost(host) {
+  if (!host) return () => {};
+  const next = Number(host.dataset.v2EdgeOwners || 0) + 1;
+  host.dataset.v2EdgeOwners = String(next);
+  host.classList.add('is-active');
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    const count = Math.max(0, Number(host.dataset.v2EdgeOwners || 1) - 1);
+    if (count) host.dataset.v2EdgeOwners = String(count);
+    else {
+      delete host.dataset.v2EdgeOwners;
+      host.classList.remove('is-active');
+    }
+  };
+}
+
 export function initV2Swipe(root, {
   onRight = null,
   onLeft = null,
@@ -544,6 +562,7 @@ export function initV2Swipe(root, {
   const hasDeck = revealDeck && isBaseZ && Boolean(app?.querySelector?.('[data-v2-card-deck][data-v2-deck-level="f"]'));
   const edgeHost = onRight ? app?.querySelector?.('[data-v2-edge-swipe]') : null;
   const gestureHost = edgeHost || stage || surface;
+  const releaseEdgeHost = retainV2EdgeHost(edgeHost);
   let pointerId = null;
   let startX = 0;
   let startY = 0;
@@ -640,6 +659,7 @@ export function initV2Swipe(root, {
     gestureHost.removeEventListener('pointerup', up);
     gestureHost.removeEventListener('pointercancel', clear);
     gestureHost.removeEventListener('click', click, true);
+    releaseEdgeHost();
   };
 }
 
@@ -685,6 +705,7 @@ export function initV2WorkspaceInteraction(root, {
   const z = app.querySelector('[data-v2-front] > [data-v2-z]');
   const edgeHost = app.querySelector('[data-v2-edge-swipe]') || stage;
   if (!stage || !front) return () => {};
+  const releaseEdgeHost = retainV2EdgeHost(edgeHost?.matches?.('[data-v2-edge-swipe]') ? edgeHost : null);
 
   const fCards = [...(fDeck?.querySelectorAll?.('[data-v2-card-item]') || [])];
   const eCards = [...(eDeck?.querySelectorAll?.('[data-v2-card-item]') || [])];
@@ -1043,6 +1064,7 @@ export function initV2WorkspaceInteraction(root, {
     for (const frame of scrollFrames.values()) cancelAnimationFrame(frame);
     scrollFrames.clear();
     disposers.forEach((dispose) => dispose?.());
+    releaseEdgeHost();
   };
 }
 
