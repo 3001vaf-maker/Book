@@ -415,7 +415,10 @@ assert.match(v2Ui, /data-v2-card-index="\$\{index\}"/);
 assert.doesNotMatch(v2Ui, /data-v2-f-index|data-v2-e-index|data-v2-e-step|--v2-e-active-offset/);
 
 assert.match(v2Ui, /const updateDeckGeometry = \(deck, cards, axis\) =>/);
-assert.match(v2Ui, /card\.getBoundingClientRect\(\)/);
+assert.match(v2Ui, /card\.offsetLeft/);
+assert.match(v2Ui, /deck\.scrollLeft/);
+assert.match(v2Ui, /card\.offsetTop/);
+assert.match(v2Ui, /deck\.scrollTop/);
 assert.match(v2Ui, /--v2-card-depth/);
 assert.match(v2Ui, /--v2-card-rotation/);
 assert.match(v2Ui, /--v2-card-scale/);
@@ -436,6 +439,7 @@ assert.match(v2Ui, /--v2-e-dismiss-x/);
 assert.doesNotMatch(v2Ui, /--v2-e-drag-x|--v2-e-drag-y/);
 
 assert.match(v2Ui, /if \(Number\(event\.clientX \|\| 0\) > rect\.left \+ edgeWidth\) return/);
+assert.match(v2Ui, /const gestureHost = stage \|\| surface/);
 assert.match(v2Ui, /const leftEdge = Number\(stageRect\?\.left \|\| 0\) \+ Number\(edgeWidth \|\| 24\)/);
 assert.match(v2Ui, /const wantsRight = Boolean\(onRight\)/);
 assert.doesNotMatch(v2Ui, /inNavigationGutter|horizontalGestureContext|forceNavigation|nestedHorizontalScroller/);
