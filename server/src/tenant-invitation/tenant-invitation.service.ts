@@ -111,6 +111,12 @@ function isRegistrationLinkEmail(email: string) {
   return email.startsWith(REGISTRATION_LINK_EMAIL_PREFIX) && email.endsWith(REGISTRATION_LINK_EMAIL_SUFFIX);
 }
 
+function normalizeToolSelection(value: unknown) {
+  return [...new Set((Array.isArray(value) ? value : [])
+    .map((item) => String(item || '').trim())
+    .filter((key) => TOOL_CAPABILITY_SET.has(key)))];
+}
+
 function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (char) => ({
     '&': '&amp;',
@@ -338,9 +344,11 @@ export class TenantInvitationService {
     };
   }
 
-  async createInvitation(adminId: string, input: { email?: unknown; name?: unknown }) {
+  async createInvitation(adminId: string, input: { email?: unknown; name?: unknown; tools?: unknown }) {
     const email = normalizeEmail(input?.email);
     const name = normalizeName(input?.name);
+    const tools = normalizeToolSelection(input?.tools);
+    if (!tools.length) throw new BadRequestException('Перед приглашением выберите хотя бы один инструмент');
     if (!email || !email.includes('@')) throw new BadRequestException('Укажите корректный email');
 
     const existingAccount = await this.prisma.platformAccount.findUnique({ where: { email } });
@@ -363,6 +371,7 @@ export class TenantInvitationService {
       tenantName,
       tokenHash,
       expiresAt,
+      tools,
     });
 
     try {
@@ -376,9 +385,7 @@ export class TenantInvitationService {
   }
 
   async createRegistrationLink(adminId: string, input: { tools?: unknown } = {}) {
-    const tools = (Array.isArray(input?.tools) ? input.tools : [])
-      .map((value) => String(value || '').trim())
-      .filter((key) => TOOL_CAPABILITY_SET.has(key));
+    const tools = normalizeToolSelection(input?.tools);
     if (!tools.length) throw new BadRequestException('Перед формированием ссылки выберите хотя бы один инструмент');
     const token = createToken();
     const tokenHash = invitationHash(token);
