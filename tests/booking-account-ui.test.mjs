@@ -465,6 +465,9 @@ assert.match(v2Css, /\.v2-e-card\{[\s\S]*?position:relative;[\s\S]*?flex:0 0 var
 assert.match(v2Css, /\.v2-app\.is-e-open \.v2-deck\{[\s\S]*?scale\(\.80\);[\s\S]*?opacity:\.82;[\s\S]*?pointer-events:none/);
 assert.doesNotMatch(v2Css, /--v2-z-nav-peek/);
 assert.match(v2Css, /\.v2-app\.is-deck-open > \.v2-app__stage > \.v2-front\{transform:translate3d\(100%,0,0\)\}/);
+assert.match(v2Ui, /if \(next\) app\.classList\.remove\('is-z-entering'\)/);
+assert.match(v2Css, /\.v2-app\.is-z-entering > \.v2-app__stage > \.v2-front\{animation:v2-z-enter-from-right \.30s cubic-bezier\(\.16,1,\.3,1\)\}/);
+assert.doesNotMatch(v2Css, /v2-z-enter-from-right \.30s cubic-bezier\(\.16,1,\.3,1\) (?:both|forwards)/);
 assert.match(v2Css, /@keyframes v2-z-enter-from-right\{from\{transform:translate3d\(100%,0,0\)\}/);
 assert.match(v2Css, /\.v2-app\.is-z-entering > \.v2-app__stage > \.v2-front/);
 assert.match(v2Css, /\.v2-front\{[\s\S]*?background:var\(--v2-base\)/);
