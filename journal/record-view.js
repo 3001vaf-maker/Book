@@ -23,9 +23,9 @@ import {
 import { getRecordPaymentState, recordSettlementItems, repriceSettlement } from '../core/finance/index.js';
 import { getWorkplaces, getWorkplaceWorkingDates } from '../core/workplace-time.js';
 import { timeToMinutes, minutesToTime } from '../core/time/index.js';
-import { getAllPeople } from '../people/data.js';
-import { personDisplay } from '../people/presentation.js';
-import { openPerson } from '../people/people.js';
+import { getAllPeople } from '../core/people/data.js';
+import { personDisplay } from '../core/people/presentation.js';
+import { openPerson } from '../core/people/people.js';
 import { getProcedures } from '../settings/service/procedures/data.js';
 import { getProducts } from '../settings/service/products/data.js';
 import { getRecords } from '../core/record/index.js';
