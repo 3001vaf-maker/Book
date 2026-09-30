@@ -263,9 +263,6 @@ function historyMarkup() {
 }
 
 function bind(root, navigateBack) {
-  
-    navigateBack();
-  });
   root.querySelectorAll('[data-documents-section]').forEach((item) => item.addEventListener('click', () => {
     currentSection = item.dataset.documentsSection;
     render(root, navigateBack);
