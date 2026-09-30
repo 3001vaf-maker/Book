@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    :root{--surface-dark:#2f3338;--button-secondary:#d8d3cf;--text-muted:#817a73;--app-max-width:390px;--visual-vh:780px}
+    html,body{margin:0;width:390px;height:780px}
+    *{box-sizing:border-box}
+  </style>
+  <link rel="stylesheet" href="/ui/v2/v2.css">
+</head>
+<body>
+<div id="host"></div>
+<pre id="result">pending</pre>
+<script type="module">
+import {
+  v2CardDeck,
+  v2Shell,
+  v2ZLayer,
+  mountV2ZLayer,
+  initV2WorkspaceInteraction,
+  initV2StickerSwipe,
+  v2Sticker,
+  setV2DeckOpen,
+} from '/ui/v2/index.js';
+
+const result = document.querySelector('#result');
+const failures = [];
+const ok = (condition, message) => { if (!condition) failures.push(message); };
+const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+const pointer = (target, type, x, y, id = 1) => {
+  target.dispatchEvent(new PointerEvent(type, {
+    bubbles:true, cancelable:true, pointerId:id, pointerType:'touch',
+    clientX:x, clientY:y, button:0,
+  }));
+};
+const click = (target, x = 180, y = 380) => {
+  pointer(target, 'pointerdown', x, y, 9);
+  pointer(target, 'pointerup', x, y, 9);
+  target.dispatchEvent(new MouseEvent('click', { bubbles:true, cancelable:true, clientX:x, clientY:y }));
+};
+
+for (const name of ['setPointerCapture','releasePointerCapture']) {
+  Object.defineProperty(Element.prototype, name, { configurable:true, value(){ } });
+}
+Object.defineProperty(Element.prototype, 'hasPointerCapture', { configurable:true, value(){ return true; } });
+window.addEventListener('error', (event) => failures.push('window error: ' + (event.error?.message || event.message)));
+
+const roots = [
+  { id:'one', label:'Один' },
+  { id:'two', label:'Два' },
+  { id:'three', label:'Три' },
+];
+const host = document.querySelector('#host');
+host.innerHTML = v2Shell({
+  deck:v2CardDeck(roots, { axis:'x', active:'one', level:'f' }),
+  body:'<div style="height:1200px"><div class="v2-rail" style="display:flex;overflow-x:auto;width:100%"><div style="min-width:700px;height:40px">rail</div></div></div>',
+  className:'v2-app--runtime-test',
+});
+const app = host.querySelector('[data-v2-app]');
+const z = app.querySelector('[data-v2-z]');
+const edge = app.querySelector('[data-v2-edge-swipe]');
+
+ok(Boolean(edge), 'missing dedicated edge owner');
+ok(getComputedStyle(z).touchAction === 'auto', 'Z must keep native inner pan-x/pan-y');
+ok(Math.round(edge.getBoundingClientRect().width) === 36, 'edge owner must be 36px');
+ok(getComputedStyle(edge).touchAction === 'none', 'edge owner must exclusively own its gesture');
+
+let firstOwnerCalls = 0;
+let dispose = initV2WorkspaceInteraction(app, {
+  activeId:'one',
+  deckOpen:false,
+  onRootSelect:() => { firstOwnerCalls += 1; },
+});
+await nextFrame();
+
+pointer(edge, 'pointerdown', 12, 300, 1);
+pointer(edge, 'pointermove', 46, 302, 1);
+pointer(edge, 'pointerup', 46, 302, 1);
+await nextFrame();
+ok(app.classList.contains('is-deck-open'), 'edge swipe did not open F');
+
+const active = app.querySelector('[data-v2-card-item].is-active');
+click(active);
+await nextFrame();
+ok(firstOwnerCalls === 1, 'active F tap must fire exactly once');
+
+dispose();
+let secondOwnerCalls = 0;
+dispose = initV2WorkspaceInteraction(app, {
+  activeId:'one',
+  deckOpen:true,
+  onRootSelect:() => { secondOwnerCalls += 1; },
+});
+await nextFrame();
+
+const reboundActive = app.querySelector('[data-v2-card-item].is-active');
+click(reboundActive);
+await nextFrame();
+ok(firstOwnerCalls === 1 && secondOwnerCalls === 1, 'disposed FEZ owner remained active after rebind');
+
+pointer(reboundActive, 'pointerdown', 180, 380, 12);
+pointer(reboundActive, 'pointermove', 220, 382, 12);
+pointer(reboundActive, 'pointerup', 220, 382, 12);
+reboundActive.dispatchEvent(new MouseEvent('click', { bubbles:true, cancelable:true, clientX:220, clientY:382 }));
+await nextFrame();
+ok(secondOwnerCalls === 1, 'drag leaked into click navigation');
+ok(getComputedStyle(reboundActive).scrollSnapStop !== 'always', 'CardDeck still forces a stop on every card');
+
+setV2DeckOpen(app, false);
+const layer = mountV2ZLayer(app, v2ZLayer('<p>Z2</p>', { className:'runtime-z2' }), { stack:true });
+ok(Boolean(layer?.isConnected), 'Z2 did not mount');
+pointer(edge, 'pointerdown', 10, 260, 20);
+pointer(edge, 'pointermove', 44, 261, 20);
+pointer(edge, 'pointerup', 44, 261, 20);
+await nextFrame();
+ok(!layer?.isConnected, 'edge swipe did not close top Z2');
+
+const oldLayer = mountV2ZLayer(app, v2ZLayer('<p>old</p>', { className:'runtime-old' }), { stack:true });
+let oldDisposed = 0;
+const oldDispose = oldLayer.v2Dispose;
+oldLayer.v2Dispose = () => { oldDisposed += 1; oldDispose(); };
+const replacement = mountV2ZLayer(app, v2ZLayer('<p>new</p>', { className:'runtime-new' }), { stack:false });
+await nextFrame();
+ok(oldDisposed === 1 && !oldLayer.isConnected && replacement?.isConnected, 'non-stack Z replacement skipped disposal');
+replacement?.v2Close?.();
+
+const stickerHost = document.createElement('div');
+stickerHost.innerHTML = v2Sticker({ title:'Тест', body:'Тело' });
+document.body.appendChild(stickerHost);
+let stickerRight = 0;
+const disposeSticker = initV2StickerSwipe(stickerHost, { onRight:() => { stickerRight += 1; }, threshold:20 });
+const stickerSurface = stickerHost.querySelector('[data-v2-sticker]');
+pointer(stickerSurface, 'pointerdown', 40, 600, 30);
+pointer(stickerSurface, 'pointermove', 80, 602, 30);
+pointer(stickerSurface, 'pointerup', 80, 602, 30);
+await nextFrame();
+ok(stickerRight === 1, 'sticker swipe runtime failed');
+disposeSticker();
+dispose();
+
+if (failures.length) {
+  document.documentElement.dataset.fezRuntime = 'fail';
+  result.textContent = failures.join('\n');
+} else {
+  document.documentElement.dataset.fezRuntime = 'pass';
+  result.textContent = 'FEZ runtime browser test passed';
+}
+</script>
+</body>
+</html>
