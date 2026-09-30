@@ -10,7 +10,7 @@ import {
   textareaField,
 } from '../../ui/ui.js';
 import { recordSpecialFinanceOperation } from '../../core/finance/index.js';
-import { getWallets } from '../../settings/wallets/data.js';
+import { getWallets } from './cash/data.js';
 
 const ACTIONS = [
   { kind: 'loan-received', label: 'Получить займ', title: 'Получить займ', counterparty: 'От кого' },
