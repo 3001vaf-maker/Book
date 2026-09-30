@@ -52,9 +52,15 @@ const roots = [
   { id:'two', label:'Два' },
   { id:'three', label:'Три' },
 ];
+const children = [
+  { id:'a', label:'A' },
+  { id:'b', label:'B' },
+  { id:'c', label:'C' },
+];
 const host = document.querySelector('#host');
 host.innerHTML = v2Shell({
   deck:v2CardDeck(roots, { axis:'x', active:'one', level:'f' }),
+  eDeck:v2CardDeck(children, { axis:'y', active:'a', level:'e' }),
   body:'<div style="height:1200px"><div class="v2-rail" style="display:flex;overflow-x:auto;width:100%"><div style="min-width:700px;height:40px">rail</div></div></div>',
   className:'v2-app--runtime-test',
 });
@@ -102,6 +108,18 @@ click(reboundActive);
 await nextFrame();
 ok(firstOwnerCalls === 1 && secondOwnerCalls === 1, 'disposed FEZ owner remained active after rebind');
 
+// Real browser layout + scroll must drive the active card and continuous 3D variables.
+const fDeck = app.querySelector('[data-v2-card-deck][data-v2-deck-level="f"]');
+const fCards = [...fDeck.querySelectorAll('[data-v2-card-item]')];
+const secondFLeft = fCards[1].offsetLeft - (fDeck.clientWidth - fCards[1].offsetWidth) / 2;
+fDeck.scrollLeft = Math.max(0, secondFLeft);
+fDeck.dispatchEvent(new Event('scroll'));
+await new Promise((resolve) => setTimeout(resolve, 140));
+await nextFrame();
+ok(fCards[1].classList.contains('is-active'), 'native F scroll did not update the centred active card');
+ok(Number.parseFloat(fCards[0].style.getPropertyValue('--v2-card-depth')) < 0, 'neighboring F card did not move into Z-depth');
+ok(Math.abs(Number.parseFloat(fCards[0].style.getPropertyValue('--v2-card-rotation'))) > 0, 'neighboring F card did not bend in 3D');
+
 pointer(reboundActive, 'pointerdown', 180, 380, 12);
 pointer(reboundActive, 'pointermove', 220, 382, 12);
 pointer(reboundActive, 'pointerup', 220, 382, 12);
@@ -109,6 +127,32 @@ reboundActive.dispatchEvent(new MouseEvent('click', { bubbles:true, cancelable:t
 await nextFrame();
 ok(secondOwnerCalls === 1, 'drag leaked into click navigation');
 ok(getComputedStyle(reboundActive).scrollSnapStop !== 'always', 'CardDeck still forces a stop on every card');
+
+dispose();
+dispose = initV2WorkspaceInteraction(app, {
+  activeId:'two',
+  eActiveId:'a',
+  deckOpen:true,
+  eOpen:true,
+});
+await nextFrame();
+const liveFCard = app.querySelector('[data-v2-card-deck][data-v2-deck-level="f"] [data-v2-card-item]');
+const eDeck = app.querySelector('[data-v2-card-deck][data-v2-deck-level="e"]');
+const eCards = [...eDeck.querySelectorAll('[data-v2-card-item]')];
+ok(Math.round(liveFCard.getBoundingClientRect().width) === Math.round(eCards[0].getBoundingClientRect().width), 'E card width differs from F card width');
+ok(Math.round(liveFCard.getBoundingClientRect().height) === Math.round(eCards[0].getBoundingClientRect().height), 'E card height differs from F card height');
+const secondETop = eCards[1].offsetTop - (eDeck.clientHeight - eCards[1].offsetHeight) / 2;
+eDeck.scrollTop = Math.max(0, secondETop);
+eDeck.dispatchEvent(new Event('scroll'));
+await new Promise((resolve) => setTimeout(resolve, 140));
+await nextFrame();
+ok(eCards[1].classList.contains('is-active'), 'native E scroll did not update the centred active card');
+ok(Math.abs(Number.parseFloat(eCards[0].style.getPropertyValue('--v2-card-rotation'))) > 0, 'neighboring E card did not bend in 3D');
+pointer(eDeck, 'pointerdown', 180, 390, 16);
+pointer(eDeck, 'pointermove', 220, 392, 16);
+pointer(eDeck, 'pointerup', 220, 392, 16);
+await nextFrame();
+ok(!app.classList.contains('is-e-open'), 'E right-swipe from its middle did not collapse back to F');
 
 setV2DeckOpen(app, false);
 const layer = mountV2ZLayer(app, v2ZLayer('<p>Z2</p>', { className:'runtime-z2' }), { stack:true });
