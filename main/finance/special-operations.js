@@ -93,12 +93,12 @@ function openAction(root, action, navigateBack) {
 }
 
 export function renderSpecialFinanceOperations(root, navigateBack = () => {}) {
-  root.innerHTML = `${pageHeader('Прочие операции')}${actionBlock(`${ACTIONS.map((action) => button(action.label, { data: `data-finance-special="${action.kind}"` })).join('')}${button('Назад', { variant: 'secondary', data: 'data-finance-special-back' })}`)}`;
+  root.innerHTML = `${pageHeader('Прочие операции')}${actionBlock(`${ACTIONS.map((action) => button(action.label, { data: `data-finance-special="${action.kind}"` })).join('')}`)}`;
   root.querySelectorAll('[data-finance-special]').forEach((element) => {
     element.addEventListener('click', () => {
       const action = ACTIONS.find((item) => item.kind === element.dataset.financeSpecial);
       if (action) openAction(root, action, navigateBack);
     });
   });
-  root.querySelector('[data-finance-special-back]')?.addEventListener('click', navigateBack);
+  
 }
