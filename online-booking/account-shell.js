@@ -26,7 +26,7 @@ import {
   field,
   v2ListEntries,
   v2ListEntry,
-  v2FDeck,
+  v2CardDeck,
   v2Header,
   v2HorizontalRail,
   modal,
@@ -275,7 +275,7 @@ function accountRootForTab(state) {
 function accountDeck(state) {
   const fallback = accountRootForTab(state);
   state.accountDeckActive ||= fallback;
-  return v2FDeck(GLOBAL_ACCOUNT_ROOTS, { active: state.accountDeckActive, data: 'data-account-deck-item' });
+  return v2CardDeck(GLOBAL_ACCOUNT_ROOTS, { axis: 'x', active: state.accountDeckActive, data: 'data-account-deck-item', level: 'f' });
 }
 
 function renderV2Shell(root, state, { header, body = '', deck = true, className = '' } = {}) {
