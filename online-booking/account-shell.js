@@ -279,15 +279,35 @@ function accountDeck(state) {
 }
 
 function renderV2Shell(root, state, { header, body = '', deck = true, className = '' } = {}) {
-  const shell = v2Shell({
-    header,
-    body,
-    deck: deck ? accountDeck(state) : '',
-    deckOpen: Boolean(state.accountDeckOpen && deck),
-    zEnter: Boolean(state.accountZEnter),
-    className,
-  });
-  root.innerHTML = shell;
+  const deckMarkup = deck ? accountDeck(state) : '';
+  let shell = root.querySelector(':scope > [data-v2-app]');
+  const canReuseScene = Boolean(deck && shell?.querySelector('[data-v2-card-deck][data-v2-deck-level="f"]'));
+
+  if (!canReuseScene) {
+    root.innerHTML = v2Shell({
+      header,
+      body,
+      deck: deckMarkup,
+      deckOpen: Boolean(state.accountDeckOpen && deck),
+      zEnter: Boolean(state.accountZEnter),
+      className,
+    });
+    shell = root.querySelector(':scope > [data-v2-app]');
+  } else {
+    const currentHeader = shell.querySelector(':scope > .v2-header');
+    if (currentHeader) currentHeader.outerHTML = header;
+    const z = shell.querySelector('[data-v2-front] > [data-v2-z]');
+    if (z) z.innerHTML = body;
+    setV2DeckOpen(shell, Boolean(state.accountDeckOpen));
+    shell.classList.toggle('is-z-entering', Boolean(state.accountZEnter && !state.accountDeckOpen));
+    const preserved = ['v2-app', 'v2-app--with-deck'];
+    String(className || '').split(/\s+/).filter(Boolean).forEach((name) => preserved.push(name));
+    [...shell.classList].forEach((name) => {
+      if (name.startsWith('v2-app--') && !preserved.includes(name) && name !== 'v2-app--with-deck') shell.classList.remove(name);
+    });
+    preserved.forEach((name) => shell.classList.add(name));
+  }
+
   state.accountZEnter = false;
 }
 
