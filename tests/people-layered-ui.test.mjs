@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const people = readFileSync(new URL('../main/people/people.js', import.meta.url), 'utf8');
-const peopleCss = readFileSync(new URL('../main/people/people.css', import.meta.url), 'utf8');
+const people = readFileSync(new URL('../people/people.js', import.meta.url), 'utf8');
+const peopleCss = readFileSync(new URL('../people/people.css', import.meta.url), 'utf8');
 const v2 = readFileSync(new URL('../ui/v2/index.js', import.meta.url), 'utf8');
 const v2Css = readFileSync(new URL('../ui/v2/v2.css', import.meta.url), 'utf8');
 const selectors = readFileSync(new URL('../ui/selectors/index.js', import.meta.url), 'utf8');
