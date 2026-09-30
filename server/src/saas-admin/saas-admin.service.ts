@@ -38,7 +38,13 @@ export class SaasAdminService {
   async capabilities() {
     await this.invitations.ensureStarterPlan();
     return this.prisma.capability.findMany({
-      where: { isActive: true, key: { in: [...TOOL_CAPABILITY_KEYS] } },
+      where: {
+        isActive: true,
+        OR: [
+          { key: { in: [...TOOL_CAPABILITY_KEYS] } },
+          { valueType: CapabilityValueType.LIMIT },
+        ],
+      },
       orderBy: [{ groupKey: 'asc' }, { position: 'asc' }, { key: 'asc' }],
       select: {
         id: true,
