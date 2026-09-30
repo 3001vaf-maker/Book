@@ -8,6 +8,7 @@ const BUTTON_VARIANTS = {
 };
 
 export function button(label, { className = '', data = '', type = 'button', aria = '', variant = '', disabled = false } = {}) {
+  if (/^назад$/i.test(String(label || '').trim())) return '';
   const variantClass = BUTTON_VARIANTS[variant] || '';
   return `<button type="${type}" class="ui-button ${variantClass} ${className}" ${data}${aria ? ` aria-label="${escapeHtml(aria)}"` : ''}${disabled ? ' disabled' : ''}>${label}</button>`;
 }
