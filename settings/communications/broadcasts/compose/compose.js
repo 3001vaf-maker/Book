@@ -36,7 +36,7 @@ function renderForm(root, navigateBack, templates = []) {
       <div class="action-block"><strong>Как увидит человек</strong><div class="muted" data-broadcast-message-preview>Начните вводить текст.</div></div>
       <div class="muted">Перед отправкой Book проверит ПДн, рекламное согласие и доступность выбранного канала у каждого человека.</div>
       <div class="muted" data-broadcast-result aria-live="polite"></div>
-      ${actionBlock(`${button('Проверить аудиторию', { type: 'submit' })}${button('Отправить', { type: 'button', variant: 'secondary', data: 'data-broadcast-send' })}${button('Назад', { type: 'button', variant: 'secondary', data: 'data-broadcast-back' })}`)}
+      ${actionBlock(`${button('Проверить аудиторию', { type: 'submit' })}${button('Отправить', { type: 'button', variant: 'secondary', data: 'data-broadcast-send' })}`)}
     </form>`;
   const form = root.querySelector('[data-broadcast-compose]'); const result = root.querySelector('[data-broadcast-result]'); const send = root.querySelector('[data-broadcast-send]');
   const bodyInput = form?.querySelector('[name="body"]'); const nameInput = form?.querySelector('[name="name"]'); const messagePreview = root.querySelector('[data-broadcast-message-preview]'); let lastPreview = null;
@@ -48,7 +48,7 @@ function renderForm(root, navigateBack, templates = []) {
   bodyInput?.addEventListener('input', refreshMessagePreview); form?.addEventListener('input', () => { lastPreview = null; if (send) send.disabled = true; });
   form?.addEventListener('submit', async (event) => { event.preventDefault(); if (result) result.textContent = 'Проверяем аудиторию…'; try { const payload = payloadFrom(form); if (!payload.name) throw new Error('Введите название рассылки.'); if (!payload.body) throw new Error('Введите текст рассылки.'); lastPreview = await previewBroadcast(payload); if (result) result.textContent = `${payload.channel === 'EMAIL' ? 'Email' : 'Telegram'}: можно отправить ${lastPreview.eligibleCount}. Исключено: ${lastPreview.excludedCount}.`; if (send) send.disabled = !lastPreview.eligibleCount; } catch (error) { lastPreview = null; if (send) send.disabled = true; if (result) result.textContent = error instanceof Error ? error.message : 'Не удалось проверить аудиторию'; } });
   send?.addEventListener('click', async () => { if (!lastPreview) return; const payload = payloadFrom(form); send.disabled = true; if (result) result.textContent = 'Отправляем…'; try { const sent = await sendBroadcast(payload); if (result) result.textContent = `${payload.channel === 'EMAIL' ? 'Email' : 'Telegram'} отправлено: ${sent.sentCount}. Ошибок: ${sent.failedCount}.`; lastPreview = null; } catch (error) { if (result) result.textContent = error instanceof Error ? error.message : 'Не удалось отправить рассылку'; send.disabled = false; } });
-  root.querySelector('[data-broadcast-back]')?.addEventListener('click', navigateBack);
+  
 }
 
 export function render(root, navigateBack = () => {}) {
