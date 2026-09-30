@@ -114,20 +114,24 @@
 .v2-card-deck--x{
   z-index:4;inset:0;display:flex;align-items:center;
   overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;
-  scroll-snap-type:x mandatory;scroll-padding-inline:calc((100% - var(--v2-card-width))/2);
-  padding-inline:calc((100% - var(--v2-card-width))/2);
+  scroll-snap-type:x mandatory;
   touch-action:pan-x;
   transition:transform .22s cubic-bezier(.16,1,.3,1),opacity .18s ease,filter .18s ease;
   will-change:transform,opacity,filter
 }
+.v2-card-deck--x::before,.v2-card-deck--x::after{
+  content:"";display:block;flex:0 0 max(0px,calc((100% - var(--v2-card-width))/2))
+}
 .v2-card-deck--y{
   z-index:8;inset:0;display:flex;flex-direction:column;align-items:center;
   overflow-x:hidden;overflow-y:auto;overscroll-behavior-y:contain;
-  scroll-snap-type:y mandatory;scroll-padding-block:calc((100% - var(--v2-card-height))/2);
-  padding-block:calc((100% - var(--v2-card-height))/2);
+  scroll-snap-type:y mandatory;
   touch-action:pan-y;opacity:0;pointer-events:none;
   transform:translate3d(var(--v2-e-dismiss-x,0px),0,0);
   transition:opacity .16s ease,transform .24s cubic-bezier(.16,1,.3,1)
+}
+.v2-card-deck--y::before,.v2-card-deck--y::after{
+  content:"";display:block;flex:0 0 max(0px,calc((100% - var(--v2-card-height))/2))
 }
 .v2-card-deck--y.is-dragging{transition:none}
 .v2-app.is-e-open .v2-card-deck--y{opacity:1;pointer-events:auto}
