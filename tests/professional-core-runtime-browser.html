@@ -170,7 +170,7 @@ const openDdsSettings = async () => {
   const a = shell()?.querySelector('[data-v2-workspace-a]');
   ok(Boolean(a), 'DDS A/settings control missing');
   a?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
-  await wait(120);
+  await wait(40);
   const modal = document.querySelector('[data-modal][data-v2-layer-kind="bottom"]');
   ok(Boolean(modal), 'DDS settings did not open as bottom modal');
   const ids = [...(modal?.querySelectorAll('[data-finance-dds-tool]') || [])]
@@ -190,7 +190,7 @@ for (const [index, id, title] of [
   const action = settings?.querySelector('[data-finance-dds-tool="' + id + '"]');
   ok(Boolean(action), 'DDS settings action missing: ' + id);
   action?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
-  await wait(140);
+  await wait(40);
 
   const layer = shell()?.querySelector('[data-v2-z-layer]');
   ok(Boolean(layer), 'DDS tool did not open as Z2: ' + id);
@@ -202,7 +202,7 @@ for (const [index, id, title] of [
   pointer(layer,'pointerdown',10,360,120 + index);
   pointer(layer,'pointermove',82,362,120 + index);
   pointer(layer,'pointerup',82,362,120 + index);
-  await wait(160);
+  await wait(60);
   ok(!shell()?.querySelector('[data-v2-z-layer]'), 'DDS Z2 did not close by right swipe: ' + id);
   ok(Boolean(shell()?.querySelector('[data-v2-workspace-a]')), 'DDS A/settings was not restored after closing Z2: ' + id);
 }
