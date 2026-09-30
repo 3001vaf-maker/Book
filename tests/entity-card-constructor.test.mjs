@@ -69,7 +69,9 @@ assert.match(constructorSource,/data-v2-primary-action/);
 assert.match(constructorSource,/data-card-photo-select/);
 assert.doesNotMatch(constructorSource,/type="color"/);
 
-assert.match(v2Source,/button,input,select,textarea,label/);
+assert.match(v2Source,/data-v2-stage-gesture-ignore/);
+assert.match(v2Source,/forceNavigation = Number\(event\.clientX \|\| 0\) <= Number\(rect\?\.left \|\| 0\) \+ 36/);
+assert.doesNotMatch(v2Source,/event\.target\.closest\?\.\('button,input,select,textarea,label/);
 assert.match(inputCss,/background:#ffff00/);
 assert.match(inputCss,/::-webkit-slider-thumb/);
 assert.match(colorSource,/#FFFF00/);
