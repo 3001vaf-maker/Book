@@ -559,6 +559,9 @@ export function initV2Swipe(root, {
   const stage = app?.querySelector?.('.v2-app__stage') || surface.parentElement;
   const isLayer = surface.matches?.('[data-v2-z-layer]');
   const isBaseZ = surface.matches?.('[data-v2-z]') && !isLayer;
+  const front = app?.querySelector?.('[data-v2-front]');
+  const dragSurface = isBaseZ && front ? front : surface;
+  const dragProperty = isBaseZ && front ? '--v2-front-drag-x' : '--v2-drag-x';
   const hasDeck = revealDeck && isBaseZ && Boolean(app?.querySelector?.('[data-v2-card-deck][data-v2-deck-level="f"]'));
   const edgeHost = onRight ? app?.querySelector?.('[data-v2-edge-swipe]') : null;
   const gestureHost = edgeHost || stage || surface;
@@ -577,8 +580,8 @@ export function initV2Swipe(root, {
   };
 
   const clear = () => {
-    surface.style.removeProperty('--v2-drag-x');
-    surface.classList.remove('is-dragging');
+    dragSurface.style.removeProperty(dragProperty);
+    dragSurface.classList.remove('is-dragging');
     app?.classList.remove('is-revealing-deck');
     pointerId = null;
     dx = 0;
@@ -622,8 +625,8 @@ export function initV2Swipe(root, {
     if (hasDeck && dx > 0 && onRight && !app?.classList.contains('is-deck-open')) {
       app?.classList.add('is-revealing-deck');
     }
-    surface.classList.add('is-dragging');
-    surface.style.setProperty('--v2-drag-x', `${dx}px`);
+    dragSurface.classList.add('is-dragging');
+    dragSurface.style.setProperty(dragProperty, `${dx}px`);
     if (Math.abs(nextX) > 7) suppressNextClick = true;
     event.preventDefault();
   };
