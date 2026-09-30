@@ -93,8 +93,8 @@ assert.equal(report.entries.some((row) => row.operationId === 'cancel-cancelled-
 
 const server = readFileSync(new URL('../server/src/finance/finance.service.ts', import.meta.url), 'utf8');
 const controller = readFileSync(new URL('../server/src/finance/finance.controller.ts', import.meta.url), 'utf8');
-const specialUi = readFileSync(new URL('../main/finance/special-operations.js', import.meta.url), 'utf8');
-const zUi = readFileSync(new URL('../main/finance/z-report.js', import.meta.url), 'utf8');
+const specialUi = readFileSync(new URL('../core/finance/special-operations.js', import.meta.url), 'utf8');
+const zUi = readFileSync(new URL('../core/finance/z-report.js', import.meta.url), 'utf8');
 
 assert.match(server, /recordSpecialOperation/);
 assert.match(server, /loan-received/);
