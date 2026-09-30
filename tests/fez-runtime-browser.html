@@ -158,6 +158,7 @@ pointer(eDeck, 'pointermove', 220, 392, 16);
 pointer(eDeck, 'pointerup', 220, 392, 16);
 await nextFrame();
 ok(!app.classList.contains('is-e-open'), 'E right-swipe from its middle did not collapse back to F');
+ok(Number.parseFloat(eDeck.style.getPropertyValue('--v2-e-dismiss-x')) >= app.querySelector('.v2-app__stage').clientWidth, 'E collapse snapped back instead of continuing right from the finger');
 
 setV2DeckOpen(app, false);
 const layer = mountV2ZLayer(app, v2ZLayer('<p>Z2</p>', { className:'runtime-z2' }), { stack:true });
