@@ -206,7 +206,7 @@ for (const token of ['calculateSettlement', 'getRecordPaymentState', 'getLedgerE
   if (!financeIndex.includes(token)) errors.push(`core/finance/index.js must expose ${token}`);
 }
 
-const walletData = source('settings/wallets/data.js');
+const walletData = source('main/finance/cash/data.js');
 if (!/getWalletDDSMovements/.test(walletData) || !/export function getWalletBalance/.test(walletData)) {
   errors.push('Wallet must derive balance from Finance Ledger projection');
 }
