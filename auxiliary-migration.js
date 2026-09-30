@@ -1,8 +1,7 @@
 import { apiRequest } from './core/auth.js';
-import { hydrateFinanceFromServer } from './core/finance/index.js';
+import { hydrateFinanceFromServer, hydrateWalletsFromServer } from './core/finance/index.js';
 import { hydrateProductsFromServer } from './settings/service/products/data.js';
 import { hydrateTagsFromServer } from './settings/tags/data.js';
-import { hydrateWalletsFromServer } from './main/finance/cash/data.js';
 
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
