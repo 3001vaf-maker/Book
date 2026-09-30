@@ -425,7 +425,7 @@ export class RecordService {
         ? this.finance.repriceSettlement(nextSettlementSources, currentSettlement, person?.discountPercent)
         : null;
 
-    const { finance: _legacyFinance, ...currentRecord } = current;
+    const { finance: _financeProjection, ...currentRecord } = current;
     const stored = {
       ...currentRecord,
       date,
