@@ -104,9 +104,9 @@ assert.equal(getWalletBalance('cash'), -15000);
 const schema = readFileSync(new URL('../server/prisma/schema.prisma', import.meta.url), 'utf8');
 const server = readFileSync(new URL('../server/src/finance/finance.service.ts', import.meta.url), 'utf8');
 const controller = readFileSync(new URL('../server/src/finance/finance.controller.ts', import.meta.url), 'utf8');
-const financeUi = readFileSync(new URL('../finance/finance.js', import.meta.url), 'utf8');
-const articlesUi = readFileSync(new URL('../finance/articles.js', import.meta.url), 'utf8');
-const incomeExpenseUi = readFileSync(new URL('../finance/income-expense.js', import.meta.url), 'utf8');
+const financeUi = readFileSync(new URL('../core/finance/finance.js', import.meta.url), 'utf8');
+const articlesUi = readFileSync(new URL('../core/finance/articles.js', import.meta.url), 'utf8');
+const incomeExpenseUi = readFileSync(new URL('../core/finance/income-expense.js', import.meta.url), 'utf8');
 
 assert.match(schema, /model FinanceArticle/);
 assert.match(controller, /operations\/manual/);
