@@ -96,13 +96,13 @@ const methodsSource = readFileSync(new URL('../ui/payment/methods.js', import.me
 const paymentCss = readFileSync(new URL('../ui/payment/payment.css', import.meta.url), 'utf8');
 const recordViewSource = readFileSync(new URL('../journal/record-view.js', import.meta.url), 'utf8');
 const recordPaymentSource = readFileSync(new URL('../journal/record-payment.js', import.meta.url), 'utf8');
-const financeUiSource = readFileSync(new URL('../main/finance/finance.js', import.meta.url), 'utf8');
+const financeUiSource = readFileSync(new URL('../finance/finance.js', import.meta.url), 'utf8');
 const financeServiceSource = readFileSync(new URL('../core/finance/service.js', import.meta.url), 'utf8');
 const journalListSource = readFileSync(new URL('../journal/список.js', import.meta.url), 'utf8');
-const personMetadataSource = readFileSync(new URL('../main/people/metadata.js', import.meta.url), 'utf8');
-const walletSource = readFileSync(new URL('../main/finance/cash/cash.js', import.meta.url), 'utf8');
+const personMetadataSource = readFileSync(new URL('../people/metadata.js', import.meta.url), 'utf8');
+const walletSource = readFileSync(new URL('../finance/cash/cash.js', import.meta.url), 'utf8');
 const documentsSource = readFileSync(new URL('../settings/documents/documents.js', import.meta.url), 'utf8');
-const peopleSource = readFileSync(new URL('../main/people/people.js', import.meta.url), 'utf8');
+const peopleSource = readFileSync(new URL('../people/people.js', import.meta.url), 'utf8');
 
 assert.doesNotMatch(modalSource, /querySelector\(['"]input,select,textarea/);
 assert.match(modalSource, /data-modal-autofocus/);
