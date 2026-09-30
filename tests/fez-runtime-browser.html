@@ -79,6 +79,8 @@ await nextFrame();
 ok(getComputedStyle(edge).pointerEvents === 'none', 'bindZ:false activated a dead edge strip');
 disposeNoZ();
 
+const hiddenF = app.querySelector('[data-v2-card-deck][data-v2-deck-level="f"]');
+hiddenF.scrollLeft = hiddenF.scrollWidth;
 let firstOwnerCalls = 0;
 let dispose = initV2WorkspaceInteraction(app, {
   activeId:'one',
@@ -86,6 +88,7 @@ let dispose = initV2WorkspaceInteraction(app, {
   onRootSelect:() => { firstOwnerCalls += 1; },
 });
 await nextFrame();
+ok(app.querySelector('[data-v2-card-item="one"]').classList.contains('is-active'), 'closed F overwrote semantic activeId from stale scroll position');
 ok(getComputedStyle(edge).pointerEvents === 'auto', 'bound edge owner must become interactive');
 
 pointer(edge, 'pointerdown', 12, 300, 1);
