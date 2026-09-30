@@ -607,8 +607,8 @@ export function initV2Swipe(root, {
     const nextX = event.clientX - startX;
     const nextY = event.clientY - startY;
     if (axis === 'pending') {
-      if (Math.max(Math.abs(nextX), Math.abs(nextY)) < 6) return;
-      const horizontal = Math.abs(nextX) >= Math.abs(nextY) * 1.05;
+      if (Math.max(Math.abs(nextX), Math.abs(nextY)) < 4) return;
+      const horizontal = Math.abs(nextX) >= Math.abs(nextY) * .72;
       const allowedDirection = (nextX > 0 && onRight) || (nextX < 0 && onLeft);
       if (!horizontal || !allowedDirection) {
         clear();
@@ -1007,8 +1007,8 @@ export function initV2WorkspaceInteraction(root, {
     const dy = event.clientY - zGesture.y;
     zGesture.dx = dx;
     if (zGesture.axis === 'pending') {
-      if (Math.max(Math.abs(dx), Math.abs(dy)) < 6) return;
-      if (dx <= 0 || Math.abs(dx) < Math.abs(dy) * 1.05) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 4) return;
+      if (dx <= 0 || Math.abs(dx) < Math.abs(dy) * .72) {
         clearZGesture();
         return;
       }
