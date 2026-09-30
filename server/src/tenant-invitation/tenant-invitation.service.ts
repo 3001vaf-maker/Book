@@ -54,7 +54,7 @@ const CAPABILITY_CATALOG: Array<{
   starterLimit?: number | null;
 }> = [
   { key: 'profile.access', groupKey: 'system', name: 'Профиль', valueType: CapabilityValueType.BOOLEAN, position: 5, starterEnabled: true },
-  { key: 'workplaces.access', groupKey: 'profile', name: 'Рабочее пространство', valueType: CapabilityValueType.BOOLEAN, position: 10, starterEnabled: true },
+  { key: 'workplaces.access', groupKey: 'profile', name: 'Рабочие пространства', valueType: CapabilityValueType.BOOLEAN, position: 10, starterEnabled: true },
   { key: 'workplaces.max', groupKey: 'system', name: 'Количество рабочих пространств', valueType: CapabilityValueType.LIMIT, position: 15, starterLimit: 1 },
   { key: 'timetable.access', groupKey: 'work', name: 'График', valueType: CapabilityValueType.BOOLEAN, position: 20, starterEnabled: false },
   { key: 'people.access', groupKey: 'people', name: 'Клиенты', valueType: CapabilityValueType.BOOLEAN, position: 30, starterEnabled: true },
