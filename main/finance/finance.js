@@ -1,8 +1,7 @@
-import { actionBlock, button, details, emptyState, field, folderCard, list, modal, mountModal, openNotice, pageHeader, shortDateTime } from '../../ui/ui.js';
+import { button, details, emptyState, field, list, modal, mountModal, openNotice, pageHeader, shortDateTime } from '../../ui/ui.js';
 import { cancelFinanceOperation, getLedgerEntries } from '../../core/finance/index.js';
 import { canUseBookCapability } from '../../core/access.js';
-import { getWalletTotalBalance } from '../../settings/wallets/data.js';
-import { renderWallets } from '../../settings/wallets/wallets.js';
+import { renderWallets } from './cash/cash.js';
 import { renderFinanceArticles } from './articles.js';
 import { renderIncomeExpense } from './income-expense.js';
 import { renderSpecialFinanceOperations } from './special-operations.js';
@@ -122,7 +121,7 @@ function localDateTimeValue(date = new Date()) {
   return shifted.toISOString().slice(0, 16);
 }
 
-function openFinanceOperation(root, movements, operationId, onBack = () => renderFinance(root)) {
+function openFinanceOperation(root, movements, operationId) {
   const id = String(operationId || '');
   const entries = movements.filter((item) => String(item?.operationId || '') === id);
   if (!entries.length) return;
@@ -171,14 +170,14 @@ function openFinanceOperation(root, movements, operationId, onBack = () => rende
       });
       if (!cancelled) return;
       m.remove();
-      renderDDS(root, onBack);
+      renderDDS(root);
     } catch (error) {
       openNotice({ message: String(error?.message || 'Не удалось отменить операцию') });
     }
   });
 }
 
-function renderDDS(root, onBack = () => renderFinance(root)) {
+function renderDDS(root) {
   const movements = [...getLedgerEntries()].reverse();
   const operations = movements.length
     ? list({ items: movements.map(movementListItem) })
@@ -187,7 +186,7 @@ function renderDDS(root, onBack = () => renderFinance(root)) {
   root.innerHTML = `${pageHeader('ДДС', 'Все операции')}<div class="ui-list-toolbar"><div></div><div class="ui-list-toolbar__actions">${button('Excel', { className: 'ui-button--secondary', data: 'data-finance-dds-excel' })}</div></div>${operations}`;
   root.querySelector('[data-finance-dds-excel]')?.addEventListener('click', () => downloadDDS(movements));
   root.querySelectorAll('[data-finance-operation]').forEach((element) => {
-    element.addEventListener('click', () => openFinanceOperation(root, movements, element.dataset.financeOperation, onBack));
+    element.addEventListener('click', () => openFinanceOperation(root, movements, element.dataset.financeOperation));
   });
   
 }
@@ -207,69 +206,13 @@ export function financeNavigationItems() {
     .map(({ id, label }) => ({ id, label }));
 }
 
-export function renderFinanceSection(root, section = 'cash', { onBack = () => renderFinance(root) } = {}) {
-  if (section === 'dds') return renderDDS(root, onBack);
-  if (section === 'income-expense') return renderIncomeExpense(root, onBack);
-  if (section === 'articles') return renderFinanceArticles(root, onBack);
-  if (section === 'special') return renderSpecialFinanceOperations(root, onBack);
-  if (section === 'z-report') return renderZReport(root, onBack);
-  return renderWallets(root, onBack);
+export function renderFinanceSection(root, section = 'cash') {
+  if (section === 'dds') return renderDDS(root);
+  if (section === 'income-expense') return renderIncomeExpense(root);
+  if (section === 'articles') return renderFinanceArticles(root);
+  if (section === 'special') return renderSpecialFinanceOperations(root);
+  if (section === 'z-report') return renderZReport(root);
+  return renderWallets(root);
 }
 
-export function renderFinance(root) {
-  const cashTotal = formatMoney(getWalletTotalBalance());
-  const cashFolder = folderCard({
-    title: 'Касса',
-    icon: '₽',
-    count: cashTotal,
-    variant: 'compact',
-    data: 'data-finance-cash',
-    aria: `Открыть кассу, ${cashTotal}`,
-  });
-  const ddsFolder = folderCard({
-    title: 'ДДС',
-    icon: '▤',
-    variant: 'compact',
-    data: 'data-finance-dds',
-    aria: 'Открыть движение денежных средств',
-  });
-
-  const incomeExpenseFolder = folderCard({
-    title: 'Доход / Расход',
-    icon: '±',
-    variant: 'compact',
-    data: 'data-finance-income-expense',
-    aria: 'Открыть доходы и расходы',
-  });
-  const articlesFolder = folderCard({
-    title: 'Статьи',
-    icon: '≡',
-    variant: 'compact',
-    data: 'data-finance-articles',
-    aria: 'Открыть статьи доходов и расходов',
-  });
-  const specialFolder = folderCard({
-    title: 'Прочие операции',
-    icon: '↔',
-    variant: 'compact',
-    data: 'data-finance-special',
-    aria: 'Открыть займы, инвестиции и переводы',
-  });
-  const zReportFolder = folderCard({
-    title: 'Z-отчёт',
-    icon: 'Z',
-    variant: 'compact',
-    data: 'data-finance-z-report',
-    aria: 'Открыть Z-отчёт',
-  });
-
-  root.innerHTML = `${pageHeader('Финансы')}<div class="ui-folder-grid">${cashFolder}${ddsFolder}${incomeExpenseFolder}${articlesFolder}${specialFolder}${zReportFolder}</div>`;
-  root.querySelector('[data-finance-cash]')?.addEventListener('click', () => renderWallets(root, () => renderFinance(root)));
-  root.querySelector('[data-finance-dds]')?.addEventListener('click', () => renderDDS(root));
-  root.querySelector('[data-finance-income-expense]')?.addEventListener('click', () => renderIncomeExpense(root, () => renderFinance(root)));
-  root.querySelector('[data-finance-articles]')?.addEventListener('click', () => renderFinanceArticles(root, () => renderFinance(root)));
-  root.querySelector('[data-finance-special]')?.addEventListener('click', () => renderSpecialFinanceOperations(root, () => renderFinance(root)));
-  root.querySelector('[data-finance-z-report]')?.addEventListener('click', () => renderZReport(root, () => renderFinance(root)));
-}
-
-export { renderFinance as render };
+export { renderFinanceSection as render };
