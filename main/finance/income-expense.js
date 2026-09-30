@@ -10,7 +10,7 @@ import {
   textareaField,
 } from '../../ui/ui.js';
 import { getFinanceArticles, recordManualFinanceOperation } from '../../core/finance/index.js';
-import { getWallets } from '../../settings/wallets/data.js';
+import { getWallets } from './cash/data.js';
 
 function localDateTimeValue(date = new Date()) {
   const shifted = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
