@@ -86,7 +86,7 @@ function normalizeSettlement(value: unknown) {
   });
   const serviceTotal = money(source.serviceTotal ?? items.reduce((sum, item) => sum + item.price, 0));
   const discountTotal = money(source.discountTotal ?? items.reduce((sum, item) => sum + item.discountMoney, 0));
-  const planTotal = money(source.planTotal ?? source.dueTotal ?? items.reduce((sum, item) => sum + item.planAmount, 0));
+  const planTotal = money(source.planTotal ?? items.reduce((sum, item) => sum + item.planAmount, 0));
   return {
     items,
     serviceTotal,
