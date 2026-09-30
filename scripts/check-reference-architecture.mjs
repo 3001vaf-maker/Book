@@ -38,17 +38,20 @@ function report(file, rule) {
   errors.push(`${relative(root, file)}: ${rule}`);
 }
 
-const mainFiles = walk(join(root, 'main'));
+const coreReferenceFiles = [
+  ...walk(join(root, 'core/people')),
+  ...walk(join(root, 'core/finance')),
+];
 const settingsFiles = walk(join(root, 'settings'));
 const timetableFiles = walk(join(root, 'timetable'));
 const journalFiles = walk(join(root, 'journal'));
 const timetableController = join(root, 'timetable/timetable.js');
 const journalController = join(root, 'journal/journal.js');
 const journalWorkplaceControl = join(root, 'journal/workplace-control.js');
-const referenceFiles = [...mainFiles, ...settingsFiles, ...timetableFiles, ...journalFiles];
+const referenceFiles = [...coreReferenceFiles, ...settingsFiles, ...timetableFiles, ...journalFiles];
 const uiFiles = walk(join(root, 'ui'));
 const coreFiles = walk(join(root, 'core'));
-const allFiles = [...mainFiles, ...settingsFiles, ...timetableFiles, ...journalFiles, ...uiFiles, ...coreFiles, join(root, 'core.js')];
+const allFiles = [...settingsFiles, ...timetableFiles, ...journalFiles, ...uiFiles, ...coreFiles, join(root, 'core.js')];
 const cssFiles = [...walkCss(join(root, 'css')), ...walkCss(join(root, 'ui'))];
 
 for (const file of referenceFiles) {
