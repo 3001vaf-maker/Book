@@ -204,7 +204,7 @@ for (const [index, id, title] of [
   pointer(layer,'pointerup',82,362,120 + index);
   await wait(160);
   ok(!shell()?.querySelector('[data-v2-z-layer]'), 'DDS Z2 did not close by right swipe: ' + id);
-  ok(Boolean(shell()?.querySelector('[data-v2-workspace-a]'), 'DDS A/settings was not restored after closing Z2: ' + id);
+  ok(Boolean(shell()?.querySelector('[data-v2-workspace-a]')), 'DDS A/settings was not restored after closing Z2: ' + id);
 }
 
 await openF(2,'dds');
