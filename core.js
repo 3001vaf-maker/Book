@@ -1,5 +1,5 @@
-import { renderPeople } from './main/people/people.js';
-import { financeNavigationItems, renderFinanceSection } from './main/finance/finance.js';
+import { renderPeople } from './people/people.js';
+import { financeNavigationItems, renderFinanceSection } from './finance/finance.js';
 import { journalNavigationItems, renderJournalView } from './journal/journal.js';
 import { renderTimetable } from './timetable/timetable.js';
 import { settingsNavigationItems, renderSettingsSection } from './settings/settings.js';
@@ -422,7 +422,7 @@ function renderActiveWorkspaceSurface(surface) {
   if (section === 'people') return renderPeople(surface, {
     onDirectChat: (personKey) => navigate('chat', { navigationOpen: false, chatPersonKey: personKey }),
   });
-  if (section === 'finance') return renderFinanceSection(surface, ensureSecondary('finance'), { onBack: openNavigation });
+  if (section === 'finance') return renderFinanceSection(surface, ensureSecondary('finance'));
   if (section === 'timetable') return renderTimetable(surface);
   if (section === 'journal') {
     return renderJournalView(surface, ensureSecondary('journal'), {
