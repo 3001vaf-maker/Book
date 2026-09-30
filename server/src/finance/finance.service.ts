@@ -964,7 +964,7 @@ export class FinanceService {
         updatedAt: row.updatedAt.toISOString(),
       })),
       operations: operationRows,
-      ledger: ledgerRows => row.movementType === 'expense'),
+      ledger: ledgerRows,
     };
   }
 }
