@@ -24,6 +24,22 @@ function sourceMatch(item, source) {
     && String(item?.source?.id || '') === String(source?.id || '');
 }
 
+export async function canPermanentlyDeleteFinanceData() {
+  const response = await apiRequest('/saas-admin/me');
+  return response.ok;
+}
+
+export async function hardDeleteFinanceWallet(walletId) {
+  const id = String(walletId || '').trim();
+  if (!id) return null;
+  const response = await apiRequest(`/finance/wallets/${encodeURIComponent(id)}/hard`, {
+    method: 'DELETE',
+  });
+  const state = await applyServerState(response, 'Не удалось полностью удалить кассу');
+  notifyFinanceChanged({ action: 'wallet-hard-delete', walletId: id });
+  return state;
+}
+
 export async function refreshFinanceState() {
   const response = await apiRequest('/finance');
   return applyServerState(response, 'Не удалось обновить Финансы');

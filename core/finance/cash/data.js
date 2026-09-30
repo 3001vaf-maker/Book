@@ -74,8 +74,16 @@ export function updateWallet(id, patch) {
 export function deleteWallet(id) {
   const values = getWallets();
   const current = values.find((item) => item.id === id);
-  if (!current || current.system) return false;
+  if (!current || current.system || Math.abs(getWalletBalance(id)) > 0.009) return false;
   const deletedAt = new Date().toISOString();
   write(values.map((item) => item.id === id ? { ...item, deletedAt, updatedAt: deletedAt } : item));
+  return true;
+}
+
+export function deleteWalletPermanently(id) {
+  const values = readRaw();
+  const current = values.find((item) => item.id === id);
+  if (!current || current.system) return false;
+  write(values.filter((item) => item.id !== id));
   return true;
 }
