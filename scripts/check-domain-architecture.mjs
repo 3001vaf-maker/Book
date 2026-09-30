@@ -4,6 +4,8 @@ import { dirname, join, relative, resolve } from 'node:path';
 const root = process.cwd();
 const ignored = new Set(['.git', 'node_modules', '_site']);
 const errors = [];
+
+if (existsSync(join(root, 'main'))) errors.push('main/: obsolete root directory must not exist');
 const domains = ['day', 'time', 'record', 'finance'];
 const legacyFiles = [
   'core/day.js',
@@ -71,6 +73,10 @@ for (const file of walk(root)) {
   for (const specifier of imports(source)) {
     if (!specifier.startsWith('.')) continue;
     const resolved = rel(resolve(dirname(file), specifier));
+    if (resolved === 'main' || resolved.startsWith('main/')) {
+      errors.push(`${path}: must not import from obsolete main directory (${resolved})`);
+      continue;
+    }
     if (legacyFiles.includes(resolved)) {
       errors.push(`${path}: imports removed legacy domain owner ${resolved}`);
       continue;
