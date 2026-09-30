@@ -166,6 +166,47 @@ ok(Boolean(eCard('dds')), 'Finance E DDS missing');
 await tapAndOpen(eDeck(), eCard('dds'), 12, 'finance-dds');
 ok(!shell()?.classList.contains('is-deck-open'), 'DDS selection did not enter Z');
 
+const openDdsSettings = async () => {
+  const a = shell()?.querySelector('[data-v2-workspace-a]');
+  ok(Boolean(a), 'DDS A/settings control missing');
+  a?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+  await wait(120);
+  const modal = document.querySelector('[data-modal][data-v2-layer-kind="bottom"]');
+  ok(Boolean(modal), 'DDS settings did not open as bottom modal');
+  const ids = [...(modal?.querySelectorAll('[data-finance-dds-tool]') || [])]
+    .map((node) => node.dataset.financeDdsTool);
+  ok(ids.join('|') === 'income-expense|articles|special',
+    'DDS settings must contain Income/Expense, Articles and Special operations in place of former E folders');
+  return modal;
+};
+
+for (const [index, id, title] of [
+  [0, 'income-expense', 'Доход / Расход'],
+  [1, 'articles', 'Статьи'],
+  [2, 'special', 'Прочие операции'],
+]) {
+  mark('dds-settings-' + id);
+  const settings = await openDdsSettings();
+  const action = settings?.querySelector('[data-finance-dds-tool="' + id + '"]');
+  ok(Boolean(action), 'DDS settings action missing: ' + id);
+  action?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+  await wait(140);
+
+  const layer = shell()?.querySelector('[data-v2-z-layer]');
+  ok(Boolean(layer), 'DDS tool did not open as Z2: ' + id);
+  ok(layer?.querySelector('.page-header h1')?.textContent.trim() === title,
+    'DDS Z2 rendered wrong tool: ' + id);
+  ok(!document.querySelector('[data-modal][data-v2-layer-kind="bottom"]'),
+    'DDS settings modal remained open behind Z2: ' + id);
+
+  pointer(layer,'pointerdown',10,360,120 + index);
+  pointer(layer,'pointermove',82,362,120 + index);
+  pointer(layer,'pointerup',82,362,120 + index);
+  await wait(160);
+  ok(!shell()?.querySelector('[data-v2-z-layer]'), 'DDS Z2 did not close by right swipe: ' + id);
+  ok(Boolean(shell()?.querySelector('[data-v2-workspace-a]'), 'DDS A/settings was not restored after closing Z2: ' + id);
+}
+
 await openF(2,'dds');
 await tapAndOpen(fDeck(), fCard('journal'), 13, 'journal');
 ok(shell()?.classList.contains('is-e-open'), 'Journal did not open real E deck');
