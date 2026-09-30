@@ -20,7 +20,7 @@ import { canUseBookCapability, getBookAccess, loadBookAccess } from './core/acce
 import { startServerBookingSync } from './online-booking/server-sync.js';
 import { renderGlobalClient, renderOnlineBooking } from './online-booking/booking.js';
 import { startAccountRuntime } from './online-booking/account-runtime.js';
-import { field, passwordField, initPasswordFields, mountV2ZLayer, openNotice, initV2WorkspaceInteraction, setV2DeckOpen, v2EList, v2FDeck, v2Header, v2Shell, v2Sticker, v2ZLayer } from './ui/ui.js';
+import { field, passwordField, initPasswordFields, mountV2ZLayer, openNotice, initV2WorkspaceInteraction, setV2DeckOpen, v2CardDeck, v2Header, v2Shell, v2Sticker, v2ZLayer } from './ui/ui.js';
 import { clearLegacyBusinessStorage } from './core/legacy-browser-business.js';
 import { FirstRunRuntime, bindDemoBadgeAction, demoBadgeMarkup, startPlatformSessionTracking } from './first-run/runtime.js';
 import { startPlatformNotices } from './core/platform-notices.js';
@@ -461,15 +461,19 @@ function renderWorkspace() {
   const rootItems = allowedRootItems();
   const childItems = secondaryItems(root);
   const childActive = ensureSecondary(root);
-  const rootDeck = v2FDeck(rootItems, {
+  const rootDeck = v2CardDeck(rootItems, {
+    axis: 'x',
     active: root,
     data: 'data-v2-root-item',
     className: 'v2-deck--root',
     role: 'root',
+    level: 'f',
   });
-  const eDeck = childItems.length ? v2EList(childItems, {
+  const eDeck = childItems.length ? v2CardDeck(childItems, {
+    axis: 'y',
     active: childActive,
     data: 'data-v2-secondary-item',
+    level: 'e',
   }) : '';
 
   app.innerHTML = v2Shell({
