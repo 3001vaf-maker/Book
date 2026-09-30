@@ -91,9 +91,10 @@
 
 .v2-edge-swipe-zone{
   position:absolute;z-index:12;left:0;top:0;bottom:0;width:36px;
-  pointer-events:auto;touch-action:none;background:transparent
+  pointer-events:none;touch-action:none;background:transparent
 }
-.v2-app.is-deck-open .v2-edge-swipe-zone{pointer-events:none}
+.v2-edge-swipe-zone.is-active{pointer-events:auto}
+.v2-app.is-deck-open .v2-edge-swipe-zone.is-active{pointer-events:none}
 
 .v2-fe-deck{
   position:absolute;z-index:2;inset:0;overflow:hidden;pointer-events:none;opacity:0;
