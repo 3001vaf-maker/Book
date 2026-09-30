@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { calculateSettlement, hydrateFinanceFromServer } from '../core/finance/index.js';
-import { deleteWallet, getWalletTotalBalance, getWallets, hydrateWalletsFromServer, saveWallet } from '../settings/wallets/data.js';
+import { deleteWallet, getWalletTotalBalance, getWallets, hydrateWalletsFromServer, saveWallet } from '../main/finance/cash/data.js';
 import {
   canonicalFinanceState,
   paymentFixture,
@@ -65,7 +65,7 @@ assert.equal(getWalletTotalBalance(), 130);
 const coreSource = readFileSync(new URL('../core.js', import.meta.url), 'utf8');
 const financeSource = readFileSync(new URL('../main/finance/finance.js', import.meta.url), 'utf8');
 const settingsSource = readFileSync(new URL('../settings/settings.js', import.meta.url), 'utf8');
-const walletSource = readFileSync(new URL('../settings/wallets/wallets.js', import.meta.url), 'utf8');
+const walletSource = readFileSync(new URL('../main/finance/cash/cash.js', import.meta.url), 'utf8');
 const folderSource = readFileSync(new URL('../ui/cards/folder-card.js', import.meta.url), 'utf8');
 
 assert.match(coreSource, /from '\.\/main\/finance\/finance\.js'/);
