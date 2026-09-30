@@ -30,10 +30,10 @@ configureSoftTimeUsageReleaseSource(releaseJournalSoftTimeUsages);
 
 const ROOT_SECTIONS = [
   { id: 'people', label: 'Клиенты', capability: 'people.access' },
-  { id: 'finance', label: 'Финансы', capability: 'finance.access' },
+  { id: 'finance', label: 'Финансы', capability: '' },
   { id: 'timetable', label: 'График', capability: 'timetable.access' },
-  { id: 'journal', label: 'Журнал', capability: 'journal.access' },
-  { id: 'profile', label: 'Профиль', capability: 'profile.access' },
+  { id: 'journal', label: 'Журнал', capability: '' },
+  { id: 'profile', label: 'Профиль', capability: '' },
   { id: 'settings', label: 'Настройки', capability: '' },
 ];
 
@@ -205,6 +205,9 @@ function rootDefinition(section) {
 
 function sectionAllowed(section) {
   if (section === 'chat') return canUseBookCapability('chat.access');
+  if (section === 'finance' || section === 'journal' || section === 'settings') {
+    return secondaryItems(section).length > 0;
+  }
   const item = rootDefinition(section);
   return Boolean(item && (!item.capability || canUseBookCapability(item.capability)));
 }
@@ -213,10 +216,24 @@ function allowedSections() {
   return ROOT_SECTIONS.filter((item) => sectionAllowed(item.id)).map((item) => item.id);
 }
 
+function rootDisplayLabel(section) {
+  const definition = rootDefinition(section);
+  if (!definition) return '';
+  const children = secondaryItems(section);
+  return children.length === 1 ? children[0].label : definition.label;
+}
+
 function allowedRootItems() {
   return ROOT_SECTIONS
     .filter((item) => sectionAllowed(item.id))
-    .map(({ id, label }) => ({ id, label, childrenCount: secondaryItems(id).length }));
+    .map(({ id }) => {
+      const children = secondaryItems(id);
+      return {
+        id,
+        label: rootDisplayLabel(id),
+        childrenCount: children.length > 1 ? children.length : 0,
+      };
+    });
 }
 
 function defaultSection() {
@@ -444,7 +461,7 @@ function renderWorkspace() {
     role: 'root',
     level: 'f',
   });
-  const eDeck = childItems.length ? v2CardDeck(childItems, {
+  const eDeck = childItems.length > 1 ? v2CardDeck(childItems, {
     axis: 'y',
     active: childActive,
     data: 'data-v2-secondary-item',
@@ -452,7 +469,7 @@ function renderWorkspace() {
   }) : '';
 
   const headerMarkup = v2Header({
-    b: state.activeSection === 'chat' ? 'Чат' : rootDefinition(root)?.label || '',
+    b: state.activeSection === 'chat' ? 'Чат' : rootDisplayLabel(root),
     d: sectionAllowed('chat') ? { kind: 'chat', data: 'data-v2-workspace-chat', aria: 'Чат' } : null,
   });
   let shell = app.querySelector(':scope > [data-v2-app].v2-app--workspace');
@@ -522,7 +539,7 @@ function renderWorkspace() {
       state.navigationLevel = open ? 'e' : 'f';
     },
     onRootSelect: (id) => {
-      const hasE = secondaryItems(id).length > 0;
+      const hasE = secondaryItems(id).length > 1;
       state.navigationLevel = hasE ? 'e' : 'f';
       state.navigationEnterZ = !hasE;
       navigate(id, { navigationOpen: hasE });
