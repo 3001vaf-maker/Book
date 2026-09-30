@@ -1,6 +1,5 @@
 // Pure Settlement/Finance rules. No persistence, UI or browser state.
-// Legacy persisted fields such as planAmount/planTotal/fact* stay unchanged until the storage migration;
-// they are compatibility fields and are not the future Financial Model.
+// Settlement arithmetic is independent from persistence and UI.
 
 export function financialNumber(value) {
   const number = Number(String(value ?? '').replace(',', '.'));
