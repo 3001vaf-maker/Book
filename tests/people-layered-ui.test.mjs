@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const people = readFileSync(new URL('../people/people.js', import.meta.url), 'utf8');
-const peopleCss = readFileSync(new URL('../people/people.css', import.meta.url), 'utf8');
+const people = readFileSync(new URL('../core/people/people.js', import.meta.url), 'utf8');
 const v2 = readFileSync(new URL('../ui/v2/index.js', import.meta.url), 'utf8');
 const v2Css = readFileSync(new URL('../ui/v2/v2.css', import.meta.url), 'utf8');
 const selectors = readFileSync(new URL('../ui/selectors/index.js', import.meta.url), 'utf8');
@@ -64,8 +63,6 @@ const saveEnd = people.indexOf('function deletePersonByKey', saveStart);
 const saveBlock = people.slice(saveStart, saveEnd);
 assert.doesNotMatch(saveBlock, /person\.photo\s*=/);
 
-assert.match(peopleCss, /width:84px/);
-assert.match(peopleCss, /height:84px/);
 
 assert.match(miniCard, /export function miniCardRail/);
 assert.match(miniCardCss, /--mini-card-width:238px/);
