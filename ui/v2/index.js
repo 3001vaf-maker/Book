@@ -1103,16 +1103,6 @@ export function initV2WorkspaceInteraction(root, {
 
   setOpen(open, false);
   setEOpen(secondaryOpen, false);
-  queueOwnerFrame(() => {
-    if (open) {
-      centerCard(fCards[fActiveIndex], 'x');
-      scheduleGeometry(fDeck, fCards, 'x', (index) => { fActiveIndex = index; });
-    }
-    if (secondaryOpen) {
-      centerCard(eCards[eActiveIndex], 'y');
-      scheduleGeometry(eDeck, eCards, 'y', (index) => { eActiveIndex = index; });
-    }
-  });
 
   return () => {
     clearZGesture();
