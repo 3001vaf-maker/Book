@@ -3,8 +3,8 @@ import { calculateSettlement, getRecordPaymentState, getWallets, recordSettlemen
 import { cancelPaymentOperation, getRefundsForPayment, recordPaymentIncome, recordRefundExpense, saveSettlementSnapshot } from '../core/finance/index.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { normalizeWorkplaceTimeZone, zonedDateTimeParts, zonedDateTimeToDate } from '../core/time/index.js';
-import { getAllPeople } from '../people/data.js';
-import { personDisplay } from '../people/presentation.js';
+import { getAllPeople } from '../core/people/data.js';
+import { personDisplay } from '../core/people/presentation.js';
 import { getRecord } from '../core/record/index.js';
 import { setRecordAttendance, updateRecord } from '../core/record/index.js';
 import { journalRecordActionContext } from './record-action-context.js';
