@@ -309,12 +309,23 @@ export class SaasAccessService {
       return this.suspendedValue(capability.key, capability.valueType);
     }
 
-    if (this.demoActive(access)) return this.demoValue(capability.key, capability.valueType);
-    if (this.demoExpired(access)) return this.demoExpiredValue(capability.key, capability.valueType);
-    if (this.liveUnapproved(access)) return this.demoExpiredValue(capability.key, capability.valueType);
-
     const override = access.overrides[0];
     const planValue = access.plan?.capabilityValues[0];
+
+    if (this.demoActive(access)) {
+      if (capability.valueType === CapabilityValueType.BOOLEAN && override && override.enabled !== null) {
+        return {
+          key: capability.key,
+          valueType: capability.valueType,
+          enabled: override.enabled,
+          limit: null,
+          source: 'TENANT_OVERRIDE',
+        };
+      }
+      return this.demoValue(capability.key, capability.valueType);
+    }
+    if (this.demoExpired(access)) return this.demoExpiredValue(capability.key, capability.valueType);
+    if (this.liveUnapproved(access)) return this.demoExpiredValue(capability.key, capability.valueType);
 
     if (capability.valueType === CapabilityValueType.BOOLEAN) {
       if (override && override.enabled !== null) {
@@ -423,11 +434,23 @@ export class SaasAccessService {
       if (access.status === TenantAccessStatus.SUSPENDED) {
         return this.suspendedValue(capability.key, capability.valueType);
       }
-      if (this.demoActive(access)) return this.demoValue(capability.key, capability.valueType);
-      if (this.demoExpired(access)) return this.demoExpiredValue(capability.key, capability.valueType);
 
       const override = overrides.get(capability.id);
       const planValue = planValues.get(capability.id);
+
+      if (this.demoActive(access)) {
+        if (capability.valueType === CapabilityValueType.BOOLEAN && override && override.enabled !== null) {
+          return {
+            key: capability.key,
+            valueType: capability.valueType,
+            enabled: override.enabled,
+            limit: null,
+            source: 'TENANT_OVERRIDE',
+          };
+        }
+        return this.demoValue(capability.key, capability.valueType);
+      }
+      if (this.demoExpired(access)) return this.demoExpiredValue(capability.key, capability.valueType);
 
       if (capability.valueType === CapabilityValueType.BOOLEAN) {
         if (override && override.enabled !== null) {
