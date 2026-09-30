@@ -91,33 +91,27 @@ function v2NestedMark(count = 0) {
   return `<span class="v2-f-nested" aria-hidden="true"><i></i><i></i><i></i><b>${value}</b></span>`;
 }
 
-export function v2EList(items = [], { active = '', data = 'data-v2-e-item' } = {}) {
+export function v2CardDeck(items = [], {
+  axis = 'x',
+  active = '',
+  data = 'data-v2-deck-item',
+  className = '',
+  role = '',
+  level = 'f',
+} = {}) {
   const values = (Array.isArray(items) ? items : []).filter(Boolean).slice(0, 7);
   if (!values.length) return '';
+  const resolvedAxis = axis === 'y' ? 'y' : 'x';
   const activeId = String(active || values[0]?.id || '0');
   const activeIndex = Math.max(0, values.findIndex((item, index) => String(item.id || index) === activeId));
-  return `<div class="v2-e-deck" data-v2-e-list data-v2-e-count="${values.length}">${values.map((item, index) => {
-    const id = String(item.id || index);
-    const isActive = index === activeIndex;
-    const itemData = data ? ` ${data}="${text(id)}"` : '';
-    return `<button type="button" class="v2-e-card${isActive ? ' is-active' : ''}"${itemData} data-v2-e-index="${index}" aria-label="${text(item.aria || item.label || '')}"${isActive ? ' aria-current="true"' : ''}>${v2NavigationIcon(item.icon || id)}<strong>${text(item.label || '')}</strong></button>`;
-  }).join('')}</div>`;
-}
-
-export function v2FDeck(items = [], { active = '', data = 'data-v2-deck-item', className = '', role = '' } = {}) {
-  const values = (Array.isArray(items) ? items : []).filter(Boolean).slice(0, 7);
-  if (!values.length) return '';
-  const activeId = String(active || values[0]?.id || '0');
-  const activeIndex = Math.max(0, values.findIndex((item, index) => String(item.id || index) === activeId));
-  const deckClasses = ['v2-deck', className].filter(Boolean).join(' ');
+  const classes = ['v2-card-deck', `v2-card-deck--${resolvedAxis}`, className].filter(Boolean).join(' ');
   const roleData = role ? ` data-v2-deck-role="${text(role)}"` : '';
-  return `<div class="${text(deckClasses)}" data-v2-deck data-v2-deck-count="${values.length}"${roleData}>${values.map((item, index) => {
+  return `<div class="${text(classes)}" data-v2-card-deck data-v2-deck-axis="${resolvedAxis}" data-v2-deck-level="${text(level)}" data-v2-deck-count="${values.length}"${roleData}>${values.map((item, index) => {
     const id = String(item.id || index);
     const isActive = index === activeIndex;
     const childrenCount = Number(item.childrenCount || item.children || 0);
-    const classes = ['v2-deck__card', isActive ? 'is-active' : ''].filter(Boolean).join(' ');
-    const customData = data && data !== 'data-v2-deck-item' ? ` ${data}="${text(id)}"` : '';
-    return `<button type="button" class="${classes}" data-v2-deck-item="${text(id)}"${customData} data-v2-f-index="${index}" aria-label="${text(item.aria || item.label || '')}"${isActive ? ' aria-current="true"' : ''}>${v2NestedMark(childrenCount)}${v2NavigationIcon(item.icon || id)}<strong>${text(item.label || '')}</strong></button>`;
+    const customData = data ? ` ${data}="${text(id)}"` : '';
+    return `<button type="button" class="v2-card-deck__card${isActive ? ' is-active' : ''}" data-v2-card-item="${text(id)}"${customData} data-v2-card-index="${index}" aria-label="${text(item.aria || item.label || '')}"${isActive ? ' aria-current="true"' : ''}>${level === 'f' ? v2NestedMark(childrenCount) : ''}${v2NavigationIcon(item.icon || id)}<strong>${text(item.label || '')}</strong></button>`;
   }).join('')}</div>`;
 }
 
@@ -519,35 +513,30 @@ export function mountV2Layer(html, { root = null } = {}) {
   return node;
 }
 
-export function initV2Swipe(root, { onRight = null, onLeft = null, threshold = 72, maxDrag = 180, revealDeck = true } = {}) {
-  const surface = root?.matches?.('[data-v2-z], [data-v2-z-layer]') ? root : root?.querySelector?.('[data-v2-z], [data-v2-z-layer]');
+export function initV2Swipe(root, {
+  onRight = null,
+  onLeft = null,
+  threshold = 42,
+  maxDrag = 180,
+  revealDeck = true,
+  edgeWidth = 24,
+} = {}) {
+  const surface = root?.matches?.('[data-v2-z], [data-v2-z-layer]')
+    ? root
+    : root?.querySelector?.('[data-v2-z], [data-v2-z-layer]');
   if (!surface) return () => {};
   const app = surface.closest?.('[data-v2-app]');
+  const stage = app?.querySelector?.('.v2-app__stage') || surface.parentElement;
   const isLayer = surface.matches?.('[data-v2-z-layer]');
   const isBaseZ = surface.matches?.('[data-v2-z]') && !isLayer;
-  const hasDeck = revealDeck && isBaseZ && Boolean(app?.querySelector?.('[data-v2-deck]'));
+  const hasDeck = revealDeck && isBaseZ && Boolean(app?.querySelector?.('[data-v2-card-deck][data-v2-deck-level="f"]'));
+  const gestureHost = stage || surface;
   let pointerId = null;
   let startX = 0;
   let startY = 0;
   let dx = 0;
   let axis = 'pending';
   let suppressNextClick = false;
-  let forceNavigation = false;
-  let horizontalScrollOwner = null;
-
-  const nestedHorizontalScroller = (target) => {
-    let node = target?.nodeType === 1 ? target : target?.parentElement;
-    while (node && node !== surface) {
-      if (node.matches?.('[data-v2-stage-gesture-ignore]')) return { blocked: true, owner: null };
-      const style = window.getComputedStyle?.(node);
-      const overflowX = style?.overflowX || '';
-      if ((overflowX === 'auto' || overflowX === 'scroll') && Number(node.scrollWidth || 0) > Number(node.clientWidth || 0) + 2) {
-        return { blocked: false, owner: node };
-      }
-      node = node.parentElement;
-    }
-    return { blocked: false, owner: null };
-  };
 
   const isTopmost = () => {
     const layers = [...(app?.querySelectorAll?.('[data-v2-z-layer]') || [])];
@@ -555,25 +544,24 @@ export function initV2Swipe(root, { onRight = null, onLeft = null, threshold = 7
     return layers.length === 0;
   };
 
-  const reset = () => {
+  const clear = () => {
     surface.style.removeProperty('--v2-drag-x');
     surface.classList.remove('is-dragging');
     app?.classList.remove('is-revealing-deck');
     pointerId = null;
     dx = 0;
     axis = 'pending';
-    forceNavigation = false;
-    horizontalScrollOwner = null;
   };
 
   const down = (event) => {
     if (!isTopmost()) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
-    const rect = surface.getBoundingClientRect?.();
-    forceNavigation = Number(event.clientX || 0) <= Number(rect?.left || 0) + 36;
-    const nested = forceNavigation ? { blocked: false, owner: null } : nestedHorizontalScroller(event.target);
-    if (nested.blocked) return;
-    horizontalScrollOwner = nested.owner;
+    const stageRect = stage?.getBoundingClientRect?.() || surface.getBoundingClientRect?.();
+    const leftEdge = Number(stageRect?.left || 0) + Number(edgeWidth || 24);
+    const rightEdge = Number(stageRect?.right || 0) - Number(edgeWidth || 24);
+    const wantsRight = Boolean(onRight) && Number(event.clientX || 0) <= leftEdge;
+    const wantsLeft = Boolean(onLeft) && Number(event.clientX || 0) >= rightEdge;
+    if (!wantsRight && !wantsLeft) return;
     pointerId = event.pointerId;
     startX = event.clientX;
     startY = event.clientY;
@@ -581,57 +569,44 @@ export function initV2Swipe(root, { onRight = null, onLeft = null, threshold = 7
     axis = 'pending';
     suppressNextClick = false;
   };
+
   const move = (event) => {
     if (event.pointerId !== pointerId) return;
     const nextX = event.clientX - startX;
     const nextY = event.clientY - startY;
     if (axis === 'pending') {
-      if (Math.max(Math.abs(nextX), Math.abs(nextY)) < 7) return;
-      const rightIntent = nextX > 0 && Math.abs(nextX) >= Math.abs(nextY) * .90;
-      axis = rightIntent || Math.abs(nextX) >= Math.abs(nextY) * 1.08 ? 'horizontal' : 'vertical';
-      if (axis === 'vertical') {
-        pointerId = null;
+      if (Math.max(Math.abs(nextX), Math.abs(nextY)) < 6) return;
+      const horizontal = Math.abs(nextX) >= Math.abs(nextY) * 1.05;
+      const allowedDirection = (nextX > 0 && onRight) || (nextX < 0 && onLeft);
+      if (!horizontal || !allowedDirection) {
+        clear();
         return;
       }
-      if (!forceNavigation && horizontalScrollOwner) {
-        const maxScrollLeft = Math.max(0, Number(horizontalScrollOwner.scrollWidth || 0) - Number(horizontalScrollOwner.clientWidth || 0));
-        const scrollLeft = Number(horizontalScrollOwner.scrollLeft || 0);
-        const childCanConsume = (nextX > 0 && scrollLeft > 1) || (nextX < 0 && scrollLeft < maxScrollLeft - 1);
-        if (childCanConsume) {
-          pointerId = null;
-          return;
-        }
-      }
-      surface.setPointerCapture?.(event.pointerId);
+      axis = 'horizontal';
+      gestureHost.setPointerCapture?.(event.pointerId);
     }
-    if (axis !== 'horizontal') return;
     const allowedX = nextX > 0 ? (onRight ? nextX : 0) : (onLeft ? nextX : 0);
     dx = Math.max(-maxDrag, Math.min(maxDrag, allowedX));
     if (hasDeck && dx > 0 && onRight && !app?.classList.contains('is-deck-open')) {
       app?.classList.add('is-revealing-deck');
-    } else if (dx <= 0) {
-      app?.classList.remove('is-revealing-deck');
     }
-    if (dx !== 0) {
-      surface.classList.add('is-dragging');
-      surface.style.setProperty('--v2-drag-x', `${dx}px`);
-      if (Math.abs(nextX) > 7) suppressNextClick = true;
-    }
+    surface.classList.add('is-dragging');
+    surface.style.setProperty('--v2-drag-x', `${dx}px`);
+    if (Math.abs(nextX) > 7) suppressNextClick = true;
     event.preventDefault();
   };
+
   const up = (event) => {
     if (event.pointerId !== pointerId) return;
     const finalDx = dx;
     const finalAxis = axis;
-    surface.releasePointerCapture?.(event.pointerId);
-    pointerId = null;
-    dx = 0;
-    axis = 'pending';
-    if (finalAxis === 'horizontal' && finalDx >= threshold) onRight?.();
-    else if (finalAxis === 'horizontal' && finalDx <= -threshold) onLeft?.();
-    surface.classList.remove('is-dragging');
-    surface.style.removeProperty('--v2-drag-x');
-    app?.classList.remove('is-revealing-deck');
+    try {
+      if (gestureHost.hasPointerCapture?.(event.pointerId)) gestureHost.releasePointerCapture?.(event.pointerId);
+    } catch {}
+    clear();
+    if (finalAxis !== 'horizontal') return;
+    if (finalDx >= threshold) onRight?.();
+    else if (finalDx <= -threshold) onLeft?.();
   };
 
   const click = (event) => {
@@ -641,19 +616,20 @@ export function initV2Swipe(root, { onRight = null, onLeft = null, threshold = 7
     event.stopPropagation();
   };
 
-  surface.addEventListener('pointerdown', down);
-  surface.addEventListener('pointermove', move, { passive: false });
-  surface.addEventListener('pointerup', up);
-  surface.addEventListener('pointercancel', reset);
-  surface.addEventListener('click', click, true);
+  gestureHost.addEventListener('pointerdown', down);
+  gestureHost.addEventListener('pointermove', move, { passive: false });
+  gestureHost.addEventListener('pointerup', up);
+  gestureHost.addEventListener('pointercancel', clear);
+  gestureHost.addEventListener('click', click, true);
   return () => {
-    surface.removeEventListener('pointerdown', down);
-    surface.removeEventListener('pointermove', move);
-    surface.removeEventListener('pointerup', up);
-    surface.removeEventListener('pointercancel', reset);
-    surface.removeEventListener('click', click, true);
+    gestureHost.removeEventListener('pointerdown', down);
+    gestureHost.removeEventListener('pointermove', move);
+    gestureHost.removeEventListener('pointerup', up);
+    gestureHost.removeEventListener('pointercancel', clear);
+    gestureHost.removeEventListener('click', click, true);
   };
 }
+
 
 export function setV2DeckOpen(root, open) {
   const app = root?.matches?.('[data-v2-app]')
@@ -682,6 +658,7 @@ export function initV2WorkspaceInteraction(root, {
   bindZ = true,
   threshold = 42,
   maxDrag = 180,
+  edgeWidth = 24,
 } = {}) {
   const app = root?.matches?.('[data-v2-app]')
     ? root
@@ -690,103 +667,179 @@ export function initV2WorkspaceInteraction(root, {
 
   const stage = app.querySelector('.v2-app__stage');
   const front = app.querySelector('[data-v2-front]');
-  const deck = app.querySelector('[data-v2-deck]');
-  const eDeck = app.querySelector('[data-v2-e-list]');
+  const fDeck = app.querySelector('[data-v2-card-deck][data-v2-deck-level="f"]');
+  const eDeck = app.querySelector('[data-v2-card-deck][data-v2-deck-level="e"]');
   const z = app.querySelector('[data-v2-front] > [data-v2-z]');
   if (!stage || !front) return () => {};
 
-  const fCards = [...(deck?.querySelectorAll?.('.v2-deck__card') || [])];
-  const eCards = [...(eDeck?.querySelectorAll?.('.v2-e-card') || [])];
-  let fActiveIndex = Math.max(0, fCards.findIndex((card) => String(card.getAttribute('data-account-deck-item') || card.getAttribute('data-v2-deck-item') || '') === String(activeId || '')));
-  let eActiveIndex = Math.max(0, eCards.findIndex((card) => String(card.getAttribute('data-v2-secondary-item') || card.getAttribute('data-v2-e-item') || '') === String(eActiveId || '')));
+  const fCards = [...(fDeck?.querySelectorAll?.('[data-v2-card-item]') || [])];
+  const eCards = [...(eDeck?.querySelectorAll?.('[data-v2-card-item]') || [])];
+  let fActiveIndex = Math.max(0, fCards.findIndex((card) => String(card.getAttribute('data-v2-card-item') || '') === String(activeId || '')));
+  let eActiveIndex = Math.max(0, eCards.findIndex((card) => String(card.getAttribute('data-v2-card-item') || '') === String(eActiveId || '')));
   let open = Boolean(deckOpen);
   let secondaryOpen = Boolean(open && eOpen && eCards.length);
-  let gesture = null;
-  let suppressNextClick = false;
-  let suppressTimer = 0;
+  let zGesture = null;
+  let eGesture = null;
+  const disposers = [];
+  const scrollFrames = new Map();
 
-  const fId = (card) => String(card?.getAttribute('data-account-deck-item') || card?.getAttribute('data-v2-deck-item') || '');
-  const eId = (card) => String(card?.getAttribute('data-v2-secondary-item') || card?.getAttribute('data-v2-e-item') || '');
+  const cardId = (card) => String(card?.getAttribute('data-v2-card-item') || '');
 
-  const clampScroll = (node, value, axis = 'x') => {
-    if (!node) return 0;
-    const max = axis === 'x'
-      ? Math.max(0, Number(node.scrollWidth || 0) - Number(node.clientWidth || 0))
-      : Math.max(0, Number(node.scrollHeight || 0) - Number(node.clientHeight || 0));
-    return Math.max(0, Math.min(max, Number(value || 0)));
-  };
-
-  const centerCard = (scroller, card, axis = 'x') => {
-    if (!scroller || !card) return;
-    if (axis === 'x') {
-      const next = Number(card.offsetLeft || 0) - (Number(scroller.clientWidth || 0) - Number(card.offsetWidth || 0)) / 2;
-      scroller.scrollLeft = clampScroll(scroller, next, 'x');
-      return;
-    }
-    const next = Number(card.offsetTop || 0) - (Number(scroller.clientHeight || 0) - Number(card.offsetHeight || 0)) / 2;
-    scroller.scrollTop = clampScroll(scroller, next, 'y');
-  };
-
-  const centerF = () => centerCard(deck, fCards[fActiveIndex], 'x');
-  const centerE = () => centerCard(eDeck, eCards[eActiveIndex], 'y');
-
-  const syncF = () => {
-    fCards.forEach((card, index) => {
-      const active = index === fActiveIndex;
+  const setActiveCard = (cards, index) => {
+    cards.forEach((card, cardIndex) => {
+      const active = cardIndex === index;
       card.classList.toggle('is-active', active);
       if (active) card.setAttribute('aria-current', 'true');
       else card.removeAttribute('aria-current');
     });
   };
 
-  const syncE = () => {
-    eCards.forEach((card, index) => {
-      const active = index === eActiveIndex;
-      card.classList.toggle('is-active', active);
-      if (active) card.setAttribute('aria-current', 'true');
-      else card.removeAttribute('aria-current');
+  const updateDeckGeometry = (deck, cards, axis) => {
+    if (!deck || !cards.length) return -1;
+    const center = axis === 'y' ? Number(deck.clientHeight || 0) / 2 : Number(deck.clientWidth || 0) / 2;
+    let nearestIndex = 0;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    cards.forEach((card, index) => {
+      const cardCenter = axis === 'y'
+        ? Number(card.offsetTop || 0) - Number(deck.scrollTop || 0) + Number(card.offsetHeight || 0) / 2
+        : Number(card.offsetLeft || 0) - Number(deck.scrollLeft || 0) + Number(card.offsetWidth || 0) / 2;
+      const span = Math.max(1, axis === 'y' ? Number(card.offsetHeight || 0) : Number(card.offsetWidth || 0));
+      const signed = (cardCenter - center) / Math.max(1, span * .72);
+      const absolute = Math.min(2.6, Math.abs(signed));
+      const depth = -Math.min(180, absolute * 82);
+      const scale = 1 - Math.min(.13, absolute * .055);
+      const opacity = 1 - Math.min(.38, absolute * .16);
+      const brightness = 1 - Math.min(.22, absolute * .09);
+      const rotation = Math.max(-13, Math.min(13, signed * (axis === 'y' ? -6.5 : 7.5)));
+      const shift = Math.max(-18, Math.min(18, signed * -8));
+      card.style.setProperty('--v2-card-depth', `${depth}px`);
+      card.style.setProperty('--v2-card-scale', scale.toFixed(4));
+      card.style.setProperty('--v2-card-opacity', opacity.toFixed(4));
+      card.style.setProperty('--v2-card-brightness', brightness.toFixed(4));
+      card.style.setProperty('--v2-card-rotation', `${rotation.toFixed(3)}deg`);
+      card.style.setProperty('--v2-card-shift', `${shift.toFixed(3)}px`);
+      card.style.setProperty('--v2-card-stack', String(Math.max(1, 100 - Math.round(absolute * 24))));
+      if (Math.abs(cardCenter - center) < nearestDistance) {
+        nearestDistance = Math.abs(cardCenter - center);
+        nearestIndex = index;
+      }
+    });
+    setActiveCard(cards, nearestIndex);
+    return nearestIndex;
+  };
+
+  const scheduleGeometry = (deck, cards, axis, assign) => {
+    if (!deck) return;
+    const prior = scrollFrames.get(deck);
+    if (prior) cancelAnimationFrame(prior);
+    const frame = requestAnimationFrame(() => {
+      scrollFrames.delete(deck);
+      const index = updateDeckGeometry(deck, cards, axis);
+      if (index >= 0) assign(index);
+    });
+    scrollFrames.set(deck, frame);
+  };
+
+  const centerCard = (card, axis, behavior = 'auto') => {
+    if (!card) return;
+    card.scrollIntoView({
+      behavior,
+      block: axis === 'y' ? 'center' : 'nearest',
+      inline: axis === 'x' ? 'center' : 'nearest',
     });
   };
 
-  const horizontalGestureContext = (target) => {
-    let node = target?.nodeType === 1 ? target : target?.parentElement;
-    let scrollOwner = null;
-    while (node && node !== z && node !== stage) {
-      if (node.matches?.('[data-v2-stage-gesture-ignore]')) {
-        return { blocked: true, scrollOwner: null };
-      }
-      const style = window.getComputedStyle?.(node);
-      const overflowX = style?.overflowX || '';
-      if (!scrollOwner && (overflowX === 'auto' || overflowX === 'scroll') && Number(node.scrollWidth || 0) > Number(node.clientWidth || 0) + 2) {
-        scrollOwner = node;
-      }
-      node = node.parentElement;
-    }
-    return { blocked: false, scrollOwner };
-  };
+  const bindNativeDeck = (deck, cards, axis, getActiveIndex, setActiveIndex, onSelect) => {
+    if (!deck || !cards.length) return;
+    let pointer = null;
+    let suppressClick = false;
+    let settleTimer = 0;
 
-  const markSuppressClick = () => {
-    suppressNextClick = true;
-    if (suppressTimer) window.clearTimeout(suppressTimer);
-    suppressTimer = window.setTimeout(() => {
-      suppressNextClick = false;
-      suppressTimer = 0;
-    }, 350);
-  };
+    const refresh = () => scheduleGeometry(deck, cards, axis, setActiveIndex);
+    const settle = () => {
+      if (settleTimer) window.clearTimeout(settleTimer);
+      settleTimer = window.setTimeout(() => {
+        const next = updateDeckGeometry(deck, cards, axis);
+        if (next >= 0) setActiveIndex(next);
+      }, 90);
+    };
+    const down = (event) => {
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      pointer = {
+        id: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+        dragged: false,
+      };
+      suppressClick = false;
+    };
+    const move = (event) => {
+      if (!pointer || event.pointerId !== pointer.id) return;
+      const dx = event.clientX - pointer.x;
+      const dy = event.clientY - pointer.y;
+      if (Math.hypot(dx, dy) >= 9) pointer.dragged = true;
+    };
+    const up = (event) => {
+      if (!pointer || event.pointerId !== pointer.id) return;
+      suppressClick = pointer.dragged;
+      pointer = null;
+    };
+    const cancel = () => {
+      pointer = null;
+      suppressClick = true;
+    };
+    const click = (event) => {
+      const card = event.target.closest?.('[data-v2-card-item]');
+      if (!card || !deck.contains(card)) return;
+      if (suppressClick) {
+        suppressClick = false;
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      const index = cards.indexOf(card);
+      if (index < 0) return;
+      const activeIndex = getActiveIndex();
+      if (index !== activeIndex) {
+        event.preventDefault();
+        event.stopPropagation();
+        centerCard(card, axis, 'smooth');
+        return;
+      }
+      const id = cardId(card);
+      if (id) onSelect?.(id);
+    };
 
-  const clearMotion = () => {
-    app.classList.remove('is-revealing-deck');
-    front.classList.remove('is-dragging');
-    front.style.removeProperty('--v2-front-drag-x');
-    eDeck?.classList.remove('is-dragging');
-    eDeck?.style.removeProperty('--v2-e-drag-x');
+    deck.addEventListener('scroll', refresh, { passive: true });
+    deck.addEventListener('scroll', settle, { passive: true });
+    deck.addEventListener('pointerdown', down, { passive: true });
+    deck.addEventListener('pointermove', move, { passive: true });
+    deck.addEventListener('pointerup', up, { passive: true });
+    deck.addEventListener('pointercancel', cancel, { passive: true });
+    deck.addEventListener('click', click, true);
+    disposers.push(() => {
+      if (settleTimer) window.clearTimeout(settleTimer);
+      deck.removeEventListener('scroll', refresh);
+      deck.removeEventListener('scroll', settle);
+      deck.removeEventListener('pointerdown', down);
+      deck.removeEventListener('pointermove', move);
+      deck.removeEventListener('pointerup', up);
+      deck.removeEventListener('pointercancel', cancel);
+      deck.removeEventListener('click', click, true);
+    });
   };
 
   const setEOpen = (nextOpen, notify = true) => {
     secondaryOpen = Boolean(open && nextOpen && eCards.length);
     app.classList.toggle('is-e-open', secondaryOpen);
-    clearMotion();
-    if (secondaryOpen) requestAnimationFrame(centerE);
+    eDeck?.style.removeProperty('--v2-e-dismiss-x');
+    eDeck?.classList.remove('is-dragging');
+    if (secondaryOpen) {
+      requestAnimationFrame(() => {
+        centerCard(eCards[eActiveIndex], 'y');
+        scheduleGeometry(eDeck, eCards, 'y', (index) => { eActiveIndex = index; });
+      });
+    }
     if (notify) onEOpenChange?.(secondaryOpen);
     return secondaryOpen;
   };
@@ -797,226 +850,184 @@ export function initV2WorkspaceInteraction(root, {
       secondaryOpen = false;
       app.classList.remove('is-e-open');
     }
-    clearMotion();
-    if (open) requestAnimationFrame(centerF);
+    front.classList.remove('is-dragging');
+    front.style.removeProperty('--v2-front-drag-x');
+    if (open) {
+      requestAnimationFrame(() => {
+        centerCard(fCards[fActiveIndex], 'x');
+        scheduleGeometry(fDeck, fCards, 'x', (index) => { fActiveIndex = index; });
+      });
+    }
     if (notify) onDeckOpenChange?.(open);
     return open;
   };
 
-  const endGesture = () => {
-    if (gesture?.captured && gesture.pointerId != null) {
-      try { stage.releasePointerCapture?.(gesture.pointerId); } catch {}
-    }
-    gesture = null;
-    clearMotion();
+  const clearZEntry = (event) => {
+    if (event.animationName === 'v2-z-enter-from-right') app.classList.remove('is-z-entering');
   };
+  front.addEventListener('animationend', clearZEntry);
+  disposers.push(() => front.removeEventListener('animationend', clearZEntry));
+
+  bindNativeDeck(
+    fDeck,
+    fCards,
+    'x',
+    () => fActiveIndex,
+    (index) => { fActiveIndex = index; },
+    (id) => onRootSelect?.(id),
+  );
+  bindNativeDeck(
+    eDeck,
+    eCards,
+    'y',
+    () => eActiveIndex,
+    (index) => { eActiveIndex = index; },
+    (id) => onSecondarySelect?.(id),
+  );
+
+  const eDown = (event) => {
+    if (!secondaryOpen || !eDeck?.contains(event.target)) return;
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    eGesture = { id:event.pointerId, x:event.clientX, y:event.clientY, dx:0, axis:'pending' };
+  };
+  const eMove = (event) => {
+    if (!eGesture || event.pointerId !== eGesture.id) return;
+    const dx = event.clientX - eGesture.x;
+    const dy = event.clientY - eGesture.y;
+    eGesture.dx = dx;
+    if (eGesture.axis === 'pending') {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 7) return;
+      if (Math.abs(dy) >= Math.abs(dx) * 1.05 || dx <= 0) {
+        eGesture = null;
+        return;
+      }
+      eGesture.axis = 'horizontal';
+      eDeck.setPointerCapture?.(event.pointerId);
+    }
+    const dragX = Math.max(0, Math.min(Math.max(maxDrag, Number(stage.clientWidth || 0)), dx));
+    eDeck.classList.add('is-dragging');
+    eDeck.style.setProperty('--v2-e-dismiss-x', `${dragX}px`);
+    event.preventDefault();
+  };
+  const eUp = (event) => {
+    if (!eGesture || event.pointerId !== eGesture.id) return;
+    const current = eGesture;
+    eGesture = null;
+    try {
+      if (eDeck.hasPointerCapture?.(event.pointerId)) eDeck.releasePointerCapture?.(event.pointerId);
+    } catch {}
+    eDeck.classList.remove('is-dragging');
+    eDeck.style.removeProperty('--v2-e-dismiss-x');
+    if (current.axis === 'horizontal' && current.dx >= threshold) setEOpen(false);
+  };
+  const eCancel = () => {
+    eGesture = null;
+    eDeck?.classList.remove('is-dragging');
+    eDeck?.style.removeProperty('--v2-e-dismiss-x');
+  };
+  eDeck?.addEventListener('pointerdown', eDown);
+  eDeck?.addEventListener('pointermove', eMove, { passive:false });
+  eDeck?.addEventListener('pointerup', eUp);
+  eDeck?.addEventListener('pointercancel', eCancel);
+  disposers.push(() => {
+    eDeck?.removeEventListener('pointerdown', eDown);
+    eDeck?.removeEventListener('pointermove', eMove);
+    eDeck?.removeEventListener('pointerup', eUp);
+    eDeck?.removeEventListener('pointercancel', eCancel);
+  });
+
+  const clearZGesture = () => {
+    if (zGesture?.captured && zGesture.id != null) {
+      try { stage.releasePointerCapture?.(zGesture.id); } catch {}
+    }
+    zGesture = null;
+    front.classList.remove('is-dragging');
+    front.style.removeProperty('--v2-front-drag-x');
+    app.classList.remove('is-revealing-deck');
+  };
+
+  const zDown = (event) => {
+    if (!bindZ || open || zGesture || app.querySelector('[data-v2-z-layer]')) return;
+    if (event.target.closest?.('[data-v2-layer], [data-v2-z-layer]')) return;
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    const rect = stage.getBoundingClientRect();
+    if (Number(event.clientX || 0) > rect.left + edgeWidth) return;
+    zGesture = {
+      id:event.pointerId,
+      x:event.clientX,
+      y:event.clientY,
+      dx:0,
+      axis:'pending',
+      captured:false,
+      scrollTop:Number(z?.scrollTop || 0),
+    };
+  };
+  const zMove = (event) => {
+    if (!zGesture || event.pointerId !== zGesture.id) return;
+    const dx = event.clientX - zGesture.x;
+    const dy = event.clientY - zGesture.y;
+    zGesture.dx = dx;
+    if (zGesture.axis === 'pending') {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 6) return;
+      if (dx <= 0 || Math.abs(dx) < Math.abs(dy) * 1.05) {
+        clearZGesture();
+        return;
+      }
+      zGesture.axis = 'horizontal';
+      stage.setPointerCapture?.(event.pointerId);
+      zGesture.captured = true;
+    }
+    if (z) z.scrollTop = zGesture.scrollTop;
+    const dragX = Math.max(0, Math.min(Math.max(maxDrag, Number(stage.clientWidth || 0)), dx));
+    front.classList.add('is-dragging');
+    front.style.setProperty('--v2-front-drag-x', `${dragX}px`);
+    app.classList.add('is-revealing-deck');
+    event.preventDefault();
+  };
+  const zUp = (event) => {
+    if (!zGesture || event.pointerId !== zGesture.id) return;
+    const current = zGesture;
+    clearZGesture();
+    if (current.axis !== 'horizontal' || current.dx < threshold) return;
+    if (onZRight) onZRight();
+    else {
+      setOpen(true);
+      setEOpen(false, false);
+    }
+  };
+  const zCancel = () => clearZGesture();
+
+  stage.addEventListener('pointerdown', zDown);
+  stage.addEventListener('pointermove', zMove, { passive:false });
+  stage.addEventListener('pointerup', zUp);
+  stage.addEventListener('pointercancel', zCancel);
+  disposers.push(() => {
+    stage.removeEventListener('pointerdown', zDown);
+    stage.removeEventListener('pointermove', zMove);
+    stage.removeEventListener('pointerup', zUp);
+    stage.removeEventListener('pointercancel', zCancel);
+  });
 
   setOpen(open, false);
   setEOpen(secondaryOpen, false);
-  syncF();
-  syncE();
   requestAnimationFrame(() => {
-    centerF();
-    if (secondaryOpen) centerE();
+    if (open) centerCard(fCards[fActiveIndex], 'x');
+    scheduleGeometry(fDeck, fCards, 'x', (index) => { fActiveIndex = index; });
+    if (secondaryOpen) {
+      centerCard(eCards[eActiveIndex], 'y');
+      scheduleGeometry(eDeck, eCards, 'y', (index) => { eActiveIndex = index; });
+    }
   });
 
-  const down = (event) => {
-    if (gesture) return;
-    if (event.pointerType === 'mouse' && event.button !== 0) return;
-    if (event.target.closest?.('[data-v2-layer], [data-v2-z-layer]')) return;
-    if (app.querySelector('[data-v2-z-layer]')) return;
-
-    let role = '';
-    let horizontalContext = null;
-    let forceNavigation = false;
-    const stageRect = stage.getBoundingClientRect?.();
-    const zRect = z?.getBoundingClientRect?.();
-    const navigationEdge = Number(zRect?.left || stageRect?.left || 0) + 36;
-    const inNavigationGutter = !open && bindZ && Number(event.clientX || 0) <= navigationEdge;
-
-    if (secondaryOpen && eDeck?.contains(event.target)) {
-      role = 'e';
-    } else if (!open && bindZ && (z?.contains(event.target) || inNavigationGutter)) {
-      forceNavigation = inNavigationGutter;
-      horizontalContext = forceNavigation ? { blocked: false, scrollOwner: null } : horizontalGestureContext(event.target);
-      if (horizontalContext.blocked) return;
-      role = 'z';
-    } else {
-      return;
-    }
-
-    gesture = {
-      pointerId: event.pointerId,
-      role,
-      startX: event.clientX,
-      startY: event.clientY,
-      dx: 0,
-      dy: 0,
-      axis: 'pending',
-      cancelled: false,
-      captured: false,
-      forceNavigation,
-      zScrollTop: role === 'z' ? Number(z?.scrollTop || 0) : 0,
-      fScrollLeft: role === 'e' ? Number(deck?.scrollLeft || 0) : 0,
-      horizontalContext,
-    };
-  };
-
-  const move = (event) => {
-    if (!gesture || event.pointerId !== gesture.pointerId || gesture.cancelled) return;
-    const dx = event.clientX - gesture.startX;
-    const dy = event.clientY - gesture.startY;
-    gesture.dx = dx;
-    gesture.dy = dy;
-
-    if (gesture.axis === 'pending') {
-      if (Math.max(Math.abs(dx), Math.abs(dy)) < 7) return;
-      const zRightIntent = gesture.role === 'z' && dx > 0 && Math.abs(dx) >= Math.abs(dy) * .90;
-      gesture.axis = zRightIntent || Math.abs(dx) >= Math.abs(dy) * 1.08 ? 'horizontal' : 'vertical';
-
-      if (gesture.role === 'e') {
-        if (gesture.axis !== 'horizontal' || dx <= 0) {
-          gesture.cancelled = true;
-          return;
-        }
-      } else {
-        if (gesture.axis !== 'horizontal') {
-          gesture.cancelled = true;
-          return;
-        }
-        const owner = gesture.forceNavigation ? null : gesture.horizontalContext?.scrollOwner;
-        if (owner) {
-          const maxScrollLeft = Math.max(0, Number(owner.scrollWidth || 0) - Number(owner.clientWidth || 0));
-          const scrollLeft = Number(owner.scrollLeft || 0);
-          const childCanConsume = (dx > 0 && scrollLeft > 1) || (dx < 0 && scrollLeft < maxScrollLeft - 1);
-          if (childCanConsume) {
-            gesture.cancelled = true;
-            return;
-          }
-        }
-      }
-
-      stage.setPointerCapture?.(event.pointerId);
-      gesture.captured = true;
-    }
-
-    const dragLimit = Math.max(maxDrag, Number(stage.clientWidth || 0));
-
-    if (gesture.role === 'e') {
-      const dragX = Math.max(0, Math.min(dragLimit, dx));
-      eDeck?.classList.add('is-dragging');
-      eDeck?.style.setProperty('--v2-e-drag-x', `${dragX}px`);
-      if (deck && dragX > threshold) {
-        const carry = dragX - threshold;
-        deck.scrollLeft = clampScroll(deck, gesture.fScrollLeft - carry, 'x');
-      }
-      if (dragX > 7) markSuppressClick();
-      event.preventDefault();
-      return;
-    }
-
-    if (z && gesture.role === 'z') z.scrollTop = gesture.zScrollTop;
-    if (dx > 0 && !onZRight) {
-      const dragX = Math.max(0, Math.min(dragLimit, dx));
-      front.classList.add('is-dragging');
-      front.style.setProperty('--v2-front-drag-x', `${dragX}px`);
-      app.classList.add('is-revealing-deck');
-    }
-    if (Math.abs(dx) > 7) markSuppressClick();
-    event.preventDefault();
-  };
-
-  const up = (event) => {
-    if (!gesture || event.pointerId !== gesture.pointerId) return;
-    const current = gesture;
-
-    if (current.role === 'e' && !current.cancelled && current.axis === 'horizontal' && current.dx >= threshold) {
-      markSuppressClick();
-      endGesture();
-      setEOpen(false);
-      return;
-    }
-
-    if (current.role === 'z' && !current.cancelled && current.axis === 'horizontal') {
-      if (current.dx >= threshold) {
-        markSuppressClick();
-        endGesture();
-        if (onZRight) onZRight();
-        else {
-          setOpen(true);
-          setEOpen(false, false);
-        }
-        return;
-      }
-      if (current.dx <= -threshold && onZLeft) {
-        markSuppressClick();
-        endGesture();
-        onZLeft();
-        return;
-      }
-    }
-
-    endGesture();
-  };
-
-  const cancel = (event) => {
-    if (!gesture || (event?.pointerId != null && event.pointerId !== gesture.pointerId)) return;
-    endGesture();
-  };
-
-  const click = (event) => {
-    if (suppressNextClick) {
-      suppressNextClick = false;
-      if (suppressTimer) {
-        window.clearTimeout(suppressTimer);
-        suppressTimer = 0;
-      }
-      event.preventDefault();
-      event.stopPropagation();
-      return;
-    }
-    if (!open) return;
-
-    const eCard = secondaryOpen ? event.target.closest?.('.v2-e-card') : null;
-    if (eCard && eDeck?.contains(eCard)) {
-      const index = eCards.indexOf(eCard);
-      if (index >= 0) {
-        eActiveIndex = index;
-        syncE();
-        const id = eId(eCard);
-        if (id) onSecondarySelect?.(id);
-      }
-      return;
-    }
-
-    const fCard = event.target.closest?.('.v2-deck__card');
-    if (fCard && deck?.contains(fCard)) {
-      const index = fCards.indexOf(fCard);
-      if (index >= 0) {
-        fActiveIndex = index;
-        syncF();
-        const id = fId(fCard);
-        if (id) onRootSelect?.(id);
-      }
-    }
-  };
-
-  stage.addEventListener('pointerdown', down);
-  stage.addEventListener('pointermove', move, { passive: false });
-  stage.addEventListener('pointerup', up);
-  stage.addEventListener('pointercancel', cancel);
-  stage.addEventListener('click', click, true);
-
   return () => {
-    if (suppressTimer) window.clearTimeout(suppressTimer);
-    endGesture();
-    stage.removeEventListener('pointerdown', down);
-    stage.removeEventListener('pointermove', move);
-    stage.removeEventListener('pointerup', up);
-    stage.removeEventListener('pointercancel', cancel);
-    stage.removeEventListener('click', click, true);
+    clearZGesture();
+    eCancel();
+    for (const frame of scrollFrames.values()) cancelAnimationFrame(frame);
+    scrollFrames.clear();
+    disposers.forEach((dispose) => dispose?.());
   };
 }
+
 
 export function initV2StickerSwipe(root, { onRight = null, onLeft = null, threshold = 64, maxDrag = 180 } = {}) {
   const surface = root?.matches?.('[data-v2-sticker]') ? root : root?.querySelector?.('[data-v2-sticker]');
@@ -1053,7 +1064,7 @@ export function initV2StickerSwipe(root, { onRight = null, onLeft = null, thresh
         pointerId = null;
         return;
       }
-      surface.setPointerCapture?.(event.pointerId);
+      gestureHost.setPointerCapture?.(event.pointerId);
     }
     if (axis !== 'horizontal') return;
     const allowedX = nextX > 0 ? (onRight ? nextX : 0) : (onLeft ? nextX : 0);

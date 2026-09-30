@@ -20,7 +20,7 @@ import { canUseBookCapability, getBookAccess, loadBookAccess } from './core/acce
 import { startServerBookingSync } from './online-booking/server-sync.js';
 import { renderGlobalClient, renderOnlineBooking } from './online-booking/booking.js';
 import { startAccountRuntime } from './online-booking/account-runtime.js';
-import { field, passwordField, initPasswordFields, mountV2ZLayer, openNotice, initV2WorkspaceInteraction, setV2DeckOpen, v2EList, v2FDeck, v2Header, v2Shell, v2Sticker, v2ZLayer } from './ui/ui.js';
+import { field, passwordField, initPasswordFields, mountV2ZLayer, openNotice, initV2WorkspaceInteraction, setV2DeckOpen, v2CardDeck, v2Header, v2Shell, v2Sticker, v2ZLayer } from './ui/ui.js';
 import { clearLegacyBusinessStorage } from './core/legacy-browser-business.js';
 import { FirstRunRuntime, bindDemoBadgeAction, demoBadgeMarkup, startPlatformSessionTracking } from './first-run/runtime.js';
 import { startPlatformNotices } from './core/platform-notices.js';
@@ -461,35 +461,62 @@ function renderWorkspace() {
   const rootItems = allowedRootItems();
   const childItems = secondaryItems(root);
   const childActive = ensureSecondary(root);
-  const rootDeck = v2FDeck(rootItems, {
+  const rootDeck = v2CardDeck(rootItems, {
+    axis: 'x',
     active: root,
     data: 'data-v2-root-item',
     className: 'v2-deck--root',
     role: 'root',
+    level: 'f',
   });
-  const eDeck = childItems.length ? v2EList(childItems, {
+  const eDeck = childItems.length ? v2CardDeck(childItems, {
+    axis: 'y',
     active: childActive,
     data: 'data-v2-secondary-item',
+    level: 'e',
   }) : '';
 
-  app.innerHTML = v2Shell({
-    header: v2Header({
-      b: state.activeSection === 'chat' ? 'Чат' : rootDefinition(root)?.label || '',
-      d: sectionAllowed('chat') ? { kind: 'chat', data: 'data-v2-workspace-chat', aria: 'Чат' } : null,
-    }),
-    deck: rootDeck,
-    eDeck,
-    deckOpen: state.navigationOpen,
-    eOpen: state.navigationOpen && state.navigationLevel === 'e',
-    zEnter: Boolean(state.navigationEnterZ),
-    className: 'v2-app--workspace',
-    body: '<section class="v2-workspace-surface" data-v2-workspace-surface></section>',
+  const headerMarkup = v2Header({
+    b: state.activeSection === 'chat' ? 'Чат' : rootDefinition(root)?.label || '',
+    d: sectionAllowed('chat') ? { kind: 'chat', data: 'data-v2-workspace-chat', aria: 'Чат' } : null,
   });
+  let shell = app.querySelector(':scope > [data-v2-app].v2-app--workspace');
+  if (!shell) {
+    app.innerHTML = v2Shell({
+      header: headerMarkup,
+      deck: rootDeck,
+      eDeck,
+      deckOpen: state.navigationOpen,
+      eOpen: state.navigationOpen && state.navigationLevel === 'e',
+      zEnter: Boolean(state.navigationEnterZ),
+      className: 'v2-app--workspace',
+      body: '<section class="v2-workspace-surface" data-v2-workspace-surface></section>',
+    });
+    shell = app.querySelector(':scope > [data-v2-app].v2-app--workspace');
+  } else {
+    const currentHeader = shell.querySelector(':scope > .v2-header');
+    if (currentHeader) currentHeader.outerHTML = headerMarkup;
+
+    const feHost = shell.querySelector('[data-v2-fe]');
+    const currentE = feHost?.querySelector('[data-v2-card-deck][data-v2-deck-level="e"]');
+    const nextEIds = childItems.map((item) => String(item.id || '')).join('|');
+    const currentEIds = [...(currentE?.querySelectorAll('[data-v2-card-item]') || [])]
+      .map((card) => String(card.dataset.v2CardItem || '')).join('|');
+    if (nextEIds !== currentEIds) {
+      currentE?.remove();
+      if (eDeck && feHost) feHost.insertAdjacentHTML('beforeend', eDeck);
+    }
+
+    setV2DeckOpen(shell, state.navigationOpen);
+    shell.classList.toggle('is-e-open', Boolean(state.navigationOpen && state.navigationLevel === 'e' && eDeck));
+    shell.classList.toggle('is-z-entering', Boolean(state.navigationEnterZ && !state.navigationOpen));
+    const persistentSurface = shell.querySelector('[data-v2-workspace-surface]');
+    persistentSurface?.replaceChildren();
+  }
 
   state.navigationEnterZ = false;
 
-  const shell = app.querySelector('[data-v2-app]');
-  const surface = app.querySelector('[data-v2-workspace-surface]');
+  const surface = shell?.querySelector('[data-v2-workspace-surface]');
   const disposers = [];
   let moduleDispose = () => {};
   let disposed = false;
