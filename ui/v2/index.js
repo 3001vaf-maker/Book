@@ -570,8 +570,8 @@ export function initV2Swipe(root, {
     if (!isTopmost()) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     const stageRect = stage?.getBoundingClientRect?.() || surface.getBoundingClientRect?.();
-    const leftEdge = Number(stageRect?.left || 0) + Number(edgeWidth || 24);
-    const rightEdge = Number(stageRect?.right || 0) - Number(edgeWidth || 24);
+    const leftEdge = Number(stageRect?.left || 0) + Number(edgeWidth || 36);
+    const rightEdge = Number(stageRect?.right || 0) - Number(edgeWidth || 36);
     const wantsRight = Boolean(onRight) && (Boolean(edgeHost) || Number(event.clientX || 0) <= leftEdge);
     const wantsLeft = Boolean(onLeft) && !edgeHost && Number(event.clientX || 0) >= rightEdge;
     if (!wantsRight && !wantsLeft) return;
