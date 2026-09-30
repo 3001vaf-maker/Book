@@ -836,6 +836,7 @@ export function initV2WorkspaceInteraction(root, {
       }, 90);
     };
     const down = (event) => {
+      if (!isEnabled()) return;
       if (event.pointerType === 'mouse' && event.button !== 0) return;
       pointer = {
         id: event.pointerId,
@@ -861,6 +862,7 @@ export function initV2WorkspaceInteraction(root, {
       suppressClick = true;
     };
     const click = (event) => {
+      if (!isEnabled()) return;
       const card = event.target.closest?.('[data-v2-card-item]');
       if (!card || !deck.contains(card)) return;
       if (suppressClick) {
@@ -949,7 +951,7 @@ export function initV2WorkspaceInteraction(root, {
     () => fActiveIndex,
     (index) => { fActiveIndex = index; },
     (id) => onRootSelect?.(id),
-    () => open,
+    () => open && !secondaryOpen,
   );
   bindNativeDeck(
     eDeck,
