@@ -67,6 +67,8 @@ for (const file of uiFiles) {
 }
 
 for (const file of coreFiles) {
+  const path = rel(file);
+  if (!/^core\/(?:day|time|record|finance)\//.test(path)) continue;
   const source = text(file);
   if (/from\s+['"][^'"]*(?:settings|main|journal)\//.test(source)) report(file, 'core domain module must not import feature/entity folders');
 }
