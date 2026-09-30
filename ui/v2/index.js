@@ -661,6 +661,7 @@ export function setV2DeckOpen(root, open) {
     : root?.closest?.('[data-v2-app]') || root?.querySelector?.('[data-v2-app]');
   if (!app) return false;
   const next = Boolean(open);
+  if (next) app.classList.remove('is-z-entering');
   app.classList.toggle('is-deck-open', next);
   app.classList.remove('is-revealing-deck');
   if (!next) app.classList.remove('is-e-open');
