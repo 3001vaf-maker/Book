@@ -45,7 +45,7 @@ import { bindPersonCreateForm, personCreateForm } from './create.js';
 import { getPersonMetadata, formatPersonVisitDate } from './metadata.js';
 import { personDisplay } from './presentation.js';
 import { getPeopleSortMode, setPeopleSortMode } from './view-state.js';
-import { canUseRealPersonalData } from '../core/access.js';
+import { canUseRealPersonalData } from '../access.js';
 
 const name = (person) => [person?.name, person?.surname].filter(Boolean).join(' ').trim() || 'Без имени';
 const money = (value) => new Intl.NumberFormat('ru-RU').format(Number(value || 0)) + ' ₽';
