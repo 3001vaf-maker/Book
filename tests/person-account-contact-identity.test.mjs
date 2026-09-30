@@ -5,7 +5,7 @@ const identity = fs.readFileSync('server/src/online-booking/person-identity.serv
 const booking = fs.readFileSync('server/src/online-booking/online-booking.service.ts', 'utf8');
 const controller = fs.readFileSync('server/src/online-booking/online-booking.controller.ts', 'utf8');
 const business = fs.readFileSync('server/src/business-state/business-state.service.ts', 'utf8');
-const people = fs.readFileSync('main/people/data.js', 'utf8');
+const people = fs.readFileSync('core/people/data.js', 'utf8');
 
 assert.match(identity, /accountContact\.findMany\(/, 'Person identity must read the canonical global AccountContact set');
 assert.match(identity, /String\(row\.type\) === 'PHONE'/);
