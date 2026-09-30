@@ -39,10 +39,10 @@ function localDateTimeValue(date = new Date()) {
 
 function renderList(root, navigateBack) {
   const items = getWallets();
-  root.innerHTML = `<div class="entity-page-header">${pageHeader('Касса')}<div class="page-header-action">${iconButton('+', { className: 'icon-button--primary', data: 'data-add-wallet', aria: 'Добавить кошелёк' })}</div></div>${items.length ? v2ListEntries(items.map(renderRow)) : emptyState('Кошельков пока нет', 'Добавьте первый кошелёк кнопкой «+».')}${actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-back-wallets' }))}`;
+  root.innerHTML = `<div class="entity-page-header">${pageHeader('Касса')}<div class="page-header-action">${iconButton('+', { className: 'icon-button--primary', data: 'data-add-wallet', aria: 'Добавить кошелёк' })}</div></div>${items.length ? v2ListEntries(items.map(renderRow)) : emptyState('Кошельков пока нет', 'Добавьте первый кошелёк кнопкой «+».')}`;
   root.querySelector('[data-add-wallet]')?.addEventListener('click', () => openForm(root, null, navigateBack));
   root.querySelectorAll('[data-wallet]').forEach((element) => element.addEventListener('click', () => renderCard(root, element.dataset.wallet, navigateBack)));
-  root.querySelector('[data-back-wallets]')?.addEventListener('click', navigateBack);
+  
 }
 
 function renderRow(wallet) {
@@ -164,12 +164,12 @@ function renderCard(root, id, navigateBack) {
   });
   const paymentList = payments.length ? v2ListEntries(payments.map(renderPaymentRow)) : emptyState('Оплат пока нет', 'После оплаты через этот кошелёк операции появятся здесь.');
   const deleteButton=wallet.system?'':button('Удалить',{variant:'danger',data:'data-delete-wallet-card'});
-  root.innerHTML=page([card,paymentList,actionBlock(`${button('Работа с кошельком',{data:'data-wallet-work'})}${button('Назад',{className:'ui-button--secondary',data:'data-back-wallet-card'})}${deleteButton}`)]);
+  root.innerHTML=page([card,paymentList,actionBlock(`${button('Работа с кошельком',{data:'data-wallet-work'})}${deleteButton}`)]);
   root.querySelectorAll('[data-wallet-operation]').forEach((element) => {
     element.addEventListener('click', () => openWalletOperation(root, element.dataset.walletOperation, wallet, navigateBack));
   });
   root.querySelector('[data-wallet-work]')?.addEventListener('click', () => openPhotoForm(root, wallet, navigateBack));
-  root.querySelector('[data-back-wallet-card]')?.addEventListener('click', () => renderList(root, navigateBack));
+  
   root.querySelector('[data-delete-wallet-card]')?.addEventListener('click', () => confirmDeleteWallet(root, wallet, navigateBack));
 }
 
