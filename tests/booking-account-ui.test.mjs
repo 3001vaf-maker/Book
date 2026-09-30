@@ -265,7 +265,9 @@ assert.doesNotMatch(accountShell, /requestMoment\(request\)\s*[<>]=?\s*nowMoment
 assert.doesNotMatch(accountShell, /bookingThemeStyle/);
 assert.doesNotMatch(accountShell, /booking-shape--|booking-choice-style--/);
 assert.doesNotMatch(accountShell, /accountThemeClasses/);
-assert.match(accountShell, /root\.innerHTML = shell;/);
+assert.match(accountShell, /if \(!canReuseScene\) \{/);
+assert.match(accountShell, /root\.innerHTML = v2Shell\(\{/);
+assert.match(accountShell, /if \(z\) z\.innerHTML = body;/);
 
 // Personal data is a stacked Z editor. Photo is owned separately by Profile settings.
 assert.match(personalData, /openAccountPersonalDataZ\(root, state/);
