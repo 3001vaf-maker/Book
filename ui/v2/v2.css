@@ -116,7 +116,9 @@
   overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;
   scroll-snap-type:x mandatory;scroll-padding-inline:calc((100% - var(--v2-card-width))/2);
   padding-inline:calc((100% - var(--v2-card-width))/2);
-  touch-action:pan-x
+  touch-action:pan-x;
+  transition:transform .22s cubic-bezier(.16,1,.3,1),opacity .18s ease,filter .18s ease;
+  will-change:transform,opacity,filter
 }
 .v2-card-deck--y{
   z-index:8;inset:0;display:flex;flex-direction:column;align-items:center;
@@ -145,7 +147,7 @@
   opacity:var(--v2-card-opacity);filter:brightness(var(--v2-card-brightness));
   z-index:var(--v2-card-stack);scroll-snap-align:center;
   transform-style:preserve-3d;backface-visibility:hidden;
-  transition:border-color .14s ease,box-shadow .16s ease,filter .08s linear,opacity .08s linear;
+  transition:border-color .14s ease,box-shadow .16s ease;
   will-change:transform,opacity,filter
 }
 .v2-card-deck--x .v2-card-deck__card{
