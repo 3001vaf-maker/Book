@@ -330,10 +330,6 @@ function primaryVisible(source) {
   return true;
 }
 
-function syncWorkspaceBack(surface) {
-  surface.querySelector(':scope > [data-v2-workspace-back]')?.remove();
-}
-
 function syncWorkspacePrimarySource(surface, source) {
   surface.querySelectorAll('.v2-workspace-source-hidden').forEach((node) => {
     if (node !== source) node.classList.remove('v2-workspace-source-hidden');
@@ -360,14 +356,12 @@ function syncWorkspaceHeader(surface) {
     contextRoot.querySelector('.page-header h1'),
     fallbackTitle,
   );
-  const backSource = contextRoot.querySelector('[data-workspace-back-source]');
   const contextSource = contextRoot.querySelector('[data-workspace-context-action], .page-header__meta button');
   const aSource = contextSource;
   const dSource = contextRoot.querySelector('[data-workspace-d-action]');
   const cSource = primarySource(contextRoot);
   const cVisible = primaryVisible(cSource);
   const hideD = context?.dataset.workspaceHideD === 'true';
-  syncWorkspaceBack(contextRoot);
   syncWorkspacePrimarySource(contextRoot, cVisible ? cSource : null);
   const header = app.querySelector('[data-v2-header]');
   if (!header) return;
