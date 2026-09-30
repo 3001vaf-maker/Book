@@ -62,8 +62,11 @@ export class SaasAdminController {
   }
 
   @Post('invitations/link')
-  createRegistrationLink(@Req() request: AdminRequest) {
-    return this.invitations.createRegistrationLink(request.platformAdminId!);
+  createRegistrationLink(
+    @Req() request: AdminRequest,
+    @Body() body: { tools?: unknown },
+  ) {
+    return this.invitations.createRegistrationLink(request.platformAdminId!, body || {});
   }
 
   @Post('invitations/:id/resend')
