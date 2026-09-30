@@ -3,8 +3,8 @@ import { readFileSync } from 'node:fs';
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
-const peopleData = read('main/people/data.js');
-const peopleUi = read('main/people/people.js');
+const peopleData = read('core/people/data.js');
+const peopleUi = read('core/people/people.js');
 const browserConsents = read('settings/documents/consents.js');
 const businessState = read('server/src/business-state/business-state.service.ts');
 const migration = read('tenant-document-archive.js');
