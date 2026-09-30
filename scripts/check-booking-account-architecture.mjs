@@ -101,7 +101,7 @@ expect(settings.includes("label: 'Отменить'") && settings.includes("labe
 expect(settings.includes('twoColumnLayout(') && settings.includes("ariaLabel: 'Цвета фона'") && settings.includes("ariaLabel: 'Цвета интерфейса'"), 'Appearance colors must use the shared two-column layout.');
 expect(settings.includes('BOOKING_SLOT_STEPS.map') && settings.includes("value === 60 ? '1 час'"), 'Time screen must use the canonical 5/10/15/30/60 slot select.');
 expect(serverSync.includes("apiRequest('/business-state')"), 'Open Book must refresh from canonical server business state.');
-expect(v2Ui.includes('v2Header') && v2Ui.includes('v2Shell') && v2Ui.includes('v2FDeck'), 'Shared ui/v2 must own V2 H / Z / F geometry.');
+expect(v2Ui.includes('v2Header') && v2Ui.includes('v2Shell') && v2Ui.includes('v2CardDeck') && !v2Ui.includes('v2FDeck'), 'Shared ui/v2 must own one CardDeck geometry for F/E inside V2 H/Z.');
 expect(v2Css.includes('.v2-z') && v2Css.includes('border-radius:var(--v2-z-radius) 0 0 0'), 'Shared V2 CSS must keep only the Z upper-left corner rounded.');
 expect(!accountShell.includes('accountBottomNavigation') && !accountShell.includes('bindBottomNavigation'), 'The migrated end-user contour must not use bottom navigation.');
 expect(chatUi.includes('messageComposer') && chatUi.includes('messageThread') && chatUi.includes('bindMessageAttachments') && chatUi.includes('initMessageComposer'), 'Shared ui/chat must own messenger rendering, attachments and growing composer behavior.');
@@ -124,7 +124,7 @@ expect(!accountShell.includes("document.createElement('style')") && !accountShel
 expect(!accountShell.includes('bookingThemeStyle'), 'Authenticated end-user surfaces must not inject representative booking theme styles into Shared V2.');
 expect(!accountShell.includes('booking-shape--') && !accountShell.includes('booking-choice-style--'), 'Authenticated end-user surfaces must not select local shape or choice-style variants for Shared UI.');
 expect(!accountShell.includes('accountThemeClasses'), 'Authenticated end-user surfaces must not own a local shell theme classifier.');
-expect(accountShell.includes('root.innerHTML = shell;'), 'Authenticated end-user surfaces must render the canonical Shared V2 shell directly without a local visual wrapper.');
+expect(accountShell.includes('if (!canReuseScene) {') && accountShell.includes('root.innerHTML = v2Shell({') && accountShell.includes('if (z) z.innerHTML = body;'), 'Authenticated end-user surfaces must mount the canonical Shared V2 shell once and then reuse its persistent FEZ scene without a local visual wrapper.');
 expect(chatRuntime.includes("messageComposer({ attachments: true, attachmentTrigger: 'external' })") && chatRuntime.includes("kind: 'attachment'"), 'Core Chat runtime must own the shared composer and Header D attachment control.');
 expect(!accountShell.includes('messageComposer(') && !accountShell.includes('messageThread(') && !accountShell.includes('bindMessageAttachments('), 'End-user account shell must not duplicate Chat runtime behavior.');
 expect(accountShell.includes('async function renderGlobalHistoryDetail') && accountShell.includes("label: 'Записаться', data: 'data-global-history-repeat'"), 'Global History must own record detail and repeat booking in Header C.');
