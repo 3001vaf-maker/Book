@@ -54,33 +54,21 @@ core/<domain>/
 F/E/Z navigation belongs only to the Shared V2 owner in `ui/v2` and is identical for the professional and end-user contours.
 
 - **H** is the navigation background.
-- **Z** keeps its canonical geometry and content. Opening navigation moves the entire existing Z/front fully offscreen to the right. Z content moves only with Z; a horizontal navigation gesture must not change its vertical scroll position. Navigation never redraws or locally restyles Z.
-- **F** is one horizontal native scroll rail of full-size section cards on H. It uses the platform's own inertial scrolling instead of transform-by-index paging or custom velocity projection.
-- A selected F card uses the canonical yellow selection outline.
-- An F card that owns nested sections shows the Shared nested-card indicator.
-- **E** is not a separate screen. It unfolds as a native vertical scroll rail of full cards through the selected F card while the horizontal F layer stays visible, forming one F/E cross on H.
-- F scrolls horizontally and E scrolls vertically. The browser owns their normal inertial scrolling. The only cross-axis custom gesture is right-swipe from E: E collapses back into F and the excess distance may continue into the F rail.
-- Tap on F without E opens the existing Z1. Tap on F with E opens the E cross. Tap on E opens the existing Z1. Returning right from any Z always opens the root F rail first; E never auto-reopens and traps the user inside a nested level.
-- The visible left H/Z edge is a guaranteed navigation gutter: a deliberate right-swipe begun there always belongs to FEZ, even when the Z content below contains forms or horizontal rails. A normal tap on an interactive control remains a tap because gesture ownership begins only after horizontal movement is established.
-- Z2/Z3 use the same rule on their own topmost surface: right-swipe closes only that upper Z first; the underlying Z1 then owns the next right-swipe to F.
-- Z2/Z3 and modals remain above this owner and block lower FEZ gestures while active.
+- **F and E use one Shared CardDeck card geometry.** E is never a compact or alternate card. Width, height, radius, surface, typography, icon placement, border and shadow are shared; only the deck axis changes.
+- **F** is the horizontal instance of CardDeck. Normal movement is native `overflow-x` scrolling with platform inertia and `scroll-snap`.
+- **E** is the vertical instance of the same CardDeck. Normal movement is native `overflow-y` scrolling with platform inertia and `scroll-snap`.
+- Card depth is derived continuously from real geometry: distance from each card centre to the deck centre controls scale, Z-depth, subtle axis rotation, opacity, brightness, shadow and stacking order. The centred card is the single active front card and uses the canonical yellow outline. Neighboring cards visibly bend away and sit deeper instead of behaving like flat 2D tiles.
+- F and E never use transform-by-index paging, velocity projection, manual scrollLeft/scrollTop paging or index-based decorative depth.
+- A tap and a drag are different states. A drag never opens a card. A tap on a non-centred card only centres it; a tap on the centred active card performs the navigation action.
+- An F card that owns nested sections shows the Shared nested-card indicator. Opening E does not mutate F into another card type: the entire F layer only moves visually deeper while the vertical E deck appears above it, forming one spatial cross.
+- Right-swipe on E is cross-axis geometry, not a special hit-zone: it may begin anywhere on E and collapses E back to F after the horizontal intent is established.
+- **Z keeps ownership of all of its internal vertical and horizontal data scrolling.** Z→F is therefore the one exception to free-start geometry: it is accepted only as a rightward edge-swipe that starts within the shared left screen edge zone. A swipe started in the middle of Z belongs to Z content, never to FE navigation.
+- Z2/Z3 use the same edge rule and close only the topmost Z level. Lower FEZ gestures are blocked while a stacked Z or modal is active.
+- Opening navigation moves the existing Z/front fully offscreen to the right. Z geometry and vertical scroll position do not change.
+- The FEZ scene is persistent. Selecting F/E must not destroy and recreate the complete shell with `innerHTML`; the existing F, Z and stage remain mounted while state/content changes. E is replaced only when its actual child set changes.
+- Old parallel motion owners, separate F/E card implementations, compact E geometry, custom pager math, legacy gesture carry, index-based colour/depth tricks and stale compatibility selectors are forbidden after migration.
 
-Functional screens may supply labels, children and state, but may not implement their own FEZ geometry or gesture controller.
-
-CSS принадлежит общему UI-компоненту в `ui/` либо глобальной оболочке приложения в `css/style.css`. Экран/фича не должна чинить ошибку ownership локальным CSS-обходом или копировать существующий компонент.
-
-Основные общие понятия UI:
-- FOLDER UI;
-- V2 LIST ENTRY / V2 LIST ENTRIES;
-- CARD;
-- FIELD / SELECT / TEXTAREA;
-- BUTTON / ICON BUTTON;
-- MODAL / BOTTOM SHEET;
-- CALENDAR;
-- DATE / TIME / DURATION UI;
-- PAGE HEADER / HEADER CONTROL;
-- NAVIGATION / BOTTOM NAVIGATION;
-- EMPTY / LOADING / ERROR / ACTIVE / DISABLED states.
+Functional screens may supply labels, children and state, but may not implement their own FEZ geometry, card type or gesture controller.
 
 ## 5. Workplace → Day → Calendar
 
