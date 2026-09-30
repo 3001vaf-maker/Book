@@ -40,4 +40,4 @@ export {
   hydrateWalletsFromServer,
   saveWallet,
   updateWallet,
-} from './cash.js';
+} from './cash/data.js';
