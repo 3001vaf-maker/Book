@@ -57,7 +57,7 @@ jobs:
             local marker="$2"
             local stage_attr="$3"
             local output="$4"
-            "$chrome_bin"               --headless=new               --no-sandbox               --disable-gpu               --disable-dev-shm-usage               --virtual-time-budget=12000               --dump-dom               "http://127.0.0.1:4173/$path"               > "$output"
+            "$chrome_bin"               --headless=new               --no-sandbox               --disable-gpu               --disable-dev-shm-usage               --window-size=390,844               --force-device-scale-factor=1               --touch-events=enabled               --virtual-time-budget=12000               --dump-dom               "http://127.0.0.1:4173/$path"               > "$output"
             if ! grep -Fq "$marker" "$output"; then
               echo "Browser runtime regression failed: $path"
               grep -o "$stage_attr=\"[^\"]*\"" "$output" || true
