@@ -735,33 +735,48 @@ export function initV2WorkspaceInteraction(root, {
   const updateDeckGeometry = (deck, cards, axis) => {
     if (!deck || !cards.length) return -1;
     const center = axis === 'y' ? Number(deck.clientHeight || 0) / 2 : Number(deck.clientWidth || 0) / 2;
-    let nearestIndex = 0;
-    let nearestDistance = Number.POSITIVE_INFINITY;
-    cards.forEach((card, index) => {
+    const scroll = axis === 'y' ? Number(deck.scrollTop || 0) : Number(deck.scrollLeft || 0);
+
+    // Read all layout geometry first. Mixing offset reads with style writes card-by-card
+    // forces repeated layout work and makes the deck feel behind the finger.
+    const metrics = cards.map((card, index) => {
       const cardCenter = axis === 'y'
-        ? Number(card.offsetTop || 0) - Number(deck.scrollTop || 0) + Number(card.offsetHeight || 0) / 2
-        : Number(card.offsetLeft || 0) - Number(deck.scrollLeft || 0) + Number(card.offsetWidth || 0) / 2;
+        ? Number(card.offsetTop || 0) - scroll + Number(card.offsetHeight || 0) / 2
+        : Number(card.offsetLeft || 0) - scroll + Number(card.offsetWidth || 0) / 2;
       const span = Math.max(1, axis === 'y' ? Number(card.offsetHeight || 0) : Number(card.offsetWidth || 0));
       const signed = (cardCenter - center) / Math.max(1, span * .72);
       const absolute = Math.min(2.6, Math.abs(signed));
-      const depth = -Math.min(180, absolute * 82);
-      const scale = 1 - Math.min(.13, absolute * .055);
-      const opacity = 1 - Math.min(.38, absolute * .16);
-      const brightness = 1 - Math.min(.22, absolute * .09);
-      const rotation = Math.max(-13, Math.min(13, signed * (axis === 'y' ? -6.5 : 7.5)));
-      const shift = Math.max(-18, Math.min(18, signed * -8));
-      card.style.setProperty('--v2-card-depth', `${depth}px`);
-      card.style.setProperty('--v2-card-scale', scale.toFixed(4));
-      card.style.setProperty('--v2-card-opacity', opacity.toFixed(4));
-      card.style.setProperty('--v2-card-brightness', brightness.toFixed(4));
-      card.style.setProperty('--v2-card-rotation', `${rotation.toFixed(3)}deg`);
-      card.style.setProperty('--v2-card-shift', `${shift.toFixed(3)}px`);
-      card.style.setProperty('--v2-card-stack', String(Math.max(1, 100 - Math.round(absolute * 24))));
-      if (Math.abs(cardCenter - center) < nearestDistance) {
-        nearestDistance = Math.abs(cardCenter - center);
-        nearestIndex = index;
+      return {
+        card,
+        index,
+        distance: Math.abs(cardCenter - center),
+        depth: -Math.min(180, absolute * 82),
+        scale: 1 - Math.min(.13, absolute * .055),
+        opacity: 1 - Math.min(.38, absolute * .16),
+        brightness: 1 - Math.min(.22, absolute * .09),
+        rotation: Math.max(-13, Math.min(13, signed * (axis === 'y' ? -6.5 : 7.5))),
+        shift: Math.max(-18, Math.min(18, signed * -8)),
+        stack: Math.max(1, 100 - Math.round(absolute * 24)),
+      };
+    });
+
+    let nearestIndex = 0;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    metrics.forEach((metric) => {
+      const { card } = metric;
+      card.style.setProperty('--v2-card-depth', `${metric.depth}px`);
+      card.style.setProperty('--v2-card-scale', metric.scale.toFixed(4));
+      card.style.setProperty('--v2-card-opacity', metric.opacity.toFixed(4));
+      card.style.setProperty('--v2-card-brightness', metric.brightness.toFixed(4));
+      card.style.setProperty('--v2-card-rotation', `${metric.rotation.toFixed(3)}deg`);
+      card.style.setProperty('--v2-card-shift', `${metric.shift.toFixed(3)}px`);
+      card.style.setProperty('--v2-card-stack', String(metric.stack));
+      if (metric.distance < nearestDistance) {
+        nearestDistance = metric.distance;
+        nearestIndex = metric.index;
       }
     });
+
     setActiveCard(cards, nearestIndex);
     return nearestIndex;
   };
