@@ -1,5 +1,6 @@
 import { pageHeader, viewNavigation, initViewNavigation, headerControl, workplaceContent, ALL_WORKPLACES_ID } from '../ui/ui.js';
 import { getWorkplaceContext, setWorkplaceContext } from '../core/workplace-context.js';
+import { canUseBookCapability } from '../core/access.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getActiveDayWorkplaces } from '../core/day/index.js';
 import { recordAmountDue } from '../core/finance/index.js';
@@ -13,9 +14,9 @@ import { renderJournalList } from './список.js';
 const JOURNAL_CONTEXT_SCOPE = 'journal';
 
 const views = [
-  { id: 'day', label: 'День', render: renderJournalDay },
-  { id: 'month', label: 'Месяц', render: renderJournalMonth },
-  { id: 'list', label: 'Список', render: renderJournalList },
+  { id: 'day', label: 'День', render: renderJournalDay, capability: 'journal.day.access' },
+  { id: 'month', label: 'Месяц', render: renderJournalMonth, capability: 'journal.month.access' },
+  { id: 'list', label: 'Список', render: renderJournalList, capability: 'journal.list.access' },
 ];
 
 const listModes = [
@@ -34,11 +35,16 @@ function formatRubles(value = 0) {
 }
 
 export function journalNavigationItems() {
-  return views.map(({ id, label }) => ({ id, label }));
+  return views
+    .filter((view) => canUseBookCapability(view.capability))
+    .map(({ id, label }) => ({ id, label }));
 }
 
 export function renderJournal(root, options = {}) {
-  let activeView = views.some((view) => view.id === options.initialView) ? options.initialView : 'day';
+  const availableViews = views.filter((view) => canUseBookCapability(view.capability));
+  let activeView = availableViews.some((view) => view.id === options.initialView)
+    ? options.initialView
+    : (availableViews[0]?.id || 'day');
   const externalNavigation = Boolean(options.externalNavigation);
   let listMode = 'flow';
   const workplaces = getWorkplaces();
@@ -138,7 +144,7 @@ export function renderJournal(root, options = {}) {
       ? `<div class="journal-list-mode-navigation" data-journal-list-mode-navigation>${viewNavigation({ views: listModes, activeView: listMode, className: 'segment-control--two-equal', ariaLabel: 'Режим списка' })}</div>`
       : '';
     const viewClass = activeView === 'list' ? ' class="journal-list-viewport"' : '';
-    const primaryNavigation = externalNavigation ? '' : viewNavigation({ views, activeView });
+    const primaryNavigation = externalNavigation ? '' : viewNavigation({ views: availableViews, activeView });
     root.innerHTML = `${pageHeader('Журнал', '', renderHeaderControl())}${primaryNavigation}${listModeNavigation}<div data-journal-view${viewClass}></div>`;
     const viewRoot = root.querySelector('[data-journal-view]');
     if (activeView === 'day') {
