@@ -70,7 +70,7 @@ function collectLines(root) {
   })).filter((row) => row.quantity > 0 && row.unitPrice > 0);
 }
 
-async function saveManual(root, modalRoot, direction, navigateBack) {
+async function saveManual(root, modalRoot, direction) {
   const form = modalRoot.querySelector('[data-finance-manual-form]');
   const data = new FormData(form);
   const mode = String(data.get('entryMode') || 'simple');
@@ -93,13 +93,13 @@ async function saveManual(root, modalRoot, direction, navigateBack) {
   try {
     await recordManualFinanceOperation(payload);
     modalRoot.remove();
-    renderIncomeExpense(root, navigateBack);
+    renderIncomeExpense(root);
   } catch (error) {
     openNotice({ message: String(error?.message || 'Не удалось сохранить операцию') });
   }
 }
 
-function openOperation(root, direction, navigateBack) {
+function openOperation(root, direction) {
   const isIncome = direction === 'IN';
   const articles = articleOptions(direction);
   const wallets = walletOptions();
@@ -139,13 +139,13 @@ function openOperation(root, direction, navigateBack) {
   });
   m.querySelector('[data-finance-manual-form]')?.addEventListener('submit', (event) => {
     event.preventDefault();
-    void saveManual(root, m, direction, navigateBack);
+    void saveManual(root, m, direction);
   });
 }
 
-export function renderIncomeExpense(root, navigateBack = () => {}) {
+export function renderIncomeExpense(root) {
   root.innerHTML = `${pageHeader('Доход / Расход')}${actionBlock(`${button('Доход', { data: 'data-finance-manual-income' })}${button('Расход', { data: 'data-finance-manual-expense' })}`)}`;
-  root.querySelector('[data-finance-manual-income]')?.addEventListener('click', () => openOperation(root, 'IN', navigateBack));
-  root.querySelector('[data-finance-manual-expense]')?.addEventListener('click', () => openOperation(root, 'OUT', navigateBack));
+  root.querySelector('[data-finance-manual-income]')?.addEventListener('click', () => openOperation(root, 'IN'));
+  root.querySelector('[data-finance-manual-expense]')?.addEventListener('click', () => openOperation(root, 'OUT'));
   
 }
