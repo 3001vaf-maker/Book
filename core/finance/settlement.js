@@ -63,10 +63,10 @@ export function normalizeRecordSettlement(value = null) {
     serviceTotal: Math.max(0, financialNumber(value.serviceTotal)),
     discountPercent: value.discountPercent == null ? null : clampFinancialPercent(value.discountPercent),
     discountTotal: Math.max(0, financialNumber(value.discountTotal)),
-    planTotal: Math.max(0, financialNumber(value.planTotal ?? value.dueTotal)),
-    factIncome: Math.max(0, financialNumber(value.factIncome ?? value.paidTotal)),
-    factExpense: Math.max(0, financialNumber(value.factExpense ?? value.refundedTotal)),
-    factTotal: financialNumber(value.factTotal ?? value.netPaidTotal),
+    planTotal: Math.max(0, financialNumber(value.planTotal)),
+    factIncome: Math.max(0, financialNumber(value.factIncome)),
+    factExpense: Math.max(0, financialNumber(value.factExpense)),
+    factTotal: financialNumber(value.factTotal),
   };
 }
 
