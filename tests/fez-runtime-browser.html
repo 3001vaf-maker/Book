@@ -66,6 +66,7 @@ ok(Boolean(edge), 'missing dedicated edge owner');
 ok(getComputedStyle(z).touchAction === 'auto', 'Z must keep native inner pan-x/pan-y');
 ok(Math.round(edge.getBoundingClientRect().width) === 36, 'edge owner must be 36px');
 ok(getComputedStyle(edge).touchAction === 'none', 'edge owner must exclusively own its gesture');
+ok(getComputedStyle(edge).pointerEvents === 'none', 'unused edge owner must not block Z content');
 
 let firstOwnerCalls = 0;
 let dispose = initV2WorkspaceInteraction(app, {
@@ -74,6 +75,7 @@ let dispose = initV2WorkspaceInteraction(app, {
   onRootSelect:() => { firstOwnerCalls += 1; },
 });
 await nextFrame();
+ok(getComputedStyle(edge).pointerEvents === 'auto', 'bound edge owner must become interactive');
 
 pointer(edge, 'pointerdown', 12, 300, 1);
 pointer(edge, 'pointermove', 46, 302, 1);
@@ -139,6 +141,8 @@ await nextFrame();
 ok(stickerRight === 1, 'sticker swipe runtime failed');
 disposeSticker();
 dispose();
+await nextFrame();
+ok(getComputedStyle(edge).pointerEvents === 'none', 'edge owner stayed interactive after all owners disposed');
 
 if (failures.length) {
   document.documentElement.dataset.fezRuntime = 'fail';
