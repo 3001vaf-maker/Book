@@ -718,6 +718,7 @@ export function initV2WorkspaceInteraction(root, {
   let secondaryOpen = Boolean(open && eOpen && eCards.length);
   let zGesture = null;
   let eGesture = null;
+  let eDismissTimer = 0;
   const disposers = [];
   const scrollFrames = new Map();
 
@@ -883,6 +884,10 @@ export function initV2WorkspaceInteraction(root, {
   };
 
   const setEOpen = (nextOpen, notify = true) => {
+    if (eDismissTimer) {
+      window.clearTimeout(eDismissTimer);
+      eDismissTimer = 0;
+    }
     secondaryOpen = Boolean(open && nextOpen && eCards.length);
     app.classList.toggle('is-e-open', secondaryOpen);
     eDeck?.style.removeProperty('--v2-e-dismiss-x');
@@ -969,9 +974,27 @@ export function initV2WorkspaceInteraction(root, {
     try {
       if (eDeck.hasPointerCapture?.(event.pointerId)) eDeck.releasePointerCapture?.(event.pointerId);
     } catch {}
+
+    if (current.axis === 'horizontal' && current.dx >= threshold) {
+      // Continue from the finger position instead of snapping E back to x=0 first.
+      const currentX = Math.max(0, current.dx);
+      const exitX = Math.max(Number(stage.clientWidth || 0), currentX);
+      eDeck.style.setProperty('--v2-e-dismiss-x', `${currentX}px`);
+      eDeck.classList.remove('is-dragging');
+      void eDeck.offsetWidth;
+      secondaryOpen = false;
+      app.classList.remove('is-e-open');
+      eDeck.style.setProperty('--v2-e-dismiss-x', `${exitX}px`);
+      onEOpenChange?.(false);
+      eDismissTimer = window.setTimeout(() => {
+        eDismissTimer = 0;
+        if (!secondaryOpen) eDeck.style.removeProperty('--v2-e-dismiss-x');
+      }, 260);
+      return;
+    }
+
     eDeck.classList.remove('is-dragging');
     eDeck.style.removeProperty('--v2-e-dismiss-x');
-    if (current.axis === 'horizontal' && current.dx >= threshold) setEOpen(false);
   };
   const eCancel = () => {
     eGesture = null;
@@ -1081,6 +1104,8 @@ export function initV2WorkspaceInteraction(root, {
     eCancel();
     for (const frame of scrollFrames.values()) cancelAnimationFrame(frame);
     scrollFrames.clear();
+    if (eDismissTimer) window.clearTimeout(eDismissTimer);
+    eDismissTimer = 0;
     disposers.forEach((dispose) => dispose?.());
     releaseEdgeHost();
   };
