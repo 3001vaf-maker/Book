@@ -102,7 +102,7 @@ function rootMarkup() {
       { title: 'Инструкции', data: 'data-documents-section="guides"', aria: 'Открыть сохранённые инструкции' },
       { title: 'История', data: 'data-documents-section="history"', aria: 'Открыть историю документов' },
     ]),
-    actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-documents-back' }))
+    ''
   ]);
 }
 
@@ -121,7 +121,7 @@ function templatesMarkup() {
   return page([
     `<div class="entity-page-header">${pageHeader('Шаблоны')}<div class="page-header-action">${iconButton('+', { className: 'icon-button--primary', data: 'data-add-document', aria: 'Добавить шаблон' })}</div></div>`,
     rows,
-    actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-documents-root' }))
+    ''
   ]);
 }
 
@@ -175,7 +175,7 @@ function guidesMarkup() {
     pageHeader('Инструкции'),
     '<p class="muted">Персональные инструкции Book формирует автоматически из актуального шаблона Реестра и ваших рабочих данных.</p>',
     rows,
-    actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-documents-root' }))
+    ''
   ]);
 }
 
@@ -258,23 +258,15 @@ function historyMarkup() {
     pageHeader('История'),
     viewNavigation({ views: HISTORY_VIEWS, activeView: currentHistoryView, ariaLabel: 'История документов' }),
     currentHistoryView === 'documents' ? documentHistoryMarkup() : signatureHistoryMarkup(),
-    actionBlock(button('Назад', { className: 'ui-button--secondary', data: 'data-documents-root' }))
+    ''
   ]);
 }
 
 function bind(root, navigateBack) {
-  root.querySelector('[data-documents-back]')?.addEventListener('click', () => {
-    currentSection = 'root';
-    navigateBack();
-  });
   root.querySelectorAll('[data-documents-section]').forEach((item) => item.addEventListener('click', () => {
     currentSection = item.dataset.documentsSection;
     render(root, navigateBack);
   }));
-  root.querySelector('[data-documents-root]')?.addEventListener('click', () => {
-    currentSection = 'root';
-    render(root, navigateBack);
-  });
   root.querySelector('[data-add-document]')?.addEventListener('click', () => openCreateDocument(() => render(root, navigateBack)));
   root.querySelectorAll('[data-document-id]').forEach((row) => row.addEventListener('click', () => {
     const item = getDocuments().find((document) => document.id === row.dataset.documentId);

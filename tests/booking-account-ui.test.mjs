@@ -349,15 +349,15 @@ assert.match(onlineBookingService, /emails: uniqueStrings/);
 assert.match(onlineBookingService, /telegram: text\(source\.telegram\)/);
 assert.match(onlineBookingService, /links,/);
 
-// Online booking settings stay inside the single Shared workspace Z and expose only header/action sources.
+// Online booking settings stay inside the single Shared workspace Z; return navigation is gesture-owned.
 assert.match(bookingSettingsUi, /workspaceHeaderContext\(\{/);
-assert.match(bookingSettingsUi, /back: \{ data: 'data-online-booking-back'/);
+assert.doesNotMatch(bookingSettingsUi, /data-online-booking-back/);
 assert.match(bookingSettingsUi, /data-v2-primary-action/);
 assert.match(bookingSettingsUi, /data-v2-primary-visible="false"/);
 assert.doesNotMatch(bookingSettingsUi, /\bappShell\s*\(/);
 assert.doesNotMatch(bookingSettingsUi, /\bappHeader\s*\(/);
 assert.doesNotMatch(bookingSettingsUi, /app-content--book-shell/);
-assert.match(headerUi, /data-workspace-back-source/);
+assert.doesNotMatch(headerUi, /data-workspace-back-source/);
 assert.match(headerUi, /actionData/);
 assert.match(bookingSettingsUi, /folderList\(\[/);
 assert.match(bookingSettingsUi, /Приветствие/);
