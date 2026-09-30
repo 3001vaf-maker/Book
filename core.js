@@ -330,21 +330,8 @@ function primaryVisible(source) {
   return true;
 }
 
-function syncWorkspaceBack(surface, backSource) {
-  let control = surface.querySelector(':scope > [data-v2-workspace-back]');
-  if (!backSource) {
-    control?.remove();
-    return;
-  }
-  if (!control) {
-    surface.insertAdjacentHTML('afterbegin', '<button type="button" class="v2-workspace-back" data-v2-workspace-back aria-label="Назад">‹</button>');
-    control = surface.querySelector(':scope > [data-v2-workspace-back]');
-  }
-  const backLabel = backSource.getAttribute('aria-label') || 'Назад';
-  if (control.getAttribute('aria-label') !== backLabel) {
-    control.setAttribute('aria-label', backLabel);
-  }
-  control.onclick = () => backSource.click();
+function syncWorkspaceBack(surface) {
+  surface.querySelector(':scope > [data-v2-workspace-back]')?.remove();
 }
 
 function syncWorkspacePrimarySource(surface, source) {
@@ -380,7 +367,7 @@ function syncWorkspaceHeader(surface) {
   const cSource = primarySource(contextRoot);
   const cVisible = primaryVisible(cSource);
   const hideD = context?.dataset.workspaceHideD === 'true';
-  syncWorkspaceBack(contextRoot, backSource);
+  syncWorkspaceBack(contextRoot);
   syncWorkspacePrimarySource(contextRoot, cVisible ? cSource : null);
   const header = app.querySelector('[data-v2-header]');
   if (!header) return;
