@@ -47,10 +47,6 @@ function discountMode(item: JsonObject, defaultPercent = 0) {
   return defaultPercent > 0 ? 'percent' : 'none';
 }
 
-function dateValue(value: unknown, fallback = new Date()) {
-  const date = value instanceof Date ? value : new Date(String(value || ''));
-  return Number.isFinite(date.getTime()) ? date : fallback;
-}
 
 function requiredOccurredAt(value: unknown) {
   const raw = text(value);
@@ -283,12 +279,10 @@ export class FinanceService {
   }
 
   async upsertSettlement(tenantId: string, sourceType: string, sourceId: string, value: unknown) {
-    await this.ensureLegacyMigrated(tenantId);
     return this.saveSettlementWith(this.prisma, tenantId, sourceType, sourceId, value);
   }
 
   async settlementForSource(tenantId: string, sourceType: string, sourceId: string, fallback: unknown = null) {
-    await this.ensureLegacyMigrated(tenantId);
     const type = text(sourceType);
     const id = text(sourceId);
     const row = await this.prisma.financeSettlement.findUnique({
@@ -301,7 +295,6 @@ export class FinanceService {
   }
 
   async saveSettlement(tenantId: string, sourceType: string, sourceId: string, value: unknown) {
-    await this.ensureLegacyMigrated(tenantId);
     const settlement = validSettlement(value);
     if (!settlement) throw new BadRequestException('Расчёт не содержит суммы');
     const type = text(sourceType);
@@ -315,7 +308,7 @@ export class FinanceService {
       }
       await this.saveSettlementWith(tx, tenantId, type, id, settlement);
     });
-    return this.snapshot(tenantId, { skipMigration: true });
+    return this.snapshot(tenantId);
   }
 
   private async serviceNet(db: Db, tenantId: string, sourceType: string, sourceId: string) {
@@ -331,7 +324,6 @@ export class FinanceService {
   }
 
   async recordSettlementPaymentState(tenantId: string, recordId: string, settlement: JsonObject) {
-    await this.ensureLegacyMigrated(tenantId);
     const paid = Math.max(0, await this.serviceNet(this.prisma, tenantId, 'record', text(recordId)));
     const total = money(settlement?.planTotal);
     const due = Math.max(0, money(total - paid));
@@ -415,108 +407,7 @@ export class FinanceService {
     });
   }
 
-  private async migrateLegacyPayment(tx: Prisma.TransactionClient, tenantId: string, item: JsonObject, index: number) {
-    const source = sourceValue(item.source);
-    if (!source.type || !source.id) return;
-    const operationId = text(item.id) || `legacy-payment-${index}`;
-    const allocations = allocationsValue(item.allocations?.length ? item.allocations : [{
-      walletId: item.walletId,
-      walletName: item.walletName,
-      amount: item.total,
-    }]);
-    if (!allocations.length) return;
-    const total = money(item.total ?? allocations.reduce((sum, entry) => sum + entry.amount, 0));
-    const tips = Math.min(total, money(item.tips));
-    const serviceAmount = Math.min(total, money(item.serviceAmount ?? (total - tips)));
-    const occurredAt = dateValue(item.paidAt ?? item.createdAt);
-    const components = splitAllocationComponents(allocations, serviceAmount, tips);
-    const settlement = validSettlement(item.finance);
-    if (settlement) await this.saveSettlementWith(tx, tenantId, source.type, source.id, settlement);
 
-    await this.createOperationWithEntries(tx, tenantId, {
-      operationId,
-      kind: 'payment',
-      status: item.status === 'cancelled' ? 'cancelled' : 'completed',
-      source,
-      occurredAt,
-      data: {
-        workplace: text(item.workplace),
-        person: clone(objectValue(item.person)),
-        allocations,
-        total,
-        serviceAmount,
-        tips,
-        settlement,
-        legacy: true,
-      },
-      entries: components.map((entry) => ({
-        ...entry,
-        direction: 'IN',
-        economicType: entry.component === 'tips' ? 'TIPS' : 'SERVICE_REVENUE',
-      })),
-    });
-
-    if (item.status === 'cancelled') {
-      await this.createReversalFor(tx, tenantId, operationId, 'legacy-cancelled-payment', occurredAt);
-    }
-  }
-
-  private async migrateLegacyExpense(tx: Prisma.TransactionClient, tenantId: string, item: JsonObject, index: number) {
-    const source = sourceValue(item.source);
-    if (!source.type || !source.id) return;
-    const operationId = text(item.id) || `legacy-expense-${index}`;
-    const total = money(item.total);
-    if (total <= 0) return;
-    const tips = Math.min(total, money(item.tips));
-    const serviceAmount = Math.min(total, money(item.serviceAmount ?? (total - tips)));
-    const occurredAt = dateValue(item.refundedAt ?? item.createdAt);
-    const walletId = text(item.walletId);
-    if (!walletId) return;
-    const kind = text(item.expenseType) === 'refund' ? 'refund' : 'expense';
-    const entries: JsonObject[] = [];
-    if (serviceAmount > 0) entries.push({
-      walletId,
-      walletName: text(item.walletName),
-      amount: serviceAmount,
-      component: 'service',
-      direction: 'OUT',
-      economicType: kind === 'refund' ? 'SERVICE_REFUND' : 'EXPENSE',
-    });
-    if (tips > 0) entries.push({
-      walletId,
-      walletName: text(item.walletName),
-      amount: tips,
-      component: 'tips',
-      direction: 'OUT',
-      economicType: kind === 'refund' ? 'TIPS_REFUND' : 'EXPENSE',
-    });
-
-    await this.createOperationWithEntries(tx, tenantId, {
-      operationId,
-      kind,
-      status: item.status === 'cancelled' ? 'cancelled' : 'completed',
-      source,
-      originalOperationId: text(item.originalPaymentId),
-      occurredAt,
-      data: {
-        workplace: text(item.workplace),
-        person: clone(objectValue(item.person)),
-        walletId,
-        walletName: text(item.walletName),
-        total,
-        serviceAmount,
-        tips,
-        reason: text(item.reason),
-        settlement: validSettlement(item.finance),
-        legacy: true,
-      },
-      entries,
-    });
-
-    if (item.status === 'cancelled') {
-      await this.createReversalFor(tx, tenantId, operationId, 'legacy-cancelled-expense', occurredAt);
-    }
-  }
 
   private async createReversalFor(db: Db, tenantId: string, originalOperationId: string, reason: string, occurredAt: Date) {
     const original = await db.financeOperation.findUnique({
@@ -544,41 +435,6 @@ export class FinanceService {
     });
   }
 
-  private async ensureLegacyMigrated(tenantId: string) {
-    const auxiliary = await this.prisma.businessAuxiliaryState.findUnique({ where: { tenantId } });
-    const bundle = objectValue(auxiliary?.data);
-    const legacy = objectValue(bundle.finance);
-    const alreadyMarked = Boolean(legacy.canonicalLedgerMigratedAt);
-
-    const records = await this.prisma.record.findMany({ where: { tenantId } });
-    const recordsWithSettlement = records.filter((row) => validSettlement(objectValue(row.data).finance));
-
-    if (alreadyMarked && !recordsWithSettlement.length) return;
-
-    await this.serializable(async (tx) => {
-      for (const row of recordsWithSettlement) {
-        const record = clone(objectValue(row.data));
-        const settlement = validSettlement(record.finance);
-        if (settlement) await this.saveSettlementWith(tx, tenantId, 'record', text(record.id ?? row.recordId), settlement);
-        delete record.finance;
-        await tx.record.update({ where: { id: row.id }, data: { data: json(record) } });
-      }
-
-      if (!alreadyMarked) {
-        for (const [index, item] of arrayValue(legacy.income).entries()) {
-          await this.migrateLegacyPayment(tx, tenantId, objectValue(item), index);
-        }
-        for (const [index, item] of arrayValue(legacy.expense).entries()) {
-          await this.migrateLegacyExpense(tx, tenantId, objectValue(item), index);
-        }
-        if (auxiliary) {
-          const nextFinance = { ...legacy, canonicalLedgerMigratedAt: new Date().toISOString() };
-          const nextBundle = { ...bundle, finance: nextFinance };
-          await tx.businessAuxiliaryState.update({ where: { tenantId }, data: { data: json(nextBundle) } });
-        }
-      }
-    });
-  }
 
   private async ensureDefaultArticles(tenantId: string, db: Db = this.prisma) {
     const existing = await db.financeArticle.findMany({
@@ -647,7 +503,7 @@ export class FinanceService {
         position: (max._max.position || 0) + 10,
       },
     });
-    return this.snapshot(tenantId, { skipMigration: true });
+    return this.snapshot(tenantId);
   }
 
   async updateArticle(tenantId: string, articleId: string, body: unknown) {
@@ -689,7 +545,7 @@ export class FinanceService {
       where: { id: current.id },
       data: { name, parentArticleId, direction, economicType },
     });
-    return this.snapshot(tenantId, { skipMigration: true });
+    return this.snapshot(tenantId);
   }
 
   async archiveArticle(tenantId: string, articleId: string) {
@@ -698,16 +554,15 @@ export class FinanceService {
     const current = await this.prisma.financeArticle.findUnique({
       where: { tenantId_articleId: { tenantId, articleId: id } },
     });
-    if (!current || current.archivedAt) return this.snapshot(tenantId, { skipMigration: true });
+    if (!current || current.archivedAt) return this.snapshot(tenantId);
     if (current.systemKey) throw new BadRequestException('Системную статью удалить нельзя');
     const child = await this.prisma.financeArticle.findFirst({ where: { tenantId, parentArticleId: id, archivedAt: null } });
     if (child) throw new BadRequestException('Сначала удалите или перенесите вложенные статьи');
     await this.prisma.financeArticle.update({ where: { id: current.id }, data: { archivedAt: new Date() } });
-    return this.snapshot(tenantId, { skipMigration: true });
+    return this.snapshot(tenantId);
   }
 
   async recordManualOperation(tenantId: string, body: unknown) {
-    await this.ensureLegacyMigrated(tenantId);
     await this.ensureDefaultArticles(tenantId);
     const input = objectValue(body);
     const direction = text(input.direction);
@@ -793,11 +648,10 @@ export class FinanceService {
         }),
       });
     });
-    return this.snapshot(tenantId, { skipMigration: true });
+    return this.snapshot(tenantId);
   }
 
   async recordSpecialOperation(tenantId: string, body: unknown) {
-    await this.ensureLegacyMigrated(tenantId);
     await this.ensureDefaultArticles(tenantId);
     const input = objectValue(body);
     const kind = text(input.kind);
@@ -875,7 +729,7 @@ export class FinanceService {
         });
       });
 
-      return this.snapshot(tenantId, { skipMigration: true });
+      return this.snapshot(tenantId);
     }
 
     const definition = definitions[kind];
@@ -919,11 +773,10 @@ export class FinanceService {
       });
     });
 
-    return this.snapshot(tenantId, { skipMigration: true });
+    return this.snapshot(tenantId);
   }
 
   async recordPayment(tenantId: string, body: unknown) {
-    await this.ensureLegacyMigrated(tenantId);
     const input = objectValue(body);
     const source = sourceValue(input.source);
     if (!source.type || !source.id) throw new BadRequestException('У оплаты отсутствует источник');
@@ -969,11 +822,10 @@ export class FinanceService {
         })),
       });
     });
-    return this.snapshot(tenantId, { skipMigration: true });
+    return this.snapshot(tenantId);
   }
 
   async recordRefund(tenantId: string, operationId: string, body: unknown) {
-    await this.ensureLegacyMigrated(tenantId);
     const id = text(operationId);
     const payment = await this.prisma.financeOperation.findUnique({
       where: { tenantId_operationId: { tenantId, operationId: id } },
@@ -1032,11 +884,10 @@ export class FinanceService {
       });
     });
 
-    return this.snapshot(tenantId, { skipMigration: true });
+    return this.snapshot(tenantId);
   }
 
   async cancelOperation(tenantId: string, operationId: string, body: unknown) {
-    await this.ensureLegacyMigrated(tenantId);
     const id = text(operationId);
     const input = objectValue(body);
     const occurredAt = requiredOccurredAt(input.occurredAt);
@@ -1044,7 +895,7 @@ export class FinanceService {
       where: { tenantId_operationId: { tenantId, operationId: id } },
     });
     if (!original) throw new NotFoundException('Операция не найдена');
-    if (original.status === 'cancelled') return this.snapshot(tenantId, { skipMigration: true });
+    if (original.status === 'cancelled') return this.snapshot(tenantId);
 
     await this.serializable(async (tx) => {
       const targets = [original];
@@ -1061,7 +912,7 @@ export class FinanceService {
       }
     });
 
-    return this.snapshot(tenantId, { skipMigration: true });
+    return this.snapshot(tenantId);
   }
 
   private legacyReadModel(operation: any) {
@@ -1134,8 +985,7 @@ export class FinanceService {
     };
   }
 
-  async snapshot(tenantId: string, { skipMigration = false } = {}) {
-    if (!skipMigration) await this.ensureLegacyMigrated(tenantId);
+  async snapshot(tenantId: string) {
     await this.ensureDefaultArticles(tenantId);
     const [articles, settlements, operations, ledger] = await Promise.all([
       this.prisma.financeArticle.findMany({ where: { tenantId, archivedAt: null }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
