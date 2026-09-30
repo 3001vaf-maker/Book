@@ -1,5 +1,5 @@
 import { actionBlock, button, collectRepeatedField, entityVisualCard, escapeHtml, field, initPhotoField, initRepeatedFields, modal, mountModal, mountEntityCardConstructor, mountV2ZLayer, openSharedProfileSettingsMenu, openSharedPasswordAction, page, photoField, repeatedField, searchableSelect, select, setSharedProfilePrimary, textareaField, v2HorizontalRail, v2Section, workspaceHeaderContext, v2ZLayer, workplaceAddButton } from '../../ui/ui.js';
-import { getBookAccess, getBookLimit, loadBookAccess, requestLiveMode } from '../../core/access.js';
+import { canUseBookCapability, getBookAccess, getBookLimit, loadBookAccess, requestLiveMode } from '../../core/access.js';
 import { changePassword, logout } from '../../core/auth.js';
 import { getProfessionCatalog, getProfile, saveProfile as saveProfileData } from './data.js';
 import { getWorkplaces } from './workplaces/data.js';
@@ -33,7 +33,7 @@ function profileContext(p,title=fullName(p)){
 }
 
 function profileCard(p){
-  const workplaces=getWorkplaces();
+  const workplaces=canUseBookCapability('workplaces.access')?getWorkplaces():[];
   return entityVisualCard({
     appearance:profileCardAppearance(p),
     fields:profileCardFields(p,workplaces),
@@ -294,11 +294,12 @@ function rootAddSource(){
 
 function renderProfile(root,navigateBack,options={}){
   const p=getProfile();
+  const workplacesAllowed=canUseBookCapability('workplaces.access');
   root.innerHTML=page([
     profileContext(p),
     profileCard(p),
-    v2Section('Рабочие пространства',workplaceRail()),
-    rootAddSource()
+    workplacesAllowed?v2Section('Рабочие пространства',workplaceRail()):'',
+    workplacesAllowed?rootAddSource():''
   ]);
   root.querySelector('[data-workspace-context-action]')?.addEventListener('click',()=>openProfileSettings(root,navigateBack,options));
   root.querySelector('[data-profile-card]')?.addEventListener('click',()=>openProfileData(root,navigateBack,options));
