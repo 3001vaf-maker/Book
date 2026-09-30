@@ -708,7 +708,7 @@ export function initV2WorkspaceInteraction(root, {
   const z = app.querySelector('[data-v2-front] > [data-v2-z]');
   const edgeHost = app.querySelector('[data-v2-edge-swipe]') || stage;
   if (!stage || !front) return () => {};
-  const releaseEdgeHost = retainV2EdgeHost(edgeHost?.matches?.('[data-v2-edge-swipe]') ? edgeHost : null);
+  const releaseEdgeHost = retainV2EdgeHost(bindZ && edgeHost?.matches?.('[data-v2-edge-swipe]') ? edgeHost : null);
 
   const fCards = [...(fDeck?.querySelectorAll?.('[data-v2-card-item]') || [])];
   const eCards = [...(eDeck?.querySelectorAll?.('[data-v2-card-item]') || [])];
