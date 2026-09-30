@@ -266,7 +266,7 @@ if (!/data-record-owner-settings/.test(sharedRecordUi)
 const sharedV2Runtime = read('ui/v2/index.js');
 if (!/mountV2ZLayer/.test(sharedV2Runtime)
   || !/stack\s*=\s*false/.test(sharedV2Runtime)
-  || !/initV2Swipe\(node,\s*\{\s*onRight:\s*close,\s*revealDeck:\s*false\s*\}\)/.test(sharedV2Runtime)
+  || !/initV2Swipe\(node,\s*\{\s*onRight:\s*close,\s*revealDeck:\s*false,\s*threshold:\s*42\s*\}\)/.test(sharedV2Runtime)
   || !/book:v2-context-changed/.test(sharedV2Runtime)) {
   errors.push('Shared Record Z stack must close one top sheet on right swipe and resync Header context after close');
 }

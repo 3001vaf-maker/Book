@@ -61,6 +61,8 @@ F/E/Z navigation belongs only to the Shared V2 owner in `ui/v2` and is identical
 - **E** is not a separate screen. It unfolds as a native vertical scroll rail of full cards through the selected F card while the horizontal F layer stays visible, forming one F/E cross on H.
 - F scrolls horizontally and E scrolls vertically. The browser owns their normal inertial scrolling. The only cross-axis custom gesture is right-swipe from E: E collapses back into F and the excess distance may continue into the F rail.
 - Tap on F without E opens the existing Z1. Tap on F with E opens the E cross. Tap on E opens the existing Z1. Returning right from any Z always opens the root F rail first; E never auto-reopens and traps the user inside a nested level.
+- The visible left H/Z edge is a guaranteed navigation gutter: a deliberate right-swipe begun there always belongs to FEZ, even when the Z content below contains forms or horizontal rails. A normal tap on an interactive control remains a tap because gesture ownership begins only after horizontal movement is established.
+- Z2/Z3 use the same rule on their own topmost surface: right-swipe closes only that upper Z first; the underlying Z1 then owns the next right-swipe to F.
 - Z2/Z3 and modals remain above this owner and block lower FEZ gestures while active.
 
 Functional screens may supply labels, children and state, but may not implement their own FEZ geometry or gesture controller.
