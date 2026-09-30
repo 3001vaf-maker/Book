@@ -883,13 +883,8 @@ export function initV2WorkspaceInteraction(root, {
       }
       const index = cards.indexOf(card);
       if (index < 0) return;
-      const activeIndex = getActiveIndex();
-      if (index !== activeIndex) {
-        event.preventDefault();
-        event.stopPropagation();
-        centerCard(card, axis, 'smooth');
-        return;
-      }
+      setActiveIndex(index);
+      setActiveCard(cards, index);
       const id = cardId(card);
       if (id) onSelect?.(id);
     };
