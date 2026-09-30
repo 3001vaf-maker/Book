@@ -15,7 +15,7 @@ import { hydrateWorkplacesFromServer } from '../settings/profile/workplaces/data
 import { hydrateProceduresFromServer } from '../settings/service/procedures/data.js';
 import { hydrateProductsFromServer } from '../settings/service/products/data.js';
 import { hydrateTagsFromServer } from '../settings/tags/data.js';
-import { hydrateWalletsFromServer } from '../settings/wallets/data.js';
+import { hydrateWalletsFromServer } from '../main/finance/cash/data.js';
 
 const POLL_MS = 4000;
 const ALL_SCOPES = Object.freeze(['business', 'operational', 'documents', 'profile', 'auxiliary', 'finance']);
