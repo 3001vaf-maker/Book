@@ -253,13 +253,8 @@ if (!/export function getZReport/.test(financeRead) || !/getLedgerEntries\(\)/.t
 
 
 const stagingSeed = source('server/prisma/seed-staging.ts');
-if (!/financeSettlement\.upsert/.test(stagingSeed)
-  || !/financeOperation\.upsert/.test(stagingSeed)
-  || !/financeLedgerEntry\.upsert/.test(stagingSeed)) {
-  errors.push('Staging fixtures must seed canonical Settlement, Operation and Ledger owners');
-}
-if (/version:\s*5[\s\S]*income:\s*\[/.test(stagingSeed)) {
-  errors.push('Staging fixtures must not recreate legacy auxiliary Finance income/expense storage');
+if (/financeSettlement\.upsert|financeOperation\.upsert|financeLedgerEntry\.upsert|staging-payment-|staging-ledger-/.test(stagingSeed)) {
+  errors.push('Staging fixtures must not create test Finance facts');
 }
 
 const recordView = source('journal/record-view.js');
