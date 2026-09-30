@@ -452,7 +452,10 @@ assert.match(v2Css, /\.v2-card-deck\{[\s\S]*?--v2-card-width:min\(68vw,258px\);[
 assert.match(v2Css, /\.v2-card-deck--x\{[\s\S]*?overflow-x:auto;overflow-y:hidden[\s\S]*?scroll-snap-type:x mandatory[\s\S]*?touch-action:pan-x/);
 assert.match(v2Css, /\.v2-card-deck--y\{[\s\S]*?overflow-x:hidden;overflow-y:auto[\s\S]*?scroll-snap-type:y mandatory[\s\S]*?touch-action:pan-y/);
 assert.match(v2Css, /\.v2-z\{[\s\S]*?touch-action:auto/);
-assert.match(v2Css, /\.v2-edge-swipe-zone\{[\s\S]*?width:36px;[\s\S]*?touch-action:none/);
+assert.match(v2Css, /\.v2-edge-swipe-zone\{[\s\S]*?width:36px;[\s\S]*?pointer-events:none;[\s\S]*?touch-action:none/);
+assert.match(v2Css, /\.v2-edge-swipe-zone\.is-active\{pointer-events:auto\}/);
+assert.match(v2Ui, /function retainV2EdgeHost\(host\)/);
+assert.match(v2Ui, /host\.dataset\.v2EdgeOwners/);
 assert.doesNotMatch(v2Css, /scroll-snap-stop:always/);
 assert.match(v2Css, /\.v2-card-deck__card\{[\s\S]*?width:var\(--v2-card-width\);height:var\(--v2-card-height\)/);
 assert.match(v2Css, /rotateY\(var\(--v2-card-rotation\)\)/);
