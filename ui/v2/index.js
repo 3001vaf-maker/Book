@@ -816,16 +816,21 @@ export function initV2WorkspaceInteraction(root, {
     else deck.scrollLeft = target;
   };
 
-  const bindNativeDeck = (deck, cards, axis, getActiveIndex, setActiveIndex, onSelect) => {
+  const bindNativeDeck = (deck, cards, axis, getActiveIndex, setActiveIndex, onSelect, isEnabled = () => true) => {
     if (!deck || !cards.length) return;
     let pointer = null;
     let suppressClick = false;
     let settleTimer = 0;
 
-    const refresh = () => scheduleGeometry(deck, cards, axis, setActiveIndex);
+    const refresh = () => {
+      if (!isEnabled()) return;
+      scheduleGeometry(deck, cards, axis, setActiveIndex);
+    };
     const settle = () => {
+      if (!isEnabled()) return;
       if (settleTimer) window.clearTimeout(settleTimer);
       settleTimer = window.setTimeout(() => {
+        if (!isEnabled()) return;
         const next = updateDeckGeometry(deck, cards, axis);
         if (next >= 0) setActiveIndex(next);
       }, 90);
@@ -944,6 +949,7 @@ export function initV2WorkspaceInteraction(root, {
     () => fActiveIndex,
     (index) => { fActiveIndex = index; },
     (id) => onRootSelect?.(id),
+    () => open,
   );
   bindNativeDeck(
     eDeck,
@@ -952,6 +958,7 @@ export function initV2WorkspaceInteraction(root, {
     () => eActiveIndex,
     (index) => { eActiveIndex = index; },
     (id) => onSecondarySelect?.(id),
+    () => secondaryOpen,
   );
 
   const eDown = (event) => {
