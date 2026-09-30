@@ -27,8 +27,17 @@ import {
 
 const result = document.querySelector('#result');
 const failures = [];
-const ok = (condition, message) => { if (!condition) failures.push(message); };
-const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+let stageName = 'boot';
+const mark = (name) => {
+  stageName = name;
+  result.textContent = 'running: ' + name;
+  document.documentElement.dataset.fezRuntimeStage = name;
+};
+const ok = (condition, message) => { if (!condition) failures.push(stageName + ': ' + message); };
+const nextFrame = () => new Promise((resolve) => window.setTimeout(resolve, 70));
+window.addEventListener('unhandledrejection', (event) => {
+  failures.push(stageName + ': unhandled rejection: ' + String(event.reason?.message || event.reason || 'unknown'));
+});
 const pointer = (target, type, x, y, id = 1) => {
   target.dispatchEvent(new PointerEvent(type, {
     bubbles:true, cancelable:true, pointerId:id, pointerType:'touch',
@@ -45,7 +54,7 @@ for (const name of ['setPointerCapture','releasePointerCapture']) {
   Object.defineProperty(Element.prototype, name, { configurable:true, value(){ } });
 }
 Object.defineProperty(Element.prototype, 'hasPointerCapture', { configurable:true, value(){ return true; } });
-window.addEventListener('error', (event) => failures.push('window error: ' + (event.error?.message || event.message)));
+window.addEventListener('error', (event) => failures.push(stageName + ': window error: ' + (event.error?.message || event.message)));
 
 const roots = [
   { id:'one', label:'Один' },
@@ -74,11 +83,13 @@ ok(Math.round(edge.getBoundingClientRect().width) === 36, 'edge owner must be 36
 ok(getComputedStyle(edge).touchAction === 'none', 'edge owner must exclusively own its gesture');
 ok(getComputedStyle(edge).pointerEvents === 'none', 'unused edge owner must not block Z content');
 
+mark('bind-z-disabled');
 const disposeNoZ = initV2WorkspaceInteraction(app, { activeId:'one', deckOpen:false, bindZ:false });
 await nextFrame();
 ok(getComputedStyle(edge).pointerEvents === 'none', 'bindZ:false activated a dead edge strip');
 disposeNoZ();
 
+mark('closed-semantic-active');
 const hiddenF = app.querySelector('[data-v2-card-deck][data-v2-deck-level="f"]');
 hiddenF.scrollLeft = hiddenF.scrollWidth;
 let firstOwnerCalls = 0;
@@ -91,17 +102,20 @@ await nextFrame();
 ok(app.querySelector('[data-v2-card-item="one"]').classList.contains('is-active'), 'closed F overwrote semantic activeId from stale scroll position');
 ok(getComputedStyle(edge).pointerEvents === 'auto', 'bound edge owner must become interactive');
 
+mark('root-z-to-f');
 pointer(edge, 'pointerdown', 12, 300, 1);
 pointer(edge, 'pointermove', 46, 302, 1);
 pointer(edge, 'pointerup', 46, 302, 1);
 await nextFrame();
 ok(app.classList.contains('is-deck-open'), 'edge swipe did not open F');
 
+mark('active-f-tap');
 const active = app.querySelector('[data-v2-card-item].is-active');
 click(active);
 await nextFrame();
 ok(firstOwnerCalls === 1, 'active F tap must fire exactly once');
 
+mark('owner-rebind');
 dispose();
 let secondOwnerCalls = 0;
 dispose = initV2WorkspaceInteraction(app, {
@@ -116,6 +130,7 @@ click(reboundActive);
 await nextFrame();
 ok(firstOwnerCalls === 1 && secondOwnerCalls === 1, 'disposed FEZ owner remained active after rebind');
 
+mark('f-native-scroll');
 // Real browser layout + scroll must drive the active card and continuous 3D variables.
 const fDeck = app.querySelector('[data-v2-card-deck][data-v2-deck-level="f"]');
 const fCards = [...fDeck.querySelectorAll('[data-v2-card-item]')];
@@ -136,6 +151,7 @@ await nextFrame();
 ok(secondOwnerCalls === 1, 'drag leaked into click navigation');
 ok(getComputedStyle(reboundActive).scrollSnapStop !== 'always', 'CardDeck still forces a stop on every card');
 
+mark('e-native-scroll');
 dispose();
 dispose = initV2WorkspaceInteraction(app, {
   activeId:'two',
@@ -156,6 +172,7 @@ await new Promise((resolve) => setTimeout(resolve, 140));
 await nextFrame();
 ok(eCards[1].classList.contains('is-active'), 'native E scroll did not update the centred active card');
 ok(Math.abs(Number.parseFloat(eCards[0].style.getPropertyValue('--v2-card-rotation'))) > 0, 'neighboring E card did not bend in 3D');
+mark('e-collapse');
 pointer(eDeck, 'pointerdown', 180, 390, 16);
 pointer(eDeck, 'pointermove', 220, 392, 16);
 pointer(eDeck, 'pointerup', 220, 392, 16);
@@ -163,6 +180,7 @@ await nextFrame();
 ok(!app.classList.contains('is-e-open'), 'E right-swipe from its middle did not collapse back to F');
 ok(Number.parseFloat(eDeck.style.getPropertyValue('--v2-e-dismiss-x')) >= app.querySelector('.v2-app__stage').clientWidth, 'E collapse snapped back instead of continuing right from the finger');
 
+mark('z2-edge-close');
 setV2DeckOpen(app, false);
 const layer = mountV2ZLayer(app, v2ZLayer('<p>Z2</p>', { className:'runtime-z2' }), { stack:true });
 ok(Boolean(layer?.isConnected), 'Z2 did not mount');
@@ -172,6 +190,7 @@ pointer(edge, 'pointerup', 44, 261, 20);
 await nextFrame();
 ok(!layer?.isConnected, 'edge swipe did not close top Z2');
 
+mark('z-layer-replacement');
 const oldLayer = mountV2ZLayer(app, v2ZLayer('<p>old</p>', { className:'runtime-old' }), { stack:true });
 let oldDisposed = 0;
 const oldDispose = oldLayer.v2Dispose;
@@ -181,6 +200,7 @@ await nextFrame();
 ok(oldDisposed === 1 && !oldLayer.isConnected && replacement?.isConnected, 'non-stack Z replacement skipped disposal');
 replacement?.v2Close?.();
 
+mark('generic-base-z');
 // Generic base-Z owner (used by booking/auth/chat) must move the whole front with the finger.
 const genericHost = document.createElement('div');
 genericHost.innerHTML = v2Shell({ body:'<p>generic Z</p>', className:'v2-app--generic-runtime' });
@@ -204,6 +224,7 @@ ok(genericBack === 1, 'generic Z1 edge swipe callback did not fire');
 disposeGeneric();
 genericHost.remove();
 
+mark('sticker-swipe');
 const stickerHost = document.createElement('div');
 stickerHost.innerHTML = v2Sticker({ title:'Тест', body:'Тело' });
 document.body.appendChild(stickerHost);
@@ -220,6 +241,7 @@ dispose();
 await nextFrame();
 ok(getComputedStyle(edge).pointerEvents === 'none', 'edge owner stayed interactive after all owners disposed');
 
+mark('finalize');
 if (failures.length) {
   document.documentElement.dataset.fezRuntime = 'fail';
   result.textContent = failures.join('\n');
