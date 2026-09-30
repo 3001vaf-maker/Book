@@ -8,7 +8,7 @@ import {
   saveCommunicationGroup,
   sendBroadcast,
 } from '../core/communications/broadcasts.js';
-import { findPeopleByPhone, getAllPeople } from '../main/people/data.js';
+import { findPeopleByPhone, getAllPeople } from '../core/people/data.js';
 import {
   button,
   checkList,
