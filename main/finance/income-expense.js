@@ -144,8 +144,8 @@ function openOperation(root, direction, navigateBack) {
 }
 
 export function renderIncomeExpense(root, navigateBack = () => {}) {
-  root.innerHTML = `${pageHeader('Доход / Расход')}${actionBlock(`${button('Доход', { data: 'data-finance-manual-income' })}${button('Расход', { data: 'data-finance-manual-expense' })}${button('Назад', { variant: 'secondary', data: 'data-finance-manual-back' })}`)}`;
+  root.innerHTML = `${pageHeader('Доход / Расход')}${actionBlock(`${button('Доход', { data: 'data-finance-manual-income' })}${button('Расход', { data: 'data-finance-manual-expense' })}`)}`;
   root.querySelector('[data-finance-manual-income]')?.addEventListener('click', () => openOperation(root, 'IN', navigateBack));
   root.querySelector('[data-finance-manual-expense]')?.addEventListener('click', () => openOperation(root, 'OUT', navigateBack));
-  root.querySelector('[data-finance-manual-back]')?.addEventListener('click', navigateBack);
+  
 }
