@@ -184,12 +184,12 @@ function renderDDS(root, onBack = () => renderFinance(root)) {
     ? list({ items: movements.map(movementListItem) })
     : emptyState('Все операции', 'Финансовых операций пока нет.');
 
-  root.innerHTML = `${pageHeader('ДДС', 'Все операции')}<div class="ui-list-toolbar"><div></div><div class="ui-list-toolbar__actions">${button('Excel', { className: 'ui-button--secondary', data: 'data-finance-dds-excel' })}</div></div>${operations}${actionBlock(button('Назад', { variant: 'secondary', data: 'data-finance-dds-back' }))}`;
+  root.innerHTML = `${pageHeader('ДДС', 'Все операции')}<div class="ui-list-toolbar"><div></div><div class="ui-list-toolbar__actions">${button('Excel', { className: 'ui-button--secondary', data: 'data-finance-dds-excel' })}</div></div>${operations}`;
   root.querySelector('[data-finance-dds-excel]')?.addEventListener('click', () => downloadDDS(movements));
   root.querySelectorAll('[data-finance-operation]').forEach((element) => {
     element.addEventListener('click', () => openFinanceOperation(root, movements, element.dataset.financeOperation, onBack));
   });
-  root.querySelector('[data-finance-dds-back]')?.addEventListener('click', onBack);
+  
 }
 
 const FINANCE_NAVIGATION = [
