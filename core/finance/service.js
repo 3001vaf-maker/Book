@@ -1,6 +1,7 @@
 import { apiRequest } from '../auth.js';
-import { hydrateFinanceFromServer, readFinanceState } from './data.js';
+import { hydrateFinanceFromServer } from './data.js';
 import { financialNumber } from './rules.js';
+import { getDDSExpenses, getDDSIncome } from './read.js';
 
 function notifyFinanceChanged(detail = {}) {
   if (typeof window === 'undefined') return;
@@ -144,7 +145,7 @@ export async function recordPaymentIncome({
   if (maxAmount != null && applied > Math.max(0, financialNumber(maxAmount)) + 0.009) return null;
   if (Math.abs(allocated - applied - tipsTotal) > 0.009) return null;
 
-  const before = new Set(readFinanceState().income.map((item) => String(item?.id || '')));
+  const before = new Set(getDDSIncome().map((item) => String(item?.id || '')));
   const response = await apiRequest('/finance/operations/payment', {
     method: 'POST',
     body: JSON.stringify({
@@ -158,9 +159,10 @@ export async function recordPaymentIncome({
       occurredAt: occurredAt instanceof Date ? occurredAt.toISOString() : occurredAt,
     }),
   });
-  const state = await applyServerState(response, 'Не удалось провести оплату');
-  const payment = state.income.find((item) => !before.has(String(item?.id || '')) && sourceMatch(item, source))
-    || [...state.income].reverse().find((item) => sourceMatch(item, source));
+  await applyServerState(response, 'Не удалось провести оплату');
+  const income = getDDSIncome();
+  const payment = income.find((item) => !before.has(String(item?.id || '')) && sourceMatch(item, source))
+    || [...income].reverse().find((item) => sourceMatch(item, source));
   if (!payment) return null;
   notifyFinanceChanged({
     action: 'income',
@@ -194,9 +196,8 @@ export async function cancelPaymentOperation(paymentId, options = {}) {
   const id = String(paymentId || '');
   const operation = await cancelFinanceOperation(id, options);
   if (!operation) return null;
-  const state = readFinanceState();
-  return state.income.find((payment) => String(payment?.id || '') === id)
-    || state.expense.find((expense) => String(expense?.id || '') === id)
+  return getDDSIncome().find((payment) => String(payment?.id || '') === id)
+    || getDDSExpenses().find((expense) => String(expense?.id || '') === id)
     || null;
 }
 
@@ -206,7 +207,7 @@ export async function recordRefundExpense(
 ) {
   const id = String(paymentId || '');
   if (!id || !walletId || !occurredAt) return null;
-  const before = new Set(readFinanceState().expense.map((item) => String(item?.id || '')));
+  const before = new Set(getDDSExpenses().map((item) => String(item?.id || '')));
   const response = await apiRequest(`/finance/operations/${encodeURIComponent(id)}/refund`, {
     method: 'POST',
     body: JSON.stringify({
@@ -217,10 +218,11 @@ export async function recordRefundExpense(
       occurredAt: occurredAt instanceof Date ? occurredAt.toISOString() : occurredAt,
     }),
   });
-  const state = await applyServerState(response, 'Не удалось выполнить возврат');
-  const refund = state.expense.find((item) => !before.has(String(item?.id || ''))
+  await applyServerState(response, 'Не удалось выполнить возврат');
+  const expenses = getDDSExpenses();
+  const refund = expenses.find((item) => !before.has(String(item?.id || ''))
     && String(item?.originalPaymentId || '') === id)
-    || [...state.expense].reverse().find((item) => String(item?.originalPaymentId || '') === id);
+    || [...expenses].reverse().find((item) => String(item?.originalPaymentId || '') === id);
   if (!refund) return null;
   notifyFinanceChanged({
     action: 'refund',
