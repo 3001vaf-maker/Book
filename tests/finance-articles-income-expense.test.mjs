@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { getFinanceArticles, getLedgerEntries, hydrateFinanceFromServer } from '../core/finance/index.js';
-import { getWalletBalance, hydrateWalletsFromServer } from '../settings/wallets/data.js';
+import { getWalletBalance, hydrateWalletsFromServer } from '../main/finance/cash/data.js';
 
 hydrateWalletsFromServer([
   { id: 'cash', name: 'Наличные', photo: '', system: true },
