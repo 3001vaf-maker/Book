@@ -56,7 +56,7 @@ export class SaasAdminController {
   @Post('invitations')
   createInvitation(
     @Req() request: AdminRequest,
-    @Body() body: { email?: unknown; name?: unknown },
+    @Body() body: { email?: unknown; name?: unknown; tools?: unknown },
   ) {
     return this.invitations.createInvitation(request.platformAdminId!, body || {});
   }
