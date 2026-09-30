@@ -915,76 +915,6 @@ export class FinanceService {
     return this.snapshot(tenantId);
   }
 
-  private legacyReadModel(operation: any) {
-    if (operation.kind === 'cancel') return null;
-    const data = objectValue(operation.data);
-    const source = { type: operation.sourceType, id: operation.sourceId };
-    const base = {
-      id: operation.operationId,
-      status: operation.status,
-      source,
-      workplace: text(data.workplace),
-      person: clone(objectValue(data.person)),
-      total: money(data.total),
-      serviceAmount: money(data.serviceAmount),
-      tips: money(data.tips),
-      finance: clone(objectValue(data.settlement)),
-      occurredAt: operation.occurredAt.toISOString(),
-      recordedAt: operation.createdAt.toISOString(),
-      createdAt: operation.createdAt.toISOString(),
-    };
-    if (operation.kind === 'manual-income') {
-      return {
-        ...base,
-        movementType: 'income',
-        incomeType: 'manual',
-        walletId: text(data.walletId),
-        walletName: text(data.walletName),
-        articleId: text(data.articleId),
-        note: text(data.note),
-        paidAt: operation.occurredAt.toISOString(),
-      };
-    }
-    if (operation.kind === 'transfer') return null;
-    if (operation.kind === 'loan-received' || operation.kind === 'investment-received') {
-      return {
-        ...base,
-        movementType: 'income',
-        incomeType: operation.kind,
-        walletId: text(data.walletId),
-        walletName: text(data.walletName),
-        articleId: text(data.articleId),
-        note: text(data.note),
-        paidAt: operation.occurredAt.toISOString(),
-      };
-    }
-    if (operation.kind === 'payment') {
-      return {
-        ...base,
-        movementType: 'income',
-        incomeType: 'payment',
-        allocations: arrayValue(data.allocations).map((entry) => clone(objectValue(entry))),
-        walletId: arrayValue(data.allocations).length === 1 ? text(objectValue(data.allocations[0]).walletId) : '',
-        walletName: arrayValue(data.allocations).length === 1 ? text(objectValue(data.allocations[0]).walletName) : '',
-        paidAt: operation.occurredAt.toISOString(),
-      };
-    }
-    return {
-      ...base,
-      movementType: 'expense',
-      expenseType: operation.kind === 'refund'
-        ? 'refund'
-        : (operation.kind === 'manual-expense'
-          ? 'manual'
-          : (operation.kind === 'loan-repayment' || operation.kind === 'investment-return' ? operation.kind : 'expense')),
-      originalPaymentId: operation.originalOperationId,
-      walletId: text(data.walletId),
-      walletName: text(data.walletName),
-      reason: text(data.reason),
-      refundedAt: operation.occurredAt.toISOString(),
-    };
-  }
-
   async snapshot(tenantId: string) {
     await this.ensureDefaultArticles(tenantId);
     const [articles, settlements, operations, ledger] = await Promise.all([
@@ -1024,7 +954,6 @@ export class FinanceService {
       unitPrice: objectValue(row.data).unitPrice == null ? null : money(objectValue(row.data).unitPrice),
       note: text(objectValue(row.data).note),
     }));
-    const compatibility = operations.map((row) => this.legacyReadModel(row)).filter(Boolean) as JsonObject[];
     return {
       version: 7,
       articles: articles.map((row) => this.articleDto(row)),
@@ -1035,9 +964,7 @@ export class FinanceService {
         updatedAt: row.updatedAt.toISOString(),
       })),
       operations: operationRows,
-      ledger: ledgerRows,
-      income: compatibility.filter((row) => row.movementType === 'income'),
-      expense: compatibility.filter((row) => row.movementType === 'expense'),
+      ledger: ledgerRows => row.movementType === 'expense'),
     };
   }
 }
