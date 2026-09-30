@@ -23,6 +23,7 @@ const accountControlsUi = fs.readFileSync('settings/profile/account-controls.js'
 const accountMobileCss = fs.readFileSync('ui/booking/account-mobile.css', 'utf8');
 const core = fs.readFileSync('core.js', 'utf8');
 const finance = fs.readFileSync('core/finance/finance.js', 'utf8');
+const financeDds = fs.readFileSync('core/finance/dds/index.js', 'utf8');
 const journal = fs.readFileSync('journal/journal.js', 'utf8');
 const settings = fs.readFileSync('settings/settings.js', 'utf8');
 const onlineBookingSettings = fs.readFileSync('settings/online-booking/online-booking.js', 'utf8');
@@ -294,7 +295,7 @@ expect(!/(?:min-|max-)?height\s*:\s*(?:var\(--visual-vh\s*,\s*)?100dvh|position\
 expect(!core.includes("contextRoot.querySelector('[data-workspace-back-source]')"), 'Shared workspace must not consume retired local Back sources; navigation is gesture-owned.');
 expect(!core.includes('.app-header__'), 'Legacy app-header compatibility selectors must not return.');
 expect(!journalList.includes('getBoundingPersonRect') && journalList.includes('getBoundingClientRect()'), 'Journal List scroll must use the real DOM geometry API.');
-expect(finance.includes('openFinanceOperation(root, movements, element.dataset.financeOperation)') && !finance.includes('navigateBack') && !finance.includes('onBack'), 'Finance DDS detail/cancel refresh must remain gesture-owned with no retired Back callback.');
+expect(financeDds.includes('openFinanceOperation(root, movements, element.dataset.financeOperation)') && !financeDds.includes('navigateBack') && !financeDds.includes('onBack'), 'Finance DDS detail/cancel refresh must remain gesture-owned with no retired Back callback.');
 
 expect(profile.includes('workspaceHeaderContext({') && profile.includes("kind:'avatar'") && !profile.includes("hideD:true"), 'Professional Profile must feed A/B and keep Shared D=Chat enabled instead of hiding D.');
 expect(profile.includes("function profileContext(p,title=fullName(p))"), 'Professional Profile root B must use the profile name while nested layers may use contextual titles.');
