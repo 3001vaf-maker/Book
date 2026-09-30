@@ -259,7 +259,7 @@ export function mountV2ZLayer(root, html, { onClose = null, stack = false } = {}
   node.addEventListener('click', (event) => {
     if (event.target.closest?.('[data-v2-z-close]')) close();
   });
-  disposeSwipe = initV2Swipe(node, { onRight: close, revealDeck: false });
+  disposeSwipe = initV2Swipe(node, { onRight: close, revealDeck: false, threshold: 42 });
   node.v2Close = close;
   notify();
   return node;
@@ -532,6 +532,22 @@ export function initV2Swipe(root, { onRight = null, onLeft = null, threshold = 7
   let dx = 0;
   let axis = 'pending';
   let suppressNextClick = false;
+  let forceNavigation = false;
+  let horizontalScrollOwner = null;
+
+  const nestedHorizontalScroller = (target) => {
+    let node = target?.nodeType === 1 ? target : target?.parentElement;
+    while (node && node !== surface) {
+      if (node.matches?.('[data-v2-stage-gesture-ignore]')) return { blocked: true, owner: null };
+      const style = window.getComputedStyle?.(node);
+      const overflowX = style?.overflowX || '';
+      if ((overflowX === 'auto' || overflowX === 'scroll') && Number(node.scrollWidth || 0) > Number(node.clientWidth || 0) + 2) {
+        return { blocked: false, owner: node };
+      }
+      node = node.parentElement;
+    }
+    return { blocked: false, owner: null };
+  };
 
   const isTopmost = () => {
     const layers = [...(app?.querySelectorAll?.('[data-v2-z-layer]') || [])];
@@ -546,12 +562,18 @@ export function initV2Swipe(root, { onRight = null, onLeft = null, threshold = 7
     pointerId = null;
     dx = 0;
     axis = 'pending';
+    forceNavigation = false;
+    horizontalScrollOwner = null;
   };
 
   const down = (event) => {
     if (!isTopmost()) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
-    if (event.target.closest?.('button,input,select,textarea,label,[contenteditable="true"],[data-v2-stage-gesture-ignore]')) return;
+    const rect = surface.getBoundingClientRect?.();
+    forceNavigation = Number(event.clientX || 0) <= Number(rect?.left || 0) + 36;
+    const nested = forceNavigation ? { blocked: false, owner: null } : nestedHorizontalScroller(event.target);
+    if (nested.blocked) return;
+    horizontalScrollOwner = nested.owner;
     pointerId = event.pointerId;
     startX = event.clientX;
     startY = event.clientY;
@@ -565,10 +587,20 @@ export function initV2Swipe(root, { onRight = null, onLeft = null, threshold = 7
     const nextY = event.clientY - startY;
     if (axis === 'pending') {
       if (Math.max(Math.abs(nextX), Math.abs(nextY)) < 7) return;
-      axis = Math.abs(nextX) >= Math.abs(nextY) * 1.08 ? 'horizontal' : 'vertical';
+      const rightIntent = nextX > 0 && Math.abs(nextX) >= Math.abs(nextY) * .90;
+      axis = rightIntent || Math.abs(nextX) >= Math.abs(nextY) * 1.08 ? 'horizontal' : 'vertical';
       if (axis === 'vertical') {
         pointerId = null;
         return;
+      }
+      if (!forceNavigation && horizontalScrollOwner) {
+        const maxScrollLeft = Math.max(0, Number(horizontalScrollOwner.scrollWidth || 0) - Number(horizontalScrollOwner.clientWidth || 0));
+        const scrollLeft = Number(horizontalScrollOwner.scrollLeft || 0);
+        const childCanConsume = (nextX > 0 && scrollLeft > 1) || (nextX < 0 && scrollLeft < maxScrollLeft - 1);
+        if (childCanConsume) {
+          pointerId = null;
+          return;
+        }
       }
       surface.setPointerCapture?.(event.pointerId);
     }
