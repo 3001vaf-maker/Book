@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { getFinanceArticles, getLedgerEntries, hydrateFinanceFromServer } from '../core/finance/index.js';
-import { getWalletBalance, hydrateWalletsFromServer } from '../main/finance/cash/data.js';
+import { getFinanceArticles, getLedgerEntries, getWalletBalance, hydrateFinanceFromServer, hydrateWalletsFromServer } from '../core/finance/index.js';
 
 hydrateWalletsFromServer([
   { id: 'cash', name: 'Наличные', photo: '', system: true },
@@ -105,9 +104,9 @@ assert.equal(getWalletBalance('cash'), -15000);
 const schema = readFileSync(new URL('../server/prisma/schema.prisma', import.meta.url), 'utf8');
 const server = readFileSync(new URL('../server/src/finance/finance.service.ts', import.meta.url), 'utf8');
 const controller = readFileSync(new URL('../server/src/finance/finance.controller.ts', import.meta.url), 'utf8');
-const financeUi = readFileSync(new URL('../main/finance/finance.js', import.meta.url), 'utf8');
-const articlesUi = readFileSync(new URL('../main/finance/articles.js', import.meta.url), 'utf8');
-const incomeExpenseUi = readFileSync(new URL('../main/finance/income-expense.js', import.meta.url), 'utf8');
+const financeUi = readFileSync(new URL('../finance/finance.js', import.meta.url), 'utf8');
+const articlesUi = readFileSync(new URL('../finance/articles.js', import.meta.url), 'utf8');
+const incomeExpenseUi = readFileSync(new URL('../finance/income-expense.js', import.meta.url), 'utf8');
 
 assert.match(schema, /model FinanceArticle/);
 assert.match(controller, /operations\/manual/);
