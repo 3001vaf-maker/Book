@@ -1,7 +1,7 @@
 import { actionBlock, button, escapeHtml, field, folderList, iconButton, initViewNavigation, list, modal, mountModal, page, pageHeader, shortDateTime, textareaField, viewNavigation } from '../../ui/ui.js';
 import { downloadRknGuide } from '../../tenant-document-archive.js';
 import { phonesMatch } from '../../core/phone/index.js';
-import { getAllPeople } from '../../main/people/data.js';
+import { getAllPeople } from '../../core/people/data.js';
 import { createDocument, getDocuments, saveDocument } from './data.js';
 import { getConsents } from './consents.js';
 import { getDocumentHistory } from './history.js';
