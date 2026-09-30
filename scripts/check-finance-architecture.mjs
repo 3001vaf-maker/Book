@@ -260,14 +260,12 @@ if (!/export function deleteWalletPermanently/.test(walletData)) {
   errors.push('Admin hard-delete flow must remove custom cash metadata only after the server purge');
 }
 
-const financeController = source('server/src/finance/finance.controller.ts');
-const financeServer = source('server/src/finance/finance.service.ts');
 if (!/wallets\/:walletId\/hard/.test(financeController)) {
   errors.push('Finance server must expose the admin-only full cash deletion command');
 }
-if (!/platformAdmin\.findUnique/.test(financeServer)
-  || !/financeOperation\.deleteMany/.test(financeServer)
-  || !/id === 'cash' \|\| id === 'cashless'/.test(financeServer)) {
+if (!/platformAdmin\.findUnique/.test(serverFinance)
+  || !/financeOperation\.deleteMany/.test(serverFinance)
+  || !/id === 'cash' \|\| id === 'cashless'/.test(serverFinance)) {
   errors.push('Full cash deletion must be platform-admin gated, purge operation history, and protect system cash');
 }
 
