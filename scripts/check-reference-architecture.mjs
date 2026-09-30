@@ -167,7 +167,7 @@ for (const file of allFiles) {
   if (rel(file) !== workplaceOwner) report(file, 'book.workplaces may only be accessed by the Workplace data owner');
 }
 
-const peopleUi = join(root, 'main/people/people.js');
+const peopleUi = join(root, 'core/people/people.js');
 if (/\blocalStorage\b/.test(text(peopleUi))) report(peopleUi, 'People screen must use data/view-state owners instead of direct localStorage');
 
 if (/\blocalStorage\b/.test(text(timetableController))) {
@@ -256,7 +256,6 @@ const settingsControllers = [
   'settings/documents/documents.js',
   'settings/loyalty/loyalty.js',
   'settings/tags/tags.js',
-  'settings/wallets/wallets.js',
   'settings/service/procedures/procedures.js',
   'settings/service/products/products.js',
 ];
@@ -291,7 +290,7 @@ if (/iconButton\('\+'[^)]*data-add-workplace/.test(text(profileController))) {
   report(profileController, 'Profile must not recreate the workplace add button locally');
 }
 
-const walletsController = join(root, 'settings/wallets/wallets.js');
+const walletsController = join(root, 'core/finance/cash/cash.js');
 if (/Системный кошелёк/.test(text(walletsController))) {
   report(walletsController, 'The internal system-wallet flag must not be exposed as a visible label');
 }
