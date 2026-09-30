@@ -199,9 +199,10 @@ for (const [index, id, title] of [
   ok(!document.querySelector('[data-modal][data-v2-layer-kind="bottom"]'),
     'DDS settings modal remained open behind Z2: ' + id);
 
-  pointer(layer,'pointerdown',10,360,120 + index);
-  pointer(layer,'pointermove',82,362,120 + index);
-  pointer(layer,'pointerup',82,362,120 + index);
+  const zEdge = edge();
+  pointer(zEdge,'pointerdown',10,360,120 + index);
+  pointer(zEdge,'pointermove',82,362,120 + index);
+  pointer(zEdge,'pointerup',82,362,120 + index);
   await wait(60);
   ok(!shell()?.querySelector('[data-v2-z-layer]'), 'DDS Z2 did not close by right swipe: ' + id);
   ok(Boolean(shell()?.querySelector('[data-v2-workspace-a]')), 'DDS A/settings was not restored after closing Z2: ' + id);
