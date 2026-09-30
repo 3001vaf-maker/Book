@@ -1,7 +1,16 @@
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
-const migration = '20260922075500_prelaunch_hard_delete_clean_start';
+const prelaunchMigration = '20260922075500_prelaunch_hard_delete_clean_start';
+const firstRunCleanupMigration = '20260930143000_remove_first_run_runtime';
+
+async function tableExists(name) {
+  const rows = await prisma.$queryRawUnsafe(
+    'SELECT to_regclass($1) IS NOT NULL AS "exists"',
+    '"' + name + '"',
+  );
+  return rows[0]?.exists === true;
+}
 
 async function columnExists(table, column) {
   const rows = await prisma.$queryRawUnsafe(
@@ -43,7 +52,7 @@ async function constraintExists(name) {
   return rows[0]?.exists === true;
 }
 
-async function main() {
+async function failedMigration(name) {
   const rows = await prisma.$queryRawUnsafe(
     `SELECT
        "id",
@@ -56,20 +65,19 @@ async function main() {
      FROM "_prisma_migrations"
      WHERE "migration_name" = $1
      ORDER BY "started_at" DESC`,
-    migration,
+    name,
   );
+  return rows.find((row) => row.finished_at == null && row.rolled_back_at == null) || null;
+}
 
-  const failed = rows.find((row) => row.finished_at == null && row.rolled_back_at == null);
-  if (!failed) {
-    console.log('[prelaunch-recovery] no active failed 07:55 migration');
-    return 0;
-  }
+async function main() {
+  const failedPrelaunch = await failedMigration(prelaunchMigration);
+  if (failedPrelaunch) {
+    if (!String(failedPrelaunch.logs || '').trim()) {
+      console.warn('[prelaunch-recovery] failed 07:55 row has no stored error log; validating database state instead');
+    }
 
-  if (!String(failed.logs || '').trim()) {
-    console.warn('[prelaunch-recovery] failed 07:55 row has no stored error log; validating database state instead');
-  }
-
-  const state = {
+    const state = {
     liveRequestedAt: await columnExists('TenantAccess', 'liveRequestedAt'),
     liveRequestedByPlatformAccountId: await columnExists('TenantAccess', 'liveRequestedByPlatformAccountId'),
     liveApprovedAt: await columnExists('TenantAccess', 'liveApprovedAt'),
@@ -82,7 +90,7 @@ async function main() {
     workspaceAccountFk: await constraintExists('WorkspaceState_platformAccountId_fkey'),
   };
 
-  const expectedFullyRolledBack =
+    const expectedFullyRolledBack =
     !state.liveRequestedAt
     && !state.liveRequestedByPlatformAccountId
     && !state.liveApprovedAt
@@ -94,14 +102,42 @@ async function main() {
     && !state.workspaceTenantFk
     && !state.workspaceAccountFk;
 
-  if (!expectedFullyRolledBack) {
-    console.error('[prelaunch-recovery] database is not in the expected pre-07:55 state');
-    console.error('[prelaunch-recovery] refusing automatic resolve:', JSON.stringify(state));
-    return 2;
+    if (!expectedFullyRolledBack) {
+      console.error('[prelaunch-recovery] database is not in the expected pre-07:55 state');
+      console.error('[prelaunch-recovery] refusing automatic resolve:', JSON.stringify(state));
+      return 2;
+    }
+
+    console.warn('[prelaunch-recovery] failed 07:55 is fully rolled back and may be safely retried');
+    return 42;
   }
 
-  console.warn('[prelaunch-recovery] failed 07:55 is fully rolled back and may be safely retried');
-  return 42;
+  const failedCleanup = await failedMigration(firstRunCleanupMigration);
+  if (failedCleanup) {
+    const state = {
+      firstRunScenario: await tableExists('FirstRunScenario'),
+      firstRunScenarioVersion: await tableExists('FirstRunScenarioVersion'),
+      firstRunStep: await tableExists('FirstRunStep'),
+      firstRunProgress: await tableExists('FirstRunProgress'),
+      firstRunStepProgress: await tableExists('FirstRunStepProgress'),
+      platformSession: await tableExists('PlatformSession'),
+      activitySessionId: await columnExists('PlatformActivityEvent', 'sessionId'),
+      activityStepKey: await columnExists('PlatformActivityEvent', 'stepKey'),
+      activityScenarioVersionId: await columnExists('PlatformActivityEvent', 'scenarioVersionId'),
+      accountOnboardingStep: await columnExists('PlatformAccount', 'onboardingStep'),
+      accountWorkspaceUnlocked: await columnExists('PlatformAccount', 'workspaceUnlocked'),
+    };
+    if (!Object.values(state).every(Boolean)) {
+      console.error('[prelaunch-recovery] failed first-run cleanup is not fully rolled back');
+      console.error('[prelaunch-recovery] refusing automatic resolve:', JSON.stringify(state));
+      return 2;
+    }
+    console.warn('[prelaunch-recovery] failed first-run cleanup is fully rolled back and may be safely retried');
+    return 43;
+  }
+
+  console.log('[prelaunch-recovery] no active failed recoverable migration');
+  return 0;
 }
 
 let status = 2;
