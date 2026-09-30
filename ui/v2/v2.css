@@ -142,7 +142,7 @@
   will-change:transform,opacity,filter
 }
 .v2-card-deck--x .v2-card-deck__card{
-  margin-right:calc(-1 * min(12vw,46px));touch-action:pan-x;
+  margin-right:calc(-1 * min(22vw,86px));touch-action:pan-x;
   transform:perspective(1100px)
     translate3d(var(--v2-card-shift),0,var(--v2-card-depth))
     rotateY(var(--v2-card-rotation))
