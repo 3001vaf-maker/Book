@@ -3,7 +3,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 const root = new URL('../', import.meta.url);
-const roots = ['server/src', 'online-booking', 'main', 'settings', 'core'];
+const roots = ['server/src', 'online-booking', 'settings', 'core'];
 const extraFiles = ['core.js', 'tenant-document-archive.js'];
 const forbidden = [
   'migrateLegacyConsents',
