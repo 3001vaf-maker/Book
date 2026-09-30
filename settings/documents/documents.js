@@ -267,10 +267,6 @@ function bind(root, navigateBack) {
     currentSection = item.dataset.documentsSection;
     render(root, navigateBack);
   }));
-  root.querySelector('[data-documents-root]')?.addEventListener('click', () => {
-    currentSection = 'root';
-    render(root, navigateBack);
-  });
   root.querySelector('[data-add-document]')?.addEventListener('click', () => openCreateDocument(() => render(root, navigateBack)));
   root.querySelectorAll('[data-document-id]').forEach((row) => row.addEventListener('click', () => {
     const item = getDocuments().find((document) => document.id === row.dataset.documentId);
