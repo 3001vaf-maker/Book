@@ -1,5 +1,7 @@
 import { actionBlock, button, details, emptyState, entityCard, escapeHtml, field, iconButton, initPhotoField, v2ListEntries, v2ListEntry, mountModal, modal, openNotice, page, pageHeader, photoField, shortDateTime } from '../../../ui/ui.js';
-import { cancelFinanceOperation, deleteWallet as deleteWalletData, getLedgerEntries, getWalletBalance, getWalletHistory, getWallets, saveWallet as saveWalletData, updateWallet } from '../index.js';
+import { cancelFinanceOperation } from '../service.js';
+import { getLedgerEntries } from '../read.js';
+import { deleteWallet as deleteWalletData, getWalletBalance, getWalletHistory, getWallets, saveWallet as saveWalletData, updateWallet } from './data.js';
 
 const formatMoney = (value) => `${(Number(value) || 0).toLocaleString('ru-RU')} ₽`;
 
