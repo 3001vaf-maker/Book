@@ -721,17 +721,6 @@ export function initV2WorkspaceInteraction(root, {
   let eDismissTimer = 0;
   const disposers = [];
   const scrollFrames = new Map();
-  const ownerFrames = new Set();
-
-  const queueOwnerFrame = (callback) => {
-    const frame = requestAnimationFrame(() => {
-      ownerFrames.delete(frame);
-      callback();
-    });
-    ownerFrames.add(frame);
-    return frame;
-  };
-
   const cardId = (card) => String(card?.getAttribute('data-v2-card-item') || '');
 
   const setActiveCard = (cards, index) => {
@@ -808,12 +797,23 @@ export function initV2WorkspaceInteraction(root, {
   };
 
   const centerCard = (card, axis, behavior = 'auto') => {
-    if (!card) return;
-    card.scrollIntoView({
-      behavior,
-      block: axis === 'y' ? 'center' : 'nearest',
-      inline: axis === 'x' ? 'center' : 'nearest',
-    });
+    const deck = card?.closest?.('[data-v2-card-deck]');
+    if (!card || !deck) return;
+    if (axis === 'y') {
+      const target = Math.max(0, Math.min(
+        Math.max(0, Number(deck.scrollHeight || 0) - Number(deck.clientHeight || 0)),
+        Number(card.offsetTop || 0) + Number(card.offsetHeight || 0) / 2 - Number(deck.clientHeight || 0) / 2,
+      ));
+      if (behavior === 'smooth') deck.scrollTo({ top:target, behavior:'smooth' });
+      else deck.scrollTop = target;
+      return;
+    }
+    const target = Math.max(0, Math.min(
+      Math.max(0, Number(deck.scrollWidth || 0) - Number(deck.clientWidth || 0)),
+      Number(card.offsetLeft || 0) + Number(card.offsetWidth || 0) / 2 - Number(deck.clientWidth || 0) / 2,
+    ));
+    if (behavior === 'smooth') deck.scrollTo({ left:target, behavior:'smooth' });
+    else deck.scrollLeft = target;
   };
 
   const bindNativeDeck = (deck, cards, axis, getActiveIndex, setActiveIndex, onSelect) => {
@@ -906,10 +906,9 @@ export function initV2WorkspaceInteraction(root, {
     eDeck?.style.removeProperty('--v2-e-dismiss-x');
     eDeck?.classList.remove('is-dragging');
     if (secondaryOpen) {
-      queueOwnerFrame(() => {
-        centerCard(eCards[eActiveIndex], 'y');
-        scheduleGeometry(eDeck, eCards, 'y', (index) => { eActiveIndex = index; });
-      });
+      centerCard(eCards[eActiveIndex], 'y');
+      const index = updateDeckGeometry(eDeck, eCards, 'y');
+      if (index >= 0) eActiveIndex = index;
     }
     if (notify) onEOpenChange?.(secondaryOpen);
     return secondaryOpen;
@@ -924,10 +923,9 @@ export function initV2WorkspaceInteraction(root, {
     front.classList.remove('is-dragging');
     front.style.removeProperty('--v2-front-drag-x');
     if (open) {
-      queueOwnerFrame(() => {
-        centerCard(fCards[fActiveIndex], 'x');
-        scheduleGeometry(fDeck, fCards, 'x', (index) => { fActiveIndex = index; });
-      });
+      centerCard(fCards[fActiveIndex], 'x');
+      const index = updateDeckGeometry(fDeck, fCards, 'x');
+      if (index >= 0) fActiveIndex = index;
     }
     if (notify) onDeckOpenChange?.(open);
     return open;
@@ -1109,8 +1107,6 @@ export function initV2WorkspaceInteraction(root, {
     eCancel();
     for (const frame of scrollFrames.values()) cancelAnimationFrame(frame);
     scrollFrames.clear();
-    for (const frame of ownerFrames) cancelAnimationFrame(frame);
-    ownerFrames.clear();
     if (eDismissTimer) window.clearTimeout(eDismissTimer);
     eDismissTimer = 0;
     disposers.forEach((dispose) => dispose?.());
