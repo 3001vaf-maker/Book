@@ -66,6 +66,9 @@ if (/business-persistence/.test(financeData) || /queueAuxiliaryDataset/.test(fin
 if (!/settlements:\s*\[\]/.test(financeData) || !/operations:\s*\[\]/.test(financeData) || !/ledger:\s*\[\]/.test(financeData)) {
   errors.push('core/finance/data.js must cache Settlement, Operation and flat Ledger state');
 }
+if (/\bincome\s*:|\bexpense\s*:|legacyOperational|normalizeIncome|normalizeExpense/.test(financeData)) {
+  errors.push('core/finance/data.js must not keep duplicate legacy income/expense Finance state');
+}
 
 const financeService = source('core/finance/service.js');
 for (const command of ['recordPaymentIncome', 'recordRefundExpense', 'cancelPaymentOperation', 'recordManualFinanceOperation', 'recordSpecialFinanceOperation']) {
@@ -126,7 +129,6 @@ for (const route of [
 
 const serverFinance = source('server/src/finance/finance.service.ts');
 for (const token of [
-  'ensureLegacyMigrated',
   'saveSettlementWith',
   'repriceSettlement(',
   'createOperationWithEntries',
@@ -160,8 +162,8 @@ if (!/recordedAt:\s*row\.createdAt\.toISOString\(\)/.test(serverFinance)) {
 for (const economicType of ['LOAN_RECEIVED', 'LOAN_REPAYMENT', 'INVESTMENT_RECEIVED', 'INVESTMENT_RETURN', 'TRANSFER']) {
   if (!serverFinance.includes(economicType)) errors.push(`FinanceService missing special economic type: ${economicType}`);
 }
-if (!/canonicalLedgerMigratedAt/.test(serverFinance)) {
-  errors.push('FinanceService must migrate legacy auxiliary Finance exactly into canonical storage');
+if (/ensureLegacyMigrated|canonicalLedgerMigratedAt|migrateLegacyPayment|migrateLegacyExpense|legacyReadModel/.test(serverFinance)) {
+  errors.push('FinanceService must not contain legacy Finance migration/read-model bridges');
 }
 
 const browserRecord = source('core/record/service.js');
@@ -178,8 +180,8 @@ if (!/this\.finance\.upsertSettlement/.test(serverRecord)
   || !/this\.finance\.repriceSettlement/.test(serverRecord)) {
   errors.push('Server Record must delegate Settlement ownership and repricing to Finance');
 }
-if (!/const \{ finance: _legacyFinance, \.\.\.currentRecord \} = current/.test(serverRecord)) {
-  errors.push('Server Record update must strip legacy finance before persisting Record');
+if (!/const \{ finance: _financeProjection, \.\.\.currentRecord \} = current/.test(serverRecord)) {
+  errors.push('Server Record update must strip transient Finance projection before persisting Record');
 }
 
 const financeRead = source('core/finance/read.js');
