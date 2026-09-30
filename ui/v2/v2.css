@@ -80,7 +80,7 @@
 @keyframes v2-z-enter-from-right{from{transform:translate3d(100%,0,0)}to{transform:translate3d(0,0,0)}}
 .v2-app.is-z-entering > .v2-app__stage > .v2-front{animation:v2-z-enter-from-right .30s cubic-bezier(.16,1,.3,1)}
 .v2-z{
-  position:relative;touch-action:pan-y;z-index:3;box-sizing:border-box;width:calc(100% - var(--v2-edge));
+  position:relative;touch-action:auto;z-index:3;box-sizing:border-box;width:calc(100% - var(--v2-edge));
   height:calc(var(--visual-vh,100dvh) - 72px);min-height:calc(var(--visual-vh,100dvh) - 72px);
   margin-left:var(--v2-edge);overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;
   border-radius:var(--v2-z-radius) 0 0 0;padding:22px 18px calc(24px + env(safe-area-inset-bottom));
@@ -88,6 +88,12 @@
 }
 .v2-app.is-deck-open > .v2-app__stage > .v2-front{transform:translate3d(100%,0,0)}
 .v2-app:not(.is-deck-open).is-revealing-deck > .v2-app__stage > .v2-front.is-dragging{transform:translate3d(var(--v2-front-drag-x,0px),0,0)}
+
+.v2-edge-swipe-zone{
+  position:absolute;z-index:12;left:0;top:0;bottom:0;width:36px;
+  pointer-events:auto;touch-action:none;background:transparent
+}
+.v2-app.is-deck-open .v2-edge-swipe-zone{pointer-events:none}
 
 .v2-fe-deck{
   position:absolute;z-index:2;inset:0;overflow:hidden;pointer-events:none;opacity:0;
@@ -136,7 +142,7 @@
   background:var(--v2-beige);color:var(--v2-ink);text-align:left;cursor:pointer;
   box-shadow:8px 12px 24px rgba(0,0,0,.18),inset 0 0 0 1px rgba(255,255,255,.18);
   opacity:var(--v2-card-opacity);filter:brightness(var(--v2-card-brightness));
-  z-index:var(--v2-card-stack);scroll-snap-align:center;scroll-snap-stop:always;
+  z-index:var(--v2-card-stack);scroll-snap-align:center;
   transform-style:preserve-3d;backface-visibility:hidden;
   transition:border-color .14s ease,box-shadow .16s ease,filter .08s linear,opacity .08s linear;
   will-change:transform,opacity,filter
@@ -180,10 +186,6 @@
 .v2-app--workspace .v2-z .page-header,.v2-app--workspace .v2-z .app-header{display:none}
 .v2-app--workspace .v2-z .entity-page-header{display:contents}
 .v2-app--workspace .v2-z .v2-workspace-source-hidden{display:none!important}
-.v2-app--workspace .v2-z .v2-workspace-back{
-  width:42px;height:42px;margin:0 0 12px;border:0;border-radius:0;padding:0;display:grid;place-items:center;
-  background:transparent;color:var(--v2-ink);font-size:34px;line-height:1
-}
 .v2-app--workspace .v2-z .app-view-shell{min-height:100%;background:transparent}
 
 .v2-section{display:grid;gap:10px;margin-bottom:24px}
