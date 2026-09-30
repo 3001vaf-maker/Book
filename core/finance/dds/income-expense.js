@@ -8,10 +8,10 @@ import {
   pageHeader,
   select,
   textareaField,
-} from '../../ui/ui.js';
-import { getFinanceArticles } from './data.js';
-import { getWallets } from './cash/data.js';
-import { recordManualFinanceOperation } from './service.js';
+} from '../../../ui/ui.js';
+import { getFinanceArticles } from '../data.js';
+import { getWallets } from '../cash/data.js';
+import { recordManualFinanceOperation } from '../service.js';
 
 
 function localDateTimeValue(date = new Date()) {

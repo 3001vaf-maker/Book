@@ -8,9 +8,9 @@ import {
   pageHeader,
   select,
   textareaField,
-} from '../../ui/ui.js';
-import { getWallets } from './cash/data.js';
-import { recordSpecialFinanceOperation } from './service.js';
+} from '../../../ui/ui.js';
+import { getWallets } from '../cash/data.js';
+import { recordSpecialFinanceOperation } from '../service.js';
 
 
 const ACTIONS = [

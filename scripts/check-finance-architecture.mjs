@@ -231,19 +231,19 @@ const articlesUI = source('core/finance/articles.js');
 if (!/parentArticleId/.test(articlesUI) || !/economicType/.test(articlesUI)) {
   errors.push('Articles UI must support hierarchy and separate economic character');
 }
-const incomeExpenseUI = source('core/finance/income-expense.js');
+const incomeExpenseUI = source('core/finance/dds/income-expense.js');
 if (!/recordManualFinanceOperation/.test(incomeExpenseUI) || !/lineQuantity/.test(incomeExpenseUI) || !/linePrice/.test(incomeExpenseUI)) {
   errors.push('Income / Expense UI must support simple and detailed manual operations');
 }
 
-const specialOperationsUI = source('core/finance/special-operations.js');
+const specialOperationsUI = source('core/finance/dds/special-operations.js');
 if (!/recordSpecialFinanceOperation/.test(specialOperationsUI)
   || !/loan-received/.test(specialOperationsUI)
   || !/investment-return/.test(specialOperationsUI)
   || !/transfer/.test(specialOperationsUI)) {
   errors.push('Special Finance UI must expose loans, investments, returns and wallet transfers');
 }
-const zReportUI = source('core/finance/z-report.js');
+const zReportUI = source('core/finance/z-report/index.js');
 if (!/getZReport/.test(zReportUI) || !/type:\s*'date'/.test(zReportUI)) {
   errors.push('Z-report UI must project Ledger for a day or arbitrary period');
 }

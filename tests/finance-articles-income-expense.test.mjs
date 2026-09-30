@@ -106,7 +106,7 @@ const server = readFileSync(new URL('../server/src/finance/finance.service.ts', 
 const controller = readFileSync(new URL('../server/src/finance/finance.controller.ts', import.meta.url), 'utf8');
 const financeUi = readFileSync(new URL('../core/finance/finance.js', import.meta.url), 'utf8');
 const articlesUi = readFileSync(new URL('../core/finance/articles.js', import.meta.url), 'utf8');
-const incomeExpenseUi = readFileSync(new URL('../core/finance/income-expense.js', import.meta.url), 'utf8');
+const incomeExpenseUi = readFileSync(new URL('../core/finance/dds/income-expense.js', import.meta.url), 'utf8');
 
 assert.match(schema, /model FinanceArticle/);
 assert.match(controller, /operations\/manual/);
