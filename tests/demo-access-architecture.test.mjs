@@ -10,6 +10,11 @@ const coreAccess = source('core/access.js');
 const registrationDocuments = source('server/src/document-registry/registration-document.service.ts');
 const invitation = source('server/src/tenant-invitation/tenant-invitation.service.ts');
 const profile = source('settings/profile/profile.js');
+const finance = source('main/finance/finance.js');
+const journal = source('journal/journal.js');
+const settings = source('settings/settings.js');
+const admin = source('admin/admin.js');
+const adminAccess = source('server/src/saas-admin/saas-admin.service.ts');
 
 assert.match(core, /activateBookDemo\(\)/);
 
@@ -37,4 +42,49 @@ assert.match(profile, /DEMO · осталось/);
 assert.match(profile, /Запросить LIVE/);
 assert.match(profile, /requestLiveMode/);
 
-console.log('Direct DEMO entry contract: OK');
+assert.match(invitation, /TOOL_CAPABILITY_KEYS/);
+for (const key of [
+  'workplaces.access',
+  'timetable.access',
+  'people.access',
+  'finance.cash.access',
+  'finance.dds.access',
+  'finance.income_expense.access',
+  'finance.articles.access',
+  'finance.special.access',
+  'finance.z_report.access',
+  'journal.day.access',
+  'journal.month.access',
+  'journal.list.access',
+  'services.access',
+  'online_booking.access',
+  'notifications.access',
+  'integrations.access',
+  'documents.access',
+  'tags.access',
+]) assert.match(invitation, new RegExp(key.replaceAll('.', '\\.')));
+
+assert.match(invitation, /Перед формированием ссылки выберите хотя бы один инструмент/);
+assert.match(invitation, /tenantCapabilityOverride\.create/);
+assert.match(access, /this\.demoActive\(access\)[\s\S]*override\.enabled/);
+assert.match(adminAccess, /key: \{ in: \[\.\.\.TOOL_CAPABILITY_KEYS\] \}/);
+
+assert.match(finance, /finance\.cash\.access/);
+assert.match(finance, /finance\.z_report\.access/);
+assert.match(journal, /journal\.day\.access/);
+assert.match(journal, /journal\.list\.access/);
+assert.match(settings, /services\.access/);
+assert.match(settings, /online_booking\.access/);
+assert.match(profile, /workplaces\.access/);
+
+assert.match(core, /section === 'finance' \|\| section === 'journal' \|\| section === 'settings'/);
+assert.match(core, /children\.length === 1 \? children\[0\]\.label : definition\.label/);
+assert.match(core, /children\.length > 1 \? children\.length : 0/);
+assert.match(core, /childItems\.length > 1 \? v2CardDeck/);
+assert.match(core, /secondaryItems\(id\)\.length > 1/);
+
+assert.match(admin, /Инструменты DEMO/);
+assert.match(admin, /selectedInvitationTools/);
+assert.match(admin, /JSON\.stringify\(\{ tools \}\)/);
+
+console.log('Direct DEMO entry and assigned-tool contract: OK');
