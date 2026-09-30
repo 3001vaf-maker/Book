@@ -18,7 +18,7 @@ function clone(value) {
 }
 
 function emptyState() {
-  return { version: VERSION, articles: [], settlements: [], operations: [], ledger: [], income: [], expense: [] };
+  return { version: VERSION, articles: [], settlements: [], operations: [], ledger: [] };
 }
 
 function normalizeSettlementSnapshot(value = null) {
@@ -29,49 +29,6 @@ function normalizeSettlementSnapshot(value = null) {
     discountPercent: value.discountPercent == null ? null : Math.max(0, Math.min(100, numberValue(value.discountPercent))),
     discountTotal: Math.max(0, numberValue(value.discountTotal)),
     planTotal: Math.max(0, numberValue(value.planTotal ?? value.dueTotal)),
-  };
-}
-
-function legacyFinancialSnapshot(item = {}) {
-  return item?.['business'] || null;
-}
-
-function normalizeIncome(item = {}) {
-  const { finance: currentFinance, ...rest } = item;
-  delete rest['business'];
-  const total = Math.max(0, numberValue(item.total));
-  const tips = Math.max(0, Math.min(total, numberValue(item.tips)));
-  const serviceAmount = Math.max(0, Math.min(total, numberValue(item.serviceAmount ?? (total - tips))));
-  return {
-    ...rest,
-    status: item.status === 'cancelled' ? 'cancelled' : 'completed',
-    movementType: 'income',
-    incomeType: item.incomeType || 'payment',
-    source: item.source || null,
-    total,
-    serviceAmount,
-    tips,
-    allocations: Array.isArray(item.allocations) ? item.allocations.map((entry) => ({ ...entry })) : [],
-    finance: normalizeSettlementSnapshot(currentFinance || legacyFinancialSnapshot(item)),
-  };
-}
-
-function normalizeExpense(item = {}) {
-  const { finance: currentFinance, ...rest } = item;
-  delete rest['business'];
-  const total = Math.max(0, numberValue(item.total));
-  const tips = Math.max(0, Math.min(total, numberValue(item.tips)));
-  const serviceAmount = Math.max(0, Math.min(total, numberValue(item.serviceAmount ?? (total - tips))));
-  return {
-    ...rest,
-    status: item.status === 'cancelled' ? 'cancelled' : (item.status === 'refund' ? 'refund' : (item.status || 'expense')),
-    movementType: 'expense',
-    expenseType: item.expenseType || (item.status === 'refund' ? 'refund' : 'other'),
-    source: item.source || null,
-    total,
-    serviceAmount,
-    tips,
-    finance: normalizeSettlementSnapshot(currentFinance || legacyFinancialSnapshot(item)),
   };
 }
 
@@ -125,17 +82,6 @@ function normalizeLedgerEntry(row = {}) {
 
 function normalizedState(value) {
   if (!value || typeof value !== 'object') return null;
-  const legacyOperational = Array.isArray(value.operational) ? value.operational : [];
-  const income = Array.isArray(value.income) ? value.income.map(normalizeIncome) : [];
-  const expense = Array.isArray(value.expense) ? value.expense.map(normalizeExpense) : [];
-  if (legacyOperational.length) {
-    const bySource = new Map(legacyOperational.map((entry) => [sourceKey(entry?.source), entry]));
-    income.forEach((entry) => {
-      if (entry.finance) return;
-      const legacy = bySource.get(sourceKey(entry?.source));
-      if (legacy) entry.finance = normalizeSettlementSnapshot(legacy);
-    });
-  }
   return {
     version: VERSION,
     articles: (Array.isArray(value.articles) ? value.articles : []).map((row) => ({
@@ -151,8 +97,6 @@ function normalizedState(value) {
     settlements: (Array.isArray(value.settlements) ? value.settlements : []).map(normalizeSettlementRow).filter(Boolean),
     operations: (Array.isArray(value.operations) ? value.operations : []).map(normalizeOperation),
     ledger: (Array.isArray(value.ledger) ? value.ledger : []).map(normalizeLedgerEntry),
-    income,
-    expense,
   };
 }
 
