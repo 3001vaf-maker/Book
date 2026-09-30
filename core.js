@@ -1,5 +1,5 @@
-import { renderPeople } from './people/people.js';
-import { financeNavigationItems, renderFinanceSection } from './finance/finance.js';
+import { renderPeople } from './core/people/people.js';
+import { financeNavigationItems, renderFinanceSection } from './core/finance/finance.js';
 import { journalNavigationItems, renderJournalView } from './journal/journal.js';
 import { renderTimetable } from './timetable/timetable.js';
 import { settingsNavigationItems, renderSettingsSection } from './settings/settings.js';
