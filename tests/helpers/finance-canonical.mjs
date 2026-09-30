@@ -67,25 +67,7 @@ export function paymentFixture({
     component: entry.component,
     relatedOperationId: '',
   }));
-  const income = {
-    id,
-    status,
-    movementType: 'income',
-    incomeType: 'payment',
-    source: { type: 'record', id: recordId },
-    workplace,
-    person,
-    allocations,
-    walletId: allocations?.length === 1 ? allocations[0].walletId : '',
-    walletName: allocations?.length === 1 ? allocations[0].walletName : '',
-    total,
-    serviceAmount: service,
-    tips,
-    finance: settlement,
-    createdAt: occurredAt,
-    paidAt: occurredAt,
-  };
-  return { operation, ledger, income };
+  return { operation, ledger };
 }
 
 export function refundFixture({
@@ -140,25 +122,7 @@ export function refundFixture({
       relatedOperationId: '',
     }] : []),
   ];
-  const expense = {
-    id,
-    status: status === 'cancelled' ? 'cancelled' : 'refund',
-    movementType: 'expense',
-    expenseType: 'refund',
-    originalPaymentId: paymentId,
-    source: { type: 'record', id: recordId },
-    workplace,
-    person,
-    walletId,
-    walletName,
-    total,
-    serviceAmount: money(serviceAmount),
-    tips: money(tips),
-    finance: settlement,
-    createdAt: occurredAt,
-    refundedAt: occurredAt,
-  };
-  return { operation, ledger, expense };
+  return { operation, ledger };
 }
 
 export function reversalFixture({
@@ -200,7 +164,7 @@ export function canonicalFinanceState({
   reversals = [],
 } = {}) {
   return {
-    version: 6,
+    version: 7,
     settlements,
     operations: [
       ...payments.map((item) => item.operation),
@@ -212,7 +176,5 @@ export function canonicalFinanceState({
       ...refunds.flatMap((item) => item.ledger),
       ...reversals.flatMap((item) => item.ledger),
     ],
-    income: payments.map((item) => item.income),
-    expense: refunds.map((item) => item.expense),
   };
 }
