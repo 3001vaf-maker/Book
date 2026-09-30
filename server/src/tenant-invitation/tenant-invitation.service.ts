@@ -59,7 +59,7 @@ const CAPABILITY_CATALOG: Array<{
   { key: 'timetable.access', groupKey: 'work', name: 'График', valueType: CapabilityValueType.BOOLEAN, position: 20, starterEnabled: false },
   { key: 'people.access', groupKey: 'people', name: 'Клиенты', valueType: CapabilityValueType.BOOLEAN, position: 30, starterEnabled: true },
 
-  { key: 'finance.cash.access', groupKey: 'finance', name: 'Кассы', valueType: CapabilityValueType.BOOLEAN, position: 40, starterEnabled: false },
+  { key: 'finance.cash.access', groupKey: 'finance', name: 'Касса', valueType: CapabilityValueType.BOOLEAN, position: 40, starterEnabled: false },
   { key: 'finance.dds.access', groupKey: 'finance', name: 'ДДС', valueType: CapabilityValueType.BOOLEAN, position: 50, starterEnabled: false },
   { key: 'finance.income_expense.access', groupKey: 'finance', name: 'Доход / Расход', valueType: CapabilityValueType.BOOLEAN, position: 60, starterEnabled: false },
   { key: 'finance.articles.access', groupKey: 'finance', name: 'Статьи', valueType: CapabilityValueType.BOOLEAN, position: 70, starterEnabled: false },
