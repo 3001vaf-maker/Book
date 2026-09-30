@@ -1,6 +1,10 @@
-import { button, details, emptyState, field, list, modal, mountModal, openNotice, pageHeader, shortDateTime } from '../../../ui/ui.js';
+import { actionBlock, button, details, emptyState, field, list, modal, mountModal, mountV2ZLayer, openNotice, pageHeader, shortDateTime, v2ZLayer, workspaceHeaderContext } from '../../../ui/ui.js';
+import { canUseBookCapability } from '../../access.js';
 import { cancelFinanceOperation } from '../service.js';
 import { getLedgerEntries } from '../read.js';
+import { renderFinanceArticles } from './articles.js';
+import { renderIncomeExpense } from './income-expense.js';
+import { renderSpecialFinanceOperations } from './special-operations.js';
 
 function formatMoney(value = 0, { signed = false } = {}) {
   const amount = Number(value) || 0;
@@ -172,13 +176,81 @@ function openFinanceOperation(root, movements, operationId) {
   });
 }
 
+const DDS_SETTINGS = [
+  {
+    id: 'income-expense',
+    label: 'Доход / Расход',
+    capability: 'finance.income_expense.access',
+    render: renderIncomeExpense,
+  },
+  {
+    id: 'articles',
+    label: 'Статьи',
+    capability: 'finance.articles.access',
+    render: renderFinanceArticles,
+  },
+  {
+    id: 'special',
+    label: 'Прочие операции',
+    capability: 'finance.special.access',
+    render: renderSpecialFinanceOperations,
+  },
+];
+
+function availableDDSSettings() {
+  return DDS_SETTINGS.filter((item) => canUseBookCapability(item.capability));
+}
+
+function openDDSSettingsTool(root, item) {
+  const layer = mountV2ZLayer(
+    root,
+    v2ZLayer('', { className: 'finance-dds-tool-z' }),
+    { stack: true },
+  );
+  if (!layer) return;
+  item.render(layer);
+}
+
+function openDDSSettings(root) {
+  const items = availableDDSSettings();
+  if (!items.length) return;
+  const content = actionBlock(items.map((item) => button(item.label, {
+    variant: 'secondary',
+    data: `data-finance-dds-tool="${item.id}"`,
+  })).join(''));
+  const settings = mountModal(root, modal(content, {
+    title: 'Настройки ДДС',
+    variant: 'quick',
+    surface: 'app',
+  }));
+  if (!settings) return;
+  settings.querySelectorAll('[data-finance-dds-tool]').forEach((element) => {
+    element.addEventListener('click', () => {
+      const item = items.find((candidate) => candidate.id === element.dataset.financeDdsTool);
+      if (!item) return;
+      settings.v2Close?.();
+      openDDSSettingsTool(root, item);
+    });
+  });
+}
+
 function renderDDS(root) {
   const movements = [...getLedgerEntries()].reverse();
   const operations = movements.length
     ? list({ items: movements.map(movementListItem) })
     : emptyState('Все операции', 'Финансовых операций пока нет.');
+  const settingsItems = availableDDSSettings();
+  const headerContext = workspaceHeaderContext({
+    title: 'ДДС',
+    a: settingsItems.length ? {
+      kind: 'settings',
+      data: 'data-finance-dds-settings',
+      aria: 'Настройки ДДС',
+    } : null,
+  });
 
-  root.innerHTML = `${pageHeader('ДДС', 'Все операции')}<div class="ui-list-toolbar"><div></div><div class="ui-list-toolbar__actions">${button('Excel', { className: 'ui-button--secondary', data: 'data-finance-dds-excel' })}</div></div>${operations}`;
+  root.innerHTML = `${headerContext}${pageHeader('ДДС', 'Все операции')}<div class="ui-list-toolbar"><div></div><div class="ui-list-toolbar__actions">${button('Excel', { className: 'ui-button--secondary', data: 'data-finance-dds-excel' })}</div></div>${operations}`;
+  root.querySelector('[data-finance-dds-settings]')?.addEventListener('click', () => openDDSSettings(root));
   root.querySelector('[data-finance-dds-excel]')?.addEventListener('click', () => downloadDDS(movements));
   root.querySelectorAll('[data-finance-operation]').forEach((element) => {
     element.addEventListener('click', () => openFinanceOperation(root, movements, element.dataset.financeOperation));
