@@ -1,7 +1,7 @@
 // Settlement projects amount due, paid/refunded totals and outstanding amount for a concrete source.
 // This is operational calculation, NOT the reserved future Financial Model.
 // Low-level arithmetic lives in rules.js; money persistence lives in data/service.
-// Canonical Settlement snapshots live in Finance. record.finance is only a transient read projection.
+// Canonical Settlement snapshots live in Finance. Record receives finance only as a read projection.
 import { getStoredSettlement } from './data.js';
 import { getActiveDDSMovements, getActiveDDSMovementsForSource } from './read.js';
 import {
@@ -21,8 +21,6 @@ export function resolveRecordSettlement(record = null, { discountPercent = 0 } =
     const owned = normalizeStoredSettlement(getStoredSettlement('record', record.id));
     if (owned) return owned;
   }
-  const projected = normalizeStoredSettlement(record?.finance);
-  if (projected) return projected;
   return calculateSettlement(recordSettlementItems(record), { discountPercent });
 }
 
@@ -81,7 +79,6 @@ export function hydrateRecordSettlement(record = null) {
     procedures: Array.isArray(cleanRecord.procedures) ? cleanRecord.procedures : [],
     products: Array.isArray(cleanRecord.products) ? cleanRecord.products : [],
   };
-  const storedSettlement = resolveRecordSettlement(normalizedRecord, { discountPercent });
-  const projectedSettlement = getRecordSettlement({ ...normalizedRecord, finance: storedSettlement }, { discountPercent });
+  const projectedSettlement = getRecordSettlement(normalizedRecord, { discountPercent });
   return { ...normalizedRecord, finance: normalizeRecordSettlement(projectedSettlement) };
 }
