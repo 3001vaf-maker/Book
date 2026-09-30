@@ -277,7 +277,7 @@ expect(!core.includes('appHeader(') && !core.includes('appShell('), 'Professiona
 for (const marker of ["{ id: 'people', label: 'Клиенты'", "{ id: 'finance', label: 'Финансы'", "{ id: 'timetable', label: 'График'", "{ id: 'journal', label: 'Журнал'", "{ id: 'profile', label: 'Профиль'", "{ id: 'settings', label: 'Настройки'"]) {
   expect(core.includes(marker), `Workspace root F is missing ${marker}.`);
 }
-expect(!core.includes('bottomNavigation(') && !core.includes("renderMain } from './main/main.js'"), 'Workspace V2 must not retain legacy bottom navigation or Main hub routing.');
+expect(!core.includes('bottomNavigation(') && !core.includes('renderMain'), 'Workspace V2 must not retain legacy bottom navigation or Main hub routing.');
 expect(!fs.existsSync('main/main.js'), 'Legacy Main hub file must be physically removed.');
 expect(core.includes("kind: 'chat'") && core.includes("data: 'data-v2-workspace-chat'"), 'Chat must live in Header D instead of root F.');
 expect(core.includes("[data-workspace-context-action]") && core.includes('aSource.dataset.workspaceAKind') && !core.includes('function syncWorkspaceBack(') && !core.includes("kind: backSource ? 'back' : 'settings'"), 'Workspace Header A must consume the canonical Header context with no retired Back owner.');
