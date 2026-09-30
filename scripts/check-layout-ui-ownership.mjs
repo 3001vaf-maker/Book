@@ -43,7 +43,7 @@ if (!/## twoColumnLayout\(\)/.test(read(standard)) || !/содержимое к�
   fail(standard, 'canonical twoColumnLayout() contract must stay documented as content-neutral');
 }
 
-for (const file of [...walk('main'), ...walk('settings'), ...walk('timetable'), ...walk('journal'), ...walk('ui')]) {
+for (const file of [...walk('core/people'), ...walk('core/finance'), ...walk('settings'), ...walk('timetable'), ...walk('journal'), ...walk('ui')]) {
   if (file === ownerJs || file === ownerCss) continue;
   const source = read(file);
   if (/two-column-layout(?:__column)?/.test(source)) {
