@@ -445,6 +445,8 @@ assert.match(v2Ui, /const edgeHost = onRight \? app\?\.querySelector\?\.\('\[dat
 assert.match(v2Ui, /const gestureHost = edgeHost \|\| stage \|\| surface/);
 assert.match(v2Ui, /const leftEdge = Number\(stageRect\?\.left \|\| 0\) \+ Number\(edgeWidth \|\| 36\)/);
 assert.match(v2Ui, /const wantsRight = Boolean\(onRight\)/);
+assert.match(v2Ui, /const dragSurface = isBaseZ && front \? front : surface/);
+assert.match(v2Ui, /const dragProperty = isBaseZ && front \? '--v2-front-drag-x' : '--v2-drag-x'/);
 assert.doesNotMatch(v2Ui, /inNavigationGutter|horizontalGestureContext|forceNavigation|nestedHorizontalScroller/);
 assert.match(v2Ui, /disposeSwipe = initV2Swipe\(node, \{ onRight: close, revealDeck: false, threshold: 28, edgeWidth: 36 \}\)/);
 
