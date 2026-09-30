@@ -600,7 +600,9 @@ export function initV2Swipe(root, {
     if (event.pointerId !== pointerId) return;
     const finalDx = dx;
     const finalAxis = axis;
-    gestureHost.releasePointerCapture?.(event.pointerId);
+    try {
+      if (gestureHost.hasPointerCapture?.(event.pointerId)) gestureHost.releasePointerCapture?.(event.pointerId);
+    } catch {}
     clear();
     if (finalAxis !== 'horizontal') return;
     if (finalDx >= threshold) onRight?.();
@@ -860,6 +862,12 @@ export function initV2WorkspaceInteraction(root, {
     return open;
   };
 
+  const clearZEntry = (event) => {
+    if (event.animationName === 'v2-z-enter-from-right') app.classList.remove('is-z-entering');
+  };
+  front.addEventListener('animationend', clearZEntry);
+  disposers.push(() => front.removeEventListener('animationend', clearZEntry));
+
   bindNativeDeck(
     fDeck,
     fCards,
@@ -905,7 +913,9 @@ export function initV2WorkspaceInteraction(root, {
     if (!eGesture || event.pointerId !== eGesture.id) return;
     const current = eGesture;
     eGesture = null;
-    eDeck.releasePointerCapture?.(event.pointerId);
+    try {
+      if (eDeck.hasPointerCapture?.(event.pointerId)) eDeck.releasePointerCapture?.(event.pointerId);
+    } catch {}
     eDeck.classList.remove('is-dragging');
     eDeck.style.removeProperty('--v2-e-dismiss-x');
     if (current.axis === 'horizontal' && current.dx >= threshold) setEOpen(false);
