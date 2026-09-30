@@ -45,8 +45,8 @@ assert.equal(cents.items[1].planAmount, 49.98);
 assert.equal(cents.discountTotal, 43.35);
 assert.equal(cents.planTotal, 116.65);
 
-// Reload must prefer canonical FinanceSettlement over a stale legacy Record.finance snapshot.
-const legacy8000 = calculateSettlement([{ sourceId: 'p-reload', name: 'Окрашивание', price: 8000 }]);
+// Reload must prefer canonical FinanceSettlement over a transient Record.finance projection.
+const recordProjection8000 = calculateSettlement([{ sourceId: 'p-reload', name: 'Окрашивание', price: 8000 }]);
 const corrected6400 = calculateSettlement([{
   sourceId: 'p-reload',
   name: 'Окрашивание',
@@ -66,7 +66,7 @@ reload(canonicalFinanceState({
 }));
 let state = getRecordPaymentState({
   id: 'record-reload',
-  finance: legacy8000,
+  finance: recordProjection8000,
   procedures: [{ id: 'p-reload', name: 'Окрашивание', cost: 8000 }],
 });
 assert.equal(state.planTotal, 6400);
@@ -188,7 +188,7 @@ assert.match(serverFinance, /financeLedgerEntry\.create/);
 assert.doesNotMatch(serverFinance, /queueAuxiliaryDataset/);
 assert.match(recordServer, /settlementForSource/);
 assert.match(recordServer, /repriceSettlement/);
-assert.match(recordServer, /const \{ finance: _legacyFinance, \.\.\.currentRecord \} = current/);
+assert.match(recordServer, /const \{ finance: _financeProjection, \.\.\.currentRecord \} = current/);
 assert.match(serverFinance, /requiredOccurredAt/);
 assert.match(serverFinance, /settlement\.planTotal\) \+ 0\.009 < paid/);
 assert.match(serverFinance, /Сначала выполните возврат или отмените ошибочную оплату/);
