@@ -28,7 +28,7 @@ function normalizeSettlementSnapshot(value = null) {
     serviceTotal: Math.max(0, numberValue(value.serviceTotal)),
     discountPercent: value.discountPercent == null ? null : Math.max(0, Math.min(100, numberValue(value.discountPercent))),
     discountTotal: Math.max(0, numberValue(value.discountTotal)),
-    planTotal: Math.max(0, numberValue(value.planTotal ?? value.dueTotal)),
+    planTotal: Math.max(0, numberValue(value.planTotal)),
   };
 }
 
