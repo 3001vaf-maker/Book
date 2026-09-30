@@ -68,7 +68,7 @@ export class AuxiliaryStateService {
 
   private async requireVerified(tenantId: string) {
     const row = await this.prisma.businessAuxiliaryState.findUnique({ where: { tenantId } });
-    if (!row?.migrationVerifiedAt) throw new ConflictException('Перенос Финансов и связанных данных ещё не подтверждён');
+    if (!row?.migrationVerifiedAt) throw new ConflictException('Перенос связанных данных ещё не подтверждён');
     return row;
   }
 
@@ -84,10 +84,10 @@ export class AuxiliaryStateService {
   async verifyMigration(tenantId: string, body: unknown) {
     const expected = normalize(body);
     const current = await this.bundle(tenantId);
-    if (!current.migrated) throw new ConflictException('Финансы и связанные данные ещё не перенесены');
+    if (!current.migrated) throw new ConflictException('Связанные данные ещё не перенесены');
     const actual = normalize(current);
     if (canonical(actual) !== canonical(expected)) {
-      throw new ConflictException('Проверка переноса Финансов и связанных данных не пройдена');
+      throw new ConflictException('Проверка переноса связанных данных не пройдена');
     }
     await this.prisma.businessAuxiliaryState.update({ where: { tenantId }, data: { migrationVerifiedAt: new Date() } });
     return this.bundle(tenantId);
