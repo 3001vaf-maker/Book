@@ -42,8 +42,6 @@ hydrateFinanceFromServer({
   settlements: [],
   operations,
   ledger,
-  income: [],
-  expense: [],
 });
 
 const report = getZReport({
