@@ -5,7 +5,7 @@ import { getWorkplaces } from '../core/workplace-time.js';
 import { normalizeWorkplaceTimeZone, zonedDateTimeParts, zonedDateTimeToDate } from '../core/time/index.js';
 import { getAllPeople } from '../main/people/data.js';
 import { personDisplay } from '../main/people/presentation.js';
-import { getWallets } from '../settings/wallets/data.js';
+import { getWallets } from '../main/finance/cash/data.js';
 import { getRecord } from '../core/record/index.js';
 import { setRecordAttendance, updateRecord } from '../core/record/index.js';
 import { journalRecordActionContext } from './record-action-context.js';
