@@ -72,20 +72,17 @@ const runtimeJsFiles = [
   ...jsFilesUnder('ui'),
   ...jsFilesUnder('online-booking'),
   ...jsFilesUnder('settings'),
-  ...jsFilesUnder('main'),
   ...jsFilesUnder('journal'),
   ...jsFilesUnder('timetable'),
 ];
 
 const workspaceJsFiles = [
   ...jsFilesUnder('settings'),
-  ...jsFilesUnder('main'),
   ...jsFilesUnder('journal'),
   ...jsFilesUnder('timetable'),
 ];
 const workspaceCssFiles = [
   ...cssFilesUnder('settings'),
-  ...cssFilesUnder('main'),
   ...cssFilesUnder('journal'),
   ...cssFilesUnder('timetable'),
 ];
@@ -297,7 +294,7 @@ expect(!/(?:min-|max-)?height\s*:\s*(?:var\(--visual-vh\s*,\s*)?100dvh|position\
 expect(!core.includes("contextRoot.querySelector('[data-workspace-back-source]')"), 'Shared workspace must not consume retired local Back sources; navigation is gesture-owned.');
 expect(!core.includes('.app-header__'), 'Legacy app-header compatibility selectors must not return.');
 expect(!journalList.includes('getBoundingPersonRect') && journalList.includes('getBoundingClientRect()'), 'Journal List scroll must use the real DOM geometry API.');
-expect(finance.includes('openFinanceOperation(root, movements, element.dataset.financeOperation, onBack)'), 'Finance DDS must preserve its E back callback through operation detail/cancel refresh.');
+expect(finance.includes('openFinanceOperation(root, movements, element.dataset.financeOperation)') && !finance.includes('navigateBack') && !finance.includes('onBack'), 'Finance DDS detail/cancel refresh must remain gesture-owned with no retired Back callback.');
 
 expect(profile.includes('workspaceHeaderContext({') && profile.includes("kind:'avatar'") && !profile.includes("hideD:true"), 'Professional Profile must feed A/B and keep Shared D=Chat enabled instead of hiding D.');
 expect(profile.includes("function profileContext(p,title=fullName(p))"), 'Professional Profile root B must use the profile name while nested layers may use contextual titles.');
