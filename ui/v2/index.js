@@ -719,7 +719,7 @@ export function initV2WorkspaceInteraction(root, {
     let node = target?.nodeType === 1 ? target : target?.parentElement;
     let scrollOwner = null;
     while (node && node !== z && node !== stage) {
-      if (node.matches?.('[data-v2-stage-gesture-ignore],input,textarea,select,[contenteditable="true"],[draggable="true"]')) {
+      if (node.matches?.('[data-v2-stage-gesture-ignore]')) {
         return { blocked: true, scrollOwner: null };
       }
       const style = window.getComputedStyle?.(node);
@@ -795,11 +795,17 @@ export function initV2WorkspaceInteraction(root, {
 
     let role = '';
     let horizontalContext = null;
+    let forceNavigation = false;
+    const stageRect = stage.getBoundingClientRect?.();
+    const zRect = z?.getBoundingClientRect?.();
+    const navigationEdge = Number(zRect?.left || stageRect?.left || 0) + 36;
+    const inNavigationGutter = !open && bindZ && Number(event.clientX || 0) <= navigationEdge;
 
     if (secondaryOpen && eDeck?.contains(event.target)) {
       role = 'e';
-    } else if (!open && bindZ && z?.contains(event.target)) {
-      horizontalContext = horizontalGestureContext(event.target);
+    } else if (!open && bindZ && (z?.contains(event.target) || inNavigationGutter)) {
+      forceNavigation = inNavigationGutter;
+      horizontalContext = forceNavigation ? { blocked: false, scrollOwner: null } : horizontalGestureContext(event.target);
       if (horizontalContext.blocked) return;
       role = 'z';
     } else {
@@ -816,6 +822,7 @@ export function initV2WorkspaceInteraction(root, {
       axis: 'pending',
       cancelled: false,
       captured: false,
+      forceNavigation,
       zScrollTop: role === 'z' ? Number(z?.scrollTop || 0) : 0,
       fScrollLeft: role === 'e' ? Number(deck?.scrollLeft || 0) : 0,
       horizontalContext,
@@ -831,7 +838,8 @@ export function initV2WorkspaceInteraction(root, {
 
     if (gesture.axis === 'pending') {
       if (Math.max(Math.abs(dx), Math.abs(dy)) < 7) return;
-      gesture.axis = Math.abs(dx) >= Math.abs(dy) * 1.08 ? 'horizontal' : 'vertical';
+      const zRightIntent = gesture.role === 'z' && dx > 0 && Math.abs(dx) >= Math.abs(dy) * .90;
+      gesture.axis = zRightIntent || Math.abs(dx) >= Math.abs(dy) * 1.08 ? 'horizontal' : 'vertical';
 
       if (gesture.role === 'e') {
         if (gesture.axis !== 'horizontal' || dx <= 0) {
@@ -843,7 +851,7 @@ export function initV2WorkspaceInteraction(root, {
           gesture.cancelled = true;
           return;
         }
-        const owner = gesture.horizontalContext?.scrollOwner;
+        const owner = gesture.forceNavigation ? null : gesture.horizontalContext?.scrollOwner;
         if (owner) {
           const maxScrollLeft = Math.max(0, Number(owner.scrollWidth || 0) - Number(owner.clientWidth || 0));
           const scrollLeft = Number(owner.scrollLeft || 0);
