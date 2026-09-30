@@ -479,6 +479,15 @@ function renderWorkspace() {
     if (currentHeader) currentHeader.outerHTML = headerMarkup;
 
     const feHost = shell.querySelector('[data-v2-fe]');
+    const currentF = feHost?.querySelector('[data-v2-card-deck][data-v2-deck-level="f"]');
+    const nextFIds = rootItems.map((item) => String(item.id || '')).join('|');
+    const currentFIds = [...(currentF?.querySelectorAll('[data-v2-card-item]') || [])]
+      .map((card) => String(card.dataset.v2CardItem || '')).join('|');
+    if (nextFIds !== currentFIds) {
+      if (currentF) currentF.outerHTML = rootDeck;
+      else if (rootDeck && feHost) feHost.insertAdjacentHTML('afterbegin', rootDeck);
+    }
+
     const currentE = feHost?.querySelector('[data-v2-card-deck][data-v2-deck-level="e"]');
     const nextEIds = childItems.map((item) => String(item.id || '')).join('|');
     const currentEIds = [...(currentE?.querySelectorAll('[data-v2-card-item]') || [])]
