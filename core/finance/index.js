@@ -30,3 +30,14 @@ export {
 } from './settlement.js';
 export { getFinanceArticles, hydrateFinanceFromServer } from './data.js';
 export { archiveFinanceArticle, cancelFinanceOperation, cancelPaymentOperation, createFinanceArticle, recordManualFinanceOperation, recordPaymentIncome, recordSpecialFinanceOperation, recordRefundExpense, refreshFinanceState, saveSettlementSnapshot, updateFinanceArticle } from './service.js';
+
+export {
+  deleteWallet,
+  getWalletBalance,
+  getWalletHistory,
+  getWallets,
+  getWalletTotalBalance,
+  hydrateWalletsFromServer,
+  saveWallet,
+  updateWallet,
+} from './cash.js';
