@@ -217,14 +217,15 @@ if (/\bbalance\s*:/.test(walletData)) {
 }
 
 const financeUI = source('core/finance/finance.js');
-if (!/getLedgerEntries/.test(financeUI)) errors.push('DDS UI must render flat Ledger rows');
+const ddsUI = source('core/finance/dds/index.js');
+if (!/getLedgerEntries/.test(ddsUI)) errors.push('DDS UI must render flat Ledger rows');
 if (!/renderFinanceArticles/.test(financeUI) || !/renderIncomeExpense/.test(financeUI)) {
   errors.push('Finance UI must expose Articles and Income / Expense instruments');
 }
 if (!/renderSpecialFinanceOperations/.test(financeUI) || !/renderZReport/.test(financeUI)) {
   errors.push('Finance UI must expose special operations and Z-report');
 }
-if (!/Фактическая дата и время/.test(financeUI) || !/Внесено в Book/.test(financeUI)) {
+if (!/Фактическая дата и время/.test(ddsUI) || !/Внесено в Book/.test(ddsUI)) {
   errors.push('DDS/export must expose factual occurrence time separately from Book recording time');
 }
 const articlesUI = source('core/finance/articles.js');
