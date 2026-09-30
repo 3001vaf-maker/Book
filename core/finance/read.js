@@ -9,24 +9,93 @@ function isActiveMovement(item = null) {
   return item?.status !== 'cancelled';
 }
 
+function operationMovement(operation = null) {
+  if (!operation || operation.kind === 'cancel' || operation.kind === 'transfer') return null;
+  const data = operation?.data && typeof operation.data === 'object' ? operation.data : {};
+  const source = operation?.source && typeof operation.source === 'object' ? { ...operation.source } : null;
+  const total = Math.max(0, financialNumber(data.total));
+  const serviceAmount = Math.max(0, financialNumber(data.serviceAmount));
+  const tips = Math.max(0, financialNumber(data.tips));
+  const base = {
+    id: String(operation.operationId || ''),
+    status: String(operation.status || 'completed'),
+    source,
+    workplace: String(data.workplace || ''),
+    person: data.person && typeof data.person === 'object' ? { ...data.person } : null,
+    total,
+    serviceAmount,
+    tips,
+    finance: data.settlement && typeof data.settlement === 'object' ? { ...data.settlement } : null,
+    occurredAt: String(operation.occurredAt || ''),
+    recordedAt: String(operation.recordedAt || ''),
+    createdAt: String(operation.recordedAt || operation.occurredAt || ''),
+  };
+
+  if (operation.kind === 'payment') {
+    const allocations = Array.isArray(data.allocations) ? data.allocations.map((entry) => ({ ...entry })) : [];
+    return {
+      ...base,
+      movementType: 'income',
+      incomeType: 'payment',
+      allocations,
+      walletId: allocations.length === 1 ? String(allocations[0]?.walletId || '') : '',
+      walletName: allocations.length === 1 ? String(allocations[0]?.walletName || '') : '',
+      paidAt: String(operation.occurredAt || ''),
+    };
+  }
+
+  if (operation.kind === 'manual-income' || operation.kind === 'loan-received' || operation.kind === 'investment-received') {
+    return {
+      ...base,
+      movementType: 'income',
+      incomeType: operation.kind === 'manual-income' ? 'manual' : String(operation.kind || ''),
+      walletId: String(data.walletId || ''),
+      walletName: String(data.walletName || ''),
+      articleId: String(data.articleId || ''),
+      note: String(data.note || ''),
+      paidAt: String(operation.occurredAt || ''),
+    };
+  }
+
+  return {
+    ...base,
+    movementType: 'expense',
+    expenseType: operation.kind === 'refund'
+      ? 'refund'
+      : (operation.kind === 'manual-expense' ? 'manual' : String(operation.kind || 'expense')),
+    originalPaymentId: String(operation.originalOperationId || ''),
+    walletId: String(data.walletId || ''),
+    walletName: String(data.walletName || ''),
+    reason: String(data.reason || ''),
+    note: String(data.note || ''),
+    refundedAt: String(operation.occurredAt || ''),
+  };
+}
+
+function operationMovements(state = readFinanceState()) {
+  return (Array.isArray(state.operations) ? state.operations : [])
+    .map(operationMovement)
+    .filter(Boolean)
+    .sort((a, b) => String(a?.occurredAt || '').localeCompare(String(b?.occurredAt || '')));
+}
+
 function refundsForPayment(state, paymentId) {
-  return state.expense.filter((item) => isActiveMovement(item)
+  return operationMovements(state).filter((item) => isActiveMovement(item)
+    && item?.movementType === 'expense'
     && item?.expenseType === 'refund'
     && String(item?.originalPaymentId || '') === String(paymentId || ''));
 }
 
 export function getDDSIncome() {
-  return readFinanceState().income.map((item) => ({ ...item }));
+  return operationMovements().filter((item) => item.movementType === 'income').map((item) => ({ ...item }));
 }
 
 export function getDDSExpenses() {
-  return readFinanceState().expense.map((item) => ({ ...item }));
+  return operationMovements().filter((item) => item.movementType === 'expense').map((item) => ({ ...item }));
 }
 
 export function getDDSMovements() {
-  const state = readFinanceState();
-  return [...state.income, ...state.expense]
-    .sort((a, b) => String(a?.occurredAt || '').localeCompare(String(b?.occurredAt || '')));
+  return operationMovements().map((item) => ({ ...item }));
 }
 
 export function getDDSMovementsForSource(type, id) {
@@ -93,7 +162,9 @@ export function getRefundsForPayment(paymentId) {
 
 export function getPaymentRemaining(paymentId) {
   const state = readFinanceState();
-  const payment = state.income.find((item) => String(item?.id || '') === String(paymentId || ''));
+  const payment = operationMovements(state).find((item) => item?.movementType === 'income'
+    && item?.incomeType === 'payment'
+    && String(item?.id || '') === String(paymentId || ''));
   if (!payment || !isActiveMovement(payment)) return 0;
   const refunded = refundsForPayment(state, payment.id)
     .reduce((sum, item) => sum + Math.max(0, financialNumber(item?.total)), 0);
