@@ -799,21 +799,31 @@ export function initV2WorkspaceInteraction(root, {
   const centerCard = (card, axis, behavior = 'auto') => {
     const deck = card?.closest?.('[data-v2-card-deck]');
     if (!card || !deck) return;
-    if (axis === 'y') {
-      const target = Math.max(0, Math.min(
+    const target = axis === 'y'
+      ? Math.max(0, Math.min(
         Math.max(0, Number(deck.scrollHeight || 0) - Number(deck.clientHeight || 0)),
         Number(card.offsetTop || 0) + Number(card.offsetHeight || 0) / 2 - Number(deck.clientHeight || 0) / 2,
+      ))
+      : Math.max(0, Math.min(
+        Math.max(0, Number(deck.scrollWidth || 0) - Number(deck.clientWidth || 0)),
+        Number(card.offsetLeft || 0) + Number(card.offsetWidth || 0) / 2 - Number(deck.clientWidth || 0) / 2,
       ));
-      if (behavior === 'smooth') deck.scrollTo({ top:target, behavior:'smooth' });
-      else deck.scrollTop = target;
+
+    if (behavior === 'smooth') {
+      if (axis === 'y') deck.scrollTo({ top:target, behavior:'smooth' });
+      else deck.scrollTo({ left:target, behavior:'smooth' });
       return;
     }
-    const target = Math.max(0, Math.min(
-      Math.max(0, Number(deck.scrollWidth || 0) - Number(deck.clientWidth || 0)),
-      Number(card.offsetLeft || 0) + Number(card.offsetWidth || 0) / 2 - Number(deck.clientWidth || 0) / 2,
-    ));
-    if (behavior === 'smooth') deck.scrollTo({ left:target, behavior:'smooth' });
+
+    // State restore/open must land on the exact semantic card. Native mandatory
+    // snap may otherwise reinterpret a large programmatic jump as a fling and
+    // choose the neighbouring snap point.
+    const previousSnap = deck.style.scrollSnapType;
+    deck.style.scrollSnapType = 'none';
+    if (axis === 'y') deck.scrollTop = target;
     else deck.scrollLeft = target;
+    void deck.offsetWidth;
+    deck.style.scrollSnapType = previousSnap;
   };
 
   const bindNativeDeck = (deck, cards, axis, getActiveIndex, setActiveIndex, onSelect, isEnabled = () => true) => {
@@ -913,6 +923,7 @@ export function initV2WorkspaceInteraction(root, {
     eDeck?.style.removeProperty('--v2-e-dismiss-x');
     eDeck?.classList.remove('is-dragging');
     if (secondaryOpen) {
+      setActiveCard(eCards, eActiveIndex);
       centerCard(eCards[eActiveIndex], 'y');
       const index = updateDeckGeometry(eDeck, eCards, 'y');
       if (index >= 0) eActiveIndex = index;
@@ -930,6 +941,7 @@ export function initV2WorkspaceInteraction(root, {
     front.classList.remove('is-dragging');
     front.style.removeProperty('--v2-front-drag-x');
     if (open) {
+      setActiveCard(fCards, fActiveIndex);
       centerCard(fCards[fActiveIndex], 'x');
       const index = updateDeckGeometry(fDeck, fCards, 'x');
       if (index >= 0) fActiveIndex = index;
