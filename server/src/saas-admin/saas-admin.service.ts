@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { CapabilityValueType, TenantAccessStatus } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { SaasAccessService } from '../saas-access/saas-access.service';
-import { TenantInvitationService } from '../tenant-invitation/tenant-invitation.service';
+import { TenantInvitationService, TOOL_CAPABILITY_KEYS } from '../tenant-invitation/tenant-invitation.service';
 import { DocumentRegistryService } from '../document-registry/document-registry.service';
 import { TransactionalEmailService } from '../transactional-email/transactional-email.service';
 import { PlatformNoticeService } from '../platform-notice/platform-notice.service';
@@ -38,7 +38,7 @@ export class SaasAdminService {
   async capabilities() {
     await this.invitations.ensureStarterPlan();
     return this.prisma.capability.findMany({
-      where: { isActive: true },
+      where: { isActive: true, key: { in: [...TOOL_CAPABILITY_KEYS] } },
       orderBy: [{ groupKey: 'asc' }, { position: 'asc' }, { key: 'asc' }],
       select: {
         id: true,
