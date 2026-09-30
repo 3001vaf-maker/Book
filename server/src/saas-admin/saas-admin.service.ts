@@ -55,6 +55,7 @@ export class SaasAdminService {
   }
 
   async tenants() {
+    await this.invitations.ensureStarterPlan();
     const rows = await this.prisma.tenantAccess.findMany({
       include: {
         plan: { select: { id: true, key: true, name: true } },
