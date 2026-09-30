@@ -530,6 +530,7 @@ export function initV2Swipe(root, {
   const isLayer = surface.matches?.('[data-v2-z-layer]');
   const isBaseZ = surface.matches?.('[data-v2-z]') && !isLayer;
   const hasDeck = revealDeck && isBaseZ && Boolean(app?.querySelector?.('[data-v2-card-deck][data-v2-deck-level="f"]'));
+  const gestureHost = stage || surface;
   let pointerId = null;
   let startX = 0;
   let startY = 0;
@@ -582,7 +583,7 @@ export function initV2Swipe(root, {
         return;
       }
       axis = 'horizontal';
-      surface.setPointerCapture?.(event.pointerId);
+      gestureHost.setPointerCapture?.(event.pointerId);
     }
     const allowedX = nextX > 0 ? (onRight ? nextX : 0) : (onLeft ? nextX : 0);
     dx = Math.max(-maxDrag, Math.min(maxDrag, allowedX));
@@ -599,7 +600,7 @@ export function initV2Swipe(root, {
     if (event.pointerId !== pointerId) return;
     const finalDx = dx;
     const finalAxis = axis;
-    surface.releasePointerCapture?.(event.pointerId);
+    gestureHost.releasePointerCapture?.(event.pointerId);
     clear();
     if (finalAxis !== 'horizontal') return;
     if (finalDx >= threshold) onRight?.();
@@ -613,17 +614,17 @@ export function initV2Swipe(root, {
     event.stopPropagation();
   };
 
-  surface.addEventListener('pointerdown', down);
-  surface.addEventListener('pointermove', move, { passive: false });
-  surface.addEventListener('pointerup', up);
-  surface.addEventListener('pointercancel', clear);
-  surface.addEventListener('click', click, true);
+  gestureHost.addEventListener('pointerdown', down);
+  gestureHost.addEventListener('pointermove', move, { passive: false });
+  gestureHost.addEventListener('pointerup', up);
+  gestureHost.addEventListener('pointercancel', clear);
+  gestureHost.addEventListener('click', click, true);
   return () => {
-    surface.removeEventListener('pointerdown', down);
-    surface.removeEventListener('pointermove', move);
-    surface.removeEventListener('pointerup', up);
-    surface.removeEventListener('pointercancel', clear);
-    surface.removeEventListener('click', click, true);
+    gestureHost.removeEventListener('pointerdown', down);
+    gestureHost.removeEventListener('pointermove', move);
+    gestureHost.removeEventListener('pointerup', up);
+    gestureHost.removeEventListener('pointercancel', clear);
+    gestureHost.removeEventListener('click', click, true);
   };
 }
 
@@ -691,24 +692,16 @@ export function initV2WorkspaceInteraction(root, {
     });
   };
 
-  const deckCenter = (deck, axis) => {
-    const rect = deck?.getBoundingClientRect?.();
-    return axis === 'y'
-      ? Number(rect?.top || 0) + Number(rect?.height || 0) / 2
-      : Number(rect?.left || 0) + Number(rect?.width || 0) / 2;
-  };
-
   const updateDeckGeometry = (deck, cards, axis) => {
     if (!deck || !cards.length) return -1;
-    const center = deckCenter(deck, axis);
+    const center = axis === 'y' ? Number(deck.clientHeight || 0) / 2 : Number(deck.clientWidth || 0) / 2;
     let nearestIndex = 0;
     let nearestDistance = Number.POSITIVE_INFINITY;
     cards.forEach((card, index) => {
-      const rect = card.getBoundingClientRect();
       const cardCenter = axis === 'y'
-        ? rect.top + rect.height / 2
-        : rect.left + rect.width / 2;
-      const span = Math.max(1, axis === 'y' ? rect.height : rect.width);
+        ? Number(card.offsetTop || 0) - Number(deck.scrollTop || 0) + Number(card.offsetHeight || 0) / 2
+        : Number(card.offsetLeft || 0) - Number(deck.scrollLeft || 0) + Number(card.offsetWidth || 0) / 2;
+      const span = Math.max(1, axis === 'y' ? Number(card.offsetHeight || 0) : Number(card.offsetWidth || 0));
       const signed = (cardCenter - center) / Math.max(1, span * .72);
       const absolute = Math.min(2.6, Math.abs(signed));
       const depth = -Math.min(180, absolute * 82);
@@ -1061,7 +1054,7 @@ export function initV2StickerSwipe(root, { onRight = null, onLeft = null, thresh
         pointerId = null;
         return;
       }
-      surface.setPointerCapture?.(event.pointerId);
+      gestureHost.setPointerCapture?.(event.pointerId);
     }
     if (axis !== 'horizontal') return;
     const allowedX = nextX > 0 ? (onRight ? nextX : 0) : (onLeft ? nextX : 0);
