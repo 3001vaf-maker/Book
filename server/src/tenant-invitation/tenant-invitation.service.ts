@@ -22,6 +22,28 @@ const STARTER_PLAN_KEY = 'starter-people';
 const REGISTRATION_LINK_EMAIL_PREFIX = 'registration+';
 const REGISTRATION_LINK_EMAIL_SUFFIX = '@registration.invalid';
 
+export const TOOL_CAPABILITY_KEYS = [
+  'workplaces.access',
+  'timetable.access',
+  'people.access',
+  'finance.cash.access',
+  'finance.dds.access',
+  'finance.income_expense.access',
+  'finance.articles.access',
+  'finance.special.access',
+  'finance.z_report.access',
+  'journal.day.access',
+  'journal.month.access',
+  'journal.list.access',
+  'services.access',
+  'online_booking.access',
+  'notifications.access',
+  'integrations.access',
+  'documents.access',
+  'tags.access',
+] as const;
+const TOOL_CAPABILITY_SET = new Set<string>(TOOL_CAPABILITY_KEYS);
+
 const CAPABILITY_CATALOG: Array<{
   key: string;
   groupKey: string;
@@ -31,20 +53,34 @@ const CAPABILITY_CATALOG: Array<{
   starterEnabled?: boolean;
   starterLimit?: number | null;
 }> = [
-  { key: 'profile.access', groupKey: 'start', name: 'Профиль', valueType: CapabilityValueType.BOOLEAN, position: 10, starterEnabled: true },
-  { key: 'services.access', groupKey: 'start', name: 'Услуги', valueType: CapabilityValueType.BOOLEAN, position: 20, starterEnabled: true },
-  { key: 'people.access', groupKey: 'people', name: 'Люди', valueType: CapabilityValueType.BOOLEAN, position: 30, starterEnabled: true },
-  { key: 'workplaces.max', groupKey: 'start', name: 'Количество рабочих пространств', valueType: CapabilityValueType.LIMIT, position: 40, starterLimit: 1 },
-  { key: 'timetable.access', groupKey: 'work', name: 'График', valueType: CapabilityValueType.BOOLEAN, position: 50, starterEnabled: false },
-  { key: 'journal.access', groupKey: 'work', name: 'Журнал', valueType: CapabilityValueType.BOOLEAN, position: 60, starterEnabled: false },
-  { key: 'online_booking.access', groupKey: 'sales', name: 'Онлайн-запись', valueType: CapabilityValueType.BOOLEAN, position: 70, starterEnabled: false },
-  { key: 'payments.access', groupKey: 'sales', name: 'Оплаты', valueType: CapabilityValueType.BOOLEAN, position: 80, starterEnabled: false },
-  { key: 'finance.access', groupKey: 'finance', name: 'Финансы', valueType: CapabilityValueType.BOOLEAN, position: 90, starterEnabled: false },
-  { key: 'chat.access', groupKey: 'communication', name: 'Чат', valueType: CapabilityValueType.BOOLEAN, position: 100, starterEnabled: false },
-  { key: 'notifications.access', groupKey: 'communication', name: 'Уведомления', valueType: CapabilityValueType.BOOLEAN, position: 110, starterEnabled: false },
-  { key: 'integrations.access', groupKey: 'settings', name: 'Интеграции', valueType: CapabilityValueType.BOOLEAN, position: 120, starterEnabled: false },
-  { key: 'documents.access', groupKey: 'settings', name: 'Документы', valueType: CapabilityValueType.BOOLEAN, position: 130, starterEnabled: false },
-  { key: 'tags.access', groupKey: 'settings', name: 'Ярлыки', valueType: CapabilityValueType.BOOLEAN, position: 140, starterEnabled: false },
+  { key: 'profile.access', groupKey: 'system', name: 'Профиль', valueType: CapabilityValueType.BOOLEAN, position: 5, starterEnabled: true },
+  { key: 'workplaces.access', groupKey: 'profile', name: 'Рабочее пространство', valueType: CapabilityValueType.BOOLEAN, position: 10, starterEnabled: true },
+  { key: 'workplaces.max', groupKey: 'system', name: 'Количество рабочих пространств', valueType: CapabilityValueType.LIMIT, position: 15, starterLimit: 1 },
+  { key: 'timetable.access', groupKey: 'work', name: 'График', valueType: CapabilityValueType.BOOLEAN, position: 20, starterEnabled: false },
+  { key: 'people.access', groupKey: 'people', name: 'Клиенты', valueType: CapabilityValueType.BOOLEAN, position: 30, starterEnabled: true },
+
+  { key: 'finance.cash.access', groupKey: 'finance', name: 'Кассы', valueType: CapabilityValueType.BOOLEAN, position: 40, starterEnabled: false },
+  { key: 'finance.dds.access', groupKey: 'finance', name: 'ДДС', valueType: CapabilityValueType.BOOLEAN, position: 50, starterEnabled: false },
+  { key: 'finance.income_expense.access', groupKey: 'finance', name: 'Доход / Расход', valueType: CapabilityValueType.BOOLEAN, position: 60, starterEnabled: false },
+  { key: 'finance.articles.access', groupKey: 'finance', name: 'Статьи', valueType: CapabilityValueType.BOOLEAN, position: 70, starterEnabled: false },
+  { key: 'finance.special.access', groupKey: 'finance', name: 'Прочие операции', valueType: CapabilityValueType.BOOLEAN, position: 80, starterEnabled: false },
+  { key: 'finance.z_report.access', groupKey: 'finance', name: 'Z-отчёт', valueType: CapabilityValueType.BOOLEAN, position: 90, starterEnabled: false },
+
+  { key: 'journal.day.access', groupKey: 'journal', name: 'День', valueType: CapabilityValueType.BOOLEAN, position: 100, starterEnabled: false },
+  { key: 'journal.month.access', groupKey: 'journal', name: 'Месяц', valueType: CapabilityValueType.BOOLEAN, position: 110, starterEnabled: false },
+  { key: 'journal.list.access', groupKey: 'journal', name: 'Список', valueType: CapabilityValueType.BOOLEAN, position: 120, starterEnabled: false },
+
+  { key: 'services.access', groupKey: 'settings', name: 'Сервис', valueType: CapabilityValueType.BOOLEAN, position: 130, starterEnabled: true },
+  { key: 'online_booking.access', groupKey: 'settings', name: 'Онлайн-запись', valueType: CapabilityValueType.BOOLEAN, position: 140, starterEnabled: false },
+  { key: 'notifications.access', groupKey: 'settings', name: 'Уведомления', valueType: CapabilityValueType.BOOLEAN, position: 150, starterEnabled: false },
+  { key: 'integrations.access', groupKey: 'settings', name: 'Интеграции', valueType: CapabilityValueType.BOOLEAN, position: 160, starterEnabled: false },
+  { key: 'documents.access', groupKey: 'settings', name: 'Документы', valueType: CapabilityValueType.BOOLEAN, position: 170, starterEnabled: false },
+  { key: 'tags.access', groupKey: 'settings', name: 'Ярлыки', valueType: CapabilityValueType.BOOLEAN, position: 180, starterEnabled: false },
+
+  { key: 'journal.access', groupKey: 'system', name: 'Журнал', valueType: CapabilityValueType.BOOLEAN, position: 900, starterEnabled: false },
+  { key: 'finance.access', groupKey: 'system', name: 'Финансы', valueType: CapabilityValueType.BOOLEAN, position: 910, starterEnabled: false },
+  { key: 'payments.access', groupKey: 'system', name: 'Оплаты', valueType: CapabilityValueType.BOOLEAN, position: 920, starterEnabled: false },
+  { key: 'chat.access', groupKey: 'system', name: 'Чат', valueType: CapabilityValueType.BOOLEAN, position: 930, starterEnabled: false },
 ];
 
 function normalizeEmail(value: unknown) {
@@ -164,6 +200,7 @@ export class TenantInvitationService {
     tenantName: string;
     tokenHash: string;
     expiresAt: Date;
+    tools?: string[];
   }) {
     const plan = await this.ensureStarterPlan();
     return this.prisma.$transaction(async (tx) => {
@@ -177,6 +214,26 @@ export class TenantInvitationService {
           commercialMode: 'DEMO',
         },
       });
+      const selectedTools = Array.isArray(input.tools)
+        ? [...new Set(input.tools.map((value) => String(value || '').trim()).filter((key) => TOOL_CAPABILITY_SET.has(key)))]
+        : null;
+      if (selectedTools) {
+        const toolCapabilities = await tx.capability.findMany({
+          where: { key: { in: [...TOOL_CAPABILITY_KEYS] } },
+          select: { id: true, key: true },
+        });
+        for (const capability of toolCapabilities) {
+          await tx.tenantCapabilityOverride.create({
+            data: {
+              tenantId: tenant.id,
+              capabilityId: capability.id,
+              enabled: selectedTools.includes(capability.key),
+              limit: null,
+            },
+          });
+        }
+      }
+
       const invitation = await tx.tenantInvitation.create({
         data: {
           tenantId: tenant.id,
@@ -318,7 +375,11 @@ export class TenantInvitationService {
     return this.invitationDto(created.invitation);
   }
 
-  async createRegistrationLink(adminId: string) {
+  async createRegistrationLink(adminId: string, input: { tools?: unknown } = {}) {
+    const tools = (Array.isArray(input?.tools) ? input.tools : [])
+      .map((value) => String(value || '').trim())
+      .filter((key) => TOOL_CAPABILITY_SET.has(key));
+    if (!tools.length) throw new BadRequestException('Перед формированием ссылки выберите хотя бы один инструмент');
     const token = createToken();
     const tokenHash = invitationHash(token);
     const expiresAt = new Date(Date.now() + INVITATION_TTL_MS);
