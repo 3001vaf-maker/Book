@@ -6,7 +6,6 @@ const tenantId = 'prelaunch-delete-tenant';
 const accountId = 'prelaunch-delete-platform-account';
 const membershipId = 'prelaunch-delete-membership';
 const consentEventId = 'prelaunch-delete-consent';
-const sessionId = 'prelaunch-delete-session';
 const activityEventId = 'prelaunch-delete-activity';
 
 function messageOf(error) {
@@ -23,8 +22,6 @@ try {
       id: accountId,
       email: 'prelaunch-delete@example.invalid',
       passwordHash: 'test-hash',
-      onboardingStep: 3,
-      workspaceUnlocked: true,
     },
   });
 
@@ -43,16 +40,12 @@ try {
     },
   });
 
-  await prisma.platformSession.create({
-    data: { id: sessionId, tenantId, platformAccountId: accountId },
-  });
 
   await prisma.platformActivityEvent.create({
     data: {
       id: activityEventId,
       tenantId,
       platformAccountId: accountId,
-      sessionId,
       eventType: 'PRELAUNCH_DELETE_TEST',
     },
   });
@@ -122,7 +115,7 @@ try {
     await tx.platformAccount.delete({ where: { id: accountId } });
   });
 
-  const [tenant, account, consentEvents, activityEvents, sessions] = await Promise.all([
+  const [tenant, account, consentEvents, activityEvents] = await Promise.all([
     prisma.tenant.findUnique({ where: { id: tenantId }, select: { id: true } }),
     prisma.platformAccount.findUnique({ where: { id: accountId }, select: { id: true } }),
     prisma.$queryRaw`
@@ -134,10 +127,6 @@ try {
       where: { id: activityEventId },
       select: { id: true },
     }),
-    prisma.platformSession.findMany({
-      where: { id: sessionId },
-      select: { id: true },
-    }),
   ]);
 
   if (tenant) throw new Error('Unapproved LIVE Tenant was not deleted');
@@ -146,7 +135,6 @@ try {
     throw new Error('PlatformConsentEvent test history remains');
   }
   if (activityEvents.length) throw new Error('PlatformActivityEvent test history remains');
-  if (sessions.length) throw new Error('PlatformSession test row remains');
 
   console.log('Unapproved LIVE test tenant hard delete passed with append-only restored afterward');
 } finally {

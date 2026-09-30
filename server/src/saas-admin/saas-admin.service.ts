@@ -2,10 +2,9 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { CapabilityValueType, TenantAccessStatus } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { SaasAccessService } from '../saas-access/saas-access.service';
-import { TenantInvitationService } from '../tenant-invitation/tenant-invitation.service';
+import { TenantInvitationService, TOOL_CAPABILITY_KEYS } from '../tenant-invitation/tenant-invitation.service';
 import { DocumentRegistryService } from '../document-registry/document-registry.service';
 import { TransactionalEmailService } from '../transactional-email/transactional-email.service';
-import { FirstRunService } from '../first-run/first-run.service';
 import { PlatformNoticeService } from '../platform-notice/platform-notice.service';
 
 @Injectable()
@@ -16,7 +15,6 @@ export class SaasAdminService {
     private readonly invitations: TenantInvitationService,
     private readonly documentRegistry: DocumentRegistryService,
     private readonly email: TransactionalEmailService,
-    private readonly firstRun: FirstRunService,
     private readonly notices: PlatformNoticeService,
   ) {}
 
@@ -40,7 +38,13 @@ export class SaasAdminService {
   async capabilities() {
     await this.invitations.ensureStarterPlan();
     return this.prisma.capability.findMany({
-      where: { isActive: true },
+      where: {
+        isActive: true,
+        OR: [
+          { key: { in: [...TOOL_CAPABILITY_KEYS] } },
+          { valueType: CapabilityValueType.LIMIT },
+        ],
+      },
       orderBy: [{ groupKey: 'asc' }, { position: 'asc' }, { key: 'asc' }],
       select: {
         id: true,
@@ -57,6 +61,7 @@ export class SaasAdminService {
   }
 
   async tenants() {
+    await this.invitations.ensureStarterPlan();
     const rows = await this.prisma.tenantAccess.findMany({
       include: {
         plan: { select: { id: true, key: true, name: true } },
@@ -72,13 +77,9 @@ export class SaasAdminService {
             tenantInvitations: {
               orderBy: { createdAt: 'desc' },
               take: 1,
-              select: { id: true, email: true, name: true, status: true, createdAt: true, expiresAt: true, activatedAt: true, demoExpiresAt: true, firstRunScenarioVersionId: true },
+              select: { id: true, email: true, name: true, status: true, createdAt: true, expiresAt: true, activatedAt: true, demoExpiresAt: true },
             },
-            firstRunProgress: {
-              orderBy: { updatedAt: 'desc' },
-              take: 1,
-              select: { status: true, currentStepKey: true, startedAt: true, completedAt: true, scenarioVersionId: true },
-            },
+
           },
         },
       },
@@ -107,7 +108,7 @@ export class SaasAdminService {
         } : null,
         invitation,
         access: resolved,
-        firstRun: row.tenant.firstRunProgress[0] || null,
+
         liveRequestedAt: row.liveRequestedAt?.toISOString() || '',
         liveRequestedByPlatformAccountId: row.liveRequestedByPlatformAccountId || '',
       };
@@ -382,43 +383,13 @@ export class SaasAdminService {
     return { deleted: true, tenantId, platformAccountIds };
   }
 
-  firstRunScenario() {
-    return this.firstRun.adminScenario();
-  }
-
-  ensureFirstRunDraft() {
-    return this.firstRun.ensureAdminDraft();
-  }
-
-  updateFirstRunStep(stepKey: string, input: Record<string, unknown>) {
-    return this.firstRun.updateDraftStep(stepKey, input);
-  }
-
-  reorderFirstRun(stepKeys: unknown) {
-    return this.firstRun.reorderDraft(stepKeys);
-  }
-
-  publishFirstRun() {
-    return this.firstRun.publishDraft();
-  }
-
-  firstRunAnalytics() {
-    return this.firstRun.adminAnalytics();
-  }
-
-  async tenantActivity(tenantId: string) {
-    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { id: true } });
-    if (!tenant) throw new NotFoundException('Рабочее пространство не найдено');
-    return this.firstRun.adminActivity(tenantId);
-  }
-
   async setCommercialMode(tenantId: string, mode: unknown, platformAdminId: string) {
     const normalizedMode = String(mode || '').trim().toUpperCase();
     const before = await this.prisma.tenantAccess.findUnique({
       where: { tenantId },
       select: { commercialMode: true },
     });
-    const result = await this.firstRun.setCommercialMode(tenantId, mode, platformAdminId);
+    const result = await this.access.setCommercialMode(tenantId, mode, platformAdminId);
     if (normalizedMode === 'LIVE' && before?.commercialMode !== 'LIVE') {
       await Promise.all([
         this.notices.resolveLiveRequest(tenantId),
@@ -434,7 +405,7 @@ export class SaasAdminService {
   }
 
   extendDemo(tenantId: string, days: unknown) {
-    return this.firstRun.extendDemo(tenantId, days);
+    return this.access.extendDemo(tenantId, days);
   }
 
   async updateCapabilityOrder(tenantId: string, keysValue: unknown) {
@@ -446,7 +417,7 @@ export class SaasAdminService {
     }
 
     const capabilities = await this.prisma.capability.findMany({
-      where: { isActive: true },
+      where: { isActive: true, key: { in: [...TOOL_CAPABILITY_KEYS] } },
       select: { id: true, key: true },
     });
     const byKey = new Map(capabilities.map((item) => [item.key, item]));

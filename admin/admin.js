@@ -1,6 +1,5 @@
 import { apiRequest, clearAuthToken, getCurrentAccount, login } from '../core/auth.js';
 import { renderDocumentRegistry } from './document-registry/view.js';
-import { renderFirstRunAdmin } from './first-run.js';
 import { DOCUMENT_CATALOG } from './document-registry/catalog.js';
 
 const app = document.querySelector('#admin-app');
@@ -217,7 +216,6 @@ function renderShell() {
           <button data-section="overview">Обзор</button>
           <button data-section="owner" class="owner-link">Моё пространство</button>
           <button data-section="document-registry">Реестр документов</button>
-          <button data-section="first-run">Первое знакомство</button>
           <button data-section="tenants">Пользователи</button>
           <button data-section="live-requests" class="${liveRequestCount ? 'has-live-requests' : ''}">🔔 Запросы LIVE <span class="admin-live-count" data-live-request-count ${liveRequestCount ? '' : 'hidden'}>${liveRequestCount}</span></button>
           <button data-section="capabilities">Инструменты</button>
@@ -285,13 +283,6 @@ function renderCurrentSection() {
       escapeHtml,
       setTitle: setActiveSection,
       loadHistory: () => adminRequest('/document-registry/history'),
-    });
-  }
-  if (state.section === 'first-run') {
-    return renderFirstRunAdmin(app.querySelector('[data-content]'), {
-      request: adminRequest,
-      escapeHtml,
-      setTitle: setActiveSection,
     });
   }
   if (state.section === 'capabilities') return renderCapabilities();
@@ -408,6 +399,44 @@ function openDeleteTenantModal(tenantId) {
   });
 }
 
+const INVITATION_TOOL_GROUP_LABELS = {
+  profile: 'Профиль',
+  work: 'Основные',
+  people: 'Основные',
+  finance: 'Финансы',
+  journal: 'Журнал',
+  settings: 'Настройки',
+};
+
+function invitationToolSelector() {
+  const groups = new Map();
+  state.capabilities.forEach((item) => {
+    if (item.valueType !== 'BOOLEAN') return;
+    const label = INVITATION_TOOL_GROUP_LABELS[item.groupKey] || item.groupKey || 'Инструменты';
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label).push(item);
+  });
+  return `<div class="admin-invite-tools" data-invite-tools>
+    <h4>Инструменты DEMO</h4>
+    <p class="admin-service-note">Сначала выберите инструменты. После этого можно сформировать ссылку или отправить приглашение.</p>
+    ${[...groups.entries()].map(([group, items]) => `<section class="admin-invite-tool-group">
+      <strong>${escapeHtml(group)}</strong>
+      <div class="admin-invite-tool-list">
+        ${items.map((item) => `<label class="admin-invite-tool">
+          <input type="checkbox" value="${escapeHtml(item.key)}" data-invite-tool>
+          <span>${escapeHtml(item.name)}</span>
+        </label>`).join('')}
+      </div>
+    </section>`).join('')}
+  </div>`;
+}
+
+function selectedInvitationTools(root) {
+  return [...root.querySelectorAll('[data-invite-tool]:checked')]
+    .map((input) => String(input.value || '').trim())
+    .filter(Boolean);
+}
+
 function renderTenants() {
   setActiveSection('Пользователи');
   const content = app.querySelector('[data-content]');
@@ -419,6 +448,7 @@ function renderTenants() {
         <h3>Пригласить пользователя</h3>
         <button class="admin-button secondary" type="button" data-create-invite-link>Регистрационная ссылка</button>
       </div>
+      ${invitationToolSelector()}
       <form class="admin-invite-grid" data-invite-form>
         <label class="admin-field"><span>Имя</span><input name="name" placeholder="Имя"></label>
         <label class="admin-field"><span>Email</span><input name="email" type="email" placeholder="name@example.com" required></label>
@@ -450,13 +480,19 @@ function renderTenants() {
   createLinkButton?.addEventListener('click', async () => {
     message.textContent = '';
     message.classList.remove('error');
+    const tools = selectedInvitationTools(content);
+    if (!tools.length) {
+      message.textContent = 'Сначала выберите хотя бы один инструмент.';
+      message.classList.add('error');
+      return;
+    }
     createLinkButton.disabled = true;
     createLinkButton.textContent = 'Создаём…';
     try {
       const result = await adminRequest('/invitations/link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: '{}',
+        body: JSON.stringify({ tools }),
       });
       const url = String(result?.url || '').trim();
       if (!url) throw new Error('Ссылка не получена');
@@ -493,13 +529,19 @@ function renderTenants() {
     message.classList.remove('error');
     const button = form.querySelector('button[type="submit"]');
     const data = new FormData(form);
+    const tools = selectedInvitationTools(content);
+    if (!tools.length) {
+      message.textContent = 'Сначала выберите хотя бы один инструмент.';
+      message.classList.add('error');
+      return;
+    }
     button.disabled = true;
     button.textContent = 'Отправляем…';
     try {
       await adminRequest('/invitations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: data.get('name'), email: data.get('email') }),
+        body: JSON.stringify({ name: data.get('name'), email: data.get('email'), tools }),
       });
       form.reset();
       message.textContent = 'Приглашение отправлено по email.';
@@ -603,14 +645,6 @@ function formatAdminMoment(value, fallback = '—') {
   }).format(date);
 }
 
-function activeTimeText(secondsValue) {
-  const seconds = Math.max(0, Number(secondsValue) || 0);
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  if (hours) return `${hours} ч ${minutes} мин`;
-  return `${minutes} мин`;
-}
-
 function orderedCapabilityCatalog(tenant) {
   const byKey = new Map(state.capabilities.map((item) => [item.key, item]));
   const order = Array.isArray(tenant.access?.capabilityOrder) ? tenant.access.capabilityOrder : [];
@@ -621,56 +655,9 @@ function orderedCapabilityCatalog(tenant) {
   return result;
 }
 
-function activityEventLabel(event, stepTitles) {
-  const stepTitle = stepTitles.get(event.stepKey) || event.stepKey || '';
-  if (event.eventType === 'INVITATION_ACTIVATED') return 'Открыта регистрационная ссылка';
-  if (event.eventType === 'ACCOUNT_CREATED') return 'Создана учётная запись';
-  if (event.eventType === 'FIRST_RUN_STARTED') return 'Начато первое знакомство';
-  if (event.eventType === 'STEP_MODAL_SHOWN') return stepTitle ? `Показана подсказка «${stepTitle}»` : 'Показана подсказка';
-  if (event.eventType === 'STEP_COMPLETED') return stepTitle ? `Завершён этап «${stepTitle}»` : 'Этап завершён';
-  if (event.eventType === 'STEP_SKIPPED') return stepTitle ? `Пропущен этап «${stepTitle}»` : 'Этап пропущен';
-  if (event.eventType === 'FIRST_RUN_COMPLETED') return 'Первое знакомство завершено';
-  if (event.eventType === 'SESSION_STARTED') return 'Вход в систему';
-  if (event.eventType === 'SESSION_ENDED') {
-    const reason = String(event.metadata?.reason || '');
-    return reason === 'LOGOUT' ? 'Выход из системы' : reason === 'TIMEOUT' ? 'Сеанс завершён по отсутствию активности' : 'Сеанс завершён';
-  }
-  if (event.eventType === 'LIVE_REQUESTED') return 'Пользователь запросил переход в LIVE';
-  if (event.eventType === 'LIVE_APPROVED_BY_ADMIN') return 'LIVE подтверждён администратором';
-  if (event.eventType === 'COMMERCIAL_MODE_CHANGED') return `Режим изменён: ${escapeHtml(event.metadata?.commercialMode || '')}`;
-  if (event.eventType === 'DEMO_EXTENDED') return 'DEMO продлено компанией';
-  if (event.eventType === 'DEMO_OPERATIONAL_DATA_CLEARED') return 'Учебные операционные данные очищены';
-  if (event.eventType === 'FINANCE_SECTION_OPENED') return 'Открыт финансовый раздел';
-  return event.eventType;
-}
-
-function activityMarkup(activity) {
-  const progress = activity?.progress || null;
-  const steps = Array.isArray(progress?.steps) ? progress.steps : [];
-  const stepTitles = new Map(steps.map((item) => [item.key, item.title]));
-  const currentTitle = stepTitles.get(progress?.currentStepKey) || progress?.currentStepKey || '—';
-  const sessions = Array.isArray(activity?.sessions) ? activity.sessions : [];
-  const events = Array.isArray(activity?.events) ? activity.events : [];
-  const firstSession = sessions.length ? sessions[sessions.length - 1] : null;
-  return `
-    <div class="admin-activity-summary">
-      <div><span>Первый вход</span><strong>${escapeHtml(firstSession ? formatAdminMoment(firstSession.startedAt) : 'Не входил')}</strong></div>
-      <div><span>Последняя активность</span><strong>${escapeHtml(activity?.lastActivityAt ? formatAdminMoment(activity.lastActivityAt) : 'Нет')}</strong></div>
-      <div><span>Сеансов</span><strong>${escapeHtml(sessions.length)}</strong></div>
-      <div><span>Активное время</span><strong>${escapeHtml(activeTimeText(activity?.totalActiveSeconds))}</strong></div>
-      <div><span>Обучение</span><strong>${escapeHtml(progress ? (progress.status === 'COMPLETED' ? 'Завершено' : currentTitle) : 'Не начато')}</strong></div>
-      <div><span>Версия сценария</span><strong>${escapeHtml(progress?.scenarioVersion || '—')}</strong></div>
-    </div>
-    <div class="admin-activity-timeline">
-      ${events.length ? events.map((event) => `<div class="admin-activity-event">
-        <time>${escapeHtml(formatAdminMoment(event.occurredAt))}</time>
-        <div>${escapeHtml(activityEventLabel(event, stepTitles))}</div>
-      </div>`).join('') : '<div class="admin-history-empty">Событий пока нет.</div>'}
-    </div>`;
-}
-
 function capabilityOrderRow(capability, resolved) {
-  return `<div class="admin-capability-order-row" draggable="true" data-capability-row="${escapeHtml(capability.key)}">
+  const orderable = capability.valueType === 'BOOLEAN';
+  return `<div class="admin-capability-order-row" draggable="${orderable}" data-capability-row="${escapeHtml(capability.key)}" data-capability-orderable="${orderable}">
     <div class="admin-capability-move">
       <button type="button" data-capability-up aria-label="Поднять">↑</button>
       <button type="button" data-capability-down aria-label="Опустить">↓</button>
@@ -687,7 +674,6 @@ function openAccessDrawer(tenantId) {
   const mode = String(tenant.access?.commercialMode || 'DEMO');
   const demoActivated = tenant.access?.demoActivatedAt || tenant.invitation?.activatedAt || '';
   const demoExpires = tenant.access?.demoExpiresAt || tenant.invitation?.demoExpiresAt || '';
-  const progress = tenant.firstRun || null;
   const liveRequestedAt = tenant.liveRequestedAt || '';
   const backdrop = document.createElement('div');
   backdrop.className = 'admin-drawer-backdrop';
@@ -704,7 +690,6 @@ function openAccessDrawer(tenantId) {
           <strong>${escapeHtml(mode)}</strong>
           <span>${demoActivated ? `DEMO активировано ${escapeHtml(formatAdminMoment(demoActivated))}` : 'DEMO ещё не активировано'}</span>
           <span>${demoExpires ? `Срок DEMO до ${escapeHtml(formatAdminMoment(demoExpires))}` : ''}</span>
-          <span>${progress ? (progress.status === 'COMPLETED' ? 'Первое знакомство завершено' : `Текущий этап: ${escapeHtml(progress.currentStepKey || '—')}`) : 'Первое знакомство ещё не начато'}</span>
         </div>
         <div class="admin-inline-actions">
           ${mode === 'DEMO' ? '<button class="admin-button secondary" data-extend-demo>Продлить DEMO на 14 дней</button>' : ''}
@@ -726,11 +711,6 @@ function openAccessDrawer(tenantId) {
       <section class="admin-section">
         <h4>Состояние пространства</h4>
         <button class="admin-button ${tenant.status === 'SUSPENDED' ? '' : 'danger'}" data-status>${tenant.status === 'SUSPENDED' ? 'Включить пространство' : 'Отключить пространство'}</button>
-      </section>
-
-      <section class="admin-section">
-        <h4>Журнал активности</h4>
-        <div data-activity><div class="admin-history-empty">Загрузка…</div></div>
       </section>
 
       ${tenant.ownerProfile?.email ? `
@@ -755,7 +735,7 @@ function openAccessDrawer(tenantId) {
   backdrop.addEventListener('click', (event) => { if (event.target === backdrop) close(); });
 
   const capabilityList = backdrop.querySelector('[data-capability-order-list]');
-  const originalOrder = capabilities.map((item) => item.key).join('|');
+  const originalOrder = capabilities.filter((item) => item.valueType === 'BOOLEAN').map((item) => item.key).join('|');
   const moveCapability = (row, direction) => {
     const sibling = direction < 0 ? row.previousElementSibling : row.nextElementSibling;
     if (!sibling) return;
@@ -763,6 +743,11 @@ function openAccessDrawer(tenantId) {
     else capabilityList.insertBefore(sibling, row);
   };
   capabilityList?.querySelectorAll('[data-capability-row]').forEach((row) => {
+    if (row.dataset.capabilityOrderable !== 'true') {
+      row.querySelector('[data-capability-up]')?.setAttribute('disabled', 'disabled');
+      row.querySelector('[data-capability-down]')?.setAttribute('disabled', 'disabled');
+      return;
+    }
     row.querySelector('[data-capability-up]')?.addEventListener('click', () => moveCapability(row, -1));
     row.querySelector('[data-capability-down]')?.addEventListener('click', () => moveCapability(row, 1));
     row.addEventListener('dragstart', (event) => {
@@ -886,7 +871,8 @@ function openAccessDrawer(tenantId) {
       }
     });
 
-    const orderKeys = [...capabilityList.querySelectorAll('[data-capability-row]')].map((row) => row.dataset.capabilityRow);
+    const orderKeys = [...capabilityList.querySelectorAll('[data-capability-row][data-capability-orderable="true"]')]
+      .map((row) => row.dataset.capabilityRow);
     const orderChanged = orderKeys.join('|') !== originalOrder;
     const message = backdrop.querySelector('[data-save-message]');
     if (!changes.length && !orderChanged) {
@@ -918,16 +904,6 @@ function openAccessDrawer(tenantId) {
       message.classList.add('error');
     }
   });
-
-  void adminRequest(`/tenants/${encodeURIComponent(tenantId)}/activity`)
-    .then((activity) => {
-      const host = backdrop.querySelector('[data-activity]');
-      if (host) host.innerHTML = activityMarkup(activity);
-    })
-    .catch((error) => {
-      const host = backdrop.querySelector('[data-activity]');
-      if (host) host.innerHTML = `<div class="admin-history-empty">${escapeHtml(error instanceof Error ? error.message : 'Не удалось загрузить активность')}</div>`;
-    });
 }
 
 function capabilityEditor(capability, resolved) {

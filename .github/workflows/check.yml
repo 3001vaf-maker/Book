@@ -119,6 +119,7 @@ jobs:
           mv server/prisma/migrations/20260922094500_purge_unapproved_legacy_live /tmp/profile-migrations/
           mv server/prisma/migrations/20260922173000_platform_push_subscription /tmp/profile-migrations/
           mv server/prisma/migrations/20260922213000_demo_starts_at_profile_open /tmp/profile-migrations/
+          mv server/prisma/migrations/20260930143000_remove_first_run_runtime /tmp/profile-migrations/
           (
             cd server
             DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' npx prisma migrate deploy
@@ -257,12 +258,12 @@ jobs:
             ('approved-live-tenant','Approved LIVE Profile',CURRENT_TIMESTAMP);
 
           INSERT INTO "PlatformAccount" (
-            "id","email","passwordHash","onboardingStep","workspaceUnlocked","updatedAt"
+            "id","email","passwordHash","updatedAt"
           )
           VALUES
-            ('incoming-profile-account','incoming-profile@example.invalid','hash',3,true,CURRENT_TIMESTAMP),
-            ('dirty-live-account','dirty-live@example.invalid','hash',3,true,CURRENT_TIMESTAMP),
-            ('approved-live-account','approved-live@example.invalid','hash',3,true,CURRENT_TIMESTAMP);
+            ('incoming-profile-account','incoming-profile@example.invalid','hash',CURRENT_TIMESTAMP),
+            ('dirty-live-account','dirty-live@example.invalid','hash',CURRENT_TIMESTAMP),
+            ('approved-live-account','approved-live@example.invalid','hash',CURRENT_TIMESTAMP);
 
           INSERT INTO "Membership" ("id","tenantId","platformAccountId","role")
           VALUES
@@ -340,6 +341,7 @@ jobs:
           mv /tmp/profile-migrations/20260922094500_purge_unapproved_legacy_live server/prisma/migrations/
           mv /tmp/profile-migrations/20260922173000_platform_push_subscription server/prisma/migrations/
           mv /tmp/profile-migrations/20260922213000_demo_starts_at_profile_open server/prisma/migrations/
+          mv /tmp/profile-migrations/20260930143000_remove_first_run_runtime server/prisma/migrations/
           (
             cd server
             DATABASE_URL='postgresql://book:book_staging_local@localhost:54329/book_staging?schema=public' npx prisma migrate deploy

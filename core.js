@@ -16,15 +16,13 @@ import { configureWorkplaceSource } from './core/workplace-time.js';
 import { configureTimeUsageSource, configureSoftTimeUsageReleaseSource } from './core/time/index.js';
 import { getCurrentAccount, login } from './core/auth.js';
 import { resolveBookingPublicRoute } from './core/account/index.js';
-import { canUseBookCapability, getBookAccess, loadBookAccess } from './core/access.js';
+import { activateBookDemo, canUseBookCapability, getBookAccess, loadBookAccess } from './core/access.js';
 import { startServerBookingSync } from './online-booking/server-sync.js';
 import { renderGlobalClient, renderOnlineBooking } from './online-booking/booking.js';
 import { startAccountRuntime } from './online-booking/account-runtime.js';
 import { field, passwordField, initPasswordFields, mountV2ZLayer, openNotice, initV2WorkspaceInteraction, setV2DeckOpen, v2CardDeck, v2Header, v2Shell, v2Sticker, v2ZLayer } from './ui/ui.js';
 import { clearLegacyBusinessStorage } from './core/legacy-browser-business.js';
-import { FirstRunRuntime, bindDemoBadgeAction, demoBadgeMarkup, startPlatformSessionTracking } from './first-run/runtime.js';
 import { startPlatformNotices } from './core/platform-notices.js';
-import { requestDemoExtension, requestLiveMode } from './first-run/api.js';
 
 configureWorkplaceSource(getWorkplaceEntities);
 configureTimeUsageSource(getJournalTimeUsages);
@@ -32,10 +30,10 @@ configureSoftTimeUsageReleaseSource(releaseJournalSoftTimeUsages);
 
 const ROOT_SECTIONS = [
   { id: 'people', label: 'Клиенты', capability: 'people.access' },
-  { id: 'finance', label: 'Финансы', capability: 'finance.access' },
+  { id: 'finance', label: 'Финансы', capability: '' },
   { id: 'timetable', label: 'График', capability: 'timetable.access' },
-  { id: 'journal', label: 'Журнал', capability: 'journal.access' },
-  { id: 'profile', label: 'Профиль', capability: 'profile.access' },
+  { id: 'journal', label: 'Журнал', capability: '' },
+  { id: 'profile', label: 'Профиль', capability: '' },
   { id: 'settings', label: 'Настройки', capability: '' },
 ];
 
@@ -57,10 +55,6 @@ let disposeView = () => {};
 let workspaceReady = false;
 let authenticatedAccount = null;
 let serverBookingSyncStarted = false;
-let firstRunRuntime = null;
-let firstRunState = null;
-let disposePlatformSession = () => {};
-let demoBadgeTimer = null;
 let disposePlatformNotices = () => {};
 let rknGuideSyncTimer = null;
 let workspaceRenderVersion = 0;
@@ -211,6 +205,9 @@ function rootDefinition(section) {
 
 function sectionAllowed(section) {
   if (section === 'chat') return canUseBookCapability('chat.access');
+  if (section === 'finance' || section === 'journal' || section === 'settings') {
+    return secondaryItems(section).length > 0;
+  }
   const item = rootDefinition(section);
   return Boolean(item && (!item.capability || canUseBookCapability(item.capability)));
 }
@@ -219,10 +216,24 @@ function allowedSections() {
   return ROOT_SECTIONS.filter((item) => sectionAllowed(item.id)).map((item) => item.id);
 }
 
+function rootDisplayLabel(section) {
+  const definition = rootDefinition(section);
+  if (!definition) return '';
+  const children = secondaryItems(section);
+  return children.length === 1 ? children[0].label : definition.label;
+}
+
 function allowedRootItems() {
   return ROOT_SECTIONS
     .filter((item) => sectionAllowed(item.id))
-    .map(({ id, label }) => ({ id, label, childrenCount: secondaryItems(id).length }));
+    .map(({ id }) => {
+      const children = secondaryItems(id);
+      return {
+        id,
+        label: rootDisplayLabel(id),
+        childrenCount: children.length > 1 ? children.length : 0,
+      };
+    });
 }
 
 function defaultSection() {
@@ -450,7 +461,7 @@ function renderWorkspace() {
     role: 'root',
     level: 'f',
   });
-  const eDeck = childItems.length ? v2CardDeck(childItems, {
+  const eDeck = childItems.length > 1 ? v2CardDeck(childItems, {
     axis: 'y',
     active: childActive,
     data: 'data-v2-secondary-item',
@@ -458,7 +469,7 @@ function renderWorkspace() {
   }) : '';
 
   const headerMarkup = v2Header({
-    b: state.activeSection === 'chat' ? 'Чат' : rootDefinition(root)?.label || '',
+    b: state.activeSection === 'chat' ? 'Чат' : rootDisplayLabel(root),
     d: sectionAllowed('chat') ? { kind: 'chat', data: 'data-v2-workspace-chat', aria: 'Чат' } : null,
   });
   let shell = app.querySelector(':scope > [data-v2-app].v2-app--workspace');
@@ -528,7 +539,7 @@ function renderWorkspace() {
       state.navigationLevel = open ? 'e' : 'f';
     },
     onRootSelect: (id) => {
-      const hasE = secondaryItems(id).length > 0;
+      const hasE = secondaryItems(id).length > 1;
       state.navigationLevel = hasE ? 'e' : 'f';
       state.navigationEnterZ = !hasE;
       navigate(id, { navigationOpen: hasE });
@@ -577,23 +588,7 @@ function renderWorkspace() {
     moduleDispose?.();
   };
 
-  if (demoBadgeTimer) {
-    window.clearInterval(demoBadgeTimer);
-    demoBadgeTimer = null;
-  }
-  if (firstRunState?.progress?.status === 'COMPLETED') {
-    const updateBadge = () => {
-      app.querySelector('[data-first-run-demo-badge]')?.remove();
-      const badge = demoBadgeMarkup(firstRunState);
-      if (badge) {
-        app.insertAdjacentHTML('beforeend', badge);
-        bindDemoBadgeAction(app, firstRunState);
-      }
-    };
-    updateBadge();
-    if (firstRunState?.commercialMode === 'DEMO') demoBadgeTimer = window.setInterval(updateBadge, 60_000);
-  }
-  firstRunRuntime?.afterWorkspaceRender();
+
   syncViewport();
 }
 
@@ -610,32 +605,6 @@ function renderMigrationPending() {
   });
   app.querySelector('[data-technical-u-close]')?.addEventListener('click', () => {
     if (window.history.length > 1) window.history.back();
-  });
-  syncViewport();
-}
-
-function renderFirstRunUnavailable(error) {
-  app.classList.remove('app-shell--booking');
-  workspaceReady = false;
-  disposeView();
-  disposeView = () => {};
-  const message = error instanceof Error ? error.message : 'Не удалось продолжить знакомство с Book.';
-  app.innerHTML = v2Sticker({
-    title: 'Не удалось открыть знакомство',
-    body: '<p data-first-run-load-error></p>',
-    action: '<button class="ui-button" type="button" data-first-run-retry>Повторить</button>',
-    className: 'v2-sticker-screen--technical',
-    closeData: 'data-first-run-u-close',
-  });
-  app.querySelector('[data-first-run-u-close]')?.addEventListener('click', () => {
-    if (window.history.length > 1) window.history.back();
-  });
-  app.querySelector('[data-first-run-load-error]').textContent = message;
-  app.querySelector('[data-first-run-retry]')?.addEventListener('click', async (event) => {
-    const control = event.currentTarget;
-    control.disabled = true;
-    control.textContent = 'Открываем…';
-    await renderAuthenticated(authenticatedAccount);
   });
   syncViewport();
 }
@@ -657,73 +626,6 @@ function renderSuspended() {
   syncViewport();
 }
 
-
-function renderDemoExpired(firstRun) {
-  if (demoBadgeTimer) {
-    window.clearInterval(demoBadgeTimer);
-    demoBadgeTimer = null;
-  }
-  app.classList.remove('app-shell--booking');
-  workspaceReady = false;
-  disposeView();
-  disposeView = () => {};
-  const expiresAt = firstRun?.demo?.expiresAt
-    ? new Intl.DateTimeFormat('ru-RU', { dateStyle: 'long', timeStyle: 'short' }).format(new Date(firstRun.demo.expiresAt))
-    : '';
-  app.innerHTML = `
-    <main class="first-run-expired">
-      <section class="first-run-expired__card">
-        <h1>Срок DEMO завершён</h1>
-        <p>${firstRun?.progress?.status === 'COMPLETED'
-          ? 'Данные и настройки сохранены. Вы можете запросить переход в LIVE или попросить продлить DEMO.'
-          : 'Данные и настройки сохранены. Для продолжения знакомства потребуется продление DEMO или включение LIVE администратором.'}</p>
-        ${expiresAt ? `<p style="margin-top:12px">DEMO завершено: ${expiresAt}</p>` : ''}
-        <div class="first-run-expired__actions">
-          ${firstRun?.progress?.status === 'COMPLETED' ? '<button class="ui-button" type="button" data-request-live>Запросить LIVE</button>' : ''}
-          <button class="ui-button ui-button--secondary" type="button" data-request-demo-extension>Запросить продление DEMO</button>
-        </div>
-        <p class="first-run-expired__status" data-request-status></p>
-      </section>
-    </main>`;
-  const status = app.querySelector('[data-request-status]');
-  app.querySelector('[data-request-live]')?.addEventListener('click', async (event) => {
-    const control = event.currentTarget;
-    control.disabled = true;
-    if (status) status.textContent = 'Отправляем запрос…';
-    try {
-      const result = await requestLiveMode();
-      if (status) status.textContent = result?.alreadyLive ? 'LIVE уже активен.' : 'Запрос на LIVE отправлен компании.';
-      control.textContent = 'Запрос отправлен';
-    } catch (error) {
-      control.disabled = false;
-      if (status) status.textContent = error instanceof Error ? error.message : 'Не удалось отправить запрос';
-    }
-  });
-  app.querySelector('[data-request-demo-extension]')?.addEventListener('click', async (event) => {
-    const control = event.currentTarget;
-    control.disabled = true;
-    if (status) status.textContent = 'Отправляем запрос…';
-    try {
-      await requestDemoExtension();
-      if (status) status.textContent = 'Запрос на продление DEMO отправлен компании.';
-      control.textContent = 'Запрос отправлен';
-    } catch (error) {
-      control.disabled = false;
-      if (status) status.textContent = error instanceof Error ? error.message : 'Не удалось отправить запрос';
-    }
-  });
-  syncViewport();
-}
-
-function showGuidedWorkspace(section) {
-  workspaceReady = true;
-  const requested = normalizeRequestedSection(section);
-  state.activeSection = sectionAllowed(requested) ? requested : defaultSection();
-  if (state.activeSection !== 'chat') state.lastRootSection = state.activeSection;
-  history.replaceState({}, '', `#${state.activeSection}`);
-  renderWorkspace();
-  startRegularPlatformNotices();
-}
 
 function startRegularPlatformNotices() {
   disposePlatformNotices();
@@ -770,73 +672,15 @@ async function renderAuthenticated(account = authenticatedAccount) {
     return;
   }
   clearLegacyBusinessStorage();
-  await loadBookAccess();
+  await activateBookDemo();
   if (getBookAccess().status === 'SUSPENDED') {
     renderSuspended();
     return;
   }
   ensureServerBookingSync();
 
-  firstRunRuntime?.dispose();
-  firstRunRuntime = null;
   disposePlatformNotices();
   disposePlatformNotices = () => {};
-  disposePlatformSession();
-  disposePlatformSession = () => {};
-
-  const candidateRuntime = new FirstRunRuntime({
-    app,
-    accountEmail: authenticatedAccount?.account?.email || '',
-    getActiveSection: () => state.activeSection,
-    showWorkspace: showGuidedWorkspace,
-    onStateChange: (nextState) => { firstRunState = nextState; },
-    onFinished: (nextState) => {
-      firstRunState = nextState || firstRunState;
-      state.activeSection = defaultSection();
-      history.replaceState({}, '', `#${state.activeSection}`);
-      renderWorkspace();
-      startRegularPlatformNotices();
-    },
-  });
-
-  try {
-    firstRunState = await candidateRuntime.load();
-  } catch (error) {
-    candidateRuntime.dispose();
-    renderFirstRunUnavailable(error);
-    return;
-  }
-
-  if (firstRunState?.assigned) {
-    if (firstRunState.commercialMode === 'DEMO' && firstRunState.demo?.expired) {
-      candidateRuntime.dispose();
-      disposePlatformSession = await startPlatformSessionTracking();
-      renderDemoExpired(firstRunState);
-      return;
-    }
-
-    if (firstRunState.progress?.status === 'IN_PROGRESS') {
-      firstRunRuntime = candidateRuntime;
-      workspaceReady = false;
-      history.replaceState({}, '', location.pathname);
-      await firstRunRuntime.start();
-      syncViewport();
-      return;
-    }
-
-    candidateRuntime.dispose();
-    disposePlatformSession = await startPlatformSessionTracking();
-    const requested = normalizeRequestedSection(location.hash.slice(1));
-    state.activeSection = sectionAllowed(requested) ? requested : defaultSection();
-    if (state.activeSection !== 'chat') state.lastRootSection = state.activeSection;
-    history.replaceState({}, '', `#${state.activeSection}`);
-    renderWorkspace();
-    startRegularPlatformNotices();
-    return;
-  }
-
-  candidateRuntime.dispose();
-  disposePlatformSession = await startPlatformSessionTracking();
 
   const requested = normalizeRequestedSection(location.hash.slice(1));
   state.activeSection = sectionAllowed(requested) ? requested : defaultSection();
@@ -909,17 +753,8 @@ function renderLogin(message = '') {
 
 window.addEventListener('book:auth-logout', () => {
   authenticatedAccount = null;
-  firstRunRuntime?.dispose();
-  firstRunRuntime = null;
-  firstRunState = null;
   disposePlatformNotices();
   disposePlatformNotices = () => {};
-  disposePlatformSession();
-  disposePlatformSession = () => {};
-  if (demoBadgeTimer) {
-    window.clearInterval(demoBadgeTimer);
-    demoBadgeTimer = null;
-  }
   history.replaceState({}, '', location.pathname);
   renderLogin();
 });

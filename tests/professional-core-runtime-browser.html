@@ -25,8 +25,29 @@
     try { return new URL(typeof input === 'string' ? input : input.url, location.href).pathname; }
     catch { return String(input || ''); }
   };
+  const demoCapabilities = [
+    'profile.access','workplaces.access','services.access','people.access','timetable.access',
+    'finance.cash.access','finance.dds.access','finance.income_expense.access',
+    'finance.articles.access','finance.special.access','finance.z_report.access',
+    'journal.day.access','journal.month.access','journal.list.access',
+    'online_booking.access','payments.access','finance.access','journal.access','chat.access',
+    'notifications.access','integrations.access','documents.access','tags.access',
+  ].map((key) => ({ key, valueType:'BOOLEAN', enabled:true, limit:null, source:'DEMO' }));
+  demoCapabilities.push({ key:'workplaces.max', valueType:'LIMIT', enabled:null, limit:null, source:'DEMO' });
+  const demoAccess = {
+    tenantId:'runtime-tenant',
+    status:'ACTIVE',
+    isOwnerBook:false,
+    commercialMode:'DEMO',
+    demoActivatedAt:'2026-09-30T12:00:00.000Z',
+    demoExpiresAt:'2026-10-14T12:00:00.000Z',
+    liveRequestedAt:'',
+    liveApprovedAt:'',
+    capabilities:demoCapabilities,
+    plan:null,
+  };
   const payloadFor = (path, method) => {
-    if (path.endsWith('/auth/me')) return { account:{ email:'runtime@example.test', workspaceUnlocked:true }, user:{ workspaceUnlocked:true } };
+    if (path.endsWith('/auth/me')) return { account:{ email:'runtime@example.test' }, user:{} };
     if (path.endsWith('/profile')) return {
       verified:true,
       profile:{ name:'Иван', surname:'Проверка', profession:'Специалист' },
@@ -51,14 +72,8 @@
     if (path.endsWith('/finance')) return {
       version:7, articles:[], settlements:[], operations:[], ledger:[], income:[], expense:[],
     };
-    if (path.endsWith('/saas-access/me')) return {
-      tenantId:'runtime-tenant', status:'ACTIVE', isOwnerBook:true, commercialMode:'LIVE',
-      capabilities:[], plan:null,
-    };
-    if (path.endsWith('/first-run/state')) return {
-      assigned:true, commercialMode:'LIVE', progress:{status:'COMPLETED'}, steps:[], demo:{},
-    };
-    if (path.endsWith('/first-run/session/start')) return { id:'' };
+    if (path.endsWith('/saas-access/me')) return demoAccess;
+    if (path.endsWith('/saas-access/demo/activate')) return demoAccess;
     if (path.endsWith('/platform-notices')) return [];
     if (method === 'PUT' || method === 'POST' || method === 'DELETE') return { ok:true, verified:true };
     return {};

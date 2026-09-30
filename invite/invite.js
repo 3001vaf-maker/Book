@@ -82,7 +82,7 @@ function renderForm(invitation) {
     <div class="invite-meta">
       <strong data-name></strong>
       <span data-email></span>
-      <span>DEMO · 14 дней с первого открытия профиля</span>
+      <span>DEMO · 14 дней с первого входа в приложение</span>
     </div>
 
     <form class="invite-form" data-form>
@@ -190,7 +190,7 @@ function renderForm(invitation) {
         documents: registrationFacts(invitation),
       });
       setAuthToken(account.accessToken);
-      state.innerHTML = '<h1>Учётная запись создана</h1><p class="invite-success">Открываем настройку профиля…</p>';
+      state.innerHTML = '<h1>Учётная запись создана</h1><p class="invite-success">Открываем приложение…</p>';
       window.setTimeout(() => location.replace('../'), 350);
     } catch (acceptError) {
       error.textContent = acceptError instanceof Error ? acceptError.message : 'Не удалось завершить регистрацию';

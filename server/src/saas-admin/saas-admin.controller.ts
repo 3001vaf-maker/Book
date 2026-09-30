@@ -56,14 +56,17 @@ export class SaasAdminController {
   @Post('invitations')
   createInvitation(
     @Req() request: AdminRequest,
-    @Body() body: { email?: unknown; name?: unknown },
+    @Body() body: { email?: unknown; name?: unknown; tools?: unknown },
   ) {
     return this.invitations.createInvitation(request.platformAdminId!, body || {});
   }
 
   @Post('invitations/link')
-  createRegistrationLink(@Req() request: AdminRequest) {
-    return this.invitations.createRegistrationLink(request.platformAdminId!);
+  createRegistrationLink(
+    @Req() request: AdminRequest,
+    @Body() body: { tools?: unknown },
+  ) {
+    return this.invitations.createRegistrationLink(request.platformAdminId!, body || {});
   }
 
   @Post('invitations/:id/resend')
@@ -92,40 +95,6 @@ export class SaasAdminController {
     return this.admin.updateTenantAccess(tenantId, body || {});
   }
 
-  @Get('first-run-scenario')
-  firstRunScenario() {
-    return this.admin.firstRunScenario();
-  }
-
-  @Post('first-run-scenario/draft')
-  ensureFirstRunDraft() {
-    return this.admin.ensureFirstRunDraft();
-  }
-
-  @Put('first-run-scenario/steps/:stepKey')
-  updateFirstRunStep(@Param('stepKey') stepKey: string, @Body() body: Record<string, unknown>) {
-    return this.admin.updateFirstRunStep(stepKey, body || {});
-  }
-
-  @Put('first-run-scenario/order')
-  reorderFirstRun(@Body() body: { stepKeys?: unknown }) {
-    return this.admin.reorderFirstRun(body?.stepKeys);
-  }
-
-  @Post('first-run-scenario/publish')
-  publishFirstRun() {
-    return this.admin.publishFirstRun();
-  }
-
-  @Get('first-run-analytics')
-  firstRunAnalytics() {
-    return this.admin.firstRunAnalytics();
-  }
-
-  @Get('tenants/:tenantId/activity')
-  tenantActivity(@Param('tenantId') tenantId: string) {
-    return this.admin.tenantActivity(tenantId);
-  }
 
   @Put('tenants/:tenantId/commercial-mode')
   setCommercialMode(
