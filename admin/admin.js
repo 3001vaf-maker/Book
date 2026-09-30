@@ -656,7 +656,8 @@ function orderedCapabilityCatalog(tenant) {
 }
 
 function capabilityOrderRow(capability, resolved) {
-  return `<div class="admin-capability-order-row" draggable="true" data-capability-row="${escapeHtml(capability.key)}">
+  const orderable = capability.valueType === 'BOOLEAN';
+  return `<div class="admin-capability-order-row" draggable="${orderable}" data-capability-row="${escapeHtml(capability.key)}" data-capability-orderable="${orderable}">
     <div class="admin-capability-move">
       <button type="button" data-capability-up aria-label="Поднять">↑</button>
       <button type="button" data-capability-down aria-label="Опустить">↓</button>
@@ -734,7 +735,7 @@ function openAccessDrawer(tenantId) {
   backdrop.addEventListener('click', (event) => { if (event.target === backdrop) close(); });
 
   const capabilityList = backdrop.querySelector('[data-capability-order-list]');
-  const originalOrder = capabilities.map((item) => item.key).join('|');
+  const originalOrder = capabilities.filter((item) => item.valueType === 'BOOLEAN').map((item) => item.key).join('|');
   const moveCapability = (row, direction) => {
     const sibling = direction < 0 ? row.previousElementSibling : row.nextElementSibling;
     if (!sibling) return;
@@ -742,6 +743,11 @@ function openAccessDrawer(tenantId) {
     else capabilityList.insertBefore(sibling, row);
   };
   capabilityList?.querySelectorAll('[data-capability-row]').forEach((row) => {
+    if (row.dataset.capabilityOrderable !== 'true') {
+      row.querySelector('[data-capability-up]')?.setAttribute('disabled', 'disabled');
+      row.querySelector('[data-capability-down]')?.setAttribute('disabled', 'disabled');
+      return;
+    }
     row.querySelector('[data-capability-up]')?.addEventListener('click', () => moveCapability(row, -1));
     row.querySelector('[data-capability-down]')?.addEventListener('click', () => moveCapability(row, 1));
     row.addEventListener('dragstart', (event) => {
@@ -865,7 +871,8 @@ function openAccessDrawer(tenantId) {
       }
     });
 
-    const orderKeys = [...capabilityList.querySelectorAll('[data-capability-row]')].map((row) => row.dataset.capabilityRow);
+    const orderKeys = [...capabilityList.querySelectorAll('[data-capability-row][data-capability-orderable="true"]')]
+      .map((row) => row.dataset.capabilityRow);
     const orderChanged = orderKeys.join('|') !== originalOrder;
     const message = backdrop.querySelector('[data-save-message]');
     if (!changes.length && !orderChanged) {
