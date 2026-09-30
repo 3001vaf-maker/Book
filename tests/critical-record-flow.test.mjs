@@ -30,7 +30,7 @@ const recordPaymentSource = readFileSync(new URL('../journal/record-payment.js',
 assert.doesNotMatch(recordServiceSource, /from ['"][^'"]*finance\/index\.js['"]/);
 assert.match(recordServiceSource, /'finance'/);
 assert.match(serverRecordSource, /this\.finance\.upsertSettlement/);
-assert.match(serverRecordSource, /const \{ finance: _legacyFinance, \.\.\.currentRecord \} = current/);
+assert.match(serverRecordSource, /const \{ finance: _financeProjection, \.\.\.currentRecord \} = current/);
 assert.match(recordPaymentSource, /saveSettlementSnapshot/);
 
 // Record owns source facts; Finance projection calculates the initial Settlement.
@@ -41,7 +41,7 @@ hydrateDaysFromServer([
   { date: '2026-09-23', workplaceId: 'workplace-1', from: '09:00', to: '20:00' },
 ]);
 hydrateRecordStateFromServer({ records: [], recordEvents: [] });
-hydrateFinanceFromServer({ version: 6, settlements: [], operations: [], ledger: [], income: [], expense: [] });
+hydrateFinanceFromServer({ version: 7, settlements: [], operations: [], ledger: [] });
 hydrateWalletsFromServer([]);
 
 const person = { id: 'person-1', key: 'person-1', name: 'Анна', discountPercent: 20 };
