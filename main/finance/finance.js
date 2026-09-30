@@ -193,7 +193,7 @@ function renderDDS(root, onBack = () => renderFinance(root)) {
 }
 
 const FINANCE_NAVIGATION = [
-  { id: 'cash', label: 'Кассы', capability: 'finance.cash.access' },
+  { id: 'cash', label: 'Касса', capability: 'finance.cash.access' },
   { id: 'dds', label: 'ДДС', capability: 'finance.dds.access' },
   { id: 'income-expense', label: 'Доход / Расход', capability: 'finance.income_expense.access' },
   { id: 'articles', label: 'Статьи', capability: 'finance.articles.access' },
