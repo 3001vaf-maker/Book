@@ -8,8 +8,8 @@ import {
   getIdentityMemberKeys,
   getIdentityOwner,
   hydratePeopleFromServer,
-} from '../main/people/data.js';
-import { getPersonMetadata } from '../main/people/metadata.js';
+} from '../core/people/data.js';
+import { getPersonMetadata } from '../core/people/metadata.js';
 import { canonicalFinanceState, paymentFixture, settlementRow } from './helpers/finance-canonical.mjs';
 
 hydratePeopleFromServer([
