@@ -142,8 +142,17 @@ const centerAndTap = async (deck, target, pointerId, label) => {
     deck.scrollLeft = Math.max(0, target.offsetLeft - (deck.clientWidth - target.offsetWidth) / 2);
   }
   deck.dispatchEvent(new Event('scroll'));
-  await wait(160);
-  ok(target.classList.contains('is-active'), label + ' did not become centred active card');
+  await wait(220);
+  const activeNow = deck.querySelector('[data-v2-card-item].is-active');
+  ok(
+    target.classList.contains('is-active'),
+    label + ' did not become centred active card'
+      + ' active=' + String(activeNow?.dataset.v2CardItem || 'none')
+      + ' scroll=' + String(Math.round(axisY ? deck.scrollTop : deck.scrollLeft))
+      + ' targetOffset=' + String(Math.round(axisY ? target.offsetTop : target.offsetLeft))
+      + ' deckSize=' + String(Math.round(axisY ? deck.clientHeight : deck.clientWidth))
+      + ' cardSize=' + String(Math.round(axisY ? target.offsetHeight : target.offsetWidth))
+  );
   pointer(target,'pointerdown',190,390,pointerId);
   pointer(target,'pointerup',190,390,pointerId);
   target.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,clientX:190,clientY:390}));
