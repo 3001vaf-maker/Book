@@ -97,7 +97,7 @@ function row(item) {
 function renderList(root, navigateBack) {
   const items = getFinanceArticles();
   const rows = treeRows(items);
-  root.innerHTML = `<div class="entity-page-header">${pageHeader('Статьи')}<div class="page-header-action">${iconButton('+', { className: 'icon-button--primary', data: 'data-add-finance-article', aria: 'Добавить статью' })}</div></div>${rows.length ? list({ items: rows.map(row) }) : emptyState('Статей пока нет', 'Добавьте первую статью кнопкой «+».')}${actionBlock(button('Назад', { variant: 'secondary', data: 'data-finance-articles-back' }))}`;
+  root.innerHTML = `<div class="entity-page-header">${pageHeader('Статьи')}<div class="page-header-action">${iconButton('+', { className: 'icon-button--primary', data: 'data-add-finance-article', aria: 'Добавить статью' })}</div></div>${rows.length ? list({ items: rows.map(row) }) : emptyState('Статей пока нет', 'Добавьте первую статью кнопкой «+».')}`;
   root.querySelector('[data-add-finance-article]')?.addEventListener('click', () => openForm(root, navigateBack));
   root.querySelectorAll('[data-finance-article]').forEach((element) => {
     element.addEventListener('click', () => {
@@ -105,7 +105,7 @@ function renderList(root, navigateBack) {
       if (item) openForm(root, navigateBack, item);
     });
   });
-  root.querySelector('[data-finance-articles-back]')?.addEventListener('click', navigateBack);
+  
 }
 
 function openForm(root, navigateBack, existing = null) {
