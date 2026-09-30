@@ -410,7 +410,7 @@ export class SaasAdminService {
     }
 
     const capabilities = await this.prisma.capability.findMany({
-      where: { isActive: true },
+      where: { isActive: true, key: { in: [...TOOL_CAPABILITY_KEYS] } },
       select: { id: true, key: true },
     });
     const byKey = new Map(capabilities.map((item) => [item.key, item]));
