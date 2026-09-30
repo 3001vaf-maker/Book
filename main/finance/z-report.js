@@ -61,11 +61,11 @@ function breakdown(title, rows = []) {
   })}</section>`;
 }
 
-function renderReport(root, navigateBack, from, to) {
+function renderReport(root, from, to) {
   const range = rangeToIso(from, to);
   if (!range) {
     openNotice({ message: 'Проверьте период отчёта.' });
-    return renderZReport(root, navigateBack);
+    return renderZReport(root);
   }
   const report = getZReport(range);
   const content = report.entries.length
@@ -84,12 +84,12 @@ function renderReport(root, navigateBack, from, to) {
   root.querySelector('[data-z-report-form]')?.addEventListener('submit', (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
-    renderReport(root, navigateBack, String(data.get('from') || ''), String(data.get('to') || ''));
+    renderReport(root, String(data.get('from') || ''), String(data.get('to') || ''));
   });
   
 }
 
-export function renderZReport(root, navigateBack = () => {}) {
+export function renderZReport(root) {
   const today = localDateValue();
-  renderReport(root, navigateBack, today, today);
+  renderReport(root, today, today);
 }
