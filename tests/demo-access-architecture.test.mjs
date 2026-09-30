@@ -15,6 +15,9 @@ const journal = source('journal/journal.js');
 const settings = source('settings/settings.js');
 const admin = source('admin/admin.js');
 const adminAccess = source('server/src/saas-admin/saas-admin.service.ts');
+const cleanupMigration = source('server/prisma/migrations/20260930143000_remove_first_run_runtime/migration.sql');
+const recovery = source('server/scripts/recover-failed-prelaunch-migration.mjs');
+const dockerfile = source('Dockerfile');
 
 assert.match(core, /activateBookDemo\(\)/);
 
@@ -87,4 +90,9 @@ assert.match(admin, /Инструменты DEMO/);
 assert.match(admin, /selectedInvitationTools/);
 assert.match(admin, /JSON\.stringify\(\{ tools \}\)/);
 
-console.log('Direct DEMO entry and assigned-tool contract: OK');
+assert.doesNotMatch(cleanupMigration, /DELETE FROM "PlatformActivityEvent"/);
+assert.match(recovery, /firstRunCleanupMigration/);
+assert.match(recovery, /return 43/);
+assert.match(dockerfile, /migrate resolve --rolled-back 20260930143000_remove_first_run_runtime/);
+
+console.log('Direct DEMO entry, assigned-tool and migration recovery contract: OK');
