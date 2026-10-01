@@ -1,22 +1,26 @@
 import {
   actionBlock,
   button,
-  details,
   emptyState,
   field,
-  list,
+  infoUI,
   modal,
   mountModal,
   mountV2ZLayer,
   openNotice,
+  openSharedProfileSettingsMenu,
   select,
   shortDateTime,
+  shortDateTimeParts,
+  v2ListEntries,
+  v2ListEntry,
   v2Section,
   v2ZLayer,
   workspaceHeaderContext,
 } from '../../../ui/ui.js';
+import { readOnlyReceipt } from '../../../ui/receipt/index.js';
 import { canUseBookCapability } from '../../access.js';
-import { cancelFinanceOperation } from '../service.js';
+import { cancelFinanceOperation, hardDeleteFinanceOperation } from '../service.js';
 import { getLedgerEntries } from '../read.js';
 import { renderFinanceArticles } from './articles.js';
 import { renderIncomeExpenseOperation } from './income-expense.js';
@@ -41,18 +45,27 @@ function recordedMoment(item) {
 }
 
 function operationName(item) {
+  const kind = String(item?.operationKind || '');
   const type = String(item?.economicType || '');
   let label = 'Движение';
-  if (type === 'SERVICE_REVENUE') label = 'Оплата услуги';
+  if (kind === 'payment') label = 'Оплата услуги';
+  else if (kind === 'refund') label = 'Возврат';
+  else if (kind === 'manual-income') label = 'Доход';
+  else if (kind === 'manual-expense') label = 'Расход';
+  else if (kind === 'loan-received') label = 'Получен займ';
+  else if (kind === 'loan-repayment') label = 'Возврат займа';
+  else if (kind === 'investment-received') label = 'Получена инвестиция';
+  else if (kind === 'investment-return') label = 'Возврат инвестиций';
+  else if (kind === 'transfer') label = 'Перевод';
+  else if (type === 'SERVICE_REVENUE') label = 'Оплата услуги';
   else if (type === 'TIPS') label = 'Чаевые';
   else if (type === 'SERVICE_REFUND') label = 'Возврат услуги';
   else if (type === 'TIPS_REFUND') label = 'Возврат чаевых';
-  else if (type === 'REVERSAL') label = 'Отмена операции';
   else if (type === 'LOAN_RECEIVED') label = 'Получен займ';
   else if (type === 'LOAN_REPAYMENT') label = 'Возврат займа';
   else if (type === 'INVESTMENT_RECEIVED') label = 'Получена инвестиция';
   else if (type === 'INVESTMENT_RETURN') label = 'Возврат инвестиций';
-  else if (type === 'TRANSFER') label = item?.direction === 'OUT' ? 'Перевод · списание' : 'Перевод · зачисление';
+  else if (type === 'TRANSFER') label = 'Перевод';
   else if (item?.direction === 'IN') label = 'Доход';
   else if (item?.direction === 'OUT') label = 'Расход';
   return item?.operationStatus === 'cancelled' ? `${label} · Отменена` : label;
@@ -68,39 +81,71 @@ function walletText(item) {
 }
 
 function personText(item) {
-  return String(item?.person?.name || '').trim();
+  return [item?.person?.name, item?.person?.surname].filter(Boolean).join(' ').trim();
 }
 
-function operationDetails(item) {
-  const values = [
-    personText(item),
-    item?.sourceDetails || '',
-    item?.articleName || '',
-    item?.lineName || '',
-    item?.counterparty || '',
-    item?.workplace || '',
-    walletText(item),
-  ].filter(Boolean);
-  if (item?.economicType === 'TIPS' || item?.economicType === 'TIPS_REFUND') values.push('Чаевые');
-  if (item?.quantity != null && item?.unitPrice != null && Number(item.quantity) !== 1) {
-    values.push(`${item.quantity} × ${formatMoney(item.unitPrice)}`);
+function operationGroupsFromLedger(movements = []) {
+  const groups = new Map();
+  (Array.isArray(movements) ? movements : []).forEach((item) => {
+    const id = String(item?.operationId || '').trim();
+    if (!id || item?.operationKind === 'cancel') return;
+    if (!groups.has(id)) groups.set(id, []);
+    groups.get(id).push(item);
+  });
+  return [...groups.values()];
+}
+
+function operationTotal(entries = []) {
+  const rows = Array.isArray(entries) ? entries : [];
+  const declared = Math.max(0, Number(rows[0]?.operationTotal) || 0);
+  if (declared > 0) return declared;
+  if (rows[0]?.operationKind === 'transfer') {
+    return Math.max(0, ...rows.map((item) => Math.max(0, Number(item?.amount) || 0)));
   }
-  const recorded = recordedMoment(item);
-  if (recorded) values.push(`Внесено ${recorded}`);
-  return values.join(' · ');
+  return rows.reduce((sum, item) => sum + Math.max(0, Number(item?.amount) || 0), 0);
 }
 
-function movementListItem(item) {
-  const interactive = Boolean(item?.operationId);
-  return {
-    overline: operationMoment(item),
-    title: operationName(item),
-    secondary: operationDetails(item),
-    right: formatMoney(operationAmount(item), { signed: true }),
-    interactive,
-    data: interactive ? `data-finance-operation="${item.operationId}"` : '',
-    aria: interactive ? `Открыть финансовую операцию ${operationName(item)}` : '',
-  };
+function operationDisplayAmount(entries = []) {
+  const rows = Array.isArray(entries) ? entries : [];
+  const total = operationTotal(rows);
+  if (rows[0]?.operationKind === 'transfer') return formatMoney(total);
+  const directions = new Set(rows.map((item) => String(item?.direction || '')).filter(Boolean));
+  if (directions.size === 1 && directions.has('OUT')) return formatMoney(-total, { signed: true });
+  if (directions.size === 1 && directions.has('IN')) return formatMoney(total, { signed: true });
+  return formatMoney(total);
+}
+
+function operationListSubtitle(entries = []) {
+  const rows = Array.isArray(entries) ? entries : [];
+  const first = rows[0] || {};
+  const wallets = [...new Set(rows.map((item) => walletText(item)).filter(Boolean))];
+  if (first?.operationKind === 'transfer') {
+    const from = rows.find((item) => item?.direction === 'OUT');
+    const to = rows.find((item) => item?.direction === 'IN');
+    return [walletText(from), walletText(to)].filter(Boolean).join(' → ');
+  }
+  const articles = [...new Set(rows.map((item) => String(item?.articleName || '')).filter(Boolean))];
+  return [
+    articles.join(', '),
+    personText(first),
+    first?.workplace || '',
+    wallets.join(' + '),
+  ].filter(Boolean).join(' · ');
+}
+
+function operationListEntry(entries = []) {
+  const first = entries[0] || {};
+  const id = String(first?.operationId || '');
+  return v2ListEntry({
+    title: operationName(first),
+    subtitle: operationListSubtitle(entries),
+    rightTop: operationDisplayAmount(entries),
+    rightBottom: operationMoment(first),
+    interactive: Boolean(id),
+    initial: '',
+    data: id ? `data-finance-operation="${id}"` : '',
+    aria: id ? `Открыть финансовую операцию ${operationName(first)}` : '',
+  });
 }
 
 function csvCell(value) {
@@ -136,59 +181,196 @@ function localDateTimeValue(date = new Date()) {
   return shifted.toISOString().slice(0, 16);
 }
 
+function operationReceiptItems(entries = []) {
+  const rows = Array.isArray(entries) ? entries : [];
+  const first = rows[0] || {};
+  const items = [];
+  const recorded = recordedMoment(first);
+  if (recorded) items.push({ label: `Внесено · ${recorded}`, value: '' });
+
+  const articles = [...new Set(rows.map((item) => String(item?.articleName || '')).filter(Boolean))];
+  if (articles.length && first?.operationKind !== 'transfer') {
+    items.push({ label: `Статья · ${articles.join(', ')}`, value: '' });
+  }
+
+  const person = personText(first);
+  const uei = String(first?.person?.uei || '').trim();
+  if (person || uei) items.push({ label: [uei, person].filter(Boolean).join(' · '), value: '' });
+  if (first?.workplace) items.push({ label: `Рабочее место · ${first.workplace}`, value: '' });
+
+  const wallets = [...new Set(rows.map((item) => walletText(item)).filter(Boolean))];
+  if (first?.operationKind === 'transfer') {
+    const from = rows.find((item) => item?.direction === 'OUT');
+    const to = rows.find((item) => item?.direction === 'IN');
+    if (walletText(from)) items.push({ label: `Из кошелька · ${walletText(from)}`, value: '' });
+    if (walletText(to)) items.push({ label: `В кошелёк · ${walletText(to)}`, value: '' });
+  } else if (wallets.length === 1) {
+    items.push({ label: `Кошелёк · ${wallets[0]}`, value: '' });
+  } else if (wallets.length > 1) {
+    items.push({ label: `Кошельки · ${wallets.join(' + ')}`, value: '' });
+  }
+
+  if (first?.counterparty) items.push({ label: `Контрагент · ${first.counterparty}`, value: '' });
+  if (first?.note) items.push({ label: `Комментарий · ${first.note}`, value: '' });
+
+  let lines = [];
+  if (first?.operationKind === 'payment') {
+    const settlementItems = Array.isArray(first?.settlementItems) ? first.settlementItems : [];
+    const tips = rows
+      .filter((item) => item?.economicType === 'TIPS')
+      .reduce((sum, item) => sum + Math.max(0, Number(item?.amount) || 0), 0);
+    const servicePaid = Math.max(0, operationTotal(rows) - tips);
+    const settlementTotal = settlementItems.reduce((sum, item) => sum + Math.max(0, Number(item?.planAmount ?? item?.price) || 0), 0);
+    const canShowLineAmounts = settlementItems.length > 1 && Math.abs(settlementTotal - servicePaid) < 0.01;
+    lines = settlementItems.map((item) => ({
+      label: String(item?.name || 'Услуга'),
+      value: canShowLineAmounts ? formatMoney(item?.planAmount ?? item?.price) : '',
+    }));
+    if (tips > 0) lines.push({ label: 'Чаевые', value: formatMoney(tips) });
+  } else if (first?.operationKind !== 'transfer') {
+    lines = rows
+      .filter((item) => String(item?.lineName || '').trim())
+      .map((item) => ({
+        label: String(item.lineName),
+        value: formatMoney(Math.max(0, Number(item?.amount) || 0)),
+      }));
+  }
+
+  if (lines.length === 1) lines[0].value = '';
+  items.push(...lines);
+  return { items, lineCount: lines.length };
+}
+
+function openCancellationInfo(root) {
+  return openNotice({
+    title: 'Об отмене операции',
+    message: 'Отмена сохраняет исходную операцию в истории и создаёт обратную операцию на выбранные фактические дату и время.',
+    action: 'Закрыть',
+    variant: 'top',
+    surface: 'app',
+  });
+}
+
+function openCancelOperation(root, operationLayer, entries) {
+  const first = entries[0] || {};
+  const content = `<div class="ui-list-toolbar"><div></div><div class="ui-list-toolbar__actions">${infoUI('', {
+    aria: 'Что означает отмена операции',
+    data: 'data-finance-cancel-info',
+    actionOnly: true,
+  })}</div></div>
+    <div class="compact-form">
+      ${field({ label: 'Фактическая дата и время отмены', name: 'financeCancelOccurredAt', type: 'datetime-local', value: localDateTimeValue(), required: true })}
+      ${button('Отменить', { variant: 'danger', data: 'data-finance-operation-cancel-confirm' })}
+    </div>`;
+  const cancelLayer = mountModal(root, modal(content, {
+    title: 'Отменить операцию',
+    variant: 'bottom',
+    surface: 'app',
+  }));
+  if (!cancelLayer) return;
+
+  cancelLayer.querySelector('[data-finance-cancel-info] [data-info-trigger]')?.addEventListener('click', () => {
+    openCancellationInfo(root);
+  });
+  cancelLayer.querySelector('[data-finance-operation-cancel-confirm]')?.addEventListener('click', async () => {
+    const input = cancelLayer.querySelector('input[name="financeCancelOccurredAt"]');
+    if (!input?.value) return;
+    try {
+      const cancelled = await cancelFinanceOperation(first.operationId, {
+        reason: 'incorrect-entry',
+        occurredAt: new Date(input.value),
+      });
+      if (!cancelled) return;
+      cancelLayer.v2Close?.();
+      operationLayer.v2Close?.();
+      renderDDS(root);
+    } catch (error) {
+      openNotice({ message: String(error?.message || 'Не удалось отменить операцию') });
+    }
+  });
+}
+
+function openDeleteOperation(root, operationLayer, entries) {
+  const first = entries[0] || {};
+  const content = `<div class="modal-title"><h2>Удалить операцию?</h2><p>Операция и связанные с ней финансовые записи будут удалены без возможности восстановления.</p></div>
+    <div class="modal-actions">
+      ${button('Отмена', { variant: 'secondary', data: 'data-finance-operation-delete-close' })}
+      ${button('Удалить', { variant: 'critical', data: 'data-finance-operation-delete-confirm' })}
+    </div>`;
+  const confirmation = mountModal(root, modal(content, {
+    title: 'Удалить операцию',
+    variant: 'top',
+    surface: 'app',
+  }));
+  if (!confirmation) return;
+
+  confirmation.querySelector('[data-finance-operation-delete-close]')?.addEventListener('click', () => confirmation.v2Close?.());
+  confirmation.querySelector('[data-finance-operation-delete-confirm]')?.addEventListener('click', async () => {
+    try {
+      await hardDeleteFinanceOperation(first.operationId);
+      confirmation.v2Close?.();
+      operationLayer.v2Close?.();
+      renderDDS(root);
+    } catch (error) {
+      openNotice({ message: String(error?.message || 'Не удалось удалить операцию') });
+    }
+  });
+}
+
+function openOperationSettings(root, operationLayer, entries) {
+  const first = entries[0] || {};
+  const canCancel = first?.operationStatus !== 'cancelled';
+  return openSharedProfileSettingsMenu({
+    title: 'Настройки операции',
+    actions: [
+      canCancel ? {
+        id: 'cancel-operation',
+        label: 'Отменить операцию',
+        variant: 'outline',
+        onSelect: () => openCancelOperation(root, operationLayer, entries),
+      } : null,
+      {
+        id: 'delete-operation',
+        label: 'Удалить операцию',
+        variant: 'critical',
+        onSelect: () => openDeleteOperation(root, operationLayer, entries),
+      },
+    ].filter(Boolean),
+  });
+}
+
 function openFinanceOperation(root, movements, operationId) {
   const id = String(operationId || '');
   const entries = movements.filter((item) => String(item?.operationId || '') === id);
   if (!entries.length) return;
   const first = entries[0];
-  const canCancel = first?.operationKind !== 'cancel' && first?.operationStatus !== 'cancelled';
-  const person = [first?.person?.name, first?.person?.surname].filter(Boolean).join(' ').trim();
-  const wallets = [...new Set(entries.map((item) => walletText(item)).filter(Boolean))].join(' + ');
-  const articles = [...new Set(entries.map((item) => String(item?.articleName || '')).filter(Boolean))].join(', ');
-  const sourceDetails = [...new Set(entries.map((item) => String(item?.sourceDetails || '')).filter(Boolean))].join(', ');
-  const context = details([
-    { label: 'Фактическая дата и время', value: operationMoment(first) || '—' },
-    { label: 'Внесено в систему', value: recordedMoment(first) || '—' },
-    person ? { label: 'Конечный пользователь', value: person } : null,
-    sourceDetails ? { label: 'За что', value: sourceDetails } : null,
-    first?.workplace ? { label: 'Рабочее место', value: first.workplace } : null,
-    wallets ? { label: 'Кошелёк', value: wallets } : null,
-    articles ? { label: 'Статья', value: articles } : null,
-    first?.counterparty ? { label: 'Контрагент', value: first.counterparty } : null,
-    first?.note ? { label: 'Комментарий', value: first.note } : null,
-    { label: 'Статус', value: first?.operationStatus === 'cancelled' ? 'Отменена' : 'Активна' },
-  ]);
-  const rows = list({
-    items: entries.map((item) => ({
-      ...movementListItem(item),
-      interactive: false,
-      data: '',
-      aria: '',
-    })),
-  });
-  const cancel = canCancel
-    ? `<div class="compact-form">
-        ${field({ label: 'Фактическая дата и время отмены', name: 'financeCancelOccurredAt', type: 'datetime-local', value: localDateTimeValue(), required: true })}
-        <p>Ошибочный ввод останется в финансовой истории, а его влияние на кошельки и отчёты будет отменено обратной операцией.</p>
-        ${button('Отменить ошибочную операцию', { variant: 'danger', data: 'data-finance-operation-cancel' })}
-      </div>`
-    : '';
-  const m = mountModal(root, modal(`<div class="modal-title"><h2>${operationName(first)}</h2></div>${context}${rows}${cancel}`, { variant: 'medium' }));
-  if (!m || !canCancel) return;
-  m.querySelector('[data-finance-operation-cancel]')?.addEventListener('click', async () => {
-    const input = m.querySelector('input[name="financeCancelOccurredAt"]');
-    if (!input?.value) return;
-    try {
-      const cancelled = await cancelFinanceOperation(id, {
-        reason: 'incorrect-entry',
-        occurredAt: new Date(input.value),
-      });
-      if (!cancelled) return;
-      m.remove();
-      renderDDS(root);
-    } catch (error) {
-      openNotice({ message: String(error?.message || 'Не удалось отменить операцию') });
-    }
+  const when = shortDateTimeParts(first?.occurredAt || '');
+  const receiptContent = operationReceiptItems(entries);
+  const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'finance-dds-receipt-z' }), { stack: true });
+  if (!layer) return;
+
+  layer.innerHTML = `${workspaceHeaderContext({
+    title: operationName(first),
+    a: {
+      kind: 'settings',
+      data: 'data-finance-operation-settings',
+      aria: 'Настройки операции',
+    },
+  })}${readOnlyReceipt({
+    title: operationName(first).replace(' · Отменена', ''),
+    status: first?.operationStatus === 'cancelled' ? 'Отменена · Факт операции' : 'Факт операции',
+    date: when.date || '—',
+    time: when.time || '—',
+    items: receiptContent.items,
+    totals: [{
+      label: receiptContent.lineCount > 1 ? 'Итого' : '',
+      value: formatMoney(operationTotal(entries)),
+      strong: true,
+    }],
+  })}`;
+
+  layer.querySelector('[data-finance-operation-settings]')?.addEventListener('click', () => {
+    openOperationSettings(root, layer, entries);
   });
 }
 
@@ -382,8 +564,9 @@ function openDDSSettings(root, movements) {
 
 function renderDDS(root) {
   const movements = [...getLedgerEntries()].reverse();
-  const operations = movements.length
-    ? list({ items: movements.map(movementListItem) })
+  const groupedOperations = operationGroupsFromLedger(movements);
+  const operations = groupedOperations.length
+    ? v2ListEntries(groupedOperations.map(operationListEntry))
     : emptyState('Все операции', 'Финансовых операций пока нет.');
   const settingsItems = availableDDSSettings();
   const headerContext = workspaceHeaderContext({
