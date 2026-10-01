@@ -29,6 +29,8 @@ import {
   workspaceHeaderContext,
 } from '../../../ui/ui.js';
 import { readOnlyReceipt } from '../../../ui/receipt/index.js';
+import { canUseBookCapability } from '../../access.js';
+import { findPersonByAccountId, getPeople } from '../../people/data.js';
 import {
   canPermanentlyDeleteFinanceData,
   cancelFinanceOperation,
@@ -61,8 +63,18 @@ import {
   calculateLoanState,
   normalizeLoanTerms,
 } from './loan-calculator.js';
+import {
+  calculateInvestmentState,
+  investmentRoleLabel,
+  normalizeInvestmentTerms,
+} from './investment-calculator.js';
 
 const formatMoney = (value) => `${(Number(value) || 0).toLocaleString('ru-RU')} ₽`;
+const formatPercent = (value) => value == null || !Number.isFinite(Number(value))
+  ? '—'
+  : `${Number(value).toLocaleString('ru-RU', { maximumFractionDigits: 2 })}%`;
+
+let cashRuntimeOptions = {};
 
 function operationMoment(item) {
   const raw = item?.occurredAt || item?.refundedAt || item?.paidAt || item?.createdAt || '';
@@ -81,7 +93,12 @@ function operationName(item) {
   else if (economicType === 'LOAN_RECEIVED') title = 'Получен займ';
   else if (economicType === 'LOAN_REPAYMENT') title = 'Возврат займа';
   else if (economicType === 'INVESTMENT_RECEIVED') title = 'Получена инвестиция';
-  else if (economicType === 'INVESTMENT_RETURN') title = 'Возврат инвестиций';
+  else if (economicType === 'INVESTMENT_RETURN') title = 'Возврат капитала';
+  else if (economicType === 'INVESTMENT_CONTRIBUTION') title = 'Вложение';
+  else if (economicType === 'INVESTMENT_CAPITAL_RETURN') title = 'Возврат капитала';
+  else if (economicType === 'INVESTMENT_INCOME') title = 'Доход';
+  else if (economicType === 'INVESTMENT_EXPENSE') title = 'Расход';
+  else if (economicType === 'INVESTMENT_INCOME_PAYMENT') title = 'Выплата дохода';
   else if (economicType === 'TRANSFER') title = direction === 'OUT' ? 'Перевод · списание' : 'Перевод · зачисление';
   else if (item?.articleName) title = item.articleName;
   return title;
@@ -182,10 +199,21 @@ function renderCashEntityCard(entity, kind) {
   const label = kind === 'investment' ? 'инвестицию' : 'займ';
   const movements = getFinanceEntityMovements(kind, entity.id);
   const loanState = kind === 'loan' ? calculateLoanState(entity, movements) : null;
-  const balance = kind === 'loan' ? loanState.totalDue : getFinanceEntityBalance(kind, entity.id);
+  const investmentState = kind === 'investment' ? calculateInvestmentState(entity, movements) : null;
+  const investmentTerms = kind === 'investment' ? normalizeInvestmentTerms(entity) : null;
+  const balance = kind === 'loan'
+    ? loanState.totalDue
+    : kind === 'investment'
+      ? (investmentState.role === 'raise' ? investmentState.remainingObligation : investmentState.result)
+      : getFinanceEntityBalance(kind, entity.id);
+  const investment = investmentState ? {
+    roleLabel: investmentRoleLabel(investmentTerms.role),
+    balanceLabel: investmentState.role === 'raise' ? 'Обязательства' : 'Результат',
+    balanceValue: balance,
+  } : null;
   return entityVisualCard({
     appearance: cashEntityCardAppearance(entity),
-    fields: cashEntityCardFields(entity, balance, kind, loanState?.endDate || ''),
+    fields: cashEntityCardFields(entity, balance, kind, loanState?.endDate || '', investment),
     image: entity.photo || '',
     interactive: true,
     data: `data-finance-entity-type="${escapeHtml(kind)}" data-finance-entity-id="${escapeHtml(entity.id)}"`,
@@ -198,12 +226,32 @@ function horizontalCards(cards = []) {
   return values.length ? entityCardRail(values) : '';
 }
 
+function allowedInvestmentRoles() {
+  return [
+    canUseBookCapability('finance.investment.self.access') ? { value: 'self', label: 'В своё дело' } : null,
+    canUseBookCapability('finance.investment.raise.access') ? { value: 'raise', label: 'Привлекаю инвестора' } : null,
+    canUseBookCapability('finance.investment.external.access') ? { value: 'external', label: 'Я инвестор' } : null,
+  ].filter(Boolean);
+}
+
+function canCreateInvestment() {
+  return allowedInvestmentRoles().length > 0;
+}
+
 function openCashCreateMenu(root) {
-  const content = actionBlock([
-    button('+ Добавить кошелек', { variant: 'secondary', data: 'data-cash-create-wallet' }),
-    button('+ Добавить инвестицию', { variant: 'secondary', data: 'data-cash-create-investment' }),
-    button('+ Добавить займ', { variant: 'secondary', data: 'data-cash-create-loan' }),
-  ].join(''));
+  const actions = [
+    canUseBookCapability('finance.cash.access')
+      ? button('+ Добавить кошелек', { variant: 'secondary', data: 'data-cash-create-wallet' })
+      : '',
+    canCreateInvestment()
+      ? button('+ Добавить инвестицию', { variant: 'secondary', data: 'data-cash-create-investment' })
+      : '',
+    canUseBookCapability('finance.special.access')
+      ? button('+ Добавить займ', { variant: 'secondary', data: 'data-cash-create-loan' })
+      : '',
+  ].filter(Boolean);
+  if (!actions.length) return null;
+  const content = actionBlock(actions.join(''));
   const layer = mountModal(document.body, modal(content, {
     title: 'Добавить',
     variant: 'quick',
@@ -309,7 +357,24 @@ function openWalletForm(root, existing = null) {
 
 function openCashEntityForm(root, kind) {
   const investment = kind === 'investment';
-  const title = investment ? 'Новая инвестиция' : 'Новый займ';
+  if (investment) {
+    const role = allowedInvestmentRoles()[0]?.value || '';
+    if (!role) {
+      openNotice({ message: 'Инвестиции недоступны.' });
+      return null;
+    }
+    return openInvestmentTerms(root, null, {
+      id: crypto.randomUUID(),
+      name: '',
+      photo: '',
+      cardAppearance: {},
+      investmentEvents: [],
+      investmentTerms: { role },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }, { creating: true });
+  }
+  const title = 'Новый займ';
   const fieldLabel = investment ? 'Наименование инвестиции' : 'Наименование займа';
   const dataName = investment ? 'investmentName' : 'loanName';
   const photoName = investment ? 'investmentPhoto' : 'loanPhoto';
@@ -359,6 +424,10 @@ function financeEntityById(type, id) {
 
 function financeEntityContext(entity, type) {
   const fallback = type === 'loan' ? 'Займ' : 'Инвестиция';
+  const terms = type === 'investment' ? normalizeInvestmentTerms(entity) : null;
+  const participant = terms?.participantAccountId
+    ? findPersonByAccountId(terms.participantAccountId)
+    : null;
   return workspaceHeaderContext({
     title: entity?.name || fallback,
     a: {
@@ -366,6 +435,13 @@ function financeEntityContext(entity, type) {
       data: 'data-finance-entity-settings',
       aria: `Настройки ${entity?.name || fallback}`,
     },
+    d: participant && typeof cashRuntimeOptions.onDirectChat === 'function'
+      ? {
+          kind: 'chat',
+          data: 'data-finance-entity-chat',
+          aria: `Чат · ${[participant.name, participant.surname].filter(Boolean).join(' ') || entity?.name || fallback}`,
+        }
+      : null,
   });
 }
 
@@ -417,6 +493,13 @@ function renderFinanceEntityLayer(root, layer, type, id) {
 
   layer.querySelector('[data-finance-entity-settings]')?.addEventListener('click', () => {
     openFinanceEntitySettings(root, layer, type, entity);
+  });
+  layer.querySelector('[data-finance-entity-chat]')?.addEventListener('click', () => {
+    const terms = normalizeInvestmentTerms(entity);
+    const participant = findPersonByAccountId(terms.participantAccountId);
+    if (participant && typeof cashRuntimeOptions.onDirectChat === 'function') {
+      cashRuntimeOptions.onDirectChat(participant.key);
+    }
   });
   layer.querySelectorAll('[data-finance-entity-operation]').forEach((element) => {
     element.addEventListener('click', () => {
@@ -947,7 +1030,8 @@ function openOperationSettings(root, walletLayer, operationLayer, wallet, operat
   });
 }
 
-export function renderWallets(root) {
+export function renderWallets(root, options = {}) {
+  cashRuntimeOptions = options && typeof options === 'object' ? options : {};
   renderList(root);
 }
 
