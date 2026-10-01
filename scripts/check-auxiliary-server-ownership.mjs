@@ -31,5 +31,6 @@ assert(tags.includes('hydrateTagsFromServer') && tags.includes("queueAuxiliaryDa
 assert(products.includes('hydrateProductsFromServer') && products.includes("queueAuxiliaryDataset('products'") && products.includes("queueAuxiliaryDataset('productHistory'"), 'Products and product history must use server-hydrated runtime state and server writes.');
 assert(schema.includes('model BusinessAuxiliaryState'), 'Server must own a dedicated auxiliary business state.');
 assert(schema.includes('model FinanceOperation') && schema.includes('model FinanceLedgerEntry'), 'Finance money persistence must be outside BusinessAuxiliaryState.');
-assert(moduleFile.includes('imports: [AuthModule]'), 'AuxiliaryStateModule must provide JwtService to JwtAuthGuard through AuthModule.');
+assert(/imports:\s*\[[^\]]*AuthModule[^\]]*\]/s.test(moduleFile), 'AuxiliaryStateModule must provide JwtService to JwtAuthGuard through AuthModule.');
+assert(/imports:\s*\[[^\]]*SaasAccessModule[^\]]*\]/s.test(moduleFile), 'AuxiliaryStateModule must use the canonical SaaS capability owner for investment role access.');
 console.log('auxiliary server ownership check: OK');

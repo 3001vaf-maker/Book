@@ -41,7 +41,51 @@ window.addEventListener('unhandledrejection', (event) => failures.push(stage + '
 const state = {
   account:{ id:'runtime-user', name:'Иван', surname:'Тестов', phone:'+79990000000', profileData:{} },
   accountRecords:[],
-  relationships:[],
+  relationships:[{
+    tenantId:'tenant-invest',
+    linkedAt:'2026-01-01T00:00:00.000Z',
+    context:{
+      tenantId:'tenant-invest',
+      profile:{name:'Александр',surname:'Проект'},
+      workplaces:[],
+      investments:[{
+        id:'investment-accepted',
+        name:'Приложение',
+        photo:'',
+        cardAppearance:{},
+        investmentTerms:{
+          role:'external',
+          investmentType:'business-project',
+          participationModel:'equity',
+          objectName:'Разработка приложения',
+          targetAmount:500000,
+          sharePercent:10,
+          participantStatus:'accepted',
+        },
+        investmentEvents:[{id:'value-1',type:'valuation',amount:1200000,occurredDate:'2026-09-01'}],
+        movements:[
+          {operationId:'invest-1',operationKind:'investment-received',operationStatus:'completed',direction:'OUT',economicType:'INVESTMENT_CONTRIBUTION',amount:500000,total:-500000,occurredAt:'2026-01-01T09:00:00.000Z'},
+          {operationId:'income-1',operationKind:'investment-income-payment',operationStatus:'completed',direction:'IN',economicType:'INVESTMENT_INCOME',amount:50000,total:50000,occurredAt:'2026-08-01T09:00:00.000Z'},
+        ],
+      },{
+        id:'investment-pending',
+        name:'Новый проект',
+        photo:'',
+        cardAppearance:{},
+        investmentTerms:{
+          role:'external',
+          investmentType:'business-project',
+          participationModel:'fixed-return',
+          objectName:'Новый проект',
+          targetAmount:200000,
+          returnPercent:20,
+          participantStatus:'pending',
+        },
+        investmentEvents:[],
+        movements:[],
+      }],
+    },
+  }],
   accountTab:'home',
   accountDeckOpen:false,
   accountDeckActive:'home',
@@ -93,6 +137,28 @@ ok(Boolean(initialShell), 'real account shell did not render');
 ok(Boolean(fDeck()), 'real account F deck did not render');
 ok(ownerCount() === 1, 'initial account shell must have exactly one FEZ owner');
 ok(card('home')?.classList.contains('is-active'), 'home must be initial active F');
+
+mark('linked-investments');
+const acceptedInvestmentCard = root.querySelector('[data-account-investment="tenant-invest:investment-accepted"]');
+ok(Boolean(acceptedInvestmentCard?.classList.contains('entity-visual-card')), 'Accepted linked investment must appear as shared entity card in Overview');
+const proposal = root.querySelector('[data-account-investment-proposal="0"]');
+ok(Boolean(proposal?.classList.contains('list-entry')), 'Pending investment proposal must appear as shared List Entry');
+acceptedInvestmentCard?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(90);
+let investmentZ = root.querySelector('[data-v2-z-layer].account-investment-z');
+ok(Boolean(investmentZ), 'Linked investor card must open a real stacked Z');
+ok(Boolean(root.querySelector('[data-account-investment-chat]')), 'Linked investor Z must expose shared D chat');
+ok(investmentZ?.textContent.includes('ROI'), 'Investor Z must expose ROI');
+investmentZ?.v2Close?.();
+await wait(90);
+proposal?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(60);
+const proposalModal = document.querySelector('[data-modal][data-v2-layer-kind="bottom"]');
+ok(Boolean(proposalModal), 'Investment proposal must open as shared bottom action modal');
+ok(Boolean(proposalModal?.querySelector('[data-account-investment-accept]')), 'Investment proposal Accept action missing');
+ok(Boolean(proposalModal?.querySelector('[data-account-investment-decline]')), 'Investment proposal Decline action missing');
+proposalModal?.v2Close?.();
+await wait(50);
 
 await edgeOpen(1);
 await selectRoot('profile',11);

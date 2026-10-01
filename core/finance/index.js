@@ -53,10 +53,23 @@ export {
 } from './cash/entities.js';
 
 export {
+  cashEntityCardAppearance,
+  cashEntityCardFields,
+} from './cash/card-presentation.js';
+
+export {
   buildLoanSchedule,
   calculateLoanState,
   loanTermEndDate,
   normalizeLoanTerms,
 } from './cash/loan-calculator.js';
+
+export {
+  calculateInvestmentState,
+  investmentRoleLabel,
+  investmentTermEndDate,
+  investmentXirr,
+  normalizeInvestmentTerms,
+} from './cash/investment-calculator.js';
 
 export { financeNavigationItems, renderFinanceSection } from './finance.js';

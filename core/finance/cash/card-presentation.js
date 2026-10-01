@@ -47,25 +47,34 @@ export function walletCardAppearance(wallet = {}) {
 }
 
 
-export function cashEntityCardFields(entity = {}, balance = 0, kind = '', dueDate = '') {
+export function cashEntityCardFields(entity = {}, balance = 0, kind = '', dueDate = '', investment = null) {
   const fields = [
     { value: 'entityName', label: 'Наименование', text: String(entity?.name || '') },
   ];
   if (kind === 'loan' && dueDate) {
     fields.push({ value: 'dueDate', label: 'Срок', text: shortDate(dueDate, '') });
   }
+  if (kind === 'investment') {
+    fields.push({ value: 'investmentRole', label: 'Роль', text: String(investment?.roleLabel || '') });
+    fields.push({
+      value: 'balance',
+      label: investment?.balanceLabel || 'Результат',
+      text: money(investment?.balanceValue ?? balance),
+    });
+    return fields;
+  }
   fields.push({ value: 'balance', label: kind === 'loan' ? 'К возврату' : 'Остаток', text: money(balance) });
   return fields;
 }
 
-export function cashEntityCardAppearance(entity = {}) {
+export function cashEntityCardAppearance(entity = {}, kind = '') {
   if (hasConfiguredLines(entity?.cardAppearance)) {
     return normalizeEntityCardAppearance(entity.cardAppearance);
   }
   return normalizeEntityCardAppearance({
     lines: defaultLines([
       { row: 7, field: 'entityName', zone: 'full', align: 'left', size: 'l', bold: true },
-      { row: 8, field: 'dueDate', zone: 'left', align: 'left', size: 'm' },
+      { row: 8, field: kind === 'loan' ? 'dueDate' : kind === 'investment' ? 'investmentRole' : '', zone: 'left', align: 'left', size: 'm' },
       { row: 9, field: 'balance', zone: 'right', align: 'right', size: 'm', bold: true },
     ]),
   });

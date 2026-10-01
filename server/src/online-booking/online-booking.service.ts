@@ -28,6 +28,10 @@ function arrayValue(value: unknown): any[] {
   return Array.isArray(value) ? value : [];
 }
 
+function clone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value));
+}
+
 function text(value: unknown) {
   return String(value ?? '').trim();
 }
@@ -940,6 +944,131 @@ export class OnlineBookingService {
     return { changed: true };
   }
 
+  private async accountInvestmentRelationships(tenantId: string, accountId: string) {
+    const row = await this.prisma.businessAuxiliaryState.findUnique({ where: { tenantId } });
+    const data = objectValue(row?.data);
+    const investments = arrayValue(data.investments)
+      .map((value) => objectValue(value))
+      .filter((entity) => {
+        if (text(entity.deletedAt)) return false;
+        const terms = objectValue(entity.investmentTerms);
+        const status = text(terms.participantStatus);
+        return text(terms.role) === 'raise'
+          && text(terms.participantAccountId) === accountId
+          && ['pending', 'accepted'].includes(status);
+      });
+    if (!investments.length) return [];
+
+    const ids = new Set(investments.map((entity) => text(entity.id)).filter(Boolean));
+    const operations = await this.prisma.financeOperation.findMany({
+      where: {
+        tenantId,
+        status: 'completed',
+        kind: { in: ['investment-received', 'investment-return', 'investment-income-payment'] },
+      },
+      orderBy: [{ occurredAt: 'asc' }, { createdAt: 'asc' }],
+    });
+
+    const byEntity = new Map<string, any[]>();
+    for (const operation of operations) {
+      const operationData = objectValue(operation.data);
+      const entityId = text(operationData.financeEntityId);
+      if (!ids.has(entityId)) continue;
+      const kind = text(operation.kind);
+      const projection = kind === 'investment-received'
+        ? { direction: 'OUT', economicType: 'INVESTMENT_CONTRIBUTION' }
+        : kind === 'investment-return'
+          ? { direction: 'IN', economicType: 'INVESTMENT_CAPITAL_RETURN' }
+          : { direction: 'IN', economicType: 'INVESTMENT_INCOME' };
+      const list = byEntity.get(entityId) || [];
+      list.push({
+        operationId: operation.operationId,
+        operationKind: kind,
+        operationStatus: operation.status,
+        direction: projection.direction,
+        economicType: projection.economicType,
+        amount: numeric(operationData.total, 0),
+        total: projection.direction === 'OUT' ? -numeric(operationData.total, 0) : numeric(operationData.total, 0),
+        occurredAt: operation.occurredAt.toISOString(),
+      });
+      byEntity.set(entityId, list);
+    }
+
+    return investments.map((entity) => {
+      const terms = objectValue(entity.investmentTerms);
+      return {
+        id: text(entity.id),
+        name: text(entity.name),
+        photo: text(entity.photo),
+        cardAppearance: objectValue(entity.cardAppearance),
+        investmentTerms: {
+          role: 'external',
+          investmentType: text(terms.investmentType),
+          participationModel: text(terms.participationModel),
+          objectName: text(terms.objectName),
+          termMode: text(terms.termMode),
+          endDate: text(terms.endDate),
+          durationValue: numeric(terms.durationValue, 0),
+          durationUnit: text(terms.durationUnit),
+          targetAmount: numeric(terms.targetAmount, 0),
+          sharePercent: numeric(terms.sharePercent, 0),
+          returnPercent: numeric(terms.returnPercent, 0),
+          participantName: text(terms.participantName),
+          participantStatus: text(terms.participantStatus),
+          participantRespondedAt: text(terms.participantRespondedAt),
+        },
+        investmentEvents: arrayValue(entity.investmentEvents)
+          .map((event) => clone(objectValue(event)))
+          .filter((event) => !text(event.deletedAt)),
+        movements: byEntity.get(text(entity.id)) || [],
+      };
+    });
+  }
+
+  async decideGlobalAccountInvestment(accountId: string, tenantIdValue: unknown, investmentIdValue: unknown, decisionValue: unknown) {
+    const tenantId = text(tenantIdValue);
+    const investmentId = text(investmentIdValue);
+    const decision = text(decisionValue);
+    if (!tenantId || !investmentId) throw new BadRequestException('Инвестиция не выбрана');
+    if (!['accepted', 'declined'].includes(decision)) throw new BadRequestException('Неизвестное решение');
+
+    const link = await this.prisma.accountTenantLink.findUnique({
+      where: { accountId_tenantId: { accountId, tenantId } },
+      select: { accountId: true },
+    });
+    if (!link) throw new BadRequestException('Связь с проектом не найдена');
+
+    const row = await this.prisma.businessAuxiliaryState.findUnique({ where: { tenantId } });
+    if (!row?.migrationVerifiedAt) throw new BadRequestException('Инвестиция недоступна');
+    const data = objectValue(row.data);
+    const investments = arrayValue(data.investments).map((value) => clone(objectValue(value)));
+    const index = investments.findIndex((entity) => text(entity.id) === investmentId && !text(entity.deletedAt));
+    if (index < 0) throw new BadRequestException('Инвестиция не найдена');
+    const entity = investments[index];
+    const terms = objectValue(entity.investmentTerms);
+    if (text(terms.role) !== 'raise' || text(terms.participantAccountId) !== accountId) {
+      throw new BadRequestException('Предложение инвестиции недоступно');
+    }
+
+    investments[index] = {
+      ...entity,
+      investmentTerms: {
+        ...terms,
+        participantStatus: decision,
+        participantRespondedAt: new Date().toISOString(),
+      },
+      updatedAt: new Date().toISOString(),
+    };
+    await this.prisma.businessAuxiliaryState.update({
+      where: { tenantId },
+      data: { data: {
+        ...data,
+        investments,
+      } as Prisma.InputJsonValue },
+    });
+    return { investmentId, tenantId, status: decision };
+  }
+
   async globalAccountRelationships(accountId: string) {
     await this.globalAccountView(accountId);
     const links = await this.prisma.accountTenantLink.findMany({
@@ -948,9 +1077,10 @@ export class OnlineBookingService {
     });
     const relationships = await Promise.all(links.map(async (link) => {
       try {
-        const [data, relationshipProfile] = await Promise.all([
+        const [data, relationshipProfile, investments] = await Promise.all([
           this.bookingSource(link.tenantId),
           this.profile.accountRelationshipProfile(link.tenantId),
+          this.accountInvestmentRelationships(link.tenantId, accountId),
         ]);
         return {
           tenantId: link.tenantId,
@@ -960,6 +1090,7 @@ export class OnlineBookingService {
             profile: objectValue(relationshipProfile),
             settings: objectValue(data.bookingSettings),
             workplaces: arrayValue(data.workplaces),
+            investments,
           },
         };
       } catch {

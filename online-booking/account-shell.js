@@ -10,6 +10,7 @@ import {
   updateGlobalAccount,
   deleteGlobalAccount,
   deleteGlobalAccountRelationship,
+  decideGlobalAccountInvestment,
 } from '../core/account/index.js';
 import { formatPhone } from '../core/phone/index.js';
 import { projectRecordStatuses } from '../core/record/index.js';
@@ -31,6 +32,7 @@ import {
   v2HorizontalRail,
   modal,
   openNotice,
+  page,
   v2RailCard,
   v2Section,
   v2Shell,
@@ -50,6 +52,13 @@ import { openAccountConsentSettings } from './consent-settings.js';
 import { openAccountPasswordSettings } from './password-settings.js';
 import { openAccountPersonalDataZ } from './personal-data.js';
 import { profileCardAppearance, profileCardFields, workplaceCardAppearance, workplaceCardFields } from '../settings/profile/card-presentation.js';
+import {
+  calculateInvestmentState,
+  cashEntityCardAppearance,
+  cashEntityCardFields,
+  investmentRoleLabel,
+  normalizeInvestmentTerms,
+} from '../core/finance/index.js';
 
 function money(value) {
   const number = Number(value || 0);
@@ -793,23 +802,212 @@ async function renderGlobalProfileSettings(root, state, handlers) {
   openGlobalProfileSettingsMenu(state, handlers);
 }
 
+function globalHomeHeader(state) {
+  return v2Header({
+    a: { kind: 'avatar', label: accountName(state), image: accountPhoto(state), data: 'data-account-profile-settings', aria: 'Настройки профиля' },
+    b: 'Обзор',
+    d: { kind: 'chat', data: 'data-account-open-chat-root', aria: 'Чат' },
+  });
+}
+
+function accountInvestments(state, status = '') {
+  const rows = [];
+  for (const relationship of Array.isArray(state.relationships) ? state.relationships : []) {
+    const investments = Array.isArray(relationship?.context?.investments)
+      ? relationship.context.investments
+      : [];
+    for (const investment of investments) {
+      const terms = normalizeInvestmentTerms(investment);
+      if (status && terms.participantStatus !== status) continue;
+      rows.push({
+        tenantId: String(relationship?.tenantId || ''),
+        relationship,
+        investment,
+        terms,
+      });
+    }
+  }
+  return rows;
+}
+
+function accountInvestmentCard(row) {
+  const investment = row.investment;
+  const state = calculateInvestmentState(investment, investment.movements || []);
+  return entityVisualCard({
+    appearance: cashEntityCardAppearance(investment, 'investment'),
+    fields: cashEntityCardFields(investment, state.result, 'investment', '', {
+      roleLabel: investmentRoleLabel('external'),
+      balanceLabel: 'Результат',
+      balanceValue: state.result,
+    }),
+    image: String(investment.photo || ''),
+    interactive: true,
+    data: `data-account-investment="${escapeHtml(row.tenantId)}:${escapeHtml(String(investment.id || ''))}"`,
+    aria: `Открыть инвестицию ${String(investment.name || '')}`,
+  });
+}
+
+function accountInvestmentProposalRow(row, index) {
+  const terms = row.terms;
+  return v2ListEntry({
+    title: String(row.investment?.name || 'Инвестиция'),
+    subtitle: [relationshipTitle(row.relationship), terms.objectName].filter(Boolean).join(' · '),
+    rightTop: terms.targetAmount > 0 ? money(terms.targetAmount) : '',
+    rightBottom: terms.participationModel === 'equity' && terms.sharePercent > 0
+      ? `${terms.sharePercent}%`
+      : terms.returnPercent > 0 ? `${terms.returnPercent}%` : '',
+    interactive: true,
+    data: `data-account-investment-proposal="${index}"`,
+    aria: `Открыть предложение ${String(row.investment?.name || '')}`,
+  });
+}
+
+function accountInvestmentSummary(investment) {
+  const state = calculateInvestmentState(investment, investment.movements || []);
+  const rows = [
+    v2ListEntry({ title: 'Вложено', rightTop: money(state.contributed) }),
+    v2ListEntry({ title: 'Возвращено капитала', rightTop: money(state.returnedCapital) }),
+    v2ListEntry({ title: 'Получено дохода', rightTop: money(state.income) }),
+    v2ListEntry({ title: 'Расходы', rightTop: money(state.expenses) }),
+    v2ListEntry({ title: 'Текущая стоимость', rightTop: money(state.currentValue) }),
+    v2ListEntry({ title: 'Результат', rightTop: money(state.result) }),
+    v2ListEntry({ title: 'ROI', rightTop: state.roi == null ? '—' : `${Number(state.roi).toLocaleString('ru-RU', { maximumFractionDigits: 2 })}%` }),
+    v2ListEntry({ title: 'Годовая доходность', rightTop: state.annualizedReturn == null ? '—' : `${Number(state.annualizedReturn).toLocaleString('ru-RU', { maximumFractionDigits: 2 })}%` }),
+    v2ListEntry({ title: 'Окуплено', rightTop: state.paybackRatio == null ? '—' : `${Number(state.paybackRatio).toLocaleString('ru-RU', { maximumFractionDigits: 2 })}%` }),
+  ];
+  if (state.paybackDate) rows.push(v2ListEntry({ title: 'Точка окупаемости', rightTop: formatDate(state.paybackDate) }));
+  return v2ListEntries(rows);
+}
+
+function accountInvestmentTermsRows(row) {
+  const terms = row.terms;
+  const modelLabels = {
+    returnable: 'Возвратная инвестиция',
+    equity: 'Доля',
+    'profit-share': 'Процент от прибыли',
+    'revenue-share': 'Процент от выручки',
+    'fixed-return': 'Фиксированная доходность',
+    joint: 'Совместный проект',
+    other: 'Другое',
+  };
+  const rows = [
+    v2ListEntry({ title: 'Проект', rightTop: relationshipTitle(row.relationship) }),
+    terms.objectName ? v2ListEntry({ title: 'Объект', rightTop: terms.objectName }) : '',
+    v2ListEntry({ title: 'Условия участия', rightTop: modelLabels[terms.participationModel] || 'Инвестиция' }),
+    terms.targetAmount > 0 ? v2ListEntry({ title: 'План вложения', rightTop: money(terms.targetAmount) }) : '',
+    terms.sharePercent > 0 ? v2ListEntry({ title: 'Доля', rightTop: `${terms.sharePercent}%` }) : '',
+    terms.returnPercent > 0 ? v2ListEntry({ title: 'Доходность / процент', rightTop: `${terms.returnPercent}%` }) : '',
+  ].filter(Boolean);
+  return v2ListEntries(rows);
+}
+
+function mutateAccountInvestmentStatus(state, tenantId, investmentId, status) {
+  const relationship = (Array.isArray(state.relationships) ? state.relationships : [])
+    .find((item) => String(item?.tenantId || '') === String(tenantId || ''));
+  const investment = (Array.isArray(relationship?.context?.investments) ? relationship.context.investments : [])
+    .find((item) => String(item?.id || '') === String(investmentId || ''));
+  if (!investment) return;
+  investment.investmentTerms = {
+    ...(investment.investmentTerms || {}),
+    participantStatus: status,
+    participantRespondedAt: new Date().toISOString(),
+  };
+}
+
+function openAccountInvestmentProposal(state, handlers, row) {
+  const content = `${v2Section('Условия', accountInvestmentTermsRows(row))}
+    <div class="modal-actions">
+      ${button('Принять', { data: 'data-account-investment-accept' })}
+      ${button('Отклонить', { variant: 'danger', data: 'data-account-investment-decline' })}
+    </div>`;
+  const layer = mountModal(document.body, modal(content, {
+    title: String(row.investment?.name || 'Инвестиция'),
+    variant: 'quick',
+    surface: 'app',
+  }));
+  if (!layer) return null;
+
+  const decide = async (decision) => {
+    try {
+      await decideGlobalAccountInvestment(row.tenantId, row.investment.id, decision);
+      mutateAccountInvestmentStatus(state, row.tenantId, row.investment.id, decision);
+      layer.v2Close?.();
+      await handlers.render?.();
+    } catch (error) {
+      openNotice({ message: accountErrorMessage(error, 'Не удалось сохранить решение') });
+    }
+  };
+  layer.querySelector('[data-account-investment-accept]')?.addEventListener('click', () => void decide('accepted'));
+  layer.querySelector('[data-account-investment-decline]')?.addEventListener('click', () => void decide('declined'));
+  return layer;
+}
+
+function openAccountInvestmentDetail(root, state, handlers, row) {
+  const investment = row.investment;
+  const restoreHeader = () => setGlobalAccountHeader(root, globalHomeHeader(state));
+  const layer = mountV2ZLayer(root, v2ZLayer(page([
+    v2Section('Расчёт', accountInvestmentSummary(investment)),
+    v2Section('Условия', accountInvestmentTermsRows(row)),
+  ]), { className: 'account-investment-z' }), {
+    stack: true,
+    onClose: restoreHeader,
+  });
+  if (!layer) return null;
+  setGlobalAccountHeader(root, v2Header({
+    b: String(investment.name || 'Инвестиция'),
+    d: { kind: 'chat', data: 'data-account-investment-chat', aria: 'Чат' },
+  }));
+  root.querySelector('[data-account-investment-chat]')?.addEventListener('click', () => {
+    state.accountSelectedChatTenantId = row.tenantId;
+    state.accountTab = 'messages';
+    state.accountDeckOpen = false;
+    void handlers.render?.();
+  });
+  return layer;
+}
+
+function bindAccountInvestments(root, state, handlers, accepted, pending) {
+  root.querySelectorAll('[data-account-investment]').forEach((node) => {
+    node.addEventListener('click', () => {
+      const key = String(node.dataset.accountInvestment || '');
+      const row = accepted.find((item) => `${item.tenantId}:${item.investment.id}` === key);
+      if (row) openAccountInvestmentDetail(root, state, handlers, row);
+    });
+  });
+  root.querySelectorAll('[data-account-investment-proposal]').forEach((node) => {
+    node.addEventListener('click', () => {
+      const row = pending[Number(node.dataset.accountInvestmentProposal)];
+      if (row) openAccountInvestmentProposal(state, handlers, row);
+    });
+  });
+}
+
 async function renderGlobalHome(root, state, handlers) {
   const requests = futureRequests(state.accountRecords || []);
   const upcoming = requests.length
     ? v2HorizontalRail(requests.map((request, index) => visitCard(state, request, index)).join(''))
     : emptyState('Предстоящих визитов нет', 'Новые записи появятся здесь.');
-  const header = v2Header({
-    a: { kind: 'avatar', label: accountName(state), image: accountPhoto(state), data: 'data-account-profile-settings', aria: 'Настройки профиля' },
-    b: 'Обзор',
-    d: { kind: 'chat', data: 'data-account-open-chat-root', aria: 'Чат' },
-  });
+  const accepted = accountInvestments(state, 'accepted');
+  const pending = accountInvestments(state, 'pending');
+  const investmentCards = accepted.length
+    ? v2HorizontalRail(accepted.map(accountInvestmentCard).join(''))
+    : '';
+  const proposals = pending.length
+    ? v2ListEntries(pending.map(accountInvestmentProposalRow))
+    : '';
+
   renderV2Shell(root, state, {
-    header,
-    body: v2Section('Предстоящие визиты', upcoming),
+    header: globalHomeHeader(state),
+    body: [
+      v2Section('Предстоящие визиты', upcoming),
+      investmentCards ? v2Section('Инвестиции', investmentCards) : '',
+      proposals ? v2Section('Предложения инвестиций', proposals) : '',
+    ].join(''),
   });
   bindWorkspaceInteraction(root, state, handlers);
   bindGlobalProfileSettingsEntry(root, state, handlers);
   bindGlobalChatButton(root, state, handlers);
+  bindAccountInvestments(root, state, handlers, accepted, pending);
   root.querySelectorAll('[data-account-upcoming]').forEach((node) => node.addEventListener('click', () => {
     const request = requests[Number(node.dataset.accountUpcoming)];
     if (!request) return;

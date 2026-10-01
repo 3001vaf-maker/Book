@@ -55,6 +55,9 @@ for (const key of [
   'finance.income_expense.access',
   'finance.articles.access',
   'finance.special.access',
+  'finance.investment.self.access',
+  'finance.investment.raise.access',
+  'finance.investment.external.access',
   'finance.z_report.access',
   'journal.day.access',
   'journal.month.access',
@@ -73,6 +76,9 @@ assert.match(access, /this\.demoActive\(access\)[\s\S]*override\.enabled/);
 assert.match(adminAccess, /key: \{ in: \[\.\.\.TOOL_CAPABILITY_KEYS\] \}/);
 
 assert.match(finance, /finance\.cash\.access/);
+assert.match(finance, /finance\.investment\.self\.access/);
+assert.match(finance, /finance\.investment\.raise\.access/);
+assert.match(finance, /finance\.investment\.external\.access/);
 assert.match(finance, /finance\.z_report\.access/);
 assert.match(journal, /journal\.day\.access/);
 assert.match(journal, /journal\.list\.access/);

@@ -318,6 +318,20 @@ if (!/getInvestmentEntities/.test(cashEntityData)
   || !/queueAuxiliaryDataset\('loans'/.test(cashEntityData)) {
   errors.push('Cash Investment and Loan must be persistent auxiliary entities, not visual placeholders');
 }
+if (!/finance\.investment\.self\.access/.test(cashUI)
+  || !/finance\.investment\.raise\.access/.test(cashUI)
+  || !/finance\.investment\.external\.access/.test(cashUI)) {
+  errors.push('Investment roles must be independently capability-gated');
+}
+if (!/data-investment-terms-form/.test(cashUI)
+  || !/label: 'Условия инвестиции'/.test(cashUI)
+  || !/label: 'Финансовая операция'/.test(cashUI)) {
+  errors.push('Investment entity A must own View, Investment terms and one Finance operation entry');
+}
+if (/<select\b/.test(cashUI)) {
+  errors.push('Cash investment tools must reuse the shared selector instead of native select');
+}
+
 
 if (!/wallets\/:walletId\/hard/.test(financeController)) {
   errors.push('Finance server must expose the admin-only full cash deletion command');

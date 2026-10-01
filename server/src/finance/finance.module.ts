@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { PrismaService } from '../prisma.service';
+import { SaasAccessModule } from '../saas-access/saas-access.module';
 import { FinanceController } from './finance.controller';
 import { FinanceService } from './finance.service';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, SaasAccessModule],
   controllers: [FinanceController],
   providers: [FinanceService, PrismaService],
   exports: [FinanceService],

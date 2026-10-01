@@ -217,6 +217,17 @@ export async function deleteGlobalAccountRelationship(tenantId) {
   );
 }
 
+export async function decideGlobalAccountInvestment(tenantId, investmentId, decision) {
+  return jsonResponse(
+    await request(`/online-booking/account/investments/${encodeURIComponent(String(tenantId || ''))}/${encodeURIComponent(String(investmentId || ''))}/decision`, {
+      auth: true,
+      method: 'POST',
+      body: JSON.stringify({ decision }),
+    }),
+    'Не удалось сохранить решение по инвестиции',
+  );
+}
+
 export async function getGlobalAccountRecords() {
   return jsonResponse(
     await request('/online-booking/account/records', { auth: true }),

@@ -154,6 +154,22 @@ export class OnlineBookingController {
   }
 
   @UseGuards(AccountGuard)
+  @Post('account/investments/:tenantId/:investmentId/decision')
+  decideGlobalAccountInvestment(
+    @Param('tenantId') tenantId: string,
+    @Param('investmentId') investmentId: string,
+    @Req() request: AccountRequest,
+    @Body() body: { decision?: unknown },
+  ) {
+    return this.booking.decideGlobalAccountInvestment(
+      request.accountAuth!.accountId,
+      tenantId,
+      investmentId,
+      body?.decision,
+    );
+  }
+
+  @UseGuards(AccountGuard)
   @Get('account/records')
   globalAccountRecords(@Req() request: AccountRequest) {
     return this.booking.globalAccountRecords(request.accountAuth!.accountId);

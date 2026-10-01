@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
+import { SaasAccessService } from '../saas-access/saas-access.service';
 
 type JsonObject = Record<string, any>;
 type AuxiliaryBundle = {
@@ -54,7 +55,10 @@ function json(value: unknown): Prisma.InputJsonValue {
 
 @Injectable()
 export class AuxiliaryStateService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly access: SaasAccessService,
+  ) {}
 
   private async bundle(tenantId: string) {
     const row = await this.prisma.businessAuxiliaryState.findUnique({ where: { tenantId } });
@@ -107,13 +111,53 @@ export class AuxiliaryStateService {
     return this.bundle(tenantId);
   }
 
+  private investmentRole(value: unknown) {
+    const entity = objectValue(value);
+    const terms = objectValue(entity.investmentTerms);
+    const role = text(terms.role);
+    return ['self', 'raise', 'external'].includes(role) ? role : 'raise';
+  }
+
+  private async assertInvestmentMutationAllowed(tenantId: string, before: unknown[], after: unknown[]) {
+    const beforeById = new Map<string, JsonObject>(
+      before
+        .map((value): [string, JsonObject] => {
+          const entity = objectValue(value);
+          return [text(entity.id), entity];
+        })
+        .filter(([id]) => Boolean(id)),
+    );
+    const changedRoles = new Set<string>();
+    for (const value of after) {
+      const entity = objectValue(value);
+      const id = text(entity.id);
+      if (!id) continue;
+      const previous = beforeById.get(id);
+      if (previous && JSON.stringify(stable(previous)) === JSON.stringify(stable(entity))) continue;
+      changedRoles.add(this.investmentRole(entity));
+    }
+    for (const role of changedRoles) {
+      const capabilityKey = role === 'self'
+        ? 'finance.investment.self.access'
+        : role === 'external'
+          ? 'finance.investment.external.access'
+          : 'finance.investment.raise.access';
+      const capability = await this.access.resolveCapability(tenantId, capabilityKey);
+      if (capability.enabled !== true) throw new BadRequestException('Этот режим инвестиций недоступен');
+    }
+  }
+
   async updateDataset(tenantId: string, dataset: string, body: unknown) {
     const key = text(dataset);
     if (!DATASETS.has(key)) throw new BadRequestException('Неизвестный набор связанных данных');
     const row = await this.requireVerified(tenantId);
     const current = normalize(row.data);
     const value = objectValue(body).value;
-    (current as any)[key] = Array.isArray(value) ? clone(value) : [];
+    const next = Array.isArray(value) ? clone(value) : [];
+    if (key === 'investments') {
+      await this.assertInvestmentMutationAllowed(tenantId, current.investments, next);
+    }
+    (current as any)[key] = next;
     await this.prisma.businessAuxiliaryState.update({ where: { tenantId }, data: { data: json(current) } });
     return current;
   }

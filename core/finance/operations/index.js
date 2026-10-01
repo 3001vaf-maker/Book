@@ -71,14 +71,22 @@ export function openFinanceOperation(root, actionId, { onSaved = null, financeEn
   return layer;
 }
 
-export function openFinanceEntityOperation(root, type, { onSaved = null, financeEntity = null } = {}) {
+export function openFinanceEntityOperation(root, type, {
+  onSaved = null,
+  financeEntity = null,
+  onInvestmentEventSaved = null,
+} = {}) {
   const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'finance-operation-z' }), { stack: true });
   if (!layer) return null;
   const saved = () => {
     layer.v2Close?.();
     onSaved?.();
   };
-  const rendered = renderFinanceEntityOperation(layer, type, { onSaved: saved, financeEntity });
+  const rendered = renderFinanceEntityOperation(layer, type, {
+    onSaved: saved,
+    financeEntity,
+    onInvestmentEventSaved,
+  });
   if (!rendered) {
     layer.v2Close?.();
     return null;
