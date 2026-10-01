@@ -23,10 +23,10 @@ export function financeNavigationItems() {
     .map(({ id, label }) => ({ id, label }));
 }
 
-export function renderFinanceSection(root, section = 'cash') {
+export function renderFinanceSection(root, section = 'cash', options = {}) {
   if (section === 'dds') return renderDDS(root);
   if (section === 'z-report') return renderZReport(root);
-  return renderWallets(root);
+  return renderWallets(root, options);
 }
 
 export { renderFinanceSection as render };
