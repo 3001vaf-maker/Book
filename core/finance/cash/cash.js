@@ -334,6 +334,7 @@ function operationReceipt(operation) {
     .filter(Boolean)
     .join(' ');
   return readOnlyReceipt({
+    title: operationName(operation),
     items: [
       { label: String(operation?.workplace || '').trim(), value: '' },
       { label: when.date || '—', value: when.time || '—' },
