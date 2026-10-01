@@ -5,6 +5,7 @@ import {
   entityVisualCard,
   escapeHtml,
   field,
+  formValidationMessage,
   initPhotoField,
   modal,
   mountEntityCardConstructor,
@@ -173,7 +174,7 @@ function renderList(root) {
 
 function openForm(root, existing = null) {
   const wallet = existing || { photo: '', name: '', cardAppearance: {} };
-  const html = `<form class="compact-form" data-wallet-form>
+  const html = `<form class="compact-form" data-wallet-form novalidate>
     <div class="modal-title"><h2>${existing ? 'Изменить кассу' : 'Новая касса'}</h2></div>
     ${photoField({ name: 'walletPhoto', value: wallet.photo || '' })}
     ${field({ label: 'Наименование кассы', name: 'walletName', value: wallet.name || '', placeholder: 'Наименование', required: true })}
@@ -185,9 +186,17 @@ function openForm(root, existing = null) {
   layer.querySelector('[data-wallet-form]')?.addEventListener('submit', (event) => {
     event.preventDefault();
     const form = layer.querySelector('[data-wallet-form]');
+    const validation = formValidationMessage(form);
+    if (validation) {
+      openNotice({ message: validation });
+      return;
+    }
     const data = new FormData(form);
     const name = String(data.get('walletName') || '').trim();
-    if (!name) return;
+    if (!name) {
+      openNotice({ message: 'Укажите наименование кассы.' });
+      return;
+    }
     saveWalletData({
       id: existing?.id || crypto.randomUUID(),
       name,
