@@ -30,7 +30,7 @@ import {
   cancelFinanceOperation,
   hardDeleteFinanceWallet,
 } from '../service.js';
-import { financeOperationGroups, openFinanceOperations } from '../operations/index.js';
+import { financeOperationGroups, openFinanceOperation, openFinanceOperations } from '../operations/index.js';
 import { getFinanceEntityBalance, getFinanceEntityMovements } from '../read.js';
 import {
   deleteWallet as deleteWalletData,
@@ -419,23 +419,70 @@ function openFinanceEntityZ2(root, type, id) {
   return layer;
 }
 
+function openFinanceEntityAppearance(root, entityLayer, type, entity) {
+  const layer = mountV2ZLayer(entityLayer, v2ZLayer(page([
+    financeEntityContext(entity, type),
+    '<div data-finance-entity-card-constructor></div>',
+  ])), { stack: true });
+  const host = layer?.querySelector('[data-finance-entity-card-constructor]');
+  if (!host) return layer;
+  mountEntityCardConstructor(host, {
+    appearance: cashEntityCardAppearance(entity),
+    fields: cashEntityCardFields(entity, getFinanceEntityBalance(type, entity.id)),
+    photo: entity.photo || '',
+    onSave: async ({ appearance, photo }) => {
+      const next = {
+        ...entity,
+        photo,
+        cardAppearance: appearance,
+        updatedAt: new Date().toISOString(),
+      };
+      if (type === 'loan') saveLoanEntity(next);
+      else saveInvestmentEntity(next);
+      layer.v2Close?.();
+      renderFinanceEntityLayer(root, entityLayer, type, entity.id);
+      renderList(root);
+    },
+  });
+  return layer;
+}
+
 function openFinanceEntitySettings(root, entityLayer, type, entity) {
-  const group = type === 'loan' ? 'loan' : 'investment';
+  const financeEntity = { type, id: entity.id, name: entity.name };
+  const receivedAction = type === 'loan' ? 'loan-received' : 'investment-received';
+  const returnAction = type === 'loan' ? 'loan-repayment' : 'investment-return';
+  const receivedLabel = type === 'loan' ? 'Получение займа' : 'Получение инвестиции';
+  const returnLabel = type === 'loan' ? 'Возврат займа' : 'Возврат инвестиции';
+  const saved = () => {
+    renderFinanceEntityLayer(root, entityLayer, type, entity.id);
+    renderList(root);
+  };
+
   return openSharedProfileSettingsMenu({
     title: entity.name,
-    actions: [{
-      id: 'financial-operation',
-      label: 'Финансовая операция',
-      onSelect: () => openFinanceOperations(entityLayer, {
-        groups: [group],
-        financeEntity: { type, id: entity.id, name: entity.name },
-        title: 'Финансовая операция',
-        onSaved: () => {
-          renderFinanceEntityLayer(root, entityLayer, type, entity.id);
-          renderList(root);
-        },
-      }),
-    }],
+    actions: [
+      {
+        id: 'appearance',
+        label: 'Вид',
+        onSelect: () => openFinanceEntityAppearance(root, entityLayer, type, entity),
+      },
+      {
+        id: 'receive',
+        label: receivedLabel,
+        onSelect: () => openFinanceOperation(entityLayer, receivedAction, {
+          financeEntity,
+          onSaved: saved,
+        }),
+      },
+      {
+        id: 'return',
+        label: returnLabel,
+        onSelect: () => openFinanceOperation(entityLayer, returnAction, {
+          financeEntity,
+          onSaved: saved,
+        }),
+      },
+    ],
   });
 }
 
