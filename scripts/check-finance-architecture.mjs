@@ -286,11 +286,23 @@ if (!/workspaceHeaderContext/.test(ddsUI)
   || !/data-finance-dds-tool/.test(ddsUI)) {
   errors.push('DDS must expose its former Finance E instruments through the DDS A/settings control');
 }
-for (const label of ['Доход / Расход', 'Статьи', 'Прочие операции']) {
-  if (!ddsUI.includes(label)) errors.push(`DDS settings missing relocated instrument: ${label}`);
+for (const label of ['Эксель', 'Финансовые операции', 'Статьи']) {
+  if (!ddsUI.includes(label)) errors.push(`DDS A/settings missing instrument: ${label}`);
+}
+if (!/title: 'Движения денежных средств'/.test(ddsUI)) {
+  errors.push('DDS Z1 must expose the full “Движения денежных средств” Header B title');
+}
+if (!/title: 'Выгрузка ДДС'/.test(ddsUI) || !/data-finance-dds-export-submit/.test(ddsUI)) {
+  errors.push('DDS Excel must open Z2 filters and expose Export through Header C');
+}
+for (const group of ['Доход / Расход', 'Займы', 'Инвестиции', 'Переводы']) {
+  if (!ddsUI.includes(group)) errors.push(`DDS financial operation picker missing group: ${group}`);
+}
+if (!/variant: 'quick'/.test(ddsUI)) {
+  errors.push('DDS financial operation choice must use the shared bottom modal');
 }
 if (!/mountV2ZLayer/.test(ddsUI) || !/v2ZLayer/.test(ddsUI)) {
-  errors.push('DDS settings instruments must open as real stacked Z layers');
+  errors.push('DDS Excel, operation forms and Articles must open as real stacked Z layers');
 }
 if (!/Фактическая дата и время/.test(ddsUI) || !/Внесено в систему/.test(ddsUI)) {
   errors.push('DDS/export must expose factual occurrence time separately from system recording time');
