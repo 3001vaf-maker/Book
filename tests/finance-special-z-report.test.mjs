@@ -120,6 +120,9 @@ assert.match(specialUi, /Получить инвестицию/);
 assert.match(specialUi, /Вернуть инвестицию/);
 assert.match(specialUi, /Перевод между кошельками/);
 assert.match(zUi, /getZReport/);
-assert.match(zUi, /type: 'date'/);
+assert.match(zUi, /datePicker/);
+assert.match(zUi, /initDatePickers/);
+assert.doesNotMatch(zUi, /datetime-local|type:\s*'date'|type:\s*'time'/);
 
 console.log('finance special operations and Z-report tests: OK');
+
