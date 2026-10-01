@@ -357,8 +357,8 @@ if (/datetime-local|type:\s*['"](?:date|time)['"]/.test(ddsUI)) {
 if (!/datePicker/.test(ddsUI) || !/initDatePickers/.test(ddsUI)) {
   errors.push('DDS date selection must use the shared calendar owner');
 }
-if (!/actionOnly:\s*true/.test(ddsUI) || !/variant:\s*'top'/.test(ddsUI)) {
-  errors.push('DDS cancellation help must use the shared info icon and top information modal');
+if (!/actionOnly:\s*true/.test(ddsUI) || !/openCancellationInfo/.test(ddsUI)) {
+  errors.push('DDS cancellation help must use the shared info icon and shared TOP notice owner');
 }
 if (!/Внесено в систему/.test(ddsUI)) {
   errors.push('DDS export must preserve immutable system recording time');
