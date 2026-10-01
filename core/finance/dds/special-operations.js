@@ -1,24 +1,19 @@
 import {
-  actionBlock,
-  button,
   field,
-  mountModal,
-  modal,
   openNotice,
-  pageHeader,
   select,
   textareaField,
+  workspaceHeaderContext,
 } from '../../../ui/ui.js';
 import { getWallets } from '../cash/data.js';
 import { recordSpecialFinanceOperation } from '../service.js';
 
-
-const ACTIONS = [
-  { kind: 'loan-received', label: 'Получить займ', title: 'Получить займ', counterparty: 'От кого' },
-  { kind: 'loan-repayment', label: 'Вернуть займ', title: 'Вернуть займ', counterparty: 'Кому' },
-  { kind: 'investment-received', label: 'Получить инвестицию', title: 'Получить инвестицию', counterparty: 'От кого' },
-  { kind: 'investment-return', label: 'Вернуть инвестицию', title: 'Вернуть инвестицию', counterparty: 'Кому' },
-  { kind: 'transfer', label: 'Перевод между кошельками', title: 'Перевод между кошельками', transfer: true },
+export const SPECIAL_FINANCE_ACTIONS = [
+  { id: 'loan-received', kind: 'loan-received', group: 'loan', label: 'Получить займ', title: 'Получить займ', counterparty: 'От кого' },
+  { id: 'loan-repayment', kind: 'loan-repayment', group: 'loan', label: 'Вернуть займ', title: 'Вернуть займ', counterparty: 'Кому' },
+  { id: 'investment-received', kind: 'investment-received', group: 'investment', label: 'Получить инвестицию', title: 'Получить инвестицию', counterparty: 'От кого' },
+  { id: 'investment-return', kind: 'investment-return', group: 'investment', label: 'Вернуть инвестицию', title: 'Вернуть инвестицию', counterparty: 'Кому' },
+  { id: 'transfer', kind: 'transfer', group: 'transfer', label: 'Перевод между кошельками', title: 'Перевод между кошельками', transfer: true },
 ];
 
 function localDateTimeValue(date = new Date()) {
@@ -34,30 +29,36 @@ function walletName(id) {
   return getWallets().find((item) => item.id === id)?.name || '';
 }
 
-function openAction(root, action) {
+export function renderSpecialFinanceOperation(root, actionId, { onSaved = null } = {}) {
+  const action = SPECIAL_FINANCE_ACTIONS.find((item) => item.id === actionId);
+  if (!action) return false;
   const wallets = walletOptions();
   if (!wallets.length) {
     openNotice({ message: 'Сначала добавьте кошелёк.' });
-    return;
+    return false;
   }
 
   const walletFields = action.transfer
     ? `${select({ label: 'Из кошелька', name: 'fromWalletId', value: wallets[0]?.value || '', options: wallets })}${select({ label: 'В кошелёк', name: 'toWalletId', value: wallets[1]?.value || wallets[0]?.value || '', options: wallets })}`
     : select({ label: 'Кошелёк', name: 'walletId', value: wallets[0]?.value || '', options: wallets });
 
-  const html = `<form class="compact-form" data-finance-special-form>
-    ${walletFields}
-    ${field({ label: 'Сумма', name: 'amount', type: 'number', inputmode: 'decimal', required: true, placeholder: '0', data: 'min="0" step="0.01"' })}
-    ${!action.transfer ? field({ label: action.counterparty || 'Контрагент', name: 'counterparty', placeholder: 'Необязательно' }) : ''}
-    ${field({ label: 'Фактическая дата и время', name: 'occurredAt', type: 'datetime-local', value: localDateTimeValue(), required: true })}
-    ${textareaField({ label: 'Примечание', name: 'note', rows: 3, placeholder: 'Необязательно' })}
-    ${button('Сохранить', { type: 'submit' })}
-  </form>`;
+  root.innerHTML = `${workspaceHeaderContext({
+    title: action.title,
+    c: {
+      label: 'Сохранить',
+      data: 'data-finance-special-save',
+      aria: `Сохранить операцию ${action.title}`,
+    },
+  })}
+    <form class="compact-form" data-finance-special-form>
+      ${walletFields}
+      ${field({ label: 'Сумма', name: 'amount', type: 'number', inputmode: 'decimal', required: true, placeholder: '0', data: 'min="0" step="0.01"' })}
+      ${!action.transfer ? field({ label: action.counterparty || 'Контрагент', name: 'counterparty', placeholder: 'Необязательно' }) : ''}
+      ${field({ label: 'Фактическая дата и время', name: 'occurredAt', type: 'datetime-local', value: localDateTimeValue(), required: true })}
+      ${textareaField({ label: 'Примечание', name: 'note', rows: 3, placeholder: 'Необязательно' })}
+    </form>`;
 
-  const m = mountModal(root, modal(html, { title: action.title }));
-  if (!m) return;
-
-  m.querySelector('[data-finance-special-form]')?.addEventListener('submit', async (event) => {
+  root.querySelector('[data-finance-special-form]')?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const payload = {
@@ -85,21 +86,14 @@ function openAction(root, action) {
 
     try {
       await recordSpecialFinanceOperation(payload);
-      m.remove();
-      renderSpecialFinanceOperations(root);
+      onSaved?.();
     } catch (error) {
       openNotice({ message: String(error?.message || 'Не удалось сохранить операцию') });
     }
   });
-}
 
-export function renderSpecialFinanceOperations(root) {
-  root.innerHTML = `${pageHeader('Прочие операции')}${actionBlock(`${ACTIONS.map((action) => button(action.label, { data: `data-finance-special="${action.kind}"` })).join('')}`)}`;
-  root.querySelectorAll('[data-finance-special]').forEach((element) => {
-    element.addEventListener('click', () => {
-      const action = ACTIONS.find((item) => item.kind === element.dataset.financeSpecial);
-      if (action) openAction(root, action);
-    });
+  root.querySelector('[data-finance-special-save]')?.addEventListener('click', () => {
+    root.querySelector('[data-finance-special-form]')?.requestSubmit();
   });
-  
+  return true;
 }
