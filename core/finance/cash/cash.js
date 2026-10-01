@@ -212,7 +212,7 @@ function renderCashEntityCard(entity, kind) {
     balanceValue: balance,
   } : null;
   return entityVisualCard({
-    appearance: cashEntityCardAppearance(entity),
+    appearance: cashEntityCardAppearance(entity, kind),
     fields: cashEntityCardFields(entity, balance, kind, loanState?.endDate || '', investment),
     image: entity.photo || '',
     interactive: true,
@@ -561,7 +561,7 @@ function openFinanceEntityAppearance(root, entityLayer, type, entity) {
   const host = layer?.querySelector('[data-finance-entity-card-constructor]');
   if (!host) return layer;
   mountEntityCardConstructor(host, {
-    appearance: cashEntityCardAppearance(entity),
+    appearance: cashEntityCardAppearance(entity, kind),
     fields: (() => {
       const movements = getFinanceEntityMovements(type, entity.id);
       if (type === 'loan') {
