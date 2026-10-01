@@ -63,6 +63,9 @@
 .entity-card-editor__color-dot.is-white{background:#fff}
 
 .v2-profile-workplaces>.entity-visual-card{flex:0 0 min(338px,100%);width:min(338px,100%);max-width:338px}
+.entity-card-rail{display:flex;gap:10px;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;padding:4px 0 12px}
+.entity-card-rail::-webkit-scrollbar{display:none}
+.entity-card-rail>.entity-visual-card{flex:0 0 min(338px,100%);width:min(338px,100%);max-width:338px}
 
 @media(max-width:360px){
   .entity-visual-card__grid{inset:10px 12px}
