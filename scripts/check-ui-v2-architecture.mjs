@@ -356,9 +356,10 @@ expect(core.includes('activeWorkspaceSurface(surface)') && core.includes("contex
 expect(modals.includes("import { mountV2Layer, v2Layer } from '../v2/index.js';")
   && modals.includes('v2Layer(content')
   && modals.includes('mountV2Layer(html, { root })')
-  && modals.includes("variant = 'technical'")
+  && modals.includes("MODAL_VARIANTS = new Set(['list', 'large', 'medium', 'compact', 'quick', 'top', 'standard', 'bottom', 'technical'])")
+  && modals.includes("openNotice({ title = 'Внимание', message = '', variant = 'top'")
   && !modals.includes('<div class="modal-backdrop"'),
-  'ui/modals must remain the sole public modal owner and route work modals into active Z while reserving technical overlays for system cases.');
+  'ui/modals must remain the sole public modal owner, route user notices to swipe-only TOP, and reserve technical overlays for exceptional system cases.');
 expect(timeUi.includes("variant:'bottom'") && timeUi.includes("className:'modal--time-picker-sheet'"), 'Time Picker must use the Shared BOTTOM action modal; TOP/technical/native variants are forbidden for this ordinary picker.');
 expect(ui.includes("const allowed = new Set(['top', 'standard', 'bottom', 'technical'])") && ui.includes("const technical = kind === 'technical'") && ui.includes('activeV2ModalSurface(root)'), 'Internal V2 modal geometry must expose exactly the approved top/standard/bottom/technical model.');
 expect(ui.includes('function initV2LayerDismissGesture') && ui.includes("kind === 'top' ? Math.min(0, raw) : Math.max(0, raw)") && ui.includes('stopPointerPropagation') && ui.includes("resolved === 'technical'"), 'Shared Modal must own origin-directed dismissal, isolate pointer gestures from lower Z/F/E, and reserve X for technical overlays only.');
