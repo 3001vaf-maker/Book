@@ -1,4 +1,4 @@
-import { normalizeEntityCardAppearance } from '../../../ui/ui.js';
+import { normalizeEntityCardAppearance, shortDate } from '../../../ui/ui.js';
 
 function money(value = 0) {
   return `${(Number(value) || 0).toLocaleString('ru-RU')} ₽`;
@@ -47,11 +47,15 @@ export function walletCardAppearance(wallet = {}) {
 }
 
 
-export function cashEntityCardFields(entity = {}, balance = 0) {
-  return [
+export function cashEntityCardFields(entity = {}, balance = 0, kind = '', dueDate = '') {
+  const fields = [
     { value: 'entityName', label: 'Наименование', text: String(entity?.name || '') },
-    { value: 'balance', label: 'Остаток', text: money(balance) },
   ];
+  if (kind === 'loan' && dueDate) {
+    fields.push({ value: 'dueDate', label: 'Срок', text: shortDate(dueDate, '') });
+  }
+  fields.push({ value: 'balance', label: kind === 'loan' ? 'К возврату' : 'Остаток', text: money(balance) });
+  return fields;
 }
 
 export function cashEntityCardAppearance(entity = {}) {
@@ -61,6 +65,7 @@ export function cashEntityCardAppearance(entity = {}) {
   return normalizeEntityCardAppearance({
     lines: defaultLines([
       { row: 7, field: 'entityName', zone: 'full', align: 'left', size: 'l', bold: true },
+      { row: 8, field: 'dueDate', zone: 'left', align: 'left', size: 'm' },
       { row: 9, field: 'balance', zone: 'right', align: 'right', size: 'm', bold: true },
     ]),
   });
