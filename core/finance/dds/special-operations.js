@@ -6,7 +6,7 @@ import {
   workspaceHeaderContext,
 } from '../../../ui/ui.js';
 import { getWallets } from '../cash/data.js';
-import { recordSpecialFinanceOperation } from '../service.js';
+import { correctFinanceOperation, recordSpecialFinanceOperation } from '../service.js';
 
 export const SPECIAL_FINANCE_ACTIONS = [
   { id: 'loan-received', kind: 'loan-received', group: 'loan', label: 'Получить займ', title: 'Получить займ', counterparty: 'От кого' },
@@ -16,8 +16,10 @@ export const SPECIAL_FINANCE_ACTIONS = [
   { id: 'transfer', kind: 'transfer', group: 'transfer', label: 'Перевод между кошельками', title: 'Перевод между кошельками', transfer: true },
 ];
 
-function localDateTimeValue(date = new Date()) {
-  const shifted = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+function localDateTimeValue(value = new Date()) {
+  const date = value instanceof Date ? value : new Date(value);
+  const safe = Number.isFinite(date.getTime()) ? date : new Date();
+  const shifted = new Date(safe.getTime() - safe.getTimezoneOffset() * 60000);
   return shifted.toISOString().slice(0, 16);
 }
 
@@ -29,7 +31,7 @@ function walletName(id) {
   return getWallets().find((item) => item.id === id)?.name || '';
 }
 
-export function renderSpecialFinanceOperation(root, actionId, { onSaved = null } = {}) {
+export function renderSpecialFinanceOperation(root, actionId, { onSaved = null, operation = null } = {}) {
   const action = SPECIAL_FINANCE_ACTIONS.find((item) => item.id === actionId);
   if (!action) return false;
   const wallets = walletOptions();
@@ -38,12 +40,13 @@ export function renderSpecialFinanceOperation(root, actionId, { onSaved = null }
     return false;
   }
 
+  const existing = operation?.data && typeof operation.data === 'object' ? operation.data : {};
   const walletFields = action.transfer
-    ? `${select({ label: 'Из кошелька', name: 'fromWalletId', value: wallets[0]?.value || '', options: wallets })}${select({ label: 'В кошелёк', name: 'toWalletId', value: wallets[1]?.value || wallets[0]?.value || '', options: wallets })}`
-    : select({ label: 'Кошелёк', name: 'walletId', value: wallets[0]?.value || '', options: wallets });
+    ? `${select({ label: 'Из кошелька', name: 'fromWalletId', value: existing.fromWalletId || wallets[0]?.value || '', options: wallets })}${select({ label: 'В кошелёк', name: 'toWalletId', value: existing.toWalletId || wallets[1]?.value || wallets[0]?.value || '', options: wallets })}`
+    : select({ label: 'Кошелёк', name: 'walletId', value: existing.walletId || wallets[0]?.value || '', options: wallets });
 
   root.innerHTML = `${workspaceHeaderContext({
-    title: action.title,
+    title: operation ? `Корректировка · ${action.title}` : action.title,
     c: {
       label: 'Сохранить',
       data: 'data-finance-special-save',
@@ -52,10 +55,10 @@ export function renderSpecialFinanceOperation(root, actionId, { onSaved = null }
   })}
     <form class="compact-form" data-finance-special-form>
       ${walletFields}
-      ${field({ label: 'Сумма', name: 'amount', type: 'number', inputmode: 'decimal', required: true, placeholder: '0', data: 'min="0" step="0.01"' })}
-      ${!action.transfer ? field({ label: action.counterparty || 'Контрагент', name: 'counterparty', placeholder: 'Необязательно' }) : ''}
-      ${field({ label: 'Фактическая дата и время', name: 'occurredAt', type: 'datetime-local', value: localDateTimeValue(), required: true })}
-      ${textareaField({ label: 'Примечание', name: 'note', rows: 3, placeholder: 'Необязательно' })}
+      ${field({ label: 'Сумма', name: 'amount', type: 'number', inputmode: 'decimal', value: existing.total || '', required: true, placeholder: '0', data: 'min="0" step="0.01"' })}
+      ${!action.transfer ? field({ label: action.counterparty || 'Контрагент', name: 'counterparty', value: existing.counterparty || '', placeholder: 'Необязательно' }) : ''}
+      ${field({ label: 'Фактическая дата и время', name: 'occurredAt', type: 'datetime-local', value: localDateTimeValue(operation?.occurredAt || new Date()), required: true })}
+      ${textareaField({ label: 'Примечание', name: 'note', value: existing.note || '', rows: 3, placeholder: 'Необязательно' })}
     </form>`;
 
   root.querySelector('[data-finance-special-form]')?.addEventListener('submit', async (event) => {
@@ -85,7 +88,8 @@ export function renderSpecialFinanceOperation(root, actionId, { onSaved = null }
     }
 
     try {
-      await recordSpecialFinanceOperation(payload);
+      if (operation?.operationId) await correctFinanceOperation(operation.operationId, payload);
+      else await recordSpecialFinanceOperation(payload);
       onSaved?.();
     } catch (error) {
       openNotice({ message: String(error?.message || 'Не удалось сохранить операцию') });

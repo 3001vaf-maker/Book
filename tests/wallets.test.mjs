@@ -84,6 +84,8 @@ assert.match(ddsSource, /v2ListEntry\(/);
 assert.match(ddsSource, /readOnlyReceipt/);
 assert.match(ddsSource, /openSharedProfileSettingsMenu/);
 assert.match(ddsSource, /hardDeleteFinanceOperation/);
+assert.match(ddsSource, /correctFinanceOperation/);
+assert.match(ddsSource, /id:\s*'correct-operation'/);
 assert.doesNotMatch(ddsSource, /details\s*\(/);
 assert.match(ddsSource, /title: 'Движения денежных средств'/);
 assert.match(ddsSource, /id: 'excel', label: 'Эксель'/);
@@ -127,6 +129,8 @@ assert.doesNotMatch(walletSource, /Конечный пользователь/);
 assert.doesNotMatch(walletSource, /За что/);
 assert.match(ddsSource, /data-finance-operation/);
 assert.match(ddsSource, /data-finance-operation-cancel-confirm/);
+assert.match(ddsSource, /className:\s*'modal--time-picker-sheet'/);
+assert.match(ddsSource, /button\('Отменить',\s*\{\s*variant:\s*'danger'/);
 assert.match(ddsSource, /data-finance-operation-delete-confirm/);
 assert.match(ddsSource, /actionOnly:\s*true/);
 

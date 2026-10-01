@@ -8,10 +8,12 @@ import {
 } from '../../../ui/ui.js';
 import { getFinanceArticles } from '../data.js';
 import { getWallets } from '../cash/data.js';
-import { recordManualFinanceOperation } from '../service.js';
+import { correctFinanceOperation, recordManualFinanceOperation } from '../service.js';
 
-function localDateTimeValue(date = new Date()) {
-  const shifted = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+function localDateTimeValue(value = new Date()) {
+  const date = value instanceof Date ? value : new Date(value);
+  const safe = Number.isFinite(date.getTime()) ? date : new Date();
+  const shifted = new Date(safe.getTime() - safe.getTimezoneOffset() * 60000);
   return shifted.toISOString().slice(0, 16);
 }
 
@@ -27,18 +29,19 @@ function walletOptions() {
 
 function detailRow(values = {}) {
   return `<div class="array-row" data-finance-manual-line>
-    <input type="text" name="lineName" value="${String(values.name || '').replaceAll('"', '&quot;')}" placeholder="Что купили / что получили">
+    <input type="text" name="lineName" value="${String(values.name ?? values.lineName ?? '').replaceAll('"', '&quot;')}" placeholder="Что купили / что получили">
     <input type="number" min="0" step="0.01" inputmode="decimal" name="lineQuantity" value="${values.quantity ?? 1}" placeholder="Количество">
     <input type="number" min="0" step="0.01" inputmode="decimal" name="linePrice" value="${values.unitPrice ?? ''}" placeholder="Цена">
     <button type="button" class="remove-button" data-finance-manual-line-remove aria-label="Удалить строку">×</button>
   </div>`;
 }
 
-function modeMarkup(mode) {
+function modeMarkup(mode, { amount = '', lines = [] } = {}) {
   if (mode === 'detail') {
+    const rows = (Array.isArray(lines) && lines.length ? lines : [{}]).map(detailRow).join('');
     return `<div class="array-group" data-finance-manual-detail>
       <span class="array-label">Позиции</span>
-      <div data-finance-manual-lines>${detailRow()}</div>
+      <div data-finance-manual-lines>${rows}</div>
       ${button('+ Добавить позицию', { type: 'button', variant: 'secondary', data: 'data-finance-manual-line-add' })}
     </div>`;
   }
@@ -47,6 +50,7 @@ function modeMarkup(mode) {
     name: 'amount',
     type: 'number',
     inputmode: 'decimal',
+    value: amount,
     required: true,
     placeholder: '0',
     data: 'min="0" step="0.01"',
@@ -68,7 +72,7 @@ function collectLines(root) {
   })).filter((row) => row.quantity > 0 && row.unitPrice > 0);
 }
 
-async function saveManual(root, direction, onSaved) {
+async function saveManual(root, direction, onSaved, operationId = '') {
   const form = root.querySelector('[data-finance-manual-form]');
   if (!form) return;
   const data = new FormData(form);
@@ -90,14 +94,15 @@ async function saveManual(root, direction, onSaved) {
     return;
   }
   try {
-    await recordManualFinanceOperation(payload);
+    if (operationId) await correctFinanceOperation(operationId, payload);
+    else await recordManualFinanceOperation(payload);
     onSaved?.();
   } catch (error) {
     openNotice({ message: String(error?.message || 'Не удалось сохранить операцию') });
   }
 }
 
-export function renderIncomeExpenseOperation(root, direction, { onSaved = null } = {}) {
+export function renderIncomeExpenseOperation(root, direction, { onSaved = null, operation = null } = {}) {
   const isIncome = direction === 'IN';
   const articles = articleOptions(direction);
   const wallets = walletOptions();
@@ -110,8 +115,16 @@ export function renderIncomeExpenseOperation(root, direction, { onSaved = null }
     return false;
   }
 
+  const existing = operation?.data && typeof operation.data === 'object' ? operation.data : {};
+  const lines = Array.isArray(existing.lines) ? existing.lines : [];
+  const detailed = lines.length > 1 || Boolean(String(lines[0]?.lineName || '').trim());
+  const mode = detailed ? 'detail' : 'simple';
+  const articleId = String(existing.articleId || lines[0]?.articleId || articles[0]?.value || '');
+  const walletId = String(existing.walletId || wallets[0]?.value || '');
+  const simpleAmount = Number(existing.total || lines[0]?.total || lines[0]?.unitPrice || 0) || '';
+
   root.innerHTML = `${workspaceHeaderContext({
-    title: isIncome ? 'Доход' : 'Расход',
+    title: operation ? `Корректировка · ${isIncome ? 'Доход' : 'Расход'}` : (isIncome ? 'Доход' : 'Расход'),
     c: {
       label: 'Сохранить',
       data: 'data-finance-manual-save',
@@ -119,12 +132,12 @@ export function renderIncomeExpenseOperation(root, direction, { onSaved = null }
     },
   })}
     <form class="compact-form" data-finance-manual-form>
-      ${select({ label: 'Статья', name: 'articleId', value: articles[0]?.value || '', options: articles, searchable: true })}
-      ${select({ label: 'Кошелёк', name: 'walletId', value: wallets[0]?.value || '', options: wallets })}
-      ${select({ label: 'Ввод', name: 'entryMode', value: 'simple', options: [{ value: 'simple', label: 'Сумма' }, { value: 'detail', label: 'Детально' }] })}
-      ${field({ label: 'Фактическая дата и время', name: 'occurredAt', type: 'datetime-local', value: localDateTimeValue(), required: true })}
-      <div data-finance-manual-mode>${modeMarkup('simple')}</div>
-      ${textareaField({ label: 'Примечание', name: 'note', rows: 3, placeholder: 'Необязательно' })}
+      ${select({ label: 'Статья', name: 'articleId', value: articleId, options: articles, searchable: true })}
+      ${select({ label: 'Кошелёк', name: 'walletId', value: walletId, options: wallets })}
+      ${select({ label: 'Ввод', name: 'entryMode', value: mode, options: [{ value: 'simple', label: 'Сумма' }, { value: 'detail', label: 'Детально' }] })}
+      ${field({ label: 'Фактическая дата и время', name: 'occurredAt', type: 'datetime-local', value: localDateTimeValue(operation?.occurredAt || new Date()), required: true })}
+      <div data-finance-manual-mode>${modeMarkup(mode, { amount: simpleAmount, lines })}</div>
+      ${textareaField({ label: 'Примечание', name: 'note', value: existing.note || '', rows: 3, placeholder: 'Необязательно' })}
     </form>`;
 
   root.addEventListener('change', (event) => {
@@ -143,7 +156,7 @@ export function renderIncomeExpenseOperation(root, direction, { onSaved = null }
   });
   root.querySelector('[data-finance-manual-form]')?.addEventListener('submit', (event) => {
     event.preventDefault();
-    void saveManual(root, direction, onSaved);
+    void saveManual(root, direction, onSaved, operation?.operationId || '');
   });
   root.querySelector('[data-finance-manual-save]')?.addEventListener('click', () => {
     root.querySelector('[data-finance-manual-form]')?.requestSubmit();

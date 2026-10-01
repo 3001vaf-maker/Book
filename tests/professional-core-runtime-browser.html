@@ -71,7 +71,16 @@
     };
     if (path.endsWith('/finance')) return {
       version:7,
-      articles:[],
+      articles:[{
+        articleId:'system-other-income',
+        parentArticleId:'system-income',
+        name:'Прочие доходы',
+        direction:'IN',
+        economicType:'OPERATING_REVENUE',
+        systemKey:'OTHER_INCOME',
+        position:40,
+        archivedAt:'',
+      }],
       settlements:[],
       operations:[{
         operationId:'runtime-payment',
@@ -418,12 +427,34 @@ shell()?.querySelector('[data-v2-workspace-a]')?.dispatchEvent(new MouseEvent('c
 await wait(40);
 let ddsOperationSettings = document.querySelector('[data-shared-profile-settings-menu]');
 ok(Boolean(ddsOperationSettings), 'DDS receipt settings did not open');
+ok(Boolean(ddsOperationSettings?.querySelector('[data-shared-profile-action="correct-operation"]')),
+  'DDS receipt settings correction action missing');
 ok(Boolean(ddsOperationSettings?.querySelector('[data-shared-profile-action="cancel-operation"]')),
   'DDS receipt settings cancel action missing');
 const deleteAction = ddsOperationSettings?.querySelector('[data-shared-profile-action="delete-operation"]');
 ok(Boolean(deleteAction), 'DDS receipt settings permanent delete action missing');
 ok(Boolean(deleteAction?.classList.contains('ui-button--critical')), 'DDS permanent delete action must be red');
 
+ddsOperationSettings?.querySelector('[data-shared-profile-action="correct-operation"]')
+  ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(50);
+let correctionZ = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
+ok(Boolean(correctionZ?.querySelector('[data-finance-manual-form]')), 'DDS correction must reopen the existing manual operation editor');
+ok(correctionZ?.querySelector('[data-workspace-header-context]')?.dataset.workspaceTitle === 'Корректировка · Доход',
+  'DDS correction B title is wrong');
+ok(shell()?.querySelector('[data-v2-workspace-primary]')?.textContent.trim() === 'Сохранить',
+  'DDS correction C must be Save');
+const correctionNames = [...(correctionZ?.querySelectorAll('input[name="lineName"]') || [])]
+  .map((input) => input.value);
+ok(correctionNames.includes('глажка') && correctionNames.includes('стирка'),
+  'DDS correction must preload the current receipt composition');
+await closeTopDdsZ(119, 'correction');
+ok([...((shell()?.querySelectorAll('[data-v2-z-layer]')) || [])].length === 1,
+  'DDS correction did not return to receipt Z2');
+
+shell()?.querySelector('[data-v2-workspace-a]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(40);
+ddsOperationSettings = document.querySelector('[data-shared-profile-settings-menu]');
 ddsOperationSettings?.querySelector('[data-shared-profile-action="cancel-operation"]')
   ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
 await wait(40);
@@ -434,6 +465,10 @@ ok(Boolean(cancelModal?.querySelector('[data-finance-cancel-info] [data-info-tri
   'DDS cancel modal shared info icon missing');
 ok(Boolean(cancelModal?.querySelector('[data-finance-operation-cancel-confirm]')),
   'DDS cancel modal action missing');
+ok(Boolean(cancelModal?.querySelector('.modal--time-picker-sheet')),
+  'DDS cancel must use canonical bottom time-picker sheet geometry');
+ok(Boolean(cancelModal?.querySelector('[data-finance-operation-cancel-confirm].ui-button--danger')),
+  'DDS cancel action must use the shared pink/red danger button');
 ok(!cancelModal?.textContent.includes('Ошибочный ввод останется'),
   'DDS cancel modal must not expose permanent technical explanation text');
 
