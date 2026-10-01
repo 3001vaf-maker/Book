@@ -945,7 +945,11 @@ export class OnlineBookingService {
   }
 
   private async accountInvestmentRelationships(tenantId: string, accountId: string) {
-    const row = await this.prisma.businessAuxiliaryState.findUnique({ where: { tenantId } });
+    const [row, raiseCapability] = await Promise.all([
+      this.prisma.businessAuxiliaryState.findUnique({ where: { tenantId } }),
+      this.access.resolveCapability(tenantId, 'finance.investment.raise.access').catch(() => null),
+    ]);
+    const canRaise = raiseCapability?.enabled === true;
     const data = objectValue(row?.data);
     const investments = arrayValue(data.investments)
       .map((value) => objectValue(value))
@@ -955,11 +959,14 @@ export class OnlineBookingService {
         const status = text(terms.participantStatus);
         return text(terms.role) === 'raise'
           && text(terms.participantAccountId) === accountId
-          && ['pending', 'accepted'].includes(status);
+          && (status === 'accepted' || (status === 'pending' && canRaise));
       });
     if (!investments.length) return [];
 
-    const ids = new Set(investments.map((entity) => text(entity.id)).filter(Boolean));
+    const acceptedIds = new Set(investments
+      .filter((entity) => text(objectValue(entity.investmentTerms).participantStatus) === 'accepted')
+      .map((entity) => text(entity.id))
+      .filter(Boolean));
     const operations = await this.prisma.financeOperation.findMany({
       where: {
         tenantId,
@@ -973,7 +980,7 @@ export class OnlineBookingService {
     for (const operation of operations) {
       const operationData = objectValue(operation.data);
       const entityId = text(operationData.financeEntityId);
-      if (!ids.has(entityId)) continue;
+      if (!acceptedIds.has(entityId)) continue;
       const kind = text(operation.kind);
       const projection = kind === 'investment-received'
         ? { direction: 'OUT', economicType: 'INVESTMENT_CONTRIBUTION' }
@@ -1017,10 +1024,14 @@ export class OnlineBookingService {
           participantStatus: text(terms.participantStatus),
           participantRespondedAt: text(terms.participantRespondedAt),
         },
-        investmentEvents: arrayValue(entity.investmentEvents)
-          .map((event) => clone(objectValue(event)))
-          .filter((event) => !text(event.deletedAt)),
-        movements: byEntity.get(text(entity.id)) || [],
+        investmentEvents: text(terms.participantStatus) === 'accepted'
+          ? arrayValue(entity.investmentEvents)
+            .map((event) => clone(objectValue(event)))
+            .filter((event) => !text(event.deletedAt))
+          : [],
+        movements: text(terms.participantStatus) === 'accepted'
+          ? (byEntity.get(text(entity.id)) || [])
+          : [],
       };
     });
   }
@@ -1048,6 +1059,13 @@ export class OnlineBookingService {
     const terms = objectValue(entity.investmentTerms);
     if (text(terms.role) !== 'raise' || text(terms.participantAccountId) !== accountId) {
       throw new BadRequestException('Предложение инвестиции недоступно');
+    }
+    if (text(terms.participantStatus) !== 'pending') {
+      throw new BadRequestException('Решение по предложению уже принято');
+    }
+    const raiseCapability = await this.access.resolveCapability(tenantId, 'finance.investment.raise.access');
+    if (raiseCapability.enabled !== true) {
+      throw new BadRequestException('Предложение инвестиции больше недоступно');
     }
 
     investments[index] = {
