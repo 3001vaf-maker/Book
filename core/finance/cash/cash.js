@@ -13,7 +13,6 @@ import {
   openNotice,
   openSharedProfileSettingsMenu,
   page,
-  paymentReceipt,
   photoField,
   shortDateTime,
   shortDateTimeParts,
@@ -22,6 +21,7 @@ import {
   v2ZLayer,
   workspaceHeaderContext,
 } from '../../../ui/ui.js';
+import { readOnlyReceipt } from '../../../ui/receipt/index.js';
 import {
   canPermanentlyDeleteFinanceData,
   cancelFinanceOperation,
@@ -88,14 +88,13 @@ function walletOperations(walletId) {
 function renderOperationRow(operation) {
   const name = personName(operation);
   const counterparty = String(operation?.counterparty || '').trim();
+  const workplace = String(operation?.workplace || '').trim();
   const label = operationName(operation);
-  const title = name || counterparty || label;
-  const subtitle = String(operation?.workplace || '').trim()
-    || (title !== label ? label : '');
+  const source = [name || counterparty, workplace].filter(Boolean).join(' · ');
   return v2ListEntry({
     overline: String(operation?.person?.uei || ''),
-    title,
-    subtitle,
+    title: label,
+    subtitle: source,
     rightTop: formatMoney(operation.total),
     rightBottom: operationMoment(operation),
     initial: '',
@@ -330,16 +329,20 @@ async function openWalletSettings(root, walletLayer, wallet) {
 
 function operationReceipt(operation) {
   const when = shortDateTimeParts(operation?.occurredAt || '');
-  return paymentReceipt({
-    workplace: operation?.workplace || '',
-    workplaceFallback: '',
-    date: when.date || '—',
-    time: when.time || '—',
-    person: operation?.person || {},
-    amount: formatMoney(operation?.total),
-    wallet: '',
-    tips: '',
-    totalDivider: true,
+  const fullName = [operation?.person?.name, operation?.person?.surname]
+    .map((part) => String(part || '').trim())
+    .filter(Boolean)
+    .join(' ');
+  return readOnlyReceipt({
+    items: [
+      { label: String(operation?.workplace || '').trim(), value: '' },
+      { label: when.date || '—', value: when.time || '—' },
+      { label: String(operation?.person?.uei || '').trim(), value: '' },
+      { label: fullName, value: '' },
+    ].filter((item) => item.label || item.value),
+    totals: [
+      { label: '', value: formatMoney(operation?.total), strong: true },
+    ],
   });
 }
 
