@@ -71,7 +71,16 @@
     };
     if (path.endsWith('/finance')) return {
       version:7,
-      articles:[],
+      articles:[{
+        articleId:'system-other-income',
+        parentArticleId:'system-income',
+        name:'Прочие доходы',
+        direction:'IN',
+        economicType:'OPERATING_REVENUE',
+        systemKey:'OTHER_INCOME',
+        position:40,
+        archivedAt:'',
+      }],
       settlements:[],
       operations:[{
         operationId:'runtime-payment',
