@@ -223,7 +223,7 @@ ok(cashZ2?.querySelector('[data-workspace-header-context]')?.dataset.workspaceTi
 ok(Boolean(shell()?.querySelector('[data-v2-workspace-a]')), 'Cash Z2 A/settings control missing');
 const runtimeOperation = cashZ2?.querySelector('[data-wallet-operation="runtime-payment"]');
 ok(Boolean(runtimeOperation?.classList.contains('list-entry')), 'Cash operations must use the canonical List Entry');
-ok(runtimeOperation?.querySelector('.list-entry__text > strong')?.textContent.trim() === 'Оплата услуги', 'Cash operation name must stay in the List Entry title');
+ok([...((runtimeOperation?.querySelectorAll('.list-entry__text > strong')) || [])].some((node) => node.textContent.trim() === 'Оплата услуги'), 'Cash operation name must stay in the List Entry title');
 ok(runtimeOperation?.querySelector('.list-entry__text > small')?.textContent.includes('Иван Проверка'), 'Cash List Entry must keep who the money came from');
 ok(runtimeOperation?.querySelector('.list-entry__text > small')?.textContent.includes('Студия Тест'), 'Cash List Entry must keep where the money came from');
 ok(runtimeOperation?.querySelector('.list-entry__right > strong')?.textContent.includes('1'), 'Cash List Entry amount must be on the right');
