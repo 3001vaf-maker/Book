@@ -10,6 +10,8 @@ export {
   getDDSIncome,
   getDDSMovements,
   getDDSMovementsForSource,
+  getFinanceEntityBalance,
+  getFinanceEntityMovements,
   getLedgerEntries,
   getLedgerEntriesForSource,
   getPaymentRemaining,
@@ -49,5 +51,12 @@ export {
   saveInvestmentEntity,
   saveLoanEntity,
 } from './cash/entities.js';
+
+export {
+  buildLoanSchedule,
+  calculateLoanState,
+  loanTermEndDate,
+  normalizeLoanTerms,
+} from './cash/loan-calculator.js';
 
 export { financeNavigationItems, renderFinanceSection } from './finance.js';

@@ -361,24 +361,22 @@ await wait(45);
 let cashOperationsModal = document.querySelector('[data-modal][data-v2-layer-kind="bottom"]');
 ok(Boolean(cashOperationsModal), 'Cash Financial operations did not open as bottom modal');
 ok(cashOperationsModal?.textContent.includes('Доход / Расход'), 'Cash operations Income/Expense section missing');
-ok(cashOperationsModal?.textContent.includes('Займы'), 'Cash operations Loans section missing');
-ok(cashOperationsModal?.textContent.includes('Инвестиции'), 'Cash operations Investments section missing');
+ok(!cashOperationsModal?.textContent.includes('Займы'), 'Cash root operations must not duplicate Loan entity operations');
+ok(!cashOperationsModal?.textContent.includes('Инвестиции'), 'Cash root operations must not duplicate Investment entity operations');
 ok(cashOperationsModal?.textContent.includes('Переводы'), 'Cash operations Transfers section missing');
 ok(Boolean(cashOperationsModal?.querySelector('[data-finance-operation-action="manual-income"]')), 'Cash Income action missing');
 ok(Boolean(cashOperationsModal?.querySelector('[data-finance-operation-action="manual-expense"]')), 'Cash Expense action missing');
-ok(Boolean(cashOperationsModal?.querySelector('[data-finance-operation-action="loan-received"]')), 'Cash Receive loan action missing');
-ok(Boolean(cashOperationsModal?.querySelector('[data-finance-operation-action="loan-repayment"]')), 'Cash Repay loan action missing');
-ok(Boolean(cashOperationsModal?.querySelector('[data-finance-operation-action="investment-received"]')), 'Cash Receive investment action missing');
-ok(Boolean(cashOperationsModal?.querySelector('[data-finance-operation-action="investment-return"]')), 'Cash Return investment action missing');
+ok(!cashOperationsModal?.querySelector('[data-finance-operation-action="loan-received"]'), 'Cash root must not expose Receive loan');
+ok(!cashOperationsModal?.querySelector('[data-finance-operation-action="investment-received"]'), 'Cash root must not expose Receive investment');
 ok(Boolean(cashOperationsModal?.querySelector('[data-finance-operation-action="transfer"]')), 'Cash Transfer action missing');
 ok(!shell()?.querySelector('[data-v2-z-layer]'), 'Cash operation choice must stay a bottom modal, not Z');
 
-cashOperationsModal?.querySelector('[data-finance-operation-action="loan-received"]')
+cashOperationsModal?.querySelector('[data-finance-operation-action="transfer"]')
   ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
 await wait(55);
 let cashOperationLayer = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
 ok(Boolean(cashOperationLayer), 'Cash selected operation did not open Z2');
-ok(cashOperationLayer?.querySelector('[data-workspace-header-context]')?.dataset.workspaceTitle === 'Получить займ',
+ok(cashOperationLayer?.querySelector('[data-workspace-header-context]')?.dataset.workspaceTitle === 'Перевод между кошельками',
   'Cash operation Z2 B title is wrong');
 ok(shell()?.querySelector('[data-v2-workspace-primary]')?.textContent.trim() === 'Сохранить',
   'Cash operation Z2 C must be Save');
@@ -427,6 +425,122 @@ let loanSection = [...(shell()?.querySelectorAll('.v2-section') || [])]
   .find((section) => section.querySelector('.v2-section__title')?.textContent.trim() === 'Займ');
 ok(Boolean(loanSection?.querySelector('.entity-card-rail .entity-visual-card')), 'Saved loan must create a card in the horizontal Loan section');
 ok(loanSection?.textContent.includes('Займ Runtime'), 'Saved loan card name missing');
+
+mark('cash-loan-entity');
+let loanCard = loanSection?.querySelector('[data-finance-entity-type="loan"][data-finance-entity-id]');
+loanCard?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(35);
+let loanZ2 = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
+ok(Boolean(loanZ2), 'Loan card did not open its Z1/history surface');
+ok(loanZ2?.querySelector('[data-workspace-header-context]')?.dataset.workspaceTitle === 'Займ Runtime',
+  'Loan card B must use the entity name');
+shell()?.querySelector('[data-v2-workspace-a]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(30);
+let loanSettings = document.querySelector('[data-shared-profile-settings-menu]');
+const loanActionIds = [...(loanSettings?.querySelectorAll('[data-shared-profile-action]') || [])]
+  .map((node) => node.dataset.sharedProfileAction);
+ok(loanActionIds.join('|') === 'appearance|terms|financial-operation',
+  'Loan A must contain exactly View, Loan terms and Financial operation');
+
+loanSettings?.querySelector('[data-shared-profile-action="terms"]')
+  ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(35);
+let loanTermsZ = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
+ok(loanTermsZ?.querySelector('[data-workspace-header-context]')?.dataset.workspaceTitle === 'Условия займа',
+  'Loan terms must open as stacked Z');
+ok(Boolean(loanTermsZ?.querySelector('[data-loan-terms-form]')), 'Loan terms form missing');
+ok(Boolean(loanTermsZ?.querySelector('input[name="loanName"]')), 'Loan terms must edit entity name');
+ok(Boolean(loanTermsZ?.querySelector('input[name="lenderName"]')), 'Loan terms must contain lender name');
+ok(Boolean(loanTermsZ?.querySelector('input[name="interestRate"]')), 'Loan terms shared Rate selector missing');
+ok(!loanTermsZ?.querySelector('select'), 'Loan terms must not use native select controls');
+ok(loanTermsZ?.querySelectorAll('.ui-select__control').length >= 3, 'Loan terms must reuse shared selectors');
+
+let interestRate = loanTermsZ?.querySelector('input[name="interestRate"]');
+if (interestRate) {
+  interestRate.value = '20';
+  interestRate.dispatchEvent(new Event('change',{bubbles:true}));
+}
+await wait(30);
+ok(Boolean(loanTermsZ?.querySelector('input[name="ratePeriod"]')),
+  'Positive Loan rate must reveal monthly/annual period selector');
+
+let termMode = loanTermsZ?.querySelector('input[name="termMode"]');
+if (termMode) {
+  termMode.value = 'duration';
+  termMode.dispatchEvent(new Event('change',{bubbles:true}));
+}
+await wait(30);
+ok(Boolean(loanTermsZ?.querySelector('input[name="durationValue"]')), 'Fixed Loan duration value missing');
+ok(Boolean(loanTermsZ?.querySelector('input[name="durationUnit"]')), 'Fixed Loan duration unit selector missing');
+
+let repaymentMode = loanTermsZ?.querySelector('input[name="repaymentMode"]');
+if (repaymentMode) {
+  repaymentMode.value = 'monthly';
+  repaymentMode.dispatchEvent(new Event('change',{bubbles:true}));
+}
+await wait(30);
+ok(Boolean(loanTermsZ?.querySelector('input[name="monthlyMode"]')), 'Monthly Loan calculation selector missing');
+ok(Boolean(loanTermsZ?.querySelector('input[name="firstPaymentDate"]')), 'Monthly Loan first payment shared date picker missing');
+loanTermsZ?.v2Close?.();
+await wait(30);
+
+shell()?.querySelector('[data-v2-workspace-a]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(25);
+loanSettings = document.querySelector('[data-shared-profile-settings-menu]');
+loanSettings?.querySelector('[data-shared-profile-action="financial-operation"]')
+  ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(35);
+let loanOperationZ = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
+ok(loanOperationZ?.querySelector('[data-workspace-header-context]')?.dataset.workspaceTitle === 'Финансовая операция',
+  'Loan Financial operation must open one direct Z form');
+const loanOperationForm = loanOperationZ?.querySelector('[data-finance-special-form]');
+ok(Boolean(loanOperationForm), 'Loan Financial operation form missing');
+const loanOperationKind = loanOperationForm?.querySelector('input[name="financeEntityAction"]');
+ok(Boolean(loanOperationKind), 'Loan operation type shared selector missing');
+const loanOperationTrigger = loanOperationKind?.closest('.ui-select')?.querySelector('[data-ui-select-trigger]');
+const loanOperationOptions = JSON.parse(loanOperationTrigger?.dataset.options || '[]').map((item) => item.value);
+ok(loanOperationOptions.join('|') === 'loan-received|loan-repayment',
+  'Loan operation selector must contain only Receive and Return');
+ok(!loanOperationForm?.querySelector('input[name="financeEntityId"]'),
+  'Loan entity must be locked by its card and not selected again');
+ok(Boolean(loanOperationForm?.querySelector('input[name="walletId"]')),
+  'Loan operation must select the receiving/spending wallet');
+loanOperationZ?.v2Close?.();
+await wait(25);
+loanZ2?.v2Close?.();
+await wait(30);
+
+mark('cash-investment-entity');
+investmentSection = [...(shell()?.querySelectorAll('.v2-section') || [])]
+  .find((section) => section.querySelector('.v2-section__title')?.textContent.trim() === 'Инвестиции');
+const investmentCard = investmentSection?.querySelector('[data-finance-entity-type="investment"][data-finance-entity-id]');
+investmentCard?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(35);
+let investmentZ2 = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
+shell()?.querySelector('[data-v2-workspace-a]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(25);
+const investmentSettings = document.querySelector('[data-shared-profile-settings-menu]');
+const investmentActionIds = [...(investmentSettings?.querySelectorAll('[data-shared-profile-action]') || [])]
+  .map((node) => node.dataset.sharedProfileAction);
+ok(investmentActionIds.join('|') === 'appearance|financial-operation',
+  'Investment A must contain View and one Financial operation entry');
+investmentSettings?.querySelector('[data-shared-profile-action="financial-operation"]')
+  ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(35);
+let investmentOperationZ = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
+const investmentOperationKind = investmentOperationZ?.querySelector('input[name="financeEntityAction"]');
+const investmentTrigger = investmentOperationKind?.closest('.ui-select')?.querySelector('[data-ui-select-trigger]');
+const investmentOptions = JSON.parse(investmentTrigger?.dataset.options || '[]').map((item) => item.value);
+ok(investmentOptions.join('|') === 'investment-received|investment-return',
+  'Investment operation selector must contain only Receive and Return');
+ok(!investmentOperationZ?.querySelector('input[name="financeEntityId"]'),
+  'Investment entity must be locked by its card and not selected again');
+ok(Boolean(investmentOperationZ?.querySelector('input[name="walletId"]')),
+  'Investment operation must select the receiving/spending wallet');
+investmentOperationZ?.v2Close?.();
+await wait(25);
+investmentZ2?.v2Close?.();
+await wait(30);
 
 const systemCashCard = shell()?.querySelector('[data-wallet="cash"]');
 ok(Boolean(systemCashCard?.classList.contains('entity-visual-card')), 'Cash Z1 must use the canonical fixed entity card');

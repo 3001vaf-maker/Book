@@ -22,6 +22,9 @@ function operationMovement(operation = null) {
     source,
     workplace: String(data.workplace || ''),
     person: data.person && typeof data.person === 'object' ? { ...data.person } : null,
+    financeEntityType: String(data.financeEntityType || ''),
+    financeEntityId: String(data.financeEntityId || ''),
+    financeEntityName: String(data.financeEntityName || ''),
     total,
     serviceAmount,
     tips,
@@ -137,6 +140,9 @@ function projectLedgerEntry(state, entry) {
     operationTotal: Math.max(0, financialNumber(data?.total)),
     allocations: (Array.isArray(data?.allocations) ? data.allocations : []).map((item) => ({ ...item })),
     settlementItems: (Array.isArray(settlement?.items) ? settlement.items : []).map((item) => ({ ...item })),
+    financeEntityType: String(data?.financeEntityType || ''),
+    financeEntityId: String(data?.financeEntityId || ''),
+    financeEntityName: String(data?.financeEntityName || ''),
     note: entry?.note || data?.note || '',
     counterparty: data?.counterparty || '',
   };
@@ -157,6 +163,23 @@ export function getLedgerEntriesForSource(type, id) {
 export function getWalletDDSMovements(walletId) {
   const id = String(walletId || '');
   return getLedgerEntries().filter((entry) => String(entry?.walletId || '') === id);
+}
+
+export function getFinanceEntityMovements(type, id) {
+  const entityType = String(type || '');
+  const entityId = String(id || '');
+  return getLedgerEntries().filter((entry) => String(entry?.financeEntityType || '') === entityType
+    && String(entry?.financeEntityId || '') === entityId);
+}
+
+export function getFinanceEntityBalance(type, id) {
+  const total = getFinanceEntityMovements(type, id)
+    .filter((entry) => entry?.operationStatus !== 'cancelled' && entry?.economicType !== 'REVERSAL')
+    .reduce((sum, entry) => {
+      const amount = Math.max(0, financialNumber(entry?.amount));
+      return sum + (entry?.direction === 'OUT' ? -amount : amount);
+    }, 0);
+  return Math.round(total * 100) / 100;
 }
 
 export function getRefundsForPayment(paymentId) {

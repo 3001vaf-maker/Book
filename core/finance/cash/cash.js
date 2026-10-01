@@ -1,12 +1,14 @@
 import {
   button,
   actionBlock,
+  datePicker,
   emptyState,
   entityCardRail,
   entityVisualCard,
   escapeHtml,
   field,
   formValidationMessage,
+  initDatePickers,
   initPhotoField,
   modal,
   mountEntityCardConstructor,
@@ -16,6 +18,8 @@ import {
   openSharedProfileSettingsMenu,
   page,
   photoField,
+  select,
+  shortDate,
   shortDateTime,
   shortDateTimeParts,
   v2ListEntries,
@@ -30,7 +34,12 @@ import {
   cancelFinanceOperation,
   hardDeleteFinanceWallet,
 } from '../service.js';
-import { financeOperationGroups, openFinanceOperations } from '../operations/index.js';
+import {
+  financeOperationGroups,
+  openFinanceEntityOperation as openEntityFinanceOperation,
+  openFinanceOperations,
+} from '../operations/index.js';
+import { getFinanceEntityBalance, getFinanceEntityMovements } from '../read.js';
 import {
   deleteWallet as deleteWalletData,
   deleteWalletPermanently,
@@ -47,6 +56,11 @@ import {
   saveInvestmentEntity,
   saveLoanEntity,
 } from './entities.js';
+import {
+  buildLoanSchedule,
+  calculateLoanState,
+  normalizeLoanTerms,
+} from './loan-calculator.js';
 
 const formatMoney = (value) => `${(Number(value) || 0).toLocaleString('ru-RU')} ₽`;
 
@@ -166,12 +180,16 @@ function renderWalletCard(wallet) {
 
 function renderCashEntityCard(entity, kind) {
   const label = kind === 'investment' ? 'инвестицию' : 'займ';
+  const movements = getFinanceEntityMovements(kind, entity.id);
+  const loanState = kind === 'loan' ? calculateLoanState(entity, movements) : null;
+  const balance = kind === 'loan' ? loanState.totalDue : getFinanceEntityBalance(kind, entity.id);
   return entityVisualCard({
     appearance: cashEntityCardAppearance(entity),
-    fields: cashEntityCardFields(entity),
+    fields: cashEntityCardFields(entity, balance, kind, loanState?.endDate || ''),
     image: entity.photo || '',
-    interactive: false,
-    aria: `${label} ${entity.name}`,
+    interactive: true,
+    data: `data-finance-entity-type="${escapeHtml(kind)}" data-finance-entity-id="${escapeHtml(entity.id)}"`,
+    aria: `Открыть ${label} ${entity.name}`,
   });
 }
 
@@ -209,11 +227,15 @@ function openCashCreateMenu(root) {
 }
 
 function openCashSettings(root) {
-  const actions = financeOperationGroups().length
+  const groups = ['income-expense', 'transfer'];
+  const actions = financeOperationGroups({ groups }).length
     ? [{
         id: 'financial-operations',
         label: 'Финансовые операции',
-        onSelect: () => openFinanceOperations(root, { onSaved: () => renderList(root) }),
+        onSelect: () => openFinanceOperations(root, {
+          groups,
+          onSaved: () => renderList(root),
+        }),
       }]
     : [];
   if (!actions.length) return null;
@@ -238,6 +260,11 @@ function renderList(root) {
   root.querySelector('[data-cash-create]')?.addEventListener('click', () => openCashCreateMenu(root));
   root.querySelectorAll('[data-wallet]').forEach((element) => {
     element.addEventListener('click', () => openWalletZ2(root, element.dataset.wallet));
+  });
+  root.querySelectorAll('[data-finance-entity-type][data-finance-entity-id]').forEach((element) => {
+    element.addEventListener('click', () => {
+      openFinanceEntityZ2(root, element.dataset.financeEntityType, element.dataset.financeEntityId);
+    });
   });
 }
 
@@ -323,6 +350,418 @@ function openCashEntityForm(root, kind) {
     layer.v2Close?.();
     renderList(root);
   });
+}
+
+function financeEntityById(type, id) {
+  const values = type === 'loan' ? getLoanEntities() : getInvestmentEntities();
+  return values.find((item) => String(item?.id || '') === String(id || '')) || null;
+}
+
+function financeEntityContext(entity, type) {
+  const fallback = type === 'loan' ? 'Займ' : 'Инвестиция';
+  return workspaceHeaderContext({
+    title: entity?.name || fallback,
+    a: {
+      kind: 'settings',
+      data: 'data-finance-entity-settings',
+      aria: `Настройки ${entity?.name || fallback}`,
+    },
+  });
+}
+
+function financeEntityOperations(type, id) {
+  const grouped = new Map();
+  for (const entry of getFinanceEntityMovements(type, id)) {
+    const operationId = String(entry?.operationId || '');
+    if (!operationId) continue;
+    if (entry?.operationKind === 'cancel' || entry?.operationStatus === 'cancelled' || entry?.economicType === 'REVERSAL') continue;
+    const current = grouped.get(operationId) || { ...entry, operationId, total: 0, entries: [] };
+    current.entries.push(entry);
+    current.total += Number(entry?.total) || 0;
+    grouped.set(operationId, current);
+  }
+  return [...grouped.values()]
+    .sort((a, b) => String(b?.occurredAt || '').localeCompare(String(a?.occurredAt || '')));
+}
+
+function renderFinanceEntityOperationRow(operation, type, entityId) {
+  const label = operationName(operation);
+  return v2ListEntry({
+    title: label,
+    subtitle: String(operation?.walletName || ''),
+    rightTop: formatMoney(operation.total),
+    rightBottom: operationMoment(operation),
+    initial: '',
+    interactive: true,
+    data: `data-finance-entity-operation="${escapeHtml(operation.operationId)}" data-finance-entity-type="${escapeHtml(type)}" data-finance-entity-id="${escapeHtml(entityId)}"`,
+    aria: `Открыть операцию ${label}`,
+  });
+}
+
+function renderFinanceEntityLayer(root, layer, type, id) {
+  const entity = financeEntityById(type, id);
+  if (!entity) {
+    layer.v2Close?.();
+    renderList(root);
+    return;
+  }
+  const operations = financeEntityOperations(type, entity.id);
+  layer.innerHTML = page([
+    financeEntityContext(entity, type),
+    operations.length
+      ? v2ListEntries(operations.map((operation) => renderFinanceEntityOperationRow(operation, type, entity.id)))
+      : emptyState('Операций пока нет', type === 'loan'
+        ? 'Получение и возврат займа появятся здесь.'
+        : 'Получение и возврат инвестиции появятся здесь.'),
+  ]);
+
+  layer.querySelector('[data-finance-entity-settings]')?.addEventListener('click', () => {
+    openFinanceEntitySettings(root, layer, type, entity);
+  });
+  layer.querySelectorAll('[data-finance-entity-operation]').forEach((element) => {
+    element.addEventListener('click', () => {
+      openFinanceEntityOperation(root, layer, type, entity, element.dataset.financeEntityOperation);
+    });
+  });
+}
+
+function openFinanceEntityZ2(root, type, id) {
+  const entity = financeEntityById(type, id);
+  if (!entity) return null;
+  const layer = mountV2ZLayer(root, v2ZLayer(''), { stack: true });
+  if (!layer) return null;
+  renderFinanceEntityLayer(root, layer, type, entity.id);
+  return layer;
+}
+
+function openFinanceEntityAppearance(root, entityLayer, type, entity) {
+  const layer = mountV2ZLayer(entityLayer, v2ZLayer(page([
+    financeEntityContext(entity, type),
+    '<div data-finance-entity-card-constructor></div>',
+  ])), { stack: true });
+  const host = layer?.querySelector('[data-finance-entity-card-constructor]');
+  if (!host) return layer;
+  mountEntityCardConstructor(host, {
+    appearance: cashEntityCardAppearance(entity),
+    fields: cashEntityCardFields(
+      entity,
+      type === 'loan'
+        ? calculateLoanState(entity, getFinanceEntityMovements(type, entity.id)).totalDue
+        : getFinanceEntityBalance(type, entity.id),
+      type,
+      type === 'loan'
+        ? calculateLoanState(entity, getFinanceEntityMovements(type, entity.id)).endDate
+        : '',
+    ),
+    photo: entity.photo || '',
+    onSave: async ({ appearance, photo }) => {
+      const next = {
+        ...entity,
+        photo,
+        cardAppearance: appearance,
+        updatedAt: new Date().toISOString(),
+      };
+      if (type === 'loan') saveLoanEntity(next);
+      else saveInvestmentEntity(next);
+      layer.v2Close?.();
+      renderFinanceEntityLayer(root, entityLayer, type, entity.id);
+      renderList(root);
+    },
+  });
+  return layer;
+}
+
+function loanRateOptions() {
+  return [
+    { value: '0', label: 'Без процентов' },
+    ...Array.from({ length: 100 }, (_, index) => ({
+      value: String(index + 1),
+      label: `${index + 1}%`,
+    })),
+  ];
+}
+
+function loanTermsDraft(entity = {}, draft = null) {
+  const terms = normalizeLoanTerms(draft ? { loanTerms: draft.loanTerms } : entity);
+  return {
+    name: String(draft?.name ?? entity?.name ?? ''),
+    loanTerms: {
+      ...terms,
+      lenderName: String(draft?.loanTerms?.lenderName ?? terms.lenderName ?? ''),
+    },
+  };
+}
+
+function loanTermsFromForm(form, entity) {
+  const data = new FormData(form);
+  return {
+    name: String(data.get('loanName') || entity?.name || '').trim(),
+    loanTerms: {
+      lenderName: String(data.get('lenderName') || '').trim(),
+      termMode: String(data.get('termMode') || 'none'),
+      endDate: String(data.get('endDate') || ''),
+      durationValue: Number(data.get('durationValue') || 1),
+      durationUnit: String(data.get('durationUnit') || 'months'),
+      interestRate: Number(data.get('interestRate') || 0),
+      ratePeriod: String(data.get('ratePeriod') || 'annual'),
+      repaymentMode: String(data.get('repaymentMode') || 'free'),
+      monthlyMode: String(data.get('monthlyMode') || 'equal-payment'),
+      firstPaymentDate: String(data.get('firstPaymentDate') || ''),
+    },
+  };
+}
+
+function loanCalculationRows(entity) {
+  const movements = getFinanceEntityMovements('loan', entity.id);
+  const state = calculateLoanState(entity, movements);
+  const rows = [
+    v2ListEntry({ title: 'Получено', rightTop: formatMoney(state.received) }),
+    v2ListEntry({ title: 'Возвращено', rightTop: formatMoney(state.repaid) }),
+    v2ListEntry({ title: 'Основной долг', rightTop: formatMoney(state.principal) }),
+    v2ListEntry({ title: 'Начислено процентов', rightTop: formatMoney(state.accruedInterest) }),
+    v2ListEntry({ title: 'К возврату', rightTop: formatMoney(state.totalDue) }),
+  ];
+  if (state.endDate) rows.push(v2ListEntry({ title: 'Срок', rightTop: shortDate(state.endDate, '') }));
+  return { state, html: v2ListEntries(rows) };
+}
+
+function loanScheduleRows(entity) {
+  const movements = getFinanceEntityMovements('loan', entity.id);
+  const schedule = buildLoanSchedule(entity, movements);
+  if (!schedule.length) return '';
+  return v2ListEntries(schedule.map((item) => v2ListEntry({
+    title: shortDate(item.date, ''),
+    subtitle: `Основной долг ${formatMoney(item.principal)} · Проценты ${formatMoney(item.interest)}`,
+    rightTop: formatMoney(item.total),
+  })));
+}
+
+function renderLoanTermsLayer(root, entityLayer, layer, sourceEntity, draft = null) {
+  const current = loanTermsDraft(sourceEntity, draft);
+  const terms = current.loanTerms;
+  const termOptions = [
+    { value: 'none', label: 'Без срока' },
+    { value: 'date', label: 'До даты' },
+    { value: 'duration', label: 'На срок' },
+  ];
+  const repaymentOptions = terms.termMode === 'none'
+    ? [
+        { value: 'free', label: 'Свободно' },
+        { value: 'monthly', label: 'Ежемесячно' },
+      ]
+    : [
+        { value: 'free', label: 'Свободно' },
+        { value: 'end', label: 'В конце срока' },
+        { value: 'monthly', label: 'Ежемесячно' },
+      ];
+  const monthlyOptions = terms.termMode === 'none'
+    ? [{ value: 'interest-only', label: 'Проценты ежемесячно' }]
+    : [
+        { value: 'equal-payment', label: 'Равными платежами' },
+        { value: 'equal-principal', label: 'Равными частями основного долга' },
+        { value: 'interest-only', label: 'Проценты ежемесячно, основной долг в конце' },
+      ];
+  const safeRepayment = repaymentOptions.some((item) => item.value === terms.repaymentMode)
+    ? terms.repaymentMode
+    : 'free';
+  const safeMonthly = monthlyOptions.some((item) => item.value === terms.monthlyMode)
+    ? terms.monthlyMode
+    : monthlyOptions[0].value;
+  const previewEntity = {
+    ...sourceEntity,
+    name: current.name,
+    loanTerms: {
+      ...terms,
+      repaymentMode: safeRepayment,
+      monthlyMode: safeMonthly,
+    },
+  };
+  const calculation = loanCalculationRows(previewEntity);
+  const schedule = loanScheduleRows(previewEntity);
+
+  layer.innerHTML = page([
+    workspaceHeaderContext({
+      title: 'Условия займа',
+      c: {
+        label: 'Сохранить',
+        data: 'data-loan-terms-save',
+        aria: 'Сохранить условия займа',
+      },
+    }),
+    `<form class="compact-form" data-loan-terms-form novalidate>
+      ${field({ label: 'Наименование', name: 'loanName', value: current.name, required: true })}
+      ${field({ label: 'У кого заняли', name: 'lenderName', value: terms.lenderName || '', placeholder: 'Необязательно' })}
+      ${select({ label: 'Срок', name: 'termMode', value: terms.termMode, options: termOptions })}
+      ${terms.termMode === 'date' ? datePicker({
+        label: 'Дата возврата',
+        name: 'endDate',
+        value: terms.endDate || '',
+        required: true,
+        allowClear: false,
+      }) : ''}
+      ${terms.termMode === 'duration' ? `${field({
+        label: 'Срок',
+        name: 'durationValue',
+        type: 'number',
+        inputmode: 'numeric',
+        value: terms.durationValue,
+        required: true,
+        data: 'min="1" step="1"',
+      })}${select({
+        label: 'Единица срока',
+        name: 'durationUnit',
+        value: terms.durationUnit,
+        options: [
+          { value: 'months', label: 'Месяцев' },
+          { value: 'years', label: 'Лет' },
+        ],
+      })}` : ''}
+      ${select({ label: 'Ставка', name: 'interestRate', value: String(terms.interestRate), options: loanRateOptions() })}
+      ${terms.interestRate > 0 ? select({
+        label: 'Период ставки',
+        name: 'ratePeriod',
+        value: terms.ratePeriod,
+        options: [
+          { value: 'monthly', label: 'В месяц' },
+          { value: 'annual', label: 'В год' },
+        ],
+      }) : ''}
+      ${select({ label: 'Порядок возврата', name: 'repaymentMode', value: safeRepayment, options: repaymentOptions })}
+      ${safeRepayment === 'monthly' ? select({
+        label: 'Расчёт платежа',
+        name: 'monthlyMode',
+        value: safeMonthly,
+        options: monthlyOptions,
+      }) : ''}
+      ${safeRepayment === 'monthly' ? datePicker({
+        label: 'Первый платёж',
+        name: 'firstPaymentDate',
+        value: terms.firstPaymentDate || '',
+        required: false,
+        allowClear: true,
+      }) : ''}
+    </form>`,
+    v2Section('Расчёт', calculation.html),
+    schedule ? v2Section('График', schedule) : '',
+  ]);
+
+  initDatePickers(layer);
+  const form = layer.querySelector('[data-loan-terms-form]');
+  if (!form) return;
+
+  form.addEventListener('change', (event) => {
+    const name = String(event.target?.name || '');
+    if (!['termMode', 'endDate', 'durationValue', 'durationUnit', 'interestRate', 'ratePeriod', 'repaymentMode', 'monthlyMode', 'firstPaymentDate'].includes(name)) return;
+    renderLoanTermsLayer(root, entityLayer, layer, sourceEntity, loanTermsFromForm(form, sourceEntity));
+  });
+
+  layer.querySelector('[data-loan-terms-save]')?.addEventListener('click', () => {
+    form.requestSubmit();
+  });
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const validation = formValidationMessage(form);
+    if (validation) {
+      openNotice({ message: validation });
+      return;
+    }
+    const nextDraft = loanTermsFromForm(form, sourceEntity);
+    if (!nextDraft.name) {
+      openNotice({ message: 'Укажите наименование займа.' });
+      return;
+    }
+    if (nextDraft.loanTerms.termMode === 'date' && !nextDraft.loanTerms.endDate) {
+      openNotice({ message: 'Укажите дату возврата.' });
+      return;
+    }
+    const next = {
+      ...sourceEntity,
+      name: nextDraft.name,
+      loanTerms: normalizeLoanTerms({ loanTerms: nextDraft.loanTerms }),
+      updatedAt: new Date().toISOString(),
+    };
+    saveLoanEntity(next);
+    layer.v2Close?.();
+    renderFinanceEntityLayer(root, entityLayer, 'loan', next.id);
+    renderList(root);
+  });
+}
+
+function openLoanTerms(root, entityLayer, entity) {
+  const layer = mountV2ZLayer(entityLayer, v2ZLayer(''), { stack: true });
+  if (!layer) return null;
+  renderLoanTermsLayer(root, entityLayer, layer, entity);
+  return layer;
+}
+
+function openFinanceEntitySettings(root, entityLayer, type, entity) {
+  const financeEntity = { type, id: entity.id, name: entity.name };
+  const saved = () => {
+    renderFinanceEntityLayer(root, entityLayer, type, entity.id);
+    renderList(root);
+  };
+
+  const actions = [{
+    id: 'appearance',
+    label: 'Вид',
+    onSelect: () => openFinanceEntityAppearance(root, entityLayer, type, entity),
+  }];
+  if (type === 'loan') {
+    actions.push({
+      id: 'terms',
+      label: 'Условия займа',
+      onSelect: () => openLoanTerms(root, entityLayer, entity),
+    });
+  }
+  actions.push({
+    id: 'financial-operation',
+    label: 'Финансовая операция',
+    onSelect: () => openEntityFinanceOperation(entityLayer, type, {
+      financeEntity,
+      onSaved: saved,
+    }),
+  });
+
+  return openSharedProfileSettingsMenu({
+    title: entity.name,
+    actions,
+  });
+}
+
+function openFinanceEntityOperation(root, entityLayer, type, entity, operationId) {
+  const operation = financeEntityOperations(type, entity.id)
+    .find((item) => String(item?.operationId || '') === String(operationId || ''));
+  if (!operation) return null;
+  const layer = mountV2ZLayer(entityLayer, v2ZLayer(page([
+    operationContext(operation),
+    operationReceipt(operation),
+  ])), { stack: true });
+  if (!layer) return null;
+  layer.querySelector('[data-wallet-operation-settings]')?.addEventListener('click', () => {
+    openSharedProfileSettingsMenu({
+      title: operationName(operation),
+      actions: [{
+        id: 'delete-operation',
+        label: 'Удалить операцию',
+        variant: 'danger',
+        onSelect: async () => {
+          try {
+            await cancelFinanceOperation(operation.operationId, {
+              reason: 'incorrect-entry',
+              occurredAt: new Date(),
+            });
+            layer.v2Close?.();
+            renderFinanceEntityLayer(root, entityLayer, type, entity.id);
+            renderList(root);
+          } catch (error) {
+            openNotice({ message: String(error?.message || 'Не удалось удалить операцию') });
+          }
+        },
+      }],
+    });
+  });
+  return layer;
 }
 
 function renderWalletLayer(root, layer, walletId) {

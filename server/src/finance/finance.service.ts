@@ -323,6 +323,28 @@ export class FinanceService {
     }, 0));
   }
 
+  private async financeEntity(tenantId: string, type: string, id: string) {
+    const entityType = text(type);
+    const entityId = text(id);
+    if (!['loan', 'investment'].includes(entityType) || !entityId) {
+      throw new BadRequestException('Выберите финансовую сущность');
+    }
+    const row = await this.prisma.businessAuxiliaryState.findUnique({ where: { tenantId } });
+    const data = objectValue(row?.data);
+    const values = entityType === 'loan' ? arrayValue(data.loans) : arrayValue(data.investments);
+    const entity = values
+      .map((value) => objectValue(value))
+      .find((value) => text(value.id) === entityId && !text(value.deletedAt));
+    if (!entity) {
+      throw new BadRequestException(entityType === 'loan' ? 'Займ не найден' : 'Инвестиция не найдена');
+    }
+    return {
+      type: entityType,
+      id: entityId,
+      name: text(entity.name),
+    };
+  }
+
   async recordSettlementPaymentState(tenantId: string, recordId: string, settlement: JsonObject) {
     const paid = Math.max(0, await this.serviceNet(this.prisma, tenantId, 'record', text(recordId)));
     const total = money(settlement?.planTotal);
@@ -707,17 +729,17 @@ export class FinanceService {
       economicType: string;
       systemKey: string;
       operationKind: string;
+      financeEntityType: 'loan' | 'investment';
     }> = {
-      'loan-received': { direction: 'IN', economicType: 'LOAN_RECEIVED', systemKey: 'LOAN_RECEIVED', operationKind: 'loan-received' },
-      'loan-repayment': { direction: 'OUT', economicType: 'LOAN_REPAYMENT', systemKey: 'LOAN_REPAYMENT', operationKind: 'loan-repayment' },
-      'investment-received': { direction: 'IN', economicType: 'INVESTMENT_RECEIVED', systemKey: 'INVESTMENT_RECEIVED', operationKind: 'investment-received' },
-      'investment-return': { direction: 'OUT', economicType: 'INVESTMENT_RETURN', systemKey: 'INVESTMENT_RETURN', operationKind: 'investment-return' },
+      'loan-received': { direction: 'IN', economicType: 'LOAN_RECEIVED', systemKey: 'LOAN_RECEIVED', operationKind: 'loan-received', financeEntityType: 'loan' },
+      'loan-repayment': { direction: 'OUT', economicType: 'LOAN_REPAYMENT', systemKey: 'LOAN_REPAYMENT', operationKind: 'loan-repayment', financeEntityType: 'loan' },
+      'investment-received': { direction: 'IN', economicType: 'INVESTMENT_RECEIVED', systemKey: 'INVESTMENT_RECEIVED', operationKind: 'investment-received', financeEntityType: 'investment' },
+      'investment-return': { direction: 'OUT', economicType: 'INVESTMENT_RETURN', systemKey: 'INVESTMENT_RETURN', operationKind: 'investment-return', financeEntityType: 'investment' },
     };
 
     const occurredAt = requiredOccurredAt(input.occurredAt);
     const operationId = randomUUID();
     const note = text(input.note);
-    const counterparty = text(input.counterparty);
 
     if (kind === 'transfer') {
       const fromWalletId = text(input.fromWalletId);
@@ -781,6 +803,11 @@ export class FinanceService {
     const walletId = text(input.walletId);
     const walletName = text(input.walletName);
     if (!walletId) throw new BadRequestException('Выберите кошелёк');
+    const financeEntity = await this.financeEntity(
+      tenantId,
+      definition.financeEntityType,
+      text(input.financeEntityId),
+    );
     const article = await this.prisma.financeArticle.findFirst({
       where: { tenantId, systemKey: definition.systemKey, archivedAt: null },
     });
@@ -796,7 +823,9 @@ export class FinanceService {
           total: amount,
           walletId,
           walletName,
-          counterparty,
+          financeEntityType: financeEntity.type,
+          financeEntityId: financeEntity.id,
+          financeEntityName: financeEntity.name,
           note,
           articleId: article.articleId,
         },
@@ -809,7 +838,7 @@ export class FinanceService {
           component: kind,
           articleId: article.articleId,
           articleName: article.name,
-          lineName: counterparty,
+          lineName: financeEntity.name,
           quantity: 1,
           unitPrice: amount,
           note,
@@ -1032,7 +1061,6 @@ export class FinanceService {
       const amount = money(input.amount == null ? currentData.total : input.amount);
       if (amount <= 0) throw new BadRequestException('Введите сумму операции');
       const note = input.note == null ? text(currentData.note) : text(input.note);
-      const counterparty = input.counterparty == null ? text(currentData.counterparty) : text(input.counterparty);
 
       if (current.kind === 'transfer') {
         const fromWalletId = text(input.fromWalletId ?? currentData.fromWalletId);
@@ -1075,16 +1103,22 @@ export class FinanceService {
           direction: 'IN' | 'OUT';
           economicType: string;
           systemKey: string;
+          financeEntityType: 'loan' | 'investment';
         }> = {
-          'loan-received': { direction: 'IN', economicType: 'LOAN_RECEIVED', systemKey: 'LOAN_RECEIVED' },
-          'loan-repayment': { direction: 'OUT', economicType: 'LOAN_REPAYMENT', systemKey: 'LOAN_REPAYMENT' },
-          'investment-received': { direction: 'IN', economicType: 'INVESTMENT_RECEIVED', systemKey: 'INVESTMENT_RECEIVED' },
-          'investment-return': { direction: 'OUT', economicType: 'INVESTMENT_RETURN', systemKey: 'INVESTMENT_RETURN' },
+          'loan-received': { direction: 'IN', economicType: 'LOAN_RECEIVED', systemKey: 'LOAN_RECEIVED', financeEntityType: 'loan' },
+          'loan-repayment': { direction: 'OUT', economicType: 'LOAN_REPAYMENT', systemKey: 'LOAN_REPAYMENT', financeEntityType: 'loan' },
+          'investment-received': { direction: 'IN', economicType: 'INVESTMENT_RECEIVED', systemKey: 'INVESTMENT_RECEIVED', financeEntityType: 'investment' },
+          'investment-return': { direction: 'OUT', economicType: 'INVESTMENT_RETURN', systemKey: 'INVESTMENT_RETURN', financeEntityType: 'investment' },
         };
         const definition = definitions[current.kind];
         const walletId = text(input.walletId ?? currentData.walletId);
         const walletName = text(input.walletName ?? currentData.walletName);
         if (!walletId) throw new BadRequestException('Выберите кошелёк');
+        const financeEntity = await this.financeEntity(
+          tenantId,
+          definition.financeEntityType,
+          text(input.financeEntityId ?? currentData.financeEntityId),
+        );
         const article = await this.prisma.financeArticle.findFirst({
           where: { tenantId, systemKey: definition.systemKey, archivedAt: null },
         });
@@ -1093,7 +1127,9 @@ export class FinanceService {
           total: amount,
           walletId,
           walletName,
-          counterparty,
+          financeEntityType: financeEntity.type,
+          financeEntityId: financeEntity.id,
+          financeEntityName: financeEntity.name,
           note,
           articleId: article.articleId,
         };
@@ -1106,7 +1142,7 @@ export class FinanceService {
           component: current.kind,
           articleId: article.articleId,
           articleName: article.name,
-          lineName: counterparty,
+          lineName: financeEntity.name,
           quantity: 1,
           unitPrice: amount,
           note,

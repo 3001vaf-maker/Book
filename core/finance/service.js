@@ -1,4 +1,5 @@
 import { apiRequest } from '../auth.js';
+import { flushBusinessPersistence } from '../business-persistence.js';
 import { hydrateFinanceFromServer } from './data.js';
 import { financialNumber } from './rules.js';
 import { getDDSExpenses, getDDSIncome } from './read.js';
@@ -123,6 +124,7 @@ export async function recordManualFinanceOperation({
 
 export async function recordSpecialFinanceOperation(payload = {}) {
   if (!payload?.occurredAt) return null;
+  if (payload?.financeEntityId) await flushBusinessPersistence();
   const response = await apiRequest('/finance/operations/special', {
     method: 'POST',
     body: JSON.stringify({
