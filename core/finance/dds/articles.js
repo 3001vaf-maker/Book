@@ -3,8 +3,10 @@ import {
   emptyState,
   escapeHtml,
   field,
+  formValidationMessage,
   list,
   mountV2ZLayer,
+  openNotice,
   select,
   v2ZLayer,
   workspaceHeaderContext,
@@ -104,7 +106,7 @@ function openForm(root, existing = null) {
       aria: 'Сохранить статью',
     },
   })}
-    <form class="compact-form" data-finance-article-form>
+    <form class="compact-form" data-finance-article-form novalidate>
       ${field({ label: 'Название', name: 'articleName', value: existing?.name || '', required: true, placeholder: 'Например, Краска' })}
       ${select({ label: 'Родитель', name: 'parentArticleId', value: existing?.parentArticleId || '', options: parentOptions(items, existing?.articleId || '') })}
       ${select({ label: 'Тип', name: 'direction', value: direction, options: DIRECTION_OPTIONS })}
@@ -114,14 +116,23 @@ function openForm(root, existing = null) {
 
   layer.querySelector('[data-finance-article-form]')?.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const data = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const validation = formValidationMessage(form);
+    if (validation) {
+      openNotice({ message: validation });
+      return;
+    }
+    const data = new FormData(form);
     const payload = {
       name: String(data.get('articleName') || '').trim(),
       parentArticleId: String(data.get('parentArticleId') || ''),
       direction: String(data.get('direction') || ''),
       economicType: String(data.get('economicType') || ''),
     };
-    if (!payload.name) return;
+    if (!payload.name) {
+      openNotice({ message: 'Укажите название статьи.' });
+      return;
+    }
     if (existing) await updateFinanceArticle(existing.articleId, payload);
     else await createFinanceArticle(payload);
     layer.v2Close?.();
