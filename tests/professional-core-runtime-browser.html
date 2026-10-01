@@ -444,7 +444,9 @@ ok(correctionZ?.querySelector('[data-workspace-header-context]')?.dataset.worksp
   'DDS correction B title is wrong');
 ok(shell()?.querySelector('[data-v2-workspace-primary]')?.textContent.trim() === 'Сохранить',
   'DDS correction C must be Save');
-ok(correctionZ?.textContent.includes('глажка') && correctionZ?.textContent.includes('стирка'),
+const correctionNames = [...(correctionZ?.querySelectorAll('input[name="lineName"]') || [])]
+  .map((input) => input.value);
+ok(correctionNames.includes('глажка') && correctionNames.includes('стирка'),
   'DDS correction must preload the current receipt composition');
 await closeTopDdsZ(119, 'correction');
 ok([...((shell()?.querySelectorAll('[data-v2-z-layer]')) || [])].length === 1,
