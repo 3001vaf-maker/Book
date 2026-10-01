@@ -41,12 +41,31 @@ function financeEntityName(type, id) {
   return financeEntities(type).find((item) => String(item.id) === String(id))?.name || '';
 }
 
-export function renderSpecialFinanceOperation(root, actionId, {
+function actionById(actionId) {
+  return SPECIAL_FINANCE_ACTIONS.find((item) => item.id === actionId) || null;
+}
+
+function draftFromForm(form) {
+  const data = new FormData(form);
+  return {
+    financeEntityId: String(data.get('financeEntityId') || ''),
+    walletId: String(data.get('walletId') || ''),
+    fromWalletId: String(data.get('fromWalletId') || ''),
+    toWalletId: String(data.get('toWalletId') || ''),
+    total: String(data.get('amount') || ''),
+    occurredDate: String(data.get('occurredDate') || ''),
+    note: String(data.get('note') || ''),
+  };
+}
+
+function renderOperationForm(root, action, {
   onSaved = null,
   operation = null,
   financeEntity = null,
+  actionChoices = [],
+  draft = null,
+  onActionChange = null,
 } = {}) {
-  const action = SPECIAL_FINANCE_ACTIONS.find((item) => item.id === actionId);
   if (!action) return false;
   const wallets = walletOptions();
   if (!wallets.length) {
@@ -54,7 +73,8 @@ export function renderSpecialFinanceOperation(root, actionId, {
     return false;
   }
 
-  const existing = operation?.data && typeof operation.data === 'object' ? operation.data : {};
+  const operationData = operation?.data && typeof operation.data === 'object' ? operation.data : {};
+  const existing = draft && typeof draft === 'object' ? { ...operationData, ...draft } : operationData;
   const lockedEntity = !action.transfer && financeEntity
     && String(financeEntity?.type || '') === String(action.entityType || '')
     && String(financeEntity?.id || '').trim()
@@ -69,6 +89,16 @@ export function renderSpecialFinanceOperation(root, actionId, {
     openNotice({ message: action.entityType === 'loan' ? 'Сначала добавьте займ.' : 'Сначала добавьте инвестицию.' });
     return false;
   }
+
+  const actionSelect = actionChoices.length > 1
+    ? select({
+        label: 'Операция',
+        name: 'financeEntityAction',
+        value: action.id,
+        options: actionChoices.map((item) => ({ value: item.id, label: item.label })),
+      })
+    : '';
+
   const walletFields = action.transfer
     ? `${select({ label: 'Из кошелька', name: 'fromWalletId', value: existing.fromWalletId || wallets[0]?.value || '', options: wallets })}${select({ label: 'В кошелёк', name: 'toWalletId', value: existing.toWalletId || wallets[1]?.value || wallets[0]?.value || '', options: wallets })}`
     : `${lockedEntity ? '' : select({
@@ -83,8 +113,11 @@ export function renderSpecialFinanceOperation(root, actionId, {
         options: wallets,
       })}`;
 
+  const occurredDate = String(existing.occurredDate || '').trim()
+    || financeLocalDateValue(operation?.occurredAt || new Date());
+
   root.innerHTML = `${workspaceHeaderContext({
-    title: operation ? `Корректировка · ${action.title}` : action.title,
+    title: operation ? `Корректировка · ${action.title}` : (actionChoices.length > 1 ? 'Финансовая операция' : action.title),
     c: {
       label: 'Сохранить',
       data: 'data-finance-special-save',
@@ -92,17 +125,22 @@ export function renderSpecialFinanceOperation(root, actionId, {
     },
   })}
     <form class="compact-form" data-finance-special-form novalidate>
+      ${actionSelect}
       ${walletFields}
       ${field({ label: 'Сумма', name: 'amount', type: 'number', inputmode: 'decimal', value: existing.total || '', required: true, placeholder: '0', data: 'min="0" step="0.01"' })}
-      ${datePicker({ label: 'Фактическая дата', name: 'occurredDate', value: financeLocalDateValue(operation?.occurredAt || new Date()), required: true, allowClear: false })}
+      ${datePicker({ label: 'Фактическая дата', name: 'occurredDate', value: occurredDate, required: true, allowClear: false })}
       ${textareaField({ label: 'Примечание', name: 'note', value: existing.note || '', rows: 3, placeholder: 'Необязательно' })}
     </form>`;
 
   initDatePickers(root);
 
-  root.querySelector('[data-finance-special-form]')?.addEventListener('submit', async (event) => {
+  const form = root.querySelector('[data-finance-special-form]');
+  form?.querySelector('input[name="financeEntityAction"]')?.addEventListener('change', (event) => {
+    onActionChange?.(String(event.currentTarget.value || ''), draftFromForm(form));
+  });
+
+  form?.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const form = event.currentTarget;
     const validation = formValidationMessage(form);
     if (validation) {
       openNotice({ message: validation });
@@ -147,7 +185,36 @@ export function renderSpecialFinanceOperation(root, actionId, {
   });
 
   root.querySelector('[data-finance-special-save]')?.addEventListener('click', () => {
-    root.querySelector('[data-finance-special-form]')?.requestSubmit();
+    form?.requestSubmit();
   });
   return true;
+}
+
+export function renderSpecialFinanceOperation(root, actionId, options = {}) {
+  return renderOperationForm(root, actionById(actionId), options);
+}
+
+export function renderFinanceEntityOperation(root, type, {
+  onSaved = null,
+  financeEntity = null,
+} = {}) {
+  const actionChoices = SPECIAL_FINANCE_ACTIONS.filter((item) => item.entityType === type);
+  if (!actionChoices.length) return false;
+  let currentActionId = actionChoices[0].id;
+  let draft = null;
+
+  const render = () => renderOperationForm(root, actionById(currentActionId), {
+    onSaved,
+    financeEntity,
+    actionChoices,
+    draft,
+    onActionChange: (nextActionId, nextDraft) => {
+      if (!actionChoices.some((item) => item.id === nextActionId)) return;
+      currentActionId = nextActionId;
+      draft = nextDraft;
+      render();
+    },
+  });
+
+  return render();
 }
