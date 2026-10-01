@@ -4,6 +4,7 @@ import {
   datePicker,
   emptyState,
   field,
+  formValidationMessage,
   infoUI,
   initDatePickers,
   modal,
@@ -363,13 +364,19 @@ function renderPaymentCorrection(root, operation, { onSaved = null } = {}) {
       aria: 'Сохранить корректировку оплаты',
     },
   })}
-    <form class="compact-form" data-finance-payment-correction-form>
+    <form class="compact-form" data-finance-payment-correction-form novalidate>
       <div class="payment-total"><span>Сумма услуг</span><strong>${formatMoney(serviceAmount)}</strong></div>
       ${rows}
     </form>`;
   root.querySelector('[data-finance-payment-correction-form]')?.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const validation = formValidationMessage(formElement);
+    if (validation) {
+      openNotice({ message: validation });
+      return;
+    }
+    const form = new FormData(formElement);
     const walletRows = [1, 2].map((index) => {
       const walletId = String(form.get(`allocationWallet${index}`) || '');
       const amount = Math.max(0, Number(form.get(`allocationAmount${index}`) || 0));
@@ -411,7 +418,7 @@ function renderRefundCorrection(root, operation, { onSaved = null } = {}) {
       aria: 'Сохранить корректировку возврата',
     },
   })}
-    <form class="compact-form" data-finance-refund-correction-form>
+    <form class="compact-form" data-finance-refund-correction-form novalidate>
       ${field({
         label: 'Сумма',
         name: 'amount',
@@ -446,7 +453,13 @@ function renderRefundCorrection(root, operation, { onSaved = null } = {}) {
 
   root.querySelector('[data-finance-refund-correction-form]')?.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const validation = formValidationMessage(formElement);
+    if (validation) {
+      openNotice({ message: validation });
+      return;
+    }
+    const form = new FormData(formElement);
     const walletId = String(form.get('walletId') || '');
     const wallet = getWallets().find((item) => String(item.id) === walletId);
     try {
@@ -602,7 +615,7 @@ function openDDSExport(root, movements) {
     title: 'Выгрузка ДДС',
     c: { label: 'Выгрузить', data: 'data-finance-dds-export-submit', aria: 'Выгрузить ДДС' },
   })}
-    <form class="compact-form" data-finance-dds-export-form>
+    <form class="compact-form" data-finance-dds-export-form novalidate>
       ${datePicker({ label: 'С', name: 'from' })}
       ${datePicker({ label: 'До', name: 'to' })}
       ${select({
