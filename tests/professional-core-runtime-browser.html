@@ -448,6 +448,12 @@ const correctionNames = [...(correctionZ?.querySelectorAll('input[name="lineName
   .map((input) => input.value);
 ok(correctionNames.includes('глажка') && correctionNames.includes('стирка'),
   'DDS correction must preload the current receipt composition');
+const correctionLineSelectors = [...(correctionZ?.querySelectorAll('[data-finance-manual-line] .ui-select') || [])];
+ok(correctionLineSelectors.length === 2, 'DDS detail line names must use shared searchable selectors');
+ok(correctionLineSelectors.every((node) => node.querySelector('[data-ui-select-trigger]')?.dataset.searchable === 'true'),
+  'DDS detail line selectors must support history search');
+ok(correctionLineSelectors.every((node) => node.querySelector('[data-ui-select-trigger]')?.dataset.allowCustom === 'true'),
+  'DDS detail line selectors must allow new manual names');
 await closeTopDdsZ(119, 'correction');
 ok([...((shell()?.querySelectorAll('[data-v2-z-layer]')) || [])].length === 1,
   'DDS correction did not return to receipt Z2');
