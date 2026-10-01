@@ -119,10 +119,14 @@ export class AuxiliaryStateService {
   }
 
   private async assertInvestmentMutationAllowed(tenantId: string, before: unknown[], after: unknown[]) {
-    const beforeById = new Map(before.map((value) => {
-      const entity = objectValue(value);
-      return [text(entity.id), entity];
-    }).filter(([id]) => Boolean(id)));
+    const beforeById = new Map<string, JsonObject>(
+      before
+        .map((value): [string, JsonObject] => {
+          const entity = objectValue(value);
+          return [text(entity.id), entity];
+        })
+        .filter(([id]) => Boolean(id)),
+    );
     const changedRoles = new Set<string>();
     for (const value of after) {
       const entity = objectValue(value);
