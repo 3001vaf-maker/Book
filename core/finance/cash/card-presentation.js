@@ -45,3 +45,21 @@ export function walletCardAppearance(wallet = {}) {
     ]),
   });
 }
+
+
+export function cashEntityCardFields(entity = {}) {
+  return [
+    { value: 'entityName', label: 'Наименование', text: String(entity?.name || '') },
+  ];
+}
+
+export function cashEntityCardAppearance(entity = {}) {
+  if (hasConfiguredLines(entity?.cardAppearance)) {
+    return normalizeEntityCardAppearance(entity.cardAppearance);
+  }
+  return normalizeEntityCardAppearance({
+    lines: defaultLines([
+      { row: 7, field: 'entityName', zone: 'full', align: 'left', size: 'l', bold: true },
+    ]),
+  });
+}

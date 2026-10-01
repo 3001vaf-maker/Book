@@ -1,6 +1,19 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { calculateSettlement, deleteWallet, getWalletTotalBalance, getWallets, hydrateFinanceFromServer, hydrateWalletsFromServer, saveWallet } from '../core/finance/index.js';
+import {
+  calculateSettlement,
+  deleteWallet,
+  getInvestmentEntities,
+  getLoanEntities,
+  getWalletTotalBalance,
+  getWallets,
+  hydrateCashEntitiesFromServer,
+  hydrateFinanceFromServer,
+  hydrateWalletsFromServer,
+  saveInvestmentEntity,
+  saveLoanEntity,
+  saveWallet,
+} from '../core/finance/index.js';
 import {
   canonicalFinanceState,
   paymentFixture,
@@ -13,6 +26,14 @@ assert.deepEqual(getWallets().map((wallet) => wallet.name), ['Наличные',
 assert.equal(deleteWallet('cash'), false);
 assert.equal(deleteWallet('cashless'), false);
 assert.deepEqual(getWallets().map((wallet) => wallet.name), ['Наличные', 'Безналичные']);
+
+hydrateCashEntitiesFromServer({ investments: [], loans: [] });
+assert.deepEqual(getInvestmentEntities(), []);
+assert.deepEqual(getLoanEntities(), []);
+saveInvestmentEntity({ id: 'investment-1', name: 'Инвестиция 1' });
+saveLoanEntity({ id: 'loan-1', name: 'Займ 1' });
+assert.deepEqual(getInvestmentEntities().map((item) => item.name), ['Инвестиция 1']);
+assert.deepEqual(getLoanEntities().map((item) => item.name), ['Займ 1']);
 
 saveWallet({ id: 'custom', name: 'Мой кошелёк', photo: '', system: false });
 assert.equal(deleteWallet('custom'), true);
@@ -106,7 +127,15 @@ assert.match(ddsSource, /ДДС\.csv/);
 assert.match(folderSource, /variant === 'compact'/);
 assert.doesNotMatch(settingsSource, /\['wallets', 'Кошелёк'/);
 assert.match(walletSource, /workspaceHeaderContext\(\{[\s\S]*title: 'Касса'/);
-assert.match(walletSource, /data-add-wallet data-v2-primary-action data-v2-primary-label="\+"/);
+assert.match(walletSource, /v2Section\('Кошельки'/);
+assert.match(walletSource, /v2Section\('Инвестиции'/);
+assert.match(walletSource, /v2Section\('Займ'/);
+assert.match(walletSource, /entityCardRail/);
+assert.match(walletSource, /data-cash-create/);
+assert.match(walletSource, /\+ Добавить кошелек/);
+assert.match(walletSource, /\+ Добавить инвестицию/);
+assert.match(walletSource, /\+ Добавить займ/);
+assert.doesNotMatch(walletSource, /entityCardStack/);
 assert.match(walletSource, /title:\s*label/);
 assert.match(walletSource, /rightTop:\s*formatMoney\(operation\.total\)/);
 assert.match(walletSource, /rightBottom:\s*operationMoment\(operation\)/);

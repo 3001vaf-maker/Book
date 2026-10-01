@@ -42,4 +42,12 @@ export {
   updateWallet,
 } from './cash/data.js';
 
+export {
+  getInvestmentEntities,
+  getLoanEntities,
+  hydrateCashEntitiesFromServer,
+  saveInvestmentEntity,
+  saveLoanEntity,
+} from './cash/entities.js';
+
 export { financeNavigationItems, renderFinanceSection } from './finance.js';

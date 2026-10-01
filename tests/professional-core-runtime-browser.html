@@ -67,7 +67,7 @@
       verified:true, data:{ documents:[], consents:[], history:[] },
     };
     if (path.endsWith('/auxiliary-state')) return {
-      verified:true, wallets:[], tags:[], products:[], productHistory:[],
+      verified:true, wallets:[], investments:[], loans:[], tags:[], products:[], productHistory:[],
     };
     if (path.endsWith('/finance')) return {
       version:7,
@@ -338,6 +338,51 @@ ok(!shell()?.classList.contains('is-deck-open'), 'Cash selection did not enter Z
 ok(Boolean(shell()?.querySelector('[data-v2-workspace-a]')), 'Cash A/settings control missing');
 ok(shell()?.querySelector('[data-v2-workspace-primary]')?.textContent.trim() === '+', 'Cash C add control missing');
 ok(Boolean(shell()?.querySelector('[data-v2-workspace-chat]')), 'Cash D chat control missing');
+
+const cashSections = [...(shell()?.querySelectorAll('.v2-section') || [])];
+ok(cashSections.length === 3, 'Cash Z1 must contain exactly three sections');
+ok(cashSections.map((section) => section.querySelector('.v2-section__title')?.textContent.trim()).join('|') === 'Кошельки|Инвестиции|Займ',
+  'Cash Z1 section order must be Wallets, Investments, Loan');
+ok(Boolean(cashSections[0]?.querySelector('.entity-card-rail')), 'Cash wallets section must use horizontal layout');
+ok(!cashSections[1]?.querySelector('.entity-visual-card'), 'Cash investments section must start empty');
+ok(!cashSections[2]?.querySelector('.entity-visual-card'), 'Cash loan section must start empty');
+
+shell()?.querySelector('[data-v2-workspace-primary]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(35);
+let cashCreateMenu = document.querySelector('[data-modal][data-v2-layer-kind="bottom"]');
+ok(Boolean(cashCreateMenu), 'Cash C must open one bottom create modal');
+const cashCreateLabels = [...(cashCreateMenu?.querySelectorAll('.ui-button') || [])].map((node) => node.textContent.trim());
+ok(cashCreateLabels.join('|') === '+ Добавить кошелек|+ Добавить инвестицию|+ Добавить займ',
+  'Cash create modal must contain exactly wallet, investment and loan actions');
+
+cashCreateMenu?.querySelector('[data-cash-create-investment]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(30);
+let investmentForm = document.querySelector('[data-investment-form]');
+ok(Boolean(investmentForm), 'Cash Add investment must open the entity form');
+const investmentName = investmentForm?.querySelector('input[name="investmentName"]');
+if (investmentName) investmentName.value = 'Инвестиция Runtime';
+investmentForm?.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
+await wait(35);
+let investmentSection = [...(shell()?.querySelectorAll('.v2-section') || [])]
+  .find((section) => section.querySelector('.v2-section__title')?.textContent.trim() === 'Инвестиции');
+ok(Boolean(investmentSection?.querySelector('.entity-card-rail .entity-visual-card')), 'Saved investment must create a card in the horizontal Investments section');
+ok(investmentSection?.textContent.includes('Инвестиция Runtime'), 'Saved investment card name missing');
+
+shell()?.querySelector('[data-v2-workspace-primary]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(30);
+cashCreateMenu = document.querySelector('[data-modal][data-v2-layer-kind="bottom"]');
+cashCreateMenu?.querySelector('[data-cash-create-loan]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(30);
+let loanForm = document.querySelector('[data-loan-form]');
+ok(Boolean(loanForm), 'Cash Add loan must open the entity form');
+const loanName = loanForm?.querySelector('input[name="loanName"]');
+if (loanName) loanName.value = 'Займ Runtime';
+loanForm?.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
+await wait(35);
+let loanSection = [...(shell()?.querySelectorAll('.v2-section') || [])]
+  .find((section) => section.querySelector('.v2-section__title')?.textContent.trim() === 'Займ');
+ok(Boolean(loanSection?.querySelector('.entity-card-rail .entity-visual-card')), 'Saved loan must create a card in the horizontal Loan section');
+ok(loanSection?.textContent.includes('Займ Runtime'), 'Saved loan card name missing');
 
 const systemCashCard = shell()?.querySelector('[data-wallet="cash"]');
 ok(Boolean(systemCashCard?.classList.contains('entity-visual-card')), 'Cash Z1 must use the canonical fixed entity card');

@@ -5,12 +5,14 @@ import { PrismaService } from '../prisma.service';
 type JsonObject = Record<string, any>;
 type AuxiliaryBundle = {
   wallets: JsonObject[];
+  investments: JsonObject[];
+  loans: JsonObject[];
   tags: JsonObject[];
   products: JsonObject[];
   productHistory: JsonObject[];
 };
 
-const DATASETS = new Set(['wallets', 'tags', 'products', 'productHistory']);
+const DATASETS = new Set(['wallets', 'investments', 'loans', 'tags', 'products', 'productHistory']);
 
 function objectValue(value: unknown): JsonObject {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonObject : {};
@@ -28,6 +30,8 @@ function normalize(value: unknown): AuxiliaryBundle {
   const source = objectValue(value);
   return {
     wallets: (Array.isArray(source.wallets) ? source.wallets : []).map((item) => clone(objectValue(item))),
+    investments: (Array.isArray(source.investments) ? source.investments : []).map((item) => clone(objectValue(item))),
+    loans: (Array.isArray(source.loans) ? source.loans : []).map((item) => clone(objectValue(item))),
     tags: (Array.isArray(source.tags) ? source.tags : []).map((item) => clone(objectValue(item))),
     products: (Array.isArray(source.products) ? source.products : []).map((item) => clone(objectValue(item))),
     productHistory: (Array.isArray(source.productHistory) ? source.productHistory : []).map((item) => clone(objectValue(item))),

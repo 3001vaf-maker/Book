@@ -226,6 +226,7 @@ for (const token of ['calculateSettlement', 'getRecordPaymentState', 'getLedgerE
 }
 
 const walletData = source('core/finance/cash/data.js');
+const cashEntityData = source('core/finance/cash/entities.js');
 if (!/getWalletDDSMovements/.test(walletData) || !/export function getWalletBalance/.test(walletData)) {
   errors.push('Wallet must derive balance from Finance Ledger projection');
 }
@@ -274,8 +275,21 @@ const cashUI = source('core/finance/cash/cash.js');
 for (const token of ['workspaceHeaderContext', 'entityVisualCard', 'mountEntityCardConstructor', 'mountV2ZLayer', 'v2ListEntry', 'v2ListEntries', 'readOnlyReceipt']) {
   if (!cashUI.includes(token)) errors.push(`Cash UI must use shared ${token}`);
 }
-if (!/data-add-wallet data-v2-primary-action data-v2-primary-label="\+"/.test(cashUI)) {
-  errors.push('Cash C must be the shared Header primary + action');
+if (!/data-cash-create/.test(cashUI)
+  || !/v2Section\('Кошельки'/.test(cashUI)
+  || !/v2Section\('Инвестиции'/.test(cashUI)
+  || !/v2Section\('Займ'/.test(cashUI)
+  || !/entityCardRail/.test(cashUI)) {
+  errors.push('Cash Z1 must expose Wallets, Investments and Loan as three horizontal shared sections with Header C create action');
+}
+for (const label of ['+ Добавить кошелек', '+ Добавить инвестицию', '+ Добавить займ']) {
+  if (!cashUI.includes(label)) errors.push(`Cash C create modal missing action: ${label}`);
+}
+if (!/variant:\s*'quick'/.test(cashUI)) {
+  errors.push('Cash C entity choice must use the shared bottom quick modal');
+}
+if (/entityCardStack/.test(cashUI)) {
+  errors.push('Cash Z1 must not fall back to the old vertical entity card stack');
 }
 if (/entityCard--hero|\bentityCard\s*\(/.test(cashUI)) {
   errors.push('Cash Z1 must use the fixed shared entity visual card, not a local/legacy card');
@@ -296,6 +310,12 @@ if (!/Math\.abs\(getWalletBalance\(id\)\) > 0\.009/.test(walletData)) {
 }
 if (!/export function deleteWalletPermanently/.test(walletData)) {
   errors.push('Admin hard-delete flow must remove custom cash metadata only after the server purge');
+}
+if (!/getInvestmentEntities/.test(cashEntityData)
+  || !/getLoanEntities/.test(cashEntityData)
+  || !/queueAuxiliaryDataset\('investments'/.test(cashEntityData)
+  || !/queueAuxiliaryDataset\('loans'/.test(cashEntityData)) {
+  errors.push('Cash Investment and Loan must be persistent auxiliary entities, not visual placeholders');
 }
 
 if (!/wallets\/:walletId\/hard/.test(financeController)) {
