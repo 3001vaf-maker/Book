@@ -1,6 +1,7 @@
 import {
   datePicker,
   field,
+  formValidationMessage,
   initDatePickers,
   openNotice,
   select,
@@ -49,7 +50,7 @@ export function renderSpecialFinanceOperation(root, actionId, { onSaved = null, 
       aria: `Сохранить операцию ${action.title}`,
     },
   })}
-    <form class="compact-form" data-finance-special-form>
+    <form class="compact-form" data-finance-special-form novalidate>
       ${walletFields}
       ${field({ label: 'Сумма', name: 'amount', type: 'number', inputmode: 'decimal', value: existing.total || '', required: true, placeholder: '0', data: 'min="0" step="0.01"' })}
       ${!action.transfer ? field({ label: action.counterparty || 'Контрагент', name: 'counterparty', value: existing.counterparty || '', placeholder: 'Необязательно' }) : ''}
@@ -61,7 +62,13 @@ export function renderSpecialFinanceOperation(root, actionId, { onSaved = null, 
 
   root.querySelector('[data-finance-special-form]')?.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const data = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const validation = formValidationMessage(form);
+    if (validation) {
+      openNotice({ message: validation });
+      return;
+    }
+    const data = new FormData(form);
     const payload = {
       kind: action.kind,
       amount: Number(data.get('amount') || 0),
