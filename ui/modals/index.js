@@ -1,5 +1,4 @@
 import { escapeHtml } from '../utils/escape-html.js';
-import { button } from '../buttons/index.js';
 import { mountV2Layer, v2Layer } from '../v2/index.js';
 
 let modalLevel = 0;
@@ -64,10 +63,7 @@ export function mountModal(root, html) {
   return m;
 }
 
-export function openNotice({ title = 'Внимание', message = '', action = 'ОК', variant = 'top', surface = 'app' } = {}) {
-  const content = `<div class="modal-title"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(message)}</p></div><div class="modal-actions">${button(escapeHtml(action), { data: 'data-notice-close' })}</div>`;
-  const m = mountModal(document.body, modal(content, { variant, surface, title }));
-  if (!m) return null;
-  m.querySelector('[data-notice-close]')?.addEventListener('click', () => m.v2Close?.());
-  return m;
+export function openNotice({ title = 'Внимание', message = '', variant = 'top', surface = 'app' } = {}) {
+  const content = `<div class="modal-title"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(message)}</p></div>`;
+  return mountModal(document.body, modal(content, { variant, surface, title }));
 }
