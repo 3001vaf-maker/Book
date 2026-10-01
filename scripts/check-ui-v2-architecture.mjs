@@ -357,7 +357,7 @@ expect(modals.includes("import { mountV2Layer, v2Layer } from '../v2/index.js';"
   && modals.includes('v2Layer(content')
   && modals.includes('mountV2Layer(html, { root })')
   && modals.includes("MODAL_VARIANTS = new Set(['list', 'large', 'medium', 'compact', 'quick', 'top', 'standard', 'bottom', 'technical'])")
-  && modals.includes("openNotice({ title = 'Внимание', message = '', variant = 'top'")
+  && modals.includes("openNotice({ title = 'Внимание', message = '', surface = 'app'")
   && !modals.includes('<div class="modal-backdrop"'),
   'ui/modals must remain the sole public modal owner, route user notices to swipe-only TOP, and reserve technical overlays for exceptional system cases.');
 expect(timeUi.includes("variant:'bottom'") && timeUi.includes("className:'modal--time-picker-sheet'"), 'Time Picker must use the Shared BOTTOM action modal; TOP/technical/native variants are forbidden for this ordinary picker.');
