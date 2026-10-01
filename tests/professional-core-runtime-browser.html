@@ -320,9 +320,10 @@ const closeTopDdsZ = async (pointerId, label) => {
   mark('dds-close-' + label);
   const layer = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
   ok(Boolean(layer), 'DDS Z layer missing before close: ' + label);
-  pointer(layer,'pointerdown',18,360,pointerId);
-  pointer(layer,'pointermove',92,362,pointerId);
-  pointer(layer,'pointerup',92,362,pointerId);
+  const zEdge = edge();
+  pointer(zEdge,'pointerdown',10,360,pointerId);
+  pointer(zEdge,'pointermove',82,362,pointerId);
+  pointer(zEdge,'pointerup',82,362,pointerId);
   await wait(70);
 };
 
