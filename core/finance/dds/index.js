@@ -247,7 +247,6 @@ function openCancellationInfo(root) {
   return openNotice({
     title: 'Об отмене операции',
     message: 'Отмена сохраняет исходную операцию в истории и создаёт обратную операцию на выбранную фактическую дату.',
-    action: 'Закрыть',
     variant: 'top',
     surface: 'app',
   });
@@ -303,7 +302,8 @@ function openDeleteOperation(root, operationLayer, entries) {
     </div>`;
   const confirmation = mountModal(document.body, modal(content, {
     title: 'Удалить операцию',
-    variant: 'top',
+    variant: 'bottom',
+    className: 'modal--form-sheet',
     surface: 'app',
   }));
   if (!confirmation) return;
