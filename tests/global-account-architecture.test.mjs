@@ -70,6 +70,17 @@ assert.match(controller, /@Get\('account\/me'\)/, 'Global client app must expose
 assert.match(controller, /@Get\('account\/relationships'\)/, 'Global client app must expose Account relationships');
 assert.match(controller, /@Delete\('account\/relationships\/:tenantId'\)/, 'Global client app must expose Account relationship removal');
 assert.match(controller, /@Get\('account\/records'\)/, 'Global client app must expose cross-tenant history');
+assert.match(controller, /@Post\('account\/investments\/:tenantId\/:investmentId\/decision'\)/, 'Global Account must expose linked investment decision route');
+assert.match(booking, /private async accountInvestmentRelationships\(/, 'Linked investor card must project from the professional investment entity');
+assert.match(booking, /acceptedIds/, 'Pending investment proposals must not project operational history');
+assert.match(booking, /text\(terms\.participantStatus\) === 'accepted'[\s\S]*investmentEvents/, 'Investment events must be shared with the linked investor only after acceptance');
+const investmentDecisionStart = booking.indexOf('async decideGlobalAccountInvestment');
+const investmentDecisionEnd = booking.indexOf('async globalAccountRelationships', investmentDecisionStart);
+const investmentDecisionBlock = booking.slice(investmentDecisionStart, investmentDecisionEnd);
+assert.match(investmentDecisionBlock, /participantStatus\) !== 'pending'/, 'Investment proposal can be decided only once');
+assert.match(investmentDecisionBlock, /finance\.investment\.raise\.access/, 'Investment acceptance must respect the administrator capability');
+assert.match(accountShell, /data-account-investment=/, 'Accepted investment must appear as an Entity Card in the end-user Overview');
+assert.match(accountShell, /data-account-investment-chat/, 'Linked investment must expose the shared Header D chat');
 const deleteRelationshipStart = booking.indexOf('async deleteGlobalAccountRelationship');
 const deleteRelationshipEnd = booking.indexOf('async globalAccountRecords', deleteRelationshipStart);
 const deleteRelationshipBlock = booking.slice(deleteRelationshipStart, deleteRelationshipEnd);
