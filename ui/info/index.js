@@ -7,9 +7,15 @@ export function infoUI(message = '', {
   className = '',
   inverse = false,
   data = '',
+  actionOnly = false,
 } = {}) {
   const id = `ui-info-${++infoSequence}`;
   const classes = ['ui-info', inverse ? 'ui-info--inverse' : '', className].filter(Boolean).join(' ');
+  if (actionOnly) {
+    return `<span class="${escapeHtml(classes)}" data-info-ui${data ? ` ${data}` : ''}>
+      <button type="button" class="ui-info__trigger" data-info-trigger aria-label="${escapeHtml(aria)}">i</button>
+    </span>`;
+  }
   return `<span class="${escapeHtml(classes)}" data-info-ui${data ? ` ${data}` : ''}>
     <button type="button" class="ui-info__trigger" data-info-trigger aria-label="${escapeHtml(aria)}" aria-expanded="false" aria-controls="${id}">i</button>
     <span class="ui-info__panel" id="${id}" data-info-panel role="note" hidden>${escapeHtml(message)}</span>
