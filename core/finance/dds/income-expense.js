@@ -2,6 +2,7 @@ import {
   button,
   datePicker,
   field,
+  formValidationMessage,
   initDatePickers,
   openNotice,
   searchableSelect,
@@ -106,6 +107,11 @@ function collectLines(root) {
 async function saveManual(root, direction, onSaved, operation = null) {
   const form = root.querySelector('[data-finance-manual-form]');
   if (!form) return;
+  const validation = formValidationMessage(form);
+  if (validation) {
+    openNotice({ message: validation });
+    return;
+  }
   const data = new FormData(form);
   const mode = String(data.get('entryMode') || 'simple');
   const walletId = String(data.get('walletId') || '');
@@ -126,6 +132,10 @@ async function saveManual(root, direction, onSaved, operation = null) {
   };
   if (!payload.occurredAt) {
     openNotice({ message: 'Укажите фактическую дату операции.' });
+    return;
+  }
+  if (mode === 'detail' && !payload.lines.length) {
+    openNotice({ message: 'Добавьте хотя бы одну позицию с названием, количеством и ценой.' });
     return;
   }
   try {
@@ -166,7 +176,7 @@ export function renderIncomeExpenseOperation(root, direction, { onSaved = null, 
       aria: isIncome ? 'Сохранить доход' : 'Сохранить расход',
     },
   })}
-    <form class="compact-form" data-finance-manual-form>
+    <form class="compact-form" data-finance-manual-form novalidate>
       ${select({ label: 'Статья', name: 'articleId', value: articleId, options: articles, searchable: true })}
       ${select({ label: 'Кошелёк', name: 'walletId', value: walletId, options: wallets })}
       ${select({ label: 'Ввод', name: 'entryMode', value: mode, options: [{ value: 'simple', label: 'Сумма' }, { value: 'detail', label: 'Детально' }] })}
