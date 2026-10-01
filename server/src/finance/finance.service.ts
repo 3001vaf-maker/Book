@@ -931,6 +931,289 @@ export class FinanceService {
     return this.snapshot(tenantId);
   }
 
+  async correctOperation(tenantId: string, operationId: string, body: unknown) {
+    await this.ensureDefaultArticles(tenantId);
+    const id = text(operationId);
+    const current = await this.prisma.financeOperation.findUnique({
+      where: { tenantId_operationId: { tenantId, operationId: id } },
+      include: { ledgerEntries: true },
+    });
+    if (!current) throw new NotFoundException('Операция не найдена');
+    if (current.kind === 'cancel' || current.status === 'cancelled') {
+      throw new BadRequestException('Отменённую операцию корректировать нельзя');
+    }
+
+    const related = await this.prisma.financeOperation.findFirst({
+      where: { tenantId, originalOperationId: current.operationId },
+      select: { operationId: true },
+    });
+    if (related) {
+      throw new BadRequestException('Операцию со связанными возвратами или отменами сначала нужно привести в исходное состояние');
+    }
+
+    const input = objectValue(body);
+    const currentData = objectValue(current.data);
+    const occurredAt = requiredOccurredAt(input.occurredAt ?? current.occurredAt);
+    let nextData: JsonObject = {};
+    let nextEntries: JsonObject[] = [];
+
+    if (current.kind === 'manual-income' || current.kind === 'manual-expense') {
+      const direction = current.kind === 'manual-income' ? 'IN' : 'OUT';
+      const walletId = text(input.walletId ?? currentData.walletId);
+      const walletName = text(input.walletName ?? currentData.walletName);
+      if (!walletId) throw new BadRequestException('Выберите кошелёк');
+      const operationArticleId = text(input.articleId ?? currentData.articleId);
+      const rawLines = input.lines == null ? arrayValue(currentData.lines) : arrayValue(input.lines);
+      const simpleAmount = money(input.amount == null ? currentData.total : input.amount);
+      const preparedLines = rawLines.length
+        ? rawLines.map((value, index) => {
+            const row = objectValue(value);
+            const quantity = Math.max(0, numberValue(row.quantity || 1));
+            const unitPrice = money(row.unitPrice ?? row.price);
+            const total = money(quantity * unitPrice);
+            return {
+              lineName: text(row.name ?? row.lineName) || `Позиция ${index + 1}`,
+              quantity,
+              unitPrice,
+              total,
+              articleId: text(row.articleId || operationArticleId),
+            };
+          }).filter((row) => row.quantity > 0 && row.unitPrice > 0 && row.total > 0)
+        : (simpleAmount > 0 ? [{
+            lineName: text(input.name),
+            quantity: 1,
+            unitPrice: simpleAmount,
+            total: simpleAmount,
+            articleId: operationArticleId,
+          }] : []);
+      if (!preparedLines.length) throw new BadRequestException('Введите сумму или позиции');
+
+      const articleIds = [...new Set(preparedLines.map((line) => line.articleId).filter(Boolean))];
+      if (!articleIds.length) throw new BadRequestException('Выберите статью');
+      const articles = await this.prisma.financeArticle.findMany({
+        where: { tenantId, articleId: { in: articleIds }, archivedAt: null },
+      });
+      const articleById = new Map(articles.map((article) => [article.articleId, article]));
+      for (const line of preparedLines) {
+        const article = articleById.get(line.articleId);
+        if (!article) throw new BadRequestException('Статья не найдена');
+        if (article.economicType === 'GROUP') throw new BadRequestException('Выберите конечную статью, а не группу');
+        if (article.direction !== direction) throw new BadRequestException('Статья не соответствует типу операции');
+      }
+      const note = input.note == null ? text(currentData.note) : text(input.note);
+      const total = money(preparedLines.reduce((sum, line) => sum + line.total, 0));
+      nextData = {
+        direction,
+        articleId: operationArticleId,
+        walletId,
+        walletName,
+        note,
+        total,
+        lines: preparedLines,
+      };
+      nextEntries = preparedLines.map((line) => {
+        const article = articleById.get(line.articleId)!;
+        return {
+          walletId,
+          walletName,
+          direction,
+          economicType: article.economicType,
+          amount: line.total,
+          component: 'manual',
+          articleId: article.articleId,
+          articleName: article.name,
+          lineName: line.lineName,
+          quantity: line.quantity,
+          unitPrice: line.unitPrice,
+          note,
+        };
+      });
+    } else if (['loan-received', 'loan-repayment', 'investment-received', 'investment-return', 'transfer'].includes(current.kind)) {
+      const amount = money(input.amount == null ? currentData.total : input.amount);
+      if (amount <= 0) throw new BadRequestException('Введите сумму операции');
+      const note = input.note == null ? text(currentData.note) : text(input.note);
+      const counterparty = input.counterparty == null ? text(currentData.counterparty) : text(input.counterparty);
+
+      if (current.kind === 'transfer') {
+        const fromWalletId = text(input.fromWalletId ?? currentData.fromWalletId);
+        const fromWalletName = text(input.fromWalletName ?? currentData.fromWalletName);
+        const toWalletId = text(input.toWalletId ?? currentData.toWalletId);
+        const toWalletName = text(input.toWalletName ?? currentData.toWalletName);
+        if (!fromWalletId || !toWalletId) throw new BadRequestException('Выберите оба кошелька');
+        if (fromWalletId === toWalletId) throw new BadRequestException('Для перевода нужны разные кошельки');
+        const article = await this.prisma.financeArticle.findFirst({
+          where: { tenantId, systemKey: 'TRANSFER', archivedAt: null },
+        });
+        if (!article) throw new BadRequestException('Системная статья перевода не найдена');
+        nextData = { total: amount, fromWalletId, fromWalletName, toWalletId, toWalletName, note };
+        nextEntries = [
+          {
+            walletId: fromWalletId,
+            walletName: fromWalletName,
+            direction: 'OUT',
+            economicType: 'TRANSFER',
+            amount,
+            component: 'transfer-out',
+            articleId: article.articleId,
+            articleName: article.name,
+            note,
+          },
+          {
+            walletId: toWalletId,
+            walletName: toWalletName,
+            direction: 'IN',
+            economicType: 'TRANSFER',
+            amount,
+            component: 'transfer-in',
+            articleId: article.articleId,
+            articleName: article.name,
+            note,
+          },
+        ];
+      } else {
+        const definitions: Record<string, {
+          direction: 'IN' | 'OUT';
+          economicType: string;
+          systemKey: string;
+        }> = {
+          'loan-received': { direction: 'IN', economicType: 'LOAN_RECEIVED', systemKey: 'LOAN_RECEIVED' },
+          'loan-repayment': { direction: 'OUT', economicType: 'LOAN_REPAYMENT', systemKey: 'LOAN_REPAYMENT' },
+          'investment-received': { direction: 'IN', economicType: 'INVESTMENT_RECEIVED', systemKey: 'INVESTMENT_RECEIVED' },
+          'investment-return': { direction: 'OUT', economicType: 'INVESTMENT_RETURN', systemKey: 'INVESTMENT_RETURN' },
+        };
+        const definition = definitions[current.kind];
+        const walletId = text(input.walletId ?? currentData.walletId);
+        const walletName = text(input.walletName ?? currentData.walletName);
+        if (!walletId) throw new BadRequestException('Выберите кошелёк');
+        const article = await this.prisma.financeArticle.findFirst({
+          where: { tenantId, systemKey: definition.systemKey, archivedAt: null },
+        });
+        if (!article) throw new BadRequestException('Системная статья операции не найдена');
+        nextData = {
+          total: amount,
+          walletId,
+          walletName,
+          counterparty,
+          note,
+          articleId: article.articleId,
+        };
+        nextEntries = [{
+          walletId,
+          walletName,
+          direction: definition.direction,
+          economicType: definition.economicType,
+          amount,
+          component: current.kind,
+          articleId: article.articleId,
+          articleName: article.name,
+          lineName: counterparty,
+          quantity: 1,
+          unitPrice: amount,
+          note,
+        }];
+      }
+    } else if (current.kind === 'payment') {
+      const settlement = validSettlement(currentData.settlement);
+      if (!settlement) throw new BadRequestException('У оплаты отсутствует расчёт');
+      const allocations = input.allocations == null
+        ? allocationsValue(currentData.allocations)
+        : allocationsValue(input.allocations);
+      if (!allocations.length) throw new BadRequestException('Не выбран кошелёк');
+      const allocated = money(allocations.reduce((sum, entry) => sum + entry.amount, 0));
+      const tips = Math.min(allocated, money(input.tips == null ? currentData.tips : input.tips));
+      const serviceAmount = money(input.serviceAmount == null ? currentData.serviceAmount : input.serviceAmount);
+      if (serviceAmount <= 0 || money(serviceAmount + tips) !== allocated) {
+        throw new BadRequestException('Сумма оплаты не совпадает с распределением по кошелькам');
+      }
+      const otherRows = await this.prisma.financeLedgerEntry.findMany({
+        where: {
+          tenantId,
+          sourceType: current.sourceType,
+          sourceId: current.sourceId,
+          financeOperationId: { not: current.id },
+        },
+        select: { direction: true, amount: true, data: true },
+      });
+      const otherPaid = money(otherRows.reduce((sum, row) => {
+        if (text(objectValue(row.data).component) !== 'service') return sum;
+        const amount = numberValue(row.amount);
+        return sum + (row.direction === 'IN' ? amount : -amount);
+      }, 0));
+      const due = Math.max(0, money(settlement.planTotal - otherPaid));
+      if (serviceAmount > due + 0.009) throw new BadRequestException('Оплата превышает остаток к оплате');
+      const components = splitAllocationComponents(allocations, serviceAmount, tips);
+      nextData = {
+        workplace: text(currentData.workplace),
+        person: clone(objectValue(currentData.person)),
+        allocations,
+        total: allocated,
+        serviceAmount,
+        tips,
+        settlement,
+      };
+      nextEntries = components.map((entry) => ({
+        ...entry,
+        direction: 'IN',
+        economicType: entry.component === 'tips' ? 'TIPS' : 'SERVICE_REVENUE',
+      }));
+    } else if (current.kind === 'refund') {
+      const paymentId = text(current.originalOperationId);
+      const payment = await this.prisma.financeOperation.findUnique({
+        where: { tenantId_operationId: { tenantId, operationId: paymentId } },
+      });
+      if (!payment || payment.kind !== 'payment') throw new NotFoundException('Исходная оплата не найдена');
+      const paymentData = objectValue(payment.data);
+      const siblings = await this.prisma.financeOperation.findMany({
+        where: {
+          tenantId,
+          kind: 'refund',
+          originalOperationId: paymentId,
+          status: 'completed',
+          operationId: { not: current.operationId },
+        },
+      });
+      const refundedTips = money(siblings.reduce((sum, row) => sum + money(objectValue(row.data).tips), 0));
+      const refundedService = money(siblings.reduce((sum, row) => sum + money(objectValue(row.data).serviceAmount), 0));
+      const tipsRemaining = Math.max(0, money(paymentData.tips - refundedTips));
+      const serviceRemaining = Math.max(0, money(paymentData.serviceAmount - refundedService));
+      const remaining = money(tipsRemaining + serviceRemaining);
+      const requested = Math.min(remaining, money(input.amount == null ? currentData.total : input.amount));
+      if (requested <= 0) throw new BadRequestException('Некорректная сумма возврата');
+      const serviceAmount = Math.min(requested, serviceRemaining);
+      const tips = Math.min(money(requested - serviceAmount), tipsRemaining);
+      const walletId = text(input.walletId ?? currentData.walletId);
+      const walletName = text(input.walletName ?? currentData.walletName);
+      if (!walletId) throw new BadRequestException('Не выбран кошелёк возврата');
+      const reason = input.reason == null ? text(currentData.reason) : text(input.reason);
+      nextData = {
+        workplace: text(paymentData.workplace),
+        person: clone(objectValue(paymentData.person)),
+        walletId,
+        walletName,
+        total: money(serviceAmount + tips),
+        serviceAmount,
+        tips,
+        reason,
+        settlement: clone(objectValue(paymentData.settlement)),
+      };
+      nextEntries = [
+        ...(serviceAmount > 0 ? [{
+          walletId, walletName, amount: serviceAmount, component: 'service', direction: 'OUT', economicType: 'SERVICE_REFUND',
+        }] : []),
+        ...(tips > 0 ? [{
+          walletId, walletName, amount: tips, component: 'tips', direction: 'OUT', economicType: 'TIPS_REFUND',
+        }] : []),
+      ];
+    } else {
+      throw new BadRequestException('Для этой операции корректировка недоступна');
+    }
+
+    await this.serializable(async (tx) => {
+      await this.replaceOperationWithEntries(tx, tenantId, current, occurredAt, nextData, nextEntries);
+    });
+    return this.snapshot(tenantId);
+  }
+
   async cancelOperation(tenantId: string, operationId: string, body: unknown) {
     const id = text(operationId);
     const input = objectValue(body);
