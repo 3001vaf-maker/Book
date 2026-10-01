@@ -253,6 +253,9 @@ for (const path of financeUiFiles) {
   if (/variant:\s*['"]technical['"]/.test(text)) errors.push(`${path}: Finance user UI must not use technical modals`);
   if (/<select\b/.test(text)) errors.push(`${path}: Finance user UI must not use raw select elements`);
   if (/\b(?:alert|confirm|prompt)\s*\(/.test(text)) errors.push(`${path}: Finance user UI must not use browser dialogs`);
+  for (const form of text.match(/<form\b[^>]*>/g) || []) {
+    if (!/\bnovalidate\b/.test(form)) errors.push(`${path}: Finance forms must disable native browser validation UI and surface validation through shared TOP notices`);
+  }
 }
 
 const modalUI = source('ui/modals/index.js');
