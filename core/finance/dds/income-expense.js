@@ -1,21 +1,19 @@
 import {
   button,
+  datePicker,
   field,
+  initDatePickers,
   openNotice,
+  searchableSelect,
   select,
   textareaField,
   workspaceHeaderContext,
 } from '../../../ui/ui.js';
 import { getFinanceArticles } from '../data.js';
 import { getWallets } from '../cash/data.js';
+import { financeLocalDateValue, financeOccurredAtForDate } from '../date.js';
+import { getLedgerEntries } from '../read.js';
 import { correctFinanceOperation, recordManualFinanceOperation } from '../service.js';
-
-function localDateTimeValue(value = new Date()) {
-  const date = value instanceof Date ? value : new Date(value);
-  const safe = Number.isFinite(date.getTime()) ? date : new Date();
-  const shifted = new Date(safe.getTime() - safe.getTimezoneOffset() * 60000);
-  return shifted.toISOString().slice(0, 16);
-}
 
 function articleOptions(direction) {
   return getFinanceArticles()
@@ -27,18 +25,51 @@ function walletOptions() {
   return getWallets().map((item) => ({ value: item.id, label: item.name }));
 }
 
-function detailRow(values = {}) {
+function manualLineOptions(direction) {
+  const kind = direction === 'IN' ? 'manual-income' : 'manual-expense';
+  return [...new Set(getLedgerEntries()
+    .filter((item) => item?.operationKind === kind)
+    .map((item) => String(item?.lineName || '').trim())
+    .filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, 'ru'))
+    .map((value) => ({ value, label: value }));
+}
+
+function detailRow(values = {}, direction = 'IN') {
   return `<div class="array-row" data-finance-manual-line>
-    <input type="text" name="lineName" value="${String(values.name ?? values.lineName ?? '').replaceAll('"', '&quot;')}" placeholder="Что купили / что получили">
-    <input type="number" min="0" step="0.01" inputmode="decimal" name="lineQuantity" value="${values.quantity ?? 1}" placeholder="Количество">
-    <input type="number" min="0" step="0.01" inputmode="decimal" name="linePrice" value="${values.unitPrice ?? ''}" placeholder="Цена">
+    ${searchableSelect({
+      label: 'Позиция',
+      name: 'lineName',
+      value: values.name ?? values.lineName ?? '',
+      options: manualLineOptions(direction),
+      placeholder: 'Введите или выберите',
+    })}
+    ${field({
+      label: 'Количество',
+      name: 'lineQuantity',
+      type: 'number',
+      inputmode: 'decimal',
+      value: values.quantity ?? 1,
+      data: 'min="0" step="0.01"',
+    })}
+    ${field({
+      label: 'Цена',
+      name: 'linePrice',
+      type: 'number',
+      inputmode: 'decimal',
+      value: values.unitPrice ?? '',
+      placeholder: '0',
+      data: 'min="0" step="0.01"',
+    })}
     <button type="button" class="remove-button" data-finance-manual-line-remove aria-label="Удалить строку">×</button>
   </div>`;
 }
 
-function modeMarkup(mode, { amount = '', lines = [] } = {}) {
+function modeMarkup(mode, { amount = '', lines = [], direction = 'IN' } = {}) {
   if (mode === 'detail') {
-    const rows = (Array.isArray(lines) && lines.length ? lines : [{}]).map(detailRow).join('');
+    const rows = (Array.isArray(lines) && lines.length ? lines : [{}])
+      .map((item) => detailRow(item, direction))
+      .join('');
     return `<div class="array-group" data-finance-manual-detail>
       <span class="array-label">Позиции</span>
       <div data-finance-manual-lines>${rows}</div>
@@ -57,11 +88,11 @@ function modeMarkup(mode, { amount = '', lines = [] } = {}) {
   });
 }
 
-function syncMode(root) {
+function syncMode(root, direction) {
   const mode = String(root.querySelector('input[name="entryMode"]')?.value || 'simple');
   const host = root.querySelector('[data-finance-manual-mode]');
   if (!host) return;
-  host.innerHTML = modeMarkup(mode);
+  host.innerHTML = modeMarkup(mode, { direction });
 }
 
 function collectLines(root) {
@@ -69,16 +100,20 @@ function collectLines(root) {
     name: String(row.querySelector('[name="lineName"]')?.value || '').trim(),
     quantity: Number(row.querySelector('[name="lineQuantity"]')?.value || 0),
     unitPrice: Number(row.querySelector('[name="linePrice"]')?.value || 0),
-  })).filter((row) => row.quantity > 0 && row.unitPrice > 0);
+  })).filter((row) => row.name && row.quantity > 0 && row.unitPrice > 0);
 }
 
-async function saveManual(root, direction, onSaved, operationId = '') {
+async function saveManual(root, direction, onSaved, operation = null) {
   const form = root.querySelector('[data-finance-manual-form]');
   if (!form) return;
   const data = new FormData(form);
   const mode = String(data.get('entryMode') || 'simple');
   const walletId = String(data.get('walletId') || '');
   const wallet = getWallets().find((item) => item.id === walletId);
+  const occurredAt = financeOccurredAtForDate(
+    String(data.get('occurredDate') || ''),
+    operation?.occurredAt || new Date(),
+  );
   const payload = {
     direction,
     articleId: String(data.get('articleId') || ''),
@@ -87,14 +122,14 @@ async function saveManual(root, direction, onSaved, operationId = '') {
     amount: mode === 'simple' ? Number(data.get('amount') || 0) : null,
     lines: mode === 'detail' ? collectLines(root) : [],
     note: String(data.get('note') || '').trim(),
-    occurredAt: data.get('occurredAt') ? new Date(String(data.get('occurredAt'))).toISOString() : '',
+    occurredAt,
   };
   if (!payload.occurredAt) {
-    openNotice({ message: 'Укажите фактическую дату и время операции.' });
+    openNotice({ message: 'Укажите фактическую дату операции.' });
     return;
   }
   try {
-    if (operationId) await correctFinanceOperation(operationId, payload);
+    if (operation?.operationId) await correctFinanceOperation(operation.operationId, payload);
     else await recordManualFinanceOperation(payload);
     onSaved?.();
   } catch (error) {
@@ -135,17 +170,19 @@ export function renderIncomeExpenseOperation(root, direction, { onSaved = null, 
       ${select({ label: 'Статья', name: 'articleId', value: articleId, options: articles, searchable: true })}
       ${select({ label: 'Кошелёк', name: 'walletId', value: walletId, options: wallets })}
       ${select({ label: 'Ввод', name: 'entryMode', value: mode, options: [{ value: 'simple', label: 'Сумма' }, { value: 'detail', label: 'Детально' }] })}
-      ${field({ label: 'Фактическая дата и время', name: 'occurredAt', type: 'datetime-local', value: localDateTimeValue(operation?.occurredAt || new Date()), required: true })}
-      <div data-finance-manual-mode>${modeMarkup(mode, { amount: simpleAmount, lines })}</div>
+      ${datePicker({ label: 'Фактическая дата', name: 'occurredDate', value: financeLocalDateValue(operation?.occurredAt || new Date()), required: true, allowClear: false })}
+      <div data-finance-manual-mode>${modeMarkup(mode, { amount: simpleAmount, lines, direction })}</div>
       ${textareaField({ label: 'Примечание', name: 'note', value: existing.note || '', rows: 3, placeholder: 'Необязательно' })}
     </form>`;
 
+  initDatePickers(root);
+
   root.addEventListener('change', (event) => {
-    if (event.target?.matches?.('input[name="entryMode"]')) syncMode(root);
+    if (event.target?.matches?.('input[name="entryMode"]')) syncMode(root, direction);
   });
   root.addEventListener('click', (event) => {
     if (event.target.closest?.('[data-finance-manual-line-add]')) {
-      root.querySelector('[data-finance-manual-lines]')?.insertAdjacentHTML('beforeend', detailRow());
+      root.querySelector('[data-finance-manual-lines]')?.insertAdjacentHTML('beforeend', detailRow({}, direction));
       return;
     }
     const remove = event.target.closest?.('[data-finance-manual-line-remove]');
@@ -156,7 +193,7 @@ export function renderIncomeExpenseOperation(root, direction, { onSaved = null, 
   });
   root.querySelector('[data-finance-manual-form]')?.addEventListener('submit', (event) => {
     event.preventDefault();
-    void saveManual(root, direction, onSaved, operation?.operationId || '');
+    void saveManual(root, direction, onSaved, operation);
   });
   root.querySelector('[data-finance-manual-save]')?.addEventListener('click', () => {
     root.querySelector('[data-finance-manual-form]')?.requestSubmit();
