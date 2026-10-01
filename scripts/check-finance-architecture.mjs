@@ -236,7 +236,7 @@ if (financeCss.length) {
 }
 
 const cashUI = source('core/finance/cash/cash.js');
-for (const token of ['workspaceHeaderContext', 'entityVisualCard', 'mountEntityCardConstructor', 'mountV2ZLayer', 'v2ListEntry', 'paymentReceipt']) {
+for (const token of ['workspaceHeaderContext', 'entityVisualCard', 'mountEntityCardConstructor', 'mountV2ZLayer', 'v2ListEntry', 'v2ListEntries', 'readOnlyReceipt']) {
   if (!cashUI.includes(token)) errors.push(`Cash UI must use shared ${token}`);
 }
 if (!/data-add-wallet data-v2-primary-action data-v2-primary-label="\+"/.test(cashUI)) {
@@ -244,6 +244,9 @@ if (!/data-add-wallet data-v2-primary-action data-v2-primary-label="\+"/.test(ca
 }
 if (/entityCard--hero|\bentityCard\s*\(/.test(cashUI)) {
   errors.push('Cash Z1 must use the fixed shared entity visual card, not a local/legacy card');
+}
+if (/paymentReceipt/.test(cashUI)) {
+  errors.push('Cash operation Z3 must use shared readOnlyReceipt, not paymentReceipt');
 }
 if (/Внесено в систему|Конечный пользователь|За что/.test(cashUI)) {
   errors.push('Cash receipt must not expose recording time, end-user headings or paid-for detail');
