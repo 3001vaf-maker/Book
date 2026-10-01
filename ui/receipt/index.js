@@ -15,8 +15,13 @@ export function readOnlyReceipt({
   action = null,
 } = {}) {
   const headerVisible = [title, status, date, time].some((value) => String(value ?? '').trim());
+  const meta = [
+    String(status ?? '').trim() ? `<strong>${text(status)}</strong>` : '',
+    String(date ?? '').trim() ? `<span>${text(date)}</span>` : '',
+    String(time ?? '').trim() ? `<span>${text(time)}</span>` : '',
+  ].filter(Boolean).join('');
   const header = headerVisible
-    ? `<header class="read-only-sheet__header"><h2>${text(title)}</h2><div class="read-only-sheet__meta"><strong>${text(status)}</strong><span>${text(date)}</span><span>${text(time)}</span></div></header>`
+    ? `<header class="read-only-sheet__header">${String(title ?? '').trim() ? `<h2>${text(title)}</h2>` : ''}${meta ? `<div class="read-only-sheet__meta">${meta}</div>` : ''}</header>`
     : '';
   return `<section class="read-only-sheet" data-read-only-sheet>
     ${header}
