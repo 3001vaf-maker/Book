@@ -247,7 +247,6 @@ function openCancellationInfo(root) {
   return openNotice({
     title: 'Об отмене операции',
     message: 'Отмена сохраняет исходную операцию в истории и создаёт обратную операцию на выбранную фактическую дату.',
-    variant: 'top',
     surface: 'app',
   });
 }
