@@ -67,14 +67,14 @@ export function cashEntityCardFields(entity = {}, balance = 0, kind = '', dueDat
   return fields;
 }
 
-export function cashEntityCardAppearance(entity = {}) {
+export function cashEntityCardAppearance(entity = {}, kind = '') {
   if (hasConfiguredLines(entity?.cardAppearance)) {
     return normalizeEntityCardAppearance(entity.cardAppearance);
   }
   return normalizeEntityCardAppearance({
     lines: defaultLines([
       { row: 7, field: 'entityName', zone: 'full', align: 'left', size: 'l', bold: true },
-      { row: 8, field: 'investmentRole', zone: 'left', align: 'left', size: 'm' },
+      { row: 8, field: kind === 'loan' ? 'dueDate' : kind === 'investment' ? 'investmentRole' : '', zone: 'left', align: 'left', size: 'm' },
       { row: 9, field: 'balance', zone: 'right', align: 'right', size: 'm', bold: true },
     ]),
   });
