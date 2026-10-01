@@ -915,6 +915,46 @@ export class FinanceService {
     return this.snapshot(tenantId);
   }
 
+  async hardDeleteOperation(tenantId: string, operationId: string) {
+    const id = text(operationId);
+    if (!id) throw new BadRequestException('Операция не найдена');
+
+    const current = await this.prisma.financeOperation.findUnique({
+      where: { tenantId_operationId: { tenantId, operationId: id } },
+      select: { operationId: true },
+    });
+    if (!current) return this.snapshot(tenantId);
+
+    await this.serializable(async (tx) => {
+      const operationIds = new Set([current.operationId]);
+      let frontier = [current.operationId];
+
+      while (frontier.length) {
+        const related = await tx.financeOperation.findMany({
+          where: {
+            tenantId,
+            originalOperationId: { in: frontier },
+          },
+          select: { operationId: true },
+        });
+        const next = related
+          .map((row) => row.operationId)
+          .filter((relatedId) => !operationIds.has(relatedId));
+        next.forEach((relatedId) => operationIds.add(relatedId));
+        frontier = next;
+      }
+
+      await tx.financeOperation.deleteMany({
+        where: {
+          tenantId,
+          operationId: { in: [...operationIds] },
+        },
+      });
+    });
+
+    return this.snapshot(tenantId);
+  }
+
   async hardDeleteWallet(tenantId: string, platformAccountId: string, walletId: string) {
     const accountId = text(platformAccountId);
     const id = text(walletId);
