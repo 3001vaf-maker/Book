@@ -264,9 +264,10 @@ function openCancelOperation(root, operationLayer, entries) {
       ${field({ label: 'Фактическая дата и время отмены', name: 'financeCancelOccurredAt', type: 'datetime-local', value: localDateTimeValue(), required: true })}
       ${button('Отменить', { variant: 'danger', data: 'data-finance-operation-cancel-confirm' })}
     </div>`;
-  const cancelLayer = mountModal(root, modal(content, {
+  const cancelLayer = mountModal(document.body, modal(content, {
     title: 'Отменить операцию',
     variant: 'bottom',
+    className: 'modal--time-picker-sheet',
     surface: 'app',
   }));
   if (!cancelLayer) return;
