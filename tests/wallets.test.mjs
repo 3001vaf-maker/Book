@@ -130,7 +130,7 @@ assert.match(walletSource, /workspaceHeaderContext\(\{[\s\S]*title: 'Касса'
 assert.match(walletSource, /v2Section\('Кошельки'/);
 assert.match(walletSource, /v2Section\('Инвестиции'/);
 assert.match(walletSource, /v2Section\('Займ'/);
-assert.match(walletSource, /v2HorizontalRail/);
+assert.match(walletSource, /entityCardRail/);
 assert.match(walletSource, /data-cash-create/);
 assert.match(walletSource, /\+ Добавить кошелек/);
 assert.match(walletSource, /\+ Добавить инвестицию/);
