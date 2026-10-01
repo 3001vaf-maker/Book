@@ -27,7 +27,7 @@ export function modal(content, { title = '', className = '', variant = '', surfa
   html = html
     .replace('class="v2-layer-backdrop"', 'class="v2-layer-backdrop modal-backdrop" data-modal')
     .replace('class="v2-layer__close"', 'class="v2-layer__close modal-close" data-modal-close');
-  if (resolvedVariant === 'bottom') {
+  if (resolvedVariant === 'bottom' || resolvedVariant === 'top' || resolvedVariant === 'compact') {
     html = html.replace(/<button type="button" class="v2-layer__close modal-close"[^>]*>×<\/button>/, '');
   }
   return html;
