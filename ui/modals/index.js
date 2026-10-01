@@ -63,7 +63,7 @@ export function mountModal(root, html) {
   return m;
 }
 
-export function openNotice({ title = 'Внимание', message = '', variant = 'top', surface = 'app' } = {}) {
+export function openNotice({ title = 'Внимание', message = '', surface = 'app' } = {}) {
   const content = `<div class="modal-title"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(message)}</p></div>`;
-  return mountModal(document.body, modal(content, { variant, surface, title }));
+  return mountModal(document.body, modal(content, { variant: 'top', surface, title }));
 }
