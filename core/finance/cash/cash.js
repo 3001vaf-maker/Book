@@ -1,7 +1,7 @@
 import {
   button,
+  actionBlock,
   emptyState,
-  entityCardStack,
   entityVisualCard,
   escapeHtml,
   field,
@@ -17,8 +17,10 @@ import {
   photoField,
   shortDateTime,
   shortDateTimeParts,
+  v2HorizontalRail,
   v2ListEntries,
   v2ListEntry,
+  v2Section,
   v2ZLayer,
   workspaceHeaderContext,
 } from '../../../ui/ui.js';
@@ -37,7 +39,13 @@ import {
   saveWallet as saveWalletData,
   updateWallet,
 } from './data.js';
-import { walletCardAppearance, walletCardFields } from './card-presentation.js';
+import { cashEntityCardAppearance, cashEntityCardFields, walletCardAppearance, walletCardFields } from './card-presentation.js';
+import {
+  getInvestmentEntities,
+  getLoanEntities,
+  saveInvestmentEntity,
+  saveLoanEntity,
+} from './entities.js';
 
 const formatMoney = (value) => `${(Number(value) || 0).toLocaleString('ru-RU')} ₽`;
 
@@ -113,6 +121,11 @@ function cashContext() {
       data: 'data-cash-settings',
       aria: 'Настройки кассы',
     },
+    c: {
+      label: '+',
+      data: 'data-cash-create',
+      aria: 'Создать сущность кассы',
+    },
   });
 }
 
@@ -138,14 +151,6 @@ function operationContext(operation) {
   });
 }
 
-function addWalletSource() {
-  return button('+', {
-    className: 'v2-primary-source-only',
-    data: 'data-add-wallet data-v2-primary-action data-v2-primary-label="+"',
-    aria: 'Добавить кассу',
-  });
-}
-
 function renderWalletCard(wallet) {
   const balance = getWalletBalance(wallet.id);
   return entityVisualCard({
@@ -154,33 +159,80 @@ function renderWalletCard(wallet) {
     image: wallet.photo || '',
     interactive: true,
     data: `data-wallet="${escapeHtml(wallet.id)}"`,
-    aria: `Открыть кассу ${wallet.name}`,
+    aria: `Открыть кошелёк ${wallet.name}`,
   });
+}
+
+function renderCashEntityCard(entity, kind) {
+  const label = kind === 'investment' ? 'инвестицию' : 'займ';
+  return entityVisualCard({
+    appearance: cashEntityCardAppearance(entity),
+    fields: cashEntityCardFields(entity),
+    image: entity.photo || '',
+    interactive: false,
+    aria: `${label} ${entity.name}`,
+  });
+}
+
+function horizontalCards(cards = []) {
+  const values = (Array.isArray(cards) ? cards : []).filter(Boolean);
+  return values.length ? v2HorizontalRail(values.join('')) : '';
+}
+
+function openCashCreateMenu(root) {
+  const content = actionBlock([
+    button('+ Добавить кошелек', { variant: 'secondary', data: 'data-cash-create-wallet' }),
+    button('+ Добавить инвестицию', { variant: 'secondary', data: 'data-cash-create-investment' }),
+    button('+ Добавить займ', { variant: 'secondary', data: 'data-cash-create-loan' }),
+  ].join(''));
+  const layer = mountModal(document.body, modal(content, {
+    title: 'Добавить',
+    variant: 'quick',
+    surface: 'app',
+  }));
+  if (!layer) return null;
+
+  layer.querySelector('[data-cash-create-wallet]')?.addEventListener('click', () => {
+    layer.v2Close?.();
+    openWalletForm(root);
+  });
+  layer.querySelector('[data-cash-create-investment]')?.addEventListener('click', () => {
+    layer.v2Close?.();
+    openCashEntityForm(root, 'investment');
+  });
+  layer.querySelector('[data-cash-create-loan]')?.addEventListener('click', () => {
+    layer.v2Close?.();
+    openCashEntityForm(root, 'loan');
+  });
+  return layer;
 }
 
 function renderList(root) {
   const wallets = getWallets();
-  const cards = wallets.map(renderWalletCard);
+  const investments = getInvestmentEntities();
+  const loans = getLoanEntities();
   root.innerHTML = page([
     cashContext(),
-    cards.length ? entityCardStack(cards) : emptyState('Касс пока нет', 'Добавьте первую кассу кнопкой «+».'),
-    addWalletSource(),
+    v2Section('Кошельки', horizontalCards(wallets.map(renderWalletCard))),
+    v2Section('Инвестиции', horizontalCards(investments.map((item) => renderCashEntityCard(item, 'investment')))),
+    v2Section('Займ', horizontalCards(loans.map((item) => renderCashEntityCard(item, 'loan')))),
   ]);
-  root.querySelector('[data-add-wallet]')?.addEventListener('click', () => openForm(root));
+
+  root.querySelector('[data-cash-create]')?.addEventListener('click', () => openCashCreateMenu(root));
   root.querySelectorAll('[data-wallet]').forEach((element) => {
     element.addEventListener('click', () => openWalletZ2(root, element.dataset.wallet));
   });
 }
 
-function openForm(root, existing = null) {
+function openWalletForm(root, existing = null) {
   const wallet = existing || { photo: '', name: '', cardAppearance: {} };
   const html = `<form class="compact-form" data-wallet-form novalidate>
-    <div class="modal-title"><h2>${existing ? 'Изменить кассу' : 'Новая касса'}</h2></div>
+    <div class="modal-title"><h2>${existing ? 'Изменить кошелёк' : 'Новый кошелёк'}</h2></div>
     ${photoField({ name: 'walletPhoto', value: wallet.photo || '' })}
-    ${field({ label: 'Наименование кассы', name: 'walletName', value: wallet.name || '', placeholder: 'Наименование', required: true })}
+    ${field({ label: 'Наименование кошелька', name: 'walletName', value: wallet.name || '', placeholder: 'Наименование', required: true })}
     ${button('Сохранить', { type: 'submit' })}
   </form>`;
-  const layer = mountModal(root, modal(html, { title: existing ? 'Изменить кассу' : 'Новая касса' }));
+  const layer = mountModal(root, modal(html, { title: existing ? 'Изменить кошелёк' : 'Новый кошелёк' }));
   if (!layer) return;
   initPhotoField(layer);
   layer.querySelector('[data-wallet-form]')?.addEventListener('submit', (event) => {
@@ -194,7 +246,7 @@ function openForm(root, existing = null) {
     const data = new FormData(form);
     const name = String(data.get('walletName') || '').trim();
     if (!name) {
-      openNotice({ message: 'Укажите наименование кассы.' });
+      openNotice({ message: 'Укажите наименование кошелька.' });
       return;
     }
     saveWalletData({
@@ -206,6 +258,51 @@ function openForm(root, existing = null) {
       createdAt: existing?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
+    layer.v2Close?.();
+    renderList(root);
+  });
+}
+
+function openCashEntityForm(root, kind) {
+  const investment = kind === 'investment';
+  const title = investment ? 'Новая инвестиция' : 'Новый займ';
+  const fieldLabel = investment ? 'Наименование инвестиции' : 'Наименование займа';
+  const dataName = investment ? 'investmentName' : 'loanName';
+  const photoName = investment ? 'investmentPhoto' : 'loanPhoto';
+  const formData = investment ? 'data-investment-form' : 'data-loan-form';
+  const html = `<form class="compact-form" ${formData} novalidate>
+    <div class="modal-title"><h2>${title}</h2></div>
+    ${photoField({ name: photoName, value: '' })}
+    ${field({ label: fieldLabel, name: dataName, value: '', placeholder: 'Наименование', required: true })}
+    ${button('Сохранить', { type: 'submit' })}
+  </form>`;
+  const layer = mountModal(root, modal(html, { title }));
+  if (!layer) return;
+  initPhotoField(layer);
+  const form = layer.querySelector(`[${formData}]`);
+  form?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const validation = formValidationMessage(form);
+    if (validation) {
+      openNotice({ message: validation });
+      return;
+    }
+    const data = new FormData(form);
+    const name = String(data.get(dataName) || '').trim();
+    if (!name) {
+      openNotice({ message: `Укажите ${fieldLabel.toLocaleLowerCase('ru-RU')}.` });
+      return;
+    }
+    const entity = {
+      id: crypto.randomUUID(),
+      name,
+      photo: String(data.get(photoName) || ''),
+      cardAppearance: {},
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    if (investment) saveInvestmentEntity(entity);
+    else saveLoanEntity(entity);
     layer.v2Close?.();
     renderList(root);
   });
