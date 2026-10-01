@@ -332,8 +332,8 @@ ok(operationZ3?.querySelector('[data-workspace-header-context]')?.dataset.worksp
 
 shell()?.querySelector('[data-v2-workspace-a]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
 await wait(20);
-const operationSettings = document.querySelector('[data-shared-profile-settings-menu]');
-ok(Boolean(operationSettings?.querySelector('[data-shared-profile-action="delete-operation"]')), 'Cash operation A/settings must expose delete operation');
+const ddsOperationSettings = document.querySelector('[data-shared-profile-settings-menu]');
+ok(Boolean(ddsOperationSettings?.querySelector('[data-shared-profile-action="delete-operation"]')), 'Cash operation A/settings must expose delete operation');
 operationSettings?.closest('[data-modal]')?.v2Close?.();
 
 zEdge = edge();
@@ -416,15 +416,15 @@ ok(!shell()?.querySelector('[data-v2-workspace-primary]'), 'DDS receipt must not
 
 shell()?.querySelector('[data-v2-workspace-a]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
 await wait(40);
-let operationSettings = document.querySelector('[data-shared-profile-settings-menu]');
-ok(Boolean(operationSettings), 'DDS receipt settings did not open');
-ok(Boolean(operationSettings?.querySelector('[data-shared-profile-action="cancel-operation"]')),
+let ddsOperationSettings = document.querySelector('[data-shared-profile-settings-menu]');
+ok(Boolean(ddsOperationSettings), 'DDS receipt settings did not open');
+ok(Boolean(ddsOperationSettings?.querySelector('[data-shared-profile-action="cancel-operation"]')),
   'DDS receipt settings cancel action missing');
-const deleteAction = operationSettings?.querySelector('[data-shared-profile-action="delete-operation"]');
+const deleteAction = ddsOperationSettings?.querySelector('[data-shared-profile-action="delete-operation"]');
 ok(Boolean(deleteAction), 'DDS receipt settings permanent delete action missing');
 ok(Boolean(deleteAction?.classList.contains('ui-button--critical')), 'DDS permanent delete action must be red');
 
-operationSettings?.querySelector('[data-shared-profile-action="cancel-operation"]')
+ddsOperationSettings?.querySelector('[data-shared-profile-action="cancel-operation"]')
   ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
 await wait(40);
 let cancelModal = document.querySelector('[data-modal][data-v2-layer-kind="bottom"]');
@@ -450,8 +450,8 @@ await wait(20);
 
 shell()?.querySelector('[data-v2-workspace-a]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
 await wait(40);
-operationSettings = document.querySelector('[data-shared-profile-settings-menu]');
-operationSettings?.querySelector('[data-shared-profile-action="delete-operation"]')
+ddsOperationSettings = document.querySelector('[data-shared-profile-settings-menu]');
+ddsOperationSettings?.querySelector('[data-shared-profile-action="delete-operation"]')
   ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
 await wait(40);
 let deleteConfirm = document.querySelector('[data-modal][data-v2-layer-kind="top"]');
