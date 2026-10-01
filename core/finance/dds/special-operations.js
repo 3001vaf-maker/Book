@@ -16,8 +16,16 @@ import { correctFinanceOperation, recordSpecialFinanceOperation } from '../servi
 export const SPECIAL_FINANCE_ACTIONS = [
   { id: 'loan-received', kind: 'loan-received', group: 'loan', entityType: 'loan', entityLabel: 'Займ', walletLabel: 'Кошелёк получения', label: 'Получение займа', title: 'Получение займа' },
   { id: 'loan-repayment', kind: 'loan-repayment', group: 'loan', entityType: 'loan', entityLabel: 'Займ', walletLabel: 'Кошелёк списания', label: 'Возврат займа', title: 'Возврат займа' },
-  { id: 'investment-received', kind: 'investment-received', group: 'investment', entityType: 'investment', entityLabel: 'Инвестиция', walletLabel: 'Кошелёк получения', label: 'Получение инвестиции', title: 'Получение инвестиции' },
-  { id: 'investment-return', kind: 'investment-return', group: 'investment', entityType: 'investment', entityLabel: 'Инвестиция', walletLabel: 'Кошелёк списания', label: 'Возврат инвестиции', title: 'Возврат инвестиции' },
+  { id: 'investment-received', kind: 'investment-received', group: 'investment', entityType: 'investment', entityLabel: 'Инвестиция', walletLabel: 'Кошелёк получения', label: 'Получение инвестиции', title: 'Получение инвестиции', roles: ['raise'] },
+  { id: 'investment-return', kind: 'investment-return', group: 'investment', entityType: 'investment', entityLabel: 'Инвестиция', walletLabel: 'Кошелёк списания', label: 'Возврат капитала', title: 'Возврат капитала', roles: ['raise'] },
+  { id: 'investment-income-payment', kind: 'investment-income-payment', group: 'investment', entityType: 'investment', entityLabel: 'Инвестиция', walletLabel: 'Кошелёк списания', label: 'Выплата дохода', title: 'Выплата дохода инвестору', roles: ['raise'] },
+  { id: 'investment-contribution', kind: 'investment-contribution', group: 'investment', entityType: 'investment', entityLabel: 'Инвестиция', walletLabel: 'Кошелёк списания', label: 'Вложение', title: 'Вложение', roles: ['self', 'external'] },
+  { id: 'investment-capital-return', kind: 'investment-capital-return', group: 'investment', entityType: 'investment', entityLabel: 'Инвестиция', walletLabel: 'Кошелёк получения', label: 'Возврат капитала', title: 'Возврат капитала', roles: ['self', 'external'] },
+  { id: 'investment-income', kind: 'investment-income', group: 'investment', entityType: 'investment', entityLabel: 'Инвестиция', walletLabel: 'Кошелёк получения', label: 'Доход', title: 'Доход инвестиции', roles: ['self', 'external'] },
+  { id: 'investment-expense', kind: 'investment-expense', group: 'investment', entityType: 'investment', entityLabel: 'Инвестиция', walletLabel: 'Кошелёк списания', label: 'Расход', title: 'Расход инвестиции', roles: ['self', 'external'] },
+  { id: 'investment-saving', kind: 'investment-saving', group: 'investment', entityType: 'investment', entityLabel: 'Инвестиция', label: 'Экономия', title: 'Экономия', roles: ['self'], nonCash: true, eventType: 'saving' },
+  { id: 'investment-reinvestment', kind: 'investment-reinvestment', group: 'investment', entityType: 'investment', entityLabel: 'Инвестиция', label: 'Реинвестирование', title: 'Реинвестирование', roles: ['self', 'external', 'raise'], nonCash: true, eventType: 'reinvestment' },
+  { id: 'investment-valuation', kind: 'investment-valuation', group: 'investment', entityType: 'investment', entityLabel: 'Инвестиция', label: 'Изменение оценки', title: 'Изменение оценки', roles: ['self', 'external', 'raise'], nonCash: true, eventType: 'valuation' },
   { id: 'transfer', kind: 'transfer', group: 'transfer', label: 'Перевод между кошельками', title: 'Перевод между кошельками', transfer: true },
 ];
 
@@ -65,10 +73,11 @@ function renderOperationForm(root, action, {
   actionChoices = [],
   draft = null,
   onActionChange = null,
+  onInvestmentEventSaved = null,
 } = {}) {
   if (!action) return false;
   const wallets = walletOptions();
-  if (!wallets.length) {
+  if (!action.nonCash && !wallets.length) {
     openNotice({ message: 'Сначала добавьте кошелёк.' });
     return false;
   }
@@ -84,8 +93,8 @@ function renderOperationForm(root, action, {
         name: String(financeEntity.name || ''),
       }
     : null;
-  const entityOptions = action.transfer || lockedEntity ? [] : financeEntityOptions(action.entityType);
-  if (!action.transfer && !lockedEntity && !entityOptions.length) {
+  const entityOptions = action.transfer || lockedEntity || action.nonCash ? [] : financeEntityOptions(action.entityType);
+  if (!action.transfer && !action.nonCash && !lockedEntity && !entityOptions.length) {
     openNotice({ message: action.entityType === 'loan' ? 'Сначала добавьте займ.' : 'Сначала добавьте инвестицию.' });
     return false;
   }
@@ -99,19 +108,21 @@ function renderOperationForm(root, action, {
       })
     : '';
 
-  const walletFields = action.transfer
-    ? `${select({ label: 'Из кошелька', name: 'fromWalletId', value: existing.fromWalletId || wallets[0]?.value || '', options: wallets })}${select({ label: 'В кошелёк', name: 'toWalletId', value: existing.toWalletId || wallets[1]?.value || wallets[0]?.value || '', options: wallets })}`
-    : `${lockedEntity ? '' : select({
-        label: action.entityLabel,
-        name: 'financeEntityId',
-        value: existing.financeEntityId || entityOptions[0]?.value || '',
-        options: entityOptions,
-      })}${select({
-        label: action.walletLabel,
-        name: 'walletId',
-        value: existing.walletId || wallets[0]?.value || '',
-        options: wallets,
-      })}`;
+  const walletFields = action.nonCash
+    ? ''
+    : action.transfer
+      ? `${select({ label: 'Из кошелька', name: 'fromWalletId', value: existing.fromWalletId || wallets[0]?.value || '', options: wallets })}${select({ label: 'В кошелёк', name: 'toWalletId', value: existing.toWalletId || wallets[1]?.value || wallets[0]?.value || '', options: wallets })}`
+      : `${lockedEntity ? '' : select({
+          label: action.entityLabel,
+          name: 'financeEntityId',
+          value: existing.financeEntityId || entityOptions[0]?.value || '',
+          options: entityOptions,
+        })}${select({
+          label: action.walletLabel,
+          name: 'walletId',
+          value: existing.walletId || wallets[0]?.value || '',
+          options: wallets,
+        })}`;
 
   const occurredDate = String(existing.occurredDate || '').trim()
     || financeLocalDateValue(operation?.occurredAt || new Date());
@@ -176,8 +187,21 @@ function renderOperationForm(root, action, {
     }
 
     try {
-      if (operation?.operationId) await correctFinanceOperation(operation.operationId, payload);
-      else await recordSpecialFinanceOperation(payload);
+      if (action.nonCash) {
+        if (!lockedEntity || typeof onInvestmentEventSaved !== 'function') {
+          throw new Error('Событие инвестиции недоступно');
+        }
+        await onInvestmentEventSaved({
+          type: action.eventType,
+          amount: payload.amount,
+          occurredDate: String(data.get('occurredDate') || ''),
+          note: payload.note,
+        });
+      } else if (operation?.operationId) {
+        await correctFinanceOperation(operation.operationId, payload);
+      } else {
+        await recordSpecialFinanceOperation(payload);
+      }
       onSaved?.();
     } catch (error) {
       openNotice({ message: String(error?.message || 'Не удалось сохранить операцию') });
@@ -194,11 +218,21 @@ export function renderSpecialFinanceOperation(root, actionId, options = {}) {
   return renderOperationForm(root, actionById(actionId), options);
 }
 
+export function financeEntityOperationChoices(type, financeEntity = null) {
+  const role = String(financeEntity?.role || '');
+  return SPECIAL_FINANCE_ACTIONS.filter((item) => {
+    if (item.entityType !== type) return false;
+    if (type !== 'investment') return true;
+    return !Array.isArray(item.roles) || item.roles.includes(role || 'raise');
+  });
+}
+
 export function renderFinanceEntityOperation(root, type, {
   onSaved = null,
   financeEntity = null,
+  onInvestmentEventSaved = null,
 } = {}) {
-  const actionChoices = SPECIAL_FINANCE_ACTIONS.filter((item) => item.entityType === type);
+  const actionChoices = financeEntityOperationChoices(type, financeEntity);
   if (!actionChoices.length) return false;
   let currentActionId = actionChoices[0].id;
   let draft = null;
@@ -208,6 +242,7 @@ export function renderFinanceEntityOperation(root, type, {
     financeEntity,
     actionChoices,
     draft,
+    onInvestmentEventSaved,
     onActionChange: (nextActionId, nextDraft) => {
       if (!actionChoices.some((item) => item.id === nextActionId)) return;
       currentActionId = nextActionId;
