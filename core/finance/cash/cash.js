@@ -335,9 +335,10 @@ function operationReceipt(operation) {
     .join(' ');
   return readOnlyReceipt({
     title: operationName(operation),
+    date: when.date || '—',
+    time: when.time || '—',
     items: [
       { label: String(operation?.workplace || '').trim(), value: '' },
-      { label: when.date || '—', value: when.time || '—' },
       { label: String(operation?.person?.uei || '').trim(), value: '' },
       { label: fullName, value: '' },
     ].filter((item) => item.label || item.value),
