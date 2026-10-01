@@ -1,15 +1,13 @@
 import {
-  actionBlock,
   button,
   emptyState,
   escapeHtml,
   field,
-  iconButton,
   list,
-  mountModal,
-  modal,
-  pageHeader,
+  mountV2ZLayer,
   select,
+  v2ZLayer,
+  workspaceHeaderContext,
 } from '../../../ui/ui.js';
 import { getFinanceArticles } from '../data.js';
 import { archiveFinanceArticle, createFinanceArticle, updateFinanceArticle } from '../service.js';
@@ -90,36 +88,31 @@ function row(item) {
   };
 }
 
-function renderList(root) {
-  const items = getFinanceArticles();
-  const rows = treeRows(items);
-  root.innerHTML = `<div class="entity-page-header">${pageHeader('Статьи')}<div class="page-header-action">${iconButton('+', { className: 'icon-button--primary', data: 'data-add-finance-article', aria: 'Добавить статью' })}</div></div>${rows.length ? list({ items: rows.map(row) }) : emptyState('Статей пока нет', 'Добавьте первую статью кнопкой «+».')}`;
-  root.querySelector('[data-add-finance-article]')?.addEventListener('click', () => openForm(root));
-  root.querySelectorAll('[data-finance-article]').forEach((element) => {
-    element.addEventListener('click', () => {
-      const item = getFinanceArticles().find((row) => row.articleId === element.dataset.financeArticle);
-      if (item) openForm(root, item);
-    });
-  });
-  
-}
-
 function openForm(root, existing = null) {
   const items = getFinanceArticles();
   const isSystem = Boolean(existing?.systemKey);
   const direction = existing?.direction || 'OUT';
   const economicType = existing?.economicType === 'GROUP' ? 'OPERATING_EXPENSE' : (existing?.economicType || 'OPERATING_EXPENSE');
-  const form = `<form class="compact-form" data-finance-article-form>
-    ${field({ label: 'Название', name: 'articleName', value: existing?.name || '', required: true, placeholder: 'Например, Краска' })}
-    ${select({ label: 'Родитель', name: 'parentArticleId', value: existing?.parentArticleId || '', options: parentOptions(items, existing?.articleId || '') })}
-    ${select({ label: 'Тип', name: 'direction', value: direction, options: DIRECTION_OPTIONS })}
-    ${select({ label: 'Экономический характер', name: 'economicType', value: economicType, options: ECONOMIC_OPTIONS })}
-    ${button('Сохранить', { type: 'submit' })}
-    ${existing && !isSystem ? button('Удалить', { type: 'button', variant: 'danger', data: 'data-delete-finance-article' }) : ''}
-  </form>`;
-  const m = mountModal(root, modal(form, { title: existing ? 'Изменить статью' : 'Новая статья' }));
-  if (!m) return;
-  m.querySelector('[data-finance-article-form]')?.addEventListener('submit', async (event) => {
+  const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'finance-article-edit-z' }), { stack: true });
+  if (!layer) return;
+
+  layer.innerHTML = `${workspaceHeaderContext({
+    title: existing ? 'Редактирование статьи' : 'Новая статья',
+    c: {
+      label: 'Сохранить',
+      data: 'data-finance-article-save',
+      aria: 'Сохранить статью',
+    },
+  })}
+    <form class="compact-form" data-finance-article-form>
+      ${field({ label: 'Название', name: 'articleName', value: existing?.name || '', required: true, placeholder: 'Например, Краска' })}
+      ${select({ label: 'Родитель', name: 'parentArticleId', value: existing?.parentArticleId || '', options: parentOptions(items, existing?.articleId || '') })}
+      ${select({ label: 'Тип', name: 'direction', value: direction, options: DIRECTION_OPTIONS })}
+      ${select({ label: 'Экономический характер', name: 'economicType', value: economicType, options: ECONOMIC_OPTIONS })}
+      ${existing && !isSystem ? button('Удалить', { type: 'button', variant: 'danger', data: 'data-delete-finance-article' }) : ''}
+    </form>`;
+
+  layer.querySelector('[data-finance-article-form]')?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const payload = {
@@ -131,13 +124,39 @@ function openForm(root, existing = null) {
     if (!payload.name) return;
     if (existing) await updateFinanceArticle(existing.articleId, payload);
     else await createFinanceArticle(payload);
-    m.remove();
+    layer.v2Close?.();
     renderList(root);
   });
-  m.querySelector('[data-delete-finance-article]')?.addEventListener('click', async () => {
+
+  layer.querySelector('[data-finance-article-save]')?.addEventListener('click', () => {
+    layer.querySelector('[data-finance-article-form]')?.requestSubmit();
+  });
+
+  layer.querySelector('[data-delete-finance-article]')?.addEventListener('click', async () => {
     await archiveFinanceArticle(existing.articleId);
-    m.remove();
+    layer.v2Close?.();
     renderList(root);
+  });
+}
+
+function renderList(root) {
+  const items = getFinanceArticles();
+  const rows = treeRows(items);
+  root.innerHTML = `${workspaceHeaderContext({
+    title: 'Статьи',
+    c: {
+      label: '+',
+      data: 'data-add-finance-article',
+      aria: 'Добавить статью',
+    },
+  })}${rows.length ? list({ items: rows.map(row) }) : emptyState('Статей пока нет', 'Добавьте первую статью кнопкой «+».')}`;
+
+  root.querySelector('[data-add-finance-article]')?.addEventListener('click', () => openForm(root));
+  root.querySelectorAll('[data-finance-article]').forEach((element) => {
+    element.addEventListener('click', () => {
+      const item = getFinanceArticles().find((candidate) => candidate.articleId === element.dataset.financeArticle);
+      if (item) openForm(root, item);
+    });
   });
 }
 
