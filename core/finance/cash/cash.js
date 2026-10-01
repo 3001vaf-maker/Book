@@ -2,6 +2,7 @@ import {
   button,
   actionBlock,
   emptyState,
+  entityCardRail,
   entityVisualCard,
   escapeHtml,
   field,
@@ -17,7 +18,6 @@ import {
   photoField,
   shortDateTime,
   shortDateTimeParts,
-  v2HorizontalRail,
   v2ListEntries,
   v2ListEntry,
   v2Section,
@@ -176,7 +176,7 @@ function renderCashEntityCard(entity, kind) {
 
 function horizontalCards(cards = []) {
   const values = (Array.isArray(cards) ? cards : []).filter(Boolean);
-  return values.length ? v2HorizontalRail(values.join('')) : '';
+  return values.length ? entityCardRail(values) : '';
 }
 
 function openCashCreateMenu(root) {
