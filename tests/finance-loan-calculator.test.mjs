@@ -3,7 +3,7 @@ import {
   buildLoanSchedule,
   calculateLoanState,
   loanTermEndDate,
-} from '../core/finance/cash/loan-calculator.js';
+} from '../core/finance/index.js';
 
 const receive = (amount, occurredAt) => ({
   economicType: 'LOAN_RECEIVED',
