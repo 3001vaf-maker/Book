@@ -9,14 +9,15 @@ import {
   workspaceHeaderContext,
 } from '../../../ui/ui.js';
 import { getWallets } from '../cash/data.js';
+import { getInvestmentEntities, getLoanEntities } from '../cash/entities.js';
 import { financeLocalDateValue, financeOccurredAtForDate } from '../date.js';
 import { correctFinanceOperation, recordSpecialFinanceOperation } from '../service.js';
 
 export const SPECIAL_FINANCE_ACTIONS = [
-  { id: 'loan-received', kind: 'loan-received', group: 'loan', label: 'Получить займ', title: 'Получить займ', counterparty: 'От кого' },
-  { id: 'loan-repayment', kind: 'loan-repayment', group: 'loan', label: 'Вернуть займ', title: 'Вернуть займ', counterparty: 'Кому' },
-  { id: 'investment-received', kind: 'investment-received', group: 'investment', label: 'Получить инвестицию', title: 'Получить инвестицию', counterparty: 'От кого' },
-  { id: 'investment-return', kind: 'investment-return', group: 'investment', label: 'Вернуть инвестицию', title: 'Вернуть инвестицию', counterparty: 'Кому' },
+  { id: 'loan-received', kind: 'loan-received', group: 'loan', entityType: 'loan', entityLabel: 'Займ', walletLabel: 'Кошелёк получения', label: 'Получить займ', title: 'Получить займ' },
+  { id: 'loan-repayment', kind: 'loan-repayment', group: 'loan', entityType: 'loan', entityLabel: 'Займ', walletLabel: 'Кошелёк списания', label: 'Вернуть займ', title: 'Вернуть займ' },
+  { id: 'investment-received', kind: 'investment-received', group: 'investment', entityType: 'investment', entityLabel: 'Инвестиция', walletLabel: 'Кошелёк получения', label: 'Получить инвестицию', title: 'Получить инвестицию' },
+  { id: 'investment-return', kind: 'investment-return', group: 'investment', entityType: 'investment', entityLabel: 'Инвестиция', walletLabel: 'Кошелёк списания', label: 'Вернуть инвестицию', title: 'Вернуть инвестицию' },
   { id: 'transfer', kind: 'transfer', group: 'transfer', label: 'Перевод между кошельками', title: 'Перевод между кошельками', transfer: true },
 ];
 
@@ -26,6 +27,18 @@ function walletOptions() {
 
 function walletName(id) {
   return getWallets().find((item) => item.id === id)?.name || '';
+}
+
+function financeEntities(type) {
+  return type === 'loan' ? getLoanEntities() : getInvestmentEntities();
+}
+
+function financeEntityOptions(type) {
+  return financeEntities(type).map((item) => ({ value: item.id, label: item.name }));
+}
+
+function financeEntityName(type, id) {
+  return financeEntities(type).find((item) => String(item.id) === String(id))?.name || '';
 }
 
 export function renderSpecialFinanceOperation(root, actionId, { onSaved = null, operation = null } = {}) {
@@ -38,9 +51,24 @@ export function renderSpecialFinanceOperation(root, actionId, { onSaved = null, 
   }
 
   const existing = operation?.data && typeof operation.data === 'object' ? operation.data : {};
+  const entityOptions = action.transfer ? [] : financeEntityOptions(action.entityType);
+  if (!action.transfer && !entityOptions.length) {
+    openNotice({ message: action.entityType === 'loan' ? 'Сначала добавьте займ.' : 'Сначала добавьте инвестицию.' });
+    return false;
+  }
   const walletFields = action.transfer
     ? `${select({ label: 'Из кошелька', name: 'fromWalletId', value: existing.fromWalletId || wallets[0]?.value || '', options: wallets })}${select({ label: 'В кошелёк', name: 'toWalletId', value: existing.toWalletId || wallets[1]?.value || wallets[0]?.value || '', options: wallets })}`
-    : select({ label: 'Кошелёк', name: 'walletId', value: existing.walletId || wallets[0]?.value || '', options: wallets });
+    : `${select({
+        label: action.entityLabel,
+        name: 'financeEntityId',
+        value: existing.financeEntityId || entityOptions[0]?.value || '',
+        options: entityOptions,
+      })}${select({
+        label: action.walletLabel,
+        name: 'walletId',
+        value: existing.walletId || wallets[0]?.value || '',
+        options: wallets,
+      })}`;
 
   root.innerHTML = `${workspaceHeaderContext({
     title: operation ? `Корректировка · ${action.title}` : action.title,
@@ -53,7 +81,6 @@ export function renderSpecialFinanceOperation(root, actionId, { onSaved = null, 
     <form class="compact-form" data-finance-special-form novalidate>
       ${walletFields}
       ${field({ label: 'Сумма', name: 'amount', type: 'number', inputmode: 'decimal', value: existing.total || '', required: true, placeholder: '0', data: 'min="0" step="0.01"' })}
-      ${!action.transfer ? field({ label: action.counterparty || 'Контрагент', name: 'counterparty', value: existing.counterparty || '', placeholder: 'Необязательно' }) : ''}
       ${datePicker({ label: 'Фактическая дата', name: 'occurredDate', value: financeLocalDateValue(operation?.occurredAt || new Date()), required: true, allowClear: false })}
       ${textareaField({ label: 'Примечание', name: 'note', value: existing.note || '', rows: 3, placeholder: 'Необязательно' })}
     </form>`;
@@ -72,7 +99,6 @@ export function renderSpecialFinanceOperation(root, actionId, { onSaved = null, 
     const payload = {
       kind: action.kind,
       amount: Number(data.get('amount') || 0),
-      counterparty: String(data.get('counterparty') || '').trim(),
       note: String(data.get('note') || '').trim(),
       occurredAt: financeOccurredAtForDate(
         String(data.get('occurredDate') || ''),
@@ -91,6 +117,9 @@ export function renderSpecialFinanceOperation(root, actionId, { onSaved = null, 
       payload.toWalletId = String(data.get('toWalletId') || '');
       payload.toWalletName = walletName(payload.toWalletId);
     } else {
+      payload.financeEntityType = action.entityType;
+      payload.financeEntityId = String(data.get('financeEntityId') || '');
+      payload.financeEntityName = financeEntityName(action.entityType, payload.financeEntityId);
       payload.walletId = String(data.get('walletId') || '');
       payload.walletName = walletName(payload.walletId);
     }
