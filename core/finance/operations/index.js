@@ -11,10 +11,12 @@ import { canUseBookCapability } from '../../access.js';
 import { renderIncomeExpenseOperation } from '../dds/income-expense.js';
 import { SPECIAL_FINANCE_ACTIONS, renderSpecialFinanceOperation } from '../dds/special-operations.js';
 
-export function financeOperationGroups() {
-  const groups = [];
+export function financeOperationGroups({ groups = null } = {}) {
+  const allowed = Array.isArray(groups) ? new Set(groups) : null;
+  const groupsOut = [];
   if (canUseBookCapability('finance.income_expense.access')) {
-    groups.push({
+    groupsOut.push({
+      key: 'income-expense',
       title: 'Доход / Расход',
       items: [
         { id: 'manual-income', label: 'Доход' },
@@ -23,23 +25,28 @@ export function financeOperationGroups() {
     });
   }
   if (canUseBookCapability('finance.special.access')) {
-    groups.push({
+    groupsOut.push({
+      key: 'loan',
       title: 'Займы',
       items: SPECIAL_FINANCE_ACTIONS.filter((item) => item.group === 'loan'),
     });
-    groups.push({
+    groupsOut.push({
+      key: 'investment',
       title: 'Инвестиции',
       items: SPECIAL_FINANCE_ACTIONS.filter((item) => item.group === 'investment'),
     });
-    groups.push({
+    groupsOut.push({
+      key: 'transfer',
       title: 'Переводы',
       items: SPECIAL_FINANCE_ACTIONS.filter((item) => item.group === 'transfer'),
     });
   }
-  return groups.filter((group) => group.items.length);
+  return groupsOut
+    .filter((group) => group.items.length)
+    .filter((group) => !allowed || allowed.has(group.key));
 }
 
-function openFinanceOperationForm(root, actionId, { onSaved = null } = {}) {
+function openFinanceOperationForm(root, actionId, { onSaved = null, financeEntity = null } = {}) {
   const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'finance-operation-z' }), { stack: true });
   if (!layer) return null;
 
@@ -51,7 +58,7 @@ function openFinanceOperationForm(root, actionId, { onSaved = null } = {}) {
   let rendered = false;
   if (actionId === 'manual-income') rendered = renderIncomeExpenseOperation(layer, 'IN', { onSaved: saved });
   else if (actionId === 'manual-expense') rendered = renderIncomeExpenseOperation(layer, 'OUT', { onSaved: saved });
-  else rendered = renderSpecialFinanceOperation(layer, actionId, { onSaved: saved });
+  else rendered = renderSpecialFinanceOperation(layer, actionId, { onSaved: saved, financeEntity });
 
   if (!rendered) {
     layer.v2Close?.();
@@ -60,8 +67,13 @@ function openFinanceOperationForm(root, actionId, { onSaved = null } = {}) {
   return layer;
 }
 
-export function openFinanceOperations(root, { onSaved = null } = {}) {
-  const groups = financeOperationGroups();
+export function openFinanceOperations(root, {
+  onSaved = null,
+  groups: requestedGroups = null,
+  financeEntity = null,
+  title = 'Финансовые операции',
+} = {}) {
+  const groups = financeOperationGroups({ groups: requestedGroups });
   if (!groups.length) return null;
 
   const content = groups.map((group) => v2Section(
@@ -73,7 +85,7 @@ export function openFinanceOperations(root, { onSaved = null } = {}) {
   )).join('');
 
   const picker = mountModal(root, modal(content, {
-    title: 'Финансовые операции',
+    title,
     variant: 'quick',
     surface: 'app',
   }));
@@ -83,7 +95,7 @@ export function openFinanceOperations(root, { onSaved = null } = {}) {
     element.addEventListener('click', () => {
       const actionId = String(element.dataset.financeOperationAction || '');
       picker.v2Close?.();
-      openFinanceOperationForm(root, actionId, { onSaved });
+      openFinanceOperationForm(root, actionId, { onSaved, financeEntity });
     });
   });
   return picker;
