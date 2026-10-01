@@ -14,10 +14,10 @@ import { financeLocalDateValue, financeOccurredAtForDate } from '../date.js';
 import { correctFinanceOperation, recordSpecialFinanceOperation } from '../service.js';
 
 export const SPECIAL_FINANCE_ACTIONS = [
-  { id: 'loan-received', kind: 'loan-received', group: 'loan', entityType: 'loan', entityLabel: 'Займ', walletLabel: 'Кошелёк получения', label: 'Получить займ', title: 'Получить займ' },
-  { id: 'loan-repayment', kind: 'loan-repayment', group: 'loan', entityType: 'loan', entityLabel: 'Займ', walletLabel: 'Кошелёк списания', label: 'Вернуть займ', title: 'Вернуть займ' },
-  { id: 'investment-received', kind: 'investment-received', group: 'investment', entityType: 'investment', entityLabel: 'Инвестиция', walletLabel: 'Кошелёк получения', label: 'Получить инвестицию', title: 'Получить инвестицию' },
-  { id: 'investment-return', kind: 'investment-return', group: 'investment', entityType: 'investment', entityLabel: 'Инвестиция', walletLabel: 'Кошелёк списания', label: 'Вернуть инвестицию', title: 'Вернуть инвестицию' },
+  { id: 'loan-received', kind: 'loan-received', group: 'loan', entityType: 'loan', entityLabel: 'Займ', walletLabel: 'Кошелёк получения', label: 'Получение займа', title: 'Получение займа' },
+  { id: 'loan-repayment', kind: 'loan-repayment', group: 'loan', entityType: 'loan', entityLabel: 'Займ', walletLabel: 'Кошелёк списания', label: 'Возврат займа', title: 'Возврат займа' },
+  { id: 'investment-received', kind: 'investment-received', group: 'investment', entityType: 'investment', entityLabel: 'Инвестиция', walletLabel: 'Кошелёк получения', label: 'Получение инвестиции', title: 'Получение инвестиции' },
+  { id: 'investment-return', kind: 'investment-return', group: 'investment', entityType: 'investment', entityLabel: 'Инвестиция', walletLabel: 'Кошелёк списания', label: 'Возврат инвестиции', title: 'Возврат инвестиции' },
   { id: 'transfer', kind: 'transfer', group: 'transfer', label: 'Перевод между кошельками', title: 'Перевод между кошельками', transfer: true },
 ];
 
