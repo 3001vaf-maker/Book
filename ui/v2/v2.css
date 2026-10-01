@@ -37,7 +37,7 @@
 }
 .v2-header__slot{min-width:0;display:grid;place-items:center}
 .v2-header__slot--a{grid-column:1}
-.v2-header__title{grid-column:2;min-width:0;margin:0;font-size:18px;line-height:1.1;font-weight:760;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.v2-header__title{grid-column:2;min-width:0;margin:0;font-size:18px;line-height:1.1;font-weight:760;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:normal;word-break:normal}
 .v2-header__slot--c{grid-column:3}
 .v2-header__slot--d{grid-column:4}
 .v2-header__slot.is-empty{display:none}
