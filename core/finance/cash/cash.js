@@ -526,16 +526,21 @@ function openFinanceEntityAppearance(root, entityLayer, type, entity) {
   if (!host) return layer;
   mountEntityCardConstructor(host, {
     appearance: cashEntityCardAppearance(entity),
-    fields: cashEntityCardFields(
-      entity,
-      type === 'loan'
-        ? calculateLoanState(entity, getFinanceEntityMovements(type, entity.id)).totalDue
-        : getFinanceEntityBalance(type, entity.id),
-      type,
-      type === 'loan'
-        ? calculateLoanState(entity, getFinanceEntityMovements(type, entity.id)).endDate
-        : '',
-    ),
+    fields: (() => {
+      const movements = getFinanceEntityMovements(type, entity.id);
+      if (type === 'loan') {
+        const state = calculateLoanState(entity, movements);
+        return cashEntityCardFields(entity, state.totalDue, type, state.endDate);
+      }
+      const state = calculateInvestmentState(entity, movements);
+      const terms = normalizeInvestmentTerms(entity);
+      const value = state.role === 'raise' ? state.remainingObligation : state.result;
+      return cashEntityCardFields(entity, value, type, '', {
+        roleLabel: investmentRoleLabel(terms.role),
+        balanceLabel: state.role === 'raise' ? 'Обязательства' : 'Результат',
+        balanceValue: value,
+      });
+    })(),
     photo: entity.photo || '',
     onSave: async ({ appearance, photo }) => {
       const next = {
@@ -552,6 +557,346 @@ function openFinanceEntityAppearance(root, entityLayer, type, entity) {
     },
   });
   return layer;
+}
+
+function investmentRoleAllowed(role = '') {
+  const key = role === 'self'
+    ? 'finance.investment.self.access'
+    : role === 'external'
+      ? 'finance.investment.external.access'
+      : 'finance.investment.raise.access';
+  return canUseBookCapability(key);
+}
+
+function investmentTypeOptions() {
+  return [
+    { value: 'own-business', label: 'Своё дело' },
+    { value: 'business-project', label: 'Бизнес / проект' },
+    { value: 'equity', label: 'Доля' },
+    { value: 'property', label: 'Недвижимость' },
+    { value: 'securities', label: 'Ценные бумаги' },
+    { value: 'other', label: 'Другое' },
+  ];
+}
+
+function investmentParticipationOptions(role = '') {
+  if (role === 'self') return [{ value: 'self', label: 'В своё дело' }];
+  return [
+    { value: 'returnable', label: 'Возвратная инвестиция' },
+    { value: 'equity', label: 'Доля' },
+    { value: 'profit-share', label: 'Процент от прибыли' },
+    { value: 'revenue-share', label: 'Процент от выручки' },
+    { value: 'fixed-return', label: 'Фиксированная доходность' },
+    { value: 'joint', label: 'Совместный проект' },
+    { value: 'other', label: 'Другое' },
+  ];
+}
+
+function investmentParticipantOptions(currentAccountId = '') {
+  const options = [{ value: '', label: 'Без связи' }];
+  for (const person of getPeople()) {
+    const accountId = String(person?.accounts?.[0] || '');
+    if (!accountId) continue;
+    const name = [person.name, person.surname].filter(Boolean).join(' ').trim() || 'Пользователь';
+    const uei = String(person.uei || '').trim();
+    options.push({ value: accountId, label: [name, uei].filter(Boolean).join(' · ') });
+  }
+  if (currentAccountId && !options.some((item) => item.value === currentAccountId)) {
+    options.push({ value: currentAccountId, label: 'Связанный пользователь' });
+  }
+  return options;
+}
+
+function investmentDraft(entity = {}, draft = null) {
+  const source = draft || {};
+  const terms = normalizeInvestmentTerms(source.investmentTerms ? source : entity);
+  return {
+    name: String(source.name ?? entity.name ?? ''),
+    investmentTerms: {
+      ...terms,
+      objectName: String(source.investmentTerms?.objectName ?? terms.objectName ?? ''),
+      participantName: String(source.investmentTerms?.participantName ?? terms.participantName ?? ''),
+    },
+  };
+}
+
+function investmentTermsFromForm(form, entity) {
+  const data = new FormData(form);
+  const previous = normalizeInvestmentTerms(entity);
+  const role = String(data.get('investmentRole') || previous.role || 'self');
+  const participantAccountId = role === 'raise' ? String(data.get('participantAccountId') || '') : '';
+  const participant = participantAccountId ? findPersonByAccountId(participantAccountId) : null;
+  const participantName = participant
+    ? [participant.name, participant.surname].filter(Boolean).join(' ').trim()
+    : String(data.get('participantName') || '').trim();
+  const sameParticipant = participantAccountId
+    && participantAccountId === previous.participantAccountId;
+  return {
+    name: String(data.get('investmentName') || entity?.name || '').trim(),
+    investmentTerms: {
+      role,
+      investmentType: String(data.get('investmentType') || 'business-project'),
+      participationModel: role === 'self' ? 'self' : String(data.get('participationModel') || 'returnable'),
+      objectName: String(data.get('objectName') || '').trim(),
+      termMode: String(data.get('termMode') || 'none'),
+      endDate: String(data.get('endDate') || ''),
+      durationValue: Number(data.get('durationValue') || 1),
+      durationUnit: String(data.get('durationUnit') || 'months'),
+      targetAmount: Number(data.get('targetAmount') || 0),
+      sharePercent: Number(data.get('sharePercent') || 0),
+      returnPercent: Number(data.get('returnPercent') || 0),
+      participantAccountId,
+      participantName,
+      participantStatus: participantAccountId
+        ? (sameParticipant && previous.participantStatus === 'accepted' ? 'accepted' : 'pending')
+        : '',
+      participantRespondedAt: sameParticipant ? previous.participantRespondedAt : '',
+    },
+  };
+}
+
+function investmentSummaryRows(entity) {
+  const terms = normalizeInvestmentTerms(entity);
+  const state = calculateInvestmentState(entity, getFinanceEntityMovements('investment', entity.id));
+  const rows = [];
+  if (terms.role === 'raise') {
+    rows.push(
+      v2ListEntry({ title: 'Привлечено', rightTop: formatMoney(state.received) }),
+      v2ListEntry({ title: 'Возвращено капитала', rightTop: formatMoney(state.capitalReturned) }),
+      v2ListEntry({ title: 'Выплачено дохода', rightTop: formatMoney(state.incomePaid) }),
+      v2ListEntry({ title: 'Остаток обязательств', rightTop: formatMoney(state.remainingObligation) }),
+    );
+    if (state.explicitValuation) {
+      rows.push(v2ListEntry({ title: 'Оценка проекта', rightTop: formatMoney(state.currentValue) }));
+    }
+    if (state.shareValue != null) {
+      rows.push(v2ListEntry({ title: 'Стоимость доли инвестора', rightTop: formatMoney(state.shareValue) }));
+    }
+  } else {
+    rows.push(
+      v2ListEntry({ title: 'Вложено', rightTop: formatMoney(state.contributed) }),
+      v2ListEntry({ title: 'Возвращено капитала', rightTop: formatMoney(state.returnedCapital) }),
+      v2ListEntry({ title: 'Получено дохода', rightTop: formatMoney(state.income) }),
+    );
+    if (terms.role === 'self') rows.push(v2ListEntry({ title: 'Экономия', rightTop: formatMoney(state.savings) }));
+    rows.push(
+      v2ListEntry({ title: 'Расходы', rightTop: formatMoney(state.expenses) }),
+      v2ListEntry({ title: 'Текущая стоимость', rightTop: formatMoney(state.currentValue) }),
+      v2ListEntry({ title: 'Результат', rightTop: formatMoney(state.result) }),
+      v2ListEntry({ title: 'ROI', rightTop: formatPercent(state.roi) }),
+      v2ListEntry({ title: 'Годовая доходность', rightTop: formatPercent(state.annualizedReturn) }),
+      v2ListEntry({ title: 'Окуплено', rightTop: formatPercent(state.paybackRatio) }),
+    );
+    if (state.paybackDate) rows.push(v2ListEntry({ title: 'Точка окупаемости', rightTop: shortDate(state.paybackDate, '') }));
+  }
+  if (state.endDate) rows.push(v2ListEntry({ title: 'Срок', rightTop: shortDate(state.endDate, '') }));
+  return v2ListEntries(rows);
+}
+
+function renderInvestmentTermsLayer(root, entityLayer, layer, sourceEntity, draft = null, { creating = false } = {}) {
+  const current = investmentDraft(sourceEntity, draft);
+  const terms = current.investmentTerms;
+  const roles = allowedInvestmentRoles();
+  if (!roles.some((item) => item.value === terms.role)) {
+    roles.push({ value: terms.role, label: investmentRoleLabel(terms.role) });
+  }
+  const participationOptions = investmentParticipationOptions(terms.role);
+  const participationModel = participationOptions.some((item) => item.value === terms.participationModel)
+    ? terms.participationModel
+    : participationOptions[0].value;
+  const termOptions = [
+    { value: 'none', label: 'Без срока' },
+    { value: 'date', label: 'До даты' },
+    { value: 'duration', label: 'На срок' },
+  ];
+  const participantOptions = investmentParticipantOptions(terms.participantAccountId);
+  const previewEntity = {
+    ...sourceEntity,
+    name: current.name,
+    investmentTerms: normalizeInvestmentTerms({
+      investmentTerms: { ...terms, participationModel },
+    }),
+  };
+
+  layer.innerHTML = page([
+    workspaceHeaderContext({
+      title: 'Условия инвестиции',
+      c: {
+        label: 'Сохранить',
+        data: 'data-investment-terms-save',
+        aria: 'Сохранить условия инвестиции',
+      },
+    }),
+    `<form class="compact-form" data-investment-terms-form novalidate>
+      ${field({ label: 'Наименование', name: 'investmentName', value: current.name, required: true, placeholder: 'Наименование' })}
+      ${roles.length > 1 ? select({ label: 'Моя роль', name: 'investmentRole', value: terms.role, options: roles }) : `<input type="hidden" name="investmentRole" value="${escapeHtml(terms.role)}">`}
+      ${select({ label: 'Тип инвестиции', name: 'investmentType', value: terms.investmentType, options: investmentTypeOptions() })}
+      ${field({ label: terms.role === 'self' ? 'Во что вкладываю' : 'Проект / объект', name: 'objectName', value: terms.objectName || '', placeholder: 'Необязательно' })}
+      ${terms.role === 'raise' ? select({
+        label: 'Инвестор',
+        name: 'participantAccountId',
+        value: terms.participantAccountId || '',
+        options: participantOptions,
+        searchable: participantOptions.length > 8,
+      }) : ''}
+      ${terms.role === 'raise' && !terms.participantAccountId ? field({
+        label: 'Имя инвестора',
+        name: 'participantName',
+        value: terms.participantName || '',
+        placeholder: 'Необязательно',
+      }) : ''}
+      ${terms.role !== 'self' ? select({
+        label: 'Условия участия',
+        name: 'participationModel',
+        value: participationModel,
+        options: participationOptions,
+      }) : `<input type="hidden" name="participationModel" value="self">`}
+      ${field({
+        label: terms.role === 'raise' ? 'План привлечения' : 'План вложения',
+        name: 'targetAmount',
+        type: 'number',
+        inputmode: 'decimal',
+        value: terms.targetAmount || '',
+        placeholder: '0',
+        data: 'min="0" step="0.01"',
+      })}
+      ${participationModel === 'equity' ? field({
+        label: 'Доля, %',
+        name: 'sharePercent',
+        type: 'number',
+        inputmode: 'decimal',
+        value: terms.sharePercent || '',
+        data: 'min="0" max="100" step="0.01"',
+      }) : ''}
+      ${['profit-share', 'revenue-share', 'fixed-return'].includes(participationModel) ? field({
+        label: participationModel === 'profit-share'
+          ? 'Процент от прибыли'
+          : participationModel === 'revenue-share'
+            ? 'Процент от выручки'
+            : 'Доходность, %',
+        name: 'returnPercent',
+        type: 'number',
+        inputmode: 'decimal',
+        value: terms.returnPercent || '',
+        data: 'min="0" max="100" step="0.01"',
+      }) : ''}
+      ${select({ label: 'Срок', name: 'termMode', value: terms.termMode, options: termOptions })}
+      ${terms.termMode === 'date' ? datePicker({
+        label: 'Дата окончания',
+        name: 'endDate',
+        value: terms.endDate || '',
+        required: true,
+        allowClear: false,
+      }) : ''}
+      ${terms.termMode === 'duration' ? `${field({
+        label: 'Срок',
+        name: 'durationValue',
+        type: 'number',
+        inputmode: 'numeric',
+        value: terms.durationValue,
+        required: true,
+        data: 'min="1" step="1"',
+      })}${select({
+        label: 'Единица срока',
+        name: 'durationUnit',
+        value: terms.durationUnit,
+        options: [
+          { value: 'months', label: 'Месяцев' },
+          { value: 'years', label: 'Лет' },
+        ],
+      })}` : ''}
+    </form>`,
+    creating ? '' : v2Section('Расчёт', investmentSummaryRows(previewEntity)),
+  ]);
+
+  initDatePickers(layer);
+  const form = layer.querySelector('[data-investment-terms-form]');
+  if (!form) return;
+  form.addEventListener('change', (event) => {
+    const name = String(event.target?.name || '');
+    if (!['investmentRole', 'investmentType', 'participantAccountId', 'participationModel', 'termMode', 'endDate', 'durationValue', 'durationUnit', 'targetAmount', 'sharePercent', 'returnPercent'].includes(name)) return;
+    renderInvestmentTermsLayer(root, entityLayer, layer, sourceEntity, investmentTermsFromForm(form, sourceEntity), { creating });
+  });
+  layer.querySelector('[data-investment-terms-save]')?.addEventListener('click', () => form.requestSubmit());
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const validation = formValidationMessage(form);
+    if (validation) {
+      openNotice({ message: validation });
+      return;
+    }
+    const nextDraft = investmentTermsFromForm(form, sourceEntity);
+    if (!nextDraft.name) {
+      openNotice({ message: 'Укажите наименование инвестиции.' });
+      return;
+    }
+    if (!investmentRoleAllowed(nextDraft.investmentTerms.role)) {
+      openNotice({ message: 'Этот режим инвестиций недоступен.' });
+      return;
+    }
+    if (nextDraft.investmentTerms.termMode === 'date' && !nextDraft.investmentTerms.endDate) {
+      openNotice({ message: 'Укажите дату окончания.' });
+      return;
+    }
+    const next = {
+      ...sourceEntity,
+      name: nextDraft.name,
+      investmentTerms: normalizeInvestmentTerms({ investmentTerms: nextDraft.investmentTerms }),
+      investmentEvents: Array.isArray(sourceEntity.investmentEvents) ? sourceEntity.investmentEvents : [],
+      updatedAt: new Date().toISOString(),
+    };
+    saveInvestmentEntity(next);
+    layer.v2Close?.();
+    if (entityLayer?.isConnected) renderFinanceEntityLayer(root, entityLayer, 'investment', next.id);
+    renderList(root);
+  });
+}
+
+function openInvestmentTerms(root, entityLayer, entity, options = {}) {
+  const host = entityLayer || root;
+  const layer = mountV2ZLayer(host, v2ZLayer(''), { stack: true });
+  if (!layer) return null;
+  renderInvestmentTermsLayer(root, entityLayer, layer, entity, null, options);
+  return layer;
+}
+
+function saveInvestmentEvent(entity, event = {}) {
+  const next = {
+    ...entity,
+    investmentEvents: [
+      ...(Array.isArray(entity.investmentEvents) ? entity.investmentEvents : []),
+      {
+        id: crypto.randomUUID(),
+        type: String(event.type || ''),
+        amount: Math.max(0, Number(event.amount) || 0),
+        occurredDate: String(event.occurredDate || ''),
+        note: String(event.note || '').trim(),
+        createdAt: new Date().toISOString(),
+      },
+    ],
+    updatedAt: new Date().toISOString(),
+  };
+  saveInvestmentEntity(next);
+  return next;
+}
+
+function investmentEventTitle(event = {}) {
+  return ({
+    valuation: 'Изменение оценки',
+    saving: 'Экономия',
+    reinvestment: 'Реинвестирование',
+  })[String(event.type || '')] || 'Событие инвестиции';
+}
+
+function investmentEventRows(entity = {}) {
+  return (Array.isArray(entity.investmentEvents) ? entity.investmentEvents : [])
+    .filter((event) => event && !event.deletedAt)
+    .map((event) => ({
+      ...event,
+      occurredAt: String(event.occurredDate || event.occurredAt || ''),
+      total: Number(event.amount) || 0,
+      investmentEvent: true,
+    }));
 }
 
 function loanRateOptions() {
@@ -779,7 +1124,13 @@ function openLoanTerms(root, entityLayer, entity) {
 }
 
 function openFinanceEntitySettings(root, entityLayer, type, entity) {
-  const financeEntity = { type, id: entity.id, name: entity.name };
+  const terms = type === 'investment' ? normalizeInvestmentTerms(entity) : null;
+  const financeEntity = {
+    type,
+    id: entity.id,
+    name: entity.name,
+    role: terms?.role || '',
+  };
   const saved = () => {
     renderFinanceEntityLayer(root, entityLayer, type, entity.id);
     renderList(root);
@@ -790,21 +1141,40 @@ function openFinanceEntitySettings(root, entityLayer, type, entity) {
     label: 'Вид',
     onSelect: () => openFinanceEntityAppearance(root, entityLayer, type, entity),
   }];
+
   if (type === 'loan') {
     actions.push({
       id: 'terms',
       label: 'Условия займа',
       onSelect: () => openLoanTerms(root, entityLayer, entity),
     });
+    actions.push({
+      id: 'financial-operation',
+      label: 'Финансовая операция',
+      onSelect: () => openEntityFinanceOperation(entityLayer, type, {
+        financeEntity,
+        onSaved: saved,
+      }),
+    });
+  } else if (investmentRoleAllowed(terms.role)) {
+    actions.push({
+      id: 'terms',
+      label: 'Условия инвестиции',
+      onSelect: () => openInvestmentTerms(root, entityLayer, entity),
+    });
+    actions.push({
+      id: 'financial-operation',
+      label: 'Финансовая операция',
+      onSelect: () => openEntityFinanceOperation(entityLayer, type, {
+        financeEntity,
+        onInvestmentEventSaved: (event) => saveInvestmentEvent(
+          financeEntityById('investment', entity.id) || entity,
+          event,
+        ),
+        onSaved: saved,
+      }),
+    });
   }
-  actions.push({
-    id: 'financial-operation',
-    label: 'Финансовая операция',
-    onSelect: () => openEntityFinanceOperation(entityLayer, type, {
-      financeEntity,
-      onSaved: saved,
-    }),
-  });
 
   return openSharedProfileSettingsMenu({
     title: entity.name,
