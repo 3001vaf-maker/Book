@@ -83,7 +83,7 @@ if (/\bincome\s*:|\bexpense\s*:|legacyOperational|normalizeIncome|normalizeExpen
 }
 
 const financeService = source('core/finance/service.js');
-for (const command of ['recordPaymentIncome', 'recordRefundExpense', 'cancelPaymentOperation', 'recordManualFinanceOperation', 'recordSpecialFinanceOperation']) {
+for (const command of ['recordPaymentIncome', 'recordRefundExpense', 'cancelPaymentOperation', 'recordManualFinanceOperation', 'recordSpecialFinanceOperation', 'hardDeleteFinanceOperation']) {
   if (!new RegExp(`export\\s+async\\s+function\\s+${command}`).test(financeService)) {
     errors.push(`core/finance/service.js: ${command} must be an async server-backed command`);
   }
@@ -129,6 +129,7 @@ for (const route of [
   /@Post\(['"]operations\/payment['"]\)/,
   /@Post\(['"]operations\/:operationId\/refund['"]\)/,
   /@Post\(['"]operations\/:operationId\/cancel['"]\)/,
+  /@Delete\(['"]operations\/:operationId\/hard['"]\)/,
   /@Get\(['"]articles['"]\)/,
   /@Post\(['"]articles['"]\)/,
   /@Put\(['"]articles\/:articleId['"]\)/,
@@ -147,6 +148,7 @@ for (const token of [
   'recordPayment(',
   'recordRefund(',
   'cancelOperation(',
+  'hardDeleteOperation(',
   'settlementForSource(',
   'financeLedgerEntry',
   'financeArticle',
@@ -216,7 +218,7 @@ if (!/export function financialMoney/.test(financeRules) || !/Math\.round\([^\n]
 }
 
 const financeIndex = source('core/finance/index.js');
-for (const token of ['calculateSettlement', 'getRecordPaymentState', 'getLedgerEntries', 'getFinanceArticles', 'getZReport', 'recordManualFinanceOperation', 'recordSpecialFinanceOperation', 'recordPaymentIncome', 'saveSettlementSnapshot']) {
+for (const token of ['calculateSettlement', 'getRecordPaymentState', 'getLedgerEntries', 'getFinanceArticles', 'getZReport', 'recordManualFinanceOperation', 'recordSpecialFinanceOperation', 'recordPaymentIncome', 'hardDeleteFinanceOperation', 'saveSettlementSnapshot']) {
   if (!financeIndex.includes(token)) errors.push(`core/finance/index.js must expose ${token}`);
 }
 
@@ -274,7 +276,7 @@ if (!/platformAdmin\.findUnique/.test(serverFinance)
 
 const financeUI = source('core/finance/finance.js');
 const ddsUI = source('core/finance/dds/index.js');
-if (!/getLedgerEntries/.test(ddsUI)) errors.push('DDS UI must render flat Ledger rows');
+if (!/getLedgerEntries/.test(ddsUI) || !/operationGroupsFromLedger/.test(ddsUI)) errors.push('DDS UI must project canonical Ledger into one row per Finance operation');
 if (!/renderZReport/.test(financeUI)) {
   errors.push('Finance root must expose Z-report');
 }
@@ -302,7 +304,19 @@ if (!/variant: 'quick'/.test(ddsUI)) {
   errors.push('DDS financial operation choice must use the shared bottom modal');
 }
 if (!/mountV2ZLayer/.test(ddsUI) || !/v2ZLayer/.test(ddsUI)) {
-  errors.push('DDS Excel, operation forms and Articles must open as real stacked Z layers');
+  errors.push('DDS Excel, operation forms, receipts and Articles must open as real stacked Z layers');
+}
+for (const token of ['v2ListEntry', 'v2ListEntries', 'readOnlyReceipt', 'openSharedProfileSettingsMenu', 'hardDeleteFinanceOperation']) {
+  if (!ddsUI.includes(token)) errors.push(`DDS operation workflow must use shared ${token}`);
+}
+if (/details\s*\(|list\s*\(\{\s*items:\s*entries/.test(ddsUI)) {
+  errors.push('DDS opened operation must be one readOnlyReceipt without legacy details/list duplication');
+}
+if (!/data-finance-operation-cancel-confirm/.test(ddsUI) || !/data-finance-operation-delete-confirm/.test(ddsUI)) {
+  errors.push('DDS operation A/settings must expose separate cancel and permanent delete flows');
+}
+if (!/actionOnly:\s*true/.test(ddsUI) || !/variant:\s*'top'/.test(ddsUI)) {
+  errors.push('DDS cancellation help must use the shared info icon and top information modal');
 }
 if (!/Фактическая дата и время/.test(ddsUI) || !/Внесено в систему/.test(ddsUI)) {
   errors.push('DDS/export must expose factual occurrence time separately from system recording time');

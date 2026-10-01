@@ -92,6 +92,14 @@ export class FinanceController {
     return this.finance.recordRefund(request.auth!.tenantId, operationId, body);
   }
 
+  @Delete('operations/:operationId/hard')
+  hardDeleteOperation(
+    @Req() request: AuthenticatedRequest,
+    @Param('operationId') operationId: string,
+  ) {
+    return this.finance.hardDeleteOperation(request.auth!.tenantId, operationId);
+  }
+
   @Post('operations/:operationId/cancel')
   cancel(
     @Req() request: AuthenticatedRequest,

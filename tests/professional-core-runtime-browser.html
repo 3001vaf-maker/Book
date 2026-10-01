@@ -90,6 +90,26 @@
           tips:0,
           settlement:{items:[{sourceType:'procedure',sourceId:'runtime-procedure',name:'Стрижка',price:1500,discountMoney:0,planAmount:1500}],serviceTotal:1500,discountTotal:0,planTotal:1500},
         },
+      },{
+        operationId:'runtime-manual',
+        kind:'manual-income',
+        status:'completed',
+        source:{type:'manual',id:'runtime-manual'},
+        originalOperationId:'',
+        occurredAt:'2026-09-30T13:38:00.000Z',
+        recordedAt:'2026-09-30T13:41:00.000Z',
+        data:{
+          direction:'IN',
+          articleId:'system-other-income',
+          walletId:'cash',
+          walletName:'Наличные',
+          note:'Тестовый комментарий',
+          total:357,
+          lines:[
+            {lineName:'глажка',quantity:1,unitPrice:234,total:234,articleId:'system-other-income'},
+            {lineName:'стирка',quantity:1,unitPrice:123,total:123,articleId:'system-other-income'},
+          ],
+        },
       }],
       ledger:[{
         entryId:'runtime-ledger',
@@ -110,6 +130,44 @@
         quantity:null,
         unitPrice:null,
         note:'',
+      },{
+        entryId:'runtime-manual-1',
+        operationId:'runtime-manual',
+        walletId:'cash',
+        walletName:'Наличные',
+        direction:'IN',
+        economicType:'OPERATING_REVENUE',
+        amount:234,
+        occurredAt:'2026-09-30T13:38:00.000Z',
+        recordedAt:'2026-09-30T13:41:00.000Z',
+        source:{type:'manual',id:'runtime-manual'},
+        component:'manual',
+        relatedOperationId:'',
+        articleId:'system-other-income',
+        articleName:'Прочие доходы',
+        lineName:'глажка',
+        quantity:1,
+        unitPrice:234,
+        note:'Тестовый комментарий',
+      },{
+        entryId:'runtime-manual-2',
+        operationId:'runtime-manual',
+        walletId:'cash',
+        walletName:'Наличные',
+        direction:'IN',
+        economicType:'OPERATING_REVENUE',
+        amount:123,
+        occurredAt:'2026-09-30T13:38:00.000Z',
+        recordedAt:'2026-09-30T13:41:00.000Z',
+        source:{type:'manual',id:'runtime-manual'},
+        component:'manual',
+        relatedOperationId:'',
+        articleId:'system-other-income',
+        articleName:'Прочие доходы',
+        lineName:'стирка',
+        quantity:1,
+        unitPrice:123,
+        note:'Тестовый комментарий',
       }],
     };
     if (path.endsWith('/saas-access/me')) return demoAccess;
@@ -326,6 +384,88 @@ const closeTopDdsZ = async (pointerId, label) => {
   pointer(zEdge,'pointerup',82,362,pointerId);
   await wait(70);
 };
+
+mark('dds-operation-receipt');
+const manualEntries = [...(shell()?.querySelectorAll('[data-finance-operation="runtime-manual"]') || [])];
+ok(manualEntries.length === 1, 'DDS must group one Finance operation into one V2 List Entry');
+const manualEntry = manualEntries[0];
+ok(Boolean(manualEntry?.classList.contains('list-entry')), 'DDS operation must use canonical V2 List Entry');
+ok(!manualEntry?.textContent.includes('глажка') && !manualEntry?.textContent.includes('стирка'),
+  'DDS Z1 must not expose detailed Ledger lines');
+ok(!manualEntry?.textContent.includes('Внесено'), 'DDS Z1 must not expose system recording time');
+manualEntry?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(60);
+
+let receiptZ = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
+const ddsReceipt = receiptZ?.querySelector('[data-read-only-sheet]');
+ok(Boolean(ddsReceipt), 'DDS operation must open one shared read-only receipt in Z2');
+ok(!receiptZ?.querySelector('.entity-details'), 'DDS receipt must not render legacy details block');
+ok(!receiptZ?.querySelector('.ui-list'), 'DDS receipt must not duplicate the operation as a legacy list');
+ok(ddsReceipt?.querySelector('.read-only-sheet__header h2')?.textContent.trim() === 'Доход',
+  'DDS receipt title is wrong');
+ok(ddsReceipt?.textContent.includes('Факт операции'), 'DDS receipt factual date label missing');
+ok(ddsReceipt?.textContent.includes('Внесено ·'), 'DDS receipt recording date missing');
+ok(ddsReceipt?.textContent.includes('Статья · Прочие доходы'), 'DDS receipt article missing');
+ok(ddsReceipt?.textContent.includes('Кошелёк · Наличные'), 'DDS receipt wallet missing');
+ok(ddsReceipt?.textContent.includes('Комментарий · Тестовый комментарий'), 'DDS receipt comment missing');
+ok(ddsReceipt?.textContent.includes('глажка') && ddsReceipt?.textContent.includes('стирка'),
+  'DDS receipt must expose operation composition');
+ok(ddsReceipt?.textContent.includes('357'), 'DDS receipt total missing');
+ok(Boolean(shell()?.querySelector('[data-v2-workspace-a]')), 'DDS receipt A/settings control missing');
+ok(!shell()?.querySelector('[data-v2-workspace-primary]'), 'DDS receipt must not expose a C action');
+
+shell()?.querySelector('[data-v2-workspace-a]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(40);
+let ddsOperationSettings = document.querySelector('[data-shared-profile-settings-menu]');
+ok(Boolean(ddsOperationSettings), 'DDS receipt settings did not open');
+ok(Boolean(ddsOperationSettings?.querySelector('[data-shared-profile-action="cancel-operation"]')),
+  'DDS receipt settings cancel action missing');
+const deleteAction = ddsOperationSettings?.querySelector('[data-shared-profile-action="delete-operation"]');
+ok(Boolean(deleteAction), 'DDS receipt settings permanent delete action missing');
+ok(Boolean(deleteAction?.classList.contains('ui-button--critical')), 'DDS permanent delete action must be red');
+
+ddsOperationSettings?.querySelector('[data-shared-profile-action="cancel-operation"]')
+  ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(40);
+let cancelModal = document.querySelector('[data-modal][data-v2-layer-kind="bottom"]');
+ok(Boolean(cancelModal?.querySelector('input[name="financeCancelOccurredAt"]')),
+  'DDS cancel modal factual date-time field missing');
+ok(Boolean(cancelModal?.querySelector('[data-finance-cancel-info] [data-info-trigger]')),
+  'DDS cancel modal shared info icon missing');
+ok(Boolean(cancelModal?.querySelector('[data-finance-operation-cancel-confirm]')),
+  'DDS cancel modal action missing');
+ok(!cancelModal?.textContent.includes('Ошибочный ввод останется'),
+  'DDS cancel modal must not expose permanent technical explanation text');
+
+cancelModal?.querySelector('[data-finance-cancel-info] [data-info-trigger]')
+  ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(30);
+let cancelInfo = document.querySelector('[data-modal][data-v2-layer-kind="top"]');
+ok(Boolean(cancelInfo), 'DDS cancellation info must open as top modal');
+ok(cancelInfo?.textContent.includes('создаёт обратную операцию'), 'DDS cancellation info text missing');
+cancelInfo?.querySelector('[data-notice-close]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(20);
+cancelModal?.v2Close?.();
+await wait(20);
+
+shell()?.querySelector('[data-v2-workspace-a]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(40);
+ddsOperationSettings = document.querySelector('[data-shared-profile-settings-menu]');
+ddsOperationSettings?.querySelector('[data-shared-profile-action="delete-operation"]')
+  ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(40);
+let deleteConfirm = document.querySelector('[data-modal][data-v2-layer-kind="top"]');
+ok(Boolean(deleteConfirm), 'DDS permanent delete confirmation must open as top modal');
+ok(Boolean(deleteConfirm?.querySelector('[data-finance-operation-delete-confirm].ui-button--critical')),
+  'DDS permanent delete confirmation must contain red Delete button');
+deleteConfirm?.querySelector('[data-finance-operation-delete-close]')
+  ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(20);
+
+await closeTopDdsZ(120, 'receipt');
+ok(!shell()?.querySelector('[data-v2-z-layer]'), 'DDS receipt Z2 did not close by swipe');
+ok([...(shell()?.querySelectorAll('[data-finance-operation="runtime-manual"]') || [])].length === 1,
+  'DDS grouped operation row was not restored after closing receipt');
 
 mark('dds-export');
 let settings = await openDdsSettings();

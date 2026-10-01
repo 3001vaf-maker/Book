@@ -191,6 +191,17 @@ export async function recordPaymentIncome({
   return payment;
 }
 
+export async function hardDeleteFinanceOperation(operationId) {
+  const id = String(operationId || '').trim();
+  if (!id) return null;
+  const response = await apiRequest(`/finance/operations/${encodeURIComponent(id)}/hard`, {
+    method: 'DELETE',
+  });
+  const state = await applyServerState(response, 'Не удалось полностью удалить операцию');
+  notifyFinanceChanged({ action: 'operation-hard-delete', operationId: id });
+  return state;
+}
+
 export async function cancelFinanceOperation(operationId, { reason = 'incorrect-entry', occurredAt = null } = {}) {
   const id = String(operationId || '');
   if (!id || !occurredAt) return null;
