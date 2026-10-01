@@ -437,11 +437,11 @@ ok(!receiptZ?.querySelector('.entity-details'), 'DDS receipt must not render leg
 ok(!receiptZ?.querySelector('.ui-list'), 'DDS receipt must not duplicate the operation as a legacy list');
 ok(ddsReceipt?.querySelector('.read-only-sheet__header h2')?.textContent.trim() === 'Доход',
   'DDS receipt title is wrong');
-ok(ddsReceipt?.textContent.includes('Факт операции'), 'DDS receipt factual date label missing');
-ok(ddsReceipt?.textContent.includes('Внесено ·'), 'DDS receipt recording date missing');
+ok(!ddsReceipt?.textContent.includes('Факт операции'), 'DDS receipt must not expose technical factual labels');
+ok(!ddsReceipt?.textContent.includes('Внесено'), 'DDS receipt must not expose system recording time');
 ok(ddsReceipt?.textContent.includes('Статья · Прочие доходы'), 'DDS receipt article missing');
-ok(ddsReceipt?.textContent.includes('Кошелёк · Наличные'), 'DDS receipt wallet missing');
-ok(ddsReceipt?.textContent.includes('Комментарий · Тестовый комментарий'), 'DDS receipt comment missing');
+ok(ddsReceipt?.textContent.includes('Наличные'), 'DDS receipt wallet missing');
+ok(ddsReceipt?.textContent.includes('Тестовый комментарий'), 'DDS receipt comment missing');
 ok(ddsReceipt?.textContent.includes('глажка') && ddsReceipt?.textContent.includes('стирка'),
   'DDS receipt must expose operation composition');
 ok(ddsReceipt?.textContent.includes('357'), 'DDS receipt total missing');
@@ -454,8 +454,10 @@ let ddsOperationSettings = document.querySelector('[data-shared-profile-settings
 ok(Boolean(ddsOperationSettings), 'DDS receipt settings did not open');
 ok(Boolean(ddsOperationSettings?.querySelector('[data-shared-profile-action="correct-operation"]')),
   'DDS receipt settings correction action missing');
-ok(Boolean(ddsOperationSettings?.querySelector('[data-shared-profile-action="cancel-operation"]')),
-  'DDS receipt settings cancel action missing');
+const cancelAction = ddsOperationSettings?.querySelector('[data-shared-profile-action="cancel-operation"]');
+ok(Boolean(cancelAction), 'DDS receipt settings cancel action missing');
+ok(Boolean(cancelAction?.classList.contains('ui-button--danger')),
+  'DDS receipt settings cancel action must use shared pink/red danger style');
 const deleteAction = ddsOperationSettings?.querySelector('[data-shared-profile-action="delete-operation"]');
 ok(Boolean(deleteAction), 'DDS receipt settings permanent delete action missing');
 ok(Boolean(deleteAction?.classList.contains('ui-button--critical')), 'DDS permanent delete action must be red');
@@ -538,6 +540,56 @@ await closeTopDdsZ(120, 'receipt');
 ok(!shell()?.querySelector('[data-v2-z-layer]'), 'DDS receipt Z2 did not close by swipe');
 ok([...(shell()?.querySelectorAll('[data-finance-operation="runtime-manual"]') || [])].length === 1,
   'DDS grouped operation row was not restored after closing receipt');
+
+mark('dds-payment-receipt');
+const paymentEntries = [...(shell()?.querySelectorAll('[data-finance-operation="runtime-payment"]') || [])];
+ok(paymentEntries.length === 1, 'Split payment must remain one DDS operation row');
+paymentEntries[0]?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(60);
+
+receiptZ = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
+const paymentReceipt = receiptZ?.querySelector('[data-read-only-sheet]');
+ok(Boolean(paymentReceipt), 'Payment operation must open one shared receipt');
+ok(paymentReceipt?.querySelector('.read-only-sheet__header h2')?.textContent.trim() === 'Оплата услуги',
+  'Payment receipt title must be centered shared receipt title');
+ok(!paymentReceipt?.textContent.includes('Факт операции'), 'Payment receipt must not show factual technical label');
+ok(!paymentReceipt?.textContent.includes('Внесено'), 'Payment receipt must not show system recording time');
+ok(!paymentReceipt?.textContent.includes('Рабочее место ·'), 'Payment receipt must not prefix workplace with a technical label');
+ok(!paymentReceipt?.textContent.includes('Кошелёк ·'), 'Payment receipt must not prefix payment method with a technical label');
+ok(!paymentReceipt?.textContent.includes('|'), 'Payment receipt must not render textual separator characters');
+
+const paymentGroups = [...(paymentReceipt?.querySelectorAll('.read-only-sheet__group') || [])];
+ok(paymentGroups.length === 3, 'Payment receipt must contain service, identity/composition and payment groups');
+
+const paymentGroupRows = paymentGroups.map((group) => [...group.querySelectorAll('.read-only-sheet__row')]);
+ok(paymentGroupRows[0]?.[0]?.querySelector('span')?.textContent.trim() === 'Студия Тест',
+  'Payment receipt workplace must be first and left aligned');
+ok(paymentGroupRows[0]?.[1]?.querySelector('span')?.textContent.includes(' - '),
+  'Payment receipt procedure factual date and time must be one left row separated by dash');
+
+ok(paymentGroupRows[1]?.[0]?.querySelector('span')?.textContent.trim() === 'UEI-RUNTIME',
+  'Payment receipt UEI must be a separate left row');
+ok(paymentGroupRows[1]?.[1]?.querySelector('span')?.textContent.trim() === 'Иван Проверка',
+  'Payment receipt full name must be a separate left row');
+const haircutRow = paymentGroupRows[1]?.find((row) => row.querySelector('span')?.textContent.trim() === 'Стрижка');
+const colorRow = paymentGroupRows[1]?.find((row) => row.querySelector('span')?.textContent.trim() === 'Окраска');
+ok(Boolean(haircutRow?.querySelector('strong')?.textContent.includes('900')),
+  'Payment receipt procedure price must be on the right of the same row');
+ok(Boolean(colorRow?.querySelector('strong')?.textContent.includes('600')),
+  'Payment receipt second procedure price must be on the right of the same row');
+
+const cashRow = paymentGroupRows[2]?.find((row) => row.querySelector('span')?.textContent.trim() === 'Наличные');
+const cashlessRow = paymentGroupRows[2]?.find((row) => row.querySelector('span')?.textContent.trim() === 'Безналичные');
+const totalRow = paymentGroupRows[2]?.find((row) => row.querySelector('span')?.textContent.trim() === 'Итого');
+ok(Boolean(cashRow?.querySelector('strong')?.textContent.includes('1 000')),
+  'Split payment cash amount must be on the right');
+ok(Boolean(cashlessRow?.querySelector('strong')?.textContent.includes('500')),
+  'Split payment cashless amount must be on the right');
+ok(Boolean(totalRow?.classList.contains('is-strong') && totalRow?.querySelector('strong')?.textContent.includes('1 500')),
+  'Payment receipt total must be the final strong row');
+
+await closeTopDdsZ(122, 'payment-receipt');
+ok(!shell()?.querySelector('[data-v2-z-layer]'), 'DDS payment receipt Z2 did not close by swipe');
 
 mark('dds-export');
 let settings = await openDdsSettings();
