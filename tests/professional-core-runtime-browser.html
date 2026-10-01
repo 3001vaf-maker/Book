@@ -598,14 +598,14 @@ const paymentGroups = [...(paymentReceipt?.querySelectorAll('.read-only-sheet__g
 ok(paymentGroups.length === 3, 'Payment receipt must contain service, identity/composition and payment groups');
 
 const paymentGroupRows = paymentGroups.map((group) => [...group.querySelectorAll('.read-only-sheet__row')]);
-ok(paymentGroupRows[0]?.[0]?.querySelector('span')?.textContent.trim() === 'Студия Тест',
+ok(paymentGroupRows[0]?.[0]?.querySelector('span')?.textContent.trim() === 'Бьюти тория',
   'Payment receipt workplace must be first and left aligned');
 ok(paymentGroupRows[0]?.[1]?.querySelector('span')?.textContent.includes(' - '),
   'Payment receipt procedure factual date and time must be one left row separated by dash');
 
-ok(paymentGroupRows[1]?.[0]?.querySelector('span')?.textContent.trim() === 'UEI-RUNTIME',
+ok(paymentGroupRows[1]?.[0]?.querySelector('span')?.textContent.trim() === '0012',
   'Payment receipt UEI must be a separate left row');
-ok(paymentGroupRows[1]?.[1]?.querySelector('span')?.textContent.trim() === 'Иван Проверка',
+ok(paymentGroupRows[1]?.[1]?.querySelector('span')?.textContent.trim() === 'Татьяна Проверка',
   'Payment receipt full name must be a separate left row');
 const haircutRow = paymentGroupRows[1]?.find((row) => row.querySelector('span')?.textContent.trim() === 'Стрижка');
 const colorRow = paymentGroupRows[1]?.find((row) => row.querySelector('span')?.textContent.trim() === 'Окраска');
