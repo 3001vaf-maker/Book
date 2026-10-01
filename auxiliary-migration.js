@@ -1,5 +1,5 @@
 import { apiRequest } from './core/auth.js';
-import { hydrateFinanceFromServer, hydrateWalletsFromServer } from './core/finance/index.js';
+import { hydrateCashEntitiesFromServer, hydrateFinanceFromServer, hydrateWalletsFromServer } from './core/finance/index.js';
 import { hydrateProductsFromServer } from './settings/service/products/data.js';
 import { hydrateTagsFromServer } from './settings/tags/data.js';
 
@@ -10,6 +10,8 @@ function clone(value) {
 function normalize(value = {}) {
   return {
     wallets: Array.isArray(value.wallets) ? clone(value.wallets) : [],
+    investments: Array.isArray(value.investments) ? clone(value.investments) : [],
+    loans: Array.isArray(value.loans) ? clone(value.loans) : [],
     tags: Array.isArray(value.tags) ? clone(value.tags) : [],
     products: Array.isArray(value.products) ? clone(value.products) : [],
     productHistory: Array.isArray(value.productHistory) ? clone(value.productHistory) : [],
@@ -25,6 +27,7 @@ async function responseJson(response, fallback) {
 function hydrateAuxiliary(value) {
   const bundle = normalize(value);
   hydrateWalletsFromServer(bundle.wallets);
+  hydrateCashEntitiesFromServer({ investments: bundle.investments, loans: bundle.loans });
   hydrateTagsFromServer(bundle.tags);
   hydrateProductsFromServer({ products: bundle.products, productHistory: bundle.productHistory });
 }
