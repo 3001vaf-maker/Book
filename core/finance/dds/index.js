@@ -322,6 +322,189 @@ function openDeleteOperation(root, operationLayer, entries) {
   });
 }
 
+function correctionWalletOptions() {
+  return getWallets().map((item) => ({ value: item.id, label: item.name }));
+}
+
+function reopenCorrectedOperation(root, operationLayer, correctionLayer, operationId) {
+  correctionLayer?.v2Close?.();
+  operationLayer?.v2Close?.();
+  renderDDS(root);
+  const movements = [...getLedgerEntries()].reverse();
+  openFinanceOperation(root, movements, operationId);
+}
+
+function renderPaymentCorrection(root, operation, { onSaved = null } = {}) {
+  const data = operation?.data && typeof operation.data === 'object' ? operation.data : {};
+  const allocations = Array.isArray(data.allocations) ? data.allocations.slice(0, 2) : [];
+  const wallets = correctionWalletOptions();
+  const serviceAmount = Math.max(0, Number(data.serviceAmount) || 0);
+  const rows = [0, 1].map((index) => {
+    const allocation = allocations[index] || {};
+    return `${select({
+      label: `Кошелёк ${index + 1}`,
+      name: `allocationWallet${index + 1}`,
+      value: allocation.walletId || '',
+      options: [{ value: '', label: '—' }, ...wallets],
+    })}${field({
+      label: `Сумма ${index + 1}`,
+      name: `allocationAmount${index + 1}`,
+      type: 'number',
+      inputmode: 'decimal',
+      value: allocation.amount || '',
+      placeholder: '0',
+      data: 'min="0" step="0.01"',
+    })}`;
+  }).join('');
+
+  root.innerHTML = `${workspaceHeaderContext({
+    title: 'Корректировка · Оплата услуги',
+    c: {
+      label: 'Сохранить',
+      data: 'data-finance-payment-correction-save',
+      aria: 'Сохранить корректировку оплаты',
+    },
+  })}
+    <form class="compact-form" data-finance-payment-correction-form>
+      <div class="payment-total"><span>Сумма услуг</span><strong>${formatMoney(serviceAmount)}</strong></div>
+      ${rows}
+      ${field({
+        label: 'Фактическая дата и время',
+        name: 'occurredAt',
+        type: 'datetime-local',
+        value: localDateTimeValue(operation?.occurredAt || new Date()),
+        required: true,
+      })}
+    </form>`;
+
+  root.querySelector('[data-finance-payment-correction-form]')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const walletRows = [1, 2].map((index) => {
+      const walletId = String(form.get(`allocationWallet${index}`) || '');
+      const amount = Math.max(0, Number(form.get(`allocationAmount${index}`) || 0));
+      const wallet = getWallets().find((item) => String(item.id) === walletId);
+      return { walletId, walletName: wallet?.name || '', amount };
+    }).filter((item) => item.walletId && item.amount > 0);
+    const allocated = walletRows.reduce((sum, item) => sum + item.amount, 0);
+    if (!walletRows.length || allocated + 0.009 < serviceAmount) {
+      openNotice({ message: 'Сумма по кошелькам не может быть меньше суммы услуг.' });
+      return;
+    }
+    const occurredAt = form.get('occurredAt') ? new Date(String(form.get('occurredAt'))).toISOString() : '';
+    try {
+      await correctFinanceOperation(operation.operationId, {
+        allocations: walletRows,
+        serviceAmount,
+        tips: Math.max(0, allocated - serviceAmount),
+        occurredAt,
+      });
+      onSaved?.();
+    } catch (error) {
+      openNotice({ message: String(error?.message || 'Не удалось скорректировать оплату') });
+    }
+  });
+  root.querySelector('[data-finance-payment-correction-save]')?.addEventListener('click', () => {
+    root.querySelector('[data-finance-payment-correction-form]')?.requestSubmit();
+  });
+  return true;
+}
+
+function renderRefundCorrection(root, operation, { onSaved = null } = {}) {
+  const data = operation?.data && typeof operation.data === 'object' ? operation.data : {};
+  const wallets = correctionWalletOptions();
+  root.innerHTML = `${workspaceHeaderContext({
+    title: 'Корректировка · Возврат',
+    c: {
+      label: 'Сохранить',
+      data: 'data-finance-refund-correction-save',
+      aria: 'Сохранить корректировку возврата',
+    },
+  })}
+    <form class="compact-form" data-finance-refund-correction-form>
+      ${field({
+        label: 'Сумма',
+        name: 'amount',
+        type: 'number',
+        inputmode: 'decimal',
+        value: data.total || '',
+        required: true,
+        placeholder: '0',
+        data: 'min="0" step="0.01"',
+      })}
+      ${select({
+        label: 'Кошелёк',
+        name: 'walletId',
+        value: data.walletId || '',
+        options: wallets,
+      })}
+      ${field({
+        label: 'Причина',
+        name: 'reason',
+        value: data.reason || '',
+        placeholder: 'Необязательно',
+      })}
+      ${field({
+        label: 'Фактическая дата и время',
+        name: 'occurredAt',
+        type: 'datetime-local',
+        value: localDateTimeValue(operation?.occurredAt || new Date()),
+        required: true,
+      })}
+    </form>`;
+
+  root.querySelector('[data-finance-refund-correction-form]')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const walletId = String(form.get('walletId') || '');
+    const wallet = getWallets().find((item) => String(item.id) === walletId);
+    try {
+      await correctFinanceOperation(operation.operationId, {
+        amount: Number(form.get('amount') || 0),
+        walletId,
+        walletName: wallet?.name || '',
+        reason: String(form.get('reason') || '').trim(),
+        occurredAt: form.get('occurredAt') ? new Date(String(form.get('occurredAt'))).toISOString() : '',
+      });
+      onSaved?.();
+    } catch (error) {
+      openNotice({ message: String(error?.message || 'Не удалось скорректировать возврат') });
+    }
+  });
+  root.querySelector('[data-finance-refund-correction-save]')?.addEventListener('click', () => {
+    root.querySelector('[data-finance-refund-correction-form]')?.requestSubmit();
+  });
+  return true;
+}
+
+function openOperationCorrection(root, operationLayer, entries) {
+  const first = entries[0] || {};
+  const operation = getFinanceOperation(first.operationId);
+  if (!operation) {
+    openNotice({ message: 'Операция не найдена.' });
+    return;
+  }
+  const layer = mountV2ZLayer(operationLayer, v2ZLayer('', { className: 'finance-dds-correction-z' }), { stack: true });
+  if (!layer) return;
+  const onSaved = () => reopenCorrectedOperation(root, operationLayer, layer, operation.operationId);
+  let rendered = false;
+  if (operation.kind === 'manual-income') {
+    rendered = renderIncomeExpenseOperation(layer, 'IN', { operation, onSaved });
+  } else if (operation.kind === 'manual-expense') {
+    rendered = renderIncomeExpenseOperation(layer, 'OUT', { operation, onSaved });
+  } else if (SPECIAL_FINANCE_ACTIONS.some((item) => item.id === operation.kind)) {
+    rendered = renderSpecialFinanceOperation(layer, operation.kind, { operation, onSaved });
+  } else if (operation.kind === 'payment') {
+    rendered = renderPaymentCorrection(layer, operation, { onSaved });
+  } else if (operation.kind === 'refund') {
+    rendered = renderRefundCorrection(layer, operation, { onSaved });
+  }
+  if (!rendered) {
+    layer.v2Close?.();
+    openNotice({ message: 'Для этой операции корректировка недоступна.' });
+  }
+}
+
 function openOperationSettings(root, operationLayer, entries) {
   const first = entries[0] || {};
   const canCancel = first?.operationStatus !== 'cancelled';
