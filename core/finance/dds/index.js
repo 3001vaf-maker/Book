@@ -1,9 +1,11 @@
 import {
   actionBlock,
   button,
+  datePicker,
   emptyState,
   field,
   infoUI,
+  initDatePickers,
   modal,
   mountModal,
   mountV2ZLayer,
@@ -22,6 +24,7 @@ import { readOnlyReceipt } from '../../../ui/receipt/index.js';
 import { canUseBookCapability } from '../../access.js';
 import { getFinanceOperation } from '../data.js';
 import { getWallets } from '../cash/data.js';
+import { financeLocalDateValue, financeOccurredAtForDate } from '../date.js';
 import { cancelFinanceOperation, correctFinanceOperation, hardDeleteFinanceOperation } from '../service.js';
 import { getLedgerEntries } from '../read.js';
 import { renderFinanceArticles } from './articles.js';
@@ -180,11 +183,6 @@ function downloadDDS(movements) {
   URL.revokeObjectURL(url);
 }
 
-function localDateTimeValue(date = new Date()) {
-  const shifted = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-  return shifted.toISOString().slice(0, 16);
-}
-
 function operationReceiptItems(entries = []) {
   const rows = Array.isArray(entries) ? entries : [];
   const first = rows[0] || {};
@@ -248,7 +246,7 @@ function operationReceiptItems(entries = []) {
 function openCancellationInfo(root) {
   return openNotice({
     title: 'Об отмене операции',
-    message: 'Отмена сохраняет исходную операцию в истории и создаёт обратную операцию на выбранные фактические дату и время.',
+    message: 'Отмена сохраняет исходную операцию в истории и создаёт обратную операцию на выбранную фактическую дату.',
     action: 'Закрыть',
     variant: 'top',
     surface: 'app',
@@ -263,27 +261,28 @@ function openCancelOperation(root, operationLayer, entries) {
     actionOnly: true,
   })}</div></div>
     <div class="compact-form">
-      ${field({ label: 'Фактическая дата и время отмены', name: 'financeCancelOccurredAt', type: 'datetime-local', value: localDateTimeValue(), required: true })}
+      ${datePicker({ label: 'Фактическая дата отмены', name: 'financeCancelOccurredDate', value: financeLocalDateValue(), required: true, allowClear: false })}
       ${button('Отменить', { variant: 'danger', data: 'data-finance-operation-cancel-confirm' })}
     </div>`;
   const cancelLayer = mountModal(document.body, modal(content, {
     title: 'Отменить операцию',
     variant: 'bottom',
-    className: 'modal--time-picker-sheet',
+    className: 'modal--form-sheet',
     surface: 'app',
   }));
   if (!cancelLayer) return;
+  initDatePickers(cancelLayer);
 
   cancelLayer.querySelector('[data-finance-cancel-info] [data-info-trigger]')?.addEventListener('click', () => {
     openCancellationInfo(root);
   });
   cancelLayer.querySelector('[data-finance-operation-cancel-confirm]')?.addEventListener('click', async () => {
-    const input = cancelLayer.querySelector('input[name="financeCancelOccurredAt"]');
+    const input = cancelLayer.querySelector('input[name="financeCancelOccurredDate"]');
     if (!input?.value) return;
     try {
       const cancelled = await cancelFinanceOperation(first.operationId, {
         reason: 'incorrect-entry',
-        occurredAt: new Date(input.value),
+        occurredAt: financeOccurredAtForDate(input.value, new Date()),
       });
       if (!cancelled) return;
       cancelLayer.v2Close?.();
@@ -368,14 +367,15 @@ function renderPaymentCorrection(root, operation, { onSaved = null } = {}) {
     <form class="compact-form" data-finance-payment-correction-form>
       <div class="payment-total"><span>Сумма услуг</span><strong>${formatMoney(serviceAmount)}</strong></div>
       ${rows}
-      ${field({
-        label: 'Фактическая дата и время',
-        name: 'occurredAt',
-        type: 'datetime-local',
-        value: localDateTimeValue(operation?.occurredAt || new Date()),
+      ${datePicker({
+        label: 'Фактическая дата',
+        name: 'occurredDate',
+        value: financeLocalDateValue(operation?.occurredAt || new Date()),
         required: true,
+        allowClear: false,
       })}
     </form>`;
+  initDatePickers(root);
 
   root.querySelector('[data-finance-payment-correction-form]')?.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -391,7 +391,7 @@ function renderPaymentCorrection(root, operation, { onSaved = null } = {}) {
       openNotice({ message: 'Сумма по кошелькам не может быть меньше суммы услуг.' });
       return;
     }
-    const occurredAt = form.get('occurredAt') ? new Date(String(form.get('occurredAt'))).toISOString() : '';
+    const occurredAt = financeOccurredAtForDate(String(form.get('occurredDate') || ''), operation?.occurredAt || new Date());
     try {
       await correctFinanceOperation(operation.operationId, {
         allocations: walletRows,
@@ -444,14 +444,15 @@ function renderRefundCorrection(root, operation, { onSaved = null } = {}) {
         value: data.reason || '',
         placeholder: 'Необязательно',
       })}
-      ${field({
-        label: 'Фактическая дата и время',
-        name: 'occurredAt',
-        type: 'datetime-local',
-        value: localDateTimeValue(operation?.occurredAt || new Date()),
+      ${datePicker({
+        label: 'Фактическая дата',
+        name: 'occurredDate',
+        value: financeLocalDateValue(operation?.occurredAt || new Date()),
         required: true,
+        allowClear: false,
       })}
     </form>`;
+  initDatePickers(root);
 
   root.querySelector('[data-finance-refund-correction-form]')?.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -464,7 +465,7 @@ function renderRefundCorrection(root, operation, { onSaved = null } = {}) {
         walletId,
         walletName: wallet?.name || '',
         reason: String(form.get('reason') || '').trim(),
-        occurredAt: form.get('occurredAt') ? new Date(String(form.get('occurredAt'))).toISOString() : '',
+        occurredAt: financeOccurredAtForDate(String(form.get('occurredDate') || ''), operation?.occurredAt || new Date()),
       });
       onSaved?.();
     } catch (error) {
@@ -612,8 +613,8 @@ function openDDSExport(root, movements) {
     c: { label: 'Выгрузить', data: 'data-finance-dds-export-submit', aria: 'Выгрузить ДДС' },
   })}
     <form class="compact-form" data-finance-dds-export-form>
-      ${field({ label: 'С', name: 'from', type: 'date' })}
-      ${field({ label: 'До', name: 'to', type: 'date' })}
+      ${datePicker({ label: 'С', name: 'from' })}
+      ${datePicker({ label: 'До', name: 'to' })}
       ${select({
         label: 'Операции',
         name: 'kind',
@@ -644,6 +645,7 @@ function openDDSExport(root, movements) {
         ],
       })}
     </form>`;
+  initDatePickers(layer);
   layer.querySelector('[data-finance-dds-export-submit]')?.addEventListener('click', () => {
     const form = layer.querySelector('[data-finance-dds-export-form]');
     if (!form) return;
