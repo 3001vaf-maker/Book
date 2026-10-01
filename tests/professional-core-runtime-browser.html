@@ -448,6 +448,12 @@ const correctionNames = [...(correctionZ?.querySelectorAll('input[name="lineName
   .map((input) => input.value);
 ok(correctionNames.includes('глажка') && correctionNames.includes('стирка'),
   'DDS correction must preload the current receipt composition');
+const correctionLineSelectors = [...(correctionZ?.querySelectorAll('[data-finance-manual-line] .ui-select') || [])];
+ok(correctionLineSelectors.length === 2, 'DDS detail line names must use shared searchable selectors');
+ok(correctionLineSelectors.every((node) => node.querySelector('[data-ui-select-trigger]')?.dataset.searchable === 'true'),
+  'DDS detail line selectors must support history search');
+ok(correctionLineSelectors.every((node) => node.querySelector('[data-ui-select-trigger]')?.dataset.allowCustom === 'true'),
+  'DDS detail line selectors must allow new manual names');
 await closeTopDdsZ(119, 'correction');
 ok([...((shell()?.querySelectorAll('[data-v2-z-layer]')) || [])].length === 1,
   'DDS correction did not return to receipt Z2');
@@ -459,14 +465,14 @@ ddsOperationSettings?.querySelector('[data-shared-profile-action="cancel-operati
   ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
 await wait(40);
 let cancelModal = document.querySelector('[data-modal][data-v2-layer-kind="bottom"]');
-ok(Boolean(cancelModal?.querySelector('input[name="financeCancelOccurredAt"]')),
-  'DDS cancel modal factual date-time field missing');
+ok(Boolean(cancelModal?.querySelector('input[name="financeCancelOccurredDate"][data-date-picker-value]')),
+  'DDS cancel modal shared factual date picker missing');
 ok(Boolean(cancelModal?.querySelector('[data-finance-cancel-info] [data-info-trigger]')),
   'DDS cancel modal shared info icon missing');
 ok(Boolean(cancelModal?.querySelector('[data-finance-operation-cancel-confirm]')),
   'DDS cancel modal action missing');
-ok(Boolean(cancelModal?.querySelector('.modal--time-picker-sheet')),
-  'DDS cancel must use canonical bottom time-picker sheet geometry');
+ok(Boolean(cancelModal?.querySelector('.modal--form-sheet')),
+  'DDS cancel must use canonical bottom form sheet geometry');
 ok(Boolean(cancelModal?.querySelector('[data-finance-operation-cancel-confirm].ui-button--danger')),
   'DDS cancel action must use the shared pink/red danger button');
 ok(!cancelModal?.textContent.includes('Ошибочный ввод останется'),
@@ -478,8 +484,13 @@ await wait(30);
 let cancelInfo = document.querySelector('[data-modal][data-v2-layer-kind="top"]');
 ok(Boolean(cancelInfo), 'DDS cancellation info must open as top modal');
 ok(cancelInfo?.textContent.includes('создаёт обратную операцию'), 'DDS cancellation info text missing');
-cancelInfo?.querySelector('[data-notice-close]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
-await wait(20);
+ok(!cancelInfo?.querySelector('button'), 'Top information modal must not contain buttons');
+const cancelInfoGesture = cancelInfo?.querySelector('[data-v2-layer-gesture-zone]');
+pointer(cancelInfoGesture,'pointerdown',190,120,221);
+pointer(cancelInfoGesture,'pointermove',190,30,221);
+pointer(cancelInfoGesture,'pointerup',190,30,221);
+await wait(190);
+ok(!cancelInfo?.isConnected, 'Top information modal must close by upward swipe');
 cancelModal?.v2Close?.();
 await wait(20);
 
@@ -489,8 +500,9 @@ ddsOperationSettings = document.querySelector('[data-shared-profile-settings-men
 ddsOperationSettings?.querySelector('[data-shared-profile-action="delete-operation"]')
   ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
 await wait(40);
-let deleteConfirm = document.querySelector('[data-modal][data-v2-layer-kind="top"]');
-ok(Boolean(deleteConfirm), 'DDS permanent delete confirmation must open as top modal');
+let deleteConfirm = document.querySelector('[data-modal][data-v2-layer-kind="bottom"]');
+ok(Boolean(deleteConfirm), 'DDS permanent delete confirmation must open as bottom action modal');
+ok(Boolean(deleteConfirm?.querySelector('.modal--form-sheet')), 'DDS permanent delete confirmation must use shared bottom form sheet');
 ok(Boolean(deleteConfirm?.querySelector('[data-finance-operation-delete-confirm].ui-button--critical')),
   'DDS permanent delete confirmation must contain red Delete button');
 deleteConfirm?.querySelector('[data-finance-operation-delete-close]')
@@ -516,6 +528,9 @@ ok(shell()?.querySelector('[data-v2-workspace-primary]')?.textContent.trim() ===
 ok(Boolean(ddsLayer?.querySelector('[data-finance-dds-export-form]')), 'DDS Excel filters form missing');
 ok(Boolean(ddsLayer?.querySelector('[name="from"]')), 'DDS Excel from filter missing');
 ok(Boolean(ddsLayer?.querySelector('[name="to"]')), 'DDS Excel to filter missing');
+ok(Boolean(ddsLayer?.querySelector('[data-date-picker]')), 'DDS Excel must use the shared calendar');
+ok(!ddsLayer?.querySelector('input[type="date"],input[type="datetime-local"],input[type="time"]'),
+  'DDS Excel must not expose native browser date/time controls');
 ok(Boolean(ddsLayer?.querySelector('[name="kind"]')), 'DDS Excel operation filter missing');
 ok(Boolean(ddsLayer?.querySelector('[name="walletId"]')), 'DDS Excel wallet filter missing');
 ok(Boolean(ddsLayer?.querySelector('[name="status"]')), 'DDS Excel status filter missing');

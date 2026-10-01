@@ -1,5 +1,4 @@
 import { escapeHtml } from '../utils/escape-html.js';
-import { button } from '../buttons/index.js';
 import { mountV2Layer, v2Layer } from '../v2/index.js';
 
 let modalLevel = 0;
@@ -28,7 +27,7 @@ export function modal(content, { title = '', className = '', variant = '', surfa
   html = html
     .replace('class="v2-layer-backdrop"', 'class="v2-layer-backdrop modal-backdrop" data-modal')
     .replace('class="v2-layer__close"', 'class="v2-layer__close modal-close" data-modal-close');
-  if (resolvedVariant === 'bottom') {
+  if (resolvedVariant === 'bottom' || resolvedVariant === 'top' || resolvedVariant === 'compact') {
     html = html.replace(/<button type="button" class="v2-layer__close modal-close"[^>]*>×<\/button>/, '');
   }
   return html;
@@ -64,10 +63,7 @@ export function mountModal(root, html) {
   return m;
 }
 
-export function openNotice({ title = 'Внимание', message = '', action = 'ОК', variant = 'technical', surface = 'app' } = {}) {
-  const content = `<div class="modal-title"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(message)}</p></div><div class="modal-actions">${button(escapeHtml(action), { data: 'data-notice-close' })}</div>`;
-  const m = mountModal(document.body, modal(content, { variant, surface, title }));
-  if (!m) return null;
-  m.querySelector('[data-notice-close]')?.addEventListener('click', () => m.v2Close?.());
-  return m;
+export function openNotice({ title = 'Внимание', message = '', surface = 'app' } = {}) {
+  const content = `<div class="modal-title"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(message)}</p></div>`;
+  return mountModal(document.body, modal(content, { variant: 'top', surface, title }));
 }

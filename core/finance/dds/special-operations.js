@@ -1,11 +1,15 @@
 import {
+  datePicker,
   field,
+  formValidationMessage,
+  initDatePickers,
   openNotice,
   select,
   textareaField,
   workspaceHeaderContext,
 } from '../../../ui/ui.js';
 import { getWallets } from '../cash/data.js';
+import { financeLocalDateValue, financeOccurredAtForDate } from '../date.js';
 import { correctFinanceOperation, recordSpecialFinanceOperation } from '../service.js';
 
 export const SPECIAL_FINANCE_ACTIONS = [
@@ -15,13 +19,6 @@ export const SPECIAL_FINANCE_ACTIONS = [
   { id: 'investment-return', kind: 'investment-return', group: 'investment', label: 'Вернуть инвестицию', title: 'Вернуть инвестицию', counterparty: 'Кому' },
   { id: 'transfer', kind: 'transfer', group: 'transfer', label: 'Перевод между кошельками', title: 'Перевод между кошельками', transfer: true },
 ];
-
-function localDateTimeValue(value = new Date()) {
-  const date = value instanceof Date ? value : new Date(value);
-  const safe = Number.isFinite(date.getTime()) ? date : new Date();
-  const shifted = new Date(safe.getTime() - safe.getTimezoneOffset() * 60000);
-  return shifted.toISOString().slice(0, 16);
-}
 
 function walletOptions() {
   return getWallets().map((item) => ({ value: item.id, label: item.name }));
@@ -53,27 +50,38 @@ export function renderSpecialFinanceOperation(root, actionId, { onSaved = null, 
       aria: `Сохранить операцию ${action.title}`,
     },
   })}
-    <form class="compact-form" data-finance-special-form>
+    <form class="compact-form" data-finance-special-form novalidate>
       ${walletFields}
       ${field({ label: 'Сумма', name: 'amount', type: 'number', inputmode: 'decimal', value: existing.total || '', required: true, placeholder: '0', data: 'min="0" step="0.01"' })}
       ${!action.transfer ? field({ label: action.counterparty || 'Контрагент', name: 'counterparty', value: existing.counterparty || '', placeholder: 'Необязательно' }) : ''}
-      ${field({ label: 'Фактическая дата и время', name: 'occurredAt', type: 'datetime-local', value: localDateTimeValue(operation?.occurredAt || new Date()), required: true })}
+      ${datePicker({ label: 'Фактическая дата', name: 'occurredDate', value: financeLocalDateValue(operation?.occurredAt || new Date()), required: true, allowClear: false })}
       ${textareaField({ label: 'Примечание', name: 'note', value: existing.note || '', rows: 3, placeholder: 'Необязательно' })}
     </form>`;
 
+  initDatePickers(root);
+
   root.querySelector('[data-finance-special-form]')?.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const data = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const validation = formValidationMessage(form);
+    if (validation) {
+      openNotice({ message: validation });
+      return;
+    }
+    const data = new FormData(form);
     const payload = {
       kind: action.kind,
       amount: Number(data.get('amount') || 0),
       counterparty: String(data.get('counterparty') || '').trim(),
       note: String(data.get('note') || '').trim(),
-      occurredAt: data.get('occurredAt') ? new Date(String(data.get('occurredAt'))).toISOString() : '',
+      occurredAt: financeOccurredAtForDate(
+        String(data.get('occurredDate') || ''),
+        operation?.occurredAt || new Date(),
+      ),
     };
 
     if (!payload.occurredAt) {
-      openNotice({ message: 'Укажите фактическую дату и время операции.' });
+      openNotice({ message: 'Укажите фактическую дату операции.' });
       return;
     }
 

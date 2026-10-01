@@ -240,6 +240,36 @@ if (financeCss.length) {
   errors.push(`Finance must not own local CSS: ${financeCss.join(', ')}`);
 }
 
+const financeUiFiles = [
+  'core/finance/cash/cash.js',
+  'core/finance/dds/index.js',
+  'core/finance/dds/income-expense.js',
+  'core/finance/dds/special-operations.js',
+  'core/finance/dds/articles.js',
+  'core/finance/z-report/index.js',
+];
+for (const path of financeUiFiles) {
+  const text = source(path);
+  if (/variant:\s*['"]technical['"]/.test(text)) errors.push(`${path}: Finance user UI must not use technical modals`);
+  if (/<select\b/.test(text)) errors.push(`${path}: Finance user UI must not use raw select elements`);
+  if (/\b(?:alert|confirm|prompt)\s*\(/.test(text)) errors.push(`${path}: Finance user UI must not use browser dialogs`);
+  for (const form of text.match(/<form\b[^>]*>/g) || []) {
+    if (!/\bnovalidate\b/.test(form)) errors.push(`${path}: Finance forms must disable native browser validation UI and surface validation through shared TOP notices`);
+  }
+}
+
+const modalUI = source('ui/modals/index.js');
+if (!/openNotice\(\{ title = 'Внимание', message = '', surface = 'app'/.test(modalUI)
+  || !/modal\(content, \{ variant: 'top', surface, title \}\)/.test(modalUI)) {
+  errors.push('Shared user notices must be locked to the top modal');
+}
+if (/data-notice-close|action = 'ОК'/.test(modalUI)) {
+  errors.push('Top shared notices must contain information only and close by gesture');
+}
+if (!/resolvedVariant === 'bottom' \|\| resolvedVariant === 'top' \|\| resolvedVariant === 'compact'/.test(modalUI)) {
+  errors.push('Top shared modals must not render a close button');
+}
+
 const cashUI = source('core/finance/cash/cash.js');
 for (const token of ['workspaceHeaderContext', 'entityVisualCard', 'mountEntityCardConstructor', 'mountV2ZLayer', 'v2ListEntry', 'v2ListEntries', 'readOnlyReceipt']) {
   if (!cashUI.includes(token)) errors.push(`Cash UI must use shared ${token}`);
@@ -318,14 +348,20 @@ if (/details\s*\(|list\s*\(\{\s*items:\s*entries/.test(ddsUI)) {
 if (!/data-finance-operation-cancel-confirm/.test(ddsUI) || !/data-finance-operation-delete-confirm/.test(ddsUI) || !/correct-operation/.test(ddsUI)) {
   errors.push('DDS operation A/settings must expose correction, cancel and permanent delete flows');
 }
-if (!/modal--time-picker-sheet/.test(ddsUI) || !/variant:\s*'danger'/.test(ddsUI)) {
-  errors.push('DDS cancel must reuse the canonical bottom time sheet and shared danger button');
+if (!/modal--form-sheet/.test(ddsUI) || !/variant:\s*'danger'/.test(ddsUI)) {
+  errors.push('DDS cancel must reuse the shared bottom form sheet and shared danger button');
 }
-if (!/actionOnly:\s*true/.test(ddsUI) || !/variant:\s*'top'/.test(ddsUI)) {
-  errors.push('DDS cancellation help must use the shared info icon and top information modal');
+if (/datetime-local|type:\s*['"](?:date|time)['"]/.test(ddsUI)) {
+  errors.push('DDS must not use native browser date/time controls');
 }
-if (!/Фактическая дата и время/.test(ddsUI) || !/Внесено в систему/.test(ddsUI)) {
-  errors.push('DDS/export must expose factual occurrence time separately from system recording time');
+if (!/datePicker/.test(ddsUI) || !/initDatePickers/.test(ddsUI)) {
+  errors.push('DDS date selection must use the shared calendar owner');
+}
+if (!/actionOnly:\s*true/.test(ddsUI) || !/openCancellationInfo/.test(ddsUI)) {
+  errors.push('DDS cancellation help must use the shared info icon and shared TOP notice owner');
+}
+if (!/Внесено в систему/.test(ddsUI)) {
+  errors.push('DDS export must preserve immutable system recording time');
 }
 const articlesUI = source('core/finance/dds/articles.js');
 if (!/parentArticleId/.test(articlesUI) || !/economicType/.test(articlesUI)) {
@@ -335,6 +371,12 @@ const incomeExpenseUI = source('core/finance/dds/income-expense.js');
 if (!/recordManualFinanceOperation/.test(incomeExpenseUI) || !/lineQuantity/.test(incomeExpenseUI) || !/linePrice/.test(incomeExpenseUI)) {
   errors.push('Income / Expense UI must support simple and detailed manual operations');
 }
+if (!/searchableSelect/.test(incomeExpenseUI) || !/getLedgerEntries/.test(incomeExpenseUI)) {
+  errors.push('Manual Finance line names must support reusable history plus free custom entry');
+}
+if (/<input\b|<select\b|datetime-local|type:\s*['"](?:date|time)['"]/.test(incomeExpenseUI)) {
+  errors.push('Manual Finance UI must use shared fields/selectors/calendar instead of raw or native controls');
+}
 
 const specialOperationsUI = source('core/finance/dds/special-operations.js');
 if (!/recordSpecialFinanceOperation/.test(specialOperationsUI)
@@ -343,9 +385,17 @@ if (!/recordSpecialFinanceOperation/.test(specialOperationsUI)
   || !/transfer/.test(specialOperationsUI)) {
   errors.push('Special Finance UI must expose loans, investments, returns and wallet transfers');
 }
+if (/datetime-local|type:\s*['"](?:date|time)['"]/.test(specialOperationsUI)
+  || !/datePicker/.test(specialOperationsUI)
+  || !/initDatePickers/.test(specialOperationsUI)) {
+  errors.push('Special Finance operations must use the shared date calendar without native time controls');
+}
 const zReportUI = source('core/finance/z-report/index.js');
-if (!/getZReport/.test(zReportUI) || !/type:\s*'date'/.test(zReportUI)) {
-  errors.push('Z-report UI must project Ledger for a day or arbitrary period');
+if (!/getZReport/.test(zReportUI) || !/datePicker/.test(zReportUI) || !/initDatePickers/.test(zReportUI)) {
+  errors.push('Z-report UI must project Ledger through the shared date calendar');
+}
+if (/datetime-local|type:\s*['"](?:date|time)['"]/.test(zReportUI)) {
+  errors.push('Z-report must not use native browser date/time controls');
 }
 if (!/export function getZReport/.test(financeRead) || !/getLedgerEntries\(\)/.test(financeRead)) {
   errors.push('Z-report must be a Ledger-only projection');

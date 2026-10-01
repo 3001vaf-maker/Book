@@ -124,5 +124,10 @@ assert.match(articlesUi, /economicType/);
 assert.match(incomeExpenseUi, /lineQuantity/);
 assert.match(incomeExpenseUi, /linePrice/);
 assert.match(incomeExpenseUi, /recordManualFinanceOperation/);
+assert.match(incomeExpenseUi, /searchableSelect/);
+assert.match(incomeExpenseUi, /getLedgerEntries/);
+assert.match(incomeExpenseUi, /datePicker/);
+assert.match(incomeExpenseUi, /initDatePickers/);
+assert.doesNotMatch(incomeExpenseUi, /<input\b|<select\b|datetime-local|type:\s*'date'|type:\s*'time'/);
 
 console.log('finance articles income expense tests: OK');
