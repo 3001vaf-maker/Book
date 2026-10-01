@@ -160,6 +160,24 @@ const ARTICLE_ECONOMIC_TYPES = new Set([
   'TRANSFER',
 ]);
 
+const SPECIAL_FINANCE_DEFINITIONS: Record<string, {
+  direction: 'IN' | 'OUT';
+  economicType: string;
+  systemKey: string;
+  financeEntityType: 'loan' | 'investment';
+  roles?: Array<'self' | 'raise' | 'external'>;
+}> = {
+  'loan-received': { direction: 'IN', economicType: 'LOAN_RECEIVED', systemKey: 'LOAN_RECEIVED', financeEntityType: 'loan' },
+  'loan-repayment': { direction: 'OUT', economicType: 'LOAN_REPAYMENT', systemKey: 'LOAN_REPAYMENT', financeEntityType: 'loan' },
+  'investment-received': { direction: 'IN', economicType: 'INVESTMENT_RECEIVED', systemKey: 'INVESTMENT_RECEIVED', financeEntityType: 'investment', roles: ['raise'] },
+  'investment-return': { direction: 'OUT', economicType: 'INVESTMENT_RETURN', systemKey: 'INVESTMENT_RETURN', financeEntityType: 'investment', roles: ['raise'] },
+  'investment-income-payment': { direction: 'OUT', economicType: 'INVESTMENT_INCOME_PAYMENT', systemKey: 'INVESTMENT_INCOME_PAYMENT', financeEntityType: 'investment', roles: ['raise'] },
+  'investment-contribution': { direction: 'OUT', economicType: 'INVESTMENT_CONTRIBUTION', systemKey: 'INVESTMENT_CONTRIBUTION', financeEntityType: 'investment', roles: ['self', 'external'] },
+  'investment-capital-return': { direction: 'IN', economicType: 'INVESTMENT_CAPITAL_RETURN', systemKey: 'INVESTMENT_CAPITAL_RETURN', financeEntityType: 'investment', roles: ['self', 'external'] },
+  'investment-income': { direction: 'IN', economicType: 'INVESTMENT_INCOME', systemKey: 'INVESTMENT_INCOME', financeEntityType: 'investment', roles: ['self', 'external'] },
+  'investment-expense': { direction: 'OUT', economicType: 'INVESTMENT_EXPENSE', systemKey: 'INVESTMENT_EXPENSE', financeEntityType: 'investment', roles: ['self', 'external'] },
+};
+
 function splitAllocationComponents(allocations: JsonObject[], serviceAmount: number, tips: number) {
   let serviceLeft = money(serviceAmount);
   let tipsLeft = money(tips);
@@ -352,11 +370,29 @@ export class FinanceService {
     if (!entity) {
       throw new BadRequestException(entityType === 'loan' ? 'Займ не найден' : 'Инвестиция не найдена');
     }
+    const investmentTerms = objectValue(entity.investmentTerms);
+    const investmentRole = ['self', 'raise', 'external'].includes(text(investmentTerms.role))
+      ? text(investmentTerms.role)
+      : 'raise';
     return {
       type: entityType,
       id: entityId,
       name: text(entity.name),
+      role: entityType === 'investment' ? investmentRole : '',
     };
+  }
+
+  private async assertInvestmentRoleAllowed(tenantId: string, roleValue: string) {
+    const role = text(roleValue);
+    const capabilityKey = role === 'self'
+      ? 'finance.investment.self.access'
+      : role === 'external'
+        ? 'finance.investment.external.access'
+        : 'finance.investment.raise.access';
+    const capability = await this.access.resolveCapability(tenantId, capabilityKey);
+    if (capability.enabled !== true) {
+      throw new ForbiddenException('Этот режим инвестиций недоступен');
+    }
   }
 
   async recordSettlementPaymentState(tenantId: string, recordId: string, settlement: JsonObject) {
@@ -738,18 +774,7 @@ export class FinanceService {
     const amount = money(input.amount);
     if (amount <= 0) throw new BadRequestException('Введите сумму операции');
 
-    const definitions: Record<string, {
-      direction: 'IN' | 'OUT';
-      economicType: string;
-      systemKey: string;
-      operationKind: string;
-      financeEntityType: 'loan' | 'investment';
-    }> = {
-      'loan-received': { direction: 'IN', economicType: 'LOAN_RECEIVED', systemKey: 'LOAN_RECEIVED', operationKind: 'loan-received', financeEntityType: 'loan' },
-      'loan-repayment': { direction: 'OUT', economicType: 'LOAN_REPAYMENT', systemKey: 'LOAN_REPAYMENT', operationKind: 'loan-repayment', financeEntityType: 'loan' },
-      'investment-received': { direction: 'IN', economicType: 'INVESTMENT_RECEIVED', systemKey: 'INVESTMENT_RECEIVED', operationKind: 'investment-received', financeEntityType: 'investment' },
-      'investment-return': { direction: 'OUT', economicType: 'INVESTMENT_RETURN', systemKey: 'INVESTMENT_RETURN', operationKind: 'investment-return', financeEntityType: 'investment' },
-    };
+    const definitions = SPECIAL_FINANCE_DEFINITIONS;
 
     const occurredAt = requiredOccurredAt(input.occurredAt);
     const operationId = randomUUID();
@@ -822,6 +847,12 @@ export class FinanceService {
       definition.financeEntityType,
       text(input.financeEntityId),
     );
+    if (definition.financeEntityType === 'investment') {
+      if (!definition.roles?.includes(financeEntity.role as 'self' | 'raise' | 'external')) {
+        throw new BadRequestException('Операция не соответствует роли инвестиции');
+      }
+      await this.assertInvestmentRoleAllowed(tenantId, financeEntity.role);
+    }
     const article = await this.prisma.financeArticle.findFirst({
       where: { tenantId, systemKey: definition.systemKey, archivedAt: null },
     });
@@ -830,7 +861,7 @@ export class FinanceService {
     await this.serializable(async (tx) => {
       await this.createOperationWithEntries(tx, tenantId, {
         operationId,
-        kind: definition.operationKind,
+        kind,
         source: { type: 'finance', id: operationId },
         occurredAt,
         data: {
@@ -1071,7 +1102,7 @@ export class FinanceService {
           note,
         };
       });
-    } else if (['loan-received', 'loan-repayment', 'investment-received', 'investment-return', 'transfer'].includes(current.kind)) {
+    } else if ([...Object.keys(SPECIAL_FINANCE_DEFINITIONS), 'transfer'].includes(current.kind)) {
       const amount = money(input.amount == null ? currentData.total : input.amount);
       if (amount <= 0) throw new BadRequestException('Введите сумму операции');
       const note = input.note == null ? text(currentData.note) : text(input.note);
@@ -1113,18 +1144,8 @@ export class FinanceService {
           },
         ];
       } else {
-        const definitions: Record<string, {
-          direction: 'IN' | 'OUT';
-          economicType: string;
-          systemKey: string;
-          financeEntityType: 'loan' | 'investment';
-        }> = {
-          'loan-received': { direction: 'IN', economicType: 'LOAN_RECEIVED', systemKey: 'LOAN_RECEIVED', financeEntityType: 'loan' },
-          'loan-repayment': { direction: 'OUT', economicType: 'LOAN_REPAYMENT', systemKey: 'LOAN_REPAYMENT', financeEntityType: 'loan' },
-          'investment-received': { direction: 'IN', economicType: 'INVESTMENT_RECEIVED', systemKey: 'INVESTMENT_RECEIVED', financeEntityType: 'investment' },
-          'investment-return': { direction: 'OUT', economicType: 'INVESTMENT_RETURN', systemKey: 'INVESTMENT_RETURN', financeEntityType: 'investment' },
-        };
-        const definition = definitions[current.kind];
+        const definition = SPECIAL_FINANCE_DEFINITIONS[current.kind];
+        if (!definition) throw new BadRequestException('Неизвестный вид финансовой операции');
         const walletId = text(input.walletId ?? currentData.walletId);
         const walletName = text(input.walletName ?? currentData.walletName);
         if (!walletId) throw new BadRequestException('Выберите кошелёк');
@@ -1133,6 +1154,12 @@ export class FinanceService {
           definition.financeEntityType,
           text(input.financeEntityId ?? currentData.financeEntityId),
         );
+        if (definition.financeEntityType === 'investment') {
+          if (!definition.roles?.includes(financeEntity.role as 'self' | 'raise' | 'external')) {
+            throw new BadRequestException('Операция не соответствует роли инвестиции');
+          }
+          await this.assertInvestmentRoleAllowed(tenantId, financeEntity.role);
+        }
         const article = await this.prisma.financeArticle.findFirst({
           where: { tenantId, systemKey: definition.systemKey, archivedAt: null },
         });
