@@ -422,7 +422,9 @@ function renderActiveWorkspaceSurface(surface) {
   if (section === 'people') return renderPeople(surface, {
     onDirectChat: (personKey) => navigate('chat', { navigationOpen: false, chatPersonKey: personKey }),
   });
-  if (section === 'finance') return renderFinanceSection(surface, ensureSecondary('finance'));
+  if (section === 'finance') return renderFinanceSection(surface, ensureSecondary('finance'), {
+    onDirectChat: (personKey) => navigate('chat', { navigationOpen: false, chatPersonKey: personKey }),
+  });
   if (section === 'timetable') return renderTimetable(surface);
   if (section === 'journal') {
     return renderJournalView(surface, ensureSecondary('journal'), {
