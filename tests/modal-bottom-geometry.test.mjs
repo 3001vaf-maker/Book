@@ -35,6 +35,8 @@ const inputs=fs.readFileSync(new URL('../ui/inputs/index.js',import.meta.url),'u
 const sharedProfile=fs.readFileSync(new URL('../ui/profile/index.js',import.meta.url),'utf8');
 const v2=fs.readFileSync(new URL('../ui/v2/index.js',import.meta.url),'utf8');
 const css=fs.readFileSync(new URL('../ui/v2/v2.css',import.meta.url),'utf8');
+const modals=fs.readFileSync(new URL('../ui/modals/index.js',import.meta.url),'utf8');
+const modalCss=fs.readFileSync(new URL('../ui/modals/modal.css',import.meta.url),'utf8');
 
 assert.match(core,/if \(target\.closest\('\[data-v2-layer\]'\)\) return;/);
 assert.match(selectors,/mountModal\(trigger, modal\(content, \{ variant: 'quick'/);
@@ -44,5 +46,9 @@ assert.match(v2,/document\.body\.appendChild\(portal\)/);
 assert.match(v2,/visualViewport\?\.addEventListener\('resize', settle\)/);
 assert.match(v2,/document\.addEventListener\('focusout', settle, true\)/);
 assert.match(css,/\.v2-layer-portal--viewport\{position:fixed/);
+assert.match(modals,/openNotice\(\{ title = 'Внимание', message = '', variant = 'top'/);
+assert.doesNotMatch(modals,/data-notice-close|action = 'ОК'/);
+assert.match(modals,/resolvedVariant === 'bottom' \|\| resolvedVariant === 'top' \|\| resolvedVariant === 'compact'/);
+assert.match(modalCss,/modal--bottom\.modal--form-sheet/);
 
 console.log('modal bottom geometry tests passed');
