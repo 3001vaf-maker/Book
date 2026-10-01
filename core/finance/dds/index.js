@@ -17,7 +17,6 @@ import {
   shortDateTimeParts,
   v2ListEntries,
   v2ListEntry,
-  v2Section,
   v2ZLayer,
   workspaceHeaderContext,
 } from '../../../ui/ui.js';
@@ -688,73 +687,6 @@ function openDDSExport(root, movements) {
   });
 }
 
-function operationGroups() {
-  const groups = [];
-  if (canUseBookCapability('finance.income_expense.access')) {
-    groups.push({
-      title: 'Доход / Расход',
-      items: [
-        { id: 'manual-income', label: 'Доход' },
-        { id: 'manual-expense', label: 'Расход' },
-      ],
-    });
-  }
-  if (canUseBookCapability('finance.special.access')) {
-    groups.push({
-      title: 'Займы',
-      items: SPECIAL_FINANCE_ACTIONS.filter((item) => item.group === 'loan'),
-    });
-    groups.push({
-      title: 'Инвестиции',
-      items: SPECIAL_FINANCE_ACTIONS.filter((item) => item.group === 'investment'),
-    });
-    groups.push({
-      title: 'Переводы',
-      items: SPECIAL_FINANCE_ACTIONS.filter((item) => item.group === 'transfer'),
-    });
-  }
-  return groups.filter((group) => group.items.length);
-}
-
-function openFinanceOperationForm(root, actionId) {
-  const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'finance-dds-operation-z' }), { stack: true });
-  if (!layer) return;
-  const onSaved = () => {
-    layer.v2Close?.();
-    renderDDS(root);
-  };
-  let rendered = false;
-  if (actionId === 'manual-income') rendered = renderIncomeExpenseOperation(layer, 'IN', { onSaved });
-  else if (actionId === 'manual-expense') rendered = renderIncomeExpenseOperation(layer, 'OUT', { onSaved });
-  else rendered = renderSpecialFinanceOperation(layer, actionId, { onSaved });
-  if (!rendered) layer.v2Close?.();
-}
-
-function openFinancialOperations(root) {
-  const groups = operationGroups();
-  if (!groups.length) return;
-  const content = groups.map((group) => v2Section(
-    group.title,
-    actionBlock(group.items.map((item) => button(item.label, {
-      variant: 'secondary',
-      data: `data-finance-operation-action="${item.id}"`,
-    })).join('')),
-  )).join('');
-  const picker = mountModal(root, modal(content, {
-    title: 'Финансовые операции',
-    variant: 'quick',
-    surface: 'app',
-  }));
-  if (!picker) return;
-  picker.querySelectorAll('[data-finance-operation-action]').forEach((element) => {
-    element.addEventListener('click', () => {
-      const actionId = String(element.dataset.financeOperationAction || '');
-      picker.v2Close?.();
-      openFinanceOperationForm(root, actionId);
-    });
-  });
-}
-
 function openArticles(root) {
   const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'finance-dds-articles-z' }), { stack: true });
   if (!layer) return;
@@ -763,7 +695,6 @@ function openArticles(root) {
 
 function availableDDSSettings() {
   const items = [{ id: 'excel', label: 'Эксель' }];
-  if (operationGroups().length) items.push({ id: 'operations', label: 'Финансовые операции' });
   if (canUseBookCapability('finance.articles.access')) items.push({ id: 'articles', label: 'Статьи' });
   return items;
 }
@@ -786,7 +717,6 @@ function openDDSSettings(root, movements) {
       const id = String(element.dataset.financeDdsTool || '');
       settings.v2Close?.();
       if (id === 'excel') openDDSExport(root, movements);
-      else if (id === 'operations') openFinancialOperations(root);
       else if (id === 'articles') openArticles(root);
     });
   });
