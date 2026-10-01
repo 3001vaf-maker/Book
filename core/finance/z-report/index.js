@@ -1,31 +1,20 @@
 import {
-  actionBlock,
   button,
+  datePicker,
   emptyState,
-  field,
+  initDatePickers,
   list,
   openNotice,
   pageHeader,
 } from '../../../ui/ui.js';
+import { financeDateRange, financeLocalDateValue } from '../date.js';
 import { getZReport } from '../read.js';
-
-function localDateValue(date = new Date()) {
-  const shifted = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-  return shifted.toISOString().slice(0, 10);
-}
 
 function money(value = 0, signed = false) {
   const amount = Number(value) || 0;
   const absolute = Math.abs(amount).toLocaleString('ru-RU').replaceAll('\u00a0', ' ');
   if (!signed || Math.abs(amount) < 0.009) return `${absolute} ₽`;
   return `${amount < 0 ? '−' : '+'}${absolute} ₽`;
-}
-
-function rangeToIso(from, to) {
-  const start = new Date(`${from}T00:00:00`);
-  const end = new Date(`${to}T23:59:59.999`);
-  if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || start > end) return null;
-  return { from: start.toISOString(), to: end.toISOString() };
 }
 
 function summaryList(report) {
@@ -62,7 +51,7 @@ function breakdown(title, rows = []) {
 }
 
 function renderReport(root, from, to) {
-  const range = rangeToIso(from, to);
+  const range = financeDateRange(from, to);
   if (!range) {
     openNotice({ message: 'Проверьте период отчёта.' });
     return renderZReport(root);
@@ -74,22 +63,23 @@ function renderReport(root, from, to) {
 
   root.innerHTML = `${pageHeader('Z-отчёт', `${from} — ${to}`)}
     <form class="compact-form" data-z-report-form>
-      ${field({ label: 'С', name: 'from', type: 'date', value: from, required: true })}
-      ${field({ label: 'По', name: 'to', type: 'date', value: to, required: true })}
+      ${datePicker({ label: 'С', name: 'from', value: from, required: true, allowClear: false })}
+      ${datePicker({ label: 'По', name: 'to', value: to, required: true, allowClear: false })}
       ${button('Показать', { type: 'submit' })}
     </form>
     ${content}
     `;
+
+  initDatePickers(root);
 
   root.querySelector('[data-z-report-form]')?.addEventListener('submit', (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     renderReport(root, String(data.get('from') || ''), String(data.get('to') || ''));
   });
-  
 }
 
 export function renderZReport(root) {
-  const today = localDateValue();
+  const today = financeLocalDateValue();
   renderReport(root, today, today);
 }
