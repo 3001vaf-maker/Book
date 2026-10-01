@@ -1,10 +1,26 @@
-import { actionBlock, button, details, emptyState, field, list, modal, mountModal, mountV2ZLayer, openNotice, pageHeader, shortDateTime, v2ZLayer, workspaceHeaderContext } from '../../../ui/ui.js';
+import {
+  actionBlock,
+  button,
+  details,
+  emptyState,
+  field,
+  list,
+  modal,
+  mountModal,
+  mountV2ZLayer,
+  openNotice,
+  select,
+  shortDateTime,
+  v2Section,
+  v2ZLayer,
+  workspaceHeaderContext,
+} from '../../../ui/ui.js';
 import { canUseBookCapability } from '../../access.js';
 import { cancelFinanceOperation } from '../service.js';
 import { getLedgerEntries } from '../read.js';
 import { renderFinanceArticles } from './articles.js';
-import { renderIncomeExpense } from './income-expense.js';
-import { renderSpecialFinanceOperations } from './special-operations.js';
+import { renderIncomeExpenseOperation } from './income-expense.js';
+import { SPECIAL_FINANCE_ACTIONS, renderSpecialFinanceOperation } from './special-operations.js';
 
 function formatMoney(value = 0, { signed = false } = {}) {
   const amount = Number(value) || 0;
@@ -56,7 +72,7 @@ function personText(item) {
 }
 
 function operationDetails(item) {
-  const details = [
+  const values = [
     personText(item),
     item?.sourceDetails || '',
     item?.articleName || '',
@@ -65,13 +81,13 @@ function operationDetails(item) {
     item?.workplace || '',
     walletText(item),
   ].filter(Boolean);
-  if (item?.economicType === 'TIPS' || item?.economicType === 'TIPS_REFUND') details.push('Чаевые');
+  if (item?.economicType === 'TIPS' || item?.economicType === 'TIPS_REFUND') values.push('Чаевые');
   if (item?.quantity != null && item?.unitPrice != null && Number(item.quantity) !== 1) {
-    details.push(`${item.quantity} × ${formatMoney(item.unitPrice)}`);
+    values.push(`${item.quantity} × ${formatMoney(item.unitPrice)}`);
   }
   const recorded = recordedMoment(item);
-  if (recorded) details.push(`Внесено ${recorded}`);
-  return details.join(' · ');
+  if (recorded) values.push(`Внесено ${recorded}`);
+  return values.join(' · ');
 }
 
 function movementListItem(item) {
@@ -176,42 +192,171 @@ function openFinanceOperation(root, movements, operationId) {
   });
 }
 
-const DDS_SETTINGS = [
-  {
-    id: 'income-expense',
-    label: 'Доход / Расход',
-    capability: 'finance.income_expense.access',
-    render: renderIncomeExpense,
-  },
-  {
-    id: 'articles',
-    label: 'Статьи',
-    capability: 'finance.articles.access',
-    render: renderFinanceArticles,
-  },
-  {
-    id: 'special',
-    label: 'Прочие операции',
-    capability: 'finance.special.access',
-    render: renderSpecialFinanceOperations,
-  },
-];
+function movementDay(item) {
+  const raw = String(item?.occurredAt || item?.refundedAt || item?.paidAt || item?.date || '').trim();
+  if (!raw) return '';
+  return raw.slice(0, 10);
+}
+
+function exportKind(item) {
+  const type = String(item?.economicType || '');
+  if (type === 'TRANSFER') return 'transfer';
+  if (type === 'LOAN_RECEIVED' || type === 'LOAN_REPAYMENT') return 'loan';
+  if (type === 'INVESTMENT_RECEIVED' || type === 'INVESTMENT_RETURN') return 'investment';
+  return item?.direction === 'OUT' ? 'expense' : 'income';
+}
+
+function filterExportMovements(movements, form) {
+  const data = new FormData(form);
+  const from = String(data.get('from') || '');
+  const to = String(data.get('to') || '');
+  const kind = String(data.get('kind') || '');
+  const walletId = String(data.get('walletId') || '');
+  const status = String(data.get('status') || '');
+  return movements.filter((item) => {
+    const day = movementDay(item);
+    if (from && (!day || day < from)) return false;
+    if (to && (!day || day > to)) return false;
+    if (kind && exportKind(item) !== kind) return false;
+    if (walletId && String(item?.walletId || '') !== walletId) return false;
+    if (status === 'active' && item?.operationStatus === 'cancelled') return false;
+    if (status === 'cancelled' && item?.operationStatus !== 'cancelled') return false;
+    return true;
+  });
+}
+
+function openDDSExport(root, movements) {
+  const wallets = [...new Map(movements
+    .filter((item) => item?.walletId)
+    .map((item) => [String(item.walletId), { value: String(item.walletId), label: walletText(item) || String(item.walletId) }])).values()];
+  const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'finance-dds-export-z' }), { stack: true });
+  if (!layer) return;
+  layer.innerHTML = `${workspaceHeaderContext({
+    title: 'Выгрузка ДДС',
+    c: { label: 'Выгрузить', data: 'data-finance-dds-export-submit', aria: 'Выгрузить ДДС' },
+  })}
+    <form class="compact-form" data-finance-dds-export-form>
+      ${field({ label: 'С', name: 'from', type: 'date' })}
+      ${field({ label: 'До', name: 'to', type: 'date' })}
+      ${select({
+        label: 'Операции',
+        name: 'kind',
+        value: '',
+        options: [
+          { value: '', label: 'Все операции' },
+          { value: 'income', label: 'Доходы' },
+          { value: 'expense', label: 'Расходы' },
+          { value: 'loan', label: 'Займы' },
+          { value: 'investment', label: 'Инвестиции' },
+          { value: 'transfer', label: 'Переводы' },
+        ],
+      })}
+      ${select({
+        label: 'Кошелёк',
+        name: 'walletId',
+        value: '',
+        options: [{ value: '', label: 'Все кошельки' }, ...wallets],
+      })}
+      ${select({
+        label: 'Статус',
+        name: 'status',
+        value: '',
+        options: [
+          { value: '', label: 'Все' },
+          { value: 'active', label: 'Активные' },
+          { value: 'cancelled', label: 'Отменённые' },
+        ],
+      })}
+    </form>`;
+  layer.querySelector('[data-finance-dds-export-submit]')?.addEventListener('click', () => {
+    const form = layer.querySelector('[data-finance-dds-export-form]');
+    if (!form) return;
+    downloadDDS(filterExportMovements(movements, form));
+    layer.v2Close?.();
+  });
+}
+
+function operationGroups() {
+  const groups = [];
+  if (canUseBookCapability('finance.income_expense.access')) {
+    groups.push({
+      title: 'Доход / Расход',
+      items: [
+        { id: 'manual-income', label: 'Доход' },
+        { id: 'manual-expense', label: 'Расход' },
+      ],
+    });
+  }
+  if (canUseBookCapability('finance.special.access')) {
+    groups.push({
+      title: 'Займы',
+      items: SPECIAL_FINANCE_ACTIONS.filter((item) => item.group === 'loan'),
+    });
+    groups.push({
+      title: 'Инвестиции',
+      items: SPECIAL_FINANCE_ACTIONS.filter((item) => item.group === 'investment'),
+    });
+    groups.push({
+      title: 'Переводы',
+      items: SPECIAL_FINANCE_ACTIONS.filter((item) => item.group === 'transfer'),
+    });
+  }
+  return groups.filter((group) => group.items.length);
+}
+
+function openFinanceOperationForm(root, actionId) {
+  const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'finance-dds-operation-z' }), { stack: true });
+  if (!layer) return;
+  const onSaved = () => {
+    layer.v2Close?.();
+    renderDDS(root);
+  };
+  let rendered = false;
+  if (actionId === 'manual-income') rendered = renderIncomeExpenseOperation(layer, 'IN', { onSaved });
+  else if (actionId === 'manual-expense') rendered = renderIncomeExpenseOperation(layer, 'OUT', { onSaved });
+  else rendered = renderSpecialFinanceOperation(layer, actionId, { onSaved });
+  if (!rendered) layer.v2Close?.();
+}
+
+function openFinancialOperations(root) {
+  const groups = operationGroups();
+  if (!groups.length) return;
+  const content = groups.map((group) => v2Section(
+    group.title,
+    actionBlock(group.items.map((item) => button(item.label, {
+      variant: 'secondary',
+      data: `data-finance-operation-action="${item.id}"`,
+    })).join('')),
+  )).join('');
+  const picker = mountModal(root, modal(content, {
+    title: 'Финансовые операции',
+    variant: 'quick',
+    surface: 'app',
+  }));
+  if (!picker) return;
+  picker.querySelectorAll('[data-finance-operation-action]').forEach((element) => {
+    element.addEventListener('click', () => {
+      const actionId = String(element.dataset.financeOperationAction || '');
+      picker.v2Close?.();
+      openFinanceOperationForm(root, actionId);
+    });
+  });
+}
+
+function openArticles(root) {
+  const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'finance-dds-articles-z' }), { stack: true });
+  if (!layer) return;
+  renderFinanceArticles(layer);
+}
 
 function availableDDSSettings() {
-  return DDS_SETTINGS.filter((item) => canUseBookCapability(item.capability));
+  const items = [{ id: 'excel', label: 'Эксель' }];
+  if (operationGroups().length) items.push({ id: 'operations', label: 'Финансовые операции' });
+  if (canUseBookCapability('finance.articles.access')) items.push({ id: 'articles', label: 'Статьи' });
+  return items;
 }
 
-function openDDSSettingsTool(root, item) {
-  const layer = mountV2ZLayer(
-    root,
-    v2ZLayer('', { className: 'finance-dds-tool-z' }),
-    { stack: true },
-  );
-  if (!layer) return;
-  item.render(layer);
-}
-
-function openDDSSettings(root) {
+function openDDSSettings(root, movements) {
   const items = availableDDSSettings();
   if (!items.length) return;
   const content = actionBlock(items.map((item) => button(item.label, {
@@ -226,10 +371,11 @@ function openDDSSettings(root) {
   if (!settings) return;
   settings.querySelectorAll('[data-finance-dds-tool]').forEach((element) => {
     element.addEventListener('click', () => {
-      const item = items.find((candidate) => candidate.id === element.dataset.financeDdsTool);
-      if (!item) return;
+      const id = String(element.dataset.financeDdsTool || '');
       settings.v2Close?.();
-      openDDSSettingsTool(root, item);
+      if (id === 'excel') openDDSExport(root, movements);
+      else if (id === 'operations') openFinancialOperations(root);
+      else if (id === 'articles') openArticles(root);
     });
   });
 }
@@ -241,7 +387,7 @@ function renderDDS(root) {
     : emptyState('Все операции', 'Финансовых операций пока нет.');
   const settingsItems = availableDDSSettings();
   const headerContext = workspaceHeaderContext({
-    title: 'ДДС',
+    title: 'Движения денежных средств',
     a: settingsItems.length ? {
       kind: 'settings',
       data: 'data-finance-dds-settings',
@@ -249,13 +395,11 @@ function renderDDS(root) {
     } : null,
   });
 
-  root.innerHTML = `${headerContext}${pageHeader('ДДС', 'Все операции')}<div class="ui-list-toolbar"><div></div><div class="ui-list-toolbar__actions">${button('Excel', { className: 'ui-button--secondary', data: 'data-finance-dds-excel' })}</div></div>${operations}`;
-  root.querySelector('[data-finance-dds-settings]')?.addEventListener('click', () => openDDSSettings(root));
-  root.querySelector('[data-finance-dds-excel]')?.addEventListener('click', () => downloadDDS(movements));
+  root.innerHTML = `${headerContext}${operations}`;
+  root.querySelector('[data-finance-dds-settings]')?.addEventListener('click', () => openDDSSettings(root, movements));
   root.querySelectorAll('[data-finance-operation]').forEach((element) => {
     element.addEventListener('click', () => openFinanceOperation(root, movements, element.dataset.financeOperation));
   });
-  
 }
 
 export { renderDDS };
