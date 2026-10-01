@@ -30,6 +30,7 @@ import {
   cancelFinanceOperation,
   hardDeleteFinanceWallet,
 } from '../service.js';
+import { financeOperationGroups, openFinanceOperations } from '../operations/index.js';
 import {
   deleteWallet as deleteWalletData,
   deleteWalletPermanently,
@@ -207,6 +208,21 @@ function openCashCreateMenu(root) {
   return layer;
 }
 
+function openCashSettings(root) {
+  const actions = financeOperationGroups().length
+    ? [{
+        id: 'financial-operations',
+        label: 'Финансовые операции',
+        onSelect: () => openFinanceOperations(root, { onSaved: () => renderList(root) }),
+      }]
+    : [];
+  if (!actions.length) return null;
+  return openSharedProfileSettingsMenu({
+    title: 'Касса',
+    actions,
+  });
+}
+
 function renderList(root) {
   const wallets = getWallets();
   const investments = getInvestmentEntities();
@@ -218,6 +234,7 @@ function renderList(root) {
     v2Section('Займ', horizontalCards(loans.map((item) => renderCashEntityCard(item, 'loan')))),
   ]);
 
+  root.querySelector('[data-cash-settings]')?.addEventListener('click', () => openCashSettings(root));
   root.querySelector('[data-cash-create]')?.addEventListener('click', () => openCashCreateMenu(root));
   root.querySelectorAll('[data-wallet]').forEach((element) => {
     element.addEventListener('click', () => openWalletZ2(root, element.dataset.wallet));
