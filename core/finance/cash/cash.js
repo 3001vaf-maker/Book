@@ -571,7 +571,7 @@ function openFinanceEntityAppearance(root, entityLayer, type, entity) {
   const host = layer?.querySelector('[data-finance-entity-card-constructor]');
   if (!host) return layer;
   mountEntityCardConstructor(host, {
-    appearance: cashEntityCardAppearance(entity, kind),
+    appearance: cashEntityCardAppearance(entity, type),
     fields: (() => {
       const movements = getFinanceEntityMovements(type, entity.id);
       if (type === 'loan') {
