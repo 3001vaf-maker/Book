@@ -133,6 +133,9 @@ export class AuxiliaryStateService {
       const id = text(entity.id);
       if (!id) continue;
       const previous = beforeById.get(id);
+      if (previous && this.investmentRole(previous) !== this.investmentRole(entity)) {
+        throw new BadRequestException('Роль инвестиции задаётся при создании');
+      }
       if (previous && JSON.stringify(stable(previous)) === JSON.stringify(stable(entity))) continue;
       changedRoles.add(this.investmentRole(entity));
     }
