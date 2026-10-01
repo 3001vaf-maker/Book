@@ -191,6 +191,22 @@ export async function recordPaymentIncome({
   return payment;
 }
 
+export async function correctFinanceOperation(operationId, payload = {}) {
+  const id = String(operationId || '').trim();
+  if (!id) return null;
+  const response = await apiRequest(`/finance/operations/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      ...payload,
+      occurredAt: payload?.occurredAt instanceof Date ? payload.occurredAt.toISOString() : payload?.occurredAt,
+    }),
+  });
+  const state = await applyServerState(response, 'Не удалось скорректировать операцию');
+  const operation = state.operations.find((item) => String(item?.operationId || '') === id) || null;
+  notifyFinanceChanged({ action: 'operation-corrected', operationId: id, source: operation?.source || null });
+  return operation;
+}
+
 export async function hardDeleteFinanceOperation(operationId) {
   const id = String(operationId || '').trim();
   if (!id) return null;
