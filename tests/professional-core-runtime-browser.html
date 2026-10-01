@@ -361,24 +361,22 @@ await wait(45);
 let cashOperationsModal = document.querySelector('[data-modal][data-v2-layer-kind="bottom"]');
 ok(Boolean(cashOperationsModal), 'Cash Financial operations did not open as bottom modal');
 ok(cashOperationsModal?.textContent.includes('Доход / Расход'), 'Cash operations Income/Expense section missing');
-ok(cashOperationsModal?.textContent.includes('Займы'), 'Cash operations Loans section missing');
-ok(cashOperationsModal?.textContent.includes('Инвестиции'), 'Cash operations Investments section missing');
+ok(!cashOperationsModal?.textContent.includes('Займы'), 'Cash root operations must not duplicate Loan entity operations');
+ok(!cashOperationsModal?.textContent.includes('Инвестиции'), 'Cash root operations must not duplicate Investment entity operations');
 ok(cashOperationsModal?.textContent.includes('Переводы'), 'Cash operations Transfers section missing');
 ok(Boolean(cashOperationsModal?.querySelector('[data-finance-operation-action="manual-income"]')), 'Cash Income action missing');
 ok(Boolean(cashOperationsModal?.querySelector('[data-finance-operation-action="manual-expense"]')), 'Cash Expense action missing');
-ok(Boolean(cashOperationsModal?.querySelector('[data-finance-operation-action="loan-received"]')), 'Cash Receive loan action missing');
-ok(Boolean(cashOperationsModal?.querySelector('[data-finance-operation-action="loan-repayment"]')), 'Cash Repay loan action missing');
-ok(Boolean(cashOperationsModal?.querySelector('[data-finance-operation-action="investment-received"]')), 'Cash Receive investment action missing');
-ok(Boolean(cashOperationsModal?.querySelector('[data-finance-operation-action="investment-return"]')), 'Cash Return investment action missing');
+ok(!cashOperationsModal?.querySelector('[data-finance-operation-action="loan-received"]'), 'Cash root must not expose Receive loan');
+ok(!cashOperationsModal?.querySelector('[data-finance-operation-action="investment-received"]'), 'Cash root must not expose Receive investment');
 ok(Boolean(cashOperationsModal?.querySelector('[data-finance-operation-action="transfer"]')), 'Cash Transfer action missing');
 ok(!shell()?.querySelector('[data-v2-z-layer]'), 'Cash operation choice must stay a bottom modal, not Z');
 
-cashOperationsModal?.querySelector('[data-finance-operation-action="loan-received"]')
+cashOperationsModal?.querySelector('[data-finance-operation-action="transfer"]')
   ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
 await wait(55);
 let cashOperationLayer = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
 ok(Boolean(cashOperationLayer), 'Cash selected operation did not open Z2');
-ok(cashOperationLayer?.querySelector('[data-workspace-header-context]')?.dataset.workspaceTitle === 'Получить займ',
+ok(cashOperationLayer?.querySelector('[data-workspace-header-context]')?.dataset.workspaceTitle === 'Перевод между кошельками',
   'Cash operation Z2 B title is wrong');
 ok(shell()?.querySelector('[data-v2-workspace-primary]')?.textContent.trim() === 'Сохранить',
   'Cash operation Z2 C must be Save');
