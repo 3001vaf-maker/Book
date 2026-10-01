@@ -244,6 +244,7 @@ if (financeCss.length) {
 const financeUiFiles = [
   'core/finance/cash/cash.js',
   'core/finance/dds/index.js',
+  'core/finance/operations/index.js',
   'core/finance/dds/income-expense.js',
   'core/finance/dds/special-operations.js',
   'core/finance/dds/articles.js',
@@ -339,10 +340,13 @@ if (/renderFinanceArticles|renderIncomeExpense|renderSpecialFinanceOperations/.t
 if (!/workspaceHeaderContext/.test(ddsUI)
   || !/data-finance-dds-settings/.test(ddsUI)
   || !/data-finance-dds-tool/.test(ddsUI)) {
-  errors.push('DDS must expose its former Finance E instruments through the DDS A/settings control');
+  errors.push('DDS must expose Export and Articles through the DDS A/settings control');
 }
-for (const label of ['Эксель', 'Финансовые операции', 'Статьи']) {
+for (const label of ['Эксель', 'Статьи']) {
   if (!ddsUI.includes(label)) errors.push(`DDS A/settings missing instrument: ${label}`);
+}
+if (/Финансовые операции|data-finance-dds-tool="operations"|openFinanceOperations/.test(ddsUI)) {
+  errors.push('DDS A/settings must not create Finance operations; that workflow belongs to Cash A/settings');
 }
 if (!/title: 'Движения денежных средств'/.test(ddsUI)) {
   errors.push('DDS Z1 must expose the full “Движения денежных средств” Header B title');
@@ -350,11 +354,19 @@ if (!/title: 'Движения денежных средств'/.test(ddsUI)) {
 if (!/title: 'Выгрузка ДДС'/.test(ddsUI) || !/data-finance-dds-export-submit/.test(ddsUI)) {
   errors.push('DDS Excel must open Z2 filters and expose Export through Header C');
 }
+const financeOperationsUI = source('core/finance/operations/index.js');
 for (const group of ['Доход / Расход', 'Займы', 'Инвестиции', 'Переводы']) {
-  if (!ddsUI.includes(group)) errors.push(`DDS financial operation picker missing group: ${group}`);
+  if (!financeOperationsUI.includes(group)) errors.push(`Shared Finance operation picker missing group: ${group}`);
 }
-if (!/variant: 'quick'/.test(ddsUI)) {
-  errors.push('DDS financial operation choice must use the shared bottom modal');
+if (!/variant: 'quick'/.test(financeOperationsUI)
+  || !/openFinanceOperations/.test(financeOperationsUI)
+  || !/mountV2ZLayer/.test(financeOperationsUI)) {
+  errors.push('Shared Finance operation launcher must own the bottom picker and stacked operation form');
+}
+if (!/data-cash-settings/.test(cashUI)
+  || !/financial-operations/.test(cashUI)
+  || !/openFinanceOperations/.test(cashUI)) {
+  errors.push('Cash A/settings must own the Finance operations entry point');
 }
 if (!/mountV2ZLayer/.test(ddsUI) || !/v2ZLayer/.test(ddsUI)) {
   errors.push('DDS Excel, operation forms, receipts and Articles must open as real stacked Z layers');
