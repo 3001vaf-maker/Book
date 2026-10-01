@@ -52,4 +52,11 @@ export {
   saveLoanEntity,
 } from './cash/entities.js';
 
+export {
+  buildLoanSchedule,
+  calculateLoanState,
+  loanTermEndDate,
+  normalizeLoanTerms,
+} from './cash/loan-calculator.js';
+
 export { financeNavigationItems, renderFinanceSection } from './finance.js';
