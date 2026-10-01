@@ -31,6 +31,7 @@ import {
   hardDeleteFinanceWallet,
 } from '../service.js';
 import { financeOperationGroups, openFinanceOperations } from '../operations/index.js';
+import { getFinanceEntityBalance, getFinanceEntityMovements } from '../read.js';
 import {
   deleteWallet as deleteWalletData,
   deleteWalletPermanently,
@@ -166,12 +167,14 @@ function renderWalletCard(wallet) {
 
 function renderCashEntityCard(entity, kind) {
   const label = kind === 'investment' ? 'инвестицию' : 'займ';
+  const balance = getFinanceEntityBalance(kind, entity.id);
   return entityVisualCard({
     appearance: cashEntityCardAppearance(entity),
-    fields: cashEntityCardFields(entity),
+    fields: cashEntityCardFields(entity, balance),
     image: entity.photo || '',
-    interactive: false,
-    aria: `${label} ${entity.name}`,
+    interactive: true,
+    data: `data-finance-entity-type="${escapeHtml(kind)}" data-finance-entity-id="${escapeHtml(entity.id)}"`,
+    aria: `Открыть ${label} ${entity.name}`,
   });
 }
 
@@ -209,11 +212,15 @@ function openCashCreateMenu(root) {
 }
 
 function openCashSettings(root) {
-  const actions = financeOperationGroups().length
+  const groups = ['income-expense', 'transfer'];
+  const actions = financeOperationGroups({ groups }).length
     ? [{
         id: 'financial-operations',
         label: 'Финансовые операции',
-        onSelect: () => openFinanceOperations(root, { onSaved: () => renderList(root) }),
+        onSelect: () => openFinanceOperations(root, {
+          groups,
+          onSaved: () => renderList(root),
+        }),
       }]
     : [];
   if (!actions.length) return null;
@@ -238,6 +245,11 @@ function renderList(root) {
   root.querySelector('[data-cash-create]')?.addEventListener('click', () => openCashCreateMenu(root));
   root.querySelectorAll('[data-wallet]').forEach((element) => {
     element.addEventListener('click', () => openWalletZ2(root, element.dataset.wallet));
+  });
+  root.querySelectorAll('[data-finance-entity-type][data-finance-entity-id]').forEach((element) => {
+    element.addEventListener('click', () => {
+      openFinanceEntityZ2(root, element.dataset.financeEntityType, element.dataset.financeEntityId);
+    });
   });
 }
 
@@ -323,6 +335,143 @@ function openCashEntityForm(root, kind) {
     layer.v2Close?.();
     renderList(root);
   });
+}
+
+function financeEntityById(type, id) {
+  const values = type === 'loan' ? getLoanEntities() : getInvestmentEntities();
+  return values.find((item) => String(item?.id || '') === String(id || '')) || null;
+}
+
+function financeEntityContext(entity, type) {
+  const fallback = type === 'loan' ? 'Займ' : 'Инвестиция';
+  return workspaceHeaderContext({
+    title: entity?.name || fallback,
+    a: {
+      kind: 'settings',
+      data: 'data-finance-entity-settings',
+      aria: `Настройки ${entity?.name || fallback}`,
+    },
+  });
+}
+
+function financeEntityOperations(type, id) {
+  const grouped = new Map();
+  for (const entry of getFinanceEntityMovements(type, id)) {
+    const operationId = String(entry?.operationId || '');
+    if (!operationId) continue;
+    if (entry?.operationKind === 'cancel' || entry?.operationStatus === 'cancelled' || entry?.economicType === 'REVERSAL') continue;
+    const current = grouped.get(operationId) || { ...entry, operationId, total: 0, entries: [] };
+    current.entries.push(entry);
+    current.total += Number(entry?.total) || 0;
+    grouped.set(operationId, current);
+  }
+  return [...grouped.values()]
+    .sort((a, b) => String(b?.occurredAt || '').localeCompare(String(a?.occurredAt || '')));
+}
+
+function renderFinanceEntityOperationRow(operation, type, entityId) {
+  const label = operationName(operation);
+  return v2ListEntry({
+    title: label,
+    subtitle: String(operation?.walletName || ''),
+    rightTop: formatMoney(operation.total),
+    rightBottom: operationMoment(operation),
+    initial: '',
+    interactive: true,
+    data: `data-finance-entity-operation="${escapeHtml(operation.operationId)}" data-finance-entity-type="${escapeHtml(type)}" data-finance-entity-id="${escapeHtml(entityId)}"`,
+    aria: `Открыть операцию ${label}`,
+  });
+}
+
+function renderFinanceEntityLayer(root, layer, type, id) {
+  const entity = financeEntityById(type, id);
+  if (!entity) {
+    layer.v2Close?.();
+    renderList(root);
+    return;
+  }
+  const operations = financeEntityOperations(type, entity.id);
+  layer.innerHTML = page([
+    financeEntityContext(entity, type),
+    operations.length
+      ? v2ListEntries(operations.map((operation) => renderFinanceEntityOperationRow(operation, type, entity.id)))
+      : emptyState('Операций пока нет', type === 'loan'
+        ? 'Получение и возврат займа появятся здесь.'
+        : 'Получение и возврат инвестиции появятся здесь.'),
+  ]);
+
+  layer.querySelector('[data-finance-entity-settings]')?.addEventListener('click', () => {
+    openFinanceEntitySettings(root, layer, type, entity);
+  });
+  layer.querySelectorAll('[data-finance-entity-operation]').forEach((element) => {
+    element.addEventListener('click', () => {
+      openFinanceEntityOperation(root, layer, type, entity, element.dataset.financeEntityOperation);
+    });
+  });
+}
+
+function openFinanceEntityZ2(root, type, id) {
+  const entity = financeEntityById(type, id);
+  if (!entity) return null;
+  const layer = mountV2ZLayer(root, v2ZLayer(''), { stack: true });
+  if (!layer) return null;
+  renderFinanceEntityLayer(root, layer, type, entity.id);
+  return layer;
+}
+
+function openFinanceEntitySettings(root, entityLayer, type, entity) {
+  const group = type === 'loan' ? 'loan' : 'investment';
+  return openSharedProfileSettingsMenu({
+    title: entity.name,
+    actions: [{
+      id: 'financial-operation',
+      label: 'Финансовая операция',
+      onSelect: () => openFinanceOperations(entityLayer, {
+        groups: [group],
+        financeEntity: { type, id: entity.id, name: entity.name },
+        title: 'Финансовая операция',
+        onSaved: () => {
+          renderFinanceEntityLayer(root, entityLayer, type, entity.id);
+          renderList(root);
+        },
+      }),
+    }],
+  });
+}
+
+function openFinanceEntityOperation(root, entityLayer, type, entity, operationId) {
+  const operation = financeEntityOperations(type, entity.id)
+    .find((item) => String(item?.operationId || '') === String(operationId || ''));
+  if (!operation) return null;
+  const layer = mountV2ZLayer(entityLayer, v2ZLayer(page([
+    operationContext(operation),
+    operationReceipt(operation),
+  ])), { stack: true });
+  if (!layer) return null;
+  layer.querySelector('[data-wallet-operation-settings]')?.addEventListener('click', () => {
+    openSharedProfileSettingsMenu({
+      title: operationName(operation),
+      actions: [{
+        id: 'delete-operation',
+        label: 'Удалить операцию',
+        variant: 'danger',
+        onSelect: async () => {
+          try {
+            await cancelFinanceOperation(operation.operationId, {
+              reason: 'incorrect-entry',
+              occurredAt: new Date(),
+            });
+            layer.v2Close?.();
+            renderFinanceEntityLayer(root, entityLayer, type, entity.id);
+            renderList(root);
+          } catch (error) {
+            openNotice({ message: String(error?.message || 'Не удалось удалить операцию') });
+          }
+        },
+      }],
+    });
+  });
+  return layer;
 }
 
 function renderWalletLayer(root, layer, walletId) {
