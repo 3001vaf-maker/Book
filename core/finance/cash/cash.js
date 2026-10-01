@@ -775,7 +775,10 @@ function renderInvestmentTermsLayer(root, entityLayer, layer, sourceEntity, draf
     }),
     `<form class="compact-form" data-investment-terms-form novalidate>
       ${field({ label: 'Наименование', name: 'investmentName', value: current.name, required: true, placeholder: 'Наименование' })}
-      ${roles.length > 1 ? select({ label: 'Моя роль', name: 'investmentRole', value: terms.role, options: roles }) : `<input type="hidden" name="investmentRole" value="${escapeHtml(terms.role)}">`}
+      ${creating && roles.length > 1
+        ? select({ label: 'Моя роль', name: 'investmentRole', value: terms.role, options: roles })
+        : `<input type="hidden" name="investmentRole" value="${escapeHtml(terms.role)}">`}
+      ${creating ? '' : v2ListEntries([v2ListEntry({ title: 'Моя роль', rightTop: investmentRoleLabel(terms.role) })])}
       ${select({ label: 'Тип инвестиции', name: 'investmentType', value: terms.investmentType, options: investmentTypeOptions() })}
       ${field({ label: terms.role === 'self' ? 'Во что вкладываю' : 'Проект / объект', name: 'objectName', value: terms.objectName || '', placeholder: 'Необязательно' })}
       ${terms.role === 'raise' ? select({

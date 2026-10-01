@@ -260,7 +260,16 @@ export function calculateInvestmentState(entity = {}, movements = [], asOfDate =
 
   const explicitValuation = latestValuation(events);
   const capitalBase = Math.max(0, contributed + reinvested - returnedCapital);
-  const currentValue = explicitValuation == null ? capitalBase : explicitValuation;
+  const projectValue = explicitValuation == null ? null : explicitValuation;
+  const equityPositionValue = terms.role === 'external'
+    && terms.participationModel === 'equity'
+    && terms.sharePercent > 0
+    && projectValue != null
+    ? projectValue * terms.sharePercent / 100
+    : null;
+  const currentValue = terms.role === 'external'
+    ? (equityPositionValue == null ? capitalBase : equityPositionValue)
+    : (projectValue == null ? capitalBase : projectValue);
   const realizedInflows = returnedCapital + income + savings;
   const capitalOutflows = contributed + expenses;
   const realizedResult = realizedInflows - capitalOutflows;
@@ -279,8 +288,8 @@ export function calculateInvestmentState(entity = {}, movements = [], asOfDate =
     terminalCashflows.push({ date: asOf, amount: currentValue });
   }
   const xirr = terms.role === 'raise' ? null : investmentXirr(terminalCashflows);
-  const shareValue = terms.sharePercent > 0 && explicitValuation != null
-    ? explicitValuation * terms.sharePercent / 100
+  const shareValue = terms.sharePercent > 0 && projectValue != null
+    ? projectValue * terms.sharePercent / 100
     : null;
 
   return {
@@ -296,7 +305,8 @@ export function calculateInvestmentState(entity = {}, movements = [], asOfDate =
     reinvested,
     capitalBase,
     currentValue,
-    explicitValuation: explicitValuation != null,
+    projectValue,
+    explicitValuation: projectValue != null,
     realizedResult,
     result,
     roi,

@@ -69,6 +69,29 @@ assert.equal(raisedState.currentValue, 5000000);
 assert.equal(raisedState.shareValue, 1000000);
 assert.equal(raisedState.roi, null);
 
+const external = {
+  name: 'Доля проекта',
+  investmentTerms: {
+    role: 'external',
+    investmentType: 'equity',
+    participationModel: 'equity',
+    sharePercent: 20,
+  },
+  investmentEvents: [
+    { id: 'valuation-external', type: 'valuation', amount: 5000000, occurredDate: '2026-09-01' },
+  ],
+};
+const externalState = calculateInvestmentState(external, [
+  movement('INVESTMENT_CONTRIBUTION', 500000, '2026-01-01T09:00:00.000Z', 'OUT'),
+  movement('INVESTMENT_CAPITAL_RETURN', 100000, '2026-08-01T09:00:00.000Z', 'IN'),
+  movement('INVESTMENT_INCOME', 40000, '2026-09-01T09:00:00.000Z', 'IN'),
+], '2026-10-01');
+
+assert.equal(externalState.projectValue, 5000000);
+assert.equal(externalState.shareValue, 1000000);
+assert.equal(externalState.currentValue, 1000000, 'Investor current value must be the owned share, not whole project value');
+assert.equal(externalState.result, 640000);
+
 const xirr = investmentXirr([
   { date: '2025-01-01', amount: -1000 },
   { date: '2026-01-01', amount: 1100 },
