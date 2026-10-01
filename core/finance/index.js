@@ -10,6 +10,8 @@ export {
   getDDSIncome,
   getDDSMovements,
   getDDSMovementsForSource,
+  getFinanceEntityBalance,
+  getFinanceEntityMovements,
   getLedgerEntries,
   getLedgerEntriesForSource,
   getPaymentRemaining,
