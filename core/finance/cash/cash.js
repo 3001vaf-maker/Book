@@ -471,42 +471,261 @@ function openFinanceEntityAppearance(root, entityLayer, type, entity) {
   return layer;
 }
 
+function loanRateOptions() {
+  return [
+    { value: '0', label: 'Без процентов' },
+    ...Array.from({ length: 100 }, (_, index) => ({
+      value: String(index + 1),
+      label: `${index + 1}%`,
+    })),
+  ];
+}
+
+function loanTermsDraft(entity = {}, draft = null) {
+  const terms = normalizeLoanTerms(draft ? { loanTerms: draft.loanTerms } : entity);
+  return {
+    name: String(draft?.name ?? entity?.name ?? ''),
+    loanTerms: {
+      ...terms,
+      lenderName: String(draft?.loanTerms?.lenderName ?? terms.lenderName ?? ''),
+    },
+  };
+}
+
+function loanTermsFromForm(form, entity) {
+  const data = new FormData(form);
+  return {
+    name: String(data.get('loanName') || entity?.name || '').trim(),
+    loanTerms: {
+      lenderName: String(data.get('lenderName') || '').trim(),
+      termMode: String(data.get('termMode') || 'none'),
+      endDate: String(data.get('endDate') || ''),
+      durationValue: Number(data.get('durationValue') || 1),
+      durationUnit: String(data.get('durationUnit') || 'months'),
+      interestRate: Number(data.get('interestRate') || 0),
+      ratePeriod: String(data.get('ratePeriod') || 'annual'),
+      repaymentMode: String(data.get('repaymentMode') || 'free'),
+      monthlyMode: String(data.get('monthlyMode') || 'equal-payment'),
+      firstPaymentDate: String(data.get('firstPaymentDate') || ''),
+    },
+  };
+}
+
+function loanCalculationRows(entity) {
+  const movements = getFinanceEntityMovements('loan', entity.id);
+  const state = calculateLoanState(entity, movements);
+  const rows = [
+    v2ListEntry({ title: 'Получено', rightTop: formatMoney(state.received) }),
+    v2ListEntry({ title: 'Возвращено', rightTop: formatMoney(state.repaid) }),
+    v2ListEntry({ title: 'Основной долг', rightTop: formatMoney(state.principal) }),
+    v2ListEntry({ title: 'Начислено процентов', rightTop: formatMoney(state.accruedInterest) }),
+    v2ListEntry({ title: 'К возврату', rightTop: formatMoney(state.totalDue) }),
+  ];
+  if (state.endDate) rows.push(v2ListEntry({ title: 'Срок', rightTop: shortDate(state.endDate, '') }));
+  return { state, html: v2ListEntries(rows) };
+}
+
+function loanScheduleRows(entity) {
+  const movements = getFinanceEntityMovements('loan', entity.id);
+  const schedule = buildLoanSchedule(entity, movements);
+  if (!schedule.length) return '';
+  return v2ListEntries(schedule.map((item) => v2ListEntry({
+    title: shortDate(item.date, ''),
+    subtitle: `Основной долг ${formatMoney(item.principal)} · Проценты ${formatMoney(item.interest)}`,
+    rightTop: formatMoney(item.total),
+  })));
+}
+
+function renderLoanTermsLayer(root, entityLayer, layer, sourceEntity, draft = null) {
+  const current = loanTermsDraft(sourceEntity, draft);
+  const terms = current.loanTerms;
+  const termOptions = [
+    { value: 'none', label: 'Без срока' },
+    { value: 'date', label: 'До даты' },
+    { value: 'duration', label: 'На срок' },
+  ];
+  const repaymentOptions = terms.termMode === 'none'
+    ? [
+        { value: 'free', label: 'Свободно' },
+        { value: 'monthly', label: 'Ежемесячно' },
+      ]
+    : [
+        { value: 'free', label: 'Свободно' },
+        { value: 'end', label: 'В конце срока' },
+        { value: 'monthly', label: 'Ежемесячно' },
+      ];
+  const monthlyOptions = terms.termMode === 'none'
+    ? [{ value: 'interest-only', label: 'Проценты ежемесячно' }]
+    : [
+        { value: 'equal-payment', label: 'Равными платежами' },
+        { value: 'equal-principal', label: 'Равными частями основного долга' },
+        { value: 'interest-only', label: 'Проценты ежемесячно, основной долг в конце' },
+      ];
+  const safeRepayment = repaymentOptions.some((item) => item.value === terms.repaymentMode)
+    ? terms.repaymentMode
+    : 'free';
+  const safeMonthly = monthlyOptions.some((item) => item.value === terms.monthlyMode)
+    ? terms.monthlyMode
+    : monthlyOptions[0].value;
+  const previewEntity = {
+    ...sourceEntity,
+    name: current.name,
+    loanTerms: {
+      ...terms,
+      repaymentMode: safeRepayment,
+      monthlyMode: safeMonthly,
+    },
+  };
+  const calculation = loanCalculationRows(previewEntity);
+  const schedule = loanScheduleRows(previewEntity);
+
+  layer.innerHTML = page([
+    workspaceHeaderContext({
+      title: 'Условия займа',
+      c: {
+        label: 'Сохранить',
+        data: 'data-loan-terms-save',
+        aria: 'Сохранить условия займа',
+      },
+    }),
+    `<form class="compact-form" data-loan-terms-form novalidate>
+      ${field({ label: 'Наименование', name: 'loanName', value: current.name, required: true })}
+      ${field({ label: 'У кого заняли', name: 'lenderName', value: terms.lenderName || '', placeholder: 'Необязательно' })}
+      ${select({ label: 'Срок', name: 'termMode', value: terms.termMode, options: termOptions })}
+      ${terms.termMode === 'date' ? datePicker({
+        label: 'Дата возврата',
+        name: 'endDate',
+        value: terms.endDate || '',
+        required: true,
+        allowClear: false,
+      }) : ''}
+      ${terms.termMode === 'duration' ? `${field({
+        label: 'Срок',
+        name: 'durationValue',
+        type: 'number',
+        inputmode: 'numeric',
+        value: terms.durationValue,
+        required: true,
+        data: 'min="1" step="1"',
+      })}${select({
+        label: 'Единица срока',
+        name: 'durationUnit',
+        value: terms.durationUnit,
+        options: [
+          { value: 'months', label: 'Месяцев' },
+          { value: 'years', label: 'Лет' },
+        ],
+      })}` : ''}
+      ${select({ label: 'Ставка', name: 'interestRate', value: String(terms.interestRate), options: loanRateOptions() })}
+      ${terms.interestRate > 0 ? select({
+        label: 'Период ставки',
+        name: 'ratePeriod',
+        value: terms.ratePeriod,
+        options: [
+          { value: 'monthly', label: 'В месяц' },
+          { value: 'annual', label: 'В год' },
+        ],
+      }) : ''}
+      ${select({ label: 'Порядок возврата', name: 'repaymentMode', value: safeRepayment, options: repaymentOptions })}
+      ${safeRepayment === 'monthly' ? select({
+        label: 'Расчёт платежа',
+        name: 'monthlyMode',
+        value: safeMonthly,
+        options: monthlyOptions,
+      }) : ''}
+      ${safeRepayment === 'monthly' ? datePicker({
+        label: 'Первый платёж',
+        name: 'firstPaymentDate',
+        value: terms.firstPaymentDate || '',
+        required: false,
+        allowClear: true,
+      }) : ''}
+    </form>`,
+    v2Section('Расчёт', calculation.html),
+    schedule ? v2Section('График', schedule) : '',
+  ]);
+
+  initDatePickers(layer);
+  const form = layer.querySelector('[data-loan-terms-form]');
+  if (!form) return;
+
+  form.addEventListener('change', (event) => {
+    const name = String(event.target?.name || '');
+    if (!['termMode', 'endDate', 'durationValue', 'durationUnit', 'interestRate', 'ratePeriod', 'repaymentMode', 'monthlyMode', 'firstPaymentDate'].includes(name)) return;
+    renderLoanTermsLayer(root, entityLayer, layer, sourceEntity, loanTermsFromForm(form, sourceEntity));
+  });
+
+  layer.querySelector('[data-loan-terms-save]')?.addEventListener('click', () => {
+    form.requestSubmit();
+  });
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const validation = formValidationMessage(form);
+    if (validation) {
+      openNotice({ message: validation });
+      return;
+    }
+    const nextDraft = loanTermsFromForm(form, sourceEntity);
+    if (!nextDraft.name) {
+      openNotice({ message: 'Укажите наименование займа.' });
+      return;
+    }
+    if (nextDraft.loanTerms.termMode === 'date' && !nextDraft.loanTerms.endDate) {
+      openNotice({ message: 'Укажите дату возврата.' });
+      return;
+    }
+    const next = {
+      ...sourceEntity,
+      name: nextDraft.name,
+      loanTerms: normalizeLoanTerms({ loanTerms: nextDraft.loanTerms }),
+      updatedAt: new Date().toISOString(),
+    };
+    saveLoanEntity(next);
+    layer.v2Close?.();
+    renderFinanceEntityLayer(root, entityLayer, 'loan', next.id);
+    renderList(root);
+  });
+}
+
+function openLoanTerms(root, entityLayer, entity) {
+  const layer = mountV2ZLayer(entityLayer, v2ZLayer(''), { stack: true });
+  if (!layer) return null;
+  renderLoanTermsLayer(root, entityLayer, layer, entity);
+  return layer;
+}
+
 function openFinanceEntitySettings(root, entityLayer, type, entity) {
   const financeEntity = { type, id: entity.id, name: entity.name };
-  const receivedAction = type === 'loan' ? 'loan-received' : 'investment-received';
-  const returnAction = type === 'loan' ? 'loan-repayment' : 'investment-return';
-  const receivedLabel = type === 'loan' ? 'Получение займа' : 'Получение инвестиции';
-  const returnLabel = type === 'loan' ? 'Возврат займа' : 'Возврат инвестиции';
   const saved = () => {
     renderFinanceEntityLayer(root, entityLayer, type, entity.id);
     renderList(root);
   };
 
+  const actions = [{
+    id: 'appearance',
+    label: 'Вид',
+    onSelect: () => openFinanceEntityAppearance(root, entityLayer, type, entity),
+  }];
+  if (type === 'loan') {
+    actions.push({
+      id: 'terms',
+      label: 'Условия займа',
+      onSelect: () => openLoanTerms(root, entityLayer, entity),
+    });
+  }
+  actions.push({
+    id: 'financial-operation',
+    label: 'Финансовая операция',
+    onSelect: () => openEntityFinanceOperation(entityLayer, type, {
+      financeEntity,
+      onSaved: saved,
+    }),
+  });
+
   return openSharedProfileSettingsMenu({
     title: entity.name,
-    actions: [
-      {
-        id: 'appearance',
-        label: 'Вид',
-        onSelect: () => openFinanceEntityAppearance(root, entityLayer, type, entity),
-      },
-      {
-        id: 'receive',
-        label: receivedLabel,
-        onSelect: () => openFinanceOperation(entityLayer, receivedAction, {
-          financeEntity,
-          onSaved: saved,
-        }),
-      },
-      {
-        id: 'return',
-        label: returnLabel,
-        onSelect: () => openFinanceOperation(entityLayer, returnAction, {
-          financeEntity,
-          onSaved: saved,
-        }),
-      },
-    ],
+    actions,
   });
 }
 
