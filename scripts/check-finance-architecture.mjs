@@ -83,7 +83,7 @@ if (/\bincome\s*:|\bexpense\s*:|legacyOperational|normalizeIncome|normalizeExpen
 }
 
 const financeService = source('core/finance/service.js');
-for (const command of ['recordPaymentIncome', 'recordRefundExpense', 'cancelPaymentOperation', 'recordManualFinanceOperation', 'recordSpecialFinanceOperation', 'hardDeleteFinanceOperation']) {
+for (const command of ['recordPaymentIncome', 'recordRefundExpense', 'cancelPaymentOperation', 'recordManualFinanceOperation', 'recordSpecialFinanceOperation', 'correctFinanceOperation', 'hardDeleteFinanceOperation']) {
   if (!new RegExp(`export\\s+async\\s+function\\s+${command}`).test(financeService)) {
     errors.push(`core/finance/service.js: ${command} must be an async server-backed command`);
   }
@@ -129,6 +129,7 @@ for (const route of [
   /@Post\(['"]operations\/payment['"]\)/,
   /@Post\(['"]operations\/:operationId\/refund['"]\)/,
   /@Post\(['"]operations\/:operationId\/cancel['"]\)/,
+  /@Put\(['"]operations\/:operationId['"]\)/,
   /@Delete\(['"]operations\/:operationId\/hard['"]\)/,
   /@Get\(['"]articles['"]\)/,
   /@Post\(['"]articles['"]\)/,
@@ -148,6 +149,8 @@ for (const token of [
   'recordPayment(',
   'recordRefund(',
   'cancelOperation(',
+  'correctOperation(',
+  'replaceOperationWithEntries',
   'hardDeleteOperation(',
   'settlementForSource(',
   'financeLedgerEntry',
@@ -218,7 +221,7 @@ if (!/export function financialMoney/.test(financeRules) || !/Math\.round\([^\n]
 }
 
 const financeIndex = source('core/finance/index.js');
-for (const token of ['calculateSettlement', 'getRecordPaymentState', 'getLedgerEntries', 'getFinanceArticles', 'getZReport', 'recordManualFinanceOperation', 'recordSpecialFinanceOperation', 'recordPaymentIncome', 'hardDeleteFinanceOperation', 'saveSettlementSnapshot']) {
+for (const token of ['calculateSettlement', 'getRecordPaymentState', 'getLedgerEntries', 'getFinanceArticles', 'getZReport', 'recordManualFinanceOperation', 'recordSpecialFinanceOperation', 'recordPaymentIncome', 'correctFinanceOperation', 'hardDeleteFinanceOperation', 'saveSettlementSnapshot']) {
   if (!financeIndex.includes(token)) errors.push(`core/finance/index.js must expose ${token}`);
 }
 
@@ -306,14 +309,17 @@ if (!/variant: 'quick'/.test(ddsUI)) {
 if (!/mountV2ZLayer/.test(ddsUI) || !/v2ZLayer/.test(ddsUI)) {
   errors.push('DDS Excel, operation forms, receipts and Articles must open as real stacked Z layers');
 }
-for (const token of ['v2ListEntry', 'v2ListEntries', 'readOnlyReceipt', 'openSharedProfileSettingsMenu', 'hardDeleteFinanceOperation']) {
+for (const token of ['v2ListEntry', 'v2ListEntries', 'readOnlyReceipt', 'openSharedProfileSettingsMenu', 'correctFinanceOperation', 'hardDeleteFinanceOperation']) {
   if (!ddsUI.includes(token)) errors.push(`DDS operation workflow must use shared ${token}`);
 }
 if (/details\s*\(|list\s*\(\{\s*items:\s*entries/.test(ddsUI)) {
   errors.push('DDS opened operation must be one readOnlyReceipt without legacy details/list duplication');
 }
-if (!/data-finance-operation-cancel-confirm/.test(ddsUI) || !/data-finance-operation-delete-confirm/.test(ddsUI)) {
-  errors.push('DDS operation A/settings must expose separate cancel and permanent delete flows');
+if (!/data-finance-operation-cancel-confirm/.test(ddsUI) || !/data-finance-operation-delete-confirm/.test(ddsUI) || !/correct-operation/.test(ddsUI)) {
+  errors.push('DDS operation A/settings must expose correction, cancel and permanent delete flows');
+}
+if (!/modal--time-picker-sheet/.test(ddsUI) || !/variant:\s*'danger'/.test(ddsUI)) {
+  errors.push('DDS cancel must reuse the canonical bottom time sheet and shared danger button');
 }
 if (!/actionOnly:\s*true/.test(ddsUI) || !/variant:\s*'top'/.test(ddsUI)) {
   errors.push('DDS cancellation help must use the shared info icon and top information modal');
