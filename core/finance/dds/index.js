@@ -302,7 +302,7 @@ function openDeleteOperation(root, operationLayer, entries) {
       ${button('Отмена', { variant: 'secondary', data: 'data-finance-operation-delete-close' })}
       ${button('Удалить', { variant: 'critical', data: 'data-finance-operation-delete-confirm' })}
     </div>`;
-  const confirmation = mountModal(root, modal(content, {
+  const confirmation = mountModal(document.body, modal(content, {
     title: 'Удалить операцию',
     variant: 'top',
     surface: 'app',
@@ -507,11 +507,17 @@ function openOperationCorrection(root, operationLayer, entries) {
 
 function openOperationSettings(root, operationLayer, entries) {
   const first = entries[0] || {};
-  const canCancel = first?.operationStatus !== 'cancelled';
+  const active = first?.operationStatus !== 'cancelled';
   return openSharedProfileSettingsMenu({
     title: 'Настройки операции',
     actions: [
-      canCancel ? {
+      active ? {
+        id: 'correct-operation',
+        label: 'Корректировка',
+        variant: 'outline',
+        onSelect: () => openOperationCorrection(root, operationLayer, entries),
+      } : null,
+      active ? {
         id: 'cancel-operation',
         label: 'Отменить операцию',
         variant: 'outline',
