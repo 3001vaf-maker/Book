@@ -59,4 +59,12 @@ export {
   normalizeLoanTerms,
 } from './cash/loan-calculator.js';
 
+export {
+  calculateInvestmentState,
+  investmentRoleLabel,
+  investmentTermEndDate,
+  investmentXirr,
+  normalizeInvestmentTerms,
+} from './cash/investment-calculator.js';
+
 export { financeNavigationItems, renderFinanceSection } from './finance.js';
