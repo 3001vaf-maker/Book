@@ -93,6 +93,23 @@
         data:{
           workplace:'Студия Тест',
           person:{uei:'UEI-RUNTIME',name:'Иван',surname:'Проверка'},
+          allocations:[{walletId:'cash',walletName:'Наличные',amount:1500}],
+          total:1500,
+          serviceAmount:1500,
+          tips:0,
+          settlement:{items:[{sourceType:'procedure',sourceId:'runtime-procedure',name:'Стрижка',price:1500,discountMoney:0,planAmount:1500}],serviceTotal:1500,discountTotal:0,planTotal:1500},
+        },
+      },{
+        operationId:'runtime-payment-split',
+        kind:'payment',
+        status:'completed',
+        source:{type:'record',id:'runtime-record-split'},
+        originalOperationId:'',
+        occurredAt:'2026-09-30T15:00:00.000Z',
+        recordedAt:'2026-09-30T15:04:00.000Z',
+        data:{
+          workplace:'Бьюти тория',
+          person:{uei:'0012',name:'Татьяна',surname:'Проверка'},
           allocations:[
             {walletId:'cash',walletName:'Наличные',amount:1000},
             {walletId:'cashless',walletName:'Безналичные',amount:500},
@@ -127,13 +144,13 @@
         },
       }],
       ledger:[{
-        entryId:'runtime-ledger-cash',
+        entryId:'runtime-ledger',
         operationId:'runtime-payment',
         walletId:'cash',
         walletName:'Наличные',
         direction:'IN',
         economicType:'SERVICE_REVENUE',
-        amount:1000,
+        amount:1500,
         occurredAt:'2026-09-30T12:30:00.000Z',
         recordedAt:'2026-09-30T12:31:00.000Z',
         source:{type:'record',id:'runtime-record'},
@@ -146,16 +163,35 @@
         unitPrice:null,
         note:'',
       },{
-        entryId:'runtime-ledger-cashless',
-        operationId:'runtime-payment',
+        entryId:'runtime-ledger-split-cash',
+        operationId:'runtime-payment-split',
+        walletId:'cash',
+        walletName:'Наличные',
+        direction:'IN',
+        economicType:'SERVICE_REVENUE',
+        amount:1000,
+        occurredAt:'2026-09-30T15:00:00.000Z',
+        recordedAt:'2026-09-30T15:04:00.000Z',
+        source:{type:'record',id:'runtime-record-split'},
+        component:'service',
+        relatedOperationId:'',
+        articleId:'',
+        articleName:'',
+        lineName:'',
+        quantity:null,
+        unitPrice:null,
+        note:'',
+      },{
+        entryId:'runtime-ledger-split-cashless',
+        operationId:'runtime-payment-split',
         walletId:'cashless',
         walletName:'Безналичные',
         direction:'IN',
         economicType:'SERVICE_REVENUE',
         amount:500,
-        occurredAt:'2026-09-30T12:30:00.000Z',
-        recordedAt:'2026-09-30T12:31:00.000Z',
-        source:{type:'record',id:'runtime-record'},
+        occurredAt:'2026-09-30T15:00:00.000Z',
+        recordedAt:'2026-09-30T15:04:00.000Z',
+        source:{type:'record',id:'runtime-record-split'},
         component:'service',
         relatedOperationId:'',
         articleId:'',
@@ -542,7 +578,7 @@ ok([...(shell()?.querySelectorAll('[data-finance-operation="runtime-manual"]') |
   'DDS grouped operation row was not restored after closing receipt');
 
 mark('dds-payment-receipt');
-const paymentEntries = [...(shell()?.querySelectorAll('[data-finance-operation="runtime-payment"]') || [])];
+const paymentEntries = [...(shell()?.querySelectorAll('[data-finance-operation="runtime-payment-split"]') || [])];
 ok(paymentEntries.length === 1, 'Split payment must remain one DDS operation row');
 paymentEntries[0]?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
 await wait(60);
