@@ -13,7 +13,7 @@ import {
   openNotice,
   openSharedProfileSettingsMenu,
   page,
-  paymentReceipt,
+  readOnlyReceipt,
   photoField,
   shortDateTime,
   shortDateTimeParts,
@@ -330,16 +330,20 @@ async function openWalletSettings(root, walletLayer, wallet) {
 
 function operationReceipt(operation) {
   const when = shortDateTimeParts(operation?.occurredAt || '');
-  return paymentReceipt({
-    workplace: operation?.workplace || '',
-    workplaceFallback: '',
-    date: when.date || '—',
-    time: when.time || '—',
-    person: operation?.person || {},
-    amount: formatMoney(operation?.total),
-    wallet: '',
-    tips: '',
-    totalDivider: true,
+  const fullName = [operation?.person?.name, operation?.person?.surname]
+    .map((part) => String(part || '').trim())
+    .filter(Boolean)
+    .join(' ');
+  return readOnlyReceipt({
+    items: [
+      { label: String(operation?.workplace || '').trim(), value: '' },
+      { label: when.date || '—', value: when.time || '—' },
+      { label: String(operation?.person?.uei || '').trim(), value: '' },
+      { label: fullName, value: '' },
+    ].filter((item) => item.label || item.value),
+    totals: [
+      { label: '', value: formatMoney(operation?.total), strong: true },
+    ],
   });
 }
 
