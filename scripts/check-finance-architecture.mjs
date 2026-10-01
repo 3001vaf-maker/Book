@@ -279,7 +279,7 @@ if (!/data-cash-create/.test(cashUI)
   || !/v2Section\('Кошельки'/.test(cashUI)
   || !/v2Section\('Инвестиции'/.test(cashUI)
   || !/v2Section\('Займ'/.test(cashUI)
-  || !/v2HorizontalRail/.test(cashUI)) {
+  || !/entityCardRail/.test(cashUI)) {
   errors.push('Cash Z1 must expose Wallets, Investments and Loan as three horizontal shared sections with Header C create action');
 }
 for (const label of ['+ Добавить кошелек', '+ Добавить инвестицию', '+ Добавить займ']) {
