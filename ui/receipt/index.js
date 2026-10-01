@@ -5,6 +5,10 @@ function text(value = '') {
   return escapeHtml(String(value ?? ''));
 }
 
+function receiptRow(item = {}) {
+  return `<div class="read-only-sheet__row${item.strong ? ' is-strong' : ''}"><span>${text(item.label)}</span><strong>${text(item.value)}</strong></div>`;
+}
+
 export function readOnlyReceipt({
   title = '',
   status = '',
@@ -12,6 +16,7 @@ export function readOnlyReceipt({
   time = '',
   items = [],
   totals = [],
+  groups = [],
   action = null,
 } = {}) {
   const headerVisible = [title, status, date, time].some((value) => String(value ?? '').trim());
@@ -23,10 +28,19 @@ export function readOnlyReceipt({
   const header = headerVisible
     ? `<header class="read-only-sheet__header">${String(title ?? '').trim() ? `<h2>${text(title)}</h2>` : ''}${meta ? `<div class="read-only-sheet__meta">${meta}</div>` : ''}</header>`
     : '';
+  const grouped = (Array.isArray(groups) ? groups : [])
+    .filter((group) => Array.isArray(group) ? group.length : Array.isArray(group?.items) && group.items.length)
+    .map((group) => {
+      const rows = Array.isArray(group) ? group : group.items;
+      return `<div class="read-only-sheet__group">${rows.map(receiptRow).join('')}</div>`;
+    }).join('');
+  const itemRows = (Array.isArray(items) ? items : []).map(receiptRow).join('');
+  const totalRows = (Array.isArray(totals) ? totals : []).map(receiptRow).join('');
   return `<section class="read-only-sheet" data-read-only-sheet>
     ${header}
-    <div class="read-only-sheet__items">${(Array.isArray(items) ? items : []).map((item) => `<div class="read-only-sheet__row"><span>${text(item.label)}</span><strong>${text(item.value)}</strong></div>`).join('')}</div>
-    <div class="read-only-sheet__totals">${(Array.isArray(totals) ? totals : []).map((item) => `<div class="read-only-sheet__row${item.strong ? ' is-strong' : ''}"><span>${text(item.label)}</span><strong>${text(item.value)}</strong></div>`).join('')}</div>
+    ${grouped ? `<div class="read-only-sheet__groups">${grouped}</div>` : ''}
+    ${itemRows ? `<div class="read-only-sheet__items">${itemRows}</div>` : ''}
+    ${totalRows ? `<div class="read-only-sheet__totals">${totalRows}</div>` : ''}
     ${action ? `<div class="read-only-sheet__action">${button(text(action.label || ''), { data: action.data || '', aria: action.aria || action.label || '' })}</div>` : ''}
   </section>`;
 }
