@@ -53,6 +53,11 @@ export {
 } from './cash/entities.js';
 
 export {
+  cashEntityCardAppearance,
+  cashEntityCardFields,
+} from './cash/card-presentation.js';
+
+export {
   buildLoanSchedule,
   calculateLoanState,
   loanTermEndDate,
