@@ -363,6 +363,14 @@ if (!/actionOnly:\s*true/.test(ddsUI) || !/openCancellationInfo/.test(ddsUI)) {
 if (!/Внесено в систему/.test(ddsUI)) {
   errors.push('DDS export must preserve immutable system recording time');
 }
+if (!/paymentReceiptGroups/.test(ddsUI)
+  || !/groups:\s*paymentReceiptGroups\(entries\)/.test(ddsUI)
+  || !/id:\s*'cancel-operation',[\s\S]*variant:\s*'danger'/.test(ddsUI)) {
+  errors.push('DDS payment receipt must use grouped shared receipt sections and pink/red Cancel in A/settings');
+}
+if (/status:\s*first\?\.operationStatus[\s\S]*Факт операции/.test(ddsUI) || /Внесено ·/.test(ddsUI)) {
+  errors.push('DDS working receipts must not expose technical status or system recording timestamps');
+}
 const articlesUI = source('core/finance/dds/articles.js');
 if (!/parentArticleId/.test(articlesUI) || !/economicType/.test(articlesUI)) {
   errors.push('Articles UI must support hierarchy and separate economic character');
