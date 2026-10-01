@@ -531,6 +531,18 @@ const investmentActionIds = [...(investmentSettings?.querySelectorAll('[data-sha
 ok(investmentActionIds.join('|') === 'appearance|terms|financial-operation',
   'Investment A must contain exactly View, Investment terms and Financial operation');
 
+investmentSettings?.querySelector('[data-shared-profile-action="appearance"]')
+  ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(35);
+let investmentAppearanceZ = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
+ok(Boolean(investmentAppearanceZ?.querySelector('[data-finance-entity-card-constructor]')),
+  'Investment View must open the shared Entity Card constructor');
+investmentAppearanceZ?.v2Close?.();
+await wait(25);
+
+shell()?.querySelector('[data-v2-workspace-a]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(25);
+investmentSettings = document.querySelector('[data-shared-profile-settings-menu]');
 investmentSettings?.querySelector('[data-shared-profile-action="terms"]')
   ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
 await wait(35);
