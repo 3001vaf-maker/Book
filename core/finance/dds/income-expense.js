@@ -1,18 +1,14 @@
 import {
-  actionBlock,
   button,
   field,
-  mountModal,
-  modal,
   openNotice,
-  pageHeader,
   select,
   textareaField,
+  workspaceHeaderContext,
 } from '../../../ui/ui.js';
 import { getFinanceArticles } from '../data.js';
 import { getWallets } from '../cash/data.js';
 import { recordManualFinanceOperation } from '../service.js';
-
 
 function localDateTimeValue(date = new Date()) {
   const shifted = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
@@ -57,9 +53,9 @@ function modeMarkup(mode) {
   });
 }
 
-function syncMode(modalRoot) {
-  const mode = String(modalRoot.querySelector('input[name="entryMode"]')?.value || 'simple');
-  const host = modalRoot.querySelector('[data-finance-manual-mode]');
+function syncMode(root) {
+  const mode = String(root.querySelector('input[name="entryMode"]')?.value || 'simple');
+  const host = root.querySelector('[data-finance-manual-mode]');
   if (!host) return;
   host.innerHTML = modeMarkup(mode);
 }
@@ -72,8 +68,9 @@ function collectLines(root) {
   })).filter((row) => row.quantity > 0 && row.unitPrice > 0);
 }
 
-async function saveManual(root, modalRoot, direction) {
-  const form = modalRoot.querySelector('[data-finance-manual-form]');
+async function saveManual(root, direction, onSaved) {
+  const form = root.querySelector('[data-finance-manual-form]');
+  if (!form) return;
   const data = new FormData(form);
   const mode = String(data.get('entryMode') || 'simple');
   const walletId = String(data.get('walletId') || '');
@@ -84,7 +81,7 @@ async function saveManual(root, modalRoot, direction) {
     walletId,
     walletName: wallet?.name || '',
     amount: mode === 'simple' ? Number(data.get('amount') || 0) : null,
-    lines: mode === 'detail' ? collectLines(modalRoot) : [],
+    lines: mode === 'detail' ? collectLines(root) : [],
     note: String(data.get('note') || '').trim(),
     occurredAt: data.get('occurredAt') ? new Date(String(data.get('occurredAt'))).toISOString() : '',
   };
@@ -94,60 +91,62 @@ async function saveManual(root, modalRoot, direction) {
   }
   try {
     await recordManualFinanceOperation(payload);
-    modalRoot.remove();
-    renderIncomeExpense(root);
+    onSaved?.();
   } catch (error) {
     openNotice({ message: String(error?.message || 'Не удалось сохранить операцию') });
   }
 }
 
-function openOperation(root, direction) {
+export function renderIncomeExpenseOperation(root, direction, { onSaved = null } = {}) {
   const isIncome = direction === 'IN';
   const articles = articleOptions(direction);
   const wallets = walletOptions();
   if (!articles.length) {
     openNotice({ message: 'Сначала добавьте конечную статью для этого типа операции.' });
-    return;
+    return false;
   }
   if (!wallets.length) {
     openNotice({ message: 'Сначала добавьте кошелёк.' });
-    return;
+    return false;
   }
-  const html = `<form class="compact-form" data-finance-manual-form>
-    ${select({ label: 'Статья', name: 'articleId', value: articles[0]?.value || '', options: articles, searchable: true })}
-    ${select({ label: 'Кошелёк', name: 'walletId', value: wallets[0]?.value || '', options: wallets })}
-    ${select({ label: 'Ввод', name: 'entryMode', value: 'simple', options: [{ value: 'simple', label: 'Сумма' }, { value: 'detail', label: 'Детально' }] })}
-    ${field({ label: 'Фактическая дата и время', name: 'occurredAt', type: 'datetime-local', value: localDateTimeValue(), required: true })}
-    <div data-finance-manual-mode>${modeMarkup('simple')}</div>
-    ${textareaField({ label: 'Примечание', name: 'note', rows: 3, placeholder: 'Необязательно' })}
-    ${button(isIncome ? 'Записать доход' : 'Записать расход', { type: 'submit' })}
-  </form>`;
-  const m = mountModal(root, modal(html, { title: isIncome ? 'Доход' : 'Расход' }));
-  if (!m) return;
 
-  m.addEventListener('change', (event) => {
-    if (event.target?.matches?.('input[name="entryMode"]')) syncMode(m);
+  root.innerHTML = `${workspaceHeaderContext({
+    title: isIncome ? 'Доход' : 'Расход',
+    c: {
+      label: 'Сохранить',
+      data: 'data-finance-manual-save',
+      aria: isIncome ? 'Сохранить доход' : 'Сохранить расход',
+    },
+  })}
+    <form class="compact-form" data-finance-manual-form>
+      ${select({ label: 'Статья', name: 'articleId', value: articles[0]?.value || '', options: articles, searchable: true })}
+      ${select({ label: 'Кошелёк', name: 'walletId', value: wallets[0]?.value || '', options: wallets })}
+      ${select({ label: 'Ввод', name: 'entryMode', value: 'simple', options: [{ value: 'simple', label: 'Сумма' }, { value: 'detail', label: 'Детально' }] })}
+      ${field({ label: 'Фактическая дата и время', name: 'occurredAt', type: 'datetime-local', value: localDateTimeValue(), required: true })}
+      <div data-finance-manual-mode>${modeMarkup('simple')}</div>
+      ${textareaField({ label: 'Примечание', name: 'note', rows: 3, placeholder: 'Необязательно' })}
+    </form>`;
+
+  root.addEventListener('change', (event) => {
+    if (event.target?.matches?.('input[name="entryMode"]')) syncMode(root);
   });
-  m.addEventListener('click', (event) => {
+  root.addEventListener('click', (event) => {
     if (event.target.closest?.('[data-finance-manual-line-add]')) {
-      m.querySelector('[data-finance-manual-lines]')?.insertAdjacentHTML('beforeend', detailRow());
+      root.querySelector('[data-finance-manual-lines]')?.insertAdjacentHTML('beforeend', detailRow());
       return;
     }
     const remove = event.target.closest?.('[data-finance-manual-line-remove]');
     if (remove) {
-      const rows = m.querySelectorAll('[data-finance-manual-line]');
+      const rows = root.querySelectorAll('[data-finance-manual-line]');
       if (rows.length > 1) remove.closest('[data-finance-manual-line]')?.remove();
     }
   });
-  m.querySelector('[data-finance-manual-form]')?.addEventListener('submit', (event) => {
+  root.querySelector('[data-finance-manual-form]')?.addEventListener('submit', (event) => {
     event.preventDefault();
-    void saveManual(root, m, direction);
+    void saveManual(root, direction, onSaved);
   });
-}
-
-export function renderIncomeExpense(root) {
-  root.innerHTML = `${pageHeader('Доход / Расход')}${actionBlock(`${button('Доход', { data: 'data-finance-manual-income' })}${button('Расход', { data: 'data-finance-manual-expense' })}`)}`;
-  root.querySelector('[data-finance-manual-income]')?.addEventListener('click', () => openOperation(root, 'IN'));
-  root.querySelector('[data-finance-manual-expense]')?.addEventListener('click', () => openOperation(root, 'OUT'));
-  
+  root.querySelector('[data-finance-manual-save]')?.addEventListener('click', () => {
+    root.querySelector('[data-finance-manual-form]')?.requestSubmit();
+  });
+  return true;
 }
