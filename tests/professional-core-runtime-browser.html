@@ -252,6 +252,7 @@ await wait(25);
 let operationZ3 = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
 const receipt = operationZ3?.querySelector('[data-read-only-sheet]');
 ok(Boolean(receipt), 'Cash operation did not open shared read-only receipt in Z3');
+ok(receipt?.querySelector('.read-only-sheet__header h2')?.textContent.trim() === 'Оплата услуги', 'Cash receipt must show the operation title inside the receipt');
 ok(!operationZ3?.querySelector('.payment-receipt'), 'Cash operation must not use paymentReceipt in Z3');
 ok(receipt?.textContent.includes('Студия Тест'), 'Cash receipt workplace missing');
 ok(receipt?.textContent.includes('UEI-RUNTIME'), 'Cash receipt UEI missing');
