@@ -49,6 +49,7 @@ function operationName(item) {
   const type = String(item?.economicType || '');
   let label = 'Движение';
   if (kind === 'payment') label = 'Оплата услуги';
+  else if (kind === 'cancel') label = 'Отмена операции';
   else if (kind === 'refund') label = 'Возврат';
   else if (kind === 'manual-income') label = 'Доход';
   else if (kind === 'manual-expense') label = 'Расход';
@@ -61,6 +62,7 @@ function operationName(item) {
   else if (type === 'TIPS') label = 'Чаевые';
   else if (type === 'SERVICE_REFUND') label = 'Возврат услуги';
   else if (type === 'TIPS_REFUND') label = 'Возврат чаевых';
+  else if (type === 'REVERSAL') label = 'Отмена операции';
   else if (type === 'LOAN_RECEIVED') label = 'Получен займ';
   else if (type === 'LOAN_REPAYMENT') label = 'Возврат займа';
   else if (type === 'INVESTMENT_RECEIVED') label = 'Получена инвестиция';
