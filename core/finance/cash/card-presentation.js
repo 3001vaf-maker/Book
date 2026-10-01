@@ -47,9 +47,10 @@ export function walletCardAppearance(wallet = {}) {
 }
 
 
-export function cashEntityCardFields(entity = {}) {
+export function cashEntityCardFields(entity = {}, balance = 0) {
   return [
     { value: 'entityName', label: 'Наименование', text: String(entity?.name || '') },
+    { value: 'balance', label: 'Остаток', text: money(balance) },
   ];
 }
 
@@ -60,6 +61,7 @@ export function cashEntityCardAppearance(entity = {}) {
   return normalizeEntityCardAppearance({
     lines: defaultLines([
       { row: 7, field: 'entityName', zone: 'full', align: 'left', size: 'l', bold: true },
+      { row: 9, field: 'balance', zone: 'right', align: 'right', size: 'm', bold: true },
     ]),
   });
 }
