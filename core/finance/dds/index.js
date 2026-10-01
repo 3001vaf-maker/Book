@@ -20,7 +20,9 @@ import {
 } from '../../../ui/ui.js';
 import { readOnlyReceipt } from '../../../ui/receipt/index.js';
 import { canUseBookCapability } from '../../access.js';
-import { cancelFinanceOperation, hardDeleteFinanceOperation } from '../service.js';
+import { getFinanceOperation } from '../data.js';
+import { getWallets } from '../cash/data.js';
+import { cancelFinanceOperation, correctFinanceOperation, hardDeleteFinanceOperation } from '../service.js';
 import { getLedgerEntries } from '../read.js';
 import { renderFinanceArticles } from './articles.js';
 import { renderIncomeExpenseOperation } from './income-expense.js';
