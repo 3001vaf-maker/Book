@@ -227,6 +227,7 @@ for (const token of ['calculateSettlement', 'getRecordPaymentState', 'getLedgerE
 
 const walletData = source('core/finance/cash/data.js');
 const cashEntityData = source('core/finance/cash/entities.js');
+const auxiliaryState = source('server/src/auxiliary-state/auxiliary-state.service.ts');
 if (!/getWalletDDSMovements/.test(walletData) || !/export function getWalletBalance/.test(walletData)) {
   errors.push('Wallet must derive balance from Finance Ledger projection');
 }
@@ -322,6 +323,9 @@ if (!/finance\.investment\.self\.access/.test(cashUI)
   || !/finance\.investment\.raise\.access/.test(cashUI)
   || !/finance\.investment\.external\.access/.test(cashUI)) {
   errors.push('Investment roles must be independently capability-gated');
+}
+if (!/Роль инвестиции задаётся при создании/.test(auxiliaryState)) {
+  errors.push('Investment role must remain immutable after entity creation so historical Ledger semantics cannot be reinterpreted');
 }
 if (!/data-investment-terms-form/.test(cashUI)
   || !/label: 'Условия инвестиции'/.test(cashUI)
