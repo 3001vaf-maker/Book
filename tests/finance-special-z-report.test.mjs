@@ -104,7 +104,7 @@ assert.match(server, /investment-return/);
 assert.match(server, /kind === 'transfer'/);
 assert.match(server, /direction: 'OUT'[\s\S]*economicType: 'TRANSFER'[\s\S]*direction: 'IN'[\s\S]*economicType: 'TRANSFER'/);
 assert.match(controller, /operations\/special/);
-assert.match(controller, /@Delete\('operations\\/:operationId\\/hard'\)/);
+assert.match(controller, /@Delete\('operations\/:operationId\/hard'\)/);
 assert.match(server, /async hardDeleteOperation\(/);
 assert.match(server, /originalOperationId:\s*\{ in: frontier \}/);
 assert.match(server, /financeOperation\.deleteMany/);
