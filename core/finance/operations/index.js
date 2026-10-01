@@ -46,7 +46,7 @@ export function financeOperationGroups({ groups = null } = {}) {
     .filter((group) => !allowed || allowed.has(group.key));
 }
 
-function openFinanceOperationForm(root, actionId, { onSaved = null, financeEntity = null } = {}) {
+export function openFinanceOperation(root, actionId, { onSaved = null, financeEntity = null } = {}) {
   const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'finance-operation-z' }), { stack: true });
   if (!layer) return null;
 
@@ -95,7 +95,7 @@ export function openFinanceOperations(root, {
     element.addEventListener('click', () => {
       const actionId = String(element.dataset.financeOperationAction || '');
       picker.v2Close?.();
-      openFinanceOperationForm(root, actionId, { onSaved, financeEntity });
+      openFinanceOperation(root, actionId, { onSaved, financeEntity });
     });
   });
   return picker;
