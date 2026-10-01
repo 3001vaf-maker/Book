@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma.service';
+import { SaasAccessService } from '../saas-access/saas-access.service';
 
 type JsonObject = Record<string, any>;
 type Db = PrismaService | Prisma.TransactionClient;
@@ -122,6 +123,8 @@ const DEFAULT_FINANCE_ARTICLES = [
   { articleId: 'system-tips', parentArticleId: 'system-income', name: 'Чаевые', direction: 'IN', economicType: 'TIPS', systemKey: 'TIPS', position: 50 },
   { articleId: 'system-loan-received', parentArticleId: 'system-income', name: 'Займ', direction: 'IN', economicType: 'LOAN_RECEIVED', systemKey: 'LOAN_RECEIVED', position: 60 },
   { articleId: 'system-investment-received', parentArticleId: 'system-income', name: 'Инвестиции', direction: 'IN', economicType: 'INVESTMENT_RECEIVED', systemKey: 'INVESTMENT_RECEIVED', position: 70 },
+  { articleId: 'system-investment-capital-return', parentArticleId: 'system-income', name: 'Возврат капитала', direction: 'IN', economicType: 'INVESTMENT_CAPITAL_RETURN', systemKey: 'INVESTMENT_CAPITAL_RETURN', position: 72 },
+  { articleId: 'system-investment-income', parentArticleId: 'system-income', name: 'Доход инвестиции', direction: 'IN', economicType: 'INVESTMENT_INCOME', systemKey: 'INVESTMENT_INCOME', position: 74 },
   { articleId: 'system-expense', parentArticleId: '', name: 'Расходы', direction: 'OUT', economicType: 'GROUP', systemKey: 'EXPENSE_ROOT', position: 100 },
   { articleId: 'system-materials', parentArticleId: 'system-expense', name: 'Материалы', direction: 'OUT', economicType: 'OPERATING_EXPENSE', systemKey: 'MATERIALS', position: 110 },
   { articleId: 'system-rent', parentArticleId: 'system-expense', name: 'Аренда', direction: 'OUT', economicType: 'OPERATING_EXPENSE', systemKey: 'RENT', position: 120 },
@@ -130,6 +133,9 @@ const DEFAULT_FINANCE_ARTICLES = [
   { articleId: 'system-refund', parentArticleId: 'system-expense', name: 'Возврат', direction: 'OUT', economicType: 'REFUND', systemKey: 'REFUND', position: 150 },
   { articleId: 'system-loan-repayment', parentArticleId: 'system-expense', name: 'Возврат займа', direction: 'OUT', economicType: 'LOAN_REPAYMENT', systemKey: 'LOAN_REPAYMENT', position: 160 },
   { articleId: 'system-investment-return', parentArticleId: 'system-expense', name: 'Возврат инвестиций', direction: 'OUT', economicType: 'INVESTMENT_RETURN', systemKey: 'INVESTMENT_RETURN', position: 170 },
+  { articleId: 'system-investment-contribution', parentArticleId: 'system-expense', name: 'Вложение', direction: 'OUT', economicType: 'INVESTMENT_CONTRIBUTION', systemKey: 'INVESTMENT_CONTRIBUTION', position: 172 },
+  { articleId: 'system-investment-expense', parentArticleId: 'system-expense', name: 'Расход инвестиции', direction: 'OUT', economicType: 'INVESTMENT_EXPENSE', systemKey: 'INVESTMENT_EXPENSE', position: 174 },
+  { articleId: 'system-investment-income-payment', parentArticleId: 'system-expense', name: 'Выплата дохода инвестору', direction: 'OUT', economicType: 'INVESTMENT_INCOME_PAYMENT', systemKey: 'INVESTMENT_INCOME_PAYMENT', position: 176 },
   { articleId: 'system-transfer', parentArticleId: '', name: 'Перевод между кошельками', direction: 'TRANSFER', economicType: 'TRANSFER', systemKey: 'TRANSFER', position: 200 },
 ] as const;
 
@@ -146,6 +152,11 @@ const ARTICLE_ECONOMIC_TYPES = new Set([
   'LOAN_REPAYMENT',
   'INVESTMENT_RECEIVED',
   'INVESTMENT_RETURN',
+  'INVESTMENT_CONTRIBUTION',
+  'INVESTMENT_CAPITAL_RETURN',
+  'INVESTMENT_INCOME',
+  'INVESTMENT_EXPENSE',
+  'INVESTMENT_INCOME_PAYMENT',
   'TRANSFER',
 ]);
 
@@ -183,7 +194,10 @@ function splitAllocationComponents(allocations: JsonObject[], serviceAmount: num
 
 @Injectable()
 export class FinanceService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly access: SaasAccessService,
+  ) {}
 
   private async serializable<T>(work: (tx: Prisma.TransactionClient) => Promise<T>) {
     let lastError: unknown = null;
