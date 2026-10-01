@@ -367,16 +367,7 @@ function renderPaymentCorrection(root, operation, { onSaved = null } = {}) {
     <form class="compact-form" data-finance-payment-correction-form>
       <div class="payment-total"><span>Сумма услуг</span><strong>${formatMoney(serviceAmount)}</strong></div>
       ${rows}
-      ${datePicker({
-        label: 'Фактическая дата',
-        name: 'occurredDate',
-        value: financeLocalDateValue(operation?.occurredAt || new Date()),
-        required: true,
-        allowClear: false,
-      })}
     </form>`;
-  initDatePickers(root);
-
   root.querySelector('[data-finance-payment-correction-form]')?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -391,7 +382,7 @@ function renderPaymentCorrection(root, operation, { onSaved = null } = {}) {
       openNotice({ message: 'Сумма по кошелькам не может быть меньше суммы услуг.' });
       return;
     }
-    const occurredAt = financeOccurredAtForDate(String(form.get('occurredDate') || ''), operation?.occurredAt || new Date());
+    const occurredAt = operation?.occurredAt || '';
     try {
       await correctFinanceOperation(operation.operationId, {
         allocations: walletRows,
