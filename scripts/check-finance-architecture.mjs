@@ -256,8 +256,9 @@ for (const path of financeUiFiles) {
 }
 
 const modalUI = source('ui/modals/index.js');
-if (!/openNotice\(\{ title = 'Внимание', message = '', variant = 'top'/.test(modalUI)) {
-  errors.push('Shared user notices must default to the top modal');
+if (!/openNotice\(\{ title = 'Внимание', message = '', surface = 'app'/.test(modalUI)
+  || !/modal\(content, \{ variant: 'top', surface, title \}\)/.test(modalUI)) {
+  errors.push('Shared user notices must be locked to the top modal');
 }
 if (/data-notice-close|action = 'ОК'/.test(modalUI)) {
   errors.push('Top shared notices must contain information only and close by gesture');
