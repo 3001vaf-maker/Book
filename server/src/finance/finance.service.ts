@@ -409,6 +409,50 @@ export class FinanceService {
 
 
 
+  private async replaceOperationWithEntries(
+    db: Db,
+    tenantId: string,
+    operation: { id: string; sourceType: string; sourceId: string },
+    occurredAt: Date,
+    data: JsonObject,
+    entries: JsonObject[],
+  ) {
+    await db.financeLedgerEntry.deleteMany({
+      where: { tenantId, financeOperationId: operation.id },
+    });
+    await db.financeOperation.update({
+      where: { id: operation.id },
+      data: { occurredAt, data: json(data) },
+    });
+    for (const entry of entries) {
+      await db.financeLedgerEntry.create({
+        data: {
+          tenantId,
+          financeOperationId: operation.id,
+          entryId: randomUUID(),
+          walletId: text(entry.walletId),
+          direction: text(entry.direction),
+          economicType: text(entry.economicType),
+          amount: money(entry.amount),
+          occurredAt,
+          sourceType: operation.sourceType,
+          sourceId: operation.sourceId,
+          data: json({
+            walletName: text(entry.walletName),
+            component: text(entry.component),
+            relatedOperationId: text(entry.relatedOperationId),
+            articleId: text(entry.articleId),
+            articleName: text(entry.articleName),
+            lineName: text(entry.lineName),
+            quantity: entry.quantity == null ? null : numberValue(entry.quantity),
+            unitPrice: entry.unitPrice == null ? null : money(entry.unitPrice),
+            note: text(entry.note),
+          }),
+        },
+      });
+    }
+  }
+
   private async createReversalFor(db: Db, tenantId: string, originalOperationId: string, reason: string, occurredAt: Date) {
     const original = await db.financeOperation.findUnique({
       where: { tenantId_operationId: { tenantId, operationId: originalOperationId } },
