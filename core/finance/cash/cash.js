@@ -153,11 +153,11 @@ function cashContext() {
       data: 'data-cash-settings',
       aria: 'Настройки кассы',
     },
-    c: {
+    c: canCreateCashEntity() ? {
       label: '+',
       data: 'data-cash-create',
       aria: 'Создать сущность кассы',
-    },
+    } : null,
   });
 }
 
@@ -234,8 +234,18 @@ function allowedInvestmentRoles() {
   ].filter(Boolean);
 }
 
+function creatableInvestmentRoles() {
+  return allowedInvestmentRoles().filter((item) => item.value === 'self' || item.value === 'raise');
+}
+
 function canCreateInvestment() {
-  return allowedInvestmentRoles().length > 0;
+  return creatableInvestmentRoles().length > 0;
+}
+
+function canCreateCashEntity() {
+  return canUseBookCapability('finance.cash.access')
+    || canUseBookCapability('finance.special.access')
+    || canCreateInvestment();
 }
 
 function openCashCreateMenu(root) {
@@ -358,7 +368,7 @@ function openWalletForm(root, existing = null) {
 function openCashEntityForm(root, kind) {
   const investment = kind === 'investment';
   if (investment) {
-    const role = allowedInvestmentRoles()[0]?.value || '';
+    const role = creatableInvestmentRoles()[0]?.value || '';
     if (!role) {
       openNotice({ message: 'Инвестиции недоступны.' });
       return null;
