@@ -28,6 +28,10 @@ function arrayValue(value: unknown): any[] {
   return Array.isArray(value) ? value : [];
 }
 
+function clone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value));
+}
+
 function text(value: unknown) {
   return String(value ?? '').trim();
 }
@@ -983,8 +987,8 @@ export class OnlineBookingService {
         operationStatus: operation.status,
         direction: projection.direction,
         economicType: projection.economicType,
-        amount: numberValue(operationData.total),
-        total: projection.direction === 'OUT' ? -numberValue(operationData.total) : numberValue(operationData.total),
+        amount: numeric(operationData.total, 0),
+        total: projection.direction === 'OUT' ? -numeric(operationData.total, 0) : numeric(operationData.total, 0),
         occurredAt: operation.occurredAt.toISOString(),
       });
       byEntity.set(entityId, list);
@@ -1004,11 +1008,11 @@ export class OnlineBookingService {
           objectName: text(terms.objectName),
           termMode: text(terms.termMode),
           endDate: text(terms.endDate),
-          durationValue: numberValue(terms.durationValue),
+          durationValue: numeric(terms.durationValue, 0),
           durationUnit: text(terms.durationUnit),
-          targetAmount: numberValue(terms.targetAmount),
-          sharePercent: numberValue(terms.sharePercent),
-          returnPercent: numberValue(terms.returnPercent),
+          targetAmount: numeric(terms.targetAmount, 0),
+          sharePercent: numeric(terms.sharePercent, 0),
+          returnPercent: numeric(terms.returnPercent, 0),
           participantName: text(terms.participantName),
           participantStatus: text(terms.participantStatus),
           participantRespondedAt: text(terms.participantRespondedAt),
