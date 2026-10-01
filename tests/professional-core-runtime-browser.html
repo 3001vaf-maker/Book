@@ -296,47 +296,130 @@ ok(shell()?.classList.contains('is-e-open'), 'Finance did not reopen E after Cas
 await tapAndOpen(eDeck(), eCard('dds'), 14, 'finance-dds');
 ok(!shell()?.classList.contains('is-deck-open'), 'DDS selection did not enter Z');
 
+ok(shell()?.querySelector('.v2-header__title')?.textContent.trim() === 'Движения денежных средств',
+  'DDS B title must be full movement name');
+ok(Boolean(shell()?.querySelector('[data-v2-workspace-a]')), 'DDS A/settings control missing');
+ok(!shell()?.querySelector('[data-v2-workspace-primary]'), 'DDS Z1 must not expose a C action');
+ok(Boolean(shell()?.querySelector('[data-v2-workspace-chat]')), 'DDS D/chat control missing');
+
 const openDdsSettings = async () => {
   const a = shell()?.querySelector('[data-v2-workspace-a]');
   ok(Boolean(a), 'DDS A/settings control missing');
   a?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
   await wait(40);
-  const modal = document.querySelector('[data-modal][data-v2-layer-kind="bottom"]');
-  ok(Boolean(modal), 'DDS settings did not open as bottom modal');
-  const ids = [...(modal?.querySelectorAll('[data-finance-dds-tool]') || [])]
+  const settings = document.querySelector('[data-modal][data-v2-layer-kind="bottom"]');
+  ok(Boolean(settings), 'DDS settings did not open as bottom modal');
+  const ids = [...(settings?.querySelectorAll('[data-finance-dds-tool]') || [])]
     .map((node) => node.dataset.financeDdsTool);
-  ok(ids.join('|') === 'income-expense|articles|special',
-    'DDS settings must contain Income/Expense, Articles and Special operations in place of former E folders');
-  return modal;
+  ok(ids.join('|') === 'excel|operations|articles',
+    'DDS A must contain Excel, Financial operations and Articles');
+  return settings;
 };
 
-for (const [index, id, title] of [
-  [0, 'income-expense', 'Доход / Расход'],
-  [1, 'articles', 'Статьи'],
-  [2, 'special', 'Прочие операции'],
-]) {
-  mark('dds-settings-' + id);
-  const settings = await openDdsSettings();
-  const action = settings?.querySelector('[data-finance-dds-tool="' + id + '"]');
-  ok(Boolean(action), 'DDS settings action missing: ' + id);
-  action?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
-  await wait(40);
-
-  const layer = shell()?.querySelector('[data-v2-z-layer]');
-  ok(Boolean(layer), 'DDS tool did not open as Z2: ' + id);
-  ok(layer?.querySelector('.page-header h1')?.textContent.trim() === title,
-    'DDS Z2 rendered wrong tool: ' + id);
-  ok(!document.querySelector('[data-modal][data-v2-layer-kind="bottom"]'),
-    'DDS settings modal remained open behind Z2: ' + id);
-
+const closeTopDdsZ = async (pointerId, label) => {
+  mark('dds-close-' + label);
+  const layer = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
+  ok(Boolean(layer), 'DDS Z layer missing before close: ' + label);
   const zEdge = edge();
-  pointer(zEdge,'pointerdown',10,360,120 + index);
-  pointer(zEdge,'pointermove',82,362,120 + index);
-  pointer(zEdge,'pointerup',82,362,120 + index);
-  await wait(60);
-  ok(!shell()?.querySelector('[data-v2-z-layer]'), 'DDS Z2 did not close by right swipe: ' + id);
-  ok(Boolean(shell()?.querySelector('[data-v2-workspace-a]')), 'DDS A/settings was not restored after closing Z2: ' + id);
-}
+  pointer(zEdge,'pointerdown',10,360,pointerId);
+  pointer(zEdge,'pointermove',82,362,pointerId);
+  pointer(zEdge,'pointerup',82,362,pointerId);
+  await wait(70);
+};
+
+mark('dds-export');
+let settings = await openDdsSettings();
+settings?.querySelector('[data-finance-dds-tool="excel"]')
+  ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(50);
+let ddsLayer = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
+ok(Boolean(ddsLayer), 'DDS Excel did not open Z2');
+ok(ddsLayer?.querySelector('[data-workspace-header-context]')?.dataset.workspaceTitle === 'Выгрузка ДДС',
+  'DDS Excel Z2 B title is wrong');
+ok(shell()?.querySelector('[data-v2-workspace-primary]')?.textContent.trim() === 'Выгрузить',
+  'DDS Excel Z2 C must be Export');
+ok(Boolean(ddsLayer?.querySelector('[data-finance-dds-export-form]')), 'DDS Excel filters form missing');
+ok(Boolean(ddsLayer?.querySelector('[name="from"]')), 'DDS Excel from filter missing');
+ok(Boolean(ddsLayer?.querySelector('[name="to"]')), 'DDS Excel to filter missing');
+ok(Boolean(ddsLayer?.querySelector('[name="kind"]')), 'DDS Excel operation filter missing');
+ok(Boolean(ddsLayer?.querySelector('[name="walletId"]')), 'DDS Excel wallet filter missing');
+ok(Boolean(ddsLayer?.querySelector('[name="status"]')), 'DDS Excel status filter missing');
+ok(!document.querySelector('[data-modal][data-v2-layer-kind="bottom"]'),
+  'DDS settings bottom modal remained behind Excel Z2');
+await closeTopDdsZ(121, 'export');
+ok(!shell()?.querySelector('[data-v2-z-layer]'), 'DDS Excel Z2 did not close by swipe');
+ok(Boolean(shell()?.querySelector('[data-v2-workspace-a]')), 'DDS A was not restored after Excel Z2');
+
+mark('dds-financial-operations');
+settings = await openDdsSettings();
+settings?.querySelector('[data-finance-dds-tool="operations"]')
+  ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(50);
+let operationsModal = document.querySelector('[data-modal][data-v2-layer-kind="bottom"]');
+ok(Boolean(operationsModal), 'DDS Financial operations did not open as bottom modal');
+ok(operationsModal?.textContent.includes('Доход / Расход'), 'DDS operations Income/Expense section missing');
+ok(operationsModal?.textContent.includes('Займы'), 'DDS operations Loans section missing');
+ok(operationsModal?.textContent.includes('Инвестиции'), 'DDS operations Investments section missing');
+ok(operationsModal?.textContent.includes('Переводы'), 'DDS operations Transfers section missing');
+ok(Boolean(operationsModal?.querySelector('[data-finance-operation-action="manual-income"]')), 'DDS Income action missing');
+ok(Boolean(operationsModal?.querySelector('[data-finance-operation-action="manual-expense"]')), 'DDS Expense action missing');
+ok(Boolean(operationsModal?.querySelector('[data-finance-operation-action="loan-received"]')), 'DDS Receive loan action missing');
+ok(Boolean(operationsModal?.querySelector('[data-finance-operation-action="loan-repayment"]')), 'DDS Repay loan action missing');
+ok(Boolean(operationsModal?.querySelector('[data-finance-operation-action="investment-received"]')), 'DDS Receive investment action missing');
+ok(Boolean(operationsModal?.querySelector('[data-finance-operation-action="investment-return"]')), 'DDS Return investment action missing');
+ok(Boolean(operationsModal?.querySelector('[data-finance-operation-action="transfer"]')), 'DDS Transfer action missing');
+ok(!shell()?.querySelector('[data-v2-z-layer]'), 'DDS operation choice must stay a bottom modal, not Z');
+
+operationsModal?.querySelector('[data-finance-operation-action="loan-received"]')
+  ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(60);
+ddsLayer = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
+ok(Boolean(ddsLayer), 'DDS selected operation did not open Z2');
+ok(ddsLayer?.querySelector('[data-workspace-header-context]')?.dataset.workspaceTitle === 'Получить займ',
+  'DDS operation Z2 B title is wrong');
+ok(shell()?.querySelector('[data-v2-workspace-primary]')?.textContent.trim() === 'Сохранить',
+  'DDS operation Z2 C must be Save');
+ok(Boolean(ddsLayer?.querySelector('[data-finance-special-form]')), 'DDS operation Z2 form missing');
+ok(!ddsLayer?.querySelector('button[type="submit"]'), 'DDS operation form must not duplicate Save inside Z2');
+ok(!document.querySelector('[data-modal][data-v2-layer-kind="bottom"]'),
+  'DDS operation picker remained open behind Z2');
+await closeTopDdsZ(122, 'operation');
+ok(!shell()?.querySelector('[data-v2-z-layer]'), 'DDS operation Z2 did not close by swipe');
+ok(Boolean(shell()?.querySelector('[data-v2-workspace-a]')), 'DDS A was not restored after operation Z2');
+
+mark('dds-articles');
+settings = await openDdsSettings();
+settings?.querySelector('[data-finance-dds-tool="articles"]')
+  ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(50);
+ddsLayer = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
+ok(Boolean(ddsLayer), 'DDS Articles did not open Z2');
+ok(ddsLayer?.querySelector('[data-workspace-header-context]')?.dataset.workspaceTitle === 'Статьи',
+  'DDS Articles Z2 B title is wrong');
+ok(shell()?.querySelector('[data-v2-workspace-primary]')?.textContent.trim() === '+',
+  'DDS Articles Z2 C must be Add');
+ok(!document.querySelector('[data-modal][data-v2-layer-kind="bottom"]'),
+  'DDS settings modal remained open behind Articles Z2');
+
+shell()?.querySelector('[data-v2-workspace-primary]')
+  ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(50);
+let articleEdit = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
+ok(Boolean(articleEdit), 'DDS Article Add did not open next Z layer');
+ok(articleEdit?.querySelector('[data-workspace-header-context]')?.dataset.workspaceTitle === 'Новая статья',
+  'DDS Article editor B title is wrong');
+ok(shell()?.querySelector('[data-v2-workspace-primary]')?.textContent.trim() === 'Сохранить',
+  'DDS Article editor C must be Save');
+ok(Boolean(articleEdit?.querySelector('[data-finance-article-form]')), 'DDS Article editor form missing');
+ok(!articleEdit?.querySelector('button[type="submit"]'), 'DDS Article editor must not duplicate Save inside Z');
+await closeTopDdsZ(123, 'article-edit');
+ok([...((shell()?.querySelectorAll('[data-v2-z-layer]')) || [])].length === 1,
+  'DDS Article editor did not return to Articles Z2');
+ok(shell()?.querySelector('[data-v2-workspace-primary]')?.textContent.trim() === '+',
+  'DDS Articles C was not restored after closing editor');
+await closeTopDdsZ(124, 'articles');
+ok(!shell()?.querySelector('[data-v2-z-layer]'), 'DDS Articles Z2 did not close by swipe');
+ok(Boolean(shell()?.querySelector('[data-v2-workspace-a]')), 'DDS A was not restored after Articles Z2');
 
 await openF(3,'dds');
 await tapAndOpen(fDeck(), fCard('journal'), 15, 'journal');
