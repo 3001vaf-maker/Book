@@ -124,3 +124,9 @@ export function getStoredSettlement(type, id) {
 export function getFinanceArticles() {
   return clone(financeState.articles || []);
 }
+
+export function getFinanceOperation(operationId) {
+  const id = String(operationId || '');
+  const row = financeState.operations.find((item) => String(item?.operationId || '') === id);
+  return row ? clone(row) : null;
+}
