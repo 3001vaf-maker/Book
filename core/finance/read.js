@@ -135,6 +135,7 @@ function projectLedgerEntry(state, entry) {
     source: entry?.source || operation?.source || null,
     sourceDetails,
     operationTotal: Math.max(0, financialNumber(data?.total)),
+    allocations: (Array.isArray(data?.allocations) ? data.allocations : []).map((item) => ({ ...item })),
     settlementItems: (Array.isArray(settlement?.items) ? settlement.items : []).map((item) => ({ ...item })),
     note: entry?.note || data?.note || '',
     counterparty: data?.counterparty || '',
