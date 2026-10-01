@@ -474,6 +474,33 @@ function renderFinanceEntityOperationRow(operation, type, entityId) {
   });
 }
 
+function renderInvestmentEventRow(event, entityId) {
+  const label = investmentEventTitle(event);
+  return v2ListEntry({
+    title: label,
+    subtitle: String(event?.note || ''),
+    rightTop: formatMoney(event?.amount),
+    rightBottom: shortDate(event?.occurredDate || event?.occurredAt || '', ''),
+    initial: '',
+    interactive: true,
+    data: `data-finance-entity-event="${escapeHtml(String(event?.id || ''))}" data-finance-entity-id="${escapeHtml(entityId)}"`,
+    aria: `Открыть событие ${label}`,
+  });
+}
+
+function investmentHistory(entity, operations = []) {
+  return [
+    ...operations.map((operation) => ({ ...operation, investmentEvent: false })),
+    ...investmentEventRows(entity),
+  ].sort((a, b) => String(b?.occurredAt || '').localeCompare(String(a?.occurredAt || '')));
+}
+
+function renderFinanceEntityHistoryRow(item, type, entityId) {
+  return item?.investmentEvent
+    ? renderInvestmentEventRow(item, entityId)
+    : renderFinanceEntityOperationRow(item, type, entityId);
+}
+
 function renderFinanceEntityLayer(root, layer, type, id) {
   const entity = financeEntityById(type, id);
   if (!entity) {
@@ -482,13 +509,17 @@ function renderFinanceEntityLayer(root, layer, type, id) {
     return;
   }
   const operations = financeEntityOperations(type, entity.id);
+  const history = type === 'investment' ? investmentHistory(entity, operations) : operations;
+  const historyContent = history.length
+    ? v2ListEntries(history.map((item) => renderFinanceEntityHistoryRow(item, type, entity.id)))
+    : emptyState('Операций пока нет', type === 'loan'
+      ? 'Получение и возврат займа появятся здесь.'
+      : 'Движения и оценка инвестиции появятся здесь.');
+
   layer.innerHTML = page([
     financeEntityContext(entity, type),
-    operations.length
-      ? v2ListEntries(operations.map((operation) => renderFinanceEntityOperationRow(operation, type, entity.id)))
-      : emptyState('Операций пока нет', type === 'loan'
-        ? 'Получение и возврат займа появятся здесь.'
-        : 'Получение и возврат инвестиции появятся здесь.'),
+    type === 'investment' ? v2Section('Расчёт', investmentSummaryRows(entity)) : '',
+    v2Section('История', historyContent),
   ]);
 
   layer.querySelector('[data-finance-entity-settings]')?.addEventListener('click', () => {
@@ -504,6 +535,11 @@ function renderFinanceEntityLayer(root, layer, type, id) {
   layer.querySelectorAll('[data-finance-entity-operation]').forEach((element) => {
     element.addEventListener('click', () => {
       openFinanceEntityOperation(root, layer, type, entity, element.dataset.financeEntityOperation);
+    });
+  });
+  layer.querySelectorAll('[data-finance-entity-event]').forEach((element) => {
+    element.addEventListener('click', () => {
+      openInvestmentEvent(root, layer, entity, element.dataset.financeEntityEvent);
     });
   });
 }
@@ -1180,6 +1216,54 @@ function openFinanceEntitySettings(root, entityLayer, type, entity) {
     title: entity.name,
     actions,
   });
+}
+
+function openInvestmentEvent(root, entityLayer, entity, eventId) {
+  const event = (Array.isArray(entity?.investmentEvents) ? entity.investmentEvents : [])
+    .find((item) => String(item?.id || '') === String(eventId || '') && !item?.deletedAt);
+  if (!event) return null;
+  const layer = mountV2ZLayer(entityLayer, v2ZLayer(page([
+    workspaceHeaderContext({
+      title: investmentEventTitle(event),
+      a: {
+        kind: 'settings',
+        data: 'data-investment-event-settings',
+        aria: 'Настройки события инвестиции',
+      },
+    }),
+    readOnlyReceipt({
+      title: investmentEventTitle(event),
+      date: shortDate(event.occurredDate || event.occurredAt || '', '—'),
+      time: '',
+      items: event.note ? [{ label: String(event.note), value: '' }] : [],
+      totals: [{ label: '', value: formatMoney(event.amount), strong: true }],
+    }),
+  ])), { stack: true });
+  if (!layer) return null;
+
+  layer.querySelector('[data-investment-event-settings]')?.addEventListener('click', () => {
+    openSharedProfileSettingsMenu({
+      title: investmentEventTitle(event),
+      actions: [{
+        id: 'delete-event',
+        label: 'Удалить событие',
+        variant: 'danger',
+        onSelect: () => {
+          const current = financeEntityById('investment', entity.id) || entity;
+          saveInvestmentEntity({
+            ...current,
+            investmentEvents: (Array.isArray(current.investmentEvents) ? current.investmentEvents : [])
+              .filter((item) => String(item?.id || '') !== String(event.id || '')),
+            updatedAt: new Date().toISOString(),
+          });
+          layer.v2Close?.();
+          renderFinanceEntityLayer(root, entityLayer, 'investment', entity.id);
+          renderList(root);
+        },
+      }],
+    });
+  });
+  return layer;
 }
 
 function openFinanceEntityOperation(root, entityLayer, type, entity, operationId) {
