@@ -88,14 +88,13 @@ function walletOperations(walletId) {
 function renderOperationRow(operation) {
   const name = personName(operation);
   const counterparty = String(operation?.counterparty || '').trim();
+  const workplace = String(operation?.workplace || '').trim();
   const label = operationName(operation);
-  const title = name || counterparty || label;
-  const subtitle = String(operation?.workplace || '').trim()
-    || (title !== label ? label : '');
+  const source = [name || counterparty, workplace].filter(Boolean).join(' · ');
   return v2ListEntry({
     overline: String(operation?.person?.uei || ''),
-    title,
-    subtitle,
+    title: label,
+    subtitle: source,
     rightTop: formatMoney(operation.total),
     rightBottom: operationMoment(operation),
     initial: '',
