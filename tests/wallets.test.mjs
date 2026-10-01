@@ -68,6 +68,7 @@ const settingsSource = readFileSync(new URL('../settings/settings.js', import.me
 const walletSource = readFileSync(new URL('../core/finance/cash/cash.js', import.meta.url), 'utf8');
 const folderSource = readFileSync(new URL('../ui/cards/folder-card.js', import.meta.url), 'utf8');
 const listEntryCss = readFileSync(new URL('../ui/lists/list-entry.css', import.meta.url), 'utf8');
+const receiptCss = readFileSync(new URL('../ui/receipt/receipt.css', import.meta.url), 'utf8');
 
 assert.match(coreSource, /from '\.\/core\/finance\/index\.js'/);
 assert.match(coreSource, /section === 'finance'.*renderFinanceSection/s);
@@ -94,8 +95,11 @@ assert.match(walletSource, /mountV2ZLayer/);
 assert.match(walletSource, /v2ListEntry/);
 assert.match(walletSource, /readOnlyReceipt/);
 assert.match(walletSource, /title:\s*operationName\(operation\)/);
+assert.match(walletSource, /date:\s*when\.date/);
+assert.match(walletSource, /time:\s*when\.time/);
 assert.doesNotMatch(walletSource, /paymentReceipt/);
 assert.doesNotMatch(listEntryCss, /linear-gradient/);
+assert.doesNotMatch(receiptCss, /border-radius/);
 assert.match(walletSource, /data-wallet-operation-settings/);
 assert.match(walletSource, /cancelFinanceOperation/);
 assert.doesNotMatch(walletSource, /entityCard--hero/);
