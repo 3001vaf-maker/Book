@@ -62,7 +62,7 @@ function renderReport(root, from, to) {
     : emptyState('Нет движений', 'За выбранный период в ДДС нет операций.');
 
   root.innerHTML = `${pageHeader('Z-отчёт', `${from} — ${to}`)}
-    <form class="compact-form" data-z-report-form>
+    <form class="compact-form" data-z-report-form novalidate>
       ${datePicker({ label: 'С', name: 'from', value: from, required: true, allowClear: false })}
       ${datePicker({ label: 'По', name: 'to', value: to, required: true, allowClear: false })}
       ${button('Показать', { type: 'submit' })}
