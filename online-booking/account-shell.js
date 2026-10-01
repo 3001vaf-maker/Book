@@ -32,6 +32,7 @@ import {
   v2HorizontalRail,
   modal,
   openNotice,
+  page,
   v2RailCard,
   v2Section,
   v2Shell,
@@ -833,7 +834,7 @@ function accountInvestmentCard(row) {
   const investment = row.investment;
   const state = calculateInvestmentState(investment, investment.movements || []);
   return entityVisualCard({
-    appearance: cashEntityCardAppearance(investment),
+    appearance: cashEntityCardAppearance(investment, 'investment'),
     fields: cashEntityCardFields(investment, state.result, 'investment', '', {
       roleLabel: investmentRoleLabel('external'),
       balanceLabel: 'Результат',
