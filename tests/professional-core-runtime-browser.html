@@ -28,7 +28,9 @@
   const demoCapabilities = [
     'profile.access','workplaces.access','services.access','people.access','timetable.access',
     'finance.cash.access','finance.dds.access','finance.income_expense.access',
-    'finance.articles.access','finance.special.access','finance.z_report.access',
+    'finance.articles.access','finance.special.access',
+    'finance.investment.self.access','finance.investment.raise.access','finance.investment.external.access',
+    'finance.z_report.access',
     'journal.day.access','journal.month.access','journal.list.access',
     'online_booking.access','payments.access','finance.access','journal.access','chat.access',
     'notifications.access','integrations.access','documents.access','tags.access',
@@ -398,13 +400,17 @@ ok(cashCreateLabels.join('|') === '+ Добавить кошелек|+ Доба�
   'Cash create modal must contain exactly wallet, investment and loan actions');
 
 cashCreateMenu?.querySelector('[data-cash-create-investment]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
-await wait(30);
-let investmentForm = document.querySelector('[data-investment-form]');
-ok(Boolean(investmentForm), 'Cash Add investment must open the entity form');
+await wait(35);
+let investmentTermsZ = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
+let investmentForm = investmentTermsZ?.querySelector('[data-investment-terms-form]');
+ok(Boolean(investmentForm), 'Cash Add investment must open shared Investment terms Z');
+ok(investmentTermsZ?.querySelector('[data-workspace-header-context]')?.dataset.workspaceTitle === 'Условия инвестиции',
+  'New investment must open Investment terms Z');
 const investmentName = investmentForm?.querySelector('input[name="investmentName"]');
 if (investmentName) investmentName.value = 'Инвестиция Runtime';
 investmentForm?.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
-await wait(35);
+await wait(40);
+ok(!shell()?.querySelector('[data-v2-z-layer]'), 'Saved new investment must close Investment terms Z');
 let investmentSection = [...(shell()?.querySelectorAll('.v2-section') || [])]
   .find((section) => section.querySelector('.v2-section__title')?.textContent.trim() === 'Инвестиции');
 ok(Boolean(investmentSection?.querySelector('.entity-card-rail .entity-visual-card')), 'Saved investment must create a card in the horizontal Investments section');
@@ -519,11 +525,27 @@ await wait(35);
 let investmentZ2 = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
 shell()?.querySelector('[data-v2-workspace-a]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
 await wait(25);
-const investmentSettings = document.querySelector('[data-shared-profile-settings-menu]');
+let investmentSettings = document.querySelector('[data-shared-profile-settings-menu]');
 const investmentActionIds = [...(investmentSettings?.querySelectorAll('[data-shared-profile-action]') || [])]
   .map((node) => node.dataset.sharedProfileAction);
-ok(investmentActionIds.join('|') === 'appearance|financial-operation',
-  'Investment A must contain View and one Financial operation entry');
+ok(investmentActionIds.join('|') === 'appearance|terms|financial-operation',
+  'Investment A must contain exactly View, Investment terms and Financial operation');
+
+investmentSettings?.querySelector('[data-shared-profile-action="terms"]')
+  ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(35);
+investmentTermsZ = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
+ok(Boolean(investmentTermsZ?.querySelector('[data-investment-terms-form]')), 'Investment terms form missing');
+ok(!investmentTermsZ?.querySelector('select'), 'Investment terms must use shared selectors, not native select');
+ok(Boolean(investmentTermsZ?.querySelector('input[name="investmentRole"]')), 'Investment role selector/value missing');
+ok(Boolean(investmentTermsZ?.querySelector('input[name="investmentType"]')), 'Investment type shared selector missing');
+ok(Boolean(investmentTermsZ?.querySelector('input[name="termMode"]')), 'Investment term shared selector missing');
+investmentTermsZ?.v2Close?.();
+await wait(25);
+
+shell()?.querySelector('[data-v2-workspace-a]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(25);
+investmentSettings = document.querySelector('[data-shared-profile-settings-menu]');
 investmentSettings?.querySelector('[data-shared-profile-action="financial-operation"]')
   ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
 await wait(35);
@@ -531,12 +553,12 @@ let investmentOperationZ = [...(shell()?.querySelectorAll('[data-v2-z-layer]') |
 const investmentOperationKind = investmentOperationZ?.querySelector('input[name="financeEntityAction"]');
 const investmentTrigger = investmentOperationKind?.closest('.ui-select')?.querySelector('[data-ui-select-trigger]');
 const investmentOptions = JSON.parse(investmentTrigger?.dataset.options || '[]').map((item) => item.value);
-ok(investmentOptions.join('|') === 'investment-received|investment-return',
-  'Investment operation selector must contain only Receive and Return');
+ok(investmentOptions.join('|') === 'investment-contribution|investment-capital-return|investment-income|investment-expense|investment-saving|investment-reinvestment|investment-valuation',
+  'Self investment operation selector must expose cash and noncash investor actions');
 ok(!investmentOperationZ?.querySelector('input[name="financeEntityId"]'),
   'Investment entity must be locked by its card and not selected again');
 ok(Boolean(investmentOperationZ?.querySelector('input[name="walletId"]')),
-  'Investment operation must select the receiving/spending wallet');
+  'Investment cash operation must select the receiving/spending wallet');
 investmentOperationZ?.v2Close?.();
 await wait(25);
 investmentZ2?.v2Close?.();
