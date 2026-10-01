@@ -175,8 +175,16 @@ assert.match(accountShell, /async function renderGlobalContactDetail\(/);
 assert.match(accountShell, /state\.accountTab = 'contact-detail'/);
 assert.match(accountShell, /async function renderGlobalHistoryDetail\(/);
 assert.doesNotMatch(accountShell, /onOpenRelationship: callbacks\.onOpenRelationship/);
-const contactsBlock = accountShell.slice(
+const relationshipCardBlock = accountShell.slice(
   accountShell.indexOf('function relationshipCard'),
+  accountShell.indexOf('const ACCOUNT_PROFILE_CARD_APPEARANCE'),
+);
+assert.match(relationshipCardBlock, /profileCardAppearance\(profile\)/);
+assert.match(relationshipCardBlock, /profileCardFields\(profile, \[\]\)/);
+assert.doesNotMatch(relationshipCardBlock, /CONTACT_PROFILE_CARD_APPEARANCE|entity-card--compact|v2HorizontalRail|v2ListEntr/);
+
+const contactsBlock = accountShell.slice(
+  accountShell.indexOf('function relationshipSearchText'),
   accountShell.indexOf('function selectedGlobalRelationship'),
 );
 assert.match(contactsBlock, /entityCardStack\(filtered\.map\(relationshipCard\)\)/);
@@ -186,8 +194,6 @@ assert.match(contactsBlock, /data: 'data-account-profile-settings'/);
 assert.doesNotMatch(contactsBlock, /disabled: true, aria: 'Настройки контактов'/);
 assert.match(contactsBlock, /profile\.profession/);
 assert.match(contactsBlock, /profile\.phone/);
-assert.match(contactsBlock, /profileCardAppearance\(profile\)/);
-assert.match(contactsBlock, /profileCardFields\(profile, \[\]\)/);
 assert.doesNotMatch(contactsBlock, /CONTACT_PROFILE_CARD_APPEARANCE|entity-card--compact|v2HorizontalRail\(filtered|v2ListEntr/);
 
 const contactDetailBlock = accountShell.slice(
