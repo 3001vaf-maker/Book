@@ -9,7 +9,11 @@ import {
 } from '../../../ui/ui.js';
 import { canUseBookCapability } from '../../access.js';
 import { renderIncomeExpenseOperation } from '../dds/income-expense.js';
-import { SPECIAL_FINANCE_ACTIONS, renderSpecialFinanceOperation } from '../dds/special-operations.js';
+import {
+  SPECIAL_FINANCE_ACTIONS,
+  renderFinanceEntityOperation,
+  renderSpecialFinanceOperation,
+} from '../dds/special-operations.js';
 
 export function financeOperationGroups({ groups = null } = {}) {
   const allowed = Array.isArray(groups) ? new Set(groups) : null;
@@ -60,6 +64,21 @@ export function openFinanceOperation(root, actionId, { onSaved = null, financeEn
   else if (actionId === 'manual-expense') rendered = renderIncomeExpenseOperation(layer, 'OUT', { onSaved: saved });
   else rendered = renderSpecialFinanceOperation(layer, actionId, { onSaved: saved, financeEntity });
 
+  if (!rendered) {
+    layer.v2Close?.();
+    return null;
+  }
+  return layer;
+}
+
+export function openFinanceEntityOperation(root, type, { onSaved = null, financeEntity = null } = {}) {
+  const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'finance-operation-z' }), { stack: true });
+  if (!layer) return null;
+  const saved = () => {
+    layer.v2Close?.();
+    onSaved?.();
+  };
+  const rendered = renderFinanceEntityOperation(layer, type, { onSaved: saved, financeEntity });
   if (!rendered) {
     layer.v2Close?.();
     return null;
