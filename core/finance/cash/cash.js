@@ -1,12 +1,14 @@
 import {
   button,
   actionBlock,
+  datePicker,
   emptyState,
   entityCardRail,
   entityVisualCard,
   escapeHtml,
   field,
   formValidationMessage,
+  initDatePickers,
   initPhotoField,
   modal,
   mountEntityCardConstructor,
@@ -170,7 +172,7 @@ function renderCashEntityCard(entity, kind) {
   const balance = getFinanceEntityBalance(kind, entity.id);
   return entityVisualCard({
     appearance: cashEntityCardAppearance(entity),
-    fields: cashEntityCardFields(entity, balance),
+    fields: cashEntityCardFields(entity, balance, kind),
     image: entity.photo || '',
     interactive: true,
     data: `data-finance-entity-type="${escapeHtml(kind)}" data-finance-entity-id="${escapeHtml(entity.id)}"`,
@@ -303,11 +305,19 @@ function openCashEntityForm(root, kind) {
     <div class="modal-title"><h2>${title}</h2></div>
     ${photoField({ name: photoName, value: '' })}
     ${field({ label: fieldLabel, name: dataName, value: '', placeholder: 'Наименование', required: true })}
+    ${investment ? '' : datePicker({
+      label: 'Предполагаемая дата возврата',
+      name: 'plannedReturnDate',
+      value: '',
+      required: false,
+      allowClear: true,
+    })}
     ${button('Сохранить', { type: 'submit' })}
   </form>`;
   const layer = mountModal(root, modal(html, { title }));
   if (!layer) return;
   initPhotoField(layer);
+  if (!investment) initDatePickers(layer);
   const form = layer.querySelector(`[${formData}]`);
   form?.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -326,6 +336,7 @@ function openCashEntityForm(root, kind) {
       id: crypto.randomUUID(),
       name,
       photo: String(data.get(photoName) || ''),
+      plannedReturnDate: investment ? '' : String(data.get('plannedReturnDate') || ''),
       cardAppearance: {},
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -428,7 +439,7 @@ function openFinanceEntityAppearance(root, entityLayer, type, entity) {
   if (!host) return layer;
   mountEntityCardConstructor(host, {
     appearance: cashEntityCardAppearance(entity),
-    fields: cashEntityCardFields(entity, getFinanceEntityBalance(type, entity.id)),
+    fields: cashEntityCardFields(entity, getFinanceEntityBalance(type, entity.id), type),
     photo: entity.photo || '',
     onSave: async ({ appearance, photo }) => {
       const next = {
