@@ -18,6 +18,8 @@ import {
   openSharedProfileSettingsMenu,
   page,
   photoField,
+  select,
+  shortDate,
   shortDateTime,
   shortDateTimeParts,
   v2ListEntries,
@@ -32,7 +34,11 @@ import {
   cancelFinanceOperation,
   hardDeleteFinanceWallet,
 } from '../service.js';
-import { financeOperationGroups, openFinanceOperation, openFinanceOperations } from '../operations/index.js';
+import {
+  financeOperationGroups,
+  openFinanceEntityOperation as openEntityFinanceOperation,
+  openFinanceOperations,
+} from '../operations/index.js';
 import { getFinanceEntityBalance, getFinanceEntityMovements } from '../read.js';
 import {
   deleteWallet as deleteWalletData,
@@ -50,6 +56,11 @@ import {
   saveInvestmentEntity,
   saveLoanEntity,
 } from './entities.js';
+import {
+  buildLoanSchedule,
+  calculateLoanState,
+  normalizeLoanTerms,
+} from './loan-calculator.js';
 
 const formatMoney = (value) => `${(Number(value) || 0).toLocaleString('ru-RU')} ₽`;
 
@@ -169,10 +180,12 @@ function renderWalletCard(wallet) {
 
 function renderCashEntityCard(entity, kind) {
   const label = kind === 'investment' ? 'инвестицию' : 'займ';
-  const balance = getFinanceEntityBalance(kind, entity.id);
+  const movements = getFinanceEntityMovements(kind, entity.id);
+  const loanState = kind === 'loan' ? calculateLoanState(entity, movements) : null;
+  const balance = kind === 'loan' ? loanState.totalDue : getFinanceEntityBalance(kind, entity.id);
   return entityVisualCard({
     appearance: cashEntityCardAppearance(entity),
-    fields: cashEntityCardFields(entity, balance, kind),
+    fields: cashEntityCardFields(entity, balance, kind, loanState?.endDate || ''),
     image: entity.photo || '',
     interactive: true,
     data: `data-finance-entity-type="${escapeHtml(kind)}" data-finance-entity-id="${escapeHtml(entity.id)}"`,
@@ -305,19 +318,11 @@ function openCashEntityForm(root, kind) {
     <div class="modal-title"><h2>${title}</h2></div>
     ${photoField({ name: photoName, value: '' })}
     ${field({ label: fieldLabel, name: dataName, value: '', placeholder: 'Наименование', required: true })}
-    ${investment ? '' : datePicker({
-      label: 'Предполагаемая дата возврата',
-      name: 'plannedReturnDate',
-      value: '',
-      required: false,
-      allowClear: true,
-    })}
     ${button('Сохранить', { type: 'submit' })}
   </form>`;
   const layer = mountModal(root, modal(html, { title }));
   if (!layer) return;
   initPhotoField(layer);
-  if (!investment) initDatePickers(layer);
   const form = layer.querySelector(`[${formData}]`);
   form?.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -336,7 +341,6 @@ function openCashEntityForm(root, kind) {
       id: crypto.randomUUID(),
       name,
       photo: String(data.get(photoName) || ''),
-      plannedReturnDate: investment ? '' : String(data.get('plannedReturnDate') || ''),
       cardAppearance: {},
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -439,7 +443,16 @@ function openFinanceEntityAppearance(root, entityLayer, type, entity) {
   if (!host) return layer;
   mountEntityCardConstructor(host, {
     appearance: cashEntityCardAppearance(entity),
-    fields: cashEntityCardFields(entity, getFinanceEntityBalance(type, entity.id), type),
+    fields: cashEntityCardFields(
+      entity,
+      type === 'loan'
+        ? calculateLoanState(entity, getFinanceEntityMovements(type, entity.id)).totalDue
+        : getFinanceEntityBalance(type, entity.id),
+      type,
+      type === 'loan'
+        ? calculateLoanState(entity, getFinanceEntityMovements(type, entity.id)).endDate
+        : '',
+    ),
     photo: entity.photo || '',
     onSave: async ({ appearance, photo }) => {
       const next = {
