@@ -13,7 +13,6 @@ import {
   openNotice,
   openSharedProfileSettingsMenu,
   page,
-  readOnlyReceipt,
   photoField,
   shortDateTime,
   shortDateTimeParts,
@@ -22,6 +21,7 @@ import {
   v2ZLayer,
   workspaceHeaderContext,
 } from '../../../ui/ui.js';
+import { readOnlyReceipt } from '../../../ui/receipt/index.js';
 import {
   canPermanentlyDeleteFinanceData,
   cancelFinanceOperation,
