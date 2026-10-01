@@ -41,7 +41,11 @@ function financeEntityName(type, id) {
   return financeEntities(type).find((item) => String(item.id) === String(id))?.name || '';
 }
 
-export function renderSpecialFinanceOperation(root, actionId, { onSaved = null, operation = null } = {}) {
+export function renderSpecialFinanceOperation(root, actionId, {
+  onSaved = null,
+  operation = null,
+  financeEntity = null,
+} = {}) {
   const action = SPECIAL_FINANCE_ACTIONS.find((item) => item.id === actionId);
   if (!action) return false;
   const wallets = walletOptions();
@@ -51,14 +55,23 @@ export function renderSpecialFinanceOperation(root, actionId, { onSaved = null, 
   }
 
   const existing = operation?.data && typeof operation.data === 'object' ? operation.data : {};
-  const entityOptions = action.transfer ? [] : financeEntityOptions(action.entityType);
-  if (!action.transfer && !entityOptions.length) {
+  const lockedEntity = !action.transfer && financeEntity
+    && String(financeEntity?.type || '') === String(action.entityType || '')
+    && String(financeEntity?.id || '').trim()
+    ? {
+        type: String(financeEntity.type),
+        id: String(financeEntity.id),
+        name: String(financeEntity.name || ''),
+      }
+    : null;
+  const entityOptions = action.transfer || lockedEntity ? [] : financeEntityOptions(action.entityType);
+  if (!action.transfer && !lockedEntity && !entityOptions.length) {
     openNotice({ message: action.entityType === 'loan' ? 'Сначала добавьте займ.' : 'Сначала добавьте инвестицию.' });
     return false;
   }
   const walletFields = action.transfer
     ? `${select({ label: 'Из кошелька', name: 'fromWalletId', value: existing.fromWalletId || wallets[0]?.value || '', options: wallets })}${select({ label: 'В кошелёк', name: 'toWalletId', value: existing.toWalletId || wallets[1]?.value || wallets[0]?.value || '', options: wallets })}`
-    : `${select({
+    : `${lockedEntity ? '' : select({
         label: action.entityLabel,
         name: 'financeEntityId',
         value: existing.financeEntityId || entityOptions[0]?.value || '',
@@ -118,8 +131,8 @@ export function renderSpecialFinanceOperation(root, actionId, { onSaved = null, 
       payload.toWalletName = walletName(payload.toWalletId);
     } else {
       payload.financeEntityType = action.entityType;
-      payload.financeEntityId = String(data.get('financeEntityId') || '');
-      payload.financeEntityName = financeEntityName(action.entityType, payload.financeEntityId);
+      payload.financeEntityId = lockedEntity?.id || String(data.get('financeEntityId') || '');
+      payload.financeEntityName = lockedEntity?.name || financeEntityName(action.entityType, payload.financeEntityId);
       payload.walletId = String(data.get('walletId') || '');
       payload.walletName = walletName(payload.walletId);
     }
