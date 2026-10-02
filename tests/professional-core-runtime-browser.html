@@ -48,21 +48,72 @@
     capabilities:demoCapabilities,
     plan:null,
   };
+  const runtimeNow = new Date();
+  const runtimeDate = `${runtimeNow.getFullYear()}-${String(runtimeNow.getMonth()+1).padStart(2,'0')}-${String(runtimeNow.getDate()).padStart(2,'0')}`;
+  const runtimePerson = {
+    id:'runtime-person-id',
+    key:'runtime-person',
+    uei:'UEI-JOURNAL',
+    name:'Анна',
+    surname:'Тест',
+    phone:'+79990000000',
+    phones:['+79990000000'],
+  };
+  const runtimeProcedure = {
+    id:'runtime-journal-procedure',
+    name:'Очень длинное название процедуры без сокращения',
+    duration:60,
+    cost:1500,
+    workplaces:[{workplaceId:'runtime-studio',duration:60,cost:1500}],
+  };
+  const runtimeRecord = {
+    id:'runtime-journal-record',
+    date:runtimeDate,
+    workplaceId:'runtime-studio',
+    from:'12:00',
+    to:'13:00',
+    person:runtimePerson,
+    procedures:[{id:runtimeProcedure.id,name:runtimeProcedure.name,duration:60,cost:1500}],
+    products:[],
+    source:'manual',
+    sourceRequestId:'',
+    createdBy:{},
+    createdAt:runtimeDate+'T08:00:00.000Z',
+    updatedAt:runtimeDate+'T08:00:00.000Z',
+  };
   const payloadFor = (path, method) => {
     if (path.endsWith('/auth/me')) return { account:{ email:'runtime@example.test' }, user:{} };
     if (path.endsWith('/profile')) return {
       verified:true,
       profile:{ name:'Иван', surname:'Проверка', profession:'Специалист' },
-      workplaces:[],
+      workplaces:[{
+        id:'runtime-studio-db',
+        key:'runtime-studio',
+        name:'Студия Тест',
+        color:'#9AAE85',
+        indicatorColor:'#9AAE85',
+        from:'09:00',
+        to:'18:00',
+        timeZone:'Europe/Moscow',
+      }],
       customProfessions:[],
       professionCatalog:[],
       workplaceReferenceData:{},
     };
     if (path.endsWith('/business-state')) return {
-      verified:true, people:[], uei:{entities:{},relations:{},revoked:[]}, records:[], recordEvents:[],
+      verified:true,
+      people:[runtimePerson],
+      uei:{entities:{},relations:{},revoked:[]},
+      records:[runtimeRecord],
+      recordEvents:[],
     };
     if (path.endsWith('/business-state/operational')) return {
-      verified:true, days:[], breaks:[], procedures:[], procedureHistory:[], bookingSettings:null,
+      verified:true,
+      days:[{date:runtimeDate,workplaceId:'runtime-studio',from:'09:00',to:'18:00'}],
+      breaks:[],
+      procedures:[runtimeProcedure],
+      procedureHistory:[],
+      bookingSettings:null,
     };
     if (path.endsWith('/tenant-document-archive/rkn-guide/ensure')) return { ready:false };
     if (path.endsWith('/tenant-document-archive')) return {
@@ -321,9 +372,15 @@ const openF = async (pointerId, label) => {
 const tapAndOpen = async (deck, target, pointerId, label) => {
   mark('select-' + label);
   const beforeShell = shell();
+  if (!target) {
+    ok(false, label + ' target card missing before selection');
+    return;
+  }
   pointer(target,'pointerdown',190,390,pointerId);
   pointer(target,'pointerup',190,390,pointerId);
+  mark('click-' + label);
   target.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,clientX:190,clientY:390}));
+  mark('clicked-' + label);
   await wait(180);
   ok(shell() === beforeShell && shell() === initialShell, label + ' rebuilt the whole professional FEZ shell');
   ok(ownerCount() === 1, label + ' left duplicate FEZ owners');
@@ -927,12 +984,126 @@ ok(Boolean(shell()?.querySelector('[data-v2-workspace-a]')), 'DDS A was not rest
 await openF(3,'dds');
 await tapAndOpen(fDeck(), fCard('journal'), 15, 'journal');
 ok(shell()?.classList.contains('is-e-open'), 'Journal did not open real E deck');
+ok(Boolean(eCard('day')), 'Journal E Day missing');
 ok(Boolean(eCard('list')), 'Journal E List missing');
-await tapAndOpen(eDeck(), eCard('list'), 16, 'journal-list');
+
+await tapAndOpen(eDeck(), eCard('day'), 16, 'journal-day');
+ok(!shell()?.classList.contains('is-deck-open'), 'Journal Day selection did not enter Z');
+await wait(80);
+ok(shell()?.querySelector('.v2-header__title')?.textContent.trim() === 'Студия Тест',
+  'Journal Day B must be selected workplace');
+ok(Boolean(shell()?.querySelector('[data-v2-workspace-a]')), 'Journal Day A/settings missing');
+ok(Boolean(shell()?.querySelector('[data-v2-workspace-chat]')), 'Journal Day D/general chat missing');
+
+mark('journal-day-settings');
+shell()?.querySelector('[data-v2-workspace-a]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(40);
+let journalSettings = document.querySelector('[data-shared-profile-settings-menu]');
+ok(Boolean(journalSettings), 'Journal Day A did not open shared settings');
+const journalActionIds = [...(journalSettings?.querySelectorAll('[data-shared-profile-action]') || [])]
+  .map((node) => node.dataset.sharedProfileAction);
+ok(journalActionIds.includes('workplace') && journalActionIds.includes('z-report'),
+  'Journal Day A must contain Workplace and Z-report');
+ok(!journalActionIds.includes('day-off'),
+  'Journal Day must hide Day-off action while an active record exists');
+
+mark('journal-day-workplace-selector');
+journalSettings?.querySelector('[data-shared-profile-action="workplace"]')
+  ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(40);
+let journalWorkplaceModal = document.querySelector('[data-modal][data-v2-layer-kind="bottom"]');
+const journalWorkplaceInput = journalWorkplaceModal?.querySelector('input[name="journalWorkplaceMode"]');
+ok(Boolean(journalWorkplaceInput), 'Journal Workplace must use shared Select in bottom modal');
+const journalWorkplaceTrigger = journalWorkplaceInput?.closest('.ui-select')?.querySelector('[data-ui-select-trigger]');
+const journalWorkplaceOptions = JSON.parse(journalWorkplaceTrigger?.dataset.options || '[]');
+const journalAggregateOption = journalWorkplaceOptions.find((item) => item.value === '__all__');
+const journalStudioOption = journalWorkplaceOptions.find((item) => item.value === 'runtime-studio');
+ok(journalAggregateOption?.label === 'График дня' && String(journalAggregateOption?.meta || '').includes('1'),
+  'Journal aggregate selector must be Graph day with total record count');
+ok(String(journalStudioOption?.meta || '').includes('09:00 - 18:00') && String(journalStudioOption?.meta || '').includes('1'),
+  'Journal workplace selector must show work range and record count');
+ok(Boolean(journalStudioOption?.indicatorColor),
+  'Journal workplace selector must carry workplace indicator color');
+journalWorkplaceModal?.v2Close?.();
+await wait(25);
+
+mark('journal-day-z-report');
+shell()?.querySelector('[data-v2-workspace-a]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(30);
+journalSettings = document.querySelector('[data-shared-profile-settings-menu]');
+journalSettings?.querySelector('[data-shared-profile-action="z-report"]')
+  ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(40);
+let journalZReport = document.querySelector('[data-modal][data-v2-layer-kind="top"]');
+const journalReceipt = journalZReport?.querySelector('[data-read-only-sheet]');
+ok(Boolean(journalReceipt), 'Journal Z-report must use shared read-only receipt');
+ok(journalReceipt?.querySelector('.read-only-sheet__header h2')?.textContent.trim() === 'Z - Отчет',
+  'Journal Z-report receipt title missing');
+ok(journalReceipt?.textContent.includes('Студия Тест') && journalReceipt?.textContent.includes('Кол-во записей:'),
+  'Journal Z-report summary rows missing');
+ok(journalReceipt?.textContent.includes('UEI-JOURNAL') && journalReceipt?.textContent.includes('к оплате'),
+  'Journal Z-report record/status rows missing');
+journalZReport?.v2Close?.();
+await wait(25);
+
+mark('journal-day-record-open');
+const journalRecord = shell()?.querySelector('[data-journal-usage="runtime-journal-record"]');
+ok(Boolean(journalRecord), 'Journal Day record plaque missing');
+journalRecord?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+mark('journal-record-dispatched');
+await wait(60);
+mark('journal-record-z-ready');
+let recordZ = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
+ok(Boolean(recordZ?.classList.contains('record-view-z')), 'Journal record did not open Record Z2');
+ok(Boolean(recordZ?.querySelector('.record-confirmation-mini-card')), 'Record Z2 must use canonical mini-card');
+ok(!recordZ?.querySelector('.entity-card--top-dark'), 'Record Z2 must not keep legacy dark entity card');
+const recordReceipt = recordZ?.querySelector('[data-read-only-sheet]');
+ok(Boolean(recordReceipt), 'Record Z2 procedures must use shared read-only receipt');
+ok(recordReceipt?.textContent.includes('Очень длинное название процедуры без сокращения'),
+  'Record Z2 must show full procedure name');
+ok(!document.querySelector('[data-record-payment-entry]'),
+  'Opening Record must not create legacy automatic payment sheet');
+ok(shell()?.querySelector('[data-v2-workspace-primary]')?.textContent.includes('К оплате'),
+  'Record Z2 C must expose amount due');
+
+mark('journal-record-settings');
+shell()?.querySelector('[data-v2-workspace-a]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(35);
+const recordSettings = document.querySelector('[data-shared-profile-settings-menu]');
+const recordActionIds = [...(recordSettings?.querySelectorAll('[data-shared-profile-action]') || [])]
+  .map((node) => node.dataset.sharedProfileAction);
+ok(recordActionIds.join('|') === 'move|cancel|delete',
+  'Record A must contain exactly Move, Cancel and Delete');
+recordSettings?.closest('[data-modal]')?.v2Close?.();
+await wait(20);
+
+mark('journal-record-payment');
+shell()?.querySelector('[data-v2-workspace-primary]')
+  ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(50);
+let paymentZ = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
+ok(paymentZ?.querySelector('[data-workspace-header-context]')?.dataset.workspaceTitle === 'Оплата',
+  'Record C must open Payment Z3');
+ok(Boolean(paymentZ?.querySelector('[data-payment-ui]')), 'Payment Z3 shared form missing');
+ok(Boolean(paymentZ?.querySelector('[data-payment-price]')), 'Payment Z3 editable procedure price missing');
+ok(Boolean(paymentZ?.querySelector('input[data-payment-discount-percent]')), 'Payment Z3 percent discount selector missing');
+ok(Boolean(paymentZ?.querySelector('[data-payment-discount-money]')), 'Payment Z3 money discount field missing');
+ok(shell()?.querySelector('[data-v2-workspace-primary]')?.textContent.trim() === 'Оплатить',
+  'Payment Z3 C must be Pay when data is unchanged');
+mark('journal-record-payment-close');
+paymentZ?.v2Close?.();
+await wait(25);
+recordZ?.v2Close?.();
+await wait(35);
+
+await openF(4,'journal-day');
+await tapAndOpen(fDeck(), fCard('journal'), 17, 'journal-again');
+ok(shell()?.classList.contains('is-e-open'), 'Journal did not reopen E after Day');
+await tapAndOpen(eDeck(), eCard('list'), 18, 'journal-list');
 ok(!shell()?.classList.contains('is-deck-open'), 'Journal List selection did not enter Z');
 
-await openF(4,'journal-list');
-await tapAndOpen(fDeck(), fCard('profile'), 17, 'profile');
+await openF(5,'journal-list');
+await tapAndOpen(fDeck(), fCard('profile'), 19, 'profile');
 ok(!shell()?.classList.contains('is-deck-open'), 'Profile F without E did not enter Z directly');
 
 // Repeat full roots to expose stale listeners/rAF from persistent shell reuse.

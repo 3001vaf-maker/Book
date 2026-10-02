@@ -33,7 +33,25 @@ export function getRecordSettlement(record = null, { discountPercent = 0 } = {})
 export function getRecordPaymentState(record = null, { discountPercent = 0 } = {}) {
   const settlement = resolveRecordSettlement(record, { discountPercent });
   const movements = record?.id ? getActiveDDSMovementsForSource('record', record.id) : [];
-  return calculateSettlementPaymentState(settlement, movements);
+  const state = calculateSettlementPaymentState(settlement, movements);
+  const date = String(record?.date || '').slice(0, 10);
+  const to = String(record?.to || record?.from || '').slice(0, 5);
+  const end = date && /^\d{2}:\d{2}$/.test(to) ? new Date(`${date}T${to}:00`) : null;
+  const ended = Boolean(end && Number.isFinite(end.getTime()) && Date.now() >= end.getTime());
+  const fullyDiscounted = Number(settlement?.serviceTotal || 0) > 0.009
+    && Number(settlement?.planTotal || 0) <= 0.009
+    && Number(settlement?.discountTotal || 0) + 0.009 >= Number(settlement?.serviceTotal || 0);
+  const discountPaid = fullyDiscounted && ended && record?.attendance !== 'no-show';
+  return discountPaid ? {
+    ...state,
+    fullyPaid: true,
+    partiallyPaid: false,
+    remaining: 0,
+    paidByDiscount: true,
+  } : {
+    ...state,
+    paidByDiscount: false,
+  };
 }
 
 export function getSettlementTotalsForRecords(recordIds = []) {

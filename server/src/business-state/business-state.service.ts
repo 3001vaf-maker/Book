@@ -255,11 +255,22 @@ export class BusinessStateService {
   async deleteRecord(tenantId: string, recordId: string) {
     await this.requireVerified(tenantId);
     const id = text(recordId);
-    const [events, record] = await this.prisma.$transaction([
-      this.prisma.recordEvent.deleteMany({ where: { tenantId, recordId: id } }),
-      this.prisma.record.deleteMany({ where: { tenantId, recordId: id } }),
-    ]);
-    return { deleted: record.count, deletedEvents: events.count };
+    return this.prisma.$transaction(async (tx) => {
+      const financeOperations = await tx.financeOperation.deleteMany({
+        where: { tenantId, sourceType: 'record', sourceId: id },
+      });
+      const settlements = await tx.financeSettlement.deleteMany({
+        where: { tenantId, sourceType: 'record', sourceId: id },
+      });
+      const events = await tx.recordEvent.deleteMany({ where: { tenantId, recordId: id } });
+      const record = await tx.record.deleteMany({ where: { tenantId, recordId: id } });
+      return {
+        deleted: record.count,
+        deletedEvents: events.count,
+        deletedFinanceOperations: financeOperations.count,
+        deletedSettlements: settlements.count,
+      };
+    });
   }
 
   async deleteRecordEvents(tenantId: string, recordId: string) {

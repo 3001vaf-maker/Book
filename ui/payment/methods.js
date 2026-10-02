@@ -31,20 +31,20 @@ function allocationRow(index, wallets, initial = {}) {
   </div>`;
 }
 
-export function paymentMethodsMarkup({ wallets = [], total = 0, initialAllocations = [] } = {}) {
+export function paymentMethodsMarkup({ wallets = [], total = 0, initialAllocations = [], showAction = true, showTotal = true } = {}) {
   const allocations = Array.isArray(initialAllocations) ? initialAllocations : [];
   return `<div class="payment-methods__allocation" data-payment-allocation-owner>
-    <div class="payment-methods__total" data-payment-remaining><span>К оплате</span><strong>${escapeHtml(moneyDisplay(total))}</strong></div>
+    ${showTotal ? `<div class="payment-methods__total" data-payment-remaining><span>К оплате</span><strong>${escapeHtml(moneyDisplay(total))}</strong></div>` : ''}
     <div class="payment-allocation-rows">
       ${allocationRow(0, wallets, allocations[0] || {})}
       ${allocationRow(1, wallets, allocations[1] || {})}
     </div>
     <div class="payment-tips" data-payment-tips-row hidden><span>Tips</span><strong data-payment-tips>0 ₽</strong></div>
-    ${button('Сохранить', { data: 'data-payment-allocation-submit' })}
+    ${showAction ? button('Сохранить', { data: 'data-payment-allocation-submit' }) : ''}
   </div>`;
 }
 
-export function initPaymentMethodsAllocation(root, { wallets = [], total = 0, onPay = () => {} } = {}) {
+export function initPaymentMethodsAllocation(root, { wallets = [], total = 0, onPay = () => {}, onChange = () => {} } = {}) {
   if (!root) return;
   const remainingNode = root.querySelector('[data-payment-remaining] strong');
   const tipsRow = root.querySelector('[data-payment-tips-row]');
@@ -82,6 +82,8 @@ export function initPaymentMethodsAllocation(root, { wallets = [], total = 0, on
     if (tipsNode) tipsNode.textContent = moneyDisplay(current.tips);
     if (tipsRow) tipsRow.hidden = current.tips <= 0.009;
     if (submit) submit.disabled = !current.valid;
+    onChange?.(current);
+    return current;
   }
 
   rows().forEach(({ walletInput, amountInput }) => {
@@ -104,5 +106,10 @@ export function initPaymentMethodsAllocation(root, { wallets = [], total = 0, on
       tips: current.tips,
     });
   });
-  sync();
+  const initial = sync();
+  return {
+    state,
+    sync,
+    initial,
+  };
 }

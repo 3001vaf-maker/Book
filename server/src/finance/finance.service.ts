@@ -906,7 +906,7 @@ export class FinanceService {
     const allocated = money(allocations.reduce((sum, entry) => sum + entry.amount, 0));
     const tips = Math.min(allocated, money(input.tips));
     const serviceAmount = money(input.serviceAmount == null ? allocated - tips : input.serviceAmount);
-    if (serviceAmount <= 0 || money(serviceAmount + tips) !== allocated) {
+    if (serviceAmount < 0 || (serviceAmount <= 0 && tips <= 0) || money(serviceAmount + tips) !== allocated) {
       throw new BadRequestException('Сумма оплаты не совпадает с распределением по кошелькам');
     }
 
@@ -1199,7 +1199,7 @@ export class FinanceService {
       const allocated = money(allocations.reduce((sum, entry) => sum + entry.amount, 0));
       const tips = Math.min(allocated, money(input.tips == null ? currentData.tips : input.tips));
       const serviceAmount = money(input.serviceAmount == null ? currentData.serviceAmount : input.serviceAmount);
-      if (serviceAmount <= 0 || money(serviceAmount + tips) !== allocated) {
+      if (serviceAmount < 0 || (serviceAmount <= 0 && tips <= 0) || money(serviceAmount + tips) !== allocated) {
         throw new BadRequestException('Сумма оплаты не совпадает с распределением по кошелькам');
       }
       const otherRows = await this.prisma.financeLedgerEntry.findMany({

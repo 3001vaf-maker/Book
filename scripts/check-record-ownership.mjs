@@ -172,14 +172,6 @@ const recordPricePickerSource = journalRecordUi.slice(
   journalRecordUi.indexOf('function openPriceProcedurePicker'),
   journalRecordUi.indexOf('function renderProceduresStep')
 );
-const recordConfirmationProcedurePickerSource = journalRecordUi.slice(
-  journalRecordUi.indexOf('function openConfirmationProcedurePicker'),
-  journalRecordUi.indexOf('function renderConfirmationStep')
-);
-const existingRecordProcedurePickerSource = journalRecordViewUi.slice(
-  journalRecordViewUi.indexOf('function openAddProcedurePicker'),
-  journalRecordViewUi.indexOf('function openSalePicker')
-);
 const onlineBookingProcedureSource = onlineBookingUi.slice(
   onlineBookingUi.indexOf('function renderProcedures'),
   onlineBookingUi.indexOf('function renderDates')
@@ -187,13 +179,14 @@ const onlineBookingProcedureSource = onlineBookingUi.slice(
 
 for (const [name, source] of [
   ['Record workplace price picker', recordPricePickerSource],
-  ['Record confirmation add-procedure picker', recordConfirmationProcedurePickerSource],
-  ['Existing Record add-procedure picker', existingRecordProcedurePickerSource],
   ['Online booking procedure picker', onlineBookingProcedureSource],
 ]) {
   if (!/recordProcedureList\(/.test(source)) {
     errors.push(`${name} must consume the Shared Record procedure sticker owner`);
   }
+}
+if (/function\s+openConfirmationProcedurePicker|function\s+openAddProcedurePicker/.test(journalRecordUi + journalRecordViewUi)) {
+  errors.push('Record must not keep parallel confirmation/existing-record procedure pickers outside the shared procedure step');
 }
 
 if (!/recordTimeRows\(values,\s*\{\s*data:\s*'data-record-time'/.test(journalRecordUi)
@@ -218,7 +211,7 @@ if (!/overline:\s*item\.uei/.test(sharedPersonListSource)
 
 const recordPersonStepSource = journalRecordUi.slice(
   journalRecordUi.indexOf('function renderPersonStep'),
-  journalRecordUi.indexOf('function openConfirmationWorkplaceModal')
+  journalRecordUi.indexOf('function renderConfirmationStep')
 );
 if (!/button\('\+ Добавить клиента',\s*\{\s*data:\s*'data-record-settings-add-person'\s*\}\)/.test(recordPersonStepSource)
   || !/bindRecordSettings\(modalRoot/.test(recordPersonStepSource)
@@ -226,19 +219,13 @@ if (!/button\('\+ Добавить клиента',\s*\{\s*data:\s*'data-record-
   errors.push('Record person-step A settings must expose one canonical black "+ Добавить клиента" button');
 }
 
-const existingRecordPersonPickerSource = journalRecordViewUi.slice(
-  journalRecordViewUi.indexOf('function openPersonPicker'),
-  journalRecordViewUi.indexOf('function openAddProcedurePicker')
-);
-for (const [name, source] of [
-  ['Record person selection', recordPersonStepSource],
-  ['Existing Record person picker', existingRecordPersonPickerSource],
-]) {
-  if (!/ui-search-field/.test(source)
-    || !/field\(\{[\s\S]*type:\s*'search'[\s\S]*placeholder:\s*'Поиск по имени или UEI'/.test(source)
-    || /record-person-toolbar|class=["'][^"']*record-person-search/.test(source)) {
-    errors.push(`${name} must consume the same Shared search field presentation as the People folder`);
-  }
+if (!/ui-search-field/.test(recordPersonStepSource)
+  || !/field\(\{[\s\S]*type:\s*'search'[\s\S]*placeholder:\s*'Поиск по имени или UEI'/.test(recordPersonStepSource)
+  || /record-person-toolbar|class=["'][^"']*record-person-search/.test(recordPersonStepSource)) {
+  errors.push('Record person selection must consume the same Shared search field presentation as the People folder');
+}
+if (/function\s+openPersonPicker/.test(journalRecordViewUi)) {
+  errors.push('Existing Record must not restore a second person picker; rescheduling skips Person by design');
 }
 if (!/ui-search-field/.test(peopleUi)
   || !/placeholder:\s*'Поиск по имени или UEI'/.test(peopleUi)
@@ -291,25 +278,18 @@ if (!/duration:\s*5\b/.test(recordStartTimesSource)
   errors.push('Journal Record first-step quick choices must preserve the proven specialist 5-minute helper and must not consume online-booking slotStep');
 }
 
-const confirmationTimeSource = journalRecordUi.slice(
-  journalRecordUi.indexOf('function openConfirmationTimeModal'),
-  journalRecordUi.indexOf('function openPhoneActions')
+const sharedEditFlowSource = journalRecordUi.slice(
+  journalRecordUi.indexOf('export function openRecordEditFlow'),
+  journalRecordUi.indexOf('function blockEndValues')
 );
-if (!/openTimePickerAction\(/.test(confirmationTimeSource)
-  || !/minuteStep:\s*1\b/.test(confirmationTimeSource)
-  || !/checkTimeAvailability\(/.test(confirmationTimeSource)) {
-  errors.push('Journal Record final time correction must use the canonical Shared Time picker at exact-minute resolution and validate the resulting interval');
+if (!/timePicker\(\{[\s\S]*name:\s*'recordEditExactTime'[\s\S]*minuteStep:\s*1\b/.test(sharedEditFlowSource)
+  || !/initTimePickers\(host\)/.test(sharedEditFlowSource)
+  || !/checkTimeAvailability\(\{[\s\S]*excludeId/.test(sharedEditFlowSource)) {
+  errors.push('Shared specialist Record edit flow must preserve exact-minute Shared Time correction and validate it through canonical Availability');
 }
-
-const existingRecordTimeSource = journalRecordViewUi.slice(
-  journalRecordViewUi.indexOf('function openTimePicker'),
-  journalRecordViewUi.indexOf('function openPersonPicker')
-);
-if (!/openTimePickerAction\(/.test(existingRecordTimeSource)
-  || !/minuteStep:\s*1\b/.test(existingRecordTimeSource)
-  || !/checkRecordTime\(/.test(existingRecordTimeSource)
+if (!/openRecordEditFlow\(/.test(journalRecordViewUi)
   || /getBookingSettings\(\)\.slotStep/.test(journalRecordViewUi)) {
-  errors.push('Existing specialist Record time editing must use the canonical Shared Time picker at exact-minute resolution and stay independent from online-booking slotStep');
+  errors.push('Existing specialist Record must delegate exact-time correction to the shared edit flow and stay independent from online-booking slotStep');
 }
 
 if (!/kind:\s*'avatar'/.test(sharedRecordUi)

@@ -7,7 +7,12 @@ let selectorId = 0;
 function normalizeOptions(options = []) {
   return (Array.isArray(options) ? options : []).map((option) => {
     const item = typeof option === 'string' ? { value: option, label: option } : option || {};
-    return { value: String(item.value ?? ''), label: String(item.label ?? item.value ?? '') };
+    return {
+      value: String(item.value ?? ''),
+      label: String(item.label ?? item.value ?? ''),
+      meta: String(item.meta ?? ''),
+      indicatorColor: String(item.indicatorColor ?? '').trim(),
+    };
   });
 }
 
@@ -17,13 +22,23 @@ function closeSelector(surface) {
   else surface?.remove?.();
 }
 
-function commitSelectorValue(surface, value, label) {
+function commitSelectorValue(surface, value, label, meta = '', indicatorColor = '') {
   const input = document.getElementById(surface?.dataset.inputId || '');
   const trigger = input?.closest('.ui-select')?.querySelector('[data-ui-select-trigger]');
   if (!input || !trigger) return;
   input.value = String(value ?? '');
   const valueNode = trigger.querySelector('.ui-select__value');
+  const metaNode = trigger.querySelector('.ui-select__meta');
+  const indicatorNode = trigger.querySelector('.ui-select__indicator');
   if (valueNode) valueNode.textContent = String(label ?? value ?? '');
+  if (metaNode) {
+    metaNode.textContent = String(meta || '');
+    metaNode.hidden = !meta;
+  }
+  if (indicatorNode) {
+    indicatorNode.hidden = !indicatorColor;
+    indicatorNode.style.setProperty('--ui-select-indicator', String(indicatorColor || 'transparent'));
+  }
   input.dispatchEvent(new Event('input', { bubbles: true }));
   input.dispatchEvent(new Event('change', { bubbles: true }));
   closeSelector(surface);
@@ -53,7 +68,13 @@ function ensureSelectorEvents() {
     if (!option) return;
     const surface = option.closest('[data-ui-selector]');
     if (!surface) return;
-    commitSelectorValue(surface, option.dataset.value ?? '', option.querySelector('span')?.textContent ?? '');
+    commitSelectorValue(
+      surface,
+      option.dataset.value ?? '',
+      option.querySelector('.ui-selector__option-label')?.textContent ?? '',
+      option.dataset.meta ?? '',
+      option.dataset.indicatorColor ?? '',
+    );
   });
 
   document.addEventListener('input', (event) => {
@@ -73,7 +94,7 @@ function ensureSelectorEvents() {
       if (!query) return;
       const options = JSON.parse(surface.dataset.options || '[]');
       const exact = options.find((option) => option.label.toLocaleLowerCase('ru') === query.toLocaleLowerCase('ru') || option.value.toLocaleLowerCase('ru') === query.toLocaleLowerCase('ru'));
-      if (exact) commitSelectorValue(surface, exact.value, exact.label);
+      if (exact) commitSelectorValue(surface, exact.value, exact.label, exact.meta, exact.indicatorColor);
       else if (surface.dataset.allowCustom === 'true') commitSelectorValue(surface, query, query);
       return;
     }
@@ -93,8 +114,9 @@ function openSelector(trigger) {
   const currentValue = String(input.value ?? '');
   const selectedIndex = options.findIndex((option) => String(option.value ?? '') === currentValue);
   const optionMarkup = options.map((option, index) => `
-    <button type="button" class="ui-selector__option${index === selectedIndex ? ' is-current' : ''}" data-ui-select-option data-value="${escapeHtml(option.value)}">
-      <span>${escapeHtml(option.label)}</span>
+    <button type="button" class="ui-selector__option${index === selectedIndex ? ' is-current' : ''}" data-ui-select-option data-value="${escapeHtml(option.value)}" data-meta="${escapeHtml(option.meta || '')}" data-indicator-color="${escapeHtml(option.indicatorColor || '')}">
+      <span class="ui-selector__option-indicator"${option.indicatorColor ? ` style="--ui-select-indicator:${escapeHtml(option.indicatorColor)}"` : ' hidden'} aria-hidden="true"></span>
+      <span class="ui-selector__option-main"><span class="ui-selector__option-label">${escapeHtml(option.label)}</span>${option.meta ? `<small>${escapeHtml(option.meta)}</small>` : ''}</span>
     </button>`).join('');
   const searchable = trigger.dataset.searchable === 'true';
   const allowCustom = trigger.dataset.allowCustom === 'true';
@@ -135,7 +157,7 @@ export function select({ name = '', label = '', value = '', options = [], aria =
   const stringValue = String(value ?? '');
   if (stringValue && !normalized.some((option) => option.value === stringValue) && allowCustom) normalized.unshift({ value: stringValue, label: stringValue });
   const inputId = `ui-select-${++selectorId}`;
-  const current = normalized.find((option) => option.value === stringValue) || (!stringValue && placeholder ? { value: '', label: placeholder } : normalized[0]) || { value: '', label: placeholder || 'Выбрать' };
+  const current = normalized.find((option) => option.value === stringValue) || (!stringValue && placeholder ? { value: '', label: placeholder, meta: '', indicatorColor: '' } : normalized[0]) || { value: '', label: placeholder || 'Выбрать', meta: '', indicatorColor: '' };
   const optionData = escapeHtml(JSON.stringify(normalized));
   const dataAttrs = data ? ` ${data}` : '';
 
@@ -143,7 +165,10 @@ export function select({ name = '', label = '', value = '', options = [], aria =
     ${label ? `<span>${escapeHtml(label)}</span>` : ''}
     <input id="${inputId}" type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(stringValue)}"${dataAttrs}>
     <button type="button" class="ui-select__control" data-ui-select-trigger data-input-id="${inputId}" data-options="${optionData}" data-searchable="${searchable ? 'true' : 'false'}" data-allow-custom="${allowCustom ? 'true' : 'false'}" data-placeholder="${escapeHtml(placeholder)}"${aria ? ` aria-label="${escapeHtml(aria)}"` : ''}${dataAttrs}>
-      <span class="ui-select__value">${escapeHtml(current.label)}</span>
+      <span class="ui-select__selection">
+        <span class="ui-select__indicator"${current.indicatorColor ? ` style="--ui-select-indicator:${escapeHtml(current.indicatorColor)}"` : ' hidden'} aria-hidden="true"></span>
+        <span class="ui-select__text"><span class="ui-select__value">${escapeHtml(current.label)}</span><small class="ui-select__meta"${current.meta ? '' : ' hidden'}>${escapeHtml(current.meta || '')}</small></span>
+      </span>
       <span class="ui-select__chevron" aria-hidden="true">⌄</span>
     </button>
   </label>`;

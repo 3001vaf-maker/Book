@@ -151,8 +151,8 @@ const journalSource = text(journalController);
 if (/\bopenWorkplace(?:Picker|Time)?Modal\b/.test(journalSource)) {
   report(journalController, 'Journal must not create a parallel raw Workplace modal; use its Journal-owned Header manifestation');
 }
-if (!/\bheaderControl\s*\(/.test(journalSource) || !/\bworkplaceContent\s*\(/.test(journalSource)) {
-  report(journalController, 'Journal must compose neutral Workplace content inside the shared Header Control');
+if (!/\bworkspaceHeaderContext\s*\(/.test(journalSource)) {
+  report(journalController, 'Journal must compose the shared workspace Header context');
 }
 if (/\bopenWorkplaceControl\s*\(/.test(journalSource)) {
   report(journalController, 'Journal must not use the Graph Workplace manifestation');
@@ -161,8 +161,8 @@ if (!/\bopenJournalWorkplaceControl\s*\(/.test(journalSource)) {
   report(journalController, 'Journal must use its own Header manifestation');
 }
 const journalWorkplaceSource = text(journalWorkplaceControl);
-if (!/\bopenHeaderControl\s*\(/.test(journalWorkplaceSource) || !/\blist\s*\(/.test(journalWorkplaceSource)) {
-  report(journalWorkplaceControl, 'Journal Header manifestation must reuse shared Header Control and List');
+if (!/\bmountModal\s*\(/.test(journalWorkplaceSource) || !/\bselect\s*\(/.test(journalWorkplaceSource) || !/variant:\s*['"]bottom['"]/.test(journalWorkplaceSource)) {
+  report(journalWorkplaceControl, 'Journal workplace manifestation must reuse Shared Select inside the canonical bottom Modal');
 }
 
 const workplaceOwner = 'settings/profile/workplaces/data.js';

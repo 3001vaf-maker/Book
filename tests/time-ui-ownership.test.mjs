@@ -19,18 +19,19 @@ assert.match(recordFlow, /getWorkplaceWorkingDates/);
 assert.doesNotMatch(recordFlow, /isTimeRangeAvailable|getTimeUsages|getJournalBreaks|getRecords\(|getDayTime|getDay\(/);
 assert.doesNotMatch(recordFlow, /from ['"]\.\.\/core\/day\.js['"]/);
 
-assert.match(recordView, /openTimePickerAction/);
-assert.match(recordView, /checkRecordTime/);
-assert.match(recordView, /minuteStep:\s*1/);
-assert.doesNotMatch(recordView, /listAvailableStartTimes|timeSlots\(\{\s*values,\s*selected:|getBookingSettings\(\)\.slotStep/);
-assert.match(recordView, /getWorkplaceWorkingDates/);
-assert.match(recordView, /startWorkplaceEdit/);
-assert.match(recordView, /startRecordDateEdit/);
-assert.match(recordView, /chooseTimeForDraft\(datedDraft/);
-assert.doesNotMatch(recordView, /timeSlots\(\{[^}]*\boccupied\b/);
+assert.match(recordView, /openRecordEditFlow/);
+assert.doesNotMatch(recordView, /openTimePickerAction|checkRecordTime|startWorkplaceEdit|startRecordDateEdit|startRecordTimeEdit|openWorkplacePicker|openDatePicker/);
+assert.doesNotMatch(recordView, /listAvailableStartTimes|timeSlots\(\{|getBookingSettings\(\)\.slotStep/);
 assert.doesNotMatch(recordView, /from ['"]\.\.\/core\/day\.js['"]/);
-assert.doesNotMatch(recordView, /openWorkplacePicker\(state,\s*\(workplaceId\)\s*=>\s*applyPatch/);
-assert.doesNotMatch(recordView, /openDatePicker\(state,\s*\(date\)\s*=>\s*applyPatch/);
+
+const sharedEditFlow = recordFlow.slice(
+  recordFlow.indexOf('export function openRecordEditFlow'),
+  recordFlow.indexOf('function blockEndValues'),
+);
+assert.match(sharedEditFlow, /timePicker\(\{[\s\S]*name:\s*'recordEditExactTime'[\s\S]*minuteStep:\s*1/);
+assert.match(sharedEditFlow, /initTimePickers\(host\)/);
+assert.match(sharedEditFlow, /checkTimeAvailability\(\{[\s\S]*excludeId/);
+assert.doesNotMatch(sharedEditFlow, /getBookingSettings\(\)\.slotStep/);
 
 assert.match(breakView, /listAvailableStartTimes/);
 assert.match(breakView, /listAvailableEndTimes/);

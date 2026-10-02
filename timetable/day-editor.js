@@ -1,5 +1,5 @@
 import { button, escapeHtml, initTimePickers, modal, mountModal, openDayWorkplaceControl, timePicker } from '../ui/ui.js';
-import { createDay, findSuggestedInterval, getDay, getDayDraftScheduleConflicts, getDayTime, getDays, getDaysForDate, saveDays, updateDayTime } from '../core/day/index.js';
+import { createDay, findSuggestedInterval, getDay, getDayDraftScheduleConflicts, getDayTime, getDays, getDaysForDate, removeDay, saveDays, updateDayTime } from '../core/day/index.js';
 import { getWorkingTimeUsageConflicts } from '../core/time/index.js';
 import { isValidRange } from '../core/time/index.js';
 import { getWorkplaces, resolveWorkplaceTime } from '../core/workplace-time.js';
@@ -54,6 +54,22 @@ function suggestedEntry({ workplaceId, date, workingDays, workplaces }) {
     from: suggested.from,
     to: suggested.to,
   };
+}
+
+export function makeTimetableDayOff({
+  date,
+  workplaceId,
+  onSave = () => {},
+} = {}) {
+  const day = dateKey(date);
+  const id = String(workplaceId || '');
+  if (!day || !id) return false;
+  const workingDays = getDays();
+  if (!removeDay(workingDays, id, day)) return false;
+  const result = saveDays(workingDays);
+  if (!result?.ok) return false;
+  onSave({ date: day, workplaceId: id });
+  return true;
 }
 
 export function openTimetableDayEditor({

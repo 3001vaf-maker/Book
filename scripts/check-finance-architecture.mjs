@@ -486,17 +486,23 @@ const recordPayment = source('journal/record-payment.js');
 if (!/saveSettlementSnapshot/.test(recordPayment) || !/await\s+recordPaymentIncome/.test(recordPayment)) {
   errors.push('Payment UI must save Settlement and await the server money command');
 }
-if (!/recordPaymentOccurredAtValue/.test(recordPayment)
-  || !/paymentOccurredAt/.test(recordPayment)
-  || !/refundOccurredAt/.test(recordPayment)
-  || !/cancelOccurredAt/.test(recordPayment)) {
-  errors.push('Payment/refund/cancel UI must capture factual occurredAt; late Record closure must default payment to Record date/time');
+if (!/datePicker\(\{[^}]*name:\s*['"]recordPaymentDate['"][^}]*allowClear:\s*true/s.test(recordPayment)
+  || /type:\s*['"]datetime-local['"]|paymentOccurredAt|refundOccurredAt|cancelOccurredAt/.test(recordPayment)) {
+  errors.push('Record payment must use the shared optional date-only picker and must not recreate legacy date-time payment/refund fields');
+}
+if (!/datePicker\(\{[^}]*name:\s*['"]recordPaymentCancelDate['"]/s.test(recordPayment)
+  || !/await\s+cancelPaymentOperation/.test(recordPayment)
+  || !/await\s+hardDeleteFinanceOperation/.test(recordPayment)
+  || !/await\s+correctFinanceOperation/.test(recordPayment)) {
+  errors.push('Payment settings must await canonical correction, cancellation and hard-delete Finance commands');
+}
+if (!/await\s+recordRefundExpense/.test(recordPayment)
+  || !/datePicker\(\{[^}]*name:\s*['"]recordPaymentRefundDate['"]/s.test(recordPayment)
+  || /refundOccurredAt|type:\s*['"]datetime-local['"]/.test(recordPayment)) {
+  errors.push('Record payment refund must use the canonical server command with the shared date-only picker');
 }
 if (/finance:\s*settlement/.test(recordPayment)) {
   errors.push('Payment-stage Settlement must not be persisted back into Record');
-}
-if (!/await\s+recordRefundExpense/.test(recordPayment) || !/await\s+cancelPaymentOperation/.test(recordPayment)) {
-  errors.push('Refund and cancellation must await server Finance commands');
 }
 
 if (errors.length) {

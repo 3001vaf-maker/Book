@@ -14,7 +14,7 @@ const recordViewSource = readFileSync(new URL('../journal/record-view.js', impor
 
 assert.match(procedureFormSource, /durationPicker\(\{ label: 'Длительность'/);
 assert.match(recordCreationSource, /durationPicker\(\{ name: 'recordDuration'/);
-assert.match(recordViewSource, /durationPicker\(\{ name: 'recordViewProcedureDuration'/);
-assert.doesNotMatch(recordViewSource, /timePicker\(\{ name: 'recordViewProcedureDuration'/);
+assert.match(recordViewSource, /openRecordEditFlow/);
+assert.doesNotMatch(recordViewSource, /durationPicker\(\{ name: 'recordViewProcedureDuration'|timePicker\(\{ name: 'recordViewProcedureDuration'/);
 
 console.log('ui-duration tests: OK');

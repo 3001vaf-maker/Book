@@ -1,10 +1,11 @@
-import { pageHeader, viewNavigation, initViewNavigation, headerControl, workplaceContent, ALL_WORKPLACES_ID } from '../ui/ui.js';
+import { viewNavigation, initViewNavigation, ALL_WORKPLACES_ID, modal, mountModal, openSharedProfileSettingsMenu, workspaceHeaderContext } from '../ui/ui.js';
 import { getWorkplaceContext, setWorkplaceContext } from '../core/workplace-context.js';
+import { readOnlyReceipt } from '../ui/receipt/index.js';
 import { canUseBookCapability } from '../core/access.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getActiveDayWorkplaces } from '../core/day/index.js';
-import { recordAmountDue } from '../core/finance/index.js';
-import { openTimetableDayEditor } from '../timetable/day-editor.js';
+import { getRecordPaymentState, recordAmountDue } from '../core/finance/index.js';
+import { makeTimetableDayOff, openTimetableDayEditor } from '../timetable/day-editor.js';
 import { getActiveRecordCountForDay, getRecordsForDay } from '../core/record/index.js';
 import { openJournalWorkplaceControl } from './workplace-control.js';
 import { renderJournalDay } from './день.js';
@@ -54,34 +55,6 @@ export function renderJournal(root, options = {}) {
 
   const activeDayWorkplaces = () => getActiveDayWorkplaces(selectedDate, workplaces);
 
-  const dayHeaderSummary = () => {
-    const day = dateKey(selectedDate);
-    const allMode = selectedWorkplaceId === ALL_WORKPLACES_ID;
-    const records = getRecordsForDay(day, allMode ? '' : selectedWorkplaceId)
-      .filter((record) => record?.status !== 'cancelled');
-    const recordCount = records.length;
-    const procedureCount = records.reduce((sum, record) => sum + (Array.isArray(record?.procedures) ? record.procedures.length : 0), 0);
-    const total = records.reduce((sum, record) => sum + recordAmountDue(record), 0);
-    return {
-      primaryText: `${recordCount} зап. - ${procedureCount}пр.`,
-      secondaryText: formatRubles(total),
-    };
-  };
-
-  const renderHeaderControl = () => {
-    const allMode = selectedWorkplaceId === ALL_WORKPLACES_ID;
-    const workplace = allMode ? null : workplaces.find((item) => item.key === selectedWorkplaceId) || null;
-    const summary = activeView === 'day' ? dayHeaderSummary() : {};
-    return headerControl(workplaceContent({
-      workplace,
-      title: allMode ? 'Все записи' : '',
-      ...summary,
-    }), {
-      data: 'data-workplace-header-open',
-      aria: allMode ? 'Все записи по рабочим местам' : `Рабочее место: ${workplace?.name || 'не выбрано'}`,
-    });
-  };
-
   const openDayTime = (workplaceId = '') => {
     openTimetableDayEditor({
       date: selectedDate,
@@ -108,6 +81,8 @@ export function renderJournal(root, options = {}) {
         key: item.workplaceId,
         name: item.name,
         indicatorColor: item.indicatorColor,
+        from: item.from,
+        to: item.to,
       };
     });
     const recordCounts = Object.fromEntries(active.map((workplace) => {
@@ -119,6 +94,7 @@ export function renderJournal(root, options = {}) {
       workplaces: active,
       workplaceId: selectedWorkplaceId,
       recordCounts,
+      aggregateCount: getActiveRecordCountForDay(day),
       onSelect: selectWorkplace,
     });
   };
@@ -134,7 +110,89 @@ export function renderJournal(root, options = {}) {
       workplaces,
       workplaceId: selectedWorkplaceId,
       recordCounts,
+      aggregateCount: getActiveRecordCountForDay(day),
       onSelect: selectWorkplace,
+    });
+  };
+
+  const journalTitle = () => {
+    if (selectedWorkplaceId === ALL_WORKPLACES_ID) return 'Журнал';
+    return workplaces.find((item) => String(item?.key || '') === String(selectedWorkplaceId || ''))?.name || 'Журнал';
+  };
+
+  const openDayZReport = () => {
+    const day = dateKey(selectedDate);
+    const allMode = selectedWorkplaceId === ALL_WORKPLACES_ID;
+    const records = getRecordsForDay(day, allMode ? '' : selectedWorkplaceId)
+      .filter((record) => record?.status !== 'cancelled');
+    const procedureCount = records.reduce((sum, record) => sum + (Array.isArray(record?.procedures) ? record.procedures.length : 0), 0);
+    const total = records.reduce((sum, record) => sum + recordAmountDue(record), 0);
+    const average = records.length ? total / records.length : 0;
+    const dateLabel = selectedDate.toLocaleDateString('ru-RU');
+    const workplaceLabel = allMode ? 'Все пространства' : journalTitle();
+    const groups = [
+      [
+        { label: workplaceLabel, value: dateLabel },
+        { label: 'Кол-во записей:', value: String(records.length) },
+        { label: 'Кол-во процедур:', value: String(procedureCount) },
+        { label: 'Сумма:', value: formatRubles(total) },
+        { label: 'Средний чек:', value: formatRubles(average) },
+      ],
+      ...records.map((record) => {
+        const person = record?.person || {};
+        const fullName = [person?.name, person?.surname].map((value) => String(value || '').trim()).filter(Boolean).join(' ');
+        const identity = [person?.uei, fullName].map((value) => String(value || '').trim()).filter(Boolean).join(' ');
+        const payment = getRecordPaymentState(record);
+        const status = payment.fullyPaid ? 'оплачено' : payment.partiallyPaid ? 'задолженность' : 'к оплате';
+        return [
+          { label: identity || 'Запись', value: formatRubles(recordAmountDue(record)) },
+          { label: 'Статус', value: status },
+        ];
+      }),
+    ];
+    mountModal(document.body, modal(readOnlyReceipt({
+      title: 'Z - Отчет',
+      groups,
+    }), { variant: 'top', surface: 'app', title: 'Z - Отчет' }));
+  };
+
+  const makeSelectedDayOff = () => {
+    if (selectedWorkplaceId === ALL_WORKPLACES_ID) return;
+    const day = dateKey(selectedDate);
+    if (getActiveRecordCountForDay(day, selectedWorkplaceId) > 0) return;
+    makeTimetableDayOff({
+      date: selectedDate,
+      workplaceId: selectedWorkplaceId,
+      onSave: renderView,
+    });
+  };
+
+  const openJournalSettings = () => {
+    const day = dateKey(selectedDate);
+    const allMode = selectedWorkplaceId === ALL_WORKPLACES_ID;
+    const canMakeDayOff = activeView === 'day'
+      && !allMode
+      && getActiveRecordCountForDay(day, selectedWorkplaceId) === 0;
+    openSharedProfileSettingsMenu({
+      title: 'Настройки журнала',
+      actions: [
+        {
+          id: 'workplace',
+          label: 'Рабочее пространство',
+          onSelect: activeView === 'day' ? openDayWorkplaces : openWorkplace,
+        },
+        activeView === 'day' ? {
+          id: 'z-report',
+          label: 'Z-Отчет',
+          onSelect: openDayZReport,
+        } : null,
+        canMakeDayOff ? {
+          id: 'day-off',
+          label: 'Сделать выходным',
+          variant: 'danger',
+          onSelect: makeSelectedDayOff,
+        } : null,
+      ].filter(Boolean),
     });
   };
 
@@ -145,7 +203,15 @@ export function renderJournal(root, options = {}) {
       : '';
     const viewClass = activeView === 'list' ? ' class="journal-list-viewport"' : '';
     const primaryNavigation = externalNavigation ? '' : viewNavigation({ views: availableViews, activeView });
-    root.innerHTML = `${pageHeader('Журнал', '', renderHeaderControl())}${primaryNavigation}${listModeNavigation}<div data-journal-view${viewClass}></div>`;
+    root.innerHTML = `${workspaceHeaderContext({
+      title: activeView === 'day' ? journalTitle() : 'Журнал',
+      a: {
+        kind: 'settings',
+        label: 'Настройки журнала',
+        data: 'data-journal-settings',
+        aria: 'Настройки журнала',
+      },
+    })}${primaryNavigation}${listModeNavigation}<div data-journal-view${viewClass}></div>`;
     const viewRoot = root.querySelector('[data-journal-view]');
     if (activeView === 'day') {
       renderJournalDay(viewRoot, {
@@ -171,7 +237,7 @@ export function renderJournal(root, options = {}) {
       });
     } else renderJournalList(viewRoot, { mode: listMode, workplaceId: selectedWorkplaceId });
 
-    root.querySelector('[data-workplace-header-open]')?.addEventListener('click', activeView === 'day' ? openDayWorkplaces : openWorkplace);
+    root.querySelector('[data-journal-settings]')?.addEventListener('click', openJournalSettings);
     const listModeRoot = root.querySelector('[data-journal-list-mode-navigation]');
     if (listModeRoot) {
       initViewNavigation(listModeRoot, {

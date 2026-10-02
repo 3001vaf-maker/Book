@@ -3,6 +3,7 @@ import { apiRequest } from './auth.js';
 let serverReady = false;
 let running = false;
 let lastError = null;
+let pendingPermanentError = null;
 const queue = [];
 const idleWaiters = [];
 const completedMutationScopes = new Set();
@@ -13,13 +14,18 @@ function sleep(ms) {
 
 async function responseJson(response, fallbackMessage) {
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload?.message || fallbackMessage);
+  if (!response.ok) {
+    const error = new Error(payload?.message || fallbackMessage);
+    error.status = Number(response.status) || 0;
+    throw error;
+  }
   return payload;
 }
 
 function reportError(error) {
+  const previousMessage = lastError?.message || '';
   lastError = error instanceof Error ? error : new Error(String(error || 'Ошибка серверного сохранения'));
-  if (typeof window !== 'undefined') {
+  if (typeof window !== 'undefined' && lastError.message !== previousMessage) {
     window.dispatchEvent(new CustomEvent('book:business-persistence-error', { detail: { message: lastError.message } }));
   }
 }
@@ -60,6 +66,39 @@ async function send(item) {
   return responseJson(response, item.fallbackMessage);
 }
 
+function failedRecordMutationId(item = null) {
+  const method = String(item?.options?.method || '').toUpperCase();
+  if (method !== 'PUT' && method !== 'DELETE') return '';
+  const match = String(item?.path || '').match(/^\/business-state\/records\/([^/]+)$/);
+  return match ? decodeURIComponent(match[1]) : '';
+}
+
+function discardImmediateRecordEvents(recordId, error) {
+  const id = String(recordId || '');
+  if (!id) return;
+  while (queue.length) {
+    const next = queue[0];
+    const path = String(next?.path || '');
+    const method = String(next?.options?.method || '').toUpperCase();
+    const deleteEventsPath = `/business-state/records/${encodeURIComponent(id)}/events`;
+    if (method === 'DELETE' && path === deleteEventsPath) {
+      queue.shift();
+      next.resolve?.({ ok: false, error });
+      continue;
+    }
+    if (!path.startsWith('/business-state/record-events/')) break;
+    let eventRecordId = '';
+    try {
+      eventRecordId = String(JSON.parse(next?.options?.body || '{}')?.event?.recordId || '');
+    } catch {
+      eventRecordId = '';
+    }
+    if (eventRecordId !== id) break;
+    queue.shift();
+    next.resolve?.({ ok: false, error });
+  }
+}
+
 async function runQueue() {
   if (running || !serverReady) return;
   running = true;
@@ -74,6 +113,14 @@ async function runQueue() {
         markMutationCompleted(item.path);
       } catch (error) {
         reportError(error);
+        const status = Number(error?.status) || 0;
+        if (status >= 400 && status < 500) {
+          queue.shift();
+          pendingPermanentError = lastError;
+          item.resolve?.({ ok: false, error: lastError });
+          discardImmediateRecordEvents(failedRecordMutationId(item), lastError);
+          continue;
+        }
         await sleep(1200);
       }
     }
@@ -187,15 +234,22 @@ export function queueAuxiliaryDataset(dataset, value) {
 }
 
 export async function flushBusinessPersistence({ timeoutMs = 12000 } = {}) {
-  if (!serverReady || (!queue.length && !running)) return;
-  let timer;
-  await Promise.race([
-    new Promise((resolve) => {
-      idleWaiters.push(resolve);
-      resolveIdle();
-    }),
-    new Promise((_, reject) => {
-      timer = setTimeout(() => reject(lastError || new Error('Серверное сохранение не завершено')), timeoutMs);
-    }),
-  ]).finally(() => clearTimeout(timer));
+  if (!serverReady) return;
+  if (queue.length || running) {
+    let timer;
+    await Promise.race([
+      new Promise((resolve) => {
+        idleWaiters.push(resolve);
+        resolveIdle();
+      }),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(lastError || new Error('Серверное сохранение не завершено')), timeoutMs);
+      }),
+    ]).finally(() => clearTimeout(timer));
+  }
+  if (pendingPermanentError) {
+    const error = pendingPermanentError;
+    pendingPermanentError = null;
+    throw error;
+  }
 }
