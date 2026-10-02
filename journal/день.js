@@ -4,9 +4,6 @@ import { getDays, getDay, getDayTime, getDaysForDate, getScheduleConflicts } fro
 import { getTimeUsagesForScope } from '../core/time/index.js';
 import { getTimeAvailabilityAt } from '../core/time/index.js';
 import { getRecordPaymentState, recordAmountDue } from '../core/finance/index.js';
-import { openRecordCreation } from './record.js';
-import { openRecordView } from './record-view.js';
-import { openBreakView } from './break-view.js';
 
 function dateKey(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
 function withFinancialState(usages = []) {
@@ -17,16 +14,20 @@ function withFinancialState(usages = []) {
   } : usage);
 }
 
-function openExistingRecord(record) {
+async function openExistingRecord(record) {
+  const { openRecordView } = await import('./record-view.js');
   openRecordView(record);
 }
 
-function openUsage(usage, rerender = () => {}) {
+async function openUsage(usage, rerender = () => {}) {
   if (usage?.type === 'record') {
-    openExistingRecord(usage);
+    await openExistingRecord(usage);
     return;
   }
-  if (usage?.type === 'break') openBreakView(usage, { onClose: rerender });
+  if (usage?.type === 'break') {
+    const { openBreakView } = await import('./break-view.js');
+    openBreakView(usage, { onClose: rerender });
+  }
 }
 
 export function renderJournalDay(root, {
@@ -86,15 +87,16 @@ export function renderJournalDay(root, {
 
   contentRoot.innerHTML = journalDayTimeline({ from: time.from, to: time.to, usages });
   initJournalDayTimeline(contentRoot, {
-    onUsageClick: ({ usageId }) => openUsage(usageById.get(String(usageId || '')), rerender),
-    onSlotClick: ({ from, to }) => {
+    onUsageClick: ({ usageId }) => { void openUsage(usageById.get(String(usageId || '')), rerender); },
+    onSlotClick: async ({ from, to }) => {
       const minuteState = getTimeAvailabilityAt({ date: dayDate, workplaceId, time: from });
       if (minuteState.state === 'occupied' && minuteState.usage) {
         const usage = usageById.get(String(minuteState.usage.sourceId || '')) || minuteState.usage;
-        openUsage(usage, rerender);
+        await openUsage(usage, rerender);
         return;
       }
       if (minuteState.state !== 'free') return;
+      const { openRecordCreation } = await import('./record.js');
       openRecordCreation({ date, workplaceId, from, to });
     },
   });
