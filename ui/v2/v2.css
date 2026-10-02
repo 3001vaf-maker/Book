@@ -43,7 +43,7 @@
 .v2-header__slot.is-empty{display:none}
 .v2-header:not(.has-d).has-c .v2-header__slot--c{grid-column:3/5;justify-items:end}
 .v2-header__title-control{width:100%;border:0;padding:0;background:transparent;color:#fff;text-align:left}
-.v2-header__control{position:relative;min-width:42px;height:42px;border:0;padding:0 12px;display:grid;place-items:center;background:#fff;color:var(--v2-ink);font:inherit;font-weight:760}
+.v2-header__control{position:relative;min-width:42px;height:42px;border:0;padding:0 12px;display:grid;place-items:center;background:#fff;color:var(--v2-ink);font:inherit;font-weight:760;touch-action:manipulation}
 
 /* A is one immutable Shared Header control. Only its data changes by section. */
 .v2-header__slot--a .v2-header__control{box-sizing:border-box;width:48px;min-width:48px;max-width:48px;height:48px;min-height:48px;max-height:48px;border:2px solid var(--v2-yellow);border-radius:50%;padding:0;overflow:hidden;background:var(--v2-base);color:#fff}
@@ -59,6 +59,7 @@
 .v2-header__slot--c .v2-header__control--white{border-color:#111;background:#fff;color:#111}
 .v2-header__slot--c .v2-header__control--danger{border-color:var(--v2-danger);background:var(--v2-danger);color:#fff}
 .v2-header__slot--c .v2-header__control:disabled{border-color:#B7B7B7;background:var(--v2-disabled);color:#777}
+.v2-header__slot--c .v2-header__control:active{transform:translateY(1px);filter:brightness(.92)}
 
 /* D chat is the white chat mark itself, never a circular button. */
 .v2-header__control--settings,.v2-header__control--contacts,.v2-header__control--attachment,.v2-header__control--back{width:42px;border-radius:50%;padding:0}
