@@ -1,16 +1,42 @@
-import { button, details, field, initPaymentForm, initPaymentMethods, modal, mountModal, openNotice, paymentForm, paymentMethods, paymentReceipt, select, shortDate, shortTime } from '../ui/ui.js';
-import { calculateSettlement, getRecordPaymentState, getWallets, recordSettlementItems } from '../core/finance/index.js';
-import { cancelPaymentOperation, getRefundsForPayment, recordPaymentIncome, recordRefundExpense, saveSettlementSnapshot } from '../core/finance/index.js';
+import {
+  button,
+  datePicker,
+  initDatePickers,
+  initPaymentForm,
+  initPaymentMethods,
+  modal,
+  mountModal,
+  mountV2ZLayer,
+  openNotice,
+  openSharedProfileSettingsMenu,
+  paymentForm,
+  paymentMethods,
+  setRecordPrimaryAction,
+  shortDate,
+  v2ZLayer,
+  workspaceHeaderContext,
+} from '../ui/ui.js';
+import {
+  calculateSettlement,
+  cancelPaymentOperation,
+  correctFinanceOperation,
+  getRecordPaymentState,
+  getWallets,
+  hardDeleteFinanceOperation,
+  recordPaymentIncome,
+  recordSettlementItems,
+  refreshFinanceState,
+  saveSettlementSnapshot,
+} from '../core/finance/index.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { normalizeWorkplaceTimeZone, zonedDateTimeParts, zonedDateTimeToDate } from '../core/time/index.js';
 import { getAllPeople } from '../core/people/data.js';
 import { personDisplay } from '../core/people/presentation.js';
-import { getRecord } from '../core/record/index.js';
-import { setRecordAttendance, updateRecord } from '../core/record/index.js';
+import { getRecord, refreshRecordsFromServer, setRecordConfirmed, updateRecord } from '../core/record/index.js';
+import { flushBusinessPersistence } from '../core/business-persistence.js';
 import { journalRecordActionContext } from './record-action-context.js';
 
 const money = (value) => `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(Number(value || 0)).replaceAll('\u00a0', ' ')} ₽`;
-
 
 function personForRecord(record) {
   const source = record?.person || {};
@@ -41,36 +67,32 @@ async function saveSettlementCorrection(record, settlement) {
   const current = getRecord(record?.id) || record;
   const state = paymentStateForRecord(current);
   if (Number(settlement?.planTotal || 0) + 0.009 < Number(state?.paidTotal || 0)) {
-    openNotice({ message: 'Расчёт нельзя уменьшить ниже уже оплаченной суммы. Сначала выполните возврат или отмените ошибочную оплату.' });
+    openNotice({ message: 'Расчёт нельзя уменьшить ниже уже оплаченной суммы. Сначала отмените ошибочную оплату.' });
     return null;
   }
+
   try {
     await saveSettlementSnapshot({
       source: { type: 'record', id: current.id },
       settlement,
     });
+    const updated = updateRecord(current.id, {
+      procedures: sourcesFromSettlement(current?.procedures, settlement, 'procedure'),
+      products: sourcesFromSettlement(current?.products, settlement, 'product'),
+    });
+    if (!updated) throw new Error('Не удалось обновить запись');
+    await flushBusinessPersistence();
+    await Promise.all([
+      refreshRecordsFromServer(),
+      refreshFinanceState(),
+    ]);
+    return getRecord(current.id) || updated;
   } catch (error) {
+    await refreshRecordsFromServer().catch(() => null);
+    await refreshFinanceState().catch(() => null);
     openNotice({ message: String(error?.message || 'Не удалось сохранить расчёт') });
     return null;
   }
-  const updated = updateRecord(current.id, {
-    procedures: sourcesFromSettlement(current?.procedures, settlement, 'procedure'),
-    products: sourcesFromSettlement(current?.products, settlement, 'product'),
-  });
-  if (!updated) {
-    openNotice({ message: 'Расчёт сохранён, но запись не удалось обновить. Перезагрузите Book перед следующей операцией.' });
-    return null;
-  }
-  return getRecord(current.id) || updated;
-}
-
-function paymentEntryContent(record) {
-  const state = paymentStateForRecord(record);
-  if (state.fullyPaid) {
-    return `<button type="button" class="modal-bottom-action modal-bottom-action--paid" data-record-payment-paid aria-label="Открыть оплату ${state.paidTotal} рублей"><strong>Оплачено</strong><strong>${money(state.paidTotal)}</strong></button>`;
-  }
-  const partialClass = state.partiallyPaid ? ' modal-bottom-action--partial' : '';
-  return `<button type="button" class="modal-bottom-action${partialClass}" data-record-payment-open aria-label="Открыть оплату, к оплате ${state.remaining} рублей"><span>К оплате</span><strong>${money(state.remaining)}</strong></button>`;
 }
 
 function workplaceForId(id) {
@@ -91,13 +113,19 @@ function paymentWorkplaceTimeZone(paymentOrRecord = null) {
   return normalizeWorkplaceTimeZone(workplace?.timeZone || '');
 }
 
-function financeDateTimeInputValue(date = new Date(), paymentOrRecord = null) {
-  const parts = zonedDateTimeParts(date, paymentWorkplaceTimeZone(paymentOrRecord));
-  return `${parts.date}T${parts.time}`;
+function occurredAtForDate(dateValue, paymentOrRecord = null, reference = new Date()) {
+  const source = reference instanceof Date ? reference : new Date(reference);
+  const safe = Number.isFinite(source.getTime()) ? source : new Date();
+  if (!dateValue) return safe;
+  const parts = zonedDateTimeParts(safe, paymentWorkplaceTimeZone(paymentOrRecord));
+  const time = /^\d{2}:\d{2}$/.test(parts.time || '') ? parts.time : '12:00';
+  return zonedDateTimeToDate(`${dateValue}T${time}`, paymentWorkplaceTimeZone(paymentOrRecord));
 }
 
-function financeDateTimeValue(value, paymentOrRecord = null) {
-  return zonedDateTimeToDate(value, paymentWorkplaceTimeZone(paymentOrRecord));
+function paymentDateValue(paymentOrRecord = null, reference = null) {
+  const value = reference || paymentOrRecord?.occurredAt || paymentOrRecord?.paidAt || '';
+  if (!value) return '';
+  return zonedDateTimeParts(value, paymentWorkplaceTimeZone(paymentOrRecord)).date || '';
 }
 
 function recordPerson(record) {
@@ -109,22 +137,11 @@ function recordPerson(record) {
   };
 }
 
-function recordPaymentOccurredAtValue(record) {
-  const date = String(record?.date || '').slice(0, 10);
-  const time = String(record?.to || record?.from || '').slice(0, 5);
-  if (date && /^\d{2}:\d{2}$/.test(time)) return `${date}T${time}`;
-  if (date) return `${date}T12:00`;
-  return financeDateTimeInputValue(new Date(), record);
-}
-
 function paymentMoment(record) {
-  const raw = recordPaymentOccurredAtValue(record);
-  const date = raw.slice(0, 10);
-  const time = raw.slice(11, 16);
+  const date = String(record?.date || '').slice(0, 10);
   return {
     date: date ? shortDate(new Date(`${date}T12:00:00`)) : '',
-    time: time || '',
-    occurredAtValue: raw,
+    time: `${String(record?.from || '')} - ${String(record?.to || '')}`,
   };
 }
 
@@ -136,339 +153,349 @@ function paymentFromRecord(record) {
     person: recordPerson(record),
     date: moment.date,
     time: moment.time,
-    occurredAtValue: moment.occurredAtValue,
     settlement: settlementForRecord(record),
   };
 }
 
 function paymentAllocations(payment) {
   if (Array.isArray(payment?.allocations) && payment.allocations.length) return payment.allocations.map((item) => ({ ...item }));
-  if (payment?.walletId) return [{ walletId: payment.walletId, walletName: payment.walletName || '', amount: Number(payment.total || 0) }];
+  if (payment?.walletId) return [{
+    walletId: payment.walletId,
+    walletName: payment.walletName || '',
+    amount: Number(payment.total || 0),
+  }];
   return [];
 }
 
-function paymentDateTime(payment) {
-  const value = payment?.refundedAt || payment?.paidAt || payment?.createdAt;
-  if (value) {
-    const parts = zonedDateTimeParts(value, paymentWorkplaceTimeZone(payment));
-    if (parts.date) return { date: shortDate(parts.date), time: parts.time };
-  }
-  return {
-    date: String(payment?.date || ''),
-    time: String(payment?.time || ''),
-  };
-}
-
-function walletSummary(payment) {
-  const allocations = paymentAllocations(payment);
-  if (!allocations.length) return payment?.walletName || '—';
-  return allocations.map((item) => item.walletName || 'Кошелёк').join(' + ');
-}
-
-function paymentFactMarkup(payment) {
-  const when = paymentDateTime(payment);
-  return paymentReceipt({
-    workplace: payment?.workplace || '',
-    date: when.date || '—',
-    time: when.time || '—',
-    person: payment?.person || {},
-    amount: money(payment?.total),
-    wallet: walletSummary(payment),
-    tips: Number(payment?.tips || 0) > 0 ? money(payment.tips) : '',
+function paymentLayerContext(record, state) {
+  return workspaceHeaderContext({
+    title: 'Оплата',
+    a: state?.hasPayments ? {
+      kind: 'settings',
+      label: 'Настройки оплаты',
+      data: 'data-record-payment-settings',
+      aria: 'Настройки оплаты',
+    } : null,
+    d: record?.person?.key ? {
+      kind: 'chat',
+      data: 'data-record-payment-chat',
+      aria: 'Чат',
+    } : null,
+    hideD: !record?.person?.key,
   });
 }
 
-function sourcePaymentFactMarkup(state) {
-  const payments = Array.isArray(state?.payments) ? state.payments : [];
-  const latest = state?.latestPayment || payments[payments.length - 1] || null;
-  if (!latest) return '';
-  const when = paymentDateTime(latest);
-  const wallets = [];
-  payments.forEach((payment) => paymentAllocations(payment).forEach((allocation) => {
-    const name = allocation.walletName || 'Кошелёк';
-    if (!wallets.includes(name)) wallets.push(name);
+function blankPaymentContext() {
+  return workspaceHeaderContext({
+    title: ' ',
+    hideD: true,
+  });
+}
+
+function bindPaymentChat(layer, record) {
+  layer.querySelector('[data-record-payment-chat]')?.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('book:record-chat-request', {
+      detail: { personKey: String(record?.person?.key || '') },
+    }));
+  });
+}
+
+function paymentItems(settlement) {
+  return (Array.isArray(settlement?.items) ? settlement.items : []).map((item) => ({
+    sourceType: item.sourceType || 'procedure',
+    id: item.sourceId,
+    name: item.name,
+    cost: item.price,
+    discountMode: item.discountMode,
+    discountPercent: item.discountPercent,
+    discountMoney: item.discountMoney,
   }));
-  const receivedTotal = payments.reduce((sum, payment) => sum + Number(payment?.total || 0), 0);
-  return paymentReceipt({
-    workplace: latest?.workplace || '',
-    date: when.date || '—',
-    time: when.time || '—',
-    person: latest?.person || {},
-    amount: money(receivedTotal),
-    wallet: wallets.join(' + ') || '—',
-    tips: Number(state?.tipsTotal || 0) > 0 ? money(state.tipsTotal) : '',
-  });
 }
 
-function openPaymentMethodsModal(payment, paymentModal) {
-  const recordState = getRecordPaymentState({ id: payment?.source?.id || '', finance: payment?.settlement || null });
-  const total = Number(recordState.remaining || 0);
-  if (total <= 0.009) return;
-  const content = `<div class="modal-title"><h2>Способ оплаты</h2></div>
-    ${field({ label: 'Фактическая дата и время', name: 'paymentOccurredAt', type: 'datetime-local', value: payment?.occurredAtValue || financeDateTimeInputValue(new Date(), payment), required: true })}
-    ${paymentMethods({ wallets: getWallets(), total })}`;
-  const methodsModal = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
-  if (!methodsModal) return;
+function openPaymentAllocationLayer(parentLayer, record, settlement, onCompleted) {
+  const current = getRecord(record?.id) || record;
+  const state = paymentStateForRecord(current);
+  const total = Math.max(0, Number(settlement?.planTotal || 0) - Number(state?.paidTotal || 0));
+  const layer = mountV2ZLayer(parentLayer, v2ZLayer(
+    `${blankPaymentContext()}<div class="record-screen record-screen--state-view" data-record-payment-allocation-host></div>`,
+    { className: 'record-payment-allocation-z' },
+  ), { stack: true });
+  if (!layer) return null;
 
-  const finish = (completed) => {
-    if (!completed) return;
-    if (completed?.source?.type === 'record' && completed?.source?.id) {
-      setRecordAttendance(completed.source.id, 'arrived', { actionContext: journalRecordActionContext() });
+  const host = layer.querySelector('[data-record-payment-allocation-host]');
+  host.innerHTML = `
+    <div class="payment-methods__total"><span>К оплате</span><strong>${money(total)}</strong></div>
+    <div class="compact-form">
+      ${datePicker({ label: 'Дата оплаты', name: 'recordPaymentDate', value: '', allowClear: true })}
+    </div>
+    ${paymentMethods({ wallets: getWallets(), total, showAction: false, showTotal: false })}`;
+  initDatePickers(host);
+
+  let allocationState = null;
+  const syncPrimary = () => {
+    if (!allocationState?.valid) {
+      setRecordPrimaryAction(layer);
+      return;
     }
-    methodsModal.remove();
-    paymentModal?.remove();
+    setRecordPrimaryAction(layer, {
+      label: 'Оплатить',
+      onClick: async () => {
+        const dateValue = String(host.querySelector('input[name="recordPaymentDate"]')?.value || '');
+        try {
+          const completed = await recordPaymentIncome({
+            source: { type: 'record', id: current.id },
+            workplace: workplaceName(current.workplaceId),
+            person: recordPerson(current),
+            settlement,
+            allocations: allocationState.allocations,
+            maxAmount: total,
+            serviceAmount: allocationState.applied,
+            tips: allocationState.tips,
+            occurredAt: occurredAtForDate(dateValue, current),
+          });
+          if (!completed) return;
+          setRecordConfirmed(current.id, true, { actionContext: journalRecordActionContext() });
+          await flushBusinessPersistence();
+          await refreshRecordsFromServer();
+          layer.v2Close?.();
+          onCompleted?.();
+        } catch (error) {
+          openNotice({ message: String(error?.message || 'Не удалось провести оплату') });
+        }
+      },
+    });
   };
 
-  initPaymentMethods(methodsModal.querySelector('[data-payment-methods]'), {
-    onPay: async ({ allocations, tips, appliedAmount }) => {
-      const occurredAtInput = methodsModal.querySelector('input[name="paymentOccurredAt"]');
-      if (!occurredAtInput?.value) return;
-      const completed = await recordPaymentIncome({
-        source: payment.source,
-        workplace: payment.workplace,
-        person: payment.person,
-        settlement: payment.settlement,
-        allocations,
-        maxAmount: total,
-        serviceAmount: appliedAmount,
-        tips,
-        occurredAt: financeDateTimeValue(occurredAtInput.value, payment),
-      });
-      finish(completed);
+  initPaymentMethods(host.querySelector('[data-payment-methods]'), {
+    onChange: (next) => {
+      allocationState = next;
+      syncPrimary();
     },
   });
+  syncPrimary();
+  return layer;
 }
 
-function openPaymentModal(record, { onCancelled = () => {} } = {}) {
-  if (paymentStateForRecord(record).fullyPaid) return;
-  const current = getRecord(record?.id) || record;
+function openPaymentCorrection(parentLayer, record, payment, onSaved) {
+  if (!payment?.id) return null;
+  const serviceAmount = Math.max(0, Number(payment?.serviceAmount || 0));
+  const initialAllocations = paymentAllocations(payment);
+  const layer = mountV2ZLayer(parentLayer, v2ZLayer(
+    `${workspaceHeaderContext({ title: 'Корректировка оплаты', hideD: true })}<div class="record-screen record-screen--state-view" data-record-payment-correction-host></div>`,
+    { className: 'record-payment-correction-z' },
+  ), { stack: true });
+  if (!layer) return null;
+
+  const host = layer.querySelector('[data-record-payment-correction-host]');
+  host.innerHTML = `
+    <div class="payment-methods__total"><span>Оплата</span><strong>${money(payment.total)}</strong></div>
+    <div class="compact-form">
+      ${datePicker({
+        label: 'Дата оплаты',
+        name: 'recordPaymentCorrectionDate',
+        value: paymentDateValue(payment),
+        allowClear: false,
+      })}
+    </div>
+    ${paymentMethods({
+      wallets: getWallets(),
+      total: serviceAmount,
+      showAction: false,
+      showTotal: false,
+      initialAllocations,
+    })}`;
+  initDatePickers(host);
+
+  let allocationState = null;
+  const syncPrimary = () => {
+    if (!allocationState?.valid) {
+      setRecordPrimaryAction(layer);
+      return;
+    }
+    setRecordPrimaryAction(layer, {
+      label: 'Сохранить',
+      variant: 'secondary',
+      onClick: async () => {
+        const dateValue = String(host.querySelector('input[name="recordPaymentCorrectionDate"]')?.value || '');
+        try {
+          await correctFinanceOperation(payment.id, {
+            allocations: allocationState.allocations,
+            serviceAmount: allocationState.applied,
+            tips: allocationState.tips,
+            occurredAt: occurredAtForDate(dateValue, record, payment.occurredAt || payment.paidAt || new Date()),
+          });
+          layer.v2Close?.();
+          onSaved?.();
+        } catch (error) {
+          openNotice({ message: String(error?.message || 'Не удалось скорректировать оплату') });
+        }
+      },
+    });
+  };
+
+  initPaymentMethods(host.querySelector('[data-payment-methods]'), {
+    onChange: (next) => {
+      allocationState = next;
+      syncPrimary();
+    },
+  });
+  syncPrimary();
+  return layer;
+}
+
+function openPaymentCancellation(record, payment, onSaved) {
+  if (!payment?.id) return null;
+  const layer = mountModal(document.body, modal(
+    `<div class="compact-form">
+      ${datePicker({ label: 'Дата отмены', name: 'recordPaymentCancelDate', value: paymentDateValue(record, new Date()), allowClear: false })}
+      ${button('Отменить оплату', { variant: 'danger', data: 'data-record-payment-cancel-confirm' })}
+    </div>`,
+    { variant: 'bottom', surface: 'app', title: 'Отмена оплаты' },
+  ));
+  if (!layer) return null;
+  initDatePickers(layer);
+  layer.querySelector('[data-record-payment-cancel-confirm]')?.addEventListener('click', async () => {
+    const dateValue = String(layer.querySelector('input[name="recordPaymentCancelDate"]')?.value || '');
+    try {
+      await cancelPaymentOperation(payment.id, {
+        reason: 'incorrect-entry',
+        occurredAt: occurredAtForDate(dateValue, record),
+      });
+      layer.v2Close?.();
+      onSaved?.();
+    } catch (error) {
+      openNotice({ message: String(error?.message || 'Не удалось отменить оплату') });
+    }
+  });
+  return layer;
+}
+
+function openPaymentDeletion(payment, onSaved) {
+  if (!payment?.id) return null;
+  const layer = mountModal(document.body, modal(
+    `<div class="modal-title"><h2>Удалить оплату полностью?</h2><p>Данные этой оплаты будут удалены из финансовой истории без восстановления.</p></div>
+    <div class="modal-actions">${button('Удалить оплату', { variant: 'critical', data: 'data-record-payment-delete-confirm' })}</div>`,
+    { variant: 'bottom', surface: 'app', title: 'Удаление оплаты' },
+  ));
+  layer?.querySelector('[data-record-payment-delete-confirm]')?.addEventListener('click', async () => {
+    try {
+      await hardDeleteFinanceOperation(payment.id);
+      layer.v2Close?.();
+      onSaved?.();
+    } catch (error) {
+      openNotice({ message: String(error?.message || 'Не удалось удалить оплату') });
+    }
+  });
+  return layer;
+}
+
+function openPaymentSettings(layer, record, state, rerender) {
+  const payment = state?.latestPayment || null;
+  if (!payment) return null;
+  return openSharedProfileSettingsMenu({
+    title: 'Настройки оплаты',
+    actions: [
+      {
+        id: 'correct-payment',
+        label: 'Корректировка оплаты',
+        onSelect: () => openPaymentCorrection(layer, record, payment, rerender),
+      },
+      {
+        id: 'cancel-payment',
+        label: 'Отмена оплаты',
+        variant: 'danger',
+        onSelect: () => openPaymentCancellation(record, payment, rerender),
+      },
+      {
+        id: 'delete-payment',
+        label: 'Удаление оплаты',
+        variant: 'critical',
+        onSelect: () => openPaymentDeletion(payment, rerender),
+      },
+    ],
+  });
+}
+
+function renderPaymentLayer(layer, recordId) {
+  const current = getRecord(recordId);
+  if (!current) {
+    layer.v2Close?.();
+    return;
+  }
   const state = paymentStateForRecord(current);
   const payment = paymentFromRecord(current);
   const settlement = payment.settlement;
-  const paymentHistory = state.hasPayments
-    ? `<div class="modal-actions">${button(`Оплачено ${money(state.paidTotal)} · История`, { variant: 'secondary', data: 'data-payment-history' })}</div>`
-    : '';
-  const content = `<div class="modal-title"><h2>Оплата</h2></div>${paymentHistory}${paymentForm({
-    workplace: payment.workplace,
-    date: payment.date,
-    time: payment.time,
-    person: payment.person || {},
-    procedures: (settlement?.items || []).map((item) => ({ sourceType: item.sourceType || 'procedure', id: item.sourceId, name: item.name, cost: item.price, discountMode: item.discountMode, discountPercent: item.discountPercent, discountMoney: item.discountMoney })),
-    total: settlement?.planTotal || 0,
-  })}`;
-  const m = mountModal(document.body, modal(content, { variant: 'large', surface: 'app' }));
-  if (!m) return;
-  m.querySelector('[data-payment-history]')?.addEventListener('click', () => openPaidState(current, {
-    onCancelled: (cancelled) => {
-      m.remove();
-      onCancelled(cancelled);
-    },
-  }));
-  initPaymentForm(m.querySelector('[data-payment-ui]'), {
-    calculate: (items) => calculateSettlement(items),
-    onRemove: async ({ settlement: updatedSettlement }) => {
-      const updated = await saveSettlementCorrection(current, updatedSettlement);
-      if (updated) return;
-      m.remove();
-      openPaymentModal(getRecord(current.id) || current);
-    },
-    onSave: async ({ settlement: updatedSettlement }) => {
-      const updated = await saveSettlementCorrection(current, updatedSettlement);
-      if (!updated) return;
-      m.remove();
-    },
-    onPay: async ({ settlement: updatedSettlement }) => {
-      const updated = await saveSettlementCorrection(current, updatedSettlement);
-      if (!updated) return;
-      openPaymentMethodsModal({ ...paymentFromRecord(updated), settlement: updatedSettlement }, m);
-    },
-  });
-}
 
-function refundHistoryMarkup(refunds) {
-  if (!refunds.length) return '';
-  return `<div class="payment-refund-history">${refunds.map((item) => {
-    const when = paymentDateTime(item);
-    return `<div class="payment-refund-history__item"><strong class="payment-refund-history__label">Возврат</strong>${details([
-      { left: when.date || '—', right: when.time || '—' },
-      { left: money(item.total), right: item.walletName || 'Кошелёк' },
-    ], { variant: 'split' })}</div>`;
-  }).join('')}</div>`;
-}
-
-function refreshPaidStateForPayment(payment) {
-  const source = payment?.source;
-  if (String(source?.type || '') !== 'record' || !source?.id) return;
-  const current = getRecord(source.id);
-  if (!current) return;
-  const state = paymentStateForRecord(current);
-  if (state.hasPayments) openPaidState(current);
-}
-
-function openRefundModal(payment) {
-  const refunds = getRefundsForPayment(payment.id);
-  const refunded = refunds.reduce((sum, item) => sum + Number(item?.total || 0), 0);
-  const remaining = Math.max(0, Number(payment.total || 0) - refunded);
-  if (!remaining) {
-    mountModal(document.body, modal(`<div class="modal-title"><h2>Возврат выполнен</h2></div>${paymentFactMarkup(payment)}${refundHistoryMarkup(refunds)}`, { variant: 'compact', surface: 'app' }));
-    return;
-  }
-  const wallets = getWallets();
-  const allocations = paymentAllocations(payment);
-  const defaultWalletId = allocations.length === 1 ? String(allocations[0]?.walletId || '') : '';
-  const options = [{ value: '', label: 'Кошелёк возврата' }, ...wallets.map((wallet) => ({ value: wallet.id, label: wallet.name }))];
-  const html = `<div class="modal-title"><h2>Возврат оплаты</h2></div>
-    ${paymentFactMarkup(payment)}
-    ${refundHistoryMarkup(refunds)}
-    <div class="payment-refund-form">
-      <label class="payment-refund-amount"><span>Сумма возврата</span><input type="number" min="0" max="${remaining}" step="0.01" inputmode="decimal" value="${remaining}" data-refund-amount></label>
-      ${select({ value: defaultWalletId, options, data: 'data-refund-wallet', aria: 'Кошелёк возврата' })}
-      ${field({ label: 'Фактическая дата и время', name: 'refundOccurredAt', type: 'datetime-local', value: financeDateTimeInputValue(new Date(), payment), required: true })}
-      ${button(remaining === Number(payment.total || 0) ? 'Вернуть полностью' : 'Подтвердить возврат', { variant: 'danger', data: 'data-refund-submit' })}
+  layer.innerHTML = `${paymentLayerContext(current, state)}
+    <div class="record-screen record-screen--state-view">
+      ${paymentForm({
+        workplace: payment.workplace,
+        date: payment.date,
+        time: payment.time,
+        person: payment.person || {},
+        procedures: paymentItems(settlement),
+        total: state.remaining,
+        showActions: false,
+      })}
     </div>`;
-  const m = mountModal(document.body, modal(html, { variant: 'medium', surface: 'app' }));
-  if (!m) return;
-  const walletInput = m.querySelector('input[data-refund-wallet]');
-  const amountInput = m.querySelector('[data-refund-amount]');
-  const submit = m.querySelector('[data-refund-submit]');
-  const sync = () => {
-    const amount = Math.max(0, Math.min(remaining, Number(String(amountInput?.value || '0').replace(',', '.')) || 0));
-    if (submit) {
-      submit.disabled = !walletInput?.value || !amount;
-      submit.textContent = amount === remaining && refunded === 0 ? 'Вернуть полностью' : 'Подтвердить возврат';
-    }
+  bindPaymentChat(layer, current);
+
+  let formState = {
+    settlement,
+    total: state.remaining,
+    dirty: false,
   };
-  walletInput?.addEventListener('change', sync);
-  amountInput?.addEventListener('input', sync);
-  submit?.addEventListener('click', async () => {
-    const amount = Math.max(0, Math.min(remaining, Number(String(amountInput?.value || '0').replace(',', '.')) || 0));
-    const wallet = wallets.find((item) => String(item.id || '') === String(walletInput?.value || ''));
-    if (!amount || !wallet) return;
-    const occurredAtInput = m.querySelector('input[name="refundOccurredAt"]');
-    if (!occurredAtInput?.value) return;
-    const refund = await recordRefundExpense(payment.id, {
-      amount,
-      walletId: wallet.id,
-      walletName: wallet.name,
-      occurredAt: financeDateTimeValue(occurredAtInput.value, payment),
-    });
-    if (!refund) return;
-    m.remove();
-    refreshPaidStateForPayment(refund);
-  });
-  sync();
-}
 
-function openCancelPaymentModal(payment, { onCancelled = () => {} } = {}) {
-  const html = `<div class="modal-title"><h2>Отменить операцию?</h2></div>
-    ${paymentFactMarkup(payment)}
-    <p>Неверный ввод останется в финансовой истории с пометкой «Отменена», но не будет участвовать в кошельках и расчётах.</p>
-    ${field({ label: 'Фактическая дата и время отмены', name: 'cancelOccurredAt', type: 'datetime-local', value: financeDateTimeInputValue(new Date(), payment), required: true })}
-    <div class="modal-actions">${button('Подтвердить отмену', { variant: 'secondary', data: 'data-cancel-payment-confirm' })}</div>`;
-  const m = mountModal(document.body, modal(html, { variant: 'medium', surface: 'app' }));
-  if (!m) return;
-  m.querySelector('[data-cancel-payment-confirm]')?.addEventListener('click', async () => {
-    const occurredAtInput = m.querySelector('input[name="cancelOccurredAt"]');
-    if (!occurredAtInput?.value) return;
-    const cancelled = await cancelPaymentOperation(payment.id, {
-      reason: 'incorrect-entry',
-      occurredAt: financeDateTimeValue(occurredAtInput.value, payment),
-    });
-    if (!cancelled) return;
-    m.remove();
-    onCancelled(cancelled);
-  });
-}
-
-function openPaymentActions(payment, { onCancelled = () => {} } = {}) {
-  const html = `<div class="modal-title"><h2>Действия с оплатой</h2></div>
-    ${paymentFactMarkup(payment)}
-    <div class="modal-actions">
-      ${button('Отменить операцию', { variant: 'secondary', data: 'data-cancel-payment' })}
-      ${button('Возврат', { variant: 'danger', data: 'data-refund-payment' })}
-    </div>`;
-  const m = mountModal(document.body, modal(html, { variant: 'medium', surface: 'app' }));
-  if (!m) return;
-  m.querySelector('[data-cancel-payment]')?.addEventListener('click', () => {
-    m.remove();
-    openCancelPaymentModal(payment, { onCancelled });
-  });
-  m.querySelector('[data-refund-payment]')?.addEventListener('click', () => {
-    m.remove();
-    openRefundModal(payment);
-  });
-}
-
-function openPaidState(record, { onCancelled = () => {} } = {}) {
-  const state = paymentStateForRecord(record);
-  const payments = Array.isArray(state?.payments) ? state.payments : [];
-  if (!payments.length) return;
-  const summary = payments.length > 1 ? sourcePaymentFactMarkup(state) : '';
-  const paymentHistory = payments.map((payment, index) => {
-    const refunds = getRefundsForPayment(payment.id);
-    return `<section class="payment-history-item"><strong>Оплата ${index + 1}</strong>${paymentFactMarkup(payment)}${refundHistoryMarkup(refunds)}<div class="modal-actions">${button('Действия с оплатой', { variant: 'secondary', data: `data-payment-actions="${payment.id}"` })}</div></section>`;
-  }).join('');
-  const html = `<div class="modal-title"><h2>Оплаты</h2></div>${summary}${paymentHistory}`;
-  const m = mountModal(document.body, modal(html, { variant: 'medium', surface: 'app' }));
-  if (!m) return;
-  m.querySelectorAll('[data-payment-actions]').forEach((element) => {
-    element.addEventListener('click', () => {
-      const payment = payments.find((item) => String(item?.id || '') === String(element.dataset.paymentActions || ''));
-      if (!payment) return;
-      m.remove();
-      openPaymentActions(payment, { onCancelled });
-    });
-  });
-}
-
-export function openRecordPayment(record) {
-  if (!record?.id) return null;
-  const current = getRecord(record.id) || record;
-  const state = paymentStateForRecord(current);
-  if (state.hasPayments && state.fullyPaid) return openPaidState(current);
-  return openPaymentModal(current);
-}
-
-export function openRecordPaymentEntry(record) {
-  if (!record?.id) return () => {};
-  const bottom = mountModal(document.body, modal(paymentEntryContent(record), { variant: 'bottom' }));
-  if (!bottom) return () => {};
-
-  let closed = false;
-  const closePaymentEntry = () => {
-    if (closed) return;
-    closed = true;
-    window.removeEventListener('book:records-changed', onRecordsChanged);
-    window.removeEventListener('book:dds-changed', onDDSChanged);
-    bottom.remove();
-  };
-  const finishCancelledPayment = () => closePaymentEntry();
-
-  const bindEntry = (current) => {
-    bottom.querySelector('[data-record-payment-open]')?.addEventListener('click', () => openPaymentModal(current, { onCancelled: finishCancelledPayment }));
-    bottom.querySelector('[data-record-payment-paid]')?.addEventListener('click', () => openPaidState(current, { onCancelled: finishCancelledPayment }));
-  };
-  const renderPaymentState = () => {
-    const current = getRecord(record.id) || record;
-    const sheet = bottom.querySelector('.modal-sheet');
-    if (!sheet) return;
-    sheet.innerHTML = paymentEntryContent(current);
-    bindEntry(current);
-  };
-  const onRecordsChanged = (event) => {
-    if (String(event?.detail?.recordId || '') === String(record.id)) renderPaymentState();
-  };
-  const onDDSChanged = (event) => {
-    if (event?.detail?.action === 'server-refresh') {
-      renderPaymentState();
+  const syncPrimary = () => {
+    if (formState.dirty) {
+      setRecordPrimaryAction(layer, {
+        label: 'Сохранить',
+        variant: 'secondary',
+        onClick: async () => {
+          const updated = await saveSettlementCorrection(current, formState.settlement);
+          if (updated && layer.isConnected) renderPaymentLayer(layer, current.id);
+        },
+      });
       return;
     }
-    const source = event?.detail?.source;
-    if (String(source?.type || '') === 'record' && String(source?.id || '') === String(record.id)) renderPaymentState();
+
+    const canPay = state.remaining > 0.009 || state.paidByDiscount;
+    if (!canPay) {
+      setRecordPrimaryAction(layer);
+      return;
+    }
+    setRecordPrimaryAction(layer, {
+      label: 'Оплатить',
+      onClick: () => openPaymentAllocationLayer(layer, current, formState.settlement, () => {
+        if (layer.isConnected) renderPaymentLayer(layer, current.id);
+      }),
+    });
   };
 
-  bindEntry(record);
-  window.addEventListener('book:records-changed', onRecordsChanged);
-  window.addEventListener('book:dds-changed', onDDSChanged);
-  return closePaymentEntry;
+  initPaymentForm(layer.querySelector('[data-payment-ui]'), {
+    calculate: (items) => calculateSettlement(items),
+    paidTotal: state.paidTotal,
+    onChange: (next) => {
+      formState = next;
+      syncPrimary();
+    },
+  });
+
+  layer.querySelector('[data-record-payment-settings]')?.addEventListener('click', () => {
+    openPaymentSettings(layer, current, paymentStateForRecord(getRecord(current.id) || current), () => {
+      if (layer.isConnected) renderPaymentLayer(layer, current.id);
+    });
+  });
+  syncPrimary();
+}
+
+export function openRecordPayment(record, { host = null } = {}) {
+  if (!record?.id) return null;
+  const current = getRecord(record.id) || record;
+  const layer = mountV2ZLayer(host || document.querySelector('[data-v2-workspace-surface]'), v2ZLayer('', {
+    className: 'record-payment-z',
+  }), { stack: true });
+  if (!layer) return null;
+  renderPaymentLayer(layer, current.id);
+  return layer;
 }
