@@ -132,6 +132,15 @@ function paymentDateValue(paymentOrRecord = null, reference = null) {
   return zonedDateTimeParts(value, paymentWorkplaceTimeZone(paymentOrRecord)).date || '';
 }
 
+function recordPaymentOccurredAt(record, dateValue = '') {
+  const date = String(dateValue || record?.date || '').slice(0, 10);
+  const time = String(record?.to || record?.from || '').slice(0, 5);
+  if (date && /^\d{2}:\d{2}$/.test(time)) {
+    return zonedDateTimeToDate(`${date}T${time}`, paymentWorkplaceTimeZone(record));
+  }
+  return occurredAtForDate(dateValue, record);
+}
+
 function recordPerson(record) {
   const current = personForRecord(record);
   const display = personDisplay(current);
@@ -255,7 +264,7 @@ function openPaymentAllocationLayer(parentLayer, record, settlement, onCompleted
             maxAmount: total,
             serviceAmount: allocationState.applied,
             tips: allocationState.tips,
-            occurredAt: occurredAtForDate(dateValue, current),
+            occurredAt: recordPaymentOccurredAt(current, dateValue),
           });
           if (!completed) return;
           setRecordConfirmed(current.id, true, { actionContext: journalRecordActionContext() });
