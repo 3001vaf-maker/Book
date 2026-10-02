@@ -5,6 +5,7 @@ import { miniCard } from '../cards/mini-card.js';
 import { v2ListEntry, v2ListEntries } from '../lists/list-entry.js';
 import { v2HorizontalRail } from '../v2/index.js';
 import { timeSlots } from '../time/index.js';
+import { readOnlyReceipt } from '../receipt/index.js';
 
 function recordSurface() {
   return document.querySelector('[data-v2-workspace-surface]')
@@ -103,28 +104,19 @@ export function recordTimeRows(items = [], {
 } = {}) {
   const values = (Array.isArray(items) ? items : []).map(timeValue).filter(Boolean);
   if (!values.length) return `<div class="muted">${escapeRecordText(empty)}</div>`;
-  const groups = new Map();
-  values.forEach((value) => {
-    const [hour = ''] = value.split(':');
-    if (!groups.has(hour)) groups.set(hour, []);
-    groups.get(hour).push(value);
+  return timeSlots({
+    values: values.map((value) => {
+      const minute = Number(value.split(':')[1] || 0);
+      return {
+        value,
+        label: value,
+        emphasized: Number(accentEvery) > 0 && minute % Number(accentEvery) === 0,
+      };
+    }),
+    data,
+    ariaLabel: 'Выбор времени',
+    className: 'time-slots--record-vertical',
   });
-  return `<div class="record-time-hours">${[...groups.entries()].map(([hour, times]) => `
-    <div class="record-time-hour" data-record-time-hour="${escapeRecordText(hour)}">
-      ${timeSlots({
-        values: times.map((value) => {
-          const minute = Number(value.split(':')[1] || 0);
-          return {
-            value,
-            label: value,
-            emphasized: Number(accentEvery) > 0 && minute % Number(accentEvery) === 0,
-          };
-        }),
-        data,
-        ariaLabel: `Время ${hour}:00`,
-        className: 'time-slots--hour-rows',
-      })}
-    </div>`).join('')}</div>`;
 }
 
 export function recordConfirmationMiniCard({
@@ -139,23 +131,12 @@ export function recordConfirmationMiniCard({
   total = '',
   procedures = [],
 } = {}) {
-  const rows = v2ListEntries((Array.isArray(procedures) ? procedures : []).map((item = {}) => v2ListEntry({
-    columns: [
-      [
-        { value: item.name || item.title || 'Процедура', strong: true },
-        { value: '', className: 'list-entry__line-spacer' },
-        { value: item.durationText || '', strong: true },
-      ],
-      [
-        { value: '', className: 'list-entry__line-spacer' },
-        { value: item.right || item.costText || '', strong: true },
-        { value: '', className: 'list-entry__line-spacer' },
-      ],
-    ],
-    interactive: false,
-    className: 'list-entry--record-procedure',
-    aria: item.aria || item.name || item.title || 'Процедура',
-  })));
+  const services = readOnlyReceipt({
+    groups: (Array.isArray(procedures) ? procedures : []).map((item = {}) => [{
+      label: item.name || item.title || 'Процедура',
+      value: item.right || item.costText || '',
+    }]),
+  });
 
   const card = miniCard({
     className: 'record-confirmation-mini-card',
@@ -174,7 +155,7 @@ export function recordConfirmationMiniCard({
 
   return `<div class="record-confirmation-view">
     <div class="record-confirmation-view__card">${card}</div>
-    <div class="record-confirmation-view__procedures">${rows}</div>
+    <div class="record-confirmation-view__procedures">${services}</div>
   </div>`;
 }
 
