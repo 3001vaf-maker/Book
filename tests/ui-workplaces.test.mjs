@@ -121,11 +121,13 @@ assert.match(journalTimelineSource, /aria-disabled="true"/);
 
 const journalControlSource = readFileSync(new URL('../journal/workplace-control.js', import.meta.url), 'utf8');
 assert.match(journalControlSource, /export function openJournalWorkplaceControl/);
-assert.match(journalControlSource, /Все записи/);
+assert.match(journalControlSource, /label:\s*'График дня'/);
 assert.match(journalControlSource, /data-journal-workplace-select/);
-assert.match(journalControlSource, /openHeaderControl/);
-assert.match(journalControlSource, /list\(\{\s*items\s*\}\)/);
-assert.doesNotMatch(journalControlSource, /Общий график|data-workplace-control-select/);
+assert.match(journalControlSource, /select\(\{/);
+assert.match(journalControlSource, /variant:\s*'bottom'/);
+assert.match(journalControlSource, /indicatorColor/);
+assert.match(journalControlSource, /recordCountText/);
+assert.doesNotMatch(journalControlSource, /openHeaderControl|list\(\{\s*items\s*\}\)|Общий график|data-workplace-control-select/);
 
 const timeGridSource = readFileSync(new URL('../core/time/grid.js', import.meta.url), 'utf8');
 assert.match(timeGridSource, /export function createTimeGrid/);
