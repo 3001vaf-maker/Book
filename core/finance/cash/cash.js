@@ -765,6 +765,7 @@ function investmentSummaryRows(entity) {
 function renderInvestmentTermsLayer(root, entityLayer, layer, sourceEntity, draft = null, { creating = false } = {}) {
   const current = investmentDraft(sourceEntity, draft);
   const terms = current.investmentTerms;
+  const acceptedAgreement = !creating && terms.role === 'raise' && terms.participantStatus === 'accepted';
   const roles = allowedInvestmentRoles();
   if (!roles.some((item) => item.value === terms.role)) {
     roles.push({ value: terms.role, label: investmentRoleLabel(terms.role) });
@@ -887,6 +888,11 @@ function renderInvestmentTermsLayer(root, entityLayer, layer, sourceEntity, draf
   form.addEventListener('change', (event) => {
     const name = String(event.target?.name || '');
     if (!['investmentRole', 'investmentType', 'participantAccountId', 'participationModel', 'termMode', 'endDate', 'durationValue', 'durationUnit', 'targetAmount', 'sharePercent', 'returnPercent'].includes(name)) return;
+    if (acceptedAgreement) {
+      openNotice({ message: 'Условия уже приняты инвестором. Для новых условий нужно новое соглашение.' });
+      renderInvestmentTermsLayer(root, entityLayer, layer, sourceEntity, null, { creating });
+      return;
+    }
     renderInvestmentTermsLayer(root, entityLayer, layer, sourceEntity, investmentTermsFromForm(form, sourceEntity), { creating });
   });
   layer.querySelector('[data-investment-terms-save]')?.addEventListener('click', () => form.requestSubmit());
@@ -897,7 +903,12 @@ function renderInvestmentTermsLayer(root, entityLayer, layer, sourceEntity, draf
       openNotice({ message: validation });
       return;
     }
-    const nextDraft = investmentTermsFromForm(form, sourceEntity);
+    const nextDraft = acceptedAgreement
+      ? {
+          name: String(new FormData(form).get('investmentName') || sourceEntity?.name || '').trim(),
+          investmentTerms: normalizeInvestmentTerms(sourceEntity),
+        }
+      : investmentTermsFromForm(form, sourceEntity);
     if (!nextDraft.name) {
       openNotice({ message: 'Укажите наименование инвестиции.' });
       return;
