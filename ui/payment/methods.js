@@ -31,10 +31,10 @@ function allocationRow(index, wallets, initial = {}) {
   </div>`;
 }
 
-export function paymentMethodsMarkup({ wallets = [], total = 0, initialAllocations = [], showAction = true } = {}) {
+export function paymentMethodsMarkup({ wallets = [], total = 0, initialAllocations = [], showAction = true, showTotal = true } = {}) {
   const allocations = Array.isArray(initialAllocations) ? initialAllocations : [];
   return `<div class="payment-methods__allocation" data-payment-allocation-owner>
-    <div class="payment-methods__total" data-payment-remaining><span>К оплате</span><strong>${escapeHtml(moneyDisplay(total))}</strong></div>
+    ${showTotal ? `<div class="payment-methods__total" data-payment-remaining><span>К оплате</span><strong>${escapeHtml(moneyDisplay(total))}</strong></div>` : ''}
     <div class="payment-allocation-rows">
       ${allocationRow(0, wallets, allocations[0] || {})}
       ${allocationRow(1, wallets, allocations[1] || {})}
