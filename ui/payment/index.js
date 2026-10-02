@@ -214,10 +214,10 @@ export function initPaymentForm(root, {
   };
 }
 
-export function initPaymentMethods(root, { onPay = () => {} } = {}) {
-  if (!root) return;
+export function initPaymentMethods(root, { onPay = () => {}, onChange = () => {} } = {}) {
+  if (!root) return null;
   const total = Math.max(0, numberValue(root.dataset.paymentTotal));
   let wallets = [];
   try { wallets = JSON.parse(root.dataset.paymentWallets || '[]'); } catch { wallets = []; }
-  initPaymentMethodsAllocation(root, { wallets, total, onPay });
+  return initPaymentMethodsAllocation(root, { wallets, total, onPay, onChange });
 }
