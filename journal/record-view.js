@@ -2,7 +2,6 @@ import {
   button,
   durationPicker,
   durationText,
-  entityCard,
   escapeHtml,
   field,
   initCalendar,
@@ -17,6 +16,7 @@ import {
   recordZHost,
   recordProcedureList,
   recordPersonList,
+  recordConfirmationMiniCard,
   setRecordPrimaryAction,
   bindRecordSettings,
 } from '../ui/ui.js';
@@ -32,6 +32,7 @@ import { getRecords } from '../core/record/index.js';
 import { updateRecord, cancelRecord, checkRecordTime } from '../core/record/index.js';
 import { journalRecordActionContext } from './record-action-context.js';
 import { getProfile } from '../settings/profile/data.js';
+import { openRecordPayment } from './record-payment.js';
 
 function recordOwnerOptions({ settings = false, chatPersonKey = '' } = {}) {
   const profile = getProfile();
@@ -105,7 +106,7 @@ const stateFromRecord = (record, { paid = false } = {}) => ({
     items: Array.isArray(record.finance.items) ? record.finance.items.map((item) => ({ ...item })) : [],
   } : null,
   confirmed: Boolean(record.confirmed),
-  attendance: paid ? 'arrived' : normalizedAttendance(record.attendance),
+  attendance: normalizedAttendance(record.attendance) || (paid ? 'arrived' : ''),
 });
 
 function workplaceAssignment(item, workplaceId) {
@@ -398,7 +399,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
   let finishClose = () => {};
   const m = mountRecordZ({
     ...recordOwnerOptions({ settings: true, chatPersonKey: state.person?.key || '' }),
-    title: 'Запись',
+    title: personDisplay(findPerson(record) || state.person || {}).name || 'Запись',
     className: 'record-view-z',
     onClose: () => finishClose(),
   });
@@ -523,72 +524,37 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     const finance = repriceSettlement(recordSettlementItems(state), state.finance);
     const discountTotal = Math.max(0, Number(finance?.discountTotal) || 0);
     const discountPercent = finance?.discountPercent;
-    const meta = [
-      { value: durationText(totalDuration), label: 'расход' },
-      { value: formatMoney(finance?.serviceTotal), label: 'стоимость' },
-      {
-        value: discountTotal > 0 ? `−${formatMoney(discountTotal)}` : formatMoney(0),
-        label: Number(discountPercent) > 0 ? `скидка ${formatPercent(discountPercent)}%` : 'скидка',
-      },
-    ];
-    const detailRows = [
-      ...state.procedures.map((item, index) => ({
-        left: item.name || '',
-        right: item.cost === '' || item.cost == null ? '' : formatMoney(item.cost),
-        data: paid ? '' : `data-record-view-procedure-edit="${index}"`,
-        aria: paid ? '' : `Изменить время процедуры ${item.name || ''}`,
-      })),
-      ...state.products.map((item, index) => ({
-        left: item.name || '',
-        right: item.cost === '' || item.cost == null ? '' : formatMoney(item.cost),
-        data: paid ? '' : `data-record-view-product-edit="${index}"`,
-        aria: paid ? '' : `Удалить товар ${item.name || ''}`,
-      })),
-    ];
-    const card = entityCard({
-      id: person.uei,
-      title: person.name,
-      subtitle: person.phone,
-      idData: person.uei && currentPerson?.key ? 'data-record-view-person-profile' : '',
-      idAria: person.uei ? `Открыть человека ${person.name}` : '',
-      titleData: currentPerson?.key ? 'data-record-view-person-profile' : '',
-      titleAria: `Открыть человека ${person.name}`,
-      subtitleData: person.phone ? 'data-record-view-phone' : '',
-      subtitleAria: person.phone ? `Действия с телефоном ${person.phone}` : '',
-      topMeta: [{
-        value: workplace,
-        row: 1,
-        data: paid ? '' : 'data-record-view-workplace-edit',
-        aria: paid ? '' : `Изменить рабочее пространство ${workplace}`,
-      }],
-      topRightMeta: [
-        {
-          value: formatDate(state.date),
-          row: 2,
-          data: paid ? '' : 'data-record-view-date-edit',
-          aria: paid ? '' : `Изменить дату ${formatDate(state.date)}`,
-        },
-        {
-          value: `${state.from} - ${state.to}`,
-          row: 3,
-          data: paid ? '' : 'data-record-view-time-edit',
-          aria: paid ? '' : `Изменить время ${state.from} - ${state.to}`,
-        },
+    const card = recordConfirmationMiniCard({
+      workplace,
+      date: formatDate(state.date),
+      period: `${state.from} - ${state.to}`,
+      uei: person.uei,
+      name: person.name,
+      phone: person.phone,
+      duration: durationText(totalDuration),
+      discount: Number(discountPercent) > 0 ? `${formatPercent(discountPercent)}%` : '0%',
+      total: formatMoney(finance?.planTotal),
+      procedures: [
+        ...state.procedures.map((item) => ({
+          name: item.name || '',
+          right: item.cost === '' || item.cost == null ? '' : formatMoney(item.cost),
+        })),
+        ...state.products.map((item) => ({
+          name: item.name || '',
+          right: item.cost === '' || item.cost == null ? '' : formatMoney(item.cost),
+        })),
       ],
-      meta,
-      detailRows,
-      className: 'entity-card--hero entity-card--top-dark',
     });
 
     const started = hasAppointmentStarted(state);
-    const effectiveAttendance = paid ? 'arrived' : (started ? (normalizedAttendance(state.attendance) || 'arrived') : '');
+    const effectiveAttendance = normalizedAttendance(state.attendance) || (paid || started ? 'arrived' : '');
     const statusControl = `<div class="record-status-controls">
       <div class="segment-control segment-control--one" role="group" aria-label="Подтверждение записи">
-        <button type="button" class="${state.confirmed ? 'is-active' : ''}" aria-pressed="${state.confirmed}" data-record-view-confirmed${paid ? ' disabled' : ''}>Подтвердил</button>
+        <button type="button" class="${paid || state.confirmed ? 'is-active' : ''}" aria-pressed="${paid || state.confirmed}" data-record-view-confirmed${paid ? ' disabled' : ''}>Подтвердил</button>
       </div>
       <div class="segment-control segment-control--two-equal" role="group" aria-label="Посещение записи">
-        <button type="button" class="${effectiveAttendance === 'arrived' ? 'is-active' : ''}" aria-pressed="${effectiveAttendance === 'arrived'}" data-record-view-attendance="arrived"${paid || !started ? ' disabled' : ''}>Пришел</button>
-        <button type="button" class="${effectiveAttendance === 'no-show' ? 'is-active' : ''}" aria-pressed="${effectiveAttendance === 'no-show'}" data-record-view-attendance="no-show"${paid || !started ? ' disabled' : ''}>Не пришел</button>
+        <button type="button" class="${effectiveAttendance === 'arrived' ? 'is-active' : ''}" aria-pressed="${effectiveAttendance === 'arrived'}" data-record-view-attendance="arrived"${!started ? ' disabled' : ''}>Пришел</button>
+        <button type="button" class="${effectiveAttendance === 'no-show' ? 'is-active' : ''}" aria-pressed="${effectiveAttendance === 'no-show'}" data-record-view-attendance="no-show"${!started ? ' disabled' : ''}>Не пришел</button>
       </div>
     </div>`;
     const dirty = stateSnapshot(state) !== baseline;
@@ -597,6 +563,12 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       setRecordPrimaryAction(m, {
         label: 'Сохранить',
         onClick: persistChanges,
+      });
+    } else if (!paid) {
+      const paymentState = getRecordPaymentState({ ...record, ...state, id: record.id, finance });
+      setRecordPrimaryAction(m, {
+        label: `К оплате · ${formatMoney(paymentState.remaining)}`,
+        onClick: () => openRecordPayment(getRecords().find((item) => String(item?.id || '') === String(record.id)) || { ...record, ...state, id: record.id }),
       });
     } else {
       setRecordPrimaryAction(m);
@@ -654,7 +626,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       applyPatch({ confirmed: !state.confirmed });
     });
     root.querySelectorAll('[data-record-view-attendance]').forEach((node) => node.addEventListener('click', () => {
-      if (isPaid() || !hasAppointmentStarted(state)) return;
+      if (!hasAppointmentStarted(state)) return;
       const next = normalizedAttendance(node.dataset.recordViewAttendance);
       const current = normalizedAttendance(state.attendance) || 'arrived';
       if (!next || next === current) return;
