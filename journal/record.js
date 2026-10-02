@@ -138,7 +138,7 @@ function openPriceProcedurePicker({ workplaceId, onAssigned }) {
     selected: [],
     empty: 'Процедур нет.',
   });
-  const m = mountModal(document.body, modal(`<div class="modal-title"><h2>Из прайса</h2><p>Отметьте процедуры, которые выполняются в этом рабочем месте.</p></div><div data-record-price-list>${content}</div><div class="modal-actions">${button('Добавить', { data: 'data-record-price-save' })}</div>`, { variant: 'bottom', surface: 'app' }));
+  const m = mountModal(document.body, modal(`<div class="modal-title"><h2>Из прайса</h2><p>Отметьте процедуры, которые выполняются в этом рабочем месте.</p></div><div data-record-price-list>${content}</div><div class="modal-actions">${button('Добавить', { data: 'data-record-price-save' })}</div>`, { variant: 'bottom', surface: 'app', className: 'modal--form-sheet' }));
   if (!m) return;
 
   const listRoot = m.querySelector('[data-record-price-list]');
@@ -326,6 +326,7 @@ function renderProceduresStep(modalRoot, {
         defaultWorkplaceId: workplaceId,
         variant: 'bottom',
         surface: 'app',
+        className: 'modal--form-sheet',
         onSaved: (procedure) => {
           items = procedures().filter((item) => procedureForWorkplace(item, workplaceId));
           if (procedureForWorkplace(procedure, workplaceId)) {
@@ -487,7 +488,7 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
         ],
         aria: 'Выберите этап редактирования записи',
       })}</div>`,
-      { variant: 'bottom', surface: 'app', title: 'Настройки записи' },
+      { variant: 'bottom', surface: 'app', title: 'Настройки записи', className: 'modal--form-sheet' },
     ));
     const input = layer?.querySelector('input[name="recordConfirmationEditStep"]');
     input?.addEventListener('change', () => {
