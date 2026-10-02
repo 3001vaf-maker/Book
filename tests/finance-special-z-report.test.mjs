@@ -127,6 +127,8 @@ assert.match(specialUi, /investment-capital-return/);
 assert.match(specialUi, /investment-income/);
 assert.match(specialUi, /investment-expense/);
 assert.match(specialUi, /investment-saving/);
+assert.match(specialUi, /investment-project-profit/);
+assert.match(specialUi, /investment-project-revenue/);
 assert.match(specialUi, /investment-reinvestment/);
 assert.match(specialUi, /investment-valuation/);
 assert.match(specialUi, /financeEntityAction/);
