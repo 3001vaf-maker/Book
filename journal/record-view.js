@@ -31,7 +31,7 @@ import { openPerson } from '../core/people/people.js';
 import { getProcedures } from '../settings/service/procedures/data.js';
 import { getProducts } from '../settings/service/products/data.js';
 import { getRecords } from '../core/record/index.js';
-import { updateRecord, cancelRecord, deleteRecord, checkRecordTime } from '../core/record/index.js';
+import { updateRecord, cancelRecord, deleteRecord, checkRecordTime, refreshRecordsFromServer } from '../core/record/index.js';
 import { journalRecordActionContext } from './record-action-context.js';
 import { getProfile } from '../settings/profile/data.js';
 import { openRecordPayment } from './record-payment.js';
@@ -400,6 +400,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
   let baseline = stateSnapshot(state);
   let startTimer = null;
   let updatingFromView = false;
+  let saving = false;
   let finishClose = () => {};
   const m = mountRecordZ({
     ...recordOwnerOptions({ settings: true, chatPersonKey: state.person?.key || '' }),
@@ -478,7 +479,9 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     applyPatch(patch);
   };
 
-  const persistChanges = () => {
+  const persistChanges = async () => {
+    if (saving) return false;
+    saving = true;
     updatingFromView = true;
     const updated = updateRecord(record.id, {
       date: dateKey(state.date),
@@ -491,15 +494,37 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       confirmed: Boolean(state.confirmed),
       attendance: normalizedAttendance(state.attendance),
     }, { actionContext: journalRecordActionContext() });
-    updatingFromView = false;
     if (!updated) {
+      updatingFromView = false;
+      saving = false;
       openNotice({ title: 'Не удалось сохранить', message: 'Проверьте рабочий день и свободное время.' });
       return false;
     }
-    state = stateFromRecord(updated);
-    baseline = stateSnapshot(state);
-    render();
-    return true;
+
+    try {
+      await flushBusinessPersistence();
+      await Promise.all([
+        refreshRecordsFromServer(),
+        refreshFinanceState(),
+      ]);
+      const current = getRecords().find((item) => String(item?.id || '') === String(record.id)) || updated;
+      state = stateFromRecord(current, { paid: recordPaid(current) });
+      baseline = stateSnapshot(state);
+      return true;
+    } catch {
+      await refreshRecordsFromServer().catch(() => null);
+      await refreshFinanceState().catch(() => null);
+      const current = getRecords().find((item) => String(item?.id || '') === String(record.id));
+      if (current) {
+        state = stateFromRecord(current, { paid: recordPaid(current) });
+        baseline = stateSnapshot(state);
+      }
+      return false;
+    } finally {
+      updatingFromView = false;
+      saving = false;
+      if (m.isConnected) render();
+    }
   };
 
   const scheduleStartRender = () => {
