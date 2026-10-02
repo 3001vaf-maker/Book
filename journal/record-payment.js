@@ -421,6 +421,14 @@ function openPaidState(record, { onCancelled = () => {} } = {}) {
   });
 }
 
+export function openRecordPayment(record) {
+  if (!record?.id) return null;
+  const current = getRecord(record.id) || record;
+  const state = paymentStateForRecord(current);
+  if (state.hasPayments && state.fullyPaid) return openPaidState(current);
+  return openPaymentModal(current);
+}
+
 export function openRecordPaymentEntry(record) {
   if (!record?.id) return () => {};
   const bottom = mountModal(document.body, modal(paymentEntryContent(record), { variant: 'bottom' }));
