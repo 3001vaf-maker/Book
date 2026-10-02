@@ -133,9 +133,31 @@ export class AuxiliaryStateService {
       const id = text(entity.id);
       if (!id) continue;
       const previous = beforeById.get(id);
-      if (previous && this.investmentRole(previous) !== this.investmentRole(entity)) {
-        throw new BadRequestException('Роль инвестиции задаётся при создании');
+      const nextTerms = objectValue(entity.investmentTerms);
+      const nextParticipantId = text(nextTerms.participantAccountId);
+      const nextStatus = text(nextTerms.participantStatus);
+
+      if (!previous) {
+        if (this.investmentRole(entity) === 'raise' && nextParticipantId && nextStatus !== 'pending') {
+          throw new BadRequestException('Новое предложение инвестиции ожидает решения инвестора');
+        }
+        if (this.investmentRole(entity) === 'raise' && !nextParticipantId && nextStatus) {
+          throw new BadRequestException('Статус участия доступен только связанному инвестору');
+        }
+      } else {
+        const previousTerms = objectValue(previous.investmentTerms);
+        if (this.investmentRole(previous) !== this.investmentRole(entity)) {
+          throw new BadRequestException('Роль инвестиции задаётся при создании');
+        }
+        if (text(previousTerms.participantStatus) !== nextStatus) {
+          throw new BadRequestException('Статус участия меняет только инвестор');
+        }
+        if (text(previousTerms.participantStatus) === 'accepted'
+          && JSON.stringify(stable(previousTerms)) !== JSON.stringify(stable(nextTerms))) {
+          throw new BadRequestException('Принятые условия инвестиции нельзя изменить без нового соглашения');
+        }
       }
+
       if (previous && JSON.stringify(stable(previous)) === JSON.stringify(stable(entity))) continue;
       changedRoles.add(this.investmentRole(entity));
     }
