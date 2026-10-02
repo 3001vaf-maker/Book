@@ -15,14 +15,16 @@ export function openJournalWorkplaceControl({
   workplaces = [],
   workplaceId = '',
   recordCounts = {},
+  aggregateCount = 0,
   onSelect = () => {},
 } = {}) {
   const items = [{
-    title: 'Все записи',
+    title: 'График дня',
+    right: [recordCountText(aggregateCount)],
     interactive: true,
     selected: workplaceId === ALL_WORKPLACES_ID,
     data: `data-journal-workplace-select="${ALL_WORKPLACES_ID}"`,
-    aria: 'Показать записи всех рабочих мест',
+    aria: 'Режим корректировки графика дня',
   }];
 
   for (const workplace of Array.isArray(workplaces) ? workplaces : []) {
