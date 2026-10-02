@@ -864,17 +864,26 @@ function accountInvestmentProposalRow(row, index) {
 
 function accountInvestmentSummary(investment) {
   const state = calculateInvestmentState(investment, investment.movements || []);
+  const terms = normalizeInvestmentTerms(investment);
   const rows = [
     v2ListEntry({ title: 'Вложено', rightTop: money(state.contributed) }),
     v2ListEntry({ title: 'Возвращено капитала', rightTop: money(state.returnedCapital) }),
     v2ListEntry({ title: 'Получено дохода', rightTop: money(state.income) }),
     v2ListEntry({ title: 'Расходы', rightTop: money(state.expenses) }),
     v2ListEntry({ title: 'Текущая стоимость', rightTop: money(state.currentValue) }),
+  ];
+  if (['profit-share', 'revenue-share', 'fixed-return'].includes(terms.participationModel)) {
+    rows.push(
+      v2ListEntry({ title: 'Доход по условиям', rightTop: money(state.entitledIncome) }),
+      v2ListEntry({ title: 'Осталось получить', rightTop: money(state.incomeDue) }),
+    );
+  }
+  rows.push(
     v2ListEntry({ title: 'Результат', rightTop: money(state.result) }),
     v2ListEntry({ title: 'ROI', rightTop: state.roi == null ? '—' : `${Number(state.roi).toLocaleString('ru-RU', { maximumFractionDigits: 2 })}%` }),
     v2ListEntry({ title: 'Годовая доходность', rightTop: state.annualizedReturn == null ? '—' : `${Number(state.annualizedReturn).toLocaleString('ru-RU', { maximumFractionDigits: 2 })}%` }),
     v2ListEntry({ title: 'Окуплено', rightTop: state.paybackRatio == null ? '—' : `${Number(state.paybackRatio).toLocaleString('ru-RU', { maximumFractionDigits: 2 })}%` }),
-  ];
+  );
   if (state.paybackDate) rows.push(v2ListEntry({ title: 'Точка окупаемости', rightTop: formatDate(state.paybackDate) }));
   return v2ListEntries(rows);
 }
