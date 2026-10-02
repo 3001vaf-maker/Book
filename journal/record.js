@@ -1,4 +1,4 @@
-import { button, durationPicker, durationText, entityCard, escapeHtml, field, list, v2ListEntry, stateView, initStateView, initCalendar, mountModal, modal, openNotice, initDurationPickers, initMultiSelect, viewNavigation, initViewNavigation, openTimePickerAction, mountRecordZ, recordZHost, renderRecordZ, recordTimeRows, recordWorkplaceCards, recordProcedureList, recordPersonList, recordConfirmationMiniCard, setRecordPrimaryAction, bindRecordSettings, closeRecordZStack } from '../ui/ui.js';
+import { button, durationPicker, durationText, entityCard, escapeHtml, field, list, select, v2ListEntry, stateView, initStateView, initCalendar, mountModal, modal, openNotice, initDurationPickers, initMultiSelect, viewNavigation, initViewNavigation, openTimePickerAction, mountRecordZ, recordZHost, renderRecordZ, recordTimeRows, recordWorkplaceCards, recordProcedureList, recordPersonList, recordConfirmationMiniCard, setRecordPrimaryAction, bindRecordSettings, closeRecordZStack } from '../ui/ui.js';
 import { createRecord } from '../core/record/index.js';
 import { createJournalBreak } from './break-service.js';
 import { getPeople } from '../core/people/data.js';
@@ -278,10 +278,39 @@ function renderProceduresStep(modalRoot, {
 
   bindRecordSettings(modalRoot, () => {
     const menu = `<div class="modal-actions">
+      ${selected.size ? button('Время процедур', { data: 'data-record-settings-duration', variant: 'secondary' }) : ''}
       ${button('Добавить из прайса', { data: 'data-record-settings-from-price', variant: 'secondary' })}
       ${button('+ Добавить процедуру', { data: 'data-record-settings-add-procedure' })}
     </div>`;
     const m = mountModal(document.body, modal(menu, { variant: 'quick', surface: 'app' }));
+    m?.querySelector('[data-record-settings-duration]')?.addEventListener('click', () => {
+      m.v2Close?.();
+      const rows = recordProcedureList([...selected.entries()].map(([id, item]) => ({
+        id,
+        name: item?.procedure?.name || 'Процедура',
+        durationText: durationText(item?.duration),
+        costText: item?.cost === '' || item?.cost == null ? '' : `${item.cost} ₽`,
+      })), {
+        data: 'data-record-duration-edit',
+        selected: [],
+        empty: 'Процедуры не выбраны.',
+      });
+      const durationLayer = mountModal(document.body, modal(rows, { variant: 'bottom', surface: 'app' }));
+      durationLayer?.querySelectorAll('[data-record-duration-edit]').forEach((node) => node.addEventListener('click', () => {
+        const id = String(node.dataset.recordDurationEdit || '');
+        const current = selected.get(id);
+        if (!current) return;
+        durationLayer.v2Close?.();
+        openProcedureSettings({
+          procedure: current.procedure,
+          current,
+          onSave: (updated) => {
+            selected.set(id, updated);
+            render();
+          },
+        });
+      }));
+    });
     m?.querySelector('[data-record-settings-from-price]')?.addEventListener('click', () => {
       m.v2Close?.();
       openPriceProcedurePicker({
@@ -687,35 +716,51 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
   };
 
   const openRecordSettings = () => {
-    const m = mountModal(document.body, modal(list({
-      items: [
-        { title: 'Пространство', interactive: true, data: 'data-record-confirm-settings-workplace' },
-        { title: 'Дата', interactive: true, data: 'data-record-confirm-settings-date' },
-        { title: 'Время', interactive: true, data: 'data-record-confirm-settings-time' },
-        { title: 'Процедуры', interactive: true, data: 'data-record-confirm-settings-procedures' },
-        { title: 'Сбросить', interactive: true, data: 'data-record-confirm-settings-reset' },
-      ],
-    }), { variant: 'quick', surface: 'app' }));
-    if (!m) return;
-    m.querySelector('[data-record-confirm-settings-workplace]')?.addEventListener('click', () => {
-      m.v2Close?.();
-      openConfirmationWorkplaceModal({ workplaceId: currentWorkplaceId, onSelected: chooseDateAfterWorkplace });
-    });
-    m.querySelector('[data-record-confirm-settings-date]')?.addEventListener('click', () => {
-      m.v2Close?.();
-      chooseDate();
-    });
-    m.querySelector('[data-record-confirm-settings-time]')?.addEventListener('click', () => {
-      m.v2Close?.();
-      chooseTime();
-    });
-    m.querySelector('[data-record-confirm-settings-procedures]')?.addEventListener('click', () => {
-      m.v2Close?.();
-      openProcedureCorrections();
-    });
-    m.querySelector('[data-record-confirm-settings-reset]')?.addEventListener('click', () => {
-      m.v2Close?.();
-      closeRecordZStack('record-flow-z');
+    const layer = mountModal(document.body, modal(
+      `<div class="compact-form">${select({
+        label: 'Изменить',
+        name: 'recordConfirmationEditStep',
+        value: '',
+        options: [
+          { value: '', label: 'Без выбора' },
+          { value: 'workplace', label: 'Пространство' },
+          { value: 'date', label: 'Дата' },
+          { value: 'time', label: 'Время' },
+          { value: 'procedure', label: 'Процедура' },
+        ],
+        aria: 'Выберите этап редактирования записи',
+      })}</div>`,
+      { variant: 'bottom', surface: 'app', title: 'Настройки записи' },
+    ));
+    const input = layer?.querySelector('input[name="recordConfirmationEditStep"]');
+    input?.addEventListener('change', () => {
+      const startAt = String(input.value || '');
+      if (!startAt) return;
+      layer.v2Close?.();
+      openRecordEditFlow({
+        startAt,
+        date: currentDate,
+        workplaceId: currentWorkplaceId,
+        from: currentFrom,
+        to: currentTo,
+        selectedProcedures,
+        onApply: (next) => {
+          currentDate = next.date;
+          currentWorkplaceId = next.workplaceId;
+          currentFrom = next.from;
+          currentTo = next.to;
+          selectedProcedures.splice(0, selectedProcedures.length, ...next.procedures.map((item) => ({
+            procedure: procedures().find((entry) => String(entry?.id || '') === String(item?.id || '')) || {
+              id: item.id,
+              name: item.name,
+              duration: item.duration,
+            },
+            cost: item.cost,
+            duration: item.duration,
+          })));
+          render();
+        },
+      });
     });
   };
 
