@@ -1,5 +1,6 @@
-import { viewNavigation, initViewNavigation, ALL_WORKPLACES_ID, modal, mountModal, openSharedProfileSettingsMenu, readOnlyReceipt, workspaceHeaderContext } from '../ui/ui.js';
+import { viewNavigation, initViewNavigation, ALL_WORKPLACES_ID, modal, mountModal, openSharedProfileSettingsMenu, workspaceHeaderContext } from '../ui/ui.js';
 import { getWorkplaceContext, setWorkplaceContext } from '../core/workplace-context.js';
+import { readOnlyReceipt } from '../ui/receipt/index.js';
 import { canUseBookCapability } from '../core/access.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getActiveDayWorkplaces, getDays, removeDay, saveDays } from '../core/day/index.js';
@@ -53,20 +54,6 @@ export function renderJournal(root, options = {}) {
   let selectedDate = context.date;
 
   const activeDayWorkplaces = () => getActiveDayWorkplaces(selectedDate, workplaces);
-
-  const dayHeaderSummary = () => {
-    const day = dateKey(selectedDate);
-    const allMode = selectedWorkplaceId === ALL_WORKPLACES_ID;
-    const records = getRecordsForDay(day, allMode ? '' : selectedWorkplaceId)
-      .filter((record) => record?.status !== 'cancelled');
-    const recordCount = records.length;
-    const procedureCount = records.reduce((sum, record) => sum + (Array.isArray(record?.procedures) ? record.procedures.length : 0), 0);
-    const total = records.reduce((sum, record) => sum + recordAmountDue(record), 0);
-    return {
-      primaryText: `${recordCount} зап. - ${procedureCount}пр.`,
-      secondaryText: formatRubles(total),
-    };
-  };
 
   const openDayTime = (workplaceId = '') => {
     openTimetableDayEditor({
