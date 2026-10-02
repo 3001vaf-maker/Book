@@ -496,8 +496,10 @@ if (!/datePicker\(\{[^}]*name:\s*['"]recordPaymentCancelDate['"]/s.test(recordPa
   || !/await\s+correctFinanceOperation/.test(recordPayment)) {
   errors.push('Payment settings must await canonical correction, cancellation and hard-delete Finance commands');
 }
-if (/recordRefundExpense|openRefundModal|refundOccurredAt/.test(recordPayment)) {
-  errors.push('Record payment must not keep the legacy parallel refund manifestation');
+if (!/await\s+recordRefundExpense/.test(recordPayment)
+  || !/datePicker\(\{[^}]*name:\s*['"]recordPaymentRefundDate['"]/s.test(recordPayment)
+  || /refundOccurredAt|type:\s*['"]datetime-local['"]/.test(recordPayment)) {
+  errors.push('Record payment refund must use the canonical server command with the shared date-only picker');
 }
 if (/finance:\s*settlement/.test(recordPayment)) {
   errors.push('Payment-stage Settlement must not be persisted back into Record');
