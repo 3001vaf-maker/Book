@@ -161,8 +161,8 @@ if (!/\bopenJournalWorkplaceControl\s*\(/.test(journalSource)) {
   report(journalController, 'Journal must use its own Header manifestation');
 }
 const journalWorkplaceSource = text(journalWorkplaceControl);
-if (!/\bopenHeaderControl\s*\(/.test(journalWorkplaceSource) || !/\blist\s*\(/.test(journalWorkplaceSource)) {
-  report(journalWorkplaceControl, 'Journal Header manifestation must reuse shared Header Control and List');
+if (!/\bmountModal\s*\(/.test(journalWorkplaceSource) || !/\bselect\s*\(/.test(journalWorkplaceSource) || !/variant:\s*['"]bottom['"]/.test(journalWorkplaceSource)) {
+  report(journalWorkplaceControl, 'Journal workplace manifestation must reuse Shared Select inside the canonical bottom Modal');
 }
 
 const workplaceOwner = 'settings/profile/workplaces/data.js';
