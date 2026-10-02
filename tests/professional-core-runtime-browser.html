@@ -1059,7 +1059,7 @@ ok(Boolean(recordZ?.querySelector('.record-confirmation-mini-card')), 'Record Z2
 ok(!recordZ?.querySelector('.entity-card--top-dark'), 'Record Z2 must not keep legacy dark entity card');
 const recordReceipt = recordZ?.querySelector('[data-read-only-sheet]');
 ok(Boolean(recordReceipt), 'Record Z2 procedures must use shared read-only receipt');
-ok(recordReceipt?.textContent.includes(runtimeProcedure.name),
+ok(recordReceipt?.textContent.includes('Очень длинное название процедуры без сокращения'),
   'Record Z2 must show full procedure name');
 ok(!document.querySelector('[data-record-payment-entry]'),
   'Opening Record must not create legacy automatic payment sheet');
