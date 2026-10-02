@@ -73,9 +73,9 @@ export function paymentForm({
   </div>`;
 }
 
-export function paymentMethods({ wallets = [], total = 0, showAction = true } = {}) {
+export function paymentMethods({ wallets = [], total = 0, showAction = true, showTotal = true, initialAllocations = [] } = {}) {
   const walletData = escapeHtml(JSON.stringify(Array.isArray(wallets) ? wallets.map((wallet) => ({ id: String(wallet?.id || ''), name: String(wallet?.name || '') })) : []));
-  return `<div class="payment-methods" data-payment-methods data-payment-total="${escapeHtml(moneyText(total))}" data-payment-wallets="${walletData}">${paymentMethodsMarkup({ wallets, total, showAction })}</div>`;
+  return `<div class="payment-methods" data-payment-methods data-payment-total="${escapeHtml(moneyText(total))}" data-payment-wallets="${walletData}">${paymentMethodsMarkup({ wallets, total, showAction, showTotal, initialAllocations })}</div>`;
 }
 
 function rowValues(row) {
