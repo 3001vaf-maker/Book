@@ -550,7 +550,7 @@ function renderPaymentLayer(layer, recordId) {
       return;
     }
 
-    const canPay = state.remaining > 0.009 || state.paidByDiscount;
+    const canPay = state.remaining > 0.009 || state.fullyPaid;
     if (!canPay) {
       setRecordPrimaryAction(layer);
       return;
