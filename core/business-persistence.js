@@ -66,8 +66,9 @@ async function send(item) {
   return responseJson(response, item.fallbackMessage);
 }
 
-function failedRecordUpsertId(item = null) {
-  if (String(item?.options?.method || '').toUpperCase() !== 'PUT') return '';
+function failedRecordMutationId(item = null) {
+  const method = String(item?.options?.method || '').toUpperCase();
+  if (method !== 'PUT' && method !== 'DELETE') return '';
   const match = String(item?.path || '').match(/^\/business-state\/records\/([^/]+)$/);
   return match ? decodeURIComponent(match[1]) : '';
 }
@@ -77,7 +78,15 @@ function discardImmediateRecordEvents(recordId, error) {
   if (!id) return;
   while (queue.length) {
     const next = queue[0];
-    if (!String(next?.path || '').startsWith('/business-state/record-events/')) break;
+    const path = String(next?.path || '');
+    const method = String(next?.options?.method || '').toUpperCase();
+    const deleteEventsPath = `/business-state/records/${encodeURIComponent(id)}/events`;
+    if (method === 'DELETE' && path === deleteEventsPath) {
+      queue.shift();
+      next.resolve?.({ ok: false, error });
+      continue;
+    }
+    if (!path.startsWith('/business-state/record-events/')) break;
     let eventRecordId = '';
     try {
       eventRecordId = String(JSON.parse(next?.options?.body || '{}')?.event?.recordId || '');
@@ -109,7 +118,7 @@ async function runQueue() {
           queue.shift();
           pendingPermanentError = lastError;
           item.resolve?.({ ok: false, error: lastError });
-          discardImmediateRecordEvents(failedRecordUpsertId(item), lastError);
+          discardImmediateRecordEvents(failedRecordMutationId(item), lastError);
           continue;
         }
         await sleep(1200);
