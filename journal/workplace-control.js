@@ -1,15 +1,20 @@
-import { openHeaderControl, list, escapeHtml, ALL_WORKPLACES_ID } from '../ui/ui.js';
+import { ALL_WORKPLACES_ID, modal, mountModal, select } from '../ui/ui.js';
 
 const WORKPLACE_FALLBACK_COLOR = '#212529';
 
 function recordCountText(count = 0) {
-  return `${Math.max(0, Number(count) || 0)} з`;
+  return `${Math.max(0, Number(count) || 0)} записей`;
+}
+
+function workplaceMeta(workplace = {}, count = 0) {
+  const range = workplace?.from && workplace?.to ? `${workplace.from} - ${workplace.to}` : '';
+  return [range, recordCountText(count)].filter(Boolean).join(' · ');
 }
 
 /**
- * Journal-owned Header manifestation.
- * Journal decides that its aggregate row means "Все записи".
- * It reuses shared Header Control + List, but does not use Graph's Workplace control.
+ * Journal-owned workplace selector.
+ * The Journal owns aggregate semantics; Shared Select owns the visual control
+ * and its bottom selector manifestation.
  */
 export function openJournalWorkplaceControl({
   workplaces = [],
@@ -18,37 +23,40 @@ export function openJournalWorkplaceControl({
   aggregateCount = 0,
   onSelect = () => {},
 } = {}) {
-  const items = [{
-    title: 'График дня',
-    right: [recordCountText(aggregateCount)],
-    interactive: true,
-    selected: workplaceId === ALL_WORKPLACES_ID,
-    data: `data-journal-workplace-select="${ALL_WORKPLACES_ID}"`,
-    aria: 'Режим корректировки графика дня',
+  const options = [{
+    value: ALL_WORKPLACES_ID,
+    label: 'График дня',
+    meta: recordCountText(aggregateCount),
+    indicatorColor: '',
   }];
 
   for (const workplace of Array.isArray(workplaces) ? workplaces : []) {
-    const key = String(workplace?.key || '');
+    const key = String(workplace?.key || workplace?.workplaceId || '');
     if (!key) continue;
-    items.push({
-      title: workplace?.name || 'Без названия',
-      right: [recordCountText(recordCounts?.[key])],
+    options.push({
+      value: key,
+      label: workplace?.name || 'Без названия',
+      meta: workplaceMeta(workplace, recordCounts?.[key]),
       indicatorColor: workplace?.indicatorColor || workplace?.color || WORKPLACE_FALLBACK_COLOR,
-      indicatorLabel: workplace?.name || 'Рабочее место',
-      interactive: true,
-      selected: key === String(workplaceId || ''),
-      data: `data-journal-workplace-select="${escapeHtml(key)}"`,
-      aria: `Показать записи рабочего места ${workplace?.name || ''}`,
     });
   }
 
-  const content = `<div class="workplace-control-list">${list({ items })}</div>`;
-  const main = openHeaderControl(content, { title: '' });
-  main?.querySelectorAll('[data-journal-workplace-select]').forEach((row) => row.addEventListener('click', () => {
-    const nextId = String(row.dataset.journalWorkplaceSelect || '');
+  const main = mountModal(document.body, modal(
+    `<div class="compact-form">${select({
+      label: 'Режим',
+      name: 'journalWorkplaceMode',
+      value: workplaceId || ALL_WORKPLACES_ID,
+      options,
+      aria: 'Режим рабочего поля журнала',
+    })}</div>`,
+    { variant: 'bottom', surface: 'app', title: 'Рабочее пространство' },
+  ));
+  const input = main?.querySelector('input[name="journalWorkplaceMode"]');
+  input?.addEventListener('change', () => {
+    const nextId = String(input.value || '');
     if (!nextId) return;
-    main.remove();
+    main.v2Close?.();
     onSelect(nextId);
-  }));
+  });
   return main;
 }
