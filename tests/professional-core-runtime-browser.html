@@ -372,9 +372,15 @@ const openF = async (pointerId, label) => {
 const tapAndOpen = async (deck, target, pointerId, label) => {
   mark('select-' + label);
   const beforeShell = shell();
+  if (!target) {
+    ok(false, label + ' target card missing before selection');
+    return;
+  }
   pointer(target,'pointerdown',190,390,pointerId);
   pointer(target,'pointerup',190,390,pointerId);
+  mark('click-' + label);
   target.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,clientX:190,clientY:390}));
+  mark('clicked-' + label);
   await wait(180);
   ok(shell() === beforeShell && shell() === initialShell, label + ' rebuilt the whole professional FEZ shell');
   ok(ownerCount() === 1, label + ' left duplicate FEZ owners');
