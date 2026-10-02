@@ -307,11 +307,14 @@ function renderList(root) {
   const wallets = getWallets();
   const investments = getInvestmentEntities();
   const loans = getLoanEntities();
+  const canUseWallets = canUseBookCapability('finance.cash.access');
+  const canUseInvestments = allowedInvestmentRoles().length > 0;
+  const canUseLoans = canUseBookCapability('finance.special.access');
   root.innerHTML = page([
     cashContext(),
-    v2Section('Кошельки', horizontalCards(wallets.map(renderWalletCard))),
-    v2Section('Инвестиции', horizontalCards(investments.map((item) => renderCashEntityCard(item, 'investment')))),
-    v2Section('Займ', horizontalCards(loans.map((item) => renderCashEntityCard(item, 'loan')))),
+    canUseWallets ? v2Section('Кошельки', horizontalCards(wallets.map(renderWalletCard))) : '',
+    canUseInvestments ? v2Section('Инвестиции', horizontalCards(investments.map((item) => renderCashEntityCard(item, 'investment')))) : '',
+    canUseLoans ? v2Section('Займ', horizontalCards(loans.map((item) => renderCashEntityCard(item, 'loan')))) : '',
   ]);
 
   root.querySelector('[data-cash-settings]')?.addEventListener('click', () => openCashSettings(root));
@@ -710,8 +713,16 @@ function investmentSummaryRows(entity) {
       v2ListEntry({ title: 'Привлечено', rightTop: formatMoney(state.received) }),
       v2ListEntry({ title: 'Возвращено капитала', rightTop: formatMoney(state.capitalReturned) }),
       v2ListEntry({ title: 'Выплачено дохода', rightTop: formatMoney(state.incomePaid) }),
-      v2ListEntry({ title: 'Остаток обязательств', rightTop: formatMoney(state.remainingObligation) }),
     );
+    if (['returnable', 'fixed-return'].includes(terms.participationModel)) {
+      rows.push(v2ListEntry({ title: 'К возврату капитала', rightTop: formatMoney(state.remainingObligation) }));
+    }
+    if (['profit-share', 'revenue-share', 'fixed-return'].includes(terms.participationModel)) {
+      rows.push(
+        v2ListEntry({ title: 'Доход инвестора по условиям', rightTop: formatMoney(state.entitledIncome) }),
+        v2ListEntry({ title: 'К выплате дохода', rightTop: formatMoney(state.incomeDue) }),
+      );
+    }
     if (state.explicitValuation) {
       rows.push(v2ListEntry({ title: 'Оценка проекта', rightTop: formatMoney(state.currentValue) }));
     }
@@ -728,6 +739,14 @@ function investmentSummaryRows(entity) {
     rows.push(
       v2ListEntry({ title: 'Расходы', rightTop: formatMoney(state.expenses) }),
       v2ListEntry({ title: 'Текущая стоимость', rightTop: formatMoney(state.currentValue) }),
+    );
+    if (terms.role === 'external' && ['profit-share', 'revenue-share', 'fixed-return'].includes(terms.participationModel)) {
+      rows.push(
+        v2ListEntry({ title: 'Доход по условиям', rightTop: formatMoney(state.entitledIncome) }),
+        v2ListEntry({ title: 'Осталось получить', rightTop: formatMoney(state.incomeDue) }),
+      );
+    }
+    rows.push(
       v2ListEntry({ title: 'Результат', rightTop: formatMoney(state.result) }),
       v2ListEntry({ title: 'ROI', rightTop: formatPercent(state.roi) }),
       v2ListEntry({ title: 'Годовая доходность', rightTop: formatPercent(state.annualizedReturn) }),
@@ -934,6 +953,8 @@ function investmentEventTitle(event = {}) {
     valuation: 'Изменение оценки',
     saving: 'Экономия',
     reinvestment: 'Реинвестирование',
+    'project-profit': 'Прибыль проекта',
+    'project-revenue': 'Выручка проекта',
   })[String(event.type || '')] || 'Событие инвестиции';
 }
 
@@ -1179,6 +1200,7 @@ function openFinanceEntitySettings(root, entityLayer, type, entity) {
     id: entity.id,
     name: entity.name,
     role: terms?.role || '',
+    participationModel: terms?.participationModel || '',
   };
   const saved = () => {
     renderFinanceEntityLayer(root, entityLayer, type, entity.id);
