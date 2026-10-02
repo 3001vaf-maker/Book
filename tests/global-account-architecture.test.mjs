@@ -84,8 +84,9 @@ assert.match(accountShell, /data-account-investment=/, 'Accepted investment must
 assert.match(accountShell, /data-account-investment-chat/, 'Linked investment must expose the shared Header D chat');
 assert.match(accountShell, /v2Section\('История', accountInvestmentHistory\(investment\)\)/, 'Linked investor card must expose the same investment history');
 assert.match(accountShell, /await getGlobalAccountRelationships\(\)/, 'Accepting an investment must refresh the linked projection immediately');
-assert.match(auxiliaryState, /Статус участия меняет только инвестор/, 'Professional writes must not self-accept an investor proposal');
-assert.match(auxiliaryState, /Принятые условия инвестиции нельзя изменить без нового соглашения/, 'Accepted investment terms must be immutable for the project side');
+assert.match(auxiliaryState, /protectInvestmentAgreements/, 'Auxiliary investment writes must preserve server-owned agreement state');
+assert.match(auxiliaryState, /previousStatus === 'accepted'[\s\S]*entity\.investmentTerms = clone\(previousTerms\)/, 'Accepted investment terms must remain immutable without blocking unrelated auxiliary writes');
+assert.match(auxiliaryState, /participantStatus: participantAccountId \? 'pending' : ''/, 'A new linked investment proposal must start pending instead of self-accepting');
 const deleteRelationshipStart = booking.indexOf('async deleteGlobalAccountRelationship');
 const deleteRelationshipEnd = booking.indexOf('async globalAccountRecords', deleteRelationshipStart);
 const deleteRelationshipBlock = booking.slice(deleteRelationshipStart, deleteRelationshipEnd);
