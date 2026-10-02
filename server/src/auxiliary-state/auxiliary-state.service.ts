@@ -118,6 +118,62 @@ export class AuxiliaryStateService {
     return ['self', 'raise', 'external'].includes(role) ? role : 'raise';
   }
 
+  private protectInvestmentAgreements(before: unknown[], after: unknown[]) {
+    const beforeById = new Map<string, JsonObject>(
+      before
+        .map((value): [string, JsonObject] => {
+          const entity = objectValue(value);
+          return [text(entity.id), entity];
+        })
+        .filter(([id]) => Boolean(id)),
+    );
+
+    return after.map((value) => {
+      const entity = clone(objectValue(value));
+      const id = text(entity.id);
+      if (!id) return entity;
+
+      const previous = beforeById.get(id);
+      const incomingTerms = objectValue(entity.investmentTerms);
+      if (!previous) {
+        if (this.investmentRole(entity) !== 'raise') return entity;
+        const participantAccountId = text(incomingTerms.participantAccountId);
+        entity.investmentTerms = {
+          ...incomingTerms,
+          participantStatus: participantAccountId ? 'pending' : '',
+          participantRespondedAt: '',
+        };
+        return entity;
+      }
+
+      const previousTerms = objectValue(previous.investmentTerms);
+      const previousRole = this.investmentRole(previous);
+      const previousStatus = text(previousTerms.participantStatus);
+      const previousParticipantId = text(previousTerms.participantAccountId);
+      const nextParticipantId = text(incomingTerms.participantAccountId);
+
+      if (previousStatus === 'accepted') {
+        entity.investmentTerms = clone(previousTerms);
+        return entity;
+      }
+
+      let participantStatus = previousStatus;
+      let participantRespondedAt = text(previousTerms.participantRespondedAt);
+      if (previousRole === 'raise' && nextParticipantId !== previousParticipantId) {
+        participantStatus = nextParticipantId ? 'pending' : '';
+        participantRespondedAt = '';
+      }
+
+      entity.investmentTerms = {
+        ...incomingTerms,
+        role: previousRole,
+        participantStatus,
+        participantRespondedAt,
+      };
+      return entity;
+    });
+  }
+
   private async assertInvestmentMutationAllowed(tenantId: string, before: unknown[], after: unknown[]) {
     const beforeById = new Map<string, JsonObject>(
       before
@@ -133,31 +189,6 @@ export class AuxiliaryStateService {
       const id = text(entity.id);
       if (!id) continue;
       const previous = beforeById.get(id);
-      const nextTerms = objectValue(entity.investmentTerms);
-      const nextParticipantId = text(nextTerms.participantAccountId);
-      const nextStatus = text(nextTerms.participantStatus);
-
-      if (!previous) {
-        if (this.investmentRole(entity) === 'raise' && nextParticipantId && nextStatus !== 'pending') {
-          throw new BadRequestException('Новое предложение инвестиции ожидает решения инвестора');
-        }
-        if (this.investmentRole(entity) === 'raise' && !nextParticipantId && nextStatus) {
-          throw new BadRequestException('Статус участия доступен только связанному инвестору');
-        }
-      } else {
-        const previousTerms = objectValue(previous.investmentTerms);
-        if (this.investmentRole(previous) !== this.investmentRole(entity)) {
-          throw new BadRequestException('Роль инвестиции задаётся при создании');
-        }
-        if (text(previousTerms.participantStatus) !== nextStatus) {
-          throw new BadRequestException('Статус участия меняет только инвестор');
-        }
-        if (text(previousTerms.participantStatus) === 'accepted'
-          && JSON.stringify(stable(previousTerms)) !== JSON.stringify(stable(nextTerms))) {
-          throw new BadRequestException('Принятые условия инвестиции нельзя изменить без нового соглашения');
-        }
-      }
-
       if (previous && JSON.stringify(stable(previous)) === JSON.stringify(stable(entity))) continue;
       changedRoles.add(this.investmentRole(entity));
     }
@@ -178,7 +209,10 @@ export class AuxiliaryStateService {
     const row = await this.requireVerified(tenantId);
     const current = normalize(row.data);
     const value = objectValue(body).value;
-    const next = Array.isArray(value) ? clone(value) : [];
+    const requested = Array.isArray(value) ? clone(value) : [];
+    const next = key === 'investments'
+      ? this.protectInvestmentAgreements(current.investments, requested)
+      : requested;
     if (key === 'investments') {
       await this.assertInvestmentMutationAllowed(tenantId, current.investments, next);
     }
