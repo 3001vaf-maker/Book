@@ -23,11 +23,12 @@ export function openProcedureForm({
   defaultWorkplaceId = '',
   variant = '',
   surface = '',
+  className = '',
   onSaved = () => {},
 } = {}) {
   const procedure = initialProcedure(existing, defaultWorkplaceId);
   const html = `<form class="compact-form" data-procedure-form><div class="modal-title"><h2>${existing ? 'Изменить процедуру' : 'Процедура'}</h2></div>${photoField({ name: 'procedurePhoto', value: procedure.photo || '' })}${field({ label: 'Название', name: 'procedureName', value: procedure.name || '', placeholder: 'Название процедуры', required: true })}${costField({ value: procedure.cost || {}, name: 'procedureCost' })}<div class="work-time-row__fields">${durationPicker({ label: 'Длительность', name: 'procedureDuration', value: procedure.duration || 0 })}${durationPicker({ label: 'Перерыв', name: 'procedureBreak', value: procedure.breakDuration || 0 })}</div>${workplaceSelector({ name: 'procedureWorkplaces', selected: procedure.workplaces || [], allowMultiple: true, workplaces: getWorkplaces() })}${textareaField({ label: 'Описание', name: 'procedureDescription', value: procedure.description || '', placeholder: 'Описание процедуры' })}${button('Сохранить', { type: 'submit' })}</form>`;
-  const m = mountModal(root, modal(html, { variant, surface }));
+  const m = mountModal(root, modal(html, { variant, surface, className }));
   if (!m) return null;
 
   initPhotoField(m);

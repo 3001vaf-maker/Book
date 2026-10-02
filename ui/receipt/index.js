@@ -1,4 +1,4 @@
-import { button } from '../buttons/index.js';
+import { button, iconButton } from '../buttons/index.js';
 import { escapeHtml } from '../utils/escape-html.js';
 
 function text(value = '') {
@@ -6,7 +6,14 @@ function text(value = '') {
 }
 
 function receiptRow(item = {}) {
-  return `<div class="read-only-sheet__row${item.strong ? ' is-strong' : ''}"><span>${text(item.label)}</span><strong>${text(item.value)}</strong></div>`;
+  const action = item?.action && typeof item.action === 'object'
+    ? iconButton(item.action.label || '×', {
+      className: item.action.className || 'remove-button',
+      data: item.action.data || '',
+      aria: item.action.aria || 'Действие',
+    })
+    : `<strong>${text(item.value)}</strong>`;
+  return `<div class="read-only-sheet__row${item.strong ? ' is-strong' : ''}"><span>${text(item.label)}</span>${action}</div>`;
 }
 
 export function readOnlyReceipt({

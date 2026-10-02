@@ -203,6 +203,9 @@ export function datePicker({
   maxYear = null,
   initialYear = null,
   showYear = true,
+  modalVariant = 'standard',
+  modalClassName = '',
+  modalSurface = '',
   allowClear = true,
   required = false,
 } = {}) {
@@ -217,6 +220,9 @@ export function datePicker({
     `data-date-picker-max-year="${escapeHtml(maxYear == null ? '' : String(maxYear))}"`,
     `data-date-picker-initial-year="${escapeHtml(initialYear == null ? '' : String(initialYear))}"`,
     `data-date-picker-show-year="${showYear ? 'true' : 'false'}"`,
+    `data-date-picker-modal-variant="${escapeHtml(modalVariant)}"`,
+    `data-date-picker-modal-class="${escapeHtml(modalClassName)}"`,
+    `data-date-picker-modal-surface="${escapeHtml(modalSurface)}"`,
     `data-date-picker-placeholder="${escapeHtml(placeholder)}"`,
     `data-date-picker-allow-clear="${allowClear ? 'true' : 'false'}"`,
   ].join(' ');
@@ -266,6 +272,9 @@ function openDatePicker(host) {
     : Math.max(minYear, Math.min(maxYear, now.getFullYear()));
   const placeholder = host.dataset.datePickerPlaceholder || 'Выберите дату';
   const showYear = host.dataset.datePickerShowYear !== 'false';
+  const modalVariant = host.dataset.datePickerModalVariant || 'standard';
+  const modalClassName = host.dataset.datePickerModalClass || '';
+  const modalSurface = host.dataset.datePickerModalSurface || '';
   const allowClear = host.dataset.datePickerAllowClear !== 'false';
   let displayed = current
     ? new Date(current.getFullYear(), current.getMonth(), 1)
@@ -273,7 +282,12 @@ function openDatePicker(host) {
   let selectedValue = current ? dateKey(current) : '';
 
   const content = `<div class="form-grid">${showYear ? '<div data-date-picker-year></div>' : ''}<div data-date-picker-calendar></div>${allowClear && selectedValue ? button('Очистить дату', { variant: 'secondary', data: 'data-date-picker-clear' }) : ''}</div>`;
-  const modalRoot = mountModal(document.body, modal(content, { variant: 'standard', title: host.querySelector(':scope > span')?.textContent?.replace(/\s*\*$/, '') || 'Дата' }));
+  const modalRoot = mountModal(document.body, modal(content, {
+    variant: modalVariant,
+    className: modalClassName,
+    surface: modalSurface,
+    title: host.querySelector(':scope > span')?.textContent?.replace(/\s*\*$/, '') || 'Дата',
+  }));
   if (!modalRoot) return;
   const yearHost = modalRoot.querySelector('[data-date-picker-year]');
   const calendarHost = modalRoot.querySelector('[data-date-picker-calendar]');
