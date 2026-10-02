@@ -6,7 +6,6 @@ import { getTimeAvailabilityAt } from '../core/time/index.js';
 import { getRecordPaymentState, recordAmountDue } from '../core/finance/index.js';
 import { openRecordCreation } from './record.js';
 import { openRecordView } from './record-view.js';
-import { openRecordPaymentEntry } from './record-payment.js';
 import { openBreakView } from './break-view.js';
 
 function dateKey(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
@@ -19,9 +18,7 @@ function withFinancialState(usages = []) {
 }
 
 function openExistingRecord(record) {
-  let closePayment = () => {};
-  openRecordView(record, { onClose: () => closePayment() });
-  closePayment = openRecordPaymentEntry(record);
+  openRecordView(record);
 }
 
 function openUsage(usage, rerender = () => {}) {
