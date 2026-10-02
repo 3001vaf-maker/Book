@@ -1,5 +1,6 @@
 import { button, iconButton } from '../buttons/index.js';
 import { select } from '../selectors/index.js';
+import { field } from '../inputs/index.js';
 import { escapeHtml } from '../utils/escape-html.js';
 import { paymentMethodsMarkup, initPaymentMethodsAllocation } from './methods.js';
 
@@ -51,9 +52,9 @@ export function paymentForm({
         ${iconButton('×', { className: 'remove-button payment-procedure__remove', data: 'data-payment-remove', aria: `Удалить ${itemName}` })}
       </div>
       <div class="payment-fields payment-fields--three">
-        <label><span>Цена</span><input type="number" inputmode="decimal" step="0.01" min="0" value="${escapeHtml(moneyText(price))}" data-payment-price></label>
-        <div class="payment-discount-percent">${select({ label: 'Скидка %', value: percent ? percentText(percent) : '', options: discountOptions, data: 'data-payment-discount-percent', aria: 'Скидка в процентах' })}</div>
-        <label><span>Скидка ₽</span><input type="number" inputmode="decimal" step="0.01" min="0" value="${money ? escapeHtml(moneyText(money)) : ''}" data-payment-discount-money></label>
+        ${field({ label: 'Цена', value: moneyText(price), type: 'number', inputmode: 'decimal', min: 0, step: '0.01', data: 'data-payment-price' })}
+        <div class="payment-discount-percent">${select({ label: 'Скидка %', value: percent ? percentText(percent) : '', options: discountOptions, className: 'ui-select--center', data: 'data-payment-discount-percent', aria: 'Скидка в процентах' })}</div>
+        ${field({ label: 'Скидка ₽', value: money ? moneyText(money) : '', type: 'number', inputmode: 'decimal', min: 0, step: '0.01', data: 'data-payment-discount-money' })}
       </div>
     </section>`;
   }).join('');

@@ -122,7 +122,8 @@ function openSelector(trigger) {
   const allowCustom = trigger.dataset.allowCustom === 'true';
   const placeholder = trigger.dataset.placeholder || 'Начните вводить';
 
-  const content = `<div class="ui-selector" data-ui-selector data-input-id="${escapeHtml(input.id)}">
+  const centered = trigger.closest('.ui-select')?.classList.contains('ui-select--center');
+  const content = `<div class="ui-selector${centered ? ' ui-selector--center' : ''}" data-ui-selector data-input-id="${escapeHtml(input.id)}">
     <div class="ui-selector__wheel${searchable ? ' is-searchable' : ''}" role="listbox" aria-label="Выбор значения">
       ${searchable ? `<div class="ui-selector__search-wrap"><input class="ui-selector__search" type="search" data-ui-selector-search placeholder="${escapeHtml(placeholder)}" autocomplete="off"></div>` : ''}
       <div class="ui-selector__viewport">${optionMarkup}</div>
