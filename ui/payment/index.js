@@ -1,6 +1,7 @@
-import { button, iconButton } from '../buttons/index.js';
+import { button } from '../buttons/index.js';
 import { select } from '../selectors/index.js';
 import { field } from '../inputs/index.js';
+import { readOnlyReceipt } from '../receipt/index.js';
 import { escapeHtml } from '../utils/escape-html.js';
 import { paymentMethodsMarkup, initPaymentMethodsAllocation } from './methods.js';
 
@@ -27,6 +28,17 @@ const discountOptions = [
   ...Array.from({ length: 100 }, (_, index) => ({ value: String(index + 1), label: `${index + 1}%` })),
 ];
 
+function paymentSummary({ workplace = '', moment = '', identity = '', total = 0 } = {}) {
+  return readOnlyReceipt({
+    groups: [[
+      { label: workplace, value: '' },
+      { label: moment, value: '' },
+      { label: identity, value: '' },
+    ]],
+    totals: [{ label: 'К оплате', value: moneyDisplay(total), strong: true }],
+  });
+}
+
 export function paymentForm({
   workplace = '',
   date = '',
@@ -46,14 +58,17 @@ export function paymentForm({
       : percent ? 'percent' : money ? 'money' : 'none';
     const itemName = procedure?.name || '';
     return `
-    <section class="payment-procedure" data-payment-procedure="${index}" data-payment-source-type="${escapeHtml(procedure?.sourceType || 'procedure')}" data-payment-source-id="${escapeHtml(procedure?.id || '')}" data-payment-name="${escapeHtml(itemName)}" data-payment-discount-mode="${mode}">
-      <div class="payment-procedure__head">
-        <strong class="payment-procedure__name">${escapeHtml(itemName)}</strong>
-        ${iconButton('×', { className: 'remove-button payment-procedure__remove', data: 'data-payment-remove', aria: `Удалить ${itemName}` })}
-      </div>
-      <div class="payment-fields payment-fields--three">
+    <section class="form-grid" data-payment-procedure="${index}" data-payment-source-type="${escapeHtml(procedure?.sourceType || 'procedure')}" data-payment-source-id="${escapeHtml(procedure?.id || '')}" data-payment-name="${escapeHtml(itemName)}" data-payment-discount-mode="${mode}">
+      ${readOnlyReceipt({
+        items: [{
+          label: itemName,
+          value: moneyDisplay(price),
+          action: { label: '×', data: 'data-payment-remove', aria: `Удалить ${itemName}` },
+        }],
+      })}
+      <div class="payment-edit-grid">
         ${field({ label: 'Цена', value: moneyText(price), type: 'number', inputmode: 'decimal', min: 0, step: '0.01', data: 'data-payment-price' })}
-        <div class="payment-discount-percent">${select({ label: 'Скидка %', value: percent ? percentText(percent) : '', options: discountOptions, className: 'ui-select--center', data: 'data-payment-discount-percent', aria: 'Скидка в процентах' })}</div>
+        ${select({ label: 'Скидка %', value: percent ? percentText(percent) : '', options: discountOptions, className: 'ui-select--center', data: 'data-payment-discount-percent', aria: 'Скидка в процентах' })}
         ${field({ label: 'Скидка ₽', value: money ? moneyText(money) : '', type: 'number', inputmode: 'decimal', min: 0, step: '0.01', data: 'data-payment-discount-money' })}
       </div>
     </section>`;
@@ -62,21 +77,16 @@ export function paymentForm({
   const identity = [person?.uei, person?.name].map((value) => String(value || '').trim()).filter(Boolean).join(' ');
   const moment = [date, time].map((value) => String(value || '').trim()).filter(Boolean).join(' - ');
 
-  return `<div class="payment-ui" data-payment-ui>
-    <section class="payment-record-summary">
-      <div class="payment-record-summary__line"><span>${escapeHtml(workplace)}</span></div>
-      <div class="payment-record-summary__line"><span>${escapeHtml(moment)}</span></div>
-      <div class="payment-record-summary__line"><span>${escapeHtml(identity)}</span></div>
-      <div class="payment-record-summary__line payment-record-summary__due"><span>К оплате</span><strong data-payment-total>${escapeHtml(moneyDisplay(total))}</strong></div>
-    </section>
-    <div class="payment-procedures">${procedureBlocks}</div>
-    ${showActions ? `<div class="payment-actions">${button('Сохранить', { data: 'data-payment-save', variant: 'secondary' })}${button('Оплатить', { data: 'data-payment-submit' })}</div>` : ''}
+  return `<div class="form-grid" data-payment-ui data-payment-workplace="${escapeHtml(workplace)}" data-payment-moment="${escapeHtml(moment)}" data-payment-identity="${escapeHtml(identity)}">
+    <div data-payment-summary>${paymentSummary({ workplace, moment, identity, total })}</div>
+    <div class="form-grid" data-payment-procedures>${procedureBlocks}</div>
+    ${showActions ? `<div class="modal-actions">${button('Сохранить', { data: 'data-payment-save', variant: 'secondary' })}${button('Оплатить', { data: 'data-payment-submit' })}</div>` : ''}
   </div>`;
 }
 
 export function paymentMethods({ wallets = [], total = 0, showAction = true, showTotal = true, initialAllocations = [] } = {}) {
   const walletData = escapeHtml(JSON.stringify(Array.isArray(wallets) ? wallets.map((wallet) => ({ id: String(wallet?.id || ''), name: String(wallet?.name || '') })) : []));
-  return `<div class="payment-methods" data-payment-methods data-payment-total="${escapeHtml(moneyText(total))}" data-payment-wallets="${walletData}">${paymentMethodsMarkup({ wallets, total, showAction, showTotal, initialAllocations })}</div>`;
+  return `<div data-payment-methods data-payment-total="${escapeHtml(moneyText(total))}" data-payment-wallets="${walletData}">${paymentMethodsMarkup({ wallets, total, showAction, showTotal, initialAllocations })}</div>`;
 }
 
 function rowValues(row) {
@@ -128,8 +138,15 @@ function applySettlement(root, settlement = null, { preserve = null, paidTotal =
     if (percentInput !== preserve) setPercentDisplay(percentInput, item.discountPercent || 0);
     if (moneyInput && moneyInput !== preserve) moneyInput.value = item.discountMoney ? moneyText(item.discountMoney) : '';
   });
-  const totalNode = root.querySelector('[data-payment-total]');
-  if (totalNode) totalNode.textContent = moneyDisplay(Math.max(0, numberValue(settlement?.planTotal) - Math.max(0, numberValue(paidTotal))));
+  const summary = root.querySelector('[data-payment-summary]');
+  if (summary) {
+    summary.innerHTML = paymentSummary({
+      workplace: root.dataset.paymentWorkplace || '',
+      moment: root.dataset.paymentMoment || '',
+      identity: root.dataset.paymentIdentity || '',
+      total: Math.max(0, numberValue(settlement?.planTotal) - Math.max(0, numberValue(paidTotal))),
+    });
+  }
 }
 
 function recalculate(root, calculate, { preserve = null, paidTotal = 0 } = {}) {
