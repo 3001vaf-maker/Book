@@ -8,6 +8,8 @@ import {
   initDurationPickers,
   initMultiSelect,
   list,
+  select,
+  openSharedProfileSettingsMenu,
   modal,
   mountModal,
   openNotice,
@@ -20,7 +22,7 @@ import {
   setRecordPrimaryAction,
   bindRecordSettings,
 } from '../ui/ui.js';
-import { getRecordPaymentState, recordSettlementItems, repriceSettlement } from '../core/finance/index.js';
+import { getRecordPaymentState, recordSettlementItems, repriceSettlement, refreshFinanceState } from '../core/finance/index.js';
 import { getWorkplaces, getWorkplaceWorkingDates } from '../core/workplace-time.js';
 import { timeToMinutes, minutesToTime } from '../core/time/index.js';
 import { getAllPeople } from '../core/people/data.js';
@@ -29,10 +31,12 @@ import { openPerson } from '../core/people/people.js';
 import { getProcedures } from '../settings/service/procedures/data.js';
 import { getProducts } from '../settings/service/products/data.js';
 import { getRecords } from '../core/record/index.js';
-import { updateRecord, cancelRecord, checkRecordTime } from '../core/record/index.js';
+import { updateRecord, cancelRecord, deleteRecord, checkRecordTime } from '../core/record/index.js';
 import { journalRecordActionContext } from './record-action-context.js';
 import { getProfile } from '../settings/profile/data.js';
 import { openRecordPayment } from './record-payment.js';
+import { openRecordEditFlow } from './record.js';
+import { flushBusinessPersistence } from '../core/business-persistence.js';
 
 function recordOwnerOptions({ settings = false, chatPersonKey = '' } = {}) {
   const profile = getProfile();
@@ -377,7 +381,7 @@ function openPhoneActions(phone) {
 
 function confirmCancel(record, onCancelled) {
   const content = `<div class="modal-title"><h2>Отменить запись?</h2><p>Запись останется в истории как отменённая и освободит это время.</p></div><div class="modal-actions">${button('Нет', { data: 'data-record-cancel-no', variant: 'secondary' })}${button('Отменить запись', { data: 'data-record-cancel-yes', variant: 'danger' })}</div>`;
-  const m = mountModal(document.body, modal(content, { variant: 'compact', surface: 'app' }));
+  const m = mountModal(document.body, modal(content, { variant: 'bottom', surface: 'app' }));
   if (!m) return;
   m.querySelector('[data-record-cancel-no]')?.addEventListener('click', () => m.remove());
   m.querySelector('[data-record-cancel-yes]')?.addEventListener('click', () => {
@@ -407,7 +411,6 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
   const root = recordZHost(m);
 
   const applyPatch = (patch) => {
-    if (isPaid()) return;
     const movesAppointment = Object.prototype.hasOwnProperty.call(patch, 'date')
       || Object.prototype.hasOwnProperty.call(patch, 'workplaceId')
       || Object.prototype.hasOwnProperty.call(patch, 'from')
@@ -476,7 +479,6 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
   };
 
   const persistChanges = () => {
-    if (isPaid()) return false;
     updatingFromView = true;
     const updated = updateRecord(record.id, {
       date: dateKey(state.date),
@@ -509,6 +511,72 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     const delay = start.getTime() - Date.now();
     if (delay <= 0) return;
     startTimer = setTimeout(() => render(), Math.min(delay + 50, 2147483647));
+  };
+
+  const openRecordEditSelector = () => {
+    const paid = isPaid();
+    const layer = mountModal(document.body, modal(
+      `<div class="compact-form">${select({
+        label: 'Изменить',
+        name: 'recordEditStep',
+        value: '',
+        options: [
+          { value: '', label: 'Без выбора' },
+          { value: 'workplace', label: 'Пространство' },
+          { value: 'date', label: 'Дата' },
+          { value: 'time', label: 'Время' },
+          ...(!paid ? [{ value: 'procedure', label: 'Процедура' }] : []),
+        ],
+        aria: 'Выберите этап переноса записи',
+      })}</div>`,
+      { variant: 'bottom', surface: 'app', title: 'Перенос' },
+    ));
+    const input = layer?.querySelector('input[name="recordEditStep"]');
+    input?.addEventListener('change', () => {
+      const startAt = String(input.value || '');
+      if (!startAt) return;
+      layer.v2Close?.();
+      openRecordEditFlow({
+        startAt,
+        date: state.date,
+        workplaceId: state.workplaceId,
+        from: state.from,
+        to: state.to,
+        selectedProcedures: state.procedures,
+        excludeId: record.id,
+        onApply: (next) => {
+          state = {
+            ...state,
+            date: next.date,
+            workplaceId: next.workplaceId,
+            from: next.from,
+            to: next.to,
+            ...(paid ? {} : { procedures: next.procedures }),
+            attendance: '',
+          };
+          render();
+        },
+      });
+    });
+  };
+
+  const confirmHardDelete = () => {
+    const layer = mountModal(document.body, modal(
+      `<div class="modal-title"><h2>Удалить запись полностью?</h2><p>Запись, её история и связанные данные оплаты будут удалены без восстановления.</p></div>
+      <div class="modal-actions">${button('Удалить', { variant: 'critical', data: 'data-record-hard-delete-confirm' })}</div>`,
+      { variant: 'bottom', surface: 'app', title: 'Удалить запись' },
+    ));
+    layer?.querySelector('[data-record-hard-delete-confirm]')?.addEventListener('click', async () => {
+      if (!deleteRecord(record.id)) return;
+      try {
+        await flushBusinessPersistence();
+        await refreshFinanceState();
+        layer.v2Close?.();
+        m.v2Close?.();
+      } catch (error) {
+        openNotice({ title: 'Не удалось удалить', message: String(error?.message || 'Сервер не подтвердил удаление записи.') });
+      }
+    });
   };
 
   const render = () => {
@@ -559,7 +627,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     </div>`;
     const dirty = stateSnapshot(state) !== baseline;
     root.innerHTML = `<div class="record-screen record-screen--state-view">${card}${statusControl}</div>`;
-    if (!paid && dirty) {
+    if (dirty) {
       setRecordPrimaryAction(m, {
         label: 'Сохранить',
         onClick: persistChanges,
@@ -673,24 +741,29 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
   };
 
   bindRecordSettings(m, () => {
-    if (isPaid()) return;
-    const menu = list({
-      items: [
-        { title: 'Продажа', interactive: true, data: 'data-record-settings-sale', aria: 'Добавить продажу' },
-        { title: 'Отменить запись', interactive: true, data: 'data-record-settings-cancel', aria: 'Отменить запись' },
-      ],
-    });
-    const layer = mountModal(document.body, modal(menu, { variant: 'quick', surface: 'app' }));
-    layer?.querySelector('[data-record-settings-sale]')?.addEventListener('click', () => {
-      layer.v2Close?.();
-      openSalePicker(state, (nextProducts) => {
-        state = { ...state, products: nextProducts };
-        persistChanges();
-      });
-    });
-    layer?.querySelector('[data-record-settings-cancel]')?.addEventListener('click', () => {
-      layer.v2Close?.();
-      confirmCancel(record, () => m.v2Close?.());
+    const current = getRecords().find((item) => String(item?.id || '') === String(record.id)) || record;
+    const cancelled = current?.status === 'cancelled';
+    openSharedProfileSettingsMenu({
+      title: 'Настройки записи',
+      actions: [
+        !cancelled ? {
+          id: 'move',
+          label: 'Перенос',
+          onSelect: openRecordEditSelector,
+        } : null,
+        !cancelled ? {
+          id: 'cancel',
+          label: 'Отмена',
+          variant: 'danger',
+          onSelect: () => confirmCancel(current, () => m.v2Close?.()),
+        } : null,
+        {
+          id: 'delete',
+          label: 'Удалить',
+          variant: 'critical',
+          onSelect: confirmHardDelete,
+        },
+      ].filter(Boolean),
     });
   });
 
