@@ -1,4 +1,4 @@
-import { button, durationPicker, durationText, entityCard, escapeHtml, field, list, select, v2ListEntry, stateView, initStateView, initCalendar, mountModal, modal, openNotice, initDurationPickers, initMultiSelect, viewNavigation, initViewNavigation, mountRecordZ, recordZHost, renderRecordZ, recordTimeRows, recordWorkplaceCards, recordProcedureList, recordPersonList, recordConfirmationMiniCard, setRecordPrimaryAction, bindRecordSettings, closeRecordZStack } from '../ui/ui.js';
+import { button, durationPicker, durationText, entityCard, escapeHtml, field, list, select, timePicker, initTimePickers, v2ListEntry, stateView, initStateView, initCalendar, mountModal, modal, openNotice, initDurationPickers, initMultiSelect, viewNavigation, initViewNavigation, mountRecordZ, recordZHost, renderRecordZ, recordTimeRows, recordWorkplaceCards, recordProcedureList, recordPersonList, recordConfirmationMiniCard, setRecordPrimaryAction, bindRecordSettings, closeRecordZStack } from '../ui/ui.js';
 import { createRecord } from '../core/record/index.js';
 import { createJournalBreak } from './break-service.js';
 import { getPeople } from '../core/people/data.js';
@@ -659,24 +659,41 @@ export function openRecordEditFlow({
 
   const openTime = () => {
     const duration = Math.max(5, draft.procedures.reduce((sum, item) => sum + (Number(item?.duration) || 0), 0));
-    const values = listAvailableStartTimes({
-      date: draft.date,
-      workplaceId: draft.workplaceId,
-      duration,
-      step: 5,
-      excludeId,
-    });
     const layer = mountRecordZ({ ...recordOwnerOptions(), title: 'Выбор времени', showA: false, className });
-    const host = renderRecordZ(layer, `<div class="record-screen record-screen--time">${recordTimeRows(values, { data: 'data-record-edit-time', accentEvery: 30 })}</div>`);
-    host?.querySelectorAll('[data-record-edit-time]').forEach((node) => node.addEventListener('click', () => {
-      const nextFrom = String(node.dataset.recordEditTime || '');
+    const host = renderRecordZ(layer, `<div class="record-screen record-screen--state-view"><div class="compact-form">${timePicker({
+      name: 'recordEditExactTime',
+      label: 'Время',
+      value: draft.from,
+      minuteStep: 1,
+    })}</div></div>`);
+    if (!host) return;
+    initTimePickers(host);
+    const input = host.querySelector('input[name="recordEditExactTime"]');
+    input?.addEventListener('change', () => {
+      const nextFrom = String(input.value || '');
       const start = timeToMinutes(nextFrom);
       const nextTo = start == null ? '' : minutesToTime(start + duration);
       if (!nextFrom || !nextTo) return;
+      const availability = checkTimeAvailability({
+        date: draft.date,
+        workplaceId: draft.workplaceId,
+        from: nextFrom,
+        to: nextTo,
+        excludeId,
+      });
+      if (!availability.ok) {
+        openNotice({
+          title: 'Недостаточно времени',
+          message: availability.reason === 'occupied'
+            ? 'Это время уже занято. Выберите другое время.'
+            : 'Это время находится вне рабочего периода. Выберите другое время.',
+        });
+        return;
+      }
       draft.from = nextFrom;
       draft.to = nextTo;
       openProcedures();
-    }));
+    });
   };
 
   const openDate = () => {
