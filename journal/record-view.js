@@ -530,7 +530,6 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
   const scheduleStartRender = () => {
     if (startTimer) clearTimeout(startTimer);
     startTimer = null;
-    if (isPaid()) return;
     const start = appointmentStart(state);
     if (!start) return;
     const delay = start.getTime() - Date.now();
@@ -640,7 +639,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     });
 
     const started = hasAppointmentStarted(state);
-    const effectiveAttendance = normalizedAttendance(state.attendance) || (paid || started ? 'arrived' : '');
+    const effectiveAttendance = normalizedAttendance(state.attendance) || (started ? 'arrived' : '');
     const statusControl = `<div class="record-status-controls">
       <div class="segment-control segment-control--one" role="group" aria-label="Подтверждение записи">
         <button type="button" class="${paid || state.confirmed ? 'is-active' : ''}" aria-pressed="${paid || state.confirmed}" data-record-view-confirmed${paid ? ' disabled' : ''}>Подтвердил</button>
@@ -657,14 +656,18 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
         label: 'Сохранить',
         onClick: persistChanges,
       });
-    } else if (!paid) {
+    } else {
       const paymentState = getRecordPaymentState({ ...record, ...state, id: record.id, finance });
       setRecordPrimaryAction(m, {
-        label: `К оплате · ${formatMoney(paymentState.remaining)}`,
-        onClick: () => openRecordPayment(getRecords().find((item) => String(item?.id || '') === String(record.id)) || { ...record, ...state, id: record.id }),
+        label: paymentState.fullyPaid
+          ? `Оплачено · ${formatMoney(paymentState.paidTotal)}`
+          : `К оплате · ${formatMoney(paymentState.remaining)}`,
+        variant: paymentState.fullyPaid ? 'secondary' : '',
+        onClick: () => openRecordPayment(
+          getRecords().find((item) => String(item?.id || '') === String(record.id)) || { ...record, ...state, id: record.id },
+          { host: m },
+        ),
       });
-    } else {
-      setRecordPrimaryAction(m);
     }
 
     root.querySelector('[data-record-view-workplace-edit]')?.addEventListener('click', () => {
