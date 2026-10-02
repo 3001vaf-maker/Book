@@ -16,11 +16,15 @@ function investmentAccessAllowed() {
 }
 
 export function financeNavigationItems() {
+  const cashAccess = canUseBookCapability('finance.cash.access');
   return FINANCE_NAVIGATION
     .filter((item) => item.id === 'cash'
-      ? (canUseBookCapability(item.capability) || investmentAccessAllowed())
+      ? (cashAccess || investmentAccessAllowed())
       : canUseBookCapability(item.capability))
-    .map(({ id, label }) => ({ id, label }));
+    .map(({ id, label }) => ({
+      id,
+      label: id === 'cash' && !cashAccess && investmentAccessAllowed() ? 'Инвестиции' : label,
+    }));
 }
 
 export function renderFinanceSection(root, section = 'cash', options = {}) {
