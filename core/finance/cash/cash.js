@@ -146,17 +146,21 @@ function renderOperationRow(operation) {
 }
 
 function cashContext() {
+  const investmentOnly = allowedInvestmentRoles().length > 0
+    && !canUseBookCapability('finance.cash.access')
+    && !canUseBookCapability('finance.special.access');
+  const hasSettings = financeOperationGroups({ groups: ['income-expense', 'transfer'] }).length > 0;
   return workspaceHeaderContext({
-    title: 'Касса',
-    a: {
+    title: investmentOnly ? 'Инвестиции' : 'Касса',
+    a: hasSettings ? {
       kind: 'settings',
       data: 'data-cash-settings',
       aria: 'Настройки кассы',
-    },
+    } : null,
     c: canCreateCashEntity() ? {
       label: '+',
       data: 'data-cash-create',
-      aria: 'Создать сущность кассы',
+      aria: investmentOnly ? 'Добавить инвестицию' : 'Создать сущность кассы',
     } : null,
   });
 }
