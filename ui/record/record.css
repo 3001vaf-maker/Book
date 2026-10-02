@@ -51,3 +51,5 @@
 .list-entry--record-person .list-entry__background>span{display:none}
 .list-entry--record-person .list-entry__content{background:#fff}
 .list-entry--record-person .list-entry__text{grid-template-rows:repeat(3,minmax(0,auto));gap:4px}
+
+.record-status-controls .segment-control--one button.is-active,.record-status-controls .segment-control--one button.is-active:disabled{background:var(--active);color:var(--text);font-weight:650}
