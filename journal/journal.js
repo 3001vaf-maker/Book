@@ -81,6 +81,8 @@ export function renderJournal(root, options = {}) {
         key: item.workplaceId,
         name: item.name,
         indicatorColor: item.indicatorColor,
+        from: item.from,
+        to: item.to,
       };
     });
     const recordCounts = Object.fromEntries(active.map((workplace) => {
