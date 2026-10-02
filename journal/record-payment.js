@@ -1,6 +1,7 @@
 import {
   button,
   datePicker,
+  field,
   initDatePickers,
   initPaymentForm,
   initPaymentMethods,
@@ -11,6 +12,7 @@ import {
   openSharedProfileSettingsMenu,
   paymentForm,
   paymentMethods,
+  select,
   setRecordPrimaryAction,
   shortDate,
   v2ZLayer,
@@ -21,9 +23,11 @@ import {
   cancelPaymentOperation,
   correctFinanceOperation,
   getRecordPaymentState,
+  getRefundsForPayment,
   getWallets,
   hardDeleteFinanceOperation,
   recordPaymentIncome,
+  recordRefundExpense,
   recordSettlementItems,
   refreshFinanceState,
   saveSettlementSnapshot,
@@ -67,7 +71,7 @@ async function saveSettlementCorrection(record, settlement) {
   const current = getRecord(record?.id) || record;
   const state = paymentStateForRecord(current);
   if (Number(settlement?.planTotal || 0) + 0.009 < Number(state?.paidTotal || 0)) {
-    openNotice({ message: 'Расчёт нельзя уменьшить ниже уже оплаченной суммы. Сначала отмените ошибочную оплату.' });
+    openNotice({ message: 'Расчёт нельзя уменьшить ниже уже оплаченной суммы. Сначала выполните возврат или отмените ошибочную оплату.' });
     return null;
   }
 
@@ -343,6 +347,87 @@ function openPaymentCorrection(parentLayer, record, payment, onSaved) {
   return layer;
 }
 
+function openPaymentRefund(record, payment, onSaved) {
+  if (!payment?.id) return null;
+  const refunds = getRefundsForPayment(payment.id);
+  const refunded = refunds.reduce((sum, item) => sum + Number(item?.total || 0), 0);
+  const remaining = Math.max(0, Number(payment?.total || 0) - refunded);
+  if (remaining <= 0.009) {
+    openNotice({ title: 'Возврат', message: 'Эта оплата уже возвращена полностью.' });
+    return null;
+  }
+
+  const wallets = getWallets();
+  const allocations = paymentAllocations(payment);
+  const defaultWalletId = allocations.length === 1 ? String(allocations[0]?.walletId || '') : '';
+  const layer = mountModal(document.body, modal(
+    `<div class="compact-form">
+      ${field({
+        label: 'Сумма возврата',
+        name: 'recordPaymentRefundAmount',
+        type: 'number',
+        value: remaining,
+        min: 0,
+        max: remaining,
+        step: '0.01',
+        inputmode: 'decimal',
+      })}
+      ${select({
+        label: 'Кошелёк',
+        name: 'recordPaymentRefundWallet',
+        value: defaultWalletId,
+        options: [
+          { value: '', label: 'Выберите кошелёк' },
+          ...wallets.map((wallet) => ({ value: wallet.id, label: wallet.name })),
+        ],
+        aria: 'Кошелёк возврата',
+      })}
+      ${datePicker({
+        label: 'Дата возврата',
+        name: 'recordPaymentRefundDate',
+        value: paymentDateValue(record, new Date()),
+        allowClear: false,
+      })}
+      ${button('Вернуть', { variant: 'danger', data: 'data-record-payment-refund-confirm' })}
+    </div>`,
+    { variant: 'bottom', surface: 'app', title: 'Возврат' },
+  ));
+  if (!layer) return null;
+  initDatePickers(layer);
+
+  const amountInput = layer.querySelector('input[name="recordPaymentRefundAmount"]');
+  const walletInput = layer.querySelector('input[name="recordPaymentRefundWallet"]');
+  const submit = layer.querySelector('[data-record-payment-refund-confirm]');
+  const sync = () => {
+    const amount = Math.max(0, Math.min(remaining, Number(String(amountInput?.value || '0').replace(',', '.')) || 0));
+    if (submit) submit.disabled = !walletInput?.value || amount <= 0;
+  };
+  amountInput?.addEventListener('input', sync);
+  walletInput?.addEventListener('change', sync);
+
+  submit?.addEventListener('click', async () => {
+    const amount = Math.max(0, Math.min(remaining, Number(String(amountInput?.value || '0').replace(',', '.')) || 0));
+    const wallet = wallets.find((item) => String(item?.id || '') === String(walletInput?.value || ''));
+    const dateValue = String(layer.querySelector('input[name="recordPaymentRefundDate"]')?.value || '');
+    if (!amount || !wallet || !dateValue) return;
+    try {
+      const refund = await recordRefundExpense(payment.id, {
+        amount,
+        walletId: wallet.id,
+        walletName: wallet.name,
+        occurredAt: occurredAtForDate(dateValue, record),
+      });
+      if (!refund) return;
+      layer.v2Close?.();
+      onSaved?.();
+    } catch (error) {
+      openNotice({ message: String(error?.message || 'Не удалось выполнить возврат') });
+    }
+  });
+  sync();
+  return layer;
+}
+
 function openPaymentCancellation(record, payment, onSaved) {
   if (!payment?.id) return null;
   const layer = mountModal(document.body, modal(
@@ -399,6 +484,12 @@ function openPaymentSettings(layer, record, state, rerender) {
         id: 'correct-payment',
         label: 'Корректировка оплаты',
         onSelect: () => openPaymentCorrection(layer, record, payment, rerender),
+      },
+      {
+        id: 'refund-payment',
+        label: 'Возврат',
+        variant: 'danger',
+        onSelect: () => openPaymentRefund(record, payment, rerender),
       },
       {
         id: 'cancel-payment',
