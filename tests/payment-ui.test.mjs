@@ -16,11 +16,12 @@ const html = paymentForm({
   total: 9250,
 });
 
-assert.match(html, /class="payment-record-summary"/);
+assert.match(html, /data-read-only-sheet/);
+assert.doesNotMatch(html, /payment-record-summary|payment-procedure__|payment-methods__/);
 assert.match(html, /Рабочее пространство/);
 assert.match(html, /11\.09\.26 - 12:00 - 13:00/);
 assert.match(html, /0278 Наталья Гусева/);
-assert.match(html, /<span>К оплате<\/span><strong data-payment-total>9 250 ₽<\/strong>/);
+assert.match(html, /<span>К оплате<\/span><strong>9 250 ₽<\/strong>/);
 assert.equal((html.match(/data-payment-procedure="/g) || []).length, 2);
 assert.match(html, /Очень длинное название процедуры без сокращения/);
 assert.match(html, /data-payment-price/);
@@ -54,7 +55,7 @@ assert.match(methodsHtml, /data-payment-allocation-row="1"/);
 assert.match(methodsHtml, /data-payment-allocation-amount="0"/);
 assert.match(methodsHtml, /data-payment-allocation-amount="1"/);
 assert.match(methodsHtml, /data-payment-tips-row hidden/);
-assert.match(methodsHtml, /data-payment-tips>0 ₽/);
+assert.match(methodsHtml, /data-payment-tips-row hidden/);
 assert.match(methodsHtml, />Сохранить</);
 assert.doesNotMatch(methodsHtml, /data-payment-mode|Разделить/);
 assert.doesNotMatch(methodsHtml, /type="number"[^>]*data-payment-allocation-amount/);
@@ -100,12 +101,13 @@ assert.match(methodsSource, /const tips = Math\.max\(0, received - applied\)/);
 assert.match(methodsSource, /const remaining = Math\.max\(0, total - applied\)/);
 assert.match(methodsSource, /return \{\s*state,\s*sync,\s*initial,/s);
 
-assert.match(paymentCss, /\.payment-procedure\{[^}]*border-radius:0/);
-assert.match(methodsSource, /payment-allocation-block/);
+assert.match(paymentSource, /readOnlyReceipt/);
+assert.match(methodsSource, /readOnlyReceipt/);
 assert.match(methodsSource, /field\(\{[\s\S]*label: 'Сумма'/);
-assert.doesNotMatch(paymentCss, /payment-allocation-input|min-height:52px/);
-assert.match(paymentCss, /\.payment-record-summary__due strong\{font-size:14px;font-weight:800/);
-assert.match(paymentCss, /\.payment-procedure__name\{[^}]*white-space:normal[^}]*text-overflow:clip/);
+assert.match(paymentCss, /\.payment-edit-grid\{/);
+assert.doesNotMatch(paymentCss, /payment-record-summary|payment-procedure|payment-methods|payment-allocation|font-size|min-height|padding|border-radius/);
+assert.doesNotMatch(paymentSource, /payment-record-summary|payment-procedure__|payment-methods__/);
+assert.doesNotMatch(methodsSource, /payment-allocation-block|payment-methods__/);
 
 assert.match(recordViewSource, /openRecordPayment\(/);
 assert.match(recordViewSource, /\{ host: m \}/);
@@ -139,6 +141,9 @@ assert.match(recordPaymentSource, /name: 'recordPaymentCorrectionDate'/);
 assert.match(recordPaymentSource, /name: 'recordPaymentRefundDate'/);
 assert.match(recordPaymentSource, /name: 'recordPaymentCancelDate'/);
 assert.match(recordPaymentSource, /showYear: false/);
+assert.match(recordPaymentSource, /modalVariant: 'bottom'/);
+assert.match(recordPaymentSource, /modalClassName: 'modal--form-sheet'/);
+assert.match(recordPaymentSource, /readOnlyReceipt/);
 assert.doesNotMatch(recordPaymentSource, /datetime-local|refundOccurredAt|cancelOccurredAt|paymentOccurredAt/);
 assert.doesNotMatch(recordPaymentSource, /openRecordPaymentEntry|paymentEntryContent|openPaymentModal|openPaidState/);
 
