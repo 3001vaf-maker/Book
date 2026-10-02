@@ -195,7 +195,10 @@ assert.match(serverFinance, /Сначала выполните возврат и
 assert.match(serverFinance, /recordedAt: row\.createdAt\.toISOString\(\)/);
 assert.match(financeData, /recordedAt/);
 assert.match(financeRead, /entry\?\.occurredAt/);
-assert.doesNotMatch(financeUi, /Фактическая дата и время|Внесено в систему/);
+const receiptStart = financeUi.indexOf('function paymentReceiptGroups');
+const receiptEnd = financeUi.indexOf('function openCancellationInfo', receiptStart);
+const receiptSource = financeUi.slice(receiptStart, receiptEnd);
+assert.doesNotMatch(receiptSource, /Фактическая дата и время|Внесено в систему|recordedMoment/);
 assert.match(paymentUi, /function occurredAtForDate/);
 assert.match(paymentUi, /record\?\.to \|\| record\?\.from/);
 assert.match(paymentUi, /name: 'recordPaymentDate'/);
