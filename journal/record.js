@@ -138,7 +138,7 @@ function openPriceProcedurePicker({ workplaceId, onAssigned }) {
     selected: [],
     empty: 'Процедур нет.',
   });
-  const m = mountModal(document.body, modal(`<div class="modal-title"><h2>Из прайса</h2><p>Отметьте процедуры, которые выполняются в этом рабочем месте.</p></div><div data-record-price-list>${content}</div><div class="modal-actions">${button('Добавить', { data: 'data-record-price-save' })}</div>`, { variant: 'medium', surface: 'app' }));
+  const m = mountModal(document.body, modal(`<div class="modal-title"><h2>Из прайса</h2><p>Отметьте процедуры, которые выполняются в этом рабочем месте.</p></div><div data-record-price-list>${content}</div><div class="modal-actions">${button('Добавить', { data: 'data-record-price-save' })}</div>`, { variant: 'bottom', surface: 'app' }));
   if (!m) return;
 
   const listRoot = m.querySelector('[data-record-price-list]');
@@ -176,6 +176,7 @@ function renderProceduresStep(modalRoot, {
   onDone = null,
   excludeId = '',
   className = 'record-flow-z',
+  allowDurationCorrection = false,
 } = {}) {
   modalRoot ||= mountRecordZ({ ...recordOwnerOptions({ settings: true }), title: 'Выбор процедур', className });
   let items = procedures().filter((procedure) => procedureForWorkplace(procedure, workplaceId));
@@ -275,7 +276,7 @@ function renderProceduresStep(modalRoot, {
 
   bindRecordSettings(modalRoot, () => {
     const menu = `<div class="modal-actions">
-      ${selected.size ? button('Время процедур', { data: 'data-record-settings-duration', variant: 'secondary' }) : ''}
+      ${allowDurationCorrection && selected.size ? button('Время процедур', { data: 'data-record-settings-duration', variant: 'secondary' }) : ''}
       ${button('Добавить из прайса', { data: 'data-record-settings-from-price', variant: 'secondary' })}
       ${button('+ Добавить процедуру', { data: 'data-record-settings-add-procedure' })}
     </div>`;
@@ -323,7 +324,7 @@ function renderProceduresStep(modalRoot, {
       openProcedureForm({
         root: document.body,
         defaultWorkplaceId: workplaceId,
-        variant: 'large',
+        variant: 'bottom',
         surface: 'app',
         onSaved: (procedure) => {
           items = procedures().filter((item) => procedureForWorkplace(item, workplaceId));
@@ -349,7 +350,7 @@ function openProcedureSettings({ procedure, current, onSave, onAdd, onDelete }) 
   const deleteAction = onDelete ? button('Удалить процедуру', { data: 'data-record-delete-procedure', variant: 'danger' }) : '';
   const durationField = durationPicker({ name: 'recordDuration', label: 'Время', value: Number(value.duration) || 0 });
   const html = `<div class="modal-title"><h2>${escapeHtml(procedure.name)}</h2><p>Скорректируйте время процедуры для этой записи.</p></div><div class="compact-form">${durationField}<div class="modal-actions">${button('Сохранить', { data: 'data-record-save' })}${addAction}${deleteAction}</div></div>`;
-  const m = mountModal(document.body, modal(html, { variant: 'medium', surface: 'app' }));
+  const m = mountModal(document.body, modal(html, { variant: 'bottom', surface: 'app' }));
   if (!m) return;
   initDurationPickers(m);
   m.querySelector('[data-record-add-procedure]')?.addEventListener('click', () => {
@@ -647,6 +648,7 @@ export function openRecordEditFlow({
       initialSelected: draft.procedures,
       excludeId,
       className,
+      allowDurationCorrection: true,
       onDone: ({ procedures: next, to: nextTo }) => {
         draft.procedures = next;
         draft.to = nextTo;
