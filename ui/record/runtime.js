@@ -162,6 +162,7 @@ export function recordConfirmationMiniCard({
 export function mountRecordZ({
   title = 'Запись',
   settings = false,
+  showA = true,
   className = '',
   stack = true,
   onClose = null,
@@ -173,7 +174,7 @@ export function mountRecordZ({
   const context = workspaceHeaderContext({
     title,
     hideD: !chatPersonKey,
-    a: {
+    a: showA ? {
       kind: 'avatar',
       label: 'Запись',
       image: aImage,
@@ -186,7 +187,7 @@ export function mountRecordZ({
         disabled: true,
         aria: 'Запись',
       }),
-    },
+    } : null,
     d: chatPersonKey ? {
       kind: 'chat',
       data: 'data-record-owner-chat',
