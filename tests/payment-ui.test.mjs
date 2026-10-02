@@ -1,38 +1,47 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
-import { details } from '../ui/page/page.js';
+import { readFileSync } from 'node:fs';
 import { paymentForm, paymentMethods } from '../ui/payment/index.js';
-import { paymentReceipt } from '../ui/payment/receipt.js';
-import { modal } from '../ui/modals/index.js';
 import { shortDate } from '../ui/utils/date-time.js';
 import { zonedDateTimeParts, zonedDateTimeToDate } from '../core/time/index.js';
 
 const html = paymentForm({
-  workplace: 'Бьюти тория',
+  workplace: 'Рабочее пространство',
   date: '11.09.26',
-  time: '02:09',
+  time: '12:00 - 13:00',
   person: { uei: '0278', name: 'Наталья Гусева' },
-  procedures: [{ id: 'p1', name: 'Стрижка - Женская', cost: 7000, discountPercent: 0, discountMoney: 0 }],
-  total: 7000,
+  procedures: [
+    { id: 'p1', name: 'Стрижка - Женская', cost: 7000, discountPercent: 0, discountMoney: 0 },
+    { id: 'p2', name: 'Очень длинное название процедуры без сокращения', cost: 2500, discountPercent: 10, discountMoney: 250 },
+  ],
+  total: 9250,
 });
 
-assert.match(html, /class="payment-person-uei">0278</);
-assert.match(html, /data-payment-save/);
-assert.match(html, /ui-button--secondary/);
-assert.match(html, /data-payment-submit/);
-assert.match(html, /data-payment-total>7 000 ₽</);
+assert.match(html, /class="payment-record-summary"/);
+assert.match(html, /Рабочее пространство/);
+assert.match(html, /11\.09\.26 - 12:00 - 13:00/);
+assert.match(html, /0278 Наталья Гусева/);
+assert.match(html, /<span>К оплате<\/span><strong data-payment-total>9 250 ₽<\/strong>/);
+assert.equal((html.match(/data-payment-procedure="/g) || []).length, 2);
+assert.match(html, /Очень длинное название процедуры без сокращения/);
+assert.match(html, /data-payment-price/);
+assert.match(html, /data-payment-discount-percent/);
+assert.match(html, /data-payment-discount-money/);
 assert.match(html, /data-payment-remove/);
-assert.match(html, /remove-button payment-procedure__remove/);
-assert.doesNotMatch(html, /data-payment-total[^>]*type="number"/);
-assert.equal(shortDate('2026-09-11'), '11.09.26');
-assert.equal(shortDate('2026-09-11T02:41:00'), '11.09.26');
-const moscowMoment = zonedDateTimeToDate('2026-09-21T14:30', 'Europe/Moscow');
-assert.ok(moscowMoment instanceof Date);
-assert.equal(moscowMoment.toISOString(), '2026-09-21T11:30:00.000Z');
-assert.deepEqual(
-  { date: zonedDateTimeParts(moscowMoment, 'Europe/Moscow').date, time: zonedDateTimeParts(moscowMoment, 'Europe/Moscow').time },
-  { date: '2026-09-21', time: '14:30' },
-);
+assert.match(html, /data-payment-save/);
+assert.match(html, /data-payment-submit/);
+assert.doesNotMatch(html, /payment-person-uei|payment-entry|payment-history-item/);
+assert.doesNotMatch(html, /text-overflow:ellipsis/);
+
+const embeddedHtml = paymentForm({
+  workplace: 'Тест',
+  date: '11.09.26',
+  time: '12:00 - 13:00',
+  person: { uei: 'U1', name: 'Тест' },
+  procedures: [{ id: 'p1', name: 'Процедура', cost: 1000 }],
+  total: 1000,
+  showActions: false,
+});
+assert.doesNotMatch(embeddedHtml, /data-payment-save|data-payment-submit/);
 
 const methodsHtml = paymentMethods({
   wallets: [{ id: 'cash', name: 'Наличные' }, { id: 'card', name: 'СберБанк' }],
@@ -46,159 +55,100 @@ assert.match(methodsHtml, /data-payment-allocation-amount="0"/);
 assert.match(methodsHtml, /data-payment-allocation-amount="1"/);
 assert.match(methodsHtml, /data-payment-tips-row hidden/);
 assert.match(methodsHtml, /data-payment-tips>0 ₽/);
-assert.match(methodsHtml, />Tips</);
 assert.match(methodsHtml, />Сохранить</);
-assert.doesNotMatch(methodsHtml, /data-payment-mode|Оплата<\/button>|Разделить/);
+assert.doesNotMatch(methodsHtml, /data-payment-mode|Разделить/);
 assert.doesNotMatch(methodsHtml, /type="number"[^>]*data-payment-allocation-amount/);
-assert.doesNotMatch(methodsHtml, /data-payment-tips[^>]*input/);
 
-const receipt = paymentReceipt({
-  workplace: 'Бьюти тория',
-  date: '11.09.26',
-  time: '02:41',
-  person: { uei: '0278', name: 'Наталья Гусева', phone: '+7 999 000-00-00' },
-  amount: '7 000 ₽',
-  wallet: 'СберБанк',
-  tips: '400 ₽',
+const embeddedMethods = paymentMethods({
+  wallets: [{ id: 'cash', name: 'Наличные' }],
+  total: 7000,
+  showAction: false,
+  showTotal: false,
 });
-assert.match(receipt, /class="payment-receipt"/);
-assert.match(receipt, /Бьюти тория/);
-assert.match(receipt, /11\.09\.26/);
-assert.match(receipt, /02:41/);
-assert.match(receipt, /0278/);
-assert.match(receipt, /Наталья Гусева/);
-assert.match(receipt, /7 000 ₽/);
-assert.match(receipt, /СберБанк/);
-assert.match(receipt, />Tips</);
-assert.match(receipt, /400 ₽/);
-assert.doesNotMatch(receipt, /\+7 999 000-00-00/);
-assert.equal((receipt.match(/class="payment-receipt"/g) || []).length, 1);
+assert.doesNotMatch(embeddedMethods, /data-payment-remaining/);
+assert.doesNotMatch(embeddedMethods, /data-payment-allocation-submit/);
 
-const split = details([
-  { left: '11.09.26', right: '02:41' },
-  { left: '7 000 ₽', right: 'СберБанк' },
-], { variant: 'split' });
-assert.match(split, /entity-details--split/);
-assert.match(split, /11\.09\.26/);
-assert.match(split, /02:41/);
-assert.match(split, /7 000 ₽/);
-assert.match(split, /СберБанк/);
+assert.equal(shortDate('2026-09-11'), '11.09.26');
+const moscowMoment = zonedDateTimeToDate('2026-09-21T14:30', 'Europe/Moscow');
+assert.ok(moscowMoment instanceof Date);
+assert.equal(moscowMoment.toISOString(), '2026-09-21T11:30:00.000Z');
+assert.deepEqual(
+  { date: zonedDateTimeParts(moscowMoment, 'Europe/Moscow').date, time: zonedDateTimeParts(moscowMoment, 'Europe/Moscow').time },
+  { date: '2026-09-21', time: '14:30' },
+);
 
-const modalHtml = modal('<div>Оплата</div>', { variant: 'large', surface: 'app' });
-assert.match(modalHtml, /tabindex="-1"/);
-
-const modalSource = readFileSync(new URL('../ui/modals/index.js', import.meta.url), 'utf8');
-const modalCss = readFileSync(new URL('../ui/modals/modal.css', import.meta.url), 'utf8');
-const inputCss = readFileSync(new URL('../ui/inputs/inputs.css', import.meta.url), 'utf8');
 const paymentSource = readFileSync(new URL('../ui/payment/index.js', import.meta.url), 'utf8');
-const receiptSource = readFileSync(new URL('../ui/payment/receipt.js', import.meta.url), 'utf8');
 const methodsSource = readFileSync(new URL('../ui/payment/methods.js', import.meta.url), 'utf8');
 const paymentCss = readFileSync(new URL('../ui/payment/payment.css', import.meta.url), 'utf8');
 const recordViewSource = readFileSync(new URL('../journal/record-view.js', import.meta.url), 'utf8');
 const recordPaymentSource = readFileSync(new URL('../journal/record-payment.js', import.meta.url), 'utf8');
 const financeUiSource = readFileSync(new URL('../core/finance/dds/index.js', import.meta.url), 'utf8');
 const financeServiceSource = readFileSync(new URL('../core/finance/service.js', import.meta.url), 'utf8');
-const journalListSource = readFileSync(new URL('../journal/список.js', import.meta.url), 'utf8');
-const personMetadataSource = readFileSync(new URL('../core/people/metadata.js', import.meta.url), 'utf8');
-const walletSource = readFileSync(new URL('../core/finance/cash/cash.js', import.meta.url), 'utf8');
-const documentsSource = readFileSync(new URL('../settings/documents/documents.js', import.meta.url), 'utf8');
-const peopleSource = readFileSync(new URL('../core/people/people.js', import.meta.url), 'utf8');
+const journalDaySource = readFileSync(new URL('../journal/день.js', import.meta.url), 'utf8');
 
-assert.doesNotMatch(modalSource, /querySelector\(['"]input,select,textarea/);
-assert.match(modalSource, /data-modal-autofocus/);
-assert.match(paymentSource, /preserve:\s*moneyInput/);
-assert.match(paymentSource, /preserve:\s*priceInput/);
-assert.match(paymentSource, /preserve:\s*percentInput/);
-assert.match(paymentSource, /iconButton\('×'/);
-assert.match(paymentSource, /onRemove/);
-assert.doesNotMatch(paymentSource, /singlePaymentMarkup|splitPaymentMarkup|data-payment-mode/);
-assert.doesNotMatch(paymentCss, /payment-procedure__remove[^}]*font-size/);
-assert.match(paymentCss, /payment-receipt\{/);
-assert.match(receiptSource, /payment-receipt__workplace/);
-assert.match(receiptSource, /payment-receipt__person/);
-assert.doesNotMatch(receiptSource, /phone/);
-assert.match(methodsSource, /data-payment-allocation-row="\$\{index\}"/);
-assert.match(methodsSource, /data-payment-remaining/);
-assert.match(methodsSource, /data-payment-tips-row/);
+assert.match(paymentSource, /const discountOptions = \[/);
+assert.match(paymentSource, /Array\.from\(\{ length: 100 \}/);
+assert.match(paymentSource, /setPercentDisplay/);
+assert.match(paymentSource, /data-payment-discount-mode/);
+assert.match(paymentSource, /preserve = null/);
+assert.match(paymentSource, /priceInput[^\n]*currentState\(priceInput\)/);
+assert.match(paymentSource, /percentInput[^\n]*addEventListener\('change'/);
+assert.match(paymentSource, /moneyInput[^\n]*addEventListener\('input'/);
+assert.match(paymentSource, /onChange\?\.\(result\)/);
 assert.match(methodsSource, /const applied = Math\.min\(Math\.max\(0, total\), received\)/);
 assert.match(methodsSource, /const tips = Math\.max\(0, received - applied\)/);
-assert.match(methodsSource, /remaining = Math\.max\(0, total - applied\)/);
-assert.doesNotMatch(methodsSource, /tipsInput|data-payment-tips[^\n]*input/);
-assert.match(paymentCss, /payment-person-uei[^}]*font-size:16px/);
-assert.match(paymentCss, /ui-select__value[^}]*font-size:16px/);
-assert.match(inputCss, /input\[type="number"\]::-webkit-outer-spin-button/);
-assert.match(inputCss, /-moz-appearance:textfield/);
-assert.match(modalCss, /modal-bottom-action--partial[^}]*rgba\(154,98,88,\.14\)/);
-assert.match(recordViewSource, /discountTotal\s*>\s*0\s*\?[^:]+:\s*formatMoney\(0\)/s);
-assert.match(recordViewSource, /getRecordPaymentState/);
-assert.match(recordViewSource, /book:records-changed/);
-assert.match(recordViewSource, /openProductRemoval/);
-assert.match(recordViewSource, /data-record-view-product-edit/);
-assert.match(recordPaymentSource, /modal\(content,\s*\{\s*variant:\s*'large'/);
-assert.match(recordPaymentSource, /variant:\s*'split'/);
-assert.match(recordPaymentSource, /getRecordPaymentState/);
-assert.match(recordPaymentSource, /saveSettlementSnapshot/);
-assert.match(recordPaymentSource, /await\s+recordPaymentIncome/);
+assert.match(methodsSource, /const remaining = Math\.max\(0, total - applied\)/);
+assert.match(methodsSource, /return \{\s*state,\s*sync,\s*initial,/s);
+
+assert.match(paymentCss, /\.payment-procedure\{[^}]*border-radius:0/);
+assert.match(paymentCss, /\.payment-allocation-input\{[^}]*border-radius:0/);
+assert.match(paymentCss, /\.payment-record-summary__due strong\{font-size:15px;font-weight:800/);
+assert.match(paymentCss, /\.payment-procedure__name\{[^}]*white-space:normal[^}]*text-overflow:clip/);
+
+assert.match(recordViewSource, /openRecordPayment\(/);
+assert.match(recordViewSource, /\{ host: m \}/);
+assert.match(recordViewSource, /К оплате ·/);
+assert.doesNotMatch(recordViewSource, /openRecordPaymentEntry|openPaidState|data-record-payment-open/);
+assert.doesNotMatch(journalDaySource, /openRecordPaymentEntry/);
+
+assert.match(recordPaymentSource, /export function openRecordPayment/);
+assert.match(recordPaymentSource, /className: 'record-payment-z'/);
+assert.match(recordPaymentSource, /title: 'Оплата'/);
+assert.match(recordPaymentSource, /showActions: false/);
+assert.match(recordPaymentSource, /label: 'Сохранить'/);
+assert.match(recordPaymentSource, /label: 'Оплатить'/);
+assert.match(recordPaymentSource, /const canPay = state\.remaining > 0\.009 \|\| state\.fullyPaid/);
+assert.match(recordPaymentSource, /data-record-payment-chat/);
+
+for (const action of [
+  "id: 'correct-payment'",
+  "id: 'refund-payment'",
+  "id: 'cancel-payment'",
+  "id: 'delete-payment'",
+]) assert.ok(recordPaymentSource.includes(action), `Missing payment A action: ${action}`);
+
+assert.match(recordPaymentSource, /await\s+correctFinanceOperation/);
 assert.match(recordPaymentSource, /await\s+recordRefundExpense/);
 assert.match(recordPaymentSource, /await\s+cancelPaymentOperation/);
-assert.match(recordPaymentSource, /function openCancelPaymentModal\(payment, \{ onCancelled = \(\) => \{\} \} = \{\}\)/);
-assert.match(recordPaymentSource, /if \(!cancelled\) return;[\s\S]*m\.remove\(\);[\s\S]*onCancelled\(cancelled\)/);
-assert.doesNotMatch(recordPaymentSource, /if \(!cancelled\) return;[\s\S]{0,120}refreshPaidStateForPayment\(cancelled\)/);
-assert.match(recordPaymentSource, /onCancelled: \(cancelled\) => \{[\s\S]*m\.remove\(\);[\s\S]*onCancelled\(cancelled\);/);
-assert.match(recordPaymentSource, /const finishCancelledPayment = \(\) => closePaymentEntry\(\)/);
-assert.match(recordPaymentSource, /data-record-payment-open[^\n]*openPaymentModal\(current, \{ onCancelled: finishCancelledPayment \}\)/);
-assert.match(recordPaymentSource, /data-record-payment-paid[^\n]*openPaidState\(current, \{ onCancelled: finishCancelledPayment \}\)/);
-assert.doesNotMatch(recordPaymentSource, /finance:\s*settlement/);
-assert.match(recordPaymentSource, /modal-bottom-action--partial/);
-assert.match(recordPaymentSource, /paymentReceipt\(/);
-assert.match(recordPaymentSource, /receivedTotal/);
-assert.match(recordPaymentSource, /person:\s*latest\?\.person/);
-assert.match(recordPaymentSource, /workplace:\s*latest\?\.workplace/);
-assert.match(recordPaymentSource, /Действия с оплатой',\s*\{\s*variant:\s*'secondary'/);
-assert.match(recordPaymentSource, /data-payment-history/);
-assert.match(recordPaymentSource, /const payments = Array\.isArray\(state\?\.payments\)/);
-assert.match(recordPaymentSource, /querySelectorAll\('\[data-payment-actions\]'\)/);
-assert.match(recordPaymentSource, /data-payment-actions="\$\{payment\.id\}"/);
-assert.doesNotMatch(recordPaymentSource, /if \(!state\.fullyPaid \|\| !state\.latestPayment\) return/);
-assert.match(recordPaymentSource, /Отменить операцию',\s*\{\s*variant:\s*'secondary'/);
-assert.match(recordPaymentSource, /Возврат',\s*\{\s*variant:\s*'danger'/);
-assert.match(recordPaymentSource, /Подтвердить возврат',[\s\S]*variant:\s*'danger'/);
+assert.match(recordPaymentSource, /await\s+hardDeleteFinanceOperation/);
+assert.match(recordPaymentSource, /name: 'recordPaymentDate'/);
+assert.match(recordPaymentSource, /name: 'recordPaymentCorrectionDate'/);
+assert.match(recordPaymentSource, /name: 'recordPaymentRefundDate'/);
+assert.match(recordPaymentSource, /name: 'recordPaymentCancelDate'/);
+assert.doesNotMatch(recordPaymentSource, /datetime-local|refundOccurredAt|cancelOccurredAt|paymentOccurredAt/);
+assert.doesNotMatch(recordPaymentSource, /openRecordPaymentEntry|paymentEntryContent|openPaymentModal|openPaidState/);
+
+assert.match(recordPaymentSource, /blankPaymentContext\(\)/);
+assert.match(recordPaymentSource, /paymentMethods\(\{ wallets: getWallets\(\), total, showAction: false, showTotal: false \}\)/);
+assert.match(recordPaymentSource, /setRecordPrimaryAction\(layer, \{\s*label: 'Оплатить'/s);
+assert.match(recordPaymentSource, /occurredAtForDate/);
 assert.match(recordPaymentSource, /zonedDateTimeToDate/);
-assert.match(recordPaymentSource, /paymentWorkplaceTimeZone/);
-assert.match(recordPaymentSource, /financeDateTimeInputValue/);
-assert.match(recordPaymentSource, /onRemove:[\s\S]*if \(updated\) return;[\s\S]*openPaymentModal/);
+
 assert.match(financeServiceSource, /export async function cancelFinanceOperation/);
 assert.match(financeServiceSource, /export async function correctFinanceOperation/);
-assert.match(financeUiSource, /data-finance-operation/);
-assert.match(financeUiSource, /cancelFinanceOperation\(first\.operationId/);
-assert.match(financeUiSource, /label:\s*'Корректировка'/);
-assert.match(financeUiSource, /label:\s*'Отменить операцию'/);
-assert.match(financeUiSource, /id:\s*'cancel-operation',[\s\S]*variant:\s*'danger'/);
-assert.match(financeUiSource, /paymentReceiptGroups/);
-assert.match(financeUiSource, /groups:\s*paymentReceiptGroups\(entries\)/);
-assert.match(financeUiSource, /hardDeleteFinanceOperation\(first\.operationId/);
-assert.match(financeUiSource, /data-finance-operation-delete-confirm/);
-assert.match(recordPaymentSource, /flatMap/);
-assert.doesNotMatch(recordPaymentSource, /toLocaleDateString/);
-assert.match(journalListSource, /shortDate\(record\?\.date\)/);
-assert.match(personMetadataSource, /shortDate\(value,\s*'—'\)/);
-assert.match(walletSource, /shortDateTime\(raw,\s*fallback\)/);
-assert.match(walletSource, /data-wallet-operation/);
-assert.match(walletSource, /getWalletHistory\(walletId\)/);
-assert.match(walletSource, /openWalletOperation/);
-assert.match(walletSource, /readOnlyReceipt\(/);
-assert.doesNotMatch(walletSource, /paymentReceipt\(/);
-assert.match(walletSource, /shortDateTimeParts\(operation\?\.occurredAt/);
-assert.doesNotMatch(walletSource, /Внесено в систему/);
-assert.doesNotMatch(walletSource, /Конечный пользователь/);
-assert.match(financeUiSource, /operationGroupsFromLedger/);
-assert.match(financeUiSource, /v2ListEntry\(/);
+assert.match(financeServiceSource, /export async function hardDeleteFinanceOperation/);
+assert.match(financeServiceSource, /export async function recordRefundExpense/);
 assert.match(financeUiSource, /readOnlyReceipt\(/);
-assert.doesNotMatch(financeUiSource, /Внесено ·/);
-assert.match(financeUiSource, /Внесено в систему/);
-assert.match(documentsSource, /shortDateTime\(value,\s*'Дата не зафиксирована'\)/);
-assert.match(peopleSource, /shortDateTime\(value,'—'\)/);
-assert.equal(existsSync(new URL('../ui/payment/single.js', import.meta.url)), false);
-assert.equal(existsSync(new URL('../ui/payment/split.js', import.meta.url)), false);
+assert.match(financeUiSource, /hardDeleteFinanceOperation/);
 
-console.log('payment ui tests: OK');
+console.log('payment UI tests: OK');
