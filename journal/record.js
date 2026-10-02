@@ -11,7 +11,6 @@ import { assignProceduresToWorkplace } from '../settings/service/procedures/serv
 import { checkTimeAvailability, listAvailableEndTimes, listAvailableStartTimes } from '../core/time/index.js';
 import { timeToMinutes, minutesToTime } from '../core/time/index.js';
 import { getWorkplaces, getWorkplaceWorkingDates } from '../core/workplace-time.js';
-import { getDay, getDays, getDayTime } from '../core/day/index.js';
 import { journalRecordActionContext } from './record-action-context.js';
 import { getProfile } from '../settings/profile/data.js';
 import { calculateSettlement, recordSettlementDiscountPercent } from '../core/finance/index.js';
@@ -835,11 +834,6 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
   render();
 }
 
-function editDayRange(date, workplaceId) {
-  const day = getDay(getDays(), workplaceId, dateKey(date));
-  return day ? getDayTime(day, getWorkplaces()) : null;
-}
-
 function selectedRecordProcedures(items = []) {
   return (Array.isArray(items) ? items : []).map((item) => ({
     procedure: {
@@ -905,17 +899,14 @@ export function openRecordEditFlow({
   };
 
   const openTime = () => {
-    const range = editDayRange(draft.date, draft.workplaceId);
     const duration = Math.max(5, draft.procedures.reduce((sum, item) => sum + (Number(item?.duration) || 0), 0));
-    const values = range ? listAvailableStartTimes({
+    const values = listAvailableStartTimes({
       date: draft.date,
       workplaceId: draft.workplaceId,
-      from: range.from,
-      to: range.to,
       duration,
       step: 5,
       excludeId,
-    }) : [];
+    });
     const layer = mountRecordZ({ ...recordOwnerOptions(), title: 'Выбор времени', showA: false, className });
     const host = renderRecordZ(layer, `<div class="record-screen record-screen--time">${recordTimeRows(values, { data: 'data-record-edit-time', accentEvery: 30 })}</div>`);
     host?.querySelectorAll('[data-record-edit-time]').forEach((node) => node.addEventListener('click', () => {
