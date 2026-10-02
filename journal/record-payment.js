@@ -39,6 +39,7 @@ import { personDisplay } from '../core/people/presentation.js';
 import { getRecord, refreshRecordsFromServer, setRecordConfirmed, updateRecord } from '../core/record/index.js';
 import { flushBusinessPersistence } from '../core/business-persistence.js';
 import { journalRecordActionContext } from './record-action-context.js';
+import { getProfile } from '../settings/profile/data.js';
 
 const money = (value) => `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(Number(value || 0)).replaceAll('\u00a0', ' ')} ₽`;
 
@@ -180,15 +181,34 @@ function paymentAllocations(payment) {
   return [];
 }
 
+function paymentOwnerA({ settings = false } = {}) {
+  const profile = getProfile();
+  const initials = [profile?.name, profile?.surname]
+    .filter(Boolean)
+    .map((value) => String(value).trim().charAt(0))
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+  return {
+    kind: 'avatar',
+    label: 'Оплата',
+    image: String(profile?.photo || ''),
+    imagePosition: `${Number(profile?.photoCropX ?? 50)}% ${Number(profile?.photoCropY ?? 50)}%`,
+    initials,
+    ...(settings ? {
+      data: 'data-record-payment-settings',
+      aria: 'Настройки оплаты',
+    } : {
+      disabled: true,
+      aria: 'Оплата',
+    }),
+  };
+}
+
 function paymentLayerContext(record, state) {
   return workspaceHeaderContext({
     title: 'Оплата',
-    a: state?.hasPayments ? {
-      kind: 'settings',
-      label: 'Настройки оплаты',
-      data: 'data-record-payment-settings',
-      aria: 'Настройки оплаты',
-    } : null,
+    a: paymentOwnerA({ settings: Boolean(state?.hasPayments) }),
     d: record?.person?.key ? {
       kind: 'chat',
       data: 'data-record-payment-chat',
@@ -200,7 +220,8 @@ function paymentLayerContext(record, state) {
 
 function blankPaymentContext() {
   return workspaceHeaderContext({
-    title: ' ',
+    title: 'Оплата',
+    a: paymentOwnerA(),
     hideD: true,
   });
 }
@@ -239,7 +260,7 @@ function openPaymentAllocationLayer(parentLayer, record, settlement, onCompleted
   host.innerHTML = `
     <div class="payment-methods__total"><span>К оплате</span><strong>${money(total)}</strong></div>
     <div class="compact-form">
-      ${datePicker({ label: 'Дата оплаты', name: 'recordPaymentDate', value: '', allowClear: true })}
+      ${datePicker({ label: 'Дата оплаты', name: 'recordPaymentDate', value: '', showYear: false, allowClear: true })}
     </div>
     ${paymentMethods({ wallets: getWallets(), total, showAction: false, showTotal: false })}`;
   initDatePickers(host);
@@ -307,6 +328,7 @@ function openPaymentCorrection(parentLayer, record, payment, onSaved) {
         label: 'Дата оплаты',
         name: 'recordPaymentCorrectionDate',
         value: paymentDateValue(payment),
+        showYear: false,
         allowClear: false,
       })}
     </div>
@@ -395,11 +417,12 @@ function openPaymentRefund(record, payment, onSaved) {
         label: 'Дата возврата',
         name: 'recordPaymentRefundDate',
         value: paymentDateValue(record, new Date()),
+        showYear: false,
         allowClear: false,
       })}
       ${button('Вернуть', { variant: 'danger', data: 'data-record-payment-refund-confirm' })}
     </div>`,
-    { variant: 'bottom', surface: 'app', title: 'Возврат' },
+    { variant: 'bottom', surface: 'app', title: 'Возврат', className: 'modal--form-sheet' },
   ));
   if (!layer) return null;
   initDatePickers(layer);
@@ -441,10 +464,10 @@ function openPaymentCancellation(record, payment, onSaved) {
   if (!payment?.id) return null;
   const layer = mountModal(document.body, modal(
     `<div class="compact-form">
-      ${datePicker({ label: 'Дата отмены', name: 'recordPaymentCancelDate', value: paymentDateValue(record, new Date()), allowClear: false })}
+      ${datePicker({ label: 'Дата отмены', name: 'recordPaymentCancelDate', value: paymentDateValue(record, new Date()), showYear: false, allowClear: false })}
       ${button('Отменить оплату', { variant: 'danger', data: 'data-record-payment-cancel-confirm' })}
     </div>`,
-    { variant: 'bottom', surface: 'app', title: 'Отмена оплаты' },
+    { variant: 'bottom', surface: 'app', title: 'Отмена оплаты', className: 'modal--form-sheet' },
   ));
   if (!layer) return null;
   initDatePickers(layer);
@@ -469,7 +492,7 @@ function openPaymentDeletion(payment, onSaved) {
   const layer = mountModal(document.body, modal(
     `<div class="modal-title"><h2>Удалить оплату полностью?</h2><p>Данные этой оплаты будут удалены из финансовой истории без восстановления.</p></div>
     <div class="modal-actions">${button('Удалить оплату', { variant: 'critical', data: 'data-record-payment-delete-confirm' })}</div>`,
-    { variant: 'bottom', surface: 'app', title: 'Удаление оплаты' },
+    { variant: 'bottom', surface: 'app', title: 'Удаление оплаты', className: 'modal--form-sheet' },
   ));
   layer?.querySelector('[data-record-payment-delete-confirm]')?.addEventListener('click', async () => {
     try {
