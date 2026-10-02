@@ -48,6 +48,7 @@ export function openJournalWorkplaceControl({
       value: workplaceId || ALL_WORKPLACES_ID,
       options,
       aria: 'Режим рабочего поля журнала',
+      data: 'data-journal-workplace-select',
     })}</div>`,
     { variant: 'bottom', surface: 'app', title: 'Рабочее пространство' },
   ));
