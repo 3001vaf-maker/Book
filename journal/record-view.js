@@ -1,23 +1,14 @@
 import {
   button,
-  durationPicker,
   durationText,
   escapeHtml,
-  field,
-  initCalendar,
-  initDurationPickers,
-  initMultiSelect,
-  list,
   select,
   openSharedProfileSettingsMenu,
   modal,
   mountModal,
   openNotice,
-  openTimePickerAction,
   mountRecordZ,
   recordZHost,
-  recordProcedureList,
-  recordPersonList,
   recordConfirmationMiniCard,
   setRecordPrimaryAction,
   bindRecordSettings,
@@ -27,9 +18,7 @@ import { getWorkplaces, getWorkplaceWorkingDates } from '../core/workplace-time.
 import { timeToMinutes, minutesToTime } from '../core/time/index.js';
 import { getAllPeople } from '../core/people/data.js';
 import { personDisplay } from '../core/people/presentation.js';
-import { openPerson } from '../core/people/people.js';
 import { getProcedures } from '../settings/service/procedures/data.js';
-import { getProducts } from '../settings/service/products/data.js';
 import { getRecords } from '../core/record/index.js';
 import { updateRecord, cancelRecord, deleteRecord, checkRecordTime, refreshRecordsFromServer } from '../core/record/index.js';
 import { journalRecordActionContext } from './record-action-context.js';
@@ -52,7 +41,6 @@ function recordOwnerOptions({ settings = false, chatPersonKey = '' } = {}) {
 
 const people = () => getAllPeople();
 const procedures = () => getProcedures();
-const products = () => getProducts();
 const dateKey = (value) => {
   const date = value instanceof Date ? value : new Date(value);
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -132,169 +120,6 @@ function defaultCost(item, workplaceId) {
   return cost.amount ?? cost.from ?? '';
 }
 
-function productAvailable(product, workplaceId) {
-  const assigned = Array.isArray(product?.workplaces) ? product.workplaces : [];
-  return !assigned.length || Boolean(workplaceAssignment(product, workplaceId));
-}
-
-function openWorkplacePicker(state, onSelected) {
-  const items = getWorkplaces().map((workplace) => ({
-    title: workplace.name || workplace.title || 'Без названия',
-    interactive: true,
-    selected: String(workplace.key ?? workplace.id ?? '') === String(state.workplaceId || ''),
-    data: `data-record-view-workplace="${escapeHtml(workplace.key ?? workplace.id ?? '')}"`,
-    aria: `Выбрать рабочее пространство ${workplace.name || workplace.title || ''}`,
-  }));
-  const content = `<div class="modal-title"><h2>Рабочее пространство</h2></div>${list({ items }) || '<div class="muted">Рабочие пространства не найдены.</div>'}`;
-  const m = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
-  if (!m) return;
-  m.querySelectorAll('[data-record-view-workplace]').forEach((node) => node.addEventListener('click', () => {
-    const id = node.dataset.recordViewWorkplace;
-    if (!id) return;
-    m.remove();
-    onSelected?.(id);
-  }));
-}
-
-function openDatePicker(state, onSelected) {
-  const workingDates = getWorkplaceWorkingDates(state.workplaceId);
-  if (!workingDates.length) {
-    openNotice({ title: 'Нет рабочего дня', message: 'Для этого рабочего пространства нет доступных рабочих дат.' });
-    return;
-  }
-  const value = state.date instanceof Date ? state.date : new Date(`${state.date}T00:00:00`);
-  const content = '<div data-record-view-date-calendar></div>';
-  const m = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
-  if (!m) return;
-  const calendarRoot = m.querySelector('[data-record-view-date-calendar]');
-  initCalendar(calendarRoot, {
-    month: Number.isNaN(value.getTime()) ? new Date(`${workingDates[0]}T00:00:00`) : value,
-    selectedValue: dateKey(state.date),
-    workingDates,
-    onDateSelect: (key) => {
-      if (!workingDates.includes(String(key || ''))) return;
-      const [year, month, day] = String(key || '').split('-').map(Number);
-      if (!year || !month || !day) return;
-      m.remove();
-      onSelected?.(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`);
-    },
-  });
-}
-
-function openTimePicker(state, record, onSelected) {
-  const duration = procedureTotalDuration(state.procedures) || 30;
-  return openTimePickerAction({
-    value: state.from,
-    minuteStep: 1,
-    title: 'Время',
-    onSave: (from) => {
-      const start = timeToMinutes(from);
-      const to = start == null ? '' : minutesToTime(start + duration);
-      if (!from || !to) return;
-      const check = checkRecordTime({
-        date: dateKey(state.date),
-        workplaceId: state.workplaceId,
-        from,
-        to,
-        excludeId: record?.id || '',
-      });
-      if (!check.ok) {
-        openNotice({
-          title: 'Недостаточно времени',
-          message: check.reason === 'occupied'
-            ? 'Это время уже занято. Выберите другое время.'
-            : 'Это время находится вне рабочего периода. Выберите другое время.',
-        });
-        return;
-      }
-      onSelected?.({ from, to });
-    },
-  });
-}
-
-function openAddProcedurePicker(state, onSelected) {
-  const available = procedures().filter((procedure) => workplaceAssignment(procedure, state.workplaceId));
-  const content = `<div class="modal-title"><h2>Добавить процедуру</h2></div>${recordProcedureList(available.map((procedure) => ({
-    id: String(procedure.id || ''),
-    name: procedure.name || 'Процедура',
-    durationText: durationText(Number(workplaceAssignment(procedure, state.workplaceId)?.duration ?? procedure.duration) || 0),
-    costText: defaultCost(procedure, state.workplaceId) !== '' ? formatMoney(defaultCost(procedure, state.workplaceId)) : '',
-    aria: `Добавить процедуру ${procedure.name || ''}`,
-  })), {
-    data: 'data-record-view-procedure-add-select',
-    empty: 'Процедур нет.',
-  })}`;
-  const m = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
-  if (!m) return;
-  m.querySelectorAll('[data-record-view-procedure-add-select]').forEach((node) => node.addEventListener('click', () => {
-    const procedure = available.find((item) => String(item.id || '') === String(node.dataset.recordViewProcedureAddSelect || ''));
-    if (!procedure) return;
-    const assignment = workplaceAssignment(procedure, state.workplaceId);
-    const duration = Number(assignment?.duration ?? procedure.duration) || 0;
-    onSelected?.({ id: procedure.id, name: procedure.name || '', cost: defaultCost(procedure, state.workplaceId), duration });
-    m.remove();
-  }));
-}
-
-function openProcedureCorrection(state, index, { onSave, onAdd, onDelete } = {}) {
-  const item = state.procedures[index];
-  if (!item) return;
-  const duration = Number(item.duration) || 0;
-  const durationField = durationPicker({ name: 'recordViewProcedureDuration', label: 'Время', value: duration });
-  const html = `<div class="modal-title"><h2>${escapeHtml(item.name || 'Процедура')}</h2><p>Скорректируйте время процедуры для этой записи.</p></div><div class="compact-form">${durationField}<div class="modal-actions">${button('Сохранить', { data: 'data-record-view-procedure-save' })}${button('+ Добавить процедуру', { data: 'data-record-view-procedure-add', variant: 'secondary' })}${button('Удалить процедуру', { data: 'data-record-view-procedure-delete', variant: 'danger' })}</div></div>`;
-  const m = mountModal(document.body, modal(html, { variant: 'medium', surface: 'app' }));
-  if (!m) return;
-  initDurationPickers(m);
-  m.querySelector('[data-record-view-procedure-add]')?.addEventListener('click', () => {
-    m.remove();
-    onAdd?.();
-  });
-  m.querySelector('[data-record-view-procedure-delete]')?.addEventListener('click', () => {
-    m.remove();
-    onDelete?.();
-  });
-  m.querySelector('[data-record-view-procedure-save]')?.addEventListener('click', () => {
-    const durationValue = Number(m.querySelector('[data-duration-value]')?.value);
-    onSave?.({
-      ...item,
-      duration: Number.isFinite(durationValue) ? durationValue : duration,
-    });
-    m.remove();
-  });
-}
-
-function openProductRemoval(state, index, onDelete) {
-  const item = state.products[index];
-  if (!item) return;
-  const html = `<div class="modal-title"><h2>${escapeHtml(item.name || 'Товар')}</h2></div><div class="modal-actions">${button('Удалить товар', { data: 'data-record-view-product-delete', variant: 'danger' })}</div>`;
-  const m = mountModal(document.body, modal(html, { variant: 'compact', surface: 'app' }));
-  if (!m) return;
-  m.querySelector('[data-record-view-product-delete]')?.addEventListener('click', () => {
-    m.remove();
-    onDelete?.();
-  });
-}
-
-function openPhoneActions(phone) {
-  const value = String(phone || '').trim();
-  if (!value) return;
-  const content = list({
-    items: [
-      { title: 'Позвонить', interactive: true, data: 'data-record-view-phone-call', aria: `Позвонить ${value}` },
-      { title: 'Написать', interactive: true, data: 'data-record-view-phone-write', aria: `Написать ${value}` },
-    ],
-  });
-  const m = mountModal(document.body, modal(content, { variant: 'compact' }));
-  if (!m) return;
-  m.querySelector('[data-record-phone-call]')?.addEventListener('click', () => {
-    window.location.href = `tel:${value.replace(/[^\d+]/g, '')}`;
-  });
-  m.querySelector('[data-record-phone-write]')?.addEventListener('click', () => {
-    m.remove();
-    mountModal(document.body, modal('<div class="muted">Чат в разработке</div>', { variant: 'compact' }));
-  });
-}
-
 function confirmCancel(record, onCancelled) {
   const content = `<div class="modal-title"><h2>Отменить запись?</h2><p>Запись останется в истории как отменённая и освободит это время.</p></div><div class="modal-actions">${button('Нет', { data: 'data-record-cancel-no', variant: 'secondary' })}${button('Отменить запись', { data: 'data-record-cancel-yes', variant: 'danger' })}</div>`;
   const m = mountModal(document.body, modal(content, { variant: 'bottom', surface: 'app' }));
@@ -334,65 +159,6 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       || Object.prototype.hasOwnProperty.call(patch, 'to');
     state = { ...state, ...patch, ...(movesAppointment ? { attendance: '' } : {}) };
     render();
-  };
-
-  const chooseTimeForDraft = (draft, onSelected) => {
-    openTimePicker(draft, original, ({ from, to }) => onSelected?.({ ...draft, from, to }));
-  };
-
-  const startDateEdit = (draft, onSelected) => {
-    openDatePicker(draft, (date) => {
-      const datedDraft = { ...draft, date };
-      chooseTimeForDraft(datedDraft, (scheduledDraft) => onSelected?.(scheduledDraft));
-    });
-  };
-
-  const startWorkplaceEdit = () => {
-    openWorkplacePicker(state, (workplaceId) => {
-      const workplaceDraft = { ...state, workplaceId };
-      startDateEdit(workplaceDraft, (scheduledDraft) => applyPatch({
-        workplaceId: scheduledDraft.workplaceId,
-        date: scheduledDraft.date,
-        from: scheduledDraft.from,
-        to: scheduledDraft.to,
-      }));
-    });
-  };
-
-  const startRecordDateEdit = () => {
-    startDateEdit({ ...state }, (scheduledDraft) => applyPatch({
-      date: scheduledDraft.date,
-      from: scheduledDraft.from,
-      to: scheduledDraft.to,
-    }));
-  };
-
-  const startRecordTimeEdit = () => {
-    chooseTimeForDraft({ ...state }, (scheduledDraft) => applyPatch({
-      from: scheduledDraft.from,
-      to: scheduledDraft.to,
-    }));
-  };
-
-  const applyProcedures = (nextProcedures) => {
-    if (isPaid()) return;
-    const start = timeToMinutes(state.from);
-    const duration = nextProcedures.length ? procedureTotalDuration(nextProcedures) : 30;
-    const nextTo = start == null ? state.to : minutesToTime(start + duration);
-    const check = checkRecordTime({
-      date: state.date,
-      workplaceId: state.workplaceId,
-      from: state.from,
-      to: nextTo,
-      excludeId: original.id,
-    });
-    if (!check.ok) {
-      openNotice({ title: 'Недостаточно времени', message: 'Новая длительность не помещается в свободный интервал. Выберите другое время.' });
-      return;
-    }
-    const patch = { procedures: nextProcedures };
-    if (nextTo !== state.to) patch.to = nextTo;
-    applyPatch(patch);
   };
 
   const persistChanges = async () => {
@@ -586,53 +352,6 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       });
     }
 
-    root.querySelector('[data-record-view-workplace-edit]')?.addEventListener('click', () => {
-      if (isPaid()) return;
-      startWorkplaceEdit();
-    });
-    root.querySelector('[data-record-view-date-edit]')?.addEventListener('click', () => {
-      if (isPaid()) return;
-      startRecordDateEdit();
-    });
-    root.querySelector('[data-record-view-time-edit]')?.addEventListener('click', () => {
-      if (isPaid()) return;
-      startRecordTimeEdit();
-    });
-    root.querySelectorAll('[data-record-view-person-profile]').forEach((node) => node.addEventListener('click', () => {
-      if (!currentPerson?.key) return;
-      openPerson({ root: document.body, key: currentPerson.key, onClose: render });
-    }));
-    root.querySelector('[data-record-view-phone]')?.addEventListener('click', () => openPhoneActions(person.phone));
-    root.querySelectorAll('[data-record-view-procedure-edit]').forEach((node) => node.addEventListener('click', () => {
-      if (isPaid()) return;
-      const index = Number(node.dataset.recordViewProcedureEdit);
-      if (!Number.isInteger(index) || !state.procedures[index]) return;
-      openProcedureCorrection(state, index, {
-        onSave: (updated) => {
-          const nextProcedures = state.procedures.map((item, itemIndex) => itemIndex === index ? updated : { ...item });
-          applyProcedures(nextProcedures);
-        },
-        onAdd: () => openAddProcedurePicker(state, (added) => {
-          applyProcedures([...state.procedures.map((item) => ({ ...item })), added]);
-        }),
-        onDelete: () => {
-          const nextProcedures = state.procedures.filter((_, itemIndex) => itemIndex !== index).map((item) => ({ ...item }));
-          applyProcedures(nextProcedures);
-        },
-      });
-    }));
-    root.querySelectorAll('[data-record-view-product-edit]').forEach((node) => node.addEventListener('click', () => {
-      if (isPaid()) return;
-      const index = Number(node.dataset.recordViewProductEdit);
-      if (!Number.isInteger(index) || !state.products[index]) return;
-      openProductRemoval(state, index, () => {
-        state = {
-          ...state,
-          products: state.products.filter((_, itemIndex) => itemIndex !== index).map((item) => ({ ...item })),
-        };
-        persistChanges();
-      });
-    }));
     root.querySelector('[data-record-view-confirmed]')?.addEventListener('click', () => {
       if (isPaid()) return;
       applyPatch({ confirmed: !state.confirmed });
