@@ -1,7 +1,27 @@
 import { checkTimeAvailability } from '../time/index.js';
-import { deleteRecordRow, insertRecordRow, patchRecordRow } from './data.js';
+import { deleteRecordRow, hydrateRecordStateFromServer, insertRecordRow, patchRecordRow } from './data.js';
 import { appendRecordEvent, deleteRecordEvents, RECORD_EVENT_TYPES } from './events.js';
 import { getRecord } from './read.js';
+import { apiRequest } from '../auth.js';
+
+async function responseJson(response, fallback) {
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.message || fallback);
+  return payload;
+}
+
+export async function refreshRecordsFromServer() {
+  const response = await apiRequest('/business-state');
+  const payload = await responseJson(response, 'Не удалось обновить записи');
+  if (!payload?.verified) throw new Error('Серверное хранилище записей не подтверждено');
+  hydrateRecordStateFromServer({
+    records: payload.records || [],
+    recordEvents: payload.recordEvents || [],
+  });
+  notify('book:records-changed', { action: 'server-refresh' });
+  notify('book:time-usage-changed', { action: 'server-refresh' });
+  return payload.records || [];
+}
 
 function notify(name, detail = {}) {
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(name, { detail }));
