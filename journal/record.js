@@ -438,7 +438,7 @@ function renderPersonStep(modalRoot, { date, workplaceId, from, to, procedures: 
       m.v2Close?.();
       openPersonCreate({
         root: document.body,
-        variant: 'large',
+        variant: 'bottom',
         surface: 'app',
         onCreated: (person) => {
           all = people();
