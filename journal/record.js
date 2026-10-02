@@ -293,7 +293,7 @@ function renderProceduresStep(modalRoot, {
         selected: [],
         empty: 'Процедуры не выбраны.',
       });
-      const durationLayer = mountModal(document.body, modal(rows, { variant: 'bottom', surface: 'app' }));
+      const durationLayer = mountModal(document.body, modal(rows, { variant: 'bottom', surface: 'app', className: 'modal--form-sheet' }));
       durationLayer?.querySelectorAll('[data-record-duration-edit]').forEach((node) => node.addEventListener('click', () => {
         const id = String(node.dataset.recordDurationEdit || '');
         const current = selected.get(id);
@@ -351,7 +351,7 @@ function openProcedureSettings({ procedure, current, onSave, onAdd, onDelete }) 
   const deleteAction = onDelete ? button('Удалить процедуру', { data: 'data-record-delete-procedure', variant: 'danger' }) : '';
   const durationField = durationPicker({ name: 'recordDuration', label: 'Время', value: Number(value.duration) || 0 });
   const html = `<div class="modal-title"><h2>${escapeHtml(procedure.name)}</h2><p>Скорректируйте время процедуры для этой записи.</p></div><div class="compact-form">${durationField}<div class="modal-actions">${button('Сохранить', { data: 'data-record-save' })}${addAction}${deleteAction}</div></div>`;
-  const m = mountModal(document.body, modal(html, { variant: 'bottom', surface: 'app' }));
+  const m = mountModal(document.body, modal(html, { variant: 'bottom', surface: 'app', className: 'modal--form-sheet' }));
   if (!m) return;
   initDurationPickers(m);
   m.querySelector('[data-record-add-procedure]')?.addEventListener('click', () => {
@@ -441,6 +441,7 @@ function renderPersonStep(modalRoot, { date, workplaceId, from, to, procedures: 
         root: document.body,
         variant: 'bottom',
         surface: 'app',
+        className: 'modal--form-sheet',
         onCreated: (person) => {
           all = people();
           filtered = all;
