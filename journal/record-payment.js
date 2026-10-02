@@ -40,6 +40,7 @@ import { getRecord, refreshRecordsFromServer, setRecordConfirmed, updateRecord }
 import { flushBusinessPersistence } from '../core/business-persistence.js';
 import { journalRecordActionContext } from './record-action-context.js';
 import { getProfile } from '../settings/profile/data.js';
+import { readOnlyReceipt } from '../ui/receipt/index.js';
 
 const money = (value) => `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(Number(value || 0)).replaceAll('\u00a0', ' ')} ₽`;
 
@@ -258,11 +259,20 @@ function openPaymentAllocationLayer(parentLayer, record, settlement, onCompleted
 
   const host = layer.querySelector('[data-record-payment-allocation-host]');
   host.innerHTML = `
-    <div class="payment-methods__total"><span>К оплате</span><strong>${money(total)}</strong></div>
-    <div class="compact-form">
-      ${datePicker({ label: 'Дата оплаты', name: 'recordPaymentDate', value: '', showYear: false, allowClear: true })}
-    </div>
-    ${paymentMethods({ wallets: getWallets(), total, showAction: false, showTotal: false })}`;
+    ${readOnlyReceipt({ totals: [{ label: 'К оплате', value: money(total), strong: true }] })}
+    <div class="form-grid">
+      ${datePicker({
+        label: 'Дата оплаты',
+        name: 'recordPaymentDate',
+        value: '',
+        showYear: false,
+        modalVariant: 'bottom',
+        modalClassName: 'modal--form-sheet',
+        modalSurface: 'app',
+        allowClear: true,
+      })}
+      ${paymentMethods({ wallets: getWallets(), total, showAction: false, showTotal: false })}
+    </div>`;
   initDatePickers(host);
 
   let allocationState = null;
@@ -315,30 +325,33 @@ function openPaymentCorrection(parentLayer, record, payment, onSaved) {
   const serviceAmount = Math.max(0, Number(payment?.serviceAmount || 0));
   const initialAllocations = paymentAllocations(payment);
   const layer = mountV2ZLayer(parentLayer, v2ZLayer(
-    `${workspaceHeaderContext({ title: 'Корректировка оплаты', hideD: true })}<div class="record-screen record-screen--state-view" data-record-payment-correction-host></div>`,
+    `${workspaceHeaderContext({ title: 'Корректировка оплаты', a: paymentOwnerA(), hideD: true })}<div class="record-screen record-screen--state-view" data-record-payment-correction-host></div>`,
     { className: 'record-payment-correction-z' },
   ), { stack: true });
   if (!layer) return null;
 
   const host = layer.querySelector('[data-record-payment-correction-host]');
   host.innerHTML = `
-    <div class="payment-methods__total"><span>Оплата</span><strong>${money(payment.total)}</strong></div>
-    <div class="compact-form">
+    ${readOnlyReceipt({ totals: [{ label: 'Оплата', value: money(payment.total), strong: true }] })}
+    <div class="form-grid">
       ${datePicker({
         label: 'Дата оплаты',
         name: 'recordPaymentCorrectionDate',
         value: paymentDateValue(payment),
         showYear: false,
+        modalVariant: 'bottom',
+        modalClassName: 'modal--form-sheet',
+        modalSurface: 'app',
         allowClear: false,
       })}
-    </div>
-    ${paymentMethods({
-      wallets: getWallets(),
-      total: serviceAmount,
-      showAction: false,
-      showTotal: false,
-      initialAllocations,
-    })}`;
+      ${paymentMethods({
+        wallets: getWallets(),
+        total: serviceAmount,
+        showAction: false,
+        showTotal: false,
+        initialAllocations,
+      })}
+    </div>`;
   initDatePickers(host);
 
   let allocationState = null;
@@ -418,6 +431,9 @@ function openPaymentRefund(record, payment, onSaved) {
         name: 'recordPaymentRefundDate',
         value: paymentDateValue(record, new Date()),
         showYear: false,
+        modalVariant: 'bottom',
+        modalClassName: 'modal--form-sheet',
+        modalSurface: 'app',
         allowClear: false,
       })}
       ${button('Вернуть', { variant: 'danger', data: 'data-record-payment-refund-confirm' })}
@@ -464,7 +480,7 @@ function openPaymentCancellation(record, payment, onSaved) {
   if (!payment?.id) return null;
   const layer = mountModal(document.body, modal(
     `<div class="compact-form">
-      ${datePicker({ label: 'Дата отмены', name: 'recordPaymentCancelDate', value: paymentDateValue(record, new Date()), showYear: false, allowClear: false })}
+      ${datePicker({ label: 'Дата отмены', name: 'recordPaymentCancelDate', value: paymentDateValue(record, new Date()), showYear: false, modalVariant: 'bottom', modalClassName: 'modal--form-sheet', modalSurface: 'app', allowClear: false })}
       ${button('Отменить оплату', { variant: 'danger', data: 'data-record-payment-cancel-confirm' })}
     </div>`,
     { variant: 'bottom', surface: 'app', title: 'Отмена оплаты', className: 'modal--form-sheet' },

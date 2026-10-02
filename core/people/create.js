@@ -41,9 +41,10 @@ export function openPersonCreate({
   preset = {},
   variant = 'medium',
   surface = '',
+  className = '',
   onCreated = () => {},
 } = {}) {
-  const m = mountModal(root, modal(personCreateForm(preset), { variant, surface, title: 'Создать' }));
+  const m = mountModal(root, modal(personCreateForm(preset), { variant, surface, className, title: 'Создать' }));
   if (!m) return null;
   bindPersonCreateForm(m, {
     onCreated: (person) => {

@@ -1,6 +1,7 @@
 import { button } from '../buttons/index.js';
 import { select } from '../selectors/index.js';
 import { field } from '../inputs/index.js';
+import { readOnlyReceipt } from '../receipt/index.js';
 import { escapeHtml } from '../utils/escape-html.js';
 
 const numberValue = (value) => {
@@ -26,7 +27,7 @@ function walletOptions(wallets = []) {
 
 function allocationRow(index, wallets, initial = {}) {
   const amount = initial?.amount == null ? '' : moneyInputText(initial.amount);
-  return `<div class="payment-allocation-block" data-payment-allocation-row="${index}">
+  return `<div class="form-grid" data-payment-allocation-row="${index}">
     ${select({
       label: 'Кошелёк',
       value: String(initial?.walletId || ''),
@@ -45,24 +46,27 @@ function allocationRow(index, wallets, initial = {}) {
   </div>`;
 }
 
+function totalReceipt(label, value) {
+  return readOnlyReceipt({ totals: [{ label, value: moneyDisplay(value), strong: true }] });
+}
+
 export function paymentMethodsMarkup({ wallets = [], total = 0, initialAllocations = [], showAction = true, showTotal = true } = {}) {
   const allocations = Array.isArray(initialAllocations) ? initialAllocations : [];
-  return `<div class="payment-methods__allocation" data-payment-allocation-owner>
-    ${showTotal ? `<div class="payment-methods__total" data-payment-remaining><span>К оплате</span><strong>${escapeHtml(moneyDisplay(total))}</strong></div>` : ''}
-    <div class="payment-allocation-rows">
+  return `<div class="form-grid" data-payment-allocation-owner>
+    ${showTotal ? `<div data-payment-remaining>${totalReceipt('К оплате', total)}</div>` : ''}
+    <div class="form-grid">
       ${allocationRow(0, wallets, allocations[0] || {})}
       ${allocationRow(1, wallets, allocations[1] || {})}
     </div>
-    <div class="payment-tips" data-payment-tips-row hidden><span>Tips</span><strong data-payment-tips>0 ₽</strong></div>
-    ${showAction ? button('Сохранить', { data: 'data-payment-allocation-submit' }) : ''}
+    <div data-payment-tips-row hidden></div>
+    ${showAction ? `<div class="modal-actions">${button('Сохранить', { data: 'data-payment-allocation-submit' })}</div>` : ''}
   </div>`;
 }
 
 export function initPaymentMethodsAllocation(root, { wallets = [], total = 0, onPay = () => {}, onChange = () => {} } = {}) {
   if (!root) return;
-  const remainingNode = root.querySelector('[data-payment-remaining] strong');
+  const remainingNode = root.querySelector('[data-payment-remaining]');
   const tipsRow = root.querySelector('[data-payment-tips-row]');
-  const tipsNode = root.querySelector('[data-payment-tips]');
   const submit = root.querySelector('[data-payment-allocation-submit]');
   const rows = () => [...root.querySelectorAll('[data-payment-allocation-row]')].map((part) => ({
     walletInput: part.querySelector('input[data-payment-allocation-wallet]'),
@@ -92,9 +96,11 @@ export function initPaymentMethodsAllocation(root, { wallets = [], total = 0, on
 
   function sync() {
     const current = state();
-    if (remainingNode) remainingNode.textContent = moneyDisplay(current.remaining);
-    if (tipsNode) tipsNode.textContent = moneyDisplay(current.tips);
-    if (tipsRow) tipsRow.hidden = current.tips <= 0.009;
+    if (remainingNode) remainingNode.innerHTML = totalReceipt('К оплате', current.remaining);
+    if (tipsRow) {
+      tipsRow.hidden = current.tips <= 0.009;
+      tipsRow.innerHTML = current.tips > 0.009 ? totalReceipt('Tips', current.tips) : '';
+    }
     if (submit) submit.disabled = !current.valid;
     onChange?.(current);
     return current;
