@@ -212,45 +212,6 @@ function openTimePicker(state, record, onSelected) {
   });
 }
 
-function openPersonPicker(state, onSelected) {
-  const content = `<div class="record-editor-screen record-editor-screen--people"><div class="ui-search-field">${field({ name: 'recordViewPersonSearch', type: 'search', placeholder: 'Поиск по имени или UEI', autocomplete: 'off', data: 'data-record-view-person-search' })}</div><div class="ui-search-divider" aria-hidden="true"></div><div class="record-person-list" data-record-view-person-list></div></div>`;
-  const m = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app', className: 'record-editor-modal' }));
-  if (!m) return;
-  const render = (query = '') => {
-    const normalized = String(query || '').trim().toLowerCase();
-    const matches = people().filter((person) => {
-      const display = personDisplay(person);
-      return !normalized || `${display.uei} ${display.name} ${display.phone}`.toLowerCase().includes(normalized);
-    });
-    const listRoot = m.querySelector('[data-record-view-person-list]');
-    if (!listRoot) return;
-    listRoot.innerHTML = recordPersonList(matches.map((person) => {
-      const display = personDisplay(person);
-      return {
-        key: person.key,
-        name: display.name,
-        uei: display.uei,
-        phone: display.phone,
-        aria: `Выбрать человека ${display.name}`,
-      };
-    }), {
-      data: 'data-record-view-person',
-      selected: state.person?.key || '',
-      empty: 'Люди не найдены.',
-    });
-    listRoot.querySelectorAll('[data-record-view-person]').forEach((node) => node.addEventListener('click', () => {
-      const person = people().find((item) => String(item.key || '') === String(node.dataset.recordViewPerson || ''));
-      if (!person) return;
-      m.remove();
-      const display = personDisplay(person);
-      onSelected?.({ key: person.key, id: person.id, uei: display.uei, name: person.name, surname: person.surname, phone: display.phone, discountPercent: Number(person.discountPercent) || 0 });
-    }));
-  };
-  const search = m.querySelector('[data-record-view-person-search]');
-  search?.addEventListener('input', () => render(search.value));
-  render();
-}
-
 function openAddProcedurePicker(state, onSelected) {
   const available = procedures().filter((procedure) => workplaceAssignment(procedure, state.workplaceId));
   const content = `<div class="modal-title"><h2>Добавить процедуру</h2></div>${recordProcedureList(available.map((procedure) => ({
@@ -273,51 +234,6 @@ function openAddProcedurePicker(state, onSelected) {
     onSelected?.({ id: procedure.id, name: procedure.name || '', cost: defaultCost(procedure, state.workplaceId), duration });
     m.remove();
   }));
-}
-
-function openSalePicker(state, onSave) {
-  const available = products().filter((product) => productAvailable(product, state.workplaceId));
-  const selected = new Set((state.products || []).map((item) => String(item?.id || '')).filter(Boolean));
-  const currentById = new Map((state.products || []).map((item) => [String(item?.id || ''), item]));
-  const items = available.map((product) => {
-    const cost = currentById.get(String(product.id || ''))?.cost ?? defaultCost(product, state.workplaceId);
-    return {
-      title: product.name || 'Товар',
-      secondary: cost === '' || cost == null ? '' : formatMoney(cost),
-      interactive: true,
-      selected: selected.has(String(product.id || '')),
-      data: `data-record-sale-product="${escapeHtml(product.id || '')}"`,
-      aria: `Выбрать товар ${product.name || ''}`,
-    };
-  });
-  const content = `<div class="modal-title"><h2>Продажа</h2></div><div data-record-sale-products>${list({ items }) || '<div class="muted">Товаров пока нет.</div>'}</div><div class="modal-actions">${button('Сохранить', { data: 'data-record-sale-save' })}</div>`;
-  const m = mountModal(document.body, modal(content, { variant: 'medium', surface: 'app' }));
-  if (!m) return;
-  const listRoot = m.querySelector('[data-record-sale-products]');
-  const controller = listRoot && available.length ? initMultiSelect(listRoot, {
-    selectedValues: [...selected],
-    selector: '[data-record-sale-product]',
-    valueAttribute: 'recordSaleProduct',
-    onChange: (values) => {
-      selected.clear();
-      values.forEach((value) => selected.add(String(value)));
-    },
-  }) : null;
-  m.querySelector('[data-record-sale-save]')?.addEventListener('click', () => {
-    const nextProducts = available
-      .filter((product) => selected.has(String(product.id || '')))
-      .map((product) => {
-        const current = currentById.get(String(product.id || ''));
-        return current ? { ...current } : {
-          id: product.id,
-          name: product.name || '',
-          cost: defaultCost(product, state.workplaceId),
-        };
-      });
-    controller?.destroy();
-    m.remove();
-    onSave?.(nextProducts);
-  });
 }
 
 function openProcedureCorrection(state, index, { onSave, onAdd, onDelete } = {}) {
