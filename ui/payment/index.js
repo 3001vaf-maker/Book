@@ -26,7 +26,15 @@ const discountOptions = [
   ...Array.from({ length: 100 }, (_, index) => ({ value: String(index + 1), label: `${index + 1}%` })),
 ];
 
-export function paymentForm({ workplace = '', date = '', time = '', person = {}, procedures = [], total = 0 } = {}) {
+export function paymentForm({
+  workplace = '',
+  date = '',
+  time = '',
+  person = {},
+  procedures = [],
+  total = 0,
+  showActions = true,
+} = {}) {
   const procedureBlocks = (Array.isArray(procedures) ? procedures : []).map((procedure, index) => {
     const price = Math.max(0, numberValue(procedure?.cost));
     const percent = Math.max(0, Math.min(100, numberValue(procedure?.discountPercent)));
@@ -50,22 +58,24 @@ export function paymentForm({ workplace = '', date = '', time = '', person = {},
     </section>`;
   }).join('');
 
-  const uei = person?.uei ? `<span class="payment-person-uei">${escapeHtml(person.uei)}</span>` : '';
-  const name = escapeHtml(person?.name || '');
+  const identity = [person?.uei, person?.name].map((value) => String(value || '').trim()).filter(Boolean).join(' ');
+  const moment = [date, time].map((value) => String(value || '').trim()).filter(Boolean).join(' - ');
 
   return `<div class="payment-ui" data-payment-ui>
-    <div class="payment-readonly-block"><strong>${escapeHtml(workplace)}</strong></div>
-    <div class="payment-readonly-block"><span>${escapeHtml(date)}</span><span>${escapeHtml(time)}</span></div>
-    <div class="payment-readonly-block payment-readonly-block--person">${uei}<strong>${name}</strong></div>
+    <section class="payment-record-summary">
+      <div class="payment-record-summary__line"><span>${escapeHtml(workplace)}</span></div>
+      <div class="payment-record-summary__line"><span>${escapeHtml(moment)}</span></div>
+      <div class="payment-record-summary__line"><span>${escapeHtml(identity)}</span></div>
+      <div class="payment-record-summary__line payment-record-summary__due"><span>К оплате</span><strong data-payment-total>${escapeHtml(moneyDisplay(total))}</strong></div>
+    </section>
     <div class="payment-procedures">${procedureBlocks}</div>
-    <div class="payment-total"><span>Итого</span><strong data-payment-total>${escapeHtml(moneyDisplay(total))}</strong></div>
-    <div class="payment-actions">${button('Сохранить', { data: 'data-payment-save', variant: 'secondary' })}${button('Оплатить', { data: 'data-payment-submit' })}</div>
+    ${showActions ? `<div class="payment-actions">${button('Сохранить', { data: 'data-payment-save', variant: 'secondary' })}${button('Оплатить', { data: 'data-payment-submit' })}</div>` : ''}
   </div>`;
 }
 
-export function paymentMethods({ wallets = [], total = 0 } = {}) {
+export function paymentMethods({ wallets = [], total = 0, showAction = true } = {}) {
   const walletData = escapeHtml(JSON.stringify(Array.isArray(wallets) ? wallets.map((wallet) => ({ id: String(wallet?.id || ''), name: String(wallet?.name || '') })) : []));
-  return `<div class="payment-methods" data-payment-methods data-payment-total="${escapeHtml(moneyText(total))}" data-payment-wallets="${walletData}">${paymentMethodsMarkup({ wallets, total })}</div>`;
+  return `<div class="payment-methods" data-payment-methods data-payment-total="${escapeHtml(moneyText(total))}" data-payment-wallets="${walletData}">${paymentMethodsMarkup({ wallets, total, showAction })}</div>`;
 }
 
 function rowValues(row) {
@@ -106,7 +116,7 @@ function settlementInputs(root) {
   });
 }
 
-function applySettlement(root, settlement = null, { preserve = null } = {}) {
+function applySettlement(root, settlement = null, { preserve = null, paidTotal = 0 } = {}) {
   const items = Array.isArray(settlement?.items) ? settlement.items : [];
   [...root.querySelectorAll('[data-payment-procedure]')].forEach((row, index) => {
     const item = items[index];
@@ -118,32 +128,54 @@ function applySettlement(root, settlement = null, { preserve = null } = {}) {
     if (moneyInput && moneyInput !== preserve) moneyInput.value = item.discountMoney ? moneyText(item.discountMoney) : '';
   });
   const totalNode = root.querySelector('[data-payment-total]');
-  if (totalNode) totalNode.textContent = moneyDisplay(settlement?.planTotal || 0);
+  if (totalNode) totalNode.textContent = moneyDisplay(Math.max(0, numberValue(settlement?.planTotal) - Math.max(0, numberValue(paidTotal))));
 }
 
-function recalculate(root, calculate, { preserve = null } = {}) {
+function recalculate(root, calculate, { preserve = null, paidTotal = 0 } = {}) {
   if (typeof calculate !== 'function') return null;
   const settlement = calculate(settlementInputs(root));
-  applySettlement(root, settlement, { preserve });
+  applySettlement(root, settlement, { preserve, paidTotal });
   return settlement;
 }
 
-function bindPaymentRow(root, row, calculate) {
-  const { priceInput, percentInput, moneyInput } = rowValues(row);
-  priceInput?.addEventListener('input', () => recalculate(root, calculate, { preserve: priceInput }));
-  percentInput?.addEventListener('change', () => {
-    row.dataset.paymentDiscountMode = percentInput.value ? 'percent' : 'none';
-    recalculate(root, calculate, { preserve: percentInput });
-  });
-  moneyInput?.addEventListener('input', () => {
-    row.dataset.paymentDiscountMode = moneyInput.value ? 'money' : 'none';
-    recalculate(root, calculate, { preserve: moneyInput });
-  });
-}
+export function initPaymentForm(root, {
+  calculate = null,
+  paidTotal = 0,
+  onSave = () => {},
+  onPay = () => {},
+  onRemove = () => {},
+  onChange = () => {},
+} = {}) {
+  if (!root) return null;
+  const initialSettlement = recalculate(root, calculate, { paidTotal });
+  let baseline = JSON.stringify(settlementInputs(root));
 
-export function initPaymentForm(root, { calculate = null, onSave = () => {}, onPay = () => {}, onRemove = () => {} } = {}) {
-  if (!root) return;
-  root.querySelectorAll('[data-payment-procedure]').forEach((row) => bindPaymentRow(root, row, calculate));
+  const currentState = (preserve = null) => {
+    const settlement = recalculate(root, calculate, { preserve, paidTotal });
+    const dirty = JSON.stringify(settlementInputs(root)) !== baseline;
+    const result = {
+      settlement,
+      items: settlement?.items || [],
+      total: Math.max(0, numberValue(settlement?.planTotal) - Math.max(0, numberValue(paidTotal))),
+      dirty,
+    };
+    onChange?.(result);
+    return result;
+  };
+
+  root.querySelectorAll('[data-payment-procedure]').forEach((row) => {
+    const { priceInput, percentInput, moneyInput } = rowValues(row);
+    priceInput?.addEventListener('input', () => currentState(priceInput));
+    percentInput?.addEventListener('change', () => {
+      row.dataset.paymentDiscountMode = percentInput.value ? 'percent' : 'none';
+      currentState(percentInput);
+    });
+    moneyInput?.addEventListener('input', () => {
+      row.dataset.paymentDiscountMode = moneyInput.value ? 'money' : 'none';
+      currentState(moneyInput);
+    });
+  });
+
   root.querySelectorAll('[data-payment-remove]').forEach((remove) => remove.addEventListener('click', () => {
     const row = remove.closest('[data-payment-procedure]');
     if (!row) return;
@@ -153,21 +185,33 @@ export function initPaymentForm(root, { calculate = null, onSave = () => {}, onP
       name: row.dataset.paymentName || '',
     };
     row.remove();
-    const settlement = recalculate(root, calculate);
-    if (!settlement) return;
-    onRemove?.({ ...removed, settlement, items: settlement.items, total: settlement.planTotal });
+    const result = currentState();
+    onRemove?.({ ...removed, ...result });
   }));
+
   root.querySelector('[data-payment-save]')?.addEventListener('click', () => {
-    const settlement = recalculate(root, calculate);
-    if (!settlement) return;
-    onSave?.({ settlement, items: settlement.items, total: settlement.planTotal });
+    const result = currentState();
+    if (!result.settlement) return;
+    baseline = JSON.stringify(settlementInputs(root));
+    onSave?.(result);
   });
   root.querySelector('[data-payment-submit]')?.addEventListener('click', () => {
-    const settlement = recalculate(root, calculate);
-    if (!settlement) return;
-    onPay?.({ settlement, items: settlement.items, total: settlement.planTotal });
+    const result = currentState();
+    if (!result.settlement) return;
+    onPay?.(result);
   });
-  recalculate(root, calculate);
+
+  onChange?.({
+    settlement: initialSettlement,
+    items: initialSettlement?.items || [],
+    total: Math.max(0, numberValue(initialSettlement?.planTotal) - Math.max(0, numberValue(paidTotal))),
+    dirty: false,
+  });
+
+  return {
+    read: () => currentState(),
+    markSaved: () => { baseline = JSON.stringify(settlementInputs(root)); },
+  };
 }
 
 export function initPaymentMethods(root, { onPay = () => {} } = {}) {
