@@ -995,6 +995,7 @@ ok(shell()?.querySelector('.v2-header__title')?.textContent.trim() === 'Студ
 ok(Boolean(shell()?.querySelector('[data-v2-workspace-a]')), 'Journal Day A/settings missing');
 ok(Boolean(shell()?.querySelector('[data-v2-workspace-chat]')), 'Journal Day D/general chat missing');
 
+mark('journal-day-settings');
 shell()?.querySelector('[data-v2-workspace-a]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
 await wait(40);
 let journalSettings = document.querySelector('[data-shared-profile-settings-menu]');
@@ -1006,6 +1007,7 @@ ok(journalActionIds.includes('workplace') && journalActionIds.includes('z-report
 ok(!journalActionIds.includes('day-off'),
   'Journal Day must hide Day-off action while an active record exists');
 
+mark('journal-day-workplace-selector');
 journalSettings?.querySelector('[data-shared-profile-action="workplace"]')
   ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
 await wait(40);
@@ -1025,6 +1027,7 @@ ok(Boolean(journalStudioOption?.indicatorColor),
 journalWorkplaceModal?.v2Close?.();
 await wait(25);
 
+mark('journal-day-z-report');
 shell()?.querySelector('[data-v2-workspace-a]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
 await wait(30);
 journalSettings = document.querySelector('[data-shared-profile-settings-menu]');
@@ -1043,6 +1046,7 @@ ok(journalReceipt?.textContent.includes('UEI-JOURNAL') && journalReceipt?.textCo
 journalZReport?.v2Close?.();
 await wait(25);
 
+mark('journal-day-record-open');
 const journalRecord = shell()?.querySelector('[data-journal-usage="runtime-journal-record"]');
 ok(Boolean(journalRecord), 'Journal Day record plaque missing');
 journalRecord?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
@@ -1060,6 +1064,7 @@ ok(!document.querySelector('[data-record-payment-entry]'),
 ok(shell()?.querySelector('[data-v2-workspace-primary]')?.textContent.includes('К оплате'),
   'Record Z2 C must expose amount due');
 
+mark('journal-record-settings');
 shell()?.querySelector('[data-v2-workspace-a]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
 await wait(35);
 const recordSettings = document.querySelector('[data-shared-profile-settings-menu]');
@@ -1070,6 +1075,7 @@ ok(recordActionIds.join('|') === 'move|cancel|delete',
 recordSettings?.closest('[data-modal]')?.v2Close?.();
 await wait(20);
 
+mark('journal-record-payment');
 shell()?.querySelector('[data-v2-workspace-primary]')
   ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
 await wait(50);
@@ -1082,6 +1088,7 @@ ok(Boolean(paymentZ?.querySelector('input[data-payment-discount-percent]')), 'Pa
 ok(Boolean(paymentZ?.querySelector('[data-payment-discount-money]')), 'Payment Z3 money discount field missing');
 ok(shell()?.querySelector('[data-v2-workspace-primary]')?.textContent.trim() === 'Оплатить',
   'Payment Z3 C must be Pay when data is unchanged');
+mark('journal-record-payment-close');
 paymentZ?.v2Close?.();
 await wait(25);
 recordZ?.v2Close?.();
