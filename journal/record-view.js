@@ -1,7 +1,6 @@
 import {
   button,
   durationText,
-  escapeHtml,
   select,
   openSharedProfileSettingsMenu,
   modal,
@@ -14,13 +13,11 @@ import {
   bindRecordSettings,
 } from '../ui/ui.js';
 import { getRecordPaymentState, recordSettlementItems, repriceSettlement, refreshFinanceState } from '../core/finance/index.js';
-import { getWorkplaces, getWorkplaceWorkingDates } from '../core/workplace-time.js';
-import { timeToMinutes, minutesToTime } from '../core/time/index.js';
+import { getWorkplaces } from '../core/workplace-time.js';
 import { getAllPeople } from '../core/people/data.js';
 import { personDisplay } from '../core/people/presentation.js';
-import { getProcedures } from '../settings/service/procedures/data.js';
 import { getRecords } from '../core/record/index.js';
-import { updateRecord, cancelRecord, deleteRecord, checkRecordTime, refreshRecordsFromServer } from '../core/record/index.js';
+import { updateRecord, cancelRecord, deleteRecord, refreshRecordsFromServer } from '../core/record/index.js';
 import { journalRecordActionContext } from './record-action-context.js';
 import { getProfile } from '../settings/profile/data.js';
 import { openRecordPayment } from './record-payment.js';
@@ -40,7 +37,6 @@ function recordOwnerOptions({ settings = false, chatPersonKey = '' } = {}) {
 }
 
 const people = () => getAllPeople();
-const procedures = () => getProcedures();
 const dateKey = (value) => {
   const date = value instanceof Date ? value : new Date(value);
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
