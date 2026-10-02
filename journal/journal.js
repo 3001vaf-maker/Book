@@ -3,9 +3,9 @@ import { getWorkplaceContext, setWorkplaceContext } from '../core/workplace-cont
 import { readOnlyReceipt } from '../ui/receipt/index.js';
 import { canUseBookCapability } from '../core/access.js';
 import { getWorkplaces } from '../core/workplace-time.js';
-import { getActiveDayWorkplaces, getDays, removeDay, saveDays } from '../core/day/index.js';
+import { getActiveDayWorkplaces } from '../core/day/index.js';
 import { getRecordPaymentState, recordAmountDue } from '../core/finance/index.js';
-import { openTimetableDayEditor } from '../timetable/day-editor.js';
+import { makeTimetableDayOff, openTimetableDayEditor } from '../timetable/day-editor.js';
 import { getActiveRecordCountForDay, getRecordsForDay } from '../core/record/index.js';
 import { openJournalWorkplaceControl } from './workplace-control.js';
 import { renderJournalDay } from './день.js';
@@ -158,10 +158,11 @@ export function renderJournal(root, options = {}) {
     if (selectedWorkplaceId === ALL_WORKPLACES_ID) return;
     const day = dateKey(selectedDate);
     if (getActiveRecordCountForDay(day, selectedWorkplaceId) > 0) return;
-    const days = getDays();
-    if (!removeDay(days, selectedWorkplaceId, day)) return;
-    saveDays(days);
-    renderView();
+    makeTimetableDayOff({
+      date: selectedDate,
+      workplaceId: selectedWorkplaceId,
+      onSave: renderView,
+    });
   };
 
   const openJournalSettings = () => {
