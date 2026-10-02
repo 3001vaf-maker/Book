@@ -84,6 +84,11 @@ window.addEventListener('book:server-mutation-completed', (event) => {
   if (scopes.includes('operational')) scheduleRknGuideSync();
 });
 
+window.addEventListener('book:business-persistence-error', (event) => {
+  const message = String(event?.detail?.message || 'Не удалось сохранить изменения на сервере.');
+  openNotice({ title: 'Не удалось сохранить', message, surface: 'app' });
+});
+
 window.addEventListener('book:record-chat-request', (event) => {
   if (!workspaceReady) return;
   const layer = mountV2ZLayer(app, v2ZLayer('', { className: 'record-chat-z' }), { stack: true });
