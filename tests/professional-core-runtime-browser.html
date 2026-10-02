@@ -1063,8 +1063,8 @@ ok(recordReceipt?.textContent.includes('Очень длинное названи
   'Record Z2 must show full procedure name');
 ok(!document.querySelector('[data-record-payment-entry]'),
   'Opening Record must not create legacy automatic payment sheet');
-ok(shell()?.querySelector('[data-v2-workspace-primary]')?.textContent.includes('К оплате'),
-  'Record Z2 C must expose amount due');
+ok(/^\s*1\s*500\s*₽\s*$/.test(shell()?.querySelector('[data-v2-workspace-primary]')?.textContent || ''),
+  'Record Z2 C must expose only the amount due');
 
 mark('journal-record-settings');
 shell()?.querySelector('[data-v2-workspace-a]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));

@@ -101,13 +101,16 @@ assert.match(methodsSource, /const remaining = Math\.max\(0, total - applied\)/)
 assert.match(methodsSource, /return \{\s*state,\s*sync,\s*initial,/s);
 
 assert.match(paymentCss, /\.payment-procedure\{[^}]*border-radius:0/);
-assert.match(paymentCss, /\.payment-allocation-input\{[^}]*border-radius:0/);
-assert.match(paymentCss, /\.payment-record-summary__due strong\{font-size:15px;font-weight:800/);
+assert.match(methodsSource, /payment-allocation-block/);
+assert.match(methodsSource, /field\(\{[\s\S]*label: 'Сумма'/);
+assert.doesNotMatch(paymentCss, /payment-allocation-input|min-height:52px/);
+assert.match(paymentCss, /\.payment-record-summary__due strong\{font-size:14px;font-weight:800/);
 assert.match(paymentCss, /\.payment-procedure__name\{[^}]*white-space:normal[^}]*text-overflow:clip/);
 
 assert.match(recordViewSource, /openRecordPayment\(/);
 assert.match(recordViewSource, /\{ host: m \}/);
-assert.match(recordViewSource, /К оплате ·/);
+assert.doesNotMatch(recordViewSource, /К оплате ·/);
+assert.match(recordViewSource, /\? 'Оплачено'\s*:\s*formatMoney\(paymentState\.remaining\)/s);
 assert.doesNotMatch(recordViewSource, /openRecordPaymentEntry|openPaidState|data-record-payment-open/);
 assert.doesNotMatch(journalDaySource, /openRecordPaymentEntry/);
 
@@ -135,6 +138,7 @@ assert.match(recordPaymentSource, /name: 'recordPaymentDate'/);
 assert.match(recordPaymentSource, /name: 'recordPaymentCorrectionDate'/);
 assert.match(recordPaymentSource, /name: 'recordPaymentRefundDate'/);
 assert.match(recordPaymentSource, /name: 'recordPaymentCancelDate'/);
+assert.match(recordPaymentSource, /showYear: false/);
 assert.doesNotMatch(recordPaymentSource, /datetime-local|refundOccurredAt|cancelOccurredAt|paymentOccurredAt/);
 assert.doesNotMatch(recordPaymentSource, /openRecordPaymentEntry|paymentEntryContent|openPaymentModal|openPaidState/);
 

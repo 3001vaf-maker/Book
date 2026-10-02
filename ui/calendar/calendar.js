@@ -202,6 +202,7 @@ export function datePicker({
   minYear = null,
   maxYear = null,
   initialYear = null,
+  showYear = true,
   allowClear = true,
   required = false,
 } = {}) {
@@ -215,6 +216,7 @@ export function datePicker({
     `data-date-picker-min-year="${escapeHtml(minYear == null ? '' : String(minYear))}"`,
     `data-date-picker-max-year="${escapeHtml(maxYear == null ? '' : String(maxYear))}"`,
     `data-date-picker-initial-year="${escapeHtml(initialYear == null ? '' : String(initialYear))}"`,
+    `data-date-picker-show-year="${showYear ? 'true' : 'false'}"`,
     `data-date-picker-placeholder="${escapeHtml(placeholder)}"`,
     `data-date-picker-allow-clear="${allowClear ? 'true' : 'false'}"`,
   ].join(' ');
@@ -263,18 +265,19 @@ function openDatePicker(host) {
     ? Math.max(minYear, Math.min(maxYear, declaredInitialYear))
     : Math.max(minYear, Math.min(maxYear, now.getFullYear()));
   const placeholder = host.dataset.datePickerPlaceholder || 'Выберите дату';
+  const showYear = host.dataset.datePickerShowYear !== 'false';
   const allowClear = host.dataset.datePickerAllowClear !== 'false';
   let displayed = current
     ? new Date(current.getFullYear(), current.getMonth(), 1)
     : new Date(initialYear, now.getMonth(), 1);
   let selectedValue = current ? dateKey(current) : '';
 
-  const content = `<div class="form-grid"><div data-date-picker-year></div><div data-date-picker-calendar></div>${allowClear && selectedValue ? button('Очистить дату', { variant: 'secondary', data: 'data-date-picker-clear' }) : ''}</div>`;
+  const content = `<div class="form-grid">${showYear ? '<div data-date-picker-year></div>' : ''}<div data-date-picker-calendar></div>${allowClear && selectedValue ? button('Очистить дату', { variant: 'secondary', data: 'data-date-picker-clear' }) : ''}</div>`;
   const modalRoot = mountModal(document.body, modal(content, { variant: 'standard', title: host.querySelector(':scope > span')?.textContent?.replace(/\s*\*$/, '') || 'Дата' }));
   if (!modalRoot) return;
   const yearHost = modalRoot.querySelector('[data-date-picker-year]');
   const calendarHost = modalRoot.querySelector('[data-date-picker-calendar]');
-  if (!yearHost || !calendarHost) return;
+  if (!calendarHost) return;
 
   const withinRange = (value) => {
     const parsed = parseDateValue(value);
@@ -309,7 +312,7 @@ function openDatePicker(host) {
       month: new Date(displayed.getFullYear(), displayed.getMonth(), 1),
       onMonthChange: (month) => {
         displayed = month;
-        setYearControl();
+        if (showYear) setYearControl();
       },
       onDateSelect: (value) => {
         selectedValue = value;
@@ -319,6 +322,7 @@ function openDatePicker(host) {
   };
 
   const setYearControl = () => {
+    if (!showYear || !yearHost) return;
     yearHost.innerHTML = select({
       label: 'Год',
       name: 'sharedDatePickerYear',
@@ -334,7 +338,7 @@ function openDatePicker(host) {
     });
   };
 
-  setYearControl();
+  if (showYear) setYearControl();
   mountCalendar();
 
   modalRoot.querySelector('[data-date-picker-clear]')?.addEventListener('click', () => {

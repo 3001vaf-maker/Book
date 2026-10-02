@@ -1,5 +1,6 @@
 import { button } from '../buttons/index.js';
 import { select } from '../selectors/index.js';
+import { field } from '../inputs/index.js';
 import { escapeHtml } from '../utils/escape-html.js';
 
 const numberValue = (value) => {
@@ -25,9 +26,22 @@ function walletOptions(wallets = []) {
 
 function allocationRow(index, wallets, initial = {}) {
   const amount = initial?.amount == null ? '' : moneyInputText(initial.amount);
-  return `<div class="payment-allocation-row" data-payment-allocation-row="${index}">
-    ${select({ value: String(initial?.walletId || ''), options: walletOptions(wallets), data: `data-payment-allocation-wallet="${index}"`, aria: `Кошелёк оплаты ${index + 1}` })}
-    <input class="payment-allocation-input" type="text" inputmode="decimal" autocomplete="off" placeholder="Сумма" value="${escapeHtml(amount)}" data-payment-allocation-amount="${index}">
+  return `<div class="payment-allocation-block" data-payment-allocation-row="${index}">
+    ${select({
+      label: 'Кошелёк',
+      value: String(initial?.walletId || ''),
+      options: walletOptions(wallets),
+      data: `data-payment-allocation-wallet="${index}"`,
+      aria: `Кошелёк оплаты ${index + 1}`,
+    })}
+    ${field({
+      label: 'Сумма',
+      name: `paymentAllocationAmount${index}`,
+      value: amount,
+      type: 'text',
+      inputmode: 'decimal',
+      data: `data-payment-allocation-amount="${index}"`,
+    })}
   </div>`;
 }
 

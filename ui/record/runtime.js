@@ -174,20 +174,20 @@ export function mountRecordZ({
   const context = workspaceHeaderContext({
     title,
     hideD: !chatPersonKey,
-    a: showA ? {
+    a: {
       kind: 'avatar',
       label: 'Запись',
       image: aImage,
       imagePosition: aImagePosition,
       initials: aInitials,
-      ...(settings ? {
+      ...(showA && settings ? {
         data: 'data-record-owner-settings',
         aria: 'Настройки записи',
       } : {
         disabled: true,
         aria: 'Запись',
       }),
-    } : null,
+    },
     d: chatPersonKey ? {
       kind: 'chat',
       data: 'data-record-owner-chat',

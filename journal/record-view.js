@@ -364,8 +364,8 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       const paymentState = getRecordPaymentState({ ...record, ...state, id: record.id, finance });
       setRecordPrimaryAction(m, {
         label: paymentState.fullyPaid
-          ? `Оплачено · ${formatMoney(paymentState.paidTotal)}`
-          : `К оплате · ${formatMoney(paymentState.remaining)}`,
+          ? 'Оплачено'
+          : formatMoney(paymentState.remaining),
         variant: paymentState.fullyPaid ? 'secondary' : '',
         onClick: () => openRecordPayment(
           getRecords().find((item) => String(item?.id || '') === String(record.id)) || { ...record, ...state, id: record.id },

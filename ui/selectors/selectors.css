@@ -25,3 +25,11 @@
 .ui-selector__option{justify-content:flex-start;gap:10px;text-align:left}
 .ui-selector__option-main{flex:1 1 auto}
 .ui-selector__option-label{font-size:14px;line-height:1.2}
+
+.ui-select--center .ui-select__control{justify-content:center}
+.ui-select--center .ui-select__selection{justify-content:center;width:100%}
+.ui-select--center .ui-select__text{flex:0 1 auto;text-align:center}
+.ui-select--center .ui-select__value{text-align:center}
+.ui-select--center .ui-select__chevron{position:absolute;right:13px}
+.ui-selector--center .ui-selector__option{justify-content:center;text-align:center}
+.ui-selector--center .ui-selector__option-main{flex:0 1 auto;text-align:center}
