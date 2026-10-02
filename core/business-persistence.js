@@ -66,6 +66,30 @@ async function send(item) {
   return responseJson(response, item.fallbackMessage);
 }
 
+function failedRecordUpsertId(item = null) {
+  if (String(item?.options?.method || '').toUpperCase() !== 'PUT') return '';
+  const match = String(item?.path || '').match(/^\/business-state\/records\/([^/]+)$/);
+  return match ? decodeURIComponent(match[1]) : '';
+}
+
+function discardImmediateRecordEvents(recordId, error) {
+  const id = String(recordId || '');
+  if (!id) return;
+  while (queue.length) {
+    const next = queue[0];
+    if (!String(next?.path || '').startsWith('/business-state/record-events/')) break;
+    let eventRecordId = '';
+    try {
+      eventRecordId = String(JSON.parse(next?.options?.body || '{}')?.event?.recordId || '');
+    } catch {
+      eventRecordId = '';
+    }
+    if (eventRecordId !== id) break;
+    queue.shift();
+    next.resolve?.({ ok: false, error });
+  }
+}
+
 async function runQueue() {
   if (running || !serverReady) return;
   running = true;
@@ -85,6 +109,7 @@ async function runQueue() {
           queue.shift();
           pendingPermanentError = lastError;
           item.resolve?.({ ok: false, error: lastError });
+          discardImmediateRecordEvents(failedRecordUpsertId(item), lastError);
           continue;
         }
         await sleep(1200);
