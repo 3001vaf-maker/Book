@@ -159,7 +159,7 @@ export async function recordPaymentIncome({
   const allocated = preparedAllocations.reduce((sum, item) => sum + item.amount, 0);
   const tipsTotal = Math.max(0, financialNumber(tips));
   const applied = Math.max(0, financialNumber(serviceAmount == null ? allocated - tipsTotal : serviceAmount));
-  if (!preparedAllocations.length || allocated <= 0 || applied <= 0) return null;
+  if (!preparedAllocations.length || allocated <= 0 || applied < 0 || (applied <= 0 && tipsTotal <= 0)) return null;
   if (maxAmount != null && applied > Math.max(0, financialNumber(maxAmount)) + 0.009) return null;
   if (Math.abs(allocated - applied - tipsTotal) > 0.009) return null;
 
