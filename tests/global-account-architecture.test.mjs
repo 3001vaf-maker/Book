@@ -7,6 +7,7 @@ const relationshipMigration = fs.readFileSync('server/prisma/migrations/20260925
 const accountApi = fs.readFileSync('core/account/index.js', 'utf8');
 const guard = fs.readFileSync('server/src/online-booking/account.guard.ts', 'utf8');
 const booking = fs.readFileSync('server/src/online-booking/online-booking.service.ts', 'utf8');
+const auxiliaryState = fs.readFileSync('server/src/auxiliary-state/auxiliary-state.service.ts', 'utf8');
 const communication = fs.readFileSync('server/src/communication/communication.service.ts', 'utf8');
 const runtime = fs.readFileSync('online-booking/account-runtime.js', 'utf8');
 const bookingUi = fs.readFileSync('online-booking/booking.js', 'utf8');
@@ -81,6 +82,10 @@ assert.match(investmentDecisionBlock, /participantStatus\) !== 'pending'/, 'Inve
 assert.match(investmentDecisionBlock, /finance\.investment\.raise\.access/, 'Investment acceptance must respect the administrator capability');
 assert.match(accountShell, /data-account-investment=/, 'Accepted investment must appear as an Entity Card in the end-user Overview');
 assert.match(accountShell, /data-account-investment-chat/, 'Linked investment must expose the shared Header D chat');
+assert.match(accountShell, /v2Section\('История', accountInvestmentHistory\(investment\)\)/, 'Linked investor card must expose the same investment history');
+assert.match(accountShell, /await getGlobalAccountRelationships\(\)/, 'Accepting an investment must refresh the linked projection immediately');
+assert.match(auxiliaryState, /Статус участия меняет только инвестор/, 'Professional writes must not self-accept an investor proposal');
+assert.match(auxiliaryState, /Принятые условия инвестиции нельзя изменить без нового соглашения/, 'Accepted investment terms must be immutable for the project side');
 const deleteRelationshipStart = booking.indexOf('async deleteGlobalAccountRelationship');
 const deleteRelationshipEnd = booking.indexOf('async globalAccountRecords', deleteRelationshipStart);
 const deleteRelationshipBlock = booking.slice(deleteRelationshipStart, deleteRelationshipEnd);
