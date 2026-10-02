@@ -63,7 +63,7 @@ function openRecordTimeNotice(message) {
 }
 
 function renderTimeStep(modalRoot, { date, workplaceId, from, to, onCreated }) {
-  modalRoot ||= mountRecordZ({ ...recordOwnerOptions(), className: 'record-flow-z' });
+  modalRoot ||= mountRecordZ({ ...recordOwnerOptions(), title: 'Выбор времени', showA: false, className: 'record-flow-z' });
   let activeMode = 'record';
   const values = recordStartTimes({ date: dateKey(date), workplaceId, from });
   const toggle = viewNavigation({ views: RECORD_MODES, activeView: activeMode, className: 'segment-control--two', ariaLabel: 'Режим записи' });
@@ -169,11 +169,11 @@ function openPriceProcedurePicker({ workplaceId, onAssigned }) {
 }
 
 function renderProceduresStep(modalRoot, { date, workplaceId, from, to, onCreated }) {
-  modalRoot ||= mountRecordZ({ ...recordOwnerOptions({ settings: true }), className: 'record-flow-z' });
+  modalRoot ||= mountRecordZ({ ...recordOwnerOptions({ settings: true }), title: 'Выбор процедур', className: 'record-flow-z' });
   let items = procedures().filter((procedure) => procedureForWorkplace(procedure, workplaceId));
   const selected = new Map();
   let selectionController = null;
-  const host = renderRecordZ(modalRoot, `<div class="record-screen record-screen--procedures"><div class="record-modal-toolbar"><strong>Процедуры</strong></div><div data-record-procedures></div></div>`);
+  const host = renderRecordZ(modalRoot, `<div class="record-screen record-screen--procedures"><div data-record-procedures></div></div>`);
   if (!host) return;
 
   const syncActions = () => {
@@ -311,7 +311,7 @@ function openProcedureSettings({ procedure, current, onSave, onAdd, onDelete }) 
 }
 
 function renderPersonStep(modalRoot, { date, workplaceId, from, to, procedures: selectedProcedures, onCreated, onSelected }) {
-  modalRoot ||= mountRecordZ({ ...recordOwnerOptions({ settings: true }), className: 'record-flow-z' });
+  modalRoot ||= mountRecordZ({ ...recordOwnerOptions({ settings: true }), title: 'Выбор клиента', className: 'record-flow-z' });
   let all = people();
   let filtered = all;
   let selectedPerson = null;
@@ -505,6 +505,7 @@ function openConfirmationProcedurePicker({ workplaceId, selectedProcedures, onSe
 function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, selectedPerson, selectedProcedures, onCreated }) {
   modalRoot ||= mountRecordZ({
     ...recordOwnerOptions({ settings: true, chatPersonKey: selectedPerson?.key || '' }),
+    title: 'Подтверждение записи',
     className: 'record-flow-z',
   });
   let currentDate = dateKey(date);
