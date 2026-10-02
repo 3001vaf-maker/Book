@@ -151,8 +151,8 @@ const journalSource = text(journalController);
 if (/\bopenWorkplace(?:Picker|Time)?Modal\b/.test(journalSource)) {
   report(journalController, 'Journal must not create a parallel raw Workplace modal; use its Journal-owned Header manifestation');
 }
-if (!/\bheaderControl\s*\(/.test(journalSource) || !/\bworkplaceContent\s*\(/.test(journalSource)) {
-  report(journalController, 'Journal must compose neutral Workplace content inside the shared Header Control');
+if (!/\bworkspaceHeaderContext\s*\(/.test(journalSource)) {
+  report(journalController, 'Journal must compose the shared workspace Header context');
 }
 if (/\bopenWorkplaceControl\s*\(/.test(journalSource)) {
   report(journalController, 'Journal must not use the Graph Workplace manifestation');
