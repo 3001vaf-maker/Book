@@ -7,6 +7,7 @@ const relationshipMigration = fs.readFileSync('server/prisma/migrations/20260925
 const accountApi = fs.readFileSync('core/account/index.js', 'utf8');
 const guard = fs.readFileSync('server/src/online-booking/account.guard.ts', 'utf8');
 const booking = fs.readFileSync('server/src/online-booking/online-booking.service.ts', 'utf8');
+const auxiliaryState = fs.readFileSync('server/src/auxiliary-state/auxiliary-state.service.ts', 'utf8');
 const communication = fs.readFileSync('server/src/communication/communication.service.ts', 'utf8');
 const runtime = fs.readFileSync('online-booking/account-runtime.js', 'utf8');
 const bookingUi = fs.readFileSync('online-booking/booking.js', 'utf8');
@@ -81,6 +82,11 @@ assert.match(investmentDecisionBlock, /participantStatus\) !== 'pending'/, 'Inve
 assert.match(investmentDecisionBlock, /finance\.investment\.raise\.access/, 'Investment acceptance must respect the administrator capability');
 assert.match(accountShell, /data-account-investment=/, 'Accepted investment must appear as an Entity Card in the end-user Overview');
 assert.match(accountShell, /data-account-investment-chat/, 'Linked investment must expose the shared Header D chat');
+assert.match(accountShell, /v2Section\('История', accountInvestmentHistory\(investment\)\)/, 'Linked investor card must expose the same investment history');
+assert.match(accountShell, /await getGlobalAccountRelationships\(\)/, 'Accepting an investment must refresh the linked projection immediately');
+assert.match(auxiliaryState, /protectInvestmentAgreements/, 'Auxiliary investment writes must preserve server-owned agreement state');
+assert.match(auxiliaryState, /previousStatus === 'accepted'[\s\S]*entity\.investmentTerms = clone\(previousTerms\)/, 'Accepted investment terms must remain immutable without blocking unrelated auxiliary writes');
+assert.match(auxiliaryState, /participantStatus: participantAccountId \? 'pending' : ''/, 'A new linked investment proposal must start pending instead of self-accepting');
 const deleteRelationshipStart = booking.indexOf('async deleteGlobalAccountRelationship');
 const deleteRelationshipEnd = booking.indexOf('async globalAccountRecords', deleteRelationshipStart);
 const deleteRelationshipBlock = booking.slice(deleteRelationshipStart, deleteRelationshipEnd);

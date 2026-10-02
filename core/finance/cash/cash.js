@@ -146,17 +146,21 @@ function renderOperationRow(operation) {
 }
 
 function cashContext() {
+  const investmentOnly = allowedInvestmentRoles().length > 0
+    && !canUseBookCapability('finance.cash.access')
+    && !canUseBookCapability('finance.special.access');
+  const hasSettings = financeOperationGroups({ groups: ['income-expense', 'transfer'] }).length > 0;
   return workspaceHeaderContext({
-    title: 'Касса',
-    a: {
+    title: investmentOnly ? 'Инвестиции' : 'Касса',
+    a: hasSettings ? {
       kind: 'settings',
       data: 'data-cash-settings',
       aria: 'Настройки кассы',
-    },
+    } : null,
     c: canCreateCashEntity() ? {
       label: '+',
       data: 'data-cash-create',
-      aria: 'Создать сущность кассы',
+      aria: investmentOnly ? 'Добавить инвестицию' : 'Создать сущность кассы',
     } : null,
   });
 }
@@ -307,11 +311,14 @@ function renderList(root) {
   const wallets = getWallets();
   const investments = getInvestmentEntities();
   const loans = getLoanEntities();
+  const canUseWallets = canUseBookCapability('finance.cash.access');
+  const canUseInvestments = allowedInvestmentRoles().length > 0;
+  const canUseLoans = canUseBookCapability('finance.special.access');
   root.innerHTML = page([
     cashContext(),
-    v2Section('Кошельки', horizontalCards(wallets.map(renderWalletCard))),
-    v2Section('Инвестиции', horizontalCards(investments.map((item) => renderCashEntityCard(item, 'investment')))),
-    v2Section('Займ', horizontalCards(loans.map((item) => renderCashEntityCard(item, 'loan')))),
+    canUseWallets ? v2Section('Кошельки', horizontalCards(wallets.map(renderWalletCard))) : '',
+    canUseInvestments ? v2Section('Инвестиции', horizontalCards(investments.map((item) => renderCashEntityCard(item, 'investment')))) : '',
+    canUseLoans ? v2Section('Займ', horizontalCards(loans.map((item) => renderCashEntityCard(item, 'loan')))) : '',
   ]);
 
   root.querySelector('[data-cash-settings]')?.addEventListener('click', () => openCashSettings(root));
@@ -710,8 +717,16 @@ function investmentSummaryRows(entity) {
       v2ListEntry({ title: 'Привлечено', rightTop: formatMoney(state.received) }),
       v2ListEntry({ title: 'Возвращено капитала', rightTop: formatMoney(state.capitalReturned) }),
       v2ListEntry({ title: 'Выплачено дохода', rightTop: formatMoney(state.incomePaid) }),
-      v2ListEntry({ title: 'Остаток обязательств', rightTop: formatMoney(state.remainingObligation) }),
     );
+    if (['returnable', 'fixed-return'].includes(terms.participationModel)) {
+      rows.push(v2ListEntry({ title: 'К возврату капитала', rightTop: formatMoney(state.remainingObligation) }));
+    }
+    if (['profit-share', 'revenue-share', 'fixed-return'].includes(terms.participationModel)) {
+      rows.push(
+        v2ListEntry({ title: 'Доход инвестора по условиям', rightTop: formatMoney(state.entitledIncome) }),
+        v2ListEntry({ title: 'К выплате дохода', rightTop: formatMoney(state.incomeDue) }),
+      );
+    }
     if (state.explicitValuation) {
       rows.push(v2ListEntry({ title: 'Оценка проекта', rightTop: formatMoney(state.currentValue) }));
     }
@@ -728,6 +743,14 @@ function investmentSummaryRows(entity) {
     rows.push(
       v2ListEntry({ title: 'Расходы', rightTop: formatMoney(state.expenses) }),
       v2ListEntry({ title: 'Текущая стоимость', rightTop: formatMoney(state.currentValue) }),
+    );
+    if (terms.role === 'external' && ['profit-share', 'revenue-share', 'fixed-return'].includes(terms.participationModel)) {
+      rows.push(
+        v2ListEntry({ title: 'Доход по условиям', rightTop: formatMoney(state.entitledIncome) }),
+        v2ListEntry({ title: 'Осталось получить', rightTop: formatMoney(state.incomeDue) }),
+      );
+    }
+    rows.push(
       v2ListEntry({ title: 'Результат', rightTop: formatMoney(state.result) }),
       v2ListEntry({ title: 'ROI', rightTop: formatPercent(state.roi) }),
       v2ListEntry({ title: 'Годовая доходность', rightTop: formatPercent(state.annualizedReturn) }),
@@ -742,6 +765,7 @@ function investmentSummaryRows(entity) {
 function renderInvestmentTermsLayer(root, entityLayer, layer, sourceEntity, draft = null, { creating = false } = {}) {
   const current = investmentDraft(sourceEntity, draft);
   const terms = current.investmentTerms;
+  const acceptedAgreement = !creating && terms.role === 'raise' && terms.participantStatus === 'accepted';
   const roles = allowedInvestmentRoles();
   if (!roles.some((item) => item.value === terms.role)) {
     roles.push({ value: terms.role, label: investmentRoleLabel(terms.role) });
@@ -864,6 +888,11 @@ function renderInvestmentTermsLayer(root, entityLayer, layer, sourceEntity, draf
   form.addEventListener('change', (event) => {
     const name = String(event.target?.name || '');
     if (!['investmentRole', 'investmentType', 'participantAccountId', 'participationModel', 'termMode', 'endDate', 'durationValue', 'durationUnit', 'targetAmount', 'sharePercent', 'returnPercent'].includes(name)) return;
+    if (acceptedAgreement) {
+      openNotice({ message: 'Условия уже приняты инвестором. Для новых условий нужно новое соглашение.' });
+      renderInvestmentTermsLayer(root, entityLayer, layer, sourceEntity, null, { creating });
+      return;
+    }
     renderInvestmentTermsLayer(root, entityLayer, layer, sourceEntity, investmentTermsFromForm(form, sourceEntity), { creating });
   });
   layer.querySelector('[data-investment-terms-save]')?.addEventListener('click', () => form.requestSubmit());
@@ -874,7 +903,12 @@ function renderInvestmentTermsLayer(root, entityLayer, layer, sourceEntity, draf
       openNotice({ message: validation });
       return;
     }
-    const nextDraft = investmentTermsFromForm(form, sourceEntity);
+    const nextDraft = acceptedAgreement
+      ? {
+          name: String(new FormData(form).get('investmentName') || sourceEntity?.name || '').trim(),
+          investmentTerms: normalizeInvestmentTerms(sourceEntity),
+        }
+      : investmentTermsFromForm(form, sourceEntity);
     if (!nextDraft.name) {
       openNotice({ message: 'Укажите наименование инвестиции.' });
       return;
@@ -934,6 +968,8 @@ function investmentEventTitle(event = {}) {
     valuation: 'Изменение оценки',
     saving: 'Экономия',
     reinvestment: 'Реинвестирование',
+    'project-profit': 'Прибыль проекта',
+    'project-revenue': 'Выручка проекта',
   })[String(event.type || '')] || 'Событие инвестиции';
 }
 
@@ -1179,6 +1215,7 @@ function openFinanceEntitySettings(root, entityLayer, type, entity) {
     id: entity.id,
     name: entity.name,
     role: terms?.role || '',
+    participationModel: terms?.participationModel || '',
   };
   const saved = () => {
     renderFinanceEntityLayer(root, entityLayer, type, entity.id);

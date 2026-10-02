@@ -24,6 +24,8 @@ export const SPECIAL_FINANCE_ACTIONS = [
   { id: 'investment-income', kind: 'investment-income', group: 'investment', entityType: 'investment', entityLabel: 'Инвестиция', walletLabel: 'Кошелёк получения', label: 'Доход', title: 'Доход инвестиции', roles: ['self', 'external'] },
   { id: 'investment-expense', kind: 'investment-expense', group: 'investment', entityType: 'investment', entityLabel: 'Инвестиция', walletLabel: 'Кошелёк списания', label: 'Расход', title: 'Расход инвестиции', roles: ['self', 'external'] },
   { id: 'investment-saving', kind: 'investment-saving', group: 'investment', entityType: 'investment', entityLabel: 'Инвестиция', label: 'Экономия', title: 'Экономия', roles: ['self'], nonCash: true, eventType: 'saving' },
+  { id: 'investment-project-profit', kind: 'investment-project-profit', group: 'investment', entityType: 'investment', entityLabel: 'Инвестиция', label: 'Прибыль проекта', title: 'Прибыль проекта', roles: ['raise', 'external'], models: ['profit-share'], nonCash: true, eventType: 'project-profit' },
+  { id: 'investment-project-revenue', kind: 'investment-project-revenue', group: 'investment', entityType: 'investment', entityLabel: 'Инвестиция', label: 'Выручка проекта', title: 'Выручка проекта', roles: ['raise', 'external'], models: ['revenue-share'], nonCash: true, eventType: 'project-revenue' },
   { id: 'investment-reinvestment', kind: 'investment-reinvestment', group: 'investment', entityType: 'investment', entityLabel: 'Инвестиция', label: 'Реинвестирование', title: 'Реинвестирование', roles: ['self', 'external', 'raise'], nonCash: true, eventType: 'reinvestment' },
   { id: 'investment-valuation', kind: 'investment-valuation', group: 'investment', entityType: 'investment', entityLabel: 'Инвестиция', label: 'Изменение оценки', title: 'Изменение оценки', roles: ['self', 'external', 'raise'], nonCash: true, eventType: 'valuation' },
   { id: 'transfer', kind: 'transfer', group: 'transfer', label: 'Перевод между кошельками', title: 'Перевод между кошельками', transfer: true },
@@ -220,10 +222,13 @@ export function renderSpecialFinanceOperation(root, actionId, options = {}) {
 
 export function financeEntityOperationChoices(type, financeEntity = null) {
   const role = String(financeEntity?.role || '');
+  const participationModel = String(financeEntity?.participationModel || '');
   return SPECIAL_FINANCE_ACTIONS.filter((item) => {
     if (item.entityType !== type) return false;
     if (type !== 'investment') return true;
-    return !Array.isArray(item.roles) || item.roles.includes(role || 'raise');
+    if (Array.isArray(item.roles) && !item.roles.includes(role || 'raise')) return false;
+    if (Array.isArray(item.models) && !item.models.includes(participationModel)) return false;
+    return true;
   });
 }
 

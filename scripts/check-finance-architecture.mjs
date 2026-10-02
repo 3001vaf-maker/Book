@@ -324,8 +324,10 @@ if (!/finance\.investment\.self\.access/.test(cashUI)
   || !/finance\.investment\.external\.access/.test(cashUI)) {
   errors.push('Investment roles must be independently capability-gated');
 }
-if (!/Роль инвестиции задаётся при создании/.test(auxiliaryState)) {
-  errors.push('Investment role must remain immutable after entity creation so historical Ledger semantics cannot be reinterpreted');
+if (!/protectInvestmentAgreements/.test(auxiliaryState)
+  || !/role: previousRole/.test(auxiliaryState)
+  || !/previousStatus === 'accepted'[\s\S]*entity\.investmentTerms = clone\(previousTerms\)/.test(auxiliaryState)) {
+  errors.push('Investment role and accepted agreement must remain server-owned after entity creation so historical Ledger semantics cannot be reinterpreted');
 }
 if (!/data-investment-terms-form/.test(cashUI)
   || !/label: 'Условия инвестиции'/.test(cashUI)

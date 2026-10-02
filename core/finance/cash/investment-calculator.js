@@ -247,6 +247,8 @@ export function calculateInvestmentState(entity = {}, movements = [], asOfDate =
 
   let savings = 0;
   let reinvested = 0;
+  let projectProfit = 0;
+  let projectRevenue = 0;
   for (const event of events) {
     if (event.type === 'saving') {
       savings += event.amount;
@@ -255,6 +257,10 @@ export function calculateInvestmentState(entity = {}, movements = [], asOfDate =
       }
     } else if (event.type === 'reinvestment') {
       reinvested += event.amount;
+    } else if (event.type === 'project-profit') {
+      projectProfit += event.amount;
+    } else if (event.type === 'project-revenue') {
+      projectRevenue += event.amount;
     }
   }
 
@@ -291,6 +297,16 @@ export function calculateInvestmentState(entity = {}, movements = [], asOfDate =
   const shareValue = terms.sharePercent > 0 && projectValue != null
     ? projectValue * terms.sharePercent / 100
     : null;
+  const incomeBase = terms.role === 'raise' ? received : contributed;
+  const entitledIncome = terms.participationModel === 'profit-share'
+    ? projectProfit * terms.returnPercent / 100
+    : terms.participationModel === 'revenue-share'
+      ? projectRevenue * terms.returnPercent / 100
+      : terms.participationModel === 'fixed-return'
+        ? incomeBase * terms.returnPercent / 100
+        : 0;
+  const actualContractIncome = terms.role === 'raise' ? incomePaid : income;
+  const incomeDue = Math.max(0, entitledIncome - actualContractIncome);
 
   return {
     role: terms.role,
@@ -303,6 +319,10 @@ export function calculateInvestmentState(entity = {}, movements = [], asOfDate =
     expenses,
     savings,
     reinvested,
+    projectProfit,
+    projectRevenue,
+    entitledIncome,
+    incomeDue,
     capitalBase,
     currentValue,
     projectValue,

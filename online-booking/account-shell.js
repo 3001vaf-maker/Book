@@ -864,17 +864,26 @@ function accountInvestmentProposalRow(row, index) {
 
 function accountInvestmentSummary(investment) {
   const state = calculateInvestmentState(investment, investment.movements || []);
+  const terms = normalizeInvestmentTerms(investment);
   const rows = [
     v2ListEntry({ title: 'Вложено', rightTop: money(state.contributed) }),
     v2ListEntry({ title: 'Возвращено капитала', rightTop: money(state.returnedCapital) }),
     v2ListEntry({ title: 'Получено дохода', rightTop: money(state.income) }),
     v2ListEntry({ title: 'Расходы', rightTop: money(state.expenses) }),
     v2ListEntry({ title: 'Текущая стоимость', rightTop: money(state.currentValue) }),
+  ];
+  if (['profit-share', 'revenue-share', 'fixed-return'].includes(terms.participationModel)) {
+    rows.push(
+      v2ListEntry({ title: 'Доход по условиям', rightTop: money(state.entitledIncome) }),
+      v2ListEntry({ title: 'Осталось получить', rightTop: money(state.incomeDue) }),
+    );
+  }
+  rows.push(
     v2ListEntry({ title: 'Результат', rightTop: money(state.result) }),
     v2ListEntry({ title: 'ROI', rightTop: state.roi == null ? '—' : `${Number(state.roi).toLocaleString('ru-RU', { maximumFractionDigits: 2 })}%` }),
     v2ListEntry({ title: 'Годовая доходность', rightTop: state.annualizedReturn == null ? '—' : `${Number(state.annualizedReturn).toLocaleString('ru-RU', { maximumFractionDigits: 2 })}%` }),
     v2ListEntry({ title: 'Окуплено', rightTop: state.paybackRatio == null ? '—' : `${Number(state.paybackRatio).toLocaleString('ru-RU', { maximumFractionDigits: 2 })}%` }),
-  ];
+  );
   if (state.paybackDate) rows.push(v2ListEntry({ title: 'Точка окупаемости', rightTop: formatDate(state.paybackDate) }));
   return v2ListEntries(rows);
 }
@@ -899,6 +908,48 @@ function accountInvestmentTermsRows(row) {
     terms.returnPercent > 0 ? v2ListEntry({ title: 'Доходность / процент', rightTop: `${terms.returnPercent}%` }) : '',
   ].filter(Boolean);
   return v2ListEntries(rows);
+}
+
+function accountInvestmentHistory(investment = {}) {
+  const movementTitles = {
+    INVESTMENT_CONTRIBUTION: 'Вложение',
+    INVESTMENT_CAPITAL_RETURN: 'Возврат капитала',
+    INVESTMENT_INCOME: 'Доход',
+    INVESTMENT_EXPENSE: 'Расход',
+  };
+  const eventTitles = {
+    valuation: 'Изменение оценки',
+    saving: 'Экономия',
+    reinvestment: 'Реинвестирование',
+    'project-profit': 'Прибыль проекта',
+    'project-revenue': 'Выручка проекта',
+  };
+  const movements = (Array.isArray(investment.movements) ? investment.movements : [])
+    .filter((item) => item?.operationStatus !== 'cancelled' && item?.economicType !== 'REVERSAL')
+    .map((item) => ({
+      title: movementTitles[String(item?.economicType || '')] || 'Финансовая операция',
+      subtitle: String(item?.note || ''),
+      amount: Math.max(0, Number(item?.amount ?? item?.total) || 0),
+      moment: String(item?.occurredAt || ''),
+    }));
+  const events = (Array.isArray(investment.investmentEvents) ? investment.investmentEvents : [])
+    .filter((item) => item && !item.deletedAt)
+    .map((item) => ({
+      title: eventTitles[String(item?.type || '')] || 'Событие инвестиции',
+      subtitle: String(item?.note || ''),
+      amount: Math.max(0, Number(item?.amount) || 0),
+      moment: String(item?.occurredDate || item?.occurredAt || ''),
+    }));
+  const rows = [...movements, ...events]
+    .filter((item) => item.moment)
+    .sort((a, b) => b.moment.localeCompare(a.moment))
+    .map((item) => v2ListEntry({
+      title: item.title,
+      subtitle: item.subtitle,
+      rightTop: money(item.amount),
+      rightBottom: formatDate(String(item.moment).slice(0, 10)),
+    }));
+  return rows.length ? v2ListEntries(rows) : emptyState('Операций пока нет', 'История инвестиции появится здесь.');
 }
 
 function mutateAccountInvestmentStatus(state, tenantId, investmentId, status) {
@@ -930,7 +981,8 @@ function openAccountInvestmentProposal(state, handlers, row) {
   const decide = async (decision) => {
     try {
       await decideGlobalAccountInvestment(row.tenantId, row.investment.id, decision);
-      mutateAccountInvestmentStatus(state, row.tenantId, row.investment.id, decision);
+      const relationships = await getGlobalAccountRelationships();
+      state.relationships = Array.isArray(relationships) ? relationships : [];
       layer.v2Close?.();
       await handlers.render?.();
     } catch (error) {
@@ -947,6 +999,7 @@ function openAccountInvestmentDetail(root, state, handlers, row) {
   const restoreHeader = () => setGlobalAccountHeader(root, globalHomeHeader(state));
   const layer = mountV2ZLayer(root, v2ZLayer(page([
     v2Section('Расчёт', accountInvestmentSummary(investment)),
+    v2Section('История', accountInvestmentHistory(investment)),
     v2Section('Условия', accountInvestmentTermsRows(row)),
   ]), { className: 'account-investment-z' }), {
     stack: true,
