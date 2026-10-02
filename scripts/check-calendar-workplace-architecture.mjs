@@ -130,7 +130,7 @@ if (!/openTimetableDayEditor/.test(journal) || !/timetable\/day-editor\.js/.test
 if (/getDayWorkplaceDraft|saveDayWorkplaceTime|openDayWorkplaceTime|updateDayTime|hasScheduleConflict|createDay|saveDays/.test(journal)) fail('journal/journal.js', 'Journal must not own working-day mutation or validation');
 if (!/export function openJournalWorkplaceControl/.test(journalWorkplaceControl)) fail('journal/workplace-control.js', 'Journal must own a separate Workplace selection manifestation');
 if (!/openHeaderControl/.test(journalWorkplaceControl) || !/list\(\{\s*items\s*\}\)/.test(journalWorkplaceControl)) fail('journal/workplace-control.js', 'Journal manifestation must reuse shared Header Control and List');
-if (!/Все записи/.test(journalWorkplaceControl) || /Общий график/.test(journalWorkplaceControl)) fail('journal/workplace-control.js', 'Journal manifestation must own only Journal aggregate semantics');
+if (!/График дня/.test(journalWorkplaceControl) || /Общий график/.test(journalWorkplaceControl)) fail('journal/workplace-control.js', 'Journal manifestation must own only the Journal day-schedule aggregate semantics');
 if (!/data-journal-workplace-select/.test(journalWorkplaceControl) || /data-workplace-control-select/.test(journalWorkplaceControl)) fail('journal/workplace-control.js', 'Journal and Graph controls must have separate interaction channels');
 if (!/getWorkingDayIndicators/.test(journalMonth) || !/resolveDateIndicators/.test(journalMonth) || /calendar__date-indicator/.test(journalMonth)) fail('journal/месяц.js', 'Journal Month must use the same Calendar indicator channel and must not draw its own indicators');
 
