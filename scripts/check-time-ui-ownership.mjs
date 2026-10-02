@@ -27,16 +27,25 @@ if (!/getWorkplaceWorkingDates/.test(recordFlow)) fail('journal/record.js', 'Rec
 if (/from ['"]\.\.\/core\/day\.js['"]|isTimeRangeAvailable|getTimeUsages|getJournalBreaks|getRecords\(|getDayTime|getDay\(/.test(recordFlow)) fail('journal/record.js', 'Record creation must not rebuild occupancy or WorkPlan availability');
 if (/from ['"]\.\/break-data\.js['"]/.test(recordFlow)) fail('journal/record.js', 'Record creation must command Break through break-service.js');
 
-if (!/openTimePickerAction/.test(recordView) || !/checkRecordTime/.test(recordView)) fail('journal/record-view.js', 'Record editor must use the canonical Shared Time picker and validate the resulting interval through Core Record/Availability');
-if (!/getWorkplaceWorkingDates/.test(recordView)) fail('journal/record-view.js', 'Record editor must use the canonical WorkPlan date query');
-if (/from ['"]\.\.\/core\/day\.js['"]/.test(recordView)) fail('journal/record-view.js', 'Record editor must not read WorkPlan storage directly');
-if (/listAvailableStartTimes|timeSlots\(\{\s*values,\s*selected:|getBookingSettings\(\)\.slotStep/.test(recordView)) fail('journal/record-view.js', 'Record editor exact-time correction must not be reduced to a generated slot list or online-booking slotStep');
-if (/timeSlots\(\{[^}]*\boccupied\b/.test(recordView) || /timeSlots\(\{[^}]*\bfrom:\s*workingTime/.test(recordView)) fail('journal/record-view.js', 'Record editor must not use a local availability contract');
-if (!/const startWorkplaceEdit/.test(recordView) || !/startDateEdit\(workplaceDraft/.test(recordView)) fail('journal/record-view.js', 'Workplace edit must require Date then Time');
-if (!/const startRecordDateEdit/.test(recordView) || !/startDateEdit\(\{ \.\.\.state \}/.test(recordView)) fail('journal/record-view.js', 'Date edit must require Time before applying');
-if (!/chooseTimeForDraft\(datedDraft/.test(recordView)) fail('journal/record-view.js', 'Date selection must chain into time selection');
-if (/openWorkplacePicker\(state,\s*\(workplaceId\)\s*=>\s*applyPatch/.test(recordView)) fail('journal/record-view.js', 'Workplace selection must not apply a partial scheduling tuple');
-if (/openDatePicker\(state,\s*\(date\)\s*=>\s*applyPatch/.test(recordView)) fail('journal/record-view.js', 'Date selection must not apply stale time');
+if (!/openRecordEditFlow/.test(recordView)
+  || !/startAt,\s*date:\s*state\.date,\s*workplaceId:\s*state\.workplaceId,\s*from:\s*state\.from,\s*to:\s*state\.to/s.test(recordView)) {
+  fail('journal/record-view.js', 'Created Record editor must delegate schedule/procedure editing to the shared Record edit flow');
+}
+if (/openTimePickerAction|startWorkplaceEdit|startRecordDateEdit|startRecordTimeEdit|openWorkplacePicker|openDatePicker/.test(recordView)) {
+  fail('journal/record-view.js', 'Created Record editor must not keep a second direct schedule-edit implementation');
+}
+if (!/export function openRecordEditFlow/.test(recordFlow)
+  || !/if \(startAt === 'workplace'\) openWorkplace\(\);\s*else if \(startAt === 'date'\) openDate\(\);\s*else if \(startAt === 'procedure'\) openProcedures\(\);\s*else openTime\(\);/s.test(recordFlow)) {
+  fail('journal/record.js', 'Shared Record edit flow must own Workplace, Date, Time and Procedure entry points');
+}
+if (!/draft\.workplaceId[^\n]*[\s\S]*?openDate\(\)/.test(recordFlow)
+  || !/draft\.date\s*=\s*nextDate;\s*openTime\(\)/s.test(recordFlow)
+  || !/draft\.from\s*=\s*nextFrom;[\s\S]*?openProcedures\(\)/.test(recordFlow)) {
+  fail('journal/record.js', 'Shared Record edit flow must chain Workplace → Date → Time → Procedures without partial schedule commits');
+}
+if (!/listAvailableStartTimes/.test(recordFlow) || !/excludeId/.test(recordFlow)) {
+  fail('journal/record.js', 'Shared Record edit flow must ask canonical Availability and exclude the edited Record');
+}
 
 if (!/from ['"]\.\.\/core\/time\/index\.js['"]/.test(breakView)) fail('journal/break-view.js', 'Break view must ask Core Availability');
 if (!/listAvailableStartTimes/.test(breakView) || !/listAvailableEndTimes/.test(breakView)) fail('journal/break-view.js', 'Break view must use canonical Availability choices');
