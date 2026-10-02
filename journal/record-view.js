@@ -124,11 +124,24 @@ function confirmCancel(record, onCancelled) {
   const content = `<div class="modal-title"><h2>Отменить запись?</h2><p>Запись останется в истории как отменённая и освободит это время.</p></div><div class="modal-actions">${button('Нет', { data: 'data-record-cancel-no', variant: 'secondary' })}${button('Отменить запись', { data: 'data-record-cancel-yes', variant: 'danger' })}</div>`;
   const m = mountModal(document.body, modal(content, { variant: 'bottom', surface: 'app' }));
   if (!m) return;
-  m.querySelector('[data-record-cancel-no]')?.addEventListener('click', () => m.remove());
-  m.querySelector('[data-record-cancel-yes]')?.addEventListener('click', () => {
-    if (!cancelRecord(record.id, { actionContext: journalRecordActionContext() })) return;
-    m.remove();
-    onCancelled?.();
+  m.querySelector('[data-record-cancel-no]')?.addEventListener('click', () => m.v2Close?.());
+  m.querySelector('[data-record-cancel-yes]')?.addEventListener('click', async (event) => {
+    const submit = event.currentTarget;
+    if (submit) submit.disabled = true;
+    if (!cancelRecord(record.id, { actionContext: journalRecordActionContext() })) {
+      if (submit) submit.disabled = false;
+      return;
+    }
+    try {
+      await flushBusinessPersistence();
+      await refreshRecordsFromServer();
+      m.v2Close?.();
+      onCancelled?.();
+    } catch (error) {
+      await refreshRecordsFromServer().catch(() => null);
+      openNotice({ title: 'Не удалось отменить', message: String(error?.message || 'Сервер не подтвердил отмену записи.') });
+      if (submit?.isConnected) submit.disabled = false;
+    }
   });
 }
 
@@ -272,15 +285,28 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       <div class="modal-actions">${button('Удалить', { variant: 'critical', data: 'data-record-hard-delete-confirm' })}</div>`,
       { variant: 'bottom', surface: 'app', title: 'Удалить запись' },
     ));
-    layer?.querySelector('[data-record-hard-delete-confirm]')?.addEventListener('click', async () => {
-      if (!deleteRecord(record.id)) return;
+    layer?.querySelector('[data-record-hard-delete-confirm]')?.addEventListener('click', async (event) => {
+      const submit = event.currentTarget;
+      if (submit) submit.disabled = true;
+      if (!deleteRecord(record.id)) {
+        if (submit) submit.disabled = false;
+        return;
+      }
       try {
         await flushBusinessPersistence();
-        await refreshFinanceState();
+        await Promise.all([
+          refreshRecordsFromServer(),
+          refreshFinanceState(),
+        ]);
         layer.v2Close?.();
         m.v2Close?.();
       } catch (error) {
+        await Promise.all([
+          refreshRecordsFromServer().catch(() => null),
+          refreshFinanceState().catch(() => null),
+        ]);
         openNotice({ title: 'Не удалось удалить', message: String(error?.message || 'Сервер не подтвердил удаление записи.') });
+        if (submit?.isConnected) submit.disabled = false;
       }
     });
   };
