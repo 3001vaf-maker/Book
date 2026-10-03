@@ -26,7 +26,7 @@ const listEntry = readFileSync(new URL('../ui/lists/list-entry.js', import.meta.
 
 assert.match(service, /viewNavigation/);
 assert.doesNotMatch(service, /folderList/);
-assert.match(service, /c:\\s*\\{[\\s\\S]*label:\\s*'\\+'[\\s\\S]*data:\\s*'data-service-add'/);
+assert.match(service, /c:\s*\{[\s\S]*label:\s*'\+'[\s\S]*data:\s*'data-service-add'/);
 assert.doesNotMatch(service, /v2-primary-source-only/);
 assert.match(procedures, /initV2ListReorder/);
 assert.match(products, /initV2ListReorder/);
