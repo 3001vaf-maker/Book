@@ -11,6 +11,8 @@ export function serviceHeaderContext({
   settingsData = '',
   settingsAria = 'Настройки',
   hideD = false,
+  c = null,
+  d = null,
 } = {}) {
   const profile = getProfile();
   const name = [profile.name, profile.surname].filter(Boolean).join(' ') || 'Профиль';
@@ -27,6 +29,8 @@ export function serviceHeaderContext({
       disabled: !settingsData,
     },
     hideD,
+    c,
+    d,
   });
 }
 
