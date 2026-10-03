@@ -21,7 +21,7 @@ import { workplaceSelector, initWorkplaceSelectors, collectWorkplaceSelections, 
 import { pageHeader, workspaceHeaderContext, headerControl, headerToggle, headerControlGroup, openHeaderControl } from './header/index.js';
 import { modal, mountModal, openNotice } from './modals/index.js';
 import { button, iconButton, smallActionButton, copyIconButton, copyTextToClipboard, setCopyButtonCopied, sheetIconButton, iconButtonGroup } from './buttons/index.js';
-import { field, passwordField, initPasswordFields, formValidationMessage, phoneField, textareaField, rangeField, photoField, initPhotoField, selectPhotoFile, selectFile, selectFile } from './inputs/index.js';
+import { field, passwordField, initPasswordFields, formValidationMessage, phoneField, textareaField, rangeField, photoField, initPhotoField, selectPhotoFile, selectFile } from './inputs/index.js';
 import { emptyState, stateView, initStateView } from './states/index.js';
 import { infoUI, initInfoUI } from './info/index.js';
 import { colorPicker, initColorPickers, openColorPickerAction } from './colors/index.js';
