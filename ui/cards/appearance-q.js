@@ -40,7 +40,7 @@ export function openEntityCardAppearanceQ(root, {
     const editor = resolve(type, target) || {};
 
     host.innerHTML = `${workspaceHeaderContext({ title, hideD: true })}
-      <div class="entity-card-appearance-q__selectors">
+      <div class="form-grid entity-card-appearance-q__selectors">
         ${select({
           name: 'entityCardAppearanceType',
           label: typeLabel,
