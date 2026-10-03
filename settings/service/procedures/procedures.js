@@ -229,6 +229,11 @@ function renderProcedureEditor(layer, baseRoot, existing = null, { onChanged = (
       title,
       settingsData: 'data-procedure-editor-settings',
       settingsAria: 'Настройки процедуры',
+      c: {
+        label: 'Сохранить',
+        data: 'data-procedure-editor-primary',
+        aria: 'Сохранить процедуру',
+      },
     }),
     procedureEditorForm(existing),
   ]);
