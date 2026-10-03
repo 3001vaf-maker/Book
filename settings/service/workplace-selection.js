@@ -5,16 +5,6 @@ function workplaceId(value = {}) {
   return String(value.workplaceId || value.id || value.key || '');
 }
 
-export function normalizeServiceWorkplaces(selected = []) {
-  const selectedIds = new Set((Array.isArray(selected) ? selected : []).map(workplaceId).filter(Boolean));
-  return getWorkplaces()
-    .filter((workplace) => selectedIds.has(String(workplace.key || workplace.id || '')))
-    .map((workplace) => ({
-      workplaceId: String(workplace.key || workplace.id || ''),
-      name: String(workplace.name || ''),
-    }));
-}
-
 export function openServiceWorkplaceSelection({
   selected = [],
   title = 'Рабочие пространства',
