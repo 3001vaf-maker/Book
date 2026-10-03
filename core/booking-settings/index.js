@@ -32,15 +32,6 @@ export const DEFAULT_BOOKING_SETTINGS = Object.freeze({
   }),
 });
 
-function color(value, fallback) {
-  const text = String(value || '').trim().toUpperCase();
-  return /^#[0-9A-F]{6}$/.test(text) ? text : fallback;
-}
-
-function oneOf(value, allowed, fallback) {
-  const text = String(value || '');
-  return allowed.includes(text) ? text : fallback;
-}
 
 export function normalizeBookingSettings(value = {}) {
   const source = value && typeof value === 'object' ? value : {};
