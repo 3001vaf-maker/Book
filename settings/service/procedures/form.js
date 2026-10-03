@@ -1,4 +1,4 @@
-import { button, collectCost, costField, durationPicker, field, initCostFields, initDurationPickers, setSharedProfilePrimary, textareaField } from '../../../ui/ui.js';
+import { collectCost, costField, durationPicker, field, initCostFields, initDurationPickers, setSharedProfilePrimary, textareaField } from '../../../ui/ui.js';
 import { pushProcedureHistory, saveProcedure as saveProcedureData } from './data.js';
 
 export function initialProcedure(existing = null, defaultWorkplace = null) {
@@ -29,11 +29,6 @@ export function procedureEditorForm(existing = null) {
     </div>
     ${textareaField({ label: 'Описание', name: 'procedureDescription', value: procedure.description || '', placeholder: 'Описание процедуры' })}
     <div class="form-error" data-procedure-editor-error></div>
-    ${button('Сохранить', {
-      className: 'v2-primary-source-only',
-      data: 'data-procedure-editor-primary data-v2-primary-action data-v2-primary-label="Сохранить"',
-      aria: 'Сохранить процедуру',
-    })}
   </form>`;
 }
 
