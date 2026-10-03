@@ -1,4 +1,5 @@
-import { checkList, initCheckList, modal, mountModal } from '../../ui/ui.js';
+import { modal, mountModal } from '../../ui/ui.js';
+import { notificationSettings } from '../../ui/settings/index.js';
 import { getWorkplaces } from '../profile/workplaces/data.js';
 
 function workplaceId(value = {}) {
@@ -12,32 +13,33 @@ export function openServiceWorkplaceSelection({
 } = {}) {
   const selectedIds = new Set((Array.isArray(selected) ? selected : []).map(workplaceId).filter(Boolean));
   const workplaces = getWorkplaces();
-  const body = checkList(workplaces.map((workplace) => ({
-    value: String(workplace.key || workplace.id || ''),
+  const body = notificationSettings(workplaces.map((workplace) => ({
     label: String(workplace.name || 'Рабочее пространство'),
     checked: selectedIds.has(String(workplace.key || workplace.id || '')),
+    data: `data-service-workplace="${String(workplace.key || workplace.id || '')}"`,
   })));
   const layer = mountModal(document.body, modal(body, {
     variant: 'bottom',
     title,
-    className: 'modal--service-workplaces',
+    className: 'modal--profile-settings-sheet modal--service-workplaces',
   }));
   if (!layer) return null;
-  initCheckList(layer);
-  layer.querySelectorAll('.ui-check-list input[type="checkbox"]').forEach((input) => {
-    input.addEventListener('change', () => {
-      const ids = new Set([...layer.querySelectorAll('.ui-check-list input[type="checkbox"]')]
-        .filter((item) => item.checked)
-        .map((item) => String(item.value || ''))
-        .filter(Boolean));
-      const next = workplaces
-        .filter((workplace) => ids.has(String(workplace.key || workplace.id || '')))
-        .map((workplace) => ({
-          workplaceId: String(workplace.key || workplace.id || ''),
-          name: String(workplace.name || ''),
-        }));
-      onChange(next);
-    });
-  });
+
+  const inputs = () => [...layer.querySelectorAll('[data-service-workplace]')];
+  const emit = () => {
+    const ids = new Set(inputs()
+      .filter((input) => input.checked)
+      .map((input) => String(input.dataset.serviceWorkplace || ''))
+      .filter(Boolean));
+    const next = workplaces
+      .filter((workplace) => ids.has(String(workplace.key || workplace.id || '')))
+      .map((workplace) => ({
+        workplaceId: String(workplace.key || workplace.id || ''),
+        name: String(workplace.name || ''),
+      }));
+    onChange(next);
+  };
+
+  inputs().forEach((input) => input.addEventListener('change', emit));
   return layer;
 }
