@@ -1,4 +1,4 @@
-import { recordDocumentHistory } from './history.js';
+import { getDocumentHistory, recordDocumentHistory } from './history.js';
 
 let documentsState = null;
 let persistDocuments = null;
@@ -6,6 +6,17 @@ let platformBasesState = [];
 let platformContextState = { profile: {} };
 
 const PLATFORM_DOCUMENT_IDS = ['pdn-agreement', 'pdn-consent', 'messages-consent'];
+
+function attachmentType(item = {}) {
+  return String(item?.attachment?.type || '').trim().toUpperCase();
+}
+
+function inferredRecordType(item = {}) {
+  const explicit = String(item?.recordType || '').trim().toLowerCase();
+  if (explicit === 'document' || explicit === 'template') return explicit;
+  if (attachmentType(item) === 'RKN_GUIDE_PDF' || attachmentType(item) === 'USER_PDF') return 'document';
+  return 'template';
+}
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -26,10 +37,14 @@ function normalizeBase(item = {}) {
 
 function normalize(item = {}) {
   const sourceMode = String(item.sourceMode || '').toUpperCase();
+  const kindValue = String(item.kind || '').trim().toLowerCase();
+  const kind = ['consent', 'agreement', 'instruction', 'document'].includes(kindValue) ? kindValue : 'agreement';
   return {
     id: String(item.id || `document-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`),
     system: Boolean(item.system),
-    kind: item.kind === 'consent' ? 'consent' : 'agreement',
+    kind,
+    recordType: inferredRecordType(item),
+    signable: Boolean(item.signable || item.personConsent),
     title: String(item.title || 'Документ'),
     personConsent: Boolean(item.personConsent),
     required: Boolean(item.required),
@@ -40,6 +55,8 @@ function normalize(item = {}) {
     baseVersion: Math.max(0, Number(item.baseVersion || 0)),
     availableBaseVersion: Math.max(0, Number(item.availableBaseVersion || 0)),
     availableBookText: String(item.availableBookText || ''),
+    createdAt: String(item.createdAt || ''),
+    updatedAt: String(item.updatedAt || ''),
     attachment: item.attachment && typeof item.attachment === 'object' && !Array.isArray(item.attachment)
       ? clone(item.attachment)
       : null,
@@ -86,6 +103,8 @@ function makeDocumentFromPlatformBase(base, version = 1) {
     title: base.title,
     personConsent: base.personConsent,
     required: base.required,
+    recordType: 'template',
+    signable: base.personConsent,
     version,
     text: renderPlatformBaseText(base),
     sourceMode: 'BOOK',
@@ -229,12 +248,39 @@ export function saveDocuments(items = []) {
 export function saveDocument(document) {
   const items = getDocuments();
   const previous = items.find((item) => item.id === document?.id);
-  const changedText = previous && String(previous.text || '') !== String(document?.text || '');
-  const changedTitle = previous && String(previous.title || '') !== String(document?.title || '');
+  const changedText = Boolean(previous) && String(previous.text || '') !== String(document?.text || '');
+  const changedTitle = Boolean(previous) && String(previous.title || '') !== String(document?.title || '');
+  const changedContent = changedText || changedTitle;
+  const now = new Date().toISOString();
+
+  if (previous && changedContent) {
+    const previousAlreadyRecorded = getDocumentHistory().some((entry) =>
+      entry.documentId === previous.id
+      && Number(entry.documentVersion || 0) === Number(previous.version || 0)
+      && entry.snapshot
+    );
+    if (!previousAlreadyRecorded) {
+      recordDocumentHistory({
+        documentId: previous.id,
+        documentTitle: previous.title,
+        documentVersion: previous.version,
+        action: 'superseded',
+        source: previous.sourceMode === 'BOOK' ? 'admin-template' : 'custom',
+        snapshot: previous,
+      });
+    }
+  }
+
   const next = normalize({
     ...document,
-    sourceMode: previous?.sourceMode || document?.sourceMode || 'CUSTOM',
-    version: changedText ? Number(previous.version || 1) + 1 : Number(document?.version || previous?.version || 1),
+    sourceMode: previous && changedContent ? 'CUSTOM' : (previous?.sourceMode || document?.sourceMode || 'CUSTOM'),
+    recordType: document?.recordType || previous?.recordType || inferredRecordType(document),
+    signable: document?.signable ?? previous?.signable ?? Boolean(document?.personConsent),
+    version: changedContent
+      ? Number(previous?.version || document?.version || 1) + 1
+      : Number(document?.version || previous?.version || 1),
+    createdAt: previous?.createdAt || document?.createdAt || now,
+    updatedAt: changedContent || !previous ? now : (document?.updatedAt || previous?.updatedAt || ''),
   });
   const index = items.findIndex((item) => item.id === next.id);
   if (index >= 0) items[index] = next;
@@ -250,13 +296,13 @@ export function saveDocument(document) {
       source: next.sourceMode === 'BOOK' ? 'admin-template' : 'custom',
       snapshot: next,
     });
-  } else if (changedText || changedTitle) {
+  } else if (changedContent) {
     recordDocumentHistory({
       documentId: next.id,
       documentTitle: next.title,
       documentVersion: next.version,
       action: changedText ? 'version-created' : 'renamed',
-      source: next.sourceMode === 'BOOK' ? 'admin-template' : 'custom',
+      source: 'custom',
       snapshot: next,
     });
   }
@@ -264,11 +310,13 @@ export function saveDocument(document) {
   return next;
 }
 
-export function createDocument({ title = 'Новый документ', text = '' } = {}) {
+export function createDocument({ title = 'Новый шаблон', text = '' } = {}) {
   return saveDocument({
     id: `document-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     system: false,
     kind: 'agreement',
+    recordType: 'template',
+    signable: true,
     title,
     personConsent: false,
     required: false,
@@ -278,7 +326,37 @@ export function createDocument({ title = 'Новый документ', text = '
   });
 }
 
+export function createStandaloneDocument({
+  title = 'Новый документ',
+  text = '',
+  signable = false,
+  attachment = null,
+} = {}) {
+  return saveDocument({
+    id: `document-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    system: false,
+    kind: 'document',
+    recordType: 'document',
+    signable,
+    title,
+    personConsent: false,
+    required: false,
+    version: 1,
+    text,
+    sourceMode: 'CUSTOM',
+    attachment,
+  });
+}
+
+export function isTemplateDocument(item = {}) {
+  return inferredRecordType(item) === 'template';
+}
+
+export function isProfileDocument(item = {}) {
+  return inferredRecordType(item) === 'document';
+}
+
 export function resetDocumentTemplates() {
-  const savedGuides = getDocuments().filter((item) => item?.attachment?.type === 'RKN_GUIDE_PDF');
-  return saveDocuments([...buildTenantDocumentsFromPlatformBases(), ...savedGuides]);
+  const savedDocuments = getDocuments().filter((item) => inferredRecordType(item) === 'document');
+  return saveDocuments([...buildTenantDocumentsFromPlatformBases(), ...savedDocuments]);
 }

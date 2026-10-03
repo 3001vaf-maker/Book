@@ -1,192 +1,131 @@
-import { actionBlock, button, escapeHtml, field, folderList, iconButton, initViewNavigation, list, modal, mountModal, page, pageHeader, shortDateTime, textareaField, viewNavigation } from '../../ui/ui.js';
-import { downloadRknGuide } from '../../tenant-document-archive.js';
+import {
+  button,
+  documentTile,
+  documentTiles,
+  emptyState,
+  field,
+  initSegmentControls,
+  modal,
+  mountModal,
+  mountV2ZLayer,
+  openDocumentViewer,
+  openNotice,
+  page,
+  segmentControl,
+  selectFile,
+  shortDateTime,
+  shortDateTimeParts,
+  textareaField,
+  v2ListEntries,
+  v2ListEntry,
+  v2ZLayer,
+  workspaceHeaderContext,
+} from '../../ui/ui.js';
+import { readOnlyReceipt } from '../../ui/receipt/index.js';
 import { phonesMatch } from '../../core/phone/index.js';
 import { getAllPeople } from '../../core/people/data.js';
-import { createDocument, getDocuments, saveDocument } from './data.js';
+import {
+  createStandaloneDocument,
+  getDocuments,
+  isProfileDocument,
+  isTemplateDocument,
+  saveDocument,
+} from './data.js';
 import { getConsents } from './consents.js';
 import { getDocumentHistory } from './history.js';
 
-const HISTORY_VIEWS = [
-  { id: 'documents', label: 'Документы' },
-  { id: 'signatures', label: 'Подписания' },
+const VIEWS = [
+  { value: 'documents', label: 'Документы' },
+  { value: 'history', label: 'История' },
 ];
 
-let currentSection = 'root';
-let currentHistoryView = 'documents';
+const USER_PDF_FILE_LIMIT = 15 * 1024 * 1024;
+const USER_PDF_TOTAL_LIMIT = 30 * 1024 * 1024;
 
-function statusText(item) {
-  if (!item.personConsent) return 'Документ';
-  return item.required ? 'Обязательное согласие' : 'Необязательное согласие';
+let currentView = 'documents';
+
+function headerContext(title = 'Документы', c = null) {
+  return workspaceHeaderContext({
+    title,
+    a: {
+      kind: 'settings',
+      data: 'data-documents-settings',
+      aria: 'Настройки документов',
+    },
+    c,
+  });
 }
 
-function isAnyRknGuide(item) {
-  return item?.attachment?.type === 'RKN_GUIDE_PDF';
-}
-
-function isRknGuide(item) {
-  return isAnyRknGuide(item)
-    && item?.attachment?.templateKey === 'rkn-notification-guide-template'
+function isRknGuide(item = {}) {
+  return item?.attachment?.type === 'RKN_GUIDE_PDF'
     && Boolean(item?.attachment?.pdfBase64);
 }
 
+function isUserPdf(item = {}) {
+  return item?.attachment?.type === 'USER_PDF'
+    && Boolean(item?.attachment?.dataUrl);
+}
 
-function actionText(action) {
-  if (action === 'created') return 'Создан';
-  if (action === 'version-created') return 'Новая версия';
-  if (action === 'renamed') return 'Переименован';
-  return 'Изменён';
+function documentPdfDataUrl(item = {}) {
+  if (isUserPdf(item)) return String(item.attachment.dataUrl || '');
+  if (!isRknGuide(item)) return '';
+  const mimeType = String(item?.attachment?.mimeType || 'application/pdf');
+  return `data:${mimeType};base64,${String(item?.attachment?.pdfBase64 || '')}`;
+}
+
+function documentMoment(item = {}) {
+  const direct = item?.attachment?.generatedAt || item?.updatedAt || item?.createdAt || '';
+  if (direct) return direct;
+  const history = getDocumentHistory().find((entry) =>
+    entry.documentId === item.id
+    && Number(entry.documentVersion || 0) === Number(item.version || 0)
+  );
+  return history?.createdAt || '';
+}
+
+function currentProfileDocuments() {
+  const documents = getDocuments().filter(isProfileDocument);
+  const grouped = new Map();
+
+  documents.forEach((item) => {
+    if (item?.attachment?.legacyFormat === 'PRE_REGISTRY_TEMPLATE') return;
+    const key = isRknGuide(item)
+      ? `rkn:${String(item?.attachment?.templateKey || 'default')}`
+      : `document:${String(item.id || '')}`;
+    const current = grouped.get(key);
+    if (!current) {
+      grouped.set(key, item);
+      return;
+    }
+    const currentVersion = Number(current.version || 0);
+    const nextVersion = Number(item.version || 0);
+    if (nextVersion > currentVersion) grouped.set(key, item);
+    else if (nextVersion === currentVersion && Date.parse(documentMoment(item) || 0) > Date.parse(documentMoment(current) || 0)) {
+      grouped.set(key, item);
+    }
+  });
+
+  return [...grouped.values()].sort((left, right) =>
+    Date.parse(documentMoment(right) || 0) - Date.parse(documentMoment(left) || 0)
+  );
+}
+
+function templates() {
+  return getDocuments()
+    .filter(isTemplateDocument)
+    .sort((left, right) => String(left.title || '').localeCompare(String(right.title || ''), 'ru'));
 }
 
 function consentStateText(status) {
-  if (status === 'revoked') return 'Отозвано';
-  if (status === 'declined') return 'Не дано';
-  return 'Дано';
+  if (status === 'revoked') return 'Отозван';
+  if (status === 'declined') return 'Не подписан';
+  return 'Подписан';
 }
 
-function formatMoment(value) {
-  return shortDateTime(value, 'Дата не зафиксирована');
-}
-
-function legalNotice() {
-  return `<div class="modal-title"><h2>О шаблоне</h2><p>Для обработки персональных данных необходимо законное основание. Book даёт общий шаблон, но не гарантирует его соответствие именно вашей ситуации. Перед использованием рекомендуется обратиться к юристу.</p></div>`;
-}
-
-function openDocumentEditor(item, onSaved) {
-  const html = `<form data-document-form>
-    <div class="modal-title"><h2>${escapeHtml(item.title)}</h2><p>${escapeHtml(statusText(item))} · версия ${escapeHtml(item.version || 1)}</p></div>
-    <div class="compact-form">
-      ${field({ label: 'Название', name: 'documentTitle', value: item.title, required: true })}
-      ${textareaField({ label: 'Текст документа', name: 'documentText', value: item.text || '', placeholder: 'Введите текст документа' })}
-      <div class="modal-actions">${button('Сохранить', { type: 'submit' })}${button('О шаблоне', { type: 'button', className: 'ui-button--secondary', data: 'data-document-info' })}</div>
-    </div>
-  </form>`;
-  const m = mountModal(document.body, modal(html, { title: item.title, variant: 'large', surface: 'app' }));
-  if (!m) return;
-  m.querySelector('[data-document-info]')?.addEventListener('click', () => mountModal(document.body, modal(legalNotice(), { title: 'О шаблоне', variant: 'medium', surface: 'app' })));
-  m.querySelector('[data-document-form]')?.addEventListener('submit', (event) => {
-    event.preventDefault();
-    const title = m.querySelector('[name="documentTitle"]')?.value.trim() || '';
-    if (!title) return;
-    saveDocument({ ...item, title, text: m.querySelector('[name="documentText"]')?.value.trim() || '' });
-    m.remove();
-    onSaved?.();
-  });
-}
-
-function openCreateDocument(onCreated) {
-  const html = `<form data-document-create>
-    <div class="modal-title"><h2>Новый шаблон</h2></div>
-    <div class="compact-form">
-      ${field({ label: 'Название', name: 'documentTitle', placeholder: 'Название документа', required: true })}
-      ${textareaField({ label: 'Текст документа', name: 'documentText', placeholder: 'Текст можно добавить сейчас или позже' })}
-      <div class="modal-actions">${button('Создать', { type: 'submit' })}</div>
-    </div>
-  </form>`;
-  const m = mountModal(document.body, modal(html, { title: 'Новый шаблон', variant: 'medium', surface: 'app' }));
-  if (!m) return;
-  m.querySelector('[data-document-create]')?.addEventListener('submit', (event) => {
-    event.preventDefault();
-    const title = m.querySelector('[name="documentTitle"]')?.value.trim() || '';
-    if (!title) return;
-    createDocument({ title, text: m.querySelector('[name="documentText"]')?.value.trim() || '' });
-    m.remove();
-    onCreated?.();
-  });
-}
-
-function rootMarkup() {
-  return page([
-    pageHeader('Документы'),
-    folderList([
-      { title: 'Шаблоны', data: 'data-documents-section="templates"', aria: 'Открыть шаблоны документов' },
-      { title: 'Инструкции', data: 'data-documents-section="guides"', aria: 'Открыть сохранённые инструкции' },
-      { title: 'История', data: 'data-documents-section="history"', aria: 'Открыть историю документов' },
-    ]),
-    ''
-  ]);
-}
-
-function templatesMarkup() {
-  const documents = getDocuments().filter((item) => !isAnyRknGuide(item));
-  const rows = list({
-    items: documents.map((item) => ({
-      title: item.title,
-      secondary: `Версия ${item.version || 1}`,
-      interactive: true,
-      data: `data-document-id="${escapeHtml(item.id)}"`,
-      aria: `Открыть документ ${item.title}`
-    }))
-  });
-
-  return page([
-    `<div class="entity-page-header">${pageHeader('Шаблоны')}<div class="page-header-action">${iconButton('+', { className: 'icon-button--primary', data: 'data-add-document', aria: 'Добавить шаблон' })}</div></div>`,
-    rows,
-    ''
-  ]);
-}
-
-function openRknGuide(item) {
-  const generatedAt = item?.attachment?.generatedAt || '';
-  const html = `
-    <div class="modal-title">
-      <h2>${escapeHtml(item.title || 'Инструкция РКН')}</h2>
-      <p>PDF · версия ${escapeHtml(item.version || 1)} · ${escapeHtml(formatMoment(generatedAt))}</p>
-    </div>
-    <p style="font-size:18px;line-height:1.55;margin:0 0 18px">Это зафиксированная персональная версия инструкции, автоматически собранная из шаблона Реестра и ваших рабочих данных. Её можно скачать повторно в любое время.</p>
-    <p class="muted" data-rkn-guide-error></p>
-    <div class="modal-actions">
-      ${button('Скачать PDF', { data: 'data-rkn-guide-download' })}
-      ${button('Закрыть', { className: 'ui-button--secondary', data: 'data-rkn-guide-close' })}
-    </div>`;
-  const layer = mountModal(document.body, modal(html, { title: item.title || 'Инструкция РКН', variant: 'medium', surface: 'app' }));
-  if (!layer) return;
-  layer.querySelector('[data-rkn-guide-close]')?.addEventListener('click', () => layer.remove());
-  layer.querySelector('[data-rkn-guide-download]')?.addEventListener('click', async (event) => {
-    const control = event.currentTarget;
-    const errorNode = layer.querySelector('[data-rkn-guide-error]');
-    control.disabled = true;
-    if (errorNode) errorNode.textContent = '';
-    try {
-      await downloadRknGuide(item.id, item?.attachment?.fileName || 'rkn-guide.pdf');
-    } catch (error) {
-      if (errorNode) errorNode.textContent = error instanceof Error ? error.message : 'Не удалось скачать PDF';
-      control.disabled = false;
-    }
-  });
-}
-
-function guidesMarkup() {
-  const guides = getDocuments()
-    .filter(isRknGuide)
-    .sort((a, b) => Date.parse(b?.attachment?.generatedAt || 0) - Date.parse(a?.attachment?.generatedAt || 0));
-  const rows = guides.length
-    ? list({
-      items: guides.map((item) => ({
-        title: item.title,
-        secondary: [`PDF · версия ${item.version || 1}`, formatMoment(item?.attachment?.generatedAt)],
-        interactive: true,
-        data: `data-rkn-guide-id="${escapeHtml(item.id)}"`,
-        aria: `Открыть сохранённую инструкцию ${item.title}`,
-      })),
-    })
-    : '<div class="empty-state">Сохранённых инструкций пока нет.</div>';
-
-  return page([
-    pageHeader('Инструкции'),
-    '<p class="muted">Персональные инструкции Book формирует автоматически из актуального шаблона Реестра и ваших рабочих данных.</p>',
-    rows,
-    ''
-  ]);
-}
-
-function documentHistoryMarkup() {
-  const items = getDocumentHistory();
-  return list({
-    items: items.map((item) => ({
-      title: item.documentTitle,
-      secondary: [`${actionText(item.action)} · версия ${item.documentVersion}`, formatMoment(item.createdAt)],
-    }))
-  });
+function consentStateKind(status) {
+  if (status === 'revoked') return 'revoked';
+  if (status === 'declined') return 'pending';
+  return 'signed';
 }
 
 function consentPerson(item, people) {
@@ -208,97 +147,425 @@ function consentPerson(item, people) {
   return null;
 }
 
-function consentSubjectLabel(item, people) {
+function consentSubjectLabel(item, people = getAllPeople()) {
   const person = consentPerson(item, people);
   if (person) return [person.name, person.surname].filter(Boolean).join(' ') || person.phones?.[0] || 'Человек';
-  if (item.subjectType === 'CONTACT_POINT') return item.contactValue || 'Contact Point';
+  if (item.subjectType === 'CONTACT_POINT') return item.contactValue || 'Контакт';
   return 'Человек';
 }
 
 function signedDocumentSnapshot(item) {
-  const historical = getDocumentHistory().find((entry) => entry.documentId === item.documentId
+  const historical = getDocumentHistory().find((entry) =>
+    entry.documentId === item.documentId
     && Number(entry.documentVersion || 0) === Number(item.documentVersion || 0)
-    && entry.snapshot);
+    && entry.snapshot
+  );
   if (historical?.snapshot) return historical.snapshot;
-  return getDocuments().find((document) => document.id === item.documentId) || null;
+  return getDocuments().find((document) =>
+    document.id === item.documentId
+    && Number(document.version || 0) === Number(item.documentVersion || 0)
+  ) || null;
 }
 
-function openSignedDocument(item) {
-  const snapshot = signedDocumentSnapshot(item);
-  if (!snapshot) return;
-  const html = `
-    <div class="modal-title">
-      <h2>${escapeHtml(snapshot.title || item.documentId)}</h2>
-      <p>Версия ${escapeHtml(item.documentVersion || snapshot.version || 1)} · ${escapeHtml(consentStateText(item.status))}</p>
-    </div>
-    <div style="white-space:pre-wrap;line-height:1.55;padding:14px 0">${escapeHtml(snapshot.text || '')}</div>`;
-  mountModal(document.body, modal(html, { title: snapshot.title || 'Документ', variant: 'large', surface: 'app' }));
-}
-
-function signatureHistoryMarkup() {
-  const people = getAllPeople();
-  const items = [...getConsents()].sort((a, b) => Date.parse(b.eventAt || b.createdAt || 0) - Date.parse(a.eventAt || a.createdAt || 0));
-  return list({
-    items: items.map((item) => {
-      const snapshot = signedDocumentSnapshot(item);
-      const subject = consentSubjectLabel(item, people);
-      return {
-        title: snapshot?.title || item.documentId,
-        secondary: [`${subject} · ${consentStateText(item.status)}`, `Версия ${item.documentVersion} · ${formatMoment(item.eventAt || item.acceptedAt || item.revokedAt || item.createdAt)}`],
-        interactive: Boolean(snapshot),
-        data: snapshot ? `data-signed-document-event="${escapeHtml(item.id)}"` : '',
-        aria: snapshot ? `Открыть подписанный документ версии ${item.documentVersion}` : '',
-      };
-    })
+function openDocument(item) {
+  if (!item) return null;
+  return openDocumentViewer({
+    title: item.title || 'Документ',
+    version: item.version || '',
+    content: item.text || '',
+    pdfDataUrl: documentPdfDataUrl(item),
   });
 }
 
+function documentCard(item, data) {
+  const moment = documentMoment(item);
+  const type = isRknGuide(item) || isUserPdf(item) ? 'PDF' : 'Документ';
+  const date = moment ? shortDateTime(moment, '') : '';
+  return documentTile({
+    title: item.title || 'Документ',
+    version: item.version || 1,
+    meta: [type, date].filter(Boolean).join(' · '),
+    data,
+    aria: `Открыть документ ${item.title || 'Документ'}`,
+  });
+}
+
+function historyItems() {
+  return [...getConsents()].sort((left, right) =>
+    Date.parse(right.eventAt || right.createdAt || 0) - Date.parse(left.eventAt || left.createdAt || 0)
+  );
+}
+
+function historyCard(item) {
+  const snapshot = signedDocumentSnapshot(item);
+  const date = shortDateTime(item.eventAt || item.acceptedAt || item.revokedAt || item.createdAt, '');
+  return documentTile({
+    title: snapshot?.title || item.documentId || 'Документ',
+    version: item.documentVersion || snapshot?.version || 1,
+    meta: date,
+    status: consentStateText(item.status),
+    statusState: consentStateKind(item.status),
+    data: `data-signing-event="${String(item.id || '')}"`,
+    aria: `Открыть факт подписания ${snapshot?.title || item.documentId || 'документа'}`,
+  });
+}
+
+function documentsMarkup() {
+  const items = currentProfileDocuments();
+  if (!items.length) return emptyState('Документов пока нет', 'Добавьте документ через настройки раздела.');
+  return documentTiles(items.map((item) => documentCard(item, `data-profile-document="${String(item.id || '')}"`)));
+}
+
 function historyMarkup() {
-  return page([
-    pageHeader('История'),
-    viewNavigation({ views: HISTORY_VIEWS, activeView: currentHistoryView, ariaLabel: 'История документов' }),
-    currentHistoryView === 'documents' ? documentHistoryMarkup() : signatureHistoryMarkup(),
-    ''
+  const items = historyItems();
+  if (!items.length) return emptyState('Истории подписаний пока нет', 'Здесь появятся факты подписания документов.');
+  return documentTiles(items.map(historyCard));
+}
+
+function contentMarkup() {
+  return currentView === 'history' ? historyMarkup() : documentsMarkup();
+}
+
+function bindSettings(scope, root) {
+  scope.querySelector('[data-documents-settings]')?.addEventListener('click', () => openSettingsMenu(root));
+}
+
+function openSigningDetail(root, item) {
+  const snapshot = signedDocumentSnapshot(item);
+  if (!snapshot) {
+    openNotice({ title: 'Документ недоступен', message: 'Зафиксирован факт подписания, но снимок этой версии не найден.' });
+    return null;
+  }
+  const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'documents-signing-detail' }), { stack: true });
+  if (!layer) return null;
+
+  const person = consentSubjectLabel(item);
+  const parts = shortDateTimeParts(item.eventAt || item.acceptedAt || item.revokedAt || item.createdAt);
+  layer.innerHTML = page([
+    headerContext('Подписание'),
+    documentTiles([
+      documentTile({
+        title: snapshot.title || item.documentId || 'Документ',
+        version: item.documentVersion || snapshot.version || 1,
+        meta: shortDateTime(item.eventAt || item.createdAt, ''),
+        status: consentStateText(item.status),
+        statusState: consentStateKind(item.status),
+        data: 'data-signing-document-open',
+        aria: 'Открыть подписанную версию документа',
+      }),
+    ]),
+    readOnlyReceipt({
+      title: 'Подписание',
+      status: consentStateText(item.status),
+      date: parts.date,
+      time: parts.time,
+      items: [
+        { label: 'Кто', value: person },
+        { label: 'Документ', value: snapshot.title || item.documentId || 'Документ' },
+        { label: 'Версия', value: String(item.documentVersion || snapshot.version || 1) },
+        { label: 'Источник', value: item.source || '—' },
+      ],
+    }),
+  ]);
+
+  bindSettings(layer, root);
+  layer.querySelector('[data-signing-document-open]')?.addEventListener('click', () => openDocument(snapshot));
+  window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+  return layer;
+}
+
+function openTemplatesMenu(root) {
+  const items = templates();
+  const content = items.length
+    ? documentTiles(items.map((item) => documentTile({
+      title: item.title || 'Шаблон',
+      version: item.version || 1,
+      meta: item.sourceMode === 'CUSTOM' ? 'Ваш шаблон' : 'Системный шаблон',
+      data: `data-template-open="${String(item.id || '')}"`,
+      aria: `Открыть шаблон ${item.title || ''}`,
+    })))
+    : emptyState('Шаблонов пока нет', '');
+
+  const layer = mountModal(document.body, modal(content, {
+    title: 'Шаблоны',
+    variant: 'bottom',
+    surface: 'app',
+  }));
+  if (!layer) return null;
+
+  layer.querySelectorAll('[data-template-open]').forEach((control) => {
+    control.addEventListener('click', () => {
+      const item = getDocuments().find((document) => document.id === control.dataset.templateOpen);
+      if (!item) return;
+      layer.v2Close?.();
+      openTemplateEditor(root, item);
+    });
+  });
+  return layer;
+}
+
+function setPrimaryVisible(source, visible) {
+  if (!source) return;
+  source.dataset.v2PrimaryVisible = visible ? 'true' : 'false';
+  window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+}
+
+function renderTemplateEditor(layer, root, item) {
+  layer.innerHTML = page([
+    headerContext(item.title || 'Шаблон', {
+      label: 'Сохранить',
+      data: 'data-template-save data-v2-primary-visible="false"',
+      aria: 'Сохранить шаблон',
+    }),
+    `<form class="form-grid" data-template-form>
+      ${field({ label: 'Название', name: 'documentTitle', value: item.title || '', required: true })}
+      ${textareaField({ label: 'Текст документа', name: 'documentText', value: item.text || '', rows: 16, placeholder: 'Текст документа' })}
+    </form>`,
+  ]);
+
+  const form = layer.querySelector('[data-template-form]');
+  const primary = layer.querySelector('[data-template-save]');
+  const initialTitle = String(item.title || '');
+  const initialText = String(item.text || '');
+
+  const sync = () => {
+    const title = String(form?.querySelector('[name="documentTitle"]')?.value || '').trim();
+    const body = String(form?.querySelector('[name="documentText"]')?.value || '');
+    setPrimaryVisible(primary, Boolean(title) && (title !== initialTitle || body !== initialText));
+  };
+  form?.addEventListener('input', sync);
+  form?.addEventListener('change', sync);
+
+  primary?.addEventListener('click', () => {
+    const title = String(form?.querySelector('[name="documentTitle"]')?.value || '').trim();
+    if (!title) return;
+    const saved = saveDocument({
+      ...item,
+      title,
+      text: String(form?.querySelector('[name="documentText"]')?.value || ''),
+    });
+    renderMain(root);
+    renderTemplateEditor(layer, root, saved);
+  });
+
+  bindSettings(layer, root);
+  setPrimaryVisible(primary, false);
+}
+
+function openTemplateEditor(root, item) {
+  const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'documents-template-editor' }), { stack: true });
+  if (!layer) return null;
+  renderTemplateEditor(layer, root, item);
+  return layer;
+}
+
+function userPdfStoredBytes() {
+  return getDocuments().reduce((total, item) => {
+    if (!isUserPdf(item)) return total;
+    return total + Number(item?.attachment?.size || 0);
+  }, 0);
+}
+
+function signableSetting(checked = false) {
+  return v2ListEntries([
+    v2ListEntry({
+      title: 'Для подписания',
+      subtitle: 'Документ можно будет выбрать в чате',
+      interactive: false,
+      toggleData: 'data-document-signable',
+      toggleAria: 'Разрешить использовать документ для подписания',
+      toggleChecked: checked,
+    }),
   ]);
 }
 
-function bind(root, navigateBack) {
-  root.querySelectorAll('[data-documents-section]').forEach((item) => item.addEventListener('click', () => {
-    currentSection = item.dataset.documentsSection;
-    render(root, navigateBack);
-  }));
-  root.querySelector('[data-add-document]')?.addEventListener('click', () => openCreateDocument(() => render(root, navigateBack)));
-  root.querySelectorAll('[data-document-id]').forEach((row) => row.addEventListener('click', () => {
-    const item = getDocuments().find((document) => document.id === row.dataset.documentId);
-    if (item) openDocumentEditor(item, () => render(root, navigateBack));
-  }));
-  root.querySelectorAll('[data-rkn-guide-id]').forEach((row) => row.addEventListener('click', () => {
-    const item = getDocuments().find((document) => document.id === row.dataset.rknGuideId);
-    if (item) openRknGuide(item);
-  }));
-  root.querySelectorAll('[data-signed-document-event]').forEach((row) => row.addEventListener('click', () => {
-    const item = getConsents().find((event) => event.id === row.dataset.signedDocumentEvent);
-    if (item) openSignedDocument(item);
-  }));
-  if (currentSection === 'history') {
-    initViewNavigation(root, {
-      views: HISTORY_VIEWS,
-      activeView: currentHistoryView,
-      onChange: (view) => {
-        currentHistoryView = view;
-        render(root, navigateBack);
-      },
+function renderNewDocumentEditor(layer, root, draft = {}) {
+  let signable = Boolean(draft.signable);
+  const attachment = draft.attachment || null;
+  layer.innerHTML = page([
+    headerContext('Новый документ', {
+      label: 'Сохранить',
+      data: 'data-new-document-save data-v2-primary-visible="false"',
+      aria: 'Сохранить документ',
+    }),
+    attachment ? documentTiles([
+      documentTile({
+        title: draft.title || attachment.fileName || 'PDF',
+        version: 1,
+        meta: 'PDF',
+        interactive: false,
+      }),
+    ]) : '',
+    `<form class="form-grid" data-new-document-form>
+      ${field({ label: 'Название', name: 'documentTitle', value: draft.title || '', required: true, placeholder: 'Название документа' })}
+      ${attachment ? '' : textareaField({ label: 'Текст документа', name: 'documentText', value: draft.text || '', rows: 16, placeholder: 'Текст документа' })}
+      ${signableSetting(signable)}
+    </form>`,
+  ]);
+
+  const form = layer.querySelector('[data-new-document-form]');
+  const primary = layer.querySelector('[data-new-document-save]');
+  const toggle = layer.querySelector('[data-document-signable]');
+
+  const sync = () => {
+    const title = String(form?.querySelector('[name="documentTitle"]')?.value || '').trim();
+    const body = String(form?.querySelector('[name="documentText"]')?.value || '').trim();
+    setPrimaryVisible(primary, Boolean(title && (attachment || body)));
+  };
+
+  toggle?.addEventListener('click', () => {
+    signable = !signable;
+    toggle.setAttribute('aria-pressed', signable ? 'true' : 'false');
+    toggle.classList.toggle('is-on', signable);
+    toggle.querySelector('.app-setting-toggle__switch')?.classList.toggle('is-on', signable);
+  });
+  form?.addEventListener('input', sync);
+  form?.addEventListener('change', sync);
+
+  primary?.addEventListener('click', () => {
+    const title = String(form?.querySelector('[name="documentTitle"]')?.value || '').trim();
+    const body = String(form?.querySelector('[name="documentText"]')?.value || '');
+    if (!title || (!attachment && !body.trim())) return;
+    createStandaloneDocument({
+      title,
+      text: body,
+      signable,
+      attachment,
     });
-  }
+    layer.v2Close?.();
+    currentView = 'documents';
+    renderMain(root);
+  });
+
+  bindSettings(layer, root);
+  sync();
 }
 
-export function render(root, navigateBack = () => {}) {
-  root.innerHTML = currentSection === 'templates'
-    ? templatesMarkup()
-    : currentSection === 'guides'
-      ? guidesMarkup()
-      : currentSection === 'history'
-        ? historyMarkup()
-        : rootMarkup();
-  bind(root, navigateBack);
+function openNewDocumentEditor(root, draft = {}) {
+  const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'documents-new-editor' }), { stack: true });
+  if (!layer) return null;
+  renderNewDocumentEditor(layer, root, draft);
+  return layer;
+}
+
+async function choosePdf(root) {
+  const file = await selectFile({ accept: 'application/pdf,.pdf' }).catch(() => null);
+  if (!file) return;
+  if (file.type && file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+    openNotice({ title: 'Нужен PDF', message: 'Выберите файл в формате PDF.' });
+    return;
+  }
+  if (file.size > USER_PDF_FILE_LIMIT) {
+    openNotice({ title: 'Файл слишком большой', message: 'Сейчас один PDF может быть не больше 15 МБ.' });
+    return;
+  }
+  if (userPdfStoredBytes() + file.size > USER_PDF_TOTAL_LIMIT) {
+    openNotice({ title: 'Недостаточно места', message: 'Для текущего серверного архива суммарный объём загруженных PDF ограничен 30 МБ.' });
+    return;
+  }
+  openNewDocumentEditor(root, {
+    title: file.name.replace(/\.pdf$/i, '') || 'Документ',
+    attachment: {
+      type: 'USER_PDF',
+      fileName: file.name || 'document.pdf',
+      mimeType: file.type || 'application/pdf',
+      size: file.size,
+      dataUrl: file.dataUrl,
+      uploadedAt: new Date().toISOString(),
+    },
+  });
+}
+
+function openAddDocumentMenu(root) {
+  const layer = mountModal(document.body, modal(
+    `<div class="compact-form">
+      ${button('Создать документ', { data: 'data-create-text-document', variant: 'outline' })}
+      ${button('Загрузить PDF', { data: 'data-upload-pdf-document' })}
+    </div>`,
+    {
+      title: 'Добавить документ',
+      variant: 'bottom',
+      surface: 'app',
+      className: 'modal--form-sheet',
+    },
+  ));
+  if (!layer) return null;
+
+  layer.querySelector('[data-create-text-document]')?.addEventListener('click', () => {
+    layer.v2Close?.();
+    openNewDocumentEditor(root);
+  });
+  layer.querySelector('[data-upload-pdf-document]')?.addEventListener('click', () => {
+    layer.v2Close?.();
+    void choosePdf(root);
+  });
+  return layer;
+}
+
+function openSettingsMenu(root) {
+  const layer = mountModal(document.body, modal(
+    `<div class="compact-form">
+      ${button('Шаблоны', { data: 'data-open-document-templates', variant: 'outline' })}
+      ${button('Добавить документ', { data: 'data-add-profile-document' })}
+    </div>`,
+    {
+      title: 'Документы',
+      variant: 'bottom',
+      surface: 'app',
+      className: 'modal--form-sheet',
+    },
+  ));
+  if (!layer) return null;
+
+  layer.querySelector('[data-open-document-templates]')?.addEventListener('click', () => {
+    layer.v2Close?.();
+    openTemplatesMenu(root);
+  });
+  layer.querySelector('[data-add-profile-document]')?.addEventListener('click', () => {
+    layer.v2Close?.();
+    openAddDocumentMenu(root);
+  });
+  return layer;
+}
+
+function bindMain(root) {
+  bindSettings(root, root);
+
+  initSegmentControls(root);
+  root.querySelector('[name="documentsView"]')?.addEventListener('change', (event) => {
+    currentView = event.target.value === 'history' ? 'history' : 'documents';
+    renderMain(root);
+  });
+
+  root.querySelectorAll('[data-profile-document]').forEach((control) => {
+    control.addEventListener('click', () => {
+      const item = currentProfileDocuments().find((document) => document.id === control.dataset.profileDocument);
+      if (item) openDocument(item);
+    });
+  });
+
+  root.querySelectorAll('[data-signing-event]').forEach((control) => {
+    control.addEventListener('click', () => {
+      const item = getConsents().find((event) => event.id === control.dataset.signingEvent);
+      if (item) openSigningDetail(root, item);
+    });
+  });
+}
+
+function renderMain(root) {
+  root.innerHTML = page([
+    headerContext('Документы'),
+    segmentControl(VIEWS, {
+      value: currentView,
+      name: 'documentsView',
+      aria: 'Документы и история подписаний',
+    }),
+    `<section data-documents-content>${contentMarkup()}</section>`,
+  ]);
+  bindMain(root);
+  window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+}
+
+export function render(root) {
+  renderMain(root);
 }

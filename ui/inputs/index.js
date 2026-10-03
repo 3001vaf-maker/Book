@@ -184,6 +184,44 @@ export function selectPhotoFile({ accept = 'image/*' } = {}) {
 }
 
 
+export function selectFile({ accept = '' } = {}) {
+  return new Promise((resolve, reject) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = String(accept || '');
+    input.hidden = true;
+    document.body.appendChild(input);
+
+    const cleanup = () => input.remove();
+    input.addEventListener('change', async () => {
+      const file = input.files?.[0];
+      if (!file) {
+        cleanup();
+        resolve(null);
+        return;
+      }
+      try {
+        const dataUrl = await photoFileDataUrl(file);
+        resolve({
+          name: String(file.name || ''),
+          type: String(file.type || ''),
+          size: Number(file.size || 0),
+          dataUrl,
+        });
+      } catch (error) {
+        reject(error);
+      } finally {
+        cleanup();
+      }
+    }, { once: true });
+    input.addEventListener('cancel', () => {
+      cleanup();
+      resolve(null);
+    }, { once: true });
+    input.click();
+  });
+}
+
 export function photoField({
   name = 'photo',
   value = '',

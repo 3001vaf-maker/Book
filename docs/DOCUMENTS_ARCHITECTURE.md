@@ -111,3 +111,30 @@ For scale and auditability, consent history must behave as append-only business 
 `Notifications / SMS / Telegram` must first require active `pdn-consent` for every new `SYSTEM`, `SERVICE`, `DIRECT` or `MARKETING` communication. Only `MARKETING` additionally requests the advertising consent represented by `messages-consent`.
 
 Canonical names: **DocumentArchive → PlatformDocumentArchive / TenantDocumentArchive; PlatformDocumentArchive → DocumentRegistry; TenantDocumentArchive → Documents; events → PlatformConsentEvent / TenantConsentEvent.**
+
+## 9. User-facing Documents UI contract
+
+The internal archive remains the legal/audit owner, but the ordinary profile UI must not expose the archive structure.
+
+User-facing `Documents` has one Z1 switch:
+- `Документы` — only current profile-owned document instances;
+- `История` — consent/signing facts, represented by the same shared document UI.
+
+Header ownership:
+- A — document settings;
+- B — `Документы`;
+- C — empty on Z1 and appears as `Сохранить` only when an editable Z2 has unsaved changes;
+- D — shared Chat.
+
+A opens the shared bottom X with:
+- `Шаблоны`;
+- `Добавить документ`.
+
+Templates are editable sources. Editing a platform-provided template creates a tenant-owned custom current version; prior versions and snapshots remain internal and are not duplicated in the ordinary UI.
+
+A profile-owned document is not a template. It may be a generated document, a user-created text document, or an uploaded PDF. Only the current document is shown in Z1; historical versions remain in the archive.
+
+Every document manifestation uses the shared `documentTile()` owner. Context changes only the displayed metadata/status. Opening document content always uses the shared technical viewer: black background, white paper, close control only.
+
+Signing history shows the document cover first. Opening an event shows the same document cover plus the canonical `readOnlyReceipt` signing fact. The signed snapshot is opened from that document cover. People/Chat may later project the same shared document UI; they must not create another document-card owner.
+
