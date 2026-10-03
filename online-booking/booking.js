@@ -150,7 +150,7 @@ async function loadAccountTerms(state) {
   return state.accountTerms;
 }
 
-function openLegalDocument(document = {}) {
+function openConsentDocument(document = {}) {
   return openDocumentViewer({
     title: document?.title || 'Документ',
     version: document?.version || 1,
@@ -217,7 +217,7 @@ function renderLegalSticker(root, state) {
   root.querySelector('[data-booking-legal-u-close]')?.addEventListener('click', closeLegal);
 
   root.querySelector('[data-legal-platform-document]')?.addEventListener('click', () => {
-    openLegalDocument({
+    openConsentDocument({
       title: state.accountTerms?.title || 'Условия использования',
       version: state.accountTerms?.version || 1,
       content: state.accountTerms?.content || '',
@@ -230,7 +230,7 @@ function renderLegalSticker(root, state) {
   root.querySelectorAll('[data-booking-document]').forEach((node) => node.addEventListener('click', () => {
     const document = tenantDocuments.find((item) => String(item.id) === String(node.dataset.bookingDocument));
     if (!document) return;
-    openLegalDocument({
+    openConsentDocument({
       title: document.title || legalTitle(document),
       version: document.version || 1,
       content: document.text || '',
@@ -1280,7 +1280,7 @@ function renderGlobalClientLegal(root, state) {
   })}</section>`;
   root.querySelector('[data-global-legal-u-close]')?.addEventListener('click', () => renderGlobalClientDetails(root, state));
   root.querySelector('[data-global-platform-document]')?.addEventListener('click', () => {
-    openLegalDocument(document);
+    openConsentDocument(document);
   });
   root.querySelector('[data-global-platform-toggle]')?.addEventListener('click', () => {
     state.accountTermsAccepted = !state.accountTermsAccepted;
