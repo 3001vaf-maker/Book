@@ -356,6 +356,8 @@ function syncWorkspacePrimarySource(surface, source) {
 }
 
 function activeWorkspaceSurface(surface) {
+  const qLayers = [...document.querySelectorAll('[data-v2-q="true"] .v2-layer')];
+  if (qLayers.length) return qLayers.at(-1);
   const layers = [...app.querySelectorAll('[data-v2-z-layer]')];
   return layers.at(-1) || surface;
 }
