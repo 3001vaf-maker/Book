@@ -221,7 +221,7 @@ function editorDraftSettings(draft) {
   });
 }
 
-function renderProcedureEditor(layer, baseRoot, existing = null, { onChanged = () => {} } = {}) {
+function renderProcedureEditor(layer, baseRoot, existing = null, { onChanged = () => {}, onSaved = () => {} } = {}) {
   const draft = initialProcedure(existing);
   const title = existing?.name || 'Новая процедура';
   layer.innerHTML = page([
@@ -243,6 +243,7 @@ function renderProcedureEditor(layer, baseRoot, existing = null, { onChanged = (
     existing,
     draft,
     onSaved: (saved) => {
+      onSaved(saved);
       if (existing) renderProcedureOverview(layer, baseRoot, saved.id, { onChanged });
       else {
         layer.v2Close?.();
@@ -253,10 +254,10 @@ function renderProcedureEditor(layer, baseRoot, existing = null, { onChanged = (
   notifyServiceContext();
 }
 
-export function openProcedureEditor(root, existing = null, { onChanged = () => {} } = {}) {
+export function openProcedureEditor(root, existing = null, { onChanged = () => {}, onSaved = () => {} } = {}) {
   const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'service-procedure-editor-layer' }), { stack: true });
   if (!layer) return null;
-  renderProcedureEditor(layer, root, existing, { onChanged });
+  renderProcedureEditor(layer, root, existing, { onChanged, onSaved });
   return layer;
 }
 
