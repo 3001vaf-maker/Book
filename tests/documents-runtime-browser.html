@@ -205,7 +205,11 @@ ok(root.querySelector('[data-segment-option="documents"]')?.classList.contains('
 ok(root.querySelectorAll('[data-document-group="core"] [data-profile-document]').length === 1, 'Fixture core rail must contain the available core tenant document');
 ok(root.querySelector('[data-document-group="core"] [data-document-layout="rail"]'), 'Core documents must use the horizontal rail layout');
 ok(root.querySelectorAll('[data-document-group="other"] [data-profile-document]').length === 3, 'Other section must keep user document and both independent RKN helper files');
-ok(root.textContent.includes('Старая версия РКН') && root.textContent.includes('Текущая версия РКН'), 'Separate helper PDFs must not collapse into a version chain');
+ok(
+  root.textContent.includes('Инструкция по уведомлению Роскомнадзора')
+  && root.textContent.includes('Инструкция по изменению сведений Роскомнадзора'),
+  'Separate helper PDFs must remain visible as independent files'
+);
 ok(root.textContent.includes('Согласие на обработку персональных данных'), 'Core tenant document must remain visible in Documents Z1');
 ok([...root.querySelectorAll('.document-tile')].every((node) => getComputedStyle(node).borderRadius === '0px'), 'Document tile corners must be straight');
 
