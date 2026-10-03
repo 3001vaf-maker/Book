@@ -210,7 +210,7 @@ function rootDefinition(section) {
 
 function sectionAllowed(section) {
   if (section === 'chat') return canUseBookCapability('chat.access');
-  if (section === 'finance' || section === 'journal' || section === 'settings') {
+  if (section === 'finance' || section === 'settings') {
     return secondaryItems(section).length > 0;
   }
   const item = rootDefinition(section);
