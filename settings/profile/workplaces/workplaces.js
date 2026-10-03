@@ -1,7 +1,6 @@
-import { actionBlock, button, collectLinks, colorPicker, escapeHtml, field, initColorPickers, initLinks, initPhotoField, initTimePickers, links, mountEntityCardConstructor, mountModal, mountV2ZLayer, modal, openColorPickerAction, openSharedProfileSettingsMenu, openTimeRangeAction, page, phoneField, photoField, select, setSharedProfilePrimary, textareaField, timePicker, v2ZLayer, workspaceHeaderContext } from '../../../ui/ui.js';
+import { actionBlock, button, collectLinks, colorPicker, escapeHtml, field, initColorPickers, initLinks, initPhotoField, initTimePickers, links, mountModal, mountV2ZLayer, modal, openColorPickerAction, openSharedProfileSettingsMenu, openTimeRangeAction, page, phoneField, photoField, select, setSharedProfilePrimary, textareaField, timePicker, v2ZLayer, workspaceHeaderContext } from '../../../ui/ui.js';
 import { getProfile } from '../data.js';
 import { deleteWorkplace as deleteWorkplaceData, getWorkplaceReferenceData, getWorkplaces, upsertWorkplace } from './data.js';
-import { workplaceCardAppearance, workplaceCardFields } from '../card-presentation.js';
 
 function workplaceDefaults(){
   return getWorkplaceReferenceData().defaults||{};
@@ -211,47 +210,7 @@ function workplaceDraftFromForm(root,existing=null){
   };
 }
 
-function openWorkplaceAppearance(root,existing=null,{onSaved=()=>{}}={}){
-  const draft=workplaceDraftFromForm(root,existing);
-  const profile=getProfile();
-  const layer=mountV2ZLayer(root,v2ZLayer(page([
-    workspaceHeaderContext({
-      title:'Вид',
-      a:{
-        kind:'avatar',
-        image:draft.photo||'',
-        imagePosition:`${Number(draft.photoCropX||50)}% ${Number(draft.photoCropY||50)}%`,
-        initials:(draft.name||'?').slice(0,1).toUpperCase(),
-        aria:'Настройки пространства',
-      },
-    }),
-    '<div data-workplace-card-constructor></div>',
-  ]),{className:'v2-workplace-appearance-layer'}),{stack:true});
-  const host=layer?.querySelector('[data-workplace-card-constructor]');
-  if(!host)return layer;
-  mountEntityCardConstructor(host,{
-    appearance:workplaceCardAppearance(draft),
-    fields:workplaceCardFields(draft,profile),
-    photo:draft.photo||'',
-    photoPosition:`${Number(draft.photoCropX||50)}% ${Number(draft.photoCropY||50)}%`,
-    onSave:async({appearance,photo})=>{
-      setWorkplaceDraft(root,'workplacePhoto',photo);
-      setWorkplaceDraft(root,'workplaceCardAppearance',JSON.stringify(appearance));
-      syncWorkplaceAvatar(root,photo);
-      let saved=existing;
-      if(existing){
-        const collected=collectWorkplaceForm(root,existing);
-        if(!collected.valid)throw new Error('Сначала заполните название, город и цвет.');
-        saved=await upsertWorkplace(collected.item);
-      }
-      layer.v2Close?.();
-      onSaved(saved);
-    },
-  });
-  return layer;
-}
-
-export function openWorkplaceSettingsMenu(root,existing=null,{onDeleted=()=>{},onAppearanceSaved=()=>{}}={}){
+export function openWorkplaceSettingsMenu(root,existing=null,{onDeleted=()=>{}}={}){
   const form=root.querySelector('[data-workplace-form]');
   if(!form)return null;
   const data=()=>new FormData(form);
@@ -279,11 +238,6 @@ export function openWorkplaceSettingsMenu(root,existing=null,{onDeleted=()=>{},o
     },
   ];
   const actions=[
-    {
-      id:'appearance',
-      label:'Вид',
-      onSelect:()=>openWorkplaceAppearance(root,existing,{onSaved:onAppearanceSaved}),
-    },
     {
       id:'color',
       label:'Выбор цвета',
