@@ -92,7 +92,22 @@ A `FILE` is rejected by the signing service even if a caller submits its ID dire
 
 The visible **История** tab is built only from these events. Technical version creation, renames, helper generation and file uploads are not displayed there.
 
-## 7. Profile Documents UI
+## 7. PDN consent grey zone
+
+For the current `pdn-consent`, revocation does not delete the account, client data, booking/request history, notifications or consent history.
+
+When the current PDN consent is absent or revoked:
+- login remains available;
+- consent documents and consent management remain available;
+- booking/request history created before revocation remains readable;
+- notifications created before revocation remain readable and may be marked read;
+- creating a new booking/request is blocked;
+- Chat is unavailable until the current PDN consent is accepted again;
+- new direct/service/marketing delivery follows the existing consent guards.
+
+Data deletion/anonymisation is a separate process and is not triggered by consent revocation.
+
+## 8. Profile Documents UI
 
 Z1 has one switch: **Документы | История**.
 
@@ -122,7 +137,7 @@ History contains signing events only. The same document may appear many times be
 
 Opening an event shows the signed document cover plus the canonical `readOnlyReceipt` with who/what/version/time/status/source. Clicking the cover opens the immutable signed snapshot.
 
-## 8. End-user boundary
+## 9. End-user boundary
 
 End-user consent screens receive projections only for tenant documents that actually participate in consent/signing.
 
@@ -130,7 +145,7 @@ Helper files and ordinary files never participate.
 
 The end user does not own document versions or signing history. End-user actions write immutable `TenantConsentEvent` facts in the tenant document domain.
 
-## 9. Ownership chain
+## 10. Ownership chain
 
 ```text
 Platform Registry
