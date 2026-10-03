@@ -2,34 +2,12 @@ import { queueOperationalDataset } from '../business-persistence.js';
 
 let bookingSettingsState = null;
 
-export const BOOKING_SHAPES = Object.freeze([
-  { value: 'soft', label: 'Мягкие углы' },
-  { value: 'round', label: 'Округлые' },
-  { value: 'straight', label: 'Прямые' },
-  { value: 'cut', label: 'Скошенные' },
-]);
-
-export const BOOKING_CHOICE_STYLES = Object.freeze([
-  { value: 'cards', label: 'Карточки' },
-  { value: 'compact', label: 'Компактные карточки' },
-  { value: 'list', label: 'Лаконичный список' },
-]);
-
 export const BOOKING_SLOT_STEPS = Object.freeze([5, 10, 15, 30, 60]);
 
 export const DEFAULT_BOOKING_SETTINGS = Object.freeze({
   welcomeTitle: 'Рады видеть вас',
   welcomeText: 'Выберите удобное время для встречи — запись займёт всего пару минут.',
-  slotStep: 15,
-  theme: Object.freeze({
-    backgroundMode: 'solid',
-    backgroundStart: '#F5F5F3',
-    backgroundEnd: '#F5F5F3',
-    dark: '#3B302B',
-    light: '#E7E1DB',
-    shape: 'soft',
-    choiceStyle: 'cards',
-  }),
+  slotStep: 15
 });
 
 
@@ -40,8 +18,8 @@ export function normalizeBookingSettings(value = {}) {
   return {
     welcomeTitle: String(source.welcomeTitle || defaults.welcomeTitle).trim().slice(0, 90),
     welcomeText: String(source.welcomeText || defaults.welcomeText).trim().slice(0, 500),
-    slotStep: BOOKING_SLOT_STEPS.includes(slotStep) ? slotStep : defaults.slotStep,
-    theme: { ...defaults.theme },
+    slotStep: BOOKING_SLOT_STEPS.includes(slotStep) ? slotStep : defaults.slotStep
+
   };
 }
 
