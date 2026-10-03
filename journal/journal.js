@@ -35,18 +35,11 @@ function formatRubles(value = 0) {
   return `${amount.toLocaleString('ru-RU').replaceAll('\u00a0', ' ')} р.`;
 }
 
-export function journalNavigationItems() {
-  return views
-    .filter((view) => canUseBookCapability(view.capability))
-    .map(({ id, label }) => ({ id, label }));
-}
-
 export function renderJournal(root, options = {}) {
   const availableViews = views.filter((view) => canUseBookCapability(view.capability));
   let activeView = availableViews.some((view) => view.id === options.initialView)
     ? options.initialView
     : (availableViews[0]?.id || 'day');
-  const externalNavigation = Boolean(options.externalNavigation);
   let listMode = 'flow';
   const workplaces = getWorkplaces();
   const context = getWorkplaceContext(workplaces, { scope: JOURNAL_CONTEXT_SCOPE });
@@ -199,10 +192,10 @@ export function renderJournal(root, options = {}) {
   const renderView = () => {
     if (!root.isConnected) return;
     const listModeNavigation = activeView === 'list'
-      ? `<div class="journal-list-mode-navigation" data-journal-list-mode-navigation>${viewNavigation({ views: listModes, activeView: listMode, className: 'segment-control--two-equal', ariaLabel: 'Режим списка' })}</div>`
+      ? `<div class="journal-list-mode-navigation" data-journal-list-mode-navigation>${viewNavigation({ views: listModes, activeView: listMode, ariaLabel: 'Режим списка' })}</div>`
       : '';
     const viewClass = activeView === 'list' ? ' class="journal-list-viewport"' : '';
-    const primaryNavigation = externalNavigation ? '' : viewNavigation({ views: availableViews, activeView });
+    const primaryNavigation = viewNavigation({ views: availableViews, activeView });
     root.innerHTML = `${workspaceHeaderContext({
       title: activeView === 'day' ? journalTitle() : 'Журнал',
       a: {
@@ -249,13 +242,11 @@ export function renderJournal(root, options = {}) {
         },
       });
     }
-    if (!externalNavigation) {
-      initViewNavigation(root, { views, activeView, onChange: (nextView) => {
-        activeView = nextView;
-        options.onViewChange?.(activeView);
-        renderView();
-      } });
-    }
+    initViewNavigation(root, { views: availableViews, activeView, onChange: (nextView) => {
+      activeView = nextView;
+      options.onViewChange?.(activeView);
+      renderView();
+    } });
   };
 
   let refreshQueued = false;
@@ -284,6 +275,3 @@ export function renderJournal(root, options = {}) {
   };
 }
 
-export function renderJournalView(root, view = 'day', options = {}) {
-  return renderJournal(root, { ...options, initialView: view, externalNavigation: true });
-}

@@ -468,6 +468,7 @@ function syncGlobalProfileHeader(root, state, handlers) {
       label: accountName(state),
       image: accountPhoto(state),
       data: 'data-account-profile-settings',
+      settingsTag: true,
       aria: 'Настройки профиля',
     },
     b: accountName(state),
@@ -769,7 +770,7 @@ async function renderGlobalMessages(root, state, handlers) {
 
 async function renderGlobalProfile(root, state, handlers) {
   const header = v2Header({
-    a: { kind: 'avatar', label: accountName(state), image: accountPhoto(state), data: 'data-account-profile-settings', aria: 'Настройки профиля' },
+    a: { kind: 'avatar', label: accountName(state), image: accountPhoto(state), data: 'data-account-profile-settings', settingsTag: true, aria: 'Настройки профиля' },
     b: accountName(state),
     d: { kind: 'chat', data: 'data-account-open-chat-root', aria: 'Чат' },
   });
@@ -804,7 +805,7 @@ async function renderGlobalProfileSettings(root, state, handlers) {
 
 function globalHomeHeader(state) {
   return v2Header({
-    a: { kind: 'avatar', label: accountName(state), image: accountPhoto(state), data: 'data-account-profile-settings', aria: 'Настройки профиля' },
+    a: { kind: 'avatar', label: accountName(state), image: accountPhoto(state), data: 'data-account-profile-settings', settingsTag: true, aria: 'Настройки профиля' },
     b: 'Обзор',
     d: { kind: 'chat', data: 'data-account-open-chat-root', aria: 'Чат' },
   });
@@ -1094,7 +1095,7 @@ async function renderGlobalContacts(root, state, handlers) {
   const relationships = Array.isArray(state.relationships) ? state.relationships : [];
   const searchable = relationships.length > 15;
   const header = v2Header({
-    a: { kind: 'avatar', label: accountName(state), image: accountPhoto(state), data: 'data-account-profile-settings', aria: 'Настройки контактов' },
+    a: { kind: 'avatar', label: accountName(state), image: accountPhoto(state), data: 'data-account-profile-settings', settingsTag: true, aria: 'Настройки контактов' },
     b: 'Контакты',
     d: { kind: 'chat', data: 'data-account-open-chat-root', aria: 'Чат' },
   });
@@ -1181,7 +1182,7 @@ function contactHeaderMarkup(relationship) {
   const profile = relationship?.context?.profile || {};
   const title = relationshipTitle(relationship);
   return v2Header({
-    a: { kind: 'avatar', label: title, image: String(profile.photo || ''), data: 'data-global-contact-settings', aria: 'Настройки' },
+    a: { kind: 'avatar', label: title, image: String(profile.photo || ''), data: 'data-global-contact-settings', settingsTag: true, aria: 'Настройки' },
     b: title,
     c: { kind: 'text', label: 'Записаться', data: 'data-global-contact-booking', aria: 'Записаться' },
     d: { kind: 'chat', data: 'data-global-contact-chat', aria: 'Чат' },
@@ -1272,7 +1273,7 @@ function openGlobalContactHistoryLayer(root, state, handlers, relationship, requ
   if (!layer) return null;
 
   setGlobalAccountHeader(root, v2Header({
-    a: { kind: 'avatar', label: title, image: String(profile.photo || ''), data: 'data-global-contact-settings', aria: 'Настройки' },
+    a: { kind: 'avatar', label: title, image: String(profile.photo || ''), data: 'data-global-contact-settings', settingsTag: true, aria: 'Настройки' },
     b: workplaceName(state, request),
     c: canRepeat ? { kind: 'text', label: 'Повторить', data: 'data-global-contact-booking', aria: 'Повторить процедуру' } : null,
     d: { kind: 'chat', data: 'data-global-contact-chat', aria: 'Чат' },
@@ -1300,7 +1301,7 @@ function openGlobalContactWorkplaceLayer(root, state, handlers, relationship, wo
   const title = relationshipTitle(relationship);
   const showHeader = () => {
     setGlobalAccountHeader(root, v2Header({
-      a: { kind: 'avatar', label: title, image: String(profile.photo || ''), data: 'data-global-contact-settings', aria: 'Настройки' },
+      a: { kind: 'avatar', label: title, image: String(profile.photo || ''), data: 'data-global-contact-settings', settingsTag: true, aria: 'Настройки' },
       b: String(workplace.name || title),
       c: { kind: 'text', label: 'Записаться', data: 'data-global-contact-booking', aria: 'Записаться' },
       d: { kind: 'chat', data: 'data-global-contact-chat', aria: 'Чат' },
@@ -1412,7 +1413,7 @@ async function renderGlobalHistoryDetail(root, state, handlers) {
   const canRepeat = requestProcedures(request).length > 0;
 
   const header = v2Header({
-    a: { kind: 'avatar', label: title, image: String(profile.photo || ''), data: 'data-global-history-contact-settings', aria: 'Настройки' },
+    a: { kind: 'avatar', label: title, image: String(profile.photo || ''), data: 'data-global-history-contact-settings', settingsTag: true, aria: 'Настройки' },
     b: workplaceName(state, request),
     c: canRepeat ? { kind: 'text', label: 'Записаться', data: 'data-global-history-repeat', aria: 'Записаться снова' } : null,
     d: { kind: 'chat', data: 'data-global-history-chat', aria: 'Чат' },

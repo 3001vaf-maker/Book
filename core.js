@@ -1,6 +1,6 @@
 import { renderPeople } from './core/people/people.js';
 import { financeNavigationItems, renderFinanceSection } from './core/finance/index.js';
-import { journalNavigationItems, renderJournalView } from './journal/journal.js';
+import { renderJournal } from './journal/journal.js';
 import { renderTimetable } from './timetable/timetable.js';
 import { settingsNavigationItems, renderSettingsSection } from './settings/settings.js';
 import { render as renderProfile } from './settings/profile/profile.js';
@@ -44,9 +44,9 @@ const state = {
   navigationLevel: 'f',
   navigationEnterZ: false,
   chatPersonKey: '',
+  journalView: 'day',
   secondary: {
     finance: 'cash',
-    journal: 'day',
     settings: 'service',
   },
 };
@@ -210,7 +210,7 @@ function rootDefinition(section) {
 
 function sectionAllowed(section) {
   if (section === 'chat') return canUseBookCapability('chat.access');
-  if (section === 'finance' || section === 'journal' || section === 'settings') {
+  if (section === 'finance' || section === 'settings') {
     return secondaryItems(section).length > 0;
   }
   const item = rootDefinition(section);
@@ -255,7 +255,6 @@ function activeRootSection() {
 
 function secondaryItems(section = activeRootSection()) {
   if (section === 'finance') return financeNavigationItems();
-  if (section === 'journal') return journalNavigationItems();
   if (section === 'settings') return settingsNavigationItems();
   return [];
 }
@@ -389,6 +388,7 @@ function syncWorkspaceHeader(surface) {
       image: aSource.dataset.workspaceAImage || '',
       imagePosition: aSource.dataset.workspaceAImagePosition || '',
       initials: aSource.dataset.workspaceAInitials || '',
+      settingsTag: aSource.dataset.workspaceASettingsTag === 'true',
       data: 'data-v2-workspace-a',
       aria: aSource.getAttribute('aria-label') || sourceText(aSource, 'Контекст раздела'),
       disabled: Boolean(aSource.disabled),
@@ -432,11 +432,10 @@ function renderActiveWorkspaceSurface(surface) {
   });
   if (section === 'timetable') return renderTimetable(surface);
   if (section === 'journal') {
-    return renderJournalView(surface, ensureSecondary('journal'), {
+    return renderJournal(surface, {
+      initialView: state.journalView || 'day',
       onViewChange: (view) => {
-        if (state.secondary.journal === view) return;
-        state.secondary.journal = view;
-        renderWorkspace();
+        state.journalView = view;
       },
     });
   }

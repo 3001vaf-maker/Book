@@ -983,13 +983,15 @@ ok(Boolean(shell()?.querySelector('[data-v2-workspace-a]')), 'DDS A was not rest
 
 await openF(3,'dds');
 await tapAndOpen(fDeck(), fCard('journal'), 15, 'journal');
-ok(shell()?.classList.contains('is-e-open'), 'Journal did not open real E deck');
-ok(Boolean(eCard('day')), 'Journal E Day missing');
-ok(Boolean(eCard('list')), 'Journal E List missing');
-
-await tapAndOpen(eDeck(), eCard('day'), 16, 'journal-day');
-ok(!shell()?.classList.contains('is-deck-open'), 'Journal Day selection did not enter Z');
+ok(!shell()?.classList.contains('is-deck-open'), 'Journal F must enter Z directly without E');
 await wait(80);
+const journalViewNavigation = shell()?.querySelector('[data-view-navigation]');
+ok(Boolean(journalViewNavigation), 'Journal Z must contain Shared Day/Month/List switch');
+ok(Boolean(journalViewNavigation?.querySelector('[data-view="day"]')), 'Journal Z Day switch missing');
+ok(Boolean(journalViewNavigation?.querySelector('[data-view="month"]')), 'Journal Z Month switch missing');
+ok(Boolean(journalViewNavigation?.querySelector('[data-view="list"]')), 'Journal Z List switch missing');
+ok(journalViewNavigation?.querySelector('[data-view="day"]')?.getAttribute('aria-selected') === 'true',
+  'Journal Z must open in Day view by default');
 ok(shell()?.querySelector('.v2-header__title')?.textContent.trim() === 'Студия Тест',
   'Journal Day B must be selected workplace');
 ok(Boolean(shell()?.querySelector('[data-v2-workspace-a]')), 'Journal Day A/settings missing');
@@ -1096,11 +1098,14 @@ await wait(25);
 recordZ?.v2Close?.();
 await wait(35);
 
-await openF(4,'journal-day');
-await tapAndOpen(fDeck(), fCard('journal'), 17, 'journal-again');
-ok(shell()?.classList.contains('is-e-open'), 'Journal did not reopen E after Day');
-await tapAndOpen(eDeck(), eCard('list'), 18, 'journal-list');
-ok(!shell()?.classList.contains('is-deck-open'), 'Journal List selection did not enter Z');
+mark('journal-list-switch');
+const journalListSwitch = shell()?.querySelector('[data-view-navigation] [data-view="list"]');
+ok(Boolean(journalListSwitch), 'Journal List switch missing in Z');
+journalListSwitch?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(80);
+ok(shell()?.querySelector('[data-view-navigation] [data-view="list"]')?.getAttribute('aria-selected') === 'true',
+  'Journal List switch did not become active');
+ok(Boolean(shell()?.querySelector('[data-journal-view]')), 'Journal List view container missing after switch');
 
 await openF(5,'journal-list');
 await tapAndOpen(fDeck(), fCard('profile'), 19, 'profile');
@@ -1110,7 +1115,7 @@ ok(!shell()?.classList.contains('is-deck-open'), 'Profile F without E did not en
 for (const [index,id] of ['people','finance','journal','profile','settings','people'].entries()) {
   await openF(20 + index, 'repeat-' + id);
   await tapAndOpen(fDeck(), fCard(id), 40 + index, 'repeat-' + id);
-  if (id === 'finance' || id === 'journal' || id === 'settings') {
+  if (id === 'finance' || id === 'settings') {
     ok(shell()?.classList.contains('is-e-open'), id + ' repeat did not enter E');
     // Collapse E by its own geometry before continuing to avoid choosing an arbitrary child.
     const deck = eDeck();
@@ -1121,6 +1126,9 @@ for (const [index,id] of ['people','finance','journal','profile','settings','peo
     ok(!shell()?.classList.contains('is-e-open'), id + ' E did not collapse by right gesture');
     // F is still open; choose a root without E to return to Z deterministically.
     await tapAndOpen(fDeck(), fCard('people'), 90 + index, id + '-to-people');
+  } else if (id === 'journal') {
+    ok(!shell()?.classList.contains('is-deck-open'), 'journal repeat must enter Z directly without E');
+    ok(Boolean(shell()?.querySelector('[data-view-navigation] [data-view="day"]')), 'journal repeat lost Day/Month/List switch');
   }
 }
 
