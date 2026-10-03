@@ -22,6 +22,7 @@ import {
   workspaceHeaderContext,
 } from '../../ui/ui.js';
 import { readOnlyReceipt } from '../../ui/receipt/index.js';
+import { escapeHtml } from '../../ui/utils/escape-html.js';
 import { phonesMatch } from '../../core/phone/index.js';
 import { getAllPeople } from '../../core/people/data.js';
 import {
@@ -402,11 +403,11 @@ function openSigningDetail(item) {
 
   return mountModal(document.body, modal(
     `<div class="documents-signing-info" data-signing-info>
-      <strong class="documents-signing-info__title">${title}</strong>
-      <span class="documents-signing-info__version">Версия ${version}</span>
-      <strong class="documents-signing-info__person">${person}</strong>
-      <span class="documents-signing-info__moment">${moment}</span>
-      <span class="documents-signing-info__status">${consentStateText(item.status)}</span>
+      <strong class="documents-signing-info__title">${escapeHtml(String(title))}</strong>
+      <span class="documents-signing-info__version">Версия ${escapeHtml(String(version))}</span>
+      <strong class="documents-signing-info__person">${escapeHtml(String(person))}</strong>
+      <span class="documents-signing-info__moment">${escapeHtml(String(moment))}</span>
+      <span class="documents-signing-info__status">${escapeHtml(consentStateText(item.status))}</span>
     </div>`,
     {
       title: 'Информация о подписании',
