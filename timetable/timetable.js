@@ -83,6 +83,7 @@ export function renderTimetable(root) {
       a: {
         kind: 'logo',
         label: String(summary.days),
+        settingsTag: !inactiveA,
         data: inactiveA ? '' : 'data-timetable-settings-open',
         aria: inactiveA ? `Рабочих дней: ${summary.days}` : `Настройки графика. Рабочих дней: ${summary.days}`,
         disabled: inactiveA,
