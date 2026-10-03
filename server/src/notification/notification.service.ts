@@ -99,8 +99,9 @@ function normalizeChannels(value: unknown) {
   return [...new Set(source.map((item) => text(item).toUpperCase()).filter((item) => ROUTING_CHANNELS.has(item)))];
 }
 
-function channelsWithPush(value: unknown) {
-  return ['PUSH', ...normalizeChannels(value).filter((channel) => channel !== 'PUSH')];
+function policyChannels(value: unknown, { defaultPush = false } = {}) {
+  const channels = normalizeChannels(value);
+  return channels.length || !defaultPush ? channels : ['PUSH'];
 }
 
 @Injectable()
@@ -179,7 +180,7 @@ export class NotificationService {
     return {
       eventType,
       mode: normalizeMode(row?.mode),
-      channels: channelsWithPush(row?.channels),
+      channels: policyChannels(row?.channels, { defaultPush: !row }),
     };
   }
 
@@ -209,7 +210,7 @@ export class NotificationService {
     const type = text(eventType);
     if (!type) throw new BadRequestException('Не указан тип уведомления');
     const mode = normalizeMode(input?.mode);
-    const channels = channelsWithPush(input?.channels);
+    const channels = policyChannels(input?.channels);
     const id = randomUUID();
     const channelsJson = JSON.stringify(channels);
     await this.prisma.$executeRaw`
