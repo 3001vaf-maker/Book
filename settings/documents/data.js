@@ -7,17 +7,6 @@ let platformContextState = { profile: {} };
 
 const PLATFORM_DOCUMENT_IDS = ['pdn-agreement', 'pdn-consent', 'messages-consent'];
 
-function attachmentType(item = {}) {
-  return String(item?.attachment?.type || '').trim().toUpperCase();
-}
-
-function inferredRecordType(item = {}) {
-  const explicit = String(item?.recordType || '').trim().toLowerCase();
-  if (explicit === 'document' || explicit === 'template') return explicit;
-  if (attachmentType(item) === 'RKN_GUIDE_PDF' || attachmentType(item) === 'USER_PDF') return 'document';
-  return 'template';
-}
-
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -43,7 +32,6 @@ function normalize(item = {}) {
     id: String(item.id || `document-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`),
     system: Boolean(item.system),
     kind,
-    recordType: inferredRecordType(item),
     signable: Boolean(item.signable || item.personConsent),
     title: String(item.title || 'Документ'),
     personConsent: Boolean(item.personConsent),
@@ -103,7 +91,6 @@ function makeDocumentFromPlatformBase(base, version = 1) {
     title: base.title,
     personConsent: base.personConsent,
     required: base.required,
-    recordType: 'template',
     signable: base.personConsent,
     version,
     text: renderPlatformBaseText(base),
@@ -148,12 +135,13 @@ export function buildTenantDocumentsFromPlatformBases() {
 }
 
 export function reconcileTenantDocumentsWithPlatformBases(items = [], history = []) {
-  const current = (Array.isArray(items) ? items : []).map(normalize);
+  const sourceItems = Array.isArray(items) ? items : [];
+  const current = sourceItems.map(normalize);
   const nextHistory = Array.isArray(history) ? clone(history) : [];
-  let changed = false;
+  let changed = sourceItems.some((item) => Object.prototype.hasOwnProperty.call(item || {}, 'recordType'));
 
   if (!platformBasesState.length || !contextReady()) {
-    return { documents: current, history: nextHistory, changed: false };
+    return { documents: current, history: nextHistory, changed };
   }
 
   for (const documentId of PLATFORM_DOCUMENT_IDS) {
@@ -274,7 +262,6 @@ export function saveDocument(document) {
   const next = normalize({
     ...document,
     sourceMode: previous && changedContent ? 'CUSTOM' : (previous?.sourceMode || document?.sourceMode || 'CUSTOM'),
-    recordType: document?.recordType || previous?.recordType || inferredRecordType(document),
     signable: document?.signable ?? previous?.signable ?? Boolean(document?.personConsent),
     version: changedContent
       ? Number(previous?.version || document?.version || 1) + 1
@@ -310,20 +297,8 @@ export function saveDocument(document) {
   return next;
 }
 
-export function createDocument({ title = 'Новый шаблон', text = '' } = {}) {
-  return saveDocument({
-    id: `document-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    system: false,
-    kind: 'agreement',
-    recordType: 'template',
-    signable: true,
-    title,
-    personConsent: false,
-    required: false,
-    version: 1,
-    text,
-    sourceMode: 'CUSTOM',
-  });
+export function createDocument({ title = 'Новый документ', text = '' } = {}) {
+  return createStandaloneDocument({ title, text, signable: true });
 }
 
 export function createStandaloneDocument({
@@ -336,7 +311,6 @@ export function createStandaloneDocument({
     id: `document-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     system: false,
     kind: 'document',
-    recordType: 'document',
     signable,
     title,
     personConsent: false,
@@ -348,15 +322,7 @@ export function createStandaloneDocument({
   });
 }
 
-export function isTemplateDocument(item = {}) {
-  return inferredRecordType(item) === 'template';
-}
-
-export function isProfileDocument(item = {}) {
-  return inferredRecordType(item) === 'document';
-}
-
 export function resetDocumentTemplates() {
-  const savedDocuments = getDocuments().filter((item) => inferredRecordType(item) === 'document');
+  const savedDocuments = getDocuments().filter((item) => !PLATFORM_DOCUMENT_IDS.includes(item.id));
   return saveDocuments([...buildTenantDocumentsFromPlatformBases(), ...savedDocuments]);
 }
