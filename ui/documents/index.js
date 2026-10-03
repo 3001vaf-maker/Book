@@ -60,7 +60,7 @@ export function documentTile({
     ? String(statusState)
     : '';
   const lines = titleLines(title);
-  const titleMarkup = lines.map((line) => `<span>${text(line)}</span>`).join('');
+  const titleMarkup = lines.map((line) => `<span>${text(line)}</span>`).join(' ');
   const statusSymbol = state === 'signed' ? '✓' : state === 'revoked' ? '×' : state === 'pending' ? '—' : '';
   const statusMarkup = status
     ? `<span class="document-tile__status${state ? ` is-${state}` : ''}" aria-label="${text(status)}" title="${text(status)}"><span class="document-tile__status-mark" aria-hidden="true">${statusSymbol}</span></span>`
