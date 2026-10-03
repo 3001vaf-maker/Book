@@ -261,8 +261,6 @@ const settingsControllers = [
   'settings/documents/documents.js',
   'settings/loyalty/loyalty.js',
   'settings/tags/tags.js',
-  'settings/service/procedures/procedures.js',
-  'settings/service/products/products.js',
 ];
 for (const controller of settingsControllers) {
   const file = join(root, controller);
