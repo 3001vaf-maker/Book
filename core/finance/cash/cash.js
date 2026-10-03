@@ -11,8 +11,8 @@ import {
   initDatePickers,
   initPhotoField,
   modal,
-  mountEntityCardConstructor,
   mountModal,
+  openEntityCardAppearanceQ,
   mountV2ZLayer,
   openNotice,
   openSharedProfileSettingsMenu,
@@ -51,7 +51,8 @@ import {
   saveWallet as saveWalletData,
   updateWallet,
 } from './data.js';
-import { cashEntityCardAppearance, cashEntityCardFields, walletCardAppearance, walletCardFields } from './card-presentation.js';
+import { cashEntityCardAppearance, cashEntityCardFields, cashEntityCardPhoto, walletCardAppearance, walletCardFields, walletCardPhoto } from './card-presentation.js';
+import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../../card-appearance-templates.js';
 import {
   getInvestmentEntities,
   getLoanEntities,
@@ -149,7 +150,8 @@ function cashContext() {
   const investmentOnly = allowedInvestmentRoles().length > 0
     && !canUseBookCapability('finance.cash.access')
     && !canUseBookCapability('finance.special.access');
-  const hasSettings = financeOperationGroups({ groups: ['income-expense', 'transfer'] }).length > 0;
+  const hasSettings = cashAppearanceTypeOptions().length > 0
+    || financeOperationGroups({ groups: ['income-expense', 'transfer'] }).length > 0;
   return workspaceHeaderContext({
     title: investmentOnly ? 'Инвестиции' : 'Касса',
     a: hasSettings ? {
@@ -168,11 +170,11 @@ function cashContext() {
 function walletContext(wallet, title = wallet?.name || 'Касса') {
   return workspaceHeaderContext({
     title,
-    a: {
+    a: wallet && !wallet.system ? {
       kind: 'settings',
       data: 'data-wallet-settings',
       aria: `Настройки ${wallet?.name || 'кассы'}`,
-    },
+    } : null,
   });
 }
 
@@ -192,7 +194,7 @@ function renderWalletCard(wallet) {
   return entityVisualCard({
     appearance: walletCardAppearance(wallet),
     fields: walletCardFields(wallet, balance),
-    image: wallet.photo || '',
+    image: walletCardPhoto(wallet),
     interactive: true,
     data: `data-wallet="${escapeHtml(wallet.id)}"`,
     aria: `Открыть кошелёк ${wallet.name}`,
@@ -218,7 +220,7 @@ function renderCashEntityCard(entity, kind) {
   return entityVisualCard({
     appearance: cashEntityCardAppearance(entity, kind),
     fields: cashEntityCardFields(entity, balance, kind, loanState?.endDate || '', investment),
-    image: entity.photo || '',
+    image: cashEntityCardPhoto(entity, kind),
     interactive: true,
     data: `data-finance-entity-type="${escapeHtml(kind)}" data-finance-entity-id="${escapeHtml(entity.id)}"`,
     aria: `Открыть ${label} ${entity.name}`,
@@ -288,18 +290,145 @@ function openCashCreateMenu(root) {
   return layer;
 }
 
+function cashAppearanceTypeOptions() {
+  return [
+    canUseBookCapability('finance.cash.access') ? { value: 'wallet', label: 'Кошелёк' } : null,
+    canUseBookCapability('finance.special.access') ? { value: 'loan', label: 'Займ' } : null,
+    allowedInvestmentRoles().length > 0 ? { value: 'investment', label: 'Инвестиция' } : null,
+  ].filter(Boolean);
+}
+
+function cashAppearanceEntities(type) {
+  if (type === 'wallet') return getWallets();
+  if (type === 'loan') return getLoanEntities();
+  if (type === 'investment') return getInvestmentEntities();
+  return [];
+}
+
+function cashAppearanceTargetOptions(type) {
+  const labels = {
+    wallet: 'Все кошельки',
+    loan: 'Все займы',
+    investment: 'Все инвестиции',
+  };
+  return [
+    { value: 'all', label: labels[type] || 'Все карты' },
+    ...cashAppearanceEntities(type).map((item) => ({
+      value: String(item.id || ''),
+      label: String(item.name || (type === 'wallet' ? 'Кошелёк' : type === 'loan' ? 'Займ' : 'Инвестиция')),
+    })),
+  ];
+}
+
+function cashAppearanceEditor(type, target) {
+  const values = cashAppearanceEntities(type);
+  const selected = target === 'all'
+    ? (values[0] || null)
+    : (values.find((item) => String(item.id || '') === String(target || '')) || values[0] || null);
+  const template = getCardAppearanceTemplate(type);
+
+  if (type === 'wallet') {
+    const wallet = selected || { id: '', name: 'Кошелёк', photo: '', cardAppearance: {} };
+    return {
+      appearance: target === 'all' && template?.appearance ? template.appearance : walletCardAppearance(wallet),
+      fields: walletCardFields(wallet, wallet.id ? getWalletBalance(wallet.id) : 0),
+      photo: target === 'all' ? String(template?.photo || wallet.photo || '') : walletCardPhoto(wallet),
+      photoPosition: String(template?.photoPosition || '50% 50%'),
+    };
+  }
+
+  const entity = selected || {
+    id: '',
+    name: type === 'loan' ? 'Займ' : 'Инвестиция',
+    photo: '',
+    cardAppearance: {},
+    investmentTerms: type === 'investment' ? { role: allowedInvestmentRoles()[0]?.value || 'raise' } : undefined,
+  };
+  const movements = entity.id ? getFinanceEntityMovements(type, entity.id) : [];
+  if (type === 'loan') {
+    const state = calculateLoanState(entity, movements);
+    return {
+      appearance: target === 'all' && template?.appearance ? template.appearance : cashEntityCardAppearance(entity, type),
+      fields: cashEntityCardFields(entity, state.totalDue, type, state.endDate),
+      photo: target === 'all' ? String(template?.photo || entity.photo || '') : cashEntityCardPhoto(entity, type),
+      photoPosition: String(template?.photoPosition || '50% 50%'),
+    };
+  }
+
+  const state = calculateInvestmentState(entity, movements);
+  const terms = normalizeInvestmentTerms(entity);
+  const value = state.role === 'raise' ? state.remainingObligation : state.result;
+  return {
+    appearance: target === 'all' && template?.appearance ? template.appearance : cashEntityCardAppearance(entity, type),
+    fields: cashEntityCardFields(entity, value, type, '', {
+      roleLabel: investmentRoleLabel(terms.role),
+      balanceLabel: state.role === 'raise' ? 'Обязательства' : 'Результат',
+      balanceValue: value,
+    }),
+    photo: target === 'all' ? String(template?.photo || entity.photo || '') : cashEntityCardPhoto(entity, type),
+    photoPosition: String(template?.photoPosition || '50% 50%'),
+  };
+}
+
+async function saveCashAppearance({ type, target, appearance, photo, editor }) {
+  if (target === 'all') {
+    saveCardAppearanceTemplate(type, {
+      appearance,
+      photo,
+      photoPosition: editor?.photoPosition || '50% 50%',
+    });
+    if (type === 'wallet') {
+      cashAppearanceEntities(type).forEach((wallet) => updateWallet(wallet.id, { cardAppearance: {} }));
+    } else if (type === 'loan') {
+      cashAppearanceEntities(type).forEach((entity) => saveLoanEntity({ ...entity, cardAppearance: {}, updatedAt: new Date().toISOString() }));
+    } else if (type === 'investment') {
+      cashAppearanceEntities(type).forEach((entity) => saveInvestmentEntity({ ...entity, cardAppearance: {}, updatedAt: new Date().toISOString() }));
+    }
+    return;
+  }
+
+  const current = cashAppearanceEntities(type).find((item) => String(item.id || '') === String(target || ''));
+  if (!current) return;
+  if (type === 'wallet') {
+    updateWallet(current.id, { photo, cardAppearance: appearance });
+  } else if (type === 'loan') {
+    saveLoanEntity({ ...current, photo, cardAppearance: appearance, updatedAt: new Date().toISOString() });
+  } else if (type === 'investment') {
+    saveInvestmentEntity({ ...current, photo, cardAppearance: appearance, updatedAt: new Date().toISOString() });
+  }
+}
+
+function openCashAppearanceQ(root) {
+  const types = cashAppearanceTypeOptions();
+  return openEntityCardAppearanceQ(root, {
+    title: 'Вид',
+    typeLabel: 'Тип карты',
+    typeOptions: types,
+    initialType: types[0]?.value || 'wallet',
+    targetLabel: 'Карта',
+    initialTarget: 'all',
+    targetOptions: cashAppearanceTargetOptions,
+    resolve: cashAppearanceEditor,
+    save: saveCashAppearance,
+    onSaved: () => renderList(root),
+  });
+}
+
 function openCashSettings(root) {
   const groups = ['income-expense', 'transfer'];
-  const actions = financeOperationGroups({ groups }).length
-    ? [{
-        id: 'financial-operations',
-        label: 'Финансовые операции',
-        onSelect: () => openFinanceOperations(root, {
-          groups,
-          onSaved: () => renderList(root),
-        }),
-      }]
+  const actions = cashAppearanceTypeOptions().length
+    ? [{ id: 'appearance', label: 'Вид', onSelect: () => openCashAppearanceQ(root) }]
     : [];
+  if (financeOperationGroups({ groups }).length) {
+    actions.push({
+      id: 'financial-operations',
+      label: 'Финансовые операции',
+      onSelect: () => openFinanceOperations(root, {
+        groups,
+        onSaved: () => renderList(root),
+      }),
+    });
+  }
   if (!actions.length) return null;
   return openSharedProfileSettingsMenu({
     title: 'Касса',
@@ -567,48 +696,6 @@ function openFinanceEntityZ2(root, type, id) {
   const layer = mountV2ZLayer(root, v2ZLayer(''), { stack: true });
   if (!layer) return null;
   renderFinanceEntityLayer(root, layer, type, entity.id);
-  return layer;
-}
-
-function openFinanceEntityAppearance(root, entityLayer, type, entity) {
-  const layer = mountV2ZLayer(entityLayer, v2ZLayer(page([
-    financeEntityContext(entity, type),
-    '<div data-finance-entity-card-constructor></div>',
-  ])), { stack: true });
-  const host = layer?.querySelector('[data-finance-entity-card-constructor]');
-  if (!host) return layer;
-  mountEntityCardConstructor(host, {
-    appearance: cashEntityCardAppearance(entity, type),
-    fields: (() => {
-      const movements = getFinanceEntityMovements(type, entity.id);
-      if (type === 'loan') {
-        const state = calculateLoanState(entity, movements);
-        return cashEntityCardFields(entity, state.totalDue, type, state.endDate);
-      }
-      const state = calculateInvestmentState(entity, movements);
-      const terms = normalizeInvestmentTerms(entity);
-      const value = state.role === 'raise' ? state.remainingObligation : state.result;
-      return cashEntityCardFields(entity, value, type, '', {
-        roleLabel: investmentRoleLabel(terms.role),
-        balanceLabel: state.role === 'raise' ? 'Обязательства' : 'Результат',
-        balanceValue: value,
-      });
-    })(),
-    photo: entity.photo || '',
-    onSave: async ({ appearance, photo }) => {
-      const next = {
-        ...entity,
-        photo,
-        cardAppearance: appearance,
-        updatedAt: new Date().toISOString(),
-      };
-      if (type === 'loan') saveLoanEntity(next);
-      else saveInvestmentEntity(next);
-      layer.v2Close?.();
-      renderFinanceEntityLayer(root, entityLayer, type, entity.id);
-      renderList(root);
-    },
-  });
   return layer;
 }
 
@@ -1222,11 +1309,7 @@ function openFinanceEntitySettings(root, entityLayer, type, entity) {
     renderList(root);
   };
 
-  const actions = [{
-    id: 'appearance',
-    label: 'Вид',
-    onSelect: () => openFinanceEntityAppearance(root, entityLayer, type, entity),
-  }];
+  const actions = [];
 
   if (type === 'loan') {
     actions.push({
@@ -1381,28 +1464,6 @@ function openWalletZ2(root, walletId) {
   renderWalletLayer(root, layer, wallet.id);
 }
 
-function openWalletAppearance(root, walletLayer, walletId) {
-  const wallet = getWallets().find((item) => String(item.id) === String(walletId));
-  if (!wallet) return null;
-  const layer = mountV2ZLayer(walletLayer, v2ZLayer(page([
-    walletContext(wallet, 'Вид'),
-    '<div data-wallet-card-constructor></div>',
-  ])), { stack: true });
-  const host = layer?.querySelector('[data-wallet-card-constructor]');
-  if (!host) return layer;
-  mountEntityCardConstructor(host, {
-    appearance: walletCardAppearance(wallet),
-    fields: walletCardFields(wallet, getWalletBalance(wallet.id)),
-    photo: wallet.photo || '',
-    onSave: async ({ appearance, photo }) => {
-      updateWallet(wallet.id, { photo, cardAppearance: appearance });
-      layer.v2Close?.();
-      renderWalletLayer(root, walletLayer, wallet.id);
-    },
-  });
-  return layer;
-}
-
 function confirmDeleteWallet(root, walletLayer, wallet) {
   if (Math.abs(getWalletBalance(wallet.id)) > 0.009) {
     openNotice({ message: 'Сначала переведите остаток из этой кассы.' });
@@ -1445,11 +1506,7 @@ function confirmHardDeleteWallet(root, walletLayer, wallet) {
 }
 
 async function openWalletSettings(root, walletLayer, wallet) {
-  const actions = [{
-    id: 'appearance',
-    label: 'Вид',
-    onSelect: () => openWalletAppearance(root, walletLayer, wallet.id),
-  }];
+  const actions = [];
 
   if (!wallet.system) {
     actions.push({
@@ -1470,6 +1527,7 @@ async function openWalletSettings(root, walletLayer, wallet) {
   }
 
   if (!walletLayer.isConnected) return null;
+  if (!actions.length) return null;
   return openSharedProfileSettingsMenu({
     title: wallet.name,
     actions,
