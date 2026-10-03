@@ -51,6 +51,7 @@ function normalize(value: unknown) {
   return {
     documents: Array.isArray(source.documents) ? clone(source.documents) : [],
     history: Array.isArray(source.history) ? clone(source.history) : [],
+    helpers: clone(objectValue(source.helpers)),
   };
 }
 
@@ -157,6 +158,24 @@ export class TenantDocumentArchiveService {
     return { dataset, value: current[dataset as keyof typeof current] };
   }
 
+  async rememberRknGuideState(tenantId: string, inputValue: unknown) {
+    const state = await this.prisma.tenantDocumentArchive.findUnique({ where: { tenantId } });
+    if (!state?.migrationVerifiedAt) throw new ConflictException('Архив документов ещё не готов');
+    const current = normalize(state.data);
+    const input = objectValue(inputValue);
+    current.helpers = objectValue(current.helpers);
+    current.helpers.rkn = {
+      snapshot: clone(objectValue(input.snapshot)),
+      documentId: text(input.documentId),
+      generatedAt: text(input.generatedAt),
+    };
+    await this.prisma.tenantDocumentArchive.update({
+      where: { tenantId },
+      data: { data: json(current) },
+    });
+    return clone(current.helpers.rkn);
+  }
+
   async saveRknGuide(tenantId: string, inputValue: unknown) {
     const state = await this.prisma.tenantDocumentArchive.findUnique({ where: { tenantId } });
     if (!state?.migrationVerifiedAt) throw new ConflictException('Архив документов ещё не готов');
@@ -248,6 +267,12 @@ export class TenantDocumentArchiveService {
       },
     };
     current.documents.push(document);
+    current.helpers = objectValue(current.helpers);
+    current.helpers.rkn = {
+      snapshot: clone(snapshot),
+      documentId: document.id,
+      generatedAt,
+    };
 
     await this.prisma.tenantDocumentArchive.update({
       where: { tenantId },
