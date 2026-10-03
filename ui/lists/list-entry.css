@@ -4,3 +4,6 @@
 .journal-list-record--active .list-entry__content{background:#EFFFBB}.journal-list-record--paid .list-entry__content{background:#DDE8D7}.journal-list-record--no-show .list-entry__content{background:#F1DADA}.journal-list-record--deleted .list-entry__content{background:#FDD2D2;color:#EB4C42}.journal-list-record--deleted .list-entry__main small,.journal-list-record--deleted .list-entry__right small{color:#EB4C42}@media (max-width:360px){.list-entry__content{grid-template-columns:minmax(0,1fr) auto auto;gap:7px;padding-left:12px;padding-right:8px}.list-entry__right{max-width:115px}.list-entry__right strong{font-size:13px}.list-entry__right small{font-size:12px}.list-entry__action,.list-entry__delete{width:36px;height:40px;flex-basis:36px}.list-entry--columns .list-entry__content{padding-left:10px;padding-right:10px}.list-entry__columns{grid-template-columns:minmax(0,1.2fr) minmax(72px,.85fr) minmax(74px,.85fr);gap:6px}.list-entry__column{font-size:11px}}
 
 .list-entry__toggle{width:48px;height:40px;border:0;padding:0;display:grid;place-items:center;background:transparent;color:inherit;cursor:pointer}.list-entry__toggle:disabled{opacity:.5;cursor:default}
+
+.list-entries.is-reordering{user-select:none;-webkit-user-select:none}
+.list-entry.is-reordering{z-index:4;transform:scale(.985);box-shadow:0 10px 24px rgba(0,0,0,.16);cursor:grabbing}
