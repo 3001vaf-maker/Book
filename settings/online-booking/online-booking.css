@@ -1,4 +1,6 @@
 .online-booking-workspace-screen{display:grid;align-content:start;gap:14px}
 .online-booking-link-stack{display:grid;gap:14px}
-.online-booking-info-row{display:flex;justify-content:flex-end;align-items:end;min-height:44px}
-.online-booking-info-row .icon-button{width:44px;height:44px;font-size:18px}
+.online-booking-copy-row{grid-template-columns:minmax(0,1fr) 24px;gap:7px}
+.online-booking-copy-row .small-action-button{align-self:center}
+.online-booking-setting{display:grid;gap:6px}
+.online-booking-inline-label{display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--text-secondary);font-size:13px}
