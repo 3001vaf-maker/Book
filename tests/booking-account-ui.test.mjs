@@ -337,10 +337,11 @@ assert.match(consentSettings, /revokeAccountConsent\(scopeTenantId, consent\.doc
 assert.match(consentSettings, /Отозвать согласие/);
 assert.match(consentSettings, /Отмена/);
 assert.match(consentSettings, /variant: 'bottom'/);
-assert.match(consentSettings, /v2LegalCards\(/);
-assert.match(consentSettings, /openSharedConsentDocument\(/);
-assert.match(sharedProfile, /variant: 'technical'/);
-assert.match(sharedProfile, /v2Document\(/);
+assert.match(consentSettings, /documentTile\(/);
+assert.match(consentSettings, /documentTiles\(/);
+assert.match(consentSettings, /openDocumentViewer\(/);
+assert.doesNotMatch(consentSettings, /v2LegalCards|openSharedConsentDocument/);
+assert.doesNotMatch(sharedProfile, /v2Document|openSharedConsentDocument/);
 assert.match(consentSettings, /submitAccountConsents\(scopeTenantId/);
 assert.match(accountApi, /account\/password/);
 assert.match(accountApi, /deleteGlobalAccount/);
