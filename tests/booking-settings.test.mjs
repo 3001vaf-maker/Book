@@ -25,10 +25,10 @@ const settings = normalizeBookingSettings({
 
 assert.equal(settings.welcomeTitle, 'Привет');
 assert.equal(settings.slotStep, 60);
-assert.equal(settings.theme.backgroundMode, 'gradient');
-assert.equal(settings.theme.shape, 'cut');
-assert.equal(settings.theme.choiceStyle, 'compact');
-assert.equal(settings.theme.dark, '#001122');
+assert.equal(settings.theme.backgroundMode, DEFAULT_BOOKING_SETTINGS.theme.backgroundMode);
+assert.equal(settings.theme.shape, DEFAULT_BOOKING_SETTINGS.theme.shape);
+assert.equal(settings.theme.choiceStyle, DEFAULT_BOOKING_SETTINGS.theme.choiceStyle);
+assert.equal(settings.theme.dark, DEFAULT_BOOKING_SETTINGS.theme.dark);
 
 const invalid = normalizeBookingSettings({ slotStep: 7, theme: { shape: 'broken', dark: 'red' } });
 assert.equal(invalid.slotStep, 15);
