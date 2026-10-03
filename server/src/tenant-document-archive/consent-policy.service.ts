@@ -70,6 +70,11 @@ function asDate(value: unknown, fallback: Date) {
   return Number.isFinite(parsed.getTime()) ? parsed : fallback;
 }
 
+function canSignTenantDocument(document: any) {
+  if (!document || text(document?.documentClass).toUpperCase() === 'FILE') return false;
+  return Boolean(document?.signable || document?.personConsent);
+}
+
 function publicEvent(row: TenantConsentEventRow) {
   return {
     id: row.id,
@@ -179,7 +184,7 @@ export class ConsentPolicyService {
     for (const fact of accepted) {
       const documentId = text(fact?.documentId);
       const document = current.documents.find((item: any) => text(item?.id) === documentId);
-      if (!document) continue;
+      if (!document || !canSignTenantDocument(document)) continue;
       const documentVersion = Math.max(1, Number(fact?.documentVersion || document?.version || 1));
       const latest = await this.latestEvent(tenantId, 'ACCOUNT', accountId, documentId);
       if (latest?.status === 'accepted' && latest.documentVersion === documentVersion) continue;
@@ -214,7 +219,7 @@ export class ConsentPolicyService {
 
     const current = await this.state(tenantId);
     const document = current.documents.find((item: any) => text(item?.id) === targetDocumentId);
-    if (!document) throw new BadRequestException('Документ не найден');
+    if (!document || !canSignTenantDocument(document)) throw new BadRequestException('Документ недоступен для подписания');
     const documentVersion = Math.max(1, Number(document.version || 1));
     const latest = await this.latestEvent(tenantId, 'CONTACT_POINT', subjectKey, targetDocumentId);
     if (latest?.status === 'accepted' && latest.documentVersion === documentVersion) return publicEvent(latest);
@@ -251,7 +256,7 @@ export class ConsentPolicyService {
 
     const current = await this.state(tenantId);
     const document = current.documents.find((item: any) => text(item?.id) === targetDocumentId);
-    if (!document) throw new BadRequestException('Документ не найден');
+    if (!document || !canSignTenantDocument(document)) throw new BadRequestException('Документ недоступен для подписания');
     const latest = await this.latestEvent(tenantId, 'CONTACT_POINT', subjectKey, targetDocumentId);
     if (latest?.status === 'revoked') return publicEvent(latest);
     const now = new Date();
@@ -277,7 +282,7 @@ export class ConsentPolicyService {
     const subjectKey = contactSubjectKey(type, normalizedValue);
     const current = await this.state(tenantId);
     const document = current.documents.find((item: any) => text(item?.id) === text(documentId));
-    if (!type || !normalizedValue || !subjectKey || !document) {
+    if (!type || !normalizedValue || !subjectKey || !document || !canSignTenantDocument(document)) {
       return { allowed: false, contactType: type, contactValue: normalizedValue, event: null };
     }
     const latest = await this.latestEvent(tenantId, 'CONTACT_POINT', subjectKey, text(documentId));
@@ -293,7 +298,7 @@ export class ConsentPolicyService {
     if (!accountId || !documentId) throw new BadRequestException('Не указан аккаунт или документ');
     const current = await this.state(tenantId);
     const document = current.documents.find((item: any) => text(item?.id) === documentId);
-    if (!document) throw new BadRequestException('Документ не найден');
+    if (!document || !canSignTenantDocument(document)) throw new BadRequestException('Документ недоступен для подписания');
     const latest = await this.latestEvent(tenantId, 'ACCOUNT', accountId, documentId);
     if (latest?.status === 'revoked') return publicEvent(latest);
     const now = new Date();
