@@ -12,6 +12,7 @@ const files = {
   booking: readFileSync('online-booking/booking.js','utf8'),
   consentSettings: readFileSync('online-booking/consent-settings.js','utf8'),
   people: readFileSync('core/people/people.js','utf8'),
+  settingsDocuments: readFileSync('settings/documents/documents.js','utf8'),
   invite: readFileSync('invite/invite.js','utf8'),
   inviteCss: readFileSync('invite/invite.css','utf8'),
   admin: readFileSync('admin/document-registry/view.js','utf8'),
@@ -38,6 +39,9 @@ for (const [name, source] of Object.entries({
   accountControls: files.accountControls,
   booking: files.booking,
   consentSettings: files.consentSettings,
+  people: files.people,
+  settingsDocuments: files.settingsDocuments,
+  accountControls: files.accountControls,
   invite: files.invite,
   inviteCss: files.inviteCss,
   admin: files.admin,
@@ -49,6 +53,8 @@ for (const [name, source] of Object.entries({
 for (const [name, source] of Object.entries({
   booking: files.booking,
   consentSettings: files.consentSettings,
+  settingsDocuments: files.settingsDocuments,
+  accountControls: files.accountControls,
   invite: files.invite,
   admin: files.admin,
 })) {
@@ -81,3 +87,14 @@ const peopleConsentDetail = files.people.slice(
 );
 assert.match(peopleConsentDetail,/openDocumentViewer\(/,'People consent detail must open the shared document viewer');
 assert.match(peopleConsentDetail,/variant: 'top'/,'People consent detail must use the shared top informational modal');
+
+for (const [name, source] of Object.entries({
+  booking: files.booking,
+  consentSettings: files.consentSettings,
+  settingsDocuments: files.settingsDocuments,
+  accountControls: files.accountControls,
+  invite: files.invite,
+  admin: files.admin,
+})) {
+  assert.doesNotMatch(source,/\bminiCard(?:Rail)?\s*\(/,`Document surfaces must not use Mini Card UI: ${name}`);
+}
