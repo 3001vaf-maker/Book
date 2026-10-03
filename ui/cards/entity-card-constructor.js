@@ -177,7 +177,7 @@ function editorWorkspace(state,fields){
   </div>`;
 }
 
-export function mountEntityCardConstructor(root,{appearance={},fields=[],photo='',photoPosition='50% 50%',onSave=async()=>{},onPhotoChange=()=>{}}={}) {
+export function mountEntityCardConstructor(root,{appearance={},fields=[],photo='',photoPosition='50% 50%',onSave=async()=>{},onPhotoChange=()=>{},onStateChange=()=>{}}={}) {
   if(!root)return null;
   const state={
     appearance:normalizeEntityCardAppearance(appearance),
@@ -197,18 +197,15 @@ export function mountEntityCardConstructor(root,{appearance={},fields=[],photo='
   });
   state.savedSnapshot=snapshot();
 
-  const syncPrimary=()=>{
-    const source=root.querySelector('[data-card-save][data-v2-primary-action]');
-    if(!source)return;
-    source.dataset.v2PrimaryVisible=state.dirty?'true':'false';
-    source.dataset.v2PrimaryLabel='Сохранить';
-    source.disabled=Boolean(state.saving);
-    window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
-  };
+  const notifyState=()=>onStateChange({
+    dirty:Boolean(state.dirty),
+    saving:Boolean(state.saving),
+    error:String(state.error||''),
+  });
 
   const markDirty=()=>{
     state.dirty=snapshot()!==state.savedSnapshot;
-    syncPrimary();
+    notifyState();
   };
 
   const render=()=>{
@@ -219,15 +216,9 @@ export function mountEntityCardConstructor(root,{appearance={},fields=[],photo='
       </div>
       <div class="entity-card-editor__workspace" data-card-workspace>${editorWorkspace(state,fields)}</div>
       <div class="form-error" data-card-error>${escapeHtml(state.error||'')}</div>
-      ${button('Сохранить',{
-        className:'v2-primary-source-only',
-        data:`data-card-save data-v2-primary-action data-v2-primary-label="Сохранить" data-v2-primary-visible="${state.dirty?'true':'false'}"`,
-        aria:'Сохранить вид карты',
-        disabled:state.saving,
-      })}
     </div>`;
     bind();
-    syncPrimary();
+    notifyState();
   };
 
   const updatePreview=()=>{
@@ -240,7 +231,7 @@ export function mountEntityCardConstructor(root,{appearance={},fields=[],photo='
     if(workspace)workspace.innerHTML=editorWorkspace(state,fields);
     bindWorkspace();
     updatePreview();
-    syncPrimary();
+    notifyState();
   };
 
   const bindWorkspace=()=>{
@@ -307,7 +298,7 @@ export function mountEntityCardConstructor(root,{appearance={},fields=[],photo='
     if(state.saving||!state.dirty)return;
     state.saving=true;
     state.error='';
-    syncPrimary();
+    notifyState();
     try{
       await onSave({appearance:normalizeEntityCardAppearance(state.appearance),photo:state.photo});
       state.savedSnapshot=snapshot();
@@ -316,6 +307,7 @@ export function mountEntityCardConstructor(root,{appearance={},fields=[],photo='
       state.error=error instanceof Error?error.message:'Не удалось сохранить вид карты';
     }finally{
       state.saving=false;
+      notifyState();
       render();
     }
   };
@@ -326,9 +318,8 @@ export function mountEntityCardConstructor(root,{appearance={},fields=[],photo='
       render();
     }));
     bindWorkspace();
-    root.querySelector('[data-card-save]')?.addEventListener('click',save);
   };
 
   render();
-  return {getValue:()=>({appearance:normalizeEntityCardAppearance(state.appearance),photo:state.photo}),save};
+  return {getValue:()=>({appearance:normalizeEntityCardAppearance(state.appearance),photo:state.photo}),save,isDirty:()=>Boolean(state.dirty),isSaving:()=>Boolean(state.saving)};
 }
