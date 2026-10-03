@@ -1,63 +1,88 @@
-import { button, collectCost, collectWorkplaceSelections, costField, durationPicker, field, initCostFields, initDurationPickers, initPhotoField, initWorkplaceSelectors, mountModal, modal, photoField, textareaField, workplaceSelector } from '../../../ui/ui.js';
-import { getWorkplaces } from '../../profile/workplaces/data.js';
+import { button, collectCost, costField, durationPicker, field, initCostFields, initDurationPickers, setSharedProfilePrimary, textareaField } from '../../../ui/ui.js';
 import { pushProcedureHistory, saveProcedure as saveProcedureData } from './data.js';
 
-function initialProcedure(existing = null, defaultWorkplaceId = '') {
-  if (existing) return existing;
-  const workplaces = getWorkplaces();
-  const workplace = workplaces.find((item) => String(item?.key || item?.id || '') === String(defaultWorkplaceId || '')) || null;
+export function initialProcedure(existing = null, defaultWorkplace = null) {
+  if (existing) return {
+    ...existing,
+    workplaces: Array.isArray(existing.workplaces) ? existing.workplaces.map((item) => ({ ...item })) : [],
+  };
   return {
+    id: '',
     photo: '',
     name: '',
     description: '',
     duration: 0,
     breakDuration: 0,
     cost: { mode: 'amount', amount: '', free: false },
-    workplaces: workplace ? [{ workplaceId: workplace.key || workplace.id, name: workplace.name || '' }] : [],
+    workplaces: defaultWorkplace ? [{ ...defaultWorkplace }] : [],
   };
 }
 
-export function openProcedureForm({
-  root = document.body,
+export function procedureEditorForm(existing = null) {
+  const procedure = initialProcedure(existing);
+  return `<form class="compact-form" data-procedure-editor-form>
+    ${field({ label: 'Название', name: 'procedureName', value: procedure.name || '', placeholder: 'Название процедуры', required: true })}
+    ${costField({ value: procedure.cost || {}, name: 'procedureCost' })}
+    <div class="work-time-row__fields">
+      ${durationPicker({ label: 'Длительность', name: 'procedureDuration', value: procedure.duration || 0 })}
+      ${durationPicker({ label: 'Перерыв', name: 'procedureBreak', value: procedure.breakDuration || 0 })}
+    </div>
+    ${textareaField({ label: 'Описание', name: 'procedureDescription', value: procedure.description || '', placeholder: 'Описание процедуры' })}
+    <div class="form-error" data-procedure-editor-error></div>
+    ${button('Сохранить', {
+      className: 'v2-primary-source-only',
+      data: 'data-procedure-editor-primary data-v2-primary-action data-v2-primary-label="Сохранить"',
+      aria: 'Сохранить процедуру',
+    })}
+  </form>`;
+}
+
+export function bindProcedureEditor(root, {
   existing = null,
-  defaultWorkplaceId = '',
-  variant = '',
-  surface = '',
-  className = '',
+  draft = initialProcedure(existing),
   onSaved = () => {},
 } = {}) {
-  const procedure = initialProcedure(existing, defaultWorkplaceId);
-  const html = `<form class="compact-form" data-procedure-form><div class="modal-title"><h2>${existing ? 'Изменить процедуру' : 'Процедура'}</h2></div>${photoField({ name: 'procedurePhoto', value: procedure.photo || '' })}${field({ label: 'Название', name: 'procedureName', value: procedure.name || '', placeholder: 'Название процедуры', required: true })}${costField({ value: procedure.cost || {}, name: 'procedureCost' })}<div class="work-time-row__fields">${durationPicker({ label: 'Длительность', name: 'procedureDuration', value: procedure.duration || 0 })}${durationPicker({ label: 'Перерыв', name: 'procedureBreak', value: procedure.breakDuration || 0 })}</div>${workplaceSelector({ name: 'procedureWorkplaces', selected: procedure.workplaces || [], allowMultiple: true, workplaces: getWorkplaces() })}${textareaField({ label: 'Описание', name: 'procedureDescription', value: procedure.description || '', placeholder: 'Описание процедуры' })}${button('Сохранить', { type: 'submit' })}</form>`;
-  const m = mountModal(root, modal(html, { variant, surface, className }));
-  if (!m) return null;
+  const form = root.querySelector('[data-procedure-editor-form]');
+  const primary = root.querySelector('[data-procedure-editor-primary]');
+  if (!form || !primary) return { save: async () => null };
 
-  initPhotoField(m);
-  initCostFields(m);
-  initDurationPickers(m);
-  initWorkplaceSelectors(m);
+  initCostFields(root);
+  initDurationPickers(root);
 
-  m.querySelector('[data-procedure-form]')?.addEventListener('submit', (event) => {
-    event.preventDefault();
-    const data = new FormData(event.currentTarget);
+  const save = async () => {
+    const data = new FormData(form);
     const name = String(data.get('procedureName') || '').trim();
-    if (!name) return;
+    const error = root.querySelector('[data-procedure-editor-error]');
+    if (!name) {
+      if (error) error.textContent = 'Укажите название процедуры.';
+      return null;
+    }
+    setSharedProfilePrimary(primary, { visible: true, label: 'Сохранить', disabled: true });
     const item = {
+      ...(existing || {}),
       id: existing?.id || crypto.randomUUID(),
-      photo: String(data.get('procedurePhoto') || ''),
+      photo: String(draft.photo || existing?.photo || ''),
       name,
       description: String(data.get('procedureDescription') || '').trim(),
       duration: Number(data.get('procedureDuration') || 0),
       breakDuration: Number(data.get('procedureBreak') || 0),
-      cost: collectCost(m, 'procedureCost'),
-      workplaces: collectWorkplaceSelections(m, 'procedureWorkplaces'),
+      cost: collectCost(root, 'procedureCost'),
+      workplaces: Array.isArray(draft.workplaces) ? draft.workplaces.map((item) => ({ ...item })) : [],
       createdAt: existing?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
     if (existing) pushProcedureHistory(existing, 'updated');
     saveProcedureData(item);
-    m.remove();
+    if (error) error.textContent = '';
     onSaved(item);
-  });
+    return item;
+  };
 
-  return m;
+  primary.addEventListener('click', save);
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    void save();
+  });
+  setSharedProfilePrimary(primary, { visible: true, label: 'Сохранить' });
+  return { save };
 }
