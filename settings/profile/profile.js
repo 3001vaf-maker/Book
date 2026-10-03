@@ -194,7 +194,7 @@ function openProfileData(root,navigateBack,options={}){
   });
 }
 
-function openProfileAppearanceQ(root,navigateBack,options={}){
+export function openProfileAppearanceQ(root,{onSaved=null,navigateBack=()=>{},options={}}={}){
   const typeOptions=[
     {value:'profile',label:'Профиль'},
     {value:'workplace',label:'Рабочее пространство'},
@@ -252,7 +252,7 @@ function openProfileAppearanceQ(root,navigateBack,options={}){
       if(!current)return;
       await upsertWorkplace({...current,photo,cardAppearance:appearance});
     },
-    onSaved:()=>renderProfile(root,navigateBack,options),
+    onSaved:()=>{if(typeof onSaved==='function')onSaved();else renderProfile(root,navigateBack,options)},
   });
 }
 
@@ -278,7 +278,7 @@ function openProfileSettings(root,navigateBack,options={}){
   return openSharedProfileSettingsMenu({
     actions:[
       ...demoActions,
-      {id:'appearance',label:'Вид',onSelect:()=>openProfileAppearanceQ(root,navigateBack,options)},
+      {id:'appearance',label:'Вид',onSelect:()=>openProfileAppearanceQ(root,{navigateBack,options})},
       {id:'password',label:'Изменить пароль',onSelect:()=>openSharedPasswordAction({onSubmit:({currentPassword,newPassword})=>changePassword(currentPassword,newPassword)})},
       {id:'controls',label:'Согласия / Уведомления',onSelect:()=>import('./account-controls.js').then(({openAccountControlsModal})=>openAccountControlsModal())},
       {id:'logout',label:'Выход',variant:'danger',onSelect:()=>logout()},
