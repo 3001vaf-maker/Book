@@ -44,21 +44,24 @@ button.document-tile{cursor:pointer}
   position:relative;
   z-index:1;
   min-width:0;
+  padding-top:22px;
   display:grid;
   align-content:start;
   gap:8px;
 }
 .document-tile__title{
   max-width:100%;
-  padding-right:22px;
+  display:grid;
+  gap:0;
   font-size:var(--document-title-size,16px);
   line-height:1.14;
   font-weight:760;
   letter-spacing:-.01em;
-  text-wrap:balance;
-  overflow-wrap:normal;
-  word-break:normal;
-  hyphens:none;
+}
+.document-tile__title span{
+  display:block;
+  min-width:0;
+  white-space:nowrap;
 }
 .document-tile__version,
 .document-tile__meta{
