@@ -27,8 +27,8 @@ import { getAllPeople } from '../../core/people/data.js';
 import {
   createStandaloneDocument,
   getDocuments,
-  isProfileDocument,
-  isTemplateDocument,
+  getPlatformDocumentBases,
+  renderPlatformBaseText,
   saveDocument,
 } from './data.js';
 import { getConsents } from './consents.js';
@@ -84,7 +84,7 @@ function documentMoment(item = {}) {
 }
 
 function currentProfileDocuments() {
-  const documents = getDocuments().filter(isProfileDocument);
+  const documents = getDocuments();
   const grouped = new Map();
 
   documents.forEach((item) => {
@@ -111,8 +111,26 @@ function currentProfileDocuments() {
 }
 
 function templates() {
-  return getDocuments()
-    .filter(isTemplateDocument)
+  const documentsById = new Map(getDocuments().map((item) => [String(item.id || ''), item]));
+  return getPlatformDocumentBases()
+    .map((base) => {
+      const current = documentsById.get(String(base.documentId || '')) || null;
+      return {
+        id: String(base.documentId || ''),
+        templateKey: String(base.key || ''),
+        kind: base.kind || 'agreement',
+        title: current?.title || base.title || 'Шаблон',
+        personConsent: Boolean(base.personConsent),
+        required: Boolean(base.required),
+        signable: Boolean(base.personConsent),
+        version: Number(current?.version || base.version || 1),
+        text: current ? String(current.text || '') : renderPlatformBaseText(base),
+        sourceMode: current?.sourceMode === 'CUSTOM' ? 'CUSTOM' : 'BOOK',
+        baseKey: String(base.key || ''),
+        baseVersion: Number(base.version || 1),
+      };
+    })
+    .filter((item) => item.id)
     .sort((left, right) => String(left.title || '').localeCompare(String(right.title || ''), 'ru'));
 }
 
@@ -190,23 +208,55 @@ function documentCard(item, data) {
   });
 }
 
+function documentHistoryActionText(action) {
+  if (action === 'created') return 'Создан';
+  if (action === 'version-created') return 'Новая версия';
+  if (action === 'superseded') return 'Предыдущая версия';
+  if (action === 'renamed') return 'Переименован';
+  return 'Изменён';
+}
+
 function historyItems() {
-  return [...getConsents()].sort((left, right) =>
-    Date.parse(right.eventAt || right.createdAt || 0) - Date.parse(left.eventAt || left.createdAt || 0)
+  const signing = getConsents().map((item) => ({
+    type: 'signing',
+    sortAt: item.eventAt || item.acceptedAt || item.revokedAt || item.createdAt || '',
+    item,
+  }));
+  const versions = getDocumentHistory().map((item) => ({
+    type: 'version',
+    sortAt: item.createdAt || '',
+    item,
+  }));
+  return [...signing, ...versions].sort((left, right) =>
+    Date.parse(right.sortAt || 0) - Date.parse(left.sortAt || 0)
   );
 }
 
-function historyCard(item) {
-  const snapshot = signedDocumentSnapshot(item);
-  const date = shortDateTime(item.eventAt || item.acceptedAt || item.revokedAt || item.createdAt, '');
+function historyCard(entry) {
+  if (entry.type === 'signing') {
+    const item = entry.item;
+    const snapshot = signedDocumentSnapshot(item);
+    const date = shortDateTime(item.eventAt || item.acceptedAt || item.revokedAt || item.createdAt, '');
+    return documentTile({
+      title: snapshot?.title || item.documentId || 'Документ',
+      version: item.documentVersion || snapshot?.version || 1,
+      meta: date,
+      status: consentStateText(item.status),
+      statusState: consentStateKind(item.status),
+      data: `data-signing-event="${String(item.id || '')}"`,
+      aria: `Открыть факт подписания ${snapshot?.title || item.documentId || 'документа'}`,
+    });
+  }
+
+  const item = entry.item;
+  const snapshot = item.snapshot || null;
   return documentTile({
-    title: snapshot?.title || item.documentId || 'Документ',
+    title: snapshot?.title || item.documentTitle || item.documentId || 'Документ',
     version: item.documentVersion || snapshot?.version || 1,
-    meta: date,
-    status: consentStateText(item.status),
-    statusState: consentStateKind(item.status),
-    data: `data-signing-event="${String(item.id || '')}"`,
-    aria: `Открыть факт подписания ${snapshot?.title || item.documentId || 'документа'}`,
+    meta: [documentHistoryActionText(item.action), shortDateTime(item.createdAt, '')].filter(Boolean).join(' · '),
+    interactive: Boolean(snapshot),
+    data: snapshot ? `data-document-history-event="${String(item.id || '')}"` : '',
+    aria: snapshot ? `Открыть сохранённую версию ${snapshot.title || item.documentTitle || 'документа'}` : '',
   });
 }
 
@@ -218,7 +268,7 @@ function documentsMarkup() {
 
 function historyMarkup() {
   const items = historyItems();
-  if (!items.length) return emptyState('Истории подписаний пока нет', 'Здесь появятся факты подписания документов.');
+  if (!items.length) return emptyState('Истории пока нет', 'Здесь появятся версии документов и факты подписания.');
   return documentTiles(items.map(historyCard));
 }
 
@@ -274,33 +324,35 @@ function openSigningDetail(root, item) {
   return layer;
 }
 
-function openTemplatesMenu(root) {
+function renderTemplatesLayer(layer, root) {
   const items = templates();
-  const content = items.length
-    ? documentTiles(items.map((item) => documentTile({
-      title: item.title || 'Шаблон',
-      version: item.version || 1,
-      meta: item.sourceMode === 'CUSTOM' ? 'Ваш шаблон' : 'Системный шаблон',
-      data: `data-template-open="${String(item.id || '')}"`,
-      aria: `Открыть шаблон ${item.title || ''}`,
-    })))
-    : emptyState('Шаблонов пока нет', '');
+  layer.innerHTML = page([
+    headerContext('Шаблоны'),
+    items.length
+      ? documentTiles(items.map((item) => documentTile({
+          title: item.title || 'Шаблон',
+          version: item.version || 1,
+          meta: item.sourceMode === 'CUSTOM' ? 'Ваш вариант' : 'Системный шаблон',
+          data: `data-template-open="${String(item.id || '')}"`,
+          aria: `Открыть шаблон ${item.title || ''}`,
+        })))
+      : emptyState('Шаблоны недоступны', 'Базовые шаблоны Реестра не загрузились.'),
+  ]);
 
-  const layer = mountModal(document.body, modal(content, {
-    title: 'Шаблоны',
-    variant: 'bottom',
-    surface: 'app',
-  }));
-  if (!layer) return null;
-
+  bindSettings(layer, root);
   layer.querySelectorAll('[data-template-open]').forEach((control) => {
     control.addEventListener('click', () => {
-      const item = getDocuments().find((document) => document.id === control.dataset.templateOpen);
-      if (!item) return;
-      layer.v2Close?.();
-      openTemplateEditor(root, item);
+      const item = templates().find((template) => template.id === control.dataset.templateOpen);
+      if (item) renderTemplateEditor(layer, root, item);
     });
   });
+  window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+}
+
+function openTemplatesLayer(root) {
+  const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'documents-templates-layer' }), { stack: true });
+  if (!layer) return null;
+  renderTemplatesLayer(layer, root);
   return layer;
 }
 
@@ -343,6 +395,7 @@ function renderTemplateEditor(layer, root, item) {
       ...item,
       title,
       text: String(form?.querySelector('[name="documentText"]')?.value || ''),
+      sourceMode: 'CUSTOM',
     });
     renderMain(root);
     renderTemplateEditor(layer, root, saved);
@@ -350,13 +403,6 @@ function renderTemplateEditor(layer, root, item) {
 
   bindSettings(layer, root);
   setPrimaryVisible(primary, false);
-}
-
-function openTemplateEditor(root, item) {
-  const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'documents-template-editor' }), { stack: true });
-  if (!layer) return null;
-  renderTemplateEditor(layer, root, item);
-  return layer;
 }
 
 function userPdfStoredBytes() {
@@ -519,7 +565,7 @@ function openSettingsMenu(root) {
 
   layer.querySelector('[data-open-document-templates]')?.addEventListener('click', () => {
     layer.v2Close?.();
-    openTemplatesMenu(root);
+    openTemplatesLayer(root);
   });
   layer.querySelector('[data-add-profile-document]')?.addEventListener('click', () => {
     layer.v2Close?.();
@@ -550,6 +596,13 @@ function bindMain(root) {
       if (item) openSigningDetail(root, item);
     });
   });
+
+  root.querySelectorAll('[data-document-history-event]').forEach((control) => {
+    control.addEventListener('click', () => {
+      const item = getDocumentHistory().find((event) => event.id === control.dataset.documentHistoryEvent);
+      if (item?.snapshot) openDocument(item.snapshot);
+    });
+  });
 }
 
 function renderMain(root) {
@@ -558,7 +611,7 @@ function renderMain(root) {
     segmentControl(VIEWS, {
       value: currentView,
       name: 'documentsView',
-      aria: 'Документы и история подписаний',
+      aria: 'Документы и история',
     }),
     `<section data-documents-content>${contentMarkup()}</section>`,
   ]);
