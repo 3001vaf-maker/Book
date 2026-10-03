@@ -22,6 +22,7 @@ import {
   modal,
   mountModal,
   openNotice,
+  select,
   textareaField,
   workspaceHeaderContext,
 } from '../ui/ui.js';
@@ -130,17 +131,29 @@ async function renderCompose(root, state, recipient) {
   state.view = 'compose';
   state.recipient = recipient;
   const allowsAttachments = recipient.mode === 'one';
+  const broadcastChannel = recipient.mode === 'one'
+    ? ''
+    : select({
+        label: 'Канал',
+        name: 'broadcastChannel',
+        value: 'TELEGRAM',
+        options: [
+          { value: 'TELEGRAM', label: 'Telegram' },
+          { value: 'EMAIL', label: 'Email' },
+        ],
+      });
   renderChatSurface(root, {
     title: 'Новое сообщение',
     c: { kind: 'contacts', data: 'data-chat-contacts', aria: 'Контакты' },
     d: allowsAttachments ? { kind: 'attachment', data: 'data-profile-compose-attachment', aria: 'Вложения' } : null,
     body: `
       <div class="action-block"><strong>Кому: ${recipientLabel(recipient)}</strong></div>
+      ${broadcastChannel}
       ${button('Выбрать шаблон', { variant: 'secondary', data: 'data-profile-template-choose' })}
       ${messageComposer({ placeholder: 'Написать сообщение...', attachments: allowsAttachments, attachmentTrigger: allowsAttachments ? 'external' : 'composer' })}
     `,
   });
-  root.querySelector('[data-chat-settings]')?.addEventListener('click', openProfileChatSettings);
+  root.querySelector('[data-chat-settings]')?.addEventListener('click', () => openProfileChatSettings(root, state));
   root.querySelector('[data-chat-contacts]')?.addEventListener('click', () => openProfessionalContacts(root, state));
   const form = root.querySelector('[data-message-composer]');
   const input = form?.querySelector('[name="message"]');
@@ -161,7 +174,7 @@ async function renderCompose(root, state, recipient) {
         await sendCommunicationMessage({ phone: phoneOf(person), uei: person.uei || '', body, attachments });
       } else {
         await sendBroadcast({
-          channel: 'TELEGRAM',
+          channel: String(root.querySelector('[name="broadcastChannel"]')?.value || 'TELEGRAM'),
           all: recipient.mode === 'all',
           personKeys: recipient.mode === 'many' ? recipient.personKeys || [] : [],
           groupId: recipient.mode === 'group' ? recipient.groupId || '' : '',
@@ -313,11 +326,16 @@ async function manageTemplates() {
   }));
 }
 
-function openProfileChatSettings() {
+function openProfileChatSettings(root, state) {
   const layer = mountModal(document.body, modal(settingsPanel([
+    { label: 'Новое сообщение', data: 'data-chat-new-message' },
     { label: 'Группы людей', data: 'data-chat-groups' },
     { label: 'Шаблоны сообщений', data: 'data-chat-templates' },
   ]), { title: 'Настройки сообщений', variant: 'medium', surface: 'app' }));
+  layer?.querySelector('[data-chat-new-message]')?.addEventListener('click', () => {
+    layer.remove();
+    recipientOptions(root, state);
+  });
   layer?.querySelector('[data-chat-groups]')?.addEventListener('click', () => { layer.remove(); void manageGroups(); });
   layer?.querySelector('[data-chat-templates]')?.addEventListener('click', () => { layer.remove(); void manageTemplates(); });
 }
@@ -342,7 +360,7 @@ async function openThread(root, state, thread) {
       messages,
       viewer: 'profile',
       surface: (surface) => renderChatSurface(root, surface),
-      onSettings: openProfileChatSettings,
+      onSettings: () => openProfileChatSettings(root, state),
       onContacts: () => openProfessionalContacts(root, state),
       onSend: async ({ body, attachments }) => {
         await sendCommunicationMessage({ phone, uei, body, attachments });
@@ -355,7 +373,7 @@ async function openThread(root, state, thread) {
       c: { kind: 'contacts', data: 'data-chat-contacts', aria: 'Контакты' },
       body: emptyState('Чат недоступен', 'Не удалось загрузить переписку.'),
     });
-    root.querySelector('[data-chat-settings]')?.addEventListener('click', openProfileChatSettings);
+    root.querySelector('[data-chat-settings]')?.addEventListener('click', () => openProfileChatSettings(root, state));
     root.querySelector('[data-chat-contacts]')?.addEventListener('click', () => openProfessionalContacts(root, state));
     openNotice({
       title: 'Чат недоступен',
@@ -381,7 +399,7 @@ async function renderThreads(root, state) {
       title: 'Чат',
       threads,
       surface: (surface) => renderChatSurface(root, surface),
-      onSettings: openProfileChatSettings,
+      onSettings: () => openProfileChatSettings(root, state),
       onContacts: () => openProfessionalContacts(root, state),
       onOpenThread: (thread) => void openThread(root, state, thread),
       threadTitle: (thread) => personNameByPhone(thread.personPhone, thread.uei),
@@ -396,7 +414,7 @@ async function renderThreads(root, state) {
       c: { kind: 'contacts', data: 'data-chat-contacts', aria: 'Контакты' },
       body: emptyState('Чат недоступен', 'Не удалось загрузить диалоги.'),
     });
-    root.querySelector('[data-chat-settings]')?.addEventListener('click', openProfileChatSettings);
+    root.querySelector('[data-chat-settings]')?.addEventListener('click', () => openProfileChatSettings(root, state));
     root.querySelector('[data-chat-contacts]')?.addEventListener('click', () => openProfessionalContacts(root, state));
     openNotice({
       title: 'Чат недоступен',
