@@ -153,7 +153,7 @@ function notificationPolicy(items = []) {
   return {
     eventType: 'booking.created',
     mode: current?.mode === 'fallback' ? 'fallback' : 'always',
-    channels: Array.isArray(current?.channels) && current.channels.length ? current.channels : ['PUSH'],
+    channels: current ? (Array.isArray(current.channels) ? current.channels : []) : ['PUSH'],
   };
 }
 
@@ -180,7 +180,7 @@ function openPushInfo() {
   const content = `<div class="modal-title"><h2>Push</h2><p>Push — дополнительное уведомление. Если выбран режим «По очереди», успешный Push не останавливает отправку: основной результат определяется Telegram или Email.</p></div>`;
   return mountModal(document.body, modal(content, {
     title: 'О Push',
-    variant: 'technical',
+    variant: 'top',
     surface: 'app',
   }));
 }
@@ -192,7 +192,6 @@ async function openNotificationSettings() {
   const pushInfo = v2ListEntries([
     v2ListEntry({
       title: 'Push',
-      subtitle: 'Дополнительное уведомление',
       interactive: false,
       actionData: 'data-online-booking-push-info',
       actionAria: 'О Push',
