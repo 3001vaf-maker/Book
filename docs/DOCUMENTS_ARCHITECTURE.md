@@ -68,6 +68,8 @@ If relevant profile facts later change, a new **separate** update-helper PDF may
 
 A platform helper-template update by itself does not create another tenant PDF when the profile facts have not changed.
 
+Deleting an RKN helper removes the file from current documents but does not erase the generator state. The same helper must not reappear on login or refresh. A new helper is generated only when relevant factual profile data changes.
+
 ## 5. Document versions
 
 Document version snapshots exist only for `CORE_LEGAL` and `USER_DOCUMENT`.
