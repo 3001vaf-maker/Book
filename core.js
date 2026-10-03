@@ -388,6 +388,7 @@ function syncWorkspaceHeader(surface) {
       image: aSource.dataset.workspaceAImage || '',
       imagePosition: aSource.dataset.workspaceAImagePosition || '',
       initials: aSource.dataset.workspaceAInitials || '',
+      settingsTag: aSource.dataset.workspaceASettingsTag === 'true',
       data: 'data-v2-workspace-a',
       aria: aSource.getAttribute('aria-label') || sourceText(aSource, 'Контекст раздела'),
       disabled: Boolean(aSource.disabled),
