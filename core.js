@@ -402,7 +402,7 @@ function syncWorkspaceHeader(surface) {
   const sourceAKind = aSource?.dataset.workspaceAKind || '';
   const aSlot = !aSource
     ? workspaceProfileASlot()
-    : sourceAKind === 'settings'
+    : !sourceAKind || sourceAKind === 'settings'
       ? workspaceProfileASlot({
           settingsTag: !aSource.disabled,
           data: 'data-v2-workspace-a',
