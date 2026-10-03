@@ -1278,6 +1278,41 @@ ok(!shell()?.querySelector('[data-v2-workspace-primary]'), 'After disconnect Hea
 telegramZ2?.v2Close?.();
 await wait(60);
 
+mark('tags-mini-card-editor');
+await openF(7,'tags');
+await tapAndOpen(fDeck(), fCard('settings'), 40, 'settings-tags-root');
+await tapAndOpen(eDeck(), eCard('tags'), 41, 'settings-tags');
+await wait(80);
+let tagsSurface = shell()?.querySelector('[data-v2-workspace-surface]');
+ok(shell()?.querySelector('[data-v2-header] .v2-header__title')?.textContent?.trim() === 'Ярлыки', 'Tags B must be Ярлыки');
+ok(shell()?.querySelector('[data-v2-workspace-primary]')?.textContent?.trim() === '+', 'Tags C must be +');
+ok(Boolean(shell()?.querySelector('[data-v2-workspace-chat]')), 'Tags D chat missing');
+shell()?.querySelector('[data-v2-workspace-primary]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(40);
+let tagEditor = document.querySelector('.modal--tag-editor[data-v2-layer-kind="bottom"]');
+ok(Boolean(tagEditor), 'Tags + must open bottom X editor');
+ok(Boolean(tagEditor?.querySelector('[data-color-picker]')), 'Tags X missing shared color picker');
+ok(Boolean(tagEditor?.querySelector('[name="tagName"]')), 'Tags X missing shared name field');
+const tagName = tagEditor?.querySelector('[name="tagName"]');
+if (tagName) tagName.value = 'VIP Runtime';
+tagEditor?.querySelector('[data-tag-form]')?.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
+await wait(80);
+tagsSurface = shell()?.querySelector('[data-v2-workspace-surface]');
+let tagCard = tagsSurface?.querySelector('[data-mini-card-rail] [data-tag-edit]');
+ok(Boolean(tagCard), 'Saved tag must render in horizontal miniCard rail');
+ok(tagCard?.textContent?.includes('VIP Runtime'), 'Saved tag miniCard name missing');
+tagCard?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(40);
+tagEditor = document.querySelector('.modal--tag-editor[data-v2-layer-kind="bottom"]');
+ok(Boolean(tagEditor), 'Clicking existing tag miniCard must open the same X editor');
+ok(tagEditor?.querySelector('[name="tagName"]')?.value === 'VIP Runtime', 'Tag editor must load existing tag name');
+if (tagEditor?.querySelector('[name="tagName"]')) tagEditor.querySelector('[name="tagName"]').value = 'VIP Edited';
+tagEditor?.querySelector('[data-tag-form]')?.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
+await wait(80);
+tagsSurface = shell()?.querySelector('[data-v2-workspace-surface]');
+tagCard = tagsSurface?.querySelector('[data-mini-card-rail] [data-tag-edit]');
+ok(tagCard?.textContent?.includes('VIP Edited'), 'Edited tag must update the same miniCard list');
+
 // Repeat full roots to expose stale listeners/rAF from persistent shell reuse.
 for (const [index,id] of ['people','finance','journal','profile','settings','people'].entries()) {
   await openF(20 + index, 'repeat-' + id);
