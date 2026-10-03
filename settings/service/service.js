@@ -1,13 +1,11 @@
 import {
   initViewNavigation,
-  openSharedPhotoAction,
   openSharedProfileSettingsMenu,
   page,
   viewNavigation,
 } from '../../ui/ui.js';
-import { getProfile, saveProfile as saveProfileData } from '../profile/data.js';
-import { openProfileAppearanceQ } from '../profile/profile.js';
 import { serviceHeaderContext, notifyServiceContext } from './context.js';
+import { openServiceAppearanceQ } from './appearance.js';
 import { openProcedureEditor, renderProcedureCatalog } from './procedures/procedures.js';
 import { openProductEditor, renderProductCatalog } from './products/products.js';
 
@@ -19,29 +17,13 @@ const views = [
 let activeView = 'procedures';
 
 function openServiceSettings(root, rerender) {
-  const profile = getProfile();
   return openSharedProfileSettingsMenu({
     title: 'Настройки',
     actions: [
       {
-        id: 'photo',
-        label: 'Фото',
-        onSelect: () => openSharedPhotoAction({
-          photo: profile.photo || '',
-          onReplace: async (photo) => {
-            await saveProfileData({ ...getProfile(), photo });
-            rerender();
-          },
-          onDelete: async () => {
-            await saveProfileData({ ...getProfile(), photo: '' });
-            rerender();
-          },
-        }),
-      },
-      {
         id: 'appearance',
         label: 'Вид',
-        onSelect: () => openProfileAppearanceQ(root, { onSaved: rerender }),
+        onSelect: () => openServiceAppearanceQ(root, { onSaved: rerender }),
       },
     ],
   });
