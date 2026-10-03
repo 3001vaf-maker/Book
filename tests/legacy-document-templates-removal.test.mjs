@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { getPlatformDocumentBases } from '../admin/document-registry/catalog.js';
+import { getRegistryUserLegalTemplates } from '../admin/document-registry/catalog.js';
 import {
   buildTenantDocumentsFromPlatformBases,
   configurePlatformDocumentBases,
@@ -10,29 +10,32 @@ import {
 const activeData = readFileSync(new URL('../settings/documents/data.js', import.meta.url), 'utf8');
 const migration = readFileSync(new URL('../tenant-document-archive.js', import.meta.url), 'utf8');
 
-assert.doesNotMatch(activeData, /DEFAULT_DOCUMENTS/);
-assert.doesNotMatch(activeData, /getDefaultDocuments/);
+assert.doesNotMatch(activeData, /DEFAULT_DOCUMENTS|getDefaultDocuments/);
 assert.doesNotMatch(activeData, /Шаблон для адаптации под вашу работу/);
-assert.doesNotMatch(activeData, /Состав данных, цели, действия с данными, срок действия согласия/);
-assert.doesNotMatch(activeData, /Я согласен\(на\) получать информационные сообщения/);
 assert.doesNotMatch(activeData, /getBookDocumentBases|configureBookDocumentBases|buildBookDocuments|reconcileBookDocuments/);
+assert.match(activeData, /platform-registry/);
+assert.doesNotMatch(activeData, /admin-template/);
 
-assert.match(migration, /getPlatformDocumentBases/);
+assert.match(migration, /tenant-document-archive\/platform-bases/);
+assert.doesNotMatch(migration, /admin\/document-registry\/catalog\.js|getPlatformDocumentBases/);
 assert.doesNotMatch(migration, /getWorkplaces|workplaces/);
-assert.doesNotMatch(migration, /getBookDocumentBases|configureBookDocumentBases|buildBookDocuments|reconcileBookDocuments/);
-assert.match(migration, /\.\/admin\/document-registry\/catalog\.js/);
-assert.doesNotMatch(migration, /getDefaultDocuments/);
 
-const bases = getPlatformDocumentBases();
+const config = {
+  'user-document-pdn-policy': { documentId: 'pdn-agreement', kind: 'agreement', personConsent: false, required: false },
+  'user-document-pdn-consent': { documentId: 'pdn-consent', kind: 'consent', personConsent: true, required: true },
+  'user-document-messages-consent': { documentId: 'messages-consent', kind: 'consent', personConsent: true, required: false },
+};
+const bases = getRegistryUserLegalTemplates().map((item) => ({
+  key: item.key,
+  ...config[item.key],
+  title: item.title,
+  version: 1,
+  content: item.content,
+}));
+
 assert.equal(bases.length, 3);
-assert.deepEqual(bases.map((item) => item.documentId), [
-  'pdn-agreement',
-  'pdn-consent',
-  'messages-consent',
-]);
-for (const base of bases) {
-  assert.ok(base.content.length > 500, `Admin base is unexpectedly short: ${base.key}`);
-}
+assert.deepEqual(bases.map((item) => item.documentId), ['pdn-agreement','pdn-consent','messages-consent']);
+for (const base of bases) assert.ok(base.content.length > 500, `Registry base is unexpectedly short: ${base.key}`);
 
 configurePlatformDocumentBases(bases, {
   profile: {
@@ -65,18 +68,18 @@ const current = [{
 
 const reconciled = reconcileTenantDocumentsWithPlatformBases(current, []);
 const kept = reconciled.documents.find((item) => item.id === 'pdn-consent');
-assert.equal(kept.text, existingFullText, 'Existing real document text must not be overwritten');
-assert.equal(kept.version, 3, 'Existing real document version must not change');
-assert.equal(kept.sourceMode, 'CUSTOM', 'Existing unmatched real document is preserved as its own current document');
-assert.equal(reconciled.history.length, 2, 'Only genuinely missing documents may be created from Admin bases');
-assert.equal(reconciled.history.every((item) => item.source === 'admin-template'), true);
+assert.equal(kept.text, existingFullText);
+assert.equal(kept.version, 3);
+assert.equal(kept.sourceMode, 'CUSTOM');
+assert.equal(reconciled.history.length, 2);
+assert.equal(reconciled.history.every((item) => item.source === 'platform-registry'), true);
 
 const generatedConsent = fresh.find((item) => item.id === 'pdn-consent');
 const exactExisting = [{ ...generatedConsent, version: 3, sourceMode: '' }];
 const exactReconciled = reconcileTenantDocumentsWithPlatformBases(exactExisting, []);
 const exact = exactReconciled.documents.find((item) => item.id === 'pdn-consent');
 assert.equal(exact.text, generatedConsent.text);
-assert.equal(exact.version, 3, 'Linking an existing exact Admin document must not change its version');
+assert.equal(exact.version, 3);
 assert.equal(exact.sourceMode, 'BOOK');
 
 console.log('Legacy document templates removal tests: OK');

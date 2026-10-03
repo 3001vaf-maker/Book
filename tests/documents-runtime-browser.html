@@ -38,7 +38,7 @@ window.addEventListener('error', (event) => failures.push(stage + ': window erro
 window.addEventListener('unhandledrejection', (event) => failures.push(stage + ': rejection: ' + String(event.reason?.message || event.reason || 'unknown')));
 
 mark('imports');
-const [{ v2Header, v2Shell }, documentsUi, data, consents, history] = await Promise.all([
+const [{ v2Header, v2Shell, documentTile, documentTiles }, documentsUi, data, consents, history] = await Promise.all([
   import('/ui/ui.js'),
   import('/settings/documents/documents.js'),
   import('/settings/documents/data.js'),
@@ -338,6 +338,29 @@ ok(signingInfo?.textContent.includes('+79990000000'), 'Signing info must show wh
 ok(signingInfo?.textContent.includes('Подписано'), 'Signing info must show the action result');
 ok(!signingInfo?.textContent.includes('chat'), 'Signing info must not expose the technical source');
 signingInfo?.v2Close?.();
+
+mark('controlled-document-ui');
+const controlledProbe = document.createElement('div');
+controlledProbe.innerHTML = documentTiles([documentTile({
+  title:'Согласие на обработку персональных данных',
+  version:4,
+  openData:'data-controlled-open',
+  toggleData:'data-controlled-toggle',
+  toggleChecked:true,
+  aria:'Открыть документ',
+  toggleAria:'Подтвердить документ',
+})], { layout:'rail' });
+document.body.append(controlledProbe);
+const controlledTile = controlledProbe.querySelector('.document-tile');
+const controlledOpen = controlledProbe.querySelector('[data-controlled-open]');
+const controlledToggle = controlledProbe.querySelector('[data-controlled-toggle]');
+ok(Boolean(controlledTile?.classList.contains('document-tile--controlled')), 'Interactive consent must keep the canonical document tile');
+ok(getComputedStyle(controlledTile).width === '238px', 'Interactive consent must keep the same 238px document width');
+ok(Boolean(controlledOpen) && Boolean(controlledToggle), 'Document open action and yes/no toggle must be separate controls on the same document');
+ok(!controlledOpen?.contains(controlledToggle), 'Document toggle must not be nested inside the open button');
+ok(controlledToggle?.getAttribute('aria-pressed') === 'true', 'Controlled document must expose the current yes/no state');
+ok(controlledTile?.querySelectorAll('.document-tile__title span').length <= 2, 'Controlled document title must stay within two lines');
+controlledProbe.remove();
 
 if (failures.length) {
   document.documentElement.dataset.documentsRuntime = 'fail';

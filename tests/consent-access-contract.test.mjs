@@ -1,27 +1,18 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { getPlatformDocumentBases } from '../admin/document-registry/catalog.js';
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
 const policy = read('server/src/tenant-document-archive/consent-policy.service.ts');
+const registry = read('server/src/document-registry/document-registry.service.ts');
 const guard = read('server/src/online-booking/booking-pdn-consent.guard.ts');
 const booking = read('server/src/online-booking/online-booking.service.ts');
 const notification = read('server/src/notification/notification.service.ts');
 const telegram = read('server/src/communication/telegram-bot.service.ts');
 const broadcast = read('server/src/communication/communication-broadcast.service.ts');
 
-const bases = getPlatformDocumentBases();
-const pdn = bases.find((item) => item.documentId === 'pdn-consent');
-const marketing = bases.find((item) => item.documentId === 'messages-consent');
-
-assert.ok(pdn, 'PDN consent base must exist');
-assert.equal(pdn.personConsent, true);
-assert.equal(pdn.required, true, 'PDN consent must remain mandatory');
-
-assert.ok(marketing, 'Marketing consent base must exist');
-assert.equal(marketing.personConsent, true);
-assert.equal(marketing.required, false, 'Marketing consent must remain optional');
+assert.match(registry, /user-document-pdn-consent'[\s\S]*?documentId: 'pdn-consent'[\s\S]*?personConsent: true[\s\S]*?required: true/, 'PDN consent must remain mandatory');
+assert.match(registry, /user-document-messages-consent'[\s\S]*?documentId: 'messages-consent'[\s\S]*?personConsent: true[\s\S]*?required: false/, 'Marketing consent must remain optional');
 
 assert.match(policy, /const PDN_CONSENT_DOCUMENT_ID = 'pdn-consent'/);
 assert.match(policy, /const MARKETING_CONSENT_DOCUMENT_ID = 'messages-consent'/);

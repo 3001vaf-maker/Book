@@ -1,5 +1,7 @@
 import { setAuthToken } from '../core/auth.js';
 import { API_BASE } from '../core/environment.js';
+import { documentTile, documentTiles, openDocumentViewer } from '../ui/documents/index.js';
+import { escapeHtml } from '../ui/utils/escape-html.js';
 
 const state = document.querySelector('#invite-state');
 const token = new URLSearchParams(location.search).get('token') || '';
@@ -15,54 +17,21 @@ async function post(path, body) {
   return payload;
 }
 
-function escapeHtml(value) {
-  return String(value ?? '').replace(/[&<>"']/g, (char) => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#039;',
-  })[char] || char);
-}
-
-function formatDateTime(value) {
-  const date = new Date(value || 0);
-  if (!Number.isFinite(date.getTime())) return '';
-  return new Intl.DateTimeFormat('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-}
-
 function renderError(message) {
   state.innerHTML = '<h1>Ссылка недоступна</h1><p data-error></p>';
   state.querySelector('[data-error]').textContent = message || 'Не удалось открыть регистрационную ссылку.';
 }
 
-function documentRow(documentItem) {
-  const required = Boolean(documentItem.required);
-  const note = required ? 'Обязательно' : 'Необязательно';
-  return `
-    <section class="invite-document" data-document-row="${escapeHtml(documentItem.key)}">
-      <div class="invite-document__head">
-        <label class="invite-document__choice">
-          <input
-            type="checkbox"
-            data-document-check="${escapeHtml(documentItem.key)}"
-            data-document-version="${escapeHtml(documentItem.version)}"
-            ${required ? 'data-required-document' : ''}
-          >
-          <span><strong>${escapeHtml(documentItem.title)}</strong><small>${note} · версия ${escapeHtml(documentItem.version)}</small></span>
-        </label>
-        <button class="invite-document__open" type="button" data-document-open="${escapeHtml(documentItem.key)}">Открыть</button>
-      </div>
-      <div class="invite-document__content" data-document-content="${escapeHtml(documentItem.key)}" hidden>
-        <pre>${escapeHtml(documentItem.content)}</pre>
-      </div>
-    </section>`;
+function registrationDocuments(documents = []) {
+  return documentTiles(documents.map((item) => documentTile({
+    title: item.title || 'Документ',
+    version: item.version || 1,
+    openData: `data-document-open="${escapeHtml(item.key)}"`,
+    toggleData: `data-document-toggle="${escapeHtml(item.key)}"${item.required ? ' data-required-document-toggle' : ''}`,
+    toggleChecked: false,
+    aria: `Открыть ${item.title || 'документ'}`,
+    toggleAria: `Подтвердить ${item.title || 'документ'}`,
+  })), { layout: 'rail', className: 'invite-documents' });
 }
 
 function registrationFacts(invitation) {
@@ -70,7 +39,7 @@ function registrationFacts(invitation) {
   return documents.map((documentItem) => ({
     key: documentItem.key,
     version: documentItem.version,
-    accepted: Boolean(state.querySelector(`[data-document-check="${CSS.escape(documentItem.key)}"]`)?.checked),
+    accepted: state.querySelector(`[data-document-toggle="${CSS.escape(documentItem.key)}"]`)?.getAttribute('aria-pressed') === 'true',
   }));
 }
 
@@ -91,7 +60,7 @@ function renderForm(invitation) {
           <h2>Документы и согласия</h2>
           <p>Подтвердите обязательные документы. Отдельное согласие на рекламные и маркетинговые сообщения можно дать здесь же.</p>
         </div>
-        <div class="invite-documents">${documents.map(documentRow).join('')}</div>
+        ${registrationDocuments(documents)}
       </section>
 
       <section data-registration-data hidden>
@@ -100,32 +69,14 @@ function renderForm(invitation) {
           <p>Имя и номер телефона обязательны. Фамилию можно добавить сейчас или позже в профиле.</p>
         </div>
 
-        <label class="invite-field">
-          <span>Имя</span>
-          <input name="name" type="text" autocomplete="given-name" required>
-        </label>
-        <label class="invite-field">
-          <span>Фамилия</span>
-          <input name="surname" type="text" autocomplete="family-name">
-        </label>
-        <label class="invite-field">
-          <span>Телефон</span>
-          <input name="phone" type="tel" autocomplete="tel" required>
-        </label>
+        <label class="invite-field"><span>Имя</span><input name="name" type="text" autocomplete="given-name" required></label>
+        <label class="invite-field"><span>Фамилия</span><input name="surname" type="text" autocomplete="family-name"></label>
+        <label class="invite-field"><span>Телефон</span><input name="phone" type="tel" autocomplete="tel" required></label>
 
-        ${invitation.requiresEmail ? `<label class="invite-field">
-          <span>Email</span>
-          <input name="email" type="email" autocomplete="email" required>
-        </label>` : ''}
+        ${invitation.requiresEmail ? `<label class="invite-field"><span>Email</span><input name="email" type="email" autocomplete="email" required></label>` : ''}
 
-        <label class="invite-field">
-          <span>Пароль</span>
-          <input name="password" type="password" minlength="10" autocomplete="new-password" required>
-        </label>
-        <label class="invite-field">
-          <span>Повторите пароль</span>
-          <input name="passwordConfirm" type="password" minlength="10" autocomplete="new-password" required>
-        </label>
+        <label class="invite-field"><span>Пароль</span><input name="password" type="password" minlength="10" autocomplete="new-password" required></label>
+        <label class="invite-field"><span>Повторите пароль</span><input name="passwordConfirm" type="password" minlength="10" autocomplete="new-password" required></label>
 
         <p class="invite-error" data-form-error role="alert"></p>
         <button class="invite-button" type="submit">Создать учётную запись</button>
@@ -137,13 +88,11 @@ function renderForm(invitation) {
   const registrationName = state.querySelector('[name="name"]');
   if (registrationName && invitation.name) registrationName.value = invitation.name;
 
-  state.querySelectorAll('[data-document-open]').forEach((button) => {
-    button.addEventListener('click', () => {
-      const key = button.dataset.documentOpen || '';
-      const content = state.querySelector(`[data-document-content="${CSS.escape(key)}"]`);
-      if (!content) return;
-      content.hidden = !content.hidden;
-      button.textContent = content.hidden ? 'Открыть' : 'Свернуть';
+  state.querySelectorAll('[data-document-open]').forEach((control) => {
+    control.addEventListener('click', () => {
+      const item = documents.find((documentItem) => String(documentItem.key) === String(control.dataset.documentOpen));
+      if (!item) return;
+      openDocumentViewer({ title: item.title || 'Документ', version: item.version || 1, content: item.content || '' });
     });
   });
 
@@ -151,13 +100,21 @@ function renderForm(invitation) {
   const error = state.querySelector('[data-form-error]');
   const button = form.querySelector('button[type="submit"]');
   const registrationData = form.querySelector('[data-registration-data]');
-  const requiredChecks = [...form.querySelectorAll('[data-required-document]')];
+  const requiredToggles = [...form.querySelectorAll('[data-required-document-toggle]')];
 
   const syncReady = () => {
-    const legalReady = requiredChecks.every((checkbox) => checkbox.checked);
+    const legalReady = requiredToggles.every((control) => control.getAttribute('aria-pressed') === 'true');
     registrationData.hidden = !legalReady;
   };
-  form.querySelectorAll('[data-document-check]').forEach((checkbox) => checkbox.addEventListener('change', syncReady));
+
+  form.querySelectorAll('[data-document-toggle]').forEach((control) => {
+    control.addEventListener('click', () => {
+      const checked = control.getAttribute('aria-pressed') !== 'true';
+      control.setAttribute('aria-pressed', checked ? 'true' : 'false');
+      control.classList.toggle('is-on', checked);
+      syncReady();
+    });
+  });
   syncReady();
 
   form.addEventListener('submit', async (event) => {

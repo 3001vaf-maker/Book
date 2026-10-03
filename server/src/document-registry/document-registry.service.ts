@@ -1,10 +1,69 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { createHash, randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma.service';
 
 @Injectable()
 export class DocumentRegistryService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async tenantLegalTemplateBases() {
+    const rows = await this.prisma.$queryRaw<Array<{
+      key: string;
+      title: string;
+      version: number;
+      content: string;
+    }>>`
+      SELECT
+        d."key",
+        d."title",
+        v."version",
+        v."contentSnapshot" AS "content"
+      FROM "PlatformDocument" d
+      JOIN LATERAL (
+        SELECT "version","contentSnapshot"
+        FROM "PlatformDocumentVersion"
+        WHERE "documentId" = d."id" AND "supersededAt" IS NULL
+        ORDER BY "version" DESC
+        LIMIT 1
+      ) v ON true
+      WHERE d."isActive" = true
+        AND d."key" IN (
+          'user-document-pdn-policy',
+          'user-document-pdn-consent',
+          'user-document-messages-consent'
+        )
+    `;
+
+    const config = new Map([
+      ['user-document-pdn-policy', { documentId: 'pdn-agreement', kind: 'agreement', personConsent: false, required: false, order: 0 }],
+      ['user-document-pdn-consent', { documentId: 'pdn-consent', kind: 'consent', personConsent: true, required: true, order: 1 }],
+      ['user-document-messages-consent', { documentId: 'messages-consent', kind: 'consent', personConsent: true, required: false, order: 2 }],
+    ]);
+    const result = rows
+      .map((row) => {
+        const settings = config.get(row.key);
+        if (!settings) return null;
+        return {
+          key: row.key,
+          documentId: settings.documentId,
+          kind: settings.kind,
+          personConsent: settings.personConsent,
+          required: settings.required,
+          title: row.title,
+          version: Math.max(1, Number(row.version || 1)),
+          content: row.content,
+          order: settings.order,
+        };
+      })
+      .filter(Boolean)
+      .sort((left: any, right: any) => left.order - right.order)
+      .map(({ order, ...item }: any) => item);
+
+    if (result.length !== 3) {
+      throw new ConflictException('Реестр основных документов профиля заполнен не полностью');
+    }
+    return result;
+  }
 
   async syncCatalog(input: unknown) {
     const items = Array.isArray(input) ? input : [];

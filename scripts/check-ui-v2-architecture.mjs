@@ -5,6 +5,8 @@ const designDictionary = fs.readFileSync('DESIGN_DICTIONARY.md', 'utf8');
 const ui = fs.readFileSync('ui/v2/index.js', 'utf8');
 const css = fs.readFileSync('ui/v2/v2.css', 'utf8');
 const facade = fs.readFileSync('ui/ui.js', 'utf8');
+const documentUi = fs.readFileSync('ui/documents/index.js', 'utf8');
+const documentCss = fs.readFileSync('ui/documents/document.css', 'utf8');
 const booking = fs.readFileSync('online-booking/booking.js', 'utf8');
 const account = fs.readFileSync('online-booking/account-shell.js', 'utf8');
 const chatRuntime = fs.readFileSync('core/chat/runtime.js', 'utf8');
@@ -146,8 +148,6 @@ for (const name of [
   'v2CardDeck',
   'v2Shell',
   'v2Sticker',
-  'v2Document',
-  'v2LegalCards',
   'v2ZLayer',
   'mountV2ZLayer',
   'initV2Swipe',
@@ -223,8 +223,8 @@ expect(stickerSwipe.includes('surface.setPointerCapture?.(event.pointerId)') && 
 expect(!css.includes('scroll-snap-stop:always'), 'CardDeck native inertia must not be forced to stop at every card.');
 
 
-expect(css.includes('.v2-legal-cards{display:flex;gap:10px;overflow-x:auto'), 'Legal document stickers must use the shared horizontal rail.');
-expect(css.includes('.v2-legal-card{\n  flex:0 0 min(86%,320px);\n  height:96px;'), 'Legal document stickers must share one base height and horizontal width.');
+expect(documentUi.includes('export function documentTile') && documentUi.includes('export function documentTiles') && documentUi.includes('export function openDocumentViewer'), 'Document UI must be owned only by ui/documents.');
+expect(documentCss.includes('width:238px') && documentCss.includes('.document-tiles--rail') && documentCss.includes('.document-tile__toggle'), 'Document UI must keep one 238px geometry, horizontal rail and optional on-document toggle.');
 expect(recordRuntime.includes('export function recordTimeRows') && timeCss.includes('.time-slots--hour-rows') && timeCss.includes('overflow-x:auto'), 'Booking time must use the Shared Time owner with hourly horizontal rows.');
 expect(!/\.booking-account--account \.v2-app \.calendar__date\{[^}]*border-radius/.test(css), 'V2 must not redesign Calendar geometry.');
 expect(calendar.includes('.calendar__grid') && calendar.includes('.calendar__month-button'), 'Canonical Calendar owner must remain intact.');
@@ -245,19 +245,18 @@ expect(!ui.includes('initV2DeckSwipe') && !facade.includes('initV2DeckSwipe'), '
 expect(ui.includes('data-v2-front') && /\.v2-fe-deck\{[\s\S]*?position:absolute;z-index:2;inset:0/.test(css) && css.includes('.v2-app.is-deck-open > .v2-app__stage > .v2-front{transform:translate3d(100%,0,0)}') && !/\.v2-app\.is-deck-open[^\{]*\.v2-z[^\{]*\{[^}]*transform:/s.test(css), 'FE must stay on H while the unchanged shared front/Z moves fully offscreen right; Z may not own a separate navigation transform.');
 expect(ui.includes("if (Number(event.clientX || 0) > rect.left + edgeWidth) return;") && !ui.includes('horizontalGestureContext'), 'Closed Z must leave all internal horizontal rails alone; only a left-edge start may return to FE.');
 expect(core.includes('initV2WorkspaceInteraction(shell') && core.includes('eActiveId: childActive') && core.includes('onEOpenChange: (open)') && core.includes('onSecondarySelect: (id) => selectSecondary(id)'), 'Workspace must route F/E/Z interaction through the single Shared workspace owner.');
-expect(css.includes('box-shadow:-9px 8px 14px -11px rgba(0,0,0,.34)') && css.includes('.v2-z .entity-card{transform:translateY(-2px)') && css.includes('.v2-rail-card{') && css.includes('transform:translateY(-2px)'), 'Z stickers must lift at the edges while large cards float above the Z surface.');
+expect(css.includes('.v2-z .entity-card{transform:translateY(-2px)') && css.includes('.v2-rail-card{') && css.includes('transform:translateY(-2px)'), 'Shared Entity/Rail cards must float above the Z surface; retired legal-card shadows must not be required.');
 expect(/\.v2-z\{[\s\S]*?touch-action:auto/.test(css) && /\.v2-edge-swipe-zone\{[\s\S]*?width:36px;[\s\S]*?pointer-events:none;[\s\S]*?touch-action:none/.test(css) && css.includes('.v2-edge-swipe-zone.is-active{pointer-events:auto}'), 'Z must keep native vertical/horizontal inner scrolling while only an actively retained 36px screen-edge owner may intercept return navigation.');
 expect(ui.includes('function retainV2EdgeHost(host)') && ui.includes("host.dataset.v2EdgeOwners") && ui.includes("host.classList.add('is-active')") && ui.includes("host.classList.remove('is-active')"), 'Shared edge zone must be reference-counted so inactive screens never keep a dead touch strip.');
 expect(ui.includes("retainV2EdgeHost(bindZ && edgeHost?.matches?.('[data-v2-edge-swipe]') ? edgeHost : null)"), 'Workspace edge zone must stay inactive whenever bindZ is false.');
 expect(account.includes('GLOBAL_ACCOUNT_ROOTS') && account.includes("id: 'profile', label: 'Профиль'") && account.includes("id: 'home', label: 'Обзор'") && account.includes("id: 'contacts', label: 'Контакты'") && account.includes("id: 'history', label: 'История'") && account.includes('initV2WorkspaceInteraction(root') && account.includes('GLOBAL_ACCOUNT_ROOTS.some((item) => item.id === id)'), 'Changing the active end-user F folder must route through the Shared workspace owner and immediately change Z to the selected Profile / Overview / Contacts / History face.');
 expect(accountMobileCss.includes('background:var(--v2-base)'), 'Public booking shell safe area must continue the H base.');
 expect(core.includes("setThemeColor('#2F3338')") && core.includes("setThemeColor('#F5F5F3')"), 'Public booking must tint browser chrome to H and restore the workspace theme afterwards.');
-expect(booking.includes('v2LegalCards(') && booking.includes('v2Sticker({'), 'Legal checkpoint must use the shared sticker system.');
+expect(booking.includes('documentTile(') && booking.includes('documentTiles(') && booking.includes('openDocumentViewer(') && booking.includes('v2Sticker({') && !booking.includes('v2LegalCards(') && !booking.includes('v2Document('), 'Legal checkpoint may use the Shared U container but every document inside it must use the canonical Document UI and viewer.');
 expect(
   booking.includes("closeData: 'data-booking-welcome-u-close'")
     && booking.includes("closeData: 'data-booking-u-close'")
     && booking.includes("closeData: 'data-booking-legal-u-close'")
-    && booking.includes("closeData: 'data-u-document-close'")
     && core.includes("closeData: 'data-specialist-u-close'"),
   'Every U entry/information surface must expose the explicit Shared U close control.'
 );
@@ -324,11 +323,11 @@ expect(!workplacesUi.includes("id:'appearance'") && !workplacesUi.includes("labe
 expect(workplacesUi.includes('openSharedProfileSettingsMenu({') && workplacesUi.includes('openColorPickerAction({') && workplacesUi.includes('openTimeRangeAction({') && workplacesUi.includes('setSharedProfilePrimary(primary') && !workplacesUi.includes('openWorkplaceAppearance('), 'Workplace must consume the Shared A-menu and contextual C owners without a local appearance editor.');
 expect(!workplacesUi.includes('mountV2ZLayer(root,v2ZLayer(page([workspaceHeaderContext({title:\'Настройки пространства\''), 'Workplace settings must not create a separate settings Z; A always manifests through the Shared bottom menu.');
 expect(workplacesUi.includes("workplaceForm(existing,{bodyActions:true})") && workplacesUi.includes("workplaceForm(existing=null,{sourceOnly=false,bodyActions=false}={})"), 'Workplace must keep one reusable form renderer; onboarding compatibility may retain inline initial settings.');
-expect(sharedProfile.includes('export function openSharedProfileSettingsMenu') && sharedProfile.includes('export async function openSharedPhotoAction') && sharedProfile.includes('export function openSharedPasswordAction') && sharedProfile.includes('export function setSharedProfilePrimary') && sharedProfile.includes('export function openSharedConsentDocument'), 'Professional and end-user profiles must share one Profile UI owner for A menu, photo, password, C and consent documents.');
+expect(sharedProfile.includes('export function openSharedProfileSettingsMenu') && sharedProfile.includes('export async function openSharedPhotoAction') && sharedProfile.includes('export function openSharedPasswordAction') && sharedProfile.includes('export function setSharedProfilePrimary') && !sharedProfile.includes('openSharedConsentDocument'), 'Professional and end-user profiles must share one Profile UI owner for A menu, photo, password and C; document rendering belongs only to ui/documents.');
 expect(css.includes('--v2-z-layer-offset:12px') && css.includes('inset:0 0 0 calc(var(--v2-edge) + var(--v2-z-layer-offset))'), 'Shared Z2 must leave a single 12px Z1 edge through the shared token.');
 expect(ui.includes("[data-v2-z], [data-v2-z-layer]") && ui.includes("revealDeck: false"), 'Shared swipe must own Z2 and close it without revealing F.');
 expect(accountControlsUi.includes("data-service-email") && accountControlsUi.includes("data-service-push") && accountControlsUi.includes("data-service-telegram"), 'Profile Settings must expose Telegram, Email and Push service channels.');
-expect(accountControlsUi.includes('openSharedConsentDocument') && !accountControlsUi.includes('v2Document('), 'Professional consent documents must use the Shared technical document owner.');
+expect(accountControlsUi.includes('documentTile(') && accountControlsUi.includes('documentTiles(') && accountControlsUi.includes('openDocumentViewer(') && !accountControlsUi.includes('openSharedConsentDocument') && !accountControlsUi.includes('v2LegalCards(') && !accountControlsUi.includes('v2Document('), 'Professional consent documents must use the single canonical Document UI owner.');
 expect(!accountControlsUi.includes('История согласий') && !accountControlsUi.includes('historyMarkup') && !accountControlsUi.includes('openConsentHistory') && !accountControlsUi.includes('data-consent-history'), 'Profile Settings must not expose consent history.');
 
 expect(style.includes('--text:#111111') && style.includes('--button-secondary:#D8D3CF') && style.includes('--text-secondary:#777A7D'), 'Shared palette must use the approved black and neutral tokens.');

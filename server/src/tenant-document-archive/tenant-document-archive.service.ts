@@ -302,7 +302,11 @@ export class TenantDocumentArchiveService {
   async publicDocuments(tenantId: string) {
     const state = await this.prisma.tenantDocumentArchive.findUnique({ where: { tenantId } });
     if (!state?.migrationVerifiedAt) throw new ConflictException('Документы для онлайн-записи ещё не готовы');
-    return normalize(state.data).documents;
+    return normalize(state.data).documents.filter((document: any) => (
+      !document?.hidden
+      && String(document?.documentClass || '') !== 'FILE'
+      && Boolean(document?.signable || document?.personConsent)
+    ));
   }
 
 }

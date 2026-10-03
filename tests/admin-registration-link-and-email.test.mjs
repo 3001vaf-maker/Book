@@ -50,7 +50,11 @@ assert.match(inviteUi, /14 дней с первого входа в прилож
 assert.match(inviteUi, /name: data\.get\('name'\)/);
 assert.match(inviteUi, /phone: data\.get\('phone'\)/);
 assert.match(inviteUi, /\/tenant-invitations\/accept/);
-assert.doesNotMatch(inviteUi, /manual-invitations|\/register\//);
+assert.match(inviteUi, /documentTile\(/);
+assert.match(inviteUi, /documentTiles\(/);
+assert.match(inviteUi, /openDocumentViewer\(/);
+assert.match(inviteUi, /data-document-toggle/);
+assert.doesNotMatch(inviteUi, /invite-document__|data-document-check|manual-invitations|\/register\//);
 
 assert.match(adminController, /@Delete\('tenants\/:tenantId'\)/);
 assert.match(adminService, /async deleteTenant\(tenantId: string\)/);

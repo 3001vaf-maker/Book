@@ -10,7 +10,7 @@
 
 .modal-sheet.modal--bottom.modal--consent-sheet{height:auto;min-height:210px;max-height:46%;padding:18px;background:var(--white);overflow:hidden}
 .modal--consent-sheet .account-consent-sheet{min-width:0;overflow:hidden}
-.modal--consent-sheet .v2-legal-cards{margin:0;padding-bottom:6px}
+.modal--consent-sheet .document-tiles--rail{margin:0;padding-bottom:6px}
 
 .modal-sheet.modal--bottom.modal--password-sheet{height:auto;min-height:330px;max-height:62%;padding:22px 18px calc(20px + env(safe-area-inset-bottom));background:var(--white);overflow:auto}
 

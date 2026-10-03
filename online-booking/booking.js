@@ -26,6 +26,8 @@ import {
 import { normalizeBookingSettings } from '../core/booking-settings/index.js';
 import {
   button,
+  documentTile,
+  documentTiles,
   emptyState,
   escapeHtml,
   field,
@@ -35,12 +37,11 @@ import {
   initV2StickerSwipe,
   initV2Swipe,
   mountV2ZLayer,
+  openDocumentViewer,
   openNotice,
   passwordField,
   phoneField,
-  v2Document,
   v2Header,
-  v2LegalCards,
   v2Shell,
   v2ZLayer,
   recordWorkplaceCards,
@@ -149,19 +150,12 @@ async function loadAccountTerms(state) {
   return state.accountTerms;
 }
 
-function renderExpandedDocument(root, state, document, onBack) {
-  const content = v2Document({
+function openConsentDocument(document = {}) {
+  return openDocumentViewer({
     title: document?.title || 'Документ',
     version: document?.version || 1,
     content: document?.content ?? document?.text ?? '',
   });
-  root.innerHTML = `<section class="${flowThemeClasses()}">${v2Sticker({
-    body: content,
-    className: 'v2-sticker-screen--legal-document',
-    closeData: 'data-u-document-close',
-  })}</section>`;
-  initV2StickerSwipe(root, { onRight: onBack });
-  root.querySelector('[data-u-document-close]')?.addEventListener('click', () => onBack?.());
 }
 
 function legalTitle(document = {}) {
@@ -179,15 +173,15 @@ function renderLegalSticker(root, state) {
   const tenantReady = tenantDocuments.filter((document) => document.required).every((document) => state.consents[String(document.id || '')]);
   const canContinue = platformReady && tenantReady;
 
-  const cards = v2LegalCards(documents.map((document) => ({
+  const cards = documentTiles(documents.map((document) => documentTile({
     title: legalTitle(document),
-    required: Boolean(document.required),
-    checked: document.platform ? Boolean(state.accountTermsAccepted) : Boolean(state.consents[String(document.id || '')]),
+    version: document.version || 1,
     openData: document.platform ? 'data-legal-platform-document' : `data-booking-document="${escapeHtml(document.id)}"`,
     toggleData: document.platform ? 'data-legal-platform-toggle' : `data-booking-consent="${escapeHtml(document.id)}"`,
-    openAria: `Открыть ${legalTitle(document)}`,
+    toggleChecked: document.platform ? Boolean(state.accountTermsAccepted) : Boolean(state.consents[String(document.id || '')]),
+    aria: `Открыть ${legalTitle(document)}`,
     toggleAria: `Изменить согласие: ${legalTitle(document)}`,
-  })));
+  })), { layout: 'rail' });
 
   const action = button('Продолжить', { data: 'data-legal-continue', disabled: !canContinue });
   const closeLegal = () => {
@@ -223,11 +217,11 @@ function renderLegalSticker(root, state) {
   root.querySelector('[data-booking-legal-u-close]')?.addEventListener('click', closeLegal);
 
   root.querySelector('[data-legal-platform-document]')?.addEventListener('click', () => {
-    renderExpandedDocument(root, state, {
+    openConsentDocument({
       title: state.accountTerms?.title || 'Условия использования',
       version: state.accountTerms?.version || 1,
       content: state.accountTerms?.content || '',
-    }, () => renderLegalSticker(root, state));
+    });
   });
   root.querySelector('[data-legal-platform-toggle]')?.addEventListener('click', () => {
     state.accountTermsAccepted = !state.accountTermsAccepted;
@@ -236,11 +230,11 @@ function renderLegalSticker(root, state) {
   root.querySelectorAll('[data-booking-document]').forEach((node) => node.addEventListener('click', () => {
     const document = tenantDocuments.find((item) => String(item.id) === String(node.dataset.bookingDocument));
     if (!document) return;
-    renderExpandedDocument(root, state, {
+    openConsentDocument({
       title: document.title || legalTitle(document),
       version: document.version || 1,
       content: document.text || '',
-    }, () => renderLegalSticker(root, state));
+    });
   }));
   root.querySelectorAll('[data-booking-consent]').forEach((node) => node.addEventListener('click', () => {
     const id = String(node.dataset.bookingConsent || '');
@@ -1269,15 +1263,15 @@ function renderGlobalClientLegal(root, state) {
     });
     return;
   }
-  const cards = v2LegalCards([{
+  const cards = documentTiles([documentTile({
     title: document.title || 'Условия использования учетной записи',
-    required: true,
-    checked: Boolean(state.accountTermsAccepted),
+    version: document.version || 1,
     openData: 'data-global-platform-document',
     toggleData: 'data-global-platform-toggle',
-    openAria: 'Открыть Условия использования учетной записи',
+    toggleChecked: Boolean(state.accountTermsAccepted),
+    aria: 'Открыть Условия использования учетной записи',
     toggleAria: 'Принять Условия использования учетной записи',
-  }]);
+  })], { layout: 'rail' });
   root.innerHTML = `<section class="${flowThemeClasses(state)}">${v2Sticker({
     title: 'Документы',
     body: `${cards}${button('Продолжить', { data: 'data-global-platform-continue', disabled: !state.accountTermsAccepted })}${formError(state.error)}`,
@@ -1286,7 +1280,7 @@ function renderGlobalClientLegal(root, state) {
   })}</section>`;
   root.querySelector('[data-global-legal-u-close]')?.addEventListener('click', () => renderGlobalClientDetails(root, state));
   root.querySelector('[data-global-platform-document]')?.addEventListener('click', () => {
-    renderExpandedDocument(root, state, document, () => renderGlobalClientLegal(root, state));
+    openConsentDocument(document);
   });
   root.querySelector('[data-global-platform-toggle]')?.addEventListener('click', () => {
     state.accountTermsAccepted = !state.accountTermsAccepted;
