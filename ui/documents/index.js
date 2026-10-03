@@ -10,6 +10,37 @@ function dataAttributes(data = '') {
   return value ? ` ${value}` : '';
 }
 
+function titleLines(value = '') {
+  const words = String(value || '').trim().split(/\s+/).filter(Boolean);
+  const fullTitle = words.join(' ') || 'Документ';
+  if (words.length <= 1 || fullTitle.length <= 26) return [fullTitle];
+
+  let splitAt = 1;
+  let bestDifference = Number.POSITIVE_INFINITY;
+  for (let index = 1; index < words.length; index += 1) {
+    const left = words.slice(0, index).join(' ');
+    const right = words.slice(index).join(' ');
+    const difference = Math.abs(left.length - right.length);
+    if (difference < bestDifference) {
+      bestDifference = difference;
+      splitAt = index;
+    }
+  }
+  return [
+    words.slice(0, splitAt).join(' '),
+    words.slice(splitAt).join(' '),
+  ];
+}
+
+function titleFontSize(lines = []) {
+  const longest = Math.max(...lines.map((line) => String(line || '').length), 1);
+  if (longest <= 24) return 16;
+  if (longest <= 29) return 14.5;
+  if (longest <= 35) return 12.5;
+  if (longest <= 42) return 10.5;
+  return Math.max(8.5, Math.min(10.5, 440 / longest));
+}
+
 export function documentTile({
   title = 'Документ',
   version = '',
@@ -28,14 +59,17 @@ export function documentTile({
   const state = ['signed', 'revoked', 'pending'].includes(String(statusState || ''))
     ? String(statusState)
     : '';
+  const lines = titleLines(title);
+  const titleMarkup = lines.map((line) => `<span>${text(line)}</span>`).join(' ');
+  const statusSymbol = state === 'signed' ? '✓' : state === 'revoked' ? '×' : state === 'pending' ? '—' : '';
   const statusMarkup = status
-    ? `<span class="document-tile__status${state ? ` is-${state}` : ''}"><span class="document-tile__status-mark" aria-hidden="true">${state === 'signed' ? '✓' : ''}</span><small>${text(status)}</small></span>`
+    ? `<span class="document-tile__status${state ? ` is-${state}` : ''}" aria-label="${text(status)}" title="${text(status)}"><span class="document-tile__status-mark" aria-hidden="true">${statusSymbol}</span></span>`
     : '';
 
   return `<${tag} class="document-tile${className ? ` ${text(className)}` : ''}"${attrs}>
     <span class="document-tile__fold" aria-hidden="true"></span>
     <span class="document-tile__body">
-      <strong class="document-tile__title">${text(title)}</strong>
+      <strong class="document-tile__title" style="--document-title-size:${titleFontSize(lines)}px">${titleMarkup}</strong>
       ${version !== '' ? `<span class="document-tile__version">Версия ${text(version)}</span>` : ''}
     </span>
     <span class="document-tile__footer">

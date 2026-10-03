@@ -8,107 +8,112 @@
 .document-tile{
   position:relative;
   width:238px;
-  min-height:144px;
+  min-height:158px;
   box-sizing:border-box;
-  border:2px solid var(--v2-ink,#111);
-  border-radius:0;
-  padding:16px;
+  border:1px solid #c9c9c9;
+  border-radius:10px;
+  padding:18px 16px 14px;
   display:grid;
   grid-template-rows:1fr auto;
   gap:12px;
   overflow:hidden;
-  background:#fff;
+  background:#f8f8f8;
   color:var(--v2-ink,#111);
   text-align:left;
   font:inherit;
-  box-shadow:0 5px 13px rgba(0,0,0,.10);
+  box-shadow:0 2px 8px rgba(0,0,0,.16);
 }
 button.document-tile{cursor:pointer}
 .document-tile__fold{
   position:absolute;
-  top:-2px;
-  right:-2px;
-  width:28px;
-  height:28px;
+  z-index:2;
+  top:-1px;
+  right:-1px;
+  width:42px;
+  height:42px;
   box-sizing:border-box;
-  background:#eceae7;
-  clip-path:polygon(0 0,100% 0,100% 100%);
+  clip-path:polygon(0 0,100% 100%,0 100%);
+  background:#fff;
+  border-left:1px solid #d3d3d3;
+  border-bottom:1px solid #d3d3d3;
+  border-bottom-left-radius:8px;
+  box-shadow:-3px 4px 8px rgba(0,0,0,.12);
   pointer-events:none;
 }
-.document-tile__fold::after{
-  content:'';
-  position:absolute;
-  width:40px;
-  border-top:2px solid var(--v2-ink,#111);
-  transform:rotate(45deg);
-  transform-origin:center;
-  top:13px;
-  right:-7px;
-}
 .document-tile__body{
+  position:relative;
+  z-index:1;
   min-width:0;
-  padding-right:24px;
+  padding-top:22px;
   display:grid;
   align-content:start;
-  gap:7px;
+  gap:8px;
 }
 .document-tile__title{
-  font-size:16px;
-  line-height:1.18;
-  overflow-wrap:anywhere;
+  max-width:100%;
+  display:grid;
+  gap:0;
+  font-size:var(--document-title-size,16px);
+  line-height:1.14;
+  font-weight:760;
+  letter-spacing:-.01em;
+}
+.document-tile__title span{
+  display:block;
+  min-width:0;
+  white-space:nowrap;
 }
 .document-tile__version,
-.document-tile__meta,
-.document-tile__status small{
+.document-tile__meta{
   font-size:12px;
   line-height:1.2;
 }
 .document-tile__version,
 .document-tile__meta{color:var(--v2-muted,#6f7478)}
 .document-tile__footer{
+  position:relative;
+  z-index:1;
   min-width:0;
   display:flex;
-  align-items:end;
+  align-items:center;
   justify-content:space-between;
   gap:10px;
 }
 .document-tile__meta{
   min-width:0;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
+  white-space:normal;
+  overflow:visible;
+  text-overflow:clip;
+  overflow-wrap:normal;
+  word-break:normal;
 }
 .document-tile__status{
   flex:0 0 auto;
-  display:flex;
-  align-items:center;
-  gap:6px;
+  display:grid;
+  place-items:center;
 }
 .document-tile__status-mark{
-  width:40px;
+  width:32px;
   height:22px;
   box-sizing:border-box;
   border:1px solid var(--v2-ink,#111);
-  border-radius:999px;
+  border-radius:7px;
   display:grid;
   place-items:center;
   background:#fff;
-  color:transparent;
-  font-size:13px;
-  font-weight:800;
+  color:var(--v2-ink,#111);
+  font-size:14px;
+  font-weight:850;
   line-height:1;
 }
 .document-tile__status.is-signed .document-tile__status-mark{
-  background:var(--v2-ink,#111);
-  color:#fff;
+  background:#fff;
+  color:var(--v2-ink,#111);
 }
-.document-tile__status.is-revoked .document-tile__status-mark::after,
-.document-tile__status.is-pending .document-tile__status-mark::after{
-  content:'';
-  width:14px;
-  height:14px;
-  border-radius:50%;
-  background:var(--v2-ink,#111);
+.document-tile__status.is-revoked .document-tile__status-mark,
+.document-tile__status.is-pending .document-tile__status-mark{
+  background:#fff;
+  color:var(--v2-ink,#111);
 }
 .document-viewer-backdrop{background:#111!important}
 .v2-layer--technical.document-viewer-sheet{
@@ -167,6 +172,7 @@ button.document-tile{cursor:pointer}
   flex:0 0 238px;
   scroll-snap-align:start;
 }
+.documents-content{margin-top:16px}
 .document-group{
   width:100%;
   display:grid;
@@ -184,3 +190,32 @@ button.document-tile{cursor:pointer}
   display:grid;
   gap:14px;
 }
+.documents-signing-info{
+  display:grid;
+  gap:7px;
+  min-width:0;
+}
+.documents-signing-info__title{
+  margin:0;
+  font-size:18px;
+  line-height:1.16;
+  font-weight:760;
+  text-wrap:balance;
+}
+.documents-signing-info__version{
+  color:var(--v2-muted,#6f7478);
+  font-size:13px;
+  line-height:1.2;
+}
+.documents-signing-info__person{
+  margin-top:5px;
+  font-size:16px;
+  line-height:1.2;
+  font-weight:720;
+}
+.documents-signing-info__moment,
+.documents-signing-info__status{
+  font-size:14px;
+  line-height:1.2;
+}
+.documents-signing-info__status{font-weight:680}

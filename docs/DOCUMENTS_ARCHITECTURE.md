@@ -56,7 +56,7 @@ The RKN PDF is a `FILE`.
 
 It is:
 - generated from a helper template and factual profile data;
-- a finished, deletable PDF;
+- a finished system PDF that may be hidden from one profile's visible Documents;
 - not signable;
 - not a legal consent document;
 - not versioned;
@@ -64,11 +64,11 @@ It is:
 - never written to `TenantConsentEvent`;
 - never shown in signing history.
 
-If relevant profile facts later change, a new **separate** update-helper PDF may be generated. The earlier PDF remains a separate file until the profile deletes it.
+If relevant profile facts later change, a new **separate** update-helper PDF may be generated. The earlier PDF remains a separate system artifact.
 
 A platform helper-template update by itself does not create another tenant PDF when the profile facts have not changed.
 
-Deleting an RKN helper removes the file from current documents but does not erase the generator state. The same helper must not reappear on login or refresh. A new helper is generated only when relevant factual profile data changes.
+For an RKN helper, the user-facing remove action means **hide from this profile's visible Documents**, not physical deletion. The artifact and generator state remain stored. A hidden helper must not reappear on login or refresh. A new helper may be generated only when relevant factual profile data changes.
 
 ## 5. Document versions
 
@@ -122,7 +122,9 @@ The second section is **Другие документы** and shows:
 - uploaded ordinary PDFs;
 - profile-created documents.
 
-All use the same shared `documentTile()` cover. Shared cover means shared geometry only; lifecycle rules come from document class.
+Both **Основные документы** and **Другие документы** use horizontal rails.
+
+All use the same shared `documentTile()` cover. Shared cover means shared geometry only; lifecycle rules come from document class. The shared cover is fixed at 238 px, uses the soft file/document silhouette with a folded corner, keeps the title to a compact two-line composition without ellipsis, and represents signed state with a single check indicator rather than duplicating status text.
 
 Clicking a cover opens Z2 **Информация о документе**. Z2 contains:
 1. the same document cover;
@@ -137,7 +139,7 @@ For `CORE_LEGAL`, settings do not offer deletion. For `USER_DOCUMENT` and `FILE`
 
 History contains signing events only. The same document may appear many times because different people can sign the same version or different versions.
 
-Opening an event shows the signed document cover plus the canonical `readOnlyReceipt` with who/what/version/time/status/source. Clicking the cover opens the immutable signed snapshot.
+Opening an event shows a small top informational modal only. It contains, linearly: document title, exact version, person, date-time and action status. It has no buttons, no repeated document cover, no receipt UI, no technical source and no document-opening action. The immutable signed snapshot remains audit backing data for later evidence/export flows.
 
 ## 9. End-user boundary
 

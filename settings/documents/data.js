@@ -42,6 +42,7 @@ function normalize(item = {}) {
     kind,
     documentClass,
     signable: policy.signable,
+    hidden: Boolean(item.hidden),
     title: String(item.title || 'Документ'),
     personConsent: Boolean(item.personConsent),
     required: Boolean(item.required),
@@ -365,6 +366,12 @@ export function deleteDocument(documentId = '') {
   const target = items.find((item) => item.id === id);
   if (!target) return false;
   if (!canDeleteDocument(target)) throw new Error('Основной документ нельзя удалить');
+
+  if (String(target?.attachment?.type || '').toUpperCase() === 'RKN_GUIDE_PDF') {
+    saveDocuments(items.map((item) => item.id === id ? normalize({ ...item, hidden: true }) : item));
+    return true;
+  }
+
   saveDocuments(items.filter((item) => item.id !== id));
   return true;
 }

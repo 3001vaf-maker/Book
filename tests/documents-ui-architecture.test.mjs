@@ -17,18 +17,26 @@ assert.match(documents, /data-v2-primary-visible="false"/);
 assert.match(documents, /openDocumentViewer/);
 assert.match(documents, /document-group--core/);
 assert.match(documents, /document-group--other/);
+assert.match(documents, /document-group--other[\s\S]*?layout: 'rail'/);
 assert.match(documents, /data-document-content-open/);
 assert.match(documents, /data-document-detail-settings/);
+assert.match(documents, /data-signing-info/);
+assert.match(documents, /variant: 'top'/);
+const signingDetail = documents.slice(documents.indexOf('function openSigningDetail'), documents.indexOf('function renderTemplatesLayer'));
+assert.doesNotMatch(signingDetail, /readOnlyReceipt|mountV2ZLayer|data-signing-document-open/);
 assert.doesNotMatch(documents, /pageHeader|folderList|\blist\s*\(/);
 assert.doesNotMatch(documents, /entity-page-header|page-header-action/);
 
 assert.match(documentUi, /export function documentTile/);
 assert.match(documentUi, /export function documentTiles/);
 assert.match(documentUi, /export function openDocumentViewer/);
+assert.doesNotMatch(documentUi, /document-tile__status[^\n]*<small>/);
 assert.match(documentCss, /\.document-tile\{/);
 assert.match(documentCss, /width:238px/);
-assert.match(documentCss, /border-radius:0/);
+assert.match(documentCss, /border-radius:10px/);
 assert.match(documentCss, /\.document-tiles--rail/);
+assert.match(documentCss, /\.documents-content\{margin-top:16px\}/);
+assert.match(documentCss, /\.document-tile__status\.is-signed[\s\S]*?background:#fff/);
 assert.match(documentCss, /\.document-viewer-backdrop\{background:#111/);
 assert.doesNotMatch(documentCss, /linear-gradient|radial-gradient/);
 

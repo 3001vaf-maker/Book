@@ -205,18 +205,38 @@ ok(root.querySelector('[data-segment-option="documents"]')?.classList.contains('
 ok(root.querySelectorAll('[data-document-group="core"] [data-profile-document]').length === 1, 'Fixture core rail must contain the available core tenant document');
 ok(root.querySelector('[data-document-group="core"] [data-document-layout="rail"]'), 'Core documents must use the horizontal rail layout');
 ok(root.querySelectorAll('[data-document-group="other"] [data-profile-document]').length === 3, 'Other section must keep user document and both independent RKN helper files');
+ok(root.querySelector('[data-document-group="other"] [data-document-layout="rail"]'), 'Other documents must use the horizontal rail layout');
+ok(getComputedStyle(root.querySelector('[data-documents-content]')).marginTop === '16px', 'Document content must keep spacing below the Documents/History switch');
 ok(
   root.textContent.includes('Инструкция по уведомлению Роскомнадзора')
   && root.textContent.includes('Инструкция по изменению сведений Роскомнадзора'),
   'Separate helper PDFs must remain visible as independent files'
 );
 ok(root.textContent.includes('Согласие на обработку персональных данных'), 'Core tenant document must remain visible in Documents Z1');
-ok([...root.querySelectorAll('.document-tile')].every((node) => getComputedStyle(node).borderRadius === '0px'), 'Document tile corners must be straight');
+ok([...root.querySelectorAll('.document-tile')].every((node) => getComputedStyle(node).width === '238px'), 'Document tile width must stay fixed at 238px');
+ok([...root.querySelectorAll('.document-tile')].every((node) => getComputedStyle(node).borderRadius === '10px'), 'Document tile must use the soft file geometry');
+
+mark('rkn-hide');
+root.querySelector('[data-profile-document="rkn-old"]')?.click();
+await wait();
+let detailLayer = root.closest('[data-v2-app]')?.querySelector('[data-v2-z-layer]');
+detailLayer?.querySelector('[data-document-detail-settings]')?.click();
+await wait();
+let rknSettings = document.querySelector('[data-modal][data-v2-layer-kind="bottom"]');
+ok(rknSettings?.querySelector('[data-detail-delete]')?.textContent.includes('Убрать документ'), 'RKN settings must describe removal as hiding');
+rknSettings?.querySelector('[data-detail-delete]')?.click();
+await wait();
+let rknConfirm = document.querySelector('[data-modal][data-v2-layer-kind="bottom"]');
+rknConfirm?.querySelector('[data-confirm-document-delete]')?.click();
+await wait();
+ok(data.getDocuments().some((item) => item.id === 'rkn-old' && item.hidden === true), 'RKN helper must remain stored with hidden state');
+ok(!root.querySelector('[data-profile-document="rkn-old"]'), 'Hidden RKN helper must disappear from visible Documents');
+ok(root.querySelectorAll('[data-document-group="other"] [data-profile-document]').length === 2, 'Only the hidden RKN helper must disappear from the other-documents rail');
 
 mark('document-info-z2');
 root.querySelector('[data-profile-document="profile-contract"]')?.click();
 await wait();
-let detailLayer = root.closest('[data-v2-app]')?.querySelector('[data-v2-z-layer]');
+detailLayer = root.closest('[data-v2-app]')?.querySelector('[data-v2-z-layer]');
 ok(Boolean(detailLayer?.querySelector('[data-document-detail]')), 'Document click must open information Z2 first');
 ok(Boolean(detailLayer?.querySelector('[data-read-only-sheet]')), 'Document information must use factual receipt UI');
 ok(Boolean(detailLayer?.querySelector('[data-document-detail-settings]')), 'Document information must expose A settings');
@@ -298,26 +318,26 @@ ok(root.querySelectorAll('[data-signing-event]').length === 1, 'History must sho
 ok(root.querySelectorAll('[data-document-history-event]').length === 0, 'Technical document-version events must stay under the hood');
 const signingTile = root.querySelector('[data-signing-event="signing-1"]');
 ok(signingTile?.textContent.includes('Версия 2'), 'History tile must show signed version');
-ok(signingTile?.textContent.includes('Подписан'), 'History tile must show signed status');
+ok(!signingTile?.textContent.includes('Подписано'), 'History cover must not duplicate signed status as text');
+ok(signingTile?.querySelector('.document-tile__status-mark')?.textContent.trim() === '✓', 'Signed history cover must use one black check indicator');
+ok(getComputedStyle(signingTile?.querySelector('.document-tile__status-mark')).backgroundColor === 'rgb(255, 255, 255)', 'Signed indicator must stay white instead of a black pill');
 ok(!signingTile?.textContent.includes('+79990000000'), 'Person details must not be placed on document cover');
 signingTile?.click();
 await wait();
 
-mark('signing-detail-z2');
-let signingLayer = root.closest('[data-v2-app]')?.querySelector('[data-v2-z-layer]');
-ok(Boolean(signingLayer), 'Signing fact must open Z2');
-ok(Boolean(signingLayer?.querySelector('[data-read-only-sheet]')), 'Signing detail must use canonical readOnlyReceipt');
-ok(signingLayer?.textContent.includes('+79990000000'), 'Signing receipt must show who signed');
-ok(signingLayer?.textContent.includes('Версия') && signingLayer?.textContent.includes('2'), 'Signing receipt must show document version');
-ok(Boolean(signingLayer?.querySelector('[data-signing-document-open]')), 'Signed snapshot cover missing from detail');
-
-mark('signed-snapshot-viewer');
-signingLayer?.querySelector('[data-signing-document-open]')?.click();
-await wait();
-technical = document.querySelector('[data-v2-layer-kind="technical"].document-viewer-backdrop');
-ok(Boolean(technical), 'Signed snapshot did not open technical viewer');
-ok(technical?.textContent.includes('Именно этот текст был подписан.'), 'Technical viewer must show exact signed snapshot');
-technical?.v2Close?.();
+mark('signing-info-s');
+const signingInfo = document.querySelector('[data-modal][data-v2-layer-kind="top"]');
+ok(Boolean(signingInfo?.querySelector('[data-signing-info]')), 'Signing fact must open the top S informational modal');
+ok(!root.closest('[data-v2-app]')?.querySelector('[data-v2-z-layer]'), 'Signing fact must not open a Z layer');
+ok(!signingInfo?.querySelector('[data-read-only-sheet]'), 'Signing fact must not use receipt UI');
+ok(!signingInfo?.querySelector('.document-tile'), 'Signing info must not redraw the document cover');
+ok(!signingInfo?.querySelector('button'), 'Signing info must contain no buttons');
+ok(signingInfo?.textContent.includes('Согласие на обработку персональных данных'), 'Signing info must show document title');
+ok(signingInfo?.textContent.includes('Версия 2'), 'Signing info must show signed version');
+ok(signingInfo?.textContent.includes('+79990000000'), 'Signing info must show who signed');
+ok(signingInfo?.textContent.includes('Подписано'), 'Signing info must show the action result');
+ok(!signingInfo?.textContent.includes('chat'), 'Signing info must not expose the technical source');
+signingInfo?.v2Close?.();
 
 if (failures.length) {
   document.documentElement.dataset.documentsRuntime = 'fail';

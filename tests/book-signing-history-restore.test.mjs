@@ -71,9 +71,10 @@ const ui = readFileSync(new URL('../settings/documents/documents.js', import.met
 assert.match(ui, /signedDocumentSnapshot/);
 assert.match(ui, /data-signing-event/);
 assert.match(ui, /openSigningDetail/);
-assert.match(ui, /data-signing-document-open/);
-assert.match(ui, /readOnlyReceipt/);
-assert.match(ui, /openDocument\(snapshot\)/);
+const signingDetail = ui.slice(ui.indexOf('function openSigningDetail'), ui.indexOf('function renderTemplatesLayer'));
+assert.match(signingDetail, /data-signing-info/);
+assert.match(signingDetail, /variant: 'top'/);
+assert.doesNotMatch(signingDetail, /data-signing-document-open|readOnlyReceipt|openDocument\(snapshot\)/);
 
 const migration = readFileSync(new URL('../server/prisma/migrations/20260915130000_canonical_consent_subjects/migration.sql', import.meta.url), 'utf8');
 assert.match(migration, /CREATE TABLE "ConsentEvent"/);
