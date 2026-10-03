@@ -579,8 +579,11 @@ assert.doesNotMatch(entityCardCss, /--entity-card-neutral|var\(--v2-disabled\)|v
 assert.match(entityCardCss, /\.entity-card\.has-image \.entity-card__background/);
 assert.match(infoUi, /export function infoUI/);
 assert.match(infoUi, /export function initInfoUI/);
-assert.match(infoCss, /\.ui-info__trigger\{[\s\S]*?border:1px solid #111;[\s\S]*?border-radius:0/);
-assert.match(infoCss, /\.ui-info--inverse/);
+assert.match(infoUi, /import \{ smallActionButton \} from '..\/buttons\/index\.js'/);
+assert.match(infoUi, /smallActionButton\(\{/);
+assert.match(buttonCss, /\.small-action-button\{[\s\S]*?width:24px;[\s\S]*?border:1px solid #111;[\s\S]*?background:#fff;[\s\S]*?color:#111/);
+assert.doesNotMatch(infoCss, /\.ui-info__trigger\{/);
+assert.match(infoCss, /\.ui-info--inverse \.ui-info__panel/);
 assert.match(timeUi, /variant:'bottom'/);
 assert.match(timeUi, /className:'modal--time-picker-sheet'/);
 assert.doesNotMatch(timeUi, /variant:'top'/);
