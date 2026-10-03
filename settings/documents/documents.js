@@ -37,7 +37,7 @@ import {
   DOCUMENT_CLASS,
   canDeleteDocument,
   canSignDocument,
-  isCoreLegalDocument,
+  isCoreDocument,
   isFileDocument,
   visibleDocumentVersion,
 } from './policy.js';
@@ -125,7 +125,7 @@ function coreDocuments() {
 
 function otherDocuments() {
   return currentProfileDocuments()
-    .filter((item) => !isCoreLegalDocument(item))
+    .filter((item) => !isCoreDocument(item))
     .sort((left, right) => Date.parse(documentMoment(right) || 0) - Date.parse(documentMoment(left) || 0));
 }
 
@@ -217,7 +217,7 @@ function openDocument(item) {
 }
 
 function documentTypeText(item) {
-  if (isCoreLegalDocument(item)) return 'Основной документ';
+  if (isCoreDocument(item)) return 'Основной документ';
   if (isRknGuide(item)) return 'PDF-помощник';
   if (isFileDocument(item)) return 'Файл';
   return 'Документ';
@@ -304,7 +304,7 @@ function detailReceipt(item) {
 
 function openDocumentDetailSettings(root, layer, item) {
   const actions = [];
-  if (isCoreLegalDocument(item)) {
+  if (isCoreDocument(item)) {
     actions.push(button('Открыть шаблон', { variant: 'outline', data: 'data-detail-template' }));
   } else if (canDeleteDocument(item)) {
     actions.push(button('Удалить документ', { variant: 'critical', data: 'data-detail-delete' }));
