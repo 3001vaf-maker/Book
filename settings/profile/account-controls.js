@@ -1,6 +1,6 @@
 import { apiRequest } from '../../core/auth.js';
 import { disablePlatformPush, enablePlatformPush, getPlatformPushState } from '../../core/platform-notices.js';
-import { emptyState, escapeHtml, modal, mountModal, openSharedConsentDocument, v2LegalCards, v2Section } from '../../ui/ui.js';
+import { documentTile, documentTiles, emptyState, escapeHtml, modal, mountModal, openDocumentViewer, v2Section } from '../../ui/ui.js';
 import { notificationSettings } from '../../ui/settings/index.js';
 
 async function request(path, options = {}) {
@@ -22,24 +22,17 @@ function moment(value) {
   }).format(date);
 }
 
-function actionText(action) {
-  if (action === 'CONSENTED') return 'Дано';
-  if (action === 'REVOKED') return 'Отозвано';
-  if (action === 'DECLINED') return 'Не дано';
-  return action || 'Не дано';
-}
-
 function consentCards(consents) {
   if (!consents.length) return emptyState('Согласий пока нет', 'Здесь появятся актуальные согласия вашей учётной записи.');
-  return v2LegalCards(consents.map((item) => ({
-    title:item.title,
-    status:actionText(item.action),
-    checked:Boolean(item.active),
+  return documentTiles(consents.map((item) => documentTile({
+    title:item.title || 'Документ',
+    version:item.displayVersion || item.currentVersion || item.eventVersion || '',
     openData:`data-account-consent-open="${escapeHtml(item.key)}"`,
-    openAria:`Открыть документ ${item.title}`,
     toggleData:`data-consent-toggle="${escapeHtml(item.key)}" data-active="${item.active ? 'true' : 'false'}"`,
-    toggleAria:`${item.active ? 'Отозвать' : 'Дать'} согласие: ${item.title}`,
-  })));
+    toggleChecked:Boolean(item.active),
+    aria:`Открыть документ ${item.title || ''}`,
+    toggleAria:`${item.active ? 'Отозвать' : 'Дать'} согласие: ${item.title || ''}`,
+  })), { layout:'rail' });
 }
 
 function serviceMarkup(state, pushState) {
@@ -74,7 +67,7 @@ function serviceMarkup(state, pushState) {
 }
 
 function openConsentDocument(item) {
-  return openSharedConsentDocument({
+  return openDocumentViewer({
     title:item.title || 'Документ',
     version:item.displayVersion || item.currentVersion || item.eventVersion || '',
     content:String(item?.documentText || '').trim(),
