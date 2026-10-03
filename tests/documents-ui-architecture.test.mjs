@@ -49,10 +49,14 @@ assert.doesNotMatch(documentCss, /linear-gradient|radial-gradient/);
 
 console.log('documents UI architecture tests: OK');
 
+const peopleConsentTile = people.slice(
+  people.indexOf('function personConsentTile'),
+  people.indexOf('function openPersonConsent'),
+);
 const peopleConsentBlock = people.slice(
   people.indexOf('function settingsCards'),
   people.indexOf('function refreshPersonIdentityPresentation'),
 );
-assert.match(peopleConsentBlock, /documentTile\(/);
+assert.match(peopleConsentTile, /documentTile\(/);
 assert.match(peopleConsentBlock, /documentTiles\(/);
 assert.doesNotMatch(peopleConsentBlock, /miniCard\(\{[\s\S]*?data-person-consent/);

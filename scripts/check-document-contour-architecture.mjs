@@ -64,11 +64,15 @@ assert.match(files.tenantController,/@Get\('platform-bases'\)/);
 
 console.log('document contour architecture: OK');
 
+const peopleConsentTile = files.people.slice(
+  files.people.indexOf('function personConsentTile'),
+  files.people.indexOf('function openPersonConsent'),
+);
 const peopleConsentBlock = files.people.slice(
   files.people.indexOf('function settingsCards'),
   files.people.indexOf('function refreshPersonIdentityPresentation'),
 );
-assert.match(peopleConsentBlock,/documentTile\(/,'People consent cards must use shared documentTile');
+assert.match(peopleConsentTile,/documentTile\(/,'People consent cards must use shared documentTile');
 assert.match(peopleConsentBlock,/documentTiles\(/,'People consent cards must use shared documentTiles');
 assert.doesNotMatch(peopleConsentBlock,/miniCard\(\{[\s\S]*?data-person-consent/,'People consent cards must not use Mini Card');
 const peopleConsentDetail = files.people.slice(
