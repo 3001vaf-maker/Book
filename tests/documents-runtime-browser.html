@@ -46,11 +46,45 @@ const [{ v2Header, v2Shell }, documentsUi, data, consents, history] = await Prom
   import('/settings/documents/history.js'),
 ]);
 
+data.configurePlatformDocumentBases([
+  {
+    key:'user-document-pdn-policy',
+    documentId:'pdn-agreement',
+    kind:'agreement',
+    personConsent:false,
+    required:false,
+    title:'Политика обработки персональных данных',
+    version:1,
+    content:'Политика для [ФИО пользователя] · [Контакт пользователя]'
+  },
+  {
+    key:'user-document-pdn-consent',
+    documentId:'pdn-consent',
+    kind:'consent',
+    personConsent:true,
+    required:true,
+    title:'Согласие на обработку персональных данных',
+    version:1,
+    content:'Согласие для [ФИО пользователя] · [Контакт пользователя]'
+  },
+  {
+    key:'user-document-messages-consent',
+    documentId:'messages-consent',
+    kind:'consent',
+    personConsent:true,
+    required:false,
+    title:'Согласие на рекламные сообщения',
+    version:1,
+    content:'Реклама для [ФИО пользователя] · [Контакт пользователя]'
+  }
+], {
+  profile:{ name:'Иван', surname:'Проверка', phone:'+79990000000' }
+});
+
 data.hydrateDocumentsFromServer([
   {
     id:'pdn-consent',
     system:true,
-    recordType:'template',
     signable:true,
     kind:'consent',
     title:'Согласие на обработку персональных данных',
@@ -65,7 +99,6 @@ data.hydrateDocumentsFromServer([
   {
     id:'profile-contract',
     system:false,
-    recordType:'document',
     signable:true,
     kind:'document',
     title:'Договор на фотосъёмку',
@@ -78,7 +111,6 @@ data.hydrateDocumentsFromServer([
   {
     id:'rkn-old',
     system:true,
-    recordType:'document',
     kind:'instruction',
     title:'Инструкция по уведомлению Роскомнадзора',
     version:1,
@@ -95,7 +127,6 @@ data.hydrateDocumentsFromServer([
   {
     id:'rkn-current',
     system:true,
-    recordType:'document',
     kind:'instruction',
     title:'Инструкция по изменению сведений Роскомнадзора',
     version:2,
@@ -121,8 +152,7 @@ history.hydrateDocumentHistoryFromServer([
     createdAt:'2026-10-01T07:00:00.000Z',
     snapshot:{
       id:'pdn-consent',
-      recordType:'template',
-      signable:true,
+        signable:true,
       kind:'consent',
       title:'Согласие на обработку персональных данных',
       personConsent:true,
@@ -166,9 +196,9 @@ mark('z1-documents');
 ok(Boolean(root.querySelector('[data-workspace-header-context][data-workspace-title="Документы"]')), 'Documents workspace context missing');
 ok(root.querySelectorAll('[data-segment-option]').length === 2, 'Documents/History switch must contain two options');
 ok(root.querySelector('[data-segment-option="documents"]')?.classList.contains('is-active'), 'Documents must be active by default');
-ok(root.querySelectorAll('[data-profile-document]').length === 2, 'Z1 must show current contract plus only latest RKN document');
+ok(root.querySelectorAll('[data-profile-document]').length === 3, 'Z1 must show tenant consent, current contract and only latest RKN document');
 ok(!root.textContent.includes('Старая версия РКН'), 'Old RKN version leaked into Z1');
-ok(!root.textContent.includes('Согласие на обработку персональных данных'), 'Template leaked into profile Documents Z1');
+ok(root.textContent.includes('Согласие на обработку персональных данных'), 'Tenant document created from template must remain visible in Documents Z1');
 ok([...root.querySelectorAll('.document-tile')].every((node) => getComputedStyle(node).borderRadius === '0px'), 'Document tile corners must be straight');
 
 mark('technical-viewer');
@@ -191,15 +221,16 @@ ok(Boolean(settingsX?.querySelector('[data-add-profile-document]')), 'Add docume
 settingsX?.querySelector('[data-open-document-templates]')?.click();
 await wait();
 
-mark('templates-x');
-let templatesX = document.querySelector('[data-modal][data-v2-layer-kind="bottom"]');
-ok(Boolean(templatesX?.querySelector('[data-template-open="pdn-consent"]')), 'Current template missing from Templates X');
-templatesX?.querySelector('[data-template-open="pdn-consent"]')?.click();
+mark('templates-z2');
+let templateLayer = root.closest('[data-v2-app]')?.querySelector('[data-v2-z-layer]');
+ok(Boolean(templateLayer), 'Templates must open as Z2, not as a second bottom modal');
+ok(Boolean(templateLayer?.querySelector('[data-template-open="pdn-consent"]')), 'Current template missing from Templates Z2');
+ok(Boolean(templateLayer?.querySelector('[data-template-open="messages-consent"]')), 'Platform template missing when no tenant document exists yet');
+templateLayer?.querySelector('[data-template-open="pdn-consent"]')?.click();
 await wait();
 
-mark('template-z2');
-let templateLayer = root.closest('[data-v2-app]')?.querySelector('[data-v2-z-layer]');
-ok(Boolean(templateLayer), 'Template must open as Z2');
+mark('template-editor-z2');
+ok(Boolean(templateLayer?.querySelector('[data-template-form]')), 'Template editor must reuse the same Z2');
 let saveSource = templateLayer?.querySelector('[data-template-save]');
 ok(saveSource?.dataset.v2PrimaryVisible === 'false', 'C Save must be hidden before template changes');
 const templateText = templateLayer?.querySelector('[name="documentText"]');
@@ -222,6 +253,7 @@ root.querySelector('[data-segment-option="history"]')?.click();
 await wait();
 ok(root.querySelector('[data-segment-option="history"]')?.classList.contains('is-active'), 'History switch did not activate');
 ok(root.querySelectorAll('[data-signing-event]').length === 1, 'History must show signing fact as one document tile');
+ok(root.querySelectorAll('[data-document-history-event]').length >= 1, 'History must also preserve saved document-version snapshots');
 const signingTile = root.querySelector('[data-signing-event="signing-1"]');
 ok(signingTile?.textContent.includes('Версия 2'), 'History tile must show signed version');
 ok(signingTile?.textContent.includes('Подписан'), 'History tile must show signed status');
