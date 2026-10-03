@@ -274,7 +274,7 @@ if (!/resolvedVariant === 'bottom' \|\| resolvedVariant === 'top' \|\| resolvedV
 }
 
 const cashUI = source('core/finance/cash/cash.js');
-for (const token of ['workspaceHeaderContext', 'entityVisualCard', 'mountEntityCardConstructor', 'mountV2ZLayer', 'v2ListEntry', 'v2ListEntries', 'readOnlyReceipt']) {
+for (const token of ['workspaceHeaderContext', 'entityVisualCard', 'openEntityCardAppearanceQ', 'mountV2ZLayer', 'v2ListEntry', 'v2ListEntries', 'readOnlyReceipt']) {
   if (!cashUI.includes(token)) errors.push(`Cash UI must use shared ${token}`);
 }
 if (!/data-cash-create/.test(cashUI)
