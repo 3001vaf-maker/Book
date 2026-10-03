@@ -118,7 +118,7 @@ The internal archive remains the legal/audit owner, but the ordinary profile UI 
 
 User-facing `Documents` has one Z1 switch:
 - `Документы` — only current profile-owned document instances;
-- `История` — consent/signing facts, represented by the same shared document UI.
+- `История` — consent/signing facts plus saved document-version snapshots, represented by the same shared document UI.
 
 Header ownership:
 - A — document settings;
@@ -130,9 +130,9 @@ A opens the shared bottom X with:
 - `Шаблоны`;
 - `Добавить документ`.
 
-Templates are editable sources. Editing a platform-provided template creates a tenant-owned custom current version; prior versions and snapshots remain internal and are not duplicated in the ordinary UI.
+Templates are editable sources owned by the platform Document Registry. They are not tenant documents and must remain available even when the tenant archive has no current instance yet. Editing a platform template creates or updates the tenant-owned current document derived from that template; prior versions and snapshots remain in the archive.
 
-A profile-owned document is not a template. It may be a generated document, a user-created text document, or an uploaded PDF. Only the current document is shown in Z1; historical versions remain in the archive.
+Every item stored in TenantDocumentArchive.documents is a profile-owned document instance, including the current PDN/marketing documents derived from platform templates, generated documents, user-created text documents, and uploaded PDFs. Tenant documents must never be hidden by reclassifying them as templates. Only the current document is shown in Z1; historical versions remain in History/archive.
 
 Every document manifestation uses the shared `documentTile()` owner. Context changes only the displayed metadata/status. Opening document content always uses the shared technical viewer: black background, white paper, close control only.
 
