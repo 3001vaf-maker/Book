@@ -2,6 +2,7 @@ import { apiRequest } from './core/auth.js';
 import { hydrateCashEntitiesFromServer, hydrateFinanceFromServer, hydrateWalletsFromServer } from './core/finance/index.js';
 import { hydrateProductsFromServer } from './settings/service/products/data.js';
 import { hydrateTagsFromServer } from './settings/tags/data.js';
+import { hydrateCardAppearanceTemplates } from './core/card-appearance-templates.js';
 
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
@@ -15,6 +16,7 @@ function normalize(value = {}) {
     tags: Array.isArray(value.tags) ? clone(value.tags) : [],
     products: Array.isArray(value.products) ? clone(value.products) : [],
     productHistory: Array.isArray(value.productHistory) ? clone(value.productHistory) : [],
+    cardAppearanceTemplates: Array.isArray(value.cardAppearanceTemplates) ? clone(value.cardAppearanceTemplates) : [],
   };
 }
 
@@ -30,6 +32,7 @@ function hydrateAuxiliary(value) {
   hydrateCashEntitiesFromServer({ investments: bundle.investments, loans: bundle.loans });
   hydrateTagsFromServer(bundle.tags);
   hydrateProductsFromServer({ products: bundle.products, productHistory: bundle.productHistory });
+  hydrateCardAppearanceTemplates(bundle.cardAppearanceTemplates);
 }
 
 async function hydrateCanonicalFinance() {

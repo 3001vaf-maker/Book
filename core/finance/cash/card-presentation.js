@@ -1,4 +1,5 @@
 import { normalizeEntityCardAppearance, shortDate } from '../../../ui/ui.js';
+import { getCardAppearanceTemplate } from '../../card-appearance-templates.js';
 
 function money(value = 0) {
   return `${(Number(value) || 0).toLocaleString('ru-RU')} ₽`;
@@ -38,12 +39,20 @@ export function walletCardAppearance(wallet = {}) {
   if (hasConfiguredLines(wallet?.cardAppearance)) {
     return normalizeEntityCardAppearance(wallet.cardAppearance);
   }
+  const template = getCardAppearanceTemplate('wallet');
+  if (hasConfiguredLines(template?.appearance)) {
+    return normalizeEntityCardAppearance(template.appearance);
+  }
   return normalizeEntityCardAppearance({
     lines: defaultLines([
       { row: 7, field: 'walletName', zone: 'full', align: 'left', size: 'l', bold: true },
       { row: 9, field: 'balance', zone: 'right', align: 'right', size: 'm', bold: true },
     ]),
   });
+}
+
+export function walletCardPhoto(wallet = {}) {
+  return String(wallet?.photo || getCardAppearanceTemplate('wallet')?.photo || '');
 }
 
 
@@ -71,6 +80,10 @@ export function cashEntityCardAppearance(entity = {}, kind = '') {
   if (hasConfiguredLines(entity?.cardAppearance)) {
     return normalizeEntityCardAppearance(entity.cardAppearance);
   }
+  const template = getCardAppearanceTemplate(kind === 'loan' ? 'loan' : 'investment');
+  if (hasConfiguredLines(template?.appearance)) {
+    return normalizeEntityCardAppearance(template.appearance);
+  }
   return normalizeEntityCardAppearance({
     lines: defaultLines([
       { row: 7, field: 'entityName', zone: 'full', align: 'left', size: 'l', bold: true },
@@ -78,4 +91,9 @@ export function cashEntityCardAppearance(entity = {}, kind = '') {
       { row: 9, field: 'balance', zone: 'right', align: 'right', size: 'm', bold: true },
     ]),
   });
+}
+
+export function cashEntityCardPhoto(entity = {}, kind = '') {
+  const scope = kind === 'loan' ? 'loan' : 'investment';
+  return String(entity?.photo || getCardAppearanceTemplate(scope)?.photo || '');
 }

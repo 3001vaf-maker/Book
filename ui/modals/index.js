@@ -3,7 +3,7 @@ import { mountV2Layer, v2Layer } from '../v2/index.js';
 
 let modalLevel = 0;
 
-const MODAL_VARIANTS = new Set(['list', 'large', 'medium', 'compact', 'quick', 'top', 'standard', 'bottom', 'technical']);
+const MODAL_VARIANTS = new Set(['list', 'large', 'medium', 'compact', 'quick', 'top', 'standard', 'bottom', 'technical', 'q']);
 const MODAL_SURFACES = new Set(['app']);
 
 function v2Kind(variant = '') {
@@ -23,6 +23,7 @@ export function modal(content, { title = '', className = '', variant = '', surfa
     title: '',
     className: classes,
   });
+  if (resolvedVariant === 'q') html = html.replace('data-v2-layer ', 'data-v2-layer data-v2-q="true" ');
   if (title) html = html.replace('aria-label=""', `aria-label="${escapeHtml(title)}"`);
   html = html
     .replace('class="v2-layer-backdrop"', 'class="v2-layer-backdrop modal-backdrop" data-modal')

@@ -411,8 +411,35 @@ shell()?.querySelector('[data-v2-workspace-a]')?.dispatchEvent(new MouseEvent('c
 await wait(35);
 let cashRootSettings = document.querySelector('[data-shared-profile-settings-menu]');
 ok(Boolean(cashRootSettings), 'Cash A/settings did not open');
-ok(Boolean(cashRootSettings?.querySelector('[data-shared-profile-action="financial-operations"]')),
-  'Cash A/settings must contain Financial operations');
+const cashRootActionIds = [...(cashRootSettings?.querySelectorAll('[data-shared-profile-action]') || [])]
+  .map((node) => node.dataset.sharedProfileAction);
+ok(cashRootActionIds.join('|') === 'appearance|financial-operations',
+  'Cash A/settings must contain centralized View and Financial operations');
+
+cashRootSettings?.querySelector('[data-shared-profile-action="appearance"]')
+  ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(45);
+let cashAppearanceQ = document.querySelector('[data-v2-q="true"]');
+ok(Boolean(cashAppearanceQ), 'Cash View must open Q, not Z2');
+ok(!shell()?.querySelector('[data-v2-z-layer]'), 'Cash View Q must not create a stacked Z layer');
+ok(Boolean(cashAppearanceQ?.querySelector('[data-entity-card-appearance-constructor]')),
+  'Cash View Q must reuse the shared Entity Card constructor');
+const cashAppearanceType = cashAppearanceQ?.querySelector('input[name="entityCardAppearanceType"]');
+const cashAppearanceTypeTrigger = cashAppearanceType?.closest('.ui-select')?.querySelector('[data-ui-select-trigger]');
+const cashAppearanceTypes = JSON.parse(cashAppearanceTypeTrigger?.dataset.options || '[]').map((item) => item.value);
+ok(cashAppearanceTypes.join('|') === 'wallet|loan|investment',
+  'Cash View Q type selector must contain Wallet, Loan and Investment');
+ok(Boolean(cashAppearanceQ?.querySelector('input[name="entityCardAppearanceTarget"]')),
+  'Cash View Q must contain All/specific target selector');
+ok(!shell()?.querySelector('[data-v2-workspace-chat]'),
+  'Cash View Q must hide Chat D');
+cashAppearanceQ?.v2Close?.();
+await wait(35);
+ok(!document.querySelector('[data-v2-q="true"]'), 'Cash View Q must fully release before returning to Cash Z');
+
+shell()?.querySelector('[data-v2-workspace-a]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(30);
+cashRootSettings = document.querySelector('[data-shared-profile-settings-menu]');
 cashRootSettings?.querySelector('[data-shared-profile-action="financial-operations"]')
   ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
 await wait(45);
@@ -502,8 +529,8 @@ await wait(30);
 let loanSettings = document.querySelector('[data-shared-profile-settings-menu]');
 const loanActionIds = [...(loanSettings?.querySelectorAll('[data-shared-profile-action]') || [])]
   .map((node) => node.dataset.sharedProfileAction);
-ok(loanActionIds.join('|') === 'appearance|terms|financial-operation',
-  'Loan A must contain exactly View, Loan terms and Financial operation');
+ok(loanActionIds.join('|') === 'terms|financial-operation',
+  'Loan A must contain only Loan terms and Financial operation; View belongs to Cash Q');
 
 loanSettings?.querySelector('[data-shared-profile-action="terms"]')
   ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
@@ -585,21 +612,9 @@ await wait(25);
 let investmentSettings = document.querySelector('[data-shared-profile-settings-menu]');
 const investmentActionIds = [...(investmentSettings?.querySelectorAll('[data-shared-profile-action]') || [])]
   .map((node) => node.dataset.sharedProfileAction);
-ok(investmentActionIds.join('|') === 'appearance|terms|financial-operation',
-  'Investment A must contain exactly View, Investment terms and Financial operation');
+ok(investmentActionIds.join('|') === 'terms|financial-operation',
+  'Investment A must contain only Investment terms and Financial operation; View belongs to Cash Q');
 
-investmentSettings?.querySelector('[data-shared-profile-action="appearance"]')
-  ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
-await wait(35);
-let investmentAppearanceZ = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
-ok(Boolean(investmentAppearanceZ?.querySelector('[data-finance-entity-card-constructor]')),
-  'Investment View must open the shared Entity Card constructor');
-investmentAppearanceZ?.v2Close?.();
-await wait(25);
-
-shell()?.querySelector('[data-v2-workspace-a]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
-await wait(25);
-investmentSettings = document.querySelector('[data-shared-profile-settings-menu]');
 investmentSettings?.querySelector('[data-shared-profile-action="terms"]')
   ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
 await wait(35);
@@ -642,7 +657,9 @@ await wait(35);
 let cashZ2 = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
 ok(Boolean(cashZ2), 'Cash card did not open Z2');
 ok(cashZ2?.querySelector('[data-workspace-header-context]')?.dataset.workspaceTitle === 'Наличные', 'Cash Z2 B title is wrong');
-ok(Boolean(shell()?.querySelector('[data-v2-workspace-a]')), 'Cash Z2 A/settings control missing');
+const cashSystemA = shell()?.querySelector('.v2-header__slot--a .v2-header__control');
+ok(Boolean(cashSystemA), 'Cash Z2 A photo/logo must remain visible');
+ok(Boolean(cashSystemA?.disabled), 'System cash A must be visible but inactive because View is centralized in Cash Q');
 const runtimeOperation = cashZ2?.querySelector('[data-wallet-operation="runtime-payment"]');
 ok(Boolean(runtimeOperation?.classList.contains('list-entry')), 'Cash operations must use the canonical List Entry');
 ok([...((runtimeOperation?.querySelectorAll('.list-entry__text > strong')) || [])].some((node) => node.textContent.trim() === 'Оплата услуги'), 'Cash operation name must stay in the List Entry title');
@@ -652,23 +669,7 @@ ok(runtimeOperation?.querySelector('.list-entry__right > strong')?.textContent.i
 ok(Boolean(runtimeOperation?.querySelector('.list-entry__right > small')?.textContent.trim()), 'Cash List Entry date-time must be under the amount');
 ok(!cashZ2?.querySelector('.entity-card--compact'), 'Cash operations must not use compact entity cards');
 
-shell()?.querySelector('[data-v2-workspace-a]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
-await wait(25);
-let cashSettings = document.querySelector('[data-shared-profile-settings-menu]');
-ok(Boolean(cashSettings?.querySelector('[data-shared-profile-action="appearance"]')), 'Cash settings must contain View');
-ok(!cashSettings?.textContent.includes('Удалить кассу'), 'System cash must not expose delete');
-ok(!cashSettings?.textContent.includes('Полное удаление'), 'System cash must not expose hard delete');
-cashSettings?.querySelector('[data-shared-profile-action="appearance"]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
-await wait(25);
-let appearanceZ = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
-ok(Boolean(appearanceZ?.querySelector('[data-entity-card-editor]')), 'Cash View must open the shared entity card editor');
 let zEdge = edge();
-pointer(zEdge,'pointerdown',10,360,150);
-pointer(zEdge,'pointermove',82,362,150);
-pointer(zEdge,'pointerup',82,362,150);
-await wait(35);
-
-cashZ2 = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
 cashZ2?.querySelector('[data-wallet-operation="runtime-payment"]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
 await wait(25);
 let operationZ3 = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
@@ -694,7 +695,10 @@ ok(!receipt?.textContent.includes('Конечный пользователь'), 
 ok(!receipt?.textContent.includes('Стрижка'), 'Cash receipt must not show what was paid for');
 ok(operationZ3?.querySelector('[data-workspace-header-context]')?.dataset.workspaceTitle === 'Оплата услуги', 'Cash Z3 B operation title is wrong');
 
-shell()?.querySelector('[data-v2-workspace-a]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+const cashOperationA = shell()?.querySelector('[data-v2-workspace-a]');
+ok(Boolean(cashOperationA), 'Cash operation Z3 must expose clickable A/settings gear');
+ok(Boolean(cashOperationA?.querySelector('.v2-header__settings-tag')), 'Cash operation Z3 A must show settings gear');
+cashOperationA?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
 await wait(20);
 const operationSettings = document.querySelector('[data-shared-profile-settings-menu]');
 ok(Boolean(operationSettings?.querySelector('[data-shared-profile-action="delete-operation"]')), 'Cash operation A/settings must expose delete operation');

@@ -27,6 +27,7 @@ assert(cashEntities.includes('hydrateCashEntitiesFromServer')
   && cashEntities.includes("queueAuxiliaryDataset('investments'")
   && cashEntities.includes("queueAuxiliaryDataset('loans'"), 'Investment and loan entities must use server-hydrated auxiliary state and server writes.');
 assert(auxiliaryService.includes("'investments'") && auxiliaryService.includes("'loans'"), 'Auxiliary server owner must accept investment and loan entity datasets.');
+assert(auxiliaryService.includes("'cardAppearanceTemplates'") && migration.includes('hydrateCardAppearanceTemplates') && migration.includes('cardAppearanceTemplates'), 'Centralized card appearance templates must be server-owned auxiliary data and hydrate before UI rendering.');
 assert(tags.includes('hydrateTagsFromServer') && tags.includes("queueAuxiliaryDataset('tags'"), 'Tags must use server-hydrated runtime state and server writes.');
 assert(products.includes('hydrateProductsFromServer') && products.includes("queueAuxiliaryDataset('products'") && products.includes("queueAuxiliaryDataset('productHistory'"), 'Products and product history must use server-hydrated runtime state and server writes.');
 assert(schema.includes('model BusinessAuxiliaryState'), 'Server must own a dedicated auxiliary business state.');

@@ -482,10 +482,11 @@ export function mountV2Layer(html, { root = null } = {}) {
   if (!node?.matches('[data-v2-layer]')) return null;
   const kind = node.dataset.v2LayerKind || 'standard';
   const technical = kind === 'technical';
+  const qLayer = node.dataset.v2Q === 'true';
   const host = technical ? document.body : activeV2ModalSurface(root);
   if (!host) return null;
   const app = technical ? null : host.closest?.('[data-v2-app]');
-  const locksHeader = Boolean(app && kind === 'standard');
+  const locksHeader = Boolean(app && kind === 'standard' && !qLayer);
   const header = locksHeader ? app.querySelector?.('[data-v2-header]') : null;
   const portalOwner = technical ? null : mountV2ModalPortal(host);
   const mountHost = portalOwner?.portal || host;
@@ -497,6 +498,7 @@ export function mountV2Layer(html, { root = null } = {}) {
   }
   mountHost.appendChild(node);
   node.v2Portal = portalOwner?.portal || null;
+  if (qLayer) window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
 
   let disposeGesture = () => {};
   const stopPointerPropagation = (event) => event.stopPropagation();
@@ -509,6 +511,7 @@ export function mountV2Layer(html, { root = null } = {}) {
     if (node.isConnected) node.remove();
     portalOwner?.dispose();
     if (!technical && host.matches?.('[data-v2-z], [data-v2-z-layer]')) unlockV2ModalSurface(host);
+    if (qLayer) window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
     if (locksHeader && app && !app.querySelector('[data-v2-layer-kind="standard"]')) {
       const currentHeader = app.querySelector?.('[data-v2-header]');
       if (currentHeader) {

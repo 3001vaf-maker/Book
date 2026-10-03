@@ -11,9 +11,10 @@ type AuxiliaryBundle = {
   tags: JsonObject[];
   products: JsonObject[];
   productHistory: JsonObject[];
+  cardAppearanceTemplates: JsonObject[];
 };
 
-const DATASETS = new Set(['wallets', 'investments', 'loans', 'tags', 'products', 'productHistory']);
+const DATASETS = new Set(['wallets', 'investments', 'loans', 'tags', 'products', 'productHistory', 'cardAppearanceTemplates']);
 
 function objectValue(value: unknown): JsonObject {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonObject : {};
@@ -36,6 +37,7 @@ function normalize(value: unknown): AuxiliaryBundle {
     tags: (Array.isArray(source.tags) ? source.tags : []).map((item) => clone(objectValue(item))),
     products: (Array.isArray(source.products) ? source.products : []).map((item) => clone(objectValue(item))),
     productHistory: (Array.isArray(source.productHistory) ? source.productHistory : []).map((item) => clone(objectValue(item))),
+    cardAppearanceTemplates: (Array.isArray(source.cardAppearanceTemplates) ? source.cardAppearanceTemplates : []).map((item) => clone(objectValue(item))),
   };
 }
 

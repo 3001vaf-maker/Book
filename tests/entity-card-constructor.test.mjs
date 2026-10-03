@@ -47,20 +47,24 @@ assert.match(css,/v2-profile-workplaces>\.entity-visual-card/);
 const profileSource=fs.readFileSync(new URL('../settings/profile/profile.js',import.meta.url),'utf8');
 const workplaceSource=fs.readFileSync(new URL('../settings/profile/workplaces/workplaces.js',import.meta.url),'utf8');
 const constructorSource=fs.readFileSync(new URL('../ui/cards/entity-card-constructor.js',import.meta.url),'utf8');
+const appearanceQSource=fs.readFileSync(new URL('../ui/cards/appearance-q.js',import.meta.url),'utf8');
 const v2Source=fs.readFileSync(new URL('../ui/v2/index.js',import.meta.url),'utf8');
 const inputCss=fs.readFileSync(new URL('../ui/inputs/inputs.css',import.meta.url),'utf8');
 const colorSource=fs.readFileSync(new URL('../ui/colors/index.js',import.meta.url),'utf8');
 
 assert.match(profileSource,/entityVisualCard\(/);
 assert.doesNotMatch(profileSource,/entity-card--hero/);
-assert.match(profileSource,/mountV2ZLayer\(root,v2ZLayer/);
-assert.match(profileSource,/\{stack:true\}/);
+assert.match(profileSource,/openEntityCardAppearanceQ\(root/);
+assert.match(profileSource,/Все рабочие пространства/);
+assert.doesNotMatch(profileSource,/mountEntityCardConstructor\(/);
 assert.doesNotMatch(profileSource,/modal--entity-card-constructor/);
-assert.match(profileSource,/layer\.v2Close\?\.\(\)/);
 
-assert.match(workplaceSource,/mountV2ZLayer\(root,v2ZLayer/);
-assert.match(workplaceSource,/\{stack:true\}/);
-assert.doesNotMatch(workplaceSource,/modal--entity-card-constructor/);
+assert.doesNotMatch(workplaceSource,/openWorkplaceAppearance\(/);
+assert.doesNotMatch(workplaceSource,/mountEntityCardConstructor\(/);
+assert.doesNotMatch(workplaceSource,/label:'Вид'/);
+assert.match(appearanceQSource,/variant: 'q'/);
+assert.match(appearanceQSource,/mountEntityCardConstructor\(constructor/);
+assert.match(appearanceQSource,/data-entity-card-appearance-type/);
 
 assert.match(constructorSource,/select\(\{/);
 assert.match(constructorSource,/colorPicker\(\{/);
