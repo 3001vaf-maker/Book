@@ -1,27 +1,30 @@
 .segment-control{
-  --segment-count:3;
-  display:grid;
-  grid-template-columns:repeat(var(--segment-count),minmax(0,1fr));
-  gap:2px;
-  padding:3px;
-  margin-bottom:18px;
+  display:inline-flex;
+  align-items:center;
+  width:max-content;
+  max-width:100%;
+  gap:1px;
+  padding:2px;
+  margin:0 0 8px;
   border:1px solid var(--text);
-  border-radius:14px;
+  border-radius:10px;
   background:var(--white);
   overflow:hidden;
 }
-.segment-control--one{--segment-count:1}
-.segment-control--two-equal{--segment-count:2}
 .segment-control button{
+  flex:0 0 auto;
   min-width:0;
-  min-height:42px;
+  min-height:30px;
   border:0;
-  border-radius:10px;
-  padding:0 10px;
+  border-radius:7px;
+  padding:0 8px;
   background:var(--white);
   color:var(--text);
   font:inherit;
+  font-size:14px;
+  line-height:1;
   text-align:center;
+  white-space:nowrap;
 }
 .segment-control button.is-active{
   background:var(--text);
