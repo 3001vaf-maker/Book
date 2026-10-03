@@ -1188,6 +1188,31 @@ serviceA2?.closest('[data-modal]')?.v2Close?.();
 serviceZ2?.v2Close?.();
 await wait(60);
 
+mark('service-view-header-c-save');
+shell()?.querySelector('[data-v2-workspace-a]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(40);
+const serviceA1 = document.querySelector('[data-shared-profile-settings-menu]');
+const serviceA1Ids = [...(serviceA1?.querySelectorAll('[data-shared-profile-action]') || [])]
+  .map((node)=>node.dataset.sharedProfileAction);
+ok(serviceA1Ids.join(',') === 'appearance', 'Service Z1 A must contain only View');
+serviceA1?.querySelector('[data-shared-profile-action="appearance"]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(80);
+let serviceViewQ = document.querySelector('[data-v2-q="true"]');
+ok(Boolean(serviceViewQ), 'Service View Q did not open');
+ok(!serviceViewQ?.querySelector('[data-card-save]'), 'Service View Q must not contain local Save button/source');
+ok(Boolean(serviceViewQ?.querySelector('[data-card-q-save]')), 'Service View Q missing Header C save source');
+const boldTool = serviceViewQ?.querySelector('[data-card-tool="bold"]');
+ok(Boolean(boldTool), 'Service View Q card editor missing Bold tool');
+boldTool?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(60);
+const headerSave = shell()?.querySelector('[data-v2-workspace-primary]');
+ok(Boolean(headerSave), 'Service View dirty state did not expose shared Header C');
+ok(headerSave?.textContent?.trim() === 'Сохранить', 'Service View Header C label must be Save');
+headerSave?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(120);
+serviceViewQ = document.querySelector('[data-v2-q="true"]');
+ok(!serviceViewQ, 'Service View Q did not close after Header C save');
+
 // Repeat full roots to expose stale listeners/rAF from persistent shell reuse.
 for (const [index,id] of ['people','finance','journal','profile','settings','people'].entries()) {
   await openF(20 + index, 'repeat-' + id);
