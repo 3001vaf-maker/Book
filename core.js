@@ -4,6 +4,7 @@ import { renderJournal } from './journal/journal.js';
 import { renderTimetable } from './timetable/timetable.js';
 import { settingsNavigationItems, renderSettingsSection } from './settings/settings.js';
 import { render as renderProfile } from './settings/profile/profile.js';
+import { getProfile } from './settings/profile/data.js';
 import { renderChat } from './chat/chat.js';
 import { getWorkplaces as getWorkplaceEntities } from './settings/profile/workplaces/data.js';
 import { initializeProfileWorkplaces } from './settings/profile/migration.js';
@@ -359,6 +360,23 @@ function activeWorkspaceSurface(surface) {
   return layers.at(-1) || surface;
 }
 
+function workspaceProfileASlot({ settingsTag = false, data = '', aria = 'Профиль', disabled = true } = {}) {
+  const profile = getProfile();
+  const name = [profile.name, profile.surname].filter(Boolean).join(' ') || 'Профиль';
+  const crop = (value) => Number.isFinite(Number(value)) ? Math.max(0, Math.min(100, Math.round(Number(value)))) : 50;
+  return {
+    kind: 'avatar',
+    label: name,
+    image: String(profile.photo || ''),
+    imagePosition: `${crop(profile.photoCropX)}% ${crop(profile.photoCropY)}%`,
+    initials: name.slice(0, 1).toUpperCase() || '?',
+    settingsTag,
+    data,
+    aria,
+    disabled,
+  };
+}
+
 function syncWorkspaceHeader(surface) {
   if (!surface?.isConnected) return;
   const contextRoot = activeWorkspaceSurface(surface);
@@ -381,18 +399,30 @@ function syncWorkspaceHeader(surface) {
   const header = app.querySelector('[data-v2-header]');
   if (!header) return;
 
+  const sourceAKind = aSource?.dataset.workspaceAKind || '';
+  const aSlot = !aSource
+    ? workspaceProfileASlot()
+    : sourceAKind === 'settings'
+      ? workspaceProfileASlot({
+          settingsTag: !aSource.disabled,
+          data: 'data-v2-workspace-a',
+          aria: aSource.getAttribute('aria-label') || sourceText(aSource, 'Настройки'),
+          disabled: Boolean(aSource.disabled),
+        })
+      : {
+          kind: sourceAKind || 'avatar',
+          label: aSource.dataset.workspaceALabel || '',
+          image: aSource.dataset.workspaceAImage || '',
+          imagePosition: aSource.dataset.workspaceAImagePosition || '',
+          initials: aSource.dataset.workspaceAInitials || '',
+          settingsTag: aSource.dataset.workspaceASettingsTag === 'true' && !aSource.disabled,
+          data: 'data-v2-workspace-a',
+          aria: aSource.getAttribute('aria-label') || sourceText(aSource, 'Контекст раздела'),
+          disabled: Boolean(aSource.disabled),
+        };
+
   header.outerHTML = v2Header({
-    a: aSource ? {
-      kind: aSource.dataset.workspaceAKind || 'settings',
-      label: aSource.dataset.workspaceALabel || '',
-      image: aSource.dataset.workspaceAImage || '',
-      imagePosition: aSource.dataset.workspaceAImagePosition || '',
-      initials: aSource.dataset.workspaceAInitials || '',
-      settingsTag: aSource.dataset.workspaceASettingsTag === 'true',
-      data: 'data-v2-workspace-a',
-      aria: aSource.getAttribute('aria-label') || sourceText(aSource, 'Контекст раздела'),
-      disabled: Boolean(aSource.disabled),
-    } : null,
+    a: aSlot,
     b: title,
     c: cVisible ? {
       kind: cSource.dataset.workspaceCKind || 'text',
@@ -475,6 +505,7 @@ function renderWorkspace() {
   }) : '';
 
   const headerMarkup = v2Header({
+    a: workspaceProfileASlot(),
     b: state.activeSection === 'chat' ? 'Чат' : rootDisplayLabel(root),
     d: sectionAllowed('chat') ? { kind: 'chat', data: 'data-v2-workspace-chat', aria: 'Чат' } : null,
   });
