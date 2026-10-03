@@ -2,6 +2,8 @@
 
 ## 1. Invariants
 
+Canonical storage owners remain `PlatformDocumentArchive` for platform registry data and `TenantDocumentArchive` for one profile's document domain.
+
 A common visual cover does not make all documents one business entity.
 
 The tenant document domain has three explicit lifecycle classes:
