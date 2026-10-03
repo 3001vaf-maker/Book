@@ -28,7 +28,7 @@ export function render(root,navigateBack=()=>{},options={}){renderProfile(root,n
 function profileContext(p,title=fullName(p)){
   return workspaceHeaderContext({
     title,
-    a:{kind:'avatar',image:p.photo||'',imagePosition:avatarPosition(p),initials:initial(p),aria:'Настройки профиля'},
+    a:{kind:'avatar',image:p.photo||'',imagePosition:avatarPosition(p),initials:initial(p),settingsTag:true,aria:'Настройки профиля'},
   });
 }
 
@@ -257,6 +257,7 @@ function openWorkplaceZ2(root,existing,navigateBack,options={}){
         image:current.photo||'',
         imagePosition:`${crop(current.photoCropX)}% ${crop(current.photoCropY)}%`,
         initials:(current.name||'?').slice(0,1).toUpperCase(),
+        settingsTag:true,
         aria:'Настройки пространства',
       },
     }),
