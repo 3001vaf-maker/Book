@@ -1,6 +1,5 @@
 import { apiRequest } from './core/auth.js';
 import { queueDocumentDataset } from './core/business-persistence.js';
-import { getPlatformDocumentBases } from './admin/document-registry/catalog.js';
 import { hydrateConsentsFromServer } from './settings/documents/consents.js';
 import { getProfile } from './settings/profile/data.js';
 import {
@@ -92,7 +91,9 @@ export async function refreshTenantDocumentArchive() {
 }
 
 export async function initializeTenantDocumentArchive() {
-  configurePlatformDocumentBases(getPlatformDocumentBases(), {
+  const basesResponse = await apiRequest('/tenant-document-archive/platform-bases');
+  const bases = await responseJson(basesResponse, 'Не удалось загрузить основные шаблоны документов');
+  configurePlatformDocumentBases(Array.isArray(bases) ? bases : [], {
     profile: getProfile(),
   });
 
@@ -110,7 +111,7 @@ export async function initializeTenantDocumentArchive() {
       };
       await persistReconciled(next);
       hydrate({ data: next });
-      return { source: 'server-admin-template-reconciled', verified: true };
+      return { source: 'server-registry-reconciled', verified: true };
     }
     hydrate(remote);
     return { source: 'server', verified: true };
@@ -128,5 +129,5 @@ export async function initializeTenantDocumentArchive() {
   const bootstrapped = await responseJson(bootstrapResponse, 'Не удалось создать серверное хранилище документов');
   if (!bootstrapped?.verified) throw new Error('Серверное хранилище документов не подтверждено');
   hydrate(bootstrapped);
-  return { source: 'server-bootstrap-admin-template', verified: true };
+  return { source: 'server-bootstrap-registry', verified: true };
 }

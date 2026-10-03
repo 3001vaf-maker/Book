@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { BusinessStateModule } from '../business-state/business-state.module';
+import { DocumentRegistryModule } from '../document-registry/document-registry.module';
 import { PrismaService } from '../prisma.service';
 import { ConsentPolicyService } from './consent-policy.service';
 import { TenantDocumentArchiveController } from './tenant-document-archive.controller';
@@ -8,7 +9,7 @@ import { TenantDocumentArchiveService } from './tenant-document-archive.service'
 import { RknGuideService } from './rkn-guide.service';
 
 @Module({
-  imports: [AuthModule, BusinessStateModule],
+  imports: [AuthModule, BusinessStateModule, DocumentRegistryModule],
   controllers: [TenantDocumentArchiveController],
   providers: [PrismaService, TenantDocumentArchiveService, ConsentPolicyService, RknGuideService],
   exports: [TenantDocumentArchiveService, ConsentPolicyService, RknGuideService],

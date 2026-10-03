@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Post, Put, Query, Req, Res, StreamableFile, UseGuards } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { DocumentRegistryService } from '../document-registry/document-registry.service';
 import { ConsentPolicyService } from './consent-policy.service';
 import { TenantDocumentArchiveService } from './tenant-document-archive.service';
 import { RknGuideService } from './rkn-guide.service';
@@ -12,6 +13,7 @@ type AuthenticatedRequest = Request & { auth?: { platformAccountId: string; tena
 export class TenantDocumentArchiveController {
   constructor(
     private readonly documents: TenantDocumentArchiveService,
+    private readonly documentRegistry: DocumentRegistryService,
     private readonly consentPolicy: ConsentPolicyService,
     private readonly rknGuide: RknGuideService,
   ) {}
@@ -19,6 +21,11 @@ export class TenantDocumentArchiveController {
   @Get()
   get(@Req() request: AuthenticatedRequest) {
     return this.documents.get(request.auth!.tenantId);
+  }
+
+  @Get('platform-bases')
+  platformBases() {
+    return this.documentRegistry.tenantLegalTemplateBases();
   }
 
   @Post('rkn-guide/ensure')
