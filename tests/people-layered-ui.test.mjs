@@ -44,9 +44,10 @@ assert.doesNotMatch(people, /data-workspace-back-source/);
 
 assert.match(people, /title:\s*'UEI'/);
 assert.match(people, /title:\s*'Фото'/);
-assert.match(people, /title:\s*'Согласие ПДН'/);
-assert.match(people, /title:\s*'Согласие на рассылки'/);
-assert.match(people, /miniCardRail\(consentCards/);
+assert.match(people, /personConsentTile\(person, 'pdn-consent', 'Согласие ПДН'\)/);
+assert.match(people, /personConsentTile\(person, 'messages-consent', 'Согласие на рассылки'\)/);
+assert.match(people, /documentTiles\(consentCards, \{ layout: 'rail'/);
+assert.doesNotMatch(people, /miniCardRail\(consentCards/);
 assert.match(people, /openPersonPhotoEditor/);
 assert.match(people, /showApply:\s*false/);
 assert.match(people, /data-person-direct-chat/);
