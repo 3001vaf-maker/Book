@@ -89,3 +89,142 @@ export function v2ListEntry({
 export function v2ListEntries(items = []) {
   return `<div class="list-entries">${(Array.isArray(items) ? items : []).join('')}</div>`;
 }
+
+/**
+ * Shared long-press reorder interaction for an existing V2 list.
+ * It does not draw another list or reorder UI: the existing list entries are
+ * moved in place after a deliberate hold, then the caller receives the new IDs.
+ */
+export function initV2ListReorder(root, {
+  selector = '[data-reorder-id]',
+  idAttribute = 'reorderId',
+  holdMs = 360,
+  onReorder = () => {},
+} = {}) {
+  const host = root?.matches?.('.list-entries') ? root : root?.querySelector?.('.list-entries');
+  if (!host) return () => {};
+
+  let timer = 0;
+  let active = null;
+  let source = null;
+  let startX = 0;
+  let startY = 0;
+  let suppressClick = false;
+
+  const entries = () => [...host.querySelectorAll(selector)];
+  const valueOf = (node) => String(node?.dataset?.[idAttribute] || '');
+  const clearTimer = () => {
+    if (timer) window.clearTimeout(timer);
+    timer = 0;
+  };
+  const finish = (commit = false) => {
+    clearTimer();
+    if (active) active.classList.remove('is-reordering');
+    host.classList.remove('is-reordering');
+    const hadActive = Boolean(active);
+    active = null;
+    source = null;
+    if (commit && hadActive) {
+      const ids = entries().map(valueOf).filter(Boolean);
+      if (ids.length) onReorder(ids);
+      suppressClick = true;
+      window.setTimeout(() => { suppressClick = false; }, 0);
+    }
+  };
+  const activate = () => {
+    timer = 0;
+    if (!source?.isConnected) return;
+    active = source;
+    active.classList.add('is-reordering');
+    host.classList.add('is-reordering');
+    suppressClick = true;
+  };
+  const schedule = (node, x, y) => {
+    finish(false);
+    source = node;
+    startX = x;
+    startY = y;
+    timer = window.setTimeout(activate, Math.max(250, Number(holdMs) || 360));
+  };
+  const moveActive = (clientY) => {
+    if (!active) return;
+    const candidates = entries().filter((node) => node !== active);
+    const target = candidates.find((node) => {
+      const rect = node.getBoundingClientRect();
+      return clientY >= rect.top && clientY <= rect.bottom;
+    });
+    if (!target) return;
+    const rect = target.getBoundingClientRect();
+    const before = clientY < rect.top + rect.height / 2;
+    if (before) host.insertBefore(active, target);
+    else host.insertBefore(active, target.nextSibling);
+  };
+
+  const onTouchStart = (event) => {
+    if (event.touches.length !== 1) return;
+    const node = event.target.closest(selector);
+    if (!node || !host.contains(node)) return;
+    const touch = event.touches[0];
+    schedule(node, touch.clientX, touch.clientY);
+  };
+  const onTouchMove = (event) => {
+    if (event.touches.length !== 1 || !source) return;
+    const touch = event.touches[0];
+    if (!active) {
+      if (Math.hypot(touch.clientX - startX, touch.clientY - startY) > 7) finish(false);
+      return;
+    }
+    event.preventDefault();
+    moveActive(touch.clientY);
+  };
+  const onTouchEnd = () => finish(Boolean(active));
+
+  const onPointerDown = (event) => {
+    if (event.pointerType === 'touch' || (event.pointerType === 'mouse' && event.button !== 0)) return;
+    const node = event.target.closest(selector);
+    if (!node || !host.contains(node)) return;
+    schedule(node, event.clientX, event.clientY);
+  };
+  const onPointerMove = (event) => {
+    if (!source || event.pointerType === 'touch') return;
+    if (!active) {
+      if (Math.hypot(event.clientX - startX, event.clientY - startY) > 7) finish(false);
+      return;
+    }
+    event.preventDefault();
+    moveActive(event.clientY);
+  };
+  const onPointerUp = (event) => {
+    if (event.pointerType === 'touch') return;
+    finish(Boolean(active));
+  };
+  const onClick = (event) => {
+    if (!suppressClick) return;
+    const node = event.target.closest(selector);
+    if (!node || !host.contains(node)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    suppressClick = false;
+  };
+
+  host.addEventListener('touchstart', onTouchStart, { passive: true });
+  host.addEventListener('touchmove', onTouchMove, { passive: false });
+  host.addEventListener('touchend', onTouchEnd);
+  host.addEventListener('touchcancel', () => finish(false));
+  host.addEventListener('pointerdown', onPointerDown);
+  host.addEventListener('pointermove', onPointerMove, { passive: false });
+  host.addEventListener('pointerup', onPointerUp);
+  host.addEventListener('pointercancel', () => finish(false));
+  host.addEventListener('click', onClick, true);
+
+  return () => {
+    finish(false);
+    host.removeEventListener('touchstart', onTouchStart);
+    host.removeEventListener('touchmove', onTouchMove);
+    host.removeEventListener('touchend', onTouchEnd);
+    host.removeEventListener('pointerdown', onPointerDown);
+    host.removeEventListener('pointermove', onPointerMove);
+    host.removeEventListener('pointerup', onPointerUp);
+    host.removeEventListener('click', onClick, true);
+  };
+}
