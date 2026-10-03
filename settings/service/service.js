@@ -30,7 +30,7 @@ function openServiceSettings(root, rerender) {
           photo: profile.photo || '',
           onReplace: async (photo) => {
             await saveProfileData({ ...getProfile(), photo });
-            renderCurrent();
+            rerender();
           },
           onDelete: async () => {
             await saveProfileData({ ...getProfile(), photo: '' });
@@ -41,9 +41,7 @@ function openServiceSettings(root, rerender) {
       {
         id: 'appearance',
         label: 'Вид',
-        onSelect: () => openProfileAppearanceQ(root, {
-          onSaved: rerender,
-        }),
+        onSelect: () => openProfileAppearanceQ(root, { onSaved: rerender }),
       },
     ],
   });
@@ -58,41 +56,42 @@ export function renderService(root, navigateBack = () => {}) {
     const title = view === 'products' ? 'Товары' : 'Процедуры';
 
     root.innerHTML = page([
-    serviceHeaderContext({
-      title,
-      settingsData: 'data-service-settings',
-      settingsAria: 'Настройки сервиса',
-      c: {
-        label: '+',
-        data: 'data-service-add',
-        aria: view === 'products' ? 'Добавить товар' : 'Добавить процедуру',
-      },
-    }),
-    viewNavigation({ views, activeView: view, ariaLabel: 'Сервис' }),
-    '<div data-service-catalog></div>',
-  ]);
+      serviceHeaderContext({
+        title,
+        settingsData: 'data-service-settings',
+        settingsAria: 'Настройки сервиса',
+        c: {
+          label: '+',
+          data: 'data-service-add',
+          aria: view === 'products' ? 'Добавить товар' : 'Добавить процедуру',
+        },
+      }),
+      viewNavigation({ views, activeView: view, ariaLabel: 'Сервис' }),
+      '<div data-service-catalog></div>',
+    ]);
 
     root.querySelector('[data-service-settings]')?.addEventListener('click', () => openServiceSettings(root, renderCurrent));
-  initViewNavigation(root, {
-    views,
-    activeView: view,
-    onChange: (next) => {
-      activeView = next;
-      rerender();
-    },
-  });
 
-  const catalog = root.querySelector('[data-service-catalog]');
-  if (catalog) {
-    disposeCatalog = view === 'products'
-      ? renderProductCatalog(catalog, { root, onChanged: renderCurrent })
-      : renderProcedureCatalog(catalog, { root, onChanged: renderCurrent });
-  }
+    initViewNavigation(root, {
+      views,
+      activeView: view,
+      onChange: (next) => {
+        activeView = next;
+        renderCurrent();
+      },
+    });
 
-  root.querySelector('[data-service-add]')?.addEventListener('click', () => {
-    if (view === 'products') openProductEditor(root, null, { onChanged: renderCurrent });
-    else openProcedureEditor(root, null, { onChanged: renderCurrent });
-  });
+    const catalog = root.querySelector('[data-service-catalog]');
+    if (catalog) {
+      disposeCatalog = view === 'products'
+        ? renderProductCatalog(catalog, { root, onChanged: renderCurrent })
+        : renderProcedureCatalog(catalog, { root, onChanged: renderCurrent });
+    }
+
+    root.querySelector('[data-service-add]')?.addEventListener('click', () => {
+      if (view === 'products') openProductEditor(root, null, { onChanged: renderCurrent });
+      else openProcedureEditor(root, null, { onChanged: renderCurrent });
+    });
 
     notifyServiceContext();
   };
