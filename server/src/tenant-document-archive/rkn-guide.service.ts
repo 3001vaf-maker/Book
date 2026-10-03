@@ -91,7 +91,7 @@ export class RknGuideService {
     templateContent: string,
     snapshotValue: unknown,
     templateVersion: number,
-    personalVersion: number,
+    guideMode: 'INITIAL' | 'UPDATE',
     generatedAt: Date,
     previousSnapshotValue: unknown = null,
   ) {
@@ -101,7 +101,7 @@ export class RknGuideService {
     const previousProcedures = arrayValue(previousSnapshot.procedures).map(text).filter(Boolean);
     const changes: string[] = [];
 
-    if (personalVersion > 1) {
+    if (guideMode === 'UPDATE') {
       if (text(previousSnapshot.profession) !== text(snapshot.profession)) {
         changes.push(`Профессия: было «${text(previousSnapshot.profession) || 'не указана'}» → стало «${text(snapshot.profession) || 'не указана'}».`);
       }
@@ -114,22 +114,22 @@ export class RknGuideService {
       if (text(previousSnapshot.email) !== text(snapshot.email)) changes.push('Изменилась электронная почта.');
     }
 
-    const updateSection = personalVersion === 1
+    const updateSection = guideMode === 'INITIAL'
       ? [
-        'Версия 1 — первичная инструкция.',
-        'Используйте её для первичного заполнения уведомления, если фактическая деятельность совпадает с данными ниже.',
+        'Первичный PDF-помощник.',
+        'Используйте его для первичного заполнения уведомления, если фактическая деятельность совпадает с данными ниже.',
       ].join('\n')
       : [
-        `Версия ${personalVersion} — инструкция по проверке и изменению ранее поданных сведений.`,
+        'PDF-помощник для изменения ранее поданных сведений.',
         '',
         'Что изменилось',
-        ...(changes.length ? changes.map((value) => `• ${value}`) : ['• Изменился шаблон Book или сведения, влияющие на инструкцию.']),
+        ...(changes.length ? changes.map((value) => `• ${value}`) : ['• Изменились сведения, влияющие на инструкцию.']),
         '',
         'Что делать',
         'Откройте форму изменения сведений Роскомнадзора и сравните ранее поданные сведения с текущими.',
         'Если изменилась профессия или услуги — заново проверьте цель обработки, категории персональных данных, категории субъектов, правовые основания, действия и способы обработки.',
-        'Если новая деятельность фактически требует анализов, сведений о здоровье, противопоказаниях, диагнозах или лекарственных препаратах — отдельно проверьте специальные категории персональных данных. Не отмечайте и не снимайте эти категории только по названию профессии: учитывается то, какие данные вы реально собираете.',
-        'Старая версия инструкции остаётся в Документах и не перезаписывается.',
+        'Если новая деятельность фактически требует анализов, сведений о здоровье, противопоказаниях, диагнозах или лекарственных препаратах — отдельно проверьте специальные категории персональных данных.',
+        'Ранее сформированный PDF остаётся отдельным файлом и не перезаписывается.',
       ].join('\n');
 
     const marketingSection = [
@@ -145,6 +145,7 @@ export class RknGuideService {
       'Маркетинговая обработка отделяется от записи и оказания услуги. Если маркетинг не используется, отдельную маркетинговую цель не добавлять.',
     ].join('\n');
 
+    const guideKind = guideMode === 'INITIAL' ? 'Первичный помощник' : 'Помощник для изменения сведений';
     const values: Record<string, string> = {
       FULL_NAME: text(snapshot.fullName) || 'не указано',
       PROFESSION: text(snapshot.profession) || 'не указана',
@@ -154,7 +155,8 @@ export class RknGuideService {
       UPDATE_SECTION: updateSection,
       MARKETING_SECTION: marketingSection,
       TEMPLATE_VERSION: String(templateVersion || 1),
-      PERSONAL_VERSION: String(personalVersion || 1),
+      GUIDE_KIND: guideKind,
+      PERSONAL_VERSION: guideKind,
       GENERATED_AT: new Intl.DateTimeFormat('ru-RU', { dateStyle: 'long', timeStyle: 'short' }).format(generatedAt),
     };
 
@@ -225,29 +227,24 @@ export class RknGuideService {
       return (
         attachment.type === 'RKN_GUIDE_PDF'
         && text(attachment.templateKey) === RKN_GUIDE_TEMPLATE_KEY
-        && Number(attachment.templateVersion || 0) > 0
         && Boolean(text(attachment.sourceHash))
         && Boolean(text(attachment.pdfBase64))
       );
     });
 
     const latestGuide = [...canonicalGuides].sort((left, right) => (
-      Number(objectValue(right).version || 0) - Number(objectValue(left).version || 0)
+      Date.parse(text(objectValue(objectValue(right).attachment).generatedAt) || '0')
+      - Date.parse(text(objectValue(objectValue(left).attachment).generatedAt) || '0')
     ))[0] || null;
+
     if (latestGuide) {
       const latestAttachment = objectValue(objectValue(latestGuide).attachment);
-      if (
-        Number(latestAttachment.templateVersion || 0) === template.version
-        && sameJson(latestAttachment.snapshot, snapshot)
-      ) {
+      if (sameJson(latestAttachment.snapshot, snapshot)) {
         return { ready: true, document: latestGuide };
       }
     }
 
-    const personalVersion = canonicalGuides.reduce(
-      (maxVersion, item) => Math.max(maxVersion, Number(objectValue(item).version || 0)),
-      0,
-    ) + 1;
+    const guideMode: 'INITIAL' | 'UPDATE' = latestGuide ? 'UPDATE' : 'INITIAL';
     const generatedAt = new Date();
     const previousSnapshot = latestGuide
       ? objectValue(objectValue(latestGuide).attachment).snapshot
@@ -256,13 +253,14 @@ export class RknGuideService {
       template.content,
       snapshot,
       template.version,
-      personalVersion,
+      guideMode,
       generatedAt,
       previousSnapshot,
     );
     const pdf = await this.renderPdf(personalizedContent, template.title);
     const document = await this.documentArchive.saveRknGuide(tenantId, {
       snapshot,
+      guideMode,
       templateKey: template.key,
       templateVersion: template.version,
       templateContent: template.content,
