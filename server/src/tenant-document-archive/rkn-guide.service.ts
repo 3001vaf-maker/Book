@@ -222,6 +222,8 @@ export class RknGuideService {
     const archive = await this.documentArchive.get(tenantId);
     if (!archive?.verified) throw new ConflictException('Архив документов ещё не готов');
     const documents = arrayValue(archive?.data?.documents);
+    const helperState = objectValue(objectValue(archive?.data?.helpers).rkn);
+    const rememberedSnapshot = objectValue(helperState.snapshot);
     const canonicalGuides = documents.filter((item) => {
       const attachment = objectValue(objectValue(item).attachment);
       return (
@@ -237,18 +239,30 @@ export class RknGuideService {
       - Date.parse(text(objectValue(objectValue(left).attachment).generatedAt) || '0')
     ))[0] || null;
 
+    if (Object.keys(rememberedSnapshot).length && sameJson(rememberedSnapshot, snapshot)) {
+      return { ready: true, document: latestGuide || null };
+    }
+
     if (latestGuide) {
       const latestAttachment = objectValue(objectValue(latestGuide).attachment);
       if (sameJson(latestAttachment.snapshot, snapshot)) {
+        await this.documentArchive.rememberRknGuideState(tenantId, {
+          snapshot,
+          documentId: text(latestGuide?.id),
+          generatedAt: text(latestAttachment.generatedAt),
+        });
         return { ready: true, document: latestGuide };
       }
     }
 
-    const guideMode: 'INITIAL' | 'UPDATE' = latestGuide ? 'UPDATE' : 'INITIAL';
+    const hasPreviousGeneration = Object.keys(rememberedSnapshot).length > 0 || Boolean(latestGuide);
+    const guideMode: 'INITIAL' | 'UPDATE' = hasPreviousGeneration ? 'UPDATE' : 'INITIAL';
     const generatedAt = new Date();
-    const previousSnapshot = latestGuide
-      ? objectValue(objectValue(latestGuide).attachment).snapshot
-      : null;
+    const previousSnapshot = Object.keys(rememberedSnapshot).length
+      ? rememberedSnapshot
+      : latestGuide
+        ? objectValue(objectValue(latestGuide).attachment).snapshot
+        : null;
     const personalizedContent = this.personalize(
       template.content,
       snapshot,
