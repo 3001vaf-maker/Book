@@ -41,7 +41,7 @@ export function documentPolicy(item = {}) {
   };
 }
 
-export function isCoreLegalDocument(item = {}) {
+export function isCoreDocument(item = {}) {
   return documentPolicy(item).core;
 }
 
