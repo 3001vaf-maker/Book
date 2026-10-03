@@ -35,7 +35,9 @@ assert.doesNotMatch(products, /workplaceSelector|initWorkplaceSelectors|photoFie
 assert.match(workplaceSelection, /checkList/);
 assert.match(workplaceSelection, /initCheckList/);
 assert.match(listEntry, /initV2ListReorder/);
-assert.match(procedureForm, /v2-primary-source-only/);
-assert.match(products, /v2-primary-source-only/);
+assert.doesNotMatch(procedureForm, /v2-primary-source-only|button\('Сохранить'/);
+assert.doesNotMatch(products, /v2-primary-source-only/);
+assert.match(procedures, /data-procedure-editor-primary/);
+assert.match(products, /data-product-editor-primary/);
 
 console.log('service UI architecture tests: OK');
