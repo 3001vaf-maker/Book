@@ -560,8 +560,8 @@ assert.match(buttonCss, /\.ui-button--secondary,\.ui-button--outline\{border-col
 assert.match(buttonCss, /\.ui-button:disabled\{/);
 assert.match(segmentUi, /filter\(Boolean\)\.map/);
 assert.doesNotMatch(segmentUi, /\.slice\(0, 3\)/);
-assert.match(segmentCss, /\.segment-control\{[\s\S]*?display:inline-flex;[\s\S]*?width:max-content;[\s\S]*?border:1px solid var\(--text\);[\s\S]*?border-radius:10px;[\s\S]*?background:var\(--white\)/);
-assert.match(segmentCss, /\.segment-control button\{[\s\S]*?min-height:30px;[\s\S]*?padding:0 8px/);
+assert.match(segmentCss, /\.segment-control\{[\s\S]*?display:flex;[\s\S]*?width:100%;[\s\S]*?border:1px solid var\(--text\);[\s\S]*?border-radius:10px;[\s\S]*?background:var\(--white\)/);
+assert.match(segmentCss, /\.segment-control button\{[\s\S]*?flex:1 1 0;[\s\S]*?min-height:30px;[\s\S]*?padding:0 8px/);
 assert.match(segmentCss, /\.segment-control button\.is-active\{[\s\S]*?background:var\(--text\);[\s\S]*?color:var\(--white\)/);
 assert.match(entityCardCss, /--entity-card-depth:#2C2A28/);
 assert.match(entityCardCss, /--entity-card-mid:#817A73/);
