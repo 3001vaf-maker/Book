@@ -1,10 +1,11 @@
-import { actionBlock, button, collectRepeatedField, entityVisualCard, escapeHtml, field, initPhotoField, initRepeatedFields, modal, mountModal, mountEntityCardConstructor, mountV2ZLayer, openSharedProfileSettingsMenu, openSharedPasswordAction, page, photoField, repeatedField, searchableSelect, select, setSharedProfilePrimary, textareaField, v2HorizontalRail, v2Section, workspaceHeaderContext, v2ZLayer, workplaceAddButton } from '../../ui/ui.js';
+import { actionBlock, button, collectRepeatedField, entityVisualCard, escapeHtml, field, initPhotoField, initRepeatedFields, modal, mountModal, mountV2ZLayer, openEntityCardAppearanceQ, openSharedProfileSettingsMenu, openSharedPasswordAction, page, photoField, repeatedField, searchableSelect, select, setSharedProfilePrimary, textareaField, v2HorizontalRail, v2Section, workspaceHeaderContext, v2ZLayer, workplaceAddButton } from '../../ui/ui.js';
 import { canUseBookCapability, getBookAccess, getBookLimit, loadBookAccess, requestLiveMode } from '../../core/access.js';
 import { changePassword, logout } from '../../core/auth.js';
 import { getProfessionCatalog, getProfile, saveProfile as saveProfileData } from './data.js';
-import { getWorkplaces } from './workplaces/data.js';
+import { getWorkplaces, saveWorkplaces, upsertWorkplace } from './workplaces/data.js';
 import { bindWorkplaceForm, openWorkplaceSettingsMenu, workplaceForm } from './workplaces/workplaces.js';
-import { profileCardAppearance, profileCardFields, workplaceCardAppearance, workplaceCardFields } from './card-presentation.js';
+import { profileCardAppearance, profileCardFields, workplaceCardAppearance, workplaceCardFields, workplaceCardPhoto } from './card-presentation.js';
+import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../../core/card-appearance-templates.js';
 
 const EXPERIENCES=['Без опыта','До 1 года','1–3 года','3–5 лет','5–10 лет','10–15 лет','15–20 лет','Более 20 лет'];
 const fullName=p=>[p.name,p.surname].filter(Boolean).join(' ')||'Ваш профиль';
@@ -54,7 +55,7 @@ function workplaceRail(){
   return v2HorizontalRail(items.map(w=>entityVisualCard({
     appearance:workplaceCardAppearance(w),
     fields:workplaceCardFields(w,p),
-    image:w.photo||'',
+    image:workplaceCardPhoto(w),
     imagePosition:`${crop(w.photoCropX)}% ${crop(w.photoCropY)}%`,
     interactive:true,
     data:`data-workplace="${escapeHtml(w.key)}"`,
@@ -193,27 +194,66 @@ function openProfileData(root,navigateBack,options={}){
   });
 }
 
-function openProfileAppearance(root,navigateBack,options={}){
-  const p=getProfile();
-  const workplaces=getWorkplaces();
-  const layer=mountV2ZLayer(root,v2ZLayer(page([
-    profileContext(p,'Вид'),
-    '<div data-profile-card-constructor></div>',
-  ]),{className:'v2-profile-appearance-layer'}),{stack:true});
-  const host=layer?.querySelector('[data-profile-card-constructor]');
-  if(!host)return layer;
-  mountEntityCardConstructor(host,{
-    appearance:profileCardAppearance(p),
-    fields:profileCardFields(p,workplaces),
-    photo:p.photo||'',
-    photoPosition:avatarPosition(p),
-    onSave:async({appearance,photo})=>{
-      await saveProfileData({...getProfile(),photo,cardAppearance:appearance});
-      layer.v2Close?.();
-      renderProfile(root,navigateBack,options);
+function openProfileAppearanceQ(root,navigateBack,options={}){
+  const typeOptions=[
+    {value:'profile',label:'Профиль'},
+    {value:'workplace',label:'Рабочее пространство'},
+  ];
+  const workplaces=()=>getWorkplaces();
+  return openEntityCardAppearanceQ(root,{
+    title:'Вид',
+    typeLabel:'Тип карты',
+    typeOptions,
+    initialType:'profile',
+    targetLabel:'Рабочее пространство',
+    initialTarget:'all',
+    targetOptions:(type)=>type==='workplace'
+      ? [{value:'all',label:'Все рабочие пространства'},...workplaces().map((item)=>({value:item.key,label:item.name||'Рабочее пространство'}))]
+      : [],
+    resolve:(type,target)=>{
+      const p=getProfile();
+      const values=workplaces();
+      if(type==='profile'){
+        return {
+          appearance:profileCardAppearance(p),
+          fields:profileCardFields(p,values),
+          photo:p.photo||'',
+          photoPosition:avatarPosition(p),
+        };
+      }
+      const template=getCardAppearanceTemplate('workplace');
+      const sample=target==='all'
+        ? (values[0]||{name:'Рабочее пространство',photo:'',photoCropX:50,photoCropY:50,cardAppearance:{}})
+        : (values.find((item)=>item.key===target)||values[0]||{name:'Рабочее пространство',photo:'',photoCropX:50,photoCropY:50,cardAppearance:{}});
+      return {
+        appearance:target==='all' && template?.appearance ? template.appearance : workplaceCardAppearance(sample),
+        fields:workplaceCardFields(sample,p),
+        photo:target==='all' ? String(template?.photo||sample.photo||'') : workplaceCardPhoto(sample),
+        photoPosition:target==='all' ? String(template?.photoPosition||'50% 50%') : `${crop(sample.photoCropX)}% ${crop(sample.photoCropY)}%`,
+      };
     },
+    save:async({type,target,appearance,photo,editor})=>{
+      if(type==='profile'){
+        const current=getProfile();
+        await saveProfileData({...current,photo,cardAppearance:appearance});
+        return;
+      }
+      if(target==='all'){
+        saveCardAppearanceTemplate('workplace',{
+          appearance,
+          photo,
+          photoPosition:editor?.photoPosition||'50% 50%',
+        });
+        const values=workplaces().map((item)=>({...item,cardAppearance:{}}));
+        if(values.length)await saveWorkplaces(values);
+        return;
+      }
+      const current=workplaces().find((item)=>item.key===target);
+      if(!current)return;
+      await upsertWorkplace({...current,photo,cardAppearance:appearance});
+    },
+    onSaved:()=>renderProfile(root,navigateBack,options),
   });
-  return layer;
 }
 
 function openProfileSettings(root,navigateBack,options={}){
@@ -238,7 +278,7 @@ function openProfileSettings(root,navigateBack,options={}){
   return openSharedProfileSettingsMenu({
     actions:[
       ...demoActions,
-      {id:'appearance',label:'Вид',onSelect:()=>openProfileAppearance(root,navigateBack,options)},
+      {id:'appearance',label:'Вид',onSelect:()=>openProfileAppearanceQ(root,navigateBack,options)},
       {id:'password',label:'Изменить пароль',onSelect:()=>openSharedPasswordAction({onSubmit:({currentPassword,newPassword})=>changePassword(currentPassword,newPassword)})},
       {id:'controls',label:'Согласия / Уведомления',onSelect:()=>import('./account-controls.js').then(({openAccountControlsModal})=>openAccountControlsModal())},
       {id:'logout',label:'Выход',variant:'danger',onSelect:()=>logout()},
@@ -268,7 +308,7 @@ function openWorkplaceZ2(root,existing,navigateBack,options={}){
     layer.v2Close?.();
     renderProfile(root,navigateBack,options);
   };
-  layer.querySelector('[data-workspace-context-action]')?.addEventListener('click',()=>openWorkplaceSettingsMenu(layer,existing,{onDeleted:closeAndRender,onAppearanceSaved:()=>renderProfile(root,navigateBack,options)}));
+  layer.querySelector('[data-workspace-context-action]')?.addEventListener('click',()=>openWorkplaceSettingsMenu(layer,existing,{onDeleted:closeAndRender}));
   bindWorkplaceForm(layer,existing,{
     onSaved:closeAndRender,
     onDeleted:closeAndRender,
