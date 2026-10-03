@@ -15,6 +15,10 @@ assert.match(documents, /data-open-document-templates/);
 assert.match(documents, /data-add-profile-document/);
 assert.match(documents, /data-v2-primary-visible="false"/);
 assert.match(documents, /openDocumentViewer/);
+assert.match(documents, /document-group--core/);
+assert.match(documents, /document-group--other/);
+assert.match(documents, /data-document-content-open/);
+assert.match(documents, /data-document-detail-settings/);
 assert.doesNotMatch(documents, /pageHeader|folderList|\blist\s*\(/);
 assert.doesNotMatch(documents, /entity-page-header|page-header-action/);
 
@@ -24,6 +28,7 @@ assert.match(documentUi, /export function openDocumentViewer/);
 assert.match(documentCss, /\.document-tile\{/);
 assert.match(documentCss, /width:238px/);
 assert.match(documentCss, /border-radius:0/);
+assert.match(documentCss, /\.document-tiles--rail/);
 assert.match(documentCss, /\.document-viewer-backdrop\{background:#111/);
 assert.doesNotMatch(documentCss, /linear-gradient|radial-gradient/);
 
