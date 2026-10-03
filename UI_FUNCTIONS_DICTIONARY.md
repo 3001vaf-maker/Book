@@ -20,7 +20,7 @@
 | Calendar / Date | `ui/calendar/` | `calendar`, `initCalendar`, `monthDayPicker`, `initMonthDayPickers`, `dateNavigator`, `initDateNavigator` |
 | Selection | `ui/selection/` | `initMultiSelect`, `segmentControl`, `initSegmentControls` |
 | Entity / Folder cards | `ui/cards/` | `entityCard`, `miniCard`, `miniCardRail`, `miniCardStack`, `folderCard`, `folderList` |
-| Lists | `ui/lists/` | `list`, `v2ListEntry`, `v2ListEntries` |
+| Lists | `ui/lists/` | `list`, `v2ListEntry`, `v2ListEntries`, `initV2ListReorder` |
 | Selectors | `ui/selectors/` | `select`, `searchableSelect` (проявление через нижний Shared Modal) |
 | Links | `ui/links/` | `links`, `initLinks`, `collectLinks` |
 | Tags | `ui/tags/` | `tags`, `tagManagerList`, `initTags`, `collectTags` |
