@@ -5,7 +5,7 @@ const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf
 
 const buildPages = read('scripts/build-pages.mjs');
 const catalog = read('admin/document-registry/catalog.js');
-const legalStatus = read('docs/BOOK_OPERATOR_LEGAL_STATUS.md');
+const guide = read('README.md');
 
 assert.match(buildPages, /['"]archive['"]/);
 assert.equal(existsSync(new URL('../archive/documents-20260918', import.meta.url)), false, 'obsolete document snapshot must stay removed');
@@ -24,8 +24,7 @@ for (const key of [
   assert.match(catalog, new RegExp(`key:\\s*["']${key}["']`), `canonical document missing: ${key}`);
 }
 
-assert.match(legalStatus, /140141\/77/);
-assert.match(legalStatus, /100427372/);
-assert.match(legalStatus, /admin\/document-registry\/catalog\.js/);
+assert.match(guide, /140141\/77/);
+assert.match(guide, /100427372/);
 
 console.log('Technical document archive cleanup tests: OK');

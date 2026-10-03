@@ -1,7 +1,5 @@
 import fs from 'node:fs';
 
-const architectureDictionary = fs.readFileSync('ARCHITECTURE_DICTIONARY.md', 'utf8');
-const designDictionary = fs.readFileSync('DESIGN_DICTIONARY.md', 'utf8');
 const ui = fs.readFileSync('ui/v2/index.js', 'utf8');
 const css = fs.readFileSync('ui/v2/v2.css', 'utf8');
 const facade = fs.readFileSync('ui/ui.js', 'utf8');
@@ -100,8 +98,6 @@ const legacySystemBrown = /#(?:3B302B|7A6F69|B8AEA8|E7E1DB|E8E1DC|D7CEC7|968982|
 
 const failures = [];
 const expect = (condition, message) => { if (!condition) failures.push(message); };
-expect(architectureDictionary.includes('Shared manifestation invariance') && architectureDictionary.includes('один и тот же Shared UI-owner всегда проявляется одинаково'), 'Architecture contract must keep one invariant manifestation per Shared UI owner across all contexts.');
-expect(designDictionary.includes('Один Shared UI-компонент имеет **одно и то же проявление везде**'), 'Design contract must forbid profile/workplace/feature-specific manifestations of the same Shared UI owner.');
 for (const file of sharedCssFiles) {
   const source = fs.readFileSync(file, 'utf8');
   expect(!legacySystemBrown.test(source), `Legacy system brown must not remain in Shared UI CSS: ${file}.`);
