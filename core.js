@@ -1,6 +1,6 @@
 import { renderPeople } from './core/people/people.js';
 import { financeNavigationItems, renderFinanceSection } from './core/finance/index.js';
-import { journalNavigationItems, renderJournalView } from './journal/journal.js';
+import { renderJournal } from './journal/journal.js';
 import { renderTimetable } from './timetable/timetable.js';
 import { settingsNavigationItems, renderSettingsSection } from './settings/settings.js';
 import { render as renderProfile } from './settings/profile/profile.js';
@@ -255,7 +255,6 @@ function activeRootSection() {
 
 function secondaryItems(section = activeRootSection()) {
   if (section === 'finance') return financeNavigationItems();
-  if (section === 'journal') return journalNavigationItems();
   if (section === 'settings') return settingsNavigationItems();
   return [];
 }
@@ -432,11 +431,10 @@ function renderActiveWorkspaceSurface(surface) {
   });
   if (section === 'timetable') return renderTimetable(surface);
   if (section === 'journal') {
-    return renderJournalView(surface, ensureSecondary('journal'), {
+    return renderJournal(surface, {
+      initialView: state.secondary.journal || 'day',
       onViewChange: (view) => {
-        if (state.secondary.journal === view) return;
         state.secondary.journal = view;
-        renderWorkspace();
       },
     });
   }
