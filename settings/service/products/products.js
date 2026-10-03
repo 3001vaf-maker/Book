@@ -200,11 +200,6 @@ function productEditorForm(existing = null) {
     ${costField({ value: product.cost || {}, name: 'productCost' })}
     ${textareaField({ label: 'Описание', name: 'productAbout', value: product.about || '', rows: 7, maxlength: 5000, placeholder: 'Описание товара' })}
     <div class="form-error" data-product-editor-error></div>
-    ${button('Сохранить', {
-      className: 'v2-primary-source-only',
-      data: 'data-product-editor-primary data-v2-primary-action data-v2-primary-label="Сохранить"',
-      aria: 'Сохранить товар',
-    })}
   </form>`;
 }
 
@@ -240,6 +235,11 @@ function renderProductEditor(layer, baseRoot, existing = null, { onChanged = () 
       title: existing?.name || 'Новый товар',
       settingsData: 'data-product-editor-settings',
       settingsAria: 'Настройки товара',
+      c: {
+        label: 'Сохранить',
+        data: 'data-product-editor-primary',
+        aria: 'Сохранить товар',
+      },
     }),
     productEditorForm(existing),
   ]);
