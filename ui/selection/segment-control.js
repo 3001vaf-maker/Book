@@ -9,9 +9,8 @@ export function segmentControl(items = [], { value = '', name = '', aria = 'Вы
     };
   });
   const current = String(value ?? options[0]?.value ?? '');
-  const countClass = options.length === 1 ? ' segment-control--one' : options.length === 2 ? ' segment-control--two-equal' : '';
   const hidden = name ? `<input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(current)}" data-segment-value>` : '';
-  return `<div class="segment-control${countClass}" style="--segment-count:${Math.max(1, options.length)}" data-segment-control role="group" aria-label="${escapeHtml(aria)}">${options.map((item) => `<button type="button" data-segment-option="${escapeHtml(item.value)}" class="${item.value === current ? 'is-active' : ''}" aria-pressed="${item.value === current ? 'true' : 'false'}">${escapeHtml(item.label)}</button>`).join('')}${hidden}</div>`;
+  return `<div class="segment-control" data-segment-control role="group" aria-label="${escapeHtml(aria)}">${options.map((item) => `<button type="button" data-segment-option="${escapeHtml(item.value)}" class="${item.value === current ? 'is-active' : ''}" aria-pressed="${item.value === current ? 'true' : 'false'}">${escapeHtml(item.label)}</button>`).join('')}${hidden}</div>`;
 }
 
 export function initSegmentControls(root) {
