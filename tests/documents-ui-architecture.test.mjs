@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 const documents = readFileSync(new URL('../settings/documents/documents.js', import.meta.url), 'utf8');
 const documentUi = readFileSync(new URL('../ui/documents/index.js', import.meta.url), 'utf8');
 const documentCss = readFileSync(new URL('../ui/documents/document.css', import.meta.url), 'utf8');
+const people = readFileSync(new URL('../core/people/people.js', import.meta.url), 'utf8');
 
 assert.match(documents, /workspaceHeaderContext/);
 assert.match(documents, /segmentControl\(VIEWS/);
@@ -47,3 +48,11 @@ assert.match(documentCss, /\.document-viewer-backdrop\{background:#111/);
 assert.doesNotMatch(documentCss, /linear-gradient|radial-gradient/);
 
 console.log('documents UI architecture tests: OK');
+
+const peopleConsentBlock = people.slice(
+  people.indexOf('function settingsCards'),
+  people.indexOf('function refreshPersonIdentityPresentation'),
+);
+assert.match(peopleConsentBlock, /documentTile\(/);
+assert.match(peopleConsentBlock, /documentTiles\(/);
+assert.doesNotMatch(peopleConsentBlock, /miniCard\(\{[\s\S]*?data-person-consent/);

@@ -5,6 +5,8 @@ import {
   collectTags,
   emptyState,
   entityCard,
+  documentTile,
+  documentTiles,
   escapeHtml,
   field,
   initLinks,
@@ -21,6 +23,7 @@ import {
   monthDayPicker,
   mountModal,
   mountV2ZLayer,
+  openDocumentViewer,
   page,
   photoField,
   repeatedField,
@@ -146,6 +149,28 @@ function personConsentState(person, documentId) {
   return { active: active.length > 0, fact: active[0] || inactive[0] || null, count: facts.length };
 }
 
+function consentStatusState(state, fact) {
+  if (state?.active) return 'signed';
+  if (fact?.status === 'revoked') return 'revoked';
+  return 'pending';
+}
+
+function personConsentTile(person, documentId, fallbackTitle) {
+  const documentItem = getDocuments().find((item) => item.id === documentId);
+  const state = personConsentState(person, documentId);
+  const fact = state.fact;
+  const title = documentItem?.title || fallbackTitle || 'Согласие';
+  const version = fact?.documentVersion || documentItem?.version || 1;
+  return documentTile({
+    title,
+    version,
+    status: state.active ? 'Подписано' : consentStatus(fact),
+    statusState: consentStatusState(state, fact),
+    data: `data-person-consent="${escapeHtml(documentId)}"`,
+    aria: `Открыть ${title}`,
+  });
+}
+
 function openPersonConsent(root, person, documentId) {
   const documentItem = getDocuments().find((item) => item.id === documentId);
   const state = personConsentState(person, documentId);
@@ -156,7 +181,14 @@ function openPersonConsent(root, person, documentId) {
   const scope = documentId === 'messages-consent' && state.count > 1
     ? `<div><span>Контакты</span><strong>${escapeHtml(state.count)}</strong></div>`
     : '';
-  const html = `<div class="modal-title"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(status)}</p></div>
+  const html = `${documentTiles([documentTile({
+      title,
+      version,
+      status,
+      statusState: consentStatusState(state, fact),
+      data: 'data-person-consent-document',
+      aria: `Открыть документ ${title}`,
+    })], { layout: 'rail' })}
     <div class="entity-details">
       <div><span>Статус</span><strong>${escapeHtml(status)}</strong></div>
       <div><span>Версия</span><strong>${escapeHtml(version)}</strong></div>
@@ -165,7 +197,12 @@ function openPersonConsent(root, person, documentId) {
       ${scope}
     </div>
     ${fact ? '' : '<p class="muted">Подтверждение отсутствует.</p>'}`;
-  mountModal(root, modal(html, { title, variant: 'standard', surface: 'app' }));
+  const layer = mountModal(root, modal(html, { title, variant: 'top', surface: 'app' }));
+  layer?.querySelector('[data-person-consent-document]')?.addEventListener('click', () => openDocumentViewer({
+    title,
+    version,
+    content: String(documentItem?.text || documentItem?.content || ''),
+  }));
 }
 
 function filterPeople(items, query = '') {
@@ -540,22 +577,8 @@ function settingsCards(person) {
   const messages = personConsentState(person, 'messages-consent');
   const members = person.uei ? getMembers(person.uei).length : 0;
   const consentCards = [
-    miniCard({
-      title: 'Согласие ПДН',
-      value: pdn.active ? '✓' : '—',
-      subtitle: consentStatus(pdn.fact),
-      interactive: true,
-      data: 'data-person-consent="pdn-consent"',
-      aria: 'Открыть согласие ПДН',
-    }),
-    miniCard({
-      title: 'Согласие на рассылки',
-      value: messages.active ? '✓' : '—',
-      subtitle: consentStatus(messages.fact),
-      interactive: true,
-      data: 'data-person-consent="messages-consent"',
-      aria: 'Открыть согласие на рассылки',
-    }),
+    personConsentTile(person, 'pdn-consent', 'Согласие ПДН'),
+    personConsentTile(person, 'messages-consent', 'Согласие на рассылки'),
   ];
   return `<div class="people-person-settings">
     <section class="people-settings-section" aria-label="UEI">
@@ -582,7 +605,7 @@ function settingsCards(person) {
       })}
     </section>
     <section class="people-settings-section" aria-label="Согласия">
-      ${miniCardRail(consentCards, { className: 'people-consent-cards' })}
+      ${documentTiles(consentCards, { layout: 'rail', className: 'people-consent-cards' })}
     </section>
   </div>`;
 }

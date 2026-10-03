@@ -11,6 +11,7 @@ const files = {
   accountControls: readFileSync('settings/profile/account-controls.js','utf8'),
   booking: readFileSync('online-booking/booking.js','utf8'),
   consentSettings: readFileSync('online-booking/consent-settings.js','utf8'),
+  people: readFileSync('core/people/people.js','utf8'),
   invite: readFileSync('invite/invite.js','utf8'),
   inviteCss: readFileSync('invite/invite.css','utf8'),
   admin: readFileSync('admin/document-registry/view.js','utf8'),
@@ -62,3 +63,17 @@ assert.match(files.registryService,/async tenantLegalTemplateBases\(/);
 assert.match(files.tenantController,/@Get\('platform-bases'\)/);
 
 console.log('document contour architecture: OK');
+
+const peopleConsentBlock = files.people.slice(
+  files.people.indexOf('function settingsCards'),
+  files.people.indexOf('function refreshPersonIdentityPresentation'),
+);
+assert.match(peopleConsentBlock,/documentTile\(/,'People consent cards must use shared documentTile');
+assert.match(peopleConsentBlock,/documentTiles\(/,'People consent cards must use shared documentTiles');
+assert.doesNotMatch(peopleConsentBlock,/miniCard\(\{[\s\S]*?data-person-consent/,'People consent cards must not use Mini Card');
+const peopleConsentDetail = files.people.slice(
+  files.people.indexOf('function openPersonConsent'),
+  files.people.indexOf('function filterPeople'),
+);
+assert.match(peopleConsentDetail,/openDocumentViewer\(/,'People consent detail must open the shared document viewer');
+assert.match(peopleConsentDetail,/variant: 'top'/,'People consent detail must use the shared top informational modal');
