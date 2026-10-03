@@ -4,9 +4,13 @@ import { existsSync, readFileSync } from 'node:fs';
 const catalogModule = await import('../admin/document-registry/catalog.js');
 const bookDocs = catalogModule.getRegistryBookUserDocuments();
 const userBases = catalogModule.getRegistryUserDocumentBases();
+const legalTemplates = catalogModule.getRegistryUserLegalTemplates();
+const helperTemplates = catalogModule.getRegistryUserHelperTemplates();
 
 assert.equal(bookDocs.length, 6, 'Document Registry must contain exactly 6 Book ↔ user documents');
-assert.equal(userBases.length, 4, 'Document Registry must contain exactly 4 user document bases including the RKN guide template');
+assert.equal(userBases.length, 4, 'Document Registry must contain exactly 4 user source templates');
+assert.equal(legalTemplates.length, 3, 'Registry must separate exactly 3 tenant legal templates');
+assert.equal(helperTemplates.length, 1, 'Registry must separate the RKN helper generator from legal templates');
 assert.equal(new Set([...bookDocs, ...userBases].map((item) => item.key)).size, 10, 'Registry document keys must be unique');
 
 for (const item of [...bookDocs, ...userBases]) {
@@ -30,8 +34,9 @@ assert.match(admin, /adminRequest\('\/document-registry\/history'\)/);
 assert.doesNotMatch(admin, /renderAdminDocuments|data-section="documents">Документы</);
 
 assert.match(view, /<h2>Реестр документов<\/h2>/);
-assert.match(view, /Book ↔ пользователь/);
-assert.match(view, /Основы документов пользователя/);
+assert.match(view, /Платформа ↔ пользователь/);
+assert.match(view, /Шаблоны основных документов пользователя/);
+assert.match(view, /Шаблоны помощников/);
 assert.match(view, /История Book ↔ пользователь/);
 assert.match(view, /Подписанная версия/);
 assert.match(history, /Admin\/Document Registry only/);
