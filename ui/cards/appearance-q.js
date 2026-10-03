@@ -39,7 +39,15 @@ export function openEntityCardAppearanceQ(root, {
     target = targets.length ? optionValue(targets, target) : '';
     const editor = resolve(type, target) || {};
 
-    host.innerHTML = `${workspaceHeaderContext({ title, hideD: true })}
+    host.innerHTML = `${workspaceHeaderContext({
+      title,
+      hideD: true,
+      c: {
+        label: 'Сохранить',
+        data: 'data-card-q-save data-v2-primary-visible="false"',
+        aria: 'Сохранить вид карты',
+      },
+    })}
       <div class="form-grid entity-card-appearance-q__selectors">
         ${select({
           name: 'entityCardAppearanceType',
@@ -69,7 +77,16 @@ export function openEntityCardAppearanceQ(root, {
     });
 
     const constructor = host.querySelector('[data-entity-card-appearance-constructor]');
-    mountEntityCardConstructor(constructor, {
+    const saveSource = host.querySelector('[data-card-q-save]');
+    let controller = null;
+    const syncSaveSource = ({ dirty = false, saving = false } = {}) => {
+      if (!saveSource) return;
+      saveSource.dataset.v2PrimaryVisible = dirty ? 'true' : 'false';
+      saveSource.dataset.v2PrimaryLabel = 'Сохранить';
+      saveSource.disabled = Boolean(saving);
+      window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+    };
+    controller = mountEntityCardConstructor(constructor, {
       appearance: editor.appearance || {},
       fields: editor.fields || [],
       photo: editor.photo || '',
@@ -79,6 +96,14 @@ export function openEntityCardAppearanceQ(root, {
         layer.v2Close?.();
         onSaved({ type, target });
       },
+      onStateChange: syncSaveSource,
+    });
+    saveSource?.addEventListener('click', () => {
+      void controller?.save?.();
+    });
+    syncSaveSource({
+      dirty: controller?.isDirty?.() || false,
+      saving: controller?.isSaving?.() || false,
     });
     window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
   };
