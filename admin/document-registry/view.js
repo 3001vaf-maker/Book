@@ -1,6 +1,7 @@
 import {
   getRegistryBookUserDocuments,
-  getRegistryUserDocumentBases,
+  getRegistryUserHelperTemplates,
+  getRegistryUserLegalTemplates,
   getRegistryDocument,
 } from './catalog.js';
 import {
@@ -61,32 +62,46 @@ function openDocument(item, group, escapeHtml, meta = '') {
 }
 
 function registryMarkup(escapeHtml) {
-  const bookDocuments = getRegistryBookUserDocuments();
-  const userBases = getRegistryUserDocumentBases();
+  const platformDocuments = getRegistryBookUserDocuments();
+  const legalTemplates = getRegistryUserLegalTemplates();
+  const helperTemplates = getRegistryUserHelperTemplates();
   return `
     <section class="admin-card admin-documents-card">
       <div class="admin-documents-head">
         <div>
-          <h3>Book ↔ пользователь</h3>
-          <p>Корневые документы компании Book для отношений с пользователем.</p>
+          <h3>Платформа ↔ пользователь</h3>
+          <p>Корневые документы платформы для отношений с пользователем.</p>
         </div>
-        <span class="admin-count">${bookDocuments.length}</span>
+        <span class="admin-count">${platformDocuments.length}</span>
       </div>
       <div class="admin-document-list">
-        ${documentRows(bookDocuments, escapeHtml, 'Book ↔ пользователь')}
+        ${documentRows(platformDocuments, escapeHtml, 'Платформа ↔ пользователь')}
       </div>
     </section>
 
     <section class="admin-card admin-documents-card">
       <div class="admin-documents-head">
         <div>
-          <h3>Основы документов пользователя</h3>
-          <p>Единые основы Реестра документов, из которых формируются документы каждого отдельного Book.</p>
+          <h3>Шаблоны основных документов пользователя</h3>
+          <p>Три источника, из которых формируются основные текущие документы профиля.</p>
         </div>
-        <span class="admin-count">${userBases.length}</span>
+        <span class="admin-count">${legalTemplates.length}</span>
       </div>
       <div class="admin-document-list">
-        ${documentRows(userBases, escapeHtml, 'Основа документа пользователя')}
+        ${documentRows(legalTemplates, escapeHtml, 'Шаблон основного документа')}
+      </div>
+    </section>
+
+    <section class="admin-card admin-documents-card">
+      <div class="admin-documents-head">
+        <div>
+          <h3>Шаблоны помощников</h3>
+          <p>Источники для одноразово формируемых вспомогательных файлов. Они не являются согласиями и не имеют истории подписаний.</p>
+        </div>
+        <span class="admin-count">${helperTemplates.length}</span>
+      </div>
+      <div class="admin-document-list">
+        ${documentRows(helperTemplates, escapeHtml, 'Шаблон помощника')}
       </div>
     </section>
   `;
@@ -151,7 +166,7 @@ export async function renderDocumentRegistry(root, { escapeHtml, setTitle, loadH
       <div class="admin-heading">
         <div>
           <h2>Реестр документов</h2>
-          <p>Документы компании Book, основы документов пользователей и история Book ↔ пользователь.</p>
+          <p>Документы платформы, шаблоны основных документов, шаблоны помощников и история подписаний.</p>
         </div>
       </div>
       <div class="admin-documents-tabs" role="tablist" aria-label="Реестр документов">
