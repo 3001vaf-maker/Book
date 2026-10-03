@@ -66,6 +66,10 @@
     cost:1500,
     workplaces:[{workplaceId:'runtime-studio',duration:60,cost:1500}],
   };
+  let runtimeTelegramConnected = false;
+  const runtimeTelegramState = () => runtimeTelegramConnected
+    ? { connected:true, botUsername:'@runtime_bot', status:'active', webhookActive:true }
+    : { connected:false };
   const runtimeProduct = {
     id:'runtime-service-product',
     name:'Товар Тест',
@@ -302,6 +306,11 @@
     if (path.endsWith('/saas-access/me')) return demoAccess;
     if (path.endsWith('/saas-access/demo/activate')) return demoAccess;
     if (path.endsWith('/platform-notices')) return [];
+    if (path.endsWith('/communications/integrations/telegram')) {
+      if (method === 'PUT') runtimeTelegramConnected = true;
+      if (method === 'DELETE') runtimeTelegramConnected = false;
+      return runtimeTelegramState();
+    }
     if (method === 'PUT' || method === 'POST' || method === 'DELETE') return { ok:true, verified:true };
     return {};
   };
@@ -1234,6 +1243,40 @@ headerSave?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true})
 await wait(120);
 serviceViewQ = document.querySelector('[data-v2-q="true"]');
 ok(!serviceViewQ, 'Service View Q did not close after Header C save');
+
+mark('integrations-telegram-state-machine');
+await openF(6,'integrations');
+await tapAndOpen(fDeck(), fCard('settings'), 30, 'settings-integrations-root');
+await tapAndOpen(eDeck(), eCard('integrations'), 31, 'settings-integrations');
+await wait(140);
+const integrationsSurface = shell()?.querySelector('[data-v2-workspace-surface]');
+ok(Boolean(integrationsSurface?.querySelector('[data-integration-open="telegram"].mini-card')), 'Integrations Z1 must show Telegram as a miniCard');
+ok(!shell()?.querySelector('[data-v2-workspace-primary]'), 'Integrations Z1 must not expose Header C');
+integrationsSurface?.querySelector('[data-integration-open="telegram"]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(100);
+let telegramZ2 = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
+ok(Boolean(telegramZ2), 'Telegram must open as Z2');
+let telegramToken = telegramZ2?.querySelector('[name="telegramBotToken"]');
+ok(Boolean(telegramToken) && !telegramToken.disabled, 'Disconnected Telegram token field must be editable');
+ok(!shell()?.querySelector('[data-v2-workspace-primary]'), 'Telegram C must be absent before a token is entered');
+telegramToken.value = '123456:abcdefghijklmnopqrstuvwxyz';
+telegramToken.dispatchEvent(new Event('input',{bubbles:true}));
+await wait(40);
+ok(shell()?.querySelector('[data-v2-workspace-primary]')?.textContent?.trim() === 'Подключить', 'Telegram C must become Connect after token input');
+shell()?.querySelector('[data-v2-workspace-primary]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(120);
+telegramToken = telegramZ2?.querySelector('[name="telegramBotToken"]');
+ok(Boolean(telegramToken?.disabled), 'Connected Telegram token field must be disabled');
+const disconnectC = shell()?.querySelector('[data-v2-workspace-primary]');
+ok(disconnectC?.textContent?.trim() === 'Отключить', 'Connected Telegram C must become Disconnect');
+ok(disconnectC?.classList.contains('v2-header__control--danger'), 'Telegram Disconnect C must use shared danger state');
+disconnectC?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(120);
+telegramToken = telegramZ2?.querySelector('[name="telegramBotToken"]');
+ok(Boolean(telegramToken) && !telegramToken.disabled && telegramToken.value === '', 'After disconnect token field must be empty and editable');
+ok(!shell()?.querySelector('[data-v2-workspace-primary]'), 'After disconnect Header C must disappear until a new token is entered');
+telegramZ2?.v2Close?.();
+await wait(60);
 
 // Repeat full roots to expose stale listeners/rAF from persistent shell reuse.
 for (const [index,id] of ['people','finance','journal','profile','settings','people'].entries()) {

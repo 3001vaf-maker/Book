@@ -65,8 +65,8 @@ function ensurePhoneEvents() {
   });
 }
 
-export function field({ label = '', name = '', value = '', type = 'text', placeholder = '', required = false, readonly = false, inputmode = '', maxlength = '', autocomplete = '', min = '', max = '', step = '', data = '' } = {}) {
-  return `<label class="field"><span>${escapeHtml(labelText(label, required))}</span><input name="${escapeHtml(name)}" type="${escapeHtml(type)}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}"${required ? ' required' : ''}${readonly ? ' readonly' : ''}${inputmode ? ` inputmode="${escapeHtml(inputmode)}"` : ''}${maxlength !== '' ? ` maxlength="${escapeHtml(maxlength)}"` : ''}${autocomplete ? ` autocomplete="${escapeHtml(autocomplete)}"` : ''}${min !== '' ? ` min="${escapeHtml(min)}"` : ''}${max !== '' ? ` max="${escapeHtml(max)}"` : ''}${step !== '' ? ` step="${escapeHtml(step)}"` : ''}${data ? ` ${data}` : ''}></label>`;
+export function field({ label = '', name = '', value = '', type = 'text', placeholder = '', required = false, readonly = false, disabled = false, inputmode = '', maxlength = '', autocomplete = '', min = '', max = '', step = '', data = '' } = {}) {
+  return `<label class="field"><span>${escapeHtml(labelText(label, required))}</span><input name="${escapeHtml(name)}" type="${escapeHtml(type)}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}"${required ? ' required' : ''}${readonly ? ' readonly' : ''}${disabled ? ' disabled' : ''}${inputmode ? ` inputmode="${escapeHtml(inputmode)}"` : ''}${maxlength !== '' ? ` maxlength="${escapeHtml(maxlength)}"` : ''}${autocomplete ? ` autocomplete="${escapeHtml(autocomplete)}"` : ''}${min !== '' ? ` min="${escapeHtml(min)}"` : ''}${max !== '' ? ` max="${escapeHtml(max)}"` : ''}${step !== '' ? ` step="${escapeHtml(step)}"` : ''}${data ? ` ${data}` : ''}></label>`;
 }
 
 export function passwordField({ label = 'Пароль', name = 'password', value = '', required = false, autocomplete = 'current-password' } = {}) {
