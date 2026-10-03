@@ -44,22 +44,13 @@ function oneOf(value, allowed, fallback) {
 
 export function normalizeBookingSettings(value = {}) {
   const source = value && typeof value === 'object' ? value : {};
-  const sourceTheme = source.theme && typeof source.theme === 'object' ? source.theme : {};
   const defaults = DEFAULT_BOOKING_SETTINGS;
   const slotStep = Number(source.slotStep);
   return {
     welcomeTitle: String(source.welcomeTitle || defaults.welcomeTitle).trim().slice(0, 90),
     welcomeText: String(source.welcomeText || defaults.welcomeText).trim().slice(0, 500),
     slotStep: BOOKING_SLOT_STEPS.includes(slotStep) ? slotStep : defaults.slotStep,
-    theme: {
-      backgroundMode: oneOf(sourceTheme.backgroundMode, ['solid', 'gradient'], defaults.theme.backgroundMode),
-      backgroundStart: color(sourceTheme.backgroundStart, defaults.theme.backgroundStart),
-      backgroundEnd: color(sourceTheme.backgroundEnd, defaults.theme.backgroundEnd),
-      dark: color(sourceTheme.dark, defaults.theme.dark),
-      light: color(sourceTheme.light, defaults.theme.light),
-      shape: oneOf(sourceTheme.shape, BOOKING_SHAPES.map((item) => item.value), defaults.theme.shape),
-      choiceStyle: oneOf(sourceTheme.choiceStyle, BOOKING_CHOICE_STYLES.map((item) => item.value), defaults.theme.choiceStyle),
-    },
+    theme: { ...defaults.theme },
   };
 }
 
