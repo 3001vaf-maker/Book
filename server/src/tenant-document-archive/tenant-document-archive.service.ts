@@ -163,8 +163,6 @@ export class TenantDocumentArchiveService {
 
     const current = normalize(state.data);
 
-    // Старые тестовые RKN_GUIDE_PDF создавались до появления шаблона Реестра.
-    // Они сохраняются в архиве для истории, но не участвуют в новой цепочке версий.
     let legacyChanged = false;
     current.documents = current.documents.map((item: any) => {
       const attachment = objectValue(item?.attachment);
@@ -177,6 +175,8 @@ export class TenantDocumentArchiveService {
         return {
           ...item,
           title: item?.title || 'Старая инструкция РКН',
+          documentClass: 'FILE',
+          signable: false,
           attachment: {
             ...attachment,
             legacyFormat: 'PRE_REGISTRY_TEMPLATE',
@@ -193,16 +193,12 @@ export class TenantDocumentArchiveService {
     const templateContent = String(input.templateContent || '');
     const personalizedContent = String(input.personalizedContent || '');
     const pdfBase64 = String(input.pdfBase64 || '');
+    const guideMode = String(input.guideMode || '').toUpperCase() === 'UPDATE' ? 'UPDATE' : 'INITIAL';
     if (!templateKey || !templateVersion || !templateContent || !personalizedContent || !pdfBase64) {
       throw new BadRequestException('Персональная инструкция РКН сформирована не полностью');
     }
 
-    const source = {
-      templateKey,
-      templateVersion,
-      templateContent,
-      snapshot,
-    };
+    const source = { templateKey, templateVersion, templateContent, snapshot, guideMode };
     const sourceHash = createHash('sha256').update(JSON.stringify(stable(source)), 'utf8').digest('hex');
     const existing = current.documents.find((item: any) => (
       isCanonicalRknGuide(item, templateKey)
@@ -218,34 +214,30 @@ export class TenantDocumentArchiveService {
       return clone(existing);
     }
 
-    const canonicalGuides = current.documents.filter((item: any) => isCanonicalRknGuide(item, templateKey));
-    const version = canonicalGuides.reduce(
-      (maxVersion: number, item: any) => Math.max(maxVersion, Number(item?.version || 0)),
-      0,
-    ) + 1;
     const generatedAt = new Date().toISOString();
-    const mode = version === 1 ? 'INITIAL' : 'UPDATE';
-    const title = mode === 'INITIAL'
+    const title = guideMode === 'INITIAL'
       ? 'Инструкция по уведомлению Роскомнадзора'
       : 'Инструкция по изменению сведений Роскомнадзора';
     const document = {
       id: `rkn-guide-${randomUUID()}`,
       system: true,
       kind: 'instruction',
+      documentClass: 'FILE',
+      signable: false,
       title,
       personConsent: false,
       required: false,
-      version,
+      version: 1,
       text: personalizedContent,
       sourceMode: 'BOOK',
       baseKey: templateKey,
       baseVersion: templateVersion,
-      availableBaseVersion: templateVersion,
-      availableBookText: templateContent,
       attachment: {
         type: 'RKN_GUIDE_PDF',
-        guideMode: mode,
-        fileName: `rkn-guide-v${version}.pdf`,
+        guideMode,
+        fileName: guideMode === 'INITIAL'
+          ? 'rkn-guide-initial.pdf'
+          : `rkn-guide-update-${generatedAt.slice(0, 10)}.pdf`,
         mimeType: 'application/pdf',
         generatedAt,
         templateKey,
@@ -256,16 +248,6 @@ export class TenantDocumentArchiveService {
       },
     };
     current.documents.push(document);
-    current.history.push({
-      id: randomUUID(),
-      documentId: document.id,
-      documentTitle: document.title,
-      documentVersion: document.version,
-      action: version === 1 ? 'created' : 'version-created',
-      createdAt: generatedAt,
-      source: 'system-rkn-guide',
-      snapshot: clone(document),
-    });
 
     await this.prisma.tenantDocumentArchive.update({
       where: { tenantId },
@@ -287,7 +269,7 @@ export class TenantDocumentArchiveService {
       attachment.legacyFormat === 'PRE_REGISTRY_TEMPLATE'
       || !isCanonicalRknGuide(document)
     ) {
-      throw new ConflictException('Это старая тестовая инструкция РКН. Она сохранена в истории, но не относится к новой цепочке версий.');
+      throw new ConflictException('Это старый тестовый PDF-помощник РКН. Он не относится к текущему формату файлов.');
     }
     return clone(document);
   }
