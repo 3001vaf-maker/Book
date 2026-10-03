@@ -25,7 +25,6 @@ import {
 } from '../core/account/index.js';
 import { normalizeBookingSettings } from '../core/booking-settings/index.js';
 import {
-  bookingThemeStyle,
   button,
   emptyState,
   escapeHtml,
@@ -156,7 +155,7 @@ function renderExpandedDocument(root, state, document, onBack) {
     version: document?.version || 1,
     content: document?.content ?? document?.text ?? '',
   });
-  root.innerHTML = `<section class="${flowThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${v2Sticker({
+  root.innerHTML = `<section class="${flowThemeClasses()}">${v2Sticker({
     body: content,
     className: 'v2-sticker-screen--legal-document',
     closeData: 'data-u-document-close',
@@ -209,7 +208,7 @@ function renderLegalSticker(root, state) {
     else renderAccountDetails(root, state);
   };
 
-  root.innerHTML = `<section class="${flowThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${v2Sticker({
+  root.innerHTML = `<section class="${flowThemeClasses()}">${v2Sticker({
     title: 'Документы',
     body: `${cards}${formError(state.error)}`,
     action,
@@ -286,11 +285,8 @@ function resetBookingChoice(state) {
   state.repeatSelection = null;
 }
 
-function flowThemeClasses(state) {
-  const theme = state.settings?.theme && typeof state.settings.theme === 'object' ? state.settings.theme : {};
-  const shape = ['soft', 'round', 'straight', 'cut'].includes(theme.shape) ? theme.shape : 'soft';
-  const choiceStyle = ['cards', 'compact', 'list'].includes(theme.choiceStyle) ? theme.choiceStyle : 'cards';
-  return `booking-account booking-account--account booking-account--v2 booking-shape--${shape} booking-choice-style--${choiceStyle}`;
+function flowThemeClasses() {
+  return 'booking-account booking-account--account booking-account--v2';
 }
 
 function representativeName(state) {
@@ -342,7 +338,7 @@ function renderFlowPage(root, state, {
     body: `${localTitle}${subtitleBlock(subtitle)}${body}`,
     className: center ? 'v2-app--flow-center' : 'v2-app--booking-flow',
   });
-  root.innerHTML = `<section class="${flowThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${shell}</section>`;
+  root.innerHTML = `<section class="${flowThemeClasses()}">${shell}</section>`;
   root.querySelector('[data-booking-flow-chat]')?.addEventListener('click', () => {
     exitBookingContext(state, { tab: 'messages', tenantId: state.tenantId });
   });
@@ -410,7 +406,7 @@ function renderBookingStep(root, state, {
 } = {}) {
   let app = root.querySelector('[data-v2-app]');
   if (!app || !app.classList.contains('v2-app--booking-flow')) {
-    root.innerHTML = `<section class="${flowThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${v2Shell({
+    root.innerHTML = `<section class="${flowThemeClasses()}">${v2Shell({
       header: bookingHeaderMarkup(state, bookingActionForStep(state, step)),
       body: '<div data-booking-base-step></div>',
       className: 'v2-app--booking-flow',
@@ -533,7 +529,7 @@ function renderWelcome(root, state) {
     }
     renderAccountEntry(root, state);
   };
-  root.innerHTML = `<section class="${flowThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${v2Sticker({
+  root.innerHTML = `<section class="${flowThemeClasses()}">${v2Sticker({
     eyebrow: owner ? `Приглашение от ${owner}` : '',
     title: state.settings.welcomeTitle || '',
     body: state.settings.welcomeText ? `<p>${escapeHtml(state.settings.welcomeText).replaceAll('\n', '<br>')}</p>` : '',
@@ -562,7 +558,7 @@ function renderAccountEntry(root, state) {
     <button type="button" class="v2-sticker-link" data-booking-forgot>Забыли пароль?</button>
     <button type="button" class="v2-sticker-link" data-booking-register>Зарегистрироваться</button>
   `, { data: 'id="booking-entry-form" data-booking-entry-form' });
-  root.innerHTML = `<section class="${flowThemeClasses(state)}" style="${bookingThemeStyle(state.settings)}">${v2Sticker({
+  root.innerHTML = `<section class="${flowThemeClasses()}">${v2Sticker({
     title: 'Вход',
     body: form,
     action: '<button class="ui-button" type="submit" form="booking-entry-form">Войти</button>',
