@@ -44,9 +44,9 @@ const state = {
   navigationLevel: 'f',
   navigationEnterZ: false,
   chatPersonKey: '',
+  journalView: 'day',
   secondary: {
     finance: 'cash',
-    journal: 'day',
     settings: 'service',
   },
 };
@@ -432,9 +432,9 @@ function renderActiveWorkspaceSurface(surface) {
   if (section === 'timetable') return renderTimetable(surface);
   if (section === 'journal') {
     return renderJournal(surface, {
-      initialView: state.secondary.journal || 'day',
+      initialView: state.journalView || 'day',
       onViewChange: (view) => {
-        state.secondary.journal = view;
+        state.journalView = view;
       },
     });
   }
