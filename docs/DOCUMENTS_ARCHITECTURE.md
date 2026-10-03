@@ -1,140 +1,153 @@
-# Book — Document Archive / Consents architecture
+# Document architecture
 
-## 1. Owner
+## 1. Invariants
 
-`DocumentArchive` is the umbrella name only; it is not an independent storage owner.
+A common visual cover does not make all documents one business entity.
 
-`PlatformDocumentArchive` is the Book/platform archive. Its UI folder is `DocumentRegistry` («Реестр документов»). Platform document instances are stored as `PlatformDocument` + `PlatformDocumentVersion`; Book ↔ profile actions are stored as `PlatformConsentEvent`.
+The tenant document domain has three explicit lifecycle classes:
 
-`TenantDocumentArchive` is the archive of one tenant/profile. Its UI folder is `Documents` («Документы»). Tenant document instances and tenant document history live only here; profile ↔ people consent history is stored as `TenantConsentEvent`.
+| Class | Meaning | Delete | Version chain | Signing events |
+| --- | --- | --- | --- | --- |
+| `CORE_LEGAL` | Three platform-backed legal/current documents | No | Yes | When the document is signable |
+| `USER_DOCUMENT` | A document created or uploaded by the profile for its own work | Yes | Yes | Only when explicitly signable |
+| `FILE` | An ordinary file or helper PDF | Yes | No | Never |
 
-Document Registry may contain reusable bases for tenant documents, but those bases are templates only. They are never a second tenant archive.
+The UI must never infer lifecycle rules from card appearance, title, file extension, color or screen location. Lifecycle is explicit.
 
-The `Clients / People` domain does **not** own consent state. A client card may only display a projection calculated from Documents.
+## 2. Platform registry
 
-Canonical direction:
+The platform registry owns source material, not tenant document instances.
+
+It contains three legal templates used to build the profile's three core documents:
+
+1. `user-document-pdn-policy` → `pdn-agreement`
+2. `user-document-pdn-consent` → `pdn-consent`
+3. `user-document-messages-consent` → `messages-consent`
+
+Only these three sources appear in **A → Шаблоны** for the profile.
+
+The registry separately contains helper-generator templates, currently `rkn-notification-guide-template`. A helper-generator template is not a tenant legal template and never appears in the profile's **Шаблоны** list.
+
+## 3. Tenant documents
+
+`TenantDocumentArchive.documents` owns current tenant artifacts.
+
+The three core legal documents always have stable logical IDs and class `CORE_LEGAL`. Editing a template updates the matching tenant document; it does not create another current document.
+
+Example:
 
 ```text
-Documents
-  ├─ document
-  ├─ document version
-  ├─ consent event log
-  ├─ current consent state
-  └─ reports
-          ↓ projection
-Clients / People
+pdn-consent
+  current version: 4
+  archived snapshots: v1, v2, v3
 ```
 
-A checkbox or `person.agreements` field is never a source of truth. Legacy agreement flags may be read only as migration input and must not become a second owner.
+The profile still has one current `pdn-consent`, not four visible copies.
 
-## 2. Consent event log
+A profile-created contract is `USER_DOCUMENT`. It may be removed from current documents. If it was signed, immutable snapshots and signing events remain available for the signing facts.
 
-Every action is an immutable event tied to:
-- tenant;
-- Person / UEI;
-- document id;
-- document version;
-- action: `accepted` / `revoked` / `declined` when applicable;
-- exact timestamp;
+An ordinary uploaded PDF is `FILE` unless the profile explicitly marks it for signing, in which case it becomes `USER_DOCUMENT`.
+
+## 4. RKN helper
+
+The RKN PDF is a `FILE`.
+
+It is:
+- generated from a helper template and factual profile data;
+- a finished, deletable PDF;
+- not signable;
+- not a legal consent document;
+- not versioned;
+- never written to tenant document history;
+- never written to `TenantConsentEvent`;
+- never shown in signing history.
+
+If relevant profile facts later change, a new **separate** update-helper PDF may be generated. The earlier PDF remains a separate file until the profile deletes it.
+
+A platform helper-template update by itself does not create another tenant PDF when the profile facts have not changed.
+
+## 5. Document versions
+
+Document version snapshots exist only for `CORE_LEGAL` and `USER_DOCUMENT`.
+
+They are technical/audit backing data. They are not a second user-facing list and they are not the visible **История** tab.
+
+A previous snapshot is used to open the exact content that was signed after the current document has changed or has been removed from current documents.
+
+## 6. Signing events
+
+`TenantConsentEvent` is the only source of the tenant's visible signing history.
+
+Each event records:
+- subject;
+- document ID;
+- exact document version;
+- accepted / revoked / declined;
+- exact time;
 - source/channel.
 
-Revocation never deletes the earlier acceptance. Re-acceptance creates a new event. Current state is derived from the latest valid event for the relevant document/version.
+A `FILE` is rejected by the signing service even if a caller submits its ID directly.
 
-## 3. PDN consent and grey zone
+The visible **История** tab is built only from these events. Technical version creation, renames, helper generation and file uploads are not displayed there.
 
-`pdn-consent` controls active cooperation with the profile. Revocation does not delete the account, client history, booking history, notifications or consent history.
+## 7. Profile Documents UI
 
-When the current `pdn-consent` is absent or revoked:
-- login remains available;
-- consent documents and consent management remain available;
-- booking/request history created before revocation remains readable;
-- notifications created before revocation remain readable and may be marked read;
-- creating a new booking/request is blocked;
-- Chat is unavailable: no new `DIRECT` messages are read, written or delivered;
-- new `SYSTEM`, `SERVICE`, `DIRECT` and `MARKETING` deliveries are blocked at send time;
-- `MARKETING` additionally requires its own advertising consent.
+Z1 has one switch: **Документы | История**.
 
-Re-accepting the current `pdn-consent` returns the account to active cooperation. Changing the PDN document version requires acceptance of the current version before active cooperation resumes.
+### Документы
 
-Data deletion/anonymisation is a separate process and is not triggered by consent revocation.
+The first section is **Основные документы** and shows the three `CORE_LEGAL` documents in one horizontal rail.
 
-## 4. Marketing consent and message purpose
+The second section is **Другие документы** and shows:
+- RKN helper PDFs;
+- uploaded ordinary PDFs;
+- profile-created documents.
 
-`messages-consent` is the current technical id of the advertising/marketing consent. It applies only to messages whose persisted `purpose` is `MARKETING`.
+All use the same shared `documentTile()` cover. Shared cover means shared geometry only; lifecycle rules come from document class.
 
-Client-facing message purposes are independent of delivery channel:
-- `SYSTEM` — account, security and technical access/linking;
-- `SERVICE` — booking/service execution and operational notifications;
-- `DIRECT` — person-to-person chat between the business and the client;
-- `MARKETING` — advertising, promotions, free slots and broadcasts.
+Clicking a cover opens Z2 **Информация о документе**. Z2 contains:
+1. the same document cover;
+2. factual document information;
+3. A = document settings.
 
-`SYSTEM`, `SERVICE` and `DIRECT` must never be blocked by `messages-consent`.
+Clicking the cover inside Z2 opens the actual content in the shared technical viewer: black background, white paper, close only.
 
-Before every `MARKETING` send, the communication subsystem must query the current advertising consent for the target contact/channel. Revocation stops subsequent `MARKETING` sends for that target. Cached flags in Client or BookingAccount are not the source of truth.
+For `CORE_LEGAL`, settings do not offer deletion. For `USER_DOCUMENT` and `FILE`, deletion is allowed. Additional settings can be added later without changing lifecycle ownership.
 
-## 5. Client projection
+### История
 
-The client list/card may display only derived information from Documents, for example:
-- consent present / absent / revoked;
-- document name and version;
-- date/time of the current event;
-- link to the full consent history.
+History contains signing events only. The same document may appear many times because different people can sign the same version or different versions.
 
-The client UI does not write its own agreement flags. Any accept/revoke action writes a Documents event, after which the client projection refreshes.
+Opening an event shows the signed document cover plus the canonical `readOnlyReceipt` with who/what/version/time/status/source. Clicking the cover opens the immutable signed snapshot.
 
-## 6. Reporting
+## 8. End-user boundary
 
-Reports are built from the Documents event log, not from Client fields and not from the current checkbox state.
+End-user consent screens receive projections only for tenant documents that actually participate in consent/signing.
 
-The report must be able to answer:
-- who;
-- which document;
-- which version;
-- accepted / revoked / declined;
-- exact date and time;
-- source/channel;
-- current state;
-- full event chain.
+Helper files and ordinary files never participate.
 
-## 7. Server ownership
+The end user does not own document versions or signing history. End-user actions write immutable `TenantConsentEvent` facts in the tenant document domain.
 
-The production server/PostgreSQL owns document and consent business data. Browser state is never the legal/audit source.
+## 9. Ownership chain
 
-For scale and auditability, consent history must behave as append-only business facts. Replacing an entire mutable JSON array is not the target architecture for the final server model.
+```text
+Platform Registry
+  ├─ legal templates (3)
+  │    ↓ materialize/update
+  │  Tenant CORE_LEGAL documents (3 current logical documents)
+  │    ├─ hidden version snapshots
+  │    └─ TenantConsentEvent signing facts
+  │          ↓ projection
+  │       profile History / person context / end-user consent state
+  │
+  └─ helper templates
+       ↓ generate
+     Tenant FILE (for example RKN PDF)
+       └─ no versions / no signing history
 
-## 8. Integration boundaries
+Profile-created content
+  ├─ USER_DOCUMENT → optional signing + hidden versions
+  └─ FILE → deletable, no versions, no signing history
+```
 
-`Online Booking` may request Documents to validate required consent and record consent events, but it does not own consent history.
-
-`Clients / People` may request Documents for projections, but it does not own consent history.
-
-`Notifications / SMS / Telegram` must first require active `pdn-consent` for every new `SYSTEM`, `SERVICE`, `DIRECT` or `MARKETING` communication. Only `MARKETING` additionally requests the advertising consent represented by `messages-consent`.
-
-Canonical names: **DocumentArchive → PlatformDocumentArchive / TenantDocumentArchive; PlatformDocumentArchive → DocumentRegistry; TenantDocumentArchive → Documents; events → PlatformConsentEvent / TenantConsentEvent.**
-
-## 9. User-facing Documents UI contract
-
-The internal archive remains the legal/audit owner, but the ordinary profile UI must not expose the archive structure.
-
-User-facing `Documents` has one Z1 switch:
-- `Документы` — only current profile-owned document instances;
-- `История` — consent/signing facts plus saved document-version snapshots, represented by the same shared document UI.
-
-Header ownership:
-- A — document settings;
-- B — `Документы`;
-- C — empty on Z1 and appears as `Сохранить` only when an editable Z2 has unsaved changes;
-- D — shared Chat.
-
-A opens the shared bottom X with:
-- `Шаблоны`;
-- `Добавить документ`.
-
-Templates are editable sources owned by the platform Document Registry. They are not tenant documents and must remain available even when the tenant archive has no current instance yet. Editing a platform template creates or updates the tenant-owned current document derived from that template; prior versions and snapshots remain in the archive.
-
-Every item stored in TenantDocumentArchive.documents is a profile-owned document instance, including the current PDN/marketing documents derived from platform templates, generated documents, user-created text documents, and uploaded PDFs. Tenant documents must never be hidden by reclassifying them as templates. Only the current document is shown in Z1; historical versions remain in History/archive.
-
-Every document manifestation uses the shared `documentTile()` owner. Context changes only the displayed metadata/status. Opening document content always uses the shared technical viewer: black background, white paper, close control only.
-
-Signing history shows the document cover first. Opening an event shows the same document cover plus the canonical `readOnlyReceipt` signing fact. The signed snapshot is opened from that document cover. People/Chat may later project the same shared document UI; they must not create another document-card owner.
-
+No UI layer may collapse these owners into one lifecycle.
