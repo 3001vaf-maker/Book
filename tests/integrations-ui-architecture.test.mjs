@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 const integrations = readFileSync(new URL('../settings/integrations/integrations.js', import.meta.url), 'utf8');
 const inputs = readFileSync(new URL('../ui/inputs/index.js', import.meta.url), 'utf8');
 const v2Css = readFileSync(new URL('../ui/v2/v2.css', import.meta.url), 'utf8');
+const telegramService = readFileSync(new URL('../server/src/communication/telegram-bot.service.ts', import.meta.url), 'utf8');
 
 assert.match(integrations, /workspaceHeaderContext\(\{ title: 'Интеграции' \}\)/);
 assert.match(integrations, /miniCardRail\(\[telegramMiniCard/);
