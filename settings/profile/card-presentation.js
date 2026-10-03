@@ -1,4 +1,5 @@
 import { normalizeEntityCardAppearance } from '../../ui/ui.js';
+import { getCardAppearanceTemplate } from '../../core/card-appearance-templates.js';
 
 function firstOf(value, key) {
   return String(Array.isArray(value?.[key]) ? (value[key][0] || '') : '');
@@ -85,6 +86,8 @@ export function profileCardAppearance(profile = {}) {
 
 export function workplaceCardAppearance(workplace = {}) {
   if(hasConfiguredLines(workplace.cardAppearance)) return normalizeEntityCardAppearance(workplace.cardAppearance);
+  const template=getCardAppearanceTemplate('workplace');
+  if(hasConfiguredLines(template?.appearance)) return normalizeEntityCardAppearance(template.appearance);
   return normalizeEntityCardAppearance({
     lines:defaultLines([
       {row:1,field:'workTime',zone:'right',align:'right',size:'m'},
@@ -94,4 +97,8 @@ export function workplaceCardAppearance(workplace = {}) {
       {row:9,field:'profilePhone',zone:'full',align:'left',size:'m'},
     ]),
   });
+}
+
+export function workplaceCardPhoto(workplace = {}) {
+  return String(workplace.photo || getCardAppearanceTemplate('workplace')?.photo || '');
 }
