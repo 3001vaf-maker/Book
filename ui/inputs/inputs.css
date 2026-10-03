@@ -23,3 +23,5 @@
 .ui-search-field{padding:0 0 12px}
 .ui-search-field .field>span{display:none}
 .ui-search-divider{height:1px;margin:0 0 14px;background:#D7D7D7}
+
+.field input:disabled{background:var(--surface-soft);color:var(--text);opacity:1;cursor:default}

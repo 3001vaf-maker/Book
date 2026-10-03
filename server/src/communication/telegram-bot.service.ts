@@ -86,6 +86,9 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
   async connect(tenantId: string, rawToken: unknown) {
     const token = text(rawToken);
     if (!/^\d{5,}:[A-Za-z0-9_-]{20,}$/.test(token)) throw new BadRequestException('Некорректный токен Telegram-бота');
+    if (await this.rowForTenant(tenantId)) {
+      throw new ConflictException('Telegram-бот уже подключён. Сначала отключите его.');
+    }
     const bot = await this.telegramApi(token, 'getMe');
     if (!bot?.id || !bot?.is_bot) throw new BadRequestException('Токен не принадлежит Telegram-боту');
     const botId = String(bot.id); const botUsername = telegramUsername(bot.username);
@@ -97,11 +100,17 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       await this.telegramApi(token, 'setWebhook', { url: `${publicApiUrl}/communications/telegram/webhook/${webhookKey}`, secret_token: webhookSecret, allowed_updates: ['message'], drop_pending_updates: false });
       status = 'active';
     }
-    await this.prisma.$executeRaw`
+    const inserted = await this.prisma.$executeRaw`
       INSERT INTO "TelegramBotConnection" ("id", "tenantId", "botId", "botUsername", "encryptedToken", "tokenIv", "tokenTag", "webhookKey", "webhookSecretHash", "status", "connectedAt", "updatedAt")
       VALUES (${randomUUID()}, ${tenantId}, ${botId}, ${botUsername}, ${encrypted.encryptedToken}, ${encrypted.tokenIv}, ${encrypted.tokenTag}, ${webhookKey}, ${sha256(webhookSecret)}, ${status}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      ON CONFLICT ("tenantId") DO UPDATE SET "botId" = EXCLUDED."botId", "botUsername" = EXCLUDED."botUsername", "encryptedToken" = EXCLUDED."encryptedToken", "tokenIv" = EXCLUDED."tokenIv", "tokenTag" = EXCLUDED."tokenTag", "webhookKey" = EXCLUDED."webhookKey", "webhookSecretHash" = EXCLUDED."webhookSecretHash", "status" = EXCLUDED."status", "connectedAt" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP
+      ON CONFLICT ("tenantId") DO NOTHING
     `;
+    if (!inserted) {
+      if (publicApiUrl) {
+        try { await this.telegramApi(token, 'deleteWebhook', { drop_pending_updates: false }); } catch {}
+      }
+      throw new ConflictException('Telegram-бот уже подключён. Сначала отключите его.');
+    }
     void this.dispatchTenant(tenantId);
     return this.getConnection(tenantId);
   }
