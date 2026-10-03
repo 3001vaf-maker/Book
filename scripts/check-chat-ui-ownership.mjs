@@ -10,6 +10,7 @@ const chatRuntime = fs.readFileSync('core/chat/runtime.js', 'utf8');
 const chatCss = fs.readFileSync('ui/chat/chat.css', 'utf8');
 const v2Css = fs.readFileSync('ui/v2/v2.css', 'utf8');
 const v2Ui = fs.readFileSync('ui/v2/index.js', 'utf8');
+const settingsSource = fs.readFileSync('settings/settings.js', 'utf8');
 
 const failures = [];
 const expect = (condition, message) => { if (!condition) failures.push(message); };
@@ -22,6 +23,9 @@ expect(profileChat.includes("from '../core/chat/runtime.js'") && profileChat.inc
 expect(profileChat.includes('body, attachments'), 'Professional direct thread must send attachments through the neutral Chat runtime.');
 expect(!profileChat.includes('function bindMessageAttachments') && !profileChat.includes('function fileAttachment'), 'Professional Chat must not duplicate Shared Chat attachment logic.');
 expect(!profileChat.includes('<style>') && !profileChat.includes("document.createElement('style')"), 'Professional Chat must not own local styles.');
+expect(profileChat.includes("data-chat-new-message") && profileChat.includes("recipientOptions(root, state)"), 'Chat settings must expose the existing one/many/group/all message composer after Notifications E removal.');
+expect(profileChat.includes("name: 'broadcastChannel'") && profileChat.includes("{ value: 'TELEGRAM', label: 'Telegram' }") && profileChat.includes("{ value: 'EMAIL', label: 'Email' }"), 'Bulk Chat composition must preserve Telegram/Email channel choice from the removed duplicate broadcast UI.');
+expect(!settingsSource.includes("['communications', 'Уведомления'") && !fs.existsSync('settings/communications/communications.js'), 'Duplicate Notifications E and its retired settings UI must stay removed.');
 
 expect(accountChat.includes('v2Header({') && accountChat.includes('v2Shell'), 'End-user Chat must use the shared V2 H + Z shell.');
 expect(accountChat.includes("selected ? 'v2-app--chat' : 'v2-app--chat-list'"), 'End-user Chat must use the canonical V2 Chat shell classes.');
