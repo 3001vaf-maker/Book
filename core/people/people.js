@@ -216,6 +216,7 @@ function listContext(count) {
     a: {
       kind: 'text',
       label: String(count),
+      settingsTag: true,
       data: 'data-people-list-settings',
       aria: `Клиентов: ${count}. Сортировка и Excel`,
     },
@@ -382,6 +383,7 @@ function personContext(person) {
       kind: 'avatar',
       image: person.photo || '',
       initials: initials(person),
+      settingsTag: true,
       data: 'data-person-settings',
       aria: `Настройки ${name(person)}`,
     },

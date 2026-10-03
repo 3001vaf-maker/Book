@@ -52,7 +52,7 @@
 .v2-header__control--avatar{overflow:visible}
 .v2-header__slot--a .v2-header__avatar--initials{background:transparent;color:#fff}
 .v2-header__avatar{width:100%;height:100%;display:grid;place-items:center;border-radius:50%;overflow:hidden;background-image:var(--v2-avatar);background-size:cover;background-position:var(--v2-avatar-position,center)}
-.v2-header__settings-tag{position:absolute;right:-7px;top:14px;width:18px;height:18px;border:1px solid #111;border-radius:5px;display:grid;place-items:center;background:#fff;color:#111;box-shadow:0 2px 5px rgba(0,0,0,.18);pointer-events:none}
+.v2-header__settings-tag{position:absolute;right:-2px;bottom:-2px;width:18px;height:18px;border:1px solid #111;border-radius:5px;display:grid;place-items:center;background:#fff;color:#111;box-shadow:0 2px 5px rgba(0,0,0,.18);pointer-events:none}
 .v2-header__settings-tag svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .v2-header__avatar--initials{font-weight:800}
 

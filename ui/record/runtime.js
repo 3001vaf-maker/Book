@@ -181,6 +181,7 @@ export function mountRecordZ({
       imagePosition: aImagePosition,
       initials: aInitials,
       ...(showA && settings ? {
+        settingsTag: true,
         data: 'data-record-owner-settings',
         aria: 'Настройки записи',
       } : {
