@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    :root{--surface-dark:#2f3338;--app-max-width:390px;--visual-vh:780px;--visual-vw:390px}
+    html,body{margin:0;width:390px;height:780px}
+    *{box-sizing:border-box}
+  </style>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/ui/page/page.css">
+  <link rel="stylesheet" href="/ui/buttons/buttons.css">
+  <link rel="stylesheet" href="/ui/inputs/inputs.css">
+  <link rel="stylesheet" href="/ui/lists/list-entry.css">
+  <link rel="stylesheet" href="/ui/selection/segment-control.css">
+  <link rel="stylesheet" href="/ui/states/state-view.css">
+  <link rel="stylesheet" href="/ui/modals/modal.css">
+  <link rel="stylesheet" href="/ui/receipt/receipt.css">
+  <link rel="stylesheet" href="/ui/documents/document.css">
+  <link rel="stylesheet" href="/ui/v2/v2.css">
+</head>
+<body>
+<div id="app"></div>
+<pre id="result">pending</pre>
+<script type="module">
+const result = document.querySelector('#result');
+const failures = [];
+let stage = 'boot';
+const mark = (name) => {
+  stage = name;
+  result.textContent = 'running: ' + name;
+  document.documentElement.dataset.documentsRuntimeStage = name;
+};
+const ok = (condition, message) => { if (!condition) failures.push(stage + ': ' + message); };
+const wait = (ms = 40) => new Promise((resolve) => window.setTimeout(resolve, ms));
+window.addEventListener('error', (event) => failures.push(stage + ': window error: ' + (event.error?.message || event.message)));
+window.addEventListener('unhandledrejection', (event) => failures.push(stage + ': rejection: ' + String(event.reason?.message || event.reason || 'unknown')));
+
+mark('imports');
+const [{ v2Header, v2Shell }, documentsUi, data, consents, history] = await Promise.all([
+  import('/ui/ui.js'),
+  import('/settings/documents/documents.js'),
+  import('/settings/documents/data.js'),
+  import('/settings/documents/consents.js'),
+  import('/settings/documents/history.js'),
+]);
+
+data.hydrateDocumentsFromServer([
+  {
+    id:'pdn-consent',
+    system:true,
+    recordType:'template',
+    signable:true,
+    kind:'consent',
+    title:'Согласие на обработку персональных данных',
+    personConsent:true,
+    required:true,
+    version:2,
+    text:'Текущий текст согласия',
+    sourceMode:'BOOK',
+    baseKey:'pdn-consent-template',
+    baseVersion:2,
+  },
+  {
+    id:'profile-contract',
+    system:false,
+    recordType:'document',
+    signable:true,
+    kind:'document',
+    title:'Договор на фотосъёмку',
+    version:3,
+    text:'Текст договора на фотосъёмку.',
+    sourceMode:'CUSTOM',
+    createdAt:'2026-10-01T08:00:00.000Z',
+    updatedAt:'2026-10-03T08:00:00.000Z',
+  },
+  {
+    id:'rkn-old',
+    system:true,
+    recordType:'document',
+    kind:'instruction',
+    title:'Инструкция по уведомлению Роскомнадзора',
+    version:1,
+    text:'Старая версия РКН',
+    sourceMode:'BOOK',
+    attachment:{
+      type:'RKN_GUIDE_PDF',
+      templateKey:'rkn-notification-guide-template',
+      generatedAt:'2026-09-20T08:00:00.000Z',
+      mimeType:'application/pdf',
+      pdfBase64:'JVBERi0xLjQKJcTl8uXrCg=='
+    }
+  },
+  {
+    id:'rkn-current',
+    system:true,
+    recordType:'document',
+    kind:'instruction',
+    title:'Инструкция по изменению сведений Роскомнадзора',
+    version:2,
+    text:'Текущая версия РКН',
+    sourceMode:'BOOK',
+    attachment:{
+      type:'RKN_GUIDE_PDF',
+      templateKey:'rkn-notification-guide-template',
+      generatedAt:'2026-10-02T08:00:00.000Z',
+      mimeType:'application/pdf',
+      pdfBase64:'JVBERi0xLjQKJcTl8uXrCg=='
+    }
+  }
+]);
+
+history.hydrateDocumentHistoryFromServer([
+  {
+    id:'pdn-v2',
+    documentId:'pdn-consent',
+    documentTitle:'Согласие на обработку персональных данных',
+    documentVersion:2,
+    action:'version-created',
+    createdAt:'2026-10-01T07:00:00.000Z',
+    snapshot:{
+      id:'pdn-consent',
+      recordType:'template',
+      signable:true,
+      kind:'consent',
+      title:'Согласие на обработку персональных данных',
+      personConsent:true,
+      required:true,
+      version:2,
+      text:'Именно этот текст был подписан.',
+      sourceMode:'BOOK'
+    }
+  }
+]);
+
+consents.hydrateConsentsFromServer([
+  {
+    id:'signing-1',
+    subjectType:'CONTACT_POINT',
+    subjectKey:'phone:+79990000000',
+    contactType:'PHONE',
+    contactValue:'+79990000000',
+    documentId:'pdn-consent',
+    documentVersion:2,
+    status:'accepted',
+    acceptedAt:'2026-10-03T05:30:00.000Z',
+    eventAt:'2026-10-03T05:30:00.000Z',
+    createdAt:'2026-10-03T05:30:00.000Z',
+    source:'chat'
+  }
+]);
+
+mark('render-shell');
+const app = document.querySelector('#app');
+app.innerHTML = v2Shell({
+  header:v2Header({ b:'Документы' }),
+  className:'v2-app--workspace',
+  body:'<section class="v2-workspace-surface" id="documents-root"></section>',
+});
+const root = document.querySelector('#documents-root');
+documentsUi.render(root);
+await wait();
+
+mark('z1-documents');
+ok(Boolean(root.querySelector('[data-workspace-header-context][data-workspace-title="Документы"]')), 'Documents workspace context missing');
+ok(root.querySelectorAll('[data-segment-option]').length === 2, 'Documents/History switch must contain two options');
+ok(root.querySelector('[data-segment-option="documents"]')?.classList.contains('is-active'), 'Documents must be active by default');
+ok(root.querySelectorAll('[data-profile-document]').length === 2, 'Z1 must show current contract plus only latest RKN document');
+ok(!root.textContent.includes('Старая версия РКН'), 'Old RKN version leaked into Z1');
+ok(!root.textContent.includes('Согласие на обработку персональных данных'), 'Template leaked into profile Documents Z1');
+ok([...root.querySelectorAll('.document-tile')].every((node) => getComputedStyle(node).borderRadius === '0px'), 'Document tile corners must be straight');
+
+mark('technical-viewer');
+root.querySelector('[data-profile-document="profile-contract"]')?.click();
+await wait();
+let technical = document.querySelector('[data-v2-layer-kind="technical"].document-viewer-backdrop');
+ok(Boolean(technical), 'Document did not open technical viewer');
+ok(getComputedStyle(technical).backgroundColor === 'rgb(17, 17, 17)', 'Technical viewer backdrop must be black');
+ok(Boolean(technical?.querySelector('.document-page')), 'Text document must render as white document page');
+technical?.v2Close?.();
+await wait();
+
+mark('settings-x');
+root.querySelector('[data-documents-settings]')?.click();
+await wait();
+let settingsX = document.querySelector('[data-modal][data-v2-layer-kind="bottom"]');
+ok(Boolean(settingsX), 'A must open bottom X');
+ok(Boolean(settingsX?.querySelector('[data-open-document-templates]')), 'Templates action missing from A/X');
+ok(Boolean(settingsX?.querySelector('[data-add-profile-document]')), 'Add document action missing from A/X');
+settingsX?.querySelector('[data-open-document-templates]')?.click();
+await wait();
+
+mark('templates-x');
+let templatesX = document.querySelector('[data-modal][data-v2-layer-kind="bottom"]');
+ok(Boolean(templatesX?.querySelector('[data-template-open="pdn-consent"]')), 'Current template missing from Templates X');
+templatesX?.querySelector('[data-template-open="pdn-consent"]')?.click();
+await wait();
+
+mark('template-z2');
+let templateLayer = root.closest('[data-v2-app]')?.querySelector('[data-v2-z-layer]');
+ok(Boolean(templateLayer), 'Template must open as Z2');
+let saveSource = templateLayer?.querySelector('[data-template-save]');
+ok(saveSource?.dataset.v2PrimaryVisible === 'false', 'C Save must be hidden before template changes');
+const templateText = templateLayer?.querySelector('[name="documentText"]');
+templateText.value = templateText.value + '\nИзменение пользователя';
+templateText.dispatchEvent(new Event('input',{bubbles:true}));
+await wait();
+ok(saveSource?.dataset.v2PrimaryVisible === 'true', 'C Save must appear after template change');
+saveSource?.click();
+await wait();
+const savedTemplate = data.getDocuments().find((item) => item.id === 'pdn-consent');
+ok(savedTemplate?.version === 3, 'Template save must create next current version');
+ok(savedTemplate?.sourceMode === 'CUSTOM', 'Edited platform template must become tenant-owned CUSTOM current version');
+ok(history.getDocumentHistory().some((entry) => entry.documentId === 'pdn-consent' && entry.documentVersion === 2 && entry.snapshot?.text === 'Текущий текст согласия'),
+  'Previous template version must remain under the hood as snapshot');
+templateLayer?.v2Close?.();
+await wait();
+
+mark('history-z1');
+root.querySelector('[data-segment-option="history"]')?.click();
+await wait();
+ok(root.querySelector('[data-segment-option="history"]')?.classList.contains('is-active'), 'History switch did not activate');
+ok(root.querySelectorAll('[data-signing-event]').length === 1, 'History must show signing fact as one document tile');
+const signingTile = root.querySelector('[data-signing-event="signing-1"]');
+ok(signingTile?.textContent.includes('Версия 2'), 'History tile must show signed version');
+ok(signingTile?.textContent.includes('Подписан'), 'History tile must show signed status');
+ok(!signingTile?.textContent.includes('+79990000000'), 'Person details must not be placed on document cover');
+signingTile?.click();
+await wait();
+
+mark('signing-detail-z2');
+let signingLayer = root.closest('[data-v2-app]')?.querySelector('[data-v2-z-layer]');
+ok(Boolean(signingLayer), 'Signing fact must open Z2');
+ok(Boolean(signingLayer?.querySelector('[data-read-only-sheet]')), 'Signing detail must use canonical readOnlyReceipt');
+ok(signingLayer?.textContent.includes('+79990000000'), 'Signing receipt must show who signed');
+ok(signingLayer?.textContent.includes('Версия') && signingLayer?.textContent.includes('2'), 'Signing receipt must show document version');
+ok(Boolean(signingLayer?.querySelector('[data-signing-document-open]')), 'Signed snapshot cover missing from detail');
+
+mark('signed-snapshot-viewer');
+signingLayer?.querySelector('[data-signing-document-open]')?.click();
+await wait();
+technical = document.querySelector('[data-v2-layer-kind="technical"].document-viewer-backdrop');
+ok(Boolean(technical), 'Signed snapshot did not open technical viewer');
+ok(technical?.textContent.includes('Именно этот текст был подписан.'), 'Technical viewer must show exact signed snapshot');
+technical?.v2Close?.();
+
+if (failures.length) {
+  document.documentElement.dataset.documentsRuntime = 'fail';
+  result.textContent = failures.join('\n');
+  throw new Error(failures.join(' | '));
+}
+document.documentElement.dataset.documentsRuntime = 'pass';
+document.documentElement.dataset.documentsRuntimeStage = 'done';
+result.textContent = 'documents runtime: OK';
+</script>
+</body>
+</html>
