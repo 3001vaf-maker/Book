@@ -12,7 +12,8 @@ function dataAttributes(data = '') {
 
 function titleLines(value = '') {
   const words = String(value || '').trim().split(/\s+/).filter(Boolean);
-  if (words.length <= 1) return [words[0] || 'Документ'];
+  const fullTitle = words.join(' ') || 'Документ';
+  if (words.length <= 1 || fullTitle.length <= 26) return [fullTitle];
 
   let splitAt = 1;
   let bestDifference = Number.POSITIVE_INFINITY;
