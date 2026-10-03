@@ -66,6 +66,12 @@
     cost:1500,
     workplaces:[{workplaceId:'runtime-studio',duration:60,cost:1500}],
   };
+  const runtimeProduct = {
+    id:'runtime-service-product',
+    name:'Товар Тест',
+    cost:{mode:'amount',amount:'500',free:false},
+    workplaces:[{workplaceId:'runtime-studio',name:'Студия Тест'}],
+  };
   const runtimeRecord = {
     id:'runtime-journal-record',
     date:runtimeDate,
@@ -120,7 +126,7 @@
       verified:true, data:{ documents:[], consents:[], history:[] },
     };
     if (path.endsWith('/auxiliary-state')) return {
-      verified:true, wallets:[], investments:[], loans:[], tags:[], products:[], productHistory:[],
+      verified:true, wallets:[], investments:[], loans:[], tags:[], products:[runtimeProduct], productHistory:[],
     };
     if (path.endsWith('/finance')) return {
       version:7,
@@ -1121,6 +1127,66 @@ ok(Boolean(shell()?.querySelector('[data-journal-view]')), 'Journal List view co
 await openF(5,'journal-list');
 await tapAndOpen(fDeck(), fCard('profile'), 19, 'profile');
 ok(!shell()?.classList.contains('is-deck-open'), 'Profile F without E did not enter Z directly');
+
+
+mark('service-z2-procedure');
+await openF(6,'service');
+await tapAndOpen(fDeck(), fCard('settings'), 20, 'settings-service-root');
+ok(shell()?.classList.contains('is-e-open'), 'Settings did not open E for Service');
+await tapAndOpen(eDeck(), eCard('service'), 21, 'settings-service');
+await wait(120);
+const serviceSurface = shell()?.querySelector('[data-v2-workspace-surface]');
+const procedureEntry = serviceSurface?.querySelector('[data-procedure="runtime-journal-procedure"]');
+ok(Boolean(procedureEntry), 'Service Procedures Z1 missing runtime procedure');
+procedureEntry?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(120);
+let serviceZ2 = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
+ok(Boolean(serviceZ2?.querySelector('.entity-visual-card--service')), 'Procedure Z2 missing main procedure card');
+ok(Boolean(serviceZ2?.querySelector('[data-mini-card-rail] .mini-card')), 'Procedure Z2 missing workplace miniCard');
+ok(serviceZ2?.querySelector('.mini-card__title')?.textContent?.trim() === 'Студия Тест', 'Procedure Z2 miniCard does not represent assigned workplace');
+ok(!serviceZ2?.querySelector('.entity-visual-card--service button'), 'Procedure main card must not contain action buttons');
+ok(!serviceZ2?.querySelector('[data-mini-card-rail] button'), 'Procedure workplace miniCards must not contain action buttons');
+
+shell()?.querySelector('[data-v2-workspace-a]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(40);
+let serviceA2 = document.querySelector('[data-shared-profile-settings-menu]');
+const procedureA2Ids = [...(serviceA2?.querySelectorAll('[data-shared-profile-action]') || [])]
+  .map((node)=>node.dataset.sharedProfileAction);
+ok(procedureA2Ids.join(',') === 'workplaces,editor,delete', 'Procedure Z2 A must contain only Workplaces, Editor, Delete');
+serviceA2?.querySelector('[data-shared-profile-action="workplaces"]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(40);
+let workplaceSheet = document.querySelector('.modal--service-workplaces');
+ok(Boolean(workplaceSheet?.classList.contains('modal--profile-settings-sheet')), 'Workplace selection must use existing full settings bottom sheet');
+const workplaceInput = workplaceSheet?.querySelector('[data-service-workplace="runtime-studio"]');
+ok(Boolean(workplaceInput), 'Workplace selection missing runtime workplace');
+ok(workplaceInput?.checked === true, 'Assigned procedure workplace must be checked');
+ok(Boolean(workplaceSheet?.querySelector('.app-notification-row')), 'Workplace selection must reuse notification checkbox row UI');
+workplaceSheet?.closest('[data-modal]')?.v2Close?.();
+
+mark('service-z2-product');
+serviceZ2?.v2Close?.();
+await wait(60);
+const productsSwitch = serviceSurface?.querySelector('[data-view-navigation] [data-view="products"]');
+ok(Boolean(productsSwitch), 'Service Products switch missing');
+productsSwitch?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(80);
+const productEntry = serviceSurface?.querySelector('[data-product="runtime-service-product"]');
+ok(Boolean(productEntry), 'Service Products Z1 missing runtime product');
+productEntry?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(120);
+serviceZ2 = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
+ok(Boolean(serviceZ2?.querySelector('.entity-visual-card--service')), 'Product Z2 missing main product card');
+ok(Boolean(serviceZ2?.querySelector('[data-mini-card-rail] .mini-card')), 'Product Z2 missing workplace miniCard');
+ok(serviceZ2?.querySelector('.mini-card__title')?.textContent?.trim() === 'Студия Тест', 'Product Z2 miniCard does not represent assigned workplace');
+shell()?.querySelector('[data-v2-workspace-a]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(40);
+serviceA2 = document.querySelector('[data-shared-profile-settings-menu]');
+const productA2Ids = [...(serviceA2?.querySelectorAll('[data-shared-profile-action]') || [])]
+  .map((node)=>node.dataset.sharedProfileAction);
+ok(productA2Ids.join(',') === 'workplaces,editor,delete', 'Product Z2 A must contain only Workplaces, Editor, Delete');
+serviceA2?.closest('[data-modal]')?.v2Close?.();
+serviceZ2?.v2Close?.();
+await wait(60);
 
 // Repeat full roots to expose stale listeners/rAF from persistent shell reuse.
 for (const [index,id] of ['people','finance','journal','profile','settings','people'].entries()) {
