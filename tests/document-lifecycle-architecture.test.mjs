@@ -7,6 +7,11 @@ import {
   inferDocumentClass,
   tracksDocumentVersions,
 } from '../settings/documents/policy.js';
+import {
+  deleteDocument,
+  getDocuments,
+  hydrateDocumentsFromServer,
+} from '../settings/documents/data.js';
 
 const core = { id: 'pdn-consent', personConsent: true };
 assert.equal(inferDocumentClass(core), DOCUMENT_CLASS.CORE_LEGAL);
@@ -29,6 +34,25 @@ const contract = { id: 'contract-1', documentClass: DOCUMENT_CLASS.USER_DOCUMENT
 assert.equal(canDeleteDocument(contract), true);
 assert.equal(tracksDocumentVersions(contract), true);
 assert.equal(canSignDocument(contract), true);
+
+hydrateDocumentsFromServer([{
+  id: 'rkn-guide-1',
+  system: true,
+  documentClass: DOCUMENT_CLASS.FILE,
+  attachment: { type: 'RKN_GUIDE_PDF' },
+}]);
+assert.equal(deleteDocument('rkn-guide-1'), true);
+assert.equal(getDocuments().length, 1, 'RKN helper must remain physically stored');
+assert.equal(getDocuments()[0]?.hidden, true, 'RKN helper removal must only hide it');
+
+hydrateDocumentsFromServer([{
+  id: 'file-1',
+  system: false,
+  documentClass: DOCUMENT_CLASS.FILE,
+  attachment: { type: 'USER_PDF' },
+}]);
+assert.equal(deleteDocument('file-1'), true);
+assert.equal(getDocuments().length, 0, 'Ordinary user file deletion must still remove the file');
 
 const server = readFileSync(new URL('../server/src/tenant-document-archive/tenant-document-archive.service.ts', import.meta.url), 'utf8');
 const rknSave = server.slice(server.indexOf('async saveRknGuide'), server.indexOf('async rknGuideDocument'));

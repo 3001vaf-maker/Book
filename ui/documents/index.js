@@ -10,6 +10,15 @@ function dataAttributes(data = '') {
   return value ? ` ${value}` : '';
 }
 
+function titleFontSize(value = '') {
+  const length = String(value || '').trim().length;
+  if (length <= 34) return 16;
+  if (length <= 46) return 15;
+  if (length <= 58) return 13.5;
+  if (length <= 72) return 12;
+  return 10.5;
+}
+
 export function documentTile({
   title = 'Документ',
   version = '',
@@ -28,14 +37,15 @@ export function documentTile({
   const state = ['signed', 'revoked', 'pending'].includes(String(statusState || ''))
     ? String(statusState)
     : '';
+  const statusSymbol = state === 'signed' ? '✓' : state === 'revoked' ? '×' : state === 'pending' ? '—' : '';
   const statusMarkup = status
-    ? `<span class="document-tile__status${state ? ` is-${state}` : ''}"><span class="document-tile__status-mark" aria-hidden="true">${state === 'signed' ? '✓' : ''}</span><small>${text(status)}</small></span>`
+    ? `<span class="document-tile__status${state ? ` is-${state}` : ''}" aria-label="${text(status)}" title="${text(status)}"><span class="document-tile__status-mark" aria-hidden="true">${statusSymbol}</span></span>`
     : '';
 
   return `<${tag} class="document-tile${className ? ` ${text(className)}` : ''}"${attrs}>
     <span class="document-tile__fold" aria-hidden="true"></span>
     <span class="document-tile__body">
-      <strong class="document-tile__title">${text(title)}</strong>
+      <strong class="document-tile__title" style="--document-title-size:${titleFontSize(title)}px">${text(title)}</strong>
       ${version !== '' ? `<span class="document-tile__version">Версия ${text(version)}</span>` : ''}
     </span>
     <span class="document-tile__footer">
