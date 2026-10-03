@@ -45,9 +45,10 @@ export function documentTile({
   </${tag}>`;
 }
 
-export function documentTiles(items = [], { className = '' } = {}) {
+export function documentTiles(items = [], { className = '', layout = 'stack' } = {}) {
   const values = (Array.isArray(items) ? items : []).filter(Boolean);
-  return `<div class="document-tiles${className ? ` ${text(className)}` : ''}" data-document-tiles>${values.join('')}</div>`;
+  const layoutClass = layout === 'rail' ? ' document-tiles--rail' : '';
+  return `<div class="document-tiles${layoutClass}${className ? ` ${text(className)}` : ''}" data-document-tiles data-document-layout="${layout === 'rail' ? 'rail' : 'stack'}">${values.join('')}</div>`;
 }
 
 export function documentPage({ title = 'Документ', version = '', content = '' } = {}) {
