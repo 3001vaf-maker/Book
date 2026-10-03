@@ -661,7 +661,9 @@ await wait(35);
 let cashZ2 = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
 ok(Boolean(cashZ2), 'Cash card did not open Z2');
 ok(cashZ2?.querySelector('[data-workspace-header-context]')?.dataset.workspaceTitle === 'Наличные', 'Cash Z2 B title is wrong');
-ok(Boolean(shell()?.querySelector('[data-v2-workspace-a]')), 'Cash Z2 A/settings control missing');
+const cashSystemA = shell()?.querySelector('.v2-header__slot--a .v2-header__control');
+ok(Boolean(cashSystemA), 'Cash Z2 A photo/logo must remain visible');
+ok(Boolean(cashSystemA?.disabled), 'System cash A must be visible but inactive because View is centralized in Cash Q');
 const runtimeOperation = cashZ2?.querySelector('[data-wallet-operation="runtime-payment"]');
 ok(Boolean(runtimeOperation?.classList.contains('list-entry')), 'Cash operations must use the canonical List Entry');
 ok([...((runtimeOperation?.querySelectorAll('.list-entry__text > strong')) || [])].some((node) => node.textContent.trim() === 'Оплата услуги'), 'Cash operation name must stay in the List Entry title');
@@ -671,23 +673,7 @@ ok(runtimeOperation?.querySelector('.list-entry__right > strong')?.textContent.i
 ok(Boolean(runtimeOperation?.querySelector('.list-entry__right > small')?.textContent.trim()), 'Cash List Entry date-time must be under the amount');
 ok(!cashZ2?.querySelector('.entity-card--compact'), 'Cash operations must not use compact entity cards');
 
-shell()?.querySelector('[data-v2-workspace-a]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
-await wait(25);
-let cashSettings = document.querySelector('[data-shared-profile-settings-menu]');
-ok(Boolean(cashSettings?.querySelector('[data-shared-profile-action="appearance"]')), 'Cash settings must contain View');
-ok(!cashSettings?.textContent.includes('Удалить кассу'), 'System cash must not expose delete');
-ok(!cashSettings?.textContent.includes('Полное удаление'), 'System cash must not expose hard delete');
-cashSettings?.querySelector('[data-shared-profile-action="appearance"]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
-await wait(25);
-let appearanceZ = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
-ok(Boolean(appearanceZ?.querySelector('[data-entity-card-editor]')), 'Cash View must open the shared entity card editor');
 let zEdge = edge();
-pointer(zEdge,'pointerdown',10,360,150);
-pointer(zEdge,'pointermove',82,362,150);
-pointer(zEdge,'pointerup',82,362,150);
-await wait(35);
-
-cashZ2 = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
 cashZ2?.querySelector('[data-wallet-operation="runtime-payment"]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
 await wait(25);
 let operationZ3 = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
