@@ -23,6 +23,8 @@ const view = readFileSync(new URL('../admin/document-registry/view.js', import.m
 const history = readFileSync(new URL('../admin/document-registry/history.js', import.meta.url), 'utf8');
 const profileMigration = readFileSync(new URL('../tenant-document-archive.js', import.meta.url), 'utf8');
 const controller = readFileSync(new URL('../server/src/saas-admin/saas-admin.controller.ts', import.meta.url), 'utf8');
+const tenantController = readFileSync(new URL('../server/src/tenant-document-archive/tenant-document-archive.controller.ts', import.meta.url), 'utf8');
+const tenantModule = readFileSync(new URL('../server/src/tenant-document-archive/tenant-document-archive.module.ts', import.meta.url), 'utf8');
 const service = readFileSync(new URL('../server/src/document-registry/document-registry.service.ts', import.meta.url), 'utf8');
 const namingMigration = readFileSync(new URL('../server/prisma/migrations/20260919161000_rename_consent_events/migration.sql', import.meta.url), 'utf8');
 const platformArchiveMigration = readFileSync(new URL('../server/prisma/migrations/20260919162000_platform_document_archive/migration.sql', import.meta.url), 'utf8');
@@ -37,14 +39,24 @@ assert.match(view, /<h2>Реестр документов<\/h2>/);
 assert.match(view, /Платформа ↔ пользователь/);
 assert.match(view, /Шаблоны основных документов пользователя/);
 assert.match(view, /Шаблоны помощников/);
-assert.match(view, /История Book ↔ пользователь/);
-assert.match(view, /Подписанная версия/);
+assert.match(view, /История платформы ↔ пользователь/);
+assert.match(view, /documentTile\(/);
+assert.match(view, /documentTiles\(/);
+assert.match(view, /openDocumentViewer\(/);
+assert.doesNotMatch(view, /admin-document-row|admin-history-row|admin-document-drawer/);
 assert.match(history, /Admin\/Document Registry only/);
 
-assert.match(profileMigration, /\.\/admin\/document-registry\/catalog\.js/);
-assert.doesNotMatch(profileMigration, /\.\/admin\/documents\/catalog\.js/);
+assert.match(profileMigration, /tenant-document-archive\/platform-bases/);
+assert.doesNotMatch(profileMigration, /admin\/document-registry\/catalog\.js|getPlatformDocumentBases/);
+assert.match(tenantController, /@Get\('platform-bases'\)/);
+assert.match(tenantController, /DocumentRegistryService/);
+assert.match(tenantModule, /DocumentRegistryModule/);
 
 assert.match(controller, /@Get\('document-registry\/history'\)/);
+assert.match(service, /async tenantLegalTemplateBases\(/);
+assert.match(service, /user-document-pdn-policy/);
+assert.match(service, /user-document-pdn-consent/);
+assert.match(service, /user-document-messages-consent/);
 assert.match(service, /FROM "PlatformConsentEvent"/);
 assert.match(service, /FROM "AccountDocumentEvent"/);
 assert.match(service, /'ACCOUNT'::text AS "subjectType"/);

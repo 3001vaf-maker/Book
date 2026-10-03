@@ -69,6 +69,12 @@ assert.match(rkn, /rememberedSnapshot/);
 assert.match(rkn, /rememberRknGuideState/);
 assert.match(rkn, /return \{ ready: true, document: latestGuide \|\| null \}/);
 
+const tenantArchive = readFileSync(new URL('../server/src/tenant-document-archive/tenant-document-archive.service.ts', import.meta.url), 'utf8');
+const publicDocuments = tenantArchive.slice(tenantArchive.indexOf('async publicDocuments'), tenantArchive.lastIndexOf('\n}'));
+assert.match(publicDocuments, /!document\?\.hidden/);
+assert.match(publicDocuments, /documentClass.*FILE/);
+assert.match(publicDocuments, /signable.*personConsent/);
+
 const consent = readFileSync(new URL('../server/src/tenant-document-archive/consent-policy.service.ts', import.meta.url), 'utf8');
 assert.match(consent, /canSignTenantDocument/);
 assert.match(consent, /documentClass.*FILE/);

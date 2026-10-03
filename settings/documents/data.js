@@ -175,7 +175,7 @@ export function reconcileTenantDocumentsWithPlatformBases(items = [], history = 
     if (index < 0) {
       const created = makeDocumentFromPlatformBase(base, 1);
       current.push(created);
-      nextHistory.push(historyEntry(created, 'created', 'admin-template'));
+      nextHistory.push(historyEntry(created, 'created', 'platform-registry'));
       changed = true;
       continue;
     }
@@ -188,15 +188,15 @@ export function reconcileTenantDocumentsWithPlatformBases(items = [], history = 
     const active = current[index];
 
     if (!active.sourceMode) {
-      const exactAdminDocument = active.title === base.title && active.text === rendered;
+      const exactRegistryDocument = active.title === base.title && active.text === rendered;
       current[index] = normalize({
         ...active,
         documentClass: DOCUMENT_CLASS.CORE_LEGAL,
-        sourceMode: exactAdminDocument ? 'BOOK' : 'CUSTOM',
+        sourceMode: exactRegistryDocument ? 'BOOK' : 'CUSTOM',
         baseKey: base.key,
-        baseVersion: exactAdminDocument ? base.version : 0,
-        availableBaseVersion: exactAdminDocument ? 0 : base.version,
-        availableBookText: exactAdminDocument ? '' : rendered,
+        baseVersion: exactRegistryDocument ? base.version : 0,
+        availableBaseVersion: exactRegistryDocument ? 0 : base.version,
+        availableBookText: exactRegistryDocument ? '' : rendered,
       });
       changed = true;
       continue;
@@ -216,8 +216,8 @@ export function reconcileTenantDocumentsWithPlatformBases(items = [], history = 
           availableBookText: '',
         });
         current[index] = refreshed;
-        nextHistory.push(historyEntry(previous, 'superseded', 'admin-template'));
-        nextHistory.push(historyEntry(refreshed, 'version-created', 'admin-template'));
+        nextHistory.push(historyEntry(previous, 'superseded', 'platform-registry'));
+        nextHistory.push(historyEntry(refreshed, 'version-created', 'platform-registry'));
         changed = true;
       }
       continue;
@@ -286,7 +286,7 @@ export function saveDocument(document) {
         documentTitle: previous.title,
         documentVersion: previous.version,
         action: 'superseded',
-        source: previous.sourceMode === 'BOOK' ? 'admin-template' : 'custom',
+        source: previous.sourceMode === 'BOOK' ? 'platform-registry' : 'custom',
         snapshot: previous,
       });
     }
@@ -313,7 +313,7 @@ export function saveDocument(document) {
       documentTitle: next.title,
       documentVersion: next.version,
       action: 'created',
-      source: next.sourceMode === 'BOOK' ? 'admin-template' : 'custom',
+      source: next.sourceMode === 'BOOK' ? 'platform-registry' : 'custom',
       snapshot: next,
     });
   } else if (versioned && previous && changedContent) {
