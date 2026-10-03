@@ -369,7 +369,7 @@ expect(core.includes('activeWorkspaceSurface(surface)') && core.includes("contex
 expect(modals.includes("import { mountV2Layer, v2Layer } from '../v2/index.js';")
   && modals.includes('v2Layer(content')
   && modals.includes('mountV2Layer(html, { root })')
-  && modals.includes("MODAL_VARIANTS = new Set(['list', 'large', 'medium', 'compact', 'quick', 'top', 'standard', 'bottom', 'technical'])")
+  && modals.includes("MODAL_VARIANTS = new Set(['list', 'large', 'medium', 'compact', 'quick', 'top', 'standard', 'bottom', 'technical', 'q'])")
   && modals.includes("openNotice({ title = 'Внимание', message = '', surface = 'app'")
   && !modals.includes('<div class="modal-backdrop"'),
   'ui/modals must remain the sole public modal owner, route user notices to swipe-only TOP, and reserve technical overlays for exceptional system cases.');
@@ -377,7 +377,7 @@ expect(timeUi.includes("variant:'bottom'") && timeUi.includes("className:'modal-
 expect(ui.includes("const allowed = new Set(['top', 'standard', 'bottom', 'technical'])") && ui.includes("const technical = kind === 'technical'") && ui.includes('activeV2ModalSurface(root)'), 'Internal V2 modal geometry must expose exactly the approved top/standard/bottom/technical model.');
 expect(ui.includes('function initV2LayerDismissGesture') && ui.includes("kind === 'top' ? Math.min(0, raw) : Math.max(0, raw)") && ui.includes('stopPointerPropagation') && ui.includes("resolved === 'technical'"), 'Shared Modal must own origin-directed dismissal, isolate pointer gestures from lower Z/F/E, and reserve X for technical overlays only.');
 expect(ui.includes("app.querySelector('[data-v2-z-layer]')") && ui.includes("if (!bindZ || open || zGesture"), 'Shared workspace Z-edge owner must yield completely while any stacked Z2/Z3 is active.');
-expect(ui.includes("const locksHeader = Boolean(app && kind === 'standard')") && ui.includes("header.inert = true") && ui.includes("header.classList.add('is-modal-locked')"), 'Shared standard modal-Z must keep Header A-D visible but inactive.');
+expect(ui.includes("const locksHeader = Boolean(app && kind === 'standard' && !qLayer)") && ui.includes("header.inert = true") && ui.includes("header.classList.add('is-modal-locked')"), 'Shared standard modal-Z must keep Header A-D visible but inactive, while Q is the explicit exception that leaves Header C interactive.');
 expect(css.includes('.v2-header.is-modal-locked{pointer-events:none}'), 'Shared Header must expose one modal-lock visual interaction state.');
 
 for (const [name, source] of [
