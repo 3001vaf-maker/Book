@@ -35,11 +35,15 @@ const rknSave = server.slice(server.indexOf('async saveRknGuide'), server.indexO
 assert.match(rknSave, /documentClass: 'FILE'/);
 assert.match(rknSave, /signable: false/);
 assert.doesNotMatch(rknSave, /current\.history\.push/);
+assert.match(server, /helpers: clone\(objectValue\(source\.helpers\)\)/);
+assert.match(server, /async rememberRknGuideState/);
 
 const rkn = readFileSync(new URL('../server/src/tenant-document-archive/rkn-guide.service.ts', import.meta.url), 'utf8');
 assert.doesNotMatch(rkn, /personalVersion/);
 assert.match(rkn, /guideMode/);
-assert.match(rkn, /sameJson\(latestAttachment\.snapshot, snapshot\)/);
+assert.match(rkn, /rememberedSnapshot/);
+assert.match(rkn, /rememberRknGuideState/);
+assert.match(rkn, /return \{ ready: true, document: latestGuide \|\| null \}/);
 
 const consent = readFileSync(new URL('../server/src/tenant-document-archive/consent-policy.service.ts', import.meta.url), 'utf8');
 assert.match(consent, /canSignTenantDocument/);
