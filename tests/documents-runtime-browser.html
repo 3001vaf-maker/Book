@@ -85,6 +85,7 @@ data.hydrateDocumentsFromServer([
   {
     id:'pdn-consent',
     system:true,
+    documentClass:'CORE_LEGAL',
     signable:true,
     kind:'consent',
     title:'Согласие на обработку персональных данных',
@@ -99,6 +100,7 @@ data.hydrateDocumentsFromServer([
   {
     id:'profile-contract',
     system:false,
+    documentClass:'USER_DOCUMENT',
     signable:true,
     kind:'document',
     title:'Договор на фотосъёмку',
@@ -111,6 +113,8 @@ data.hydrateDocumentsFromServer([
   {
     id:'rkn-old',
     system:true,
+    documentClass:'FILE',
+    signable:false,
     kind:'instruction',
     title:'Инструкция по уведомлению Роскомнадзора',
     version:1,
@@ -127,6 +131,8 @@ data.hydrateDocumentsFromServer([
   {
     id:'rkn-current',
     system:true,
+    documentClass:'FILE',
+    signable:false,
     kind:'instruction',
     title:'Инструкция по изменению сведений Роскомнадзора',
     version:2,
@@ -196,19 +202,51 @@ mark('z1-documents');
 ok(Boolean(root.querySelector('[data-workspace-header-context][data-workspace-title="Документы"]')), 'Documents workspace context missing');
 ok(root.querySelectorAll('[data-segment-option]').length === 2, 'Documents/History switch must contain two options');
 ok(root.querySelector('[data-segment-option="documents"]')?.classList.contains('is-active'), 'Documents must be active by default');
-ok(root.querySelectorAll('[data-profile-document]').length === 3, 'Z1 must show tenant consent, current contract and only latest RKN document');
-ok(!root.textContent.includes('Старая версия РКН'), 'Old RKN version leaked into Z1');
-ok(root.textContent.includes('Согласие на обработку персональных данных'), 'Tenant document created from template must remain visible in Documents Z1');
+ok(root.querySelectorAll('[data-document-group="core"] [data-profile-document]').length === 1, 'Fixture core rail must contain the available core tenant document');
+ok(root.querySelector('[data-document-group="core"] [data-document-layout="rail"]'), 'Core documents must use the horizontal rail layout');
+ok(root.querySelectorAll('[data-document-group="other"] [data-profile-document]').length === 3, 'Other section must keep user document and both independent RKN helper files');
+ok(root.textContent.includes('Старая версия РКН') && root.textContent.includes('Текущая версия РКН'), 'Separate helper PDFs must not collapse into a version chain');
+ok(root.textContent.includes('Согласие на обработку персональных данных'), 'Core tenant document must remain visible in Documents Z1');
 ok([...root.querySelectorAll('.document-tile')].every((node) => getComputedStyle(node).borderRadius === '0px'), 'Document tile corners must be straight');
 
-mark('technical-viewer');
+mark('document-info-z2');
 root.querySelector('[data-profile-document="profile-contract"]')?.click();
 await wait();
+let detailLayer = root.closest('[data-v2-app]')?.querySelector('[data-v2-z-layer]');
+ok(Boolean(detailLayer?.querySelector('[data-document-detail]')), 'Document click must open information Z2 first');
+ok(Boolean(detailLayer?.querySelector('[data-read-only-sheet]')), 'Document information must use factual receipt UI');
+ok(Boolean(detailLayer?.querySelector('[data-document-detail-settings]')), 'Document information must expose A settings');
+ok(!document.querySelector('[data-v2-layer-kind="technical"].document-viewer-backdrop'), 'Document click must not jump directly to the technical viewer');
+
+mark('technical-viewer');
+detailLayer?.querySelector('[data-document-content-open]')?.click();
+await wait();
 let technical = document.querySelector('[data-v2-layer-kind="technical"].document-viewer-backdrop');
-ok(Boolean(technical), 'Document did not open technical viewer');
+ok(Boolean(technical), 'Document information cover did not open technical viewer');
 ok(getComputedStyle(technical).backgroundColor === 'rgb(17, 17, 17)', 'Technical viewer backdrop must be black');
 ok(Boolean(technical?.querySelector('.document-page')), 'Text document must render as white document page');
 technical?.v2Close?.();
+
+mark('other-document-settings');
+detailLayer?.querySelector('[data-document-detail-settings]')?.click();
+await wait();
+let documentSettings = document.querySelector('[data-modal][data-v2-layer-kind="bottom"]');
+ok(Boolean(documentSettings?.querySelector('[data-detail-delete]')), 'Other document settings must allow deletion');
+documentSettings?.v2Close?.();
+detailLayer?.v2Close?.();
+await wait();
+
+mark('core-document-settings');
+root.querySelector('[data-profile-document="pdn-consent"]')?.click();
+await wait();
+detailLayer = root.closest('[data-v2-app]')?.querySelector('[data-v2-z-layer]');
+detailLayer?.querySelector('[data-document-detail-settings]')?.click();
+await wait();
+documentSettings = document.querySelector('[data-modal][data-v2-layer-kind="bottom"]');
+ok(!documentSettings?.querySelector('[data-detail-delete]'), 'Core document settings must not expose deletion');
+ok(Boolean(documentSettings?.querySelector('[data-detail-template]')), 'Core document settings must link to its template');
+documentSettings?.v2Close?.();
+detailLayer?.v2Close?.();
 await wait();
 
 mark('settings-x');
@@ -252,8 +290,8 @@ mark('history-z1');
 root.querySelector('[data-segment-option="history"]')?.click();
 await wait();
 ok(root.querySelector('[data-segment-option="history"]')?.classList.contains('is-active'), 'History switch did not activate');
-ok(root.querySelectorAll('[data-signing-event]').length === 1, 'History must show signing fact as one document tile');
-ok(root.querySelectorAll('[data-document-history-event]').length >= 1, 'History must also preserve saved document-version snapshots');
+ok(root.querySelectorAll('[data-signing-event]').length === 1, 'History must show signing facts only');
+ok(root.querySelectorAll('[data-document-history-event]').length === 0, 'Technical document-version events must stay under the hood');
 const signingTile = root.querySelector('[data-signing-event="signing-1"]');
 ok(signingTile?.textContent.includes('Версия 2'), 'History tile must show signed version');
 ok(signingTile?.textContent.includes('Подписан'), 'History tile must show signed status');
