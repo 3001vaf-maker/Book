@@ -1,10 +1,9 @@
 import {
   button,
-  costCardMeta,
   costListParts,
   durationText,
   emptyState,
-  entityCard,
+  entityVisualCard,
   escapeHtml,
   initV2ListReorder,
   miniCard,
@@ -12,7 +11,6 @@ import {
   modal,
   mountModal,
   mountV2ZLayer,
-  openSharedPhotoAction,
   openSharedProfileSettingsMenu,
   page,
   v2ListEntries,
@@ -25,6 +23,7 @@ import { getRecords } from '../../../core/record/index.js';
 import { getWorkplaces } from '../../profile/workplaces/data.js';
 import { serviceHeaderContext, notifyServiceContext } from '../context.js';
 import { openServiceWorkplaceSelection } from '../workplace-selection.js';
+import { procedureCardAppearance, procedureCardFields, procedureCardPhoto } from '../card-presentation.js';
 import { bindProcedureEditor, initialProcedure, procedureEditorForm } from './form.js';
 import { deleteProcedure as deleteProcedureData, getProcedures, pushProcedureHistory, reorderProcedures, saveProcedure as saveProcedureData } from './data.js';
 
@@ -66,7 +65,7 @@ function procedureRow(procedure) {
   return v2ListEntry({
     title: procedure.name || '',
     subtitle: `${durationText(procedure.duration)} — ${workplaceCountText((procedure.workplaces || []).length)}`,
-    image: procedure.photo || '',
+    image: procedureCardPhoto(procedure),
     initial: (procedure.name || '?').slice(0, 1).toUpperCase(),
     rightTop: price.rightTop || '',
     rightBottom: price.rightBottom || '',
@@ -96,23 +95,15 @@ export function renderProcedureCatalog(host, { root = host, onChanged = () => {}
 function procedureOverviewCard(procedure) {
   const records = activeProcedureRecords(procedure.id);
   const fact = getSettlementItemTotals('procedure', procedure.id);
-  return entityCard({
-    title: procedure.name || '',
-    subtitle: durationText(procedure.duration),
-    image: procedure.photo || '',
-    initial: (procedure.name || '?').slice(0, 1).toUpperCase(),
-    topMeta: [
-      { value: durationText(procedure.duration), label: 'длительность' },
-      { value: workplaceCountText((procedure.workplaces || []).length), label: 'пространств' },
-      { value: String(records.length), label: 'записей' },
-    ],
-    topRightMeta: costCardMeta(procedure.cost),
-    meta: [
-      { value: spentText(spentMinutes(records, procedure)), label: 'время' },
-      { value: money(fact.factTotal), label: 'сумма' },
-    ],
-    metricsLayout: 'grid',
-    className: 'entity-card--hero entity-card--top-dark',
+  return entityVisualCard({
+    appearance: procedureCardAppearance(procedure),
+    fields: procedureCardFields(procedure, {
+      recordCount: records.length,
+      spentTime: spentText(spentMinutes(records, procedure)),
+      revenue: fact.factTotal,
+    }),
+    image: procedureCardPhoto(procedure),
+    className: 'entity-visual-card--service',
   });
 }
 
@@ -153,21 +144,6 @@ function openProcedureOverviewSettings(layer, baseRoot, procedure, { onChanged =
     title: 'Настройки',
     actions: [
       {
-        id: 'photo',
-        label: 'Фото',
-        onSelect: () => openSharedPhotoAction({
-          photo: procedure.photo || '',
-          onReplace: async (photo) => {
-            updateProcedure(procedure, { photo });
-            renderProcedureOverview(layer, baseRoot, procedure.id, { onChanged });
-          },
-          onDelete: async () => {
-            updateProcedure(procedure, { photo: '' });
-            renderProcedureOverview(layer, baseRoot, procedure.id, { onChanged });
-          },
-        }),
-      },
-      {
         id: 'workplaces',
         label: 'Рабочие пространства',
         onSelect: () => openServiceWorkplaceSelection({
@@ -200,15 +176,6 @@ function editorDraftSettings(draft) {
   return openSharedProfileSettingsMenu({
     title: 'Настройки',
     actions: [
-      {
-        id: 'photo',
-        label: 'Фото',
-        onSelect: () => openSharedPhotoAction({
-          photo: draft.photo || '',
-          onReplace: async (photo) => { draft.photo = photo; },
-          onDelete: async () => { draft.photo = ''; },
-        }),
-      },
       {
         id: 'workplaces',
         label: 'Рабочие пространства',

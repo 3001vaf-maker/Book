@@ -1,11 +1,10 @@
 import {
   button,
   collectCost,
-  costCardMeta,
   costField,
   costListParts,
   emptyState,
-  entityCard,
+  entityVisualCard,
   escapeHtml,
   field,
   initCostFields,
@@ -15,7 +14,6 @@ import {
   modal,
   mountModal,
   mountV2ZLayer,
-  openSharedPhotoAction,
   openSharedProfileSettingsMenu,
   page,
   setSharedProfilePrimary,
@@ -30,6 +28,7 @@ import { getRecords } from '../../../core/record/index.js';
 import { getWorkplaces } from '../../profile/workplaces/data.js';
 import { serviceHeaderContext, notifyServiceContext } from '../context.js';
 import { openServiceWorkplaceSelection } from '../workplace-selection.js';
+import { productCardAppearance, productCardFields, productCardPhoto } from '../card-presentation.js';
 import { deleteProduct as deleteProductData, getProducts, pushProductHistory, reorderProducts, saveProduct as saveProductData } from './data.js';
 
 const money = (value) => `${new Intl.NumberFormat('ru-RU').format(Number(value || 0))} ₽`;
@@ -69,7 +68,7 @@ function productRow(product) {
   return v2ListEntry({
     title: product.name || '',
     subtitle: workplaceCountText((product.workplaces || []).length),
-    image: product.photo || '',
+    image: productCardPhoto(product),
     initial: (product.name || '?').slice(0, 1).toUpperCase(),
     rightTop: price.rightTop || '',
     rightBottom: price.rightBottom || '',
@@ -99,18 +98,14 @@ export function renderProductCatalog(host, { root = host, onChanged = () => {} }
 function productOverviewCard(product) {
   const records = activeProductRecords(product.id);
   const fact = getSettlementItemTotals('product', product.id);
-  return entityCard({
-    title: product.name || '',
-    image: product.photo || '',
-    initial: (product.name || '?').slice(0, 1).toUpperCase(),
-    topMeta: [
-      { value: workplaceCountText((product.workplaces || []).length), label: 'пространств' },
-      { value: String(records.length), label: 'продаж' },
-    ],
-    topRightMeta: costCardMeta(product.cost),
-    meta: [{ value: money(fact.factTotal), label: 'сумма' }],
-    metricsLayout: 'vertical',
-    className: 'entity-card--hero entity-card--top-dark',
+  return entityVisualCard({
+    appearance: productCardAppearance(product),
+    fields: productCardFields(product, {
+      saleCount: records.length,
+      revenue: fact.factTotal,
+    }),
+    image: productCardPhoto(product),
+    className: 'entity-visual-card--service',
   });
 }
 
@@ -149,21 +144,6 @@ function openProductOverviewSettings(layer, baseRoot, product, { onChanged = () 
   return openSharedProfileSettingsMenu({
     title: 'Настройки',
     actions: [
-      {
-        id: 'photo',
-        label: 'Фото',
-        onSelect: () => openSharedPhotoAction({
-          photo: product.photo || '',
-          onReplace: async (photo) => {
-            updateProduct(product, { photo });
-            renderProductOverview(layer, baseRoot, product.id, { onChanged });
-          },
-          onDelete: async () => {
-            updateProduct(product, { photo: '' });
-            renderProductOverview(layer, baseRoot, product.id, { onChanged });
-          },
-        }),
-      },
       {
         id: 'workplaces',
         label: 'Рабочие пространства',
@@ -207,15 +187,6 @@ function editorDraftSettings(draft) {
   return openSharedProfileSettingsMenu({
     title: 'Настройки',
     actions: [
-      {
-        id: 'photo',
-        label: 'Фото',
-        onSelect: () => openSharedPhotoAction({
-          photo: draft.photo || '',
-          onReplace: async (photo) => { draft.photo = photo; },
-          onDelete: async () => { draft.photo = ''; },
-        }),
-      },
       {
         id: 'workplaces',
         label: 'Рабочие пространства',
