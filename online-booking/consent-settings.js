@@ -6,42 +6,34 @@ import {
 } from '../core/account/index.js';
 import {
   button,
+  documentTile,
+  documentTiles,
   emptyState,
-  escapeHtml,
   mountModal,
   modal,
+  openDocumentViewer,
   openNotice,
-  openSharedConsentDocument,
-  v2LegalCards,
 } from '../ui/ui.js';
 
-function statusText(item = {}) {
-  if (item.accepted) return 'Дано';
-  if (item.status === 'revoked') return 'Отозвано';
-  return 'Не дано';
-}
-
 function openConsentDocument(item = {}) {
-  return openSharedConsentDocument({
+  return openDocumentViewer({
     title:String(item.title || item.documentId || 'Согласие'),
     version:item.displayVersion || item.documentVersion || 1,
     content:String(item.documentText || item.text || ''),
-    className:'account-consent-document',
   });
 }
 
 function consentCards(consents = []) {
   if (!consents.length) return emptyState('Согласий пока нет', 'Здесь появятся доступные согласия.');
-  return v2LegalCards(consents.map((item, index) => ({
+  return documentTiles(consents.map((item, index) => documentTile({
     title: item?.title || item?.documentId || 'Согласие',
-    status: statusText(item),
-    required: Boolean(item?.required),
-    checked: Boolean(item?.accepted),
+    version: item?.displayVersion || item?.documentVersion || 1,
     openData: `data-account-consent-document="${index}"`,
-    openAria: `Открыть документ ${item?.title || item?.documentId || ''}`,
     toggleData: `data-account-consent-toggle="${index}"`,
+    toggleChecked: Boolean(item?.accepted),
+    aria: `Открыть документ ${item?.title || item?.documentId || ''}`,
     toggleAria: `${item?.accepted ? 'Отозвать' : 'Дать'} согласие: ${item?.title || item?.documentId || ''}`,
-  })));
+  })), { layout: 'rail' });
 }
 
 function confirmRevoke(consent, onConfirm) {
@@ -63,8 +55,6 @@ function confirmRevoke(consent, onConfirm) {
       openNotice({
         title: 'Согласие не отозвано',
         message: accountErrorMessage(error, 'Не удалось отозвать согласие'),
-        action: 'Закрыть',
-        variant: 'technical',
       });
     }
   });
@@ -73,7 +63,7 @@ function confirmRevoke(consent, onConfirm) {
 export async function openAccountConsentSettings(state, { tenantId = state?.tenantId, onChanged } = {}) {
   const scopeTenantId = String(tenantId || '');
   if (!scopeTenantId) {
-    return openNotice({ title: 'Согласия недоступны', message: 'Не выбран контакт.', action: 'Закрыть', variant: 'technical' });
+    return openNotice({ title: 'Согласия недоступны', message: 'Не выбран контакт.' });
   }
 
   let consentState;
@@ -83,8 +73,6 @@ export async function openAccountConsentSettings(state, { tenantId = state?.tena
     return openNotice({
       title: 'Согласия недоступны',
       message: accountErrorMessage(error, 'Не удалось загрузить согласия'),
-      action: 'Закрыть',
-      variant: 'technical',
     });
   }
 
@@ -132,8 +120,6 @@ export async function openAccountConsentSettings(state, { tenantId = state?.tena
       openNotice({
         title: 'Согласие не сохранено',
         message: accountErrorMessage(error, 'Не удалось сохранить согласие'),
-        action: 'Закрыть',
-        variant: 'technical',
       });
     }
   }));

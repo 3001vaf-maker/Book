@@ -4,7 +4,6 @@ import { formValidationMessage, initPasswordFields, passwordField, selectPhotoFi
 import { modal, mountModal, openNotice } from '../modals/index.js';
 import { settingsPanel } from '../settings/index.js';
 import { v2ListEntry, v2ListEntries } from '../lists/list-entry.js';
-import { v2Document } from '../v2/index.js';
 
 function actionData(id = '') {
   return `data-shared-profile-action="${String(id || '').trim()}"`;
@@ -189,13 +188,4 @@ export function setSharedProfilePrimary(source, { visible = false, label = 'Со
   source.setAttribute('aria-label', String(label || 'Сохранить'));
   source.disabled = Boolean(disabled);
   window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
-}
-
-
-export function openSharedConsentDocument({ title = 'Документ', version = '', content = '', className = '' } = {}) {
-  return mountModal(document.body, modal(v2Document({ title, version, content }), {
-    variant: 'technical',
-    title,
-    className,
-  }));
 }

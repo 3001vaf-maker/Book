@@ -216,25 +216,6 @@
 .v2-sticker__body{display:grid;gap:14px}
 .v2-sticker__close{position:absolute;top:14px;right:14px;width:38px;height:38px;border:0;border-radius:0;padding:0;display:grid;place-items:center;background:transparent;color:var(--v2-ink);font:inherit;font-size:28px;line-height:1;z-index:2}.v2-sticker__action{display:grid;gap:8px}.v2-sticker-link{border:0;padding:4px 0;background:transparent;color:var(--v2-ink);font:inherit;font-size:13px;text-decoration:underline;text-align:left}.v2-sticker-screen--auth form{display:grid;gap:12px}
 
-.v2-document{display:grid;gap:14px}.v2-document__version{font-size:12px;color:var(--v2-muted)}.v2-document h2{margin:0;font-size:24px;line-height:1.08}.v2-document__body{font-size:15px;line-height:1.55}.v2-document__body p{margin:0 0 1em}.v2-document__body p:last-child{margin-bottom:0}.v2-legal-cards{display:flex;gap:10px;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;padding:2px 0 10px}.v2-legal-cards::-webkit-scrollbar{display:none}
-.v2-legal-card{
-  flex:0 0 min(86%,320px);
-  height:96px;
-  display:grid;
-  grid-template-columns:minmax(0,1fr) 62px;
-  align-items:stretch;
-  background:var(--v2-beige);
-  transform:translateY(-1px);
-  box-shadow:-9px 8px 14px -11px rgba(0,0,0,.34),9px 8px 14px -11px rgba(0,0,0,.34),0 1px 2px rgba(0,0,0,.08);
-}
-.v2-legal-card__document{min-width:0;border:0;padding:15px 16px;display:grid;align-content:center;gap:5px;background:transparent;color:var(--v2-ink);text-align:left}
-.v2-legal-card__document strong{font-size:16px;line-height:1.18;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.v2-legal-card__document span{font-size:12px}
-.v2-legal-card__toggle{border:0;border-left:1px solid rgba(17,17,17,.18);display:grid;place-items:center;background:transparent}
-.v2-legal-card__toggle span{position:relative;width:42px;height:24px;border:1px solid var(--v2-ink);border-radius:999px}
-.v2-legal-card__toggle span::after{content:'';position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:var(--v2-ink);transition:transform .16s ease}
-.v2-legal-card__toggle.is-on span::after{transform:translateX(18px)}
-
 .v2-layer-backdrop{z-index:1200;background:rgba(47,51,56,.42);pointer-events:auto}
 .v2-z.has-v2-layer{overflow:hidden}
 .v2-layer-portal{z-index:1200;overflow:hidden;pointer-events:none;border-radius:var(--v2-z-radius) 0 0 0}

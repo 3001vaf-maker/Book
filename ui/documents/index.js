@@ -41,6 +41,18 @@ function titleFontSize(lines = []) {
   return Math.max(8.5, Math.min(10.5, 440 / longest));
 }
 
+function documentBody({ title, version, meta, lines, statusMarkup = '' } = {}) {
+  return `
+    <span class="document-tile__body">
+      <strong class="document-tile__title" style="--document-title-size:${titleFontSize(lines)}px">${lines.map((line) => `<span>${text(line)}</span>`).join(' ')}</strong>
+      ${version !== '' ? `<span class="document-tile__version">Версия ${text(version)}</span>` : ''}
+    </span>
+    <span class="document-tile__footer">
+      <small class="document-tile__meta">${meta ? text(meta) : '&nbsp;'}</small>
+      ${statusMarkup}
+    </span>`;
+}
+
 export function documentTile({
   title = 'Документ',
   version = '',
@@ -51,31 +63,40 @@ export function documentTile({
   data = '',
   aria = '',
   className = '',
+  openData = '',
+  toggleData = '',
+  toggleChecked = false,
+  toggleDisabled = false,
+  toggleAria = '',
 } = {}) {
-  const tag = interactive ? 'button' : 'article';
-  const attrs = interactive
-    ? ` type="button"${dataAttributes(data)} aria-label="${text(aria || title)}"`
-    : '';
   const state = ['signed', 'revoked', 'pending'].includes(String(statusState || ''))
     ? String(statusState)
     : '';
   const lines = titleLines(title);
-  const titleMarkup = lines.map((line) => `<span>${text(line)}</span>`).join(' ');
   const statusSymbol = state === 'signed' ? '✓' : state === 'revoked' ? '×' : state === 'pending' ? '—' : '';
   const statusMarkup = status
     ? `<span class="document-tile__status${state ? ` is-${state}` : ''}" aria-label="${text(status)}" title="${text(status)}"><span class="document-tile__status-mark" aria-hidden="true">${statusSymbol}</span></span>`
     : '';
 
+  if (String(toggleData || '').trim()) {
+    const openAttrs = dataAttributes(openData || data);
+    const toggleAttrs = dataAttributes(toggleData);
+    return `<article class="document-tile document-tile--controlled${className ? ` ${text(className)}` : ''}">
+      <span class="document-tile__fold" aria-hidden="true"></span>
+      <button type="button" class="document-tile__open"${openAttrs} aria-label="${text(aria || title)}">
+        ${documentBody({ title, version, meta, lines })}
+      </button>
+      <button type="button" class="document-tile__toggle${toggleChecked ? ' is-on' : ''}"${toggleAttrs} aria-pressed="${toggleChecked ? 'true' : 'false'}" aria-label="${text(toggleAria || title)}"${toggleDisabled ? ' disabled' : ''}><span aria-hidden="true"></span></button>
+    </article>`;
+  }
+
+  const tag = interactive ? 'button' : 'article';
+  const attrs = interactive
+    ? ` type="button"${dataAttributes(data)} aria-label="${text(aria || title)}"`
+    : '';
   return `<${tag} class="document-tile${className ? ` ${text(className)}` : ''}"${attrs}>
     <span class="document-tile__fold" aria-hidden="true"></span>
-    <span class="document-tile__body">
-      <strong class="document-tile__title" style="--document-title-size:${titleFontSize(lines)}px">${titleMarkup}</strong>
-      ${version !== '' ? `<span class="document-tile__version">Версия ${text(version)}</span>` : ''}
-    </span>
-    <span class="document-tile__footer">
-      <small class="document-tile__meta">${meta ? text(meta) : '&nbsp;'}</small>
-      ${statusMarkup}
-    </span>
+    ${documentBody({ title, version, meta, lines, statusMarkup })}
   </${tag}>`;
 }
 
