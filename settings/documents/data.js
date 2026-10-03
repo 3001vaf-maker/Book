@@ -1,11 +1,17 @@
 import { getDocumentHistory, recordDocumentHistory } from './history.js';
+import {
+  CORE_DOCUMENT_IDS,
+  DOCUMENT_CLASS,
+  canDeleteDocument,
+  documentPolicy,
+  inferDocumentClass,
+  tracksDocumentVersions,
+} from './policy.js';
 
 let documentsState = null;
 let persistDocuments = null;
 let platformBasesState = [];
 let platformContextState = { profile: {} };
-
-const PLATFORM_DOCUMENT_IDS = ['pdn-agreement', 'pdn-consent', 'messages-consent'];
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -27,16 +33,19 @@ function normalizeBase(item = {}) {
 function normalize(item = {}) {
   const sourceMode = String(item.sourceMode || '').toUpperCase();
   const kindValue = String(item.kind || '').trim().toLowerCase();
-  const kind = ['consent', 'agreement', 'instruction', 'document'].includes(kindValue) ? kindValue : 'agreement';
+  const kind = ['consent', 'agreement', 'instruction', 'document'].includes(kindValue) ? kindValue : 'document';
+  const documentClass = inferDocumentClass(item);
+  const policy = documentPolicy({ ...item, documentClass });
   return {
     id: String(item.id || `document-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`),
     system: Boolean(item.system),
     kind,
-    signable: Boolean(item.signable || item.personConsent),
+    documentClass,
+    signable: policy.signable,
     title: String(item.title || 'Документ'),
     personConsent: Boolean(item.personConsent),
     required: Boolean(item.required),
-    version: Math.max(1, Number(item.version || 1)),
+    version: policy.versioned ? Math.max(1, Number(item.version || 1)) : 1,
     text: String(item.text || ''),
     sourceMode: sourceMode === 'BOOK' ? 'BOOK' : sourceMode === 'CUSTOM' ? 'CUSTOM' : '',
     baseKey: String(item.baseKey || ''),
@@ -88,6 +97,7 @@ function makeDocumentFromPlatformBase(base, version = 1) {
     id: base.documentId,
     system: true,
     kind: base.kind,
+    documentClass: DOCUMENT_CLASS.CORE_LEGAL,
     title: base.title,
     personConsent: base.personConsent,
     required: base.required,
@@ -113,6 +123,12 @@ function historyEntry(document, action, source) {
   };
 }
 
+function technicalFileHistory(entry = {}) {
+  if (String(entry?.source || '') === 'system-rkn-guide') return true;
+  const snapshot = entry?.snapshot && typeof entry.snapshot === 'object' ? entry.snapshot : null;
+  return Boolean(snapshot && inferDocumentClass(snapshot) === DOCUMENT_CLASS.FILE);
+}
+
 export function configurePlatformDocumentBases(bases = [], context = {}) {
   platformBasesState = (Array.isArray(bases) ? bases : [])
     .map(normalizeBase)
@@ -128,7 +144,7 @@ export function getPlatformDocumentBases() {
 
 export function buildTenantDocumentsFromPlatformBases() {
   if (!platformBasesState.length || !contextReady()) return [];
-  return PLATFORM_DOCUMENT_IDS
+  return CORE_DOCUMENT_IDS
     .map((id) => baseForDocument(id))
     .filter(Boolean)
     .map((base) => makeDocumentFromPlatformBase(base, 1));
@@ -137,14 +153,19 @@ export function buildTenantDocumentsFromPlatformBases() {
 export function reconcileTenantDocumentsWithPlatformBases(items = [], history = []) {
   const sourceItems = Array.isArray(items) ? items : [];
   const current = sourceItems.map(normalize);
-  const nextHistory = Array.isArray(history) ? clone(history) : [];
-  let changed = sourceItems.some((item) => Object.prototype.hasOwnProperty.call(item || {}, 'recordType'));
+  const sourceHistory = Array.isArray(history) ? clone(history) : [];
+  const nextHistory = sourceHistory.filter((entry) => !technicalFileHistory(entry));
+  let changed = sourceHistory.length !== nextHistory.length
+    || sourceItems.some((item, index) => (
+      String(item?.documentClass || '') !== String(current[index]?.documentClass || '')
+      || Object.prototype.hasOwnProperty.call(item || {}, 'recordType')
+    ));
 
   if (!platformBasesState.length || !contextReady()) {
     return { documents: current, history: nextHistory, changed };
   }
 
-  for (const documentId of PLATFORM_DOCUMENT_IDS) {
+  for (const documentId of CORE_DOCUMENT_IDS) {
     const base = baseForDocument(documentId);
     if (!base) continue;
     const rendered = renderPlatformBaseText(base);
@@ -159,12 +180,17 @@ export function reconcileTenantDocumentsWithPlatformBases(items = [], history = 
     }
 
     const item = current[index];
+    if (item.documentClass !== DOCUMENT_CLASS.CORE_LEGAL) {
+      current[index] = normalize({ ...item, documentClass: DOCUMENT_CLASS.CORE_LEGAL });
+      changed = true;
+    }
+    const active = current[index];
 
-    // Existing real documents are never overwritten merely because this connection is new.
-    if (!item.sourceMode) {
-      const exactAdminDocument = item.title === base.title && item.text === rendered;
+    if (!active.sourceMode) {
+      const exactAdminDocument = active.title === base.title && active.text === rendered;
       current[index] = normalize({
-        ...item,
+        ...active,
+        documentClass: DOCUMENT_CLASS.CORE_LEGAL,
         sourceMode: exactAdminDocument ? 'BOOK' : 'CUSTOM',
         baseKey: base.key,
         baseVersion: exactAdminDocument ? base.version : 0,
@@ -175,14 +201,14 @@ export function reconcileTenantDocumentsWithPlatformBases(items = [], history = 
       continue;
     }
 
-    if (item.sourceMode === 'BOOK') {
-      if (item.text !== rendered || item.title !== base.title || item.baseVersion !== base.version) {
-        const previous = clone(item);
+    if (active.sourceMode === 'BOOK') {
+      if (active.text !== rendered || active.title !== base.title || active.baseVersion !== base.version) {
+        const previous = clone(active);
         const refreshed = normalize({
-          ...item,
+          ...active,
           title: base.title,
           text: rendered,
-          version: Number(item.version || 1) + 1,
+          version: Number(active.version || 1) + 1,
           baseKey: base.key,
           baseVersion: base.version,
           availableBaseVersion: 0,
@@ -196,13 +222,13 @@ export function reconcileTenantDocumentsWithPlatformBases(items = [], history = 
       continue;
     }
 
-    const nextAvailable = item.text === rendered && item.title === base.title ? 0 : base.version;
+    const nextAvailable = active.text === rendered && active.title === base.title ? 0 : base.version;
     const nextText = nextAvailable ? rendered : '';
-    if (item.baseKey !== base.key
-      || item.availableBaseVersion !== nextAvailable
-      || item.availableBookText !== nextText) {
+    if (active.baseKey !== base.key
+      || active.availableBaseVersion !== nextAvailable
+      || active.availableBookText !== nextText) {
       current[index] = normalize({
-        ...item,
+        ...active,
         baseKey: base.key,
         availableBaseVersion: nextAvailable,
         availableBookText: nextText,
@@ -236,12 +262,18 @@ export function saveDocuments(items = []) {
 export function saveDocument(document) {
   const items = getDocuments();
   const previous = items.find((item) => item.id === document?.id);
-  const changedText = Boolean(previous) && String(previous.text || '') !== String(document?.text || '');
-  const changedTitle = Boolean(previous) && String(previous.title || '') !== String(document?.title || '');
+  const provisional = normalize({
+    ...previous,
+    ...document,
+    documentClass: document?.documentClass || previous?.documentClass || inferDocumentClass(document),
+  });
+  const versioned = tracksDocumentVersions(provisional);
+  const changedText = Boolean(previous) && String(previous.text || '') !== String(provisional.text || '');
+  const changedTitle = Boolean(previous) && String(previous.title || '') !== String(provisional.title || '');
   const changedContent = changedText || changedTitle;
   const now = new Date().toISOString();
 
-  if (previous && changedContent) {
+  if (previous && changedContent && versioned) {
     const previousAlreadyRecorded = getDocumentHistory().some((entry) =>
       entry.documentId === previous.id
       && Number(entry.documentVersion || 0) === Number(previous.version || 0)
@@ -260,21 +292,21 @@ export function saveDocument(document) {
   }
 
   const next = normalize({
-    ...document,
-    sourceMode: previous && changedContent ? 'CUSTOM' : (previous?.sourceMode || document?.sourceMode || 'CUSTOM'),
-    signable: document?.signable ?? previous?.signable ?? Boolean(document?.personConsent),
-    version: changedContent
-      ? Number(previous?.version || document?.version || 1) + 1
-      : Number(document?.version || previous?.version || 1),
-    createdAt: previous?.createdAt || document?.createdAt || now,
-    updatedAt: changedContent || !previous ? now : (document?.updatedAt || previous?.updatedAt || ''),
+    ...provisional,
+    sourceMode: previous && changedContent ? 'CUSTOM' : (previous?.sourceMode || provisional.sourceMode || 'CUSTOM'),
+    version: versioned && changedContent
+      ? Number(previous?.version || provisional.version || 1) + 1
+      : Number(previous?.version || provisional.version || 1),
+    createdAt: previous?.createdAt || provisional.createdAt || now,
+    updatedAt: changedContent || !previous ? now : (provisional.updatedAt || previous?.updatedAt || ''),
   });
+
   const index = items.findIndex((item) => item.id === next.id);
   if (index >= 0) items[index] = next;
   else items.push(next);
   saveDocuments(items);
 
-  if (!previous) {
+  if (versioned && !previous) {
     recordDocumentHistory({
       documentId: next.id,
       documentTitle: next.title,
@@ -283,7 +315,7 @@ export function saveDocument(document) {
       source: next.sourceMode === 'BOOK' ? 'admin-template' : 'custom',
       snapshot: next,
     });
-  } else if (changedContent) {
+  } else if (versioned && previous && changedContent) {
     recordDocumentHistory({
       documentId: next.id,
       documentTitle: next.title,
@@ -306,11 +338,16 @@ export function createStandaloneDocument({
   text = '',
   signable = false,
   attachment = null,
+  documentClass = DOCUMENT_CLASS.USER_DOCUMENT,
 } = {}) {
+  const resolvedClass = signable && documentClass === DOCUMENT_CLASS.FILE
+    ? DOCUMENT_CLASS.USER_DOCUMENT
+    : documentClass;
   return saveDocument({
     id: `document-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     system: false,
     kind: 'document',
+    documentClass: resolvedClass,
     signable,
     title,
     personConsent: false,
@@ -322,7 +359,17 @@ export function createStandaloneDocument({
   });
 }
 
+export function deleteDocument(documentId = '') {
+  const id = String(documentId || '').trim();
+  const items = getDocuments();
+  const target = items.find((item) => item.id === id);
+  if (!target) return false;
+  if (!canDeleteDocument(target)) throw new Error('Основной документ нельзя удалить');
+  saveDocuments(items.filter((item) => item.id !== id));
+  return true;
+}
+
 export function resetDocumentTemplates() {
-  const savedDocuments = getDocuments().filter((item) => !PLATFORM_DOCUMENT_IDS.includes(item.id));
+  const savedDocuments = getDocuments().filter((item) => !CORE_DOCUMENT_IDS.includes(item.id));
   return saveDocuments([...buildTenantDocumentsFromPlatformBases(), ...savedDocuments]);
 }
