@@ -25,6 +25,9 @@ const workplaceSelection = readFileSync(new URL('../settings/service/workplace-s
 const appearance = readFileSync(new URL('../settings/service/appearance.js', import.meta.url), 'utf8');
 const cardPresentation = readFileSync(new URL('../settings/service/card-presentation.js', import.meta.url), 'utf8');
 const listEntry = readFileSync(new URL('../ui/lists/list-entry.js', import.meta.url), 'utf8');
+const appearanceQ = readFileSync(new URL('../ui/cards/appearance-q.js', import.meta.url), 'utf8');
+const entityCardConstructor = readFileSync(new URL('../ui/cards/entity-card-constructor.js', import.meta.url), 'utf8');
+const appearanceTemplates = readFileSync(new URL('../core/card-appearance-templates.js', import.meta.url), 'utf8');
 
 assert.match(service, /viewNavigation/);
 assert.doesNotMatch(service, /folderList/);
@@ -36,6 +39,12 @@ assert.match(appearance, /openEntityCardAppearanceQ/);
 assert.match(appearance, /value:\s*'procedure'[\s\S]*value:\s*'product'/);
 assert.match(appearance, /Все процедуры/);
 assert.match(appearance, /Все товары/);
+assert.match(appearanceQ, /data-card-q-save/);
+assert.match(appearanceQ, /controller\?\.save\?\.\(\)/);
+assert.doesNotMatch(entityCardConstructor, /data-card-save|v2-primary-source-only/);
+assert.match(entityCardConstructor, /onStateChange/);
+assert.match(appearanceTemplates, /'procedure'/);
+assert.match(appearanceTemplates, /'product'/);
 assert.match(cardPresentation, /procedureCardAppearance/);
 assert.match(cardPresentation, /productCardAppearance/);
 assert.match(procedures, /initV2ListReorder/);
