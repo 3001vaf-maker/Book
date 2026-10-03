@@ -435,6 +435,7 @@ ok(!shell()?.querySelector('[data-v2-workspace-chat]'),
   'Cash View Q must hide Chat D');
 cashAppearanceQ?.v2Close?.();
 await wait(35);
+ok(!document.querySelector('[data-v2-q="true"]'), 'Cash View Q must fully release before returning to Cash Z');
 
 shell()?.querySelector('[data-v2-workspace-a]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
 await wait(30);
@@ -699,7 +700,10 @@ ok(!receipt?.textContent.includes('Конечный пользователь'), 
 ok(!receipt?.textContent.includes('Стрижка'), 'Cash receipt must not show what was paid for');
 ok(operationZ3?.querySelector('[data-workspace-header-context]')?.dataset.workspaceTitle === 'Оплата услуги', 'Cash Z3 B operation title is wrong');
 
-shell()?.querySelector('[data-v2-workspace-a]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+const cashOperationA = shell()?.querySelector('[data-v2-workspace-a]');
+ok(Boolean(cashOperationA), 'Cash operation Z3 must expose clickable A/settings gear');
+ok(Boolean(cashOperationA?.querySelector('.v2-header__settings-tag')), 'Cash operation Z3 A must show settings gear');
+cashOperationA?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
 await wait(20);
 const operationSettings = document.querySelector('[data-shared-profile-settings-menu]');
 ok(Boolean(operationSettings?.querySelector('[data-shared-profile-action="delete-operation"]')), 'Cash operation A/settings must expose delete operation');
