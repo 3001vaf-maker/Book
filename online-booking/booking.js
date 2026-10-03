@@ -321,11 +321,10 @@ function renderFlowPage(root, state, {
   const header = v2Header({
     a: registration ? {
       kind: 'avatar',
-      label: '',
-      image: '',
-      initials: '',
+      label: representativeName(state),
+      image: representativePhoto(state),
       disabled: true,
-      aria: 'Регистрация',
+      aria: `Профиль ${representativeName(state)}`,
     } : {
       kind: 'avatar',
       label: representativeName(state),
