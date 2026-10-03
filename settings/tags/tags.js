@@ -66,7 +66,7 @@ function openForm(root, existing = null) {
     title,
     variant: 'bottom',
     surface: 'app',
-    className: 'modal--tag-editor',
+    className: 'modal--form-sheet',
   }));
   if (!layer) return null;
   initColorPickers(layer);
