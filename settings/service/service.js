@@ -1,21 +1,103 @@
-import { actionBlock, button, folderList, pageHeader } from '../../ui/ui.js';
+import {
+  initViewNavigation,
+  openSharedPhotoAction,
+  openSharedProfileSettingsMenu,
+  page,
+  viewNavigation,
+} from '../../ui/ui.js';
+import { getProfile, saveProfile as saveProfileData } from '../profile/data.js';
+import { openProfileAppearanceQ } from '../profile/profile.js';
+import { serviceHeaderContext, notifyServiceContext } from './context.js';
+import { openProcedureEditor, renderProcedureCatalog } from './procedures/procedures.js';
+import { openProductEditor, renderProductCatalog } from './products/products.js';
 
-const children = [
-  ['procedures', 'Процедуры', () => import('./procedures/procedures.js')],
-  ['products', 'Товары', () => import('./products/products.js')],
+const views = [
+  { id: 'procedures', label: 'Процедуры' },
+  { id: 'products', label: 'Товары' },
 ];
 
-export function renderService(root, navigateBack = () => {}) {
-  root.innerHTML = `${pageHeader('Сервис')}${folderList(children.map(([key, label]) => ({ title: label, data: `data-service-open="${key}"` })))}`;
-  root.querySelectorAll('[data-service-open]').forEach((element) => {
-    element.addEventListener('click', async () => {
-      const folder = children.find(([key]) => key === element.dataset.serviceOpen);
-      if (!folder) return;
-      const { render } = await folder[2]();
-      render(root, () => renderService(root, navigateBack));
-    });
+let activeView = 'procedures';
+
+function openServiceSettings(root, rerender) {
+  const profile = getProfile();
+  return openSharedProfileSettingsMenu({
+    title: 'Настройки',
+    actions: [
+      {
+        id: 'photo',
+        label: 'Фото',
+        onSelect: () => openSharedPhotoAction({
+          photo: profile.photo || '',
+          onReplace: async (photo) => {
+            await saveProfileData({ ...getProfile(), photo });
+            rerender();
+          },
+          onDelete: async () => {
+            await saveProfileData({ ...getProfile(), photo: '' });
+            rerender();
+          },
+        }),
+      },
+      {
+        id: 'appearance',
+        label: 'Вид',
+        onSelect: () => openProfileAppearanceQ(root, { onSaved: rerender }),
+      },
+    ],
   });
-  
+}
+
+export function renderService(root, navigateBack = () => {}) {
+  let disposeCatalog = () => {};
+
+  const renderCurrent = () => {
+    disposeCatalog?.();
+    const view = views.some((item) => item.id === activeView) ? activeView : 'procedures';
+    const title = view === 'products' ? 'Товары' : 'Процедуры';
+
+    root.innerHTML = page([
+      serviceHeaderContext({
+        title,
+        settingsData: 'data-service-settings',
+        settingsAria: 'Настройки сервиса',
+        c: {
+          label: '+',
+          data: 'data-service-add',
+          aria: view === 'products' ? 'Добавить товар' : 'Добавить процедуру',
+        },
+      }),
+      viewNavigation({ views, activeView: view, ariaLabel: 'Сервис' }),
+      '<div data-service-catalog></div>',
+    ]);
+
+    root.querySelector('[data-service-settings]')?.addEventListener('click', () => openServiceSettings(root, renderCurrent));
+
+    initViewNavigation(root, {
+      views,
+      activeView: view,
+      onChange: (next) => {
+        activeView = next;
+        renderCurrent();
+      },
+    });
+
+    const catalog = root.querySelector('[data-service-catalog]');
+    if (catalog) {
+      disposeCatalog = view === 'products'
+        ? renderProductCatalog(catalog, { root, onChanged: renderCurrent })
+        : renderProcedureCatalog(catalog, { root, onChanged: renderCurrent });
+    }
+
+    root.querySelector('[data-service-add]')?.addEventListener('click', () => {
+      if (view === 'products') openProductEditor(root, null, { onChanged: renderCurrent });
+      else openProcedureEditor(root, null, { onChanged: renderCurrent });
+    });
+
+    notifyServiceContext();
+  };
+
+  renderCurrent();
+  return () => disposeCatalog?.();
 }
 
 export { renderService as render };

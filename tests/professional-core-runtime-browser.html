@@ -329,7 +329,14 @@ window.addEventListener('error', (event) => failures.push(stage + ': window erro
 window.addEventListener('unhandledrejection', (event) => failures.push(stage + ': rejection: ' + String(event.reason?.message || event.reason || 'unknown')));
 
 mark('import-core');
-await import('/core.js');
+try {
+  await import('/core.js');
+} catch (error) {
+  document.documentElement.dataset.professionalRuntime = 'fail';
+  document.documentElement.dataset.professionalRuntimeStage = 'import-core-error';
+  result.textContent = 'import-core: ' + String(error?.stack || error?.message || error || 'unknown');
+  throw error;
+}
 
 const app = document.querySelector('#app');
 const waitFor = async (predicate, label, attempts = 80) => {

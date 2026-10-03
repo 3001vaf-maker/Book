@@ -1,135 +1,289 @@
-import { actionBlock, button, costCardMeta, costListParts, durationText, emptyState, entityCard, escapeHtml, iconButton, v2ListEntries, v2ListEntry, mountModal, modal, page, pageHeader, workplaceCountText } from '../../../ui/ui.js';
-import { getSettlementItemTotals } from '../../../core/finance/index.js';
+import {
+  button,
+  costCardMeta,
+  costListParts,
+  durationText,
+  emptyState,
+  entityCard,
+  escapeHtml,
+  initV2ListReorder,
+  miniCard,
+  miniCardRail,
+  modal,
+  mountModal,
+  mountV2ZLayer,
+  openSharedPhotoAction,
+  openSharedProfileSettingsMenu,
+  page,
+  v2ListEntries,
+  v2ListEntry,
+  v2ZLayer,
+  workplaceCountText,
+} from '../../../ui/ui.js';
+import { getSettlementItemTotals, getSettlementItemTotalsForRecords } from '../../../core/finance/index.js';
 import { getRecords } from '../../../core/record/index.js';
-import { deleteProcedure as deleteProcedureData, getProcedures, reorderProcedures } from './data.js';
-import { openProcedureForm } from './form.js';
+import { getWorkplaces } from '../../profile/workplaces/data.js';
+import { serviceHeaderContext, notifyServiceContext } from '../context.js';
+import { openServiceWorkplaceSelection } from '../workplace-selection.js';
+import { bindProcedureEditor, initialProcedure, procedureEditorForm } from './form.js';
+import { deleteProcedure as deleteProcedureData, getProcedures, pushProcedureHistory, reorderProcedures, saveProcedure as saveProcedureData } from './data.js';
 
 const money = (value) => `${new Intl.NumberFormat('ru-RU').format(Number(value || 0))} ₽`;
 
-function procedureMetrics(procedureId) {
+function activeProcedureRecords(procedureId, workplaceId = '') {
   const id = String(procedureId || '');
-  const records = getRecords().filter((record) => record?.status !== 'cancelled'
+  const workspace = String(workplaceId || '');
+  return getRecords().filter((record) => record?.status !== 'cancelled'
+    && (!workspace || String(record?.workplaceId || '') === workspace)
     && (record?.procedures || []).some((item) => String(item?.id || '') === id));
-  const fact = getSettlementItemTotals('procedure', id);
-  return { records: records.length, revenue: fact.factTotal };
 }
 
-function openProcedureOrder(root, navigateBack) {
-  let items = getProcedures();
-  const m = mountModal(root, modal('<div data-procedure-order></div>', { title: 'Порядок услуг', variant: 'medium' }));
-  if (!m) return;
-
-  const renderOrder = () => {
-    const host = m.querySelector('[data-procedure-order]');
-    host.innerHTML = `<div class="modal-title"><h2>Порядок услуг</h2><p>Переместите важные услуги выше. Этот порядок сохраняется.</p></div>
-      <div class="form-grid">${items.map((item, index) => `
-        <div class="action-block">
-          <strong>${escapeHtml(item.name || 'Без названия')}</strong>
-          <div class="modal-actions">
-            ${button('↑', { variant: 'secondary', data: `data-order-up="${escapeHtml(item.id)}"`, disabled: index === 0 })}
-            ${button('↓', { variant: 'secondary', data: `data-order-down="${escapeHtml(item.id)}"`, disabled: index === items.length - 1 })}
-          </div>
-        </div>`).join('')}</div>
-      <div class="modal-actions">${button('Готово', { data: 'data-order-done' })}</div>`;
-
-    const move = (id, delta) => {
-      const index = items.findIndex((item) => String(item.id) === String(id));
-      const next = index + delta;
-      if (index < 0 || next < 0 || next >= items.length) return;
-      [items[index], items[next]] = [items[next], items[index]];
-      reorderProcedures(items.map((item) => item.id));
-      renderOrder();
-    };
-    host.querySelectorAll('[data-order-up]').forEach((control) => control.addEventListener('click', () => move(control.dataset.orderUp, -1)));
-    host.querySelectorAll('[data-order-down]').forEach((control) => control.addEventListener('click', () => move(control.dataset.orderDown, 1)));
-    host.querySelector('[data-order-done]')?.addEventListener('click', () => {
-      m.remove();
-      renderList(root, navigateBack);
-    });
-  };
-  renderOrder();
+function spentMinutes(records, procedure) {
+  return (Array.isArray(records) ? records : []).reduce((sum, record) => {
+    const item = (record?.procedures || []).find((value) => String(value?.id || '') === String(procedure?.id || ''));
+    return sum + Math.max(0, Number(item?.duration ?? procedure?.duration ?? 0) || 0);
+  }, 0);
 }
 
-function renderList(root, navigateBack) {
-  const items = getProcedures();
-  root.innerHTML = `<div class="entity-page-header">${pageHeader('Процедуры')}<div class="page-header-action">${items.length > 1 ? iconButton('↕', { data: 'data-order-procedures', aria: 'Изменить порядок услуг' }) : ''}${iconButton('+', { className: 'icon-button--primary', data: 'data-add-procedure', aria: 'Добавить услугу' })}</div></div>${items.length ? v2ListEntries(items.map(renderRow)) : emptyState('Процедур пока нет', 'Добавьте первую процедуру кнопкой «+».')}`;
-  root.querySelector('[data-order-procedures]')?.addEventListener('click', () => openProcedureOrder(root, navigateBack));
-  root.querySelector('[data-add-procedure]')?.addEventListener('click', () => openProcedureForm({ root, onSaved: () => renderList(root, navigateBack) }));
-  root.querySelectorAll('[data-procedure]').forEach((element) => element.addEventListener('click', () => renderCard(root, element.dataset.procedure, navigateBack)));
-  root.querySelectorAll('[data-delete-action]').forEach((element) => element.addEventListener('click', (event) => {
-    event.stopPropagation();
-    confirmDelete(root, element.dataset.deleteAction, navigateBack, () => renderList(root, navigateBack));
-  }));
-  
+function spentText(minutes) {
+  const total = Math.max(0, Number(minutes) || 0);
+  const hours = Math.floor(total / 60);
+  const rest = total % 60;
+  if (!hours) return `${rest} мин`;
+  if (!rest) return `${hours} ч`;
+  return `${hours} ч ${rest} мин`;
 }
 
-function renderRow(procedure) {
+function updateProcedure(current, patch) {
+  const next = { ...current, ...patch, updatedAt: new Date().toISOString() };
+  pushProcedureHistory(current, 'updated');
+  saveProcedureData(next);
+  return next;
+}
+
+function procedureRow(procedure) {
   const price = costListParts(procedure.cost);
-  const workplaceCount = (procedure.workplaces || []).length;
   return v2ListEntry({
     title: procedure.name || '',
-    subtitle: `${durationText(procedure.duration)} — ${workplaceCountText(workplaceCount)}`,
+    subtitle: `${durationText(procedure.duration)} — ${workplaceCountText((procedure.workplaces || []).length)}`,
     image: procedure.photo || '',
     initial: (procedure.name || '?').slice(0, 1).toUpperCase(),
     rightTop: price.rightTop || '',
     rightBottom: price.rightBottom || '',
     interactive: true,
-    data: `data-procedure="${escapeHtml(procedure.id)}"`,
+    data: `data-procedure="${escapeHtml(procedure.id)}" data-reorder-id="${escapeHtml(procedure.id)}"`,
     aria: `Открыть процедуру ${procedure.name || ''}`,
-    deleteData: procedure.id,
-    deleteAria: `Удалить процедуру ${procedure.name || ''}`,
   });
 }
 
-function renderCard(root, id, navigateBack) {
-  const procedure = getProcedures().find((item) => item.id === id);
-  if (!procedure) return renderList(root, navigateBack);
-  const metrics = procedureMetrics(procedure.id);
-  const workplaceNames = (procedure.workplaces || []).map((workplace) => workplace.name || workplace.workplaceId).filter(Boolean);
-  const card = entityCard({
+export function renderProcedureCatalog(host, { root = host, onChanged = () => {} } = {}) {
+  const items = getProcedures();
+  host.innerHTML = items.length
+    ? v2ListEntries(items.map(procedureRow))
+    : emptyState('Процедур пока нет', 'Добавьте первую процедуру кнопкой «+».');
+
+  host.querySelectorAll('[data-procedure]').forEach((node) => {
+    node.addEventListener('click', () => openProcedureOverview(root, node.dataset.procedure, { onChanged }));
+  });
+
+  return initV2ListReorder(host, {
+    onReorder: (ids) => {
+      if (reorderProcedures(ids)) onChanged();
+    },
+  });
+}
+
+function procedureOverviewCard(procedure) {
+  const records = activeProcedureRecords(procedure.id);
+  const fact = getSettlementItemTotals('procedure', procedure.id);
+  return entityCard({
     title: procedure.name || '',
     subtitle: durationText(procedure.duration),
     image: procedure.photo || '',
     initial: (procedure.name || '?').slice(0, 1).toUpperCase(),
-    topMeta: [{ value: workplaceCountText(workplaceNames.length) }],
+    topMeta: [
+      { value: durationText(procedure.duration), label: 'длительность' },
+      { value: workplaceCountText((procedure.workplaces || []).length), label: 'пространств' },
+      { value: String(records.length), label: 'записей' },
+    ],
     topRightMeta: costCardMeta(procedure.cost),
     meta: [
-      { value: metrics.records, label: 'записей' },
-      { value: money(metrics.revenue), label: 'сумма' },
+      { value: spentText(spentMinutes(records, procedure)), label: 'время' },
+      { value: money(fact.factTotal), label: 'сумма' },
     ],
     metricsLayout: 'grid',
-    detailRows: workplaceNames.map((name) => ({ left: name })),
     className: 'entity-card--hero entity-card--top-dark',
   });
-  root.innerHTML = page([
-    card,
-    actionBlock(`${button('Редактировать процедуру', { data: 'data-edit-procedure' })}${button('Удалить', { variant: 'danger', data: 'data-delete-card' })}`),
-  ]);
-  root.querySelector('[data-edit-procedure]').onclick = () => openProcedureForm({
-    root,
-    existing: procedure,
-    onSaved: (saved) => renderCard(root, saved.id, navigateBack),
+}
+
+function procedureWorkplaceCards(procedure) {
+  const byId = new Map(getWorkplaces().map((workplace) => [String(workplace.key || workplace.id || ''), workplace]));
+  const cards = (procedure.workplaces || []).map((selection) => {
+    const id = String(selection.workplaceId || selection.id || selection.key || '');
+    const workplace = byId.get(id) || selection;
+    const records = activeProcedureRecords(procedure.id, id);
+    const fact = getSettlementItemTotalsForRecords('procedure', procedure.id, records.map((record) => record.id));
+    return miniCard({
+      title: workplace.name || selection.name || 'Рабочее пространство',
+      rows: [
+        { label: 'Кол-во', value: String(records.length) },
+        { label: 'Время', value: spentText(spentMinutes(records, procedure)) },
+        { label: 'Сумма', value: money(fact.factTotal) },
+      ],
+    });
   });
-  root.querySelector('[data-delete-card]').onclick = () => confirmDelete(root, id, navigateBack, () => renderList(root, navigateBack));
-  
+  return cards.length ? miniCardRail(cards) : '';
 }
 
-function confirmDelete(root, id, navigateBack, onDeleted) {
-  const procedure = getProcedures().find((item) => item.id === id);
-  if (!procedure) return;
-  const m = mountModal(root, modal(`<div class="modal-title"><h2>Удалить?</h2><p>${escapeHtml(procedure.name || 'Процедура')} будет удалена.</p></div><div class="modal-actions">${button('Удалить', { variant: 'danger', data: 'data-confirm-delete' })}${button('Отмена', { className: 'ui-button--secondary', data: 'data-cancel-delete' })}</div>`, { variant: 'compact' }));
-  if (!m) return;
-  m.querySelector('[data-cancel-delete]').onclick = () => m.remove();
-  m.querySelector('[data-confirm-delete]').onclick = () => {
-    if (deleteProcedureData(id)) {
-      m.remove();
-      onDeleted?.();
-    } else m.remove();
-  };
+function confirmDeleteProcedure(procedure, onDeleted) {
+  const layer = mountModal(document.body, modal(`<div class="modal-title"><h2>Удалить?</h2><p>${escapeHtml(procedure.name || 'Процедура')} будет удалена.</p></div><div class="modal-actions">${button('Удалить', { variant: 'danger', data: 'data-confirm-delete-procedure' })}${button('Отмена', { variant: 'secondary', data: 'data-cancel-delete-procedure' })}</div>`, {
+    variant: 'bottom',
+    title: 'Удаление процедуры',
+  }));
+  if (!layer) return;
+  layer.querySelector('[data-cancel-delete-procedure]')?.addEventListener('click', () => layer.v2Close?.());
+  layer.querySelector('[data-confirm-delete-procedure]')?.addEventListener('click', () => {
+    if (deleteProcedureData(procedure.id)) onDeleted?.();
+    layer.v2Close?.();
+  });
 }
 
-export function renderProcedures(root, navigateBack = () => {}) {
-  renderList(root, navigateBack);
+function openProcedureOverviewSettings(layer, baseRoot, procedure, { onChanged = () => {} } = {}) {
+  return openSharedProfileSettingsMenu({
+    title: 'Настройки',
+    actions: [
+      {
+        id: 'photo',
+        label: 'Фото',
+        onSelect: () => openSharedPhotoAction({
+          photo: procedure.photo || '',
+          onReplace: async (photo) => {
+            updateProcedure(procedure, { photo });
+            renderProcedureOverview(layer, baseRoot, procedure.id, { onChanged });
+          },
+          onDelete: async () => {
+            updateProcedure(procedure, { photo: '' });
+            renderProcedureOverview(layer, baseRoot, procedure.id, { onChanged });
+          },
+        }),
+      },
+      {
+        id: 'workplaces',
+        label: 'Рабочие пространства',
+        onSelect: () => openServiceWorkplaceSelection({
+          selected: procedure.workplaces || [],
+          onChange: (workplaces) => {
+            procedure = updateProcedure(procedure, { workplaces });
+            renderProcedureOverview(layer, baseRoot, procedure.id, { onChanged });
+          },
+        }),
+      },
+      {
+        id: 'editor',
+        label: 'Редактор процедуры',
+        onSelect: () => renderProcedureEditor(layer, baseRoot, procedure, { onChanged }),
+      },
+      {
+        id: 'delete',
+        label: 'Удалить',
+        variant: 'danger',
+        onSelect: () => confirmDeleteProcedure(procedure, () => {
+          layer.v2Close?.();
+          onChanged();
+        }),
+      },
+    ],
+  });
 }
 
-export { renderProcedures as render };
+function editorDraftSettings(draft) {
+  return openSharedProfileSettingsMenu({
+    title: 'Настройки',
+    actions: [
+      {
+        id: 'photo',
+        label: 'Фото',
+        onSelect: () => openSharedPhotoAction({
+          photo: draft.photo || '',
+          onReplace: async (photo) => { draft.photo = photo; },
+          onDelete: async () => { draft.photo = ''; },
+        }),
+      },
+      {
+        id: 'workplaces',
+        label: 'Рабочие пространства',
+        onSelect: () => openServiceWorkplaceSelection({
+          selected: draft.workplaces || [],
+          onChange: (workplaces) => { draft.workplaces = workplaces; },
+        }),
+      },
+    ],
+  });
+}
+
+function renderProcedureEditor(layer, baseRoot, existing = null, { onChanged = () => {}, onSaved = () => {} } = {}) {
+  const draft = initialProcedure(existing);
+  const title = existing?.name || 'Новая процедура';
+  layer.innerHTML = page([
+    serviceHeaderContext({
+      title,
+      settingsData: 'data-procedure-editor-settings',
+      settingsAria: 'Настройки процедуры',
+      c: {
+        label: 'Сохранить',
+        data: 'data-procedure-editor-primary',
+        aria: 'Сохранить процедуру',
+      },
+    }),
+    procedureEditorForm(existing),
+  ]);
+
+  layer.querySelector('[data-procedure-editor-settings]')?.addEventListener('click', () => editorDraftSettings(draft));
+  bindProcedureEditor(layer, {
+    existing,
+    draft,
+    onSaved: (saved) => {
+      onSaved(saved);
+      if (existing) renderProcedureOverview(layer, baseRoot, saved.id, { onChanged });
+      else {
+        layer.v2Close?.();
+        onChanged();
+      }
+    },
+  });
+  notifyServiceContext();
+}
+
+export function openProcedureEditor(root, existing = null, { onChanged = () => {}, onSaved = () => {} } = {}) {
+  const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'service-procedure-editor-layer' }), { stack: true });
+  if (!layer) return null;
+  renderProcedureEditor(layer, root, existing, { onChanged, onSaved });
+  return layer;
+}
+
+function renderProcedureOverview(layer, baseRoot, id, { onChanged = () => {} } = {}) {
+  const procedure = getProcedures().find((item) => String(item.id) === String(id));
+  if (!procedure) {
+    layer.v2Close?.();
+    onChanged();
+    return;
+  }
+  layer.innerHTML = page([
+    serviceHeaderContext({
+      title: procedure.name || 'Процедура',
+      settingsData: 'data-procedure-settings',
+      settingsAria: `Настройки ${procedure.name || 'процедуры'}`,
+    }),
+    procedureOverviewCard(procedure),
+    procedureWorkplaceCards(procedure),
+  ]);
+  layer.querySelector('[data-procedure-settings]')?.addEventListener('click', () => openProcedureOverviewSettings(layer, baseRoot, procedure, { onChanged }));
+  notifyServiceContext();
+}
+
+export function openProcedureOverview(root, id, { onChanged = () => {} } = {}) {
+  const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'service-procedure-overview-layer' }), { stack: true });
+  if (!layer) return null;
+  renderProcedureOverview(layer, root, id, { onChanged });
+  return layer;
+}

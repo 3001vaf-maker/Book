@@ -64,6 +64,12 @@ export function getSettlementItemTotals(sourceTypeValue, sourceIdValue) {
   return calculateSettlementItemTotals(getActiveDDSMovements(), sourceTypeValue, sourceIdValue);
 }
 
+export function getSettlementItemTotalsForRecords(sourceTypeValue, sourceIdValue, recordIds = []) {
+  const ids = new Set((Array.isArray(recordIds) ? recordIds : []).map((id) => String(id || '')).filter(Boolean));
+  const movements = getActiveDDSMovements().filter((movement) => movement?.source?.type === 'record' && ids.has(String(movement?.source?.id || '')));
+  return calculateSettlementItemTotals(movements, sourceTypeValue, sourceIdValue);
+}
+
 export function recordAmountDue(record = null) {
   return resolveRecordSettlement(record).planTotal;
 }

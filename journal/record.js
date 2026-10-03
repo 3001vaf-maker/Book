@@ -6,7 +6,7 @@ import { personDisplay } from '../core/people/presentation.js';
 import { openPersonCreate } from '../core/people/create.js';
 import { openPerson } from '../core/people/people.js';
 import { getProcedures } from '../settings/service/procedures/data.js';
-import { openProcedureForm } from '../settings/service/procedures/form.js';
+import { openProcedureEditor } from '../settings/service/procedures/procedures.js';
 import { assignProceduresToWorkplace } from '../settings/service/procedures/service.js';
 import { checkTimeAvailability, listAvailableEndTimes, listAvailableStartTimes } from '../core/time/index.js';
 import { timeToMinutes, minutesToTime } from '../core/time/index.js';
@@ -321,19 +321,21 @@ function renderProceduresStep(modalRoot, {
     });
     m?.querySelector('[data-record-settings-add-procedure]')?.addEventListener('click', () => {
       m.v2Close?.();
-      openProcedureForm({
-        root: document.body,
-        defaultWorkplaceId: workplaceId,
-        variant: 'bottom',
-        surface: 'app',
-        className: 'modal--form-sheet',
+      const appRoot = modalRoot?.closest?.('[data-v2-app]') || document.querySelector('[data-v2-app]') || document.body;
+      openProcedureEditor(appRoot, null, {
         onSaved: (procedure) => {
+          assignProceduresToWorkplace({
+            procedureIds: [procedure.id],
+            workplaceId,
+            workplaceName: getWorkplaces().find((item) => String(item.key || item.id || '') === String(workplaceId || ''))?.name || '',
+          });
           items = procedures().filter((item) => procedureForWorkplace(item, workplaceId));
-          if (procedureForWorkplace(procedure, workplaceId)) {
-            selected.set(String(procedure.id), {
-              procedure,
-              cost: defaultCost(procedure, workplaceId),
-              duration: Number(procedure.duration) || 0,
+          const assigned = items.find((item) => String(item.id) === String(procedure.id)) || procedure;
+          if (procedureForWorkplace(assigned, workplaceId)) {
+            selected.set(String(assigned.id), {
+              procedure: assigned,
+              cost: defaultCost(assigned, workplaceId),
+              duration: Number(assigned.duration) || 0,
             });
           }
           render();

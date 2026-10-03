@@ -22,6 +22,7 @@ export {
 export {
   getSettlementTotalsForRecords,
   getSettlementItemTotals,
+  getSettlementItemTotalsForRecords,
   getRecordSettlement,
   getRecordPaymentState,
   hydrateRecordSettlement,
