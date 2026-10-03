@@ -266,7 +266,7 @@ function openSlotStepInfo() {
   const content = '<div class="modal-title"><h2>Шаг записи</h2><p>Шаг определяет, как часто человеку показываются возможные начала записи. Он не ограничивает произвольное время специалиста и не меняет длительность процедуры.</p></div>';
   return mountModal(document.body, modal(content, {
     title: 'О шаге записи',
-    variant: 'technical',
+    variant: 'top',
     surface: 'app',
   }));
 }
