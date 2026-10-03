@@ -57,7 +57,7 @@ data.hydrateDocumentsFromServer([
     personConsent:true,
     required:true,
     version:2,
-    text:'Текущий текст согласия',
+    text:'Именно этот текст был подписан.',
     sourceMode:'BOOK',
     baseKey:'pdn-consent-template',
     baseVersion:2,
@@ -212,7 +212,7 @@ await wait();
 const savedTemplate = data.getDocuments().find((item) => item.id === 'pdn-consent');
 ok(savedTemplate?.version === 3, 'Template save must create next current version');
 ok(savedTemplate?.sourceMode === 'CUSTOM', 'Edited platform template must become tenant-owned CUSTOM current version');
-ok(history.getDocumentHistory().some((entry) => entry.documentId === 'pdn-consent' && entry.documentVersion === 2 && entry.snapshot?.text === 'Текущий текст согласия'),
+ok(history.getDocumentHistory().some((entry) => entry.documentId === 'pdn-consent' && entry.documentVersion === 2 && entry.snapshot?.text === 'Именно этот текст был подписан.'),
   'Previous template version must remain under the hood as snapshot');
 templateLayer?.v2Close?.();
 await wait();
