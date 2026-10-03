@@ -26,11 +26,21 @@ import { phonesMatch } from '../../core/phone/index.js';
 import { getAllPeople } from '../../core/people/data.js';
 import {
   createStandaloneDocument,
+  deleteDocument,
   getDocuments,
   getPlatformDocumentBases,
   renderPlatformBaseText,
   saveDocument,
 } from './data.js';
+import {
+  CORE_DOCUMENT_IDS,
+  DOCUMENT_CLASS,
+  canDeleteDocument,
+  canSignDocument,
+  isCoreLegalDocument,
+  isFileDocument,
+  visibleDocumentVersion,
+} from './policy.js';
 import { getConsents } from './consents.js';
 import { getDocumentHistory } from './history.js';
 
@@ -44,10 +54,10 @@ const USER_PDF_TOTAL_LIMIT = 30 * 1024 * 1024;
 
 let currentView = 'documents';
 
-function headerContext(title = 'Документы', c = null) {
+function headerContext(title = 'Документы', c = null, a = null) {
   return workspaceHeaderContext({
     title,
-    a: {
+    a: a || {
       kind: 'settings',
       data: 'data-documents-settings',
       aria: 'Настройки документов',
@@ -74,7 +84,11 @@ function documentPdfDataUrl(item = {}) {
 }
 
 function documentMoment(item = {}) {
-  const direct = item?.attachment?.generatedAt || item?.updatedAt || item?.createdAt || '';
+  const direct = item?.attachment?.generatedAt
+    || item?.attachment?.uploadedAt
+    || item?.updatedAt
+    || item?.createdAt
+    || '';
   if (direct) return direct;
   const history = getDocumentHistory().find((entry) =>
     entry.documentId === item.id
@@ -84,14 +98,11 @@ function documentMoment(item = {}) {
 }
 
 function currentProfileDocuments() {
-  const documents = getDocuments();
   const grouped = new Map();
-
-  documents.forEach((item) => {
+  getDocuments().forEach((item) => {
     if (item?.attachment?.legacyFormat === 'PRE_REGISTRY_TEMPLATE') return;
-    const key = isRknGuide(item)
-      ? `rkn:${String(item?.attachment?.templateKey || 'default')}`
-      : `document:${String(item.id || '')}`;
+    const key = String(item.id || '');
+    if (!key) return;
     const current = grouped.get(key);
     if (!current) {
       grouped.set(key, item);
@@ -104,10 +115,18 @@ function currentProfileDocuments() {
       grouped.set(key, item);
     }
   });
+  return [...grouped.values()];
+}
 
-  return [...grouped.values()].sort((left, right) =>
-    Date.parse(documentMoment(right) || 0) - Date.parse(documentMoment(left) || 0)
-  );
+function coreDocuments() {
+  const byId = new Map(currentProfileDocuments().map((item) => [item.id, item]));
+  return CORE_DOCUMENT_IDS.map((id) => byId.get(id)).filter(Boolean);
+}
+
+function otherDocuments() {
+  return currentProfileDocuments()
+    .filter((item) => !isCoreLegalDocument(item))
+    .sort((left, right) => Date.parse(documentMoment(right) || 0) - Date.parse(documentMoment(left) || 0));
 }
 
 function templates() {
@@ -118,7 +137,9 @@ function templates() {
       return {
         id: String(base.documentId || ''),
         templateKey: String(base.key || ''),
+        system: true,
         kind: base.kind || 'agreement',
+        documentClass: DOCUMENT_CLASS.CORE_LEGAL,
         title: current?.title || base.title || 'Шаблон',
         personConsent: Boolean(base.personConsent),
         required: Boolean(base.required),
@@ -131,7 +152,7 @@ function templates() {
       };
     })
     .filter((item) => item.id)
-    .sort((left, right) => String(left.title || '').localeCompare(String(right.title || ''), 'ru'));
+    .sort((left, right) => CORE_DOCUMENT_IDS.indexOf(left.id) - CORE_DOCUMENT_IDS.indexOf(right.id));
 }
 
 function consentStateText(status) {
@@ -189,86 +210,73 @@ function openDocument(item) {
   if (!item) return null;
   return openDocumentViewer({
     title: item.title || 'Документ',
-    version: item.version || '',
+    version: visibleDocumentVersion(item),
     content: item.text || '',
     pdfDataUrl: documentPdfDataUrl(item),
   });
 }
 
+function documentTypeText(item) {
+  if (isCoreLegalDocument(item)) return 'Основной документ';
+  if (isRknGuide(item)) return 'PDF-помощник';
+  if (isFileDocument(item)) return 'Файл';
+  return 'Документ';
+}
+
 function documentCard(item, data) {
   const moment = documentMoment(item);
-  const type = isRknGuide(item) || isUserPdf(item) ? 'PDF' : 'Документ';
   const date = moment ? shortDateTime(moment, '') : '';
   return documentTile({
     title: item.title || 'Документ',
-    version: item.version || 1,
-    meta: [type, date].filter(Boolean).join(' · '),
+    version: visibleDocumentVersion(item),
+    meta: [documentTypeText(item), date].filter(Boolean).join(' · '),
     data,
-    aria: `Открыть документ ${item.title || 'Документ'}`,
-  });
-}
-
-function documentHistoryActionText(action) {
-  if (action === 'created') return 'Создан';
-  if (action === 'version-created') return 'Новая версия';
-  if (action === 'superseded') return 'Предыдущая версия';
-  if (action === 'renamed') return 'Переименован';
-  return 'Изменён';
-}
-
-function historyItems() {
-  const signing = getConsents().map((item) => ({
-    type: 'signing',
-    sortAt: item.eventAt || item.acceptedAt || item.revokedAt || item.createdAt || '',
-    item,
-  }));
-  const versions = getDocumentHistory().map((item) => ({
-    type: 'version',
-    sortAt: item.createdAt || '',
-    item,
-  }));
-  return [...signing, ...versions].sort((left, right) =>
-    Date.parse(right.sortAt || 0) - Date.parse(left.sortAt || 0)
-  );
-}
-
-function historyCard(entry) {
-  if (entry.type === 'signing') {
-    const item = entry.item;
-    const snapshot = signedDocumentSnapshot(item);
-    const date = shortDateTime(item.eventAt || item.acceptedAt || item.revokedAt || item.createdAt, '');
-    return documentTile({
-      title: snapshot?.title || item.documentId || 'Документ',
-      version: item.documentVersion || snapshot?.version || 1,
-      meta: date,
-      status: consentStateText(item.status),
-      statusState: consentStateKind(item.status),
-      data: `data-signing-event="${String(item.id || '')}"`,
-      aria: `Открыть факт подписания ${snapshot?.title || item.documentId || 'документа'}`,
-    });
-  }
-
-  const item = entry.item;
-  const snapshot = item.snapshot || null;
-  return documentTile({
-    title: snapshot?.title || item.documentTitle || item.documentId || 'Документ',
-    version: item.documentVersion || snapshot?.version || 1,
-    meta: [documentHistoryActionText(item.action), shortDateTime(item.createdAt, '')].filter(Boolean).join(' · '),
-    interactive: Boolean(snapshot),
-    data: snapshot ? `data-document-history-event="${String(item.id || '')}"` : '',
-    aria: snapshot ? `Открыть сохранённую версию ${snapshot.title || item.documentTitle || 'документа'}` : '',
+    aria: `Открыть информацию о документе ${item.title || 'Документ'}`,
   });
 }
 
 function documentsMarkup() {
-  const items = currentProfileDocuments();
-  if (!items.length) return emptyState('Документов пока нет', 'Добавьте документ через настройки раздела.');
-  return documentTiles(items.map((item) => documentCard(item, `data-profile-document="${String(item.id || '')}"`)));
+  const core = coreDocuments();
+  const other = otherDocuments();
+  return `
+    <section class="document-group document-group--core" data-document-group="core">
+      <h3 class="document-group__title">Основные документы</h3>
+      ${core.length
+        ? documentTiles(core.map((item) => documentCard(item, `data-profile-document="${String(item.id || '')}"`)), { layout: 'rail' })
+        : emptyState('Основные документы не загрузились', 'Обновите раздел.')}
+    </section>
+    <section class="document-group document-group--other" data-document-group="other">
+      <h3 class="document-group__title">Другие документы</h3>
+      ${other.length
+        ? documentTiles(other.map((item) => documentCard(item, `data-profile-document="${String(item.id || '')}"`)))
+        : emptyState('Других документов пока нет', 'Здесь появятся PDF-помощники и добавленные вами документы.')}
+    </section>
+  `;
+}
+
+function historyItems() {
+  return [...getConsents()].sort((left, right) =>
+    Date.parse(right.eventAt || right.createdAt || 0) - Date.parse(left.eventAt || left.createdAt || 0)
+  );
+}
+
+function historyCard(item) {
+  const snapshot = signedDocumentSnapshot(item);
+  const date = shortDateTime(item.eventAt || item.acceptedAt || item.revokedAt || item.createdAt, '');
+  return documentTile({
+    title: snapshot?.title || item.documentId || 'Документ',
+    version: item.documentVersion || snapshot?.version || 1,
+    meta: date,
+    status: consentStateText(item.status),
+    statusState: consentStateKind(item.status),
+    data: `data-signing-event="${String(item.id || '')}"`,
+    aria: `Открыть факт подписания ${snapshot?.title || item.documentId || 'документа'}`,
+  });
 }
 
 function historyMarkup() {
   const items = historyItems();
-  if (!items.length) return emptyState('Истории пока нет', 'Здесь появятся версии документов и факты подписания.');
+  if (!items.length) return emptyState('Истории подписаний пока нет', 'Здесь появятся факты подписания, отказа и отзыва.');
   return documentTiles(items.map(historyCard));
 }
 
@@ -278,6 +286,106 @@ function contentMarkup() {
 
 function bindSettings(scope, root) {
   scope.querySelector('[data-documents-settings]')?.addEventListener('click', () => openSettingsMenu(root));
+}
+
+function detailReceipt(item) {
+  const moment = documentMoment(item);
+  const parts = shortDateTimeParts(moment);
+  const rows = [{ label: 'Тип', value: documentTypeText(item) }];
+  const version = visibleDocumentVersion(item);
+  if (version !== '') rows.push({ label: 'Версия', value: String(version) });
+  if (canSignDocument(item)) rows.push({ label: 'Подписание', value: 'Доступно' });
+  rows.push({
+    label: canDeleteDocument(item) ? 'Добавлен' : 'Обновлён',
+    value: parts.date ? [parts.date, parts.time].filter(Boolean).join(' · ') : '—',
+  });
+  return readOnlyReceipt({ title: 'Информация о документе', items: rows });
+}
+
+function openDocumentDetailSettings(root, layer, item) {
+  const actions = [];
+  if (isCoreLegalDocument(item)) {
+    actions.push(button('Открыть шаблон', { variant: 'outline', data: 'data-detail-template' }));
+  } else if (canDeleteDocument(item)) {
+    actions.push(button('Удалить документ', { variant: 'critical', data: 'data-detail-delete' }));
+  }
+  const sheet = mountModal(document.body, modal(
+    `<div class="compact-form">${actions.join('')}</div>`,
+    {
+      title: 'Настройки документа',
+      variant: 'bottom',
+      surface: 'app',
+      className: 'modal--form-sheet',
+    },
+  ));
+  if (!sheet) return null;
+
+  sheet.querySelector('[data-detail-template]')?.addEventListener('click', () => {
+    sheet.v2Close?.();
+    const template = templates().find((entry) => entry.id === item.id);
+    if (template) openTemplateEditor(root, template);
+  });
+
+  sheet.querySelector('[data-detail-delete]')?.addEventListener('click', () => {
+    sheet.v2Close?.();
+    const confirm = mountModal(document.body, modal(
+      `<div class="compact-form">
+        <p>Документ будет удалён из текущих документов. Уже существующие факты подписания не удаляются.</p>
+        ${button('Удалить', { variant: 'critical', data: 'data-confirm-document-delete' })}
+      </div>`,
+      {
+        title: 'Удалить документ',
+        variant: 'bottom',
+        surface: 'app',
+        className: 'modal--form-sheet',
+      },
+    ));
+    confirm?.querySelector('[data-confirm-document-delete]')?.addEventListener('click', () => {
+      try {
+        deleteDocument(item.id);
+        confirm.v2Close?.();
+        layer.v2Close?.();
+        renderMain(root);
+      } catch (error) {
+        openNotice({
+          title: 'Документ не удалён',
+          message: error instanceof Error ? error.message : 'Не удалось удалить документ',
+        });
+      }
+    });
+  });
+
+  return sheet;
+}
+
+function openDocumentDetail(root, item) {
+  const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'documents-detail-layer' }), { stack: true });
+  if (!layer) return null;
+
+  layer.innerHTML = page([
+    headerContext('Документ', null, {
+      kind: 'settings',
+      data: 'data-document-detail-settings',
+      aria: 'Настройки документа',
+    }),
+    `<section class="document-detail" data-document-detail>
+      ${documentTiles([
+        documentTile({
+          title: item.title || 'Документ',
+          version: visibleDocumentVersion(item),
+          meta: documentTypeText(item),
+          data: 'data-document-content-open',
+          aria: 'Открыть содержимое документа',
+        }),
+      ])}
+      ${detailReceipt(item)}
+    </section>`,
+  ]);
+
+  layer.querySelector('[data-document-content-open]')?.addEventListener('click', () => openDocument(item));
+  layer.querySelector('[data-document-detail-settings]')?.addEventListener('click', () => openDocumentDetailSettings(root, layer, item));
+  window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+  return layer;
 }
 
 function openSigningDetail(root, item) {
@@ -335,7 +443,7 @@ function renderTemplatesLayer(layer, root) {
           meta: item.sourceMode === 'CUSTOM' ? 'Ваш вариант' : 'Системный шаблон',
           data: `data-template-open="${String(item.id || '')}"`,
           aria: `Открыть шаблон ${item.title || ''}`,
-        })))
+        })), { layout: 'rail' })
       : emptyState('Шаблоны недоступны', 'Базовые шаблоны Реестра не загрузились.'),
   ]);
 
@@ -393,6 +501,7 @@ function renderTemplateEditor(layer, root, item) {
     if (!title) return;
     const saved = saveDocument({
       ...item,
+      documentClass: DOCUMENT_CLASS.CORE_LEGAL,
       title,
       text: String(form?.querySelector('[name="documentText"]')?.value || ''),
       sourceMode: 'CUSTOM',
@@ -403,6 +512,13 @@ function renderTemplateEditor(layer, root, item) {
 
   bindSettings(layer, root);
   setPrimaryVisible(primary, false);
+}
+
+function openTemplateEditor(root, item) {
+  const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'documents-template-editor' }), { stack: true });
+  if (!layer) return null;
+  renderTemplateEditor(layer, root, item);
+  return layer;
 }
 
 function userPdfStoredBytes() {
@@ -416,7 +532,7 @@ function signableSetting(checked = false) {
   return v2ListEntries([
     v2ListEntry({
       title: 'Для подписания',
-      subtitle: 'Документ можно будет выбрать в чате',
+      subtitle: 'Если включено, PDF становится пользовательским документом, а не обычным файлом',
       interactive: false,
       toggleData: 'data-document-signable',
       toggleAria: 'Разрешить использовать документ для подписания',
@@ -437,7 +553,7 @@ function renderNewDocumentEditor(layer, root, draft = {}) {
     attachment ? documentTiles([
       documentTile({
         title: draft.title || attachment.fileName || 'PDF',
-        version: 1,
+        version: '',
         meta: 'PDF',
         interactive: false,
       }),
@@ -476,6 +592,7 @@ function renderNewDocumentEditor(layer, root, draft = {}) {
       title,
       text: body,
       signable,
+      documentClass: attachment && !signable ? DOCUMENT_CLASS.FILE : DOCUMENT_CLASS.USER_DOCUMENT,
       attachment,
     });
     layer.v2Close?.();
@@ -586,7 +703,7 @@ function bindMain(root) {
   root.querySelectorAll('[data-profile-document]').forEach((control) => {
     control.addEventListener('click', () => {
       const item = currentProfileDocuments().find((document) => document.id === control.dataset.profileDocument);
-      if (item) openDocument(item);
+      if (item) openDocumentDetail(root, item);
     });
   });
 
@@ -594,13 +711,6 @@ function bindMain(root) {
     control.addEventListener('click', () => {
       const item = getConsents().find((event) => event.id === control.dataset.signingEvent);
       if (item) openSigningDetail(root, item);
-    });
-  });
-
-  root.querySelectorAll('[data-document-history-event]').forEach((control) => {
-    control.addEventListener('click', () => {
-      const item = getDocumentHistory().find((event) => event.id === control.dataset.documentHistoryEvent);
-      if (item?.snapshot) openDocument(item.snapshot);
     });
   });
 }
@@ -611,7 +721,7 @@ function renderMain(root) {
     segmentControl(VIEWS, {
       value: currentView,
       name: 'documentsView',
-      aria: 'Документы и история',
+      aria: 'Документы и история подписаний',
     }),
     `<section data-documents-content>${contentMarkup()}</section>`,
   ]);
