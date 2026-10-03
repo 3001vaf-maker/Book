@@ -37,7 +37,16 @@ assert.match(browserPush, /disableWebPush/);
 assert.match(serviceWorker, /addEventListener\('push'/);
 assert.match(serviceWorker, /addEventListener\('notificationclick'/);
 
-assert.match(notificationService, /channelsWithPush/);
+assert.doesNotMatch(notificationService, /channelsWithPush/);
+assert.match(notificationService, /policyChannels\(row\?\.channels, \{ defaultPush: !row \}\)/);
+assert.match(notificationService, /policyChannels\(input\?\.channels\)/);
+assert.match(notificationService, /policy\.channels\.includes\('PUSH'\)/);
+assert.match(notificationService, /policy\.channels\.filter\(\(channel\) => ACTIVE_EXTERNAL_CHANNELS\.has\(channel\)\)/);
+assert.match(notificationService, /policy\.mode === 'fallback' \? available\.slice\(0, 1\) : available/);
+assert.match(notificationService, /if \(policy\.mode === 'fallback'\)[\s\S]*ACTIVE_EXTERNAL_CHANNELS\.has\(nextChannel\)/);
+const routingUi = fs.readFileSync('core/notifications/routing.js', 'utf8');
+assert.doesNotMatch(routingUi, /\['PUSH', \.\.\.new Set/);
+assert.match(routingUi, /\['PUSH', 'TELEGRAM', 'EMAIL'\]\.includes\(value\)/);
 assert.match(notificationService, /listAccountEndpoints/);
 assert.match(notificationService, /dispatchNotification/);
 assert.match(pushService, /webpush\.sendNotification/);

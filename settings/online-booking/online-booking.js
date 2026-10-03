@@ -2,37 +2,44 @@ import { buildBookingLink } from '../../core/booking-link/index.js';
 import { apiRequest, getCurrentAccount } from '../../core/auth.js';
 import { ACCOUNT_APP_ORIGIN } from '../../core/environment.js';
 import {
-  BOOKING_CHOICE_STYLES,
-  BOOKING_SHAPES,
   BOOKING_SLOT_STEPS,
-  DEFAULT_BOOKING_SETTINGS,
   getBookingSettings,
   normalizeBookingSettings,
   saveBookingSettings,
 } from '../../core/booking-settings/index.js';
+import { getNotificationRouting, saveNotificationRouting } from '../../core/notifications/routing.js';
 import {
-  bookingThemePreview,
-  colorPicker,
+  button,
   copyIconButton,
   copyTextToClipboard,
   emptyState,
   escapeHtml,
   field,
-  folderList,
   iconButton,
-  initColorPickers,
   modal,
   mountModal,
+  openSharedProfileSettingsMenu,
   select,
   setCopyButtonCopied,
   textareaField,
   twoColumnLayout,
+  v2ListEntries,
+  v2ListEntry,
   workspaceHeaderContext,
 } from '../../ui/ui.js';
-import { settingsPanel } from '../../ui/settings/index.js';
 import { getWorkplaces } from '../profile/workplaces/data.js';
 
-const APPEARANCE_INFO = 'Вы задаёте настроение страницы. Расстановка экранов, календарь и логика записи остаются едиными. Карточка рабочего пространства берётся из заполненной карточки рабочего пространства.';
+const CHANNEL_OPTIONS = Object.freeze([
+  { value: 'PUSH', label: 'Push' },
+  { value: 'TELEGRAM', label: 'Telegram' },
+  { value: 'EMAIL', label: 'Email' },
+  { value: '', label: 'Не использовать' },
+]);
+
+const ROUTING_MODE_OPTIONS = Object.freeze([
+  { value: 'always', label: 'Во все выбранные каналы' },
+  { value: 'fallback', label: 'По очереди, если предыдущий не доставлен' },
+]);
 
 let publicRouteState = { profileSlug: '', workplaces: [] };
 
@@ -70,7 +77,7 @@ function bindCopyButtons(root) {
       try {
         if (await copyTextToClipboard(value)) setCopyButtonCopied(copyButton);
       } catch {
-        // The visible link remains available for manual copy if clipboard access is blocked.
+        // Ссылка остаётся видимой для ручного копирования.
       }
     });
   });
@@ -87,306 +94,262 @@ function settingsSignature(value) {
   return JSON.stringify(normalizeBookingSettings(value));
 }
 
-function settingsDraft(form, baseSettings = getBookingSettings()) {
-  const base = normalizeBookingSettings(baseSettings);
+function welcomeDraft(form, baseSettings = getBookingSettings()) {
   const data = new FormData(form);
-
-  if (form.matches('[data-online-booking-welcome]')) {
-    return normalizeBookingSettings({
-      ...base,
-      welcomeTitle: data.get('welcomeTitle'),
-      welcomeText: data.get('welcomeText'),
-    });
-  }
-
-  if (form.matches('[data-online-booking-appearance]')) {
-    return normalizeBookingSettings({
-      ...base,
-      theme: {
-        backgroundMode: data.get('backgroundMode'),
-        backgroundStart: data.get('backgroundStart'),
-        backgroundEnd: data.get('backgroundEnd'),
-        dark: data.get('dark'),
-        light: data.get('light'),
-        shape: data.get('shape'),
-        choiceStyle: data.get('choiceStyle'),
-      },
-    });
-  }
-
-  if (form.matches('[data-online-booking-time]')) {
-    return normalizeBookingSettings({
-      ...base,
-      slotStep: Number(data.get('slotStep')),
-    });
-  }
-
-  return base;
-}
-
-function setSaveVisible(root, visible) {
-  const save = root.querySelector('[data-online-booking-save]');
-  if (save) save.dataset.v2PrimaryVisible = visible ? 'true' : 'false';
-}
-
-function mountScreen(root, {
-  title,
-  body,
-  onSave = null,
-  settings = null,
-} = {}) {
-  const context = workspaceHeaderContext({
-    title,
-    a: settings ? {
-      kind: 'settings',
-      data: settings.data || '',
-      aria: settings.aria || 'Настройки',
-    } : null,
+  return normalizeBookingSettings({
+    ...baseSettings,
+    welcomeTitle: data.get('welcomeTitle'),
+    welcomeText: data.get('welcomeText'),
   });
-  const primary = onSave
-    ? '<button type="button" class="v2-primary-source-only" data-online-booking-save data-v2-primary-action data-v2-primary-label="Сохранить" data-v2-primary-visible="false" aria-label="Сохранить изменения"></button>'
-    : '';
-  root.innerHTML = `${context}${primary}<div class="online-booking-workspace-screen">${body}</div>`;
-
-  if (onSave) {
-    setSaveVisible(root, false);
-    root.querySelector('[data-online-booking-save]')?.addEventListener('click', onSave);
-  }
 }
 
+function setWelcomeSaveVisible(host, visible) {
+  const save = host?.querySelector('[data-online-booking-welcome-save]');
+  if (!save) return;
+  save.dataset.v2PrimaryVisible = visible ? 'true' : 'false';
+  window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+}
 
-function openSections(root, navigateBack, tenantId) {
-  const content = `<div class="modal-title"><h2>Настройки</h2></div>${folderList([
-    { title: 'Приветствие', data: 'data-online-booking-open="welcome"' },
-    { title: 'Внешний вид', data: 'data-online-booking-open="appearance"' },
-    { title: 'Время записи', data: 'data-online-booking-open="time"' },
-  ])}`;
-  const m = mountModal(document.body, modal(content, {
-    title: 'Настройки онлайн-записи',
-    variant: 'compact',
+function openWelcomeQ(root) {
+  const saved = getBookingSettings();
+  const content = `${workspaceHeaderContext({
+    title: 'Приветствие',
+    hideD: true,
+    c: {
+      label: 'Сохранить',
+      data: 'data-online-booking-welcome-save data-v2-primary-visible="false"',
+      aria: 'Сохранить приветствие',
+    },
+  })}
+    <form class="form-grid" data-online-booking-welcome>
+      ${field({ label: 'Заголовок', name: 'welcomeTitle', value: saved.welcomeTitle, maxlength: 90 })}
+      ${textareaField({ label: 'Текст', name: 'welcomeText', value: saved.welcomeText, rows: 6, maxlength: 500 })}
+    </form>`;
+
+  const layer = mountModal(root, modal(content, {
+    title: 'Приветствие',
+    variant: 'q',
+    className: 'online-booking-welcome-q',
+  }));
+  if (!layer) return null;
+
+  const form = layer.querySelector('[data-online-booking-welcome]');
+  const updateDirty = () => {
+    setWelcomeSaveVisible(layer, Boolean(form) && settingsSignature(welcomeDraft(form, saved)) !== settingsSignature(saved));
+  };
+  form?.addEventListener('input', updateDirty);
+  form?.addEventListener('change', updateDirty);
+  layer.querySelector('[data-online-booking-welcome-save]')?.addEventListener('click', () => {
+    if (!form) return;
+    saveBookingSettings(welcomeDraft(form, saved));
+    layer.v2Close?.();
+  });
+  updateDirty();
+  return layer;
+}
+
+function notificationPolicy(items = []) {
+  const current = (Array.isArray(items) ? items : []).find((item) => item.eventType === 'booking.created');
+  return {
+    eventType: 'booking.created',
+    mode: current?.mode === 'fallback' ? 'fallback' : 'always',
+    channels: current ? (Array.isArray(current.channels) ? current.channels : []) : ['PUSH'],
+  };
+}
+
+function channelValues(policy = {}) {
+  const values = [];
+  for (const value of Array.isArray(policy.channels) ? policy.channels : []) {
+    const channel = String(value || '').trim().toUpperCase();
+    if (!['PUSH', 'TELEGRAM', 'EMAIL'].includes(channel) || values.includes(channel)) continue;
+    values.push(channel);
+  }
+  while (values.length < 3) values.push('');
+  return values.slice(0, 3);
+}
+
+function selectedChannels(form) {
+  const data = new FormData(form);
+  const values = ['channel1', 'channel2', 'channel3']
+    .map((name) => String(data.get(name) || '').trim().toUpperCase())
+    .filter((value) => ['PUSH', 'TELEGRAM', 'EMAIL'].includes(value));
+  return [...new Set(values)];
+}
+
+function openPushInfo() {
+  const content = `<div class="modal-title"><h2>Push</h2><p>Push — дополнительное уведомление. Если выбран режим «По очереди», успешный Push не останавливает отправку: основной результат определяется Telegram или Email.</p></div>`;
+  return mountModal(document.body, modal(content, {
+    title: 'О Push',
+    variant: 'top',
     surface: 'app',
   }));
-  if (!m) return;
+}
 
-  m.querySelectorAll('[data-online-booking-open]').forEach((row) => {
-    row.addEventListener('click', () => {
-      const section = row.dataset.onlineBookingOpen;
-      m.remove();
-      if (section === 'welcome') renderWelcome(root, navigateBack, tenantId);
-      if (section === 'appearance') renderAppearance(root, navigateBack, tenantId);
-      if (section === 'time') renderTime(root, navigateBack, tenantId);
-    });
+async function openNotificationSettings() {
+  const items = await getNotificationRouting();
+  const policy = notificationPolicy(items);
+  const channels = channelValues(policy);
+  const pushInfo = v2ListEntries([
+    v2ListEntry({
+      title: 'Push',
+      interactive: false,
+      actionData: 'data-online-booking-push-info',
+      actionAria: 'О Push',
+      actionIcon: 'ⓘ',
+    }),
+  ]);
+  const body = `<div data-online-booking-notifications>
+    ${pushInfo}
+    <form class="form-grid" data-online-booking-notification-form>
+      ${select({
+        label: 'Порядок отправки',
+        name: 'mode',
+        value: policy.mode,
+        options: ROUTING_MODE_OPTIONS,
+      })}
+      ${select({ label: 'Канал 1', name: 'channel1', value: channels[0], options: CHANNEL_OPTIONS })}
+      ${select({ label: 'Канал 2', name: 'channel2', value: channels[1], options: CHANNEL_OPTIONS })}
+      ${select({ label: 'Канал 3', name: 'channel3', value: channels[2], options: CHANNEL_OPTIONS })}
+      <div class="muted" data-online-booking-notification-status aria-live="polite"></div>
+      ${button('Сохранить', { type: 'submit' })}
+    </form>
+  </div>`;
+  const layer = mountModal(document.body, modal(body, {
+    title: 'Настройки уведомлений',
+    variant: 'bottom',
+    className: 'modal--form-sheet',
+  }));
+  if (!layer) return null;
+
+  layer.querySelector('[data-online-booking-push-info]')?.addEventListener('click', openPushInfo);
+  const form = layer.querySelector('[data-online-booking-notification-form]');
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const status = layer.querySelector('[data-online-booking-notification-status]');
+    const submit = form.querySelector('button[type="submit"]');
+    if (submit) submit.disabled = true;
+    if (status) status.textContent = 'Сохраняем…';
+    try {
+      const data = new FormData(form);
+      await saveNotificationRouting('booking.created', {
+        mode: String(data.get('mode') || 'always'),
+        channels: selectedChannels(form),
+      });
+      layer.v2Close?.();
+    } catch (error) {
+      if (submit) submit.disabled = false;
+      if (status) status.textContent = error instanceof Error ? error.message : 'Не удалось сохранить';
+    }
+  });
+  return layer;
+}
+
+function openOnlineBookingSettings(root) {
+  return openSharedProfileSettingsMenu({
+    title: 'Настройки онлайн-записи',
+    actions: [
+      {
+        id: 'welcome',
+        label: 'Приветствие',
+        onSelect: () => openWelcomeQ(root),
+      },
+      {
+        id: 'notifications',
+        label: 'Настройки уведомлений',
+        onSelect: () => void openNotificationSettings(),
+      },
+    ],
   });
 }
 
-function renderReady(root, navigateBack, tenantId) {
+function openSlotStepInfo() {
+  const content = '<div class="modal-title"><h2>Шаг записи</h2><p>Шаг определяет, как часто человеку показываются возможные начала записи. Он не ограничивает произвольное время специалиста и не меняет длительность процедуры.</p></div>';
+  return mountModal(document.body, modal(content, {
+    title: 'О шаге записи',
+    variant: 'top',
+    surface: 'app',
+  }));
+}
+
+function mountScreen(root, body) {
+  root.innerHTML = `${workspaceHeaderContext({
+    title: 'Онлайн-запись',
+    a: {
+      kind: 'settings',
+      data: 'data-online-booking-settings',
+      aria: 'Настройки онлайн-записи',
+    },
+  })}<div class="online-booking-workspace-screen">${body}</div>`;
+  root.querySelector('[data-online-booking-settings]')?.addEventListener('click', () => openOnlineBookingSettings(root));
+}
+
+function renderReady(root) {
   const workplaces = getWorkplaces();
+  const saved = getBookingSettings();
   const options = [
     { value: '', label: 'Выбрать рабочее пространство' },
     ...workplaces.map((item) => ({ value: item.key, label: item.name || 'Без названия' })),
   ];
-
-  mountScreen(root, {
-    title: 'Онлайн-запись',
-    settings: {
-      label: '•••',
-      data: 'data-online-booking-sections',
-      aria: 'Настройки онлайн-записи',
-    },
-    body: `<div class="online-booking-link-stack">
-      ${copyLinkField('Общая ссылка', bookingLink(publicRouteState.profileSlug), 'general')}
-      ${select({
-        label: 'Рабочее пространство',
-        name: 'bookingWorkplace',
-        value: '',
-        options,
-        aria: 'Выбрать рабочее пространство для онлайн-записи',
-      })}
-      <div data-workplace-booking-link></div>
-    </div>`,
+  const stepControl = select({
+    label: 'Шаг записи',
+    name: 'slotStep',
+    value: String(saved.slotStep),
+    options: BOOKING_SLOT_STEPS.map((value) => ({
+      value: String(value),
+      label: value === 60 ? '1 час' : `${value} минут`,
+    })),
+    data: 'data-online-booking-slot-step',
   });
+  const stepInfo = `<div class="online-booking-info-row">${iconButton('ⓘ', {
+    data: 'data-online-booking-slot-info',
+    aria: 'О шаге записи',
+  })}</div>`;
+
+  mountScreen(root, `<div class="online-booking-link-stack">
+    ${copyLinkField('Общая ссылка', bookingLink(publicRouteState.profileSlug), 'general')}
+    ${select({
+      label: 'Рабочее пространство',
+      name: 'bookingWorkplace',
+      value: '',
+      options,
+      aria: 'Выбрать рабочее пространство для онлайн-записи',
+    })}
+    <div data-workplace-booking-link></div>
+    ${twoColumnLayout(stepControl, stepInfo, { ariaLabel: 'Шаг записи' })}
+  </div>`);
 
   bindCopyButtons(root);
-  root.querySelector('[data-online-booking-sections]')?.addEventListener('click', () => openSections(root, navigateBack, tenantId));
   root.querySelector('input[name="bookingWorkplace"]')?.addEventListener('change', (event) => {
     const host = root.querySelector('[data-workplace-booking-link]');
     if (!host) return;
     host.innerHTML = selectedWorkplaceLink(workplaces, event.target.value);
     bindCopyButtons(host);
   });
-}
-
-function renderWelcome(root, navigateBack, tenantId) {
-  const saved = getBookingSettings();
-  mountScreen(root, {
-    title: 'Приветствие',
-    onSave: () => {
-      const form = root.querySelector('[data-online-booking-welcome]');
-      if (!form) return;
-      saveBookingSettings(settingsDraft(form, saved));
-      renderWelcome(root, navigateBack, tenantId);
-    },
-    body: `<form class="form-grid" data-online-booking-welcome>
-      ${field({ label: 'Заголовок', name: 'welcomeTitle', value: saved.welcomeTitle, maxlength: 90 })}
-      ${textareaField({ label: 'Текст', name: 'welcomeText', value: saved.welcomeText, rows: 4, maxlength: 500 })}
-    </form>`,
-  });
-
-  const form = root.querySelector('[data-online-booking-welcome]');
-  if (!form) return;
-  const updateDirty = () => setSaveVisible(root, settingsSignature(settingsDraft(form, saved)) !== settingsSignature(saved));
-  form.addEventListener('input', updateDirty);
-  form.addEventListener('change', updateDirty);
-}
-
-function colorField(label, name, value) {
-  return `<div class="field"><span>${escapeHtml(label)}</span>${colorPicker({ name, value })}</div>`;
-}
-
-function openAppearanceInfo() {
-  mountModal(document.body, modal(`<div class="modal-title"><h2>Внешний вид</h2><p>${escapeHtml(APPEARANCE_INFO)}</p></div>`, {
-    title: 'О внешнем виде онлайн-записи',
-    variant: 'compact',
-    surface: 'app',
-  }));
-}
-
-function openAppearanceActions(root, navigateBack, tenantId, form, saved) {
-  const m = mountModal(document.body, modal(`<div class="modal-title"><h2>Действия</h2></div>${settingsPanel([
-    { label: 'Отменить', data: 'data-online-booking-appearance-cancel', aria: 'Отменить изменения', variant: 'outline' },
-    { label: 'Сбросить', data: 'data-online-booking-appearance-reset', aria: 'Сбросить к стандартному дизайну Book', variant: 'outline' },
-  ])}`, {
-    title: 'Действия внешнего вида',
-    variant: 'compact',
-    surface: 'app',
-  }));
-  if (!m) return;
-
-  m.querySelector('[data-online-booking-appearance-cancel]')?.addEventListener('click', () => {
-    m.remove();
-    renderAppearance(root, navigateBack, tenantId);
-  });
-  m.querySelector('[data-online-booking-appearance-reset]')?.addEventListener('click', () => {
-    const current = settingsDraft(form, saved);
-    m.remove();
-    renderAppearance(root, navigateBack, tenantId, {
-      ...current,
-      theme: { ...DEFAULT_BOOKING_SETTINGS.theme },
+  root.querySelector('[data-online-booking-slot-step]')?.addEventListener('change', (event) => {
+    saveBookingSettings({
+      ...getBookingSettings(),
+      slotStep: Number(event.currentTarget.value),
     });
   });
+  root.querySelector('[data-online-booking-slot-info]')?.addEventListener('click', openSlotStepInfo);
 }
 
-function renderAppearance(root, navigateBack, tenantId, initialSettings = null) {
-  const saved = getBookingSettings();
-  const settings = normalizeBookingSettings(initialSettings || saved);
-  const backgroundColors = twoColumnLayout(
-    colorField('Цвет фона', 'backgroundStart', settings.theme.backgroundStart),
-    colorField('Второй цвет фона', 'backgroundEnd', settings.theme.backgroundEnd),
-    { ariaLabel: 'Цвета фона' },
-  );
-  const interfaceColors = twoColumnLayout(
-    colorField('Тёмный цвет', 'dark', settings.theme.dark),
-    colorField('Светлый цвет', 'light', settings.theme.light),
-    { ariaLabel: 'Цвета интерфейса' },
-  );
-
-  mountScreen(root, {
-    title: 'Внешний вид',
-    onSave: () => {
-      const form = root.querySelector('[data-online-booking-appearance]');
-      if (!form) return;
-      saveBookingSettings(settingsDraft(form, saved));
-      renderAppearance(root, navigateBack, tenantId);
-    },
-    settings: {
-      label: '•••',
-      data: 'data-online-booking-appearance-actions',
-      aria: 'Действия внешнего вида',
-    },
-    body: `<div class="online-booking-info-row">${iconButton('ⓘ', { data: 'data-online-booking-appearance-info', aria: 'О настройках внешнего вида' })}</div>
-      <form class="form-grid" data-online-booking-appearance>
-        ${select({
-          label: 'Фон',
-          name: 'backgroundMode',
-          value: settings.theme.backgroundMode,
-          options: [{ value: 'solid', label: 'Однотонный' }, { value: 'gradient', label: 'Градиент' }],
-        })}
-        <div class="online-booking-color-grid">${backgroundColors}</div>
-        <div class="online-booking-color-grid">${interfaceColors}</div>
-        ${select({ label: 'Форма элементов', name: 'shape', value: settings.theme.shape, options: BOOKING_SHAPES })}
-        ${select({ label: 'Вид выбора', name: 'choiceStyle', value: settings.theme.choiceStyle, options: BOOKING_CHOICE_STYLES })}
-        <div data-online-booking-preview>${bookingThemePreview(settings)}</div>
-      </form>`,
-  });
-
-  const form = root.querySelector('[data-online-booking-appearance]');
-  if (!form) return;
-  initColorPickers(form);
-
-  const updatePreview = () => {
-    const draft = settingsDraft(form, saved);
-    const host = root.querySelector('[data-online-booking-preview]');
-    if (host) host.innerHTML = bookingThemePreview(draft);
-    setSaveVisible(root, settingsSignature(draft) !== settingsSignature(saved));
-  };
-  form.addEventListener('input', updatePreview);
-  form.addEventListener('change', updatePreview);
-  setSaveVisible(root, settingsSignature(settings) !== settingsSignature(saved));
-
-  root.querySelector('[data-online-booking-appearance-info]')?.addEventListener('click', openAppearanceInfo);
-  root.querySelector('[data-online-booking-appearance-actions]')?.addEventListener('click', () => openAppearanceActions(root, navigateBack, tenantId, form, saved));
+function renderUnavailable(root, title, message) {
+  mountScreen(root, emptyState(title, message));
 }
 
-function renderTime(root, navigateBack, tenantId) {
-  const saved = getBookingSettings();
-  mountScreen(root, {
-    title: 'Время записи',
-    onSave: () => {
-      const form = root.querySelector('[data-online-booking-time]');
-      if (!form) return;
-      saveBookingSettings(settingsDraft(form, saved));
-      renderTime(root, navigateBack, tenantId);
-    },
-    body: `<form class="form-grid" data-online-booking-time>
-      ${select({
-        label: 'Шаг доступного времени',
-        name: 'slotStep',
-        value: String(saved.slotStep),
-        options: BOOKING_SLOT_STEPS.map((value) => ({ value: String(value), label: value === 60 ? '1 час' : `${value} минут` })),
-      })}
-      <div class="muted">Шаг определяет, как часто человеку показываются возможные начала записи. Длительность процедур при этом не меняется.</div>
-    </form>`,
-  });
-
-  const form = root.querySelector('[data-online-booking-time]');
-  if (!form) return;
-  const updateDirty = () => setSaveVisible(root, settingsSignature(settingsDraft(form, saved)) !== settingsSignature(saved));
-  form.addEventListener('input', updateDirty);
-  form.addEventListener('change', updateDirty);
-}
-
-function renderUnavailable(root, navigateBack, title, message) {
-  mountScreen(root, {
-    title: 'Онлайн-запись',
-    body: emptyState(title, message),
-  });
-}
-
-export function render(root, navigateBack = () => {}) {
-  mountScreen(root, {
-    title: 'Онлайн-запись',
-    body: emptyState('Загрузка', 'Формируем ссылки онлайн-записи.'),
-  });
+export function render(root) {
+  root.innerHTML = `${workspaceHeaderContext({ title: 'Онлайн-запись' })}${emptyState('Загрузка', 'Формируем ссылки онлайн-записи.')}`;
 
   void Promise.all([getCurrentAccount(), loadOwnerPublicRoute()])
     .then(([account, publicRoute]) => {
       const tenantId = String(account?.tenant?.id || '');
       if (!tenantId || !publicRoute.profileSlug) {
-        renderUnavailable(root, navigateBack, 'Ссылка недоступна', 'Не удалось определить адрес онлайн-записи.');
+        renderUnavailable(root, 'Ссылка недоступна', 'Не удалось определить адрес онлайн-записи.');
         return;
       }
       publicRouteState = publicRoute;
-      renderReady(root, navigateBack, tenantId);
+      renderReady(root);
     })
-    .catch(() => renderUnavailable(root, navigateBack, 'Ссылка недоступна', 'Не удалось сформировать ссылку онлайн-записи.'));
+    .catch(() => renderUnavailable(root, 'Ссылка недоступна', 'Не удалось сформировать ссылку онлайн-записи.'));
 }

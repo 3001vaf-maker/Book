@@ -11,10 +11,9 @@ export async function getNotificationRouting() {
 }
 
 export async function saveNotificationRouting(eventType, { mode = 'always', channels = [] } = {}) {
-  const external = (Array.isArray(channels) ? channels : [])
+  const normalizedChannels = [...new Set((Array.isArray(channels) ? channels : [])
     .map((value) => String(value || '').trim().toUpperCase())
-    .filter((value) => value && value !== 'PUSH');
-  const normalizedChannels = ['PUSH', ...new Set(external)];
+    .filter((value) => ['PUSH', 'TELEGRAM', 'EMAIL'].includes(value)))];
   return payload(await apiRequest(`/notifications/routing/${encodeURIComponent(eventType)}`, {
     method: 'PUT',
     body: JSON.stringify({ mode, channels: normalizedChannels }),

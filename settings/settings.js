@@ -5,7 +5,6 @@ const folders = [
   ['profile', 'Профиль', '◫', () => import('./profile/profile.js'), 'profile.access'],
   ['service', 'Сервис', '◫', () => import('./service/service.js'), 'services.access'],
   ['online-booking', 'Онлайн-запись', '◫', () => import('./online-booking/online-booking.js'), 'online_booking.access'],
-  ['communications', 'Уведомления', '◫', () => import('./communications/communications.js'), 'notifications.access'],
   ['integrations', 'Интеграции', '◫', () => import('./integrations/integrations.js'), 'integrations.access'],
   ['documents', 'Документы', '◫', () => import('./documents/documents.js'), 'documents.access'],
   ['tags', 'Ярлыки', '◫', () => import('./tags/tags.js'), 'tags.access'],

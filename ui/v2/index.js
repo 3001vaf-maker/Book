@@ -379,13 +379,17 @@ function initV2LayerDismissGesture(node, { kind = 'standard', onDismiss = null, 
 const v2ModalSurfaceLocks = new WeakMap();
 
 function activeV2ModalSurface(root = null) {
-  if (root?.matches?.('[data-v2-z-layer], [data-v2-z]')) return root;
-  const closest = root?.closest?.('[data-v2-z-layer], [data-v2-z]');
-  if (closest) return closest;
-  const app = root?.closest?.('[data-v2-app]') || document.querySelector('[data-v2-app]');
+  const explicit = root?.matches?.('[data-v2-z-layer], [data-v2-z]')
+    ? root
+    : root?.closest?.('[data-v2-z-layer], [data-v2-z]');
+  const app = explicit?.closest?.('[data-v2-app]')
+    || root?.closest?.('[data-v2-app]')
+    || document.querySelector('[data-v2-app]');
   const layers = [...(app?.querySelectorAll?.('[data-v2-z-layer]') || [])];
-  return layers.at(-1)
-    || app?.querySelector?.('[data-v2-front] > [data-v2-z]')
+  const topLayer = layers.at(-1);
+  if (topLayer) return topLayer;
+  if (explicit) return explicit;
+  return app?.querySelector?.('[data-v2-front] > [data-v2-z]')
     || document.querySelector('.app-content')
     || document.querySelector('#app');
 }

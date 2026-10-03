@@ -337,6 +337,9 @@ window.addEventListener('unhandledrejection', (event) => failures.push(stage + '
 mark('import-core');
 try {
   await import('/core.js');
+  const sharedUi = await import('/ui/ui.js');
+  window.__runtimeSharedModal = sharedUi.modal;
+  window.__runtimeMountSharedModal = sharedUi.mountModal;
 } catch (error) {
   document.documentElement.dataset.professionalRuntime = 'fail';
   document.documentElement.dataset.professionalRuntimeStage = 'import-core-error';
@@ -1146,6 +1149,25 @@ ok(Boolean(serviceZ2?.querySelector('[data-mini-card-rail] .mini-card')), 'Proce
 ok(serviceZ2?.querySelector('.mini-card__title')?.textContent?.trim() === 'Студия Тест', 'Procedure Z2 miniCard does not represent assigned workplace');
 ok(!serviceZ2?.querySelector('.entity-visual-card--service button'), 'Procedure main card must not contain action buttons');
 ok(!serviceZ2?.querySelector('[data-mini-card-rail] button'), 'Procedure workplace miniCards must not contain action buttons');
+
+mark('q-return-to-active-z2');
+const qReturnProbe = window.__runtimeMountSharedModal(serviceSurface, window.__runtimeSharedModal(
+  '<div data-q-return-probe>Q return probe</div>',
+  { title:'Q return probe', variant:'q' },
+));
+await wait(45);
+ok(Boolean(qReturnProbe), 'Q return probe did not open');
+ok(serviceZ2?.classList.contains('has-v2-layer'), 'Q opened from active Z2 must be owned by that Z2');
+ok(!serviceSurface?.classList.contains('has-v2-layer'), 'Q must not attach to the lower Z1 when Z2 is active');
+const qReturnSheet = qReturnProbe?.querySelector('.v2-layer');
+pointer(qReturnSheet,'pointerdown',80,300,181);
+pointer(qReturnSheet,'pointermove',180,302,181);
+pointer(qReturnSheet,'pointerup',180,302,181);
+await wait(220);
+ok(!document.querySelector('[data-q-return-probe]'), 'Q swipe must close Q');
+ok(serviceZ2?.isConnected, 'Q swipe must return to the source Z2 instead of closing it');
+ok([...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1) === serviceZ2, 'Q swipe must preserve the exact active Z2');
+ok(!shell()?.classList.contains('is-deck-open') && !shell()?.classList.contains('is-e-open'), 'Q swipe must not reveal F/E');
 
 shell()?.querySelector('[data-v2-workspace-a]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
 await wait(40);

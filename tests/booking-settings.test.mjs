@@ -12,27 +12,13 @@ const settings = normalizeBookingSettings({
   welcomeTitle: 'Привет',
   welcomeText: 'Буду рад встрече',
   slotStep: 60,
-  theme: {
-    backgroundMode: 'gradient',
-    backgroundStart: '#112233',
-    backgroundEnd: '#445566',
-    dark: '#001122',
-    light: '#DDEEFF',
-    shape: 'cut',
-    choiceStyle: 'compact',
-  },
 });
 
 assert.equal(settings.welcomeTitle, 'Привет');
 assert.equal(settings.slotStep, 60);
-assert.equal(settings.theme.backgroundMode, 'gradient');
-assert.equal(settings.theme.shape, 'cut');
-assert.equal(settings.theme.choiceStyle, 'compact');
-assert.equal(settings.theme.dark, '#001122');
+assert.equal('theme' in settings, false);
 
-const invalid = normalizeBookingSettings({ slotStep: 7, theme: { shape: 'broken', dark: 'red' } });
+const invalid = normalizeBookingSettings({ slotStep: 7 });
 assert.equal(invalid.slotStep, 15);
-assert.equal(invalid.theme.shape, 'soft');
-assert.equal(invalid.theme.dark, '#3B302B');
 
 console.log('booking settings tests passed');
