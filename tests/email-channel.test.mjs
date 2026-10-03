@@ -6,7 +6,7 @@ const dispatch = fs.readFileSync('server/src/communication/communication-dispatc
 const emailChannel = fs.readFileSync('server/src/communication/email-channel.service.ts', 'utf8');
 const notification = fs.readFileSync('server/src/notification/notification.service.ts', 'utf8');
 const broadcast = fs.readFileSync('server/src/communication/communication-broadcast.service.ts', 'utf8');
-const compose = fs.readFileSync('settings/communications/broadcasts/compose/compose.js', 'utf8');
+const compose = fs.readFileSync('chat/chat.js', 'utf8');
 const transactional = fs.readFileSync('server/src/transactional-email/transactional-email.service.ts', 'utf8');
 const envExample = fs.readFileSync('server/.env.example', 'utf8');
 
