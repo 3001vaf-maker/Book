@@ -86,7 +86,9 @@ assert.match(settings, /services\.access/);
 assert.match(settings, /online_booking\.access/);
 assert.match(profile, /workplaces\.access/);
 
-assert.match(core, /section === 'finance' \|\| section === 'journal' \|\| section === 'settings'/);
+assert.match(core, /section === 'finance' \|\| section === 'settings'/);
+assert.match(core, /journalView: 'day'/);
+assert.doesNotMatch(core, /secondary\.journal/);
 assert.match(core, /children\.length === 1 \? children\[0\]\.label : definition\.label/);
 assert.match(core, /children\.length > 1 \? children\.length : 0/);
 assert.match(core, /childItems\.length > 1 \? v2CardDeck/);
