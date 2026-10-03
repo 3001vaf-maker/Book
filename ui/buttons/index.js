@@ -17,8 +17,16 @@ export function iconButton(label, { className = '', data = '', aria = label } = 
   return `<button type="button" class="icon-button ${className}" ${data} aria-label="${escapeHtml(aria)}">${label}</button>`;
 }
 
+export function smallActionButton({ icon = 'info', className = '', data = '', aria = '' } = {}) {
+  const kind = icon === 'copy' ? 'copy' : 'info';
+  const content = kind === 'copy'
+    ? '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"></rect><path d="M16 8V7a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h1"></path></svg><span class="small-action-button__done" aria-hidden="true">✓</span>'
+    : '<span class="small-action-button__info" aria-hidden="true">i</span>';
+  return `<button type="button" class="small-action-button small-action-button--${kind}${kind === 'copy' ? ' copy-icon-button' : ''}${className ? ` ${className}` : ''}" ${data} aria-label="${escapeHtml(aria || (kind === 'copy' ? 'Скопировать' : 'Информация'))}">${content}</button>`;
+}
+
 export function copyIconButton({ data = '', aria = 'Скопировать' } = {}) {
-  return `<button type="button" class="icon-button copy-icon-button" ${data} aria-label="${escapeHtml(aria)}"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"></rect><path d="M16 8V7a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h1"></path></svg><span class="copy-icon-button__done" aria-hidden="true">✓</span></button>`;
+  return smallActionButton({ icon: 'copy', data, aria });
 }
 
 export function setCopyButtonCopied(button, { timeout = 1400 } = {}) {

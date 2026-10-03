@@ -55,7 +55,9 @@ assert.match(schemaSource, /model BookingPublicRoute/);
 assert.match(schemaSource, /@@unique\(\[scopeKey, slug\]\)/);
 assert.match(schemaSource, /@@unique\(\[entityType, entityId\]\)/);
 
+assert.match(buttonsSource, /export function smallActionButton/);
 assert.match(buttonsSource, /export function copyIconButton/);
+assert.match(buttonsSource, /return smallActionButton\(\{ icon: 'copy'/);
 assert.match(buttonsSource, /<svg viewBox="0 0 24 24"/);
 assert.match(buttonsSource, /export async function copyTextToClipboard/);
 
@@ -66,7 +68,9 @@ assert.match(bookingSource, /label: 'Приветствие'/);
 assert.match(bookingSource, /label: 'Настройки уведомлений'/);
 assert.match(bookingSource, /variant: 'q'/);
 assert.match(bookingSource, /data-online-booking-welcome-save/);
-assert.match(bookingSource, /label: 'Шаг записи'/);
+assert.match(bookingSource, /<span>Шаг записи<\/span>/);
+assert.match(bookingSource, /smallActionButton\(\{[\s\S]*icon: 'info'/);
+assert.doesNotMatch(bookingSource, /iconButton\(|v2ListEntry\(|v2ListEntries\(|twoColumnLayout\(/);
 assert.match(bookingSource, /label: 'Порядок отправки'/);
 assert.match(bookingSource, /label: 'Канал 1'/);
 assert.match(bookingSource, /label: 'Канал 2'/);
@@ -74,3 +78,6 @@ assert.match(bookingSource, /label: 'Канал 3'/);
 assert.match(bookingSource, /value: 'PUSH', label: 'Push'/);
 assert.doesNotMatch(bookingSource, /Внешний вид|renderAppearance|BOOKING_SHAPES|BOOKING_CHOICE_STYLES|bookingThemePreview/);
 assert.doesNotMatch(settingsSource, /'communications', 'Уведомления'/);
+
+assert.match(bookingSource, /online-booking-inline-label/);
+assert.match(bookingSource, /online-booking-copy-row/);

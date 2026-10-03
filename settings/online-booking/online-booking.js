@@ -15,16 +15,13 @@ import {
   emptyState,
   escapeHtml,
   field,
-  iconButton,
   modal,
   mountModal,
   openSharedProfileSettingsMenu,
   select,
+  smallActionButton,
   setCopyButtonCopied,
   textareaField,
-  twoColumnLayout,
-  v2ListEntries,
-  v2ListEntry,
   workspaceHeaderContext,
 } from '../../ui/ui.js';
 import { getWorkplaces } from '../profile/workplaces/data.js';
@@ -66,7 +63,7 @@ function bookingLink(profileSlug, workplaceSlug = '') {
 }
 
 function copyLinkField(label, value, kind) {
-  return `<div class="field"><span>${escapeHtml(label)}</span><div class="array-row"><input type="text" value="${escapeHtml(value)}" readonly aria-label="${escapeHtml(label)}">${copyIconButton({ data: `data-copy-booking-link="${escapeHtml(kind)}"`, aria: `Скопировать: ${label}` })}</div></div>`;
+  return `<div class="field"><span>${escapeHtml(label)}</span><div class="array-row online-booking-copy-row"><input type="text" value="${escapeHtml(value)}" readonly aria-label="${escapeHtml(label)}">${copyIconButton({ data: `data-copy-booking-link="${escapeHtml(kind)}"`, aria: `Скопировать: ${label}` })}</div></div>`;
 }
 
 function bindCopyButtons(root) {
@@ -189,18 +186,14 @@ async function openNotificationSettings() {
   const items = await getNotificationRouting();
   const policy = notificationPolicy(items);
   const channels = channelValues(policy);
-  const pushInfo = v2ListEntries([
-    v2ListEntry({
-      title: 'Push',
-      interactive: false,
-      actionData: 'data-online-booking-push-info',
-      actionAria: 'О Push',
-      actionIcon: 'ⓘ',
-    }),
-  ]);
+  const pushInfo = `<div class="online-booking-inline-label"><span>Push</span>${smallActionButton({
+    icon: 'info',
+    data: 'data-online-booking-push-info',
+    aria: 'О Push',
+  })}</div>`;
   const body = `<div data-online-booking-notifications>
-    ${pushInfo}
     <form class="form-grid" data-online-booking-notification-form>
+      ${pushInfo}
       ${select({
         label: 'Порядок отправки',
         name: 'mode',
@@ -291,7 +284,7 @@ function renderReady(root) {
     ...workplaces.map((item) => ({ value: item.key, label: item.name || 'Без названия' })),
   ];
   const stepControl = select({
-    label: 'Шаг записи',
+    label: '',
     name: 'slotStep',
     value: String(saved.slotStep),
     options: BOOKING_SLOT_STEPS.map((value) => ({
@@ -300,10 +293,11 @@ function renderReady(root) {
     })),
     data: 'data-online-booking-slot-step',
   });
-  const stepInfo = `<div class="online-booking-info-row">${iconButton('ⓘ', {
+  const stepInfo = smallActionButton({
+    icon: 'info',
     data: 'data-online-booking-slot-info',
     aria: 'О шаге записи',
-  })}</div>`;
+  });
 
   mountScreen(root, `<div class="online-booking-link-stack">
     ${copyLinkField('Общая ссылка', bookingLink(publicRouteState.profileSlug), 'general')}
@@ -315,7 +309,10 @@ function renderReady(root) {
       aria: 'Выбрать рабочее пространство для онлайн-записи',
     })}
     <div data-workplace-booking-link></div>
-    ${twoColumnLayout(stepControl, stepInfo, { ariaLabel: 'Шаг записи' })}
+    <div class="online-booking-setting">
+      <div class="online-booking-inline-label"><span>Шаг записи</span>${stepInfo}</div>
+      ${stepControl}
+    </div>
   </div>`);
 
   bindCopyButtons(root);

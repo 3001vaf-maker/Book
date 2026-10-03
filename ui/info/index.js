@@ -1,4 +1,5 @@
 import { escapeHtml } from '../utils/escape-html.js';
+import { smallActionButton } from '../buttons/index.js';
 
 let infoSequence = 0;
 
@@ -13,11 +14,16 @@ export function infoUI(message = '', {
   const classes = ['ui-info', inverse ? 'ui-info--inverse' : '', className].filter(Boolean).join(' ');
   if (actionOnly) {
     return `<span class="${escapeHtml(classes)}" data-info-ui${data ? ` ${data}` : ''}>
-      <button type="button" class="ui-info__trigger" data-info-trigger aria-label="${escapeHtml(aria)}">i</button>
+      ${smallActionButton({ icon: 'info', className: 'ui-info__trigger', data: 'data-info-trigger', aria })}
     </span>`;
   }
   return `<span class="${escapeHtml(classes)}" data-info-ui${data ? ` ${data}` : ''}>
-    <button type="button" class="ui-info__trigger" data-info-trigger aria-label="${escapeHtml(aria)}" aria-expanded="false" aria-controls="${id}">i</button>
+    ${smallActionButton({
+      icon: 'info',
+      className: 'ui-info__trigger',
+      data: `data-info-trigger aria-expanded="false" aria-controls="${id}"`,
+      aria,
+    })}
     <span class="ui-info__panel" id="${id}" data-info-panel role="note" hidden>${escapeHtml(message)}</span>
   </span>`;
 }
