@@ -3,6 +3,7 @@ import { join, relative } from 'node:path';
 
 const root = process.cwd();
 const featureRoots = ['core/people', 'core/finance', 'settings', 'timetable', 'journal', 'chat'];
+const modalLifecycleRoots = ['ui', ...featureRoots];
 const errors = [];
 
 function walk(dir) {
@@ -25,6 +26,19 @@ for (const file of featureRoots.flatMap((dir) => walk(join(root, dir)))) {
   for (const eventName of new Set(addedWindowEvents)) {
     if (!removedWindowEvents.has(eventName)) {
       errors.push(`${relativePath}: window listener "${eventName}" has no matching cleanup`);
+    }
+  }
+}
+
+for (const file of modalLifecycleRoots.flatMap((dir) => walk(join(root, dir)))) {
+  const source = readFileSync(file, 'utf8');
+  const relativePath = relative(root, file).replaceAll('\\', '/');
+  const mountedLayers = [...source.matchAll(/(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(mountModal|mountV2Layer)\s*\(/g)];
+
+  for (const [, variableName, mountFunction] of mountedLayers) {
+    const rawRemove = new RegExp(`\\b${variableName}\\s*\\??\\.\\s*remove\\s*\\(`);
+    if (rawRemove.test(source)) {
+      errors.push(`${relativePath}: ${variableName} is created by ${mountFunction} and must close through v2Close(), never remove()`);
     }
   }
 }
