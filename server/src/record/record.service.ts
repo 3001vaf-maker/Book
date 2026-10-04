@@ -125,7 +125,6 @@ export class RecordService {
         return id
           && id !== excludeRecordId
           && !cancelled.has(id)
-          && text(record?.status) !== 'cancelled'
           && text(record?.workplaceId) === workplaceId
           && dateValue(record?.date) === date;
       })
@@ -256,7 +255,7 @@ export class RecordService {
       .map((row) => objectValue(row.data))
       .filter((record) => {
         const id = text(record.id);
-        return id && !cancelled.has(id) && text(record.status) !== 'cancelled';
+        return id && !cancelled.has(id);
       })
       .map((record) => ({
         id: text(record.id),
@@ -270,12 +269,12 @@ export class RecordService {
   }
 
   private projectLifecycle(record: JsonObject, events: JsonObject[]) {
-    let status = text(record?.status) === 'cancelled' ? 'cancelled' : 'active';
-    let confirmed = Boolean(record?.confirmed);
-    let attendance = ['arrived', 'no-show'].includes(text(record?.attendance)) ? text(record.attendance) : '';
-    let confirmedAt = text(record?.confirmedAt);
-    let attendanceAt = text(record?.attendanceAt);
-    let cancelledAt = text(record?.cancelledAt);
+    let status = 'active';
+    let confirmed = false;
+    let attendance = '';
+    let confirmedAt = '';
+    let attendanceAt = '';
+    let cancelledAt = '';
     const ordered = events.slice().sort((left, right) => String(left?.at || '').localeCompare(String(right?.at || '')));
     for (const event of ordered) {
       const type = text(event?.type);
@@ -335,7 +334,7 @@ export class RecordService {
         tenantId,
         'record',
         text(record.id),
-        objectValue(record.finance).items ? record.finance : fallbackSettlement,
+        fallbackSettlement,
       ) || fallbackSettlement;
       const payment = await this.finance.recordSettlementPaymentState(tenantId, text(record.id), settlement);
       result.push({
@@ -422,7 +421,7 @@ export class RecordService {
       tenantId,
       'record',
       id,
-      objectValue(current.finance).items ? current.finance : currentFallbackSettlement,
+      currentFallbackSettlement,
     ) || currentFallbackSettlement;
 
     const nextSettlementSources = [
