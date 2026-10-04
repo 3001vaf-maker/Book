@@ -102,7 +102,6 @@ function currentProfileDocuments() {
   const grouped = new Map();
   getDocuments().forEach((item) => {
     if (item?.hidden) return;
-    if (item?.attachment?.legacyFormat === 'PRE_REGISTRY_TEMPLATE') return;
     const key = String(item.id || '');
     if (!key) return;
     const current = grouped.get(key);
