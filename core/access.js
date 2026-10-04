@@ -2,7 +2,7 @@ import { apiRequest } from './auth.js';
 
 let currentAccess = {
   tenantId: '',
-  status: 'LEGACY_COMPAT',
+  status: 'ACTIVE',
   isOwnerBook: false,
   commercialMode: '',
   demoActivatedAt: '',
@@ -58,7 +58,7 @@ export function getBookCapability(key) {
 export function canUseBookCapability(key) {
   if (currentAccess.status === 'SUSPENDED') return false;
   const capability = getBookCapability(key);
-  if (!capability) return currentAccess.status === 'LEGACY_COMPAT' || currentAccess.isOwnerBook === true;
+  if (!capability) return currentAccess.isOwnerBook === true;
   if (capability.valueType !== 'BOOLEAN') return true;
   return capability.enabled === true;
 }
