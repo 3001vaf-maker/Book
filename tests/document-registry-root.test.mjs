@@ -21,7 +21,7 @@ for (const item of [...bookDocs, ...userBases]) {
 const admin = readFileSync(new URL('../admin/admin.js', import.meta.url), 'utf8');
 const view = readFileSync(new URL('../admin/document-registry/view.js', import.meta.url), 'utf8');
 const history = readFileSync(new URL('../admin/document-registry/history.js', import.meta.url), 'utf8');
-const documentRuntime = readFileSync(new URL('../core/runtime/document-state.js', import.meta.url), 'utf8');
+const documentRuntime = readFileSync(new URL('../core/runtime/tenant-document-archive.js', import.meta.url), 'utf8');
 const controller = readFileSync(new URL('../server/src/saas-admin/saas-admin.controller.ts', import.meta.url), 'utf8');
 const tenantController = readFileSync(new URL('../server/src/tenant-document-archive/tenant-document-archive.controller.ts', import.meta.url), 'utf8');
 const tenantModule = readFileSync(new URL('../server/src/tenant-document-archive/tenant-document-archive.module.ts', import.meta.url), 'utf8');
