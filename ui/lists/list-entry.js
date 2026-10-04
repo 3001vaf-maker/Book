@@ -107,6 +107,7 @@ export function initV2ListReorder(root, {
   let timer = 0;
   let active = null;
   let source = null;
+  let pointerId = null;
   let startX = 0;
   let startY = 0;
   let suppressClick = false;
@@ -117,33 +118,38 @@ export function initV2ListReorder(root, {
     if (timer) window.clearTimeout(timer);
     timer = 0;
   };
-  const finish = (commit = false) => {
+  const resetState = () => {
     clearTimer();
     if (active) active.classList.remove('is-reordering');
     host.classList.remove('is-reordering');
-    const hadActive = Boolean(active);
     active = null;
     source = null;
+    pointerId = null;
+  };
+  const finish = (commit = false) => {
+    const hadActive = Boolean(active);
     if (commit && hadActive) {
       const ids = entries().map(valueOf).filter(Boolean);
       if (ids.length) onReorder(ids);
       suppressClick = true;
-      window.setTimeout(() => { suppressClick = false; }, 0);
     }
+    resetState();
   };
   const activate = () => {
     timer = 0;
-    if (!source?.isConnected) return;
+    if (!source?.isConnected || pointerId == null) return;
     active = source;
     active.classList.add('is-reordering');
     host.classList.add('is-reordering');
     suppressClick = true;
+    try { source.setPointerCapture?.(pointerId); } catch {}
   };
-  const schedule = (node, x, y) => {
+  const schedule = (node, event) => {
     finish(false);
     source = node;
-    startX = x;
-    startY = y;
+    pointerId = event.pointerId;
+    startX = event.clientX;
+    startY = event.clientY;
     timer = window.setTimeout(activate, Math.max(250, Number(holdMs) || 360));
   };
   const moveActive = (clientY) => {
@@ -160,43 +166,37 @@ export function initV2ListReorder(root, {
     else host.insertBefore(active, target.nextSibling);
   };
 
-  const onTouchStart = (event) => {
-    if (event.touches.length !== 1) return;
-    const node = event.target.closest(selector);
-    if (!node || !host.contains(node)) return;
-    const touch = event.touches[0];
-    schedule(node, touch.clientX, touch.clientY);
-  };
-  const onTouchMove = (event) => {
-    if (event.touches.length !== 1 || !source) return;
-    const touch = event.touches[0];
-    if (!active) {
-      if (Math.hypot(touch.clientX - startX, touch.clientY - startY) > 7) finish(false);
-      return;
-    }
-    event.preventDefault();
-    moveActive(touch.clientY);
-  };
-  const onTouchEnd = () => finish(Boolean(active));
-
   const onPointerDown = (event) => {
-    if (event.pointerType === 'touch' || (event.pointerType === 'mouse' && event.button !== 0)) return;
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
     const node = event.target.closest(selector);
     if (!node || !host.contains(node)) return;
-    schedule(node, event.clientX, event.clientY);
+    schedule(node, event);
   };
   const onPointerMove = (event) => {
-    if (!source || event.pointerType === 'touch') return;
+    if (!source || event.pointerId !== pointerId) return;
     if (!active) {
-      if (Math.hypot(event.clientX - startX, event.clientY - startY) > 7) finish(false);
+      if (Math.hypot(event.clientX - startX, event.clientY - startY) > 7) resetState();
       return;
     }
     event.preventDefault();
     moveActive(event.clientY);
   };
   const onPointerUp = (event) => {
-    if (event.pointerType === 'touch') return;
-    finish(Boolean(active));
+    if (!source || event.pointerId !== pointerId) return;
+    if (active) {
+      try {
+        if (source.hasPointerCapture?.(event.pointerId)) source.releasePointerCapture?.(event.pointerId);
+      } catch {}
+      finish(true);
+      return;
+    }
+    // A short press is a normal tap/click. Do not cancel or synthesize it:
+    // the entry's native click handler must remain the only activation path.
+    resetState();
+  };
+  const onPointerCancel = (event) => {
+    if (pointerId != null && event.pointerId !== pointerId) return;
+    resetState();
   };
   const onClick = (event) => {
     if (!suppressClick) return;
@@ -207,24 +207,18 @@ export function initV2ListReorder(root, {
     suppressClick = false;
   };
 
-  host.addEventListener('touchstart', onTouchStart, { passive: true });
-  host.addEventListener('touchmove', onTouchMove, { passive: false });
-  host.addEventListener('touchend', onTouchEnd);
-  host.addEventListener('touchcancel', () => finish(false));
-  host.addEventListener('pointerdown', onPointerDown);
+  host.addEventListener('pointerdown', onPointerDown, { passive: true });
   host.addEventListener('pointermove', onPointerMove, { passive: false });
   host.addEventListener('pointerup', onPointerUp);
-  host.addEventListener('pointercancel', () => finish(false));
+  host.addEventListener('pointercancel', onPointerCancel);
   host.addEventListener('click', onClick, true);
 
   return () => {
-    finish(false);
-    host.removeEventListener('touchstart', onTouchStart);
-    host.removeEventListener('touchmove', onTouchMove);
-    host.removeEventListener('touchend', onTouchEnd);
+    resetState();
     host.removeEventListener('pointerdown', onPointerDown);
     host.removeEventListener('pointermove', onPointerMove);
     host.removeEventListener('pointerup', onPointerUp);
+    host.removeEventListener('pointercancel', onPointerCancel);
     host.removeEventListener('click', onClick, true);
   };
 }
