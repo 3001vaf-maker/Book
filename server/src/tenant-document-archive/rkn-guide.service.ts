@@ -220,7 +220,6 @@ export class RknGuideService {
 
     const template = await this.template();
     const archive = await this.documentArchive.get(tenantId);
-    if (!archive?.verified) throw new ConflictException('Архив документов ещё не готов');
     const documents = arrayValue(archive?.data?.documents);
     const helperState = objectValue(objectValue(archive?.data?.helpers).rkn);
     const rememberedSnapshot = objectValue(helperState.snapshot);
