@@ -46,15 +46,25 @@ assert.match(
   /function\s+openTimetableSettingsMenu\(\)[\s\S]*?data-timetable-settings-time[\s\S]*?Время работы/,
   'Graph A settings must expose a quick bottom working-time action for selected working dates',
 );
-assert.doesNotMatch(
+assert.match(
   journal,
-  /working-time|openDayTime|openTimetableDayEditor/,
-  'Journal must not own schedule-time editing',
+  /openTimetableDayTimeEditor/,
+  'Journal Day must use the compact working-time editor',
 );
 assert.doesNotMatch(
+  journal,
+  /id:\s*'working-time'/,
+  'Journal settings must not become a schedule editor',
+);
+assert.match(
   journalDay,
   /onWorkFieldClick/,
-  'Journal day view must not turn the work field into a schedule editor',
+  'Journal Day work field must allow the existing quick time adjustment',
+);
+assert.match(
+  journal,
+  /renderJournalMonth\(viewRoot,[\s\S]*?onDateSelect:/,
+  'Journal Month must remain navigation into Day rather than schedule editing',
 );
 
 console.log('working-time edit regression tests: OK');
