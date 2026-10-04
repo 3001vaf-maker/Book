@@ -84,6 +84,7 @@
 - Локальная modal geometry, backdrop, fixed-layer и собственное направление появления запрещены.
 - Q/X/S не подменяются Z2/Z3 и наоборот.
 - Нижний modal всегда X, верхний информационный всегда S, большой рабочий modal всегда Q.
+- Полоса свайпа X/S занимает отдельное место в отступе Shared modal и не перекрывает содержимое. Проверка попадания в элементы, перехода меню → рабочие пространства и касаний: `scripts/check-modal-browser-interaction.mjs` (Chromium desktop/mobile, WebKit mobile).
 
 ## CSS
 

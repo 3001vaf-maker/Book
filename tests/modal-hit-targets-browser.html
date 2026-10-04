@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/ui/buttons/buttons.css">
+  <link rel="stylesheet" href="/ui/settings/settings.css">
+  <link rel="stylesheet" href="/ui/modals/modal.css">
+  <link rel="stylesheet" href="/ui/v2/v2.css">
+</head>
+<body>
+<div id="host"></div>
+<script type="module">
+import { button, modal, mountModal, openSharedProfileSettingsMenu, v2Shell } from '/ui/ui.js';
+import { hydrateWorkplacesFromServer } from '/settings/profile/workplaces/data.js';
+import { openServiceWorkplaceSelection } from '/settings/service/workplace-selection.js';
+
+hydrateWorkplacesFromServer([{ key: 'test-space', name: 'Тестовое пространство' }]);
+let selection = [];
+const host = document.querySelector('#host');
+host.innerHTML = v2Shell({ body: button('Настройки', { data: 'data-test-settings' })
+  + '<output data-test-selection>0</output>' });
+host.querySelector('[data-test-settings]').addEventListener('click', () => {
+  openSharedProfileSettingsMenu({ actions: [{
+    id: 'workplaces', label: 'Рабочие пространства',
+    onSelect: () => openServiceWorkplaceSelection({
+      selected: selection,
+      onChange: (next) => {
+        selection = next;
+        host.querySelector('[data-test-selection]').textContent = String(next.length);
+      },
+    }),
+  }] });
+});
+
+// Layout matrix uses the real shared variants. It never disables hit testing.
+const variant = new URLSearchParams(location.search).get('variant');
+if (variant !== null) {
+  const kind = variant === 's' ? 's' : 'x';
+  const className = kind === 's' || !variant ? '' : `modal--${variant}-sheet`;
+  mountModal(host, modal(button('Проверка нажатия', { data: 'data-test-target' }), {
+    variant: kind, className, title: 'Проверка',
+  }));
+}
+document.documentElement.dataset.modalTestReady = 'true';
+</script>
+</body>
+</html>

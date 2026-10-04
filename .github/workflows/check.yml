@@ -85,6 +85,33 @@ jobs:
         run: npm run build --prefix server
 
 
+  modal-browser-interaction:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install isolated browser test runner
+        run: |
+          npm install --prefix "$RUNNER_TEMP/modal-browser" --no-audit --no-fund playwright@1.62.1
+          node "$RUNNER_TEMP/modal-browser/node_modules/playwright/cli.js" install --with-deps chromium webkit
+      - name: Verify shared modal hit targets with mouse and touch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/modal-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" >/dev/null 2>&1 || true' EXIT
+          for attempt in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:4173/tests/modal-hit-targets-browser.html >/dev/null; then
+              break
+            fi
+            sleep 0.25
+          done
+          PLAYWRIGHT_MODULE="$RUNNER_TEMP/modal-browser/node_modules/playwright/index.mjs" node scripts/check-modal-browser-interaction.mjs
+
   profile-migration-upgrade:
     runs-on: ubuntu-latest
     timeout-minutes: 10
