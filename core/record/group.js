@@ -36,9 +36,7 @@ export function normalizeRecordGroup(group = null, fallbackPerson = null) {
 
   const fallback = clonePerson(fallbackPerson);
   const fallbackKey = personKey(fallback);
-  if (fallback && fallbackKey && !seen.has(fallbackKey) && participants.length < capacity) {
-    participants.unshift(fallback);
-  }
+  if (!participants.length && fallback && fallbackKey) participants.push(fallback);
 
   return { capacity, participants: participants.slice(0, capacity) };
 }
