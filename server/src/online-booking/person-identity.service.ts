@@ -301,19 +301,4 @@ export class PersonIdentityService {
     };
   }
 
-  async reconcileLegacyAccountDuplicates(tenantId: string) {
-    const business = await this.businessState.get(tenantId);
-
-    const people = arrayValue(business.people).map((value) => objectValue(value));
-    const identity = objectValue(business.uei);
-    const relations = objectValue(identity.relations);
-    const candidates = people.filter((person) => {
-      const key = text(person.key);
-      return key.startsWith('account-')
-        && accountIds(person).length > 0
-        && !text(relations[`person:${key}`]);
-    }).length;
-
-    return { repaired: 0, candidates, requiresManualReview: candidates > 0 };
-  }
 }
