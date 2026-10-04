@@ -27,8 +27,17 @@ for(const file of walk(root)){
     failures.push(`${r}: runtime filename contains a forbidden transition marker`);
   }
   const source=fs.readFileSync(file,'utf8');
-  if(/migrationVerifiedAt|verifyMigration|\/migrate(?:\/|['"`])|readLegacy|legacyFormat/.test(source)){
-    failures.push(`${r}: runtime transition bridge is forbidden`);
+  if(/\b(?:legacy|compat(?:ibility)?|migration|bridge)\b/i.test(source)
+    || /migrationVerifiedAt|verifyMigration|\/migrate(?:\/|['"`])|readLegacy|legacyFormat/.test(source)){
+    failures.push(`${r}: runtime transition bridge/terminology is forbidden`);
+  }
+
+  if(!r.startsWith('ui/') && (
+    /addEventListener\(\s*['"](?:pointerdown|pointermove|pointerup|pointercancel|touchstart|touchmove|touchend)['"]/.test(source)
+    || /\b(?:setPointerCapture|releasePointerCapture)\s*\(/.test(source)
+    || (/\.css$/.test(r) && /touch-action\s*:/.test(source))
+  )){
+    failures.push(`${r}: gesture ownership is forbidden outside Shared UI`);
   }
 }
 for(const retired of [
