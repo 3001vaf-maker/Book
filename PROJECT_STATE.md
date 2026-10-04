@@ -18,3 +18,5 @@
 - В основном приложении CSS разрешён только в `ui/**` и фундаментальном `css/style.css`.
 - Изолированные entry-поверхности `admin/admin.css` и `invite/invite.css` не являются Shared UI и не могут импортироваться рабочими инструментами.
 - Новый feature-CSS вне Shared UI запрещён.
+
+- Мёртвый runtime JS запрещён: каждый JS-модуль должен быть достижим от реального HTML-entry или `service-worker.js`.
