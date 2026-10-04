@@ -394,7 +394,8 @@ assert.match(bookingSettingsUi, /label: 'Канал 2'/);
 assert.match(bookingSettingsUi, /label: 'Канал 3'/);
 assert.match(bookingSettingsUi, /className: 'modal--form-sheet'/);
 assert.doesNotMatch(bookingSettingsUi, /Внешний вид|renderAppearance|renderTime|folderList\(\[/);
-assert.match(indexHtml, /settings\/online-booking\/online-booking\.css/);
+assert.doesNotMatch(indexHtml, /settings\/online-booking\/online-booking\.css/);
+assert.match(indexHtml, /ui\/inputs\/inputs\.css/);
 
 // Mini App owns legal consent management; Chat settings must not mutate advertising consent.
 assert.match(accountApi, /account\/consents/);
