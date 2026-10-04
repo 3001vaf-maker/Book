@@ -16,7 +16,15 @@ function walk(dir){
   return out;
 }
 const rel=(file)=>path.relative(root,file).replaceAll(path.sep,'/');
-for(const file of walk(root)){
+const standaloneCss=new Set(['admin/admin.css','invite/invite.css']);
+const allFiles=walk(root);
+for(const file of allFiles){
+  const r=rel(file);
+  if(r.endsWith('.css') && !r.startsWith('ui/') && r!=='css/style.css' && !standaloneCss.has(r)){
+    failures.push(`${r}: feature CSS outside Shared UI is forbidden`);
+  }
+}
+for(const file of allFiles){
   const r=rel(file);
   const top=r.split('/')[0];
   if(!runtimeRoots.has(top)) continue;
