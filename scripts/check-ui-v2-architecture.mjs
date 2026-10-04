@@ -203,6 +203,20 @@ expect(!ui.includes('inNavigationGutter') && !ui.includes('horizontalGestureCont
 const sharedSwipe = ui.slice(ui.indexOf('export function initV2Swipe'), ui.indexOf('export function setV2DeckOpen'));
 expect(sharedSwipe.includes("const edgeHost = onRight ? app?.querySelector?.('[data-v2-edge-swipe]') : null") && sharedSwipe.includes('const gestureHost = edgeHost || stage || surface') && sharedSwipe.includes('const leftEdge = Number(stageRect?.left || 0) + Number(edgeWidth || 36)') && sharedSwipe.includes('const wantsRight = Boolean(onRight)') && !sharedSwipe.includes('nestedHorizontalScroller'), 'Z2/Z3 must share the same dedicated screen-edge owner and never inspect inner horizontal rails.');
 expect(ui.includes("disposeSwipe = initV2Swipe(node, { onRight: close, revealDeck: false, threshold: 28, edgeWidth: 36 })"), 'Mounted Z2/Z3 must close one top layer with the same responsive shared edge swipe.');
+expect(ui.includes('function syncV2ZStackInteraction(app, host)')
+  && ui.includes('surface.inert = blocked')
+  && ui.includes("surface.classList.toggle('is-v2-obscured', blocked)")
+  && css.includes('.v2-z.is-v2-obscured{pointer-events:none}'),
+  'Obscured Z surfaces must be inert and pointer-dead; only the top Z layer may own interaction.');
+expect(ui.includes('function lockV2StageInteraction(app)')
+  && ui.includes('stage.inert = true')
+  && ui.includes("app.classList.add('has-v2-modal')")
+  && ui.includes("if (app.classList.contains('has-v2-modal')) return;")
+  && css.includes('.v2-app.has-v2-modal > .v2-app__stage{pointer-events:none}'),
+  'Any open shared modal must hard-lock FEZ interaction until it closes.');
+expect(css.includes('.v2-app.is-revealing-deck .v2-fe-deck{opacity:1}')
+  && !/\.v2-app\.is-revealing-deck \.v2-fe-deck\{[^}]*pointer-events\s*:\s*auto/.test(css),
+  'Partially revealed F may be visible during Z drag but must never become interactive before commit.');
 expect(ui.includes("if (next) app.classList.remove('is-z-entering');"), 'Opening F after any selected Z must cancel the transient Z-entry class before applying the deck-open transform.');
 expect(css.includes('.v2-app.is-z-entering > .v2-app__stage > .v2-front{animation:v2-z-enter-from-right .30s cubic-bezier(.16,1,.3,1)}') && !css.includes('v2-z-enter-from-right .30s cubic-bezier(.16,1,.3,1) both') && !css.includes('v2-z-enter-from-right .30s cubic-bezier(.16,1,.3,1) forwards'), 'Z entry animation must release transform ownership after it finishes.');
 expect(!css.includes('--v2-z-nav-peek') && css.includes('.v2-app.is-deck-open > .v2-app__stage > .v2-front{transform:translate3d(100%,0,0)}'), 'Opening FE navigation must move the unchanged Z/front fully offscreen right.');
