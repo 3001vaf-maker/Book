@@ -27,9 +27,13 @@ for(const file of walk(root)){
     failures.push(`${r}: runtime filename contains a forbidden transition marker`);
   }
   const source=fs.readFileSync(file,'utf8');
-  if(/\b(?:legacy|compat(?:ibility)?|migration|bridge)\b/i.test(source)
+  if(/legacy|compat(?:ibility)?|\bmigration\b|\bbridge\b/i.test(source)
     || /migrationVerifiedAt|verifyMigration|\/migrate(?:\/|['"`])|readLegacy|legacyFormat/.test(source)){
     failures.push(`${r}: runtime transition bridge/terminology is forbidden`);
+  }
+
+  if(/\b(?:business|operational|documents|auxiliary)\??\.verified\b|payload\??\.verified\b/.test(source)){
+    failures.push(`${r}: canonical state owner must not depend on retired verification flags`);
   }
 
   if(!r.startsWith('ui/') && (
