@@ -399,15 +399,36 @@ function openProcedureSettings({ procedure, current, onSave, onAdd, onDelete }) 
 }
 
 function renderPersonStep(modalRoot, { date, workplaceId, from, to, procedures: selectedProcedures, onCreated, onSelected }) {
-  modalRoot ||= mountRecordZ({ ...recordOwnerOptions({ settings: true }), title: 'Выбор клиента', className: 'record-flow-z' });
+  const groupCapacity = groupCapacityForSelectedProcedures(selectedProcedures);
+  const groupMode = groupCapacity > 1;
+  modalRoot ||= mountRecordZ({
+    ...recordOwnerOptions({ settings: true }),
+    title: groupMode ? 'Выбор участников' : 'Выбор клиента',
+    className: 'record-flow-z',
+  });
   let all = people();
   let filtered = all;
   let selectedPerson = null;
-  const host = renderRecordZ(modalRoot, `<div class="record-screen record-screen--people"><div class="ui-search-field">${field({ name: 'recordPersonSearch', type: 'search', placeholder: 'Поиск по имени или UEI', autocomplete: 'off', data: 'data-record-person-search' })}</div><div class="ui-search-divider" aria-hidden="true"></div><div class="record-person-list" data-record-person-list></div></div>`);
+  const selectedPeople = new Map();
+  const host = renderRecordZ(modalRoot, `<div class="record-screen record-screen--people">${groupMode ? `<div class="muted" data-record-group-count>Участники: 0 / ${groupCapacity}</div>` : ''}<div class="ui-search-field">${field({ name: 'recordPersonSearch', type: 'search', placeholder: 'Поиск по имени или UEI', autocomplete: 'off', data: 'data-record-person-search' })}</div><div class="ui-search-divider" aria-hidden="true"></div><div class="record-person-list" data-record-person-list></div></div>`);
   if (!host) return;
 
-  const openSelectedPerson = (person) => {
-    selectedPerson = person;
+  const proceed = () => {
+    if (groupMode) {
+      const values = [...selectedPeople.values()];
+      if (!values.length) return;
+      renderConfirmationStep(null, {
+        date,
+        workplaceId,
+        from,
+        to,
+        selectedPerson: values[0],
+        selectedPeople: values,
+        selectedProcedures,
+        onCreated,
+      });
+      return;
+    }
     if (!selectedPerson) return;
     if (onSelected) {
       onSelected(selectedPerson);
@@ -419,14 +440,47 @@ function renderPersonStep(modalRoot, { date, workplaceId, from, to, procedures: 
       from,
       to,
       selectedPerson,
+      selectedPeople: [selectedPerson],
       selectedProcedures,
       onCreated,
     });
   };
 
+  const syncPrimary = () => {
+    if (!groupMode) {
+      setRecordPrimaryAction(modalRoot);
+      return;
+    }
+    setRecordPrimaryAction(modalRoot, selectedPeople.size ? {
+      label: 'Далее',
+      onClick: proceed,
+    } : {});
+  };
+
+  const selectPerson = (person) => {
+    if (!person) return;
+    if (!groupMode) {
+      selectedPerson = person;
+      proceed();
+      return;
+    }
+    const key = String(person?.key || person?.id || '');
+    if (!key) return;
+    if (selectedPeople.has(key)) selectedPeople.delete(key);
+    else if (selectedPeople.size >= groupCapacity) {
+      openNotice({
+        title: 'Групповая запись',
+        message: `Для выбранных процедур максимум ${groupCapacity} человек.`,
+      });
+      return;
+    } else selectedPeople.set(key, person);
+    render();
+  };
+
   const render = () => {
     const listHost = host.querySelector('[data-record-person-list]');
     if (!listHost) return;
+    const selectedKeys = groupMode ? [...selectedPeople.keys()] : (selectedPerson?.key || '');
     listHost.innerHTML = recordPersonList(filtered.map((person) => {
       const display = personDisplay(person);
       return {
@@ -438,12 +492,16 @@ function renderPersonStep(modalRoot, { date, workplaceId, from, to, procedures: 
       };
     }), {
       data: 'data-record-person',
-      selected: selectedPerson?.key || '',
+      selected: selectedKeys,
       empty: 'Люди не найдены.',
     });
 
+    const count = host.querySelector('[data-record-group-count]');
+    if (count) count.textContent = `Участники: ${selectedPeople.size} / ${groupCapacity}`;
+    syncPrimary();
+
     listHost.querySelectorAll('[data-record-person]').forEach((row) => row.addEventListener('click', () => {
-      openSelectedPerson(all.find((person) => person.key === row.dataset.recordPerson) || null);
+      selectPerson(all.find((person) => person.key === row.dataset.recordPerson) || null);
     }));
   };
 
@@ -470,7 +528,7 @@ function renderPersonStep(modalRoot, { date, workplaceId, from, to, procedures: 
         onCreated: (person) => {
           all = people();
           filtered = all;
-          openSelectedPerson(all.find((item) => item.key === person.key) || person);
+          selectPerson(all.find((item) => item.key === person.key) || person);
         },
       });
     });
@@ -478,7 +536,7 @@ function renderPersonStep(modalRoot, { date, workplaceId, from, to, procedures: 
   render();
 }
 
-function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, selectedPerson, selectedProcedures, onCreated }) {
+function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, selectedPerson, selectedPeople = [], selectedProcedures, onCreated }) {
   modalRoot ||= mountRecordZ({
     ...recordOwnerOptions({ settings: true, chatPersonKey: selectedPerson?.key || '' }),
     title: 'Подтверждение записи',
@@ -489,6 +547,18 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
   let currentFrom = from;
   let currentTo = to;
   let currentPerson = selectedPerson;
+  let currentPeople = (Array.isArray(selectedPeople) && selectedPeople.length ? selectedPeople : [selectedPerson]).filter(Boolean);
+
+  const groupCapacity = () => groupCapacityForSelectedProcedures(selectedProcedures);
+  const reconcileGroup = () => {
+    const capacity = groupCapacity();
+    if (capacity < 2) {
+      currentPeople = currentPeople.length ? [currentPeople[0]] : [currentPerson].filter(Boolean);
+    } else if (currentPeople.length > capacity) {
+      currentPeople = currentPeople.slice(0, capacity);
+    }
+    currentPerson = currentPeople[0] || currentPerson;
+  };
 
   const duration = () => selectedProcedures.reduce((sum, entry) => sum + (Number(entry.duration) || 0), 0);
   const settlement = () => calculateSettlement(selectedProcedures.map((entry) => ({
@@ -542,6 +612,7 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
             cost: item.cost,
             duration: item.duration,
           })));
+          reconcileGroup();
           render();
         },
       });
@@ -551,12 +622,14 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
   bindRecordSettings(modalRoot, openRecordSettings);
 
   const render = () => {
+    reconcileGroup();
     const host = recordZHost(modalRoot);
     if (!host) return;
     const person = personDisplay(currentPerson);
     const workplace = findWorkplaceName(currentWorkplaceId);
     const formattedDate = formatConfirmationDate(currentDate);
     const total = totalCost();
+    const capacity = groupCapacity();
     const card = recordConfirmationMiniCard({
       workplace,
       date: formattedDate,
@@ -564,6 +637,7 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
       uei: person.uei,
       name: person.name,
       phone: person.phone,
+      groupText: capacity > 1 ? `Участники: ${currentPeople.length} / ${capacity}` : '',
       duration: durationText(duration()),
       discount: `${recordSettlementDiscountPercent(currentPerson)}%`,
       total: `${total} ₽`,
@@ -579,39 +653,39 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
     setRecordPrimaryAction(modalRoot, {
       label: 'Подтвердить',
       onClick: () => {
-      if (!checkTimeAvailability({
-        date: currentDate,
-        workplaceId: currentWorkplaceId,
-        from: currentFrom,
-        to: currentTo,
-      }).ok) {
-        openRecordTimeNotice('Запись не может быть создана: выбранное время уже занято. Скорректируйте время записи.');
-        return;
-      }
-      createRecord({
-        source: 'journal',
-        actionContext: journalRecordActionContext(),
-        date: dateKey(currentDate),
-        workplaceId: currentWorkplaceId,
-        from: currentFrom,
-        to: currentTo,
-        person: {
-          key: currentPerson.key,
-          id: currentPerson.id || '',
-          name: currentPerson.name || '',
-          surname: currentPerson.surname || '',
-          phone: currentPerson.phones?.[0] || '',
-          discountPercent: Number(currentPerson.discountPercent) || 0,
-        },
-        procedures: selectedProcedures.map(({ procedure, cost, duration: itemDuration }) => ({
-          id: procedure.id,
-          name: procedure.name,
-          cost,
-          duration: itemDuration,
-        })),
-      });
-      closeRecordZStack('record-flow-z');
-      onCreated?.();
+        if (!checkTimeAvailability({
+          date: currentDate,
+          workplaceId: currentWorkplaceId,
+          from: currentFrom,
+          to: currentTo,
+        }).ok) {
+          openRecordTimeNotice('Запись не может быть создана: выбранное время уже занято. Скорректируйте время записи.');
+          return;
+        }
+        const capacity = groupCapacity();
+        const person = recordPersonSnapshot(currentPerson);
+        createRecord({
+          source: 'journal',
+          actionContext: journalRecordActionContext(),
+          date: dateKey(currentDate),
+          workplaceId: currentWorkplaceId,
+          from: currentFrom,
+          to: currentTo,
+          person,
+          group: capacity > 1 ? {
+            capacity,
+            participants: currentPeople.map(recordPersonSnapshot),
+          } : null,
+          procedures: selectedProcedures.map(({ procedure, cost, duration: itemDuration }) => ({
+            id: procedure.id,
+            name: procedure.name,
+            cost,
+            duration: itemDuration,
+            groupBooking: procedure?.groupBooking ? { ...procedure.groupBooking } : undefined,
+          })),
+        });
+        closeRecordZStack('record-flow-z');
+        onCreated?.();
       },
     });
   };
