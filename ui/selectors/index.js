@@ -39,9 +39,12 @@ function commitSelectorValue(surface, value, label, meta = '', indicatorColor = 
     indicatorNode.hidden = !indicatorColor;
     indicatorNode.style.setProperty('--ui-select-indicator', String(indicatorColor || 'transparent'));
   }
+  // Close the nested selector layer before notifying the owning control.
+  // Some owners close their parent X on change; notifying first can remove the
+  // parent while the nested modal still owns an interaction lock.
+  closeSelector(surface);
   input.dispatchEvent(new Event('input', { bubbles: true }));
   input.dispatchEvent(new Event('change', { bubbles: true }));
-  closeSelector(surface);
 }
 
 function filterSelector(surface, query) {
