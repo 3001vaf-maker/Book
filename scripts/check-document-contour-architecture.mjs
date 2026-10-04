@@ -17,7 +17,7 @@ const files = {
   inviteCss: readFileSync('invite/invite.css','utf8'),
   admin: readFileSync('admin/document-registry/view.js','utf8'),
   adminCss: readFileSync('admin/admin.css','utf8'),
-  archive: readFileSync('core/runtime/document-state.js','utf8'),
+  archive: readFileSync('core/runtime/tenant-document-archive.js','utf8'),
   registryService: readFileSync('server/src/document-registry/document-registry.service.ts','utf8'),
   tenantController: readFileSync('server/src/tenant-document-archive/tenant-document-archive.controller.ts','utf8'),
 };
