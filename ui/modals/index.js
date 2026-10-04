@@ -7,8 +7,8 @@ const MODAL_VARIANTS = new Set(['q', 'x', 's', 'technical']);
 const MODAL_SURFACES = new Set(['app']);
 
 function v2Kind(variant = '') {
-  if (variant === 'top' || variant === 'compact') return 'top';
-  if (variant === 'quick' || variant === 'bottom') return 'bottom';
+  if (variant === 'x') return 'bottom';
+  if (variant === 's') return 'top';
   if (variant === 'technical') return 'technical';
   return 'standard';
 }

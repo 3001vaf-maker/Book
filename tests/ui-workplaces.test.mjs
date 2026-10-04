@@ -33,7 +33,7 @@ assert.doesNotMatch(headerMarkup, /timetable-workplace-button/);
 
 const headerSource = readFileSync(new URL('../ui/header/index.js', import.meta.url), 'utf8');
 assert.match(headerSource, /export function openHeaderControl\b/);
-assert.match(headerSource, /variant:\s*'medium'/);
+assert.match(headerSource, /variant:\s*'x'/);
 
 const workplaceSource = readFileSync(new URL('../ui/workplaces/index.js', import.meta.url), 'utf8');
 assert.match(workplaceSource, /list\(\{\s*items:\s*listItems\s*\}\)/);
@@ -89,7 +89,7 @@ assert.doesNotMatch(graphSource, /canCorrectTime|onSaveTime/);
 
 const dayEditorSource = readFileSync(new URL('../timetable/day-editor.js', import.meta.url), 'utf8');
 assert.match(dayEditorSource, /export function openTimetableDayEditor/);
-assert.match(dayEditorSource, /variant:\s*'medium'/);
+assert.match(dayEditorSource, /variant:\s*'x'/);
 assert.match(dayEditorSource, /time-range-fields/);
 assert.match(dayEditorSource, /getWorkingTimeUsageConflicts/);
 assert.match(dayEditorSource, /Пересечение с/);
@@ -124,7 +124,7 @@ assert.match(journalControlSource, /export function openJournalWorkplaceControl/
 assert.match(journalControlSource, /label:\s*'График дня'/);
 assert.match(journalControlSource, /data-journal-workplace-select/);
 assert.match(journalControlSource, /select\(\{/);
-assert.match(journalControlSource, /variant:\s*'bottom'/);
+assert.match(journalControlSource, /variant:\s*'x'/);
 assert.match(journalControlSource, /indicatorColor/);
 assert.match(journalControlSource, /recordCountText/);
 assert.doesNotMatch(journalControlSource, /openHeaderControl|list\(\{\s*items\s*\}\)|Общий график|data-workplace-control-select/);
