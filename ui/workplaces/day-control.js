@@ -108,7 +108,7 @@ export function openDayWorkplaceTime({
     ? button('+ Добавить рабочее пространство', { variant: 'secondary', data: 'data-day-workplace-time-add' })
     : '';
   const content = `<div class="compact-form"><div class="modal-title"><h2>${escapeHtml(title || 'Рабочее время')}</h2></div>${occupiedMarkup}<div class="time-range-fields">${timePicker({ name: 'dayWorkplaceFrom', label: 'Начало', value: from })}${timePicker({ name: 'dayWorkplaceTo', label: 'Окончание', value: to })}</div><div class="form-error" data-day-workplace-time-error aria-live="polite"></div>${addAction}${button('Сохранить', { data: 'data-day-workplace-time-save' })}</div>`;
-  const main = mountModal(document.body, modal(content, { title: title || 'Рабочее время', variant: 'medium' }));
+  const main = mountModal(document.body, modal(content, { title: title || 'Рабочее время', variant: 'x' }));
   if (!main) return null;
   initTimePickers(main);
   main.querySelector('[data-day-workplace-time-add]')?.addEventListener('click', () => {

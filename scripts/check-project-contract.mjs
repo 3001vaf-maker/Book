@@ -55,8 +55,11 @@ for(const file of allFiles){
     failures.push(`${r}: retired BusinessStateMeta storage is forbidden`);
   }
 
-  if(/variant\s*:\s*['"](?:list|large|medium|compact|quick|standard|bottom|top)['"]/.test(source)){
+  if(/variant\s*:\s*['"](?:large|medium|compact|quick|standard|bottom|top)['"]/.test(source)){
     failures.push(`${r}: deprecated modal variant is forbidden; use q/x/s/technical only`);
+  }
+  if(r !== 'ui/cards/folder-card.js' && /variant\s*:\s*['"]list['"]/.test(source)){
+    failures.push(`${r}: deprecated list alias is forbidden outside FolderCard`);
   }
 
   if(!r.startsWith('ui/') && (

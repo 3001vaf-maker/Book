@@ -19,7 +19,7 @@ export function openServiceWorkplaceSelection({
     data: `data-service-workplace="${String(workplace.key || workplace.id || '')}"`,
   })));
   const layer = mountModal(document.body, modal(body, {
-    variant: 'bottom',
+    variant: 'x',
     title,
     className: 'modal--profile-settings-sheet modal--service-workplaces',
   }));
