@@ -9,7 +9,7 @@ const controller = read('server/src/tenant-document-archive/tenant-document-arch
 const booking = read('server/src/online-booking/online-booking.service.ts');
 const bookingConsent = read('server/src/online-booking/booking-consent.controller.ts');
 const bookingPdnGuard = read('server/src/online-booking/booking-pdn-consent.guard.ts');
-const migration = read('tenant-document-archive.js');
+const runtime = read('core/runtime/document-state.js');
 const schema = read('server/prisma/schema.prisma');
 const consentMigration = read('server/prisma/migrations/20260915130000_canonical_consent_subjects/migration.sql');
 const retirementMigration = read('server/prisma/migrations/20260919143000_retire_legacy_consent_migration/migration.sql');
@@ -48,7 +48,7 @@ assert.match(bookingPdnGuard, /accountConsentState\(auth\.tenantId, auth\.accoun
 assert.match(bookingPdnGuard, /if \(!state\.pdnActive\)/);
 assert.doesNotMatch(bookingPdnGuard, /requiredConsentState/);
 
-assert.doesNotMatch(migration, /configureConsentPersistence/);
-assert.doesNotMatch(migration, /queueDocumentDataset\('consents'/);
+assert.doesNotMatch(runtime, /configureConsentPersistence/);
+assert.doesNotMatch(runtime, /queueDocumentDataset\('consents'/);
 
 console.log('Document Archive single consent store tests: OK');
