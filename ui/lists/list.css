@@ -47,3 +47,12 @@ button.ui-list__item:focus-visible{outline:2px solid var(--active);outline-offse
 .ui-list__right-secondary{display:flex;flex:0 0 auto;flex-direction:column;align-items:flex-end;justify-content:center;min-width:0;text-align:right}
 .ui-list__secondary,.ui-list__right-secondary span{overflow-wrap:anywhere}
 .ui-list__item:disabled{cursor:default;opacity:.55}
+
+/* Shared high-density manifestation for journals and table-like operational lists. */
+.ui-list--dense .ui-list__item{min-height:38px;padding:6px 12px;gap:8px}
+.ui-list--dense .ui-list__title{font-size:14px;line-height:1.2}
+.ui-list--dense .ui-list__secondary,.ui-list--dense .ui-list__right-secondary{font-size:13px;line-height:1.15}
+.ui-list--dense .ui-list__overline{font-size:10px}
+.ui-list--dense .ui-list__item--group-start{border-top:2px solid var(--text)}
+.ui-list--dense .ui-list__item--group-start:first-child{border-top:0}
+.ui-list--dense .ui-list__item--group-header{min-height:42px;font-weight:650}

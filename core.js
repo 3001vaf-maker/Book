@@ -1,5 +1,6 @@
 import { renderPeople } from './core/people/people.js';
 import { financeNavigationItems, renderFinanceSection } from './core/finance/index.js';
+import { inventoryNavigationItems, renderInventorySection } from './core/inventory/index.js';
 import { renderJournal } from './journal/journal.js';
 import { renderTimetable } from './timetable/timetable.js';
 import { settingsNavigationItems, renderSettingsSection } from './settings/settings.js';
@@ -31,6 +32,7 @@ configureSoftTimeUsageReleaseSource(releaseJournalSoftTimeUsages);
 const ROOT_SECTIONS = [
   { id: 'people', label: 'Клиенты', capability: 'people.access' },
   { id: 'finance', label: 'Финансы', capability: '' },
+  { id: 'inventory', label: 'Склад', capability: '' },
   { id: 'timetable', label: 'График', capability: 'timetable.access' },
   { id: 'journal', label: 'Журнал', capability: '' },
   { id: 'profile', label: 'Профиль', capability: '' },
@@ -47,6 +49,7 @@ const state = {
   journalView: 'day',
   secondary: {
     finance: 'cash',
+    inventory: 'stock',
     settings: 'service',
   },
 };
@@ -201,7 +204,7 @@ function rootDefinition(section) {
 
 function sectionAllowed(section) {
   if (section === 'chat') return canUseBookCapability('chat.access');
-  if (section === 'finance' || section === 'settings') {
+  if (section === 'finance' || section === 'inventory' || section === 'settings') {
     return secondaryItems(section).length > 0;
   }
   const item = rootDefinition(section);
@@ -246,6 +249,7 @@ function activeRootSection() {
 
 function secondaryItems(section = activeRootSection()) {
   if (section === 'finance') return financeNavigationItems();
+  if (section === 'inventory') return inventoryNavigationItems();
   if (section === 'settings') return settingsNavigationItems();
   return [];
 }
@@ -452,6 +456,7 @@ function renderActiveWorkspaceSurface(surface) {
   if (section === 'finance') return renderFinanceSection(surface, ensureSecondary('finance'), {
     onDirectChat: (personKey) => navigate('chat', { navigationOpen: false, chatPersonKey: personKey }),
   });
+  if (section === 'inventory') return renderInventorySection(surface, ensureSecondary('inventory'));
   if (section === 'timetable') return renderTimetable(surface);
   if (section === 'journal') {
     return renderJournal(surface, {

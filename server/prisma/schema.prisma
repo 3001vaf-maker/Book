@@ -672,3 +672,128 @@ model PlatformNotice {
   @@index([tenantId, createdAt])
   @@index([platformAccountId, readAt, createdAt])
 }
+
+model InventoryItem {
+  id                String   @id @default(cuid())
+  tenantId          String
+  itemId            String
+  name              String
+  unit              String   @default("шт.")
+  category          String   @default("")
+  sku               String   @default("")
+  barcode           String   @default("")
+  location          String   @default("")
+  supplier          String   @default("")
+  minStock          Decimal? @db.Decimal(14, 3)
+  targetStock       Decimal? @db.Decimal(14, 3)
+  packageQuantity   Decimal? @db.Decimal(14, 3)
+  lastPurchasePrice Decimal? @db.Decimal(14, 4)
+  trackLots         Boolean  @default(true)
+  canConsume        Boolean  @default(true)
+  canSell           Boolean  @default(false)
+  position          Int      @default(0)
+  archivedAt        DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  lots          InventoryLot[]
+  movementLines InventoryMovementLine[]
+
+  @@unique([tenantId, itemId])
+  @@index([tenantId, archivedAt, position])
+  @@index([tenantId, name])
+}
+
+model InventoryLot {
+  id                String   @id @default(cuid())
+  tenantId          String
+  lotId             String
+  inventoryItemId   String
+  quantityReceived  Decimal  @db.Decimal(14, 3)
+  quantityRemaining Decimal  @db.Decimal(14, 3)
+  unitCost          Decimal  @db.Decimal(14, 4)
+  receivedAt        DateTime
+  expiresAt         DateTime?
+  supplier          String   @default("")
+  note              String   @default("")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  item        InventoryItem                 @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  allocations InventoryMovementAllocation[]
+
+  @@unique([tenantId, lotId])
+  @@index([tenantId, inventoryItemId, receivedAt])
+  @@index([tenantId, inventoryItemId, quantityRemaining])
+}
+
+model InventoryMovement {
+  id                 String   @id @default(cuid())
+  tenantId           String
+  movementId         String
+  kind               String
+  status             String   @default("completed")
+  sourceType         String   @default("")
+  sourceId           String   @default("")
+  originalMovementId String   @default("")
+  personKey          String   @default("")
+  personUei          String   @default("")
+  recordId           String   @default("")
+  procedureKey       String   @default("")
+  workplaceKey       String   @default("")
+  note               String   @default("")
+  occurredAt         DateTime
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  lines InventoryMovementLine[]
+
+  @@unique([tenantId, movementId])
+  @@index([tenantId, occurredAt])
+  @@index([tenantId, sourceType, sourceId])
+  @@index([tenantId, recordId])
+}
+
+model InventoryMovementLine {
+  id                  String   @id @default(cuid())
+  tenantId            String
+  inventoryMovementId String
+  inventoryItemId     String
+  lineId              String
+  position            Int      @default(0)
+  direction           String
+  quantity            Decimal  @db.Decimal(14, 3)
+  unitCost            Decimal  @db.Decimal(14, 4)
+  amount              Decimal  @db.Decimal(16, 4)
+  expectedQuantity    Decimal? @db.Decimal(14, 3)
+  actualQuantity      Decimal? @db.Decimal(14, 3)
+  note                String   @default("")
+  createdAt           DateTime @default(now())
+
+  movement    InventoryMovement             @relation(fields: [inventoryMovementId], references: [id], onDelete: Cascade)
+  item        InventoryItem                 @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
+  allocations InventoryMovementAllocation[]
+
+  @@unique([tenantId, lineId])
+  @@index([tenantId, inventoryMovementId, position])
+  @@index([tenantId, inventoryItemId])
+}
+
+model InventoryMovementAllocation {
+  id                      String   @id @default(cuid())
+  tenantId                String
+  inventoryMovementLineId String
+  inventoryLotId          String
+  allocationId            String
+  quantity                Decimal  @db.Decimal(14, 3)
+  unitCost                Decimal  @db.Decimal(14, 4)
+  amount                  Decimal  @db.Decimal(16, 4)
+  createdAt               DateTime @default(now())
+
+  line InventoryMovementLine @relation(fields: [inventoryMovementLineId], references: [id], onDelete: Cascade)
+  lot  InventoryLot          @relation(fields: [inventoryLotId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, allocationId])
+  @@index([inventoryMovementLineId])
+  @@index([inventoryLotId])
+}

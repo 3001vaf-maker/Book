@@ -86,7 +86,7 @@ assert.match(settings, /services\.access/);
 assert.match(settings, /online_booking\.access/);
 assert.match(profile, /workplaces\.access/);
 
-assert.match(core, /section === 'finance' \|\| section === 'settings'/);
+assert.match(core, /section === 'finance' \|\| section === 'inventory' \|\| section === 'settings'/);
 assert.match(core, /journalView: 'day'/);
 assert.doesNotMatch(core, /secondary\.journal/);
 assert.match(core, /children\.length === 1 \? children\[0\]\.label : definition\.label/);
