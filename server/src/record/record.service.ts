@@ -67,12 +67,7 @@ function normalizeGroup(value: unknown, fallbackPerson: unknown = null) {
   arrayValue(source.participants).forEach(push);
   const fallback = objectValue(fallbackPerson);
   const fallbackKey = text(fallback.key) || text(fallback.id);
-  if (fallbackKey && !seen.has(fallbackKey)) {
-    const before = participants.slice();
-    participants.length = 0;
-    push(fallback);
-    before.forEach(push);
-  }
+  if (!participants.length && fallbackKey) push(fallback);
   return { capacity, participants };
 }
 
