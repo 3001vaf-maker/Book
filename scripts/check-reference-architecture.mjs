@@ -257,9 +257,7 @@ if (/\bworkingDates\b/.test(text(dayOwner)) || text(dayOwner).includes('book.tim
 const settingsControllers = [
   'settings/profile/profile.js',
   'settings/service/service.js',
-  'settings/warehouse/warehouse.js',
   'settings/documents/documents.js',
-  'settings/loyalty/loyalty.js',
   'settings/tags/tags.js',
 ];
 for (const controller of settingsControllers) {
