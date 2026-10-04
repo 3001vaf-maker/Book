@@ -177,7 +177,7 @@ function openPushInfo() {
   const content = `<div class="modal-title"><h2>Push</h2><p>Push — дополнительное уведомление. Если выбран режим «По очереди», успешный Push не останавливает отправку: основной результат определяется Telegram или Email.</p></div>`;
   return mountModal(document.body, modal(content, {
     title: 'О Push',
-    variant: 'top',
+    variant: 's',
     surface: 'app',
   }));
 }
@@ -209,7 +209,7 @@ async function openNotificationSettings() {
   </div>`;
   const layer = mountModal(document.body, modal(body, {
     title: 'Настройки уведомлений',
-    variant: 'bottom',
+    variant: 'x',
     className: 'modal--form-sheet',
   }));
   if (!layer) return null;
@@ -259,7 +259,7 @@ function openSlotStepInfo() {
   const content = '<div class="modal-title"><h2>Шаг записи</h2><p>Шаг определяет, как часто человеку показываются возможные начала записи. Он не ограничивает произвольное время специалиста и не меняет длительность процедуры.</p></div>';
   return mountModal(document.body, modal(content, {
     title: 'О шаге записи',
-    variant: 'top',
+    variant: 's',
     surface: 'app',
   }));
 }
