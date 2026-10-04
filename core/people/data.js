@@ -192,6 +192,7 @@ export function upsertPersonFromAccount(account = {}) {
     key: previous?.key || `account-${accountId}`,
     name: String(account.name || previous?.name || ''),
     surname: String(account.surname || previous?.surname || ''),
+    photo: String(profileData.photo || ''),
     gender: incomingGender || previous?.gender || '',
     birthDate: incomingBirthDate || previous?.birthDate || '',
     phones: phone ? [...(previous?.phones || []), phone] : previous?.phones || [],

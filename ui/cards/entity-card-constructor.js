@@ -121,7 +121,7 @@ function fieldControl(line,fields){
 }
 
 function editorWorkspace(state,fields){
-  if(state.tab==='photo'){
+  if(allowPhoto && state.tab==='photo'){
     return `<div class="entity-card-editor__photo">
       ${button(state.photo?'Заменить фото':'Добавить фото',{data:'data-card-photo-select'})}
       ${state.photo?button('Удалить фото',{variant:'outline',className:'ui-button--delete-outline',data:'data-card-photo-remove'}):''}
@@ -177,7 +177,7 @@ function editorWorkspace(state,fields){
   </div>`;
 }
 
-export function mountEntityCardConstructor(root,{appearance={},fields=[],photo='',photoPosition='50% 50%',onSave=async()=>{},onPhotoChange=()=>{},onStateChange=()=>{}}={}) {
+export function mountEntityCardConstructor(root,{appearance={},fields=[],photo='',photoPosition='50% 50%',allowPhoto=true,onSave=async()=>{},onPhotoChange=()=>{},onStateChange=()=>{}}={}) {
   if(!root)return null;
   const state={
     appearance:normalizeEntityCardAppearance(appearance),
@@ -212,7 +212,7 @@ export function mountEntityCardConstructor(root,{appearance={},fields=[],photo='
     root.innerHTML=`<div class="entity-card-editor" data-entity-card-editor>
       <div class="entity-card-editor__preview" data-card-preview>${entityVisualCard({appearance:state.appearance,fields,image:state.photo,imagePosition:state.photoPosition})}</div>
       <div class="segment-control entity-card-editor__tabs" role="group" aria-label="Вид карты">
-        ${[['photo','Фото'],['background','Фон'],['card','Карта']].map(([value,label])=>`<button type="button" class="${state.tab===value?'is-active':''}" data-card-tab="${value}" aria-pressed="${state.tab===value?'true':'false'}">${label}</button>`).join('')}
+        ${(allowPhoto?[['photo','Фото'],['background','Фон'],['card','Карта']]:[['background','Фон'],['card','Карта']]).map(([value,label])=>`<button type="button" class="${state.tab===value?'is-active':''}" data-card-tab="${value}" aria-pressed="${state.tab===value?'true':'false'}">${label}</button>`).join('')}
       </div>
       <div class="entity-card-editor__workspace" data-card-workspace>${editorWorkspace(state,fields)}</div>
       <div class="form-error" data-card-error>${escapeHtml(state.error||'')}</div>

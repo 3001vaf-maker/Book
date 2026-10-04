@@ -78,6 +78,7 @@ type ContactSet = {
   phones: string[];
   emails: string[];
   telegrams: string[];
+  profilePhoto: string;
 };
 
 type PersonMatch = {
@@ -131,7 +132,7 @@ export class PersonIdentityService {
       ...rows.filter((row) => String(row.type) === 'TELEGRAM').map((row) => telegramId(row.value)),
     ].map(telegramId).filter(Boolean));
 
-    return { phones, emails, telegrams };
+    return { phones, emails, telegrams, profilePhoto: text(profileData.photo) };
   }
 
   private matchPerson(person: Record<string, any>, contacts: ContactSet) {
@@ -150,6 +151,7 @@ export class PersonIdentityService {
     const person = objectValue(personValue);
     return {
       ...person,
+      photo: contacts.profilePhoto,
       accounts: uniqueStrings([...accountIds(person), accountId]),
       phones: mergePhones(person.phones, contacts.phones),
       emails: mergeEmails(person.emails, contacts.emails),
@@ -189,7 +191,7 @@ export class PersonIdentityService {
       id: '',
       name: text(account.name),
       surname: text(account.surname),
-      photo: '',
+      photo: contacts.profilePhoto,
       gender: text(profileData.gender),
       birthDate: text(profileData.birthDate),
       phones: mergePhones([], contacts.phones),

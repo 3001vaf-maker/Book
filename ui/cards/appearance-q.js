@@ -20,6 +20,7 @@ export function openEntityCardAppearanceQ(root, {
   resolve = () => ({}),
   save = async () => {},
   onSaved = () => {},
+  allowPhoto = true,
 } = {}) {
   const types = Array.isArray(typeOptions) ? typeOptions.filter(Boolean) : [];
   if (!types.length) return null;
@@ -91,6 +92,7 @@ export function openEntityCardAppearanceQ(root, {
       fields: editor.fields || [],
       photo: editor.photo || '',
       photoPosition: editor.photoPosition || '50% 50%',
+      allowPhoto,
       onSave: async ({ appearance, photo }) => {
         await save({ type, target, appearance, photo, editor });
         layer.v2Close?.();
