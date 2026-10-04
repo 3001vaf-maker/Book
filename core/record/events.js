@@ -115,21 +115,6 @@ export function hasRecordEvent(recordId, type) {
   return getRecordEvents(recordId).some((event) => event.type === type);
 }
 
-export function ensureLegacyRecordEvents(record = {}) {
-  const recordId = normalizeRecordId(record?.id);
-  if (!recordId) return [];
-  const existing = getRecordEvents(recordId);
-  const types = new Set(existing.map((event) => event.type));
-  const createdAt = record?.createdAt || record?.updatedAt || '';
-
-  if (!types.has(RECORD_EVENT_TYPES.CREATED)) appendRecordEvent(recordId, RECORD_EVENT_TYPES.CREATED, { at: createdAt });
-  if (record?.confirmed && !types.has(RECORD_EVENT_TYPES.CONFIRMED)) appendRecordEvent(recordId, RECORD_EVENT_TYPES.CONFIRMED, { at: record?.updatedAt || createdAt });
-  if (record?.attendance === 'arrived' && !types.has(RECORD_EVENT_TYPES.ARRIVED)) appendRecordEvent(recordId, RECORD_EVENT_TYPES.ARRIVED, { at: record?.updatedAt || createdAt });
-  if (record?.attendance === 'no-show' && !types.has(RECORD_EVENT_TYPES.NO_SHOW)) appendRecordEvent(recordId, RECORD_EVENT_TYPES.NO_SHOW, { at: record?.updatedAt || createdAt });
-  if (record?.status === 'cancelled' && !types.has(RECORD_EVENT_TYPES.CANCELLED)) appendRecordEvent(recordId, RECORD_EVENT_TYPES.CANCELLED, { at: record?.cancelledAt || record?.updatedAt || createdAt });
-  return getRecordEvents(recordId);
-}
-
 export function deleteRecordEvents(recordId) {
   return deleteRecordEventRows(recordId);
 }
