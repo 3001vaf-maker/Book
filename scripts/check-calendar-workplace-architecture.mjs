@@ -126,7 +126,7 @@ if (/journal\//.test(dayEditor)) fail('timetable/day-editor.js', 'Timetable day 
 
 if (/openWorkplaceControl/.test(journal)) fail('journal/journal.js', 'Journal must not call the Graph Workplace control');
 if (!/openJournalWorkplaceControl/.test(journal)) fail('journal/journal.js', 'Journal must use its own Header manifestation');
-if (!/openTimetableDayEditor/.test(journal) || !/timetable\/day-editor\.js/.test(journal)) fail('journal/journal.js', 'Journal must call the Timetable-owned working-day editor instead of recreating it');
+if (!/openTimetableDay(?:Time)?Editor/.test(journal) || !/timetable\/day-editor\.js/.test(journal)) fail('journal/journal.js', 'Journal Day must call a Timetable-owned working-day editor instead of recreating it');
 if (/getDayWorkplaceDraft|saveDayWorkplaceTime|openDayWorkplaceTime|updateDayTime|hasScheduleConflict|createDay|saveDays/.test(journal)) fail('journal/journal.js', 'Journal must not own working-day mutation or validation');
 if (!/export function openJournalWorkplaceControl/.test(journalWorkplaceControl)) fail('journal/workplace-control.js', 'Journal must own a separate Workplace selection manifestation');
 if (!/mountModal/.test(journalWorkplaceControl) || !/select\(\{/.test(journalWorkplaceControl) || !/variant:\s*['"]x['"]/.test(journalWorkplaceControl)) fail('journal/workplace-control.js', 'Journal manifestation must reuse Shared Select in canonical X');
