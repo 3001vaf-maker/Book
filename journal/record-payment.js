@@ -438,7 +438,7 @@ function openPaymentRefund(record, payment, onSaved) {
       })}
       ${button('Вернуть', { variant: 'danger', data: 'data-record-payment-refund-confirm' })}
     </div>`,
-    { variant: 'bottom', surface: 'app', title: 'Возврат', className: 'modal--form-sheet' },
+    { variant: 'x', surface: 'app', title: 'Возврат', className: 'modal--form-sheet' },
   ));
   if (!layer) return null;
   initDatePickers(layer);
@@ -483,7 +483,7 @@ function openPaymentCancellation(record, payment, onSaved) {
       ${datePicker({ label: 'Дата отмены', name: 'recordPaymentCancelDate', value: paymentDateValue(record, new Date()), showYear: false, modalVariant: 'bottom', modalClassName: 'modal--form-sheet', modalSurface: 'app', allowClear: false })}
       ${button('Отменить оплату', { variant: 'danger', data: 'data-record-payment-cancel-confirm' })}
     </div>`,
-    { variant: 'bottom', surface: 'app', title: 'Отмена оплаты', className: 'modal--form-sheet' },
+    { variant: 'x', surface: 'app', title: 'Отмена оплаты', className: 'modal--form-sheet' },
   ));
   if (!layer) return null;
   initDatePickers(layer);
@@ -508,7 +508,7 @@ function openPaymentDeletion(payment, onSaved) {
   const layer = mountModal(document.body, modal(
     `<div class="modal-title"><h2>Удалить оплату полностью?</h2><p>Данные этой оплаты будут удалены из финансовой истории без восстановления.</p></div>
     <div class="modal-actions">${button('Удалить оплату', { variant: 'critical', data: 'data-record-payment-delete-confirm' })}</div>`,
-    { variant: 'bottom', surface: 'app', title: 'Удаление оплаты', className: 'modal--form-sheet' },
+    { variant: 'x', surface: 'app', title: 'Удаление оплаты', className: 'modal--form-sheet' },
   ));
   layer?.querySelector('[data-record-payment-delete-confirm]')?.addEventListener('click', async () => {
     try {
