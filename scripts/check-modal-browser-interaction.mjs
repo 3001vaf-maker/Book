@@ -80,6 +80,26 @@ for (const [name, engine, contextOptions] of [
     assert.equal(await page.locator(checkbox).isChecked(), true, `${name}: selection was lost on reopening`);
     await closeSheet();
 
+    // Repeated Journal workplace switching must not stack modal locks or leave
+    // the stage inert. The selector is a single bottom X with direct rows.
+    for (let cycle = 0; cycle < 3; cycle += 1) {
+      const journalTrigger = page.locator('[data-test-journal-workplace]');
+      if (contextOptions.hasTouch) await journalTrigger.tap();
+      else await journalTrigger.click();
+      await page.locator('[data-journal-workplace-control]').waitFor();
+      assert.equal(await page.locator('[data-modal]').count(), 1, `${name}: Journal workplace selector stacked modals`);
+
+      const targetValue = cycle % 2 === 0 ? 'beauty' : '__all__';
+      const target = page.locator(`[data-journal-workplace-pick="${targetValue}"]`);
+      if (contextOptions.hasTouch) await target.tap();
+      else await target.click();
+
+      await page.locator('[data-modal]').waitFor({ state: 'detached' });
+      assert.equal(await page.locator('.v2-app__stage').evaluate((node) => node.inert), false, `${name}: Journal stage stayed inert after workplace switch`);
+      const probe = page.locator('[data-test-journal-workplace]');
+      assert.equal(await probe.isEnabled(), true, `${name}: Journal trigger stopped responding after workplace switch`);
+    }
+
     for (const variant of ['', 'profile-settings', 'photo', 'password', 'consent', 'color', 'time-range', 'form', 'time-picker', 's']) {
       await open(`?variant=${variant}`);
       const hits = await targetPoints('[data-test-target]');
