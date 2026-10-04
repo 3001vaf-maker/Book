@@ -715,6 +715,8 @@ export function initV2WorkspaceInteraction(root, {
   const disposers = [];
   const scrollFrames = new Map();
   const cardId = (card) => String(card?.getAttribute('data-v2-card-item') || '');
+  const deckIsOpen = () => app.classList.contains('is-deck-open');
+  const secondaryIsOpen = () => app.classList.contains('is-e-open');
 
   const setActiveCard = (cards, index) => {
     cards.forEach((card, cardIndex) => {
@@ -902,6 +904,7 @@ export function initV2WorkspaceInteraction(root, {
   };
 
   const setEOpen = (nextOpen, notify = true) => {
+    open = deckIsOpen();
     if (eDismissTimer) {
       window.clearTimeout(eDismissTimer);
       eDismissTimer = 0;
@@ -951,7 +954,7 @@ export function initV2WorkspaceInteraction(root, {
     () => fActiveIndex,
     (index) => { fActiveIndex = index; },
     (id) => onRootSelect?.(id),
-    () => open && !secondaryOpen,
+    () => deckIsOpen() && !secondaryIsOpen(),
   );
   bindNativeDeck(
     eDeck,
@@ -960,11 +963,11 @@ export function initV2WorkspaceInteraction(root, {
     () => eActiveIndex,
     (index) => { eActiveIndex = index; },
     (id) => onSecondarySelect?.(id),
-    () => secondaryOpen,
+    () => secondaryIsOpen(),
   );
 
   const eDown = (event) => {
-    if (!secondaryOpen || !eDeck?.contains(event.target)) return;
+    if (!secondaryIsOpen() || !eDeck?.contains(event.target)) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     eGesture = { id:event.pointerId, x:event.clientX, y:event.clientY, dx:0, axis:'pending' };
   };
@@ -1045,7 +1048,7 @@ export function initV2WorkspaceInteraction(root, {
   };
 
   const zDown = (event) => {
-    if (!bindZ || open || zGesture || app.querySelector('[data-v2-z-layer]')) return;
+    if (!bindZ || deckIsOpen() || zGesture || app.querySelector('[data-v2-z-layer]')) return;
     if (event.target.closest?.('[data-v2-layer], [data-v2-z-layer]')) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     if (edgeHost === stage) {

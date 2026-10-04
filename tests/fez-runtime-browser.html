@@ -102,6 +102,25 @@ await nextFrame();
 ok(app.querySelector('[data-v2-card-item="one"]').classList.contains('is-active'), 'closed F overwrote semantic activeId from stale scroll position');
 ok(getComputedStyle(edge).pointerEvents === 'auto', 'bound edge owner must become interactive');
 
+mark('external-f-owner-sync');
+setV2DeckOpen(app, true);
+await nextFrame();
+ok(getComputedStyle(edge).pointerEvents === 'none', 'open F must disable the Z edge hit area');
+const externalNeighbour = app.querySelector('[data-v2-card-item="two"]');
+click(externalNeighbour);
+await nextFrame();
+ok(firstOwnerCalls === 1, 'F interaction owner did not follow externally opened deck state');
+const frontWhileFOpen = app.querySelector('[data-v2-front]');
+pointer(edge, 'pointerdown', 12, 300, 41);
+pointer(edge, 'pointermove', 48, 302, 41);
+pointer(edge, 'pointerup', 48, 302, 41);
+await nextFrame();
+ok(!frontWhileFOpen.classList.contains('is-dragging'), 'Z started dragging while F was already open');
+ok(frontWhileFOpen.style.getPropertyValue('--v2-front-drag-x') === '', 'Z moved while F owned navigation interaction');
+setV2DeckOpen(app, false);
+firstOwnerCalls = 0;
+await nextFrame();
+
 mark('root-z-to-f');
 pointer(edge, 'pointerdown', 12, 300, 1);
 pointer(edge, 'pointermove', 46, 302, 1);
