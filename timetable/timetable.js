@@ -401,7 +401,7 @@ export function renderTimetable(root) {
 
   function openWorkingTimePicker(dates, workplaceId = selectedWorkplaceId) {
     const content = `<div class="modal-title"><h2>Рабочее время</h2><p>У этого рабочего места время не задано. Выберите интервал для отмеченных дат. Постоянное расписание рабочего места не изменится.</p></div><div class="compact-form">${timePicker({ name: 'timetableWorkingFrom', label: 'Начало', value: '00:00' })}${timePicker({ name: 'timetableWorkingTo', label: 'Окончание', value: '00:00' })}<div class="form-error" data-timetable-working-time-error></div>${button('Применить', { data: 'data-timetable-working-time-save' })}</div>`;
-    const m = mountModal(document.body, modal(content, { title: 'Рабочее время', variant: 'bottom' }));
+    const m = mountModal(document.body, modal(content, { title: 'Рабочее время', variant: 'x' }));
     if (!m) return;
     initTimePickers(m);
     m.querySelector('[data-timetable-working-time-save]')?.addEventListener('click', () => {
@@ -473,7 +473,7 @@ export function renderTimetable(root) {
       return `<div><span>${escapeHtml(formatDateLabel(entry.date))}</span><strong>${escapeHtml(details || 'Есть занятое время')}</strong></div>`;
     }).join('');
     const content = `<div class="modal-title"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(description)}</p></div><div class="entity-details">${rows}</div>${button('Понятно', { data: 'data-removal-blocked-close' })}`;
-    const m = mountModal(document.body, modal(content, { title, variant: 'bottom' }));
+    const m = mountModal(document.body, modal(content, { title, variant: 'x' }));
     if (!m) return;
     m.querySelector('[data-removal-blocked-close]')?.addEventListener('click', () => m.remove());
   }
