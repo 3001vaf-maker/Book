@@ -21,7 +21,7 @@ for (const item of [...bookDocs, ...userBases]) {
 const admin = readFileSync(new URL('../admin/admin.js', import.meta.url), 'utf8');
 const view = readFileSync(new URL('../admin/document-registry/view.js', import.meta.url), 'utf8');
 const history = readFileSync(new URL('../admin/document-registry/history.js', import.meta.url), 'utf8');
-const profileMigration = readFileSync(new URL('../tenant-document-archive.js', import.meta.url), 'utf8');
+const documentRuntime = readFileSync(new URL('../core/runtime/document-state.js', import.meta.url), 'utf8');
 const controller = readFileSync(new URL('../server/src/saas-admin/saas-admin.controller.ts', import.meta.url), 'utf8');
 const tenantController = readFileSync(new URL('../server/src/tenant-document-archive/tenant-document-archive.controller.ts', import.meta.url), 'utf8');
 const tenantModule = readFileSync(new URL('../server/src/tenant-document-archive/tenant-document-archive.module.ts', import.meta.url), 'utf8');
@@ -46,8 +46,8 @@ assert.match(view, /openDocumentViewer\(/);
 assert.doesNotMatch(view, /admin-document-row|admin-history-row|admin-document-drawer/);
 assert.match(history, /Admin\/Document Registry only/);
 
-assert.match(profileMigration, /tenant-document-archive\/platform-bases/);
-assert.doesNotMatch(profileMigration, /admin\/document-registry\/catalog\.js|getPlatformDocumentBases/);
+assert.match(documentRuntime, /tenant-document-archive\/platform-bases/);
+assert.doesNotMatch(documentRuntime, /admin\/document-registry\/catalog\.js|getPlatformDocumentBases/);
 assert.match(tenantController, /@Get\('platform-bases'\)/);
 assert.match(tenantController, /DocumentRegistryService/);
 assert.match(tenantModule, /DocumentRegistryModule/);
