@@ -47,6 +47,7 @@ for(const retired of [
   if(fs.existsSync(path.join(root,retired))) failures.push(`${retired}: retired runtime bridge must not exist`);
 }
 if(!fs.existsSync(path.join(root,'PROJECT_STATE.md'))) failures.push('PROJECT_STATE.md is required');
+if(!fs.existsSync(path.join(root,'UI_ALPHABET.md'))) failures.push('UI_ALPHABET.md is required');
 const branch=String(process.env.GITHUB_REF_NAME||'');
 if(branch && branch!=='main' && branch!=='staging') failures.push(`branch ${branch}: only main/staging are allowed`);
 if(failures.length){
