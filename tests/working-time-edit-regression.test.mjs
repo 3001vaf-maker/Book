@@ -42,14 +42,19 @@ assert.match(
 );
 
 assert.match(
-  journal,
-  /id:\s*'working-time'[\s\S]*?label:\s*'Время работы'[\s\S]*?openDayTime\(allMode\s*\?\s*''\s*:\s*selectedWorkplaceId\)/,
-  'Journal settings must expose working-time editing',
+  timetable,
+  /function\s+openTimetableSettingsMenu\(\)[\s\S]*?data-timetable-settings-time[\s\S]*?Время работы/,
+  'Graph A settings must expose a quick bottom working-time action for selected working dates',
 );
-assert.match(
+assert.doesNotMatch(
+  journal,
+  /working-time|openDayTime|openTimetableDayEditor/,
+  'Journal must not own schedule-time editing',
+);
+assert.doesNotMatch(
   journalDay,
-  /onWorkFieldClick:\s*\(\)\s*=>\s*onWorkplaceFieldClick\(workplaceId\)/,
-  'single-workplace Journal day must open the working-time editor from its work field',
+  /onWorkFieldClick/,
+  'Journal day view must not turn the work field into a schedule editor',
 );
 
 console.log('working-time edit regression tests: OK');
