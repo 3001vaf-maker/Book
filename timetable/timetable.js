@@ -541,7 +541,7 @@ export function renderTimetable(root) {
     const dates = selection?.getSelectedDates?.() || [];
     const canEditTime = !isAllMode() && dates.some((date) => getDay(workingDays, selectedWorkplaceId, date));
     const content = `<div class="compact-form">
-      ${canEditTime ? button('Время работы', { data: 'data-timetable-settings-time' }) : ''}
+      ${canEditTime ? button('Время работы', { variant: 'secondary', data: 'data-timetable-settings-time' }) : ''}
       ${button('Рабочее пространство', { variant: 'secondary', data: 'data-timetable-settings-workplace' })}
     </div>`;
     const m = mountModal(document.body, modal(content, { title: 'Настройки графика', variant: 'x' }));

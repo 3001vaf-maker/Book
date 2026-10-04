@@ -48,18 +48,18 @@ assert.match(
 );
 assert.match(
   timetable,
-  /button\('Время работы',[\s\S]*?data-timetable-settings-time/,
-  'Graph A settings must expose a quick bottom working-time action for selected working dates',
+  /button\('Время работы',\s*\{\s*variant:\s*'secondary',[\s\S]*?data-timetable-settings-time/,
+  'Graph A settings must expose a neutral outlined working-time action for selected working dates',
 );
 assert.match(
   journal,
   /openTimetableDayTimeEditor/,
   'Journal Day must use the compact working-time editor',
 );
-assert.doesNotMatch(
+assert.match(
   journal,
-  /id:\s*'working-time'/,
-  'Journal settings must not become a schedule editor',
+  /activeView\s*===\s*'day'\s*&&\s*!allMode[\s\S]*?id:\s*'working-time'[\s\S]*?label:\s*'Рабочее время'[\s\S]*?openDayTime\(selectedWorkplaceId\)/,
+  'Journal Day settings must expose compact working-time editing only for a concrete workplace',
 );
 assert.match(
   journalDay,
