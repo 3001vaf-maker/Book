@@ -128,7 +128,7 @@ function procedureWorkplaceCards(procedure) {
 
 function confirmDeleteProcedure(procedure, onDeleted) {
   const layer = mountModal(document.body, modal(`<div class="modal-title"><h2>Удалить?</h2><p>${escapeHtml(procedure.name || 'Процедура')} будет удалена.</p></div><div class="modal-actions">${button('Удалить', { variant: 'danger', data: 'data-confirm-delete-procedure' })}${button('Отмена', { variant: 'secondary', data: 'data-cancel-delete-procedure' })}</div>`, {
-    variant: 'bottom',
+    variant: 'x',
     title: 'Удаление процедуры',
   }));
   if (!layer) return;
