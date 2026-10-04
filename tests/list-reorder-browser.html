@@ -22,6 +22,7 @@ const items = [
 host.innerHTML = v2ListEntries(items.map((item) => v2ListEntry({
   title:item.title,
   interactive:true,
+  reorderHandle:true,
   data:`data-procedure="${item.id}" data-reorder-id="${item.id}"`,
 })));
 
