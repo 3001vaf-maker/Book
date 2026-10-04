@@ -994,7 +994,7 @@ export function initV2WorkspaceInteraction(root, {
     () => fActiveIndex,
     (index) => { fActiveIndex = index; },
     (id) => onRootSelect?.(id),
-    () => deckIsOpen() && !secondaryIsOpen(),
+    () => deckIsOpen() && !secondaryIsOpen() && !app.classList.contains('has-v2-modal'),
   );
   bindNativeDeck(
     eDeck,
@@ -1003,10 +1003,11 @@ export function initV2WorkspaceInteraction(root, {
     () => eActiveIndex,
     (index) => { eActiveIndex = index; },
     (id) => onSecondarySelect?.(id),
-    () => secondaryIsOpen(),
+    () => secondaryIsOpen() && !app.classList.contains('has-v2-modal'),
   );
 
   const eDown = (event) => {
+    if (app.classList.contains('has-v2-modal')) return;
     if (!secondaryIsOpen() || !eDeck?.contains(event.target)) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     eGesture = { id:event.pointerId, x:event.clientX, y:event.clientY, dx:0, axis:'pending' };
@@ -1088,6 +1089,7 @@ export function initV2WorkspaceInteraction(root, {
   };
 
   const zDown = (event) => {
+    if (app.classList.contains('has-v2-modal')) return;
     if (!bindZ || deckIsOpen() || zGesture || app.querySelector('[data-v2-z-layer]')) return;
     if (event.target.closest?.('[data-v2-layer], [data-v2-z-layer]')) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
