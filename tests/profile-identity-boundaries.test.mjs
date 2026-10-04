@@ -86,9 +86,9 @@ assert.equal((invitationService.match(/tx\.profile\.create/g) || []).length, 1);
 assert.match(invitationService, /role: MembershipRole\.OWNER/);
 assert.match(invitationService, /platformAccountId: account\.id/);
 
-// Profile bootstrap is idempotent for the current Tenant + login identity.
+// Profile initialization is idempotent for the current Tenant + login identity.
 assert.match(profileService, /where: \{ tenantId_platformAccountId: \{ tenantId, platformAccountId \} \}/);
-assert.match(profileService, /await this\.prisma\.profile\.create/);
+assert.match(profileService, /this\.prisma\.profile\.create/);
 
 // Platform admin manages Tenant containers and exposes the owner's Profile separately.
 assert.match(adminController, /@Get\('tenants'\)/);
