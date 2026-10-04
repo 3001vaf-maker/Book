@@ -33,7 +33,7 @@ assert.match(source, /participant\.target \? 'Добавляем' : 'Уже в �
 assert.match(source, /data-timetable-conflict-participant/);
 assert.match(source, /timetableConflictFrom\$\{entryIndex\}_\$\{participantIndex\}/);
 assert.match(source, /timetableConflictTo\$\{entryIndex\}_\$\{participantIndex\}/);
-assert.match(source, /variant: 'list'/);
+assert.match(source, /variant: 'q'/);
 assert.match(source, /function draftScheduleConflicts\(date, participants\)/);
 assert.match(source, /getWorkingTimeUsageConflicts\(\{/);
 assert.match(source, /participants\.forEach\(\(participant\) => \{[\s\S]*?updateDayTime\(workingDays, participant\.workplaceId/s);
