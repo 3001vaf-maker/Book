@@ -42,6 +42,42 @@ function sameJson(left: unknown, right: unknown) {
   return JSON.stringify(stable(left)) === JSON.stringify(stable(right));
 }
 
+function groupCapacityFromProcedures(items: JsonObject[]) {
+  if (!items.length) return 1;
+  const capacities = items.map((item) => {
+    const enabled = item?.groupBooking?.enabled === true;
+    if (!enabled) return 1;
+    return Math.max(2, Math.min(999, Math.floor(Number(item?.groupBooking?.capacity) || 2)));
+  });
+  return capacities.every((value) => value >= 2) ? Math.min(...capacities) : 1;
+}
+
+function normalizeGroup(value: unknown, fallbackPerson: unknown, allowedCapacity: number) {
+  const capacity = Math.max(1, Math.floor(Number(allowedCapacity) || 1));
+  if (capacity < 2) return null;
+  const source = objectValue(value);
+  const participants: JsonObject[] = [];
+  const seen = new Set<string>();
+  const push = (raw: unknown) => {
+    if (participants.length >= capacity) return;
+    const person = objectValue(raw);
+    const key = text(person.key) || text(person.id);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    participants.push({
+      key: text(person.key),
+      id: text(person.id),
+      name: text(person.name),
+      surname: text(person.surname),
+      phone: text(person.phone),
+      discountPercent: Math.max(0, Math.min(100, Number(person.discountPercent) || 0)),
+    });
+  };
+  arrayValue(source.participants).forEach(push);
+  if (!participants.length) push(fallbackPerson);
+  return { capacity, participants };
+}
+
 
 @Injectable()
 export class RecordService {
@@ -175,7 +211,9 @@ export class RecordService {
     await this.validateAvailability(tenantId, { date, workplaceId, from, to }, { excludeRequestId: sourceRequestId });
 
     const products = arrayValue(input.products).map((item) => clone(objectValue(item)));
-    const person = clone(objectValue(input.person));
+    let person = clone(objectValue(input.person));
+    const group = normalizeGroup(input.group, person, groupCapacityFromProcedures(procedureSnapshots));
+    if (group?.participants?.length) person = clone(group.participants[0]);
     const settlement = this.finance.calculateSettlement([
       ...procedureSnapshots.map((item) => ({ ...item, sourceType: 'procedure', sourceId: item.id })),
       ...products.map((item) => ({ ...item, sourceType: 'product', sourceId: text(item?.id) })),
@@ -191,6 +229,7 @@ export class RecordService {
       from,
       to,
       person,
+      group,
       procedures: procedureSnapshots,
       products,
       source: text(input.source) || 'manual',
@@ -348,6 +387,7 @@ export class RecordService {
     const rawProceduresChanged = !sameJson(arrayValue(current.procedures), arrayValue(incoming.procedures));
     const productsChanged = !sameJson(arrayValue(current.products), arrayValue(incoming.products));
     const personChanged = !sameJson(objectValue(current.person), objectValue(incoming.person));
+    const groupChanged = !sameJson(objectValue(current.group), objectValue(incoming.group));
     const refreshProcedures = workplaceChanged || rawProceduresChanged;
 
     let procedures = arrayValue(current.procedures).map((item) => clone(objectValue(item)));
@@ -393,7 +433,10 @@ export class RecordService {
     const products = productsChanged
       ? arrayValue(incoming.products).map((item) => clone(objectValue(item)))
       : arrayValue(current.products).map((item) => clone(objectValue(item)));
-    const person = personChanged ? clone(objectValue(incoming.person)) : clone(objectValue(current.person));
+    let person = personChanged ? clone(objectValue(incoming.person)) : clone(objectValue(current.person));
+    const groupSource = groupChanged ? incoming.group : current.group;
+    const group = normalizeGroup(groupSource, person, groupCapacityFromProcedures(procedures));
+    if (group?.participants?.length) person = clone(group.participants[0]);
     const currentFallbackSettlement = this.finance.calculateSettlement([
       ...arrayValue(current.procedures).map((item) => ({ ...objectValue(item), sourceType: 'procedure', sourceId: text(item?.id) })),
       ...arrayValue(current.products).map((item) => ({ ...objectValue(item), sourceType: 'product', sourceId: text(item?.id) })),
@@ -423,6 +466,7 @@ export class RecordService {
       from,
       to,
       person,
+      group,
       procedures,
       products,
       updatedAt: text(incoming.updatedAt) || new Date().toISOString(),
