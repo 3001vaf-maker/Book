@@ -24,6 +24,13 @@ for(const file of allFiles){
     failures.push(`${r}: feature CSS outside Shared UI is forbidden`);
   }
 }
+const mainHtml=fs.readFileSync(path.join(root,'index.html'),'utf8');
+for(const href of [...mainHtml.matchAll(/<link[^>]+rel=["']stylesheet["'][^>]+href=["']([^"']+)["']/g)].map((match)=>match[1])){
+  if(href!=='css/style.css' && !href.startsWith('ui/')){
+    failures.push(`index.html: main workspace may load only foundation and Shared UI CSS, found ${href}`);
+  }
+}
+
 for(const file of allFiles){
   const r=rel(file);
   const top=r.split('/')[0];

@@ -426,6 +426,9 @@ expect(chatRuntime.includes("attachmentTrigger: 'external'") && chatRuntime.incl
 expect(!account.includes('accountBottomNavigation') && !account.includes('bindBottomNavigation'), 'End-user V2 must not contain bottom navigation.');
 expect(!account.includes('<style>') && !booking.includes('<style>'), 'Feature code must not create local V2 style owners.');
 
+const globalFeatureCss = /\.(?:bottom-nav|nav-item|entity-list|color-picker|cost-field|duration-picker|workplace-selector|journal-list-|record-status-controls|work-time-row|app-content)/;
+expect(!globalFeatureCss.test(style), 'Global style.css must remain foundation-only; component styling belongs to Shared UI owners.');
+
 if (failures.length) {
   failures.forEach((message) => console.error(`ui v2 architecture: ${message}`));
   process.exit(1);
@@ -433,5 +436,3 @@ if (failures.length) {
 
 console.log('ui v2 architecture check: OK');
 
-const globalFeatureCss = /\.(?:bottom-nav|nav-item|entity-list|color-picker|cost-field|duration-picker|workplace-selector|journal-list-|record-status-controls|work-time-row|app-content)/;
-expect(!globalFeatureCss.test(style), 'Global style.css must remain foundation-only; component styling belongs to Shared UI owners.');
