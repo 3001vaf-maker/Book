@@ -113,7 +113,7 @@ export function openFinanceOperations(root, {
 
   const picker = mountModal(root, modal(content, {
     title,
-    variant: 'quick',
+    variant: 'bottom',
     surface: 'app',
   }));
   if (!picker) return null;

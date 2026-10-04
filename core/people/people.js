@@ -331,7 +331,7 @@ function openListSettings(root, options = {}) {
     </div>
     ${allowReal ? '' : '<p class="muted">Импорт реальных персональных данных недоступен в текущем режиме.</p>'}
   </div>`;
-  const layer = mountModal(root, modal(content, { title: 'Клиенты', variant: 'quick', surface: 'app' }));
+  const layer = mountModal(root, modal(content, { title: 'Клиенты', variant: 'bottom', surface: 'app' }));
   if (!layer) return;
   layer.querySelector('[data-people-sort-settings]')?.addEventListener('change', (event) => {
     setPeopleSortMode(event.target.value);
@@ -423,7 +423,7 @@ function openAddMenu(root, options = {}) {
     </div>
     <div class="form-error" data-add-choice-error></div>`, {
     title: 'Добавить клиента',
-    variant: 'quick',
+    variant: 'bottom',
     surface: 'app',
   }));
   if (!layer) return null;
@@ -638,7 +638,7 @@ function openPersonUeiQuick(root, key, onChanged = () => {}) {
   const identifiers = [...(person.phones || []), ...(person.telegrams || []), ...(person.emails || [])];
   const layer = mountModal(root, modal(`<div class="form-grid">${uei(ueiData(person, all))}<div class="form-error" data-uei-error></div></div>`, {
     title: 'UEI',
-    variant: 'quick',
+    variant: 'bottom',
     surface: 'app',
   }));
   if (!layer) return;
@@ -808,7 +808,7 @@ function confirmDelete(root, person, onDeleted) {
     <div class="modal-actions">
       ${button('Удалить', { variant: 'danger', data: 'data-confirm-delete' })}
       ${button('Отмена', { variant: 'secondary', data: 'data-cancel-delete' })}
-    </div>`, { title: 'Удалить', variant: 'compact', surface: 'app' }));
+    </div>`, { title: 'Удалить', variant: 'bottom', surface: 'app' }));
   if (!layer) return;
   layer.querySelector('[data-cancel-delete]')?.addEventListener('click', () => layer.v2Close?.());
   layer.querySelector('[data-confirm-delete]')?.addEventListener('click', () => {

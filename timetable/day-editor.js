@@ -94,7 +94,7 @@ export function openTimetableDayEditor({
   const rowMarkup = (entry, index) => `<div class="compact-form" data-aggregate-workplace="${escapeHtml(entry.workplaceId)}"><strong>${escapeHtml(entry.name)}</strong><div class="time-range-fields">${timePicker({ name: `aggregateFrom${index}`, label: 'Начало', value: entry.from })}${timePicker({ name: `aggregateTo${index}`, label: 'Окончание', value: entry.to })}</div><div class="form-error" data-aggregate-error="${index}" aria-live="polite"></div></div>`;
   const title = formatModalDate(day);
   const content = `<div class="compact-form"><div class="modal-title"><h2>${escapeHtml(title)}</h2></div><div data-aggregate-day-rows>${entries.map(rowMarkup).join('')}</div>${button('+ Добавить рабочее пространство', { variant: 'secondary', data: 'data-aggregate-day-add' })}${button('Применить', { data: 'data-aggregate-day-apply' })}</div>`;
-  const main = mountModal(document.body, modal(content, { title, variant: 'medium' }));
+  const main = mountModal(document.body, modal(content, { title, variant: 'q' }));
   if (!main) return null;
 
   initTimePickers(main);

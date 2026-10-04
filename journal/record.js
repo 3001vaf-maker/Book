@@ -280,7 +280,7 @@ function renderProceduresStep(modalRoot, {
       ${button('Добавить из прайса', { data: 'data-record-settings-from-price', variant: 'secondary' })}
       ${button('+ Добавить процедуру', { data: 'data-record-settings-add-procedure' })}
     </div>`;
-    const m = mountModal(document.body, modal(menu, { variant: 'quick', surface: 'app' }));
+    const m = mountModal(document.body, modal(menu, { variant: 'bottom', surface: 'app' }));
     m?.querySelector('[data-record-settings-duration]')?.addEventListener('click', () => {
       m.v2Close?.();
       const rows = recordProcedureList([...selected.entries()].map(([id, item]) => ({
@@ -435,7 +435,7 @@ function renderPersonStep(modalRoot, { date, workplaceId, from, to, procedures: 
   bindRecordSettings(modalRoot, () => {
     const m = mountModal(document.body, modal(
       `<div class="modal-actions">${button('+ Добавить клиента', { data: 'data-record-settings-add-person' })}</div>`,
-      { variant: 'quick', surface: 'app' },
+      { variant: 'bottom', surface: 'app' },
     ));
     m?.querySelector('[data-record-settings-add-person]')?.addEventListener('click', () => {
       m.v2Close?.();
