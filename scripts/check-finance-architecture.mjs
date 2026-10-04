@@ -257,7 +257,7 @@ for (const path of financeUiFiles) {
   if (/<select\b/.test(text)) errors.push(`${path}: Finance user UI must not use raw select elements`);
   if (/\b(?:alert|confirm|prompt)\s*\(/.test(text)) errors.push(`${path}: Finance user UI must not use browser dialogs`);
   for (const form of text.match(/<form\b[^>]*>/g) || []) {
-    if (!/\bnovalidate\b/.test(form)) errors.push(`${path}: Finance forms must disable native browser validation UI and surface validation through shared TOP notices`);
+    if (!/\bnovalidate\b/.test(form)) errors.push(`${path}: Finance forms must disable native browser validation UI and surface validation through shared S notices`);
   }
 }
 
@@ -267,7 +267,7 @@ if (!/openNotice\(\{ title = 'Внимание', message = '', surface = 'app'/.
   errors.push('Shared user notices must be locked to canonical S');
 }
 if (/data-notice-close|action = 'ОК'/.test(modalUI)) {
-  errors.push('Top shared notices must contain information only and close by gesture');
+  errors.push('S notices must contain information only and close by gesture');
 }
 if (!/resolvedVariant === 'x' \|\| resolvedVariant === 's'/.test(modalUI)) {
   errors.push('Shared X/S modals must not render a close button');
