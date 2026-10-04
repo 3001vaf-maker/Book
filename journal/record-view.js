@@ -1,6 +1,7 @@
 import {
   button,
   durationText,
+  field,
   select,
   openSharedProfileSettingsMenu,
   modal,
@@ -9,6 +10,7 @@ import {
   mountRecordZ,
   recordZHost,
   recordConfirmationMiniCard,
+  recordPersonList,
   setRecordPrimaryAction,
   bindRecordSettings,
 } from '../ui/ui.js';
@@ -16,7 +18,7 @@ import { getRecordPaymentState, recordSettlementItems, repriceSettlement, refres
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getAllPeople } from '../core/people/data.js';
 import { personDisplay } from '../core/people/presentation.js';
-import { getRecords } from '../core/record/index.js';
+import { getRecords, normalizeRecordGroup, recordCapacity, recordParticipantCount, recordParticipants } from '../core/record/index.js';
 import { updateRecord, cancelRecord, deleteRecord, refreshRecordsFromServer } from '../core/record/index.js';
 import { journalRecordActionContext } from './record-action-context.js';
 import { getProfile } from '../settings/profile/data.js';
@@ -76,6 +78,7 @@ const stateSnapshot = (state) => JSON.stringify({
   from: String(state.from || ''),
   to: String(state.to || ''),
   person: state.person || null,
+  group: state.group || null,
   procedures: Array.isArray(state.procedures) ? state.procedures : [],
   products: Array.isArray(state.products) ? state.products : [],
   confirmed: Boolean(state.confirmed),
@@ -87,6 +90,7 @@ const stateFromRecord = (record, { paid = false } = {}) => ({
   from: record.from,
   to: record.to,
   person: record.person ? { ...record.person } : null,
+  group: record.group ? { ...record.group, participants: recordParticipants(record).map((person) => ({ ...person })) } : null,
   procedures: Array.isArray(record.procedures) ? record.procedures.map((item) => ({ ...item })) : [],
   products: Array.isArray(record.products) ? record.products.map((item) => ({ ...item })) : [],
   finance: record.finance ? {
@@ -154,7 +158,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
   let finishClose = () => {};
   const m = mountRecordZ({
     ...recordOwnerOptions({ settings: true, chatPersonKey: state.person?.key || '' }),
-    title: personDisplay(findPerson(record) || state.person || {}).name || 'Запись',
+    title: state.group ? 'Групповая запись' : (personDisplay(findPerson(record) || state.person || {}).name || 'Запись'),
     className: 'record-view-z',
     onClose: () => finishClose(),
   });
@@ -180,6 +184,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       from: state.from,
       to: state.to,
       person: state.person,
+      group: state.group,
       procedures: state.procedures,
       products: state.products,
       confirmed: Boolean(state.confirmed),
@@ -275,6 +280,120 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     });
   };
 
+  const openGroupCapacityEditor = () => {
+    const currentRecord = { ...record, ...state };
+    const count = recordParticipantCount(currentRecord);
+    const currentCapacity = Math.max(2, recordCapacity(currentRecord));
+    const layer = mountModal(document.body, modal(
+      `<div class="compact-form">${field({
+        label: 'Количество мест',
+        name: 'recordViewGroupCapacity',
+        type: 'number',
+        value: String(currentCapacity),
+        min: '2',
+        max: '999',
+        step: '1',
+        inputmode: 'numeric',
+      })}<div class="form-error" data-record-view-group-capacity-error aria-live="polite"></div>${button('Сохранить', { data: 'data-record-view-group-capacity-save' })}</div>`,
+      { variant: 'x', surface: 'app', title: state.group ? 'Количество мест' : 'Групповая запись', className: 'modal--form-sheet' },
+    ));
+    layer?.querySelector('[data-record-view-group-capacity-save]')?.addEventListener('click', () => {
+      const input = layer.querySelector('input[name="recordViewGroupCapacity"]');
+      const nextCapacity = Math.floor(Number(input?.value) || 0);
+      const error = layer.querySelector('[data-record-view-group-capacity-error]');
+      if (nextCapacity < 2) {
+        if (error) error.textContent = 'Минимум 2 места.';
+        return;
+      }
+      if (nextCapacity < count) {
+        if (error) error.textContent = `Сейчас участников: ${count}. Сначала уменьшите их количество.`;
+        return;
+      }
+      const participants = recordParticipants(currentRecord);
+      state = {
+        ...state,
+        person: participants[0] || state.person,
+        group: normalizeRecordGroup({ capacity: nextCapacity, participants }, state.person),
+      };
+      layer.v2Close?.();
+      render();
+    });
+  };
+
+  const openGroupParticipantsEditor = () => {
+    const currentRecord = { ...record, ...state };
+    const capacity = recordCapacity(currentRecord);
+    if (capacity < 2) return;
+    const all = people();
+    const selected = new Set(recordParticipants(currentRecord)
+      .map((person) => String(person?.key || person?.id || ''))
+      .filter(Boolean));
+    const rows = recordPersonList(all.map((person) => {
+      const display = personDisplay(person);
+      return {
+        key: person.key || person.id,
+        name: display.name,
+        uei: display.uei,
+        phone: display.phone,
+        aria: `Выбрать человека ${display.name}`,
+      };
+    }), {
+      data: 'data-record-view-group-person',
+      empty: 'Люди не найдены.',
+    });
+    const layer = mountModal(document.body, modal(
+      `<div class="compact-form"><div><strong data-record-view-group-count>${selected.size} / ${capacity}</strong></div><div data-record-view-group-list>${rows}</div><div class="form-error" data-record-view-group-error aria-live="polite"></div>${button('Сохранить', { data: 'data-record-view-group-save' })}</div>`,
+      { variant: 'x', surface: 'app', title: 'Участники', className: 'modal--form-sheet' },
+    ));
+    const listRoot = layer?.querySelector('[data-record-view-group-list]');
+    if (!layer || !listRoot) return;
+
+    const sync = () => {
+      listRoot.querySelectorAll('[data-record-view-group-person]').forEach((node) => {
+        const key = String(node.dataset.recordViewGroupPerson || '');
+        const active = selected.has(key);
+        node.classList.toggle('is-selected', active);
+        node.setAttribute('aria-pressed', String(active));
+      });
+      const count = layer.querySelector('[data-record-view-group-count]');
+      if (count) count.textContent = `${selected.size} / ${capacity}`;
+    };
+    sync();
+
+    listRoot.querySelectorAll('[data-record-view-group-person]').forEach((node) => {
+      node.addEventListener('click', () => {
+        const key = String(node.dataset.recordViewGroupPerson || '');
+        if (!key) return;
+        const error = layer.querySelector('[data-record-view-group-error]');
+        if (selected.has(key)) selected.delete(key);
+        else if (selected.size >= capacity) {
+          if (error) error.textContent = `Можно выбрать не больше ${capacity} человек.`;
+          return;
+        } else selected.add(key);
+        if (error) error.textContent = '';
+        sync();
+      });
+    });
+
+    layer.querySelector('[data-record-view-group-save]')?.addEventListener('click', () => {
+      const keys = [...selected];
+      if (!keys.length) {
+        const error = layer.querySelector('[data-record-view-group-error]');
+        if (error) error.textContent = 'Выберите хотя бы одного человека.';
+        return;
+      }
+      const participants = keys.map((key) => all.find((person) => String(person?.key || person?.id || '') === String(key))).filter(Boolean);
+      const group = normalizeRecordGroup({ capacity, participants }, state.person);
+      state = {
+        ...state,
+        person: group?.participants?.[0] || state.person,
+        group,
+      };
+      layer.v2Close?.();
+      render();
+    });
+  };
+
   const confirmHardDelete = () => {
     const layer = mountModal(document.body, modal(
       `<div class="modal-title"><h2>Удалить запись полностью?</h2><p>Запись, её история и связанные данные оплаты будут удалены без восстановления.</p></div>
@@ -327,6 +446,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       uei: person.uei,
       name: person.name,
       phone: person.phone,
+      groupText: state.group ? `Участники: ${recordParticipantCount({ ...record, ...state })} / ${recordCapacity({ ...record, ...state })}` : '',
       duration: durationText(totalDuration),
       discount: Number(discountPercent) > 0 ? `${formatPercent(discountPercent)}%` : '0%',
       total: formatMoney(finance?.planTotal),
@@ -435,6 +555,16 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
           id: 'move',
           label: 'Перенос',
           onSelect: openRecordEditSelector,
+        } : null,
+        !cancelled && state.group ? {
+          id: 'group-capacity',
+          label: 'Количество мест',
+          onSelect: openGroupCapacityEditor,
+        } : null,
+        !cancelled && state.group ? {
+          id: 'group-participants',
+          label: 'Участники',
+          onSelect: openGroupParticipantsEditor,
         } : null,
         !cancelled ? {
           id: 'cancel',
