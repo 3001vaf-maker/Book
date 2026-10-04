@@ -7,7 +7,7 @@ const peopleData = read('core/people/data.js');
 const peopleUi = read('core/people/people.js');
 const browserConsents = read('settings/documents/consents.js');
 const businessState = read('server/src/business-state/business-state.service.ts');
-const runtime = read('core/runtime/document-state.js');
+const runtime = read('core/runtime/tenant-document-archive.js');
 const policy = read('server/src/tenant-document-archive/consent-policy.service.ts');
 const cleanupMigration = read('server/prisma/migrations/20260919124500_remove_legacy_business_person_agreements/migration.sql');
 
