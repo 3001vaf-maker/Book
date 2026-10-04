@@ -28,7 +28,7 @@ assert.match(people, /button\('Из контактов', \{ variant: 'secondary'
 assert.match(people, /button\('Ввести вручную', \{ variant: 'secondary'/);
 assert.match(people, /personCreateForm\(preset\)/);
 
-assert.match(people, /variant:\s*'quick'/);
+assert.match(people, /variant:\s*'x'/);
 assert.match(people, /Выгрузить/);
 assert.match(people, /Загрузить/);
 assert.match(people, /Шаблон/);
@@ -46,10 +46,10 @@ assert.match(people, /openSharedProfileSettingsMenu\(\{/);
 assert.match(people, /id: 'code', label: 'Код'/);
 assert.match(people, /id: 'documents', label: 'Документы \/ согласия'/);
 assert.match(people, /id: 'history', label: 'История'/);
-assert.match(people, /variant: 'bottom'/);
+assert.match(people, /variant: 'x'/);
 assert.match(people, /variant: 'q'/);
 assert.match(people, /documentTiles\(documents\.map/);
-assert.match(people, /variant: 'top'/);
+assert.match(people, /variant: 's'/);
 assert.match(people, /openEntityCardAppearanceQ\(root/);
 assert.match(people, /allowPhoto: false/);
 assert.match(people, /entityVisualCard\(\{/);
