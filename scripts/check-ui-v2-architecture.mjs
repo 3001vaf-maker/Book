@@ -1,6 +1,12 @@
 import fs from 'node:fs';
 
-const ui = fs.readFileSync('ui/v2/index.js', 'utf8');
+const ui = [
+  'ui/v2/index.js',
+  'ui/v2/render.js',
+  'ui/v2/z-stack.js',
+  'ui/v2/modal-layer.js',
+  'ui/v2/gestures.js',
+].map((file) => fs.readFileSync(file, 'utf8')).join('\n');
 const css = fs.readFileSync('ui/v2/v2.css', 'utf8');
 const facade = fs.readFileSync('ui/ui.js', 'utf8');
 const documentUi = fs.readFileSync('ui/documents/index.js', 'utf8');
