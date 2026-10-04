@@ -24,8 +24,8 @@ function monthDayKey(date) {
 function parseMonthDay(value = '') {
   const text = String(value || '').trim();
   const direct = text.match(/^(\d{2})-(\d{2})$/);
-  const legacy = text.match(/^\d{4}-(\d{2})-(\d{2})$/);
-  const match = direct || legacy;
+  const fullDate = text.match(/^\d{4}-(\d{2})-(\d{2})$/);
+  const match = direct || fullDate;
   if (!match) return null;
   const month = Number(match[1]);
   const day = Number(match[2]);
