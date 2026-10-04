@@ -4,39 +4,35 @@ import {
   collectRepeatedEntries,
   collectTags,
   emptyState,
-  entityCard,
+  entityVisualCard,
   documentTile,
   documentTiles,
   escapeHtml,
   field,
   initLinks,
   initMonthDayPickers,
-  initPhotoField,
   initRepeatedFields,
   initTags,
   initUEI,
   links,
   list,
-  miniCard,
   modal,
   monthDayPicker,
   mountModal,
   mountV2ZLayer,
-  openDocumentViewer,
   page,
-  photoField,
   repeatedField,
   select,
   shortDateTime,
   tags,
   uei,
-  v2HorizontalRail,
   v2ListEntry,
   v2ListEntries,
-  v2RailCard,
   v2Section,
   v2ZLayer,
   workspaceHeaderContext,
+  openEntityCardAppearanceQ,
+  openSharedProfileSettingsMenu,
 } from '../../ui/ui.js';
 import { applyUEI, detachUEI, getMembers, getOptions, getUEI } from '../uei.js';
 import { getTags } from '../../settings/tags/data.js';
@@ -44,14 +40,15 @@ import { getDocuments } from '../../settings/documents/data.js';
 import { getConsents } from '../../settings/documents/consents.js';
 import { createPerson, getAllPeople, getPeople, savePeople } from './data.js';
 import { bindPersonCreateForm, personCreateForm } from './create.js';
-import { getPersonMetadata, formatPersonVisitDate } from './metadata.js';
 import { personDisplay } from './presentation.js';
+import { personCardAppearance, personCardFields } from './card-presentation.js';
+import { getPersonHistory } from './history.js';
+import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-appearance-templates.js';
 import { getPeopleSortMode, setPeopleSortMode } from './view-state.js';
 import { canUseRealPersonalData } from '../access.js';
 
 const name = (person) => [person?.name, person?.surname].filter(Boolean).join(' ').trim() || 'Без имени';
 const money = (value) => new Intl.NumberFormat('ru-RU').format(Number(value || 0)) + ' ₽';
-const initial = (person) => name(person).slice(0, 1).toUpperCase() || '?';
 const initials = (person) => [person?.name, person?.surname].filter(Boolean).slice(0, 2).map((part) => String(part).slice(0, 1).toUpperCase()).join('') || '?';
 
 function notifyContext() {
@@ -117,21 +114,22 @@ function personIdentityMembers(person) {
   return members.length ? members : [person];
 }
 
-function currentConsentFacts(person, documentId) {
+function personConsentFactMatches(person, fact) {
   const members = personIdentityMembers(person);
   const accounts = new Set(members.flatMap((item) => Array.isArray(item.accounts) ? item.accounts : []).map(String).filter(Boolean));
   const phones = new Set(members.flatMap((item) => Array.isArray(item.phones) ? item.phones : []).map(canonicalPhone).filter(Boolean));
   const emails = new Set(members.flatMap((item) => Array.isArray(item.emails) ? item.emails : []).map((value) => String(value || '').trim().toLowerCase()).filter(Boolean));
   const telegrams = new Set(members.flatMap((item) => Array.isArray(item.telegrams) ? item.telegrams : []).map((value) => String(value || '').trim()).filter(Boolean));
-  const relevant = getConsents().filter((fact) => {
-    if (fact.documentId !== documentId) return false;
-    if (documentId === 'pdn-consent') return fact.subjectType==='ACCOUNT' && accounts.has(String(fact.subjectKey || ''));
-    if (documentId !== 'messages-consent' || fact.subjectType!=='CONTACT_POINT') return false;
-    if (fact.contactType === 'PHONE') return phones.has(canonicalPhone(fact.contactValue));
-    if (fact.contactType === 'EMAIL') return emails.has(String(fact.contactValue || '').trim().toLowerCase());
-    if (fact.contactType === 'TELEGRAM') return telegrams.has(String(fact.contactValue || '').trim());
-    return false;
-  });
+  if (fact?.subjectType === 'ACCOUNT') return accounts.has(String(fact.subjectKey || ''));
+  if (fact?.subjectType !== 'CONTACT_POINT') return false;
+  if (fact.contactType === 'PHONE') return phones.has(canonicalPhone(fact.contactValue));
+  if (fact.contactType === 'EMAIL') return emails.has(String(fact.contactValue || '').trim().toLowerCase());
+  if (fact.contactType === 'TELEGRAM') return telegrams.has(String(fact.contactValue || '').trim());
+  return false;
+}
+
+function currentConsentFacts(person, documentId) {
+  const relevant = getConsents().filter((fact) => fact.documentId === documentId && personConsentFactMatches(person, fact));
   const latestBySubject = new Map();
   for (const fact of relevant) {
     const key = `${fact.subjectType}:${fact.subjectKey}:${fact.documentId}`;
@@ -154,39 +152,46 @@ function consentStatusState(state, fact) {
   return 'pending';
 }
 
-function personConsentTile(person, documentId, fallbackTitle) {
-  const documentItem = getDocuments().find((item) => item.id === documentId);
-  const state = personConsentState(person, documentId);
+function personDocuments(person) {
+  const documents = getDocuments().filter((item) => !item.hidden);
+  const byId = new Map(documents.map((item) => [String(item.id || ''), item]));
+  const relevantIds = new Set(getConsents()
+    .filter((fact) => personConsentFactMatches(person, fact))
+    .map((fact) => String(fact.documentId || ''))
+    .filter(Boolean));
+  return documents.filter((item) => item.personConsent || relevantIds.has(String(item.id || '')))
+    .concat([...relevantIds].filter((id) => !byId.has(id)).map((id) => ({
+      id, title: id, version: 1, text: '', personConsent: true,
+    })));
+}
+
+function personDocumentTile(person, documentItem) {
+  const state = personConsentState(person, documentItem.id);
   const fact = state.fact;
-  const title = documentItem?.title || fallbackTitle || 'Согласие';
-  const version = fact?.documentVersion || documentItem?.version || 1;
   return documentTile({
-    title,
-    version,
+    title: documentItem.title || 'Документ',
+    version: fact?.documentVersion || documentItem.version || 1,
     status: state.active ? 'Подписано' : consentStatus(fact),
     statusState: consentStatusState(state, fact),
-    data: `data-person-consent="${escapeHtml(documentId)}"`,
-    aria: `Открыть ${title}`,
+    data: `data-person-document="${escapeHtml(documentItem.id)}"`,
+    aria: `Открыть информацию о документе ${documentItem.title || ''}`,
   });
 }
 
-function openPersonConsent(root, person, documentId) {
-  const documentItem = getDocuments().find((item) => item.id === documentId);
-  const state = personConsentState(person, documentId);
+function openPersonDocumentInfo(root, person, documentId) {
+  const documentItem = personDocuments(person).find((item) => String(item.id) === String(documentId));
+  if (!documentItem) return null;
+  const state = personConsentState(person, documentItem.id);
   const fact = state.fact;
-  const title = documentItem?.title || 'Согласие';
   const status = state.active ? 'Подписано' : consentStatus(fact);
-  const version = fact?.documentVersion || documentItem?.version || 1;
-  const scope = documentId === 'messages-consent' && state.count > 1
-    ? `<div><span>Контакты</span><strong>${escapeHtml(state.count)}</strong></div>`
-    : '';
+  const version = fact?.documentVersion || documentItem.version || 1;
+  const scope = state.count > 1 ? `<div><span>Фактов</span><strong>${escapeHtml(state.count)}</strong></div>` : '';
   const html = `${documentTiles([documentTile({
-      title,
+      title: documentItem.title || 'Документ',
       version,
       status,
       statusState: consentStatusState(state, fact),
-      data: 'data-person-consent-document',
-      aria: `Открыть документ ${title}`,
+      interactive: false,
     })], { layout: 'rail' })}
     <div class="entity-details">
       <div><span>Статус</span><strong>${escapeHtml(status)}</strong></div>
@@ -196,11 +201,41 @@ function openPersonConsent(root, person, documentId) {
       ${scope}
     </div>
     ${fact ? '' : '<p class="muted">Подтверждение отсутствует.</p>'}`;
-  const layer = mountModal(root, modal(html, { title, variant: 'top', surface: 'app' }));
-  layer?.querySelector('[data-person-consent-document]')?.addEventListener('click', () => openDocumentViewer({
-    title,
-    version,
-    content: String(documentItem?.text || documentItem?.content || ''),
+  return mountModal(root, modal(html, { title: documentItem.title || 'Документ', variant: 'top', surface: 'app' }));
+}
+
+function openPersonDocuments(root, person) {
+  const documents = personDocuments(person);
+  const body = documents.length
+    ? documentTiles(documents.map((item) => personDocumentTile(person, item)), { layout: 'rail' })
+    : emptyState('Документов пока нет', 'Документы и согласия этого человека появятся здесь.');
+  const layer = mountModal(root, modal(body, { title: 'Документы / согласия', variant: 'bottom', surface: 'app' }));
+  layer?.querySelectorAll('[data-person-document]').forEach((node) => {
+    node.addEventListener('click', () => openPersonDocumentInfo(root, person, node.dataset.personDocument));
+  });
+  return layer;
+}
+
+function personHistoryMarkup(person) {
+  const items = getPersonHistory(person.key);
+  if (!items.length) return emptyState('Истории пока нет', 'Здесь появятся записи, продажи и связанные события.');
+  return v2ListEntries(items.map((item) => v2ListEntry({
+    overline: item.kind === 'finance' ? 'Продажа / операция' : 'Запись',
+    title: item.title || (item.kind === 'finance' ? 'Финансовая операция' : 'Запись'),
+    subtitle: item.subtitle || '',
+    rightTop: item.amount == null ? shortDateTime(item.occurredAt, '') : money(item.amount),
+    rightBottom: item.amount == null ? '' : shortDateTime(item.occurredAt, ''),
+    interactive: false,
+    initial: '',
+  })));
+}
+
+function openPersonHistoryQ(root, person) {
+  return mountModal(root, modal(`${workspaceHeaderContext({ title: 'История', hideD: true })}<section data-person-history>${personHistoryMarkup(person)}</section>`, {
+    title: 'История',
+    variant: 'q',
+    surface: 'app',
+    className: 'people-history-q',
   }));
 }
 
@@ -288,6 +323,7 @@ function openListSettings(root, options = {}) {
   const content = `<div class="people-list-settings">
     ${select({ label: 'Сортировка', value: getPeopleSortMode(), options: sortOptions(), aria: 'Сортировка', data: 'data-people-sort-settings' })}
     <div class="people-list-settings__actions">
+      ${button('Вид', { variant: 'secondary', data: 'data-people-appearance' })}
       ${button('Выгрузить', { variant: 'secondary', data: 'data-export' })}
       ${button('Загрузить', { variant: 'secondary', data: 'data-import', disabled: !allowReal })}
       ${button('Шаблон', { variant: 'secondary', data: 'data-template' })}
@@ -301,6 +337,10 @@ function openListSettings(root, options = {}) {
     setPeopleSortMode(event.target.value);
     refreshPeopleList(root);
   });
+  layer.querySelector('[data-people-appearance]')?.addEventListener('click', () => {
+    layer.v2Close?.();
+    openPeopleAppearanceQ(root, options);
+  });
   layer.querySelector('[data-export]')?.addEventListener('click', () => downloadCsv(false));
   layer.querySelector('[data-template]')?.addEventListener('click', () => downloadCsv(true));
   layer.querySelector('[data-import]')?.addEventListener('click', () => layer.querySelector('[data-file]')?.click());
@@ -309,6 +349,32 @@ function openListSettings(root, options = {}) {
       layer.v2Close?.();
       renderPeople(root, options);
     });
+  });
+}
+
+function openPeopleAppearanceQ(root, options = {}) {
+  const values = getPeople();
+  const sample = values[0] || {
+    key: '', name: 'Имя', surname: 'Фамилия', phones: ['+7 900 000-00-00'],
+    emails: [], telegrams: [], uei: '0000', photo: '',
+  };
+  return openEntityCardAppearanceQ(root, {
+    title: 'Вид',
+    typeLabel: 'Карта',
+    typeOptions: [{ value: 'person', label: 'Клиент' }],
+    initialType: 'person',
+    targetOptions: () => [],
+    allowPhoto: false,
+    resolve: () => ({
+      appearance: personCardAppearance(sample),
+      fields: personCardFields(sample),
+      photo: sample.photo || '',
+      photoPosition: '50% 50%',
+    }),
+    save: async ({ appearance }) => {
+      saveCardAppearanceTemplate('person', { appearance, photo: '', photoPosition: '50% 50%' });
+    },
+    onSaved: () => renderPeople(root, options),
   });
 }
 
@@ -431,11 +497,10 @@ function personContext(person) {
   });
 }
 
-function bindPersonContext(root, person, options = {}, { onIdentityChange = null, onPersonChange = null } = {}) {
+function bindPersonContext(root, person, options = {}, { onIdentityChange = null } = {}) {
   root.querySelector('[data-person-settings]')?.addEventListener('click', () => {
     openPersonSettings(root, person.key, {
       onIdentityChange: (nextKey) => onIdentityChange?.(nextKey),
-      onPersonChange: (nextKey) => onPersonChange?.(nextKey),
     });
   });
   root.querySelector('[data-person-direct-chat]')?.addEventListener('click', () => {
@@ -443,31 +508,15 @@ function bindPersonContext(root, person, options = {}, { onIdentityChange = null
   });
 }
 
-function metricRail(person) {
-  const meta = getPersonMetadata(person.key);
-  const items = [
-    { value: String(meta.recordCount), label: 'записей' },
-    { value: money(meta.paidTotal), label: 'сумма' },
-    { value: formatPersonVisitDate(meta.lastVisit), label: 'посещение' },
-  ];
-  return v2HorizontalRail(items.map((item) => v2RailCard({
-    title: item.value,
-    subtitle: item.label,
-    className: 'people-metric-card',
-  })).join(''), { className: 'people-metrics' });
-}
-
 function overviewCard(person) {
   const display = personDisplay(person);
-  return entityCard({
-    id: display.uei,
-    title: display.name,
-    subtitle: display.phone,
+  return entityVisualCard({
+    appearance: personCardAppearance(person),
+    fields: personCardFields(person),
     image: person.photo || '',
-    initial: initial(person),
+    imagePosition: '50% 50%',
     interactive: true,
     data: 'data-person-card',
-    className: 'entity-card--hero',
     aria: `Открыть данные ${display.name}`,
   });
 }
@@ -481,14 +530,10 @@ function renderPersonOverview(layer, baseRoot, key, options = {}) {
   }
   layer.innerHTML = page([
     personContext(person),
-    `<section class="people-overview">
-      <div>${metricRail(person)}</div>
-      <div class="people-card-wrap">${overviewCard(person)}</div>
-    </section>`,
+    `<section class="people-overview"><div class="people-card-wrap">${overviewCard(person)}</div></section>`,
   ]);
   bindPersonContext(layer, person, options, {
     onIdentityChange: (nextKey) => renderPersonOverview(layer, baseRoot, nextKey || key, options),
-    onPersonChange: (nextKey) => renderPersonOverview(layer, baseRoot, nextKey || key, options),
   });
   layer.querySelector('[data-person-card]')?.addEventListener('click', () => {
     openPersonEdit(layer, baseRoot, person.key, options, {
@@ -571,131 +616,18 @@ function ueiData(person, all) {
   };
 }
 
-function settingsCards(person) {
-  const pdn = personConsentState(person, 'pdn-consent');
-  const messages = personConsentState(person, 'messages-consent');
-  const members = person.uei ? getMembers(person.uei).length : 0;
-  const consentCards = [
-    personConsentTile(person, 'pdn-consent', 'Согласие ПДН'),
-    personConsentTile(person, 'messages-consent', 'Согласие на рассылки'),
-  ];
-  return `<div class="people-person-settings">
-    <section class="people-settings-section" aria-label="UEI">
-      ${miniCard({
-        title: 'UEI',
-        value: person.uei || 'Не присвоен',
-        subtitle: members > 1 ? `Связано профилей: ${members}` : 'Идентификатор человека',
-        interactive: true,
-        data: 'data-person-uei-card',
-        aria: 'Настроить UEI',
-      })}
-    </section>
-    <section class="people-settings-section" aria-label="Фото">
-      ${miniCard({
-        title: 'Фото',
-        value: name(person),
-        subtitle: person.photo ? 'Фото сохранено' : 'Фото не добавлено',
-        image: person.photo || '',
-        surface: 'photo',
-        actionLabel: person.photo ? 'Изменить' : 'Добавить',
-        interactive: true,
-        data: 'data-person-photo-card',
-        aria: person.photo ? 'Изменить фото' : 'Добавить фото',
-      })}
-    </section>
-    <section class="people-settings-section" aria-label="Согласия">
-      ${documentTiles(consentCards, { layout: 'rail', className: 'people-consent-cards' })}
-    </section>
-  </div>`;
-}
-
-function refreshPersonIdentityPresentation(modalRoot, key) {
+function openPersonSettings(root, key, { onIdentityChange = null } = {}) {
   const person = getAllPeople().find((item) => item.key === key);
-  const surface = modalRoot?.parentElement?.matches?.('[data-v2-z-layer]') ? modalRoot.parentElement : null;
-  if (!person || !surface) return;
-  const metrics = surface.querySelector('.people-metrics');
-  if (metrics) metrics.outerHTML = metricRail(person);
-  const id = surface.querySelector('[data-person-card] .entity-card__id');
-  if (id) id.textContent = person.uei || '';
-}
-
-function bindSettingsCards(modalRoot, key, { onIdentityChange = null, onSettingsChange = null } = {}) {
-  const person = getAllPeople().find((item) => item.key === key);
-  if (!person) {
-    modalRoot.v2Close?.();
-    return;
-  }
-  const host = modalRoot.querySelector('[data-person-settings-host]');
-  if (!host) return;
-  host.innerHTML = settingsCards(person);
-  host.querySelector('[data-person-uei-card]')?.addEventListener('click', () => {
-    openPersonUeiQuick(modalRoot, person.key, (nextKey) => {
-      if (nextKey && nextKey !== person.key) {
-        modalRoot.v2Close?.();
-        onIdentityChange?.(nextKey);
-        return;
-      }
-      bindSettingsCards(modalRoot, person.key, { onIdentityChange, onSettingsChange });
-      refreshPersonIdentityPresentation(modalRoot, person.key);
-      onSettingsChange?.();
-    });
-  });
-  host.querySelector('[data-person-photo-card]')?.addEventListener('click', () => {
-    openPersonPhotoEditor(modalRoot, person.key, () => {
-      bindSettingsCards(modalRoot, person.key, { onIdentityChange, onSettingsChange });
-      onSettingsChange?.();
-    });
-  });
-  host.querySelectorAll('[data-person-consent]').forEach((row) => {
-    row.addEventListener('click', () => openPersonConsent(modalRoot, person, row.dataset.personConsent));
-  });
-}
-
-function openPersonSettings(root, key, { onIdentityChange = null, onPersonChange = null } = {}) {
-  const layer = mountModal(root, modal('<div data-person-settings-host></div>', {
-    title: 'Настройки клиента',
-    variant: 'standard',
-    surface: 'app',
-  }));
-  if (!layer) return null;
-  let changed = false;
-  const close = layer.v2Close;
-  layer.v2Close = () => {
-    const wasConnected = layer.isConnected;
-    close?.();
-    if (wasConnected && changed) onPersonChange?.(key);
-  };
-  bindSettingsCards(layer, key, {
-    onIdentityChange,
-    onSettingsChange: () => { changed = true; },
-  });
-  return layer;
-}
-
-function openPersonPhotoEditor(root, key, onSaved = () => {}) {
-  const all = getAllPeople();
-  const person = all.find((item) => item.key === key);
   if (!person) return null;
-  const layer = mountModal(root, modal(`<div class="people-photo-editor">
-    ${photoField({ name: 'photo', value: person.photo || '' })}
-    <div class="modal-actions">${button('Сохранить', { data: 'data-person-photo-save' })}</div>
-  </div>`, {
-    title: 'Фото',
-    variant: 'standard',
-    surface: 'app',
-  }));
-  if (!layer) return null;
-  initPhotoField(layer);
-  layer.querySelector('[data-person-photo-save]')?.addEventListener('click', () => {
-    const current = getAllPeople();
-    const next = current.find((item) => item.key === key);
-    if (!next) return;
-    next.photo = layer.querySelector('[data-photo-value]')?.value || '';
-    savePeople(current);
-    layer.v2Close?.();
-    onSaved(next);
+  return openSharedProfileSettingsMenu({
+    title: name(person),
+    actions: [
+      { id: 'code', label: 'Код', onSelect: () => openPersonUeiQuick(root, person.key, (nextKey) => onIdentityChange?.(nextKey || person.key)) },
+      { id: 'documents', label: 'Документы / согласия', onSelect: () => openPersonDocuments(root, person) },
+      { id: 'history', label: 'История', onSelect: () => openPersonHistoryQ(root, person) },
+    ],
+    data: 'data-person-settings-menu',
   });
-  return layer;
 }
 
 function openPersonUeiQuick(root, key, onChanged = () => {}) {
@@ -958,18 +890,7 @@ function openPersonEdit(parentLayer, baseRoot, key, options = {}, callbacks = {}
       if (!nextKey || nextKey === key) return;
       layer.v2Close?.();
       renderPersonOverview(parentLayer, baseRoot, nextKey, options);
-    },
-    onPersonChange: (nextKey) => {
-      const resolvedKey = nextKey || key;
-      const nextPerson = getAllPeople().find((item) => item.key === resolvedKey);
-      const context = layer.querySelector('[data-workspace-context-action]');
-      if (nextPerson && context) {
-        context.dataset.workspaceAImage = nextPerson.photo || '';
-        context.dataset.workspaceAInitials = initials(nextPerson);
-        notifyContext();
-      }
-      renderPersonOverview(parentLayer, baseRoot, resolvedKey, options);
-    },
+    }
   });
   syncAction();
   return layer;

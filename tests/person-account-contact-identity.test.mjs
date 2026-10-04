@@ -28,6 +28,8 @@ assert.doesNotMatch(identity, /updateUEI\(/, 'Contact conflict handling must not
 assert.match(identity, /async syncLinkedPeople\(account:/);
 assert.match(identity, /accountIds\(objectValue\(row\.data\)\)\.includes\(accountId\)/);
 assert.match(identity, /this\.enrichPerson\(row\.data, accountId, contacts\)/);
+assert.match(identity, /photo: contacts\.profilePhoto/);
+assert.match(identity, /profilePhoto: text\(profileData\.photo\)/);
 assert.doesNotMatch(identity, /accountContact\.(?:create|update|upsert|delete)/, 'Person synchronization must never write back into global Account contacts');
 
 const updateBlock = booking.slice(

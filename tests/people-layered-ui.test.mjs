@@ -42,13 +42,20 @@ assert.match(people, /dirty \? 'Сохранить' : 'Удалить'/);
 assert.match(people, /layer\.v2Close\?\.\(\);[\s\S]*callbacks\.onSaved/);
 assert.doesNotMatch(people, /data-workspace-back-source/);
 
-assert.match(people, /title:\s*'UEI'/);
-assert.match(people, /title:\s*'Фото'/);
-assert.match(people, /personConsentTile\(person, 'pdn-consent', 'Согласие ПДН'\)/);
-assert.match(people, /personConsentTile\(person, 'messages-consent', 'Согласие на рассылки'\)/);
-assert.match(people, /documentTiles\(consentCards, \{ layout: 'rail'/);
-assert.doesNotMatch(people, /miniCardRail\(consentCards/);
-assert.match(people, /openPersonPhotoEditor/);
+assert.match(people, /openSharedProfileSettingsMenu\(\{/);
+assert.match(people, /id: 'code', label: 'Код'/);
+assert.match(people, /id: 'documents', label: 'Документы \/ согласия'/);
+assert.match(people, /id: 'history', label: 'История'/);
+assert.match(people, /variant: 'bottom'/);
+assert.match(people, /variant: 'q'/);
+assert.match(people, /documentTiles\(documents\.map/);
+assert.match(people, /variant: 'top'/);
+assert.match(people, /openEntityCardAppearanceQ\(root/);
+assert.match(people, /allowPhoto: false/);
+assert.match(people, /entityVisualCard\(\{/);
+assert.doesNotMatch(people, /openPersonPhotoEditor/);
+assert.doesNotMatch(people, /data-person-photo-card/);
+assert.doesNotMatch(people, /metricRail\(/);
 assert.match(people, /showApply:\s*false/);
 assert.match(people, /data-person-direct-chat/);
 
@@ -77,8 +84,8 @@ assert.match(miniCardCss, /mini-card--surface-photo/);
 assert.match(miniCardCss, /mini-card__context-action/);
 assert.match(miniCard, /surface = 'default'/);
 assert.match(miniCard, /actionLabel = ''/);
-assert.match(people, /surface:\s*'photo'/);
-assert.match(people, /actionLabel:\s*person\.photo \? 'Изменить' : 'Добавить'/);
+assert.doesNotMatch(people, /surface:\s*'photo'/);
+assert.doesNotMatch(people, /actionLabel:\s*person\.photo/);
 
 assert.match(selectors, /import \{ modal, mountModal \} from '\.\.\/modals\/index\.js'/);
 assert.match(selectors, /variant: 'quick'/);

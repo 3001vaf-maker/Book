@@ -37,8 +37,8 @@ assert.match(dropMigration, /ALTER TABLE "BookingAccount" DROP COLUMN "consents"
 assert.match(documentMigration, /hydrateConsentsFromServer\(normalized\.consents\)/);
 assert.match(consentCache, /export function getConsents\(\)/);
 assert.match(peopleUi, /getConsents/);
-assert.match(peopleUi, /fact\.subjectType==='ACCOUNT'/);
-assert.match(peopleUi, /fact\.subjectType!=='CONTACT_POINT'/);
+assert.match(peopleUi, /fact\?\.subjectType\s*===\s*'ACCOUNT'/);
+assert.match(peopleUi, /fact\?\.subjectType\s*!==\s*'CONTACT_POINT'/);
 assert.doesNotMatch(peopleUi, /p\.agreements/);
 assert.doesNotMatch(peopleUi, /account\.consents/);
 

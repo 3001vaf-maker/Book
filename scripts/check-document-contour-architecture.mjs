@@ -70,23 +70,23 @@ assert.match(files.tenantController,/@Get\('platform-bases'\)/);
 
 console.log('document contour architecture: OK');
 
-const peopleConsentTile = files.people.slice(
-  files.people.indexOf('function personConsentTile'),
-  files.people.indexOf('function openPersonConsent'),
+const peopleDocumentTile = files.people.slice(
+  files.people.indexOf('function personDocumentTile'),
+  files.people.indexOf('function openPersonDocumentInfo'),
 );
-const peopleConsentBlock = files.people.slice(
-  files.people.indexOf('function settingsCards'),
-  files.people.indexOf('function refreshPersonIdentityPresentation'),
+const peopleDocumentsSheet = files.people.slice(
+  files.people.indexOf('function openPersonDocuments'),
+  files.people.indexOf('function personHistoryMarkup'),
 );
-assert.match(peopleConsentTile,/documentTile\(/,'People consent cards must use shared documentTile');
-assert.match(peopleConsentBlock,/documentTiles\(/,'People consent cards must use shared documentTiles');
-assert.doesNotMatch(peopleConsentBlock,/miniCard\(\{[\s\S]*?data-person-consent/,'People consent cards must not use Mini Card');
-const peopleConsentDetail = files.people.slice(
-  files.people.indexOf('function openPersonConsent'),
-  files.people.indexOf('function filterPeople'),
+const peopleDocumentInfo = files.people.slice(
+  files.people.indexOf('function openPersonDocumentInfo'),
+  files.people.indexOf('function openPersonDocuments'),
 );
-assert.match(peopleConsentDetail,/openDocumentViewer\(/,'People consent detail must open the shared document viewer');
-assert.match(peopleConsentDetail,/variant: 'top'/,'People consent detail must use the shared top informational modal');
+assert.match(peopleDocumentTile,/documentTile\(/,'People documents must use shared documentTile');
+assert.match(peopleDocumentsSheet,/documentTiles\(/,'People documents must use shared documentTiles');
+assert.match(peopleDocumentsSheet,/variant: 'bottom'/,'People Documents / consents must open from A in the shared bottom modal');
+assert.match(peopleDocumentInfo,/variant: 'top'/,'People document details must use the shared top informational modal');
+assert.doesNotMatch(files.people,/miniCard\(\{[\s\S]*?data-person-(?:consent|document)/,'People document surfaces must not use Mini Card');
 
 for (const [name, source] of Object.entries({
   booking: files.booking,
