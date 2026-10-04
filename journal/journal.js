@@ -146,7 +146,7 @@ export function renderJournal(root, options = {}) {
     mountModal(document.body, modal(readOnlyReceipt({
       title: 'Z - Отчет',
       groups,
-    }), { variant: 'top', surface: 'app', title: 'Z - Отчет' }));
+    }), { variant: 's', surface: 'app', title: 'Z - Отчет' }));
   };
 
   const makeSelectedDayOff = () => {

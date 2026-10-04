@@ -362,7 +362,7 @@ async function openChatSettings(state) {
     { label: telegram.linked ? `Telegram: ${telegram.username || 'подключён'}` : 'Telegram не подключён' },
     { label: 'Согласия', data: 'data-chat-consents' },
   ]);
-  const layer = mountModal(document.body, modal(render(), { variant: 'large', title: 'Настройки чата' }));
+  const layer = mountModal(document.body, modal(render(), { variant: 'q', title: 'Настройки чата' }));
   const redraw = () => {
     const panel = layer?.querySelector('.app-settings-panel');
     if (panel) panel.outerHTML = render();
@@ -595,7 +595,7 @@ async function openGlobalAccountControls(root, state, handlers, relationships = 
   </div>`;
 
   const layer = mountModal(document.body, modal(content, {
-    variant: 'standard',
+    variant: 'q',
     title: 'Согласия / Уведомления',
     className: 'modal--account-controls',
   }));
@@ -639,7 +639,7 @@ function confirmDeleteAccount(state, handlers) {
     ${button('Удалить профиль', { variant: 'critical', data: 'data-account-delete-confirm' })}
     ${button('Отмена', { variant: 'outline', data: 'data-account-delete-cancel' })}
   </div>`;
-  const layer = mountModal(document.body, modal(content, { variant: 'compact', title: 'Удалить профиль' }));
+  const layer = mountModal(document.body, modal(content, { variant: 'x', title: 'Удалить профиль' }));
   layer?.querySelector('[data-account-delete-cancel]')?.addEventListener('click', () => layer.v2Close?.());
   layer?.querySelector('[data-account-delete-confirm]')?.addEventListener('click', async (event) => {
     event.currentTarget.disabled = true;
@@ -974,7 +974,7 @@ function openAccountInvestmentProposal(state, handlers, row) {
     </div>`;
   const layer = mountModal(document.body, modal(content, {
     title: String(row.investment?.name || 'Инвестиция'),
-    variant: 'quick',
+    variant: 'x',
     surface: 'app',
   }));
   if (!layer) return null;
@@ -1131,7 +1131,7 @@ function confirmDeleteGlobalContact(state, handlers, relationship) {
   const tenantId = String(relationship?.tenantId || '');
   const title = relationshipTitle(relationship);
   if (!tenantId) return;
-  const layer = mountModal(document.body, modal(`<div class="modal-title"><h2>Удалить контакт?</h2><p>${escapeHtml(title)} будет убран из Контактов. Все действующие согласия будут отозваны. Исторические данные сохранятся.</p></div><div class="form-error" data-contact-delete-error></div><div class="modal-actions">${button('Удалить', { variant: 'danger', data: 'data-confirm-delete-contact' })}${button('Отмена', { variant: 'secondary', data: 'data-cancel-delete-contact' })}</div>`, { variant: 'compact', title: 'Удаление контакта' }));
+  const layer = mountModal(document.body, modal(`<div class="modal-title"><h2>Удалить контакт?</h2><p>${escapeHtml(title)} будет убран из Контактов. Все действующие согласия будут отозваны. Исторические данные сохранятся.</p></div><div class="form-error" data-contact-delete-error></div><div class="modal-actions">${button('Удалить', { variant: 'danger', data: 'data-confirm-delete-contact' })}${button('Отмена', { variant: 'secondary', data: 'data-cancel-delete-contact' })}</div>`, { variant: 'x', title: 'Удаление контакта' }));
   if (!layer) return;
   layer.querySelector('[data-cancel-delete-contact]')?.addEventListener('click', () => layer.v2Close?.());
   layer.querySelector('[data-confirm-delete-contact]')?.addEventListener('click', async (event) => {
@@ -1436,7 +1436,7 @@ async function renderGlobalHistoryDetail(root, state, handlers) {
     if (!tenantId) return;
     const layer = mountModal(document.body, modal(settingsPanel([
       { label: 'Согласия', data: 'data-global-history-consents' },
-    ]), { variant: 'large', title: 'Настройки' }));
+    ]), { variant: 'q', title: 'Настройки' }));
     layer?.querySelector('[data-global-history-consents]')?.addEventListener('click', () => {
       layer.remove();
       void openAccountConsentSettings(state, { tenantId });

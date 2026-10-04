@@ -277,7 +277,7 @@ export function openWorkplaceSettingsMenu(root,existing=null,{onDeleted=()=>{}}=
 
 export function openWorkplaceModal(root, existing = null, onDone = () => {}) {
   const html=workplaceForm(existing,{bodyActions:true});
-  const m=mountModal(root,modal(html,{variant:'large',title:existing?'Рабочее пространство':'Новое рабочее пространство'}));
+  const m=mountModal(root,modal(html,{variant:'q',title:existing?'Рабочее пространство':'Новое рабочее пространство'}));
   if(!m)return null;
   bindWorkplaceForm(m,existing,{
     onSaved:()=>{m.v2Close?.();onDone();},
@@ -288,7 +288,7 @@ export function openWorkplaceModal(root, existing = null, onDone = () => {}) {
 
 export function confirmDeleteWorkplace(root,key,onDeleted=()=>{}){
   const w=getWorkplaces().find(x=>x.key===key);if(!w)return;
-  const m=mountModal(root,modal(`<div class="modal-title"><h2>Удалить пространство?</h2><p>${escapeHtml(w.name||'Рабочее пространство')} будет убрано из активных пространств. Исторические данные сохранятся.</p></div><div class="form-error" data-workplace-delete-error></div><div class="modal-actions">${button('Удалить',{variant:'danger',data:'data-confirm-delete-workplace'})}${button('Отмена',{variant:'secondary',data:'data-cancel-delete-workplace'})}</div>`,{variant:'compact',title:'Удаление рабочего пространства'}));
+  const m=mountModal(root,modal(`<div class="modal-title"><h2>Удалить пространство?</h2><p>${escapeHtml(w.name||'Рабочее пространство')} будет убрано из активных пространств. Исторические данные сохранятся.</p></div><div class="form-error" data-workplace-delete-error></div><div class="modal-actions">${button('Удалить',{variant:'danger',data:'data-confirm-delete-workplace'})}${button('Отмена',{variant:'secondary',data:'data-cancel-delete-workplace'})}</div>`,{variant:'x',title:'Удаление рабочего пространства'}));
   if(!m)return;
   m.querySelector('[data-cancel-delete-workplace]').onclick=()=>m.v2Close?.();
   m.querySelector('[data-confirm-delete-workplace]').onclick=async()=>{

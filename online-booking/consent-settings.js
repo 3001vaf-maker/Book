@@ -43,7 +43,7 @@ function confirmRevoke(consent, onConfirm) {
     ${button('Отозвать согласие', { variant: 'critical', data: 'data-confirm-consent-revoke' })}
     ${button('Отмена', { variant: 'outline', data: 'data-cancel-consent-revoke' })}
   </div>`;
-  const layer = mountModal(document.body, modal(content, { variant: 'compact', title }));
+  const layer = mountModal(document.body, modal(content, { variant: 'x', title }));
   layer?.querySelector('[data-cancel-consent-revoke]')?.addEventListener('click', () => layer.v2Close?.());
   layer?.querySelector('[data-confirm-consent-revoke]')?.addEventListener('click', async (event) => {
     event.currentTarget.disabled = true;
@@ -81,7 +81,7 @@ export async function openAccountConsentSettings(state, { tenantId = state?.tena
     ${consentCards(consents)}
   </div>`;
   const layer = mountModal(document.body, modal(content, {
-    variant: 'bottom',
+    variant: 'x',
     title: 'Согласия',
     className: 'modal--consent-sheet',
   }));
