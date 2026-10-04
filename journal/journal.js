@@ -5,7 +5,7 @@ import { canUseBookCapability } from '../core/access.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getActiveDayWorkplaces } from '../core/day/index.js';
 import { getRecordPaymentState, recordAmountDue } from '../core/finance/index.js';
-import { makeTimetableDayOff } from '../timetable/day-editor.js';
+import { makeTimetableDayOff, openTimetableDayTimeEditor } from '../timetable/day-editor.js';
 import { getActiveRecordCountForDay, getRecordsForDay } from '../core/record/index.js';
 import { openJournalWorkplaceControl } from './workplace-control.js';
 import { renderJournalDay } from './день.js';
@@ -47,6 +47,19 @@ export function renderJournal(root, options = {}) {
   let selectedDate = context.date;
 
   const activeDayWorkplaces = () => getActiveDayWorkplaces(selectedDate, workplaces);
+
+  const openDayTime = (workplaceId = '') => {
+    const id = String(workplaceId || selectedWorkplaceId || '');
+    if (!id || id === ALL_WORKPLACES_ID) return;
+    openTimetableDayTimeEditor({
+      date: selectedDate,
+      workplaceId: id,
+      onSave: () => {
+        setWorkplaceContext({ workplaceId: id, date: selectedDate, scope: JOURNAL_CONTEXT_SCOPE });
+        renderView();
+      },
+    });
+  };
 
   const selectWorkplace = (nextId) => {
     selectedWorkplaceId = nextId || selectedWorkplaceId;
@@ -199,6 +212,7 @@ export function renderJournal(root, options = {}) {
       renderJournalDay(viewRoot, {
         date: selectedDate,
         workplaceId: selectedWorkplaceId,
+        onWorkplaceFieldClick: openDayTime,
         onChange: (nextDate) => {
           selectedDate = nextDate;
           setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: selectedDate, scope: JOURNAL_CONTEXT_SCOPE });
