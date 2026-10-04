@@ -76,6 +76,7 @@ export function recordPersonList(items = [], {
   selected = '',
   empty = 'Люди не найдены.',
 } = {}) {
+  const selectedSet = new Set((Array.isArray(selected) ? selected : [selected]).map(String).filter(Boolean));
   const rows = (Array.isArray(items) ? items : []).map((item = {}) => {
     const key = String(item.key || item.id || '');
     return v2ListEntry({
@@ -85,7 +86,7 @@ export function recordPersonList(items = [], {
       initial: '',
       className: 'list-entry--record-person',
       interactive: true,
-      selected: String(selected || '') === key,
+      selected: selectedSet.has(key),
       data: `${data}="${escapeRecordText(key)}"`,
       aria: item.aria || `Выбрать ${item.name || ''}`,
     });

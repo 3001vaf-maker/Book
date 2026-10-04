@@ -2,7 +2,6 @@ import { checkTimeAvailability } from '../time/index.js';
 import { deleteRecordRow, hydrateRecordStateFromServer, insertRecordRow, patchRecordRow } from './data.js';
 import { appendRecordEvent, deleteRecordEvents, RECORD_EVENT_TYPES } from './events.js';
 import { getRecord } from './read.js';
-import { normalizeRecordGroup } from './group.js';
 import { apiRequest } from '../auth.js';
 
 async function responseJson(response, fallback) {
@@ -33,6 +32,41 @@ function normalizeDate(value) {
 
 function normalizeId(value) {
   return String(value || '');
+}
+
+function normalizeGroup(group = null, fallbackPerson = null) {
+  if (!group || typeof group !== 'object' || Array.isArray(group)) return null;
+  const capacity = Math.max(2, Math.min(999, Math.floor(Number(group.capacity) || 0)));
+  if (!Number.isFinite(capacity) || capacity < 2) return null;
+  const source = Array.isArray(group.participants) ? group.participants : [];
+  const seen = new Set();
+  const participants = [];
+  for (const value of source) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+    const key = String(value.key || value.id || '').trim();
+    if (!key || seen.has(key) || participants.length >= capacity) continue;
+    seen.add(key);
+    participants.push({
+      key: String(value.key || ''),
+      id: String(value.id || ''),
+      name: String(value.name || ''),
+      surname: String(value.surname || ''),
+      phone: String(value.phone || value.phones?.[0] || ''),
+      discountPercent: Math.max(0, Math.min(100, Number(value.discountPercent) || 0)),
+    });
+  }
+  if (!participants.length && fallbackPerson && typeof fallbackPerson === 'object') {
+    const key = String(fallbackPerson.key || fallbackPerson.id || '').trim();
+    if (key) participants.push({
+      key: String(fallbackPerson.key || ''),
+      id: String(fallbackPerson.id || ''),
+      name: String(fallbackPerson.name || ''),
+      surname: String(fallbackPerson.surname || ''),
+      phone: String(fallbackPerson.phone || fallbackPerson.phones?.[0] || ''),
+      discountPercent: Math.max(0, Math.min(100, Number(fallbackPerson.discountPercent) || 0)),
+    });
+  }
+  return { capacity, participants };
 }
 
 function hasOwn(object, key) {
@@ -144,7 +178,7 @@ export function createRecord({
     from: String(from || ''),
     to: String(to || ''),
     person: person || null,
-    group: normalizeRecordGroup(group, person),
+    group: normalizeGroup(group, person),
     procedures: sourceRecord.procedures,
     products: sourceRecord.products,
     source: String(source || 'manual'),
@@ -186,7 +220,7 @@ export function updateRecord(id, patch = {}, { actionContext = null } = {}) {
   if (hasOwn(nextDataPatch, 'to')) nextDataPatch.to = String(nextDataPatch.to || '');
   if (hasOwn(nextDataPatch, 'procedures')) nextDataPatch.procedures = Array.isArray(nextDataPatch.procedures) ? nextDataPatch.procedures : [];
   if (hasOwn(nextDataPatch, 'products')) nextDataPatch.products = Array.isArray(nextDataPatch.products) ? nextDataPatch.products : [];
-  if (hasOwn(nextDataPatch, 'group')) nextDataPatch.group = normalizeRecordGroup(nextDataPatch.group, nextDataPatch.person ?? current.person);
+  if (hasOwn(nextDataPatch, 'group')) nextDataPatch.group = normalizeGroup(nextDataPatch.group, nextDataPatch.person ?? current.person);
 
   const next = { ...current, ...nextDataPatch };
   if (next.group?.participants?.length) next.person = next.group.participants[0];

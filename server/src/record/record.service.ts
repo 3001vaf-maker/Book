@@ -42,11 +42,20 @@ function sameJson(left: unknown, right: unknown) {
   return JSON.stringify(stable(left)) === JSON.stringify(stable(right));
 }
 
-function normalizeGroup(value: unknown, fallbackPerson: unknown = null) {
+function groupCapacityFromProcedures(items: JsonObject[]) {
+  if (!items.length) return 1;
+  const capacities = items.map((item) => {
+    const enabled = item?.groupBooking?.enabled === true;
+    if (!enabled) return 1;
+    return Math.max(2, Math.min(999, Math.floor(Number(item?.groupBooking?.capacity) || 2)));
+  });
+  return capacities.every((value) => value >= 2) ? Math.min(...capacities) : 1;
+}
+
+function normalizeGroup(value: unknown, fallbackPerson: unknown, allowedCapacity: number) {
+  const capacity = Math.max(1, Math.floor(Number(allowedCapacity) || 1));
+  if (capacity < 2) return null;
   const source = objectValue(value);
-  const requestedCapacity = Math.floor(Number(source.capacity) || 0);
-  if (requestedCapacity < 2) return null;
-  const capacity = Math.max(2, Math.min(999, requestedCapacity));
   const participants: JsonObject[] = [];
   const seen = new Set<string>();
   const push = (raw: unknown) => {
@@ -65,9 +74,7 @@ function normalizeGroup(value: unknown, fallbackPerson: unknown = null) {
     });
   };
   arrayValue(source.participants).forEach(push);
-  const fallback = objectValue(fallbackPerson);
-  const fallbackKey = text(fallback.key) || text(fallback.id);
-  if (!participants.length && fallbackKey) push(fallback);
+  if (!participants.length) push(fallbackPerson);
   return { capacity, participants };
 }
 
@@ -205,7 +212,7 @@ export class RecordService {
 
     const products = arrayValue(input.products).map((item) => clone(objectValue(item)));
     let person = clone(objectValue(input.person));
-    const group = normalizeGroup(input.group, person);
+    const group = normalizeGroup(input.group, person, groupCapacityFromProcedures(procedureSnapshots));
     if (group?.participants?.length) person = clone(group.participants[0]);
     const settlement = this.finance.calculateSettlement([
       ...procedureSnapshots.map((item) => ({ ...item, sourceType: 'procedure', sourceId: item.id })),
@@ -427,7 +434,13 @@ export class RecordService {
       ? arrayValue(incoming.products).map((item) => clone(objectValue(item)))
       : arrayValue(current.products).map((item) => clone(objectValue(item)));
     let person = personChanged ? clone(objectValue(incoming.person)) : clone(objectValue(current.person));
-    const group = groupChanged ? normalizeGroup(incoming.group, person) : normalizeGroup(current.group, person);
+    const groupSource = groupChanged ? incoming.group : current.group;
+    const currentGroupCapacity = Math.max(
+      1,
+      Math.floor(Number(objectValue(current.group).capacity) || groupCapacityFromProcedures(arrayValue(current.procedures).map((item) => objectValue(item)))),
+    );
+    const allowedGroupCapacity = rawProceduresChanged ? groupCapacityFromProcedures(procedures) : currentGroupCapacity;
+    const group = normalizeGroup(groupSource, person, allowedGroupCapacity);
     if (group?.participants?.length) person = clone(group.participants[0]);
     const currentFallbackSettlement = this.finance.calculateSettlement([
       ...arrayValue(current.procedures).map((item) => ({ ...objectValue(item), sourceType: 'procedure', sourceId: text(item?.id) })),

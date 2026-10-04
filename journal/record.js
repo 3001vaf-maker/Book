@@ -1,5 +1,5 @@
 import { button, durationPicker, durationText, entityCard, escapeHtml, field, list, select, timePicker, initTimePickers, v2ListEntry, stateView, initStateView, initCalendar, mountModal, modal, openNotice, initDurationPickers, initMultiSelect, viewNavigation, initViewNavigation, mountRecordZ, recordZHost, renderRecordZ, recordTimeRows, recordWorkplaceCards, recordProcedureList, recordPersonList, recordConfirmationMiniCard, setRecordPrimaryAction, bindRecordSettings, closeRecordZStack } from '../ui/ui.js';
-import { createRecord, normalizeRecordGroup } from '../core/record/index.js';
+import { createRecord } from '../core/record/index.js';
 import { createJournalBreak } from './break-service.js';
 import { getPeople } from '../core/people/data.js';
 import { personDisplay } from '../core/people/presentation.js';
@@ -34,6 +34,17 @@ function recordPersonSnapshot(person = {}) {
   };
 }
 
+function groupCapacityForSelectedProcedures(selectedProcedures = []) {
+  const items = Array.isArray(selectedProcedures) ? selectedProcedures : [];
+  if (!items.length) return 1;
+  const capacities = items.map((entry) => {
+    const source = entry?.procedure || entry || {};
+    const catalog = procedures().find((item) => String(item?.id || '') === String(source?.id || '')) || source;
+    if (catalog?.groupBooking?.enabled !== true) return 1;
+    return Math.max(2, Math.min(999, Math.floor(Number(catalog?.groupBooking?.capacity) || 2)));
+  });
+  return capacities.every((value) => value >= 2) ? Math.min(...capacities) : 1;
+}
 
 function recordOwnerOptions({ settings = false, chatPersonKey = '' } = {}) {
   const profile = getProfile();
@@ -388,15 +399,36 @@ function openProcedureSettings({ procedure, current, onSave, onAdd, onDelete }) 
 }
 
 function renderPersonStep(modalRoot, { date, workplaceId, from, to, procedures: selectedProcedures, onCreated, onSelected }) {
-  modalRoot ||= mountRecordZ({ ...recordOwnerOptions({ settings: true }), title: 'Выбор клиента', className: 'record-flow-z' });
+  const groupCapacity = groupCapacityForSelectedProcedures(selectedProcedures);
+  const groupMode = groupCapacity > 1;
+  modalRoot ||= mountRecordZ({
+    ...recordOwnerOptions({ settings: true }),
+    title: groupMode ? 'Выбор участников' : 'Выбор клиента',
+    className: 'record-flow-z',
+  });
   let all = people();
   let filtered = all;
   let selectedPerson = null;
-  const host = renderRecordZ(modalRoot, `<div class="record-screen record-screen--people"><div class="ui-search-field">${field({ name: 'recordPersonSearch', type: 'search', placeholder: 'Поиск по имени или UEI', autocomplete: 'off', data: 'data-record-person-search' })}</div><div class="ui-search-divider" aria-hidden="true"></div><div class="record-person-list" data-record-person-list></div></div>`);
+  const selectedPeople = new Map();
+  const host = renderRecordZ(modalRoot, `<div class="record-screen record-screen--people">${groupMode ? `<div class="muted" data-record-group-count>Участники: 0 / ${groupCapacity}</div>` : ''}<div class="ui-search-field">${field({ name: 'recordPersonSearch', type: 'search', placeholder: 'Поиск по имени или UEI', autocomplete: 'off', data: 'data-record-person-search' })}</div><div class="ui-search-divider" aria-hidden="true"></div><div class="record-person-list" data-record-person-list></div></div>`);
   if (!host) return;
 
-  const openSelectedPerson = (person) => {
-    selectedPerson = person;
+  const proceed = () => {
+    if (groupMode) {
+      const values = [...selectedPeople.values()];
+      if (!values.length) return;
+      renderConfirmationStep(null, {
+        date,
+        workplaceId,
+        from,
+        to,
+        selectedPerson: values[0],
+        selectedPeople: values,
+        selectedProcedures,
+        onCreated,
+      });
+      return;
+    }
     if (!selectedPerson) return;
     if (onSelected) {
       onSelected(selectedPerson);
@@ -408,14 +440,47 @@ function renderPersonStep(modalRoot, { date, workplaceId, from, to, procedures: 
       from,
       to,
       selectedPerson,
+      selectedPeople: [selectedPerson],
       selectedProcedures,
       onCreated,
     });
   };
 
+  const syncPrimary = () => {
+    if (!groupMode) {
+      setRecordPrimaryAction(modalRoot);
+      return;
+    }
+    setRecordPrimaryAction(modalRoot, selectedPeople.size ? {
+      label: 'Далее',
+      onClick: proceed,
+    } : {});
+  };
+
+  const selectPerson = (person) => {
+    if (!person) return;
+    if (!groupMode) {
+      selectedPerson = person;
+      proceed();
+      return;
+    }
+    const key = String(person?.key || person?.id || '');
+    if (!key) return;
+    if (selectedPeople.has(key)) selectedPeople.delete(key);
+    else if (selectedPeople.size >= groupCapacity) {
+      openNotice({
+        title: 'Групповая запись',
+        message: `Для выбранных процедур максимум ${groupCapacity} человек.`,
+      });
+      return;
+    } else selectedPeople.set(key, person);
+    render();
+  };
+
   const render = () => {
     const listHost = host.querySelector('[data-record-person-list]');
     if (!listHost) return;
+    const selectedKeys = groupMode ? [...selectedPeople.keys()] : (selectedPerson?.key || '');
     listHost.innerHTML = recordPersonList(filtered.map((person) => {
       const display = personDisplay(person);
       return {
@@ -427,12 +492,16 @@ function renderPersonStep(modalRoot, { date, workplaceId, from, to, procedures: 
       };
     }), {
       data: 'data-record-person',
-      selected: selectedPerson?.key || '',
+      selected: selectedKeys,
       empty: 'Люди не найдены.',
     });
 
+    const count = host.querySelector('[data-record-group-count]');
+    if (count) count.textContent = `Участники: ${selectedPeople.size} / ${groupCapacity}`;
+    syncPrimary();
+
     listHost.querySelectorAll('[data-record-person]').forEach((row) => row.addEventListener('click', () => {
-      openSelectedPerson(all.find((person) => person.key === row.dataset.recordPerson) || null);
+      selectPerson(all.find((person) => person.key === row.dataset.recordPerson) || null);
     }));
   };
 
@@ -459,7 +528,7 @@ function renderPersonStep(modalRoot, { date, workplaceId, from, to, procedures: 
         onCreated: (person) => {
           all = people();
           filtered = all;
-          openSelectedPerson(all.find((item) => item.key === person.key) || person);
+          selectPerson(all.find((item) => item.key === person.key) || person);
         },
       });
     });
@@ -467,7 +536,7 @@ function renderPersonStep(modalRoot, { date, workplaceId, from, to, procedures: 
   render();
 }
 
-function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, selectedPerson, selectedProcedures, onCreated }) {
+function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, selectedPerson, selectedPeople = [], selectedProcedures, onCreated }) {
   modalRoot ||= mountRecordZ({
     ...recordOwnerOptions({ settings: true, chatPersonKey: selectedPerson?.key || '' }),
     title: 'Подтверждение записи',
@@ -478,8 +547,18 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
   let currentFrom = from;
   let currentTo = to;
   let currentPerson = selectedPerson;
-  let groupCapacity = 1;
-  let groupParticipants = [selectedPerson].filter(Boolean);
+  let currentPeople = (Array.isArray(selectedPeople) && selectedPeople.length ? selectedPeople : [selectedPerson]).filter(Boolean);
+
+  const groupCapacity = () => groupCapacityForSelectedProcedures(selectedProcedures);
+  const reconcileGroup = () => {
+    const capacity = groupCapacity();
+    if (capacity < 2) {
+      currentPeople = currentPeople.length ? [currentPeople[0]] : [currentPerson].filter(Boolean);
+    } else if (currentPeople.length > capacity) {
+      currentPeople = currentPeople.slice(0, capacity);
+    }
+    currentPerson = currentPeople[0] || currentPerson;
+  };
 
   const duration = () => selectedProcedures.reduce((sum, entry) => sum + (Number(entry.duration) || 0), 0);
   const settlement = () => calculateSettlement(selectedProcedures.map((entry) => ({
@@ -490,109 +569,7 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
     discountPercent: recordSettlementDiscountPercent(currentPerson),
   });
   const totalCost = () => settlement().planTotal;
-
-  const openGroupCapacity = () => {
-    const m = mountModal(document.body, modal(
-      `<div class="compact-form">${field({
-        label: 'Количество мест',
-        name: 'recordGroupCapacity',
-        type: 'number',
-        value: String(Math.max(2, groupCapacity)),
-        min: '2',
-        max: '999',
-        step: '1',
-        inputmode: 'numeric',
-      })}<div class="form-error" data-record-group-capacity-error aria-live="polite"></div>${button('Сохранить', { data: 'data-record-group-capacity-save' })}</div>`,
-      { variant: 'x', surface: 'app', title: 'Групповая запись', className: 'modal--form-sheet' },
-    ));
-    m?.querySelector('[data-record-group-capacity-save]')?.addEventListener('click', () => {
-      const input = m.querySelector('input[name="recordGroupCapacity"]');
-      const next = Math.floor(Number(input?.value) || 0);
-      const error = m.querySelector('[data-record-group-capacity-error]');
-      if (next < 2) {
-        if (error) error.textContent = 'Минимум 2 места.';
-        return;
-      }
-      if (next < groupParticipants.length) {
-        if (error) error.textContent = `Сейчас выбрано участников: ${groupParticipants.length}. Сначала уменьшите их количество.`;
-        return;
-      }
-      groupCapacity = Math.min(999, next);
-      m.v2Close?.();
-      render();
-    });
-  };
-
-  const openGroupParticipants = () => {
-    if (groupCapacity < 2) return;
-    const all = people();
-    const selectedKeys = new Set(groupParticipants.map((person) => String(person?.key || '')).filter(Boolean));
-    const rows = recordPersonList(all.map((person) => {
-      const display = personDisplay(person);
-      return {
-        key: person.key,
-        name: display.name,
-        uei: display.uei,
-        phone: display.phone,
-        aria: `Выбрать человека ${display.name}`,
-      };
-    }), {
-      data: 'data-record-group-person',
-      selected: [...selectedKeys],
-      empty: 'Люди не найдены.',
-    });
-    const m = mountModal(document.body, modal(
-      `<div class="compact-form"><div><strong data-record-group-count>${selectedKeys.size} / ${groupCapacity}</strong></div><div data-record-group-person-list>${rows}</div><div class="form-error" data-record-group-people-error aria-live="polite"></div>${button('Сохранить', { data: 'data-record-group-people-save' })}</div>`,
-      { variant: 'x', surface: 'app', title: 'Участники', className: 'modal--form-sheet' },
-    ));
-    const listRoot = m?.querySelector('[data-record-group-person-list]');
-    if (!m || !listRoot) return;
-    let previous = [...selectedKeys];
-    let correcting = false;
-    const controller = initMultiSelect(listRoot, {
-      selectedValues: previous,
-      selector: '[data-record-group-person]',
-      valueAttribute: 'recordGroupPerson',
-      onChange: (values) => {
-        if (correcting) return;
-        const unique = [...new Set(values.map(String))];
-        if (unique.length > groupCapacity) {
-          correcting = true;
-          controller.setSelectedValues(previous);
-          correcting = false;
-          const error = m.querySelector('[data-record-group-people-error]');
-          if (error) error.textContent = `Можно выбрать не больше ${groupCapacity} человек.`;
-          return;
-        }
-        previous = unique;
-        const count = m.querySelector('[data-record-group-count]');
-        if (count) count.textContent = `${unique.length} / ${groupCapacity}`;
-        const error = m.querySelector('[data-record-group-people-error]');
-        if (error) error.textContent = '';
-      },
-    });
-    m.querySelector('[data-record-group-people-save]')?.addEventListener('click', () => {
-      const keys = controller.getSelectedValues();
-      if (!keys.length) {
-        const error = m.querySelector('[data-record-group-people-error]');
-        if (error) error.textContent = 'Выберите хотя бы одного человека.';
-        return;
-      }
-      groupParticipants = keys.map((key) => all.find((person) => String(person?.key || '') === String(key))).filter(Boolean);
-      currentPerson = groupParticipants[0] || currentPerson;
-      controller.destroy();
-      m.v2Close?.();
-      render();
-    });
-  };
-
   const openRecordSettings = () => {
-    const groupOptions = groupCapacity > 1
-      ? [
-          { value: 'group-capacity', label: 'Количество мест' },
-          { value: 'group-people', label: 'Участники' },
-        ]
-      : [{ value: 'group-capacity', label: 'Групповая запись' }];
     const layer = mountModal(document.body, modal(
       `<div class="compact-form">${select({
         label: 'Изменить',
@@ -604,7 +581,6 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
           { value: 'date', label: 'Дата' },
           { value: 'time', label: 'Время' },
           { value: 'procedure', label: 'Процедура' },
-          ...groupOptions,
         ],
         aria: 'Выберите этап редактирования записи',
       })}</div>`,
@@ -615,14 +591,6 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
       const startAt = String(input.value || '');
       if (!startAt) return;
       layer.v2Close?.();
-      if (startAt === 'group-capacity') {
-        openGroupCapacity();
-        return;
-      }
-      if (startAt === 'group-people') {
-        openGroupParticipants();
-        return;
-      }
       openRecordEditFlow({
         startAt,
         date: currentDate,
@@ -644,6 +612,7 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
             cost: item.cost,
             duration: item.duration,
           })));
+          reconcileGroup();
           render();
         },
       });
@@ -653,20 +622,22 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
   bindRecordSettings(modalRoot, openRecordSettings);
 
   const render = () => {
+    reconcileGroup();
     const host = recordZHost(modalRoot);
     if (!host) return;
     const person = personDisplay(currentPerson);
     const workplace = findWorkplaceName(currentWorkplaceId);
     const formattedDate = formatConfirmationDate(currentDate);
     const total = totalCost();
+    const capacity = groupCapacity();
     const card = recordConfirmationMiniCard({
       workplace,
       date: formattedDate,
       period: `${currentFrom} - ${currentTo || ''}`,
       uei: person.uei,
-      name: groupCapacity > 1 ? `Групповая запись · ${person.name}` : person.name,
+      name: person.name,
       phone: person.phone,
-      groupText: groupCapacity > 1 ? `Участники: ${groupParticipants.length} / ${groupCapacity}` : '',
+      groupText: capacity > 1 ? `Участники: ${currentPeople.length} / ${capacity}` : '',
       duration: durationText(duration()),
       discount: `${recordSettlementDiscountPercent(currentPerson)}%`,
       total: `${total} ₽`,
@@ -691,13 +662,8 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
           openRecordTimeNotice('Запись не может быть создана: выбранное время уже занято. Скорректируйте время записи.');
           return;
         }
-        const personSnapshot = recordPersonSnapshot(currentPerson);
-        const group = groupCapacity > 1
-          ? normalizeRecordGroup({
-              capacity: groupCapacity,
-              participants: groupParticipants.map(recordPersonSnapshot),
-            }, personSnapshot)
-          : null;
+        const capacity = groupCapacity();
+        const person = recordPersonSnapshot(currentPerson);
         createRecord({
           source: 'journal',
           actionContext: journalRecordActionContext(),
@@ -705,13 +671,17 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
           workplaceId: currentWorkplaceId,
           from: currentFrom,
           to: currentTo,
-          person: group?.participants?.[0] || personSnapshot,
-          group,
+          person,
+          group: capacity > 1 ? {
+            capacity,
+            participants: currentPeople.map(recordPersonSnapshot),
+          } : null,
           procedures: selectedProcedures.map(({ procedure, cost, duration: itemDuration }) => ({
             id: procedure.id,
             name: procedure.name,
             cost,
             duration: itemDuration,
+            groupBooking: procedure?.groupBooking ? { ...procedure.groupBooking } : undefined,
           })),
         });
         closeRecordZStack('record-flow-z');

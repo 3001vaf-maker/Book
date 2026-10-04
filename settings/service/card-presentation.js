@@ -38,6 +38,7 @@ export function procedureCardFields(procedure = {}, stats = {}) {
     { value: 'name', label: 'Наименование', text: String(procedure.name || '') },
     { value: 'duration', label: 'Длительность', text: durationText(procedure.duration) },
     { value: 'cost', label: 'Стоимость', text: costText(procedure.cost) },
+    { value: 'groupBooking', label: 'Групповая запись', text: procedure?.groupBooking?.enabled === true ? `До ${Math.max(2, Math.floor(Number(procedure?.groupBooking?.capacity) || 2))} человек` : 'Нет' },
     { value: 'workplaceCount', label: 'Кол-во пространств', text: String((procedure.workplaces || []).length) },
     { value: 'recordCount', label: 'Кол-во записей', text: String(Number(stats.recordCount || 0)) },
     { value: 'spentTime', label: 'Потраченное время', text: String(stats.spentTime || '') },

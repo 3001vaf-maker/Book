@@ -39,15 +39,3 @@ export {
   recordVisitState,
   recordVisualState,
 } from './state.js';
-
-export {
-  isGroupRecord,
-  normalizeRecordGroup,
-  recordAvailableSpots,
-  recordCapacity,
-  recordGroupIsFull,
-  recordParticipantCount,
-  recordParticipants,
-  setRecordGroupCapacity,
-  setRecordParticipants,
-} from './group.js';
