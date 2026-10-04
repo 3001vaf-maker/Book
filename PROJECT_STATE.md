@@ -3,7 +3,7 @@
 ## Обязательный контракт
 
 - Рабочая ветка только `staging`. Production только `main`. Другие рабочие ветки запрещены.
-- Новый функционал собирается из существующего Shared UI. Локальный клон существующего UI запрещён.
+- Новый функционал собирается из существующего Shared UI по `UI_ALPHABET.md`. Локальный клон существующего UI запрещён.
 - F/E/Z, свайпы, CardDeck, modal geometry и viewport geometry имеют одного владельца: Shared UI.
 - Feature-код не создаёт собственный глобальный pointer/touch owner, fixed/full-screen слой, modal geometry или canonical component CSS.
 - A/B/C/D, F/E/Z, Q/X/S, CardDeck, EntityCard, miniCard, v2ListEntry/v2ListEntries, Calendar, TimePicker, Receipt и Document используются только через Shared UI.
