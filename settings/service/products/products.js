@@ -73,6 +73,8 @@ function productRow(product) {
     rightTop: price.rightTop || '',
     rightBottom: price.rightBottom || '',
     interactive: true,
+    reorderHandle: true,
+    reorderAria: 'Изменить порядок',
     data: `data-product="${escapeHtml(product.id)}" data-reorder-id="${escapeHtml(product.id)}"`,
     aria: `Открыть товар ${product.name || ''}`,
   });
