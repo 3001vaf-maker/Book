@@ -52,9 +52,19 @@ export class RecordService {
     private readonly procedures: ProcedureService,
   ) {}
 
-  private async requireVerified(tenantId: string) {
-    const meta = await this.prisma.businessStateMeta.findUnique({ where: { tenantId } });
-    if (!meta?.migrationVerifiedAt) throw new ConflictException('Хранилище Record ещё не подтверждено');
+  private async ensureState(tenantId: string) {
+    await this.prisma.$transaction([
+      this.prisma.businessStateMeta.upsert({
+        where: { tenantId },
+        create: { tenantId },
+        update: {},
+      }),
+      this.prisma.ueiState.upsert({
+        where: { tenantId },
+        create: { tenantId, data: json({ entities: {}, relations: {}, revoked: [] }) },
+        update: {},
+      }),
+    ]);
   }
 
   private subject(person: JsonObject) {
@@ -140,7 +150,7 @@ export class RecordService {
   }
 
   async create(tenantId: string, input: JsonObject, position?: number, { createHistory = true } = {}) {
-    await this.requireVerified(tenantId);
+    await this.ensureState(tenantId);
     const id = text(input.id) || randomUUID();
     const sourceRequestId = text(input.sourceRequestId);
     if (sourceRequestId) {
@@ -234,7 +244,7 @@ export class RecordService {
   }
 
   async publicOccupancy(tenantId: string) {
-    await this.requireVerified(tenantId);
+    await this.ensureState(tenantId);
     const [rows, eventRows] = await Promise.all([
       this.prisma.record.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
       this.prisma.recordEvent.findMany({ where: { tenantId } }),
@@ -294,7 +304,7 @@ export class RecordService {
   }
 
   async listForPeople(tenantId: string, people: JsonObject[]) {
-    await this.requireVerified(tenantId);
+    await this.ensureState(tenantId);
     const personKeys = new Set(people.map((person) => text(person?.key)).filter(Boolean));
     const personIds = new Set(people.map((person) => text(person?.id)).filter(Boolean));
     if (!personKeys.size && !personIds.size) return [];
@@ -344,7 +354,7 @@ export class RecordService {
   }
 
   async upsertFromOwner(tenantId: string, recordId: string, body: unknown) {
-    await this.requireVerified(tenantId);
+    await this.ensureState(tenantId);
     const source = objectValue(body);
     const incoming = clone(objectValue(source.record ?? source));
     const id = text(recordId);
