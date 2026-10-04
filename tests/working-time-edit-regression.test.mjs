@@ -42,14 +42,34 @@ assert.match(
 );
 
 assert.match(
+  timetable,
+  /function\s+openTimetableSettingsMenu\(\)/,
+  'Graph A must own the quick bottom settings menu',
+);
+assert.match(
+  timetable,
+  /button\('Время работы',[\s\S]*?data-timetable-settings-time/,
+  'Graph A settings must expose a quick bottom working-time action for selected working dates',
+);
+assert.match(
   journal,
-  /id:\s*'working-time'[\s\S]*?label:\s*'Время работы'[\s\S]*?openDayTime\(allMode\s*\?\s*''\s*:\s*selectedWorkplaceId\)/,
-  'Journal settings must expose working-time editing',
+  /openTimetableDayTimeEditor/,
+  'Journal Day must use the compact working-time editor',
+);
+assert.doesNotMatch(
+  journal,
+  /id:\s*'working-time'/,
+  'Journal settings must not become a schedule editor',
 );
 assert.match(
   journalDay,
-  /onWorkFieldClick:\s*\(\)\s*=>\s*onWorkplaceFieldClick\(workplaceId\)/,
-  'single-workplace Journal day must open the working-time editor from its work field',
+  /onWorkFieldClick/,
+  'Journal Day work field must allow the existing quick time adjustment',
+);
+assert.match(
+  journal,
+  /renderJournalMonth\(viewRoot,[\s\S]*?onDateSelect:/,
+  'Journal Month must remain navigation into Day rather than schedule editing',
 );
 
 console.log('working-time edit regression tests: OK');

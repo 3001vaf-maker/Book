@@ -102,7 +102,7 @@ export function renderTimetable(root) {
   let calendar; let selection; let selectionMode = null;
 
   const bindHeaderContext = () => {
-    root.querySelector('[data-timetable-settings-open]')?.addEventListener('click', openTimetableSettingsZ2);
+    root.querySelector('[data-timetable-settings-open]')?.addEventListener('click', openTimetableSettingsMenu);
   };
 
   const renderHeader = (month) => {
@@ -537,6 +537,26 @@ export function renderTimetable(root) {
       renderHeader(month);
     });
   }
+  function openTimetableSettingsMenu() {
+    const dates = selection?.getSelectedDates?.() || [];
+    const canEditTime = !isAllMode() && dates.some((date) => getDay(workingDays, selectedWorkplaceId, date));
+    const content = `<div class="compact-form">
+      ${canEditTime ? button('Время работы', { data: 'data-timetable-settings-time' }) : ''}
+      ${button('Рабочее пространство', { variant: 'secondary', data: 'data-timetable-settings-workplace' })}
+    </div>`;
+    const m = mountModal(document.body, modal(content, { title: 'Настройки графика', variant: 'x' }));
+    if (!m) return;
+    m.querySelector('[data-timetable-settings-time]')?.addEventListener('click', () => {
+      const selectedDates = selection?.getSelectedDates?.() || [];
+      m.v2Close?.();
+      openSelectedWorkingTimeCorrection(selectedDates);
+    });
+    m.querySelector('[data-timetable-settings-workplace]')?.addEventListener('click', () => {
+      m.v2Close?.();
+      openTimetableSettingsZ2();
+    });
+  }
+
   function openTimetableSettingsZ2() {
     const month = calendar?.getDisplayedMonth() || initialMonth;
     const monthStats = statsForMonth(month);

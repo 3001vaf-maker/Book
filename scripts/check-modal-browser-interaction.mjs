@@ -80,6 +80,32 @@ for (const [name, engine, contextOptions] of [
     assert.equal(await page.locator(checkbox).isChecked(), true, `${name}: selection was lost on reopening`);
     await closeSheet();
 
+    // Journal keeps Shared Select inside the canonical X. Repeated switching
+    // must close the nested selector before the owning X reacts to change.
+    for (let cycle = 0; cycle < 3; cycle += 1) {
+      const journalTrigger = page.locator('[data-test-journal-workplace]');
+      if (contextOptions.hasTouch) await journalTrigger.tap();
+      else await journalTrigger.click();
+
+      const journalSelect = page.locator('[data-journal-workplace-select]').locator('..').locator('[data-ui-select-trigger]');
+      await journalSelect.waitFor();
+      assert.equal(await page.locator('[data-modal]').count(), 1, `${name}: Journal parent X missing or duplicated`);
+
+      if (contextOptions.hasTouch) await journalSelect.tap();
+      else await journalSelect.click();
+      await page.locator('[data-ui-selector]').waitFor();
+      assert.equal(await page.locator('[data-modal]').count(), 2, `${name}: Journal nested Shared Select did not open exactly once`);
+
+      const targetValue = cycle % 2 === 0 ? 'beauty' : '__all__';
+      const option = page.locator(`[data-ui-select-option][data-value="${targetValue}"]`);
+      if (contextOptions.hasTouch) await option.tap();
+      else await option.click();
+
+      await page.locator('[data-modal]').waitFor({ state: 'detached' });
+      assert.equal(await page.locator('.v2-app__stage').evaluate((node) => node.inert), false, `${name}: Journal stage stayed inert after workplace switch`);
+      assert.equal(await page.locator('[data-test-journal-workplace]').isEnabled(), true, `${name}: Journal stopped responding after workplace switch`);
+    }
+
     for (const variant of ['', 'profile-settings', 'photo', 'password', 'consent', 'color', 'time-range', 'form', 'time-picker', 's']) {
       await open(`?variant=${variant}`);
       const hits = await targetPoints('[data-test-target]');

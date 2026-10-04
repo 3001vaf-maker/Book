@@ -15,12 +15,25 @@
 import { button, modal, mountModal, openSharedProfileSettingsMenu, v2Shell } from '/ui/ui.js';
 import { hydrateWorkplacesFromServer } from '/settings/profile/workplaces/data.js';
 import { openServiceWorkplaceSelection } from '/settings/service/workplace-selection.js';
+import { openJournalWorkplaceControl } from '/journal/workplace-control.js';
 
 hydrateWorkplacesFromServer([{ key: 'test-space', name: 'Тестовое пространство' }]);
 let selection = [];
 const host = document.querySelector('#host');
 host.innerHTML = v2Shell({ body: button('Настройки', { data: 'data-test-settings' })
-  + '<output data-test-selection>0</output>' });
+  + button('Журнал: пространство', { data: 'data-test-journal-workplace' })
+  + '<output data-test-selection>0</output><output data-test-journal-selection>__all__</output>' });
+host.querySelector('[data-test-journal-workplace]').addEventListener('click', () => {
+  const output = host.querySelector('[data-test-journal-selection]');
+  openJournalWorkplaceControl({
+    workplaces: [{ key: 'beauty', name: 'Beauty Day', from: '10:00', to: '20:00' }],
+    workplaceId: output.textContent || '__all__',
+    aggregateCount: 2,
+    recordCounts: { beauty: 1 },
+    onSelect: (next) => { output.textContent = next; },
+  });
+});
+
 host.querySelector('[data-test-settings]').addEventListener('click', () => {
   openSharedProfileSettingsMenu({ actions: [{
     id: 'workplaces', label: 'Рабочие пространства',

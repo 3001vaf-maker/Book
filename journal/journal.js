@@ -5,7 +5,7 @@ import { canUseBookCapability } from '../core/access.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getActiveDayWorkplaces } from '../core/day/index.js';
 import { getRecordPaymentState, recordAmountDue } from '../core/finance/index.js';
-import { makeTimetableDayOff, openTimetableDayEditor } from '../timetable/day-editor.js';
+import { makeTimetableDayOff, openTimetableDayTimeEditor } from '../timetable/day-editor.js';
 import { getActiveRecordCountForDay, getRecordsForDay } from '../core/record/index.js';
 import { openJournalWorkplaceControl } from './workplace-control.js';
 import { renderJournalDay } from './день.js';
@@ -49,11 +49,13 @@ export function renderJournal(root, options = {}) {
   const activeDayWorkplaces = () => getActiveDayWorkplaces(selectedDate, workplaces);
 
   const openDayTime = (workplaceId = '') => {
-    openTimetableDayEditor({
+    const id = String(workplaceId || selectedWorkplaceId || '');
+    if (!id || id === ALL_WORKPLACES_ID) return;
+    openTimetableDayTimeEditor({
       date: selectedDate,
-      focusWorkplaceId: workplaceId,
+      workplaceId: id,
       onSave: () => {
-        setWorkplaceContext({ date: selectedDate, scope: JOURNAL_CONTEXT_SCOPE });
+        setWorkplaceContext({ workplaceId: id, date: selectedDate, scope: JOURNAL_CONTEXT_SCOPE });
         renderView();
       },
     });
@@ -174,11 +176,6 @@ export function renderJournal(root, options = {}) {
           label: 'Рабочее пространство',
           onSelect: activeView === 'day' ? openDayWorkplaces : openWorkplace,
         },
-        activeView === 'day' ? {
-          id: 'working-time',
-          label: 'Время работы',
-          onSelect: () => openDayTime(allMode ? '' : selectedWorkplaceId),
-        } : null,
         activeView === 'day' ? {
           id: 'z-report',
           label: 'Z-Отчет',

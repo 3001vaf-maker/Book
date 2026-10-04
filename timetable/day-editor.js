@@ -1,5 +1,5 @@
-import { button, escapeHtml, initTimePickers, modal, mountModal, openDayWorkplaceControl, timePicker } from '../ui/ui.js';
-import { createDay, findSuggestedInterval, getDay, getDayDraftScheduleConflicts, getDayTime, getDays, getDaysForDate, removeDay, saveDays, updateDayTime } from '../core/day/index.js';
+import { button, escapeHtml, initTimePickers, modal, mountModal, openDayWorkplaceControl, openDayWorkplaceTime, timePicker } from '../ui/ui.js';
+import { createDay, findSuggestedInterval, getDay, getDayDraftScheduleConflicts, getDayTime, getDays, getDaysForDate, getScheduleConflicts, removeDay, saveDays, updateDayTime } from '../core/day/index.js';
 import { getWorkingTimeUsageConflicts } from '../core/time/index.js';
 import { isValidRange } from '../core/time/index.js';
 import { getWorkplaces, resolveWorkplaceTime } from '../core/workplace-time.js';
@@ -70,6 +70,53 @@ export function makeTimetableDayOff({
   if (!result?.ok) return false;
   onSave({ date: day, workplaceId: id });
   return true;
+}
+
+export function openTimetableDayTimeEditor({
+  date,
+  workplaceId = '',
+  onSave = () => {},
+} = {}) {
+  const day = dateKey(date);
+  const id = String(workplaceId || '');
+  if (!day || !id) return null;
+
+  const workplaces = getWorkplaces();
+  const workingDays = getDays();
+  const existing = getDay(workingDays, id, day);
+  const current = getDayTime(existing, workplaces) || resolveWorkplaceTime(workplaces, id);
+  if (!current) return null;
+
+  return openDayWorkplaceTime({
+    title: 'Время работы',
+    from: current.from,
+    to: current.to,
+    onSave: ({ from, to }) => {
+      if (!isValidRange(from, to)) return { ok: false, message: 'Окончание должно быть позже начала.' };
+
+      const usage = getWorkingTimeUsageConflicts({ date: day, workplaceId: id, from, to })
+        .filter((item) => item?.from && item?.to);
+      if (usage.length) {
+        return {
+          ok: false,
+          message: usage.map((item) => `${usageLabel(item)} ${item.from}–${item.to} выходит за рабочее время`).join('. '),
+        };
+      }
+
+      const schedule = getScheduleConflicts(workingDays, { workplaceId: id, date: day, from, to });
+      if (schedule.length) return { ok: false, message: 'Время пересекается с другим рабочим пространством.' };
+
+      if (existing) updateDayTime(workingDays, id, day, from, to);
+      else {
+        const created = createDay({ date: day, workplaceId: id, from, to });
+        if (created) workingDays.push(created);
+      }
+      const saved = saveDays(workingDays);
+      if (saved?.ok === false) return { ok: false, message: 'Не удалось сохранить рабочее время.' };
+      onSave({ date: day, workplaceId: id, from, to });
+      return { ok: true };
+    },
+  });
 }
 
 export function openTimetableDayEditor({
