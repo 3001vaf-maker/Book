@@ -2,6 +2,7 @@ import { checkTimeAvailability } from '../time/index.js';
 import { deleteRecordRow, hydrateRecordStateFromServer, insertRecordRow, patchRecordRow } from './data.js';
 import { appendRecordEvent, deleteRecordEvents, RECORD_EVENT_TYPES } from './events.js';
 import { getRecord } from './read.js';
+import { normalizeRecordGroup } from './group.js';
 import { apiRequest } from '../auth.js';
 
 async function responseJson(response, fallback) {
@@ -125,6 +126,7 @@ export function createRecord({
   source = 'manual',
   sourceRequestId = '',
   actionContext = null,
+  group = null,
 } = {}) {
   const normalizedDate = normalizeDate(date);
   const normalizedWorkplaceId = normalizeId(workplaceId);
@@ -142,6 +144,7 @@ export function createRecord({
     from: String(from || ''),
     to: String(to || ''),
     person: person || null,
+    group: normalizeRecordGroup(group, person),
     procedures: sourceRecord.procedures,
     products: sourceRecord.products,
     source: String(source || 'manual'),
@@ -183,8 +186,10 @@ export function updateRecord(id, patch = {}, { actionContext = null } = {}) {
   if (hasOwn(nextDataPatch, 'to')) nextDataPatch.to = String(nextDataPatch.to || '');
   if (hasOwn(nextDataPatch, 'procedures')) nextDataPatch.procedures = Array.isArray(nextDataPatch.procedures) ? nextDataPatch.procedures : [];
   if (hasOwn(nextDataPatch, 'products')) nextDataPatch.products = Array.isArray(nextDataPatch.products) ? nextDataPatch.products : [];
+  if (hasOwn(nextDataPatch, 'group')) nextDataPatch.group = normalizeRecordGroup(nextDataPatch.group, nextDataPatch.person ?? current.person);
 
   const next = { ...current, ...nextDataPatch };
+  if (next.group?.participants?.length) next.person = next.group.participants[0];
   if (!checkRecordTime({
     date: next.date,
     workplaceId: next.workplaceId,
