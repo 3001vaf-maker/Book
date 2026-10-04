@@ -110,11 +110,11 @@ function advancedItemFields(item = {}) {
 }
 
 function openAdvancedItemModal(trigger, item = {}) {
-  return mountModal(trigger, modal(`<form data-inventory-advanced-form>${advancedItemFields(item)}</form>`, {
-    title: 'Дополнительно',
-    variant: 'x',
-    action: button('Применить', { type: 'submit', form: 'inventory-advanced-form' }),
-  }));
+  const content = `<form id="inventory-advanced-form" data-inventory-advanced-form>
+    ${advancedItemFields(item)}
+    ${button('Применить', { type: 'submit' })}
+  </form>`;
+  return mountModal(trigger, modal(content, { title: 'Дополнительно', variant: 'x' }));
 }
 
 function collectOptionalNumber(form, name) {
@@ -160,7 +160,6 @@ function openItemEditor(root, itemId = '') {
     const modalRoot = openAdvancedItemModal(event.currentTarget, advanced);
     const form = modalRoot?.querySelector('[data-inventory-advanced-form]');
     if (!form) return;
-    form.id = 'inventory-advanced-form';
     form.addEventListener('submit', (submitEvent) => {
       submitEvent.preventDefault();
       const data = new FormData(form);
@@ -189,10 +188,13 @@ function openItemEditor(root, itemId = '') {
     const value = {
       name,
       unit: String(data.get('unit') || 'шт.'),
-      purchasePrice: collectOptionalNumber(form, 'purchasePrice'),
+      lastPurchasePrice: collectOptionalNumber(form, 'purchasePrice'),
       ...advanced,
     };
-    if (creating) value.quantity = Math.max(0, Number(String(data.get('quantity') || '0').replace(',', '.')) || 0);
+    if (creating) {
+      value.quantity = Math.max(0, Number(String(data.get('quantity') || '0').replace(',', '.')) || 0);
+      value.purchasePrice = value.lastPurchasePrice;
+    }
     try {
       if (creating) await createInventoryItem(value);
       else await updateInventoryItem(item.itemId, value);
@@ -208,7 +210,8 @@ function openItemEditor(root, itemId = '') {
 function movementEditorRow(row = {}, index = 0) {
   const item = getInventoryItem(row.itemId);
   const quantity = row.quantity == null ? '' : Number(row.quantity);
-  return `<div data-inventory-movement-row data-row-index="${index}">
+  const direction = row.direction === 'IN' || row.direction === 'OUT' ? row.direction : '';
+  return `<div data-inventory-movement-row data-row-index="${index}" data-row-direction="${escapeHtml(direction)}">
     ${twoColumnLayout(
       searchableSelect({
         label: 'Материал',
@@ -237,7 +240,8 @@ function collectMovementRows(host) {
     const index = row.dataset.rowIndex;
     const itemId = row.querySelector(`[name="itemId-${CSS.escape(index)}"]`)?.value || '';
     const quantity = Number(String(row.querySelector(`[name="quantity-${CSS.escape(index)}"]`)?.value || '0').replace(',', '.')) || 0;
-    return { itemId, quantity };
+    const direction = row.dataset.rowDirection === 'IN' || row.dataset.rowDirection === 'OUT' ? row.dataset.rowDirection : undefined;
+    return { itemId, quantity, ...(direction ? { direction } : {}) };
   }).filter((row) => row.itemId && row.quantity > 0);
 }
 
@@ -245,7 +249,7 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION') {
   const movement = movementId ? getInventoryMovement(movementId) : null;
   const correcting = Boolean(movement);
   const initialRows = movement?.lines?.length
-    ? movement.lines.map((line) => ({ itemId: line.itemId, quantity: line.quantity }))
+    ? movement.lines.map((line) => ({ itemId: line.itemId, quantity: line.quantity, direction: line.direction }))
     : [{ itemId: '', quantity: '' }];
   const title = correcting ? movementTitle(movement) : movementTitle({ kind });
   const markup = `
@@ -319,9 +323,9 @@ function openMovementKind(root, trigger) {
   const modalRoot = mountModal(trigger, modal(content, { title: 'Операция', variant: 'x' }));
   modalRoot?.querySelectorAll('[data-inventory-kind]').forEach((control) => {
     control.addEventListener('click', () => {
-      const kind = control.dataset.inventoryKind;
+      const selectedKind = control.dataset.inventoryKind;
       modalRoot.v2Close?.();
-      openMovementEditor(root, '', kind);
+      openMovementEditor(root, '', selectedKind);
     });
   });
 }
