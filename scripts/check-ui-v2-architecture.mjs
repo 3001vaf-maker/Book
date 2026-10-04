@@ -32,7 +32,6 @@ const cardAppearanceTemplates = fs.readFileSync('core/card-appearance-templates.
 const journal = fs.readFileSync('journal/journal.js', 'utf8');
 const settings = fs.readFileSync('settings/settings.js', 'utf8');
 const onlineBookingSettings = fs.readFileSync('settings/online-booking/online-booking.js', 'utf8');
-const onlineBookingSettingsCss = fs.readFileSync('settings/online-booking/online-booking.css', 'utf8');
 const recordRuntime = fs.readFileSync('ui/record/runtime.js', 'utf8');
 const recordCss = fs.readFileSync('ui/record/record.css', 'utf8');
 const timeCss = fs.readFileSync('ui/time/time.css', 'utf8');
@@ -307,7 +306,7 @@ expect(!core.includes("if (section === 'journal') return journalNavigationItems(
 expect(settings.includes('export function settingsNavigationItems()') && settings.includes('export async function renderSettingsSection(') && settings.includes("key !== 'profile'"), 'Settings E must route existing settings children while Profile stays a root F folder.');
 expect(onlineBookingSettings.includes('workspaceHeaderContext({') && !onlineBookingSettings.includes('data-online-booking-back') && onlineBookingSettings.includes('data-online-booking-welcome-save') && onlineBookingSettings.includes("variant: 'q'"), 'Online booking settings must feed Welcome Save through Shared Q Header C while return navigation remains gesture-owned.');
 expect(!/\b(?:appShell|appHeader)\s*\(/.test(onlineBookingSettings) && !onlineBookingSettings.includes('app-content--book-shell'), 'Online booking settings must not recreate a full-screen shell inside Z.');
-expect(!/(?:min-|max-)?height\s*:\s*(?:var\(--visual-vh\s*,\s*)?100dvh|position\s*:\s*fixed|touch-action\s*:/.test(onlineBookingSettingsCss), 'Online booking settings CSS must stay content-only inside Shared Z.');
+expect(!fs.existsSync('settings/online-booking/online-booking.css'), 'Online booking settings must not own a local stylesheet.');
 expect(!core.includes("contextRoot.querySelector('[data-workspace-back-source]')"), 'Shared workspace must not consume retired local Back sources; navigation is gesture-owned.');
 expect(!core.includes('.app-header__'), 'Legacy app-header compatibility selectors must not return.');
 expect(!journalList.includes('getBoundingPersonRect') && journalList.includes('getBoundingClientRect()'), 'Journal List scroll must use the real DOM geometry API.');
