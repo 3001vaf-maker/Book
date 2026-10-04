@@ -303,7 +303,6 @@ export class PersonIdentityService {
 
   async reconcileLegacyAccountDuplicates(tenantId: string) {
     const business = await this.businessState.get(tenantId);
-    if (!business.verified) return { repaired: 0, candidates: 0, requiresManualReview: false };
 
     const people = arrayValue(business.people).map((value) => objectValue(value));
     const identity = objectValue(business.uei);
