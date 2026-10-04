@@ -176,6 +176,11 @@ export function renderJournal(root, options = {}) {
           label: 'Рабочее пространство',
           onSelect: activeView === 'day' ? openDayWorkplaces : openWorkplace,
         },
+        activeView === 'day' && !allMode ? {
+          id: 'working-time',
+          label: 'Рабочее время',
+          onSelect: () => openDayTime(selectedWorkplaceId),
+        } : null,
         activeView === 'day' ? {
           id: 'z-report',
           label: 'Z-Отчет',
