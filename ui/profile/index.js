@@ -36,7 +36,7 @@ export function openSharedProfileSettingsMenu({
     disabled: Boolean(item.disabled),
   })))}</div>`;
   const layer = mountModal(document.body, modal(body, {
-    variant: 'bottom',
+    variant: 'x',
     title,
     className: 'modal--profile-settings-sheet',
   }));
@@ -97,7 +97,7 @@ export async function openSharedPhotoAction({
     ${button('Удалить фото', { variant: 'outline', className: 'ui-button--delete-outline', data: 'data-shared-photo-delete' })}
   </div>`;
   const layer = mountModal(document.body, modal(body, {
-    variant: 'bottom',
+    variant: 'x',
     title,
     className: 'modal--photo-sheet',
   }));
@@ -134,7 +134,7 @@ export function openSharedPasswordAction({
     ${button('Сохранить пароль', { type: 'submit' })}
   `, { className: 'form-grid', data: 'data-shared-password-form' });
   const layer = mountModal(document.body, modal(content, {
-    variant: 'bottom',
+    variant: 'x',
     title,
     className: 'modal--password-sheet',
   }));
