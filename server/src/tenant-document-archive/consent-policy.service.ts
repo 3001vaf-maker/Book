@@ -168,7 +168,6 @@ export class ConsentPolicyService {
 
   private async state(tenantId: string) {
     const snapshot = await this.documents.get(tenantId);
-    if (!snapshot?.verified) throw new ConflictException('Документы ещё не готовы');
     const data = snapshot.data || {};
     return {
       documents: Array.isArray(data.documents) ? data.documents : [],
