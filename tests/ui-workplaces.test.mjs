@@ -89,7 +89,7 @@ assert.doesNotMatch(graphSource, /canCorrectTime|onSaveTime/);
 
 const dayEditorSource = readFileSync(new URL('../timetable/day-editor.js', import.meta.url), 'utf8');
 assert.match(dayEditorSource, /export function openTimetableDayEditor/);
-assert.match(dayEditorSource, /variant:\s*'x'/);
+assert.match(dayEditorSource, /variant:\s*'q'/);
 assert.match(dayEditorSource, /time-range-fields/);
 assert.match(dayEditorSource, /getWorkingTimeUsageConflicts/);
 assert.match(dayEditorSource, /Пересечение с/);
