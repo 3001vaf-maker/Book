@@ -478,6 +478,65 @@ export function renderTimetable(root) {
     m.querySelector('[data-removal-blocked-close]')?.addEventListener('click', () => m.remove());
   }
 
+  function openSelectedWorkingTimeCorrection(dates = selection?.getSelectedDates?.() || []) {
+    const selected = (Array.isArray(dates) ? dates : []).filter((date) => getDay(workingDays, selectedWorkplaceId, date));
+    if (!selected.length || isAllMode()) return;
+
+    const first = getDayTime(getDay(workingDays, selectedWorkplaceId, selected[0]), workplaces)
+      || resolveWorkplaceTime(workplaces, selectedWorkplaceId)
+      || { from: '09:00', to: '18:00' };
+
+    const content = `<div class="compact-form">
+      <div class="modal-title"><h2>Время работы</h2><p>Изменение применяется к выбранным рабочим датам.</p></div>
+      <div class="time-range-fields">
+        ${timePicker({ name: 'timetableCorrectionFrom', label: 'С', value: first.from, minuteStep: 1 })}
+        ${timePicker({ name: 'timetableCorrectionTo', label: 'До', value: first.to, minuteStep: 1 })}
+      </div>
+      <div class="form-error" data-timetable-correction-error aria-live="polite"></div>
+      ${button('Сохранить', { data: 'data-timetable-correction-save' })}
+    </div>`;
+
+    const m = mountModal(document.body, modal(content, { title: 'Время работы', variant: 'x' }));
+    if (!m) return;
+    initTimePickers(m);
+
+    m.querySelector('[data-timetable-correction-save]')?.addEventListener('click', () => {
+      const from = m.querySelector('[name="timetableCorrectionFrom"]')?.value || '';
+      const to = m.querySelector('[name="timetableCorrectionTo"]')?.value || '';
+      const error = m.querySelector('[data-timetable-correction-error]');
+      if (!isValidRange(from, to)) {
+        if (error) error.textContent = 'Окончание должно быть позже начала.';
+        return;
+      }
+
+      for (const date of selected) {
+        const usage = getWorkingTimeUsageConflicts({ date, workplaceId: selectedWorkplaceId, from, to })
+          .filter((item) => item?.from && item?.to);
+        if (usage.length) {
+          if (error) error.textContent = `${formatDateLabel(date)}: ${usage.map((item) => `${occupiedLabel(item)} ${item.from}–${item.to}`).join(', ')} выходит за рабочее время.`;
+          return;
+        }
+
+        const schedule = getScheduleConflicts(workingDays, {
+          workplaceId: selectedWorkplaceId,
+          date,
+          from,
+          to,
+        });
+        if (schedule.length) {
+          if (error) error.textContent = `${formatDateLabel(date)}: время пересекается с другим рабочим пространством.`;
+          return;
+        }
+      }
+
+      selected.forEach((date) => updateDayTime(workingDays, selectedWorkplaceId, date, from, to));
+      saveDays(workingDays);
+      const month = calendar?.getDisplayedMonth() || initialMonth;
+      m.v2Close?.();
+      startSelectionSession(month);
+      renderHeader(month);
+    });
+  }
   function openTimetableSettingsZ2() {
     const month = calendar?.getDisplayedMonth() || initialMonth;
     const monthStats = statsForMonth(month);
@@ -502,9 +561,21 @@ export function renderTimetable(root) {
         aria: `Рабочих дней: ${activeSummary.days}`,
         disabled: true,
       },
+      c: (!isAllMode() && (selection?.getSelectedDates?.() || []).some((date) => getDay(workingDays, selectedWorkplaceId, date)))
+        ? {
+            label: 'Время',
+            data: 'data-timetable-correct-selected-time',
+            aria: 'Изменить время выбранных рабочих дней',
+          }
+        : null,
       hideD: true,
     })}${v2HorizontalRail(cards.join(''), { className: 'timetable-settings-card-rail' })}`, { className: 'timetable-settings-layer' }), { stack: true });
     if (!layer) return;
+    layer.querySelector('[data-timetable-correct-selected-time]')?.addEventListener('click', () => {
+      const dates = selection?.getSelectedDates?.() || [];
+      layer.v2Close?.();
+      openSelectedWorkingTimeCorrection(dates);
+    });
     layer.querySelectorAll('[data-timetable-settings-select]').forEach((card) => {
       card.addEventListener('click', () => {
         const nextId = String(card.dataset.timetableSettingsSelect || '');
