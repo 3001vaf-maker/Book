@@ -5,7 +5,7 @@ import { canUseBookCapability } from '../core/access.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getActiveDayWorkplaces } from '../core/day/index.js';
 import { getRecordPaymentState, recordAmountDue } from '../core/finance/index.js';
-import { makeTimetableDayOff, openTimetableDayEditor } from '../timetable/day-editor.js';
+import { makeTimetableDayOff } from '../timetable/day-editor.js';
 import { getActiveRecordCountForDay, getRecordsForDay } from '../core/record/index.js';
 import { openJournalWorkplaceControl } from './workplace-control.js';
 import { renderJournalDay } from './день.js';
@@ -47,17 +47,6 @@ export function renderJournal(root, options = {}) {
   let selectedDate = context.date;
 
   const activeDayWorkplaces = () => getActiveDayWorkplaces(selectedDate, workplaces);
-
-  const openDayTime = (workplaceId = '') => {
-    openTimetableDayEditor({
-      date: selectedDate,
-      focusWorkplaceId: workplaceId,
-      onSave: () => {
-        setWorkplaceContext({ date: selectedDate, scope: JOURNAL_CONTEXT_SCOPE });
-        renderView();
-      },
-    });
-  };
 
   const selectWorkplace = (nextId) => {
     selectedWorkplaceId = nextId || selectedWorkplaceId;
@@ -175,11 +164,6 @@ export function renderJournal(root, options = {}) {
           onSelect: activeView === 'day' ? openDayWorkplaces : openWorkplace,
         },
         activeView === 'day' ? {
-          id: 'working-time',
-          label: 'Время работы',
-          onSelect: () => openDayTime(allMode ? '' : selectedWorkplaceId),
-        } : null,
-        activeView === 'day' ? {
           id: 'z-report',
           label: 'Z-Отчет',
           onSelect: openDayZReport,
@@ -215,7 +199,6 @@ export function renderJournal(root, options = {}) {
       renderJournalDay(viewRoot, {
         date: selectedDate,
         workplaceId: selectedWorkplaceId,
-        onWorkplaceFieldClick: openDayTime,
         onChange: (nextDate) => {
           selectedDate = nextDate;
           setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: selectedDate, scope: JOURNAL_CONTEXT_SCOPE });
