@@ -1,5 +1,5 @@
 import { text } from './html.js';
-import { initV2Swipe } from './gestures.js';
+import { initV2Swipe } from './swipe.js';
 
 function syncV2ZStackInteraction(app, host) {
   if (!app || !host) return;

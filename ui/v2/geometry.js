@@ -19,3 +19,13 @@ export function v2ModalPortalGeometry(hostRect = {}, viewport = {}) {
 
   return { left, top, width, height, bottom: top + height };
 }
+
+export function currentVisualViewport() {
+  const vv = window.visualViewport;
+  return {
+    offsetLeft: Number(vv?.offsetLeft ?? 0),
+    offsetTop: Number(vv?.offsetTop ?? 0),
+    width: Number(vv?.width ?? window.innerWidth ?? 0),
+    height: Number(vv?.height ?? window.innerHeight ?? 0),
+  };
+}

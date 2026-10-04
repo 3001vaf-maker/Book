@@ -2,10 +2,16 @@ import fs from 'node:fs';
 
 const ui = [
   'ui/v2/index.js',
-  'ui/v2/render.js',
+  'ui/v2/header.js',
+  'ui/v2/card-deck.js',
+  'ui/v2/shell.js',
+  'ui/v2/sticker.js',
   'ui/v2/z-stack.js',
-  'ui/v2/modal-layer.js',
-  'ui/v2/gestures.js',
+  'ui/v2/modal-portal.js',
+  'ui/v2/swipe.js',
+  'ui/v2/workspace-navigation.js',
+  'ui/v2/lifecycle.js',
+  'ui/v2/geometry.js',
 ].map((file) => fs.readFileSync(file, 'utf8')).join('\n');
 const css = fs.readFileSync('ui/v2/v2.css', 'utf8');
 const facade = fs.readFileSync('ui/ui.js', 'utf8');
@@ -120,7 +126,7 @@ for (const file of sharedCssFiles) {
   }
 }
 for (const file of runtimeJsFiles) {
-  if (file === 'ui/v2/index.js' || file === 'ui/v2/modal-layer.js' || file === 'ui/modals/index.js') continue;
+  if (file === 'ui/v2/index.js' || file === 'ui/v2/modal-portal.js' || file === 'ui/modals/index.js') continue;
   const source = fs.readFileSync(file, 'utf8');
   expect(!/\b(?:v2Layer|mountV2Layer)\s*\(/.test(source), `Runtime code must use canonical modal()/mountModal() instead of parallel V2 modal primitives: ${file}.`);
 }
