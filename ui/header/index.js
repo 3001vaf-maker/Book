@@ -69,6 +69,6 @@ export function openHeaderControl(content = '', { title = '', className = '' } =
   return mountModal(document.body, modal(String(content || ''), {
     title,
     className,
-    variant: 'bottom',
+    variant: 'x',
   }));
 }
