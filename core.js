@@ -10,7 +10,7 @@ import { getWorkplaces as getWorkplaceEntities } from './settings/profile/workpl
 import { loadProfileState } from './settings/profile/runtime.js';
 import { loadBusinessState } from './core/runtime/business-state.js';
 import { loadOperationalState } from './core/runtime/operational-state.js';
-import { ensureRknGuide, loadDocumentState, refreshTenantDocumentArchive } from './core/runtime/document-state.js';
+import { ensureRknGuide, loadTenantDocumentArchive, refreshTenantDocumentArchive } from './core/runtime/tenant-document-archive.js';
 import { loadAuxiliaryState } from './core/runtime/auxiliary-state.js';
 import { getJournalTimeUsages, releaseJournalSoftTimeUsages } from './journal/time-usage-source.js';
 import { configureWorkplaceSource } from './core/workplace-time.js';
@@ -658,7 +658,7 @@ async function renderAuthenticated(account = authenticatedAccount) {
   await loadProfileState();
   await loadBusinessState();
   await loadOperationalState();
-  await loadDocumentState();
+  await loadTenantDocumentArchive();
   await syncRknGuideIfReady().catch((error) => {
     console.error('RKN guide initial sync failed', error);
   });
