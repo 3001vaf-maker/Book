@@ -3,7 +3,6 @@ import { join, relative } from 'node:path';
 
 const root = process.cwd();
 const featureRoots = ['core/people', 'core/finance', 'settings', 'timetable', 'journal', 'chat'];
-const modalLifecycleRoots = ['ui', ...featureRoots];
 const errors = [];
 
 function walk(dir) {
@@ -30,17 +29,17 @@ for (const file of featureRoots.flatMap((dir) => walk(join(root, dir)))) {
   }
 }
 
-for (const file of modalLifecycleRoots.flatMap((dir) => walk(join(root, dir)))) {
-  const source = readFileSync(file, 'utf8');
-  const relativePath = relative(root, file).replaceAll('\\', '/');
-  const mountedLayers = [...source.matchAll(/(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(mountModal|mountV2Layer)\s*\(/g)];
+const modalPortalSource = readFileSync(join(root, 'ui/v2/modal-portal.js'), 'utf8');
+if (!/const\s+nativeRemove\s*=\s*node\.remove\.bind\(node\)/.test(modalPortalSource)
+  || !/if\s*\(node\.isConnected\)\s*nativeRemove\(\)/.test(modalPortalSource)
+  || !/node\.v2Close\s*=\s*close/.test(modalPortalSource)
+  || !/node\.remove\s*=\s*close/.test(modalPortalSource)) {
+  errors.push('ui/v2/modal-portal.js: every mounted V2 layer must route remove() through the canonical close lifecycle');
+}
 
-  for (const [, variableName, mountFunction] of mountedLayers) {
-    const rawRemove = new RegExp(`\\b${variableName}\\s*\\??\\.\\s*remove\\s*\\(`);
-    if (rawRemove.test(source)) {
-      errors.push(`${relativePath}: ${variableName} is created by ${mountFunction} and must close through v2Close(), never remove()`);
-    }
-  }
+const durationSource = readFileSync(join(root, 'ui/duration/index.js'), 'utf8');
+if (/modalRoot\.remove\s*\(/.test(durationSource) || !/modalRoot\.v2Close\?\.\(\)/.test(durationSource)) {
+  errors.push('ui/duration/index.js: duration picker must close through v2Close()');
 }
 
 const coreSource = readFileSync(join(root, 'core.js'), 'utf8');
