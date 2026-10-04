@@ -51,6 +51,10 @@ for(const file of allFiles){
     failures.push(`${r}: canonical state owner must not depend on retired verification flags`);
   }
 
+  if(/BusinessStateMeta|businessStateMeta/.test(source)){
+    failures.push(`${r}: retired BusinessStateMeta storage is forbidden`);
+  }
+
   if(!r.startsWith('ui/') && (
     /addEventListener\(\s*['"](?:pointerdown|pointermove|pointerup|pointercancel|touchstart|touchmove|touchend)['"]/.test(source)
     || /\b(?:setPointerCapture|releasePointerCapture)\s*\(/.test(source)

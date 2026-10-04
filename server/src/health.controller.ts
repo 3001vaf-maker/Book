@@ -11,7 +11,10 @@ export class HealthController {
       await this.prisma.$queryRaw`SELECT 1`;
       await this.prisma.$queryRaw`SELECT 1 FROM "Profile" LIMIT 1`;
       await this.prisma.$queryRaw`SELECT 1 FROM "Workplace" LIMIT 1`;
-      await this.prisma.$queryRaw`SELECT 1 FROM "BusinessStateMeta" LIMIT 1`;
+      await this.prisma.$queryRaw`SELECT 1 FROM "Person" LIMIT 1`;
+      await this.prisma.$queryRaw`SELECT 1 FROM "UeiState" LIMIT 1`;
+      await this.prisma.$queryRaw`SELECT 1 FROM "BusinessRecord" LIMIT 1`;
+      await this.prisma.$queryRaw`SELECT 1 FROM "BusinessRecordEvent" LIMIT 1`;
       await this.prisma.$queryRaw`SELECT 1 FROM "BusinessOperationalState" LIMIT 1`;
       await this.prisma.$queryRaw`SELECT 1 FROM "TenantDocumentArchive" LIMIT 1`;
       return { status: 'ok', database: 'ok', profileStorage: 'ok', businessStorage: 'ok', operationalStorage: 'ok', documentStorage: 'ok', bookingAutonomy: 'server' };
