@@ -89,6 +89,7 @@ assert.doesNotMatch(graphSource, /canCorrectTime|onSaveTime/);
 
 const dayEditorSource = readFileSync(new URL('../timetable/day-editor.js', import.meta.url), 'utf8');
 assert.match(dayEditorSource, /export function openTimetableDayEditor/);
+assert.match(dayEditorSource, /export function openTimetableDayTimeEditor/);
 assert.match(dayEditorSource, /variant:\s*'q'/);
 assert.match(dayEditorSource, /time-range-fields/);
 assert.match(dayEditorSource, /getWorkingTimeUsageConflicts/);
@@ -103,7 +104,7 @@ assert.doesNotMatch(dayEditorSource, /journal\//);
 const journalSource = readFileSync(new URL('../journal/journal.js', import.meta.url), 'utf8');
 assert.match(journalSource, /openJournalWorkplaceControl/);
 assert.match(journalSource, /onWorkplaceFieldClick:\s*openDayTime/);
-assert.match(journalSource, /openTimetableDayEditor/);
+assert.match(journalSource, /openTimetableDayTimeEditor/);
 assert.match(journalSource, /from '..\/timetable\/day-editor\.js'/);
 assert.doesNotMatch(journalSource, /getDayWorkplaceDraft|saveDayWorkplaceTime|openDayWorkplaceTime/);
 assert.doesNotMatch(journalSource, /openWorkplaceControl/);
