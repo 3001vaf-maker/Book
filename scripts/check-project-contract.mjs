@@ -55,6 +55,10 @@ for(const file of allFiles){
     failures.push(`${r}: retired BusinessStateMeta storage is forbidden`);
   }
 
+  if(/variant\s*:\s*['"](?:list|large|medium|compact|quick|standard|bottom|top)['"]/.test(source)){
+    failures.push(`${r}: deprecated modal variant is forbidden; use q/x/s/technical only`);
+  }
+
   if(!r.startsWith('ui/') && (
     /addEventListener\(\s*['"](?:pointerdown|pointermove|pointerup|pointercancel|touchstart|touchmove|touchend)['"]/.test(source)
     || /\b(?:setPointerCapture|releasePointerCapture)\s*\(/.test(source)
