@@ -1,4 +1,4 @@
-import { ALL_WORKPLACES_ID, modal, mountModal, select } from '../ui/ui.js';
+import { ALL_WORKPLACES_ID, modal, mountModal, v2ListEntries, v2ListEntry } from '../ui/ui.js';
 
 const WORKPLACE_FALLBACK_COLOR = '#212529';
 
@@ -11,10 +11,18 @@ function workplaceMeta(workplace = {}, count = 0) {
   return [range, recordCountText(count)].filter(Boolean).join(' · ');
 }
 
+function closeExistingJournalWorkplaceControl() {
+  document.querySelectorAll('[data-journal-workplace-control]').forEach((surface) => {
+    const layer = surface.closest('[data-modal]');
+    if (layer?.v2Close) layer.v2Close();
+    else layer?.remove?.();
+  });
+}
+
 /**
- * Journal-owned workplace selector.
- * The Journal owns aggregate semantics; Shared Select owns the visual control
- * and its bottom selector manifestation.
+ * Journal workplace switcher.
+ * One compact bottom X only: no nested select modal, so repeated taps cannot
+ * leave stacked modal locks over the Journal stage.
  */
 export function openJournalWorkplaceControl({
   workplaces = [],
@@ -23,41 +31,47 @@ export function openJournalWorkplaceControl({
   aggregateCount = 0,
   onSelect = () => {},
 } = {}) {
-  const options = [{
-    value: ALL_WORKPLACES_ID,
-    label: 'График дня',
-    meta: recordCountText(aggregateCount),
-    indicatorColor: '',
-  }];
+  closeExistingJournalWorkplaceControl();
 
-  for (const workplace of Array.isArray(workplaces) ? workplaces : []) {
-    const key = String(workplace?.key || workplace?.workplaceId || '');
-    if (!key) continue;
-    options.push({
-      value: key,
-      label: workplace?.name || 'Без названия',
-      meta: workplaceMeta(workplace, recordCounts?.[key]),
-      indicatorColor: workplace?.indicatorColor || workplace?.color || WORKPLACE_FALLBACK_COLOR,
-    });
-  }
+  const currentId = String(workplaceId || ALL_WORKPLACES_ID);
+  const entries = [
+    v2ListEntry({
+      title: 'График дня',
+      subtitle: recordCountText(aggregateCount),
+      interactive: true,
+      selected: currentId === ALL_WORKPLACES_ID,
+      data: `data-journal-workplace-pick="${ALL_WORKPLACES_ID}"`,
+      aria: 'Показать общий график дня',
+    }),
+    ...(Array.isArray(workplaces) ? workplaces : []).map((workplace) => {
+      const key = String(workplace?.key || workplace?.workplaceId || '');
+      if (!key) return '';
+      return v2ListEntry({
+        title: workplace?.name || 'Без названия',
+        subtitle: workplaceMeta(workplace, recordCounts?.[key]),
+        leadingSwatch: workplace?.indicatorColor || workplace?.color || WORKPLACE_FALLBACK_COLOR,
+        interactive: true,
+        selected: currentId === key,
+        data: `data-journal-workplace-pick="${key}"`,
+        aria: `Показать ${workplace?.name || 'рабочее пространство'}`,
+      });
+    }).filter(Boolean),
+  ];
 
   const main = mountModal(document.body, modal(
-    `<div class="compact-form">${select({
-      label: 'Режим',
-      name: 'journalWorkplaceMode',
-      value: workplaceId || ALL_WORKPLACES_ID,
-      options,
-      aria: 'Режим рабочего поля журнала',
-      data: 'data-journal-workplace-select',
-    })}</div>`,
-    { variant: 'x', surface: 'app', title: 'Рабочее пространство', className: 'modal--form-sheet' },
+    `<div data-journal-workplace-control>${v2ListEntries(entries)}</div>`,
+    { variant: 'x', surface: 'app', title: 'Рабочее пространство' },
   ));
-  const input = main?.querySelector('input[name="journalWorkplaceMode"]');
-  input?.addEventListener('change', () => {
-    const nextId = String(input.value || '');
-    if (!nextId) return;
-    main.v2Close?.();
-    onSelect(nextId);
+  if (!main) return null;
+
+  main.querySelectorAll('[data-journal-workplace-pick]').forEach((row) => {
+    row.addEventListener('click', () => {
+      const nextId = String(row.dataset.journalWorkplacePick || '');
+      if (!nextId) return;
+      main.v2Close?.();
+      if (nextId === currentId) return;
+      onSelect(nextId);
+    });
   });
   return main;
 }
