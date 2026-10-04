@@ -201,7 +201,7 @@ function recipientOptions(root, state) {
     { label: 'Несколько людей', data: 'data-recipient-many' },
     { label: 'Группа', data: 'data-recipient-group' },
     { label: 'Все люди', data: 'data-recipient-all' },
-  ]), { title: 'Кому?', variant: 'bottom', surface: 'app' }));
+  ]), { title: 'Кому?', variant: 'x', surface: 'app' }));
   layer?.querySelector('[data-recipient-one]')?.addEventListener('click', () => { layer.remove(); void chooseOne(root, state); });
   layer?.querySelector('[data-recipient-many]')?.addEventListener('click', () => { layer.remove(); void chooseMany(root, state); });
   layer?.querySelector('[data-recipient-group]')?.addEventListener('click', () => { layer.remove(); void chooseGroup(root, state); });
@@ -331,7 +331,7 @@ function openProfileChatSettings(root, state) {
     { label: 'Новое сообщение', data: 'data-chat-new-message' },
     { label: 'Группы людей', data: 'data-chat-groups' },
     { label: 'Шаблоны сообщений', data: 'data-chat-templates' },
-  ]), { title: 'Настройки сообщений', variant: 'bottom', surface: 'app' }));
+  ]), { title: 'Настройки сообщений', variant: 'x', surface: 'app' }));
   layer?.querySelector('[data-chat-new-message]')?.addEventListener('click', () => {
     layer.remove();
     recipientOptions(root, state);

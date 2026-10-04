@@ -39,7 +39,7 @@ function openBreakEndSlots(item, from, onSelected) {
     ? timeSlots({ values, selected: item.to, data: 'data-break-end-slot', ariaLabel: 'Выбрать завершение перерыва' })
     : '<div class="muted">Нет доступного завершения.</div>';
   const content = `<div class="modal-title"><h2>До скольки занять</h2></div>${slots}`;
-  const m = mountModal(document.body, modal(content, { variant: 'bottom', surface: 'app' }));
+  const m = mountModal(document.body, modal(content, { variant: 'x', surface: 'app' }));
   if (!m) return;
   m.querySelectorAll('[data-break-end-slot]').forEach((node) => node.addEventListener('click', () => {
     const to = node.dataset.breakEndSlot;
@@ -55,7 +55,7 @@ function openBreakTimeSlots(item, onSelected) {
     ? timeSlots({ values, selected: item.from, data: 'data-break-start-slot', ariaLabel: 'Выбрать начало перерыва' })
     : '<div class="muted">Свободного времени нет.</div>';
   const content = `<div class="modal-title"><h2>С какого времени</h2></div>${slots}`;
-  const m = mountModal(document.body, modal(content, { variant: 'bottom', surface: 'app' }));
+  const m = mountModal(document.body, modal(content, { variant: 'x', surface: 'app' }));
   if (!m) return;
   m.querySelectorAll('[data-break-start-slot]').forEach((node) => node.addEventListener('click', () => {
     const from = node.dataset.breakStartSlot;
@@ -111,7 +111,7 @@ export function openBreakView(breakItem, { onClose = () => {} } = {}) {
         { title: 'Удалить перерыв', interactive: true, data: 'data-break-settings-delete', aria: 'Удалить перерыв' },
       ],
     });
-    const layer = mountModal(document.body, modal(menu, { variant: 'bottom', surface: 'app' }));
+    const layer = mountModal(document.body, modal(menu, { variant: 'x', surface: 'app' }));
     layer?.querySelector('[data-break-settings-delete]')?.addEventListener('click', () => {
       layer.v2Close?.();
       if (!removeJournalBreak(current.id)) return;

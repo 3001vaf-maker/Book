@@ -270,7 +270,7 @@ function openCashCreateMenu(root) {
   const content = actionBlock(actions.join(''));
   const layer = mountModal(document.body, modal(content, {
     title: 'Добавить',
-    variant: 'bottom',
+    variant: 'x',
     surface: 'app',
   }));
   if (!layer) return null;

@@ -292,7 +292,7 @@ function openCancelOperation(root, operationLayer, entries) {
     </div>`;
   const cancelLayer = mountModal(document.body, modal(content, {
     title: 'Отменить операцию',
-    variant: 'bottom',
+    variant: 'x',
     className: 'modal--form-sheet',
     surface: 'app',
   }));
@@ -329,7 +329,7 @@ function openDeleteOperation(root, operationLayer, entries) {
     </div>`;
   const confirmation = mountModal(document.body, modal(content, {
     title: 'Удалить операцию',
-    variant: 'bottom',
+    variant: 'x',
     className: 'modal--form-sheet',
     surface: 'app',
   }));
@@ -708,7 +708,7 @@ function openDDSSettings(root, movements) {
   })).join(''));
   const settings = mountModal(root, modal(content, {
     title: 'Настройки ДДС',
-    variant: 'bottom',
+    variant: 'x',
     surface: 'app',
   }));
   if (!settings) return;
