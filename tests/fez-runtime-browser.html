@@ -24,6 +24,7 @@ import {
   v2Sticker,
   setV2DeckOpen,
 } from '/ui/v2/index.js';
+import { modal, mountModal } from '/ui/modals/index.js';
 
 const result = document.querySelector('#result');
 const failures = [];
@@ -120,6 +121,20 @@ ok(frontWhileFOpen.style.getPropertyValue('--v2-front-drag-x') === '', 'Z moved 
 setV2DeckOpen(app, false);
 firstOwnerCalls = 0;
 await nextFrame();
+
+mark('partial-z-reveal-lock');
+const partialFront = app.querySelector('[data-v2-front]');
+const partialFe = app.querySelector('[data-v2-fe]');
+pointer(edge, 'pointerdown', 12, 300, 40);
+pointer(edge, 'pointermove', 26, 301, 40);
+await nextFrame();
+ok(partialFront.classList.contains('is-dragging'), 'partial Z reveal did not enter drag state');
+ok(!app.classList.contains('is-deck-open'), 'partial Z reveal opened F before threshold');
+ok(getComputedStyle(partialFe).pointerEvents === 'none', 'partially revealed F became interactive before Z committed');
+pointer(edge, 'pointerup', 26, 301, 40);
+await nextFrame();
+ok(!app.classList.contains('is-deck-open'), 'sub-threshold Z gesture committed F');
+ok(!partialFront.classList.contains('is-dragging') && partialFront.style.getPropertyValue('--v2-front-drag-x') === '', 'cancelled Z gesture left a half-open interactive transform');
 
 mark('root-z-to-f');
 pointer(edge, 'pointerdown', 12, 300, 1);
@@ -221,6 +236,39 @@ pointer(edge, 'pointermove', 44, 261, 20);
 pointer(edge, 'pointerup', 44, 261, 20);
 await nextFrame();
 ok(!layer?.isConnected, 'edge swipe did not close top Z2');
+
+mark('z-stack-exclusive');
+const stackZ2 = mountV2ZLayer(app, v2ZLayer('<p>Z2 stack</p>', { className:'runtime-stack-z2' }), { stack:true });
+const stackZ3 = mountV2ZLayer(app, v2ZLayer('<p>Z3 stack</p>', { className:'runtime-stack-z3' }), { stack:true });
+await nextFrame();
+ok(z.inert === true && z.classList.contains('is-v2-obscured'), 'Z1 remained interactive under Z2/Z3');
+ok(stackZ2.inert === true && stackZ2.classList.contains('is-v2-obscured'), 'Z2 remained interactive under Z3');
+ok(stackZ3.inert === false && !stackZ3.classList.contains('is-v2-obscured'), 'top Z3 was incorrectly blocked');
+ok(getComputedStyle(z).pointerEvents === 'none' && getComputedStyle(stackZ2).pointerEvents === 'none', 'obscured Z surfaces still accept pointer interaction');
+stackZ3.v2Close?.();
+await nextFrame();
+ok(stackZ2.inert === false && !stackZ2.classList.contains('is-v2-obscured'), 'closing Z3 did not restore Z2 as sole owner');
+ok(z.inert === true, 'Z1 became interactive while Z2 was still open');
+stackZ2.v2Close?.();
+await nextFrame();
+ok(z.inert === false && !z.classList.contains('is-v2-obscured'), 'closing final Z layer did not restore Z1');
+
+mark('x-modal-exclusive');
+const xModal = mountModal(z, modal('<button type="button">X</button>', { variant:'bottom', title:'X' }));
+await nextFrame();
+const stage = app.querySelector('.v2-app__stage');
+ok(Boolean(xModal?.isConnected), 'X modal did not mount');
+ok(stage.inert === true && app.classList.contains('has-v2-modal'), 'open X did not lock FEZ interaction');
+ok(getComputedStyle(stage).pointerEvents === 'none', 'open X left FEZ pointer interaction enabled');
+const deckWasOpenBeforeBlockedSwipe = app.classList.contains('is-deck-open');
+pointer(edge, 'pointerdown', 10, 260, 51);
+pointer(edge, 'pointermove', 60, 262, 51);
+pointer(edge, 'pointerup', 60, 262, 51);
+await nextFrame();
+ok(app.classList.contains('is-deck-open') === deckWasOpenBeforeBlockedSwipe, 'Z/F state changed while X was open');
+xModal.v2Close?.();
+await nextFrame();
+ok(stage.inert === false && !app.classList.contains('has-v2-modal'), 'closing X did not restore FEZ interaction');
 
 mark('z-layer-replacement');
 const oldLayer = mountV2ZLayer(app, v2ZLayer('<p>old</p>', { className:'runtime-old' }), { stack:true });
