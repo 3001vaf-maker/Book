@@ -9,6 +9,7 @@ import { BusinessStateModule } from './business-state/business-state.module';
 import { TenantDocumentArchiveModule } from './tenant-document-archive/tenant-document-archive.module';
 import { AuxiliaryStateModule } from './auxiliary-state/auxiliary-state.module';
 import { FinanceModule } from './finance/finance.module';
+import { InventoryModule } from './inventory/inventory.module';
 import { NotificationModule } from './notification/notification.module';
 import { CommunicationModule } from './communication/communication.module';
 import { SaasAccessModule } from './saas-access/saas-access.module';
@@ -25,6 +26,7 @@ import { PlatformNoticeModule } from './platform-notice/platform-notice.module';
     TenantDocumentArchiveModule,
     AuxiliaryStateModule,
     FinanceModule,
+    InventoryModule,
     NotificationModule,
     CommunicationModule,
     OnlineBookingModule,
